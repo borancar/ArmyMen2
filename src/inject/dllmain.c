@@ -20,6 +20,7 @@
 #include "trace.h"
 #include "../game/dist.h"
 #include "../game/objtable.h"
+#include "../game/objtype.h"
 #include "../game/rect.h"
 #include "../game/savetag.h"
 
@@ -129,6 +130,7 @@ static void install(void)
     rect_install();
     dist_install();
     objtable_install();
+    objtype_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

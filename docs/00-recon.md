@@ -224,6 +224,41 @@ runs — including the three that were completely dead at the title screen:
 
 Reaching gameplay needs the game driven; no command-line switch does it alone.
 
+## The object type taxonomy
+
+The type at `+0x00` is dispatched through a 9-entry jump table in
+`AddToItemList`, so valid types are 0..8. Four predicates over it, together
+accounting for 148 call sites, narrow the meaning down:
+
+| address | tests | calls in one Boot Camp session |
+|---|---|---|
+| `0x00433860` | types 1, 4 | 750,457 |
+| `0x00457470` | type 2 | 501,957 |
+| `0x00457490` | type 3 | 1,840 |
+| `0x00457420` | types 2, 3, 8 | 62,160,244 |
+
+What is established:
+
+- Types **1 and 4 are items**. Evidenced, not inferred: the functions guarded by
+  that predicate report *"ScriptSetObjBitmap was called with %s which is not an
+  item"* and *"SetObjScriptState was called with %s which is not an item"* when
+  it fails.
+- Types **1, 2, 3, 4 and 8 are army-owned** — they carry their own owner byte at
+  `+0x10` — while **0, 5, 6 and 7 are not**, taking the owner from the global at
+  `0x004F9FDC`.
+- Types **2, 3 and 8 are therefore the owned non-item types**, and `0x00457420`
+  tests exactly that set. They live in `unit.cpp`, immediately after its
+  savegame anchor at `0x0045734D`.
+
+What is **not** established is what 2, 3 and 8 individually mean. The obvious
+guess given `troop.aai` and `vehicle.aai` is troop and vehicle, and the call
+counts are consistent with it — Boot Camp fields infantry and no vehicles, and
+type 2 is tested 273 times more often than type 3. But that is circumstantial:
+the ratio could equally reflect where the predicates are called from rather than
+how many objects of each type exist. The AAI loader passes only filenames and no
+type constants, so nothing pins the mapping down yet, and these are named
+structurally (`ObjIsType2`, `ObjIsType3`) until something does.
+
 ## Geometry primitives, and how the types were pinned down
 
 Three functions sit directly beneath the drawing code and are among the busiest

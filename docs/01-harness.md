@@ -322,6 +322,10 @@ interleave in true order.
 | `0x00427850` | `FirstItem` | **verified** | 178,392 walks |
 | `0x00427880` | `NextItem` | **verified** | 287,032,728 calls; count is exact (see below) |
 | `0x00428590` | `RemoveFromItemList` | installed | **not yet exercised** — nothing is destroyed by moving around |
+| `0x00433860` | `ObjIsItem` | **verified** | 750,457 calls |
+| `0x00457470` | `ObjIsType2` | **verified** | 501,957 calls |
+| `0x00457490` | `ObjIsType3` | **verified** | 1,840 calls |
+| `0x00457420` | `ObjIsTypeIn238` | **verified** | 62,160,244 calls |
 
 `NextItem` has an unusually crisp proof. Across a session it was called
 287,032,728 times against 178,392 walks of a 1,609-entry table, and
