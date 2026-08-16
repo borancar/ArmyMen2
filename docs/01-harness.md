@@ -221,7 +221,19 @@ wait for acknowledgement instead of guessing at timing:
 ```
 key return tap          key down down 500       key a up
 mouse move 40 -20       mouse left tap          state / clear / ping
+counts                  dump <hex addr> [len]
 ```
+
+`dump` hexdumps live memory, bounded to 96 bytes and guarded by
+`IsBadReadPtr`. Sprite and glyph data only exists at runtime, so decoding an
+encoding by hand needs a way to look at the real bytes — this is what settled
+the sprite header and row-table layout.
+
+Two related conveniences: the argument tracer now prints a pointer's value *and*
+its text when the target looks like a string, rather than replacing one with the
+other (showing only the text hid the address, which is exactly what you need in
+order to dump it); and `make run WINEDBG=+seh` overrides the wine debug channel,
+which is otherwise pinned to `-all`.
 
 `tap` is a timed hold rather than an instant press-release pair, because the
 game polls once per frame and an immediate release would fall between two polls

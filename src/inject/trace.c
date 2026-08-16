@@ -111,12 +111,14 @@ static void __cdecl trace_enter(uint32_t id, uint32_t *args)
 
         if (i)
             at += (size_t)_snprintf(buf + at, sizeof buf - at, ", ");
+        /* Always show the value. A pointer whose target happens to be printable
+         * is still a pointer, and hiding it behind the text loses the one thing
+         * needed to go and look at the memory. */
+        at += (size_t)_snprintf(buf + at, sizeof buf - at, "%08x", v);
         if (s) {
             char esc[128];
             escape(esc, sizeof esc, s);
-            at += (size_t)_snprintf(buf + at, sizeof buf - at, "\"%s\"", esc);
-        } else {
-            at += (size_t)_snprintf(buf + at, sizeof buf - at, "%08x", v);
+            at += (size_t)_snprintf(buf + at, sizeof buf - at, "=\"%s\"", esc);
         }
     }
     _snprintf(buf + at, sizeof buf - at, ")");

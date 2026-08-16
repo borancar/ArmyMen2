@@ -419,6 +419,32 @@ runs carry a length and no pixels at all. That asymmetry is the clearest
 evidence that fonts and sprites use related but **distinct** encodings, and it
 is why one font can be drawn in any colour.
 
+#### The encoding, read off a live sprite
+
+Confirmed against real memory rather than inferred. Captured with the control
+socket's `dump` command from a sprite the game passed to `0x0041C2B0`
+(85x80, unclipped, at `0x02C7CB78`):
+
+```
++0    5500        width  = 0x0055 = 85
++2    5000        height = 0x0050 = 80
++4    a400 a600 a800 aa00 ac00 ae00 b000 b200 c400 ...   row offsets
+```
+
+`row[0] = 0x00A4 = 164`, and `4 + 80*2 = 164` exactly — the first row's data
+begins immediately after the table, so the header and stride are settled.
+Decoding the rows:
+
+```
+row 0..6  55 00                          skip 85 (the full width), run 0
+row 7     11 0e  47 3b 5f 5f 4e 33 ...   skip 17, run 14, then 14 pixel bytes
+```
+
+Seven blank rows at the top, then the sprite starts — and 17 + 14 = 31 with the
+row spanning 18 bytes, which is skip + run + 14 pixels + one more pair. So the
+stream really is alternating skip/run with the run followed by that many pixel
+bytes, as implemented.
+
 Two routines reached from the same dispatcher are *not* part of this family:
 `0x0041C480` (656 bytes, unread) and `0x00445EB0`, which is a fallback chain
 that calls `IDirectDrawSurface::Restore` through the sprite's own surface.

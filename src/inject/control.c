@@ -80,6 +80,27 @@ static void handle_line(SOCKET s, char *line)
         reply(s, "ok cleared");
         return;
     }
+    /* `dump <hex addr> [len]` -- read the game's memory. Sprite and glyph data
+     * only exists at runtime, so decoding an encoding by hand needs a way to
+     * look at the real bytes. Bounded well under the reply buffer. */
+    if (!strcmp(argv[0], "dump") && argc >= 2) {
+        char           out[MAX_LINE];
+        const uint8_t *p = (const uint8_t *)(uintptr_t)strtoul(argv[1], NULL, 16);
+        uint32_t       n = (argc >= 3) ? (uint32_t)strtoul(argv[2], NULL, 10) : 32;
+        uint32_t       i, at = 0;
+
+        if (n == 0 || n > 96)
+            n = 96;
+        if (IsBadReadPtr(p, n)) {
+            reply(s, "err %p not readable for %u bytes", (void *)p, n);
+            return;
+        }
+        for (i = 0; i < n && at + 3 < sizeof out; i++)
+            at += (uint32_t)_snprintf(out + at, sizeof out - at, "%02x", p[i]);
+        out[at] = '\0';
+        reply(s, "ok %p %s", (void *)p, out);
+        return;
+    }
     if (!strcmp(argv[0], "counts")) {
         char buf[MAX_LINE - 8];
         trace_describe(buf, sizeof buf);

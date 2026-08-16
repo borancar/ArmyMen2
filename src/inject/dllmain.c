@@ -112,12 +112,10 @@ static void observe_hot_functions(void)
     if (!opt || *opt != '1')
         return;
 
-    /* DrawText is patched now, so its count comes from the patch layer.
-     * BlitGlyph is not: it is __fastcall, and the stub only reads stack
-     * dwords, so its destination x/y in ecx/edx never appear here. */
-    OBSERVE(0x0041C710u, "BlitGlyph",   6, sites_0041c710);
-    OBSERVE(0x00445FF0u, "draw_445ff0", 6, sites_00445ff0);
-    OBSERVE(0x00446AB0u, "draw_446ab0", 6, sites_00446ab0);
+    /* BlitCopy16 is deliberately left unpatched -- its reconstruction
+     * crashed, so we observe the original to capture a real sprite
+     * pointer and decode the encoding by hand via the `dump` command. */
+    OBSERVE(0x0041C2B0u, "BlitCopy16", 6, sites_0041c2b0);
 }
 
 static void install(void)

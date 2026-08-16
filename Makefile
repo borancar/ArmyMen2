@@ -94,6 +94,7 @@ install-hook: all
 # you. Runs on $DISPLAY, so set DISPLAY=:99 for a headless Xvfb run.
 
 ARGS    ?= -nointro -dbg
+WINEDBG ?= -all
 GAMELOG ?= 1
 TRACE   ?= 0
 OBSERVE ?= 0
@@ -174,7 +175,7 @@ endif
 
 run: isolate-prefix install-hook
 	@echo "run: ID=$(ID) port=$(CTLPORT) desktop=$(DESKNAME) log=$(LOGFILE) prefix=$(PREFIX)"
-	WINEPREFIX="$(PREFIX)" WINEDEBUG=-all \
+	WINEPREFIX="$(PREFIX)" WINEDEBUG=$(WINEDBG) \
 	    AM2_GAMELOG=$(GAMELOG) AM2_TRACE=$(TRACE) AM2_OBSERVE=$(OBSERVE) \
 	    AM2_CONTROL=$(CONTROL) AM2_CTL_PORT=$(CTLPORT) AM2_LOG=$(LOGFILE) \
 	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) \
@@ -182,7 +183,7 @@ run: isolate-prefix install-hook
 
 # Unpatched, straight from the GOG install -- the A/B reference.
 run-stock:
-	WINEPREFIX="$(PREFIX)" WINEDEBUG=-all \
+	WINEPREFIX="$(PREFIX)" WINEDEBUG=$(WINEDBG) \
 	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) "$(GAMEEXE)"
 
 clean:
