@@ -415,6 +415,20 @@ been documented as a DirectDraw surface outright, from having seen only the
 hardware path -- the third time in this file a field was named by generalising
 from a single call site, after `serial`/`stamp` and `TEXT_CLIP`/`SCREEN_CLIP`.
 
+The overlay layer at `+0x30` is not a sprite blit at all. `BlitOverlay`
+(`0x0041C480`) reads **no source pixels**: the RLE stream supplies coverage
+only, and every covered *destination* byte is passed through the table at
+`0x004FE1A4`, which the dispatcher sets from the sprite's `+0x38` before
+calling. That is how the game does shadows and see-through effects -- by
+transforming what is already on screen. It is 656 bytes because it aligns the
+destination to a dword and transforms four pixels at a time with separate
+lead-in cases; only the effect is reproduced, not the unrolling, since a pure
+per-byte mapping of the destination gives an identical result.
+
+That also puts the overlay on the *font* side of the encoding divide: like
+`BlitGlyph` it never advances the source pointer past a run, because there are
+no pixel bytes there to skip.
+
 Within the software arm, `+0x08` selects the blitter: format 1 uses the 32-bit
 offset variant, formats 2 and 3 the 16-bit ones, remapping through the table at
 `+0x34` when there is one. Format 3 remaps whenever a table exists; format 2

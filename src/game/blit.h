@@ -41,6 +41,12 @@ void __fastcall BlitCopy32(int32_t x, int32_t y, const uint8_t *data,
 void __fastcall BlitRemap16(int32_t x, int32_t y, const uint8_t *data,
                             AM2_Rect src, const uint8_t *lut);
 
+/* 0x0041C480. Transforms the destination through the table at 0x004FE1A4
+ * rather than drawing source pixels -- the shadow and translucency layer.
+ * Five stack dwords like the copy variants. */
+void __fastcall BlitOverlay(int32_t x, int32_t y, const uint8_t *data,
+                            AM2_Rect src);
+
 int blit_install(void);
 
 #endif /* AM2_BLIT_H */

@@ -337,6 +337,7 @@ interleave in true order.
 | `0x0041B9A0` | `LockSurface` | **verified** | 919,302 calls |
 | `0x0041BA40` | `UnlockSurface` | **verified** | 744,597 calls |
 | `0x00446070` | `DrawSpriteClipped` | **verified** | 1,158,670 calls |
+| `0x0041C480` | `BlitOverlay` | **verified** | reached; see the note below |
 
 Note that `BlitCopy16/32` and `BlitRemap16` now report **0** calls. That is not a
 regression: their only call sites were the dispatcher, which is now ours and
@@ -344,6 +345,15 @@ calls them directly as C functions rather than through the patched entry points.
 The same thing happened to `FindSlot` and to `BlitGlyph`'s share of `DrawText`.
 A reconstructed function's trace count only ever measures the *game's* remaining
 call sites, and reaches zero once its last caller is reconstructed.
+
+That creates a real blind spot, and `BlitOverlay` hit it: a count of 0 means
+either "bypassed by a reconstructed caller" or "never called at all", and the
+counter cannot tell them apart. Shadows on screen were not proof either, since
+they could have been baked into the base sprites. Settling it took a temporary
+probe inside the fill, which reported the path reached with a live table at
+`0x00502BDC` and pixel counts of 1, 1 and 2 -- thin shadow edges, exactly as
+expected. When a reconstructed function's callers are also reconstructed, reach
+for a probe rather than reading the counter.
 
 ### Use the real SDK headers, do not restate them
 

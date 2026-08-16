@@ -42,13 +42,6 @@
 #define g_overlayPalette (*(void **)(uintptr_t)ADDR_OVERLAY_PALETTE)
 #define g_defaultPalette (*(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE)
 
-/* 0x0041C480, the overlay blitter: same five-dword shape as BlitCopy16
- * (`ret 0x14`) and not yet reconstructed, so it is called in place. */
-typedef void (__fastcall *am2_blit_overlay_fn)(int32_t x, int32_t y,
-                                               const uint8_t *data,
-                                               AM2_Rect src);
-#define orig_blit_overlay (*(am2_blit_overlay_fn)ADDR_BLIT_OVERLAY)
-
 /* 0x00445EB0, the surface-lost recovery chain: calls Restore through the
  * sprite's own surface and falls back through several drawing paths. Not
  * reconstructed, so it is called in place. */
@@ -127,7 +120,7 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
             return;
 
         g_overlayPalette = spr->palette ? spr->palette : g_defaultPalette;
-        orig_blit_overlay(x, y, spr->overlay, *clipped);
+        BlitOverlay(x, y, spr->overlay, *clipped);
         return;
     }
 
