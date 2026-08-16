@@ -317,6 +317,7 @@ interleave in true order.
 | `0x0042E1F0` | `PointInRect` | **verified** | 15,473,860 calls; rendering pixel-correct |
 | `0x0042E220` | `ClipRect` | **verified** | 5,146,540 calls; sprites and terrain correct |
 | `0x00446930` | `DrawText` | **verified** | every string on screen renders correctly |
+| `0x0041C710` | `BlitGlyph` | **verified** | 874,768 calls; every text pixel written by our decoder |
 | `0x00433810` | `PackKey` | **verified** | 3,986 calls |
 | `0x00433830` | `KeyFieldA` | **verified** | 802 calls |
 | `0x00433840` | `KeyFieldB` | **verified** | 80 calls |

@@ -341,6 +341,31 @@ invisible to the argument tracer, which only reads stack dwords, and is worth
 remembering: a traced argument list that starts at what looks like the second or
 third parameter is a sign of a register calling convention.
 
+### BlitGlyph and the glyph format
+
+`BlitGlyph` (`0x0041C710`, 874,768 calls a session) completes the text path.
+Each glyph row is a stream of alternating byte counts — pixels to leave alone,
+then pixels to fill — and the runs carry **coverage only, never colour**: the
+fill uses the caller's colour byte via `rep stosb`.
+
+That single fact explains the design above it. One font can be drawn in any
+palette entry, which is exactly what `DrawText`'s `^` colour escape needs, and
+it is why glyph data is so compact.
+
+```
++0            uint16   width
++2            uint16   height
++4            uint16   rowOffset[height]   byte offset of each row's stream
+rowOffset[r]  uint8    alternating skip and run lengths
+```
+
+Horizontal clipping runs against `src.left`/`src.right` in glyph space while the
+destination pointer advances in step, so the pointer effectively starts at the
+pixel for `src.left`. Vertical clipping is simply which rows get walked. The
+framebuffer is 8-bit paletted, base at `0x004FE1A8`, pitch at `0x00502AD0` —
+which sits immediately below `ORIGIN_SEL_B`, so these are probably fields of one
+screen descriptor rather than loose globals.
+
 ### The packed map key
 
 A 26-bit key built by `PackKey` (`0x00433810`) and taken apart by three readers:

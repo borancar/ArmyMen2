@@ -43,6 +43,11 @@
 #define ADDR_ORIGIN_DX      0x00485330u  /* int32_t */
 #define ADDR_ORIGIN_DY      0x00485334u  /* int32_t */
 
+/* Framebuffer description. The pitch sits immediately below ORIGIN_SEL_B, so
+ * these are probably fields of one screen descriptor rather than loose globals. */
+#define ADDR_SCREEN_PITCH   0x00502AD0u  /* int32_t, bytes per scanline */
+#define ADDR_FRAMEBUFFER    0x004FE1A8u  /* uint8_t *, 8-bit paletted surface */
+
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u

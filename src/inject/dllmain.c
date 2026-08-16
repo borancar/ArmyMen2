@@ -18,6 +18,7 @@
 #include "patch.h"
 #include "sites.h"
 #include "trace.h"
+#include "../game/blit.h"
 #include "../game/dist.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
@@ -137,6 +138,7 @@ static void install(void)
     objtype_install();
     packkey_install();
     text_install();
+    blit_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

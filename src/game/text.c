@@ -30,6 +30,7 @@
  */
 
 #include "text.h"
+#include "blit.h"
 #include "rect.h"
 #include "../inject/patch.h"
 
@@ -44,16 +45,6 @@
 #define g_originSelB  (*(int32_t *)(uintptr_t)ADDR_ORIGIN_SEL_B)
 #define g_originDX    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
 #define g_originDY    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
-
-/* 0x0041C710 is __fastcall: the destination x and y arrive in ecx and edx,
- * everything else on the stack, with the clipped source rectangle passed BY
- * VALUE. This is why the argument tracer -- which only reads stack dwords --
- * showed six arguments starting at the pixel pointer and never saw the
- * destination at all. */
-typedef void (__fastcall *am2_blit_glyph_fn)(int32_t x, int32_t y,
-                                             const void *pixels,
-                                             AM2_Rect src, int32_t colour);
-#define orig_blit_glyph (*(am2_blit_glyph_fn)ADDR_BLIT_GLYPH)
 
 void __cdecl DrawText(int32_t x, int32_t y, const char *str,
                       int32_t font, int32_t arg4, int32_t colour)
@@ -108,7 +99,12 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
             dstY += g_originDY;
         }
 
-        orig_blit_glyph(dstX, dstY, glyph, out, colour);
+        /* Our own BlitGlyph, called directly. Going through 0x0041C710 would
+         * work -- it holds a jmp back into this DLL -- but it would bounce
+         * reconstruction through the original image for no reason. The side
+         * effect is that BlitGlyph's traced call count now only counts the
+         * game's own call sites, as with FindSlot. */
+        BlitGlyph(dstX, dstY, glyph, out, colour);
 
         penX += gw;
     }
