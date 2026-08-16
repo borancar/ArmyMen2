@@ -338,6 +338,7 @@ interleave in true order.
 | `0x0041BA40` | `UnlockSurface` | **verified** | 744,597 calls |
 | `0x00446070` | `DrawSpriteClipped` | **verified** | 1,158,670 calls |
 | `0x0041C480` | `BlitOverlay` | **verified** | reached; see the note below |
+| `0x004464C0` | `EncodeGlyph` | **verified** | 672 glyphs encoded; round-trips through BlitGlyph |
 
 Note that `BlitCopy16/32` and `BlitRemap16` now report **0** calls. That is not a
 regression: their only call sites were the dispatcher, which is now ours and

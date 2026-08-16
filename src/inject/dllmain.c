@@ -20,6 +20,7 @@
 #include "trace.h"
 #include "../game/blit.h"
 #include "../game/dist.h"
+#include "../game/font.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
@@ -80,6 +81,8 @@ static const struct {
       { 0x53, 0x55, 0x8B, 0x6C, 0x24, 0x0C, 0x56, 0x85 }, 8 },
     { ADDR_BLIT_OVERLAY, "BlitOverlay",
       { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x14, 0x53, 0x56 }, 8 },
+    { ADDR_ENCODE_GLYPH, "EncodeGlyph",
+      { 0x83, 0xEC, 0x0C, 0x8B, 0x44, 0x24, 0x10, 0x66 }, 8 },
 };
 
 static int verify_image(void)
@@ -146,6 +149,7 @@ static void install(void)
     objtype_install();
     packkey_install();
     text_install();
+    font_install();
     blit_install();
     sprite_install();
     surface_install();

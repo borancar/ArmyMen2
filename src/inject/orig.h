@@ -31,6 +31,9 @@
 
 /* Text rendering. */
 #define ADDR_DRAW_TEXT      0x00446930u  /* void(x,y,str,font,?,colour) */
+/* Runtime font generation: GDI-render a character, then RLE it. */
+#define ADDR_ENCODE_GLYPH   0x004464C0u  /* uint32_t(uint8_t*,int32,int32,int32) */
+#define ADDR_RENDER_GLYPH   0x004465E0u  /* the GDI half, not reconstructed */
 #define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[], indexed ch + font*262 */
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t*[], indexed font*133 */
 #define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- text and sprites share it */

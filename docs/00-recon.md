@@ -441,6 +441,43 @@ leaving `g_frameBuf` and `g_pitch` pointing at the old bits, where
 `UnlockSurface` clears all three. The colour-key flag is chosen from `flags & 1`
 -- set means `DDBLTFAST_WAIT` alone, clear means `WAIT | SRCCOLORKEY`.
 
+### Fonts are generated at runtime, not shipped
+
+The game ships no RLE fonts. It builds them at startup: `0x004465E0` takes a
+character, draws it into a scratch DirectDraw surface with GDI -- `GetDC`
+(vtable[17]), `SelectObject`, `SetBkMode`, `SetTextColor`, `wsprintfA` with
+`"%c"`, `GetTextExtentPoint32A`, `TextOutA`, `ReleaseDC` (vtable[26]) -- then
+locks the surface and hands it to `EncodeGlyph` (`0x004464C0`), which run-length
+encodes the pixels into the glyph format and wipes the 25x25 scratch square
+ready for the next character. That is where the tables at `0x006598D4` and
+`0x00659AD4` come from.
+
+`EncodeGlyph` is the important half, because it defines the glyph format from
+the **writing** side and so confirms independently what `BlitGlyph` was
+reverse-engineered to read:
+
+```c
+out[0] = width;  out[2] = height;      /* uint16 header */
+rowTab = out + 4;                      /* uint16 per row */
+w      = out + 4 + height * 2;         /* RLE begins right after the table */
+key    = framebuffer[pitch * 100];     /* background sampled from the surface */
+```
+
+Runs carry counts only and never pixel values -- which is exactly why
+`BlitGlyph` never advances its source pointer past a run, and why one font can
+be drawn in any colour. Two details: the background is *sampled*, not a
+constant, so whatever the surface was cleared to counts as transparent; and runs
+are capped at 254, so a longer span is emitted as several pairs with zero-length
+partners between them.
+
+Verified as a round trip rather than in isolation. Under tracing the first
+glyphs encode as width 3, 3, 4, 7, 7, 11 at a constant height of 14, and the
+caller's remaining-space counter falls by exactly the number of bytes the output
+pointer advances -- `0x8000` to `0x7FC4` for the first, which is 60 bytes, and
+60 is precisely `4 + 14*2` of header and table plus `14*2` of pairs for a
+3-wide glyph needing one pair per row. Our encoder writes the tables our decoder
+then reads 1.1 million times a session, and every glyph on screen is legible.
+
 ### The lock/unlock bracket
 
 `LockSurface` (`0x0041B9A0`, 38 call sites) and `UnlockSurface` (`0x0041BA40`,
