@@ -334,6 +334,25 @@ interleave in true order.
 | `0x0041C2B0` | `BlitCopy16` | **verified** | 72 calls |
 | `0x0041C1C0` | `BlitCopy32` | **verified** | 508 calls |
 | `0x0041C3A0` | `BlitRemap16` | **verified** | 441 calls |
+| `0x0041B9A0` | `LockSurface` | **verified** | 919,302 calls |
+| `0x0041BA40` | `UnlockSurface` | **verified** | 744,597 calls |
+
+### Use the real SDK headers, do not restate them
+
+`surface.c` gets `DDSURFACEDESC` and the `IDirectDrawSurface` vtable from
+`ddraw.h`, not from hand-written copies. The first version of it declared both
+by hand; every value happened to be right, but re-typing a public API's layout
+is duplication that can only rot. The SDK confirms all of it anyway --
+`sizeof(DDSURFACEDESC)` is 108 = the `0x6C` the game hardcodes, `lPitch` at
+`0x10`, `lpSurface` at `0x24`, `DDLOCK_WAIT` is 1, and `DDERR_SURFACELOST` is
+`0x887601C2`.
+
+One trap that follows: `ddraw.h` pulls in `windows.h`, and `winuser.h` defines
+`DrawText` as a macro expanding to `DrawTextA`. That collides with our
+reconstructed `DrawText` the moment both headers meet. `surface.h` therefore
+forward-declares `struct IDirectDrawSurface` and keeps the DirectDraw includes
+inside `surface.c`. Expect the same clash for any reconstruction that reuses a
+Win32 name.
 
 ### Check `ret N` before assuming a shared signature
 

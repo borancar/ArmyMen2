@@ -26,6 +26,7 @@
 #include "../game/rect.h"
 #include "../game/savetag.h"
 #include "../game/sprite.h"
+#include "../game/surface.h"
 #include "../game/text.h"
 
 #include <windows.h>
@@ -71,6 +72,10 @@ static const struct {
       { 0x8B, 0x44, 0x24, 0x0C, 0x8B, 0x4C, 0x24, 0x04 }, 8 },
     { ADDR_DRAW_TEXT, "DrawText",
       { 0xA1, 0x80, 0xDF, 0x4F, 0x00, 0x83, 0xEC, 0x2C }, 8 },
+    { ADDR_LOCK_SURFACE, "LockSurface",
+      { 0xA1, 0x80, 0xDF, 0x4F, 0x00, 0x83, 0xEC, 0x6C }, 8 },
+    { ADDR_UNLOCK_SURFACE, "UnlockSurface",
+      { 0xA1, 0x80, 0xDF, 0x4F, 0x00, 0x85, 0xC0, 0x74 }, 8 },
 };
 
 static int verify_image(void)
@@ -139,6 +144,7 @@ static void install(void)
     text_install();
     blit_install();
     sprite_install();
+    surface_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

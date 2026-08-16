@@ -49,6 +49,7 @@
  * DirectDraw owns and may move or lose between frames.
  */
 #define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
+#define ADDR_UNLOCK_SURFACE 0x0041BA40u  /* int32_t(void) */
 #define ADDR_SURFACE_LOCKED 0x004FDF80u  /* int32_t; non-zero while a lock is held */
 #define ADDR_LOCKED_SURFACE 0x00507128u  /* IDirectDrawSurface *, currently locked */
 #define ADDR_PRIMARY_SURFACE 0x00502AD4u /* IDirectDrawSurface *, Restore target */

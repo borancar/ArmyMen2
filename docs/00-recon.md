@@ -397,6 +397,17 @@ This corrected three names that had been guessed from the text path alone:
 is a far more sensible thing for a renderer to do than what the original naming
 implied.
 
+### The lock/unlock bracket
+
+`LockSurface` (`0x0041B9A0`, 38 call sites) and `UnlockSurface` (`0x0041BA40`,
+34) bracket every drawing operation; everything else reconstructed in the 2D
+pipeline runs between them. Measured over a Boot Camp session with movement:
+919,302 locks against 744,597 unlocks. The 174,705 difference is the trivial
+re-lock path -- asking for the surface already held returns success immediately
+without a matching unlock, which is what nested drawing calls produce. No call
+ever tried to lock a *different* surface while one was held, so the
+"another surface already locked!" complaint never fired.
+
 ### The RLE blitter family
 
 Four routines, and in the original they are the same function four times over:
