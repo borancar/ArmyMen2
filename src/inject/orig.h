@@ -25,6 +25,14 @@
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
 #define ADDR_RECT_SET       0x0042E1C0u  /* void(int32_t*,int32_t,int32_t,int32_t,int32_t) */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
+#define ADDR_FIND_SLOT      0x004277A0u  /* int32_t(uint32_t uid, int32_t *insert_at) */
+#define ADDR_LOOKUP_BY_UID  0x00427820u  /* void *(uint32_t uid) */
+
+/* The global object registry: an array of 12-byte {uid, obj, serial} records
+ * kept sorted by uid. See src/game/objtable.c. */
+#define ADDR_OBJ_TABLE      0x00514F0Cu  /* AM2_ObjEntry * */
+#define ADDR_OBJ_COUNT      0x00514F04u  /* int32_t */
+#define ADDR_OBJ_CAPACITY   0x00514F00u  /* int32_t */
 
 /* Statically linked MSVC 6 CRT */
 #define ADDR_FREAD          0x004645C1u  /* size_t(void*,size_t,size_t,FILE*) */

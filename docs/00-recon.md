@@ -213,7 +213,7 @@ runs — including the three that were completely dead at the title screen:
 
 | function | title | gameplay | identification |
 |---|---|---|---|
-| `0x00427820` | 0 | **3,098** | lookup by ID: a finder at `0x004277A0` returns an index into a 12-byte-record table at `0x00514F0C`, returning the field at `+4` |
+| `0x00427820` | 0 | **3,098** | `LookupByUID` — reconstructed; see the object registry below |
 | `0x0042DDE0` | — | 369 | `ApproxDist` — reconstructed |
 | `0x0040C040` | **0** | 35 | audio |
 | `0x0040F560` | — | 23 | audio |
@@ -223,6 +223,43 @@ runs — including the three that were completely dead at the title screen:
 | `0x0042A7B0` | **0** | 6 | item |
 
 Reaching gameplay needs the game driven; no command-line switch does it alone.
+
+## The global object registry
+
+The first real data structure recovered. Every gameplay subsystem addresses
+objects by a 32-bit UID — the recovered debug messages are full of `uid=%x` for
+items, units, vehicles and events — and this table turns one back into a
+pointer. It is by a wide margin the hottest thing in the engine.
+
+Records are 12 bytes, identified by the `lea r,[i+i*2]` then `*4` addressing
+used at every access site:
+
+| offset | type | meaning |
+|---|---|---|
+| `+0` | `uint32_t` | uid — the search key, kept sorted ascending |
+| `+4` | `void *` | the object; may be NULL |
+| `+8` | `uint32_t` | serial, stamped from the counter at `0x0051308C` |
+
+Supporting globals, each confirmed by a second independent use:
+
+| address | meaning | confirmed by |
+|---|---|---|
+| `0x00514F0C` | table base | nulled with the count on reset at `0x0042949E` |
+| `0x00514F04` | entry count | zeroed on the same reset |
+| `0x00514F00` | capacity | grown in steps of 100 at `0x00429879` |
+
+`FindSlot` (`0x004277A0`) is a binary search returning the index, or `-1` with
+the insertion position written through an out-param, so callers that are
+inserting need not search twice. It has three distinct not-found exits
+depending on where the search landed. UIDs are compared with unsigned branches,
+so the key is unsigned even though the index arithmetic is signed.
+
+`LookupByUID` (`0x00427820`) wraps it, and passes the address of its *own*
+argument slot as the out-param — one stack dword serving as both input and
+output. That is safe because `FindSlot` reads the key into a register before it
+ever writes through the pointer. `CheckSaveTag` uses the same trick with its
+`FILE *` argument, so it appears to be a habit of this codebase rather than a
+one-off.
 
 ## Toolchain constraints
 

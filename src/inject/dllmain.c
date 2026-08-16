@@ -19,6 +19,7 @@
 #include "sites.h"
 #include "trace.h"
 #include "../game/dist.h"
+#include "../game/objtable.h"
 #include "../game/rect.h"
 #include "../game/savetag.h"
 
@@ -45,6 +46,10 @@ static const struct {
       { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x4C, 0x24, 0x08 }, 8 },
     { ADDR_APPROX_DIST, "ApproxDist",
       { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x54, 0x24, 0x08 }, 8 },
+    { ADDR_FIND_SLOT, "FindSlot",
+      { 0x53, 0x8B, 0x1D, 0x0C, 0x4F, 0x51, 0x00 }, 7 },
+    { ADDR_LOOKUP_BY_UID, "LookupByUID",
+      { 0x8B, 0x4C, 0x24, 0x04, 0x8D, 0x44, 0x24, 0x04 }, 8 },
 };
 
 static int verify_image(void)
@@ -111,6 +116,7 @@ static void install(void)
     savetag_install();
     rect_install();
     dist_install();
+    objtable_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

@@ -314,6 +314,8 @@ interleave in true order.
 | `0x0042E1C0` | `RectSet` | **verified** | 161,955 calls; UI renders correctly |
 | `0x0042DDE0` | `ApproxDist` | **verified** | 1,721 calls in gameplay |
 | `0x004235D0` | `CheckSaveTag` | **verified** | all 15 call sites hit, 317 items loaded, 0 errors |
+| `0x004277A0` | `FindSlot` | **verified** | binary search over the object registry |
+| `0x00427820` | `LookupByUID` | **verified** | 536,581 calls during Boot Camp movement |
 
 ### How CheckSaveTag was finally verified
 
