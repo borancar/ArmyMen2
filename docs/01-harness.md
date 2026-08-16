@@ -315,7 +315,8 @@ interleave in true order.
 | `0x0042DDE0` | `ApproxDist` | **verified** | 1,721 calls in gameplay |
 | `0x004235D0` | `CheckSaveTag` | **verified** | all 15 call sites hit, 317 items loaded, 0 errors |
 | `0x004277A0` | `FindSlot` | **verified** | binary search over the object registry |
-| `0x00427820` | `LookupByUID` | **verified** | 536,581 calls during Boot Camp movement |
+| `0x00427820` | `LookupByUID` | **verified** | 557,800 calls during Boot Camp movement |
+| `0x00429740` | `AddToItemList` | **verified** | 1,609 registrations, all resolved by our own lookup |
 
 ### How CheckSaveTag was finally verified
 

@@ -34,6 +34,20 @@
 #define ADDR_OBJ_COUNT      0x00514F04u  /* int32_t */
 #define ADDR_OBJ_CAPACITY   0x00514F00u  /* int32_t */
 
+#define ADDR_ADD_TO_ITEM_LIST 0x00429740u /* uint32_t(AM2_Object*, uint32_t) */
+
+/* A UID is (owner << 29) | counter, so eight owners each with a 29-bit
+ * counter. These are the per-owner counters, indexed 0..7. */
+#define ADDR_UID_COUNTERS   0x00511DE0u  /* uint32_t[8] */
+/* Owner used for the object types that do not carry their own. */
+#define ADDR_DEFAULT_OWNER  0x004F9FDCu  /* uint32_t */
+/* Non-zero enables the AddToItemList commentary. */
+#define ADDR_DEBUG_ITEMLIST 0x004FD73Cu  /* int32_t */
+
+/* More of the statically linked MSVC 6 CRT. */
+#define ADDR_REALLOC        0x004646D8u  /* void *(void*, size_t) */
+#define ADDR_MEMMOVE        0x00465710u  /* void *(void*, const void*, size_t) */
+
 /* Statically linked MSVC 6 CRT */
 #define ADDR_FREAD          0x004645C1u  /* size_t(void*,size_t,size_t,FILE*) */
 
@@ -47,7 +61,14 @@ typedef size_t (__cdecl *am2_fread_fn)(void *buf, size_t size, size_t count,
                                        am2_FILE *fp);
 typedef void   (__cdecl *am2_log_fn)(const char *fmt, ...);
 
-#define orig_fread (*(am2_fread_fn)ADDR_FREAD)
-#define orig_log   (*(am2_log_fn)ADDR_LOG)
+typedef void *(__cdecl *am2_realloc_fn)(void *p, size_t n);
+typedef void *(__cdecl *am2_memmove_fn)(void *dst, const void *src, size_t n);
+
+#define orig_fread   (*(am2_fread_fn)ADDR_FREAD)
+#define orig_log     (*(am2_log_fn)ADDR_LOG)
+/* The object table was allocated by the game's CRT, so it must be grown by the
+ * game's CRT -- our msvcrt has a different heap entirely. */
+#define orig_realloc (*(am2_realloc_fn)ADDR_REALLOC)
+#define orig_memmove (*(am2_memmove_fn)ADDR_MEMMOVE)
 
 #endif /* AM2_ORIG_H */

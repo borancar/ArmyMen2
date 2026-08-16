@@ -80,11 +80,118 @@ void *__cdecl LookupByUID(uint32_t uid)
     return g_objTable[i].obj;
 }
 
+/* The records must stay exactly 12 bytes or every index computation above is
+ * wrong. Checked at compile time rather than trusted. */
+typedef char am2_objentry_is_12_bytes[(sizeof(AM2_ObjEntry) == 12) ? 1 : -1];
+
+/* AddToItemList -- reconstructed from 0x00429740.
+ *
+ * Registers an object and returns its UID, allocating one when `uid` is 0.
+ * A UID is (owner << 29) | counter, giving eight owners with a 29-bit counter
+ * each, kept in the per-owner array at 0x00511DE0 and starting at 1000.
+ *
+ * Which field supplies the owner depends on the object's type, dispatched
+ * through a 9-entry jump table at 0x0042991C: types 0, 5, 6 and 7 take it from
+ * the global at 0x004F9FDC, everything else from the object's own byte at
+ * +0x10.
+ */
+uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
+{
+    uint32_t *counter;
+    uint32_t  owner;
+    int32_t   pos = 0;
+
+    if (uid == 0) {
+        uint32_t src;
+
+        switch (obj->type) {
+        case 0: case 5: case 6: case 7:
+            src = g_defaultOwner;
+            break;
+        default:                    /* 1-4, 8, and the >8 fall-through */
+            src = (uint32_t)(int32_t)obj->owner;
+            break;
+        }
+        owner   = src & 7;
+        counter = &g_uidCounter[owner];
+        /* The original shifts the unmasked value; only three bits survive, so
+         * this matches. */
+        uid = (src << AM2_UID_OWNER_SHIFT) | *counter;
+        (*counter)++;
+    } else {
+        uint32_t next, need;
+
+        owner   = (uint32_t)(uint8_t)obj->owner & 7;
+        counter = &g_uidCounter[owner];
+
+        if (g_debugItemList)
+            orig_log("AddToItemList: newuid=%x, ownerindex=%d, gCurrentUID=%x\n",
+                     uid, owner, *counter);
+
+        /* Keep the counter ahead of any UID handed to us. */
+        next = *counter + 1;
+        need = (uid & AM2_UID_COUNTER_MASK) + 1;
+        *counter = (next > need) ? next : need;
+    }
+
+    if (*counter > AM2_UID_COUNTER_MAX) {
+        orig_log("overflow!\n");
+        *counter = AM2_UID_COUNTER_MIN;
+
+        /* Probe forward for a counter value whose UID is not already taken.
+         *
+         * Faithfully reproduced, including its defect: the free UID is built
+         * into a different register than the one the insert below uses, so the
+         * search advances the counter and is otherwise discarded -- the UID
+         * actually registered is still the one computed before the overflow.
+         * Unreachable in practice (it needs 2^29 objects for one owner), which
+         * is presumably why it was never noticed. Not fixed here: matching the
+         * original's behaviour matters more than its intent.
+         */
+        for (;;) {
+            uint32_t probe = ((uint32_t)(int32_t)obj->owner << AM2_UID_OWNER_SHIFT)
+                           | *counter;
+            int32_t i = FindSlot(probe, &pos);
+
+            if (i < 0 || g_objTable[i].obj == 0)
+                break;
+            orig_log("searching for free uid!\n");
+            (*counter)++;
+        }
+    }
+
+    obj->uid = uid;
+
+    /* Return value ignored by the original: it only wants the insertion point.
+     * Note FindSlot writes *pos only when it returns -1, so registering a UID
+     * that is already present would insert at a stale position. Callers are
+     * expected to supply fresh UIDs. */
+    FindSlot(uid, &pos);
+
+    if (g_objCount >= g_objCap) {
+        g_objCap += 100;
+        g_objTable = (AM2_ObjEntry *)orig_realloc(
+            g_objTable, (size_t)g_objCap * sizeof(AM2_ObjEntry));
+    }
+
+    if (g_objCount - pos > 0)
+        orig_memmove(&g_objTable[pos + 1], &g_objTable[pos],
+                     (size_t)(g_objCount - pos) * sizeof(AM2_ObjEntry));
+
+    g_objCount++;
+    g_objTable[pos].uid    = uid;
+    g_objTable[pos].obj    = obj;
+    g_objTable[pos].serial = 0;
+
+    return uid;
+}
+
 int objtable_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_FIND_SLOT, FindSlot, "FindSlot", 2);
     rc |= patch_replace(ADDR_LOOKUP_BY_UID, LookupByUID, "LookupByUID", 1);
+    rc |= patch_replace(ADDR_ADD_TO_ITEM_LIST, AddToItemList, "AddToItemList", 2);
     return rc;
 }

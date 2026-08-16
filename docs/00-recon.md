@@ -254,6 +254,40 @@ inserting need not search twice. It has three distinct not-found exits
 depending on where the search landed. UIDs are compared with unsigned branches,
 so the key is unsigned even though the index arithmetic is signed.
 
+### UID encoding
+
+A UID is not opaque. `AddToItemList` (`0x00429740`) builds it as:
+
+```
+uid = (owner << 29) | counter        /* 3 owner bits, 29 counter bits */
+```
+
+Established three independent ways in that function: `and eax,7` on the owner,
+`shl …,0x1D`, and `and edi,0x1FFFFFFF` when masking a supplied UID back to its
+counter. The per-owner counters live in an eight-entry array at `0x00511DE0`,
+start at 1000 (`0x3E8`), and overflow is checked against `0x1FFFFC18`, which is
+exactly 2²⁹ − 1000. That start value is why the first UIDs observed in traces
+were `0x3E8` and `0x3E9`.
+
+Which field supplies the owner depends on the object's type, dispatched through
+a 9-entry jump table at `0x0042991C`: types 0, 5, 6 and 7 take it from the
+global at `0x004F9FDC`, everything else from the object's own byte at `+0x10`.
+
+That also pins down three fields of the object structure itself:
+
+| offset | type | meaning |
+|---|---|---|
+| `+0x00` | `uint32_t` | type — the jump-table selector, 0..8 |
+| `+0x04` | `uint32_t` | uid, written back on registration |
+| `+0x10` | `int8_t` | owner index |
+
+The overflow path contains a defect, reproduced rather than fixed in
+`src/game/objtable.c`: it probes for a free UID in one register but the insert
+that follows uses another, so the search only advances the counter and its
+result is discarded. Reaching it needs 2²⁹ objects for a single owner, so it
+was presumably never executed — the same pattern as the stubbed logger, where
+code that never ran was quietly wrong.
+
 `LookupByUID` (`0x00427820`) wraps it, and passes the address of its *own*
 argument slot as the out-param — one stack dword serving as both input and
 output. That is safe because `FindSlot` reads the key into a register before it
