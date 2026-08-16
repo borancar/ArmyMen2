@@ -145,11 +145,23 @@ static void put32(uint8_t *p, uint32_t v)
 
 const void *trace_wrap(const void *fn, const char *name, int32_t nargs)
 {
+    const void *stub;
+
+    if (!trace_enabled())
+        return fn;
+    stub = trace_make_stub(fn, name, nargs);
+    return stub ? stub : fn;
+}
+
+const void *trace_make_stub(const void *fn, const char *name, int32_t nargs)
+{
     uint8_t *s;
     int32_t  id;
 
-    if (!trace_enabled() || g_count >= MAX_TRACED)
-        return fn;
+    if (g_count >= MAX_TRACED) {
+        hooklog("trace: table full, cannot wrap %s", name);
+        return NULL;
+    }
     if (nargs < 0)
         nargs = 0;
     if (nargs > MAX_ARGS)
@@ -158,7 +170,7 @@ const void *trace_wrap(const void *fn, const char *name, int32_t nargs)
     s = arena_alloc(STUB_BYTES);
     if (!s) {
         hooklog("trace: out of stub space for %s", name);
-        return fn;
+        return NULL;
     }
 
     id = g_count++;

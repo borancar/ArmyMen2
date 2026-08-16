@@ -24,4 +24,9 @@ int trace_enabled(void);
  * callers can use the result unconditionally. */
 const void *trace_wrap(const void *fn, const char *name, int32_t nargs);
 
+/* As trace_wrap(), but built regardless of AM2_TRACE. Used by call-site
+ * observation, where the stub *is* the mechanism rather than a diagnostic
+ * layered on top of one. Returns NULL on failure. */
+const void *trace_make_stub(const void *fn, const char *name, int32_t nargs);
+
 #endif /* AM2_TRACE_H */

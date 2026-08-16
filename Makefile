@@ -18,9 +18,11 @@ GAMEEXE := C:\\GOG Games\\Army Men II\\ArmyMen2.exe
 HOOK_SRC := src/inject/dllmain.c \
             src/inject/patch.c \
             src/inject/trace.c \
+            src/inject/observe.c \
             src/inject/hooklog.c \
             src/inject/gamelog.c \
-            src/game/savetag.c
+            src/game/savetag.c \
+            src/game/rect.c
 
 LAUNCH_SRC := src/inject/launcher.c
 

@@ -90,6 +90,39 @@ WINEDEBUG=+relay,+ddraw,+dsound WINEPREFIX=$PWD/.wine wine ...
 internal calls — those are intra-module and never relayed — which is exactly the
 gap the stub above fills.
 
+## Observing without replacing
+
+`patch_replace()` is one-way, which is useless for learning what a function we
+have *not* reconstructed actually does. `observe_install()` inverts the trick:
+it leaves the function byte-for-byte intact and rewrites the rel32 of each
+`call target` so it reaches a logging stub, which then jumps on to the real
+function. No trampoline, because the original is never modified.
+
+Site lists are resolved offline and exactly by `tools/callsites.py`, not by
+scanning for `E8` bytes at runtime — `E8` occurs constantly inside longer
+instructions and in data, and a false positive would corrupt the image. Each
+site is then re-verified against the live image before being written.
+
+```sh
+./.venv/bin/python tools/callsites.py 0x0042e1c0 > src/inject/sites.h
+AM2_OBSERVE=1 make run
+```
+
+Only direct calls are covered; function-pointer and vtable dispatch still
+reaches the original unseen.
+
+Two limitations worth knowing. Argument counts are guesses — reading extra
+dwords only walks into the caller's frame, so an over-estimate is noise rather
+than a fault, but a wrong count produces misleading records. And the string
+heuristic renders *any* argument that points at printable bytes as text, which
+misfires badly on out-parameters: observing `RectSet` produced entries like
+`("W", ...)` and `(",", ...)` purely because the destination buffer happened to
+hold those bytes.
+
+There is also no count-only mode yet. Observing one hot function produced 90,185
+records in a 45-second run, which is fine for a survey and much too heavy to
+leave enabled.
+
 ## Un-stubbing the 1999 logger
 
 The retail build reduced the logger at `0x0045CAA0` to a bare `ret`, but did so
@@ -137,6 +170,7 @@ interleave in true order.
 | address | function | status |
 |---|---|---|
 | `0x0045CAA0` | `Log` | replaced — un-stubbed, opt-in |
+| `0x0042E1C0` | `RectSet` | replaced — **verified**, 90k calls/run, title screen renders correctly |
 | `0x004235D0` | `CheckSaveTag` | replaced — **not yet exercised** |
 
 `CheckSaveTag` only runs when a savegame is loaded, and the install ships no

@@ -10,11 +10,15 @@
 
 #include "hooklog.h"
 #include "gamelog.h"
+#include "observe.h"
 #include "orig.h"
 #include "patch.h"
+#include "sites.h"
+#include "../game/rect.h"
 #include "../game/savetag.h"
 
 #include <windows.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* Refuse to patch anything unless the bytes we are about to overwrite are
@@ -32,6 +36,8 @@ static const struct {
       { 0xC3, 0x90, 0x90, 0x90, 0x90 }, 5 },
     { ADDR_FREAD, "fread",
       { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57 }, 7 },
+    { ADDR_RECT_SET, "RectSet",
+      { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x4C, 0x24, 0x08 }, 8 },
 };
 
 static int verify_image(void)
@@ -57,6 +63,30 @@ static int verify_image(void)
     return bad;
 }
 
+/* Watch the most-called game functions to learn which of them are actually on
+ * the startup path, and with what arguments, before committing to
+ * reconstructing any of them. None of these are replaced -- their bodies are
+ * untouched and only their call sites are redirected. Names are placeholders
+ * until each is identified. Enable with AM2_OBSERVE=1.
+ *
+ * nargs is a guess of 4: reading a few extra dwords only walks into the
+ * caller's own frame, which is always mapped, so an over-estimate is noise
+ * rather than a fault. */
+static void observe_hot_functions(void)
+{
+    const char *opt = getenv("AM2_OBSERVE");
+
+    if (!opt || *opt != '1')
+        return;
+
+    OBSERVE(0x0040C040u, "audio_40c040",  4, sites_0040c040);
+    OBSERVE(0x0042E1C0u, "map_42e1c0",    4, sites_0042e1c0);
+    OBSERVE(0x00427820u, "game_427820",   4, sites_00427820);
+    OBSERVE(0x00453D50u, "script_453d50", 4, sites_00453d50);
+    OBSERVE(0x0042A7B0u, "item_42a7b0",   4, sites_0042a7b0);
+    OBSERVE(0x00422DE0u, "evt_422de0",    4, sites_00422de0);
+}
+
 static void install(void)
 {
     hooklog_open();
@@ -70,6 +100,8 @@ static void install(void)
 
     gamelog_install();
     savetag_install();
+    rect_install();
+    observe_hot_functions();
 
     hooklog("am2hook: %d patch(es) installed", patch_count());
 }

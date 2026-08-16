@@ -146,6 +146,47 @@ visible in the messages include `AddMsg`, `RemHead`, `RemMsg`, `ReadBitmap`,
 | `0x458000`–`0x45c000` | units and vehicles |
 | `0x45c000`–`0x46eb82` | MSVC 6 CRT |
 
+## Developer command-line switches
+
+The retail build still parses its development switches. All eleven are handled
+in one contiguous chain at `0x0040b37d`–`0x0040b4a9`:
+
+| switch | referenced at |
+|---|---|
+| `-nointro` | `0x0040b37d` |
+| `-tracePF` | `0x0040b3c0` |
+| `-traceVEH` | `0x0040b3d8` |
+| `-debugComm` | `0x0040b3f0` |
+| `-traceComm` | `0x0040b40d` |
+| `-logComm` | `0x0040b42b` |
+| `-tracewin` | `0x0040b449` |
+| `-dbg` | `0x0040b461` |
+| `-rob` | `0x0040b479` |
+| `-peter` | `0x0040b491` |
+| `-dan` | `0x0040b4a9` |
+
+`-rob`, `-peter` and `-dan` are per-developer modes. `-nointro -dbg` is the
+useful pair for iteration: it skips the intro and drives the startup path
+substantially further, which is how the hot-function survey below was obtained.
+
+## Hot functions on the startup path
+
+Measured with the observation harness over a 45-second run to the title screen,
+using `-nointro -dbg` (see `docs/01-harness.md`):
+
+| function | calls | note |
+|---|---|---|
+| `0x0042E1C0` | 90,185 | `RectSet` — reconstructed |
+| `0x00422DE0` | 10 | data-path builder, `<basepath>\<name>` from the global at `0x51235C` |
+| `0x00453D50` | 7 | operates on heap objects |
+| `0x0040C040` | 0 | audio — not reached before gameplay |
+| `0x00427820` | 0 | not reached |
+| `0x0042A7B0` | 0 | not reached |
+
+The distribution is the useful part: reaching the title screen exercises almost
+none of the engine. Anything past this point needs the game driven into actual
+gameplay, which no command-line switch appears to do on its own.
+
 ## Toolchain constraints
 
 Wine 11 on this host is **new-WoW64**: `/usr/lib64/wine` contains
