@@ -39,8 +39,9 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
     if (!spr)
         return;
 
-    /* Either representation will do; neither means there is nothing to draw. */
-    if (!spr->dataA && !spr->dataB)
+    /* Either route will do -- a DirectDraw surface or software RLE data.
+     * Neither means there is nothing to draw. */
+    if (!spr->surface && !spr->rle)
         return;
 
     /* The caller gives the position of the sprite's hot spot, not its corner. */

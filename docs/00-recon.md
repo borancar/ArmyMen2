@@ -366,6 +366,63 @@ framebuffer is 8-bit paletted, base at `0x004FE1A8`, pitch at `0x00502AD0` —
 which sits immediately below `ORIGIN_SEL_B`, so these are probably fields of one
 screen descriptor rather than loose globals.
 
+### DirectDraw, and what the software blitters actually write into
+
+The game rasterises everything itself, but straight into a **locked DirectDraw
+surface**. `LockSurface` (`0x0041B9A0`) is the whole story:
+
+```c
+desc.dwSize = 0x6C;                          /* sizeof(DDSURFACEDESC) */
+hr = surf->Lock(NULL, &desc, 1, NULL);       /* vtable[25] */
+if (hr == 0x887601C2)                        /* DDERR_SURFACELOST */
+    g_primarySurface->Restore();             /* vtable[27] */
+g_frameBuf = desc.lpSurface;
+g_pitch    = desc.lPitch;
+```
+
+The sprite dispatcher calls `Unlock` (vtable[32]) when it is finished. So the
+blitters are the game's own code and safe to replace; what must never be touched
+is ddraw itself, since it owns those bits and may lose or move them.
+
+This corrected three names that had been guessed from the text path alone:
+
+| was | is |
+|---|---|
+| `ADDR_TEXT_READY` | a surface is currently locked |
+| `ADDR_ORIGIN_SEL_A` | the currently locked surface |
+| `ADDR_ORIGIN_SEL_B` | the primary surface, the `Restore` target |
+
+`DrawText`'s "if these two globals are equal, shift the origin" therefore means
+*if the surface being drawn into is the primary one, apply an offset* — which
+is a far more sensible thing for a renderer to do than what the original naming
+implied.
+
+### The RLE blitter family
+
+Four routines, and in the original they are the same function four times over:
+byte-identical prologue, row walk and clipping, differing on exactly two axes.
+
+| address | fill | row offsets | sites |
+|---|---|---|---|
+| `0x0041C710` | solid colour | 16-bit | 3 |
+| `0x0041C2B0` | copy source | 16-bit | 2 |
+| `0x0041C1C0` | copy source | 32-bit | 1 |
+| `0x0041C3A0` | copy via 256-entry LUT | 16-bit | 2 |
+
+A diff of `0x0041C1C0` against `0x0041C2B0` shows a single meaningful change —
+`*4`/`dword` versus `*2`/`word` — so the 32-bit variant exists for sprites whose
+encoded data exceeds the 64KB a 16-bit offset can reach. A diff of `0x0041C3A0`
+against `0x0041C710` shows only the inner fill.
+
+The solid variant never advances the source pointer past a run, because for it
+runs carry a length and no pixels at all. That asymmetry is the clearest
+evidence that fonts and sprites use related but **distinct** encodings, and it
+is why one font can be drawn in any colour.
+
+Two routines reached from the same dispatcher are *not* part of this family:
+`0x0041C480` (656 bytes, unread) and `0x00445EB0`, which is a fallback chain
+that calls `IDirectDrawSurface::Restore` through the sprite's own surface.
+
 ### The sprite path
 
 `DrawSprite` (`0x00445FF0`, 24 call sites) is the sprite counterpart to

@@ -319,6 +319,23 @@ interleave in true order.
 | `0x00446930` | `DrawText` | **verified** | every string on screen renders correctly |
 | `0x0041C710` | `BlitGlyph` | **verified** | 874,768 calls; every text pixel written by our decoder |
 | `0x00445FF0` | `DrawSprite` | **verified** | 61,531 calls; scene renders correctly |
+| `0x0041C2B0` | `BlitCopy16` | written, **NOT installed** | crashed on first call |
+| `0x0041C1C0` | `BlitCopy32` | written, **NOT installed** | same family, disabled with it |
+| `0x0041C3A0` | `BlitRemap16` | written, **NOT installed** | same family, disabled with it |
+
+The three copy/remap blitters are reconstructed in `src/game/blit.c` but
+deliberately not patched in. The first live call to `BlitCopy16` — an 85x80
+sprite — faulted immediately. `BlitGlyph` shares the same core and is fine,
+which localises the fault to the source-pointer handling that only the copy and
+remap paths use: the solid variant consumes exactly two bytes per iteration so
+any mis-accounting is self-limiting, whereas the others advance `rle` by the run
+length, and a desynchronised source pointer reads off the end of the sprite.
+Destination writes are bounded by the clip; source reads are not.
+
+The control flow was checked against the original line by line and matches, so
+the wrong assumption is more likely about the *stream* than the arithmetic — a
+row terminator, or a header that is not the width/height pair the glyph format
+uses. Dump one real sprite and decode a row by hand before re-enabling.
 | `0x00433810` | `PackKey` | **verified** | 3,986 calls |
 | `0x00433830` | `KeyFieldA` | **verified** | 802 calls |
 | `0x00433840` | `KeyFieldB` | **verified** | 80 calls |

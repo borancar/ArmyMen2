@@ -37,12 +37,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#define g_textReady   (*(int32_t *)(uintptr_t)ADDR_TEXT_READY)
+#define g_surfaceLocked   (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
 #define g_glyphOffset ((const uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)
 #define g_fontBase    ((uint8_t *const *)(uintptr_t)ADDR_FONT_BASES)
 #define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
-#define g_originSelA  (*(int32_t *)(uintptr_t)ADDR_ORIGIN_SEL_A)
-#define g_originSelB  (*(int32_t *)(uintptr_t)ADDR_ORIGIN_SEL_B)
+#define g_lockedSurface  (*(int32_t *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_primarySurface  (*(int32_t *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_originDX    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
 #define g_originDY    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
 
@@ -53,7 +53,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
 
     (void)arg4;                     /* every observed call passes 0 */
 
-    if (!g_textReady)
+    if (!g_surfaceLocked)
         return;
 
     len = (int32_t)strlen(str);
@@ -94,7 +94,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
         if (!ClipRect(&src, &g_screenClip, &dstX, &dstY, &out))
             return;                 /* not `continue` -- see the header note */
 
-        if (g_originSelA == g_originSelB) {
+        if (g_lockedSurface == g_primarySurface) {
             dstX += g_originDX;
             dstY += g_originDY;
         }

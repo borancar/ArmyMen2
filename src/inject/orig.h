@@ -31,25 +31,44 @@
 
 /* Text rendering. */
 #define ADDR_DRAW_TEXT      0x00446930u  /* void(x,y,str,font,?,colour) */
-#define ADDR_BLIT_GLYPH     0x0041C710u  /* __fastcall, see text.c */
-#define ADDR_TEXT_READY     0x004FDF80u  /* int32_t; zero means do not draw */
 #define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[], indexed ch + font*262 */
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t*[], indexed font*133 */
-#define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- shared by text and sprite drawing */
-/* When these two globals are equal the destination is shifted by the pair
- * below -- an origin adjustment for one of the render targets. */
-#define ADDR_ORIGIN_SEL_A   0x00507128u  /* int32_t */
-#define ADDR_ORIGIN_SEL_B   0x00502AD4u  /* int32_t */
+#define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- text and sprites share it */
+
+/* ---- DirectDraw ------------------------------------------------------
+ *
+ * The game does its own software rasterising, but it does it straight into a
+ * locked DirectDraw surface. LockSurface (0x0041B9A0) fills a 0x6C-byte
+ * DDSURFACEDESC via IDirectDrawSurface::Lock (vtable[25]), retrying through
+ * Restore (vtable[27]) on DDERR_SURFACELOST (0x887601C2), and publishes
+ * lpSurface and lPitch into the globals below. The sprite dispatcher calls
+ * Unlock (vtable[32]) when it is done.
+ *
+ * So the blitters below are the game's own code and safe to replace. What must
+ * NOT be touched is ddraw itself -- these write into surface bits that
+ * DirectDraw owns and may move or lose between frames.
+ */
+#define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
+#define ADDR_SURFACE_LOCKED 0x004FDF80u  /* int32_t; non-zero while a lock is held */
+#define ADDR_LOCKED_SURFACE 0x00507128u  /* IDirectDrawSurface *, currently locked */
+#define ADDR_PRIMARY_SURFACE 0x00502AD4u /* IDirectDrawSurface *, Restore target */
+#define ADDR_SCREEN_PITCH   0x00502AD0u  /* int32_t, DDSURFACEDESC.lPitch */
+#define ADDR_FRAMEBUFFER    0x004FE1A8u  /* uint8_t *, DDSURFACEDESC.lpSurface */
+/* Applied when the locked surface is the primary one. */
 #define ADDR_ORIGIN_DX      0x00485330u  /* int32_t */
 #define ADDR_ORIGIN_DY      0x00485334u  /* int32_t */
 
-/* Framebuffer description. The pitch sits immediately below ORIGIN_SEL_B, so
- * these are probably fields of one screen descriptor rather than loose globals. */
-#define ADDR_SCREEN_PITCH   0x00502AD0u  /* int32_t, bytes per scanline */
-#define ADDR_FRAMEBUFFER    0x004FE1A8u  /* uint8_t *, 8-bit paletted surface */
+/* The software RLE blitter family. All four are the same routine differing
+ * only in row-offset width and fill policy -- see src/game/blit.c. */
+#define ADDR_BLIT_GLYPH     0x0041C710u  /* solid fill,   16-bit offsets */
+#define ADDR_BLIT_COPY16    0x0041C2B0u  /* copy source,  16-bit offsets */
+#define ADDR_BLIT_COPY32    0x0041C1C0u  /* copy source,  32-bit offsets */
+#define ADDR_BLIT_REMAP16   0x0041C3A0u  /* copy via LUT, 16-bit offsets */
 
-/* Sprite drawing. The dispatcher is not reconstructed yet: it fans out to five
- * inner blitters, presumably transparency and blend variants of BlitGlyph. */
+/* Sprite drawing. The dispatcher is not reconstructed yet; it fans out to the
+ * four blitters above plus 0x0041C480 (656 bytes, unread) and 0x00445EB0,
+ * which is not a blitter at all but a fallback chain that calls
+ * IDirectDrawSurface::Restore on the sprite's own surface. */
 #define ADDR_DRAW_SPRITE         0x00445FF0u  /* void(AM2_Sprite*,x,y,mode) */
 #define ADDR_DRAW_SPRITE_CLIPPED 0x00446070u  /* void(spr,x,y,const AM2_Rect*,mode) */
 
