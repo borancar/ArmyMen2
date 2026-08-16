@@ -1,0 +1,604 @@
+addr	func	tu	message
+0x00401095	0x00401050	<=air.cpp	AddMsg: Impossible List Size %d
+0x00401103	0x004010c0	<=air.cpp	RemHead: Impossible List Size %d
+0x0040112b	0x004010c0	<=air.cpp	Empty List! l->first = %d listsize = %d
+0x004013c9	0x004013b0	<=air.cpp	List:
+0x004013e5	0x004013b0	<=air.cpp	(%d %d)
+0x004013f9	0x004013b0	<=air.cpp	
+0x0040146f	0x00401410	<=air.cpp	RemMsg: Impossible List Size %d
+0x0040148f	0x00401410	<=air.cpp	RemMsg has set freelist to EMPTY!! l->numItems = %d
+0x004014ac	0x00401410	<=air.cpp	Why is list %x empty?  List Size %d
+0x0040158f	0x004014c0	<=air.cpp	 Got Pulse Ack for  seq %d
+0x004015cf	0x004014c0	<=air.cpp	Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x
+0x004015ff	0x004014c0	<=air.cpp	Remote %d is acking %d, I had thru %d
+0x00401656	0x004014c0	<=air.cpp	??? PULSE seq %6d latency %d acks for %d msgs %d thru %d  nxtSeq = %d
+0x004016a9	0x004014c0	<=air.cpp	PULSE Adding to freelist from sendque Buffer seq %d  elelment %x
+0x0040173a	0x004014c0	<=air.cpp	Interrupt Level Can't find FlowQ for %x
+0x00401775	0x004014c0	<=air.cpp	GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d
+0x004017b5	0x004014c0	<=air.cpp	Flow Nack Resend: Msg not found seq %d hehas %d
+0x00401812	0x004014c0	<=air.cpp	DPlaySend Failure %x to %x size %d
+0x00401849	0x004014c0	<=air.cpp	Resend: seq %d to %d (%x)  nxtSeq = %d
+0x0040188d	0x004014c0	<=air.cpp	ADDING to Resend Queue seq %d to id %x  mask %x
+0x004018ee	0x004014c0	<=air.cpp	Can't Find FlowQ for id %x  seq
+0x00401933	0x004014c0	<=air.cpp	Can't Find my FlowQ for id %x
+0x00401967	0x004014c0	<=air.cpp	Received seq %d  expected %d from %x, he has my seqthru  %d
+0x00401989	0x004014c0	<=air.cpp	Ack for sequence %d had bad checksum %x
+0x00401a01	0x004014c0	<=air.cpp	Starting Slave Session, from %x, Received seq %d, flow->gotseq=%d, flow->hehas=%d, myFlow->active=%d
+0x00401a60	0x004014c0	<=air.cpp	First message received from player %x, Received seq %d
+0x00401ac9	0x004014c0	<=air.cpp	Residual Message from %x: expected  %d received %d  from %x hehas %d
+0x00401b12	0x004014c0	<=air.cpp	New Player joining flow he first got my seq %d hehas was %d
+0x00401b40	0x004014c0	<=air.cpp	 No many acks in one packet	 %d thru %d
+0x00401b93	0x004014c0	<=air.cpp	Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x
+0x00401bc4	0x004014c0	<=air.cpp	Remote %x is acking %d, I had thru %d
+0x00401c1e	0x004014c0	<=air.cpp	??? seq %6d from %x latency %d acks for %d msgs %d thru %d  nxtSeq = %d
+0x00401cda	0x004014c0	<=air.cpp	Duplicate: expected %d received %d  from %x hehas %d
+0x00401d57	0x004014c0	<=air.cpp	Flow Nacking ERROR too many missing from %d thru %d
+0x00401dd1	0x004014c0	<=air.cpp	Flow Nacking %d thru %d  to %x at time %d I am good thru %d
+0x00401e8d	0x004014c0	<=air.cpp	Unusually large time between messages %d seconds
+0x00401f5f	0x004014c0	<=air.cpp	 ????? m = %x  freelistsize = %d
+0x00401f81	0x004014c0	<=air.cpp	 ????? NOW m = %x freelistsize = %d
+0x0040200e	0x004014c0	<=air.cpp	 Low-Level Comm Error No Recieve Buffers free = %d inuse = %d sendq = %d
+0x00402018	0x004014c0	<=air.cpp	 Dumping incoming message on the floor
+0x00402077	0x004014c0	<=air.cpp	 Receive thread got event 0
+0x004020cf	0x004020a0	<=air.cpp	Setting Event 0
+0x00402120	0x004020a0	<=air.cpp	Packet Thread Exited with return code %d
+0x004022a9	0x004021a0	<=air.cpp	Error launching packet thread
+0x0040235b	0x004022d0	<=air.cpp	Out of Send Buffers
+0x004023d0	0x004022d0	<=air.cpp	Error Send can't find Flow for Player %x
+0x0040243b	0x004022d0	<=air.cpp	SendGameMsg, first message to %x, hehas set to %d
+0x00402480	0x004022d0	<=air.cpp	Error Send can't find My Flow for Player %x
+0x00402535	0x004022d0	<=air.cpp	Latency Emulation is Out of Send Buffers
+0x0040256c	0x004022d0	<=air.cpp	DPlaySend Failure %x to %x size %d
+0x004025c2	0x004022d0	<=air.cpp	Message Too Big
+0x0040263c	0x004022d0	<=air.cpp	DPLAY ERROR: Send too big
+0x0040264f	0x004022d0	<=air.cpp	gpComm->Send Failure2 %x to %x size %d
+0x00402735	0x00402720	<=air.cpp	Exit Game Posting WM_CLOSE from 3DONetwork
+0x0040284a	0x004027f0	<=air.cpp	Creating Flow Queue for Player id %x
+0x00402978	0x004027f0	<=air.cpp	Create FlowQ failed for ID %x
+0x004029e8	0x004029b0	<=air.cpp	DestroyFlow: Flow queue for Player %x not found
+0x00402a11	0x004029b0	<=air.cpp	About to Destroy FlowQ for id %x sendqueue Size = %d
+0x00402a49	0x004029b0	<=air.cpp	DestroyFlow: Flow queue for me (%x) not found
+0x00402aa2	0x004029b0	<=air.cpp	 Simulating Acks for  seq %d thru %d
+0x00402af7	0x004029b0	<=air.cpp	Adding to freelist from sendque Buffer seq %d  elelment %x
+0x00402b4a	0x004029b0	<=air.cpp	Finished Destroying FlowQ for id %x sendqueue Size = %d
+0x00402b79	0x004029b0	<=air.cpp	FLOW UNPAUSE nfree = %d
+0x00402bed	0x00402bd0	<=air.cpp	ERROR: GetPlayerMask: No Flowq for %X
+0x00402c1d	0x00402c00	<=air.cpp	ERROR: GetReSendMask: No Flowq for %X
+0x00402d0c	0x00402c30	<=air.cpp	 Nack Rec Array full for ID %x, %d
+0x00402d6d	0x00402c30	<=air.cpp	Nacking %6d to %x at %d  >?  %d  ( %d ) Interval = %d Latency = %d count = %d nackinterval = %d
+0x00402fca	0x00402f50	<=air.cpp	DPlaySend Failure %x to %x size %d
+0x00402fdf	0x00402f50	<=air.cpp	DPLAY ERROR: Busy
+0x00402ff8	0x00402f50	<=air.cpp	DPLAY ERROR: Invalid Object
+0x00403011	0x00402f50	<=air.cpp	DPLAY ERROR: INVALID PARAMETERS
+0x0040302a	0x00402f50	<=air.cpp	DPLAY ERROR: INVALID PLAYER
+0x00403043	0x00402f50	<=air.cpp	DPLAY ERROR: Send too big
+0x00403093	0x00403050	<=air.cpp	Entering ProcessResendQueue
+0x00403164	0x00403050	<=air.cpp	RESENDING %d to %x size %d
+0x004031c2	0x00403050	<=air.cpp	Exiting ProcessResendQueue
+0x004031df	0x00403050	<=air.cpp	DPlaySend Failure %x to %x size %d
+0x004031f4	0x00403050	<=air.cpp	DPLAY ERROR: Busy
+0x00403211	0x00403050	<=air.cpp	DPLAY ERROR: Invalid Object
+0x0040322e	0x00403050	<=air.cpp	DPLAY ERROR: INVALID PARAMETERS
+0x0040324b	0x00403050	<=air.cpp	DPLAY ERROR: INVALID PLAYER
+0x0040326c	0x00403050	<=air.cpp	DPLAY ERROR: Send Too Big
+0x00403298	0x00403280	<=air.cpp	COMM ERROR: NO BUFFERS
+0x0040343e	0x00403400	<=air.cpp	Couldn't parse %s!
+0x00403461	0x00403400	<=air.cpp	Couldn't parse %s!
+0x00403484	0x00403400	<=air.cpp	Couldn't parse %s!
+0x004034a7	0x00403400	<=air.cpp	Couldn't parse %s!
+0x004034ca	0x00403400	<=air.cpp	Couldn't parse %s!
+0x004034f7	0x00403400	<=air.cpp	Couldn't parse %s!
+0x00408177	0x00408060	<=air.cpp	Bad!
+0x00409046	0x00408ff0	<=air.cpp	EndMission  AirSupport.count decreasing to: %d
+0x0040932b	0x00409070	<=air.cpp	Air frame %d, pt %d,%d
+0x0040975f	0x00409710	<=air.cpp	DoAirSupport paratroopers where: %d, from %d, army %d, count: %d
+0x004097b8	0x00409710	<=air.cpp	EndMission  AirSupport.count increasing to: %d
+0x00409e14	0x00409be0	air.cpp..audio.cpp	Error!  %d
+0x0040aa92	0x0040a6a0	air.cpp..audio.cpp	DESTROYPLAYER Win Message for player %x
+0x0040ad21	0x0040a6a0	air.cpp..audio.cpp	Set Session Failed to reopen Session
+0x0040ae54	0x0040a6a0	air.cpp..audio.cpp	Set Session Failed to reopen Session
+0x0040b2cc	0x0040b2b0	air.cpp..audio.cpp	Missing %s
+0x0040b343	0x0040b2b0	air.cpp..audio.cpp	system speed: %d
+0x0040bade	0x0040b8f0	air.cpp..audio.cpp	Unable to allocate memory for wave data
+0x0040bb17	0x0040b8f0	air.cpp..audio.cpp	Unable to allocate memory for wave name
+0x0040bb6a	0x0040b8f0	air.cpp..audio.cpp	Unable to load wave file %s
+0x0040bba1	0x0040b8f0	air.cpp..audio.cpp	Unable to create sound buffer for %s
+0x0040bbcb	0x0040b8f0	air.cpp..audio.cpp	Unable to fill sound buffer data for %s
+0x0040c270	0x0040c220	audio.cpp..event.cpp	not a riff compatible file!
+0x0040c28c	0x0040c220	audio.cpp..event.cpp	not a wave file!
+0x0040c330	0x0040c220	audio.cpp..event.cpp	Invalid header for wave file
+0x0040c362	0x0040c340	audio.cpp..event.cpp	Unable to load wave file %s
+0x0040c388	0x0040c340	audio.cpp..event.cpp	Error seeking end of file %s
+0x0040c3ac	0x0040c340	audio.cpp..event.cpp	Empty sound file %s
+0x0040c411	0x0040c340	audio.cpp..event.cpp	Error parsing wave file %s
+0x0040c490	0x0040c440	audio.cpp..event.cpp	Unable to lock sound buffer
+0x0040c51c	0x0040c440	audio.cpp..event.cpp	Fill sound buffer missing arguments
+0x0040c572	0x0040c530	audio.cpp..event.cpp	Unable to allocate memory for wave data
+0x0040c5b2	0x0040c530	audio.cpp..event.cpp	Unable to allocate memory for wave name
+0x0040c607	0x0040c530	audio.cpp..event.cpp	Unable to load wave file %s
+0x0040c63d	0x0040c530	audio.cpp..event.cpp	Unable to create sound buffer for %s
+0x0040c666	0x0040c530	audio.cpp..event.cpp	Unable to fill sound buffer data for %s
+0x0040c74d	0x0040c710	audio.cpp..event.cpp	Unable to initialize wave %d
+0x0040c81a	0x0040c800	audio.cpp..event.cpp	Unable to create directsound object
+0x0040c873	0x0040c800	audio.cpp..event.cpp	Unable to set direct sound cooperative level
+0x0040c8a6	0x0040c800	audio.cpp..event.cpp	Unable to create primary sound buffer
+0x0040c8d6	0x0040c800	audio.cpp..event.cpp	Unable to initialize 3d sound
+0x0040c908	0x0040c800	audio.cpp..event.cpp	Unable to set listener position
+0x0040c936	0x0040c800	audio.cpp..event.cpp	Unable to set sound doppler factor
+0x0040c964	0x0040c800	audio.cpp..event.cpp	Unable to set sound roll off factor
+0x0040c98b	0x0040c800	audio.cpp..event.cpp	Unable to commit sound settings
+0x0040ddb6	0x0040dd90	audio.cpp..event.cpp	Unable to intialize connection
+0x0040dee0	0x0040de10	audio.cpp..event.cpp	CreatePlayer Failed  returned %x
+0x0040df2e	0x0040de10	audio.cpp..event.cpp	numDPPlayers is %d
+0x0040e0e8	0x0040dfc0	audio.cpp..event.cpp	InitJoin dpId = %x PlayerName = %s (%s), Flags = %x , context = %x slot = %d
+0x0040e0fa	0x0040dfc0	audio.cpp..event.cpp	%s's dpid: %d
+0x0040e6b6	0x0040e660	audio.cpp..event.cpp	DPLAY CAPS:
+0x0040e6cc	0x0040e660	audio.cpp..event.cpp	   MaxPacketSize %8d
+0x0040e6e3	0x0040e660	audio.cpp..event.cpp	   HeaderSize    %8d
+0x0040e6fa	0x0040e660	audio.cpp..event.cpp	   Latency       %8d
+0x0040e710	0x0040e660	audio.cpp..event.cpp	   TimeOut       %8d
+0x0040e733	0x0040e660	audio.cpp..event.cpp	   Guaranteed Messaging Not Supported
+0x0040e794	0x0040e660	audio.cpp..event.cpp	 Max Buffer Size = %d Default buffer size to %d bytes
+0x0040e83f	0x0040e7b0	audio.cpp..event.cpp	 Open Session Failed returned %x
+0x0040ea18	0x0040e8a0	audio.cpp..event.cpp	FLOW UNPAUSE nfree = %d
+0x0040ea9c	0x0040ea40	audio.cpp..event.cpp	Releasing Comm Connection
+0x0040ec19	0x0040eb70	audio.cpp..event.cpp	DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x
+0x0040ec5a	0x0040eb70	audio.cpp..event.cpp	-- No Players Entry for player id %x
+0x0040ed2f	0x0040ed10	audio.cpp..event.cpp	Lobby start: about to call ReadMpMapsFile
+0x0040ed79	0x0040ed10	audio.cpp..event.cpp	Out of Memory trying to allocate LobbyConnectionBuffer
+0x0040edf8	0x0040ed10	audio.cpp..event.cpp	 Lobby GetConnectionSettings failed with  %x
+0x0040ee0d	0x0040ed10	audio.cpp..event.cpp	DPERR_BUFFERTOOSMALL
+0x0040ee2b	0x0040ed10	audio.cpp..event.cpp	DPERR_INVALIDINTERFACE
+0x0040ee49	0x0040ed10	audio.cpp..event.cpp	DPERR_INVALIDOBJECT
+0x0040ee67	0x0040ed10	audio.cpp..event.cpp	DPERR_INVALIDPARAMS
+0x0040ee85	0x0040ed10	audio.cpp..event.cpp	DPERR_OUTOFMEMORY
+0x0040ef79	0x0040ed10	audio.cpp..event.cpp	Lobby start: about to call m_pLobby->Connect
+0x0040efa3	0x0040ed10	audio.cpp..event.cpp	 Lobby Connect returned %x
+0x0040f0ab	0x0040ed10	audio.cpp..event.cpp	 Connected via Lobby as Slave id %x
+0x0040f436	0x0040f400	audio.cpp..event.cpp	 SEND    BANDWIDTH (%6d samples) MAX was %6d;  %6d (%3d%%) exceeded design spec(%d)
+0x0040f46f	0x0040f400	audio.cpp..event.cpp	 RECEIVE BANDWIDTH (%6d samples) MAX was %6d;  %6d (%3d%%) exceeded design spec(%d)
+0x0040f4d0	0x0040f400	audio.cpp..event.cpp	 Sent     %8d Packets Max Size: %6d Ave Size: %6d Ave Packets/Second: %6d  Ave Bytes/Second: %6d  elapsed: %d
+0x0040f50b	0x0040f400	audio.cpp..event.cpp	 Received %8d Packets Max Size: %6d Ave Size: %6d Ave Packets/Second: %6d  Ave Bytes/Second: %6d  elapsed: %d
+0x0040f67b	0x0040f640	audio.cpp..event.cpp	Remove Player numPlayers now = %d
+0x0040fa69	0x0040f990	audio.cpp..event.cpp	Set Session Failed to reopen Session
+0x0040fbdd	0x0040fbb0	audio.cpp..event.cpp	ignoring message from defunct army
+0x0040fc70	0x0040fbb0	audio.cpp..event.cpp	Received GAME_LOST_MESSAGE
+0x0040fca1	0x0040fbb0	audio.cpp..event.cpp	Received GAME_WON_MESSAGE
+0x0040fd12	0x0040fbb0	audio.cpp..event.cpp	Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; msgsize: %d
+0x0040ff2c	0x0040fea0	audio.cpp..event.cpp	Message Error:  Host should not receive PLAYERMSG
+0x00410038	0x0040fea0	audio.cpp..event.cpp	Unknown message type %d
+0x004100d6	0x00410090	audio.cpp..event.cpp	DestroyPlayer Id=%x, to = %x
+0x0041011c	0x00410090	audio.cpp..event.cpp	CreatePlayer to=%x, name = %s id = %x
+0x00410392	0x00410090	audio.cpp..event.cpp	SESSIONLOST   from=%x, to = %x
+0x004103b7	0x00410090	audio.cpp..event.cpp	UnHandled System Message %x %d
+0x004103f2	0x00410090	audio.cpp..event.cpp	DPSYS_HOST Size=%d, from=%x, to = %x
+0x004104b8	0x00410420	audio.cpp..event.cpp	myflow null %d
+0x00410541	0x00410420	audio.cpp..event.cpp	ArmyMessageFlush: can't send since no flowq for %x yet
+0x0041058f	0x00410420	audio.cpp..event.cpp	Sending Flow Packet seq %d to %x
+0x0041064d	0x004105f0	audio.cpp..event.cpp	ArmyMessageSend Zero length message
+0x00410677	0x004105f0	audio.cpp..event.cpp	Error msg larger (%d) than Max (%d) in ArmyMessageSend
+0x004106a7	0x004105f0	audio.cpp..event.cpp	Send Over Flow, Couldn't Empty Buffer
+0x0041076a	0x00410720	audio.cpp..event.cpp	Get Packed  %x bytes seq %d Chksum %x
+0x00410789	0x00410720	audio.cpp..event.cpp	Receive Checksum Error from %x seq %d
+0x004107ff	0x00410720	audio.cpp..event.cpp	Received zero Length Message
+0x00410811	0x00410720	audio.cpp..event.cpp	Received Bogus Length Message, part greater than sum
+0x00410882	0x00410820	audio.cpp..event.cpp	SendGamePause from %x  Pause =%s  Flags=%x
+0x004109fa	0x00410890	audio.cpp..event.cpp	RemoteGamePause from %x; playerIndex== %d paused = %d pauseflags = %x (%x) (msg Pause=%x)
+0x00410a3a	0x00410a10	audio.cpp..event.cpp	SendGameReadyMsg
+ %s
+0x00410a9e	0x00410a10	audio.cpp..event.cpp	Setting m_ArmyReady[%d] to %s
+0x00410af6	0x00410a10	audio.cpp..event.cpp	m_ArmyReady[%d] = %d
+0x00410b35	0x00410a10	audio.cpp..event.cpp	Sending EndSetupMessage
+0x00410b84	0x00410b70	audio.cpp..event.cpp	ReceiveEndSetupMsg
+0x00410bc4	0x00410bb0	audio.cpp..event.cpp	ReceiveGameReadyMsg
+0x00410c2b	0x00410bb0	audio.cpp..event.cpp	Setting m_ArmyReady[%d] to %s
+0x00410c6d	0x00410bb0	audio.cpp..event.cpp	m_ArmyReady[%d] = %d
+0x00410cad	0x00410bb0	audio.cpp..event.cpp	Sending EndSetupMessage
+0x00410d1b	0x00410ce0	audio.cpp..event.cpp	m_ArmyReady[%d] = %d
+0x00410d5a	0x00410ce0	audio.cpp..event.cpp	Sending EndSetupMessage
+0x00410dc8	0x00410d90	audio.cpp..event.cpp	SendGameReadyToLoadMsg
+ %s
+0x00410e2c	0x00410d90	audio.cpp..event.cpp	Setting m_ArmyReadyToLoad[%d] to %s
+0x00410eb5	0x00410e90	audio.cpp..event.cpp	ReceiveGameReadyToLoadMsg
+0x00410f1a	0x00410e90	audio.cpp..event.cpp	Setting m_ArmyReadyToLoad[%d] to %s
+0x00410f99	0x00410f70	audio.cpp..event.cpp	Session Max Players: %d
+0x00410fb3	0x00410f70	audio.cpp..event.cpp	Session Cur Players: %d
+0x00410fcd	0x00410f70	audio.cpp..event.cpp	Session Name: %s
+0x00411005	0x00411000	audio.cpp..event.cpp	SendGameStartMsg
+0x00411078	0x00411000	audio.cpp..event.cpp	SendGameStartMsg for %d  Players: Seed is %d
+0x00411136	0x00411100	audio.cpp..event.cpp	ReceiveStartGameMsg for %d Players.  Seed is %d
+0x0041118f	0x00411100	audio.cpp..event.cpp	DPLAY ERROR SENDING TO %x
+0x004111df	0x00411100	audio.cpp..event.cpp	FlowQ creation Failure %x
+0x00411259	0x00411100	audio.cpp..event.cpp	Error in start
+0x004113a2	0x00411270	audio.cpp..event.cpp	SendPlayerMsg for %d  Players:
+0x004113ec	0x00411270	audio.cpp..event.cpp	  player: %s %x %d
+0x00411492	0x00411270	audio.cpp..event.cpp	  player: %s %x %d
+0x0041150e	0x004114e0	audio.cpp..event.cpp	ReceivePlayerMsg for %d Players. I reckoned there were %d Players
+0x0041154b	0x004114e0	audio.cpp..event.cpp	      map: %s, mapSum=%X, ruleSum=%X
+0x004115bd	0x004114e0	audio.cpp..event.cpp	                 player: %s %x %d
+0x004116a1	0x004114e0	audio.cpp..event.cpp	PlayerMsg received before DPSYS_CREATEPLAYERORGROUP. Unusual but should work. No flowq yet for id %x
+0x004118de	0x00411880	audio.cpp..event.cpp	SendMapMsg from %x   Error = %d
+0x00411922	0x004118f0	audio.cpp..event.cpp	ReceivedMapMsg from %x  Result = %d (4 is nominal)
+0x00411a07	0x004119c0	audio.cpp..event.cpp	SendColorMsg from %x , Color =%d
+0x00411a52	0x00411a20	audio.cpp..event.cpp	ReceivedColorMsg from %x  Color =%d
+0x00411b07	0x00411ac0	audio.cpp..event.cpp	SendTeamMsg from %x , Team =%d
+0x00411b52	0x00411b20	audio.cpp..event.cpp	ReceivedTeamMsg from %x  Team =%d
+0x00411cfa	0x00411bd0	audio.cpp..event.cpp	TIMING OUT PLAYER %d %s
+0x00411dec	0x00411bd0	audio.cpp..event.cpp	EXITING - HAVE NOT HEARD FROM HOST: %d %s
+0x00412063	0x00411f10	audio.cpp..event.cpp	Less than half bandwidth (%d), enoughChangeLimit decreased to %d
+0x004185cf	0x00418480	audio.cpp..event.cpp	Error: Key handler not freed
+0x0041a27c	0x0041a250	audio.cpp..event.cpp	Bad or missing number
+0x0041a2ba	0x0041a290	audio.cpp..event.cpp	Bad or missing number
+0x0041a5ac	0x0041a2d0	audio.cpp..event.cpp	Bad or missing Boolean
+0x0041a616	0x0041a5f0	audio.cpp..event.cpp	Failed to open %s for reading in DefParseInfoFile
+0x0041a632	0x0041a5f0	audio.cpp..event.cpp	Missing Filename (filename NULL or empty)
+0x0041a7b5	0x0041a6b0	audio.cpp..event.cpp	Invalid Command: line %d token %s 
+%s
+0x0041a7e6	0x0041a6b0	audio.cpp..event.cpp	Invalid table entry: line %d, token #%d
+%s
+0x0041b8f2	0x0041b850	audio.cpp..event.cpp	Failed to put surface into video memory!
+0x0041b9c0	0x0041b9a0	audio.cpp..event.cpp	another surface already locked!
+0x0041c09a	0x0041be80	audio.cpp..event.cpp	Failed to put surface into video memory!
+0x0041c0da	0x0041be80	audio.cpp..event.cpp	CreateSurface failed in MakeBitmap()
+0x0041c19a	0x0041be80	audio.cpp..event.cpp	Error on Lock in DDCopyBitmap()
+0x0041e6b0	0x0041e690	audio.cpp..event.cpp	Unreleased memory (%d) blocks:
+0x0041e6ee	0x0041e690	audio.cpp..event.cpp	%08d bytes  file: %s  line: %d
+0x0041e83d	0x0041e820	audio.cpp..event.cpp	CreateTimer: lowpriority event ignored, count is %d
+0x0041e867	0x0041e820	audio.cpp..event.cpp	CreateTimer: long delayed event ignored, count is %d
+0x0041efb3	0x0041ef80	event.cpp	EventTriggerImmediate: type %d, num: %d, uid: %x, removeevent: %d, remote: %d
+0x0041f184	0x0041f150	event.cpp	EventMessageSend: type=%d, num1=%d, uid1=%x, num2=%d, uid2=%x
+0x0041f357	0x0041f320	event.cpp	EventMessageReceive: type=%d, num1=%d, uid1=%x, num2=%d, uid2=%x
+0x0041f388	0x0041f320	event.cpp	    Event receive %s remove %d
+0x0041f441	0x0041f410	event.cpp	EventTriggerDelayed: type %d, num: %d, uid: %x, removeevent: %d, delay: %d
+0x0041f545	0x0041f520	event.cpp	Bad ME
+0x0041fee9	0x0041fec0	event.cpp	ScriptResurrectItem, uid=%x, pos=(%d,%d)
+0x0041ff80	0x0041ff60	event.cpp	Warning: check if this script command works with this object type!
+0x0042007f	0x00420060	event.cpp	ERROR: ScriptSetObjBitmap was called with %s which is not an item
+0x004200c8	0x00420060	event.cpp	Error: ChangeObjectFrame returned false when passed %s with index %d
+0x004200e2	0x00420060	event.cpp	ERROR: ScriptSetObjBitmap was called with %s which is not a valid object
+0x0042153a	0x00421430	event.cpp	Tried to switch on invalid state.
+0x00421ee8	0x00421c70	event.cpp	ERROR: a compound event got called for an event it didn't care about
+0x00423032	0x00422ff0	event.cpp..gameproc.cpp	Too many colors in bitmap.
+0x004230bb	0x00422ff0	event.cpp..gameproc.cpp	malloc failed in ReadBitmap()
+0x00423132	0x004230f0	event.cpp..gameproc.cpp	Couldn't open bitmap file!
+0x0042326f	0x00423200	event.cpp..gameproc.cpp	ERROR: %s has listed size of 0 (try resaving)
+0x00423390	0x00423300	event.cpp..gameproc.cpp	ERROR: %s not in 1-bit mode
+0x004233e3	0x00423300	event.cpp..gameproc.cpp	ERROR: invalid file size in %s.
+0x00423601	0x004235d0	event.cpp..gameproc.cpp	Error reading save file, source file: %s  line: %d
+0x00423ab6	0x004239b0	event.cpp..gameproc.cpp	Unable to open object data file <%s>
+0x00423af7	0x004239b0	event.cpp..gameproc.cpp	Invalid file id in object data file <%s>
+0x00423e19	0x00423d90	event.cpp..gameproc.cpp	Unable to get surface desc in CreateBitmapSurface()
+0x00423ec1	0x00423d90	event.cpp..gameproc.cpp	Error on Lock in CreateBitmapSurface()
+0x00424063	0x00423fe0	event.cpp..gameproc.cpp	Error seeking to location %d in data file.
+0x00424092	0x00423fe0	event.cpp..gameproc.cpp	Error in validating object in data file.
+0x004242e3	0x00424280	event.cpp..gameproc.cpp	Unable to get surface desc in ReloadBitmapSurface()
+0x00424393	0x00424280	event.cpp..gameproc.cpp	Error on Lock in ReloadBitmapSurface()
+0x0042444d	0x004243b0	event.cpp..gameproc.cpp	Error seeking to location %d in data file.
+0x004244b3	0x004243b0	event.cpp..gameproc.cpp	Error in validating object in data file.
+0x00424610	0x00424590	event.cpp..gameproc.cpp	Error seeking to location %d in data file.
+0x0042463f	0x00424590	event.cpp..gameproc.cpp	Error in validating object in data file.
+0x00424824	0x00424590	event.cpp..gameproc.cpp	DefGameParse: Bad Game Constant Type
+0x00425138	0x00425060	event.cpp..gameproc.cpp	reading script %s:
+0x00425172	0x00425060	event.cpp..gameproc.cpp	FAILED!
+0x004251c3	0x00425060	event.cpp..gameproc.cpp	reading script %s:
+0x004251fd	0x00425060	event.cpp..gameproc.cpp	FAILED!
+0x00425292	0x00425060	event.cpp..gameproc.cpp	reading script %s:
+0x004252cc	0x00425060	event.cpp..gameproc.cpp	FAILED!
+0x00425620	0x00425300	event.cpp..gameproc.cpp	Attempt# %d
+0x0042562d	0x00425300	event.cpp..gameproc.cpp	calculating region data...
+0x004267e9	0x004267c0	gameproc.cpp..item.cpp	PauseGame: %x (set: %x)
+0x0042682d	0x00426800	gameproc.cpp..item.cpp	UnPauseGame: %x (reset: %x)
+0x00426cc6	0x00426c50	gameproc.cpp..item.cpp	Using High Performance Counter
+0x00427ffe	0x00427fd0	gameproc.cpp..item.cpp	TriggerItemDestroyed, item uid=%x, by uid = %x
+0x0042866f	0x004285f0	gameproc.cpp..item.cpp	FreeItem %0x
+0x00428994	0x00428950	gameproc.cpp..item.cpp	Saved %d items
+0x00428c26	0x00428bb0	gameproc.cpp..item.cpp	Loaded %d items
+0x00428ce7	0x00428ca0	item.cpp..map.cpp	DeployItem(resurrection): uid:%x, health:%d
+0x00428d05	0x00428ca0	item.cpp..map.cpp	DeployItem(resurrection): Item Health not zero, uid:%x, health:%d
+0x00428d41	0x00428ca0	item.cpp..map.cpp	Warning: check if resurrect command works with this object type!
+0x004297c5	0x00429740	item.cpp..map.cpp	AddToItemList: newuid=%x, ownerindex=%d, gCurrentUID=%x
+0x004297fc	0x00429740	item.cpp..map.cpp	overflow!
+0x00429ca7	0x00429c80	item.cpp..map.cpp	DestroyItemObject, %x
+0x0042a91e	0x0042a880	item.cpp..map.cpp	Send Damage: uid %x, amount: %d, health: %d, army %d
+0x0042a98d	0x0042a930	item.cpp..map.cpp	Send Death Message: uid %x, army %d
+0x0042a9f6	0x0042a9a0	item.cpp..map.cpp	itemGoneMessageSend uid %x item_type %d
+0x0042aac8	0x0042aa50	item.cpp..map.cpp	itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d
+0x0042acb3	0x0042ab50	item.cpp..map.cpp	<--Send Item Create: uid:%x, item type: %d, subtype: %d
+0x0042ae1d	0x0042ada0	item.cpp..map.cpp	Recieved Damage: item->uid %x, amount: %d, army %d, dir: %d
+0x0042ae8a	0x0042ae50	item.cpp..map.cpp	Received Death Message: item->uid %x, army %d
+0x0042aeec	0x0042aeb0	item.cpp..map.cpp	itemGoneMessageReceive %x
+0x0042af5d	0x0042af30	item.cpp..map.cpp	itemDeployMessageReceive: uid=%x, pos=(%d,%d), facing=%d
+0x0042afcd	0x0042afa0	item.cpp..map.cpp	==> Receive Item Create [uid:%08x, item type: %d, subtype: %d
+0x0042b984	0x0042b860	item.cpp..map.cpp	Added Region link from %d to %d
+0x0042bb00	0x0042b9a0	item.cpp..map.cpp	Activating Region %d
+0x0042c0a0	0x0042bea0	item.cpp..map.cpp	Error in loadtileset()
+0x0042c12b	0x0042bea0	item.cpp..map.cpp	Unable to open tileset
+0x0042c2f1	0x0042bea0	item.cpp..map.cpp	Error on Lock in RestoreTileSet()
+0x0042c316	0x0042bea0	item.cpp..map.cpp	Error in loadtileset()
+0x0042cd40	0x0042c440	item.cpp..map.cpp	Missing index attribute for item #%d!
+0x0042cd71	0x0042c440	item.cpp..map.cpp	chunksize/targetsize different
+0x0042cd8d	0x0042c440	item.cpp..map.cpp	chunksize/targetsize different
+0x0042cda9	0x0042c440	item.cpp..map.cpp	chunksize/targetsize different
+0x0042cdd3	0x0042c440	item.cpp..map.cpp	tile layer size different from map size
+0x0042cde0	0x0042c440	item.cpp..map.cpp	Error in loadmap()
+0x0042d32a	0x0042c440	item.cpp..map.cpp	freeing temporary map load data...
+0x0042dbbe	0x0042dbb0	map.cpp..objscript.cpp	Checksum of %s
+0x0042dc18	0x0042dbb0	map.cpp..objscript.cpp	is %x
+0x00435a43	0x00435980	map.cpp..objscript.cpp	duplicate record in object.aai file %d-%d
+0x00435c4c	0x00435b60	map.cpp..objscript.cpp	DefObjParse: Bad object Constant Type
+0x00435f90	0x00435ee0	map.cpp..objscript.cpp	duplicate link record in object.aai file
+0x00436050	0x00435fd0	map.cpp..objscript.cpp	Object AAI record not found for link %02d-%-3d
+0x004360d3	0x00436080	map.cpp..objscript.cpp	DefLinkParse: 'LINK' command not found.
+0x0043610f	0x00436080	map.cpp..objscript.cpp	DefLinkParse: Parent object type not found.
+0x00436171	0x00436080	map.cpp..objscript.cpp	DefLinkParse: Child object type not found.
+0x00436a58	0x004369e0	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436a7a	0x004369e0	objscript.cpp..pad.cpp	Unexpected end of script.
+0x00436ac7	0x004369e0	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436af3	0x004369e0	objscript.cpp..pad.cpp	Unexpected end of script.
+0x00436b3d	0x004369e0	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436c77	0x00436c20	objscript.cpp..pad.cpp	Unexpected end of script.
+0x00436cbc	0x00436c20	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436daa	0x00436d60	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436dd7	0x00436d60	objscript.cpp..pad.cpp	Unexpected end of script.
+0x00436e6e	0x00436d60	objscript.cpp..pad.cpp	Token %s is not a valid object.
+0x00436e98	0x00436d60	objscript.cpp..pad.cpp	Unexpected end of script.
+0x00436ee8	0x00436d60	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436f12	0x00436d60	objscript.cpp..pad.cpp	Unexpected end of script.
+0x00436f57	0x00436d60	objscript.cpp..pad.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00436ff3	0x00436d60	objscript.cpp..pad.cpp	Invalid token in GenerateObjScriptFromTokens
+0x00437236	0x004371a0	objscript.cpp..pad.cpp	ChangeObjectFrame failed in UpdateObjectScript
+0x00437289	0x004371a0	objscript.cpp..pad.cpp	UpdateObjectScript: bad state index
+0x004372c6	0x004372a0	objscript.cpp..pad.cpp	ERROR: SetObjScriptState was called with %s which is not an item
+0x00437338	0x004372a0	objscript.cpp..pad.cpp	Tried to set object script state (%s) in object %s, which has no object script.
+0x00437366	0x004372a0	objscript.cpp..pad.cpp	Bad state index associated with state %s
+0x004373ae	0x004372a0	objscript.cpp..pad.cpp	ERROR: SetObjScriptState was called with %s which is not a valid object
+0x004377e7	0x00437770	objscript.cpp..pad.cpp	pad # %d thinks there are less than zero items on it
+0x0043b73e	0x0043b700	pad.cpp..script.cpp	Couldn't parse %s!
+0x0043ecaa	0x0043ec80	pad.cpp..script.cpp	Couldn't parse %s!
+0x0043ecea	0x0043ecc0	pad.cpp..script.cpp	Couldn't parse %s!
+0x0043ed2a	0x0043ed00	pad.cpp..script.cpp	Couldn't parse %s!
+0x0043f5b7	0x0043f450	script.cpp..unit.cpp	Line [%4d]: Token too long truncating to: %s
+0x0043f8c4	0x0043f7a0	script.cpp..unit.cpp	AddNameTableName: invalid type; %s has type %d and uid %d
+0x0043fa9b	0x0043f9f0	script.cpp..unit.cpp	Duplicate name '%s' used for different types
+0x0043fb3c	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fb73	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fba3	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fbd3	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fc1a	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fc52	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fc83	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fcb4	0x0043fab0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fcd9	0x0043fab0	script.cpp..unit.cpp	Unknown item descriptor for HIT or KILLED event
+0x0043fd8b	0x0043fcf0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fdc7	0x0043fcf0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fe00	0x0043fcf0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fe3d	0x0043fcf0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fe89	0x0043fcf0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043febf	0x0043fcf0	script.cpp..unit.cpp	Unexpected end of script.
+0x0043fee3	0x0043fcf0	script.cpp..unit.cpp	Unknown item descriptor for ORDER or SETAIMODE event
+0x0043ff42	0x0043ff00	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x0043fff5	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x0044003a	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Name required after PADON
+0x0044006f	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  PADON name was not a pad
+0x0044009a	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x004400df	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Name required after PADOFF
+0x00440110	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  PADOFF name was not a pad
+0x0044014f	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x00440182	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after KILLED
+0x004401b5	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x004401e8	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after KILLED ... BY
+0x00440213	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x00440246	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after HIT
+0x00440281	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x004402b4	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after HIT ... BY
+0x004402df	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x00440312	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after HEALED
+0x0044034d	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x00440380	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after HEALED ... BY
+0x004403ab	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x004403de	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after PICKEDUP
+0x00440419	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x0044044c	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after PICKEDUP ... BY
+0x00440477	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x004404aa	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after DROPPED
+0x004404e5	0x0043ff90	script.cpp..unit.cpp	Unexpected end of script.
+0x00440518	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Expected item name after DROPPED ... BY
+0x0044052f	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  Unexpected reserved word in if statement.
+0x00440582	0x0043ff90	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x004406dd	0x00440600	script.cpp..unit.cpp	Unexpected end of script.
+0x004407f7	0x00440700	script.cpp..unit.cpp	Line [%4d]:  Unexpected use of reserved word
+0x00440845	0x00440700	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00440904	0x00440700	script.cpp..unit.cpp	Line [%4d]:  Name '%s' already used for another type.
+0x00440972	0x00440930	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x004409d5	0x00440930	script.cpp..unit.cpp	Line [%4d]:  Expected Army Color instead of '%s'
+0x00440a4c	0x004409f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00440a6c	0x004409f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00440aaf	0x004409f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00440ae1	0x004409f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00440b8f	0x004409f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00440bde	0x004409f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00440c17	0x004409f0	script.cpp..unit.cpp	Line [%4d]:  Close parens expected in coordinates
+0x00440c3f	0x004409f0	script.cpp..unit.cpp	Line [%4d]:  expected variable name but variable %s not declared
+0x00440c6c	0x004409f0	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type Integer or keyword 'RefVar'
+0x00440c84	0x004409f0	script.cpp..unit.cpp	Line [%4d]:  Comma expected in coordinates
+0x00440cac	0x004409f0	script.cpp..unit.cpp	Line [%4d]:  expected variable name but variable %s not declared
+0x00440ec5	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00440f3d	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x004412fb	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  expected variable name in TRACEVAR but variable %s not declared
+0x004413b2	0x00440d70	script.cpp..unit.cpp	Unexpected end of script.
+0x004413da	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  expected variable name but variable %s not declared
+0x0044141c	0x00440d70	script.cpp..unit.cpp	Line[%4d]:  Negative time set for a TRIGGERDELAY.
+0x004414ff	0x00440d70	script.cpp..unit.cpp	Unexpected end of script.
+0x0044152c	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Illegal weapon type '%s'
+0x00441633	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Illegal vehicle type '%s'
+0x00441866	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Illegal powerup type '%s'
+0x004418e1	0x00440d70	script.cpp..unit.cpp	Line[%4d]:  Invalid explosion type.
+0x00441de2	0x00440d70	script.cpp..unit.cpp	Unexpected end of script.
+0x00441e7c	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00442207	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  expected variable name in SetVar but variable %s not declared
+0x004422c9	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  expected variable name in AddVar but variable %s not declared
+0x004424ad	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x004424da	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Expected {attack|defend|ignore|evade} in setaimode
+0x00442558	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x004425d5	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Expected {stand|kneel|prone|none} in setaipose
+0x00442653	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00442681	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Expected {slow|normal} in setspeed
+0x0044270f	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Expected {strategic} in setitemflag
+0x004427d0	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  Name required after SetDamagePad
+0x00442802	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  SetDamagePad name was not a pad
+0x00442b63	0x00440d70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00442bfc	0x00440d70	script.cpp..unit.cpp	Unexpected end of script.
+0x00442f5a	0x00442f10	script.cpp..unit.cpp	Unexpected end of script.
+0x00443048	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x004430a0	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x004430f8	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x00443150	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x004431c0	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x00443210	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x00443269	0x00443010	script.cpp..unit.cpp	Unexpected end of script.
+0x004432c2	0x00443010	script.cpp..unit.cpp	Line [%4d]:  Unrecognized operand in testvar clause.
+0x004433cd	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x004435de	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00443648	0x004432f0	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00443678	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x004436fa	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x004437eb	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00443b61	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00443b9d	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00443c43	0x004432f0	script.cpp..unit.cpp	Unexpected end of script.
+0x00443e03	0x004432f0	script.cpp..unit.cpp	Line [%4d]:  Missing 'then' in if-statement.
+0x00443e7d	0x00443e40	script.cpp..unit.cpp	GetVarValue: name %s is not a variable!
+0x00443eba	0x00443e90	script.cpp..unit.cpp	SetVarValue: name %s is not a variable!
+0x00443ee8	0x00443ed0	script.cpp..unit.cpp	SetVarValue: bad variable name %s
+0x00443f8e	0x00443f70	script.cpp..unit.cpp	Unexpected end of script.
+0x00443fd2	0x00443f70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00444002	0x00443f70	script.cpp..unit.cpp	Line [%4d]:  Duplicate variable name.
+0x0044406b	0x00443f70	script.cpp..unit.cpp	Unexpected end of script.
+0x004440b2	0x00443f70	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00444102	0x004440e0	script.cpp..unit.cpp	Unexpected end of script.
+0x0044414f	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  Duplicate pad name.
+0x004441c1	0x004440e0	script.cpp..unit.cpp	Unexpected end of script.
+0x0044420c	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x0044442e	0x004440e0	script.cpp..unit.cpp	Unexpected end of script.
+0x004445dd	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  Unexpected symbol in pad definition should be '<=>'
+0x0044461f	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  Pad can't have both specific item and generic triggers
+0x004446a7	0x004440e0	script.cpp..unit.cpp	Unexpected end of script.
+0x00444701	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x0044476b	0x004440e0	script.cpp..unit.cpp	Unexpected end of script.
+0x004447b1	0x004440e0	script.cpp..unit.cpp	Unexpected end of script.
+0x004447f9	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x0044487a	0x004440e0	script.cpp..unit.cpp	Line [%4d]:  Illegal Pad Number
+0x00444928	0x00444900	script.cpp..unit.cpp	Unexpected end of script.
+0x0044496d	0x00444900	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x0044498f	0x00444900	script.cpp..unit.cpp	Unexpected end of script.
+0x004449d4	0x00444900	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x004449f6	0x00444900	script.cpp..unit.cpp	Unexpected end of script.
+0x00444a3b	0x00444900	script.cpp..unit.cpp	Line [%4d]:  '%s' found, but expected token of type %s
+0x00444d05	0x00444cd0	script.cpp..unit.cpp	ReadScript: Could not open %s for reading.
+0x00444e77	0x00444cd0	script.cpp..unit.cpp	Line [%4d]: Unknown Initial Word: %s
+0x00444ec3	0x00444cd0	script.cpp..unit.cpp	lines: %d  tokens: %d  names: %d  compounds: %d
+0x00444ecd	0x00444cd0	script.cpp..unit.cpp	Finished Processing Script... Press SPACE to continue.
+0x00445967	0x004457e0	script.cpp..unit.cpp	Sprite file not found %s
+0x00445ddf	0x00445d80	script.cpp..unit.cpp	Error in release: Sprite not found!
+0x00445ee7	0x00445eb0	script.cpp..unit.cpp	unable to restore sprite %s.
+0x00445f11	0x00445eb0	script.cpp..unit.cpp	unable to restore sprite %x.
+0x00445f2f	0x00445eb0	script.cpp..unit.cpp	unable to restore sprite %x.
+0x00446343	0x004462f0	script.cpp..unit.cpp	Unable to load sprite %s
+0x004464a6	0x00446450	script.cpp..unit.cpp	Error creating font.
+0x004478fb	0x004478c0	script.cpp..unit.cpp	DestroyTrooper %x
+0x004479a4	0x00447990	script.cpp..unit.cpp	RemoveInventoryItem
+0x00447beb	0x00447a40	script.cpp..unit.cpp	DamageTrooper: droping armor uid:%x
+0x0044859d	0x00448540	script.cpp..unit.cpp	TrooperPickupItem %x
+0x00448759	0x00448540	script.cpp..unit.cpp	TrooperPickupItem 2 %x
+0x00448822	0x00448540	script.cpp..unit.cpp	TrooperPickupItem %x
+0x00448864	0x00448540	script.cpp..unit.cpp	TrooperPickupItem %x
+0x004488ee	0x004488c0	script.cpp..unit.cpp	TrooperHostApprovedPickupItem %x
+0x00448937	0x004488c0	script.cpp..unit.cpp		TrooperHostApprovedPickupItem: we've got somthing in that slot
+0x00448a30	0x004488c0	script.cpp..unit.cpp		TrooperHostApprovedPickupItem: new weapon
+0x00448a82	0x004488c0	script.cpp..unit.cpp		TrooperHostApprovedPickupItem:Medkit
+0x00448ab5	0x004488c0	script.cpp..unit.cpp	TrooperHostApprovedPickupItem %x
+0x00448ae0	0x004488c0	script.cpp..unit.cpp		TrooperHostApprovedPickupItem: HotTarget
+0x00448b0a	0x004488c0	script.cpp..unit.cpp	TrooperHostApprovedPickupItem %x
+0x00448b73	0x00448b20	script.cpp..unit.cpp	TrooperRemotePickupItem %x
+0x00448bbc	0x00448b20	script.cpp..unit.cpp		TrooperRemotePickupItem: we've got somthing in that slot
+0x00448c8c	0x00448b20	script.cpp..unit.cpp		TrooperRemotePickupItem: new weapon
+0x00448ccb	0x00448b20	script.cpp..unit.cpp		TrooperRemotePickupItem:Medkit
+0x00448cfe	0x00448b20	script.cpp..unit.cpp		TrooperRemotePickupItem %x
+0x00448d40	0x00448b20	script.cpp..unit.cpp		TrooperRemotePickupItem: HotTarget
+0x00448dd7	0x00448d60	script.cpp..unit.cpp	TrooperDropItem  %x
+0x00448e06	0x00448d60	script.cpp..unit.cpp	TrooperDropItem  %x  ammo: %d
+0x0044927c	0x00449250	script.cpp..unit.cpp	DeployTrooper: uid:%x, pos=(%d,%d)
+0x0044979e	0x00449760	script.cpp..unit.cpp	UseInventoryItem
+0x0044982d	0x00449760	script.cpp..unit.cpp	UseInventoryItem: droping item:%x
+0x0044a317	0x00449fd0	script.cpp..unit.cpp	FIRE  trooper: %x  weapon: %x  ammo: %d
+0x0044b5b2	0x0044afb0	script.cpp..unit.cpp	UpdateTrooperAction: asking for an item (2); oldweapon: %s; maxammo: %d (%d); oldweap ammo: %d; actual:%d; owner: %d
+0x0044bfef	0x0044bfa0	script.cpp..unit.cpp	<--Trooper Want Item Send: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0044c074	0x0044bfa0	script.cpp..unit.cpp	Send WANT_PICKUP item %x ammo %d
+0x0044c097	0x0044bfa0	script.cpp..unit.cpp	Send WANT_DROP item %x ammo %d
+0x0044c0ba	0x0044bfa0	script.cpp..unit.cpp	Send DO_PICKUP item %x ammo %d
+0x0044c0dd	0x0044bfa0	script.cpp..unit.cpp	Send DO_DROP item %x ammo %d
+0x0044c19a	0x0044c150	script.cpp..unit.cpp	<--Trooper Drop Item Send: Trooper: %x, item: %x,  slot: %d, quant: %d
+0x0044c239	0x0044c150	script.cpp..unit.cpp	-->Trooper Drop Item Sent: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0044c34e	0x0044c250	script.cpp..unit.cpp	Trooper Fire Send, trooper: %d,  face:%d, pos (%d,%d,%d), loctarg %x, globTarg %x, weap %d, seq:%d
+0x0044c3cd	0x0044c370	script.cpp..unit.cpp	Send TrooperSetWeapon message, trooper: %08x, weapon:%08x
+0x0044c405	0x0044c3e0	script.cpp..unit.cpp	Received TrooperSetWeapon message: linking trooper %08x to weapon %08x
+0x0044c41f	0x0044c3e0	script.cpp..unit.cpp	Received TrooperSetWeapon message: trooper %08x not found
+0x0044c43f	0x0044c3e0	script.cpp..unit.cpp	Received TrooperSetWeapon message: weapon %08x not found
+0x0044c5fc	0x0044c590	script.cpp..unit.cpp	troopMessageReceive: got eTROOPER_DROP_ITEM_MESSAGE
+0x0044c624	0x0044c590	script.cpp..unit.cpp	troopMessageReceive: got eTROOPER_SET_WEAPON_MESSAGE
+0x0044c63d	0x0044c590	script.cpp..unit.cpp	Unknown Troop Message of type %d Received
+0x0044c6c2	0x0044c680	script.cpp..unit.cpp	-->Trooper Want Item Received: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0044c7b0	0x0044c680	script.cpp..unit.cpp	Weapon destroyed before dropping; but we handled it
+0x0044c7f3	0x0044c680	script.cpp..unit.cpp	Tell pickup item received; ammo %d
+0x0044c87e	0x0044c680	script.cpp..unit.cpp	Tell Drop item received; ammo %d
+0x0044c915	0x0044c680	script.cpp..unit.cpp	Request pickup item received & OKed; ammo %d
+0x0044c928	0x0044c680	script.cpp..unit.cpp	Request pickup item received & denied
+0x0044c953	0x0044c680	script.cpp..unit.cpp	Request drop item received; ammo %d
+0x0044ca01	0x0044c9c0	script.cpp..unit.cpp	-->Trooper Drop Item Received: Trooper: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0044ca88	0x0044c9c0	script.cpp..unit.cpp	Weapon destroyed before dropping; but we handled it
+0x0044cab9	0x0044c9c0	script.cpp..unit.cpp	Drop item received & performed; ammo %d
+0x0044caea	0x0044c9c0	script.cpp..unit.cpp		Drop Item already handled (it's my unit)
+0x0044cc82	0x0044cb20	script.cpp..unit.cpp	Trooper Fire Rec, trooper: %x,  face:%d, pos (%d,%d,%d), loctarg %x, globTarg %x, weapidx %d
+0x0044cf34	0x0044cd70	script.cpp..unit.cpp	Bad Trooper Type
+0x0044d0f7	0x0044cfa0	script.cpp..unit.cpp	Failed to open Options.cfg for writing
+0x0044d2a0	0x0044d110	script.cpp..unit.cpp	Failed to open Options.cfg for reading
+0x0044d532	0x0044d110	script.cpp..unit.cpp	Error: Key handler not freed
+0x0045a4ca	0x0045a450	>=unit.cpp	vehicle mask direction: %d
+0x0045af37	0x0045ae30	>=unit.cpp	ExitAllFromVehicle: I was killed in a vehicle, damage owner not me
+0x0045af6c	0x0045ae30	>=unit.cpp	ExitAllFromVehicle: I was killed in a vehicle, damage owner is me
+0x0045b0d3	0x0045b090	>=unit.cpp	Vehicle aai entry not found for type %d
+0x0045ddca	0x0045daa0	>=unit.cpp	<--vehicleUpdateMessageAppend: id: %x, Change:%d%d%d, Pos/last (%d,%d)/(%d,%d), Facing/last:%d/%d, Gunfacing/last:%d/%d, intFacing/last:%d/%d, intGunfacing/last:%d/%d, action/last:%x/%x, seq:%d
+0x0045e0b7	0x0045df10	>=unit.cpp	-->vehicleUpdateMessageUnpack: ID:%x, Change:%d%d%d, Pos (%d,%d), facing:%d, gunfacing:%d, intent.facing:%d, intent.gunfacing:%d, action:%d, rev:%d, half:%d, slow:%d
+0x0045e11f	0x0045e0d0	>=unit.cpp	<--Vehicle Want Item Send: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0045e1a4	0x0045e0d0	>=unit.cpp	Send WANT_PICKUP item %x ammo %d
+0x0045e1c7	0x0045e0d0	>=unit.cpp	Send WANT_DROP item %x ammo %d
+0x0045e1ea	0x0045e0d0	>=unit.cpp	Send DO_PICKUP item %x ammo %d
+0x0045e20d	0x0045e0d0	>=unit.cpp	Send DO_DROP item %x ammo %d
+0x0045e2f0	0x0045e220	>=unit.cpp	Vehicle Fire Send, vehicle: %x,  gunface:%d, pos (%d,%d,%d),  globTarg %d
+0x0045e33b	0x0045e300	>=unit.cpp	<--Vehicle Enter Send: Vehicle: %x, item: %x
+0x0045e3ac	0x0045e300	>=unit.cpp	-->Vehicle Enter Sent: Vehicle: %x, item: %x
+0x0045e3fb	0x0045e3c0	>=unit.cpp	<--Vehicle Exit Send: Vehicle: %x, item: %x
+0x0045e46c	0x0045e3c0	>=unit.cpp	-->Vehicle Exit Sent: Vehicle: %x, item: %x
+0x0045e5fa	0x0045e590	>=unit.cpp	Unknown Vehicle Message of type %d Received
+0x0045e671	0x0045e630	>=unit.cpp	-->Vehicle Want Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0045e744	0x0045e630	>=unit.cpp	Tell pickup item received; ammo %d
+0x0045e76d	0x0045e630	>=unit.cpp	Tell Drop item received; ammo %d
+0x0045e7c0	0x0045e630	>=unit.cpp	Request pickup item received & OKed; ammo %d
+0x0045e7d2	0x0045e630	>=unit.cpp	Request pickup item received & denied
+0x0045e7fc	0x0045e630	>=unit.cpp	Request drop item received; ammo %d
+0x0045e8a0	0x0045e860	>=unit.cpp	-->Vehicle Drop Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d
+0x0045e90b	0x0045e860	>=unit.cpp	Weapon destroyed before dropping; but we handled it
+0x0045e93c	0x0045e860	>=unit.cpp	Drop item received & performed; ammo %d
+0x0045e96e	0x0045e860	>=unit.cpp		Drop Item already handled (it's my unit)
+0x0045ea20	0x0045e980	>=unit.cpp	Vehicle Fire Rec, vehicle: %x,  gunface:%d, pos (%d,%d,%d), loctarg %x, globTarg %x
+0x0045ea64	0x0045ea30	>=unit.cpp	-->Vehicle Enter Received: Vehicle: %x, trooper: %x
+0x0045ead4	0x0045eaa0	>=unit.cpp	-->Vehicle Exit Received: Vehicle: %x, trooper: %x
+0x0045edc7	0x0045ebf0	>=unit.cpp	Bad Vehicle Type
+0x0045ee9f	0x0045ee80	>=unit.cpp	uid wasn't a weapon!
+0x0045f101	0x0045f0c0	>=unit.cpp	CreateWeapon: %s, %d, %d, (%d,%d), %d, %d, %d, %x
+0x0045f183	0x0045f0c0	>=unit.cpp	CreateWeapon
+0x0045f2a2	0x0045f290	>=unit.cpp	DestroyWeapon, %x
+0x0046070a	0x004602c0	>=unit.cpp	Bad Weapon Type
+0x00462537	0x004624a0	>=unit.cpp	Couldn't Blt Seq Pixels
+0x00462581	0x004624a0	>=unit.cpp	Couldn't Blt Seq Pixels
+0x004625ee	0x004624a0	>=unit.cpp	Couldn't Blt Seq Pixels

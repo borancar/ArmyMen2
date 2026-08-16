@@ -1,0 +1,196 @@
+#include "trace.h"
+#include "hooklog.h"
+
+#include <windows.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_TRACED   64
+#define MAX_ARGS     8
+#define STUB_BYTES   27
+#define ARENA_BYTES  4096
+
+struct entry {
+    const char *name;
+    int32_t     nargs;
+    uint32_t    calls;
+};
+
+static struct entry g_entries[MAX_TRACED];
+static int32_t      g_count;
+static uint8_t     *g_arena;
+static size_t       g_arena_used;
+static int          g_enabled = -1;
+
+int trace_enabled(void)
+{
+    if (g_enabled < 0) {
+        const char *opt = getenv("AM2_TRACE");
+        g_enabled = (opt && *opt == '1');
+    }
+    return g_enabled;
+}
+
+/* A dword that points at a short, printable, NUL-terminated string is almost
+ * always meant to be read as one. Rendering those inline is what makes a
+ * generic hex trace actually legible. */
+static const char *as_string(uint32_t v)
+{
+    const char *p = (const char *)(uintptr_t)v;
+    int         i;
+
+    if (v < 0x10000 || IsBadReadPtr(p, 1))
+        return NULL;
+    for (i = 0; i < 96; i++) {
+        unsigned char c;
+
+        if (IsBadReadPtr(p + i, 1))
+            return NULL;
+        c = (unsigned char)p[i];
+        if (c == '\0')
+            return i > 0 ? p : NULL;
+        /* Nearly every format string in this binary ends in a newline, so
+         * tab/CR/LF have to count as printable or none of them render. */
+        if (c == '\n' || c == '\r' || c == '\t')
+            continue;
+        if (c < 0x20 || c > 0x7E)
+            return NULL;
+    }
+    return NULL;
+}
+
+/* Render a recovered string on one line, so an embedded newline cannot split a
+ * trace record in two. Truncates rather than overflowing. */
+static void escape(char *out, size_t cap, const char *in)
+{
+    size_t at = 0;
+
+    for (; *in && at + 3 < cap; in++) {
+        char c = *in;
+        if (c == '\n' || c == '\r' || c == '\t' || c == '"' || c == '\\') {
+            out[at++] = '\\';
+            out[at++] = (c == '\n') ? 'n'
+                      : (c == '\r') ? 'r'
+                      : (c == '\t') ? 't'
+                      : c;
+        } else {
+            out[at++] = c;
+        }
+    }
+    out[at] = '\0';
+}
+
+/* Called by every generated stub. `args` points at the first argument dword. */
+static void __cdecl trace_enter(uint32_t id, uint32_t *args)
+{
+    char        buf[512];
+    size_t      at = 0;
+    struct entry *e;
+    int32_t     i;
+
+    if (id >= (uint32_t)g_count)
+        return;
+    e = &g_entries[id];
+    e->calls++;
+
+    at += (size_t)_snprintf(buf + at, sizeof buf - at, "trace %s#%u(",
+                            e->name, e->calls);
+
+    for (i = 0; i < e->nargs && at < sizeof buf - 32; i++) {
+        uint32_t    v = args[i];
+        const char *s = as_string(v);
+
+        if (i)
+            at += (size_t)_snprintf(buf + at, sizeof buf - at, ", ");
+        if (s) {
+            char esc[128];
+            escape(esc, sizeof esc, s);
+            at += (size_t)_snprintf(buf + at, sizeof buf - at, "\"%s\"", esc);
+        } else {
+            at += (size_t)_snprintf(buf + at, sizeof buf - at, "%08x", v);
+        }
+    }
+    _snprintf(buf + at, sizeof buf - at, ")");
+    buf[sizeof buf - 1] = '\0';
+
+    hooklog_raw(buf);
+}
+
+static uint8_t *arena_alloc(size_t n)
+{
+    if (!g_arena) {
+        g_arena = VirtualAlloc(NULL, ARENA_BYTES, MEM_COMMIT | MEM_RESERVE,
+                               PAGE_EXECUTE_READWRITE);
+        if (!g_arena)
+            return NULL;
+    }
+    if (g_arena_used + n > ARENA_BYTES)
+        return NULL;
+
+    {
+        uint8_t *p = g_arena + g_arena_used;
+        g_arena_used += n;
+        return p;
+    }
+}
+
+static void put32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)(v & 0xFF);
+    p[1] = (uint8_t)((v >> 8) & 0xFF);
+    p[2] = (uint8_t)((v >> 16) & 0xFF);
+    p[3] = (uint8_t)((v >> 24) & 0xFF);
+}
+
+const void *trace_wrap(const void *fn, const char *name, int32_t nargs)
+{
+    uint8_t *s;
+    int32_t  id;
+
+    if (!trace_enabled() || g_count >= MAX_TRACED)
+        return fn;
+    if (nargs < 0)
+        nargs = 0;
+    if (nargs > MAX_ARGS)
+        nargs = MAX_ARGS;
+
+    s = arena_alloc(STUB_BYTES);
+    if (!s) {
+        hooklog("trace: out of stub space for %s", name);
+        return fn;
+    }
+
+    id = g_count++;
+    g_entries[id].name  = name;
+    g_entries[id].nargs = nargs;
+    g_entries[id].calls = 0;
+
+    /* On entry [esp] is the return address and the arguments start at [esp+4].
+     * pushfd + pushad move esp down 36, so the arguments sit at [esp+40].
+     *
+     *   9C                 pushfd
+     *   60                 pushad
+     *   8D 44 24 28        lea   eax, [esp+40]      ; &args
+     *   50                 push  eax
+     *   68 <id>            push  id
+     *   E8 <rel>           call  trace_enter
+     *   83 C4 08           add   esp, 8
+     *   61                 popad
+     *   9D                 popfd
+     *   E9 <rel>           jmp   fn                 ; stack untouched
+     */
+    s[0] = 0x9C;
+    s[1] = 0x60;
+    s[2] = 0x8D; s[3] = 0x44; s[4] = 0x24; s[5] = 0x28;
+    s[6] = 0x50;
+    s[7] = 0x68; put32(s + 8, (uint32_t)id);
+    s[12] = 0xE8; put32(s + 13, (uint32_t)((const uint8_t *)trace_enter - (s + 17)));
+    s[17] = 0x83; s[18] = 0xC4; s[19] = 0x08;
+    s[20] = 0x61;
+    s[21] = 0x9D;
+    s[22] = 0xE9; put32(s + 23, (uint32_t)((const uint8_t *)fn - (s + 27)));
+
+    FlushInstructionCache(GetCurrentProcess(), s, STUB_BYTES);
+    return s;
+}

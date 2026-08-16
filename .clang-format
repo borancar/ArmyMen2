@@ -1,0 +1,10 @@
+# The offset columns, the hex tables and the comment blocks in this folder are
+# laid out by hand and carry meaning - an aligned /* 0x… */ column is how every
+# line is checked against the disassembly. No formatter reproduces that: the
+# closest clang-format config still rewrites 4,163 lines of it.
+#
+# So: leave it alone. This file is what tells clangd, conform.nvim, VS Code and
+# anything else clang-format-based to keep its hands off, whatever the editor is
+# configured to do.
+DisableFormat: true
+SortIncludes: Never

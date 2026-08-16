@@ -1,0 +1,87 @@
+# ArmyMenII
+
+Reconstructing the source of **Army Men II** (3DO, 1999) and porting it to Linux.
+
+The approach is incremental rather than big-bang: keep the original
+`ArmyMen2.exe` running under Wine, and progressively replace its functions with
+reimplemented ones, verifying against real gameplay at every step. Only once
+enough of the engine is reconstructed does the port become standalone.
+
+## Layout
+
+    tools/      analysis tooling (Python, run from .venv)
+    docs/       findings, plus generated .tsv datasets
+    src/        reconstructed source
+    build/      build output (ignored)
+    reference/  scratch reference material (ignored, never committed)
+    .wine/      Wine prefix with the GOG install (ignored)
+
+Start with [`docs/00-recon.md`](docs/00-recon.md), then
+[`docs/01-harness.md`](docs/01-harness.md).
+
+## Running the harness
+
+```sh
+make run        # game with our patches installed
+make run-log    # plus the game's own 1999 debug logger, un-stubbed
+```
+
+`launcher.exe` starts the game suspended, injects `am2hook.dll`, and resumes it,
+so patches are in place before the entry point runs. No shipped file is
+modified — skip the launcher and the install is stock. Set `AM2_TRACE=1` for
+generic argument tracing of every patched function.
+
+## Setup
+
+The Wine prefix lives in-tree at `.wine/` and is not committed. Always point
+Wine at it explicitly:
+
+```sh
+export WINEPREFIX="$PWD/.wine"
+wine explorer /desktop=amii,800x600 "C:\GOG Games\Army Men II\ArmyMen2.exe"
+```
+
+Python tooling:
+
+```sh
+python3 -m venv .venv && ./.venv/bin/pip install pefile capstone
+```
+
+Host toolchain: `i686-w64-mingw32-gcc/g++` (32-bit PE — Wine 11 here is
+new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
+
+## Tools
+
+| | |
+|---|---|
+| `tools/am2.py` | PE loader addressed by VA, resilient linear disassembly, string/xref search |
+| `tools/find_savetags.py` | savegame chunk tags + the file/line anchors that bound translation units |
+| `tools/functions.py` | function inventory with translation-unit attribution |
+| `tools/find_logs.py` | recovers the stubbed-out debug log format strings |
+| `tools/checkdetour.py` | verifies an address is safe to overwrite with a 5-byte jmp |
+
+Each writes a `.tsv` into `docs/`. Regenerate in dependency order:
+
+```sh
+./.venv/bin/python tools/find_savetags.py
+./.venv/bin/python tools/functions.py
+./.venv/bin/python tools/find_logs.py
+```
+
+## Conventions
+
+- Reconstructed code uses `<stdint.h>` fixed-width types throughout
+  (`uint32_t`, `int16_t`, …) — never bare `int`/`long` or Win32 `DWORD`/`WORD`.
+  The original is 32-bit x86 where `long` is 32 bits; the target is 64-bit
+  Linux where it is not.
+- All addresses are absolute VAs. Relocations are stripped from the executable,
+  so it always maps at `0x400000` and addresses are stable.
+
+## On the Army Men 1 source
+
+The source to the *first* Army Men (1998) circulates publicly and shares much of
+its engine lineage with this game — 8 of the 10 filenames recovered from this
+binary also exist there. Project policy is to use it for **naming and data
+structure layout hints only**. All logic is derived from disassembly of
+`ArmyMen2.exe`. That material is never copied into this repository; anything
+consulted stays in the ignored `reference/` directory.
