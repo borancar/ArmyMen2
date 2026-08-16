@@ -366,6 +366,39 @@ framebuffer is 8-bit paletted, base at `0x004FE1A8`, pitch at `0x00502AD0` —
 which sits immediately below `ORIGIN_SEL_B`, so these are probably fields of one
 screen descriptor rather than loose globals.
 
+### The sprite path
+
+`DrawSprite` (`0x00445FF0`, 24 call sites) is the sprite counterpart to
+`DrawText` and is built the same way: clip against the screen rectangle, then
+hand the clipped source rectangle to a blitter. It places the sprite so that its
+**hot spot** lands at the given position rather than its corner.
+
+It also exposes part of the sprite structure:
+
+| offset | field |
+|---|---|
+| `+0x10` | pixel data A |
+| `+0x14` | `AM2_Rect` bounds |
+| `+0x24` | `int16` hot spot x |
+| `+0x26` | `int16` hot spot y |
+| `+0x30` | pixel data B |
+
+The two data pointers are alternatives — nothing is drawn when both are null —
+so they are presumably two representations that the dispatcher chooses between.
+
+The clip rectangle at `0x00485310` is shared with `DrawText`. It was named
+`ADDR_TEXT_CLIP` while only the text path was known; this function is what
+showed it to be the general screen clip, and it has been renamed
+`ADDR_SCREEN_CLIP`.
+
+Not yet reconstructed: the dispatcher at `0x00446070`, which is the busiest
+thing in the 2D pipeline — 14 call sites, reached from every large drawing
+composite — and which fans out to five inner blitters (`0x0041C1C0`,
+`0x0041C2B0`, `0x0041C3A0`, `0x0041C480`, `0x00445EB0`). Those are presumably
+transparency and blend variants of the RLE loop already recovered as
+`BlitGlyph`, which makes them the obvious next step: the format is known, only
+the per-pixel policy differs.
+
 ### The packed map key
 
 A 26-bit key built by `PackKey` (`0x00433810`) and taken apart by three readers:

@@ -40,7 +40,7 @@
 #define g_textReady   (*(int32_t *)(uintptr_t)ADDR_TEXT_READY)
 #define g_glyphOffset ((const uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)
 #define g_fontBase    ((uint8_t *const *)(uintptr_t)ADDR_FONT_BASES)
-#define g_textClip    (*(const AM2_Rect *)(uintptr_t)ADDR_TEXT_CLIP)
+#define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define g_originSelA  (*(int32_t *)(uintptr_t)ADDR_ORIGIN_SEL_A)
 #define g_originSelB  (*(int32_t *)(uintptr_t)ADDR_ORIGIN_SEL_B)
 #define g_originDX    (*(int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
@@ -91,7 +91,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
         dstX = penX;
         dstY = y;
 
-        if (!ClipRect(&src, &g_textClip, &dstX, &dstY, &out))
+        if (!ClipRect(&src, &g_screenClip, &dstX, &dstY, &out))
             return;                 /* not `continue` -- see the header note */
 
         if (g_originSelA == g_originSelB) {

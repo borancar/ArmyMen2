@@ -318,6 +318,7 @@ interleave in true order.
 | `0x0042E220` | `ClipRect` | **verified** | 5,146,540 calls; sprites and terrain correct |
 | `0x00446930` | `DrawText` | **verified** | every string on screen renders correctly |
 | `0x0041C710` | `BlitGlyph` | **verified** | 874,768 calls; every text pixel written by our decoder |
+| `0x00445FF0` | `DrawSprite` | **verified** | 61,531 calls; scene renders correctly |
 | `0x00433810` | `PackKey` | **verified** | 3,986 calls |
 | `0x00433830` | `KeyFieldA` | **verified** | 802 calls |
 | `0x00433840` | `KeyFieldB` | **verified** | 80 calls |

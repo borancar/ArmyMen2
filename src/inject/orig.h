@@ -35,7 +35,7 @@
 #define ADDR_TEXT_READY     0x004FDF80u  /* int32_t; zero means do not draw */
 #define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[], indexed ch + font*262 */
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t*[], indexed font*133 */
-#define ADDR_TEXT_CLIP      0x00485310u  /* AM2_Rect */
+#define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- shared by text and sprite drawing */
 /* When these two globals are equal the destination is shifted by the pair
  * below -- an origin adjustment for one of the render targets. */
 #define ADDR_ORIGIN_SEL_A   0x00507128u  /* int32_t */
@@ -47,6 +47,11 @@
  * these are probably fields of one screen descriptor rather than loose globals. */
 #define ADDR_SCREEN_PITCH   0x00502AD0u  /* int32_t, bytes per scanline */
 #define ADDR_FRAMEBUFFER    0x004FE1A8u  /* uint8_t *, 8-bit paletted surface */
+
+/* Sprite drawing. The dispatcher is not reconstructed yet: it fans out to five
+ * inner blitters, presumably transparency and blend variants of BlitGlyph. */
+#define ADDR_DRAW_SPRITE         0x00445FF0u  /* void(AM2_Sprite*,x,y,mode) */
+#define ADDR_DRAW_SPRITE_CLIPPED 0x00446070u  /* void(spr,x,y,const AM2_Rect*,mode) */
 
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u

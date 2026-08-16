@@ -25,6 +25,7 @@
 #include "../game/packkey.h"
 #include "../game/rect.h"
 #include "../game/savetag.h"
+#include "../game/sprite.h"
 #include "../game/text.h"
 
 #include <windows.h>
@@ -139,6 +140,7 @@ static void install(void)
     packkey_install();
     text_install();
     blit_install();
+    sprite_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so
