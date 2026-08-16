@@ -179,11 +179,79 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
                      (size_t)(g_objCount - pos) * sizeof(AM2_ObjEntry));
 
     g_objCount++;
-    g_objTable[pos].uid    = uid;
-    g_objTable[pos].obj    = obj;
-    g_objTable[pos].serial = 0;
+    g_objTable[pos].uid   = uid;
+    g_objTable[pos].obj   = obj;
+    /* Zero, not the current stamp: a newly registered object should be visited
+     * by a walk already in progress rather than skipped by it. */
+    g_objTable[pos].stamp = 0;
 
     return uid;
+}
+
+/* RemoveFromItemList -- reconstructed from 0x00428590.
+ *
+ * Looks the object up by the UID it carries at +0x04, drops the entry and
+ * closes the gap. Returns 1 when it removed something, 0 when the UID was not
+ * registered.
+ */
+int32_t __cdecl RemoveFromItemList(AM2_Object *obj)
+{
+    int32_t pos = 0;
+    int32_t i, tail;
+
+    /* Same trick as LookupByUID and CheckSaveTag: the original hands FindSlot
+     * the address of its own argument slot. */
+    i = FindSlot(obj->uid, &pos);
+    if (i < 0)
+        return 0;
+
+    g_objCount--;
+    tail = g_objCount - i;          /* entries sitting above the removed one */
+    if (tail > 0)
+        orig_memmove(&g_objTable[i], &g_objTable[i + 1],
+                     (size_t)tail * sizeof(AM2_ObjEntry));
+
+    return 1;
+}
+
+/* FirstItem / NextItem -- reconstructed from 0x00427850 and 0x00427880.
+ *
+ * A walk over every registered object. Because an insert memmoves the tail,
+ * an index captured by the caller can be invalidated mid-walk, so the table
+ * does not rely on index stability: FirstItem bumps a global stamp, and
+ * NextItem skips any entry already carrying it and marks each one it hands
+ * back. An object can therefore be shifted during a walk without being
+ * visited twice.
+ */
+void *__cdecl FirstItem(void)
+{
+    g_iterCursor = 0;
+    if (g_objCount <= 0)
+        return 0;
+
+    g_iterStamp++;
+    return g_objTable[0].obj;
+}
+
+void *__cdecl NextItem(void)
+{
+    int32_t count = g_objCount;
+    int32_t i = g_iterCursor + 1;
+
+    g_iterCursor = i;
+    if (i >= count)
+        return 0;
+
+    /* Skip whatever this pass has already handed out. */
+    while (g_objTable[i].stamp == g_iterStamp) {
+        i++;
+        g_iterCursor = i;
+        if (i >= count)
+            return 0;
+    }
+
+    g_objTable[i].stamp = g_iterStamp;
+    return g_objTable[g_iterCursor].obj;
 }
 
 int objtable_install(void)
@@ -193,5 +261,9 @@ int objtable_install(void)
     rc |= patch_replace(ADDR_FIND_SLOT, FindSlot, "FindSlot", 2);
     rc |= patch_replace(ADDR_LOOKUP_BY_UID, LookupByUID, "LookupByUID", 1);
     rc |= patch_replace(ADDR_ADD_TO_ITEM_LIST, AddToItemList, "AddToItemList", 2);
+    rc |= patch_replace(ADDR_REMOVE_FROM_ITEM_LIST, RemoveFromItemList,
+                        "RemoveFromItemList", 1);
+    rc |= patch_replace(ADDR_FIRST_ITEM, FirstItem, "FirstItem", 0);
+    rc |= patch_replace(ADDR_NEXT_ITEM, NextItem, "NextItem", 0);
     return rc;
 }

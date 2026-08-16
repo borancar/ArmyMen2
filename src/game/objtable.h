@@ -4,11 +4,18 @@
 #include <stdint.h>
 #include "../inject/orig.h"
 
-/* One registry entry: 12 bytes, sorted ascending by uid. */
+/* One registry entry: 12 bytes, sorted ascending by uid.
+ *
+ * `stamp` is not a serial number, despite looking like one on first reading.
+ * It is the iteration marker: FirstItem bumps a global stamp, NextItem skips
+ * entries already carrying it and marks each one it returns. That is what makes
+ * a walk safe while objects are being added, since an insert memmoves the tail
+ * and invalidates any index the caller was holding.
+ */
 typedef struct {
     uint32_t uid;
     void    *obj;
-    uint32_t serial;
+    uint32_t stamp;
 } AM2_ObjEntry;
 
 /* A registered object, so far as AddToItemList needs to know it. Only the
@@ -24,6 +31,9 @@ typedef struct {
 #define g_objTable (*(AM2_ObjEntry **)(uintptr_t)ADDR_OBJ_TABLE)
 #define g_objCount (*(int32_t *)(uintptr_t)ADDR_OBJ_COUNT)
 #define g_objCap   (*(int32_t *)(uintptr_t)ADDR_OBJ_CAPACITY)
+
+#define g_iterCursor (*(int32_t *)(uintptr_t)ADDR_ITER_CURSOR)
+#define g_iterStamp  (*(uint32_t *)(uintptr_t)ADDR_ITER_STAMP)
 
 #define g_uidCounter  ((uint32_t *)(uintptr_t)ADDR_UID_COUNTERS)   /* [8] */
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
@@ -45,6 +55,15 @@ void *__cdecl LookupByUID(uint32_t uid);
 /* Original: 0x00429740. Registers `obj`, allocating a UID when `uid` is 0.
  * Returns the UID it registered under. */
 uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid);
+
+/* Original: 0x00428590. Unregisters `obj` by its uid. 1 if removed, 0 if it
+ * was not in the table. */
+int32_t __cdecl RemoveFromItemList(AM2_Object *obj);
+
+/* Originals: 0x00427850 and 0x00427880. Walk every registered object.
+ * Names are ours. Returns NULL at the end of the walk. */
+void *__cdecl FirstItem(void);
+void *__cdecl NextItem(void);
 
 int objtable_install(void);
 

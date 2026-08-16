@@ -35,6 +35,15 @@
 #define ADDR_OBJ_CAPACITY   0x00514F00u  /* int32_t */
 
 #define ADDR_ADD_TO_ITEM_LIST 0x00429740u /* uint32_t(AM2_Object*, uint32_t) */
+#define ADDR_REMOVE_FROM_ITEM_LIST 0x00428590u /* int32_t(AM2_Object*) */
+#define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
+#define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */
+
+/* Iteration state. The cursor is an index into the table; the stamp is bumped
+ * once per pass so a walk can tell which entries it has already visited even
+ * though inserts shift indices underneath it. */
+#define ADDR_ITER_CURSOR    0x00514F08u  /* int32_t */
+#define ADDR_ITER_STAMP     0x0051308Cu  /* uint32_t */
 
 /* A UID is (owner << 29) | counter, so eight owners each with a 29-bit
  * counter. These are the per-owner counters, indexed 0..7. */

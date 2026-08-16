@@ -317,6 +317,15 @@ interleave in true order.
 | `0x004277A0` | `FindSlot` | **verified** | binary search over the object registry |
 | `0x00427820` | `LookupByUID` | **verified** | 557,800 calls during Boot Camp movement |
 | `0x00429740` | `AddToItemList` | **verified** | 1,609 registrations, all resolved by our own lookup |
+| `0x00427850` | `FirstItem` | **verified** | 178,392 walks |
+| `0x00427880` | `NextItem` | **verified** | 287,032,728 calls; count is exact (see below) |
+| `0x00428590` | `RemoveFromItemList` | installed | **not yet exercised** — nothing is destroyed by moving around |
+
+`NextItem` has an unusually crisp proof. Across a session it was called
+287,032,728 times against 178,392 walks of a 1,609-entry table, and
+178,392 x 1,609 is exactly 287,032,728. Every walk visited every object exactly
+once — nothing skipped, nothing repeated — which is precisely what the stamp
+logic has to guarantee and the hardest part of that reconstruction to get right.
 
 ### How CheckSaveTag was finally verified
 

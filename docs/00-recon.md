@@ -238,7 +238,16 @@ used at every access site:
 |---|---|---|
 | `+0` | `uint32_t` | uid — the search key, kept sorted ascending |
 | `+4` | `void *` | the object; may be NULL |
-| `+8` | `uint32_t` | serial, stamped from the counter at `0x0051308C` |
+| `+8` | `uint32_t` | iteration stamp, from the global at `0x0051308C` |
+
+That third field looks like a serial number and is not one. It is how iteration
+stays correct while the table is being mutated: `FirstItem` (`0x00427850`)
+resets a cursor at `0x00514F08` and bumps the stamp, and `NextItem`
+(`0x00427880`) skips any entry already carrying the current stamp, marking each
+one it returns. Since an insert memmoves the tail, an index held across a walk
+can be invalidated — so the table does not rely on index stability at all, and
+marks entries instead. `AddToItemList` writes 0 rather than the current stamp,
+so an object registered during a walk still gets visited by it.
 
 Supporting globals, each confirmed by a second independent use:
 
