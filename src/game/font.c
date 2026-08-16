@@ -16,9 +16,11 @@
 
 #include "font.h"
 #include "../inject/patch.h"
+#include "surface.h"
 
 #include <stdint.h>
 
+#define g_fontSurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
 #define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
 #define g_frameBuf (*(uint8_t *const *)(uintptr_t)ADDR_FRAMEBUFFER)
 
@@ -103,7 +105,66 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
     return written;
 }
 
+/* RenderGlyph -- reconstructed from 0x004465E0.
+ *
+ * Draws one character into the scratch surface with GDI, then locks it and
+ * hands it to EncodeGlyph. This is the function actually bracketed by
+ * Lock/Unlock; EncodeGlyph is what runs inside the bracket.
+ *
+ * The argument order was measured rather than derived, because the frame
+ * juggles seven Win32 calls and the locals move under it. Observation gave
+ * RenderGlyph(1, 0x20, 0x0B0A0057, 0x02B50020, 0x8000) and then 0x21, 0x22,
+ * 0x23 ... -- a constant first argument that is never read, the character
+ * walking printable ASCII from space, a constant HFONT, and the output buffer
+ * and remaining space that reappear as EncodeGlyph's first and fourth
+ * arguments.
+ *
+ * Text is drawn white on a transparent background; EncodeGlyph then treats
+ * whatever the surface was cleared to as the background, so the colour itself
+ * carries no meaning beyond "not the key".
+ */
+uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
+                             AM2_Rle16 *out, int32_t space)
+{
+    LPDIRECTDRAWSURFACE surf = g_fontSurface;
+    HDC                 hdc;
+    SIZE                size;
+    char                buf[2];
+    uint32_t            written;
+
+    (void)unused;                   /* every observed call passes 1 */
+
+    if (IDirectDrawSurface_GetDC(surf, &hdc) != DD_OK)
+        return 0;
+
+    SelectObject(hdc, font);
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, 0x00FFFFFF);
+
+    /* The character is sign-extended before being formatted, so codes above
+     * 0x7F arrive negative. Only 0x20..0x7E are ever passed. */
+    wsprintfA(buf, "%c", (int)ch);
+
+    /* lstrlenA is called twice by the original, once for each consumer. */
+    GetTextExtentPoint32A(hdc, buf, lstrlenA(buf), &size);
+    TextOutA(hdc, 0, 0, buf, lstrlenA(buf));
+
+    IDirectDrawSurface_ReleaseDC(surf, hdc);
+
+    if (!LockSurface(surf))
+        return 0;
+
+    written = EncodeGlyph(out, size.cx, size.cy, space);
+    UnlockSurface();
+
+    return written;
+}
+
 int font_install(void)
 {
-    return patch_replace(ADDR_ENCODE_GLYPH, EncodeGlyph, "EncodeGlyph", 4);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_ENCODE_GLYPH, EncodeGlyph, "EncodeGlyph", 4);
+    rc |= patch_replace(ADDR_RENDER_GLYPH, RenderGlyph, "RenderGlyph", 5);
+    return rc;
 }

@@ -339,6 +339,19 @@ interleave in true order.
 | `0x00446070` | `DrawSpriteClipped` | **verified** | 1,158,670 calls |
 | `0x0041C480` | `BlitOverlay` | **verified** | reached; see the note below |
 | `0x004464C0` | `EncodeGlyph` | **verified** | 672 glyphs encoded; round-trips through BlitGlyph |
+| `0x004465E0` | `RenderGlyph` | **verified** | 672 calls; whole font pipeline is ours |
+
+### Use the Windows headers
+
+`src/inject/win32.h` is the single place that pulls in `windows.h` and
+`ddraw.h`. Earlier headers dodged them with forward declarations of
+`struct IDirectDrawSurface` and `struct HFONT__`, to avoid `winuser.h`'s
+`DrawText` macro colliding with the game's reconstructed `DrawText`. That was
+the wrong trade: this is Windows code calling Windows APIs, and the collision is
+one problem to fix once rather than a reason to keep restating types. `win32.h`
+includes both headers with `CINTERFACE`/`COBJMACROS` and `#undef DrawText`s
+afterwards. Any future reconstruction that reuses a Win32 name should be undone
+there too.
 
 Note that `BlitCopy16/32` and `BlitRemap16` now report **0** calls. That is not a
 regression: their only call sites were the dispatcher, which is now ours and

@@ -10,9 +10,9 @@
 
 #include <stdint.h>
 
-/* 0x0041c2b0 -- 2 direct call site(s) */
-static const uint32_t sites_0041c2b0[] = {
-    0x00446114, 0x004461A6,
+/* 0x004465e0 -- 1 direct call site(s) */
+static const uint32_t sites_004465e0[] = {
+    0x004467A8,
 };
 
 #endif /* AM2_SITES_H */

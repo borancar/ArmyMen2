@@ -29,21 +29,13 @@
 #include "surface.h"
 #include "../inject/patch.h"
 
-/* DirectDraw's own declarations. CINTERFACE selects the C view of the COM
- * interfaces and COBJMACROS gives the IDirectDrawSurface_* call wrappers, so
- * nothing about DDSURFACEDESC or the vtable layout is restated anywhere here. */
-#define CINTERFACE
-#define COBJMACROS
-#include <windows.h>
-#include <ddraw.h>
-
 #include <stdint.h>
 
 /* Writable views of the globals LockSurface publishes. blit.c takes the same
  * two read-only, which is why it declares its own const versions. */
 #define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_lockedSurface  (*(struct IDirectDrawSurface **)(uintptr_t)ADDR_LOCKED_SURFACE)
-#define g_primarySurface (*(struct IDirectDrawSurface **)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_lockedSurface  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_frameBuf       (*(void **)(uintptr_t)ADDR_FRAMEBUFFER)
 #define g_pitch          (*(int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
 
@@ -51,7 +43,7 @@
  * DDSURFACEDESC2 (124 bytes). Check the SDK agrees rather than assume it. */
 typedef char am2_ddsd_is_the_v1_struct[(sizeof(DDSURFACEDESC) == 0x6C) ? 1 : -1];
 
-int32_t __cdecl LockSurface(struct IDirectDrawSurface *surf)
+int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
 {
     DDSURFACEDESC desc;
     HRESULT       hr;
@@ -92,7 +84,7 @@ int32_t __cdecl LockSurface(struct IDirectDrawSurface *surf)
 int32_t __cdecl UnlockSurface(void)
 {
     if (g_surfaceLocked) {
-        struct IDirectDrawSurface *surf = g_lockedSurface;
+        LPDIRECTDRAWSURFACE surf = g_lockedSurface;
 
         /* Unlock takes back the same pointer Lock handed out. */
         IDirectDrawSurface_Unlock(surf, g_frameBuf);

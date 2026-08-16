@@ -23,13 +23,6 @@
 #include "rect.h"
 #include "../inject/patch.h"
 
-/* DirectDraw's own declarations; see the note in sprite.h about why these are
- * here and not in the header. */
-#define CINTERFACE
-#define COBJMACROS
-#include <windows.h>
-#include <ddraw.h>
-
 #include <stdint.h>
 
 #define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)

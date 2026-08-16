@@ -13,23 +13,18 @@
  * no drawing at all -- they call out through the surface's COM vtable and cache
  * what comes back.
  *
- * DirectDraw's own declarations come from ddraw.h, included by surface.c and
- * deliberately NOT here: <windows.h> drags in winuser.h, whose `DrawText`
- * macro expands to DrawTextA and collides with our reconstructed DrawText the
- * moment both headers meet. A forward declaration is all callers need, and it
- * matches ddraw.h's C view, where IDirectDrawSurface is a plain struct.
+ * DirectDraw's own declarations come from ddraw.h via win32.h.
  */
 
 #include <stdint.h>
 #include "../inject/orig.h"
-
-struct IDirectDrawSurface;
+#include "../inject/win32.h"
 
 /* Original: 0x0041B9A0. Locks `surf` and publishes its bits and pitch into the
  * globals the blitters read. Returns 1 on success, 0 if a different surface is
  * already locked or the lock failed. Re-locking the surface already held
  * succeeds trivially. */
-int32_t __cdecl LockSurface(struct IDirectDrawSurface *surf);
+int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf);
 
 /* Original: 0x0041BA40. Releases the current lock. Always returns 1, and is
  * safe to call when nothing is locked. */

@@ -83,6 +83,8 @@ static const struct {
       { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x14, 0x53, 0x56 }, 8 },
     { ADDR_ENCODE_GLYPH, "EncodeGlyph",
       { 0x83, 0xEC, 0x0C, 0x8B, 0x44, 0x24, 0x10, 0x66 }, 8 },
+    { ADDR_RENDER_GLYPH, "RenderGlyph",
+      { 0xA1, 0x8C, 0xE0, 0x4F, 0x00, 0x83, 0xEC, 0x10 }, 8 },
 };
 
 static int verify_image(void)
@@ -124,10 +126,9 @@ static void observe_hot_functions(void)
     if (!opt || *opt != '1')
         return;
 
-    /* BlitCopy16 is deliberately left unpatched -- its reconstruction
-     * crashed, so we observe the original to capture a real sprite
-     * pointer and decode the encoding by hand via the `dump` command. */
-    OBSERVE(0x0041C2B0u, "BlitCopy16", 6, sites_0041c2b0);
+    /* Measure the GDI glyph renderer's arguments rather than deriving them
+     * from a frame that juggles seven Win32 calls. */
+    OBSERVE(0x004465E0u, "RenderGlyph", 5, sites_004465e0);
 }
 
 static void install(void)

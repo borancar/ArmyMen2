@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"
+#include "../inject/win32.h"
 #include "blit.h"
 
 /* Runtime font generation.
@@ -23,6 +24,18 @@
  * BlitGlyph never advances its source pointer past a run, and why one font can
  * be drawn in any colour.
  */
+
+/* Original: 0x004465E0. Renders one character into the scratch surface with
+ * GDI, then locks it and hands it to EncodeGlyph. Returns the encoded size, or
+ * 0 if the DC or the lock could not be had.
+ *
+ * The first argument is passed by its single caller and never read -- every
+ * observed call passes 1. The character walks printable ASCII from 0x20, which
+ * is how the whole font gets built: 672 glyphs a session, about seven fonts of
+ * 95 characters.
+ */
+uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
+                             AM2_Rle16 *out, int32_t space);
 
 /* Original: 0x004464C0. Encodes the locked surface into `out` and returns the
  * number of bytes written. Also wipes the scratch area ready for the next

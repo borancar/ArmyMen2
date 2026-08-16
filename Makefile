@@ -41,8 +41,9 @@ HOOK_SRC := src/inject/dllmain.c \
             src/game/surface.c \
             src/game/font.c
 
-# ws2_32 for the control socket.
-HOOK_LIBS := -lws2_32
+# ws2_32 for the control socket; gdi32/user32 for the runtime font generator,
+# which draws each glyph with GDI before encoding it.
+HOOK_LIBS := -lws2_32 -lgdi32 -luser32
 
 LAUNCH_SRC := src/inject/launcher.c
 

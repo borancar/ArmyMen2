@@ -3,13 +3,9 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"
+#include "../inject/win32.h"
 #include "blit.h"
 #include "rect.h"
-
-/* Declared rather than included: pulling ddraw.h in here would drag in
- * winuser.h, whose DrawText macro collides with our reconstructed DrawText.
- * The DirectDraw includes live in sprite.c. */
-struct IDirectDrawSurface;
 
 /* A drawable sprite. Only the fields the drawing path touches are named; the
  * real structure is larger.
@@ -32,7 +28,7 @@ typedef struct {
     union {
         AM2_Rle16                 *rle16;    /* software, formats 2 and 3 */
         AM2_Rle32                 *rle32;    /* software, format 1 */
-        struct IDirectDrawSurface *surface;  /* hardware: BltFast source */
+        LPDIRECTDRAWSURFACE        surface;  /* hardware: BltFast source */
     } image;                     /* +0x10 */
     AM2_Rect bounds;             /* +0x14 .. +0x23 */
     int16_t  hotX;               /* +0x24, subtracted from the draw position */
