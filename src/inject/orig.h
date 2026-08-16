@@ -23,7 +23,9 @@
 /* Game code */
 #define ADDR_CHECK_SAVE_TAG 0x004235D0u  /* BOOL(FILE*,uint32_t,const char*,int32_t) */
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
-#define ADDR_RECT_SET       0x0042E1C0u  /* void(int32_t*,int32_t,int32_t,int32_t,int32_t) */
+#define ADDR_RECT_SET       0x0042E1C0u  /* void(AM2_Rect*,int32,int32,int32,int32) */
+#define ADDR_CLAMP          0x0042E180u  /* int32_t(int32_t v, int32_t lo, int32_t hi) */
+#define ADDR_POINT_IN_RECT  0x0042E1F0u  /* int32_t(const AM2_Rect*, const AM2_Point*) */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
 #define ADDR_FIND_SLOT      0x004277A0u  /* int32_t(uint32_t uid, int32_t *insert_at) */
 #define ADDR_LOOKUP_BY_UID  0x00427820u  /* void *(uint32_t uid) */

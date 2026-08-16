@@ -313,6 +313,8 @@ interleave in true order.
 | `0x0045CAA0` | `Log` | replaced | un-stubbed, opt-in; 2,605 calls/session |
 | `0x0042E1C0` | `RectSet` | **verified** | 161,955 calls; UI renders correctly |
 | `0x0042DDE0` | `ApproxDist` | **verified** | 1,721 calls in gameplay |
+| `0x0042E180` | `Clamp` | **verified** | 547,390 calls |
+| `0x0042E1F0` | `PointInRect` | **verified** | 15,473,860 calls; rendering pixel-correct |
 | `0x004235D0` | `CheckSaveTag` | **verified** | all 15 call sites hit, 317 items loaded, 0 errors |
 | `0x004277A0` | `FindSlot` | **verified** | binary search over the object registry |
 | `0x00427820` | `LookupByUID` | **verified** | 557,800 calls during Boot Camp movement |

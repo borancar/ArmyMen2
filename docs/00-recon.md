@@ -224,6 +224,32 @@ runs — including the three that were completely dead at the title screen:
 
 Reaching gameplay needs the game driven; no command-line switch does it alone.
 
+## Geometry primitives, and how the types were pinned down
+
+Three functions sit directly beneath the drawing code and are among the busiest
+in the engine:
+
+| address | function | calls per Boot Camp session |
+|---|---|---|
+| `0x0042E1C0` | `RectSet` | 285,554 |
+| `0x0042E180` | `Clamp` | 547,390 |
+| `0x0042E1F0` | `PointInRect` | 15,473,860 |
+
+Their real value is corroboration. `AM2_Rect` and `AM2_Point` were each first
+inferred from a single function, which is weak evidence. `PointInRect` then
+independently confirmed both at once: it reads four dwords at `+0/+4/+8/+0x0C`
+and compares the point's x against the first and third and its y against the
+second and fourth — exactly the four edges `RectSet` writes, indexed against
+exactly the two `int16` coordinates `ApproxDist` reads. Two separately guessed
+layouts, confirmed by a third function that has to agree with both.
+
+It also settles a detail neither of the others could: the right and bottom
+comparisons use `jge`, so those edges are exclusive.
+
+The functions *calling* these are large composites — `0x00430530` is 4,512
+bytes with 20 `RectSet` call sites alone — so the drawing chain is best climbed
+from the primitives upward rather than the other way round.
+
 ## The global object registry
 
 The first real data structure recovered. Every gameplay subsystem addresses
