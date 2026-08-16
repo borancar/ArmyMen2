@@ -58,6 +58,68 @@ int32_t __cdecl PointInRect(const AM2_Rect *r, const AM2_Point *p)
     return 1;
 }
 
+/* ClipRect -- reconstructed from 0x0042E220.
+ *
+ * The 2D blit clipper: 18 call sites, all inside the large per-layer drawing
+ * routines. Each edge is handled the same way -- if the clip edge cuts into the
+ * placed rectangle, move the destination corner out to the clip edge and record
+ * how far into the source that landed; otherwise take the source edge whole.
+ * Any edge that puts the rectangle entirely outside the clip rejects the whole
+ * blit.
+ *
+ * Note that `out` is in *source* space, not destination space: out->left and
+ * out->top are offsets into the bitmap, which is what a blit needs in order to
+ * skip the clipped-away columns and rows.
+ *
+ * The early rejects leave `out` partly written, which is why the return value
+ * has to be checked rather than relying on an empty rectangle.
+ */
+int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
+                         int32_t *x, int32_t *y, AM2_Rect *out)
+{
+    int32_t xoff = *x, yoff = *y;
+    int32_t left   = src->left   + xoff;
+    int32_t right  = src->right  + xoff;
+    int32_t top    = src->top    + yoff;
+    int32_t bottom = src->bottom + yoff;
+
+    if (clip->left > left) {
+        if (right <= clip->left)
+            return 0;                       /* entirely left of the clip */
+        *x = clip->left;
+        out->left = clip->left - left;
+    } else {
+        out->left = 0;
+    }
+
+    if (right > clip->right) {
+        if (left >= clip->right)
+            return 0;                       /* entirely right of the clip */
+        out->right = src->right - right + clip->right;
+    } else {
+        out->right = src->right;
+    }
+
+    if (clip->top > top) {
+        if (bottom <= clip->top)
+            return 0;                       /* entirely above the clip */
+        *y = clip->top;
+        out->top = clip->top - top;
+    } else {
+        out->top = 0;
+    }
+
+    if (bottom > clip->bottom) {
+        if (top >= clip->bottom)
+            return 0;                       /* entirely below the clip */
+        out->bottom = src->bottom - bottom + clip->bottom;
+    } else {
+        out->bottom = src->bottom;
+    }
+
+    return 1;
+}
+
 int rect_install(void)
 {
     int rc = 0;
@@ -65,5 +127,6 @@ int rect_install(void)
     rc |= patch_replace(ADDR_RECT_SET, RectSet, "RectSet", 5);
     rc |= patch_replace(ADDR_CLAMP, Clamp, "Clamp", 3);
     rc |= patch_replace(ADDR_POINT_IN_RECT, PointInRect, "PointInRect", 2);
+    rc |= patch_replace(ADDR_CLIP_RECT, ClipRect, "ClipRect", 5);
     return rc;
 }

@@ -33,7 +33,8 @@ HOOK_SRC := src/inject/dllmain.c \
             src/game/rect.c \
             src/game/dist.c \
             src/game/objtable.c \
-            src/game/objtype.c
+            src/game/objtype.c \
+            src/game/packkey.c
 
 # ws2_32 for the control socket.
 HOOK_LIBS := -lws2_32

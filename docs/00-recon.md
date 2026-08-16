@@ -285,6 +285,40 @@ The functions *calling* these are large composites — `0x00430530` is 4,512
 bytes with 20 `RectSet` call sites alone — so the drawing chain is best climbed
 from the primitives upward rather than the other way round.
 
+### The blit clipper
+
+`ClipRect` (`0x0042E220`, 5,146,540 calls per session) is the piece that makes
+the drawing composites tractable. Given a source rectangle, a clip rectangle and
+a destination position passed by pointer, it moves the destination corner out to
+the clip edge where the clip cuts in, and records how far into the source that
+landed.
+
+The important detail is that its output rectangle is in **source** space, not
+destination space: `out->left` and `out->top` are offsets into the bitmap, which
+is exactly what a blit needs in order to skip the clipped-away columns and rows.
+Early rejects leave `out` only partly written, so the return value has to be
+checked rather than inferring emptiness from the rectangle.
+
+### The packed map key
+
+A 26-bit key built by `PackKey` (`0x00433810`) and taken apart by three readers:
+
+| bits | field | reader |
+|---|---|---|
+| 25..19 | A, 7 bits | `0x00433830` |
+| 18..17 | *unused* | — |
+| 16..7 | B, 10 bits | `0x00433840` |
+| 6..0 | C, 7 bits | `0x00433850` |
+
+The two-bit gap is real. `PackKey` computes `((a << 12) + b) << 7) + c`, leaving
+room for twelve bits of B, but every reader masks only ten. So either callers
+guarantee B < 1024, or larger values are silently truncated on the way back
+out — a latent limit that would only ever show up on a large map.
+
+What the fields mean is not established. Seven bits is 0..127, which would suit a
+tile coordinate, but that is a shape argument rather than evidence, so they are
+named structurally.
+
 ## The global object registry
 
 The first real data structure recovered. Every gameplay subsystem addresses

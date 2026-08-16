@@ -21,6 +21,7 @@
 #include "../game/dist.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
+#include "../game/packkey.h"
 #include "../game/rect.h"
 #include "../game/savetag.h"
 
@@ -131,6 +132,7 @@ static void install(void)
     dist_install();
     objtable_install();
     objtype_install();
+    packkey_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

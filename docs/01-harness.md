@@ -315,6 +315,11 @@ interleave in true order.
 | `0x0042DDE0` | `ApproxDist` | **verified** | 1,721 calls in gameplay |
 | `0x0042E180` | `Clamp` | **verified** | 547,390 calls |
 | `0x0042E1F0` | `PointInRect` | **verified** | 15,473,860 calls; rendering pixel-correct |
+| `0x0042E220` | `ClipRect` | **verified** | 5,146,540 calls; sprites and terrain correct |
+| `0x00433810` | `PackKey` | **verified** | 3,986 calls |
+| `0x00433830` | `KeyFieldA` | **verified** | 802 calls |
+| `0x00433840` | `KeyFieldB` | **verified** | 80 calls |
+| `0x00433850` | `KeyFieldC` | installed | **not exercised** — its one call site was never reached |
 | `0x004235D0` | `CheckSaveTag` | **verified** | all 15 call sites hit, 317 items loaded, 0 errors |
 | `0x004277A0` | `FindSlot` | **verified** | binary search over the object registry |
 | `0x00427820` | `LookupByUID` | **verified** | 557,800 calls during Boot Camp movement |
