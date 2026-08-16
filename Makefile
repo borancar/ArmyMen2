@@ -6,7 +6,7 @@
 # the game's own 32-bit address space, which means PE.
 
 CC      := i686-w64-mingw32-gcc
-CFLAGS  := -O2 -Wall -Wextra -std=gnu11 -fno-strict-aliasing
+CFLAGS  := -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing
 LDFLAGS := -static-libgcc
 
 BUILD     := build

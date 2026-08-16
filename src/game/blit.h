@@ -30,6 +30,17 @@
 void __fastcall BlitGlyph(int32_t x, int32_t y, const uint8_t *glyph,
                           AM2_Rect src, int32_t colour);
 
+/* The plain copy variants take FIVE stack dwords, not six: they need neither a
+ * colour nor a lookup table, and the originals clean up with `ret 0x14` where
+ * BlitGlyph and BlitRemap16 use `ret 0x18`. Adding a sixth parameter here makes
+ * the compiler over-pop by four bytes and corrupts the caller's stack. */
+void __fastcall BlitCopy16(int32_t x, int32_t y, const uint8_t *data,
+                           AM2_Rect src);
+void __fastcall BlitCopy32(int32_t x, int32_t y, const uint8_t *data,
+                           AM2_Rect src);
+void __fastcall BlitRemap16(int32_t x, int32_t y, const uint8_t *data,
+                            AM2_Rect src, const uint8_t *lut);
+
 int blit_install(void);
 
 #endif /* AM2_BLIT_H */

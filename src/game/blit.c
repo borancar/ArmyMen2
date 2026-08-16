@@ -5,12 +5,18 @@
  *   BlitCopy32     0x0041C1C0   copy source,  32-bit row offsets   1 site
  *   BlitRemap16    0x0041C3A0   copy via LUT, 16-bit row offsets   2 sites
  *
- * All four are the same routine in the original -- byte-identical prologue, row
- * walk and clipping arithmetic -- differing only in two respects, which is why
- * they are written here as one core with a policy rather than four near-copies.
- * A diff of 0x0041C1C0 against 0x0041C2B0 shows a single meaningful change, the
- * row-offset width; a diff of 0x0041C3A0 against 0x0041C710 shows only the
- * inner fill.
+ * All four share a body in the original -- byte-identical prologue, row walk and
+ * clipping arithmetic -- differing only in fill policy and row-offset width,
+ * which is why they are written here as one core with a policy rather than four
+ * near-copies.
+ *
+ * They do NOT share a signature, though, and that distinction cost a crash. The
+ * copy variants take five stack dwords and clean up with `ret 0x14`; BlitGlyph
+ * and BlitRemap16 take six and use `ret 0x18`, because only they need a trailing
+ * colour or lookup table. Giving the copy variants a sixth `unused` parameter
+ * made the compiler over-pop by four bytes and corrupt the caller's stack. A
+ * diff that normalises jump targets hides the epilogue, so compare `ret N`
+ * explicitly before assuming two functions are the same shape.
  *
  * Row offset width. 16-bit offsets can only reach 64KB of encoded data, so the
  * 32-bit variant exists for sprites too large for that.
@@ -135,16 +141,14 @@ void __fastcall BlitGlyph(int32_t x, int32_t y, const uint8_t *glyph,
 }
 
 void __fastcall BlitCopy16(int32_t x, int32_t y, const uint8_t *data,
-                           AM2_Rect src, int32_t unused)
+                           AM2_Rect src)
 {
-    (void)unused;
     blit_core(x, y, data, src, 0, FILL_COPY, 0);
 }
 
 void __fastcall BlitCopy32(int32_t x, int32_t y, const uint8_t *data,
-                           AM2_Rect src, int32_t unused)
+                           AM2_Rect src)
 {
-    (void)unused;
     blit_core(x, y, data, src, 0, FILL_COPY, 1);
 }
 
@@ -154,26 +158,13 @@ void __fastcall BlitRemap16(int32_t x, int32_t y, const uint8_t *data,
     blit_core(x, y, data, src, (uintptr_t)lut, FILL_REMAP, 0);
 }
 
-/* NOT INSTALLED YET -- BlitCopy16/32 and BlitRemap16 crash on their first call.
- *
- * BlitGlyph, the solid-fill variant, is verified and stays installed. The other
- * three are written but disabled, because the first live call to BlitCopy16
- * (an 85x80 sprite, src {0,0,85,80}) faulted immediately.
- *
- * The likely cause, and where to resume: the solid variant never advances the
- * source pointer, so it consumes exactly two bytes per iteration and any
- * mis-accounting is self-limiting. The copy and remap variants advance `rle` by
- * the run length, so if the running x is even slightly out of step with the
- * encoder, the source pointer desynchronises and walks off the sprite -- the
- * destination writes are bounded by the clip, but the source reads are not.
- *
- * The control-flow transcription was checked against the original line by line
- * and matches, so the fault is more likely in an assumption about the stream
- * than in the arithmetic: possibly a row terminator, or a header that is not
- * the width/height pair the glyph format uses. Next step is to dump one real
- * sprite's bytes and decode a row by hand before re-enabling.
- */
 int blit_install(void)
 {
-    return patch_replace(ADDR_BLIT_GLYPH, BlitGlyph, "BlitGlyph", 6);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_BLIT_GLYPH,   BlitGlyph,   "BlitGlyph", 6);
+    rc |= patch_replace(ADDR_BLIT_COPY16,  BlitCopy16,  "BlitCopy16", 5);
+    rc |= patch_replace(ADDR_BLIT_COPY32,  BlitCopy32,  "BlitCopy32", 5);
+    rc |= patch_replace(ADDR_BLIT_REMAP16, BlitRemap16, "BlitRemap16", 6);
+    return rc;
 }

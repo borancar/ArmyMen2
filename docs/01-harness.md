@@ -331,23 +331,54 @@ interleave in true order.
 | `0x00446930` | `DrawText` | **verified** | every string on screen renders correctly |
 | `0x0041C710` | `BlitGlyph` | **verified** | 874,768 calls; every text pixel written by our decoder |
 | `0x00445FF0` | `DrawSprite` | **verified** | 61,531 calls; scene renders correctly |
-| `0x0041C2B0` | `BlitCopy16` | written, **NOT installed** | crashed on first call |
-| `0x0041C1C0` | `BlitCopy32` | written, **NOT installed** | same family, disabled with it |
-| `0x0041C3A0` | `BlitRemap16` | written, **NOT installed** | same family, disabled with it |
+| `0x0041C2B0` | `BlitCopy16` | **verified** | 72 calls |
+| `0x0041C1C0` | `BlitCopy32` | **verified** | 508 calls |
+| `0x0041C3A0` | `BlitRemap16` | **verified** | 441 calls |
 
-The three copy/remap blitters are reconstructed in `src/game/blit.c` but
-deliberately not patched in. The first live call to `BlitCopy16` — an 85x80
-sprite — faulted immediately. `BlitGlyph` shares the same core and is fine,
-which localises the fault to the source-pointer handling that only the copy and
-remap paths use: the solid variant consumes exactly two bytes per iteration so
-any mis-accounting is self-limiting, whereas the others advance `rle` by the run
-length, and a desynchronised source pointer reads off the end of the sprite.
-Destination writes are bounded by the clip; source reads are not.
+### Check `ret N` before assuming a shared signature
 
-The control flow was checked against the original line by line and matches, so
-the wrong assumption is more likely about the *stream* than the arithmetic — a
-row terminator, or a header that is not the width/height pair the glyph format
-uses. Dump one real sprite and decode a row by hand before re-enabling.
+The copy variants crashed on their first call, and the cause is worth
+remembering. A normalised diff of `0x0041C1C0` against `0x0041C2B0` showed a
+single meaningful difference, and one of `0x0041C3A0` against `0x0041C710`
+showed only the inner fill — so all four looked like one function with a policy
+knob. They are not. They differ in **arity**:
+
+| | cleanup | stack args | why |
+|---|---|---|---|
+| `BlitGlyph` | `ret 0x18` | 6 | needs the colour |
+| `BlitRemap16` | `ret 0x18` | 6 | needs the lookup table |
+| `BlitCopy16` | **`ret 0x14`** | **5** | needs neither |
+| `BlitCopy32` | **`ret 0x14`** | **5** | needs neither |
+
+Declaring the copy variants with a sixth `unused` parameter made the compiler
+emit `ret $0x18`, over-popping four bytes. Control returned to the game with
+`esp` four bytes high, its next instruction read a local from the wrong slot,
+got NULL, and faulted dereferencing it. The fault address was in the *game's*
+code, several instructions after the call, which is exactly why reading the
+reconstruction over and over found nothing.
+
+Two lessons. **A diff that normalises away jump targets hides the epilogue**, so
+compare `ret N` explicitly before assuming two functions share a signature. And
+**the tracer's `nargs` is a guess that can invent arguments**: observing these
+with `nargs=6` produced a sixth value that varied per call, which was caller
+stack beyond the real five and not an argument at all. That varying value was
+visible and unexplained for two rounds before it meant anything.
+
+### Getting the fault address
+
+`ShowCrashDialog=0` under `HKCU\Software\Wine\WineDbg` makes Wine print the
+unhandled exception to stderr instead of opening the debugger window, which is
+what a headless run needs:
+
+```sh
+WINEPREFIX=$PWD/.wine wine reg add 'HKCU\Software\Wine\WineDbg' \
+    /v ShowCrashDialog /t REG_DWORD /d 0 /f
+make run WINEDBG=+seh 2>&1 | grep -i "page fault"
+```
+
+The harness DLL is built with `-g`, so an address inside it maps back to a
+source line; `i686-w64-mingw32-nm` gives the decorated names, whose `@N` suffix
+is itself the parameter-size check that would have caught this bug.
 | `0x00433810` | `PackKey` | **verified** | 3,986 calls |
 | `0x00433830` | `KeyFieldA` | **verified** | 802 calls |
 | `0x00433840` | `KeyFieldB` | **verified** | 80 calls |
