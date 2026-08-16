@@ -3,6 +3,23 @@
  *   LockSurface    0x0041B9A0   38 call sites
  *   UnlockSurface  0x0041BA40   34 call sites
  *
+ * STANDING NOTE -- the Restore paths are UNTESTED, and there are two of them.
+ *
+ *   1. Here in LockSurface. On DDERR_SURFACELOST the original calls Restore and
+ *      then, if that succeeds, falls straight through to publishing the
+ *      descriptor WITHOUT retrying the Lock -- so it stores an uninitialised
+ *      lpSurface and lPitch. That is reproduced faithfully below. It is a real
+ *      defect, not a misreading.
+ *   2. In DrawSpriteClipped, where a BltFast returning DDERR_SURFACELOST calls
+ *      the recovery chain at 0x00445EB0.
+ *
+ * Neither can be reached from a headless Boot Camp run: losing a surface needs
+ * an alt-tab or a display mode change. Anyone exercising them should do it
+ * deliberately -- windowed, then force a mode switch or minimise/restore -- and
+ * should expect the LockSurface path to publish garbage on the first frame
+ * after recovery, because that is what the original does. Do not "fix" it
+ * without deciding that behavioural fidelity is no longer the goal.
+ *
  * See surface.h. All DirectDraw declarations come from ddraw.h rather than
  * being restated here; the values the game hardcodes all match it exactly:
  * dwSize 0x6C == sizeof(DDSURFACEDESC), flags 1 == DDLOCK_WAIT, and the error

@@ -397,6 +397,36 @@ This corrected three names that had been guessed from the text path alone:
 is a far more sensible thing for a renderer to do than what the original naming
 implied.
 
+### The sprite dispatcher, and the union at +0x10
+
+`DrawSpriteClipped` (`0x00446070`, 14 call sites) is the centre of the 2D
+pipeline -- every large drawing composite reaches it -- and it is where the game
+decides between rasterising a sprite itself and handing it to DirectDraw.
+
+The switch is `flags & 0x3C` at `+0x0C`:
+
+| bits set | route | `+0x10` holds |
+|---|---|---|
+| yes | software RLE blitters | encoded pixel data |
+| no | `IDirectDrawSurface::BltFast` (vtable[7]) | the source surface |
+
+So `+0x10` is a **union**, and which arm applies depends on the flags. It had
+been documented as a DirectDraw surface outright, from having seen only the
+hardware path -- the third time in this file a field was named by generalising
+from a single call site, after `serial`/`stamp` and `TEXT_CLIP`/`SCREEN_CLIP`.
+
+Within the software arm, `+0x08` selects the blitter: format 1 uses the 32-bit
+offset variant, formats 2 and 3 the 16-bit ones, remapping through the table at
+`+0x34` when there is one. Format 3 remaps whenever a table exists; format 2
+also requires the caller's `mode` argument. Afterwards an optional second layer
+at `+0x30` is drawn by `0x0041C480`, with `+0x38` selecting its palette.
+
+The hardware arm drops any lock before calling BltFast, and this is **not**
+`UnlockSurface`: the inline sequence clears only the locked flag, deliberately
+leaving `g_frameBuf` and `g_pitch` pointing at the old bits, where
+`UnlockSurface` clears all three. The colour-key flag is chosen from `flags & 1`
+-- set means `DDBLTFAST_WAIT` alone, clear means `WAIT | SRCCOLORKEY`.
+
 ### The lock/unlock bracket
 
 `LockSurface` (`0x0041B9A0`, 38 call sites) and `UnlockSurface` (`0x0041BA40`,

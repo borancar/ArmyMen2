@@ -72,6 +72,10 @@
  * IDirectDrawSurface::Restore on the sprite's own surface. */
 #define ADDR_DRAW_SPRITE         0x00445FF0u  /* void(AM2_Sprite*,x,y,mode) */
 #define ADDR_DRAW_SPRITE_CLIPPED 0x00446070u  /* void(spr,x,y,const AM2_Rect*,mode) */
+#define ADDR_BLIT_OVERLAY        0x0041C480u  /* __fastcall(x,y,data,AM2_Rect) */
+#define ADDR_RESTORE_CHAIN       0x00445EB0u  /* void(AM2_Sprite*) */
+#define ADDR_OVERLAY_PALETTE     0x004FE1A4u  /* void *, set before the overlay blit */
+#define ADDR_DEFAULT_PALETTE     0x004FE084u  /* void *, used when the sprite has none */
 
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u

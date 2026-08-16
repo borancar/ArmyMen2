@@ -336,6 +336,14 @@ interleave in true order.
 | `0x0041C3A0` | `BlitRemap16` | **verified** | 441 calls |
 | `0x0041B9A0` | `LockSurface` | **verified** | 919,302 calls |
 | `0x0041BA40` | `UnlockSurface` | **verified** | 744,597 calls |
+| `0x00446070` | `DrawSpriteClipped` | **verified** | 1,158,670 calls |
+
+Note that `BlitCopy16/32` and `BlitRemap16` now report **0** calls. That is not a
+regression: their only call sites were the dispatcher, which is now ours and
+calls them directly as C functions rather than through the patched entry points.
+The same thing happened to `FindSlot` and to `BlitGlyph`'s share of `DrawText`.
+A reconstructed function's trace count only ever measures the *game's* remaining
+call sites, and reaches zero once its last caller is reconstructed.
 
 ### Use the real SDK headers, do not restate them
 
