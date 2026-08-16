@@ -21,6 +21,7 @@
 #include "../game/blit.h"
 #include "../game/dist.h"
 #include "../game/font.h"
+#include "../game/mapdraw.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
@@ -85,6 +86,10 @@ static const struct {
       { 0x83, 0xEC, 0x0C, 0x8B, 0x44, 0x24, 0x10, 0x66 }, 8 },
     { ADDR_RENDER_GLYPH, "RenderGlyph",
       { 0xA1, 0x8C, 0xE0, 0x4F, 0x00, 0x83, 0xEC, 0x10 }, 8 },
+    { ADDR_REDRAW_MAP_REGION, "RedrawMapRegion",
+      { 0x56, 0x8B, 0x74, 0x24, 0x08, 0x8B, 0x46, 0x04 }, 8 },
+    { ADDR_SET_DRAW_TARGET, "SetDrawTarget",
+      { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x0D, 0x28, 0x71 }, 8 },
 };
 
 static int verify_image(void)
@@ -151,6 +156,7 @@ static void install(void)
     packkey_install();
     text_install();
     font_install();
+    mapdraw_install();
     blit_install();
     sprite_install();
     surface_install();

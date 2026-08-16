@@ -39,7 +39,8 @@ HOOK_SRC := src/inject/dllmain.c \
             src/game/blit.c \
             src/game/sprite.c \
             src/game/surface.c \
-            src/game/font.c
+            src/game/font.c \
+            src/game/mapdraw.c
 
 # ws2_32 for the control socket; gdi32/user32 for the runtime font generator,
 # which draws each glyph with GDI before encoding it.

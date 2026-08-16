@@ -1,0 +1,32 @@
+#ifndef AM2_MAPDRAW_H
+#define AM2_MAPDRAW_H
+
+#include <stdint.h>
+#include "../inject/orig.h"
+#include "../inject/win32.h"
+#include "rect.h"
+
+/* Map repainting.
+ *
+ * Coordinates here are world space in 1/256-tile fixed point: the recursive
+ * tile walker shifts all four edges of the rectangle right by 8 to get tile
+ * indices before bounds-checking them against the map descriptor at
+ * 0x00514F20. The camera origin lives in 0x00514EA8 / 0x00514EAC and is scaled
+ * by 16 when converting to screen space.
+ */
+
+/* Original: 0x0041AC40, 28 call sites. Designates which surface subsequent
+ * drawing targets. It does not lock anything -- LockSurface later locks
+ * whatever was designated. The redundant compare before the store is the
+ * original's, kept. */
+void __cdecl SetDrawTarget(LPDIRECTDRAWSURFACE surf);
+
+/* Original: 0x0041CF90, 7 call sites. Repaints one dirty rectangle of the map:
+ * screen-space setup, target the back buffer, lock, recursively draw every tile
+ * covering the region, unlock. Empty rectangles are rejected before any of that
+ * happens, so a zero-width or zero-height region costs nothing. */
+void __cdecl RedrawMapRegion(const AM2_Rect *world);
+
+int mapdraw_install(void);
+
+#endif /* AM2_MAPDRAW_H */

@@ -81,6 +81,17 @@
 #define ADDR_OVERLAY_PALETTE     0x004FE1A4u  /* void *, set before the overlay blit */
 #define ADDR_DEFAULT_PALETTE     0x004FE084u  /* void *, used when the sprite has none */
 
+/* Map repainting. World space is 1/256-tile fixed point; the camera origin is
+ * scaled by 16 when converting to screen space. */
+#define ADDR_SET_DRAW_TARGET     0x0041AC40u  /* void(LPDIRECTDRAWSURFACE) */
+#define ADDR_REDRAW_MAP_REGION   0x0041CF90u  /* void(const AM2_Rect*) */
+#define ADDR_PREPARE_SCREEN_RECT 0x0042D9B0u  /* void(AM2_Rect by value) */
+#define ADDR_DRAW_MAP_TILES      0x0041E440u  /* void(const AM2_Rect*,void*,int32) */
+#define ADDR_BACK_SURFACE        0x00503100u  /* IDirectDrawSurface * */
+#define ADDR_MAP_DESC            0x00514F20u  /* map descriptor; +4 is a row count */
+#define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
+#define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
+
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u

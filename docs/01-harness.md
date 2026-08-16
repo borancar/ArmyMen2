@@ -340,6 +340,43 @@ interleave in true order.
 | `0x0041C480` | `BlitOverlay` | **verified** | reached; see the note below |
 | `0x004464C0` | `EncodeGlyph` | **verified** | 672 glyphs encoded; round-trips through BlitGlyph |
 | `0x004465E0` | `RenderGlyph` | **verified** | 672 calls; whole font pipeline is ours |
+| `0x0041AC40` | `SetDrawTarget` | **verified** | 659,878 calls |
+| `0x0041CF90` | `RedrawMapRegion` | **verified** | 802 calls; map renders correctly |
+
+### Auditing calling conventions
+
+`tools/checkabi.py` checks every reconstructed function's declared convention
+against what the original actually does, because getting one wrong is neither a
+compile error nor usually an immediate crash -- it corrupts the caller's stack
+and faults elsewhere, which is exactly how the `BlitCopy16` bug presented.
+
+The evidence is which of `ecx`/`edx` are read before being written, plus whether
+the function cleans its own arguments:
+
+| ecx | edx | cleanup | convention |
+|---|---|---|---|
+| no | no | plain `ret` | cdecl |
+| no | no | `ret N` | stdcall |
+| yes | no | `ret N` | **thiscall** |
+| yes | yes | `ret N` | fastcall |
+
+One trap worth knowing: `xor ecx, ecx` and `or ecx, -1` encode a *read* of the
+register even though the result does not depend on its old value. Treating those
+naively made `FindSlot`, `ObjIsType2/3` and `DrawText` all look like thiscall.
+The tool special-cases those idioms; without that its output is worthless.
+
+Current result: **no thiscall anywhere in the 34 reconstructed functions.** Every
+cdecl-declared one reads neither register on entry, and all five fastcall ones
+read both with a matching `ret N`.
+
+That is not true of the binary as a whole, though. The game is C++ -- the
+savegame anchors name `air.cpp`, `unit.cpp` and friends -- and a survey of the
+1,239 game functions below the CRT finds roughly 114 genuine thiscall member
+functions, recognisable by a `mov ebx, ecx` or `mov esi, ecx` prologue followed
+by member access off that register. A further 133 read `ecx` on entry but clean
+via the caller, so they are not thiscall and want individual inspection. The
+free functions reconstructed so far simply have not reached the class-based part
+of the codebase yet; expect thiscall as soon as they do.
 
 ### Use the Windows headers
 

@@ -83,6 +83,7 @@ new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
 | `tools/functions.py` | function inventory with translation-unit attribution |
 | `tools/find_logs.py` | recovers the stubbed-out debug log format strings |
 | `tools/checkdetour.py` | verifies an address is safe to overwrite with a 5-byte jmp |
+| `tools/checkabi.py` | audits declared calling conventions against the machine code |
 | `tools/callsites.py` | exact direct call sites of a function, for observation |
 | `tools/am2ctl.py` | client for the control socket — drives the running game |
 | `tools/drive.sh` | headless launch, screenshot and menu navigation on Xvfb |
