@@ -19,11 +19,21 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 int observe_install(uint32_t target, const char *name, int32_t nargs,
                     const uint32_t *sites, int32_t nsites);
 
 #define OBSERVE(target, name, nargs, table) \
     observe_install((target), (name), (nargs), (table), \
                     (int32_t)(sizeof(table) / sizeof((table)[0])))
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_OBSERVE_H */

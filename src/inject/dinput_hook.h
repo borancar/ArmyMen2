@@ -13,7 +13,17 @@
 #ifndef AM2_DINPUT_HOOK_H
 #define AM2_DINPUT_HOOK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Patch the DirectInputCreateA import thunk. Returns 0 on success. */
 int dinput_hook_install(void);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_DINPUT_HOOK_H */

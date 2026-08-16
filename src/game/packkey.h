@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include "../inject/orig.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* A packed 26-bit key built from three fields, used throughout the map code.
  *
  *   bit  25 .. 19   field A   7 bits    PackKey's first argument
@@ -33,5 +39,9 @@ uint32_t __cdecl KeyFieldB(uint32_t key);
 uint32_t __cdecl KeyFieldC(uint32_t key);
 
 int packkey_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_PACKKEY_H */

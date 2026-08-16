@@ -5,6 +5,12 @@
 #include "../inject/orig.h"
 #include "dist.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* An axis-aligned rectangle: four signed 32-bit edges.
  *
  * The layout is not a guess. RectSet writes four dwords, and PointInRect reads
@@ -53,5 +59,9 @@ int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
                          int32_t *x, int32_t *y, AM2_Rect *out);
 
 int rect_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_RECT_H */

@@ -6,6 +6,12 @@
 #include "../inject/win32.h"
 #include "rect.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Map repainting.
  *
  * Coordinates here are world space in 1/256-tile fixed point: the recursive
@@ -28,5 +34,9 @@ void __cdecl SetDrawTarget(LPDIRECTDRAWSURFACE surf);
 void __cdecl RedrawMapRegion(const AM2_Rect *world);
 
 int mapdraw_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_MAPDRAW_H */

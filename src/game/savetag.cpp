@@ -42,5 +42,5 @@ int32_t __cdecl CheckSaveTag(am2_FILE *fp, uint32_t expected,
 
 int savetag_install(void)
 {
-    return patch_replace(ADDR_CHECK_SAVE_TAG, CheckSaveTag, "CheckSaveTag", 4);
+    return patch_replace(ADDR_CHECK_SAVE_TAG, (const void *)CheckSaveTag, "CheckSaveTag", 4);
 }

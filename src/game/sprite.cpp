@@ -159,8 +159,8 @@ int sprite_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_DRAW_SPRITE, DrawSprite, "DrawSprite", 4);
-    rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, DrawSpriteClipped,
+    rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
+    rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
                         "DrawSpriteClipped", 5);
     return rc;
 }

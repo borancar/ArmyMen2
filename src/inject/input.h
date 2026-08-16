@@ -13,6 +13,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #define AM2_MOUSE_BUTTONS 4
 
 void input_init(void);
@@ -60,5 +65,10 @@ void input_describe(char *out, uint32_t cap);
 /* Map a key name ("Return", "Up", "a", "F1", ...) to a DIK scancode.
  * Returns 0 when unknown. Also accepts "0x1c" style literals. */
 uint8_t input_dik_from_name(const char *name);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_INPUT_H */

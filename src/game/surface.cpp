@@ -100,7 +100,7 @@ int surface_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_LOCK_SURFACE, LockSurface, "LockSurface", 1);
-    rc |= patch_replace(ADDR_UNLOCK_SURFACE, UnlockSurface, "UnlockSurface", 0);
+    rc |= patch_replace(ADDR_LOCK_SURFACE, (const void *)LockSurface, "LockSurface", 1);
+    rc |= patch_replace(ADDR_UNLOCK_SURFACE, (const void *)UnlockSurface, "UnlockSurface", 0);
     return rc;
 }

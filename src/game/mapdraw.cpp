@@ -74,8 +74,8 @@ int mapdraw_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_SET_DRAW_TARGET, SetDrawTarget, "SetDrawTarget", 1);
-    rc |= patch_replace(ADDR_REDRAW_MAP_REGION, RedrawMapRegion,
+    rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
+    rc |= patch_replace(ADDR_REDRAW_MAP_REGION, (const void *)RedrawMapRegion,
                         "RedrawMapRegion", 1);
     return rc;
 }

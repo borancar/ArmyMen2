@@ -49,9 +49,9 @@ int objtype_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_OBJ_IS_ITEM, ObjIsItem, "ObjIsItem", 1);
-    rc |= patch_replace(ADDR_OBJ_IS_TYPE2, ObjIsType2, "ObjIsType2", 1);
-    rc |= patch_replace(ADDR_OBJ_IS_TYPE3, ObjIsType3, "ObjIsType3", 1);
-    rc |= patch_replace(ADDR_OBJ_IS_TYPE238, ObjIsTypeIn238, "ObjIsTypeIn238", 1);
+    rc |= patch_replace(ADDR_OBJ_IS_ITEM, (const void *)ObjIsItem, "ObjIsItem", 1);
+    rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);
+    rc |= patch_replace(ADDR_OBJ_IS_TYPE3, (const void *)ObjIsType3, "ObjIsType3", 1);
+    rc |= patch_replace(ADDR_OBJ_IS_TYPE238, (const void *)ObjIsTypeIn238, "ObjIsTypeIn238", 1);
     return rc;
 }

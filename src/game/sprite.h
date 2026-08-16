@@ -7,6 +7,12 @@
 #include "blit.h"
 #include "rect.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* A drawable sprite. Only the fields the drawing path touches are named; the
  * real structure is larger.
  *
@@ -54,5 +60,9 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
                                const AM2_Rect *clipped, int32_t mode);
 
 int sprite_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_SPRITE_H */

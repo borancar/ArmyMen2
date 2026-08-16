@@ -6,6 +6,12 @@
 #include "../inject/win32.h"
 #include "blit.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Runtime font generation.
  *
  * The game does not ship its fonts as RLE. It builds them at startup: a
@@ -44,5 +50,9 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused);
 
 int font_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_FONT_H */

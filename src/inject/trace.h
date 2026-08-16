@@ -16,6 +16,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Is tracing enabled for this run? (AM2_TRACE=1) */
 int trace_enabled(void);
 
@@ -37,5 +42,10 @@ void trace_describe(char *out, uint32_t cap);
 
 /* Write the same totals to the log. Called on detach. */
 void trace_report(void);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_TRACE_H */

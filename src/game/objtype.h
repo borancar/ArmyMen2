@@ -5,6 +5,12 @@
 #include "../inject/orig.h"
 #include "objtable.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Predicates over the object type at +0x00.
  *
  * What is established about the taxonomy:
@@ -42,5 +48,9 @@ int32_t __cdecl ObjIsType3(const AM2_Object *obj);
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj);
 
 int objtype_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_OBJTYPE_H */

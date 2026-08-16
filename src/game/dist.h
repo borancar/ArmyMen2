@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include "../inject/orig.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* A map point: two signed 16-bit coordinates. Inferred from the movsx reads at
  * offsets 0 and 2 in ApproxDist. */
 typedef struct {
@@ -16,5 +22,9 @@ typedef struct {
 int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b);
 
 int dist_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_DIST_H */

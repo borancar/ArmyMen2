@@ -112,5 +112,5 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
 
 int text_install(void)
 {
-    return patch_replace(ADDR_DRAW_TEXT, DrawText, "DrawText", 6);
+    return patch_replace(ADDR_DRAW_TEXT, (const void *)DrawText, "DrawText", 6);
 }

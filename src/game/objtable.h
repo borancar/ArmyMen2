@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include "../inject/orig.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* One registry entry: 12 bytes, sorted ascending by uid.
  *
  * `stamp` is not a serial number, despite looking like one on first reading.
@@ -66,5 +72,9 @@ void *__cdecl FirstItem(void);
 void *__cdecl NextItem(void);
 
 int objtable_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_OBJTABLE_H */

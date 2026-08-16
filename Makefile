@@ -5,9 +5,25 @@
 # winelib ELF objects cannot be produced at all. The harness has to live inside
 # the game's own 32-bit address space, which means PE.
 
-CC      := i686-w64-mingw32-gcc
-CFLAGS  := -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing
-LDFLAGS := -static-libgcc
+# The harness in src/inject is C; the reconstruction in src/game is C++, because
+# the original is C++ -- the savegame anchors name .cpp files and ~114 game
+# functions take `this` in ecx. A non-static member function is thiscall on i386
+# by default, so C++ is the natural vehicle for those; doing it in C would mean
+# fighting the language with __attribute__((thiscall)).
+#
+# No exceptions, no RTTI, no C++ runtime: this DLL is injected into a 1999 game
+# and must not drag a standard library in behind it.
+CC       := i686-w64-mingw32-gcc
+CXX      := i686-w64-mingw32-g++
+# -MMD -MP emit a .d beside each .o listing the headers it used. Without them
+# a header edit leaves stale objects behind, which is not a theoretical worry:
+# the old build compiled every source in one command, so headers were always
+# picked up, and splitting into per-object rules silently lost that.
+DEPFLAGS := -MMD -MP
+CFLAGS   := -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing $(DEPFLAGS)
+CXXFLAGS := -O2 -g -Wall -Wextra -std=gnu++14 -fno-strict-aliasing \
+            -fno-exceptions -fno-rtti $(DEPFLAGS)
+LDFLAGS  := -static-libgcc -static-libstdc++
 
 BUILD     := build
 WINE      ?= wine
@@ -20,7 +36,7 @@ GAMEDIR    = $(PREFIX)/drive_c/GOG Games/Army Men II
 GAMEEXE   := C:\\GOG Games\\Army Men II\\ArmyMen2.exe
 LAUNCHEXE := C:\\GOG Games\\Army Men II\\launcher.exe
 
-HOOK_SRC := src/inject/dllmain.c \
+HOOK_C   := src/inject/dllmain.c \
             src/inject/patch.c \
             src/inject/trace.c \
             src/inject/observe.c \
@@ -28,23 +44,29 @@ HOOK_SRC := src/inject/dllmain.c \
             src/inject/gamelog.c \
             src/inject/input.c \
             src/inject/dinput_hook.c \
-            src/inject/control.c \
-            src/game/savetag.c \
-            src/game/rect.c \
-            src/game/dist.c \
-            src/game/objtable.c \
-            src/game/objtype.c \
-            src/game/packkey.c \
-            src/game/text.c \
-            src/game/blit.c \
-            src/game/sprite.c \
-            src/game/surface.c \
-            src/game/font.c \
-            src/game/mapdraw.c
+            src/inject/control.c
+
+HOOK_CXX := src/game/savetag.cpp \
+            src/game/rect.cpp \
+            src/game/dist.cpp \
+            src/game/objtable.cpp \
+            src/game/objtype.cpp \
+            src/game/packkey.cpp \
+            src/game/text.cpp \
+            src/game/blit.cpp \
+            src/game/sprite.cpp \
+            src/game/surface.cpp \
+            src/game/font.cpp \
+            src/game/mapdraw.cpp
+
+HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
+            $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))
 
 # ws2_32 for the control socket; gdi32/user32 for the runtime font generator,
 # which draws each glyph with GDI before encoding it.
 HOOK_LIBS := -lws2_32 -lgdi32 -luser32
+
+HOOK_DEP := $(HOOK_OBJ:.o=.d)
 
 LAUNCH_SRC := src/inject/launcher.c
 
@@ -55,9 +77,20 @@ all: $(BUILD)/am2hook.dll $(BUILD)/launcher.exe
 $(BUILD):
 	@mkdir -p $(BUILD)
 
+$(BUILD)/obj/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/obj/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+-include $(HOOK_DEP)
+
 # The DLL is loaded into the game by launcher.exe before its entry point runs.
-$(BUILD)/am2hook.dll: $(HOOK_SRC) | $(BUILD)
-	$(CC) $(CFLAGS) -shared -o $@ $(HOOK_SRC) $(LDFLAGS) $(HOOK_LIBS)
+# Linked with the C++ driver so the C and C++ objects come together correctly.
+$(BUILD)/am2hook.dll: $(HOOK_OBJ) | $(BUILD)
+	$(CXX) -shared -o $@ $(HOOK_OBJ) $(LDFLAGS) $(HOOK_LIBS)
 
 $(BUILD)/launcher.exe: $(LAUNCH_SRC) | $(BUILD)
 	$(CC) $(CFLAGS) -o $@ $(LAUNCH_SRC) $(LDFLAGS)

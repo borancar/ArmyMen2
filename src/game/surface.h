@@ -20,6 +20,12 @@
 #include "../inject/orig.h"
 #include "../inject/win32.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Original: 0x0041B9A0. Locks `surf` and publishes its bits and pitch into the
  * globals the blitters read. Returns 1 on success, 0 if a different surface is
  * already locked or the lock failed. Re-locking the surface already held
@@ -31,5 +37,9 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf);
 int32_t __cdecl UnlockSurface(void);
 
 int surface_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_SURFACE_H */

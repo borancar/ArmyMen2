@@ -41,9 +41,9 @@ int packkey_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_PACK_KEY, PackKey, "PackKey", 3);
-    rc |= patch_replace(ADDR_KEY_FIELD_A, KeyFieldA, "KeyFieldA", 1);
-    rc |= patch_replace(ADDR_KEY_FIELD_B, KeyFieldB, "KeyFieldB", 1);
-    rc |= patch_replace(ADDR_KEY_FIELD_C, KeyFieldC, "KeyFieldC", 1);
+    rc |= patch_replace(ADDR_PACK_KEY, (const void *)PackKey, "PackKey", 3);
+    rc |= patch_replace(ADDR_KEY_FIELD_A, (const void *)KeyFieldA, "KeyFieldA", 1);
+    rc |= patch_replace(ADDR_KEY_FIELD_B, (const void *)KeyFieldB, "KeyFieldB", 1);
+    rc |= patch_replace(ADDR_KEY_FIELD_C, (const void *)KeyFieldC, "KeyFieldC", 1);
     return rc;
 }

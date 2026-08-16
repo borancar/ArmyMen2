@@ -125,9 +125,9 @@ int rect_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_RECT_SET, RectSet, "RectSet", 5);
-    rc |= patch_replace(ADDR_CLAMP, Clamp, "Clamp", 3);
-    rc |= patch_replace(ADDR_POINT_IN_RECT, PointInRect, "PointInRect", 2);
-    rc |= patch_replace(ADDR_CLIP_RECT, ClipRect, "ClipRect", 5);
+    rc |= patch_replace(ADDR_RECT_SET, (const void *)RectSet, "RectSet", 5);
+    rc |= patch_replace(ADDR_CLAMP, (const void *)Clamp, "Clamp", 3);
+    rc |= patch_replace(ADDR_POINT_IN_RECT, (const void *)PointInRect, "PointInRect", 2);
+    rc |= patch_replace(ADDR_CLIP_RECT, (const void *)ClipRect, "ClipRect", 5);
     return rc;
 }

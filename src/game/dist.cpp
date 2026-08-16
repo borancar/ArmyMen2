@@ -48,5 +48,5 @@ int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
 
 int dist_install(void)
 {
-    return patch_replace(ADDR_APPROX_DIST, ApproxDist, "ApproxDist", 2);
+    return patch_replace(ADDR_APPROX_DIST, (const void *)ApproxDist, "ApproxDist", 2);
 }

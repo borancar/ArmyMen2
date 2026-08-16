@@ -21,9 +21,19 @@
 #ifndef AM2_CONTROL_H
 #define AM2_CONTROL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Start the listener thread. No-op unless AM2_CONTROL=1. Returns 0 on success. */
 int control_start(void);
 
 void control_stop(void);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_CONTROL_H */

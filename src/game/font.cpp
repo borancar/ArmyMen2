@@ -164,7 +164,7 @@ int font_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_ENCODE_GLYPH, EncodeGlyph, "EncodeGlyph", 4);
-    rc |= patch_replace(ADDR_RENDER_GLYPH, RenderGlyph, "RenderGlyph", 5);
+    rc |= patch_replace(ADDR_ENCODE_GLYPH, (const void *)EncodeGlyph, "EncodeGlyph", 4);
+    rc |= patch_replace(ADDR_RENDER_GLYPH, (const void *)RenderGlyph, "RenderGlyph", 5);
     return rc;
 }

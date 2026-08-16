@@ -5,6 +5,12 @@
 #include "../inject/orig.h"
 #include "rect.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* DrawText -- original 0x00446930, 34 call sites.
  *
  * Draws `str` at (x, y) in `font`, one glyph at a time, clipping each against
@@ -26,5 +32,9 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
                       int32_t font, int32_t arg4, int32_t colour);
 
 int text_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_TEXT_H */

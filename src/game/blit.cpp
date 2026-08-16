@@ -201,10 +201,10 @@ int blit_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_BLIT_GLYPH,   BlitGlyph,   "BlitGlyph", 6);
-    rc |= patch_replace(ADDR_BLIT_COPY16,  BlitCopy16,  "BlitCopy16", 5);
-    rc |= patch_replace(ADDR_BLIT_COPY32,  BlitCopy32,  "BlitCopy32", 5);
-    rc |= patch_replace(ADDR_BLIT_REMAP16, BlitRemap16, "BlitRemap16", 6);
-    rc |= patch_replace(ADDR_BLIT_OVERLAY, BlitOverlay, "BlitOverlay", 5);
+    rc |= patch_replace(ADDR_BLIT_GLYPH,   (const void *)BlitGlyph,   "BlitGlyph", 6);
+    rc |= patch_replace(ADDR_BLIT_COPY16,  (const void *)BlitCopy16,  "BlitCopy16", 5);
+    rc |= patch_replace(ADDR_BLIT_COPY32,  (const void *)BlitCopy32,  "BlitCopy32", 5);
+    rc |= patch_replace(ADDR_BLIT_REMAP16, (const void *)BlitRemap16, "BlitRemap16", 6);
+    rc |= patch_replace(ADDR_BLIT_OVERLAY, (const void *)BlitOverlay, "BlitOverlay", 5);
     return rc;
 }

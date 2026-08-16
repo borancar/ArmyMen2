@@ -5,6 +5,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Overwrite the first five bytes at `target` with `jmp rel32`, so every
  * existing call site reaches our code instead. This is a one-way replacement:
  * the original body becomes unreachable and there is no trampoline back to it.
@@ -24,5 +29,10 @@ int patch_replace(uint32_t target, const void *replacement, const char *name,
 
 /* Number of patches installed so far. */
 int patch_count(void);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_PATCH_H */

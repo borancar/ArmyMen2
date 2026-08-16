@@ -5,6 +5,12 @@
 #include "../inject/orig.h"
 #include "rect.h"
 
+/* The harness in src/inject is C; these are C++. Keep the linkage
+ * compatible so dllmain.c can still call the install hooks. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* BlitGlyph -- original 0x0041C710.
  *
  * Draws one run-length encoded glyph into the framebuffer at (x, y), filling
@@ -75,5 +81,9 @@ void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
                             AM2_Rect src);
 
 int blit_install(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AM2_BLIT_H */

@@ -258,12 +258,12 @@ int objtable_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_FIND_SLOT, FindSlot, "FindSlot", 2);
-    rc |= patch_replace(ADDR_LOOKUP_BY_UID, LookupByUID, "LookupByUID", 1);
-    rc |= patch_replace(ADDR_ADD_TO_ITEM_LIST, AddToItemList, "AddToItemList", 2);
-    rc |= patch_replace(ADDR_REMOVE_FROM_ITEM_LIST, RemoveFromItemList,
+    rc |= patch_replace(ADDR_FIND_SLOT, (const void *)FindSlot, "FindSlot", 2);
+    rc |= patch_replace(ADDR_LOOKUP_BY_UID, (const void *)LookupByUID, "LookupByUID", 1);
+    rc |= patch_replace(ADDR_ADD_TO_ITEM_LIST, (const void *)AddToItemList, "AddToItemList", 2);
+    rc |= patch_replace(ADDR_REMOVE_FROM_ITEM_LIST, (const void *)RemoveFromItemList,
                         "RemoveFromItemList", 1);
-    rc |= patch_replace(ADDR_FIRST_ITEM, FirstItem, "FirstItem", 0);
-    rc |= patch_replace(ADDR_NEXT_ITEM, NextItem, "NextItem", 0);
+    rc |= patch_replace(ADDR_FIRST_ITEM, (const void *)FirstItem, "FirstItem", 0);
+    rc |= patch_replace(ADDR_NEXT_ITEM, (const void *)NextItem, "NextItem", 0);
     return rc;
 }
