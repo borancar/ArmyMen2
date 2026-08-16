@@ -24,6 +24,7 @@
 #include "../game/packkey.h"
 #include "../game/rect.h"
 #include "../game/savetag.h"
+#include "../game/text.h"
 
 #include <windows.h>
 #include <stdlib.h>
@@ -64,6 +65,10 @@ static const struct {
       { 0xA1, 0x04, 0x4F, 0x51, 0x00 }, 5 },
     { ADDR_NEXT_ITEM, "NextItem",
       { 0xA1, 0x08, 0x4F, 0x51, 0x00, 0x56 }, 6 },
+    { ADDR_CLIP_RECT, "ClipRect",
+      { 0x8B, 0x44, 0x24, 0x0C, 0x8B, 0x4C, 0x24, 0x04 }, 8 },
+    { ADDR_DRAW_TEXT, "DrawText",
+      { 0xA1, 0x80, 0xDF, 0x4F, 0x00, 0x83, 0xEC, 0x2C }, 8 },
 };
 
 static int verify_image(void)
@@ -105,14 +110,12 @@ static void observe_hot_functions(void)
     if (!opt || *opt != '1')
         return;
 
-    OBSERVE(0x00427820u, "game_427820",   4, sites_00427820);
-    OBSERVE(0x0040C040u, "audio_40c040",  4, sites_0040c040);
-    OBSERVE(0x00453D50u, "script_453d50", 4, sites_00453d50);
-    OBSERVE(0x0042A7B0u, "item_42a7b0",   4, sites_0042a7b0);
-    OBSERVE(0x004540F0u, "script_4540f0", 4, sites_004540f0);
-    OBSERVE(0x0042DDE0u, "map_42dde0",    4, sites_0042dde0);
-    OBSERVE(0x0040F560u, "audio_40f560",  4, sites_0040f560);
-    OBSERVE(0x0041F520u, "evt_41f520",    4, sites_0041f520);
+    /* DrawText is patched now, so its count comes from the patch layer.
+     * BlitGlyph is not: it is __fastcall, and the stub only reads stack
+     * dwords, so its destination x/y in ecx/edx never appear here. */
+    OBSERVE(0x0041C710u, "BlitGlyph",   6, sites_0041c710);
+    OBSERVE(0x00445FF0u, "draw_445ff0", 6, sites_00445ff0);
+    OBSERVE(0x00446AB0u, "draw_446ab0", 6, sites_00446ab0);
 }
 
 static void install(void)
@@ -133,6 +136,7 @@ static void install(void)
     objtable_install();
     objtype_install();
     packkey_install();
+    text_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

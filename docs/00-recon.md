@@ -155,7 +155,8 @@ visible in the messages include `AddMsg`, `RemHead`, `RemMsg`, `ReadBitmap`,
 |---|---|
 | `0x401000`–`0x409000` | DirectPlay reliable-messaging layer (flow control, ACK/NACK, resend queues) |
 | `0x409000`–`0x40b800` | session / player management (`air.cpp`) |
-| `0x40b800`–`0x41e000` | audio: RIFF/WAVE parsing, DirectSound buffer management |
+| `0x40b800`–`0x414000` | audio: RIFF/WAVE parsing, DirectSound buffer management |
+| `0x414000`–`0x41e000` | 2D drawing — mislabelled as audio in the first pass; the functions here call `ClipRect`, `PointInRect` and `RectSet`, and `0x0041C710` is the pixel blitter |
 | `0x41e000`–`0x423000` | events, script-driven object commands |
 | `0x423000`–`0x425000` | bitmap loading, DirectDraw surface creation, object data files |
 | `0x425000`–`0x428000` | game loop, pause, timing (`QueryPerformanceCounter`) |
@@ -298,6 +299,47 @@ destination space: `out->left` and `out->top` are offsets into the bitmap, which
 is exactly what a blit needs in order to skip the clipped-away columns and rows.
 Early rejects leave `out` only partly written, so the return value has to be
 checked rather than inferring emptiness from the rectangle.
+
+### DrawText: the first composite handled
+
+`DrawText` (`0x00446930`, 384 bytes, 34 call sites) is the first substantial
+drawing routine reconstructed rather than a primitive, and it only became
+tractable because everything under it — `ClipRect`, `AM2_Rect` — was done first.
+
+Its argument order was **measured, not derived**. The stack frame is
+`sub esp,0x2C` plus four pushes, with arguments re-read at shifting offsets and
+argument slots reused as scratch, so deriving it on paper invites getting it
+backwards. Observing it instead settled it immediately: the HUD stat panel
+produces `DrawText(0x22C, 0x111, "Sarge", 0, 0, 0xFE)` and
+`DrawText(0x240, 0x11D, "4.6 cm", 0, 0, 0xFE)` — labels at x=556, values at
+x=576, y stepping 12 a row, exactly the panel on screen.
+
+Glyph lookup uses two tables with awkward strides:
+
+```
+offset = glyphOffsets[(int8_t)ch + font * 262]   uint16, 0x006598D4
+base   = fontBases[font * 133]                   uint8_t *, 0x00659AD4
+width  = *(uint16 *)(base + offset + 0)
+height = *(uint16 *)(base + offset + 2)
+```
+
+The character index is sign-extended, so bytes above `0x7F` index backwards from
+the font base.
+
+Two behaviours worth knowing:
+
+- A `^` in the string is a **colour escape** — the next character replaces the
+  colour argument for the rest of the string, and both are consumed.
+- A glyph that clips away entirely does not get skipped, it **ends the string**:
+  the original jumps to the epilogue. Text running off the right edge therefore
+  truncates, which is sensible; text starting off the left edge draws nothing at
+  all, which probably is not intended.
+
+The blitter beneath it, `0x0041C710`, is **`__fastcall`** — destination x and y
+arrive in `ecx`/`edx` with the clipped rectangle passed by value. That is
+invisible to the argument tracer, which only reads stack dwords, and is worth
+remembering: a traced argument list that starts at what looks like the second or
+third parameter is a sign of a register calling convention.
 
 ### The packed map key
 

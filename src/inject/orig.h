@@ -29,6 +29,20 @@
 
 #define ADDR_CLIP_RECT      0x0042E220u  /* int32_t(src, clip, int32*, int32*, out) */
 
+/* Text rendering. */
+#define ADDR_DRAW_TEXT      0x00446930u  /* void(x,y,str,font,?,colour) */
+#define ADDR_BLIT_GLYPH     0x0041C710u  /* __fastcall, see text.c */
+#define ADDR_TEXT_READY     0x004FDF80u  /* int32_t; zero means do not draw */
+#define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[], indexed ch + font*262 */
+#define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t*[], indexed font*133 */
+#define ADDR_TEXT_CLIP      0x00485310u  /* AM2_Rect */
+/* When these two globals are equal the destination is shifted by the pair
+ * below -- an origin adjustment for one of the render targets. */
+#define ADDR_ORIGIN_SEL_A   0x00507128u  /* int32_t */
+#define ADDR_ORIGIN_SEL_B   0x00502AD4u  /* int32_t */
+#define ADDR_ORIGIN_DX      0x00485330u  /* int32_t */
+#define ADDR_ORIGIN_DY      0x00485334u  /* int32_t */
+
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u
