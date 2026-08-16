@@ -239,6 +239,32 @@ which is otherwise pinned to `-all`.
 game polls once per frame and an immediate release would fall between two polls
 and never be seen.
 
+### Pointing at something, when the protocol only has deltas
+
+`mouse move` takes a **relative** delta, because that is what the game consumes
+— buffered `GetDeviceData`, which reports motion, not position. There is no
+absolute form to add: the game never asks where the pointer is.
+
+Converting a screen coordinate into one delta does not work, because Wine
+applies mouse acceleration and the gain is not constant. Measured against a
+cursor pinned to the corner: about 1.75× for a 100-pixel step, about 2.0× for a
+300-pixel one. A computed delta therefore overshoots, and overshoots by more the
+further it travels.
+
+`tools/point.py` closes the loop instead of modelling the curve — move, find the
+cursor in a screenshot, correct, repeat, re-estimating the gain from what the
+last step actually achieved. It converges in a handful of iterations and does
+not care what the curve looks like.
+
+Locating the cursor is the part worth being careful about. It is a saturated
+orange arrow, and the palette was sampled from a frame with it pinned to the
+corner rather than guessed: `(239,107,2)`, `(250,126,2)`, `(250,146,2)`,
+`(254,166,2)`. The threshold has to be tight on red and blue. A loose one —
+`R>180, B<90` — also matches the dirt in the title-screen scenery at
+`(181,156,88)`, and then the tool reports rubble as the pointer and clicks
+somewhere arbitrary. It looks like it is working; the clicks just land nowhere.
+A minimum blob size guards the same mistake from the other side.
+
 ```sh
 tools/am2ctl.py key return tap      # one command
 tools/am2ctl.py -f script.txt       # a script; `sleep N` pauses locally
@@ -377,6 +403,36 @@ by member access off that register. A further 133 read `ecx` on entry but clean
 via the caller, so they are not thiscall and want individual inspection. The
 free functions reconstructed so far simply have not reached the class-based part
 of the codebase yet; expect thiscall as soon as they do.
+
+### Reconstructed code is C++
+
+That survey is the reason `src/game` is built as C++ (`.cpp` sources, `.h`
+headers). thiscall is not a convention the original authors chose; it is what an
+i386 C++ compiler emits for a non-static member function. Reconstructing those
+114 in C would mean hand-written `__attribute__((thiscall))` shims around what
+the original wrote as ordinary methods, on every one of them.
+
+The move was made while everything reconstructed so far was still free
+functions, so it cost nothing to do and turns the class-based part of the
+codebase into a non-event when it arrives.
+
+`src/inject` stays C — it is harness, not game. That split has two consequences.
+Every `src/inject/*.h` declaring a function shared with `src/game` needs an
+`extern "C"` guard; `win32.h`, `orig.h` and `sites.h` declare none and are left
+alone, `win32.h` especially, since wrapping `windows.h` in `extern "C"` would be
+wrong. And C++ refuses the implicit function-pointer to `const void *`
+conversion that `patch_replace` relied on, so its install sites now cast
+explicitly — that conversion was always the loose one, C just did not say so.
+
+Verified the way anything else here is: Boot Camp through to gameplay, menus,
+map, sprites and HUD all rendering, and the registry invariant exact at
+91,173 × 1,609 == 146,697,357.
+
+One build hazard came out of it. Header dependencies are now tracked with
+`-MMD -MP`, and that is load-bearing rather than tidiness: the build used to
+compile every source in one command, so header edits were always picked up, and
+splitting into per-object rules silently lost that. Adding the `extern "C"`
+guards appeared to change nothing at all until the stale objects were noticed.
 
 ### Use the Windows headers
 
