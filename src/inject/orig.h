@@ -24,6 +24,7 @@
 #define ADDR_CHECK_SAVE_TAG 0x004235D0u  /* BOOL(FILE*,uint32_t,const char*,int32_t) */
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
 #define ADDR_RECT_SET       0x0042E1C0u  /* void(int32_t*,int32_t,int32_t,int32_t,int32_t) */
+#define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
 
 /* Statically linked MSVC 6 CRT */
 #define ADDR_FREAD          0x004645C1u  /* size_t(void*,size_t,size_t,FILE*) */

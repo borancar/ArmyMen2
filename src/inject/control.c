@@ -1,6 +1,7 @@
 #include "control.h"
 #include "hooklog.h"
 #include "input.h"
+#include "trace.h"
 
 #include <winsock2.h>
 #include <windows.h>
@@ -77,6 +78,12 @@ static void handle_line(SOCKET s, char *line)
     if (!strcmp(argv[0], "clear")) {
         input_clear();
         reply(s, "ok cleared");
+        return;
+    }
+    if (!strcmp(argv[0], "counts")) {
+        char buf[MAX_LINE - 8];
+        trace_describe(buf, sizeof buf);
+        reply(s, "ok %s", buf[0] ? buf : "(nothing traced)");
         return;
     }
     if (!strcmp(argv[0], "state")) {

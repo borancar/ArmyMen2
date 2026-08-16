@@ -17,6 +17,8 @@
 #include "orig.h"
 #include "patch.h"
 #include "sites.h"
+#include "trace.h"
+#include "../game/dist.h"
 #include "../game/rect.h"
 #include "../game/savetag.h"
 
@@ -41,6 +43,8 @@ static const struct {
       { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57 }, 7 },
     { ADDR_RECT_SET, "RectSet",
       { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x4C, 0x24, 0x08 }, 8 },
+    { ADDR_APPROX_DIST, "ApproxDist",
+      { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x54, 0x24, 0x08 }, 8 },
 };
 
 static int verify_image(void)
@@ -82,12 +86,14 @@ static void observe_hot_functions(void)
     if (!opt || *opt != '1')
         return;
 
-    OBSERVE(0x0040C040u, "audio_40c040",  4, sites_0040c040);
-    OBSERVE(0x0042E1C0u, "map_42e1c0",    4, sites_0042e1c0);
     OBSERVE(0x00427820u, "game_427820",   4, sites_00427820);
+    OBSERVE(0x0040C040u, "audio_40c040",  4, sites_0040c040);
     OBSERVE(0x00453D50u, "script_453d50", 4, sites_00453d50);
     OBSERVE(0x0042A7B0u, "item_42a7b0",   4, sites_0042a7b0);
-    OBSERVE(0x00422DE0u, "evt_422de0",    4, sites_00422de0);
+    OBSERVE(0x004540F0u, "script_4540f0", 4, sites_004540f0);
+    OBSERVE(0x0042DDE0u, "map_42dde0",    4, sites_0042dde0);
+    OBSERVE(0x0040F560u, "audio_40f560",  4, sites_0040f560);
+    OBSERVE(0x0041F520u, "evt_41f520",    4, sites_0041f520);
 }
 
 static void install(void)
@@ -104,6 +110,7 @@ static void install(void)
     gamelog_install();
     savetag_install();
     rect_install();
+    dist_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so
@@ -125,6 +132,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
         install();
         break;
     case DLL_PROCESS_DETACH:
+        trace_report();
         hooklog("am2hook detaching");
         hooklog_close();
         break;

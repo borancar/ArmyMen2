@@ -30,7 +30,8 @@ HOOK_SRC := src/inject/dllmain.c \
             src/inject/dinput_hook.c \
             src/inject/control.c \
             src/game/savetag.c \
-            src/game/rect.c
+            src/game/rect.c \
+            src/game/dist.c
 
 # ws2_32 for the control socket.
 HOOK_LIBS := -lws2_32

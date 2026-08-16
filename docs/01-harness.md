@@ -308,14 +308,26 @@ interleave in true order.
 
 ## Current targets
 
-| address | function | status |
-|---|---|---|
-| `0x0045CAA0` | `Log` | replaced — un-stubbed, opt-in |
-| `0x0042E1C0` | `RectSet` | replaced — **verified**, 90k calls/run, title screen renders correctly |
-| `0x004235D0` | `CheckSaveTag` | replaced — **not yet exercised** |
+| address | function | status | evidence |
+|---|---|---|---|
+| `0x0045CAA0` | `Log` | replaced | un-stubbed, opt-in; 2,605 calls/session |
+| `0x0042E1C0` | `RectSet` | **verified** | 161,955 calls; UI renders correctly |
+| `0x0042DDE0` | `ApproxDist` | **verified** | 1,721 calls in gameplay |
+| `0x004235D0` | `CheckSaveTag` | **verified** | all 15 call sites hit, 317 items loaded, 0 errors |
 
-`CheckSaveTag` only runs when a savegame is loaded, and the install ships no
-saves. It is patched and the game runs stably with it in place, but that is not
-the same as having been proven correct. To exercise it: play far enough to save,
-then load with `AM2_TRACE=1` and check each reported tag against
-`docs/savetags.tsv`.
+### How CheckSaveTag was finally verified
+
+It is on the savegame **load** path — it `fread`s a tag and compares — so it
+needed a real load, not a save. Boot Camp cannot save (its in-game menu offers
+only RETURN TO GAME / CONTROLS / AUDIO / ABORT MISSION), but SINGLE PLAYER →
+SELECT → LOAD reaches a shipped `map0_mission0.sav`.
+
+Loading it produced `Loaded 317 items`, zero `Error reading save file` messages,
+and a correctly restored mission — and `counts` reported exactly **15** calls,
+matching the 15 static call sites. Every `(file, line, tag)` triple recovered
+statically in `savetags.tsv` was confirmed byte-for-byte at runtime.
+
+Runtime also found what disassembly could not. The 15th site at `0x004268FF`
+loads its arguments in registers, so `find_savetags.py` reports it as `?`; under
+tracing it resolves to **`gameproc.cpp:2253`, tag `0x00000438`**, called twice
+per load. Static and dynamic analysis each covered the other's blind spot.

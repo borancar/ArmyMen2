@@ -8,6 +8,7 @@
 
 #define MAX_TRACED   64
 #define MAX_ARGS     8
+#define LOG_FIRST_N  12
 #define STUB_BYTES   27
 #define ARENA_BYTES  4096
 
@@ -94,6 +95,13 @@ static void __cdecl trace_enter(uint32_t id, uint32_t *args)
     e = &g_entries[id];
     e->calls++;
 
+    /* Log the first few calls in full, then count only. During gameplay a hot
+     * function runs tens of thousands of times a second; logging every one
+     * buries the interesting lines and slows the game badly. The first few
+     * show the argument shape, and the count is what the survey wants. */
+    if (e->calls > LOG_FIRST_N)
+        return;
+
     at += (size_t)_snprintf(buf + at, sizeof buf - at, "trace %s#%u(",
                             e->name, e->calls);
 
@@ -115,6 +123,32 @@ static void __cdecl trace_enter(uint32_t id, uint32_t *args)
     buf[sizeof buf - 1] = '\0';
 
     hooklog_raw(buf);
+}
+
+void trace_describe(char *out, uint32_t cap)
+{
+    uint32_t at = 0;
+    int32_t  i;
+
+    if (!out || cap < 8)
+        return;
+    out[0] = '\0';
+    for (i = 0; i < g_count && at < cap - 32; i++)
+        at += (uint32_t)_snprintf(out + at, cap - at, "%s%s=%u",
+                                  i ? " " : "", g_entries[i].name,
+                                  g_entries[i].calls);
+    out[cap - 1] = '\0';
+}
+
+void trace_report(void)
+{
+    int32_t i;
+
+    if (!g_count)
+        return;
+    hooklog("trace: call totals for this session --");
+    for (i = 0; i < g_count; i++)
+        hooklog("  %-20s %10u", g_entries[i].name, g_entries[i].calls);
 }
 
 static uint8_t *arena_alloc(size_t n)

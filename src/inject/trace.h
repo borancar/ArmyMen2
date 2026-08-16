@@ -29,4 +29,13 @@ const void *trace_wrap(const void *fn, const char *name, int32_t nargs);
  * layered on top of one. Returns NULL on failure. */
 const void *trace_make_stub(const void *fn, const char *name, int32_t nargs);
 
+/* Call counts per traced function, newline-free, for the control socket.
+ * Only the first few calls of each are logged in full -- a function called
+ * tens of thousands of times per second would otherwise bury the log and slow
+ * the game to a crawl -- so the counts are the real survey result. */
+void trace_describe(char *out, uint32_t cap);
+
+/* Write the same totals to the log. Called on detach. */
+void trace_report(void);
+
 #endif /* AM2_TRACE_H */

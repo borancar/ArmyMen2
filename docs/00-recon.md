@@ -88,7 +88,13 @@ The 15 call sites yield the savegame section tags. Full table in
 | `0x06660668` | unit.cpp |
 | `0x01326413` | audio.cpp |
 
-One site at `0x004268ff` passes its arguments in registers and is not resolved.
+One site at `0x004268ff` passes its arguments in registers, so the static
+extractor cannot resolve it. Runtime tracing during a savegame load does:
+it is **`gameproc.cpp:2253`, tag `0x00000438`**, called twice per load.
+
+Loading `map0_mission0.sav` hits all 15 sites and confirms every
+`(file, line, tag)` triple above exactly. Static and dynamic analysis each
+cover the other's blind spot — worth remembering for the rest of the project.
 
 ## Link order is alphabetical
 
@@ -198,8 +204,25 @@ using `-nointro -dbg` (see `docs/01-harness.md`):
 | `0x0042A7B0` | 0 | not reached |
 
 The distribution is the useful part: reaching the title screen exercises almost
-none of the engine. Anything past this point needs the game driven into actual
-gameplay, which no command-line switch appears to do on its own.
+none of the engine.
+
+### The same survey, in gameplay
+
+Driven into Boot Camp through the control socket, every one of the candidates
+runs — including the three that were completely dead at the title screen:
+
+| function | title | gameplay | identification |
+|---|---|---|---|
+| `0x00427820` | 0 | **3,098** | lookup by ID: a finder at `0x004277A0` returns an index into a 12-byte-record table at `0x00514F0C`, returning the field at `+4` |
+| `0x0042DDE0` | — | 369 | `ApproxDist` — reconstructed |
+| `0x0040C040` | **0** | 35 | audio |
+| `0x0040F560` | — | 23 | audio |
+| `0x0041F520` | — | 19 | event |
+| `0x00453D50` | 7 | 14 | takes a heap object pointer |
+| `0x004540F0` | — | 7 | UI button loader — takes three bitmap names per call (normal/highlight/pressed), e.g. `03_104_00_movies.bmp` |
+| `0x0042A7B0` | **0** | 6 | item |
+
+Reaching gameplay needs the game driven; no command-line switch does it alone.
 
 ## Toolchain constraints
 
