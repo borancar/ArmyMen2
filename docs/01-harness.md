@@ -123,6 +123,61 @@ There is also no count-only mode yet. Observing one hot function produced 90,185
 records in a 45-second run, which is fine for a survey and much too heavy to
 leave enabled.
 
+## Running several instances at once
+
+Concurrent runs collide on four things — the Wine desktop name, the control
+port, the log file and the screenshot directory. All four derive from `ID`,
+which defaults from `$DISPLAY` (`:99` → 99, `:0` → 0), so a headless run and a
+desktop run are independent without anyone having to think about it:
+
+```sh
+make run                      # ID from DISPLAY
+make run ID=7                 # a second instance on the same display
+make config ID=7              # what would that instance be called?
+```
+
+`tools/drive.sh` sources those values from `make config` rather than
+re-deriving them, so the two cannot drift apart.
+
+### The game refuses to run twice
+
+Separating ports and desktops is not enough. The game guards itself with a
+named mutex — `OpenMutexA(…, "ArmyMenMutex")` at `0x0040B603`, then
+`CreateMutexA` at `0x0040B62E`. Named kernel objects belong to the wineserver,
+and there is one wineserver per `WINEPREFIX`, so a second instance in the same
+prefix always loses. It exits immediately after `system speed:`, before
+creating any DirectInput device — a quiet, easily misread failure.
+
+`ISOLATE=1` gives an instance its own prefix, hence its own wineserver, hence
+its own mutex namespace. The 579 MB install is symlinked rather than copied:
+
+```sh
+make run ID=7 ISOLATE=1
+```
+
+Caveat: because the install is shared through that symlink, the files the game
+*writes* — `Options.cfg` and `save/` — are still shared. Independent game state
+needs a real copy.
+
+### Install by rename, never by overwrite
+
+`install-hook` writes to a temporary name and `mv`s into place. This is not
+tidiness. Wine maps `am2hook.dll` directly from that file, and `cp` truncates
+and rewrites in place — so installing while another instance was running
+corrupted *that* instance's mapping, taking its control-socket thread down with
+it. Because isolated prefixes symlink to the same directory, simply starting a
+second instance did this to the first: it answered one command, then went
+silent forever. `rename(2)` swaps the directory entry and leaves the old inode
+alive for anyone still mapping it.
+
+### A listening port does not mean a live game
+
+When the game exits, its wineserver keeps the listening socket open. `connect()`
+therefore still succeeds against a dead game, and the failure shows up as a read
+timeout rather than a refused connection. `am2ctl.py` says so explicitly instead
+of reporting a bare timeout. Check `pgrep -f 'ArmyMen2[.]exe'` for liveness, not
+the port.
+
 ## Driving the game: DirectInput interception
 
 Reaching gameplay means getting past menus, and synthesising X11 input does not

@@ -1,7 +1,9 @@
 .wine/
+.wine-*/
 .venv/
 build/
 reference/
 __pycache__/
 *.pyc
 am2.log
+am2-*.log

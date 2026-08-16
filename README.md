@@ -30,11 +30,24 @@ make run-stock          # unpatched GOG binary, the A/B reference
 ```
 
 `make run` is the only launch target — variations are knobs (`GAMELOG`, `TRACE`,
-`OBSERVE`, `ARGS`, `DESKTOP`), not separate targets. Watch the recovered debug
-commentary from another terminal:
+`OBSERVE`, `ARGS`, `DESKTOP`, `ID`, `ISOLATE`), not separate targets.
+
+Runs are independent. Desktop name, control port, log file and screenshot
+directory all derive from `ID`, which defaults from `$DISPLAY`. Running two
+games at once additionally needs `ISOLATE=1`, because the game guards itself
+with a named mutex that is scoped to the wineserver, i.e. to the prefix:
 
 ```sh
-tail -f ".wine/drive_c/GOG Games/Army Men II/am2.log"
+make run                  # ID from DISPLAY
+make run ID=7 ISOLATE=1   # a second game, own prefix, own everything
+make config ID=7          # what is that instance called?
+```
+
+Watch the recovered debug commentary from another terminal (`make config`
+prints the exact path for an instance):
+
+```sh
+tail -f ".wine/drive_c/GOG Games/Army Men II/am2-0.log"
 ```
 
 `launcher.exe` starts the game suspended, injects `am2hook.dll`, and resumes it,

@@ -33,7 +33,19 @@ class Control:
         """Send one command and return its reply line."""
         self.sock.sendall(line.encode("latin-1") + b"\n")
         while b"\n" not in self.buf:
-            chunk = self.sock.recv(4096)
+            try:
+                chunk = self.sock.recv(4096)
+            except TimeoutError:
+                # Connecting succeeded but nothing answered. The port staying
+                # open proves little: when the game exits, its wineserver keeps
+                # the listening socket, so connect() still succeeds against a
+                # dead game. The other cause is the listener being busy with an
+                # earlier client that never disconnected.
+                raise TimeoutError(
+                    "connected but got no reply -- either the game has exited "
+                    "(wineserver holds the port open after it dies) or the "
+                    "listener is stuck on a previous client"
+                ) from None
             if not chunk:
                 raise ConnectionError("control socket closed")
             self.buf += chunk

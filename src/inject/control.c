@@ -138,17 +138,27 @@ static void handle_line(SOCKET s, char *line)
     reply(s, "err unknown command '%s'", argv[0]);
 }
 
+/* One client is served at a time, which is ample for scripting -- but without a
+ * timeout a client that connects and then stalls (or is killed mid-request, or
+ * whose socket is left dangling) wedges the listener for the life of the
+ * process. New connections then sit in the backlog and time out, which looks
+ * exactly like a hung game. A receive timeout makes that self-healing. */
+#define CLIENT_IDLE_MS 15000
+
 static void serve(SOCKET client)
 {
     char buf[MAX_LINE];
     int  used = 0;
+    DWORD tmo = CLIENT_IDLE_MS;
+
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tmo, sizeof tmo);
 
     for (;;) {
         int n = recv(client, buf + used, (int)(sizeof buf - used - 1), 0);
         char *nl;
 
         if (n <= 0)
-            return;
+            return;                      /* closed, error, or idle timeout */
         used += n;
         buf[used] = '\0';
 
