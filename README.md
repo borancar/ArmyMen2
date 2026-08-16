@@ -22,8 +22,19 @@ Start with [`docs/00-recon.md`](docs/00-recon.md), then
 ## Running the harness
 
 ```sh
-make run        # game with our patches installed
-make run-log    # plus the game's own 1999 debug logger, un-stubbed
+make run                # harness + the game's own 1999 debug logger
+make run TRACE=1        # argument-trace every patched function
+make run OBSERVE=1      # log call sites of the observed functions
+make run GAMELOG=0      # leave the logger stubbed
+make run-stock          # unpatched GOG binary, the A/B reference
+```
+
+`make run` is the only launch target — variations are knobs (`GAMELOG`, `TRACE`,
+`OBSERVE`, `ARGS`, `DESKTOP`), not separate targets. Watch the recovered debug
+commentary from another terminal:
+
+```sh
+tail -f ".wine/drive_c/GOG Games/Army Men II/am2.log"
 ```
 
 `launcher.exe` starts the game suspended, injects `am2hook.dll`, and resumes it,
@@ -59,6 +70,9 @@ new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
 | `tools/functions.py` | function inventory with translation-unit attribution |
 | `tools/find_logs.py` | recovers the stubbed-out debug log format strings |
 | `tools/checkdetour.py` | verifies an address is safe to overwrite with a 5-byte jmp |
+| `tools/callsites.py` | exact direct call sites of a function, for observation |
+| `tools/am2ctl.py` | client for the control socket — drives the running game |
+| `tools/drive.sh` | headless launch, screenshot and menu navigation on Xvfb |
 
 Each writes a `.tsv` into `docs/`. Regenerate in dependency order:
 

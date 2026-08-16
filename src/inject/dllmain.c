@@ -9,7 +9,10 @@
  */
 
 #include "hooklog.h"
+#include "control.h"
+#include "dinput_hook.h"
 #include "gamelog.h"
+#include "input.h"
 #include "observe.h"
 #include "orig.h"
 #include "patch.h"
@@ -102,6 +105,12 @@ static void install(void)
     savetag_install();
     rect_install();
     observe_hot_functions();
+
+    /* Input interception is independent of the reconstruction: it exists so
+     * gameplay code paths can be reached deterministically from outside. */
+    input_init();
+    dinput_hook_install();
+    control_start();
 
     hooklog("am2hook: %d patch(es) installed", patch_count());
 }

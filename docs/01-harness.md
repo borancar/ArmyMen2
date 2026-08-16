@@ -123,6 +123,61 @@ There is also no count-only mode yet. Observing one hot function produced 90,185
 records in a 45-second run, which is fine for a survey and much too heavy to
 leave enabled.
 
+## Driving the game: DirectInput interception
+
+Reaching gameplay means getting past menus, and synthesising X11 input does not
+work here. Xvfb has no window manager, so there is no foreground window, and
+DirectInput silently discards mouse input as a result. Keyboard happens to get
+through, which is worse than an outright failure — it looks like the approach
+works until it doesn't.
+
+So input is injected below DirectInput instead. The game imports exactly one
+entry point, `DirectInputCreateA`, so one IAT patch at `0x0046F014` is enough to
+reach everything else. From there we patch vtable slots rather than writing
+wrapper objects — three methods matter against eighteen that would otherwise
+need forwarding by hand:
+
+| interface | slot | method |
+|---|---|---|
+| `IDirectInputA` | 3 | `CreateDevice` |
+| `IDirectInputDeviceA` | 9 | `GetDeviceState` |
+| `IDirectInputDeviceA` | 10 | `GetDeviceData` |
+
+Devices are identified by the GUID passed to `CreateDevice`
+(`GUID_SysKeyboard` / `GUID_SysMouse`). Each hook calls the original first and
+then adds injected state, so real input keeps working and injection composes
+with it. The game asks for **DirectInput version 0x0500**.
+
+Two details that matter. Vtables are shared by every instance of a class, so a
+slot must only save the original the first time — a second pass would record our
+own hook as the original and recurse forever. And the game reads input
+**buffered**, through `GetDeviceData`, not `GetDeviceState`; overlaying the
+polled state buffer alone drives nothing at all. Injected events are appended
+to the array the real device returns, using whatever capacity is left over.
+`GetDeviceData`'s `pdwInOut` is in/out, so the caller's capacity has to be
+captured *before* calling the original, which overwrites it with the count.
+
+### The control socket
+
+`AM2_CONTROL=1` starts a listener on `127.0.0.1:31337` (`AM2_CTL_PORT`) speaking
+a line protocol, each command answered with `ok ...` or `err ...` so a client can
+wait for acknowledgement instead of guessing at timing:
+
+```
+key return tap          key down down 500       key a up
+mouse move 40 -20       mouse left tap          state / clear / ping
+```
+
+`tap` is a timed hold rather than an instant press-release pair, because the
+game polls once per frame and an immediate release would fall between two polls
+and never be seen.
+
+```sh
+tools/am2ctl.py key return tap      # one command
+tools/am2ctl.py -f script.txt       # a script; `sleep N` pauses locally
+tools/am2ctl.py                     # interactive
+```
+
 ## Un-stubbing the 1999 logger
 
 The retail build reduced the logger at `0x0045CAA0` to a bare `ret`, but did so
@@ -148,18 +203,27 @@ reachable. The very first call at startup passes a **NULL format string**;
 
 ## Running
 
+`make run` is the only launch target; variations are make variables rather than
+separate targets.
+
 ```sh
-make run        # patches installed, logger left stubbed
-make run-log    # AM2_GAMELOG=1, the game's own debug output
+make run                # harness + the 1999 debug logger
+make run TRACE=1        # argument-trace every patched function
+make run OBSERVE=1      # log the observed functions' call sites
+make run ARGS=          # drop the -nointro -dbg developer switches
+make run-stock          # unpatched, for A/B comparison
 ```
 
-Both run inside a Wine virtual desktop so the game cannot mode-switch the real
-desktop. For a fully headless run:
+It runs inside a Wine virtual desktop so the game cannot mode-switch the real
+one, and honours `$DISPLAY`, so a headless run is just:
 
 ```sh
 Xvfb :99 -screen 0 1024x768x24 &
-DISPLAY=:99 AM2_GAMELOG=1 AM2_TRACE=1 make run
+DISPLAY=:99 make run OBSERVE=1
 ```
+
+`tools/drive.sh` builds on that to click through menus and screenshot, for
+exercising code paths that only run during real gameplay.
 
 Output goes to `am2.log` in the game folder (override with `AM2_LOG`), and to
 `OutputDebugStringA`. Harness lines and game lines share one sink so they
