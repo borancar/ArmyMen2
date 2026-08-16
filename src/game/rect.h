@@ -19,9 +19,20 @@ typedef struct {
     int32_t bottom;
 } AM2_Rect;
 
-/* Original: 0x0042E1C0. Writes the four edges. */
-void __cdecl RectSet(AM2_Rect *r, int32_t left, int32_t top,
-                     int32_t right, int32_t bottom);
+/* Original: 0x0042E1C0. Writes the four edges and RETURNS `r`.
+ *
+ * The return value is not decoration. The original leaves its first argument in
+ * eax -- it loads the destination there and uses it as the base register for all
+ * four stores -- and every one of its 186 call sites consumes eax immediately
+ * afterwards, typically as `mov reg, eax` or `mov reg, [eax]`. RectSet is used
+ * as an expression yielding the rectangle, not as a void statement.
+ *
+ * This was declared void at first. That happened to work, because the compiler
+ * also chose eax to hold `r` across the body -- but by luck, not by contract. A
+ * different optimisation level or a small edit to the body would have picked
+ * another register and broken all 186 sites at once. */
+AM2_Rect *__cdecl RectSet(AM2_Rect *r, int32_t left, int32_t top,
+                          int32_t right, int32_t bottom);
 
 /* Original: 0x0042E180. Signed clamp of `v` into [lo, hi]. */
 int32_t __cdecl Clamp(int32_t v, int32_t lo, int32_t hi);

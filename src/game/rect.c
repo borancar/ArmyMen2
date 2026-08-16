@@ -25,13 +25,14 @@
 
 #include <stdint.h>
 
-void __cdecl RectSet(AM2_Rect *r, int32_t left, int32_t top,
-                     int32_t right, int32_t bottom)
+AM2_Rect *__cdecl RectSet(AM2_Rect *r, int32_t left, int32_t top,
+                          int32_t right, int32_t bottom)
 {
     r->left   = left;
     r->top    = top;
     r->right  = right;
     r->bottom = bottom;
+    return r;                   /* callers rely on this -- see rect.h */
 }
 
 int32_t __cdecl Clamp(int32_t v, int32_t lo, int32_t hi)
