@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"
+#include "blit.h"
 #include "rect.h"
 
 /* Declared rather than included: pulling ddraw.h in here would drag in
@@ -26,15 +27,18 @@ typedef struct {
     uint32_t format;             /* +0x08  1, 2 or 3; selects the blitter */
     uint32_t flags;              /* +0x0C  bit0 clear => source colour key;
                                   *        bits 2..5 (0x3C) => software path */
+    /* Which arm applies is decided by `flags & 0x3C` and then by `format`:
+     * format 1 uses the 32-bit row table, formats 2 and 3 the 16-bit one. */
     union {
-        uint8_t                   *rle;      /* software: encoded pixels */
+        AM2_Rle16                 *rle16;    /* software, formats 2 and 3 */
+        AM2_Rle32                 *rle32;    /* software, format 1 */
         struct IDirectDrawSurface *surface;  /* hardware: BltFast source */
     } image;                     /* +0x10 */
     AM2_Rect bounds;             /* +0x14 .. +0x23 */
     int16_t  hotX;               /* +0x24, subtracted from the draw position */
     int16_t  hotY;               /* +0x26 */
     uint8_t  pad28[8];           /* +0x28 */
-    uint8_t *overlay;            /* +0x30  second layer, drawn after the first */
+    AM2_Rle16 *overlay;          /* +0x30  second layer, drawn after the first */
     uint8_t *lut;                /* +0x34  256-entry remap table, may be NULL */
     void    *palette;            /* +0x38  overlay palette; NULL means default */
 } AM2_Sprite;

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"
+#include "blit.h"
 
 /* Runtime font generation.
  *
@@ -14,12 +15,9 @@
  *
  * EncodeGlyph is the half that matters most, because it defines the glyph
  * format from the writing side and confirms independently what BlitGlyph was
- * reverse-engineered to read:
- *
- *     +0            uint16   width
- *     +2            uint16   height
- *     +4            uint16   rowOffset[height]
- *     rowOffset[r]  uint8    alternating background/foreground run lengths
+ * reverse-engineered to read. It writes an AM2_Rle16 -- the same structure the
+ * blitters consume, declared once in blit.h rather than described twice in
+ * comments.
  *
  * The runs carry counts only and never pixel values, which is exactly why
  * BlitGlyph never advances its source pointer past a run, and why one font can
@@ -29,7 +27,7 @@
 /* Original: 0x004464C0. Encodes the locked surface into `out` and returns the
  * number of bytes written. Also wipes the scratch area ready for the next
  * glyph. The fourth argument is passed by the caller but never read. */
-uint32_t __cdecl EncodeGlyph(uint8_t *out, int32_t width, int32_t height,
+uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused);
 
 int font_install(void);

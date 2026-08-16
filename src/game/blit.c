@@ -153,28 +153,28 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
     }
 }
 
-void __fastcall BlitGlyph(int32_t x, int32_t y, const uint8_t *glyph,
+void __fastcall BlitGlyph(int32_t x, int32_t y, const AM2_Rle16 *glyph,
                           AM2_Rect src, int32_t colour)
 {
-    blit_core(x, y, glyph, src, (uintptr_t)(uint8_t)colour, FILL_SOLID, 0);
+    blit_core(x, y, (const uint8_t *)glyph, src, (uintptr_t)(uint8_t)colour, FILL_SOLID, 0);
 }
 
-void __fastcall BlitCopy16(int32_t x, int32_t y, const uint8_t *data,
+void __fastcall BlitCopy16(int32_t x, int32_t y, const AM2_Rle16 *data,
                            AM2_Rect src)
 {
-    blit_core(x, y, data, src, 0, FILL_COPY, 0);
+    blit_core(x, y, (const uint8_t *)data, src, 0, FILL_COPY, 0);
 }
 
-void __fastcall BlitCopy32(int32_t x, int32_t y, const uint8_t *data,
+void __fastcall BlitCopy32(int32_t x, int32_t y, const AM2_Rle32 *data,
                            AM2_Rect src)
 {
-    blit_core(x, y, data, src, 0, FILL_COPY, 1);
+    blit_core(x, y, (const uint8_t *)data, src, 0, FILL_COPY, 1);
 }
 
-void __fastcall BlitRemap16(int32_t x, int32_t y, const uint8_t *data,
+void __fastcall BlitRemap16(int32_t x, int32_t y, const AM2_Rle16 *data,
                             AM2_Rect src, const uint8_t *lut)
 {
-    blit_core(x, y, data, src, (uintptr_t)lut, FILL_REMAP, 0);
+    blit_core(x, y, (const uint8_t *)data, src, (uintptr_t)lut, FILL_REMAP, 0);
 }
 
 /* BlitOverlay -- 0x0041C480, the shadow and translucency layer.
@@ -191,10 +191,10 @@ void __fastcall BlitRemap16(int32_t x, int32_t y, const uint8_t *data,
  * is a pure per-byte mapping of the destination, so a plain loop is
  * indistinguishable in result.
  */
-void __fastcall BlitOverlay(int32_t x, int32_t y, const uint8_t *data,
+void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
                             AM2_Rect src)
 {
-    blit_core(x, y, data, src, 0, FILL_DESTLUT, 0);
+    blit_core(x, y, (const uint8_t *)data, src, 0, FILL_DESTLUT, 0);
 }
 
 int blit_install(void)

@@ -28,11 +28,16 @@
 #define KEY_ROW      100
 #define RUN_MAX      0xFE
 
-uint32_t __cdecl EncodeGlyph(uint8_t *out, int32_t width, int32_t height,
+/* The row table is a flexible array, so the RLE stream starts at
+ * sizeof(AM2_Rle16) + height * sizeof(rowOffset[0]) -- which is the `+4` and
+ * `height * 2` the original computes by hand. */
+typedef char am2_rle16_header_is_4_bytes[(sizeof(AM2_Rle16) == 4) ? 1 : -1];
+
+uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused)
 {
-    uint8_t       *fb  = g_frameBuf;
-    uint16_t      *rowTab;
+    uint8_t       *fb   = g_frameBuf;
+    uint8_t       *base = (uint8_t *)out;
     uint8_t       *w;
     const uint8_t *rowPix;
     uint32_t       written;
@@ -41,12 +46,11 @@ uint32_t __cdecl EncodeGlyph(uint8_t *out, int32_t width, int32_t height,
 
     (void)unused;                       /* pushed by the caller, never read */
 
-    *(uint16_t *)(out + 0) = (uint16_t)width;
-    *(uint16_t *)(out + 2) = (uint16_t)height;
+    out->width  = (uint16_t)width;
+    out->height = (uint16_t)height;
 
-    rowTab  = (uint16_t *)(out + 4);
-    w       = out + 4 + height * 2;
-    written = (uint32_t)(4 + height * 2);
+    written = (uint32_t)(sizeof *out + height * sizeof out->rowOffset[0]);
+    w       = base + written;
     rowPix  = fb;
 
     key = fb[g_pitch * KEY_ROW];
@@ -55,7 +59,7 @@ uint32_t __cdecl EncodeGlyph(uint8_t *out, int32_t width, int32_t height,
         const uint8_t *p   = rowPix;
         const uint8_t *end = rowPix + width;
 
-        rowTab[row] = (uint16_t)(w - out);
+        out->rowOffset[row] = (uint16_t)(w - base);
 
         /* Always emits pairs, and always at least one pair per row -- a row
          * that is entirely background still gets its count followed by a zero

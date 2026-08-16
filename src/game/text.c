@@ -63,7 +63,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
     penX = x;
 
     for (i = 0, j = 1; i < len; i++, j++) {
-        const uint8_t *glyph;
+        const AM2_Rle16 *glyph;
         AM2_Rect src, out;
         int32_t  dstX, dstY, gw, gh;
         uint16_t offset;
@@ -79,9 +79,9 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
         }
 
         offset = g_glyphOffset[(int8_t)ch + font * 262];
-        glyph  = g_fontBase[font * 133] + offset;
-        gw     = *(const uint16_t *)(glyph + 0);
-        gh     = *(const uint16_t *)(glyph + 2);
+        glyph  = (const AM2_Rle16 *)(g_fontBase[font * 133] + offset);
+        gw     = glyph->width;
+        gh     = glyph->height;
 
         src.left = 0;
         src.top  = 0;

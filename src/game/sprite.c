@@ -57,7 +57,7 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
 
     /* Either route will do -- a DirectDraw surface or software pixel data.
      * Neither means there is nothing to draw. */
-    if (!spr->image.rle && !spr->overlay)
+    if (!spr->image.rle16 && !spr->overlay)
         return;
 
     /* The caller gives the position of the sprite's hot spot, not its corner. */
@@ -84,31 +84,30 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
     }
 
     if (spr->flags & 0x3C) {
-        const uint8_t *data = spr->image.rle;
 
         /* Software rasterising writes into the locked bits; without a lock
          * there is nowhere to draw. */
         if (!g_surfaceLocked)
             return;
 
-        if (data) {
+        if (spr->image.rle16) {
             switch (spr->format) {
             case 1:
-                BlitCopy32(x, y, data, *clipped);
+                BlitCopy32(x, y, spr->image.rle32, *clipped);
                 break;
             case 2:
                 /* Remapped only when the caller asks for it AND a table
                  * exists; format 3 remaps whenever a table exists. */
                 if (mode && spr->lut)
-                    BlitRemap16(x, y, data, *clipped, spr->lut);
+                    BlitRemap16(x, y, spr->image.rle16, *clipped, spr->lut);
                 else
-                    BlitCopy16(x, y, data, *clipped);
+                    BlitCopy16(x, y, spr->image.rle16, *clipped);
                 break;
             case 3:
                 if (spr->lut)
-                    BlitRemap16(x, y, data, *clipped, spr->lut);
+                    BlitRemap16(x, y, spr->image.rle16, *clipped, spr->lut);
                 else
-                    BlitCopy16(x, y, data, *clipped);
+                    BlitCopy16(x, y, spr->image.rle16, *clipped);
                 break;
             default:
                 break;              /* unknown format: skip to the overlay */
