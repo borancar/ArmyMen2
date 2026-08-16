@@ -195,11 +195,33 @@ That last line names a function (`ReadMpMapsFile`) that static extraction never
 found, because it is reached through a code path the string scan did not
 attribute.
 
-It is opt-in for a reason. The body was a no-op for the whole of the game's
-shipping life, so any call site whose arguments drifted out of sync with its
-format string was never noticed — and re-enabling the logger makes those
-reachable. The very first call at startup passes a **NULL format string**;
-`game_log` guards against it. Expect more of these.
+### Why it cannot just call vsnprintf
+
+Un-stubbing naively **crashes the game** — reproducibly, on selecting Boot Camp.
+A clean A/B settles it: `GAMELOG=1` dies, `GAMELOG=0` reaches the mission
+briefing. The fault is the harness's, not the game's.
+
+The cause is that `0x0045CAA0` is not only the logger. MSVC 6 folds identical
+COMDATs (`/OPT:ICF`), so every function stubbed down to a bare `ret` merges to
+one address. Its 623 callers are therefore callers of *several different*
+functions with different signatures. Some pass a code address
+(`0x004254DC`, `0x00403507`) or a small integer where the logger expects a
+format string, and handing binary data to `_vsnprintf` means any byte pair
+resembling `%s` dereferences garbage.
+
+Nothing ever caught this because the body was a no-op for the game's entire
+shipping life. So `game_log` formats defensively instead of trusting callers:
+
+- the format string must itself be a readable, printable C string, or the call
+  is reported as suspect and skipped;
+- every `%s` argument is range-checked before being dereferenced, rendering as
+  `<bad:ADDR>` when it fails;
+- width, precision and flags are still handed back to the CRT one conversion at
+  a time, so formatting stays correct — only argument fetching and validation
+  are taken over.
+
+With that, the logger runs through gameplay without crashing, and the suspect
+call sites become evidence rather than a landmine.
 
 ## Running
 

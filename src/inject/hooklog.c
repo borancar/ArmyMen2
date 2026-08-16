@@ -15,10 +15,18 @@ void hooklog_open(void)
     InitializeCriticalSection(&g_lock);
     g_ready = 1;
 
-    /* Our own msvcrt FILE*, never the game's -- see orig.h. */
-    g_fp = fopen(path && *path ? path : "am2.log", "w");
-    if (g_fp)
+    /* Our own msvcrt FILE*, never the game's -- see orig.h.
+     *
+     * Append rather than truncate: two instances sharing a prefix both write
+     * here, and a "w" open let the second silently destroy the first's log.
+     * That is easy to do by accident and produces evidence that looks real but
+     * belongs to another process, so every session gets a banner instead. */
+    g_fp = fopen(path && *path ? path : "am2.log", "a");
+    if (g_fp) {
         setvbuf(g_fp, NULL, _IOLBF, 4096);
+        fprintf(g_fp, "\n==== session pid %lu ====\n",
+                (unsigned long)GetCurrentProcessId());
+    }
 }
 
 void hooklog_close(void)

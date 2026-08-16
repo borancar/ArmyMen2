@@ -68,9 +68,12 @@ log)
     tail -n "${1:-40}" "$LOG"
     ;;
 stop)
-    pkill -f ArmyMen2.exe 2>/dev/null
-    wineserver -k 2>/dev/null
-    echo stopped
+    # The bracket keeps the pattern from matching this script's own command
+    # line -- `pkill -f ArmyMen2.exe` cheerfully kills the shell running it.
+    pkill -f 'ArmyMen2[.]exe' 2>/dev/null
+    pkill -f 'explorer [/]desktop' 2>/dev/null
+    sleep 2
+    echo "stopped (remaining: $(pgrep -cf 'ArmyMen2[.]exe'))"
     ;;
 *)
     sed -n '2,20p' "$0"

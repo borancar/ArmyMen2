@@ -116,8 +116,22 @@ approximately `0x00401000`–`0x0045c000`.
 ## Recovered debug messages
 
 Because the logger was stubbed at the *callee* rather than at the call sites,
-all 617 calls still push their real format strings. `tools/find_logs.py`
-recovers **599** of them across 216 functions — see [`logs.tsv`](logs.tsv).
+the calls still push their real format strings. `tools/find_logs.py` recovers
+**599** of them across 216 functions — see [`logs.tsv`](logs.tsv).
+
+> **Correction.** An earlier version of this document treated all 623 callers of
+> `0x0045CAA0` as calls to one logger. That is wrong. MSVC 6 folds identical
+> COMDATs (`/OPT:ICF`), and *every* function whose body compiled down to a bare
+> `ret` merges to the same address. So `0x0045CAA0` is the shared address of
+> several distinct stubbed-out functions with different signatures, and the
+> caller count conflates them.
+>
+> This was found by running: with the logger un-stubbed, some call sites pass a
+> "format string" that is really a code address (`0x004254DC`, `0x00403507`) or a
+> small integer. Treat any single folded address as a set of functions until
+> proven otherwise — the same caveat applies to every other tiny function in
+> `functions.tsv`, where a 617-caller count may be several functions in a trench
+> coat.
 
 This is the densest naming source in the binary. Original function names
 visible in the messages include `AddMsg`, `RemHead`, `RemMsg`, `ReadBitmap`,
