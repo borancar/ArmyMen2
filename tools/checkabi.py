@@ -118,6 +118,9 @@ FUNCS = [
     (0x0040DCF0, "CommClose",        "cdecl"),
     (0x0040DD90, "CommInitializeConnection", "thiscall"),
     (0x0040E630, "CommSetSessionDesc", "thiscall"),
+    (0x0040E5A0, "CommGetSessionDesc", "thiscall",
+     "thiscall with no stack arguments; the entry `push ecx` allocates the "
+     "DWORD GetSessionDesc writes the size into -- fifth instance of the idiom"),
     (0x004020A0, "CommShutdown",     "cdecl",
      "opens `push ecx` to allocate the DWORD that GetExitCodeThread fills in; "
      "ecx on entry is never read, so cdecl -- the third instance of this idiom"),

@@ -174,6 +174,47 @@ int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
     return IDirectPlayX_SetSessionDesc(dp, (LPDPSESSIONDESC2)desc, flags) == DP_OK;
 }
 
+/* The SDK spells this one unsigned and HRESULT is signed, so the comparison
+ * needs a cast to keep -Wsign-compare quiet. The value is checked here rather
+ * than trusted. */
+static_assert((uint32_t)DPERR_BUFFERTOOSMALL == 0x8877001Eu,
+              "DPERR_BUFFERTOOSMALL");
+
+typedef void *(__cdecl *am2_malloc_fn)(size_t);
+typedef void  (__cdecl *am2_free_fn)(void *);
+#define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
+#define orig_free   (*(am2_free_fn)ADDR_GAME_FREE)
+
+int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm)
+{
+    LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
+    void         **slot = (void **)((uint8_t *)comm + COMM_OFF_SESSION_BUF);
+    DWORD          size;
+    HRESULT        hr;
+
+    if (!dp)
+        return 0;
+
+    /* Whatever was fetched last time goes first -- on the game's heap, so
+     * through the game's free. */
+    if (*slot) {
+        orig_free(*slot);
+        *slot = NULL;
+    }
+
+    /* DirectPlay will not say how big the description is except by refusing to
+     * write it, so ask once with no buffer and read the size out of the
+     * complaint. Anything other than that complaint is the final answer. */
+    hr = IDirectPlayX_GetSessionDesc(dp, NULL, &size);
+    if (hr == (HRESULT)DPERR_BUFFERTOOSMALL) {
+        *slot = orig_malloc(size);
+        if (!*slot)
+            return 0;
+        hr = IDirectPlayX_GetSessionDesc(*DirectPlaySlot(comm), *slot, &size);
+    }
+    return hr == DP_OK;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -189,5 +230,7 @@ int dplay_install(void)
                         "CommInitializeConnection", 1);
     rc |= patch_replace(ADDR_COMM_SET_SESSION, (const void *)CommSetSessionDesc,
                         "CommSetSessionDesc", 2);
+    rc |= patch_replace(ADDR_COMM_GET_SESSION, (const void *)CommGetSessionDesc,
+                        "CommGetSessionDesc", 0);
     return rc;
 }

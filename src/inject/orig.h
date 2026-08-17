@@ -184,6 +184,8 @@
 #define ADDR_COMM_CLOSE          0x0040DCF0u  /* int32_t(void) */
 #define ADDR_COMM_INIT_CONN      0x0040DD90u  /* thiscall int32(this, conn) */
 #define ADDR_COMM_SET_SESSION    0x0040E630u  /* thiscall int32(this, desc, flags) */
+#define ADDR_COMM_GET_SESSION    0x0040E5A0u  /* thiscall int32(this) */
+#define COMM_OFF_SESSION_BUF     0x3E8u       /* the description, on the game heap */
 
 /* ---- streaming audio ---------------------------------------------------
  *

@@ -61,6 +61,14 @@ int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
 int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
                                                      uint32_t flags);
 
+/* Original: 0x0040E5A0. Fetch the current session description into the comm
+ * object, replacing whatever was there.
+ *
+ * Asked for twice on purpose: DirectPlay will not say how large the description
+ * is except by refusing to write it, so the first call passes no buffer and
+ * reads the size out of the complaint. Returns 1 on success. */
+int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus
