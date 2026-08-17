@@ -92,6 +92,12 @@
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
 
+/* Display palette calibration. Paints a ramp of every palette index onto the
+ * primary surface and reads it back with GDI to learn what actually displays.
+ * The colour matcher stays original -- it is pure arithmetic. */
+#define ADDR_CALIBRATE_PALETTE   0x0041AFC0u  /* void(uint32_t *palette[512]) */
+#define ADDR_NEAREST_PAL_INDEX   0x0041B7C0u  /* uint8_t(const uint32_t*,uint32_t,uint32_t) */
+
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u

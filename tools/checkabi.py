@@ -58,6 +58,7 @@ FUNCS = [
     (0x004465E0, "RenderGlyph",        "cdecl"),
     (0x0041AC40, "SetDrawTarget",      "cdecl"),
     (0x0041CF90, "RedrawMapRegion",    "cdecl"),
+    (0x0041AFC0, "CalibratePalette",   "cdecl"),
     (0x0041C710, "BlitGlyph",          "fastcall"),
     (0x0041C2B0, "BlitCopy16",         "fastcall"),
     (0x0041C1C0, "BlitCopy32",         "fastcall"),
@@ -84,7 +85,16 @@ def idiom_is_write_only(insn):
 
 
 def analyse(img, va):
-    """Return (reads_ecx, reads_edx, ret_immediates)."""
+    """Return (reads_ecx, reads_edx, ret_immediates).
+
+    Known false positive, left in deliberately: MSVC 6 allocates a single
+    4-byte local with `push ecx`, which reads ecx and so reports as thiscall.
+    0x0041B7C0 does exactly this and is plain cdecl. Suppressing it would mean
+    treating an entry `push ecx` as a non-read, and a genuine thiscall spilling
+    `this` looks identical at that instruction -- which would quietly deflate
+    the whole-binary thiscall count the C++ decision rests on. Better to
+    over-report and check the few by hand.
+    """
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
     md.detail = True
 

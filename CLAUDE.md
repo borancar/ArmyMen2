@@ -134,13 +134,21 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
 ## Open items
 
-- Lock/Unlock bracket batch: 4 of 22 done (`DrawText`, `DrawSprite`,
-  `RenderGlyph`, `RedrawMapRegion`). Next bottom-up: `0x00454F00` (144B),
-  `0x00414620` (224B, tooltip renderer), `0x00413610` (256B), `0x0041AFC0`
-  (288B), `0x00433350` (304B).
+- Lock/Unlock bracket batch: 5 of 22 done (`DrawText`, `DrawSprite`,
+  `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette`). Next bottom-up:
+  `0x00454F00` (144B), `0x00414620` (224B, tooltip renderer), `0x00413610`
+  (256B), `0x00433350` (304B).
+- The Win32/DirectX boundary is inventoried but mostly unported: 111 functions
+  below the CRT touch the import table (`docs/imports.tsv`) and 161 contain
+  COM-shaped dispatch (`docs/comcalls.tsv`). The window and message cluster is
+  the interesting one — `0x0040B600` (`CreateMutexA`/`CreateWindowExA`, almost
+  certainly WinMain), `0x0040A6A0` (2256B, `BeginPaint`/`DefWindowProcA`, the
+  window procedure) and `0x0040B070` (`AdjustWindowRectEx`/`GetWindowRect`).
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
-- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`.
+- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
+  `CalibratePalette` — the last is gated on `0x00507344`, which is 0 whenever
+  DirectDraw does not hand back a palettized primary, as under Xvfb.
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.
