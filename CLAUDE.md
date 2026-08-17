@@ -253,9 +253,22 @@ what a broken reconstruction would look like.
 
 So: an exact match on Boot Camp is strong evidence. A mismatch anywhere else is
 not evidence of a fault on its own — check whether registration overlapped the
-walks first. (The obvious confirmation, watching the ratio converge on 325 as
-more walks happen at the final count, was not completed: the mission's opening
-dialog would not dismiss and the run ended.)
+walks first. (The obvious confirmation on MAP 01, watching the ratio
+converge on 325 as more walks happen at the final count, is still not done.)
+
+**The Boot Camp dialogs do dismiss, and getting past them is worth doing.** The
+mission opens with MESSAGE FROM HQ over the map — its OK is at roughly
+`476,224` — and behind that is a full-screen instruction sign that any click
+clears. Past both, the mission is properly live: Sarge on the map, the HUD
+drawn, the frame ticking. That is where the interesting counts appear.
+`Update3DAudioVolumes` goes from 121 to 9,623 simply by getting the dialogs out
+of the way.
+
+It is also where Boot Camp's invariant can be read cleanly: one run gave
+`FirstItem` 519 and `NextItem` 835,071, and 519 × 1,609 is 835,071 exactly.
+
+`ESCAPE` does nothing there — there is no in-game menu behind it — so this is
+not a route to the shutdown path.
 
 **Compare `ret N` explicitly before assuming a shared signature.** A diff that
 normalises jump targets hides the epilogue. Getting this wrong is what made
