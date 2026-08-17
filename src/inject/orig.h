@@ -362,6 +362,13 @@
 #define SOUND_SLOT_OFF_STARTED   0x0Cu   /* GetTickCount when it last began */
 #define SOUND_FIXED_SLOTS        0x38    /* 56 */
 #define ADDR_PLAY_SOUND_AT       0x0040C040u /* void(idx,flags,?,x,y) */
+#define ADDR_PLAY_DYNAMIC_SOUND  0x0040B8F0u /* void(name,loop,?,x,y,slot,pri,owner) */
+#define ADDR_VOS_DIR             0x00474D70u /* "audio\\vos" */
+#define ADDR_VOLUME_VOICE        0x00512320u /* used for slots 0 and 16 */
+#define SOUND_REC_OFF_OWNER_DS   0x08u   /* the IDirectSound it was made from */
+#define SOUND_REC_OFF_PRIORITY   0x0Cu
+#define SOUND_REC_OFF_LOOPING    0x1Cu
+#define SOUND_VOICE_SLOT_HI      0x10    /* slot 16, like slot 0, is a voice */
 #define ADDR_POINTS_EQUAL        0x0042E140u /* int32(const AM2_Point*, const AM2_Point*) */
 #define ADDR_LOOKUP_OWNER_OBJ    0x00457750u /* void *(uint32 owner) */
 #define SOUND_DYN_OFF_BUFFER     0x00u
