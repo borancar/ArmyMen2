@@ -16,6 +16,7 @@ Run this before adding any new target to the harness:
 
 import bisect
 import collections
+import struct
 import os
 import sys
 
@@ -40,17 +41,38 @@ def main(argv):
     boundary = set(starts)
 
     targets = collections.Counter()
+    pushed = collections.Counter()
     for insn in insns:
-        if insn.mnemonic != "call" and not insn.group(JUMP):
-            continue
         if not insn.operands:
             continue
         op = insn.operands[0]
-        if op.type == OP_IMM:
+        if op.type != OP_IMM:
+            continue
+        if insn.mnemonic == "call" or insn.group(JUMP):
             targets[op.imm] += 1
+        elif insn.mnemonic == "push" and text_start <= op.imm < text_end:
+            # A function handed to something as an argument. This binary
+            # registers its menu button handlers that way -- `push 0x42ecf0`
+            # into a button constructor -- and such a function is reached by
+            # nothing else, so a scan that counts only branches reports it as
+            # having no references and reads as dead code. It is not.
+            pushed[op.imm] += 1
 
-    # Function starts, for the size check.
-    fn_starts = sorted({t for t in targets if text_start <= t < text_end})
+    # Pointers to code sitting in data: vtables and dispatch tables. Aligned
+    # only, which is what a compiler emits and which keeps instruction bytes
+    # that happen to look like an address out of the count.
+    stored = collections.Counter()
+    for _nm, sec_start, _sec_end, data in img.sections:
+        for off in range((-sec_start) % 4, len(data) - 4, 4):
+            v = struct.unpack_from("<I", data, off)[0]
+            if text_start <= v < text_end:
+                stored[v] += 1
+
+    # Function starts, for the size check. Branch targets and pushed function
+    # pointers are both genuine entries; stored pointers are left out, because
+    # a false one landing inside a function would shrink its measured size.
+    fn_starts = sorted({t for t in list(targets) + list(pushed)
+                        if text_start <= t < text_end})
 
     rc = 0
     for arg in argv:
@@ -64,7 +86,12 @@ def main(argv):
 
         raw = img.read(va, 16)
         print(f"  bytes            {raw[:8].hex()}")
-        print(f"  entry references {targets.get(va, 0)}")
+        refs = [(targets.get(va, 0), "call/jump"),
+                (pushed.get(va, 0), "pushed as an argument"),
+                (stored.get(va, 0), "stored in data")]
+        total = sum(n for n, _ in refs)
+        detail = ", ".join(f"{n} {what}" for n, what in refs if n)
+        print(f"  entry references {total}" + (f"  ({detail})" if detail else ""))
 
         i = bisect.bisect_right(fn_starts, va)
         end = fn_starts[i] if i < len(fn_starts) else text_end
