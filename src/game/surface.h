@@ -36,6 +36,33 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf);
  * safe to call when nothing is locked. */
 int32_t __cdecl UnlockSurface(void);
 
+/* Original: 0x0041B850. Create an offscreen surface, 6 call sites.
+ *
+ * Width and height are given; the pixel format is not, and is instead inherited
+ * by reading the primary's descriptor and overwriting only the fields that
+ * differ. That is the whole reason it asks DirectDraw a question first.
+ *
+ * `caps` is overloaded. The only bit read is DDSCAPS_OFFSCREENPLAIN, and its
+ * meaning is "put this in system memory and do not argue" -- which is what the
+ * game asks for, because it rasterises in software and a video-memory surface
+ * would make every locked write cross the bus. When it is clear, DirectDraw
+ * gets to choose, and a failure is retried in system memory anyway.
+ *
+ * A negative `colourKey` means none; otherwise it is set as a source colour key
+ * with the same value at both ends of the range. Returns NULL on failure,
+ * having already reported it. */
+LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height,
+                                                   int32_t caps,
+                                                   int32_t colourKey);
+
+/* Original: 0x0041AD30. Fill a surface with one colour, 7 call sites.
+ *
+ * Returns 1 on success. The primary is filled through the screen rectangle and
+ * every other surface in its entirety -- because the primary is the whole
+ * desktop when windowed, and clearing all of it would wipe everyone else's
+ * windows. */
+int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour);
+
 int surface_install(void);
 
 #ifdef __cplusplus

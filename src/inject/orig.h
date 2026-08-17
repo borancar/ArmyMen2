@@ -208,8 +208,13 @@
 #define ADDR_DIRECTDRAW2         0x004FE098u  /* IDirectDraw2 * */
 #define ADDR_IID_DIRECTDRAW2     0x0046F338u  /* the game's own copy of the IID */
 #define ADDR_PIXEL_FORMAT_BYTE   0x00502AD9u  /* uint8_t, passed to AttachPalette */
-#define ADDR_CREATE_OFFSCREEN    0x0041B850u  /* surface *(w, h, caps, int32) */
-#define ADDR_ATTACH_PALETTE      0x0041AD30u  /* void(surface *, uint8_t) */
+/* Both reconstructed in src/game/surface.cpp.
+ *
+ * ClearSurface was called ADDR_ATTACH_PALETTE for one commit, guessed from its
+ * call site in InitDirectDraw. It is nothing of the kind: vtable slot 5 is Blt,
+ * and it is a colour fill. */
+#define ADDR_CREATE_OFFSCREEN    0x0041B850u  /* surface *(w, h, caps, int32 key) */
+#define ADDR_CLEAR_SURFACE       0x0041AD30u  /* int32_t(surface *, uint32_t colour) */
 
 /* DirectInput. The GUIDs and data formats are the game's own copies in .rdata,
  * so nothing here needs dxguid. */

@@ -27,6 +27,7 @@
  */
 
 #include "surface.h"
+#include "rect.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -96,11 +97,109 @@ int32_t __cdecl UnlockSurface(void)
     return 1;
 }
 
+/* ---- creating and clearing --------------------------------------------- */
+
+#define g_ddraw2     (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
+#define g_screenRect (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)
+
+typedef int32_t (__cdecl *am2_report_error_fn)(HRESULT hr, const char *fmt, ...);
+#define orig_report_error (*(am2_report_error_fn)ADDR_REPORT_ERROR)
+
+static_assert(DDSD_CAPS + DDSD_HEIGHT + DDSD_WIDTH + DDSD_PIXELFORMAT == 0x1007,
+              "the descriptor fields it fills in");
+static_assert(DDSCAPS_SYSTEMMEMORY == 0x800, "DDSCAPS_SYSTEMMEMORY");
+static_assert(DDCKEY_SRCBLT == 8, "DDCKEY_SRCBLT");
+static_assert((DDBLT_COLORFILL | DDBLT_WAIT) == 0x01000400, "colour fill");
+static_assert(sizeof(DDBLTFX) == 0x64, "DDBLTFX");
+
+LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height,
+                                                   int32_t caps,
+                                                   int32_t colourKey)
+{
+    DDSURFACEDESC       ddsd;
+    LPDIRECTDRAWSURFACE surf;
+    HRESULT             hr;
+    /* The only bit of `caps` anyone looks at: "system memory, no argument". */
+    const int32_t       forceSystem = caps & DDSCAPS_OFFSCREENPLAIN;
+
+    /* Ask the primary what it looks like, then change only the size and the
+     * caps. This is how the new surface ends up in the same pixel format
+     * without anyone naming one. */
+    memset(&ddsd, 0, sizeof ddsd);
+    ddsd.dwSize = sizeof ddsd;
+    hr = IDirectDrawSurface_GetSurfaceDesc(g_primarySurface, &ddsd);
+    if (hr) {
+        orig_report_error(hr, "GetSurfaceDesc()");
+        return NULL;
+    }
+
+    ddsd.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT;
+    ddsd.ddsCaps.dwCaps = forceSystem
+        ? (DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY)
+        : DDSCAPS_OFFSCREENPLAIN;
+    ddsd.dwWidth  = (DWORD)width;
+    ddsd.dwHeight = (DWORD)height;
+
+    hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL);
+    if (hr) {
+        /* Only worth retrying if we had not already asked for system memory. */
+        if (forceSystem) {
+            orig_report_error(hr, "CreateSurface()");
+            return NULL;
+        }
+        orig_log("Failed to put surface into video memory!\n");
+        ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+        hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL);
+        if (hr) {
+            orig_report_error(hr, "CreateSurface()");
+            return NULL;
+        }
+    }
+
+    if (colourKey >= 0) {
+        DDCOLORKEY ck;
+
+        /* A single colour, so both ends of the range are the same. */
+        ck.dwColorSpaceLowValue  = (DWORD)colourKey;
+        ck.dwColorSpaceHighValue = (DWORD)colourKey;
+        IDirectDrawSurface_SetColorKey(surf, DDCKEY_SRCBLT, &ck);
+    }
+    return surf;
+}
+
+int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
+{
+    RECT    dest;
+    DDBLTFX fx;
+    HRESULT hr;
+
+    dest.left   = g_screenRect.left;
+    dest.top    = g_screenRect.top;
+    dest.right  = g_screenRect.right;
+    dest.bottom = g_screenRect.bottom;
+
+    /* Only dwSize and the fill colour are written; the rest of the DDBLTFX is
+     * left as it lies, as in the original, because DDBLT_COLORFILL is the only
+     * flag and it reads only that one field. */
+    fx.dwSize      = sizeof fx;
+    fx.dwFillColor = colour;
+
+    /* The primary is the entire desktop in windowed mode, so it is filled
+     * through the screen rectangle. Everything else is ours entirely. */
+    hr = IDirectDrawSurface_Blt(surf, (surf == g_primarySurface) ? &dest : NULL,
+                                NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &fx);
+    return hr == DD_OK;
+}
+
 int surface_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_LOCK_SURFACE, (const void *)LockSurface, "LockSurface", 1);
     rc |= patch_replace(ADDR_UNLOCK_SURFACE, (const void *)UnlockSurface, "UnlockSurface", 0);
+    rc |= patch_replace(ADDR_CREATE_OFFSCREEN, (const void *)CreateOffscreenSurface,
+                        "CreateOffscreenSurface", 4);
+    rc |= patch_replace(ADDR_CLEAR_SURFACE, (const void *)ClearSurface,
+                        "ClearSurface", 2);
     return rc;
 }

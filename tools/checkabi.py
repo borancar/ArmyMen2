@@ -67,6 +67,8 @@ FUNCS = [
     (0x0040A6B0, "WndProc",            "stdcall"),
     (0x0041AA10, "InitDirectDraw",     "cdecl"),
     (0x00426D30, "InitInput",          "cdecl"),
+    (0x0041B850, "CreateOffscreenSurface", "cdecl"),
+    (0x0041AD30, "ClearSurface",       "cdecl"),
     (0x0041C710, "BlitGlyph",          "fastcall"),
     (0x0041C2B0, "BlitCopy16",         "fastcall"),
     (0x0041C1C0, "BlitCopy32",         "fastcall"),

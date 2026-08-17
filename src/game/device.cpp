@@ -94,9 +94,9 @@ typedef int32_t (__cdecl *am2_report_error_fn)(HRESULT hr, const char *fmt, ...)
 typedef LPDIRECTDRAWSURFACE (__cdecl *am2_create_offscreen_fn)(int32_t w, int32_t h,
                                                                int32_t caps,
                                                                int32_t which);
-typedef void (__cdecl *am2_attach_palette_fn)(LPDIRECTDRAWSURFACE s, uint32_t fmt);
+typedef void (__cdecl *am2_clear_surface_fn)(LPDIRECTDRAWSURFACE s, uint32_t fmt);
 #define orig_create_offscreen (*(am2_create_offscreen_fn)ADDR_CREATE_OFFSCREEN)
-#define orig_attach_palette   (*(am2_attach_palette_fn)ADDR_ATTACH_PALETTE)
+#define orig_clear_surface   (*(am2_clear_surface_fn)ADDR_CLEAR_SURFACE)
 
 /* ---- display ----------------------------------------------------------- */
 
@@ -200,8 +200,8 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
 
     g_offscreen  = orig_create_offscreen(g_screenW, g_screenH,
                                          DDSCAPS_OFFSCREENPLAIN, -1);
-    orig_attach_palette(g_primary, g_pixelFormatByte);
-    orig_attach_palette(g_backBuffer, g_pixelFormatByte);
+    orig_clear_surface(g_primary, g_pixelFormatByte);
+    orig_clear_surface(g_backBuffer, g_pixelFormatByte);
 
     /* Drawing starts aimed at the back buffer, with no lock held. */
     g_lockTarget    = g_backBuffer;

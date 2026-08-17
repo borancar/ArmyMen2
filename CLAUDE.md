@@ -173,9 +173,16 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   functions below the CRT touch the import table (`docs/imports.tsv`) and 161
   contain COM-shaped dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
-  `InitDirectDraw`, `InitInput` — the application layer and device bring-up.
-  Next are the two DirectDraw helpers the latter still calls,
-  `CreateOffscreenSurface` (`0x0041B850`) and `AttachPalette` (`0x0041AD30`).
+  `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface` — the
+  application layer, device bring-up and surface creation. The window, the
+  message queue, the display mode, every surface and both input devices are now
+  ours. What remains is spread thin: the largest single boundary function left
+  is under 600 bytes.
+- **Name a function from its body, not from one call site.** `0x0041AD30` went
+  in as `AttachPalette` because that is what it looked like where
+  `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and
+  the wrong name survived a commit. Reading the callee costs a minute;
+  a wrong name in `orig.h` propagates into every module that picks it up.
 - **A reconstruction can break the harness rather than the game.**
   `src/inject/dinput_hook.c` works by patching the game's IAT slot for
   `DirectInputCreateA`. A reconstructed `InitInput` that imported the symbol
