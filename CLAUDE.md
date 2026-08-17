@@ -289,6 +289,24 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
+- **A function address can arrive as `push imm32`, so an aligned-dword scan
+  under-reports references.** Menu handlers in this binary are registered by
+  pushing the function as an argument — `push 0x42ecf0; push 0x20; push 0x51`
+  into a button constructor — and that operand sits wherever the instruction
+  stream puts it, usually unaligned. A cross-reference scan that looks for
+  rel32 branches plus *aligned* dwords will report such a function as having no
+  references at all.
+
+  This was not hypothetical: `0x0042ECF0`, the mission-start gate, was recorded
+  in commit `44312d2` as dead code on exactly that mistake. It is a live button
+  handler. Before concluding anything is unreferenced, decode the candidate hit
+  and see whether it is the operand of a `push` — the byte before an
+  address-shaped dword being `68` is the whole tell.
+
+  Note this affects *function* reachability only. Whether a block inside a
+  function can be reached is a different question and the answer there — that
+  the five copy-protection dialogs are unreachable — was checked with a scan
+  that did include unaligned operands, and stands.
 - **The copy protection in this executable is patched out, and that is not the
   same as absent.** `FindGameCD` is called from five places; all five branch on
   the result with `EB` (`jmp`) where a `75` (`jne`) has to have been, so the
