@@ -169,13 +169,20 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette`). Next bottom-up:
   `0x00454F00` (144B), `0x00414620` (224B, tooltip renderer), `0x00413610`
   (256B), `0x00433350` (304B).
-- The Win32/DirectX boundary is inventoried and being worked outward-in: 111
+- The Win32/DirectX boundary is inventoried and being worked outward-in: 122
   functions below the CRT touch the import table (`docs/imports.tsv`) and 161
-  contain COM-shaped dispatch (`docs/comcalls.tsv`). The application layer is
-  done — `WinMain`, `InitApplication`, `PumpMessage`, `PositionWindow`. Next is
-  the window procedure at `0x0040A6B0` (2256B, 17 import sites,
-  `BeginPaint`/`DefWindowProcA`/`GetUpdateRect`), then `InitDirectDraw`
-  (`0x0041AA10`) and `InitInput` (`0x00426D30`).
+  contain COM-shaped dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
+  `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`. Next are
+  `InitDirectDraw` (`0x0041AA10`) and `InitInput` (`0x00426D30`), which between
+  them own every DirectDraw and DirectInput object the game has.
+- **Not every reconstruction has to be a patch.** `WndProc` is registered, not
+  detoured: the only reference to `0x0040A6B0` in the whole image is the
+  `WNDCLASS` field in `InitApplication`, and that is ours now. Because the
+  original is left intact it stays *callable*, so the six comm messages that
+  are pure game logic are forwarded to it instead of being reconstructed. Look
+  for this shape before detouring anything reached through a function pointer —
+  a callback, a vtable, a dispatch table. It buys back the thing detouring
+  costs, which is the ability to defer.
 - **`-w` is windowed mode**, global `0x00507344`, and it gates far more than it
   looks: the window border and repositioning, the palettized primary in
   `InitDirectDraw`, and `CalibratePalette`. Anything that reads 0 under the

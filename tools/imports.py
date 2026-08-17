@@ -97,9 +97,20 @@ def main():
     # not load an import address for any other reason.
     sites = []
     for insn in insns:
-        if not insn.operands:
+        ops = insn.operands
+        # Which operand holds the slot depends on the instruction: `call [slot]`
+        # carries it as the only operand, `mov reg, [slot]` as the source. This
+        # is easy to get wrong in a way that fails silently -- checking
+        # operands[0] for both makes the `mov` case unreachable, because the
+        # destination register is never a memory operand, and the boundary then
+        # quietly under-reports every import that is called through a register.
+        if insn.mnemonic in ("call", "jmp") and len(ops) == 1:
+            op, how = ops[0], insn.mnemonic
+        elif (insn.mnemonic == "mov" and len(ops) == 2 and
+              ops[0].type == OP_REG and ops[1].type == OP_MEM):
+            op, how = ops[1], "load"
+        else:
             continue
-        op = insn.operands[0]
         if op.type != OP_MEM:
             continue
         # No base or index register: an absolute [disp32] operand.
@@ -107,15 +118,6 @@ def main():
             continue
         slot = op.mem.disp & 0xFFFFFFFF
         if slot not in slots:
-            continue
-        if insn.mnemonic in ("call", "jmp"):
-            how = insn.mnemonic
-        elif insn.mnemonic == "mov" and len(insn.operands) == 2:
-            # mov reg, [slot] -- an indirect call is set up.
-            if insn.operands[0].type != OP_REG:
-                continue
-            how = "load"
-        else:
             continue
         dll, sym = slots[slot]
         sites.append((insn.address, slot, dll, sym, how))

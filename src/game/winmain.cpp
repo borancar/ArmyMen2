@@ -40,6 +40,7 @@
  */
 
 #include "winmain.h"
+#include "winproc.h"
 #include "rect.h"
 #include "../inject/patch.h"
 
@@ -247,7 +248,10 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
     g_appMutex = CreateMutexA(NULL, FALSE, "ArmyMenMutex");
 
     wc.style         = CS_DBLCLKS;
-    wc.lpfnWndProc   = (WNDPROC)(uintptr_t)ADDR_WND_PROC;
+    /* The original registers 0x0040A6B0 here. Registering our reconstruction
+     * instead is how src/game/winproc.cpp gets installed -- there is no patch,
+     * because this field is the only thing in the image that refers to it. */
+    wc.lpfnWndProc   = WndProc;
     wc.cbClsExtra    = 0;
     wc.cbWndExtra    = 0;
     wc.hInstance     = hInstance;

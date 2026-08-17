@@ -63,6 +63,8 @@ FUNCS = [
     (0x0040B600, "InitApplication",    "cdecl"),
     (0x0040B280, "PumpMessage",        "cdecl"),
     (0x0040B070, "PositionWindow",     "cdecl"),
+    # Not patched -- registered over. We still call it, so its ABI matters.
+    (0x0040A6B0, "WndProc",            "stdcall"),
     (0x0041C710, "BlitGlyph",          "fastcall"),
     (0x0041C2B0, "BlitCopy16",         "fastcall"),
     (0x0041C1C0, "BlitCopy32",         "fastcall"),

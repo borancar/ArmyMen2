@@ -102,6 +102,10 @@ static const struct {
       { 0x56, 0x8B, 0x74, 0x24, 0x08, 0x83, 0x7E, 0x04 }, 8 },
     { ADDR_POSITION_WINDOW, "PositionWindow",
       { 0xA1, 0x44, 0x73, 0x50, 0x00, 0x83, 0xEC, 0x20 }, 8 },
+    /* Never patched -- but src/game/winproc.cpp forwards the comm messages
+     * into it, so its entry has to be the one we read. */
+    { ADDR_WND_PROC, "WndProc",
+      { 0x81, 0xEC, 0xF8, 0x00, 0x00, 0x00, 0x53, 0x8B }, 8 },
 };
 
 static int verify_image(void)

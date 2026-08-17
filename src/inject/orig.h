@@ -114,7 +114,25 @@
 #define ADDR_INIT_APPLICATION    0x0040B600u  /* int32_t(HINSTANCE, int32_t nCmdShow) */
 #define ADDR_PUMP_MESSAGE        0x0040B280u  /* int32_t(MSG *) -- 0 on WM_QUIT */
 #define ADDR_POSITION_WINDOW     0x0040B070u  /* void(void) */
-#define ADDR_WND_PROC            0x0040A6B0u  /* the window procedure, not ours yet */
+/* The window procedure. Reconstructed in src/game/winproc.cpp, but NOT patched:
+ * it is reached only through the WNDCLASS field that InitApplication fills in,
+ * so pointing that at our own leaves the original intact and callable. The
+ * messages that are pure comm and game logic are forwarded straight back to it
+ * rather than reconstructed. Nothing else in the image refers to this address. */
+#define ADDR_WND_PROC            0x0040A6B0u  /* LRESULT CALLBACK(HWND,UINT,WPARAM,LPARAM) */
+
+/* State the window procedure reads. */
+#define ADDR_DIRECTDRAW          0x004FDF78u  /* IDirectDraw * */
+#define ADDR_PAINT_OBJECT        0x0065A058u  /* see winproc.cpp -- not COM */
+#define ADDR_APP_ACTIVE          0x004FA02Cu  /* int32_t; RunFrame ticks only if set */
+#define ADDR_CHAR_HANDLER        0x005125B8u  /* void(*)(wparam, lo, hi), may be null */
+#define ADDR_GAME_STATE          0x00511DA4u  /* int32_t, 0..4 */
+#define ADDR_GAME_STATE_ARG      0x00511DB4u  /* int32_t */
+#define ADDR_STATE_DISPATCH      0x00486550u  /* 12-byte records; +0 is a function */
+#define ADDR_ON_APP_ACTIVATED    0x004269B0u  /* void(void) */
+#define ADDR_CURRENT_STATE       0x0042E5D0u  /* int32_t(void), indexes the above */
+#define ADDR_STATE_LEAVE         0x0042E720u  /* void(void) */
+#define ADDR_STATE_ENTER         0x00424AD0u  /* void(int32_t) */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
 #define ADDR_HINSTANCE_AUX       0x00512584u  /* cleared beside it; unidentified */
