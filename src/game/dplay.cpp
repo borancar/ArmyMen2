@@ -988,6 +988,101 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
     return 1;
 }
 
+/* Join a session someone else is hosting -- 0x0040E7B0, thiscall.
+ *
+ * The counterpart of CommOpenSession: the same Open, with DPOPEN_JOIN instead
+ * of DPOPEN_CREATE, and a descriptor that names which session rather than
+ * describing a new one. guidInstance identifies it and guidApplication keeps
+ * the answer to this game; nothing else in the descriptor is set, because
+ * joining does not get to choose the rules.
+ *
+ * Afterwards it reads the session back and, when the host left dwUser1 clear,
+ * records the current player count in the hosting slot. CommOpenSession puts
+ * the host's slot index in dwUser1, so a zero there means the host did not say
+ * -- and the player count is what is used instead. */
+int32_t __attribute__((thiscall)) CommJoinSession(void *comm, const GUID *instance)
+{
+    uint8_t         *self = (uint8_t *)comm;
+    LPDIRECTPLAY4A   dp   = *DirectPlaySlot(comm);
+    DPSESSIONDESC2   desc;
+    const GUID      *app;
+    HRESULT          hr;
+
+    if (!dp)
+        return 0;
+
+    memset(&desc, 0, sizeof desc);
+    desc.dwSize = sizeof desc;
+    if (instance)
+        desc.guidInstance = *instance;
+    app = *(const GUID **)(self + COMM_OFF_APP_GUID);
+    if (app)
+        desc.guidApplication = *app;
+
+    hr = IDirectPlayX_Open(dp, &desc, DPOPEN_JOIN);
+    if (hr != DP_OK) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_OPEN_FAILED, hr);
+        return 0;
+    }
+
+    if (!CommGetSessionDesc(comm))
+        return 0;
+
+    {
+        uint8_t          *shared = g_commObject;
+        LPDPSESSIONDESC2  sd =
+            *(LPDPSESSIONDESC2 *)(shared + COMM_OFF_SESSION_DESC);
+
+        if (sd->dwUser1 == 0)
+            comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE + 4)
+                = sd->dwCurrentPlayers;
+    }
+    return 1;
+}
+
+/* Tell the lobby something -- 0x0040FAA0, thiscall.
+ *
+ * Only the host of a lobby-launched game says anything, which is what the
+ * three guards at the top are: launched from a lobby, hosting it, and holding
+ * a lobby interface.
+ *
+ * The message is a DPLMSG_SETPROPERTY, and it is identifiable as one without
+ * guessing -- the 0x30 bytes it builds are exactly that structure's fields in
+ * order. dwType is 5, which is DPLSYS_SETPROPERTY; dwRequestID is 0, which is
+ * DPL_NOCONFIRMATION, so nothing is expected back; guidPlayer is the null GUID
+ * the image carries at 0x0046FD98; and the property tag is the game's own,
+ * carrying four bytes of value. It goes as DPLMSG_STANDARD.
+ *
+ * Answers non-zero when the send was accepted. */
+static_assert(DPLSYS_SETPROPERTY == 5, "DPLSYS_SETPROPERTY");
+static_assert(DPL_NOCONFIRMATION == 0, "DPL_NOCONFIRMATION");
+static_assert(sizeof(DPLMSG_SETPROPERTY) == 0x30, "DPLMSG_SETPROPERTY");
+
+int32_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t value)
+{
+    uint8_t             *self = (uint8_t *)comm;
+    LPDIRECTPLAYLOBBY3A  lobby;
+    DPLMSG_SETPROPERTY   msg;
+
+    if (!comm_u32(self, COMM_OFF_LOBBIED))
+        return 0;
+    if (!comm_u32(self, COMM_OFF_IS_HOST))
+        return 0;
+    lobby = *(LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+    if (!lobby)
+        return 0;
+
+    msg.dwType          = DPLSYS_SETPROPERTY;
+    msg.dwRequestID     = DPL_NOCONFIRMATION;
+    msg.guidPlayer      = *(const GUID *)(uintptr_t)ADDR_GUID_NULL;
+    msg.guidPropertyTag = *(const GUID *)(uintptr_t)ADDR_GUID_GAME_PROPERTY;
+    msg.dwDataSize      = sizeof value;
+    msg.dwPropertyData[0] = value;
+
+    return IDirectPlayLobby_SendLobbyMessage(lobby, DPLMSG_STANDARD, 0,
+                                             &msg, sizeof msg) >= 0;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1022,5 +1117,9 @@ int dplay_install(void)
                         "CommDropDirectPlay", 0);
     rc |= patch_replace(ADDR_COMM_LOBBY_START, (const void *)CommLobbyStart,
                         "CommLobbyStart", 0);
+    rc |= patch_replace(ADDR_COMM_JOIN_SESSION, (const void *)CommJoinSession,
+                        "CommJoinSession", 1);
+    rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
+                        "CommSendLobbyProperty", 1);
     return rc;
 }

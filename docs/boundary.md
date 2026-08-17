@@ -101,8 +101,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 59 |
-| any COM dispatch, not | 51 |
+| any COM dispatch, reconstructed | 61 |
+| any COM dispatch, not | 49 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:

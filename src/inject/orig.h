@@ -556,6 +556,11 @@
  * slot was counted. Invisible to tools/comcalls.py because the interface lives
  * inside the comm object rather than in a global. */
 #define ADDR_COMM_ENUM_SESSIONS  0x0040E3B0u  /* thiscall int32(this, void *) */
+#define ADDR_COMM_JOIN_SESSION   0x0040E7B0u  /* thiscall int32(this, const GUID *) */
+#define ADDR_COMM_SEND_PROPERTY  0x0040FAA0u  /* thiscall int32(this, uint32) */
+#define ADDR_GUID_NULL           0x0046FD98u  /* all zeroes, as guidPlayer */
+#define ADDR_GUID_GAME_PROPERTY  0x0046F888u  /* {BDD4B95F-D35C-11D0-...} */
+#define ADDR_STR_OPEN_FAILED     0x00475410u  /* " Open Session Failed returned %x \n" */
 #define ADDR_ENUM_SESSIONS_CB    0x0040E280u  /* LPDPENUMSESSIONSCALLBACK2 */
 /* The service-provider browser and its callback. The callback drops two
  * providers by name before adding the rest -- "Play on HEAT" and "Play on
