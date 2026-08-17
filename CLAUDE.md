@@ -205,6 +205,19 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   is a race rather than a crash), the Smacker movie class (`0x00444FC0`, all
   thiscall methods on a class whose layout would have to be reconstructed
   first), and the registry pair behind `0x0040DB50`.
+- **The DirectX COM figure is a lower bound.** `comcalls.py` can name the
+  interface only when the object traces back to a global, and it cannot for 182
+  of the 356 dispatch sites — those reach it through a parameter or a struct
+  field. `LockSurface` is the example: it takes the surface as an argument, so
+  its own `Lock` is unclassifiable and was reconstructed long before the count
+  existed. Read `docs/boundary.md` as "known to be outstanding", never as "all
+  that is outstanding".
+- **The game never opens a file itself.** Every `CreateFileA`, `ReadFile` and
+  `FindFirstFileA` is reached from inside the statically linked CRT, which this
+  port replaces with libc wholesale rather than function by function. The one
+  exception is the `.WAV` reader, which goes through WINMM — `wavefile.cpp`.
+  `docs/boundary.md` generates that answer, because "where is the file I/O" is
+  an obvious question with a non-obvious answer.
 - **Import sites are only half the boundary.** DirectDraw, DirectSound and
   DirectInput are reached through COM vtables and own no import, so a function
   can call DirectX all day and appear nowhere in `docs/imports.tsv`.

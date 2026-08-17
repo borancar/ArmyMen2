@@ -22,6 +22,17 @@ wholesale by libc rather than function by function.
 These own no import site and so appear nowhere above. A function can
 call DirectDraw all day without the import table showing it.
 
+**This is a lower bound, not a census.** `tools/comcalls.py` can only
+say which interface a call is on when the object traces back to a
+global, and it cannot for 182 of the 356 dispatch sites in the
+image -- those reach the object through a parameter, a local or a
+struct field. Some of them are DirectX and are not counted here.
+`LockSurface` is the obvious example: it takes the surface as an
+argument, so its own `Lock` call is one of the unclassifiable ones,
+and it has been reconstructed since long before this section existed.
+Treat the number below as "known to be outstanding", never as
+"all that is outstanding".
+
 | | functions | call sites |
 |---|---:|---:|
 | reconstructed | 19 | 60 |
@@ -72,6 +83,20 @@ function from game logic with a call in it.
 | smackw32.dll | 9 | 9 |
 | ole32.dll | 3 | 3 |
 | ADVAPI32.dll | 2 | 0 |
+
+## The filesystem
+
+Worth its own answer, because the obvious question -- the game clearly
+reads files, so where is that on the list? -- has a non-obvious one.
+It never opens a file itself. Every `CreateFileA`, `ReadFile`,
+`WriteFile` and `FindFirstFileA` in the image is reached from inside
+the statically linked MSVC CRT, which the port replaces wholesale with
+libc rather than function by function.
+
+Called only from the CRT: `CreateDirectoryA`, `CreateFileA`, `DeleteFileA`, `FileTimeToLocalFileTime`, `FileTimeToSystemTime`, `FindFirstFileA`, `FindNextFileA`, `FlushFileBuffers`, `GetCurrentDirectoryA`, `GetFileAttributesA`, `GetFileType`, `GetModuleFileNameA`, `ReadFile`, `RemoveDirectoryA`, `SetCurrentDirectoryA`, `SetEndOfFile`, `SetFileAttributesA`, `SetFilePointer`, `WriteFile`
+
+Called from game code: none. The only file the game opens for itself is a `.WAV`, through
+WINMM rather than the CRT, and that is `src/game/wavefile.cpp`.
 
 No networking library appears above, and that is not an omission:
 the game imports none. Its multiplayer transport is DirectPlay,

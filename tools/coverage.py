@@ -159,6 +159,12 @@ def main():
 
     sites = lambda d: sum(len(v) for v in d.values())
     total_sites = sites(per_fn)
+    total_com = unresolved = 0
+    if os.path.exists(compath):
+        for r in csv.DictReader(open(compath), delimiter="\t"):
+            total_com += 1
+            if not r["this"] or r["this"] == "0x00000000":
+                unresolved += 1
     com_done = {f: v for f, v in com.items() if is_done(f)}
     com_left = {f: v for f, v in com.items() if not is_done(f)}
 
@@ -182,6 +188,16 @@ def main():
         w("## DirectX through COM\n\n")
         w("These own no import site and so appear nowhere above. A function can\n"
           "call DirectDraw all day without the import table showing it.\n\n")
+        w("**This is a lower bound, not a census.** `tools/comcalls.py` can only\n"
+          "say which interface a call is on when the object traces back to a\n"
+          f"global, and it cannot for {unresolved} of the {total_com} dispatch sites in the\n"
+          "image -- those reach the object through a parameter, a local or a\n"
+          "struct field. Some of them are DirectX and are not counted here.\n"
+          "`LockSurface` is the obvious example: it takes the surface as an\n"
+          "argument, so its own `Lock` call is one of the unclassifiable ones,\n"
+          "and it has been reconstructed since long before this section existed.\n"
+          "Treat the number below as \"known to be outstanding\", never as\n"
+          "\"all that is outstanding\".\n\n")
         w("| | functions | call sites |\n|---|---:|---:|\n")
         w(f"| reconstructed | {len(com_done)} | {sites(com_done)} |\n")
         w(f"| still to do | {len(com_left)} | {sites(com_left)} |\n\n")
@@ -218,6 +234,27 @@ def main():
             got = sum(1 for r in rows
                       if r["dll"] == dll and int(r["func"], 16) in done_fns)
             w(f"| {dll} | {n} | {got} |\n")
+
+        w("\n## The filesystem\n\n")
+        w("Worth its own answer, because the obvious question -- the game clearly\n"
+          "reads files, so where is that on the list? -- has a non-obvious one.\n"
+          "It never opens a file itself. Every `CreateFileA`, `ReadFile`,\n"
+          "`WriteFile` and `FindFirstFileA` in the image is reached from inside\n"
+          "the statically linked MSVC CRT, which the port replaces wholesale with\n"
+          "libc rather than function by function.\n\n")
+        crt_rows = [r for r in rows if int(r["func"], 16) >= CRT_START]
+        fileish = sorted({r["symbol"] for r in crt_rows
+                          if any(k in r["symbol"] for k in
+                                 ("File", "Directory", "ReadFile", "WriteFile"))})
+        w("Called only from the CRT: " + ", ".join(f"`{x}`" for x in fileish) + "\n\n")
+        game_fileish = sorted({r["symbol"] for r in rows
+                               if int(r["func"], 16) < CRT_START
+                               and any(k in r["symbol"] for k in
+                                       ("File", "Directory"))})
+        w("Called from game code: "
+          + (", ".join(f"`{x}`" for x in game_fileish) if game_fileish else "none")
+          + ". The only file the game opens for itself is a `.WAV`, through\n"
+            "WINMM rather than the CRT, and that is `src/game/wavefile.cpp`.\n")
 
         w("\nNo networking library appears above, and that is not an omission:\n"
           "the game imports none. Its multiplayer transport is DirectPlay,\n"
