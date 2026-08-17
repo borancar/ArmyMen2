@@ -260,6 +260,44 @@ int32_t __cdecl InitInput(HWND hWnd)
     return 1;
 }
 
+#define g_diDevice3      (*(LPDIRECTINPUTDEVICEA *)(uintptr_t)ADDR_DI_DEVICE_3)
+#define g_mouseAcquired  (*(int32_t *)(uintptr_t)ADDR_DI_MOUSE_ACQUIRED)
+
+/* Unacquire, then Release, then forget. */
+static void ReleaseDevice(LPDIRECTINPUTDEVICEA *slot)
+{
+    if (!*slot)
+        return;
+    IDirectInputDevice_Unacquire(*slot);
+    IDirectInputDevice_Release(*slot);
+    *slot = NULL;
+}
+
+void __cdecl ShutdownInput(void)
+{
+    /* Nothing was created, so there is nothing to give back. */
+    if (!g_dinput)
+        return;
+
+    ReleaseDevice(&g_diMouse);
+    ReleaseDevice(&g_diDevice3);
+    ReleaseDevice(&g_diKeyboard);
+
+    /* Unguarded, unlike the devices -- but it was tested at the top. */
+    IDirectInput_Release(g_dinput);
+    g_dinput = NULL;
+}
+
+void __cdecl AcquireMouse(void)
+{
+    if (!g_diMouse)
+        return;
+    /* Only a success is recorded. Failing is ordinary: an exclusive foreground
+     * device cannot be acquired while another window has the focus. */
+    if (IDirectInputDevice_Acquire(g_diMouse) == DI_OK)
+        g_mouseAcquired = 1;
+}
+
 int device_install(void)
 {
     int rc = 0;
@@ -268,5 +306,9 @@ int device_install(void)
                         "InitDirectDraw", 1);
     rc |= patch_replace(ADDR_INIT_INPUT, (const void *)InitInput,
                         "InitInput", 1);
+    rc |= patch_replace(ADDR_SHUTDOWN_INPUT, (const void *)ShutdownInput,
+                        "ShutdownInput", 0);
+    rc |= patch_replace(ADDR_ACQUIRE_MOUSE, (const void *)AcquireMouse,
+                        "AcquireMouse", 0);
     return rc;
 }

@@ -12,9 +12,10 @@
 #define DEFAULT_PORT 31337
 /* Big enough for `counts` to name all MAX_TRACED functions at once. At 512 it
  * was not: the reply stopped mid-list and the four functions patched last never
- * appeared at all, which reads exactly like they were never installed. The
+ * appeared at all, which reads exactly like they were never installed. Raised
+ * again with MAX_TRACED, which is the other half of the same failure. The
  * client frames on a newline and does not care how long a line is. */
-#define MAX_LINE     2048
+#define MAX_LINE     4096
 
 static SOCKET g_listen = INVALID_SOCKET;
 static HANDLE g_thread;

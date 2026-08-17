@@ -55,6 +55,20 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd);
  */
 int32_t __cdecl InitInput(HWND hWnd);
 
+/* Original: 0x00426EA0, 1 call site. Give the input devices back.
+ *
+ * Unacquire then Release, three devices then the IDirectInput itself. The third
+ * device at 0x00512FDC is never created by InitInput and is always null here;
+ * the teardown handles it anyway, so something else was meant to fill it in. */
+void __cdecl ShutdownInput(void);
+
+/* Original: 0x00426F20, 2 call sites. Take the mouse.
+ *
+ * Records that it succeeded, and records nothing when it fails -- an exclusive
+ * foreground device cannot be acquired while another window has focus, so this
+ * failing is ordinary rather than exceptional. */
+void __cdecl AcquireMouse(void);
+
 int device_install(void);
 
 #ifdef __cplusplus

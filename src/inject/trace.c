@@ -6,7 +6,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_TRACED   64
+/* The arena below holds ARENA_BYTES/STUB_BYTES stubs, which is 151, so this is
+ * the binding limit and not the memory. It was 64, and the reconstruction went
+ * past it: the last nine patches installed correctly -- trace_wrap falls back to
+ * the unwrapped function -- but vanished from `counts`, which reads exactly like
+ * they were never installed. The log does say "table full", but nobody reads a
+ * log line for a function they are not suspicious of yet. */
+#define MAX_TRACED   128
 #define MAX_ARGS     8
 #define LOG_FIRST_N  12
 #define STUB_BYTES   27

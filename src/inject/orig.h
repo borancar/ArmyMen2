@@ -361,6 +361,10 @@
 #define ADDR_DINPUT              0x00512FD0u  /* IDirectInputA * */
 #define ADDR_DI_MOUSE            0x00512FD4u  /* IDirectInputDeviceA * */
 #define ADDR_DI_KEYBOARD         0x00512FD8u  /* IDirectInputDeviceA * */
+#define ADDR_DI_DEVICE_3         0x00512FDCu  /* a third device, never created here */
+#define ADDR_DI_MOUSE_ACQUIRED   0x00512FE0u  /* int32_t */
+#define ADDR_SHUTDOWN_INPUT      0x00426EA0u  /* void(void) */
+#define ADDR_ACQUIRE_MOUSE       0x00426F20u  /* void(void) */
 #define ADDR_GUID_SYS_MOUSE      0x0046F5A8u
 #define ADDR_GUID_SYS_KEYBOARD   0x0046F5B8u
 #define ADDR_DF_MOUSE            0x0046FD80u  /* DIDATAFORMAT c_dfDIMouse */
