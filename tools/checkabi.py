@@ -96,6 +96,8 @@ FUNCS = [
     (0x00446450, "CreateGameFont",   "cdecl"),
     (0x0040CBF0, "WaveReadFile",      "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
+    (0x0040D5D0, "StopAudioStream",  "cdecl"),
+    (0x0040D680, "StartAudioStream", "cdecl"),
     (0x004020A0, "CommShutdown",     "cdecl",
      "opens `push ecx` to allocate the DWORD that GetExitCodeThread fills in; "
      "ecx on entry is never read, so cdecl -- the third instance of this idiom"),

@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 31 | 119 |
-| still boundary | 7 | 22 |
+| reconstructed | 33 | 125 |
+| still boundary | 5 | 16 |
 | game logic, incidental calls only | 84 | 135 |
 | **total** | **122** | **276** |
 
@@ -30,8 +30,6 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x0040d5d0` | 176 | 4 | 44 | InterlockedExchange, Sleep, timeEndPeriod, timeKillEvent |
-| `0x0040d680` | 176 | 2 | 88 | timeBeginPeriod, timeSetEvent |
 | `0x0040db50` | 416 | 3 | 138 | GetTickCount, RegCloseKey, RegCreateKeyExA |
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
 | `0x0042ece0` | 352 | 2 | 176 | GetActiveWindow, MessageBoxA |
@@ -43,8 +41,8 @@ function from game logic with a call in it.
 | dll | sites | reconstructed |
 |---|---:|---:|
 | USER32.dll | 130 | 62 |
-| KERNEL32.dll | 99 | 16 |
-| WINMM.dll | 17 | 13 |
+| KERNEL32.dll | 99 | 18 |
+| WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
 | smackw32.dll | 9 | 9 |
 | ole32.dll | 3 | 3 |

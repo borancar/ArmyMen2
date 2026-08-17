@@ -18,6 +18,7 @@
 #include "patch.h"
 #include "sites.h"
 #include "trace.h"
+#include "../game/audio.h"
 #include "../game/blit.h"
 #include "../game/dist.h"
 #include "../game/font.h"
@@ -161,6 +162,10 @@ static const struct {
       { 0x8B, 0x4C, 0x24, 0x04, 0x83, 0xEC, 0x48, 0x8D }, 8 },
     { ADDR_WAVE_CLOSE_FILE, "WaveCloseReadFile",
       { 0x56, 0x8B, 0x74, 0x24, 0x0C, 0x8B, 0x06, 0x85 }, 8 },
+    { ADDR_STOP_AUDIO_STREAM, "StopAudioStream",
+      { 0xA1, 0x68, 0xA4, 0x4F, 0x00, 0x85, 0xC0, 0x0F }, 8 },
+    { ADDR_START_AUDIO_STREAM, "StartAudioStream",
+      { 0xA1, 0x68, 0xA4, 0x4F, 0x00, 0x85, 0xC0, 0x0F }, 8 },
     { ADDR_COMM_SHUTDOWN, "CommShutdown",
       { 0x51, 0x57, 0x68, 0xE8, 0xD8, 0x48, 0x00, 0xE8 }, 8 },
     { ADDR_COMM_CREATE_DPLAY, "CommCreateDirectPlay",
@@ -244,6 +249,7 @@ static void install(void)
     wavefile_install();
     dplay_install();
     movie_install();
+    audio_install();
     palette_install();
     blit_install();
     sprite_install();

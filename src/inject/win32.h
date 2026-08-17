@@ -21,6 +21,7 @@
  * interface the headers declare, and IDirectInputDevice's vtable is what the
  * reconstruction indexes into. */
 #define DIRECTINPUT_VERSION 0x0500
+#define DIRECTSOUND_VERSION 0x0300
 /* The game creates its DirectPlay objects with CoCreateInstance rather than
  * linking dplayx, which is why nothing network-shaped appears in its import
  * table. The interfaces still come from the SDK. */
@@ -28,6 +29,7 @@
 #include <windows.h>
 #include <ddraw.h>
 #include <dinput.h>
+#include <dsound.h>
 #include <dplay.h>
 #include <dplobby.h>
 

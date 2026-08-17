@@ -208,8 +208,10 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. Currently 119 of the 140 genuine
-  boundary sites are ours; the other 136 sites in the binary are game logic
+  drift from what the harness installs. Currently 125 of the 140 genuine
+  boundary sites are ours; the 5 functions
+  and 16 sites left are four game-logic routines with a MessageBoxA error path
+  and the comm constructor's registry read; the other 136 sites in the binary are game logic
   that happens to read a clock.
 - **`obj -> table -> slot` with no `this` is a real shape in this binary, and
   it needs two dereferences.** `0x0065A058` (the repaint object) and
@@ -265,7 +267,9 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   the three `WaveOpenFile` helpers. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
   `SnapshotSystemPalette` came off it once the intro movie was allowed to play.
-- **There is no audio here at all.** Every DirectSound buffer global reads
+- **There is no audio here at all.** `0x004FA468` reads 0, so both
+  `src/game/audio.cpp` functions return at their first line — verified, but only
+  their early exits are. Every DirectSound buffer global reads
   NULL, so nothing ever asks for a `.WAV` and the whole `src/game/wavefile.cpp`
   path is unreachable. This is the environment, not the game: `/dev/snd` exists
   but no PipeWire or PulseAudio session does, and pointing Wine's audio driver

@@ -163,6 +163,28 @@
 #define ADDR_COMM_CONNECTED      0x0040E660u  /* run once the connection is up */
 #define COMM_OFF_DPLAY           0x3ECu       /* IDirectPlay4A * inside the comm object */
 
+/* ---- streaming audio ---------------------------------------------------
+ *
+ * A looping DirectSound buffer kept fed by a multimedia timer, reading through
+ * src/game/wavefile.cpp. Reconstructed in src/game/audio.cpp.
+ */
+#define ADDR_STOP_AUDIO_STREAM   0x0040D5D0u  /* void(void) */
+#define ADDR_START_AUDIO_STREAM  0x0040D680u  /* void(void *track, int32) */
+#define ADDR_AUDIO_ENABLED       0x004FA468u  /* int32_t; nothing runs while clear */
+#define ADDR_AUDIO_BUFFER        0x004FA404u  /* IDirectSoundBuffer *, the stream */
+#define ADDR_AUDIO_BUFFER_2      0x004FA440u  /* IDirectSoundBuffer *, the one played */
+#define ADDR_AUDIO_TIMER_ID      0x004FA408u
+#define ADDR_AUDIO_TIMER_RUN     0x004FA464u
+#define ADDR_AUDIO_PERIOD        0x004FA448u  /* divided by 4 for timeBeginPeriod */
+#define ADDR_AUDIO_IN_CALLBACK   0x004FA478u  /* set while the refill is running */
+#define ADDR_AUDIO_TRACK_ARG     0x004FA45Cu
+#define ADDR_AUDIO_HMMIO         0x004FA414u  /* HMMIO, closed by WaveCloseReadFile */
+#define ADDR_AUDIO_WAVEFORMAT    0x004FA410u  /* WAVEFORMATEX * */
+#define ADDR_AUDIO_TIMER_PROC    0x0040D020u  /* the refill callback, stays original */
+#define ADDR_AUDIO_PREPARE       0x0040CED0u  /* void(void *), stays original */
+#define ADDR_AUDIO_CHECK_PATH    0x00422DE0u  /* int32_t(void *), stays original */
+#define ADDR_AUDIO_PATH_ARG      0x004852D4u
+
 /* ---- Smacker video ----------------------------------------------------
  *
  * smackw32.dll has no SDK header and no import library, so its entry points are
