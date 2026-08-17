@@ -96,6 +96,7 @@ new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
 | `tools/coverage.py` | how much of the boundary is reconstructed, and what is left |
 | `tools/am2ctl.py` | client for the control socket — drives the running game |
 | `tools/drive.sh` | headless launch, screenshot and menu navigation on Xvfb |
+| `tools/ab.sh` | plays a run on the original code and on ours, and compares |
 
 Most write a `.tsv` into `docs/`. Regenerate in dependency order:
 

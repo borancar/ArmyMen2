@@ -131,8 +131,17 @@ zero and one with animation gives 22 scattered pixels. Windowed also reproduces
 the screen rectangle byte for byte, `04000000 1e000000 84020000 fe010000`,
 so `PositionWindow`'s windowed branch is confirmed numerically and not by eye.
 
-Repeat this after any large batch of reconstruction; it is far stronger than the
-invariant, which only checks one subsystem. Note the counts are empty under `AM2_NOPATCH` — the counters *are*
+`tools/ab.sh bootcamp|windowed|intro|all` runs the whole thing. Repeat it after
+any large batch of reconstruction; it is far stronger than the invariant, which
+only checks one subsystem.
+
+Two traps it now guards against, both of which bit while it was being written.
+`make config` must be called with `DISPLAY` set or it names the log for ID 0,
+which this run never wrote — and two missing files diff as identical, so it
+reported a clean A/B on no data at all. And the game's loading-progress `]`
+lines end in CR, so an `^\]$` filter silently misses them; their count varies
+with load time, so comparing them fails at random. An A/B that can pass on
+nothing, or fail on noise, is worse than not running one. Note the counts are empty under `AM2_NOPATCH` — the counters *are*
 the trace stubs, installed by `patch_replace` — so the evidence is the log and
 the pixels, not the counters.
 
