@@ -234,6 +234,28 @@
  * which shift for a windowed primary. */
 #define ADDR_VIEW_ORIGIN_X       0x00514E14u  /* int32_t */
 #define ADDR_VIEW_ORIGIN_Y       0x00514E18u  /* int32_t */
+/* Last frame's copies, written by ComposeFrame at the end of every frame and
+ * read by the dirty-rectangle merge to find what has scrolled. The listener
+ * point is saved the same way and in the same block. */
+#define ADDR_LISTENER_POS_PREV   0x00514E10u  /* AM2_Point */
+#define ADDR_VIEW_RECT_PREV      0x00514E24u  /* AM2_Rect */
+#define ADDR_SECOND_RECT         0x00514E34u  /* AM2_Rect, saved alongside */
+#define ADDR_SECOND_RECT_PREV    0x00514E44u  /* AM2_Rect */
+/* Where the finished frame lands on the back buffer, and the region of the
+ * offscreen surface it comes from -- the same four numbers used both ways. */
+#define ADDR_BLIT_RECT           0x00485320u  /* AM2_Rect */
+/* Set by three places that invalidate the whole view, cleared once the frame
+ * that honoured it has been composed. */
+#define ADDR_FULL_REDRAW         0x00512460u  /* int32_t */
+#define ADDR_COMPOSE_FRAME       0x0042DA30u  /* void(void) */
+/* ComposeFrame's original callees, left alone. 0x0042B420 decays a scroll
+ * counter, 0x0042D6D0 draws the scene into the offscreen surface, 0x0041D060
+ * merges this frame's dirty rectangle with last frame's, and 0x0041DCE0 clears
+ * three word counters. */
+#define ADDR_SCROLL_DECAY        0x0042B420u  /* void(void) */
+#define ADDR_DRAW_SCENE          0x0042D6D0u  /* void(void) */
+#define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
+#define ADDR_RESET_DRAW_COUNTS   0x0041DCE0u  /* void(void) */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
 

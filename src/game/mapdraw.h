@@ -52,6 +52,11 @@ void __cdecl BlitMapBackdrop(AM2_Rect world);
  * this one is verified by reading rather than by running. */
 void __cdecl RestoreTileSet(void);
 
+/* Original: 0x0042DA30. Compose one frame into the offscreen surface and
+ * BltFast it onto the back buffer, then save this frame's rectangles as last
+ * frame's for the dirty-rectangle merge to compare against. */
+void __cdecl ComposeFrame(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

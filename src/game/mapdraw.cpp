@@ -27,7 +27,14 @@
 #include <stdio.h>   /* SEEK_CUR only */
 
 #define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
-#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
+/* ADDR_BACK_SURFACE is misnamed in orig.h and its comment there says so: this
+ * is the OFFSCREEN surface, and the real back buffer is ADDR_FONT_SURFACE.
+ * This file used to call it g_backBuffer, which made the same identifier mean
+ * two different surfaces in two files -- device.cpp's g_backBuffer is the other
+ * one. The address was always right; only the name was a trap, and it is the
+ * kind that costs an afternoon the first time somebody writes code touching
+ * both. Verified against the original: RedrawMapRegion locks [0x00503100]. */
+#define g_offscreen (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
 #define g_mapDesc    ((void *)(uintptr_t)ADDR_MAP_DESC)
 
 /* 0x0041E440: the recursive tile walker. Shifts the rectangle's edges right by
@@ -71,7 +78,7 @@ void __cdecl BlitMapBackdrop(AM2_Rect world)
     src.right  = world.right  - (g_cameraX << TILE_SHIFT);
     src.bottom = world.bottom - (g_cameraY << TILE_SHIFT);
 
-    IDirectDrawSurface_BltFast(g_backBuffer,
+    IDirectDrawSurface_BltFast(g_offscreen,
                                (DWORD)(world.left - g_viewX),
                                (DWORD)(world.top  - g_viewY),
                                g_mapCache, &src, DDBLTFAST_WAIT);
@@ -97,8 +104,8 @@ void __cdecl RedrawMapRegion(const AM2_Rect *world)
 
     BlitMapBackdrop(*world);
 
-    SetDrawTarget(g_backBuffer);
-    if (!LockSurface(g_backBuffer))
+    SetDrawTarget(g_offscreen);
+    if (!LockSurface(g_offscreen))
         return;
 
     orig_draw_map_tiles(world, g_mapDesc, 0);
@@ -361,9 +368,97 @@ bad:
     orig_fclose(fp);
 }
 
+/* Compose one frame and put it on the back buffer -- 0x0042DA30.
+ *
+ * The top of the drawing path, and the last DirectDraw blit outside the
+ * reconstruction. Everything else in this file paints INTO the offscreen
+ * surface; this is what moves the result onto the back buffer for
+ * PresentFrame to flip.
+ *
+ * Four steps. Decay the scroll counter, draw the scene into the offscreen
+ * surface, bring the map up to date -- either a full RedrawMapRegion of the
+ * view when something invalidated it, or the cheaper dirty-rectangle merge --
+ * and then BltFast the view rectangle across.
+ *
+ * THE SAME FOUR NUMBERS ARE USED TWICE, which is the only thing here that
+ * reads oddly. ADDR_BLIT_RECT is handed to RectSet to build the SOURCE
+ * rectangle, and its first two fields are also the DESTINATION point. That is
+ * correct rather than a slip: the offscreen surface and the back buffer are the
+ * same size and the view sits at the same place on both, so the copy is
+ * position-preserving and one rectangle describes both ends.
+ *
+ * The tail saves this frame's view rectangle, the second rectangle beside it
+ * and the listener position into their `_PREV` copies -- which is what the
+ * dirty-rectangle merge compares against next frame to find what scrolled --
+ * and then clears the full-redraw flag, because the frame that honoured it has
+ * now been composed.
+ *
+ * RectSet is called for its return value, which is the rectangle it just
+ * filled; the original then copies the four fields into a second local to hand
+ * to BltFast rather than passing the first one. Written with one local here --
+ * the addresses differ, nothing observable does.
+ *
+ * Exercised by every frame, so the Boot Camp pixel budget is what checks it. */
+#define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
+#define g_viewRect   ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+#define g_fullRedraw (*(int32_t *)(uintptr_t)ADDR_FULL_REDRAW)
+#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+
+typedef void (__cdecl *am2_void_fn)(void);
+#define orig_scroll_decay      (*(am2_void_fn)ADDR_SCROLL_DECAY)
+#define orig_draw_scene        (*(am2_void_fn)ADDR_DRAW_SCENE)
+#define orig_merge_dirty       (*(am2_void_fn)ADDR_MERGE_DIRTY)
+#define orig_reset_draw_counts (*(am2_void_fn)ADDR_RESET_DRAW_COUNTS)
+
+/* Save `n` dwords from `src` to `dst`. The original writes the nine stores out
+ * one at a time, interleaved; they are independent, so a loop is the same
+ * thing. */
+static void SavePrev(void *dst, const void *src, int32_t dwords)
+{
+    int32_t i;
+    for (i = 0; i < dwords; i++)
+        ((uint32_t *)dst)[i] = ((const uint32_t *)src)[i];
+}
+
+void __cdecl ComposeFrame(void)
+{
+    AM2_Rect src;
+
+    orig_scroll_decay();
+    orig_draw_scene();
+
+    if (g_fullRedraw)
+        RedrawMapRegion(g_viewRect);
+    else
+        orig_merge_dirty();
+
+    orig_reset_draw_counts();
+
+    RectSet(&src, g_blitRect->left, g_blitRect->top,
+            g_blitRect->right, g_blitRect->bottom);
+
+    IDirectDrawSurface_BltFast(g_backBuffer,
+                               (DWORD)g_blitRect->left,
+                               (DWORD)g_blitRect->top,
+                               g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
+
+    /* This frame becomes last frame. */
+    SavePrev((void *)(uintptr_t)ADDR_LISTENER_POS_PREV,
+             (const void *)(uintptr_t)ADDR_LISTENER_POS, 1);
+    SavePrev((void *)(uintptr_t)ADDR_VIEW_RECT_PREV,
+             (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X, 4);
+    SavePrev((void *)(uintptr_t)ADDR_SECOND_RECT_PREV,
+             (const void *)(uintptr_t)ADDR_SECOND_RECT, 4);
+
+    g_fullRedraw = 0;
+}
+
 int mapdraw_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_COMPOSE_FRAME, (const void *)ComposeFrame,
+                        "ComposeFrame", 0);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,
