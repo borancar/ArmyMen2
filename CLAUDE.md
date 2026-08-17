@@ -333,8 +333,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
-  (`CreateBitmapSurface`, `ReloadBitmapSurface`) and the comm object's
-  constructor and destructor. The window, the message queue, the display mode,
+  (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet` and the comm
+  object's constructor and destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -376,7 +376,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
   | | what it actually is |
   |---|---|
-  | `0x0042BEA0` 1200B, 2 | **`loadtileset` / `RestoreTileSet`**, by its own strings — a file-to-surface loader in the same family as `MakeBitmap` and `CreateBitmapSurface`, and the best remaining candidate rather than a decline |
+  | ~~`0x0042BEA0`~~ | **Done.** The entry was four functions; `RestoreTileSet` at `0x0042C0E0` (624B, `Lock`+`Unlock`) held both COM calls and is reconstructed in `mapdraw.cpp`. See the merge note under boundary density |
   | `0x0040CED0` 1792B, 12 | the sound engine. Carries no strings, so unverified as a description; now exercisable, since audio runs |
   | `0x00427070` 944B, 5 | input-to-command translation; no strings |
   | `0x00412FE0` 1184B, 4 | menu logic; no strings |
@@ -482,11 +482,16 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. Currently 125 of the 140 genuine
-  boundary sites are ours; the 5 functions
-  and 16 sites left are four game-logic routines with a MessageBoxA error path
-  and the comm constructor's registry read; the other 136 sites in the binary are game logic
-  that happens to read a clock.
+  drift from what the harness installs. Currently 144 of the 148 genuine
+  boundary sites are ours, across 43 functions. What is left is **one function
+  and four sites**, and all four are `MessageBoxA` — the "insert the CD" dialog,
+  which cannot execute at all, because every CD check in this build is patched
+  to jump past it (`docs/binarypatches.md`). The other 128 sites in the binary
+  are game logic that happens to read a clock or call `IntersectRect`.
+
+  Re-read those numbers from `docs/boundary.md` rather than from here. The
+  figures in this bullet were stale by three commits when they were last
+  checked, which is the failure mode of quoting a generated number in prose.
 - **`obj -> table -> slot` with no `this` is a real shape in this binary, and
   it needs two dereferences.** `0x0065A058` (the repaint object) and
   `0x006568A0` (the current movie) are both reached as
@@ -501,7 +506,32 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   contact with Win32 is a `GetTickCount`. Reconstructing one of those to
   capture a timer read is exactly what this port is not for. Everything under
   ~50 bytes per import site is worth looking at; above that, read it first.
-- **Name a function from its body, not from one call site.** `0x0041AD30` went
+
+  **But the denominator is wrong for one entry in eight.** `docs/functions.tsv`
+  is built from a symbol-free image, and where it cannot see a boundary it runs
+  neighbours together — at least 128 sub-CRT entries covering 90 KB, measured by
+  `tools/merges.py`. A merged entry has the COM sites of one function over the
+  bytes of several, so *both* halves of the ratio are wrong and they push it the
+  same way: merged functions rank too low and get declined. The 5,760-byte
+  function named just above is itself 17 functions.
+
+  This is not hypothetical, and it cost a real target. `0x0042BEA0` sat on the
+  declined list as "1200 B, 2 COM calls" — 600 B per call, far past the
+  threshold. The entry is four functions; the one holding both calls is
+  `RestoreTileSet` at `0x0042C0E0`, 624 B, a file-to-surface loader, and it is
+  now reconstructed. Run `tools/merges.py --com` before ranking anything.
+
+  Note the split points are only trusted when something *references* them.
+  Linear disassembly desynchronises on data in `.text` and then invents `ret`s:
+  of the first five unreferenced candidates checked by hand, two disassembled to
+  garbage. So the figure is a lower bound and is meant to be — 260 candidates,
+  186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
+- **Name a function from its body, not from one call site.** Two instances now,
+  and the second was still sitting in `orig.h` months after the first was
+  written up. `0x0042C0E0` went in as `ADDR_ON_MAP_RESTORED` because
+  `RestoreLostSurfaces` tail-calls it; its own error strings say
+  `RestoreTileSet`, and it reloads the tileset from a `.atl` file. Renamed.
+  `0x0041AD30` went
   in as `AttachPalette` because that is what it looked like where
   `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and
   the wrong name survived a commit. Reading the callee costs a minute;
@@ -538,9 +568,13 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
 - Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
-  `WaveCloseReadFile`, and `RefreshScreen` — that last has 7 callers and is
+  `WaveCloseReadFile`, `RestoreTileSet`, and `RefreshScreen` — that last has 7 callers and is
   reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever
-  forces an out-of-band repaint is somewhere further in. `CalibratePalette` came off this list once
+  forces an out-of-band repaint is somewhere further in. `RestoreTileSet` is a
+  different case and probably a permanent one: it runs only when DirectDraw
+  takes a surface back, which needs an alt-tab or a mode change, and nothing
+  under Xvfb does either. Anyone on a real display should alt-tab out of a
+  mission and back. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
   `SnapshotSystemPalette` came off it once the intro movie was allowed to play.
 - **Audio can be exercised without a sound device, and must be.** There is no

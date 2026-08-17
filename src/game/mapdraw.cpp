@@ -24,6 +24,7 @@
 #include "../inject/patch.h"
 
 #include <stdint.h>
+#include <stdio.h>   /* SEEK_CUR only */
 
 #define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
 #define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
@@ -188,11 +189,185 @@ void __cdecl PaintMapTiles(const AM2_Rect *tiles)
     }
 }
 
+/* Reload the tileset from disk into the map surface -- 0x0042C0E0.
+ *
+ * Reached from exactly one place: RestoreLostSurfaces, after the map surface
+ * comes back from DDERR_SURFACELOST. Restoring a DirectDraw surface gives back
+ * the memory but not the pixels, so they have to be read again -- and this
+ * reads them from the `.atl` file rather than from any cache, which is why a
+ * repaint that looks like it should be cheap opens a file.
+ *
+ * NAMED FROM ITS OWN STRINGS. It went into orig.h as ADDR_ON_MAP_RESTORED,
+ * after the call site, and that is the one naming mistake this project keeps
+ * making. The body says `RestoreTileSet` and `loadtileset`.
+ *
+ * The file is IFF: `FORM` <size> `TILE`, then chunks. Every `DIB ` chunk is one
+ * tile bitmap; everything else is skipped with fseek. The loop is bounded by
+ * the FORM size rather than by EOF, and the running offset counts the 8-byte
+ * chunk header plus the payload -- so a chunk whose size is wrong walks the
+ * counter off the end and the loop stops, rather than spinning.
+ *
+ * Two defects of the original are kept deliberately, both on the failure path.
+ * A failed Lock is silent -- it frees the tile and moves to the next one -- and
+ * the message that does exist, "Error on Lock in RestoreTileSet()", is printed
+ * when the *copy* fails, by which time the surface is locked. That path does
+ * not unlock it. So the one case that reports itself is also the one that
+ * leaves the surface held; every later Lock in the process then fails. It is
+ * the same shape as the Restore defect in LockSurface, and kept for the same
+ * reason.
+ *
+ * THE OUT PARAMETER IS ONE BYTE, and that is worth recording because the
+ * signature says otherwise. ReloadBitmapSurface hands this helper a whole dword
+ * slot and reads the colour key back out of it; here the address passed is
+ * unaligned -- the top byte of a scratch dword -- and never read. It cannot be
+ * a dword store: the three bytes above it are the pixel buffer, which is freed
+ * two statements later, so a 4-byte write would fault on the first tile of
+ * every restore. The helper writes one byte. The value is discarded here.
+ *
+ * NOT EXERCISED, and the honest note is that it cannot easily be. Nothing loses
+ * a surface under Xvfb -- no alt-tab, no mode change -- so neither the A/B nor
+ * the pixel budget covers a line of this. It is verified by reading, by the
+ * fingerprint, and by the fact that its callee set is entirely functions this
+ * port already owns. Anyone running on a real display should alt-tab out of a
+ * mission and back to exercise it. */
+static_assert(mmioFOURCC('F', 'O', 'R', 'M') == 0x4D524F46, "'FORM'");
+static_assert(mmioFOURCC('T', 'I', 'L', 'E') == 0x454C4954, "'TILE'");
+static_assert(mmioFOURCC('D', 'I', 'B', ' ') == 0x20424944, "'DIB '");
+static_assert(DDLOCK_WAIT == 1, "DDLOCK_WAIT");
+static_assert(SEEK_CUR == 1, "the fseek whence the original pushes");
+static_assert(sizeof(DDSURFACEDESC) == 0x6C, "the descriptor the original sizes");
+
+/* Ten dwords then a 256-entry palette; MakeBitmap reads the same shape. */
+#define DIB_HEADER_DWORDS  (10 + 256)
+#define DIB_PALETTE_INDEX  10
+#define TILESET_RESERVED   10
+
+typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
+typedef void *(__cdecl *am2_read_dib_fn)(am2_FILE *fp, uint32_t *header);
+typedef int32_t (__cdecl *am2_data_path_exists_fn)(const char *path);
+typedef uint32_t (__cdecl *am2_colour_of_fn)(uint32_t entry);
+typedef uint8_t (__cdecl *am2_match_colour_fn)(const void *palette,
+                                               uint32_t colour, uint32_t from);
+
+#define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
+#define orig_read_dib      (*(am2_read_dib_fn)ADDR_READ_DIB_CHUNK)
+#define orig_path_exists   (*(am2_data_path_exists_fn)ADDR_DATA_PATH_EXISTS)
+#define orig_colour_of     (*(am2_colour_of_fn)ADDR_COLOUR_OF_ENTRY)
+#define orig_match_colour  (*(am2_match_colour_fn)ADDR_MATCH_COLOUR)
+
+#define g_tilesetName    ((const char *)(uintptr_t)ADDR_TILESET_NAME)
+#define g_tilesetPath    ((const char *)(uintptr_t)ADDR_TILESET_PATH)
+#define g_tilesetReserve (*(int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+#define g_activePalette  (*(void **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+/* g_mapSprite, above, is the same record PaintMapTiles reads: the global
+ * holds a POINTER to it, so reaching the surface is two dereferences and
+ * not one. Width and height sit at +0x1C and +0x20 of the same record. */
+#define MAPSPR_OFF_SURFACE 0x10
+#define MAPSPR_OFF_WIDTH   0x1C
+#define MAPSPR_OFF_HEIGHT  0x20
+
+void __cdecl RestoreTileSet(void)
+{
+    uint32_t   header[DIB_HEADER_DWORDS];
+    uint8_t    remap[256];
+    char       path[256];
+    uint32_t   scratch;              /* the byte out-param; discarded */
+    DDSURFACEDESC desc;
+    am2_FILE  *fp;
+    uint32_t   magic, formSize, chunkId, chunkSize;
+    int32_t    offset, i;
+
+    /* The answer is discarded -- the call is kept because it is the original's
+     * and because it resolves the data path as a side effect. */
+    orig_path_exists(g_tilesetPath);
+    orig_sprintf(path, (const char *)(uintptr_t)ADDR_FMT_ATL, g_tilesetName);
+
+    fp = orig_fopen(path, (const char *)(uintptr_t)ADDR_MODE_RB);
+    if (!fp) {
+        orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_OPEN);
+        return;
+    }
+
+    orig_fread(&magic, 4, 1, fp);
+    if (magic != mmioFOURCC('F', 'O', 'R', 'M'))
+        goto bad;
+
+    orig_fread(&formSize, 4, 1, fp);
+    orig_fread(&magic, 4, 1, fp);
+    if (magic != mmioFOURCC('T', 'I', 'L', 'E'))
+        goto bad;
+
+    offset = 12;
+    do {
+        LPDIRECTDRAWSURFACE surf;
+        void    *pixels;
+        int32_t  from = 0;
+
+        orig_fread(&chunkId, 4, 1, fp);
+        orig_fread(&chunkSize, 4, 1, fp);
+        offset += 8;
+
+        if (chunkId != mmioFOURCC('D', 'I', 'B', ' ')) {
+            orig_fseek(fp, (int32_t)chunkSize, SEEK_CUR);
+            offset += (int32_t)chunkSize;
+            continue;
+        }
+        offset += (int32_t)chunkSize;
+
+        pixels = orig_read_dib(fp, header);
+        if (!pixels)
+            goto bad;
+
+        /* The same remap MakeBitmap builds, reached differently: there the
+         * first ten entries are reserved when a flag in the bitmap record is
+         * clear, here when a global is set. With no active palette the table
+         * is the identity and the reserve is not consulted at all. */
+        if (g_activePalette) {
+            if (g_tilesetReserve) {
+                for (i = 0; i < TILESET_RESERVED; i++)
+                    remap[i] = (uint8_t)i;
+                from = TILESET_RESERVED;
+            }
+            for (i = from; i < 256; i++)
+                remap[i] = orig_match_colour(g_activePalette,
+                                             orig_colour_of(header[DIB_PALETTE_INDEX + i]),
+                                             (uint32_t)from);
+        } else {
+            for (i = 0; i < 256; i++)
+                remap[i] = (uint8_t)i;
+        }
+
+        surf = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAPSPR_OFF_SURFACE);
+        desc.dwSize = sizeof(desc);
+        if (IDirectDrawSurface_Lock(surf, NULL, &desc, DDLOCK_WAIT, NULL) == DD_OK) {
+            int32_t width  = *(int32_t *)(g_mapSprite + MAPSPR_OFF_WIDTH);
+            int32_t height = *(int32_t *)(g_mapSprite + MAPSPR_OFF_HEIGHT);
+
+            if (orig_blit_bitmap_in(desc.lpSurface, desc.lPitch, pixels,
+                                    width, height, remap, &scratch))
+                IDirectDrawSurface_Unlock(surf, desc.lpSurface);
+            else
+                orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_LOCK);
+        }
+
+        orig_free(pixels);
+    } while (offset < (int32_t)formSize);
+
+    orig_fclose(fp);
+    return;
+
+bad:
+    orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_LOAD);
+    orig_fclose(fp);
+}
+
 int mapdraw_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
+    rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,
+                        "RestoreTileSet", 1);
     rc |= patch_replace(ADDR_REDRAW_MAP_REGION, (const void *)RedrawMapRegion,
                         "RedrawMapRegion", 1);
     rc |= patch_replace(ADDR_BLIT_MAP_BACKDROP, (const void *)BlitMapBackdrop,

@@ -135,8 +135,29 @@
 #define ADDR_MENU_SPRITES      0x004FCAACu /* AM2_Sprite *[190] */
 #define ADDR_MENU_SPRITES_END  0x004FCDA4u /* one past; also cleared as a slot */
 #define ADDR_MENU_SURFACE      0x004FCDF4u /* IDirectDrawSurface * */
-#define ADDR_MAP_SURFACE    0x00514E90u  /* desc; +8 a flag, +0x10 the surface */
-#define ADDR_ON_MAP_RESTORED 0x0042C0E0u /* tail-called after a map restore */
+/* Holds a POINTER to the map sprite record -- reaching anything in it is two
+ * dereferences. In that record: +0x10 the surface, +0x1c and +0x20 its width
+ * and height, +8 a flag. PaintMapTiles and RestoreTileSet both read it. */
+#define ADDR_MAP_SURFACE    0x00514E90u
+/* Tail-called after a map restore -- but named for what it *is*, not for the
+ * one call site. It went in as ADDR_ON_MAP_RESTORED; its own error strings say
+ * `RestoreTileSet`, and it reloads the tileset from disk. */
+#define ADDR_RESTORE_TILESET 0x0042C0E0u /* void(void) */
+/* The `.atl` reader's inputs. The name is formatted into "%s.atl"; the path is
+ * only probed, and DataPathExists' answer is discarded. */
+#define ADDR_TILESET_NAME    0x00511A88u /* char[] */
+#define ADDR_TILESET_PATH    0x00511AC8u /* char[] */
+/* Non-zero reserves the first ten palette entries, as BMP_FLAG_RESERVE10 does
+ * for MakeBitmap -- the same convention reached a different way. */
+#define ADDR_TILESET_RESERVE 0x00511CC8u /* int32_t */
+/* 0x00422FF0: reads one DIB chunk from an open stream into the 0x428-byte
+ * bitmap header MakeBitmap also reads -- ten dwords then a 256-entry palette --
+ * and returns the pixels in a buffer the caller frees. */
+#define ADDR_READ_DIB_CHUNK  0x00422FF0u
+#define ADDR_MSG_TILESET_OPEN 0x00486310u /* "Unable to open tileset" */
+#define ADDR_MSG_TILESET_LOCK 0x004862ECu /* "Error on Lock in RestoreTileSet()" */
+#define ADDR_MSG_TILESET_LOAD 0x004862D4u /* "Error in loadtileset()" */
+#define ADDR_FMT_ATL          0x00486328u /* "%s.atl" */
 #define ADDR_PRESENT_ENABLED 0x004FA030u /* int32_t */
 #define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
 #define ADDR_UNLOCK_SURFACE 0x0041BA40u  /* int32_t(void) */
@@ -818,6 +839,10 @@
 
 /* Statically linked MSVC 6 CRT */
 #define ADDR_FREAD          0x004645C1u  /* size_t(void*,size_t,size_t,FILE*) */
+#define ADDR_FOPEN          0x004648E2u  /* FILE *(const char*, const char*) */
+#define ADDR_FCLOSE         0x0046486Cu  /* int32_t(FILE*) */
+#define ADDR_FSEEK          0x00464F18u  /* int32_t(FILE*, int32_t, int32_t) */
+#define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */
 
@@ -827,6 +852,9 @@ typedef struct am2_FILE am2_FILE;
 
 typedef size_t (__cdecl *am2_fread_fn)(void *buf, size_t size, size_t count,
                                        am2_FILE *fp);
+typedef am2_FILE *(__cdecl *am2_fopen_fn)(const char *path, const char *mode);
+typedef int32_t (__cdecl *am2_fclose_fn)(am2_FILE *fp);
+typedef int32_t (__cdecl *am2_fseek_fn)(am2_FILE *fp, int32_t off, int32_t whence);
 typedef void   (__cdecl *am2_log_fn)(const char *fmt, ...);
 
 typedef void *(__cdecl *am2_malloc_fn)(size_t n);
@@ -843,6 +871,11 @@ typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
                                                  uint32_t *inout);
 
 #define orig_fread   (*(am2_fread_fn)ADDR_FREAD)
+/* The game's own stdio, for the same reason as its malloc: a FILE opened by
+ * the game's CRT cannot be read or closed by ours. */
+#define orig_fopen   (*(am2_fopen_fn)ADDR_FOPEN)
+#define orig_fclose  (*(am2_fclose_fn)ADDR_FCLOSE)
+#define orig_fseek   (*(am2_fseek_fn)ADDR_FSEEK)
 #define orig_log     (*(am2_log_fn)ADDR_LOG)
 /* The game's heap, not ours -- msvcrt has a different one entirely, so anything
  * the game allocated must be freed here and vice versa. */

@@ -304,7 +304,7 @@ release_v2:
 #define MAP_DESC_SURFACE 0x10u
 
 typedef void (__cdecl *am2_void_fn)(void);
-#define orig_on_map_restored (*(am2_void_fn)ADDR_ON_MAP_RESTORED)
+#define orig_restore_tileset (*(am2_void_fn)ADDR_RESTORE_TILESET)
 
 /* IsLost answers DD_OK when the surface is fine, so a non-zero result is the
  * thing to act on. */
@@ -332,7 +332,7 @@ void __cdecl RestoreLostSurfaces(void)
              * is what the original re-reads it for. */
             surf = *(LPDIRECTDRAWSURFACE *)(g_mapSurfaceDesc + MAP_DESC_SURFACE);
             if (IDirectDrawSurface_Restore(surf) == DD_OK)
-                orig_on_map_restored();   /* the pixels are gone; redraw them */
+                orig_restore_tileset();   /* the pixels are gone; redraw them */
         }
     }
 }

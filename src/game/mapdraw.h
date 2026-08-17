@@ -41,6 +41,17 @@ void __cdecl RedrawMapRegion(const AM2_Rect *world);
  * afterwards. */
 void __cdecl BlitMapBackdrop(AM2_Rect world);
 
+/* Original: 0x0042C0E0, 1 call site -- RestoreLostSurfaces. Reload the tileset
+ * from its `.atl` file into the map surface after DirectDraw took it back.
+ *
+ * Named from its own error strings rather than from that call site, where it
+ * had been recorded as `ADDR_ON_MAP_RESTORED`. The file is IFF and every
+ * `DIB ` chunk in it is one tile bitmap.
+ *
+ * Only reachable when a surface is lost, which does not happen under Xvfb, so
+ * this one is verified by reading rather than by running. */
+void __cdecl RestoreTileSet(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus
