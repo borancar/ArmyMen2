@@ -178,6 +178,10 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
  * surface it was painted into. */
 void __cdecl FreeMapSurfaces(void);
 
+/* Original: 0x00412FE0. The animated menu cursor and its save-under -- the
+ * last function in the image with any COM dispatch. */
+void __cdecl DrawMenuCursor(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus

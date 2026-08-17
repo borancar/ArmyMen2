@@ -135,6 +135,53 @@
 #define ADDR_MENU_SPRITES      0x004FCAACu /* AM2_Sprite *[190] */
 #define ADDR_MENU_SPRITES_END  0x004FCDA4u /* one past; also cleared as a slot */
 #define ADDR_MENU_SURFACE      0x004FCDF4u /* IDirectDrawSurface * */
+/* The animated menu cursor, and the save-under it needs so the frame beneath
+ * it survives. The LAST function in the image with any COM dispatch. */
+#define ADDR_DRAW_MENU_CURSOR    0x00412FE0u  /* void(void) */
+#define ADDR_MENU_ENABLED        0x004FCEF8u  /* int32_t; nothing drawn while 0 */
+/* Where 0x00426F40 accumulates the mouse deltas into an absolute pointer,
+ * clamped to the screen. The menu cursor is drawn here. */
+#define ADDR_CURSOR_X            0x00485464u  /* int32_t */
+#define ADDR_CURSOR_Y            0x00485468u  /* int32_t */
+#define ADDR_MENU_ROW            0x004FCAA8u  /* int32_t, row into the sprite grid */
+#define ADDR_MENU_ANIM_FRAME     0x004FCDECu  /* int32_t 0..9, -1 stops the cycle */
+#define ADDR_MENU_ANIM_NEXT      0x004FCDE8u  /* uint32_t, tick the next frame is due */
+#define MENU_ANIM_PERIOD         0xC8u        /* 200 ms */
+/* Signed on purpose: the original compares with `jl`, and the frame index
+ * can legitimately be -1, which is how a row says it does not animate. */
+#define MENU_ANIM_FRAMES         0x0A
+/* Non-zero once something has been saved under the cursor. */
+#define ADDR_MENU_SAVED_VALID    0x004FCEFCu  /* int32_t */
+#define ADDR_MENU_SAVED_RECT     0x004FCA98u  /* AM2_Rect, where it came from */
+/* This frame's cursor rectangle and last frame's. */
+#define ADDR_MENU_CURSOR_RECT    0x004FCDD8u  /* AM2_Rect */
+#define ADDR_MENU_CURSOR_PREV    0x004FCDC8u  /* AM2_Rect */
+/* Two optional overlays drawn with the cursor, and the flags and offsets they
+ * carry. */
+#define ADDR_MENU_OVERLAY_A      0x004FCDA8u  /* AM2_Sprite * */
+#define ADDR_MENU_OVERLAY_B      0x004FCDACu  /* AM2_Sprite * */
+#define ADDR_MENU_SPRITE_MODE    0x004FCDB0u  /* int32_t, non-zero -> mode 1 */
+#define ADDR_MENU_OVERLAY_A_FLD  0x004FCDB4u
+#define ADDR_MENU_OVERLAY_B_FLD  0x004FCDB8u
+#define ADDR_MENU_CURSOR_DX      0x004FCDBCu  /* int16_t pair */
+#define ADDR_MENU_OVERLAY_A_DX   0x004FCDC0u
+#define ADDR_MENU_OVERLAY_B_DX   0x004FCDC4u
+/* The rectangle the paint object reports, and the DDBLTFX the Blts pass. */
+/* The fixed rectangle inside the menu surface that the save-under occupies.
+ * It is a RECT and not a DDBLTFX -- it is passed as Blt's source when
+ * restoring and as its destination when saving. */
+#define ADDR_MENU_SAVE_SLOT      0x00476198u  /* RECT */
+#define MENU_ROW_DIRECT          0x13         /* at or above, lock and draw directly */
+#define ADDR_TICKS               0x00426CD0u  /* uint32_t(void) */
+/* Sprite fields the cursor code reads: two int16 hotspot pairs and the
+ * width/height, plus the mode slot DrawSprite consults. */
+#define SPR_OFF_W                0x1Cu
+#define SPR_OFF_H                0x20u
+#define SPR_OFF_HOTX             0x24u   /* int16_t */
+#define SPR_OFF_HOTY             0x26u   /* int16_t */
+#define SPR_OFF_OVX              0x28u   /* int16_t */
+#define SPR_OFF_OVY              0x2Au   /* int16_t */
+#define SPR_OFF_MODE             0x34u
 /* Holds a POINTER to the map sprite record -- reaching anything in it is two
  * dereferences. In that record: +0x10 the surface, +0x1c and +0x20 its width
  * and height, +8 a flag. PaintMapTiles and RestoreTileSet both read it. */

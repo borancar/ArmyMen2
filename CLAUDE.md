@@ -396,7 +396,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
   `OpenAudioStream`, `AudioTimerProc`, both input pollers, `ComposeFrame`,
   `ScrollView`, `ScrollMapCache`, `CommEnumPlayers`, `HostBattle`,
-  `SetGamePalette` and the comm object's constructor and destructor. The window, the message queue, the display mode,
+  `SetGamePalette`, `DrawMenuCursor` and the comm object's constructor and
+  destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -442,7 +443,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | ~~`0x0040CED0`~~ | **Done.** Two functions: `AudioTimerProc` at `0x0040D020` (1456 B, the streaming refill) and `OpenAudioStream` at `0x0040CED0` (336 B, opens the `.WAV` and creates the buffer). Both reconstructed; the whole audio stream is ours |
   | `0x00412FE0` 1184B, 4 | menu logic; no strings |
   | `0x0042FF60` 448B, 1 | starts a multiplayer game — it calls `CommOpenSession`, `CommCreatePlayer` and `PlaySoundAt`, all of which are ours. Genuinely menu logic |
-  | `0x0041B0E0` | The palette builder: `ReleasePalette`, two `CreatePalette`s, `SetPalette`, `CalibratePalette`, then ~1200 bytes of colour matching. Four of this row's original five are done — `ComposeFrame`, `ScrollView`, `ScrollMapCache` and `BlitMapBackdrop` |
+  | ~~all of them~~ | **Done.** Every entry that was ever on this list is reconstructed — the last were `SetGamePalette` (`0x0041B0E0`) and `DrawMenuCursor` (`0x00412FE0`) |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
 - **The import side is done, in the only sense the word can bear here.** Every
@@ -461,10 +462,28 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   reconstructed now and the sentence is true, but it was worth finding out that
   nobody had checked it.
 
-  This claim is about the IAT only. DirectX reached through COM is a separate
-  count and is *not* finished: 3 functions with 5 calls on objects
-  `tools/comcalls.py` can name, plus a share of the sites whose object it
-  cannot. Do not read "the boundary is done" off this bullet alone.
+  **The COM side is now finished too, in the same careful sense.** All 207
+  confirmed COM dispatch sites in game code — every `stdcall` vtable call
+  `tools/comcalls.py` finds below the CRT — are inside reconstructed functions,
+  and the named-object figure is 35 of 35 with 0 calls left.
+
+  One site is not counted and should not be forgotten: `0x0041F060`, in
+  `0x0041EF80`, which `comcalls.py` still records as `?`. It walks a linked
+  list calling each node's function pointer with eight arguments and cleaning
+  the stack itself, so it is a callback and not COM at all — but that was
+  established by reading it, not by the tool, and the tool is right to keep
+  saying it does not know.
+
+  A discriminator for it was written and then reverted, which is the part worth
+  keeping. A COM method is stdcall and cleans its own arguments, so an
+  `add esp` after the call should mean cdecl. It does not: these functions push
+  cdecl arguments *around* their COM calls, so that cleanup routinely belongs to
+  the enclosing call. Even reading only the next instruction it reclassified
+  `SetSurfaceColorKey`'s `SetColorKey` and `ClearRegion`'s `Blt`; with a little
+  slack it also took `PresentFrame`'s `BltFast` and `Restore` and
+  `BlitMapBackdrop`'s. Five real DirectDraw calls would have quietly left the
+  COM count to make a total read 75/75 instead of 77/78. Deciding it properly
+  needs the stack depth tracked across the call, not a peephole.
 
   That figure moves less than the work does, and `ScrollMapCache` is the
   example: its `BltFast` reaches the surface through a stack slot, so

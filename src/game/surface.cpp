@@ -956,9 +956,243 @@ void __cdecl DrawMenuOverlay(void)
                                g_screenClip, DDBLTFAST_WAIT);
 }
 
+/* The animated menu cursor -- 0x00412FE0.
+ *
+ * THE LAST FUNCTION IN THE IMAGE WITH ANY COM DISPATCH. 204 of the 207 stdcall
+ * COM sites in game code were already inside reconstructed functions; all three
+ * that were not are here.
+ *
+ * It is menu logic and it would have been a fair decline -- an animated pointer
+ * with a save-under is not a channel to the outside world. It is reconstructed
+ * because it was the only thing standing between the port and "every COM
+ * dispatch site the survey can see is ours", and because almost everything it
+ * calls is already ours: DrawSprite four times, SetDrawTarget twice,
+ * LockSurface, UnlockSurface and RectSet. What is left is three Blts and the
+ * bookkeeping between them.
+ *
+ * THREE PATHS, and which one runs depends on where the menu is:
+ *
+ *   Save-under. With a paint object and presenting disabled, the frame beneath
+ *   the cursor is copied into a corner of the menu surface before the cursor is
+ *   drawn over it, and put back on the next tick. That is what the three Blts
+ *   do -- restore, save, restore-previous -- and why there are two rectangles
+ *   rather than one.
+ *
+ *   Direct, for rows at or above 0x13. The surface is locked and the cursor and
+ *   its two optional overlays drawn straight into it, with no save-under at all.
+ *
+ *   Bare, for lower rows without a paint object: just the sprite.
+ *
+ * THE DESTINATION IS OFFSET AND THE SOURCE IS NOT, in the last Blt, and only
+ * when the target is the primary. The primary is the whole desktop in a window,
+ * so a rectangle in game coordinates lands in the wrong place on it; the back
+ * buffer it reads from has no such offset. The original keeps two copies of the
+ * rectangle for exactly this and it is the sort of asymmetry that looks like a
+ * bug until the windowed case is considered.
+ *
+ * The animation is a ten-frame cycle on a 200 ms timer. A missing sprite ends
+ * the cycle if it is the second frame -- meaning this row has no animation at
+ * all -- and otherwise wraps back to the first.
+ *
+ * Verified where it is sharpest: this draws the title-screen cursor, and the
+ * windowed A/B renders the title screen with a budget of ZERO differing pixels.
+ */
+static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
+
+#define g_menuEnabled   (*(int32_t *)(uintptr_t)ADDR_MENU_ENABLED)
+#define g_menuRow       (*(const int32_t *)(uintptr_t)ADDR_MENU_ROW)
+#define g_animFrame     (*(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME)
+#define g_animNext      (*(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT)
+#define g_menuSprites2  ((uint8_t **)(uintptr_t)ADDR_MENU_SPRITES)
+#define g_cursorSprite  (*(uint8_t **)(uintptr_t)ADDR_MENU_SPRITES_END)
+#define g_savedValid    (*(int32_t *)(uintptr_t)ADDR_MENU_SAVED_VALID)
+#define g_savedRect     ((AM2_Rect *)(uintptr_t)ADDR_MENU_SAVED_RECT)
+#define g_saveSlot      ((RECT *)(uintptr_t)ADDR_MENU_SAVE_SLOT)
+#define g_cursorRect    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT)
+#define g_cursorPrev    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV)
+#define g_menuSurface2  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
+#define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
+#define g_target        (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_back          (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_primary2      (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_clipRect      ((const RECT *)(uintptr_t)ADDR_SCREEN_CLIP)
+#define g_curX          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
+#define g_curY          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
+#define g_overlayA      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A)
+#define g_overlayB      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B)
+#define g_spriteMode    (*(const int32_t *)(uintptr_t)ADDR_MENU_SPRITE_MODE)
+#define g_overlayAFld   (*(const int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_FLD)
+#define g_overlayBFld   (*(const int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_FLD)
+
+typedef uint32_t (__cdecl *am2_ticks_fn)(void);
+#define orig_ticks (*(am2_ticks_fn)ADDR_TICKS)
+
+/* The paint object's first virtual, which takes its rectangle BY VALUE. It is
+ * a C++ virtual and not COM -- `this` stays in ecx and is never pushed. */
+typedef void (__attribute__((thiscall)) *am2_paint_fn)(void *self, AM2_Rect r);
+
+#define sfld16(s, off) (*(const int16_t *)((const uint8_t *)(s) + (off)))
+#define sfld32(s, off) (*(const int32_t *)((const uint8_t *)(s) + (off)))
+#define swr32(s, off)  (*(int32_t *)((uint8_t *)(s) + (off)))
+
+/* Advance the ten-frame cycle if its 200 ms have elapsed. */
+static void TickMenuAnimation(int32_t row)
+{
+    uint32_t now;
+    int32_t  f;
+
+    if (g_animFrame < 0)
+        return;
+    now = orig_ticks();
+    if (now <= g_animNext)
+        return;
+
+    f = g_animFrame + 1;
+    g_animFrame = f;
+    if (f >= MENU_ANIM_FRAMES) {
+        g_animFrame = 0;
+        g_animNext  = now + MENU_ANIM_PERIOD;
+        return;
+    }
+    if (!g_menuSprites2[row * MENU_ANIM_FRAMES + f]) {
+        /* No second frame means this row simply does not animate. */
+        if (f == 1) {
+            g_animFrame = -1;
+            g_animNext  = now + MENU_ANIM_PERIOD;
+            return;
+        }
+        f = 0;
+        g_animFrame = 0;
+    }
+    g_cursorSprite = g_menuSprites2[row * MENU_ANIM_FRAMES + f];
+    g_animNext     = now + MENU_ANIM_PERIOD;
+}
+
+/* Draw one overlay at the cursor, offset by the cursor sprite's own overlay
+ * point and the overlay's. The original writes this out twice. */
+static void DrawMenuOverlaySprite(uint8_t *spr, uint32_t dxAddr, int32_t fld)
+{
+    const uint8_t *cursor = g_cursorSprite;
+    int32_t x, y;
+
+    if (!spr)
+        return;
+    swr32(spr, SPR_OFF_MODE) = fld;
+    x = g_curX + sfld16(cursor, SPR_OFF_OVX)
+      + *(const int16_t *)(uintptr_t)dxAddr;
+    y = g_curY + sfld16(cursor, SPR_OFF_OVY)
+      + *(const int16_t *)(uintptr_t)(dxAddr + 2);
+    DrawSprite((AM2_Sprite *)spr, x, y, g_spriteMode != 0);
+}
+
+void __cdecl DrawMenuCursor(void)
+{
+    int32_t row;
+
+    if (!g_menuEnabled)
+        return;
+
+    row = g_menuRow;
+    TickMenuAnimation(row);
+
+    if (g_paintObj && !g_presenting) {
+        LPDIRECTDRAWSURFACE target = g_target;
+        AM2_Rect            cur, clipped, shifted;
+        uint8_t            *spr;
+
+        SetDrawTarget(g_back);
+
+        /* Put back whatever the cursor covered last tick. */
+        if (g_savedValid)
+            IDirectDrawSurface_Blt(g_target, (LPRECT)g_savedRect,
+                                   g_menuSurface2, g_saveSlot,
+                                   DDBLT_WAIT, NULL);
+
+        {
+            am2_paint_fn *vt = *(am2_paint_fn **)g_paintObj;
+            vt[1](g_paintObj, *(AM2_Rect *)(g_paintObj + 0x14));
+        }
+
+        spr = g_cursorSprite;
+        cur.left   = g_curX - sfld16(spr, SPR_OFF_HOTX);
+        cur.top    = g_curY - sfld16(spr, SPR_OFF_HOTY);
+        cur.right  = cur.left + sfld32(spr, SPR_OFF_W);
+        cur.bottom = cur.top  + sfld32(spr, SPR_OFF_H);
+
+        /* Save what is about to be covered. */
+        if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, g_clipRect)) {
+            IDirectDrawSurface_Blt(g_menuSurface2, g_saveSlot, g_back,
+                                   (LPRECT)&clipped, DDBLT_WAIT, NULL);
+            *g_savedRect = clipped;
+            g_savedValid = 1;
+        }
+
+        DrawSprite((AM2_Sprite *)g_cursorSprite, g_curX, g_curY, 0);
+        SetDrawTarget(target);
+
+        /* And restore last tick's area, which the redraw above may have left
+         * stale. */
+        if (IntersectRect((LPRECT)&cur, (const RECT *)g_cursorRect,
+                          g_clipRect)) {
+            shifted = cur;
+            if (g_target == g_primary2) {
+                /* The primary is the whole desktop when windowed, so only the
+                 * DESTINATION moves; the back buffer it reads from does not. */
+                shifted.left   += g_screenRect.left;
+                shifted.right  += g_screenRect.left;
+                shifted.top    += g_screenRect.top;
+                shifted.bottom += g_screenRect.top;
+            }
+            IDirectDrawSurface_Blt(g_target, (LPRECT)&shifted, g_back,
+                                   (LPRECT)&cur, DDBLT_WAIT, NULL);
+        }
+    } else {
+        g_savedValid = 0;
+
+        if (row >= MENU_ROW_DIRECT) {
+            if (!LockSurface(g_target))
+                return;
+            if (g_cursorSprite) {
+                uint8_t *spr = g_cursorSprite;
+
+                swr32(spr, SPR_OFF_MODE) = g_spriteMode;
+                DrawSprite((AM2_Sprite *)spr,
+                           g_curX + *(const int16_t *)(uintptr_t)ADDR_MENU_CURSOR_DX,
+                           g_curY + *(const int16_t *)(uintptr_t)(ADDR_MENU_CURSOR_DX + 2),
+                           g_spriteMode != 0);
+                DrawMenuOverlaySprite(g_overlayA, ADDR_MENU_OVERLAY_A_DX,
+                                      g_overlayAFld);
+                DrawMenuOverlaySprite(g_overlayB, ADDR_MENU_OVERLAY_B_DX,
+                                      g_overlayBFld);
+            }
+            UnlockSurface();
+        } else {
+            DrawSprite((AM2_Sprite *)g_cursorSprite, g_curX, g_curY, 0);
+        }
+    }
+
+    /* This tick becomes last tick. */
+    *g_cursorPrev = *g_cursorRect;
+
+    if (g_cursorSprite) {
+        const uint8_t *spr = g_cursorSprite;
+        AM2_Rect       r;
+        int32_t        hx = sfld16(spr, SPR_OFF_HOTX);
+        int32_t        hy = sfld16(spr, SPR_OFF_HOTY);
+
+        RectSet(&r, g_curX - hx, g_curY - hy,
+                g_curX + sfld32(spr, SPR_OFF_W) - hx,
+                g_curY + sfld32(spr, SPR_OFF_H) - hy);
+        *g_cursorRect = r;
+    }
+}
+
 int surface_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_DRAW_MENU_CURSOR, (const void *)DrawMenuCursor,
+                        "DrawMenuCursor", 0);
 
     rc |= patch_replace(ADDR_LOCK_SURFACE, (const void *)LockSurface, "LockSurface", 1);
     rc |= patch_replace(ADDR_UNLOCK_SURFACE, (const void *)UnlockSurface, "UnlockSurface", 0);
