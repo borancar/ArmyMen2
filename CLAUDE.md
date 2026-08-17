@@ -333,7 +333,6 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
   | | why |
   |---|---|
-  | `0x0040B860` 144B, 2 | walks the dynamic sound table comparing names byte by byte |
   | `0x0040CED0` 1792B, 12 | the sound engine proper |
   | `0x0040B8F0` 1024B, 12 | sound playback dispatch |
   | `0x00427070` 944B, 5 | input-to-command translation |

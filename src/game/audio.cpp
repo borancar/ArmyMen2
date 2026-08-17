@@ -422,6 +422,64 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
     return 1;
 }
 
+/* Stop one dynamic sound, by slot and by name -- 0x0040B860.
+ *
+ * The slot says which sound and the name says which sound it had better be:
+ * the caller is stopping a thing it started, and a slot is reused, so the name
+ * is the check that it has not been handed to someone else in between. An empty
+ * name skips the check and stops whatever is there.
+ *
+ * The second reason this was on the declined list -- "walks the table comparing
+ * names byte by byte" -- is just MSVC inlining strcmp two characters at a time.
+ * It compares, it does not search.
+ *
+ * The bound is inclusive, `> 0x10` rather than `>= 0x10`, so all seventeen
+ * slots are reachable. Same count as FreeDynamicSounds and StopAllSounds.
+ *
+ * One asymmetry, kept: with a name, a slot holding no buffer still gets its
+ * active flag cleared; with an empty name it does not. The two paths join at
+ * different points in the original.
+ *
+ * Unexercised: no audio device. */
+void __cdecl StopNamedSound(const char *name, int32_t index)
+{
+    uint8_t             *rec;
+    LPDIRECTSOUNDBUFFER  buf;
+
+    if (!g_audioEnabled)
+        return;
+    if (index < 0 || index > SOUND_DYNAMIC_MAX_INDEX)
+        return;
+
+    rec = ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[index];
+    if (!rec)
+        return;
+
+    buf = *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER);
+
+    if (*name == '\0') {
+        /* Stop whatever is there, and only touch the flag if there was one. */
+        if (!buf)
+            return;
+        IDirectSoundBuffer_Stop(buf);
+        *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+        return;
+    }
+
+    {
+        const char *held = *(const char **)(rec + SOUND_REC_OFF_NAME);
+
+        if (!held)
+            return;
+        if (strcmp(name, held) != 0)
+            return;      /* the slot has been reused; not ours to stop */
+    }
+
+    if (buf)
+        IDirectSoundBuffer_Stop(buf);
+    *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+}
+
 /* Follow the sounds around -- 0x0040BCF0.
  *
  * Once a frame, every playing sound in the dynamic table is asked where it is
@@ -733,6 +791,8 @@ int audio_install(void)
                         "FreeDynamicSounds", 0);
     rc |= patch_replace(ADDR_UPDATE_3D_AUDIO, (const void *)Update3DAudioVolumes,
                         "Update3DAudioVolumes", 0);
+    rc |= patch_replace(ADDR_STOP_NAMED_SOUND, (const void *)StopNamedSound,
+                        "StopNamedSound", 2);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
                         "SetStreamVolume", 1);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,

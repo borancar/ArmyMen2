@@ -107,6 +107,11 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name);
  * less three per unit. A sound whose owner has gone is stopped instead. */
 void __cdecl Update3DAudioVolumes(void);
 
+/* Original: 0x0040B860. Stop the dynamic sound in `index`, but only if it is
+ * still the one called `name` -- slots are reused, so the name is the check
+ * that the caller is stopping its own sound. An empty name skips the check. */
+void __cdecl StopNamedSound(const char *name, int32_t index);
+
 int32_t __cdecl InitWaveSounds(void);
 void __cdecl FreeDynamicSounds(void);
 

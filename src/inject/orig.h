@@ -327,6 +327,8 @@
 /* Bulk operations over those two tables. */
 #define ADDR_FREE_DYN_SOUNDS     0x0040B800u  /* void(void) */
 #define ADDR_UPDATE_3D_AUDIO     0x0040BCF0u  /* void(void) */
+#define ADDR_STOP_NAMED_SOUND    0x0040B860u  /* void(const char *, int32) */
+#define SOUND_DYNAMIC_MAX_INDEX  0x10         /* inclusive; 17 slots */
 #define ADDR_LISTENER_POS        0x00514E0Cu  /* AM2_Point, the ear */
 #define ADDR_DEFAULT_SOUND_POS   0x005125A0u  /* AM2_Point, used when a sound
                                                * has neither owner nor place */
