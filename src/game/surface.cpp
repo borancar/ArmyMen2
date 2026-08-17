@@ -362,6 +362,50 @@ void __cdecl RefreshScreen(void)
     g_presentEnabledRW = wasEnabled;
 }
 
+void __cdecl ReleasePalette(void *holder)
+{
+    LPDIRECTDRAWPALETTE *slot =
+        (LPDIRECTDRAWPALETTE *)((uint8_t *)holder + PALETTE_HOLDER_OFF);
+
+    if (!*slot)
+        return;
+    IDirectDrawPalette_Release(*slot);
+    *slot = NULL;
+}
+
+void __cdecl SetPaletteRange(PALETTEENTRY *entries, uint32_t first,
+                             uint32_t last)
+{
+    LPDIRECTDRAWPALETTE pal;
+
+    /* Windowed, the desktop owns the palette; rewriting it would recolour
+     * every other window on the screen. */
+    if (g_windowed)
+        return;
+    if (!g_palHolder)
+        return;
+
+    pal = *(LPDIRECTDRAWPALETTE *)(g_palHolder + PALETTE_HOLDER_OFF);
+    if (!pal)
+        return;
+
+    /* Inclusive range, hence the +1, and the entries are passed from `first`
+     * rather than from the start of the array. */
+    IDirectDrawPalette_SetEntries(pal, 0, first, last - first + 1,
+                                  &entries[first]);
+}
+
+void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key)
+{
+    DDCOLORKEY ck;
+
+    /* One index, so both ends of the range are the same -- as in
+     * CreateOffscreenSurface, which sets its own key the same way. */
+    ck.dwColorSpaceLowValue  = key;
+    ck.dwColorSpaceHighValue = key;
+    IDirectDrawSurface_SetColorKey(surf, DDCKEY_SRCBLT, &ck);
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -380,5 +424,11 @@ int surface_install(void)
                         "RestoreLostSurfaces", 0);
     rc |= patch_replace(ADDR_REFRESH_SCREEN, (const void *)RefreshScreen,
                         "RefreshScreen", 0);
+    rc |= patch_replace(ADDR_RELEASE_PALETTE, (const void *)ReleasePalette,
+                        "ReleasePalette", 1);
+    rc |= patch_replace(ADDR_SET_PALETTE_RANGE, (const void *)SetPaletteRange,
+                        "SetPaletteRange", 3);
+    rc |= patch_replace(ADDR_SET_SURF_COLORKEY, (const void *)SetSurfaceColorKey,
+                        "SetSurfaceColorKey", 2);
     return rc;
 }

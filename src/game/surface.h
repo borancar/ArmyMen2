@@ -111,6 +111,20 @@ void __cdecl RestoreLostSurfaces(void);
  * presenting turned off for its own reasons. */
 void __cdecl RefreshScreen(void);
 
+/* Original: 0x0041B6A0. Release the DirectDraw palette a holder owns and null
+ * it. The same +0x800 slot ShutdownDirectDraw and the movie player both use. */
+void __cdecl ReleasePalette(void *holder);
+
+/* Original: 0x0041B720. Push entries `first` through `last` inclusive into the
+ * display palette. Fullscreen only -- windowed, the desktop owns the palette
+ * and the game has no business rewriting it. */
+void __cdecl SetPaletteRange(PALETTEENTRY *entries, uint32_t first,
+                             uint32_t last);
+
+/* Original: 0x0041B970. Give a surface a one-colour source colour key, which is
+ * how every sprite gets its transparent index. */
+void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key);
+
 int surface_install(void);
 
 #ifdef __cplusplus

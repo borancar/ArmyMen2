@@ -77,6 +77,13 @@
 #define ADDR_RESTORE_LOST   0x0041A8B0u  /* void(void) */
 /* Force what is drawn onto the screen now, outside the normal frame rhythm. */
 #define ADDR_REFRESH_SCREEN 0x0044D6D0u  /* void(void), 7 call sites */
+/* Small DirectDraw wrappers that take their object as an argument, which is why
+ * tools/comcalls.py cannot name the interface and why they were invisible in
+ * docs/boundary.md until someone went looking. */
+#define ADDR_RELEASE_PALETTE   0x0041B6A0u  /* void(void *holder) */
+#define ADDR_SET_PALETTE_RANGE 0x0041B720u  /* void(PALETTEENTRY*, first, last) */
+#define ADDR_SET_SURF_COLORKEY 0x0041B970u  /* void(surface *, uint8_t key) */
+#define PALETTE_HOLDER_OFF     0x800u       /* where the DD palette hangs */
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_SURFACE_514E94 0x00514E94u  /* IDirectDrawSurface * */
