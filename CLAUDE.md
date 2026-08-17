@@ -357,17 +357,31 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   the game object's position and the other the sound's, and both are plain
   `AM2_Point`. Reading it a second time took minutes. "I could not follow this"
   ages differently from "this is game logic"; only the second is a decision.
-- **Read and deliberately left original.** These come back to the top of every
-  candidate ranking, so they are listed here rather than re-read each time. All
-  are game logic that happens to hold a device handle, and the standing brief
-  says to use original functions for pure game and menu logic.
+- **Do not trust a one-line label on this list, including the ones below.** Six
+  entries have now been found mislabelled and then reconstructed:
+  `Update3DAudioVolumes` ("distance model, DirectSound only executes"),
+  `StopNamedSound` ("compares names byte by byte"), `MakeBitmap` ("sprite cache
+  management"), `DrawMenuOverlay` ("map object placement"), and before them
+  `AttachPalette` and `ADDR_AUDIO_CHECK_PATH`. Every one was written from a
+  glance at a call site rather than from the body, which is the failure this
+  file already warns about under "name a function from its body".
 
-  | | why |
+  The cheapest antidote is to let a function name itself: most of the ones that
+  matter carry their own error strings. Sweeping the candidates for pushed
+  string literals is a minute's work and it is how `MakeBitmap`,
+  `loadtileset` and `RestoreTileSet` were identified.
+
+- **Read and deliberately left original.** These come back to the top of every
+  candidate ranking, so they are listed here rather than re-read each time.
+
+  | | what it actually is |
   |---|---|
-  | `0x0040CED0` 1792B, 12 | the sound engine proper |
-  | `0x00427070` 944B, 5 | input-to-command translation |
-  | `0x00412FE0` 1184B, 4 | menu logic |
-  | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
+  | `0x0042BEA0` 1200B, 2 | **`loadtileset` / `RestoreTileSet`**, by its own strings — a file-to-surface loader in the same family as `MakeBitmap` and `CreateBitmapSurface`, and the best remaining candidate rather than a decline |
+  | `0x0040CED0` 1792B, 12 | the sound engine. Carries no strings, so unverified as a description; now exercisable, since audio runs |
+  | `0x00427070` 944B, 5 | input-to-command translation; no strings |
+  | `0x00412FE0` 1184B, 4 | menu logic; no strings |
+  | `0x0042FF60` 448B, 1 | starts a multiplayer game — it calls `CommOpenSession`, `CommCreatePlayer` and `PlaySoundAt`, all of which are ours. Genuinely menu logic |
+  | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042D6D0` | ≥270 B per COM call and no strings to name them by. Unverified descriptions; treat as unread |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
 - **The import side is done, in the only sense the word can bear here.** Every
