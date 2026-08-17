@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 18 | 91 |
-| still boundary | 19 | 49 |
+| reconstructed | 19 | 92 |
+| still boundary | 18 | 48 |
 | game logic, incidental calls only | 85 | 136 |
 | **total** | **122** | **276** |
 
@@ -39,7 +39,6 @@ function from game logic with a call in it.
 | `0x00426b50` | 256 | 3 | 85 | GetDriveTypeA, GetLogicalDriveStringsA, GetVolumeInformationA |
 | `0x0040d680` | 176 | 2 | 88 | timeBeginPeriod, timeSetEvent |
 | `0x0041ac60` | 208 | 2 | 104 | PeekMessageA, PostQuitMessage |
-| `0x00446450` | 112 | 1 | 112 | CreateFontA |
 | `0x00444fc0` | 352 | 3 | 117 | _SmackDDSurfaceType@4, _SmackOpen@12, _SmackSoundUseDirectSound@4 |
 | `0x0040db50` | 416 | 3 | 138 | GetTickCount, RegCloseKey, RegCreateKeyExA |
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
@@ -57,7 +56,7 @@ function from game logic with a call in it.
 | USER32.dll | 130 | 57 |
 | KERNEL32.dll | 99 | 7 |
 | WINMM.dll | 17 | 11 |
-| GDI32.dll | 16 | 13 |
+| GDI32.dll | 16 | 14 |
 | smackw32.dll | 9 | 0 |
 | ole32.dll | 3 | 3 |
 | ADVAPI32.dll | 2 | 0 |

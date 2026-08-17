@@ -160,11 +160,56 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
     return written;
 }
 
+/* Original: 0x00446450. Ask GDI for a font to render glyphs from.
+ *
+ * The only CreateFontA in the game, and the source of every HFONT RenderGlyph
+ * is handed. Everything except the face, the height and three style bits is
+ * fixed: normal weight, default character set and precisions, draft quality and
+ * a variable pitch.
+ *
+ * `style` is a bitfield the game packs itself -- bit 0 italic, bit 1 underline,
+ * bit 2 strikeout -- which is why it arrives as one 16-bit value rather than as
+ * three flags. A null face name is refused rather than passed to GDI, where it
+ * would have meant "any font you like". */
+#define FONT_STYLE_ITALIC     0x1u
+#define FONT_STYLE_UNDERLINE  0x2u
+#define FONT_STYLE_STRIKEOUT  0x4u
+
+static_assert(FW_NORMAL == 0x190, "FW_NORMAL");
+static_assert(DRAFT_QUALITY == 1, "DRAFT_QUALITY");
+static_assert(VARIABLE_PITCH == 2, "VARIABLE_PITCH");
+/* The charset it passes is 0, which is ANSI_CHARSET -- DEFAULT_CHARSET is 1.
+ * Another pair that is easy to transpose, caught the same way as PC_NOCOLLAPSE
+ * in palette.cpp. */
+static_assert(ANSI_CHARSET == 0, "ANSI_CHARSET");
+static_assert(OUT_DEFAULT_PRECIS == 0 && CLIP_DEFAULT_PRECIS == 0,
+              "the precisions it passes as 0");
+
+HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style)
+{
+    HFONT font;
+
+    if (!face)
+        return NULL;
+
+    font = CreateFontA(height, 0, 0, 0, FW_NORMAL,
+                       style & FONT_STYLE_ITALIC,
+                       (style >> 1) & 1,
+                       (style >> 2) & 1,
+                       ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                       DRAFT_QUALITY, VARIABLE_PITCH, face);
+    if (!font)
+        orig_log("Error creating font.\n");
+    return font;
+}
+
 int font_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ENCODE_GLYPH, (const void *)EncodeGlyph, "EncodeGlyph", 4);
     rc |= patch_replace(ADDR_RENDER_GLYPH, (const void *)RenderGlyph, "RenderGlyph", 5);
+    rc |= patch_replace(ADDR_CREATE_GAME_FONT, (const void *)CreateGameFont,
+                        "CreateGameFont", 3);
     return rc;
 }

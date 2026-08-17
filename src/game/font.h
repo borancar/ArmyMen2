@@ -49,6 +49,11 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
 uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused);
 
+/* Original: 0x00446450. The game's only CreateFontA. `style` is packed --
+ * bit 0 italic, bit 1 underline, bit 2 strikeout. Returns NULL for a null face
+ * name without asking GDI, and logs if GDI refuses. */
+HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style);
+
 int font_install(void);
 
 #ifdef __cplusplus

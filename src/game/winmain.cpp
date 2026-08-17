@@ -72,7 +72,8 @@ static_assert(sizeof(MSG) == 28, "the 7 dwords WinMain zeroes on entry");
 /* ---- the globals this layer owns -------------------------------------- */
 
 #define g_hInstance    (*(HINSTANCE *)(uintptr_t)ADDR_HINSTANCE)
-#define g_hInstanceAux (*(uint32_t *)(uintptr_t)ADDR_HINSTANCE_AUX)
+#define g_fastMachine  (*(int32_t *)(uintptr_t)ADDR_FAST_MACHINE)
+#define g_slowMachine  (*(int32_t *)(uintptr_t)ADDR_SLOW_MACHINE)
 #define g_hWnd         (*(HWND *)(uintptr_t)ADDR_HWND)
 #define g_appMutex     (*(HANDLE *)(uintptr_t)ADDR_APP_MUTEX)
 #define g_lastMessage  (*(uint32_t *)(uintptr_t)ADDR_LAST_MESSAGE)
@@ -93,7 +94,6 @@ typedef int32_t (__cdecl *am2_hwnd_fn)(HWND hwnd);
 typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
 
 #define orig_check_base_path  (*(am2_void_fn)ADDR_CHECK_BASE_PATH)
-#define orig_startup_40b2b0   (*(am2_void_fn)ADDR_STARTUP_40B2B0)
 #define orig_init_timer       (*(am2_void_fn)ADDR_INIT_TIMER)
 #define orig_init_input       (*(am2_hwnd_fn)ADDR_INIT_INPUT)
 #define orig_init_directdraw  (*(am2_hwnd_fn)ADDR_INIT_DIRECTDRAW)
@@ -115,6 +115,61 @@ typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
 /* The game statically links its own MSVC 6 CRT and ours is a separate world,
  * but strstr crosses nothing: it reads two strings and returns a pointer into
  * the first. No heap, no FILE, no locale. Ours will do. */
+
+/* ---- machine speed ----------------------------------------------------- */
+
+/* Original: 0x0040B2B0. Decide whether this machine is fast enough.
+ *
+ * A 1999 question, answered by loading cpuinf32.dll -- which ships beside the
+ * game -- and calling two of its exports. "Fast" means a Pentium-class family
+ * running above 133MHz, and a reported speed of zero also counts as fast, which
+ * is the sensible reading of "the library could not tell".
+ *
+ * The two exported pointers are cached in globals for later use, and the answer
+ * is published twice, once each way round. It is also what logs the
+ * `system speed:` line that appears near the top of every run.
+ *
+ * Note the original calls GetProcAddress and then the result without checking
+ * it. Kept: a cpuinf32.dll present but missing its exports would be a stranger
+ * situation than the crash. */
+typedef int32_t (__cdecl *am2_wincpuid_fn)(void);
+typedef int32_t (__cdecl *am2_cpuspeed_fn)(int32_t);
+
+#define g_wincpuid     (*(am2_wincpuid_fn *)(uintptr_t)ADDR_WINCPUID_FN)
+#define g_cpunormspeed (*(am2_cpuspeed_fn *)(uintptr_t)ADDR_CPUNORMSPEED_FN)
+
+#define MIN_CPU_FAMILY 5      /* Pentium */
+#define MIN_CPU_MHZ    0x85   /* 133 */
+
+static void DetectCpuSpeed(void)
+{
+    HMODULE  dll;
+    int32_t  family, mhz, fast;
+
+    dll = LoadLibraryA("cpuinf32.dll");
+    if (!dll) {
+        orig_log("Missing %s", "cpuinf32.dll");
+        return;
+    }
+
+    /* Through void *: GetProcAddress answers FARPROC, and casting one function
+     * type straight to another is what -Wcast-function-type objects to. */
+    g_wincpuid = (am2_wincpuid_fn)(void *)GetProcAddress(dll, "wincpuid");
+    family = g_wincpuid();
+
+    g_cpunormspeed = (am2_cpuspeed_fn)(void *)GetProcAddress(dll, "cpunormspeed");
+    mhz = g_cpunormspeed(0);
+
+    /* The family test is on the low 16 bits and unsigned; the speed test is
+     * signed, and zero passes. */
+    fast = ((uint16_t)family >= MIN_CPU_FAMILY && (mhz > MIN_CPU_MHZ || mhz == 0));
+
+    g_slowMachine = !fast;
+    g_fastMachine = fast;
+    orig_log("system speed: %d\n", fast);
+
+    FreeLibrary(dll);
+}
 
 /* ---- command line ------------------------------------------------------ */
 
@@ -329,13 +384,13 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     memset(&msg, 0, sizeof msg);
     g_hInstance    = hInstance;
-    g_hInstanceAux = 0;
+    g_fastMachine  = 0;
 
     ParseCommandLine(lpCmdLine);
 
     CoInitialize(NULL);
     orig_check_base_path();
-    orig_startup_40b2b0();
+    DetectCpuSpeed();
 
     if (!InitApplication(hInstance, nCmdShow))
         return 0;

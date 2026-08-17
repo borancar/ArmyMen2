@@ -202,7 +202,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. Currently 91 of the 140 genuine
+  drift from what the harness installs. Currently 96 of the 140 genuine
   boundary sites are ours; the other 136 sites in the binary are game logic
   that happens to read a clock.
 - **Pick the next target by boundary density, not by import count.** Ranking

@@ -34,6 +34,7 @@
 /* Runtime font generation: GDI-render a character, then RLE it. */
 #define ADDR_ENCODE_GLYPH   0x004464C0u  /* uint32_t(uint8_t*,int32,int32,int32) */
 #define ADDR_RENDER_GLYPH   0x004465E0u  /* uint32_t(int32,char,HFONT,AM2_Rle16*,int32) */
+#define ADDR_CREATE_GAME_FONT 0x00446450u /* HFONT(const char *face, int32 h, uint16 style) */
 /* Named for the use font.cpp makes of it -- it GDI-renders glyphs onto it --
  * but InitDirectDraw shows it is the back buffer proper: the surface taken off
  * the primary with DDSCAPS_BACKBUFFER when fullscreen, and a plain offscreen
@@ -188,7 +189,9 @@
 #define ADDR_STATE_ENTER         0x00424AD0u  /* void(int32_t) */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
-#define ADDR_HINSTANCE_AUX       0x00512584u  /* cleared beside it; unidentified */
+/* Not HINSTANCE-related at all, despite sitting beside it: DetectCpuSpeed sets
+ * it, and it means "this machine is fast enough". WinMain clears it first. */
+#define ADDR_FAST_MACHINE        0x00512584u  /* int32_t */
 #define ADDR_HWND                0x0051245Cu  /* HWND, the one game window */
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE "ArmyMenMutex" */
 #define ADDR_LAST_MESSAGE        0x004F9FE4u  /* uint32_t, last dispatched message */
@@ -225,7 +228,10 @@
  * COM calls inside them say what they are, left at their address where they do
  * not -- these are pure game logic and stay in the original image. */
 #define ADDR_CHECK_BASE_PATH     0x00422DB0u  /* getcwd, complains past 255 chars */
-#define ADDR_STARTUP_40B2B0      0x0040B2B0u  /* LoadLibraryA/FreeLibrary probe */
+#define ADDR_DETECT_CPU_SPEED    0x0040B2B0u  /* void(void); logs "system speed" */
+#define ADDR_SLOW_MACHINE        0x005125C0u  /* int32_t, the inverse of the above */
+#define ADDR_WINCPUID_FN         0x004F9FE0u  /* cached cpuinf32.dll exports */
+#define ADDR_CPUNORMSPEED_FN     0x004F9FE8u
 #define ADDR_INIT_TIMER          0x00426C50u  /* QueryPerformanceFrequency/Counter */
 /* Variadic, and always returns 0 -- which is why both device bring-up routines
  * can `return ReportError(...)` and mean "failed". */
