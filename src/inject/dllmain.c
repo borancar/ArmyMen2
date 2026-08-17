@@ -271,7 +271,29 @@ static void install(void)
     }
     hooklog("verify: image matches ArmyMen2.exe (MSVC 6, 1999-02-03)");
 
-    gamelog_install();
+    /* AM2_NOPATCH=1 installs the harness but not the reconstruction: the game
+     * runs entirely on its own code, with the debug logger, the input hook and
+     * the control socket still in place. That is the A/B this project has never
+     * had -- `run-stock` drops the harness too, so it cannot be driven, cannot
+     * be logged and does not in fact start on this machine at all. With this,
+     * the same scripted run can be played twice and the game's own log compared
+     * line for line.
+     *
+     * Note the counts are empty under it: the per-function counters are the
+     * trace stubs, and those are installed by patch_replace along with
+     * everything else. The evidence is the game's log, not the counters. */
+    {
+        const char *nopatch = getenv("AM2_NOPATCH");
+
+        gamelog_install();
+        if (nopatch && *nopatch == '1') {
+            hooklog("am2hook: AM2_NOPATCH=1 -- reconstruction NOT installed");
+            input_init();
+            dinput_hook_install();
+            control_start();
+            return;
+        }
+    }
     savetag_install();
     rect_install();
     dist_install();

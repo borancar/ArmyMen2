@@ -111,6 +111,22 @@ caller of `SnapshotSystemPalette`, and the movie coming out in the right
 colours is a direct check on the GDI palette code that nothing else exercises.
 Between this, `-w`, and plain Boot Camp there are three distinct startup paths.
 
+**`AM2_NOPATCH=1` is the A/B, and `run-stock` is not.** It installs the harness
+— logger, input hook, control socket — and none of the reconstruction, so the
+same scripted run can be played on the original code and on ours and the
+results compared. `run-stock` drops the harness too, which means it cannot be
+driven, cannot be logged, and does not in fact start on this machine.
+
+Done once, on Boot Camp: the game's own log is byte-identical across the two,
+all 15 messages including the map-script parse (`lines: 101  tokens: 372
+names: 43  compounds: 16`), and the final screenshots differ in 22 pixels out
+of 786,432 — scattered, and attributable to animation phase between two runs
+that are not frame-synchronised. Repeat this after any large batch of
+reconstruction; it is far stronger than the invariant, which only checks one
+subsystem. Note the counts are empty under `AM2_NOPATCH` — the counters *are*
+the trace stubs, installed by `patch_replace` — so the evidence is the log and
+the pixels, not the counters.
+
 **Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
 `setsid make -s run ... &` issued from a script or an agent shell starts the
 game, gets as far as `system speed:` in the log, then fails inside `InitInput`
