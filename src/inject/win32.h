@@ -17,8 +17,13 @@
 
 #define CINTERFACE
 #define COBJMACROS
+/* The game asks for DirectInput 5. The version matters: it selects which
+ * interface the headers declare, and IDirectInputDevice's vtable is what the
+ * reconstruction indexes into. */
+#define DIRECTINPUT_VERSION 0x0500
 #include <windows.h>
 #include <ddraw.h>
+#include <dinput.h>
 
 #undef DrawText
 

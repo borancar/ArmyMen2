@@ -34,7 +34,12 @@
 /* Runtime font generation: GDI-render a character, then RLE it. */
 #define ADDR_ENCODE_GLYPH   0x004464C0u  /* uint32_t(uint8_t*,int32,int32,int32) */
 #define ADDR_RENDER_GLYPH   0x004465E0u  /* uint32_t(int32,char,HFONT,AM2_Rle16*,int32) */
-#define ADDR_FONT_SURFACE   0x004FE08Cu  /* IDirectDrawSurface *, the scratch square */
+/* Named for the use font.cpp makes of it -- it GDI-renders glyphs onto it --
+ * but InitDirectDraw shows it is the back buffer proper: the surface taken off
+ * the primary with DDSCAPS_BACKBUFFER when fullscreen, and a plain offscreen
+ * surface of the same size when windowed, where there is no flipping chain to
+ * take one from. It is also what the lock target starts out pointing at. */
+#define ADDR_FONT_SURFACE   0x004FE08Cu  /* IDirectDrawSurface *, the back buffer */
 #define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[], indexed ch + font*262 */
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t*[], indexed font*133 */
 #define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- text and sprites share it */
@@ -87,7 +92,10 @@
 #define ADDR_REDRAW_MAP_REGION   0x0041CF90u  /* void(const AM2_Rect*) */
 #define ADDR_PREPARE_SCREEN_RECT 0x0042D9B0u  /* void(AM2_Rect by value) */
 #define ADDR_DRAW_MAP_TILES      0x0041E440u  /* void(const AM2_Rect*,void*,int32) */
-#define ADDR_BACK_SURFACE        0x00503100u  /* IDirectDrawSurface * */
+/* A second offscreen surface, the same size again, and NOT the back buffer
+ * despite the name -- that is ADDR_FONT_SURFACE. Kept as-is because the name is
+ * already spread across mapdraw.cpp; the comment is the correction. */
+#define ADDR_BACK_SURFACE        0x00503100u  /* IDirectDrawSurface *, offscreen */
 #define ADDR_MAP_DESC            0x00514F20u  /* map descriptor; +4 is a row count */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
@@ -174,9 +182,50 @@
 #define ADDR_CHECK_BASE_PATH     0x00422DB0u  /* getcwd, complains past 255 chars */
 #define ADDR_STARTUP_40B2B0      0x0040B2B0u  /* LoadLibraryA/FreeLibrary probe */
 #define ADDR_INIT_TIMER          0x00426C50u  /* QueryPerformanceFrequency/Counter */
-#define ADDR_INIT_INPUT          0x00426D30u  /* int32_t(HWND); IDirectInputDevice */
-#define ADDR_INIT_DIRECTDRAW     0x0041AA10u  /* int32_t(HWND); 0 on success */
-#define ADDR_REPORT_ERROR        0x0041E7A0u  /* void(int32_t, const char *) MessageBox */
+/* Variadic, and always returns 0 -- which is why both device bring-up routines
+ * can `return ReportError(...)` and mean "failed". */
+#define ADDR_REPORT_ERROR        0x0041E7A0u  /* int32_t(HRESULT, const char *fmt, ...) */
+
+/* ---- device bring-up --------------------------------------------------
+ *
+ * The two functions that create every DirectDraw and DirectInput object the
+ * game owns. Both are reconstructed in src/game/device.cpp.
+ *
+ * They call DirectDrawCreate and DirectInputCreateA through the game's own
+ * import thunks rather than through ours. For DirectDraw that is only tidiness;
+ * for DirectInput it is required, because src/inject/dinput_hook.c works by
+ * patching the game's IAT slot, and an import of our own would walk straight
+ * past the hook and take the harness's input injection with it.
+ */
+#define ADDR_INIT_INPUT          0x00426D30u  /* int32_t(HWND); 1 on success */
+#define ADDR_INIT_DIRECTDRAW     0x0041AA10u  /* HRESULT(HWND); 0 on success */
+#define ADDR_DIRECTDRAWCREATE    0x00463396u  /* jmp [0x0046F00C] */
+#define ADDR_DIRECTINPUTCREATE   0x00464410u  /* jmp [0x0046F014] -- the hooked slot */
+
+/* DirectDraw. The game holds both interface generations: it queries v2 off v1
+ * and then uses whichever one has the SetDisplayMode it wants, three arguments
+ * on v1 and five on v2. */
+#define ADDR_DIRECTDRAW2         0x004FE098u  /* IDirectDraw2 * */
+#define ADDR_IID_DIRECTDRAW2     0x0046F338u  /* the game's own copy of the IID */
+#define ADDR_PIXEL_FORMAT_BYTE   0x00502AD9u  /* uint8_t, passed to AttachPalette */
+#define ADDR_CREATE_OFFSCREEN    0x0041B850u  /* surface *(w, h, caps, int32) */
+#define ADDR_ATTACH_PALETTE      0x0041AD30u  /* void(surface *, uint8_t) */
+
+/* DirectInput. The GUIDs and data formats are the game's own copies in .rdata,
+ * so nothing here needs dxguid. */
+#define ADDR_DINPUT              0x00512FD0u  /* IDirectInputA * */
+#define ADDR_DI_MOUSE            0x00512FD4u  /* IDirectInputDeviceA * */
+#define ADDR_DI_KEYBOARD         0x00512FD8u  /* IDirectInputDeviceA * */
+#define ADDR_GUID_SYS_MOUSE      0x0046F5A8u
+#define ADDR_GUID_SYS_KEYBOARD   0x0046F5B8u
+#define ADDR_DF_MOUSE            0x0046FD80u  /* DIDATAFORMAT c_dfDIMouse */
+#define ADDR_DF_KEYBOARD         0x0046FD68u  /* DIDATAFORMAT c_dfDIKeyboard */
+#define ADDR_DIPROP_BUFFER_SIZE  0x004854F8u  /* DIPROPDWORD, the buffered-input size */
+/* Two pointers into adjacent 256-byte input buffers, reset on bring-up. */
+#define ADDR_INPUT_CURSOR_A      0x005127C8u
+#define ADDR_INPUT_CURSOR_B      0x005127CCu
+#define ADDR_INPUT_BUFFER_A      0x005125C8u
+#define ADDR_INPUT_BUFFER_B      0x005126C8u
 #define ADDR_RELEASE_APP_MUTEX   0x0040B220u  /* void(void) */
 #define ADDR_STARTUP_426B50      0x00426B50u
 #define ADDR_STARTUP_4249C0      0x004249C0u

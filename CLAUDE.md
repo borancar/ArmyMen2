@@ -172,9 +172,19 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - The Win32/DirectX boundary is inventoried and being worked outward-in: 122
   functions below the CRT touch the import table (`docs/imports.tsv`) and 161
   contain COM-shaped dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
-  `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`. Next are
-  `InitDirectDraw` (`0x0041AA10`) and `InitInput` (`0x00426D30`), which between
-  them own every DirectDraw and DirectInput object the game has.
+  `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
+  `InitDirectDraw`, `InitInput` — the application layer and device bring-up.
+  Next are the two DirectDraw helpers the latter still calls,
+  `CreateOffscreenSurface` (`0x0041B850`) and `AttachPalette` (`0x0041AD30`).
+- **A reconstruction can break the harness rather than the game.**
+  `src/inject/dinput_hook.c` works by patching the game's IAT slot for
+  `DirectInputCreateA`. A reconstructed `InitInput` that imported the symbol
+  into `am2hook.dll` would resolve through *our* IAT, walk straight past the
+  hook and silently disable all injected input — the game would still run and
+  look perfectly healthy. `src/game/device.cpp` calls the game's own import
+  thunks (`0x00463396`, `0x00464410`) instead, which read the patched slot at
+  call time. Check for a harness hook before reconstructing anything that calls
+  an import.
 - **Not every reconstruction has to be a patch.** `WndProc` is registered, not
   detoured: the only reference to `0x0040A6B0` in the whole image is the
   `WNDCLASS` field in `InitApplication`, and that is ours now. Because the

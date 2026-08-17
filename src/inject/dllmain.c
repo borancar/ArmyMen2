@@ -31,6 +31,7 @@
 #include "../game/sprite.h"
 #include "../game/surface.h"
 #include "../game/text.h"
+#include "../game/device.h"
 #include "../game/winmain.h"
 
 #include <windows.h>
@@ -106,6 +107,16 @@ static const struct {
      * into it, so its entry has to be the one we read. */
     { ADDR_WND_PROC, "WndProc",
       { 0x81, 0xEC, 0xF8, 0x00, 0x00, 0x00, 0x53, 0x8B }, 8 },
+    { ADDR_INIT_DIRECTDRAW, "InitDirectDraw",
+      { 0x83, 0xEC, 0x6C, 0x53, 0x56, 0x8B, 0x74, 0x24 }, 8 },
+    { ADDR_INIT_INPUT, "InitInput",
+      { 0xA1, 0x80, 0x25, 0x51, 0x00, 0x56, 0x6A, 0x00 }, 8 },
+    /* Both are jmp-through-IAT thunks we call rather than import. If either
+     * moved, we would be calling into something else entirely. */
+    { ADDR_DIRECTDRAWCREATE, "DirectDrawCreate thunk",
+      { 0xFF, 0x25, 0x0C, 0xF0, 0x46, 0x00 }, 6 },
+    { ADDR_DIRECTINPUTCREATE, "DirectInputCreateA thunk",
+      { 0xFF, 0x25, 0x14, 0xF0, 0x46, 0x00 }, 6 },
 };
 
 static int verify_image(void)
@@ -177,6 +188,7 @@ static void install(void)
     blit_install();
     sprite_install();
     surface_install();
+    device_install();
     winmain_install();
     observe_hot_functions();
 

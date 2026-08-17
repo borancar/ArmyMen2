@@ -60,7 +60,8 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/mapdraw.cpp \
             src/game/palette.cpp \
             src/game/winmain.cpp \
-            src/game/winproc.cpp
+            src/game/winproc.cpp \
+            src/game/device.cpp
 
 HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
             $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))
