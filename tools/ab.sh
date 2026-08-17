@@ -28,6 +28,11 @@
 # A moving scene will differ by a handful of pixels: the two runs are not
 # frame-synchronised and nothing can make them be. `windowed` is the one to
 # watch, because its frame is static and it should be pixel-perfect.
+#
+# Each configuration has a pixel budget and exceeding it fails the run. That is
+# not decoration: a reconstruction of the map tile painter once drew 33,137
+# wrong pixels and this script reported "A/B clean", because it only ever
+# failed on the log. The number was printed and nothing read it.
 
 set -u
 
@@ -114,11 +119,27 @@ compare() {
         rc=1
     fi
 
-    "$REPO/.venv/bin/python" - "$REPO/build/shots" "$cfg" <<'PY' || rc=1
+    # A pixel budget per configuration, because a verdict that only reads the
+    # log will call a badly broken frame "clean". PaintMapTiles went in with
+    # its tile rows misdecoded, drew 33,137 wrong pixels, and this script said
+    # A/B clean -- the number was right there and nothing acted on it.
+    #
+    # windowed is static and must be exact. The two Boot Camp runs animate a
+    # little and have sat at 22 for the whole project. The intro is two
+    # unsynchronised playbacks of the same film and cannot be compared at all.
+    case "$cfg" in
+        windowed) budget=0 ;;
+        intro)    budget=-1 ;;      # -1 disables the check
+        *)        budget=500 ;;
+    esac
+    # Overridable, mainly so the check itself can be tested.
+    budget="${AM2_AB_PIXELS:-$budget}"
+
+    "$REPO/.venv/bin/python" - "$REPO/build/shots" "$cfg" "$budget" <<'PY' || rc=1
 import sys, os, glob
 from PIL import Image
 import numpy as np
-shots, cfg = sys.argv[1], sys.argv[2]
+shots, cfg, budget = sys.argv[1], sys.argv[2], int(sys.argv[3])
 def find(side):
     hits = glob.glob(os.path.join(shots, "*", "ab-%s-%s.png" % (cfg, side)))
     return max(hits, key=os.path.getmtime) if hits else None
@@ -130,9 +151,14 @@ b = np.asarray(Image.open(r).convert("RGB")).astype(int)
 if a.shape != b.shape:
     print("  pixels  DIFFERENT SIZES %s vs %s" % (a.shape, b.shape)); sys.exit(1)
 n = (np.abs(a - b).sum(axis=2) > 0).sum()
+over = budget >= 0 and n > budget
 print("  pixels  %d of %d differ (%.4f%%)%s"
       % (n, a[..., 0].size, 100.0 * n / a[..., 0].size,
-         "" if n == 0 else "  -- expected on a moving scene"))
+         "  -- OVER the budget of %d" % budget if over
+         else "" if n == 0 else "  -- expected on a moving scene"))
+if over:
+    print("  pixels  the frame is wrong, not merely unsynchronised")
+    sys.exit(1)
 PY
     return $rc
 }

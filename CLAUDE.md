@@ -187,7 +187,16 @@ zero and one with animation gives 22 scattered pixels. Windowed also reproduces
 the screen rectangle byte for byte, `04000000 1e000000 84020000 fe010000`,
 so `PositionWindow`'s windowed branch is confirmed numerically and not by eye.
 
-`tools/ab.sh bootcamp|windowed|intro|all` runs the whole thing. Repeat it after
+`tools/ab.sh bootcamp|windowed|intro|audio|all` runs the whole thing, and each
+configuration now has a pixel budget it must stay inside — 0 for windowed,
+which is static, 500 for the two Boot Camp runs, and none for the intro, which
+is two unsynchronised playbacks of a film. Exceeding it fails the run.
+
+That is there because it once did not. A reconstruction of the map tile
+painter misdecoded its rows, drew 33,137 wrong pixels, and `ab.sh` reported
+**A/B clean** — it only failed on the log. The number was printed on the line
+above and nothing acted on it. `AM2_AB_PIXELS` overrides the budget, mainly so
+the check itself can be tested. Repeat it after
 any large batch of reconstruction; it is far stronger than the invariant, which
 only checks one subsystem.
 
