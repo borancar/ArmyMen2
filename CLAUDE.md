@@ -289,6 +289,18 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
+- **The import side is done, in the only sense the word can bear here.** Every
+  Win32 call site in the image that can actually execute is now either inside
+  reconstructed code or incidental — a `GetTickCount`, an `IntersectRect`, a
+  mutex wait. What is left outside is three `MessageBoxA` calls, and all three
+  sit behind copy-protection checks that have been patched to skip them, so
+  none can run. `tools/coverage.py` reports the symbols and
+  `docs/copyprotection.md` explains why they cannot fire.
+
+  This claim is about the IAT only. DirectX reached through COM is a separate
+  count and is *not* finished: 10 functions with 30 calls on objects
+  `tools/comcalls.py` can name, plus an unmeasured share of the 182 sites whose
+  object it cannot. Do not read "the boundary is done" off this bullet alone.
 - **A function address can arrive as `push imm32`, so an aligned-dword scan
   under-reports references.** Menu handlers in this binary are registered by
   pushing the function as an argument — `push 0x42ecf0; push 0x20; push 0x51`

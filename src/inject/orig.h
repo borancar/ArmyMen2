@@ -284,7 +284,11 @@
 #define ADDR_AUDIO_WAVEFORMAT    0x004FA410u  /* WAVEFORMATEX * */
 #define ADDR_AUDIO_TIMER_PROC    0x0040D020u  /* the refill callback, stays original */
 #define ADDR_AUDIO_PREPARE       0x0040CED0u  /* void(void *), stays original */
-#define ADDR_AUDIO_CHECK_PATH    0x00422DE0u  /* int32_t(void *), stays original */
+/* Prefixes the install directory at 0x0051235C onto a relative path and answers
+ * whether it is there. 82 callers and nothing audio-specific about it -- it was
+ * ADDR_AUDIO_CHECK_PATH, named from the first call site it was seen at, which
+ * is the mistake CLAUDE.md warns about. Stays original. */
+#define ADDR_DATA_PATH_EXISTS    0x00422DE0u  /* int32_t(const char *) */
 #define ADDR_AUDIO_PATH_ARG      0x004852D4u
 
 /* ---- Smacker video ----------------------------------------------------
@@ -417,6 +421,23 @@
  * codes seen so far are 1 (refused), 0xA (joined a session) and 0xB (start a
  * local game). */
 #define ADDR_MENU_REQUEST        0x00511DC8u  /* int32_t, the code */
+/* The multiplayer session object and the two routines either side of it. */
+#define ADDR_SESSION_OBJECT      0x00516130u  /* void *, made on demand */
+#define ADDR_SESSION_CTOR        0x00453910u  /* thiscall void(this, int32) */
+#define ADDR_SESSION_RESET       0x00453940u  /* thiscall void(this) */
+/* Fills a 0x50-byte DPSESSIONDESC2 -- the app GUID from the comm object lands
+ * at +0x18, which is guidApplication -- and opens the DirectPlay session.
+ * A genuine DirectPlay boundary function and a good future candidate; it is
+ * invisible to tools/comcalls.py because the interface lives inside the comm
+ * object rather than in a global. */
+#define ADDR_COMM_OPEN_SESSION   0x0040E3B0u  /* thiscall int32(this, void *) */
+/* Calls ADDR_SESSION_RESET on the object at 0x0051612C when there is one. */
+#define ADDR_DROP_OBJ_51612C     0x00431D70u  /* void(void) */
+#define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
+#define ADDR_START_MULTIPLAYER   0x0042F310u  /* void(void), a button handler */
+#define ADDR_MP_DATA_PROBE       0x0048700Cu  /* "data\\mpalpine" */
+#define ADDR_DATA_MISSING_TEXT   0x00486FA4u  /* "...multi-player with a compact installation." */
+#define ADDR_DATA_MISSING_CAPTION 0x00486FFCu /* "Data Missing" */
 #define ADDR_MENU_REQUEST_SET    0x00511DC4u  /* int32_t, non-zero when one is pending */
 
 /* Copies the pending settings block at 0x00516xxx over the active one at

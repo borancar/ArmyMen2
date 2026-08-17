@@ -141,8 +141,103 @@ void __cdecl StartSelectedGame(void)
     *(int32_t *)(comm + COMM_OFF_READY) = 1;
 }
 
+/* The multiplayer HOST button, 0x0042F310, registered the same way.
+ *
+ * It is the last function in the image holding a Win32 call that can actually
+ * execute and was not ours: the "Data Missing" dialog, and the ShowCursor pair
+ * around the session-open. Everything else still outside reconstructed code is
+ * either incidental -- a GetTickCount, an IntersectRect -- or sits behind a
+ * copy-protection check that has been patched to skip it.
+ *
+ * The interesting part is the three-step dance in the middle, which is what a
+ * fullscreen DirectDraw application has to do before it can show a dialog:
+ * FlipToGDISurface so GDI has the screen, ShowCursor(TRUE) so the pointer
+ * exists again, and ShowCursor(FALSE) afterwards. Slot 10 on IDirectDraw is
+ * FlipToGDISurface, checked against the SDK header rather than counted by eye.
+ *
+ * DELIBERATE DEVIATION -- the original carries an MSVC structured-exception
+ * frame (`push -1; push handler; mov fs:[0], esp`) around the whole body, with
+ * the usual state variable written at two points. That is C++ unwind
+ * bookkeeping for the object allocated below, it cannot be reproduced in
+ * MinGW's model, and it is inert here: the allocation goes through the
+ * non-throwing operator new and the original checks the result for NULL rather
+ * than relying on a throw. So the frame is omitted, and nothing in this path
+ * can raise anything for it to have caught.
+ */
+
+typedef int32_t (__cdecl *am2_path_exists_fn)(const char *);
+typedef void *(__cdecl *am2_operator_new_fn)(size_t);
+typedef void (__attribute__((thiscall)) *am2_session_ctor_fn)(void *, int32_t);
+typedef int32_t (__attribute__((thiscall)) *am2_open_session_fn)(void *, void *);
+
+#define orig_path_exists   (*(am2_path_exists_fn)ADDR_DATA_PATH_EXISTS)
+#define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
+#define orig_session_ctor  (*(am2_session_ctor_fn)ADDR_SESSION_CTOR)
+#define orig_open_session  (*(am2_open_session_fn)ADDR_COMM_OPEN_SESSION)
+#define orig_drop_obj      (*(am2_void_fn)ADDR_DROP_OBJ_51612C)
+
+#define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
+#define g_sessionObject  (*(void **)(uintptr_t)ADDR_SESSION_OBJECT)
+
+#define REQUEST_MULTIPLAYER 0x0C
+#define SESSION_OBJECT_SIZE 0x0C
+
+void __cdecl StartMultiplayerGame(void)
+{
+    uint8_t *comm;
+
+    orig_play_sound(2, 0, 0, 0, 0);
+
+    /* A compact install leaves the multiplayer maps on the CD. This one is a
+     * real check with a real conditional -- unlike the five copy-protection
+     * checks, it was not patched, so this dialog can appear. */
+    if (!orig_path_exists((const char *)(uintptr_t)ADDR_MP_DATA_PROBE)) {
+        MessageBoxA(GetActiveWindow(),
+                    (const char *)(uintptr_t)ADDR_DATA_MISSING_TEXT,
+                    (const char *)(uintptr_t)ADDR_DATA_MISSING_CAPTION,
+                    MB_ICONHAND);
+        g_menuRequest    = REQUEST_REFUSED;
+        g_menuRequestSet = 1;
+        return;
+    }
+
+    g_menuRequest    = REQUEST_MULTIPLAYER;
+    g_menuRequestSet = 1;
+    orig_apply_game_settings();
+    orig_drop_obj();
+
+    comm = g_commObject;
+    *(int32_t *)(comm + COMM_OFF_READY) = 0;
+
+    /* Made once and kept. A failed allocation leaves it null, which the open
+     * below then refuses -- the original checks rather than assuming. */
+    if (!g_sessionObject) {
+        void *obj = orig_operator_new(SESSION_OBJECT_SIZE);
+        if (obj)
+            orig_session_ctor(obj, 1);
+        g_sessionObject = obj;
+    }
+
+    /* Hand the screen back to GDI and put the pointer up, or the dialog the
+     * session-open shows would be invisible and unclickable. */
+    IDirectDraw_FlipToGDISurface(g_ddraw);
+    ShowCursor(TRUE);
+
+    if (!orig_open_session(comm, g_sessionObject)) {
+        g_menuRequest    = REQUEST_REFUSED;
+        g_menuRequestSet = 1;
+    }
+
+    ShowCursor(FALSE);
+}
+
 int startgame_install(void)
 {
-    return patch_replace(ADDR_START_SELECTED_GAME, (const void *)StartSelectedGame,
-                         "StartSelectedGame", 0);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_START_SELECTED_GAME, (const void *)StartSelectedGame,
+                        "StartSelectedGame", 0);
+    rc |= patch_replace(ADDR_START_MULTIPLAYER, (const void *)StartMultiplayerGame,
+                        "StartMultiplayerGame", 0);
+    return rc;
 }

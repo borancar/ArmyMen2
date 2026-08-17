@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 36 | 131 |
-| still boundary | 3 | 11 |
+| reconstructed | 37 | 136 |
+| still boundary | 2 | 6 |
 | game logic, incidental calls only | 83 | 134 |
 | **total** | **122** | **276** |
 
@@ -25,7 +25,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 65 | 130 |  |
+| USER32 | 70 | 130 |  |
 | KERNEL32 | 19 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -41,8 +41,7 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
-| `MessageBoxA` | 5 |
-| `ShowCursor` | 1 |
+| `MessageBoxA` | 3 |
 
 Read that table with `docs/copyprotection.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
@@ -69,8 +68,8 @@ Treat the number below as "known to be outstanding", never as
 
 | | functions | call sites |
 |---|---:|---:|
-| known DirectX, reconstructed | 22 | 64 |
-| known DirectX, still to do | 11 | 31 |
+| known DirectX, reconstructed | 23 | 65 |
+| known DirectX, still to do | 10 | 30 |
 
 And the bracket the caveat above implies. Counting every function
 that dispatches through a vtable at all, whether or not the object
@@ -78,8 +77,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 38 |
-| any COM dispatch, not | 72 |
+| any COM dispatch, reconstructed | 39 |
+| any COM dispatch, not | 71 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -99,7 +98,6 @@ teardown, not boundary code.
 - `0x0040b8f0` 1024B, 1 calls — DirectSound x1
 - `0x0041d060` 432B, 1 calls — offscreen x1
 - `0x0042da30` 272B, 1 calls — back buffer x1
-- `0x0042f170` 720B, 1 calls — IDirectDraw x1
 - `0x0042ff60` 448B, 1 calls — IDirectDraw x1
 
 The middle row is the work that remains. The bottom row is not work:
@@ -115,7 +113,6 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
 | `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
 | `0x0040ed10` | 1056 | 2 | 528 | GetActiveWindow, MessageBoxA |
 
@@ -123,7 +120,7 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 65 |
+| USER32.dll | 130 | 70 |
 | KERNEL32.dll | 99 | 19 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |

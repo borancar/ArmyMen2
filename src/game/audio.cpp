@@ -43,7 +43,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 typedef void    (__cdecl *am2_audio_prepare_fn)(void *track);
 typedef int32_t (__cdecl *am2_audio_check_fn)(void *arg);
 #define orig_prepare_track (*(am2_audio_prepare_fn)ADDR_AUDIO_PREPARE)
-#define orig_check_path    (*(am2_audio_check_fn)ADDR_AUDIO_CHECK_PATH)
+#define orig_check_path    (*(am2_audio_check_fn)ADDR_DATA_PATH_EXISTS)
 
 void __cdecl StopAudioStream(void)
 {
