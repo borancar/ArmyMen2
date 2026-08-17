@@ -12,9 +12,9 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 41 | 142 |
+| reconstructed | 42 | 143 |
 | still boundary | 1 | 4 |
-| game logic, incidental calls only | 80 | 130 |
+| game logic, incidental calls only | 79 | 129 |
 | **total** | **122** | **276** |
 
 ## By library
@@ -26,7 +26,7 @@ this library ours yet?
 | library | reconstructed | sites | |
 |---|---:|---:|---|
 | USER32 | 73 | 130 |  |
-| KERNEL32 | 22 | 99 |  |
+| KERNEL32 | 23 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
 | SMACKW32 | 9 | 9 | **complete** |
@@ -101,8 +101,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 61 |
-| any COM dispatch, not | 49 |
+| any COM dispatch, reconstructed | 62 |
+| any COM dispatch, not | 48 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -143,7 +143,7 @@ function from game logic with a call in it.
 | dll | sites | reconstructed |
 |---|---:|---:|
 | USER32.dll | 130 | 73 |
-| KERNEL32.dll | 99 | 22 |
+| KERNEL32.dll | 99 | 23 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
 | smackw32.dll | 9 | 9 |

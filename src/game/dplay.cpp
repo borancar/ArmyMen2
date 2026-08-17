@@ -577,6 +577,11 @@ static_assert(DPOPEN_CREATE == 2, "DPOPEN_CREATE");
 static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 
 #define g_hostSlot     (*(int32_t *)(uintptr_t)ADDR_HOST_SLOT)
+
+typedef int32_t (__attribute__((thiscall)) *am2_slot_of_id_fn)(void *, DPID);
+typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
+#define orig_slot_of_id     (*(am2_slot_of_id_fn)ADDR_COMM_SLOT_OF_ID)
+#define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_FREE)
 #define g_joinContext  (*(int32_t *)(uintptr_t)ADDR_JOIN_CONTEXT)
 #define g_defaultOwner (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 
@@ -988,6 +993,96 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
     return 1;
 }
 
+/* Take a packet off the wire -- 0x0040E8A0, thiscall, `ret 0x14`.
+ *
+ * The other half of CommSend, and it keeps the same books: a thirty-entry ring
+ * of arrival times and lengths, running totals, and a maximum. The two sets of
+ * fields sit in separate ranges -- receive at +0x08/+0xFC/+0x174, send at
+ * +0x04/+0x0C/+0x84 -- so a busy session can be read from either direction.
+ *
+ * It also undoes what CommSend does. Send raises a bit in the global event
+ * flags when a player falls more than thirty packets behind; this clears it
+ * once they are back under fifteen. That gap is deliberate hysteresis, not an
+ * inconsistency: an alarm that cleared at the same count it raised at would
+ * chatter.
+ *
+ * A message of type 0x0B resets the sender's outstanding count outright, which
+ * is what makes it an acknowledgement in all but name.
+ *
+ * Finally, flow control. If the message list has more than 300 entries free and
+ * the paused bit is set, it is cleared and the fact logged -- the counterpart
+ * of whatever set it when the list filled up. */
+int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
+                                              DWORD flags, void *data,
+                                              DWORD *size)
+{
+    uint8_t        *self = (uint8_t *)comm;
+    LPDIRECTPLAY4A  dp   = *DirectPlaySlot(comm);
+    uint8_t        *shared;
+    uint32_t        at, now;
+    int32_t         slot, i, n;
+
+    if (!dp)
+        return 0;
+
+    if (IDirectPlayX_Receive(dp, from, to, flags, data, size) != DP_OK)
+        return 0;
+
+    at = comm_u32(self, COMM_OFF_RX_INDEX);
+    comm_u32(self, COMM_OFF_RX_SIZES + at * 4) = *size;
+    comm_u32(self, COMM_OFF_RX_BYTES)   += *size;
+    comm_u32(self, COMM_OFF_RX_PACKETS) += 1;
+    if (*size > comm_u32(self, COMM_OFF_RX_MAX))
+        comm_u32(self, COMM_OFF_RX_MAX) = *size;
+
+    now = GetTickCount();
+    comm_u32(self, COMM_OFF_RX_TIMES + at * 4) = now;
+    if (++at >= COMM_STAT_RING)
+        at = 0;
+    comm_u32(self, COMM_OFF_RX_INDEX) = at;
+
+    slot = orig_slot_of_id(comm, *from);
+
+    /* Type 0x0B is the acknowledgement: it wipes the outstanding count. */
+    if (*(uint32_t *)data == COMM_MSG_TYPE_ACK)
+        comm_u32(self, COMM_SLOT_BASE + slot * COMM_SLOT_STRIDE
+                       + COMM_SLOT_OFF_UNACKED) = 0;
+    comm_u32(self, COMM_SLOT_BASE + slot * COMM_SLOT_STRIDE
+                   + COMM_SLOT_OFF_HEARD) = now;
+
+    /* Anyone who has caught up gets their alarm cleared. */
+    shared = g_commObject;
+    n = (int32_t)comm_u32(shared, COMM_OFF_PLAYER_COUNT);
+    for (i = 0; i < n; i++) {
+        uint32_t id = comm_u32(shared, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+                                       + COMM_SLOT_OFF_ID);
+        uint32_t bit;
+
+        if (id == 0xFFFFFFFFu)
+            continue;
+        if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
+            continue;
+        if (comm_u32(self, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+                           + COMM_SLOT_OFF_UNACKED) >= COMM_UNACKED_CLEAR)
+            continue;
+        bit = 0x800u << i;
+        if (orig_get_flags() & bit)
+            orig_clear_event_flags(bit);
+    }
+
+    /* Room again in the message list: let the senders go. */
+    {
+        int32_t free = orig_msg_list_free((void *)(uintptr_t)ADDR_MSG_LIST_A);
+
+        if (free > COMM_FLOW_FREE_OK
+                && (orig_get_flags() & COMM_FLOW_PAUSED_BIT)) {
+            orig_log((const char *)(uintptr_t)ADDR_STR_FLOW_UNPAUSE, free);
+            orig_clear_event_flags(COMM_FLOW_PAUSED_BIT);
+        }
+    }
+    return 1;
+}
+
 /* Join a session someone else is hosting -- 0x0040E7B0, thiscall.
  *
  * The counterpart of CommOpenSession: the same Open, with DPOPEN_JOIN instead
@@ -1119,6 +1214,8 @@ int dplay_install(void)
                         "CommLobbyStart", 0);
     rc |= patch_replace(ADDR_COMM_JOIN_SESSION, (const void *)CommJoinSession,
                         "CommJoinSession", 1);
+    rc |= patch_replace(ADDR_COMM_RECEIVE, (const void *)CommReceive,
+                        "CommReceive", 5);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;

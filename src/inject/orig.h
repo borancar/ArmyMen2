@@ -557,6 +557,22 @@
  * inside the comm object rather than in a global. */
 #define ADDR_COMM_ENUM_SESSIONS  0x0040E3B0u  /* thiscall int32(this, void *) */
 #define ADDR_COMM_JOIN_SESSION   0x0040E7B0u  /* thiscall int32(this, const GUID *) */
+#define ADDR_COMM_RECEIVE        0x0040E8A0u  /* thiscall int32(this,from,to,flags,buf,len) */
+#define ADDR_COMM_SLOT_OF_ID     0x0040F160u  /* thiscall int32(this, DPID) */
+#define ADDR_MSG_LIST_FREE       0x00401040u  /* int32(void *list); free entries */
+#define ADDR_STR_FLOW_UNPAUSE    0x00473A84u  /* "FLOW UNPAUSE nfree = %d\n" */
+/* Receive keeps its own statistics, laid out like the send side's. */
+#define COMM_OFF_RX_INDEX        0x008u
+#define COMM_OFF_RX_TIMES        0x0FCu   /* uint32[30] */
+#define COMM_OFF_RX_SIZES        0x174u   /* uint32[30] */
+#define COMM_OFF_RX_MAX          0x1ECu
+#define COMM_OFF_RX_BYTES        0x1F4u
+#define COMM_OFF_RX_PACKETS      0x1FCu
+#define COMM_SLOT_OFF_HEARD      0x060u   /* GetTickCount of the last packet */
+#define COMM_FLOW_PAUSED_BIT     0x8000u
+#define COMM_FLOW_FREE_OK        0x12C    /* 300 free entries is enough */
+#define COMM_UNACKED_CLEAR       0x0F     /* alarm clears below this */
+#define COMM_MSG_TYPE_ACK        0x0B
 #define ADDR_COMM_SEND_PROPERTY  0x0040FAA0u  /* thiscall int32(this, uint32) */
 #define ADDR_GUID_NULL           0x0046FD98u  /* all zeroes, as guidPlayer */
 #define ADDR_GUID_GAME_PROPERTY  0x0046F888u  /* {BDD4B95F-D35C-11D0-...} */
