@@ -99,7 +99,6 @@ typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
 #define orig_init_directdraw  (*(am2_hwnd_fn)ADDR_INIT_DIRECTDRAW)
 #define orig_report_error     (*(am2_report_error_fn)ADDR_REPORT_ERROR)
 #define orig_release_mutex    (*(am2_void_fn)ADDR_RELEASE_APP_MUTEX)
-#define orig_startup_426b50   (*(am2_void_fn)ADDR_STARTUP_426B50)
 #define orig_startup_4249c0   (*(am2_void_fn)ADDR_STARTUP_4249C0)
 #define orig_startup_42dc30   (*(am2_void_fn)ADDR_STARTUP_42DC30)
 #define orig_startup_409920   (*(am2_void_fn)ADDR_STARTUP_409920)
@@ -115,6 +114,78 @@ typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
 /* The game statically links its own MSVC 6 CRT and ours is a separate world,
  * but strstr crosses nothing: it reads two strings and returns a pointer into
  * the first. No heap, no FILE, no locale. Ours will do. */
+
+/* ---- the game CD ------------------------------------------------------- */
+
+/* Original: 0x00426B50, 6 call sites. Find the drive the game CD is in.
+ *
+ * Walks the logical drive strings -- a run of NUL-terminated roots ending in a
+ * second NUL -- and for each CD-ROM asks for the volume label, looking for
+ * ARMYMEN2. The first match wins: the path is remembered and the search stops.
+ *
+ * Returns 1 if a CD-ROM drive was accepted. Note that is not the same as having
+ * found the disc: the empty-label branch below accepts any CD-ROM without
+ * recording a path, and only the matching branch sets the present flag. That
+ * branch is dead as shipped, since the label is a non-empty literal, but it is
+ * the shape of the original and is kept.
+ *
+ * Both buffers come from the game's heap and go back to it. Their size is not
+ * guessed -- GetLogicalDriveStringsA is asked how much it needs first, which is
+ * why it is called twice. */
+#define VOLUME_NAME_MAX 0x104
+
+#define g_cdPresent   (*(int32_t *)(uintptr_t)ADDR_CD_PRESENT)
+#define g_cdFoundFlag (*(int32_t *)(uintptr_t)ADDR_CD_FOUND_FLAG)
+#define g_cdPath      ((char *)(uintptr_t)ADDR_CD_PATH)
+#define g_cdLabel     ((const char *)(uintptr_t)ADDR_CD_LABEL)
+
+typedef void   *(__cdecl *am2_malloc_fn)(size_t);
+typedef void    (__cdecl *am2_free_fn)(void *);
+typedef int32_t (__cdecl *am2_stricmp_fn)(const char *, const char *);
+typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
+#define orig_malloc  (*(am2_malloc_fn)ADDR_GAME_MALLOC)
+#define orig_free    (*(am2_free_fn)ADDR_GAME_FREE)
+#define orig_stricmp (*(am2_stricmp_fn)ADDR_GAME_STRICMP)
+#define orig_sprintf (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
+
+int32_t __cdecl FindGameCD(void)
+{
+    char    *drives, *volume, *p;
+    uint32_t need;
+    int32_t  found = 0;
+
+    need   = GetLogicalDriveStringsA(0, NULL) + 1;
+    drives = (char *)orig_malloc(need);
+    GetLogicalDriveStringsA(need, drives);
+    volume = (char *)orig_malloc(VOLUME_NAME_MAX + 1);
+
+    g_cdPresent = 0;
+    g_cdPath[0] = '\0';
+
+    for (p = drives; *p && found != 1; ) {
+        if (GetDriveTypeA(p) == DRIVE_CDROM) {
+            if (g_cdLabel[0] == '\0') {
+                /* No label to match, so any CD-ROM will do. */
+                found = 1;
+            } else if (GetVolumeInformationA(p, volume, VOLUME_NAME_MAX,
+                                             NULL, NULL, NULL, NULL, 0) &&
+                       orig_stricmp(g_cdLabel, volume) == 0) {
+                found         = 1;
+                g_cdPresent   = 1;
+                g_cdFoundFlag = 1;
+                orig_sprintf(g_cdPath, "%s", p);
+            } else {
+                found = 0;
+            }
+        }
+        while (*p++)            /* step over this root and its terminator */
+            ;
+    }
+
+    orig_free(drives);
+    orig_free(volume);
+    return found;
+}
 
 /* ---- machine speed ----------------------------------------------------- */
 
@@ -395,7 +466,7 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (!InitApplication(hInstance, nCmdShow))
         return 0;
 
-    orig_startup_426b50();
+    FindGameCD();
     orig_startup_4249c0();
     orig_start_intro();
 
@@ -445,6 +516,8 @@ int winmain_install(void)
                         "InitApplication", 2);
     rc |= patch_replace(ADDR_DETECT_CPU_SPEED, (const void *)DetectCpuSpeed,
                         "DetectCpuSpeed", 0);
+    rc |= patch_replace(ADDR_FIND_GAME_CD, (const void *)FindGameCD,
+                        "FindGameCD", 0);
     rc |= patch_replace(ADDR_WIN_MAIN, (const void *)WinMain, "WinMain", 4);
     return rc;
 }

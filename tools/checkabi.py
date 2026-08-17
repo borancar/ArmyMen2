@@ -75,6 +75,7 @@ FUNCS = [
     (0x0041E750, "FatalError",        "cdecl"),
     (0x0040CA10, "WaveOpenFile",      "cdecl"),
     (0x0040CBB0, "WaveStartDataRead", "cdecl"),
+    (0x00426B50, "FindGameCD",       "cdecl"),
     (0x004466E0, "BuildFont",        "cdecl"),
     (0x0041AC60, "PresentFrame",     "cdecl"),
     (0x0040B2B0, "DetectCpuSpeed",   "cdecl"),

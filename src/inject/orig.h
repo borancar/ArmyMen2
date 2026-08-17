@@ -298,7 +298,15 @@
 #define ADDR_INPUT_BUFFER_A      0x005125C8u
 #define ADDR_INPUT_BUFFER_B      0x005126C8u
 #define ADDR_RELEASE_APP_MUTEX   0x0040B220u  /* void(void) */
-#define ADDR_STARTUP_426B50      0x00426B50u
+/* Look for the game CD: walk the logical drives, find one that is a CD-ROM and
+ * whose volume label is ARMYMEN2, and remember where it is. */
+#define ADDR_FIND_GAME_CD        0x00426B50u  /* int32_t(void) */
+#define ADDR_CD_PRESENT          0x00512588u  /* int32_t */
+#define ADDR_CD_FOUND_FLAG       0x00512594u  /* int32_t, set alongside it */
+#define ADDR_CD_PATH             0x00512464u  /* char[], the drive root */
+#define ADDR_CD_LABEL            0x004852B8u  /* "ARMYMEN2" */
+#define ADDR_GAME_STRICMP        0x00465F90u  /* the game's own CRT */
+#define ADDR_GAME_SPRINTF        0x00464CE2u
 #define ADDR_STARTUP_4249C0      0x004249C0u
 #define ADDR_STARTUP_42DC30      0x0042DC30u
 #define ADDR_STARTUP_409920      0x00409920u

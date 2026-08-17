@@ -61,6 +61,11 @@ void __cdecl PositionWindow(void);
  * `system speed:` line. See winmain.cpp for what "fast" meant in 1999. */
 void __cdecl DetectCpuSpeed(void);
 
+/* Original: 0x00426B50. Find the drive holding the game CD, by walking the
+ * logical drives for a CD-ROM labelled ARMYMEN2. Returns 1 if one was accepted
+ * and records its root. */
+int32_t __cdecl FindGameCD(void);
+
 int winmain_install(void);
 
 #ifdef __cplusplus
