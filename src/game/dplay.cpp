@@ -328,6 +328,66 @@ void __attribute__((thiscall)) CommDestruct(void *comm)
     RegCloseKey((HKEY)(uintptr_t)comm_u32(self, 0x204));
 }
 
+/* Ask DirectPlay which sessions are out there.
+ *
+ * 0x0040E3B0, thiscall, `ret 4`. The multiplayer HOST button calls it with the
+ * object that collects the results; the callback at 0x0040E280 fills that
+ * object and stays original.
+ *
+ * The identification is the descriptor and the slot together. It zeroes 0x14
+ * dwords -- 0x50 bytes, sizeof(DPSESSIONDESC2) -- sets dwSize to 0x50 and
+ * copies four dwords from the comm object's GUID pointer to offset 0x18, which
+ * is guidApplication and nothing else. Slot 13 on IDirectPlay4 is EnumSessions.
+ * The descriptor alone would equally fit Open, which is what it was first
+ * written down as; counting the slot is what settled it.
+ *
+ * Note the filter is by application GUID only. guidInstance is left zeroed, so
+ * this asks for every Army Men II session on the transport rather than a
+ * particular one. */
+static_assert(sizeof(DPSESSIONDESC2) == 0x50, "DPSESSIONDESC2");
+static_assert(DPENUMSESSIONS_AVAILABLE == 1, "DPENUMSESSIONS_AVAILABLE");
+static_assert(DPENUMSESSIONS_ASYNC == 0x10, "DPENUMSESSIONS_ASYNC");
+
+/* Resets the collecting object before it is filled again. Stays original. */
+typedef void (__attribute__((thiscall)) *am2_session_reset_fn)(void *);
+#define orig_session_reset (*(am2_session_reset_fn)ADDR_SESSION_RESET)
+
+#define g_sessionList  (*(void **)(uintptr_t)ADDR_SESSION_LIST)
+#define g_enumContext  (*(void **)(uintptr_t)ADDR_ENUM_CONTEXT)
+
+int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
+{
+    DPSESSIONDESC2  desc;
+    LPDIRECTPLAY4A  dp;
+    const GUID     *app;
+    HRESULT         hr;
+
+    /* Nowhere to put the answers, or nothing to ask. */
+    if (!list)
+        return 0;
+    dp = *DirectPlaySlot(comm);
+    if (!dp)
+        return 0;
+
+    orig_session_reset(list);
+    /* The callback is a plain function and gets the object through this global
+     * rather than through lpContext, which carries something else entirely. */
+    g_sessionList = list;
+
+    memset(&desc, 0, sizeof desc);
+    desc.dwSize = sizeof desc;
+
+    app = *(const GUID **)((uint8_t *)comm + COMM_OFF_APP_GUID);
+    if (app)
+        desc.guidApplication = *app;
+
+    hr = IDirectPlayX_EnumSessions(dp, &desc, 0,
+                                   (LPDPENUMSESSIONSCALLBACK2)(uintptr_t)ADDR_ENUM_SESSIONS_CB,
+                                   g_enumContext,
+                                   DPENUMSESSIONS_AVAILABLE | DPENUMSESSIONS_ASYNC);
+    return hr == DP_OK;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -349,5 +409,7 @@ int dplay_install(void)
                         "CommConstruct", 0);
     rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,
                         "CommDestruct", 0);
+    rc |= patch_replace(ADDR_COMM_ENUM_SESSIONS, (const void *)CommEnumSessions,
+                        "CommEnumSessions", 1);
     return rc;
 }

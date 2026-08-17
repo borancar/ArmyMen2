@@ -168,12 +168,12 @@ void __cdecl StartSelectedGame(void)
 typedef int32_t (__cdecl *am2_path_exists_fn)(const char *);
 typedef void *(__cdecl *am2_operator_new_fn)(size_t);
 typedef void (__attribute__((thiscall)) *am2_session_ctor_fn)(void *, int32_t);
-typedef int32_t (__attribute__((thiscall)) *am2_open_session_fn)(void *, void *);
+typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *);
 
 #define orig_path_exists   (*(am2_path_exists_fn)ADDR_DATA_PATH_EXISTS)
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
 #define orig_session_ctor  (*(am2_session_ctor_fn)ADDR_SESSION_CTOR)
-#define orig_open_session  (*(am2_open_session_fn)ADDR_COMM_OPEN_SESSION)
+#define orig_enum_sessions  (*(am2_enum_sessions_fn)ADDR_COMM_ENUM_SESSIONS)
 #define orig_drop_obj      (*(am2_void_fn)ADDR_DROP_OBJ_51612C)
 
 #define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
@@ -219,11 +219,11 @@ void __cdecl StartMultiplayerGame(void)
     }
 
     /* Hand the screen back to GDI and put the pointer up, or the dialog the
-     * session-open shows would be invisible and unclickable. */
+     * session browser shows would be invisible and unclickable. */
     IDirectDraw_FlipToGDISurface(g_ddraw);
     ShowCursor(TRUE);
 
-    if (!orig_open_session(comm, g_sessionObject)) {
+    if (!orig_enum_sessions(comm, g_sessionObject)) {
         g_menuRequest    = REQUEST_REFUSED;
         g_menuRequestSet = 1;
     }

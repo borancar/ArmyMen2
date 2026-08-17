@@ -76,6 +76,15 @@ int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 void *__attribute__((thiscall)) CommConstruct(void *comm);
 void  __attribute__((thiscall)) CommDestruct(void *comm);
 
+/* Original: 0x0040E3B0, thiscall. Enumerate the DirectPlay sessions matching
+ * the game's application GUID, into the object the caller supplies.
+ *
+ * Asynchronous and filtered by application only -- guidInstance is left zero --
+ * so it asks for every Army Men II session on the transport. Answers non-zero
+ * when the request was accepted, which is not the same as any session having
+ * been found; the callback at 0x0040E280 does the finding. */
+int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

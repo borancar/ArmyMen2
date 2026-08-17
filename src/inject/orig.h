@@ -426,11 +426,16 @@
 #define ADDR_SESSION_CTOR        0x00453910u  /* thiscall void(this, int32) */
 #define ADDR_SESSION_RESET       0x00453940u  /* thiscall void(this) */
 /* Fills a 0x50-byte DPSESSIONDESC2 -- the app GUID from the comm object lands
- * at +0x18, which is guidApplication -- and opens the DirectPlay session.
- * A genuine DirectPlay boundary function and a good future candidate; it is
- * invisible to tools/comcalls.py because the interface lives inside the comm
- * object rather than in a global. */
-#define ADDR_COMM_OPEN_SESSION   0x0040E3B0u  /* thiscall int32(this, void *) */
+ * at +0x18, which is guidApplication -- and asks DirectPlay to enumerate the
+ * sessions matching it. Slot 13 is EnumSessions, not Open; it was briefly
+ * ADDR_COMM_OPEN_SESSION on the strength of the descriptor alone, before the
+ * slot was counted. Invisible to tools/comcalls.py because the interface lives
+ * inside the comm object rather than in a global. */
+#define ADDR_COMM_ENUM_SESSIONS  0x0040E3B0u  /* thiscall int32(this, void *) */
+#define ADDR_ENUM_SESSIONS_CB    0x0040E280u  /* LPDPENUMSESSIONSCALLBACK2 */
+#define ADDR_SESSION_LIST        0x004FA908u  /* void *, what the callback fills */
+#define ADDR_ENUM_CONTEXT        0x0051245Cu  /* void *, lpContext */
+#define COMM_OFF_APP_GUID        0x3D4u       /* GUID *, set by CommConstruct */
 /* Calls ADDR_SESSION_RESET on the object at 0x0051612C when there is one. */
 #define ADDR_DROP_OBJ_51612C     0x00431D70u  /* void(void) */
 #define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
