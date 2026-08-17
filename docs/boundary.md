@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 21 | 97 |
-| still boundary | 16 | 43 |
+| reconstructed | 22 | 99 |
+| still boundary | 15 | 41 |
 | game logic, incidental calls only | 85 | 136 |
 | **total** | **122** | **276** |
 
@@ -42,7 +42,6 @@ function from game logic with a call in it.
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
 | `0x00445280` | 160 | 1 | 160 | _SmackVolumePan@16 |
 | `0x00445320` | 160 | 1 | 160 | _SmackWait@4 |
-| `0x004466e0` | 336 | 2 | 168 | DeleteObject |
 | `0x0042ece0` | 352 | 2 | 176 | GetActiveWindow, MessageBoxA |
 | `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
 | `0x0040ed10` | 1056 | 2 | 528 | GetActiveWindow, MessageBoxA |
@@ -54,7 +53,7 @@ function from game logic with a call in it.
 | USER32.dll | 130 | 59 |
 | KERNEL32.dll | 99 | 10 |
 | WINMM.dll | 17 | 11 |
-| GDI32.dll | 16 | 14 |
+| GDI32.dll | 16 | 16 |
 | smackw32.dll | 9 | 0 |
 | ole32.dll | 3 | 3 |
 | ADVAPI32.dll | 2 | 0 |

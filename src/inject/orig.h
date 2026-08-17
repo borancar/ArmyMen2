@@ -41,8 +41,18 @@
  * surface of the same size when windowed, where there is no flipping chain to
  * take one from. It is also what the lock target starts out pointing at. */
 #define ADDR_FONT_SURFACE   0x004FE08Cu  /* IDirectDrawSurface *, the back buffer */
-#define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[], indexed ch + font*262 */
-#define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t*[], indexed font*133 */
+/* One record per font, 524 bytes apart -- BuildFont computes the stride as
+ * ((f<<6)+f)*2+f then <<2, which is 131 dwords and not the 133 this said
+ * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
+ * each of the 256 characters, +0x204 the pointer to the encoded glyphs. */
+#define ADDR_FONT_STRIDE    524u
+#define ADDR_GLYPH_SIZE     0x006598D0u  /* uint32_t, total encoded bytes */
+#define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[256] */
+#define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t *, the encoded glyphs */
+#define ADDR_FONT_DESCS     0x004897E8u  /* {const char *face; int32 h; uint16 style}[] */
+#define ADDR_BUILD_FONT     0x004466E0u  /* int32_t(int32_t fontIndex) */
+#define ADDR_GAME_MALLOC    0x004647F8u  /* the game's own CRT malloc */
+#define ADDR_GAME_FREE      0x004646A9u  /* the game's own CRT free */
 #define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- text and sprites share it */
 
 /* ---- DirectDraw ------------------------------------------------------

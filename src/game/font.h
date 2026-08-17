@@ -54,6 +54,13 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
  * name without asking GDI, and logs if GDI refuses. */
 HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style);
 
+/* Original: 0x004466E0. Build one font's whole glyph set: ask GDI for the face,
+ * render all 256 characters, keep the encoded result. Returns 1, including when
+ * the font was already built. Renders into a 32KB scratch and then copies to an
+ * exact-sized allocation, because the encoded size is not knowable in advance;
+ * both allocations use the game's CRT, not ours. */
+int32_t __cdecl BuildFont(int32_t font);
+
 int font_install(void);
 
 #ifdef __cplusplus

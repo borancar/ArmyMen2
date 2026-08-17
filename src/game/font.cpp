@@ -17,6 +17,7 @@
 #include "font.h"
 #include "../inject/patch.h"
 #include "surface.h"
+#include <string.h>
 
 #include <stdint.h>
 
@@ -203,6 +204,96 @@ HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style)
     return font;
 }
 
+/* Original: 0x004466E0. Build one font's entire glyph set.
+ *
+ * This is what ties the font pipeline together: it asks GDI for the face,
+ * renders all 256 characters through RenderGlyph, and keeps the RLE the
+ * encoder produced. Everything it calls is already reconstructed --
+ * ClearSurface, CreateGameFont, RenderGlyph, and EncodeGlyph below that.
+ *
+ * The two-allocation shape is deliberate. How much space 256 encoded glyphs
+ * need is not knowable until they are encoded, so it renders into a fixed 32KB
+ * scratch, then allocates exactly what was used and copies. Both allocations go
+ * through the game's own CRT rather than ours, which matters: the buffer it
+ * keeps is freed elsewhere in the game, by the game's free, and orig.h is
+ * emphatic about not mixing the two heaps.
+ *
+ * Rendering happens onto the back buffer, which is cleared first -- glyphs are
+ * drawn there with GDI and read back, so whatever the frame left behind would
+ * otherwise end up inside the letters. */
+#define GLYPH_SCRATCH 0x8000
+
+typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDesc;
+
+#define g_fontDescs   ((const AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)
+#define g_backBuffer  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_fillColour  (*(const uint8_t *)(uintptr_t)ADDR_PIXEL_FORMAT_BYTE)
+
+/* Per-font record fields, `f` records apart. */
+#define font_size(f)    (*(uint32_t *)(uintptr_t)(ADDR_GLYPH_SIZE + (f) * ADDR_FONT_STRIDE))
+#define font_offsets(f) ((uint16_t *)(uintptr_t)(ADDR_GLYPH_OFFSETS + (f) * ADDR_FONT_STRIDE))
+#define font_base(f)    (*(uint8_t **)(uintptr_t)(ADDR_FONT_BASES + (f) * ADDR_FONT_STRIDE))
+
+typedef void *(__cdecl *am2_malloc_fn)(size_t);
+typedef void  (__cdecl *am2_free_fn)(void *);
+#define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
+#define orig_free   (*(am2_free_fn)ADDR_GAME_FREE)
+
+int32_t __cdecl BuildFont(int32_t font)
+{
+    uint8_t  *scratch, *out, *kept;
+    uint16_t *offsets;
+    HFONT     hfont;
+    int32_t   ch;
+    uint32_t  total;
+
+    if (font_base(font))
+        return 1;                       /* already built */
+
+    ClearSurface(g_backBuffer, g_fillColour);
+
+    scratch = (uint8_t *)orig_malloc(GLYPH_SCRATCH);
+    out     = scratch;
+
+    hfont = CreateGameFont(g_fontDescs[font].face, g_fontDescs[font].height,
+                           g_fontDescs[font].style);
+    if (!hfont) {
+        orig_free(scratch);
+        return 0;
+    }
+
+    /* The first 32 characters are never rendered, so their offsets are zeroed
+     * rather than written; the loop starts at space. */
+    memset(font_offsets(font), 0, 32 * sizeof(uint16_t));
+    offsets = font_offsets(font) + 32;
+
+    for (ch = 0x20; ch < 0x100; ch++) {
+        uint32_t used = (uint32_t)(out - scratch);
+        uint32_t n;
+
+        *offsets = (uint16_t)used;
+        n = RenderGlyph(font, (char)ch, hfont, (AM2_Rle16 *)out,
+                        GLYPH_SCRATCH - used);
+        if (!n) {
+            orig_free(scratch);
+            DeleteObject(hfont);
+            return 0;
+        }
+        out += n;
+        offsets++;
+    }
+    DeleteObject(hfont);
+
+    /* Now the size is known, so take exactly that much and let the scratch go. */
+    total = (uint32_t)(out - scratch);
+    font_size(font) = total;
+    kept = (uint8_t *)orig_malloc(total);
+    font_base(font) = kept;
+    memcpy(kept, scratch, total);
+    orig_free(scratch);
+    return 1;
+}
+
 int font_install(void)
 {
     int rc = 0;
@@ -211,5 +302,6 @@ int font_install(void)
     rc |= patch_replace(ADDR_RENDER_GLYPH, (const void *)RenderGlyph, "RenderGlyph", 5);
     rc |= patch_replace(ADDR_CREATE_GAME_FONT, (const void *)CreateGameFont,
                         "CreateGameFont", 3);
+    rc |= patch_replace(ADDR_BUILD_FONT, (const void *)BuildFont, "BuildFont", 1);
     return rc;
 }
