@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 20 | 95 |
-| still boundary | 17 | 45 |
+| reconstructed | 21 | 97 |
+| still boundary | 16 | 43 |
 | game logic, incidental calls only | 85 | 136 |
 | **total** | **122** | **276** |
 
@@ -37,7 +37,6 @@ function from game logic with a call in it.
 | `0x004453c0` | 320 | 4 | 80 | GetFocus, _SmackDoFrame@4, _SmackNextFrame@4, _SmackToBuffer@28 |
 | `0x00426b50` | 256 | 3 | 85 | GetDriveTypeA, GetLogicalDriveStringsA, GetVolumeInformationA |
 | `0x0040d680` | 176 | 2 | 88 | timeBeginPeriod, timeSetEvent |
-| `0x0041ac60` | 208 | 2 | 104 | PeekMessageA, PostQuitMessage |
 | `0x00444fc0` | 352 | 3 | 117 | _SmackDDSurfaceType@4, _SmackOpen@12, _SmackSoundUseDirectSound@4 |
 | `0x0040db50` | 416 | 3 | 138 | GetTickCount, RegCloseKey, RegCreateKeyExA |
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
@@ -52,7 +51,7 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 57 |
+| USER32.dll | 130 | 59 |
 | KERNEL32.dll | 99 | 10 |
 | WINMM.dll | 17 | 11 |
 | GDI32.dll | 16 | 14 |

@@ -28,6 +28,7 @@
 
 #include "surface.h"
 #include "rect.h"
+#include "winmain.h"
 #include "report.h"
 #include "../inject/patch.h"
 
@@ -189,6 +190,54 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
     return hr == DD_OK;
 }
 
+static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");
+static_assert(PM_NOREMOVE == 0, "PM_NOREMOVE");
+
+#define g_presentEnabled (*(const int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
+#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_screenClip     ((LPRECT)(uintptr_t)ADDR_SCREEN_CLIP)
+#define g_hWnd           (*(HWND *)(uintptr_t)ADDR_HWND)
+#define g_windowed       (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
+
+void __cdecl PresentFrame(void)
+{
+    MSG     msg;
+    HRESULT hr;
+
+    if (!g_presentEnabled)
+        return;
+
+    if (g_windowed) {
+        /* No flipping chain in a window, so the back buffer is copied up to
+         * the primary at wherever the client area happens to be. */
+        IDirectDrawSurface_BltFast(g_primarySurface,
+                                   (DWORD)g_screenRect.left,
+                                   (DWORD)g_screenRect.top,
+                                   g_backBuffer, g_screenClip, DDBLTFAST_WAIT);
+        return;
+    }
+
+    hr = IDirectDrawSurface_Flip(g_primarySurface, NULL, 0);
+    while (hr != DD_OK) {
+        if (hr == DDERR_SURFACELOST) {
+            IDirectDrawSurface_Restore(g_primarySurface);
+            return;
+        }
+
+        /* Stay answerable while the previous flip finishes. Peeked without
+         * removing, so this consumes nothing -- it is only here to notice a
+         * WM_QUIT arriving mid-wait. */
+        if (PeekMessageA(&msg, g_hWnd, 0, 0, PM_NOREMOVE) && !PumpMessage(&msg)) {
+            PostQuitMessage(0);
+            return;
+        }
+
+        if (hr != DDERR_WASSTILLDRAWING)
+            return;
+        hr = IDirectDrawSurface_Flip(g_primarySurface, NULL, 0);
+    }
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -199,5 +248,7 @@ int surface_install(void)
                         "CreateOffscreenSurface", 4);
     rc |= patch_replace(ADDR_CLEAR_SURFACE, (const void *)ClearSurface,
                         "ClearSurface", 2);
+    rc |= patch_replace(ADDR_PRESENT_FRAME, (const void *)PresentFrame,
+                        "PresentFrame", 0);
     return rc;
 }

@@ -58,6 +58,11 @@
  * NOT be touched is ddraw itself -- these write into surface bits that
  * DirectDraw owns and may move or lose between frames.
  */
+/* Putting the finished frame on the screen: a Flip when fullscreen, a BltFast
+ * from the back buffer when windowed, because a window has no flipping chain.
+ * Gated by 0x004FA030 -- clear it and the game runs with nothing appearing. */
+#define ADDR_PRESENT_FRAME  0x0041AC60u  /* void(void) */
+#define ADDR_PRESENT_ENABLED 0x004FA030u /* int32_t */
 #define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
 #define ADDR_UNLOCK_SURFACE 0x0041BA40u  /* int32_t(void) */
 #define ADDR_SURFACE_LOCKED 0x004FDF80u  /* int32_t; non-zero while a lock is held */

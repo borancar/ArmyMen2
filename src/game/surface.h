@@ -63,6 +63,20 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
  * windows. */
 int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour);
 
+/* Original: 0x0041AC60. Put the finished frame on the screen. 2 call sites.
+ *
+ * Fullscreen flips; windowed has no flipping chain, so it blits the back buffer
+ * to the primary at the client origin instead. Both paths are skipped entirely
+ * while 0x004FA030 is clear.
+ *
+ * The flip path is the interesting one. A flip can answer DDERR_WASSTILLDRAWING
+ * -- the previous one has not reached the screen yet -- and rather than block,
+ * the game peeks at its own message queue between retries so the window stays
+ * answerable while it waits. It peeks without removing, so nothing is consumed;
+ * the only message it acts on is WM_QUIT, which it turns straight back into
+ * PostQuitMessage. A lost surface is restored and the frame abandoned. */
+void __cdecl PresentFrame(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus
