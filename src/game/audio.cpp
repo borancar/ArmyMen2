@@ -370,6 +370,57 @@ unlock:
     g_cursorB = 0;
 }
 
+/* Put sample data into a DirectSound buffer -- 0x0040C440.
+ *
+ * The Lock/Unlock bracket, and the only place the game writes audio samples
+ * across the boundary. A DirectSound buffer is circular, so a lock can hand
+ * back two regions rather than one when the request wraps the end; both are
+ * filled, the second continuing where the first stopped.
+ *
+ * How much is written is decided by DirectSound, not by the caller. `size` is
+ * what is asked for, but the copies use the lengths the lock reports -- so a
+ * buffer smaller than the request is filled to its own capacity rather than
+ * overrun.
+ *
+ * STANDING NOTE -- the first region is cleared and then immediately overwritten
+ * in full by the copy that follows, so the clear cannot be observed. It is the
+ * original's and it is kept.
+ *
+ * The original reuses its own argument slots to receive the lock's out
+ * parameters, which is why the disassembly appears to overwrite its arguments;
+ * the two it still needs are in registers by then. Written with proper locals
+ * here -- the addresses differ, nothing observable does.
+ *
+ * Not exercised on this machine: there is no audio device, so no buffer ever
+ * exists to fill. See the note at the top of this file. */
+static_assert(DSBLOCK_ENTIREBUFFER == 2, "DSBLOCK_ENTIREBUFFER");
+
+int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
+                                uint32_t size)
+{
+    void  *first, *second;
+    DWORD  firstLen, secondLen;
+
+    if (!buf || !data || !size) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_SND_NO_ARGS);
+        return 0;
+    }
+
+    if (IDirectSoundBuffer_Lock(buf, 0, size, &first, &firstLen,
+                                &second, &secondLen, 0) != DS_OK) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_SND_LOCK_FAIL);
+        return 0;
+    }
+
+    memset(first, 0, firstLen);          /* see the note above */
+    memcpy(first, data, firstLen);
+    if (secondLen)
+        memcpy(second, data + firstLen, secondLen);
+
+    IDirectSoundBuffer_Unlock(buf, first, firstLen, second, secondLen);
+    return 1;
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -382,6 +433,8 @@ int audio_install(void)
                         "ReleaseSoundBuffers", 0);
     rc |= patch_replace(ADDR_INIT_DIRECTSOUND, (const void *)InitDirectSound,
                         "InitDirectSound", 0);
+    rc |= patch_replace(ADDR_FILL_SOUND_BUFFER, (const void *)FillSoundBuffer,
+                        "FillSoundBuffer", 3);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
                         "SetStreamVolume", 1);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,

@@ -81,6 +81,16 @@ void __cdecl StopAllSounds(void);
  * back to it, not ours. */
 void __cdecl FreeSound(void *snd);
 
+/* Original: 0x0040C440, 2 call sites. Write sample data into a DirectSound
+ * buffer through the Lock/Unlock bracket.
+ *
+ * A DirectSound buffer is circular, so a lock can return two regions when the
+ * request wraps; both are filled. The amount written is whatever the lock
+ * reports, not what the caller asked for. Returns 1 on success, 0 with a
+ * message if an argument is missing or the lock fails. */
+int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
+                                uint32_t size);
+
 int audio_install(void);
 
 #ifdef __cplusplus

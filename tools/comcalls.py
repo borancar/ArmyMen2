@@ -128,7 +128,13 @@ def find_vtable_load(insns, i, reg):
     osrc, _oat = outer
     if osrc.type == OP_MEM and osrc.mem.base == 0 and osrc.mem.index == 0:
         return (osrc.mem.disp & 0xFFFFFFFF, at, obj_reg, None)
-    if osrc.type == OP_MEM and osrc.mem.index == 0 and osrc.mem.disp != 0:
+    if (osrc.type == OP_MEM and osrc.mem.index == 0 and osrc.mem.disp != 0
+            and insns[at].reg_name(osrc.mem.base) not in ("esp", "ebp")):
+        # esp- and ebp-relative loads are arguments and locals, not fields.
+        # Counting them would group unrelated functions under whatever stack
+        # offset they happened to use -- FillSoundBuffer takes its buffer as
+        # an argument at [esp+0x10] and would otherwise be filed alongside the
+        # sprites, whose surfaces really are at +0x10 of a record.
         return (0, at, obj_reg, osrc.mem.disp & 0xFFFFFFFF)
     return (0, at, obj_reg, None)
 

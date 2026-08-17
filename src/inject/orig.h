@@ -130,6 +130,9 @@
 #define ADDR_RESTORE_CHAIN       0x00445EB0u  /* void(AM2_Sprite*) */
 /* Sprite lifetime. The registry is a count at 0x006598C0 and a table of
  * AM2_Sprite* at 0x006598C4; the lookup walks it for a matching id. */
+#define ADDR_FILL_SOUND_BUFFER   0x0040C440u  /* int32(buf, const void *, uint32) */
+#define ADDR_STR_SND_LOCK_FAIL   0x00474E6Cu  /* "Unable to lock sound buffer\n" */
+#define ADDR_STR_SND_NO_ARGS     0x00474E44u  /* "Fill sound buffer missing arguments\n" */
 #define ADDR_DRAW_SEQ_BAR        0x004624A0u  /* void(x,y,colour,value,base) */
 #define ADDR_SEQ_BAR_BG          0x00502AD9u  /* uint8_t, the unfilled colour */
 #define ADDR_STR_SEQ_BLT_FAIL    0x0048CBE8u  /* "Couldn't Blt Seq Pixels\n" */
