@@ -295,7 +295,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   mutex wait. What is left outside is three `MessageBoxA` calls, and all three
   sit behind copy-protection checks that have been patched to skip them, so
   none can run. `tools/coverage.py` reports the symbols and
-  `docs/copyprotection.md` explains why they cannot fire.
+  `docs/binarypatches.md` explains why they cannot fire.
 
   This claim is about the IAT only. DirectX reached through COM is a separate
   count and is *not* finished: 10 functions with 30 calls on objects
@@ -319,13 +319,31 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   function can be reached is a different question and the answer there — that
   the five copy-protection dialogs are unreachable — was checked with a scan
   that did include unaligned operands, and stands.
+- **This executable has been patched after compilation, and in more than one
+  place.** Six conditional branches were overwritten with unconditional ones --
+  `74`/`75` becoming `EB`, same length, nothing moved. Five disable the copy
+  protection; the sixth removes the MULTIPLAYER entry from the title screen,
+  which is the gap between SINGLE PLAYER and OPTIONS. `tools/binpatches.py`
+  finds all six and `docs/binarypatches.md` gives the byte to restore each.
+
+  The signature is a compare whose flags nothing reads, followed by an
+  unconditional jump. The filter that makes the scan trustworthy is checking
+  the jump's target: `cmp; jmp L` is ordinary when L starts with a `jcc`, which
+  is what a loop back-edge looks like. With that, 16 candidates become 6 and
+  all 6 are real.
+
+  **`AM2_MULTIPLAYER=1` puts the button back**, via `src/inject/restore.c`, and
+  that is the only way the reconstructed DirectPlay code can be exercised at
+  all — the whole subsystem is otherwise unreachable. It is off by default
+  because anything restored there makes the process differ from the binary it
+  is derived from, which `tools/ab.sh` will correctly flag.
 - **The copy protection in this executable is patched out, and that is not the
   same as absent.** `FindGameCD` is called from five places; all five branch on
   the result with `EB` (`jmp`) where a `75` (`jne`) has to have been, so the
   check always passes and the "insert the CD" `MessageBoxA` after it can never
   run. The tell is the `test eax, eax` left in front of each one setting flags
-  nothing reads — no compiler emits that. `tools/cdchecks.py` finds them and
-  `docs/copyprotection.md` lists the one byte per site that puts each back.
+  nothing reads — no compiler emits that. `tools/binpatches.py` finds them and
+  `docs/binarypatches.md` lists the one byte per site that puts each back.
 
   Two consequences worth keeping. Five of the six `MessageBoxA` sites that
   `docs/boundary.md` reports as outstanding are unreachable, so the leftover

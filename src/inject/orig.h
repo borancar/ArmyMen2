@@ -220,7 +220,7 @@
  * restated here -- the game's own copies are used, as with the DirectPlay
  * CLSIDs. The GUID is {2777D2A2-89D1-11D2-A387-00C04F79DCEB}. */
 /* The copy-protection dialog's two strings. Every one of the five CD checks
- * uses this pair; see docs/copyprotection.md, and note that all five checks are
+ * uses this pair; see docs/binarypatches.md, and note that all five checks are
  * patched to unconditional in this build so none of them can appear. */
 #define ADDR_CD_REQUIRED_TEXT    0x00475578u  /* "The ARMYMEN2 CD must be..." */
 #define ADDR_CD_REQUIRED_CAPTION 0x004755B4u  /* "Copy Protection" */

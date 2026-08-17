@@ -16,6 +16,7 @@
 #include "observe.h"
 #include "orig.h"
 #include "patch.h"
+#include "restore.h"
 #include "sites.h"
 #include "trace.h"
 #include "../game/audio.h"
@@ -330,6 +331,10 @@ static void install(void)
     wavefile_install();
     dplay_install();
     startgame_install();
+
+    /* Not reconstruction: undoes edits made to the shipping binary. Off
+     * unless asked for; see restore.c. */
+    restore_install();
     movie_install();
     audio_install();
     palette_install();

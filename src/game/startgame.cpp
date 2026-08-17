@@ -18,7 +18,7 @@
  * reproduced rather than repaired. `FindGameCD` is still called and its answer
  * is still discarded, because only the branch was patched and not the call --
  * see src/game/cdcheck.h, which carries the retail check behind an #ifdef, and
- * docs/copyprotection.md for the byte. Building the check in would make this
+ * docs/binarypatches.md for the byte. Building the check in would make this
  * function refuse where the original proceeds and would fail the A/B for a
  * reason having nothing to do with whether the reconstruction is right.
  */

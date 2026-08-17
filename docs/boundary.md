@@ -43,7 +43,7 @@ site still outside reconstructed code:
 |---|---:|
 | `MessageBoxA` | 3 |
 
-Read that table with `docs/copyprotection.md` beside it. Most of
+Read that table with `docs/binarypatches.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
 every CD check in this executable has been patched to skip it --
 so the sites are still there, still import the symbol, and can

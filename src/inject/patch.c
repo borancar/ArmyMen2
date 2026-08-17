@@ -41,6 +41,31 @@ int patch_replace(uint32_t target, const void *replacement, const char *name,
     return 0;
 }
 
+int patch_byte(uint32_t target, uint8_t expect, uint8_t value, const char *what)
+{
+    uint8_t *p = (uint8_t *)(uintptr_t)target;
+    DWORD    prot = 0;
+
+    if (!VirtualProtect(p, 1, PAGE_EXECUTE_READWRITE, &prot)) {
+        hooklog("restore: VirtualProtect failed for %s at %08x (err %lu)",
+                what, target, GetLastError());
+        return 1;
+    }
+
+    if (*p != expect) {
+        hooklog("restore: %s at %08x is %02x, expected %02x -- not touching it",
+                what, target, *p, expect);
+        VirtualProtect(p, 1, prot, &prot);
+        return 1;
+    }
+
+    *p = value;
+    VirtualProtect(p, 1, prot, &prot);
+    FlushInstructionCache(GetCurrentProcess(), p, 1);
+    hooklog("restore: %s at %08x  %02x -> %02x", what, target, expect, value);
+    return 0;
+}
+
 int patch_count(void)
 {
     return g_installed;

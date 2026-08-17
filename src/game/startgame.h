@@ -20,7 +20,7 @@ extern "C" {
  * Joins the highlighted session if the row carries a DirectPlay connection, and
  * otherwise starts a local game with three computer opponents. The CD check on
  * the local path is disabled in this executable and reproduced that way; see
- * cdcheck.h and docs/copyprotection.md. */
+ * cdcheck.h and docs/binarypatches.md. */
 void __cdecl StartSelectedGame(void);
 
 int startgame_install(void);

@@ -12,8 +12,8 @@
  * checks are disabled -- the conditional branch past the "insert the CD" dialog
  * has been overwritten with an unconditional one, EB where a 75 has to have
  * been. One byte each, nothing moved, and the `test` left in front of it sets
- * flags that nothing reads. `tools/cdchecks.py` finds them and
- * `docs/copyprotection.md` lists the byte to change to put each one back.
+ * flags that nothing reads. `tools/binpatches.py` finds them and
+ * `docs/binarypatches.md` lists the byte to change to put each one back.
  *
  * So a reconstruction that simply transcribed what the bytes do would record
  * "there is no copy protection in this game", which is not true of the game --
@@ -27,12 +27,12 @@
  * not, and every A/B comparison involving it would diverge for a reason that
  * has nothing to do with whether the reconstruction is correct.
  *
- * Nor would turning it on give a working copy protection. All five call sites
- * are in menu functions that are still the original's code, so nothing calls
- * this yet and the patched bytes would keep letting everyone through either
- * way. It is here so that the logic is recorded, and so that whichever of those
- * functions gets reconstructed first has something correct to call instead of
- * having to re-derive it from a branch that is no longer there.
+ * Nor would turning it on give a working copy protection. One of the five call
+ * sites is reconstructed and calls this -- StartSelectedGame, the local-game
+ * path -- and the other four are still the original's code with their patched
+ * bytes, so four of the five checks would keep letting everyone through
+ * regardless. A switch that changes one check in five is worse than one that
+ * changes none.
  *
  * All five sites pass the same three arguments, so the shape below is the whole
  * of what was removed. What differs between them is only what each one does
