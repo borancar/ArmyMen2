@@ -358,6 +358,12 @@
 #define SOUND_SLOT_STRIDE        0x10u
 #define SOUND_SLOT_OFF_BUFFER    0x00u   /* IDirectSoundBuffer * */
 #define SOUND_SLOT_OFF_BYTES     0x04u   /* DSBCAPS.dwBufferBytes */
+#define SOUND_SLOT_OFF_VOLUME    0x08u   /* what it was last set to */
+#define SOUND_SLOT_OFF_STARTED   0x0Cu   /* GetTickCount when it last began */
+#define SOUND_FIXED_SLOTS        0x38    /* 56 */
+#define ADDR_PLAY_SOUND_AT       0x0040C040u /* void(idx,flags,?,x,y) */
+#define ADDR_POINTS_EQUAL        0x0042E140u /* int32(const AM2_Point*, const AM2_Point*) */
+#define ADDR_LOOKUP_OWNER_OBJ    0x00457750u /* void *(uint32 owner) */
 #define SOUND_DYN_OFF_BUFFER     0x00u
 #define SOUND_DYN_OFF_DATA       0x04u
 #define SOUND_SLOT_STRIDE        0x10u

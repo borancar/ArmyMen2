@@ -469,6 +469,149 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
     hooklog("sound: %-20s %7u bytes  fnv1a=%08x", name, len, hash);
 }
 
+/* Play one of the fixed sounds, somewhere -- 0x0040C040, 165 call sites and
+ * the busiest thing in this file.
+ *
+ * Three decisions, in order.
+ *
+ * HOW LOUD. A sound at the origin plays at full volume. One with a position is
+ * attenuated by its distance from the listener, and then possibly by less: if
+ * the owning object is around and visible, the distance from *it* is used
+ * instead when that is shorter, or a flat near-value when the two points
+ * coincide. Past 600 units the sound is not played at all -- this is a cull,
+ * not a fade to silence.
+ *
+ * WHETHER TO RE-SET THE VOLUME. Only if the previous copy has finished, or if
+ * this one is louder. Otherwise a distant instance would quietly take over a
+ * near one that is still playing. "Finished" is computed rather than asked:
+ * the buffer's length in bytes divided by 22, which is milliseconds at 22 kHz,
+ * added to the tick it started. The 0xBA2E8BA3 multiply in the original is
+ * that division.
+ *
+ * WHETHER TO RESTART IT. Only matters if it is already playing, and `flags`
+ * decides: bit 0 restarts unless the buffer is within 0x1130 bytes of the end,
+ * on the grounds that it is nearly done anyway; bit 1 refuses to interrupt at
+ * all; neither rewinds unconditionally. Then Play, which for an already
+ * playing buffer is harmless.
+ *
+ * Exercisable at last -- see tools/alsa/asoundrc. Before there was a sound
+ * device this could not run, and neither could anything it touches. */
+static_assert(DSBVOLUME_MIN == -10000, "DSBVOLUME_MIN");
+
+/* Shared with Update3DAudioVolumes below: where the ear is, where a sound
+ * with no place of its own is taken to be, and the volume at no distance. */
+#define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
+#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_DEFAULT_SOUND_POS)
+#define g_volumeAtZero  (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
+
+typedef int32_t (__cdecl *am2_points_equal_fn)(const AM2_Point *a,
+                                               const AM2_Point *b);
+typedef void *(__cdecl *am2_lookup_owner_fn)(uint32_t owner);
+#define orig_points_equal (*(am2_points_equal_fn)ADDR_POINTS_EQUAL)
+#define orig_lookup_owner (*(am2_lookup_owner_fn)ADDR_LOOKUP_OWNER_OBJ)
+#define g_defaultOwner    (*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+
+/* 22 bytes to the millisecond: the waves are 22 kHz, eight bit, mono. */
+#define SOUND_BYTES_PER_MS   22
+#define SOUND_PLAY_CUTOFF    0x258   /* 600 units; beyond this, do not play */
+#define SOUND_NEAR_DISTANCE  0x20    /* used when owner and sound coincide */
+#define SOUND_ALMOST_DONE    0x1130  /* bytes left below which a restart is
+                                      * not worth it */
+#define SOUND_FLAG_RESTART   1
+#define SOUND_FLAG_NO_INTERRUPT 2
+
+void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
+                         int32_t x, int32_t y)
+{
+    uint8_t             *slot;
+    LPDIRECTSOUNDBUFFER  buf;
+    DWORD                status;
+    int32_t              volume;
+    AM2_Point            where;
+
+    (void)unused;
+
+    if (!g_audioEnabled)
+        return;
+    if (index < 0 || index >= SOUND_FIXED_SLOTS)
+        return;
+
+    slot = (uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS + index * SOUND_SLOT_STRIDE;
+    if (!*(void **)slot)
+        return;
+    buf = *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER);
+    if (!buf)
+        return;
+
+    IDirectSoundBuffer_GetStatus(buf, &status);
+
+    where.x = (int16_t)x;
+    where.y = (int16_t)y;
+
+    if (where.x != 0) {
+        int32_t  dist = ApproxDist(&g_listenerPos, &where);
+        void    *owner = orig_lookup_owner(g_defaultOwner);
+
+        /* An owner that can see gets a say, and only ever a shortening one. */
+        if (owner && *(const int16_t *)((uint8_t *)owner + 0x62) > 0) {
+            const AM2_Point *at = (const AM2_Point *)((uint8_t *)owner + OBJ_OFF_POS);
+            int32_t          d2;
+
+            if (orig_points_equal(&where, at))
+                d2 = SOUND_NEAR_DISTANCE;
+            else
+                d2 = ApproxDist(at, &where) / 2;
+            if (d2 < dist)
+                dist = d2;
+        }
+
+        if (dist > SOUND_PLAY_CUTOFF)
+            return;                       /* too far to bother with */
+        volume = g_volumeAtZero - dist * SOUND_3D_FALLOFF;
+    } else {
+        volume = g_volumeAtZero;
+    }
+
+    if (volume < DSBVOLUME_MIN)
+        volume = DSBVOLUME_MIN;
+
+    /* Louder wins, and so does anything whose predecessor has finished. */
+    if (!(status & DSBSTATUS_PLAYING) ||
+        GetTickCount() > *(uint32_t *)(slot + SOUND_SLOT_OFF_STARTED)
+                         + *(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES)
+                           / SOUND_BYTES_PER_MS ||
+        volume > *(int32_t *)(slot + SOUND_SLOT_OFF_VOLUME)) {
+        IDirectSoundBuffer_SetVolume(
+            *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER),
+            volume);
+        *(int32_t *)(slot + SOUND_SLOT_OFF_VOLUME)  = volume;
+        *(uint32_t *)(slot + SOUND_SLOT_OFF_STARTED) = GetTickCount();
+    }
+
+    if (status & DSBSTATUS_PLAYING) {
+        buf = *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER);
+
+        if (flags & SOUND_FLAG_RESTART) {
+            DWORD played = 0;
+
+            IDirectSoundBuffer_GetCurrentPosition(buf, &played, NULL);
+            if (*(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES) - played
+                    < SOUND_ALMOST_DONE)
+                goto play;                /* nearly over; let it finish */
+            IDirectSoundBuffer_SetCurrentPosition(buf, 0);
+        } else if (flags & SOUND_FLAG_NO_INTERRUPT) {
+            return;
+        } else {
+            IDirectSoundBuffer_SetCurrentPosition(buf, 0);
+        }
+    }
+
+play:
+    IDirectSoundBuffer_Play(
+        *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER),
+        0, 0, 0);
+}
+
 /* Stop one dynamic sound, by slot and by name -- 0x0040B860.
  *
  * The slot says which sound and the name says which sound it had better be:
@@ -556,9 +699,6 @@ static_assert(DSBVOLUME_MIN == -10000, "DSBVOLUME_MIN");
 
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
 #define orig_lookup_uid (*(am2_lookup_uid_fn)ADDR_LOOKUP_BY_UID)
-#define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
-#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_DEFAULT_SOUND_POS)
-#define g_volumeAtZero  (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
 
 void __cdecl Update3DAudioVolumes(void)
 {
@@ -850,6 +990,8 @@ int audio_install(void)
                         "Update3DAudioVolumes", 0);
     rc |= patch_replace(ADDR_STOP_NAMED_SOUND, (const void *)StopNamedSound,
                         "StopNamedSound", 2);
+    rc |= patch_replace(ADDR_PLAY_SOUND_AT, (const void *)PlaySoundAt,
+                        "PlaySoundAt", 5);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
                         "SetStreamVolume", 1);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,
