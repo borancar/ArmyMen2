@@ -163,6 +163,14 @@
 #define ADDR_MOVIE_SET_VOLUME    0x00445280u  /* thiscall void(this, int32) */
 #define ADDR_MOVIE_VTABLE        0x0046FAB4u  /* stamped into the object */
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
+#define ADDR_MOVIE_DRAW_FRAME    0x004453C0u  /* thiscall void(this, arg) */
+#define ADDR_MOVIE_FINISHED      0x00445600u  /* void(void); posts WM_USER */
+#define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall, stays original */
+#define ADDR_MOVIE_BLIT          0x00445500u  /* thiscall, stays original */
+#define ADDR_MOVIE_PALETTE_OWNER 0x00477A58u  /* void **; +0x800 is a DD palette */
+#define ADDR_IAT_SMACK_TO_BUFFER 0x0046F2B0u
+#define ADDR_IAT_SMACK_DO_FRAME  0x0046F2B4u
+#define ADDR_IAT_SMACK_NEXT_FRAME 0x0046F2B8u
 #define ADDR_IAT_SMACK_CLOSE     0x0046F2C0u
 #define ADDR_IAT_SMACK_VOLUMEPAN 0x0046F2ACu
 

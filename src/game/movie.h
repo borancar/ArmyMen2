@@ -42,6 +42,15 @@ void __attribute__((thiscall)) MovieStop(void *movie);
  * going. */
 void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume);
 
+/* Original: 0x004453C0, 1 call site. Decode one frame into the movie surface
+ * and put it on screen. Driven by a multimedia timer, so it checks the window
+ * still has focus first -- the timer keeps firing after an alt-tab. */
+void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg);
+
+/* Original: 0x00445600, 2 call sites. Post WM_USER to say the movie ended,
+ * which is how a finished cutscene becomes a game state change. */
+void __cdecl MovieFinished(void);
+
 int movie_install(void);
 
 #ifdef __cplusplus

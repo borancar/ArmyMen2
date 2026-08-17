@@ -12,9 +12,9 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 25 | 105 |
-| still boundary | 12 | 35 |
-| game logic, incidental calls only | 85 | 136 |
+| reconstructed | 27 | 110 |
+| still boundary | 11 | 31 |
+| game logic, incidental calls only | 84 | 135 |
 | **total** | **122** | **276** |
 
 The middle row is the work that remains. The bottom row is not work:
@@ -33,7 +33,6 @@ function from game logic with a call in it.
 | `0x0040d5d0` | 176 | 4 | 44 | InterlockedExchange, Sleep, timeEndPeriod, timeKillEvent |
 | `0x004020a0` | 208 | 3 | 69 | CloseHandle, GetExitCodeThread, SetEvent |
 | `0x004451f0` | 144 | 2 | 72 | PostMessageA, timeSetEvent |
-| `0x004453c0` | 320 | 4 | 80 | GetFocus, _SmackDoFrame@4, _SmackNextFrame@4, _SmackToBuffer@28 |
 | `0x0040d680` | 176 | 2 | 88 | timeBeginPeriod, timeSetEvent |
 | `0x00444fc0` | 352 | 3 | 117 | _SmackDDSurfaceType@4, _SmackOpen@12, _SmackSoundUseDirectSound@4 |
 | `0x0040db50` | 416 | 3 | 138 | GetTickCount, RegCloseKey, RegCreateKeyExA |
@@ -47,11 +46,11 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 59 |
+| USER32.dll | 130 | 61 |
 | KERNEL32.dll | 99 | 13 |
 | WINMM.dll | 17 | 12 |
 | GDI32.dll | 16 | 16 |
-| smackw32.dll | 9 | 2 |
+| smackw32.dll | 9 | 5 |
 | ole32.dll | 3 | 3 |
 | ADVAPI32.dll | 2 | 0 |
 

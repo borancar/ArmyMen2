@@ -79,6 +79,8 @@ FUNCS = [
      "thiscall taking no stack arguments, so a plain `ret` is right and there "
      "is nothing to clean -- indistinguishable from the tool's `thiscall?`"),
     (0x00445280, "MovieSetVolume",   "thiscall"),
+    (0x004453C0, "MovieDrawFrame",   "thiscall"),
+    (0x00445600, "MovieFinished",    "cdecl"),
     (0x00426B50, "FindGameCD",       "cdecl"),
     (0x004466E0, "BuildFont",        "cdecl"),
     (0x0041AC60, "PresentFrame",     "cdecl"),
