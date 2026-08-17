@@ -33,6 +33,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 #define g_hmmio         (*(HMMIO *)(uintptr_t)ADDR_AUDIO_HMMIO)
 #define g_waveFormat    (*(WAVEFORMATEX **)(uintptr_t)ADDR_AUDIO_WAVEFORMAT)
 #define g_pathArg       (*(void **)(uintptr_t)ADDR_AUDIO_PATH_ARG)
+#define g_hWnd          (*(HWND *)(uintptr_t)ADDR_HWND)
 
 /* The timer resolution is stored multiplied by four. */
 #define AUDIO_PERIOD_SHIFT 2
@@ -123,6 +124,95 @@ void __cdecl ReleaseSoundBuffers(void)
         IDirectSoundBuffer_Release(g_dsBufC);
 }
 
+#define g_dsound     (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
+#define g_dsPrimary  (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DS_PRIMARY)
+#define g_dsListener (*(LPDIRECTSOUND3DLISTENER *)(uintptr_t)ADDR_DS_LISTENER)
+#define g_streamVolume (*(const int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
+#define kIID_DS3DListener (*(const IID *)(uintptr_t)ADDR_IID_DS3D_LISTENER)
+
+typedef HRESULT (WINAPI *am2_dsound_create_fn)(GUID *, LPDIRECTSOUND *, IUnknown *);
+#define orig_DirectSoundCreate (*(am2_dsound_create_fn)ADDR_DIRECTSOUNDCREATE)
+
+/* The listener's starting parameters, as float bit patterns in the original. */
+#define LISTENER_Z       (-1.0f)
+#define DOPPLER_FACTOR   9.9f
+#define ROLLOFF_FACTOR   0.25f
+
+static_assert(DSSCL_PRIORITY == 2, "DSSCL_PRIORITY");
+static_assert((DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D) == 0x11, "primary caps");
+/* The original passes 1, and 1 is DS3D_DEFERRED -- DS3D_IMMEDIATE is 0. Which
+ * is the point: all three listener settings are deferred and then applied in
+ * one CommitDeferredSettings, so the listener never sees a half-changed state.
+ * Reading it as IMMEDIATE would have made that final call look redundant. */
+static_assert(DS3D_DEFERRED == 1 && DS3D_IMMEDIATE == 0, "DS3D_*");
+static_assert(sizeof(DSBUFFERDESC) == 0x14, "DSBUFFERDESC");
+
+/* Every failure below says which step it was, lets the buffers go and answers
+ * 0 -- so the caller only has to check the one result. */
+static int32_t SoundFailed(const char *what)
+{
+    orig_log(what);
+    ReleaseSoundBuffers();
+    return 0;
+}
+
+int32_t __cdecl InitDirectSound(void)
+{
+    DSBUFFERDESC desc;
+
+    if (orig_DirectSoundCreate(NULL, &g_dsound, NULL) != DS_OK) {
+        /* Nothing was created, so nothing is released here. */
+        orig_log("Unable to create directsound object\n");
+        return 0;
+    }
+
+    /* Priority rather than exclusive: the game wants to set the primary
+     * buffer's format without stopping everyone else making noise. */
+    if (IDirectSound_SetCooperativeLevel(g_dsound, g_hWnd, DSSCL_PRIORITY) != DS_OK)
+        return SoundFailed("Unable to set direct sound cooperative level\n");
+
+    desc.dwSize        = sizeof desc;
+    desc.dwFlags       = DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D;
+    desc.dwBufferBytes = 0;
+    desc.dwReserved    = 0;
+    desc.lpwfxFormat   = NULL;
+    if (IDirectSound_CreateSoundBuffer(g_dsound, &desc, &g_dsPrimary, NULL) != DS_OK)
+        return SoundFailed("Unable to create primary sound buffer\n");
+
+    /* The 3D listener is not created, it is asked for -- it is the primary
+     * buffer seen through another interface. */
+    if (IDirectSoundBuffer_QueryInterface(g_dsPrimary, kIID_DS3DListener,
+                                          (LPVOID *)&g_dsListener) != DS_OK)
+        return SoundFailed("Unable to initialize 3d sound\n");
+
+    if (IDirectSound3DListener_SetPosition(g_dsListener, 0.0f, 0.0f, LISTENER_Z,
+                                           DS3D_DEFERRED) != DS_OK)
+        return SoundFailed("Unable to set listener position\n");
+    if (IDirectSound3DListener_SetDopplerFactor(g_dsListener, DOPPLER_FACTOR,
+                                                DS3D_DEFERRED) != DS_OK)
+        return SoundFailed("Unable to set sound doppler factor\n");
+    if (IDirectSound3DListener_SetRolloffFactor(g_dsListener, ROLLOFF_FACTOR,
+                                                DS3D_DEFERRED) != DS_OK)
+        return SoundFailed("Unable to set sound roll off factor\n");
+    if (IDirectSound3DListener_CommitDeferredSettings(g_dsListener) != DS_OK)
+        return SoundFailed("Unable to commit sound settings\n");
+
+    return 1;
+}
+
+void __cdecl SetStreamVolume(int32_t pan)
+{
+    if (!g_audioEnabled)
+        return;
+    if (!g_buffer)
+        return;
+
+    /* Pan is only worth setting if the volume took. */
+    if (IDirectSoundBuffer_SetVolume(g_buffer, g_streamVolume) != DS_OK)
+        return;
+    IDirectSoundBuffer_SetPan(g_buffer, pan);
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -133,5 +223,9 @@ int audio_install(void)
                         "StartAudioStream", 2);
     rc |= patch_replace(ADDR_RELEASE_SOUND_BUFS, (const void *)ReleaseSoundBuffers,
                         "ReleaseSoundBuffers", 0);
+    rc |= patch_replace(ADDR_INIT_DIRECTSOUND, (const void *)InitDirectSound,
+                        "InitDirectSound", 0);
+    rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
+                        "SetStreamVolume", 1);
     return rc;
 }

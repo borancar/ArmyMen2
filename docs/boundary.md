@@ -24,15 +24,13 @@ call DirectDraw all day without the import table showing it.
 
 | | functions | call sites |
 |---|---:|---:|
-| reconstructed | 16 | 50 |
-| still to do | 17 | 45 |
+| reconstructed | 18 | 59 |
+| still to do | 15 | 36 |
 
 - `0x0040ced0` 1792B, 12 calls — DirectSound x12
-- `0x0040c800` 432B, 7 calls — DirectSound x7
 - `0x00427070` 944B, 5 calls — input device x5
 - `0x0041be80` 832B, 3 calls — IDirectDraw2 x3
 - `0x0040cd20` 368B, 2 calls — DirectSound x2
-- `0x0040ce90` 64B, 2 calls — DirectSound x2
 - `0x00412fe0` 1184B, 2 calls — locked x2
 - `0x0041b0e0` 1472B, 2 calls — IDirectDraw x1, primary x1
 - `0x00425af0` 288B, 2 calls — back buffer x1, primary x1

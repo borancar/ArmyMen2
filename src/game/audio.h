@@ -51,6 +51,22 @@ void __cdecl StartAudioStream(void *track, int32_t which);
  * immediately afterwards. */
 void __cdecl ReleaseSoundBuffers(void);
 
+/* Original: 0x0040C800, 1 call site. Bring DirectSound up.
+ *
+ * Creates the object, takes priority cooperative level, makes a primary buffer
+ * with 3D control, queries the 3D listener off it and gives that its starting
+ * position, doppler and rolloff before committing. Returns 1 on success; every
+ * failure names itself in the log, releases what it had and answers 0.
+ *
+ * On this machine it fails at the first step, because there is no device. */
+int32_t __cdecl InitDirectSound(void);
+
+/* Original: 0x0040CE90, 3 call sites. Set the stream's volume and pan.
+ *
+ * Volume comes from a global and pan from the caller, and the pan is skipped if
+ * the volume did not take. */
+void __cdecl SetStreamVolume(int32_t pan);
+
 int audio_install(void);
 
 #ifdef __cplusplus

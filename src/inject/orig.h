@@ -180,6 +180,14 @@
 #define ADDR_AUDIO_BUFFER        0x004FA404u  /* IDirectSoundBuffer *, the stream */
 #define ADDR_AUDIO_BUFFER_2      0x004FA440u  /* IDirectSoundBuffer *, the one played */
 #define ADDR_RELEASE_SOUND_BUFS  0x0040C7D0u  /* void(void), 8 call sites */
+#define ADDR_INIT_DIRECTSOUND    0x0040C800u  /* int32_t(void); 1 on success */
+#define ADDR_SET_STREAM_VOLUME   0x0040CE90u  /* void(int32 pan) */
+#define ADDR_DIRECTSOUNDCREATE   0x00463390u  /* jmp [0x0046F01C] */
+#define ADDR_DSOUND              0x004FA46Cu  /* IDirectSound * (same as BUF_C) */
+#define ADDR_DS_PRIMARY          0x004FA470u  /* the primary sound buffer */
+#define ADDR_DS_LISTENER         0x004FA474u  /* IDirectSound3DListener * */
+#define ADDR_IID_DS3D_LISTENER   0x0046F3E8u
+#define ADDR_STREAM_VOLUME       0x0051231Cu  /* int32_t, the wanted volume */
 #define ADDR_DSOUND_BUF_A        0x004FA470u
 #define ADDR_DSOUND_BUF_B        0x004FA474u
 #define ADDR_DSOUND_BUF_C        0x004FA46Cu
