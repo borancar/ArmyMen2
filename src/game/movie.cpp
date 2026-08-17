@@ -72,7 +72,19 @@ typedef void (__stdcall *am2_smack_volumepan_fn)(void *smack, uint32_t trackFlag
 #define smack_use_dsound (*(am2_smack_use_dsound_fn *)(uintptr_t)ADDR_IAT_SMACK_USE_DSOUND)
 
 /* Smack handle fields used only by the opener. */
-#define SMACK_WIDTH 0x004u
+#define SMACK_WIDTH   0x004u
+#define SMACK_PALETTE 0x08Au   /* three bytes per entry, in the Smack handle */
+
+/* Windows keeps ten entries at each end; the film gets what is between. */
+#define MOVIE_PALETTE_FIRST 10
+#define MOVIE_PALETTE_LAST  245
+
+#define MOVIE_TIMER_MS  0x32   /* 50ms per frame */
+#define MOVIE_TIMER_RES 0x0A
+
+typedef void (__stdcall *am2_movie_slot_fn)(void);
+typedef void (__cdecl *am2_delete_fn)(void *);
+#define orig_delete (*(am2_delete_fn)ADDR_GAME_DELETE)
 
 typedef LPDIRECTDRAWSURFACE (__cdecl *am2_make_surface_fn)(int32_t w, int32_t h);
 #define orig_make_surface (*(am2_make_surface_fn)ADDR_MOVIE_MAKE_SURFACE)
@@ -82,7 +94,6 @@ typedef LPDIRECTDRAWSURFACE (__cdecl *am2_make_surface_fn)(int32_t w, int32_t h)
 /* Still in the original image: the palette apply and the blit to screen are
  * game logic, and the timer callback that drives all this is never ours. */
 typedef void (__attribute__((thiscall)) *am2_movie_arg_fn)(void *movie, void *arg);
-#define orig_apply_palette (*(am2_movie_arg_fn)ADDR_MOVIE_APPLY_PALETTE)
 #define orig_blit_to_screen (*(am2_movie_arg_fn)ADDR_MOVIE_BLIT)
 
 #define g_moviePaletteOwner (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
@@ -133,6 +144,93 @@ void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume)
     for (i = 0, track = SMACK_TRACK_FIRST; i < SMACK_TRACK_COUNT; i++, track <<= 1)
         smack_volumepan(fld(movie, MOVIE_SMACK, void *), track,
                         (uint32_t)volume, SMACK_PAN_CENTRE);
+}
+
+/* Original: 0x00445320, 2 call sites. Push the film's palette to the display.
+ *
+ * Smacker keeps its palette inside its own handle, three bytes per entry. This
+ * copies it into the game's PALETTEENTRY table -- entries 10 through 245 only,
+ * which is exactly the range SnapshotSystemPalette marks PC_NOCOLLAPSE, because
+ * the twenty at either end belong to Windows -- and then hands the whole table
+ * to the surface's DirectDraw palette.
+ *
+ * The peFlags byte of each entry is stepped over rather than written, so the
+ * NOCOLLAPSE marks survive a palette change. */
+void __attribute__((thiscall)) MovieApplyPalette(void *movie,
+                                                 LPDIRECTDRAWSURFACE surf)
+{
+    LPDIRECTDRAWPALETTE pal = NULL;
+    const uint8_t      *src;
+    LPPALETTEENTRY      dst = (LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE;
+    int32_t             i;
+
+    src = (const uint8_t *)fld(movie, MOVIE_SMACK, void *) + SMACK_PALETTE;
+
+    for (i = MOVIE_PALETTE_FIRST; i <= MOVIE_PALETTE_LAST; i++) {
+        dst[i].peRed   = *src++;
+        dst[i].peGreen = *src++;
+        dst[i].peBlue  = *src++;
+    }
+
+    IDirectDrawSurface_GetPalette(surf, &pal);
+    if (pal) {
+        IDirectDrawPalette_SetEntries(pal, 0, 0, 256, dst);
+        IDirectDrawPalette_Release(pal);
+    }
+}
+
+/* Original: 0x004451F0, 1 call site. Start playing: put a timer on it.
+ *
+ * Frames are driven by a multimedia timer rather than by the game loop, which
+ * is why a cutscene keeps playing at its own rate whatever the frame rate is
+ * doing. 50ms period, 10ms resolution, and the callback stays in the original
+ * image -- it is what calls MovieDrawFrame.
+ *
+ * If the timer cannot be had the movie is not merely abandoned, it is destroyed
+ * and the state machine told to move on, because there is nothing else to drive
+ * it and the game would otherwise sit on a still frame forever. */
+int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
+{
+    (void)arg;
+
+    if (!fld(movie, MOVIE_SMACK, void *))
+        return 0;
+    if (fld(movie, MOVIE_TIMER_RUN, int32_t))
+        return 0;
+    fld(movie, MOVIE_TIMER_RUN, int32_t) = 1;
+
+    /* Slot 0 of the current movie's own table, called without `this` -- the
+     * same shape as the paint object in winproc.cpp. Two dereferences: the
+     * global holds the object, the object begins with its table. */
+    {
+        void              *current = *(void **)(uintptr_t)ADDR_MOVIE_CURRENT;
+        am2_movie_slot_fn *vtbl    = *(am2_movie_slot_fn **)current;
+
+        vtbl[0]();
+    }
+
+    fld(movie, MOVIE_TIMER_ID, UINT) =
+        timeSetEvent(MOVIE_TIMER_MS, MOVIE_TIMER_RES,
+                     (LPTIMECALLBACK)(uintptr_t)ADDR_MOVIE_TIMER_PROC, 0,
+                     TIME_PERIODIC);
+
+    if (fld(movie, MOVIE_TIMER_ID, UINT)) {
+        fld(movie, MOVIE_ACTIVE, int32_t) = 1;
+        return 1;
+    }
+
+    /* No timer, so no movie. Tear it down and let the game carry on. */
+    {
+        void *current = *(void **)(uintptr_t)ADDR_MOVIE_CURRENT;
+
+        if (current) {
+            MovieStop(current);
+            orig_delete(current);
+        }
+        *(void **)(uintptr_t)ADDR_MOVIE_CURRENT = NULL;
+    }
+    PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
+    return 0;
 }
 
 /* Original: 0x00444FC0, 1 call site. Open a .SMK and get ready to play it.
@@ -261,7 +359,7 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
 
     if (fld(smack, SMACK_NEW_PALETTE, int32_t) &&
         !fld(movie, MOVIE_DD_TYPE, int32_t)) {
-        orig_apply_palette(movie, arg);
+        MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
 
         /* See the standing note: a lock used as a question, never answered. */
         hr = IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL);
@@ -271,7 +369,7 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
             IDirectDrawSurface_SetPalette(
                 surf, *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner +
                                                MOVIE_PALETTE_OFF));
-            orig_apply_palette(movie, arg);
+            MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
         }
     }
 
@@ -313,5 +411,8 @@ int movie_install(void)
     rc |= patch_replace(ADDR_MOVIE_FINISHED, (const void *)MovieFinished,
                         "MovieFinished", 0);
     rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);
+    rc |= patch_replace(ADDR_MOVIE_START, (const void *)MovieStart, "MovieStart", 1);
+    rc |= patch_replace(ADDR_MOVIE_APPLY_PALETTE, (const void *)MovieApplyPalette,
+                        "MovieApplyPalette", 1);
     return rc;
 }

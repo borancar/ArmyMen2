@@ -171,7 +171,16 @@
 #define ADDR_IAT_SMACK_USE_DSOUND 0x0046F2C4u
 #define ADDR_MOVIE_DRAW_FRAME    0x004453C0u  /* thiscall void(this, arg) */
 #define ADDR_MOVIE_FINISHED      0x00445600u  /* void(void); posts WM_USER */
-#define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall, stays original */
+#define ADDR_MOVIE_START         0x004451F0u  /* thiscall int32(this, arg) */
+#define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall void(this, surface) */
+#define ADDR_MOVIE_CURRENT       0x006568A0u  /* the movie being played, or null */
+#define ADDR_MOVIE_TIMER_PROC    0x004455E0u  /* the timer callback, stays original */
+#define ADDR_GAME_DELETE         0x004648F5u  /* the game's own operator delete */
+/* Posted to the window to advance the game state machine: 0x400 when a movie
+ * finishes, 0x402 when one could not be started. Both land in the same handler,
+ * which is why src/game/winproc.cpp forwards them together. */
+#define AM2_WM_STATE_ADVANCE     0x0400u
+#define AM2_WM_STATE_ABORT       0x0402u
 #define ADDR_MOVIE_BLIT          0x00445500u  /* thiscall, stays original */
 #define ADDR_MOVIE_PALETTE_OWNER 0x00477A58u  /* void **; +0x800 is a DD palette */
 #define ADDR_IAT_SMACK_TO_BUFFER 0x0046F2B0u

@@ -46,8 +46,10 @@
 #include <stdint.h>
 
 /* Messages the original names by number. */
-#define AM2_WM_COMM_TICK_A   0x0400u
-#define AM2_WM_COMM_TICK_B   0x0402u
+/* Not comm traffic, despite living in the same range: src/game/movie.cpp posts
+ * these -- 0x400 when a film finishes, 0x402 when one could not be started --
+ * and both mean "advance the state machine". They were named for their
+ * neighbours before the movie player was read. */
 #define AM2_WM_COMM_464      0x0464u
 #define AM2_WM_COMM_46B      0x046Bu
 #define AM2_WM_COMM_46C      0x046Cu
@@ -216,8 +218,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         FlipToGDI();
         break;
 
-    case AM2_WM_COMM_TICK_A:
-    case AM2_WM_COMM_TICK_B:
+    case AM2_WM_STATE_ADVANCE:
+    case AM2_WM_STATE_ABORT:
         if (g_gameState == 0)
             g_stateDispatch[orig_current_state()].fn();
         else {

@@ -202,9 +202,17 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. Currently 113 of the 140 genuine
+  drift from what the harness installs. Currently 115 of the 140 genuine
   boundary sites are ours; the other 136 sites in the binary are game logic
   that happens to read a clock.
+- **`obj -> table -> slot` with no `this` is a real shape in this binary, and
+  it needs two dereferences.** `0x0065A058` (the repaint object) and
+  `0x006568A0` (the current movie) are both reached as
+  `mov ecx,[global]; mov eax,[ecx]; call [eax]`. Writing that as one
+  dereference calls the vtable pointer as if it were a function, and the game
+  exits instantly with nothing useful in the log. Cost an iteration; use a
+  named local for the object and another for the table rather than a nested
+  cast.
 - **Pick the next target by boundary density, not by import count.** Ranking
   what is left by sites-per-byte finds functions that are boundary code;
   ranking by sites alone finds 5,760-byte game-logic functions whose only
