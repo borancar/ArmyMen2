@@ -197,6 +197,45 @@ def main():
         w(f"| game logic, incidental calls only | {len(incidental)} | {sites(incidental)} |\n")
         w(f"| **total** | **{len(per_fn)}** | **{total_sites}** |\n\n")
 
+        # Per-DLL, which is the form the question is usually asked in: is the
+        # channel to this library ours yet, or not?
+        per_dll = collections.defaultdict(lambda: [0, 0])
+        leftover = collections.Counter()
+        for r in rows:
+            fn = int(r["func"], 16)
+            if not fn or fn >= CRT_START:
+                continue
+            d = per_dll[r["dll"].upper().replace(".DLL", "")]
+            d[1] += 1
+            if fn in done_fns:
+                d[0] += 1
+            else:
+                leftover[(r["symbol"], r["symbol"] in INCIDENTAL)] += 1
+
+        w("## By library\n\n")
+        w("The same import sites grouped by which DLL they reach, because that\n"
+          "is the form the question is usually asked in -- is the channel to\n"
+          "this library ours yet?\n\n")
+        w("| library | reconstructed | sites | |\n|---|---:|---:|---|\n")
+        for dll, (d, t) in sorted(per_dll.items(), key=lambda kv: -kv[1][1]):
+            w(f"| {dll} | {d} | {t} | {'**complete**' if d == t else ''} |\n")
+        w("\n")
+
+        real_left = sorted((sym, n) for (sym, inc), n in leftover.items() if not inc)
+        w("USER32 and KERNEL32 never reach 100% and are not meant to: most of\n"
+          "what is left in them is a `GetTickCount` or an `IntersectRect`, which\n"
+          "is running on Windows rather than talking to anyone. The list that\n"
+          "matters is the one with those removed -- every non-incidental import\n"
+          "site still outside reconstructed code:\n\n")
+        if real_left:
+            w("| symbol | sites |\n|---|---:|\n")
+            for sym, n in real_left:
+                w(f"| `{sym}` | {n} |\n")
+        else:
+            w("There are none. Every non-incidental import site in the image is\n"
+              "inside reconstructed code.\n")
+        w("\n")
+
         w("## DirectX through COM\n\n")
         w("These own no import site and so appear nowhere above. A function can\n"
           "call DirectDraw all day without the import table showing it.\n\n")

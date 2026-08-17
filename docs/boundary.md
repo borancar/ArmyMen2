@@ -17,6 +17,33 @@ wholesale by libc rather than function by function.
 | game logic, incidental calls only | 83 | 134 |
 | **total** | **122** | **276** |
 
+## By library
+
+The same import sites grouped by which DLL they reach, because that
+is the form the question is usually asked in -- is the channel to
+this library ours yet?
+
+| library | reconstructed | sites | |
+|---|---:|---:|---|
+| USER32 | 63 | 130 |  |
+| KERNEL32 | 19 | 99 |  |
+| WINMM | 17 | 17 | **complete** |
+| GDI32 | 16 | 16 | **complete** |
+| SMACKW32 | 9 | 9 | **complete** |
+| OLE32 | 3 | 3 | **complete** |
+| ADVAPI32 | 2 | 2 | **complete** |
+
+USER32 and KERNEL32 never reach 100% and are not meant to: most of
+what is left in them is a `GetTickCount` or an `IntersectRect`, which
+is running on Windows rather than talking to anyone. The list that
+matters is the one with those removed -- every non-incidental import
+site still outside reconstructed code:
+
+| symbol | sites |
+|---|---:|
+| `MessageBoxA` | 6 |
+| `ShowCursor` | 1 |
+
 ## DirectX through COM
 
 These own no import site and so appear nowhere above. A function can
