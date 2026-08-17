@@ -265,6 +265,33 @@ not evidence of a fault on its own — check whether registration overlapped the
 walks first. (The obvious confirmation on MAP 01, watching the ratio
 converge on 325 as more walks happen at the final count, is still not done.)
 
+**`tools/ab.sh mission` is the configuration that reaches live gameplay, and
+it exists because `bootcamp` does not.** While either opening dialog is up the
+game composes no frames at all — `ComposeFrame` sat frozen at 170 for as long
+as the instruction sign was on screen, and the dirty-rectangle merge at
+`0x0041D060` never ran once. `bootcamp` stops at the briefing, so everything
+behind those dialogs was uncompared. `mission` clears both, then scrolls.
+
+Two things it needed, both of which cost time to find:
+
+- **`tools/point.py` cannot clear the instruction sign.** It finds the pointer
+  by colour on a screenshot and that screen defeats it, so every click silently
+  did nothing and the counters simply never moved. `drive.sh ctl "mouse left
+  tap"` needs no cursor at all, and position is irrelevant when any click will
+  do. Reach for the raw button whenever point.py appears to be ignored.
+- **The per-frame `-dbg` markers have to be filtered, and the count reported.**
+  `-dbg` prints one character per frame during play; over a mission that is
+  ~25,000 lines and the two sides never live the same number of frames. The
+  first `mission` run compared 24,914 lines against 21,741 and reported a
+  difference that was entirely wall-clock. `ab.sh` now strips them through a
+  `VOLATILE` filter kept separate from the harness filter — removing our noise
+  and removing the game's are different claims — and prints how many went, so a
+  filter that ate the whole log could not pass as a clean result.
+
+Its pixel check is disabled, and that is measured rather than assumed: two
+unsynchronised runs of a live scrolling mission differ by ~22% of the frame,
+which is meaningless by construction. The log is the evidence, as with `intro`.
+
 **The Boot Camp dialogs do dismiss, and getting past them is worth doing.** The
 mission opens with MESSAGE FROM HQ over the map — its OK is at roughly
 `476,224` — and behind that is a full-screen instruction sign that any click
