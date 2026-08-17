@@ -125,6 +125,20 @@ void __cdecl SetPaletteRange(PALETTEENTRY *entries, uint32_t first,
  * how every sprite gets its transparent index. */
 void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key);
 
+/* Original: 0x00423D90, 1 call site. Read one sprite from an open stream into a
+ * surface it creates for the purpose.
+ *
+ * The counterpart of ReloadBitmapSurface below, and the same sequence with a
+ * CreateOffscreenSurface in front of it: the surface is made with no colour key,
+ * because the key is not known until the copy has run and reported it back
+ * through `nbytes`.
+ *
+ * Returns the new surface, or NULL if the read, the create or the descriptor
+ * failed -- and, wrongly, a released surface if the lock or the copy did. */
+LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
+                                                int32_t width, int32_t height,
+                                                const uint8_t *remap, uint32_t flags);
+
 /* Original: 0x00424280, 1 call site. Re-read one sprite from an open stream
  * straight into a surface.
  *

@@ -406,6 +406,68 @@ void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key)
     IDirectDrawSurface_SetColorKey(surf, DDCKEY_SRCBLT, &ck);
 }
 
+/* STANDING NOTE -- the two paths after the Lock return the surface they have
+ * just Released, so the caller is handed a dangling interface pointer and told
+ * it succeeded. As in ReloadBitmapSurface neither Unlocks first, and both blame
+ * the Lock because the copy-failed path jumps into the Lock handler rather than
+ * carrying its own message. Reproduced as the original has it.
+ *
+ * The descriptor-failure path in between leaks instead: it returns NULL without
+ * releasing the surface it created a moment earlier. Also reproduced. */
+LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
+                                                int32_t width, int32_t height,
+                                                const uint8_t *remap, uint32_t flags)
+{
+    DDSURFACEDESC        ddsd;
+    LPDIRECTDRAWSURFACE  surf;
+    uint8_t             *pixels;
+
+    pixels = (uint8_t *)orig_malloc(nbytes);
+    if (orig_fread(pixels, nbytes, 1, fp) != 1) {
+        orig_log("Error sprite from stream in CreateBitmapSurface().\n");
+        orig_free(pixels);
+        return NULL;
+    }
+
+    /* No caps and no colour key yet -- the key is not known until the copy has
+     * run, and is applied at the end from the same slot the count came in on. */
+    surf = CreateOffscreenSurface(width, height, 0, -1);
+    if (!surf) {
+        orig_log("Unable to create directdraw surface in CreateBitmapSurface()");
+        orig_free(pixels);
+        return NULL;
+    }
+
+    memset(&ddsd, 0, sizeof ddsd);
+    ddsd.dwSize = sizeof ddsd;
+    if (IDirectDrawSurface_GetSurfaceDesc(surf, &ddsd) != DD_OK) {
+        orig_log("Unable to get surface desc in CreateBitmapSurface()\n");
+        orig_free(pixels);
+        return NULL;
+    }
+
+    if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
+        IDirectDrawSurface_Release(surf);
+        orig_log("Error on Lock in CreateBitmapSurface()");
+        orig_free(pixels);
+        return surf;
+    }
+
+    if (!orig_blit_bitmap_in(ddsd.lpSurface, ddsd.lPitch, pixels,
+                             width, height, remap, &nbytes)) {
+        IDirectDrawSurface_Release(surf);
+        orig_log("Error on Lock in CreateBitmapSurface()");
+        orig_free(pixels);
+        return surf;
+    }
+
+    IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
+    if (!(flags & 1))
+        SetSurfaceColorKey(surf, (uint8_t)nbytes);
+    orig_free(pixels);
+    return surf;
+}
+
 /* STANDING NOTE -- both failure paths after the Lock return 1, which is the
  * value the caller reads as success. The surface is Released, the buffer freed
  * and an error logged, and then the function claims it worked. Worse, neither
@@ -521,6 +583,8 @@ int surface_install(void)
                         "SetPaletteRange", 3);
     rc |= patch_replace(ADDR_SET_SURF_COLORKEY, (const void *)SetSurfaceColorKey,
                         "SetSurfaceColorKey", 2);
+    rc |= patch_replace(ADDR_CREATE_BITMAP, (const void *)CreateBitmapSurface,
+                        "CreateBitmapSurface", 6);
     rc |= patch_replace(ADDR_RELOAD_BITMAP, (const void *)ReloadBitmapSurface,
                         "ReloadBitmapSurface", 7);
     return rc;

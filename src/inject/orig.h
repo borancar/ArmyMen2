@@ -94,6 +94,7 @@
  * across the call. Whether this routine actually writes through it was not
  * traced; passing the address and re-reading is faithful either way. */
 #define ADDR_BLIT_BITMAP_IN  0x0041BA90u
+#define ADDR_CREATE_BITMAP   0x00423D90u  /* surface *(FILE*, ...) */
 #define ADDR_RELOAD_BITMAP   0x00424280u  /* int32(surface*, FILE*, ...) */
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
