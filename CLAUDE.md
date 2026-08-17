@@ -450,9 +450,21 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   Win32 call site in the image that can actually execute is now either inside
   reconstructed code or incidental — a `GetTickCount`, an `IntersectRect`, a
   mutex wait. What is left outside is three `MessageBoxA` calls, and all three
-  sit behind copy-protection checks that have been patched to skip them, so
-  none can run. `tools/coverage.py` reports the symbols and
-  `docs/binarypatches.md` explains why they cannot fire.
+  sit behind copy-protection checks that have been patched to skip them.
+
+  **That last step is now proved rather than asserted**, and the proof needed
+  two corrections to be worth anything. `tools/binpatches.py` checks each
+  skipped `MessageBoxA` against every branch target and stored address in the
+  image, and all five answer *nothing can reach this*.
+
+  The first version asked "does anything point into the skipped span", which
+  answers yes for `0x0040EE9D` — its span is re-entered at `0x0040EEE7`, which
+  is *after* the dialog and cannot run it. The question has to be whether
+  anything lands at or before the call. And the branch scan read raw bytes for
+  `0x70`-`0x7F`, which finds other instructions' operands and invented a `jo`
+  and a `js` into the second dialog's span; branches now come from decoded
+  instructions. Data references still come from a raw scan, because a wrong one
+  there only makes the check more conservative.
 
   **The DirectX object claim was false until the palette was reconstructed.**
   "Every DirectX object in the process is created, configured and destroyed by

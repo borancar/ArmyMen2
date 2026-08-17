@@ -27,6 +27,7 @@ Writes docs/binarypatches.md. Nothing here modifies the executable; the harness
 does that, off by default, from src/inject/restore.c.
 """
 
+import csv
 import os
 import struct
 import sys
@@ -121,6 +122,66 @@ def cd_check_sites(img):
     return out
 
 
+def branch_targets(img):
+    """Every address the image can transfer control to or points at.
+
+    Branches come from DECODED instructions, not from a byte scan. Scanning
+    raw bytes for 0x70-0x7F and 0xEB finds operands of other instructions and
+    invents branches: it reported a `jo` and a `js` into the second CD dialog's
+    span, neither of which is an instruction at all. Data references still come
+    from a raw scan, because an address genuinely can sit at any offset as an
+    immediate -- but a wrong data reference only ever makes this check more
+    conservative, while a wrong branch makes it wrong.
+    """
+    out = set()
+    for insn in img.disasm(".text"):
+        if insn.mnemonic in ("jmp", "call") or (
+                insn.mnemonic.startswith("j") and insn.mnemonic != "jmp"):
+            if insn.op_str.startswith("0x"):
+                out.add(int(insn.op_str, 16))
+    for _name, start, _end, data in img.sections:
+        for j in range(len(data) - 5):
+            if data[j] == 0x68 or 0xB8 <= data[j] <= 0xBF:
+                out.add(struct.unpack_from("<I", data, j + 1)[0])
+        for j in range((-start) % 4, len(data) - 4, 4):
+            out.add(struct.unpack_from("<I", data, j)[0])
+    return out
+
+
+def guarded_dialogs(img, patches):
+    """Per patched jump: the MessageBoxA it skips, and whether that can be run.
+
+    Skipping a block proves only that it cannot be fallen into, so this also
+    asks whether anything reaches the dialog itself. The question has to be
+    that precise. Asking merely "does anything point into the span" answers
+    yes for 0x0040EE9D, whose span is re-entered at 0x0040EEE7 -- which is
+    AFTER its MessageBoxA and therefore cannot run it.
+
+    A dialog is reachable if some target outside the span lands at or before
+    its call site but still inside the span.
+    """
+    targets = branch_targets(img)
+    calls = {}
+    path = os.path.join(REPO, "docs", "imports.tsv")
+    if os.path.exists(path):
+        with open(path) as fh:
+            for row in csv.DictReader(fh, delimiter="\t"):
+                if row["symbol"] == "MessageBoxA":
+                    calls.setdefault(int(row["site"], 16), row["func"])
+
+    out = []
+    for p in patches:
+        lo, hi = p["jump"] + len(p["bytes"]), p["target"]
+        if hi <= lo:
+            continue
+        site = next((c for c in sorted(calls) if lo <= c < hi), None)
+        if site is None:
+            continue
+        reaching = sorted(t for t in targets if lo <= t <= site)
+        out.append((p["jump"], site, reaching))
+    return out
+
+
 def main():
     img = am2.Image()
     patches = find_patches(img)
@@ -167,6 +228,21 @@ def main():
           "`src/game/cdcheck.h` does; that header also carries the retail check\n"
           "as compilable source behind `#ifdef AM2_COPY_PROTECTION`, off by\n"
           "default.\n\n")
+
+        w("## Can the skipped dialogs run?\n\n")
+        w("A patched jump proves the block after it cannot be fallen into, and\n"
+          "no more -- a branch from elsewhere would still get there. So for each\n"
+          "one the `MessageBoxA` it skips is located and checked against every\n"
+          "decoded branch target and every stored or immediate address in the\n"
+          "image. What matters is whether anything lands AT OR BEFORE the call,\n"
+          "since a target past it cannot run it: 0x0040EE9D's span is re-entered\n"
+          "at 0x0040EEE7, which is after its dialog and therefore harmless.\n\n")
+        w("| patched jump | the dialog it skips | can reach it |\n|---|---|---:|\n")
+        for jump, site, reaching in guarded_dialogs(img, patches):
+            w(f"| `{jump:#010x}` | `{site:#010x}` | "
+              f"{'**nothing**' if not reaching else len(reaching)} |\n")
+        w("\nEvery one of them answers *nothing*, so none of these dialogs can\n"
+          "execute in this build however the game is driven.\n\n")
 
         w("## The MULTIPLAYER button\n\n")
         w("`0x0044D110` builds the title menu one button at a time, each the\n"

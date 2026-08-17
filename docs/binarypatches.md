@@ -44,6 +44,27 @@ reconstruction calls it and discards the answer, which is what
 as compilable source behind `#ifdef AM2_COPY_PROTECTION`, off by
 default.
 
+## Can the skipped dialogs run?
+
+A patched jump proves the block after it cannot be fallen into, and
+no more -- a branch from elsewhere would still get there. So for each
+one the `MessageBoxA` it skips is located and checked against every
+decoded branch target and every stored or immediate address in the
+image. What matters is whether anything lands AT OR BEFORE the call,
+since a target past it cannot run it: 0x0040EE9D's span is re-entered
+at 0x0040EEE7, which is after its dialog and therefore harmless.
+
+| patched jump | the dialog it skips | can reach it |
+|---|---|---:|
+| `0x0040ee9d` | `0x0040eeb2` | **nothing** |
+| `0x0042ed4b` | `0x0042ed60` | **nothing** |
+| `0x0042f2a9` | `0x0042f2be` | **nothing** |
+| `0x0044d303` | `0x0044d318` | **nothing** |
+| `0x0044d40a` | `0x0044d41f` | **nothing** |
+
+Every one of them answers *nothing*, so none of these dialogs can
+execute in this build however the game is driven.
+
 ## The MULTIPLAYER button
 
 `0x0044D110` builds the title menu one button at a time, each the
