@@ -248,12 +248,24 @@
  * that honoured it has been composed. */
 #define ADDR_FULL_REDRAW         0x00512460u  /* int32_t */
 #define ADDR_COMPOSE_FRAME       0x0042DA30u  /* void(void) */
-/* ComposeFrame's original callees, left alone. 0x0042B420 decays a scroll
- * counter, 0x0042D6D0 draws the scene into the offscreen surface, 0x0041D060
- * merges this frame's dirty rectangle with last frame's, and 0x0041DCE0 clears
- * three word counters. */
+/* ComposeFrame's callees. 0x0042B420 decays a scroll counter and 0x0041DCE0
+ * clears three word counters; both stay original.
+ *
+ * 0x0042D6D0 went in as ADDR_DRAW_SCENE, guessed from where ComposeFrame calls
+ * it. Reading the body says otherwise: it recentres the camera on the view,
+ * clamps it to the map, scrolls the CACHE surface onto itself by the tile
+ * delta and repaints the strips that exposed. Same shape as ScrollView one
+ * level down, in tiles rather than pixels. Renamed, and that is the fourth
+ * call-site name this project has had to correct. */
 #define ADDR_SCROLL_DECAY        0x0042B420u  /* void(void) */
-#define ADDR_DRAW_SCENE          0x0042D6D0u  /* void(void) */
+#define ADDR_SCROLL_MAP_CACHE    0x0042D6D0u  /* void(void) */
+/* The view's size in tiles -- camera right and bottom are these plus the
+ * camera origin, which is how ADDR_VISIBLE_TILES's last two fields are kept. */
+#define ADDR_VIEW_TILES_W        0x00514EA0u  /* int32_t */
+#define ADDR_VIEW_TILES_H        0x00514EA4u  /* int32_t */
+/* The map's size in tiles; the camera is clamped to one less than each. */
+#define ADDR_MAP_TILES_W         0x00514DDCu  /* int32_t */
+#define ADDR_MAP_TILES_H         0x00514DE0u  /* int32_t */
 #define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
 /* The rectangle the view is clipped against before anything is compared --
  * the map's extent on screen. */

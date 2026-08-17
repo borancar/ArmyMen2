@@ -406,7 +406,7 @@ bad:
 
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_scroll_decay      (*(am2_void_fn)ADDR_SCROLL_DECAY)
-#define orig_draw_scene        (*(am2_void_fn)ADDR_DRAW_SCENE)
+#define orig_scroll_map_cache        (*(am2_void_fn)ADDR_SCROLL_MAP_CACHE)
 #define orig_merge_dirty       (*(am2_void_fn)ADDR_MERGE_DIRTY)
 #define orig_reset_draw_counts (*(am2_void_fn)ADDR_RESET_DRAW_COUNTS)
 
@@ -425,7 +425,7 @@ void __cdecl ComposeFrame(void)
     AM2_Rect src;
 
     orig_scroll_decay();
-    orig_draw_scene();
+    orig_scroll_map_cache();
 
     if (g_fullRedraw)
         RedrawMapRegion(g_viewRect);
@@ -493,6 +493,140 @@ void __cdecl ComposeFrame(void)
 
 typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
 #define orig_repaint_dirty (*(am2_rect_fn)ADDR_REPAINT_DIRTY_LIST)
+
+/* Scroll the painted map cache and repaint what that exposed -- 0x0042D6D0.
+ *
+ * ScrollView one level down: that one scrolls the OFFSCREEN surface by pixels
+ * to follow the view, this scrolls the CACHE surface by whole tiles to follow
+ * the camera. Both blit a surface onto itself; the difference is the unit and
+ * what they repaint with -- RedrawMapRegion there, PaintMapTiles here.
+ *
+ * The camera is not moved every frame. It only jumps when the view has drifted
+ * outside a TWO-TILE margin, which is what the `< cx*16 || > (cx+2)*16` test
+ * is: within that band the existing cache still covers the view and nothing
+ * needs to move at all. When it does jump it snaps to a tile boundary, so the
+ * delta is always whole tiles and the blit is always tile-aligned.
+ *
+ * THREE EARLY EXITS, and they are not interchangeable. A pending full redraw
+ * repaints the whole camera rect and returns, because scrolling pixels that are
+ * about to be overwritten is wasted work. No movement at all returns having
+ * done nothing. And a delta of a whole screen or more ALSO repaints everything
+ * -- there is no overlap left to salvage, and blitting it would read outside
+ * the surface.
+ *
+ * The two strips are painted with the vertical one first, and the horizontal
+ * one is then narrowed to exclude it: the corner belongs to exactly one of
+ * them, and painting it twice would be visible as a double-drawn tile.
+ *
+ * The log call on the no-movement path is the game's own and does nothing --
+ * 0x0045CAA0 is five bytes of `ret` in this build. Kept because removing it
+ * would be a behavioural difference rather than a transcription.
+ *
+ * Exercised by tools/ab.sh mission, which scrolls; nothing else moves the
+ * camera. */
+#define g_mapCacheS   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
+#define g_camera      ((AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES)
+#define g_viewTilesW  (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_W)
+#define g_viewTilesH  (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_H)
+#define g_mapTilesW   (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+#define g_mapTilesH   (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+
+/* The margin, in tiles, the view may drift before the camera follows it. */
+#define CAMERA_MARGIN 2
+
+void __cdecl ScrollMapCache(void)
+{
+    LPDIRECTDRAWSURFACE cache = g_mapCacheS;
+    int32_t  dx = 0, dy = 0, adx, ady;
+    AM2_Rect wide, tall, src;
+
+    if (!cache)
+        return;
+
+    if (g_viewRect->left < (g_camera->left << TILE_SHIFT)
+        || g_viewRect->left > ((g_camera->left + CAMERA_MARGIN) << TILE_SHIFT)) {
+        int32_t now = g_viewRect->left >> TILE_SHIFT;
+        dx = now - g_camera->left;
+        g_camera->left  = now;
+        g_camera->right = g_viewTilesW + now;
+    }
+    if (g_viewRect->top < (g_camera->top << TILE_SHIFT)
+        || g_viewRect->top > ((g_camera->top + CAMERA_MARGIN) << TILE_SHIFT)) {
+        int32_t now = g_viewRect->top >> TILE_SHIFT;
+        dy = now - g_camera->top;
+        g_camera->top    = now;
+        g_camera->bottom = g_viewTilesH + now;
+    }
+
+    g_camera->left   = Clamp(g_camera->left,   0, g_mapTilesW - 1);
+    g_camera->right  = Clamp(g_camera->right,  0, g_mapTilesW - 1);
+    g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
+    g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
+
+    if (g_fullRedraw) {
+        PaintMapTiles(g_camera);
+        return;
+    }
+    if (dx == 0 && dy == 0) {
+        orig_log((const char *)g_camera);   /* stubbed to `ret` */
+        return;
+    }
+
+    adx = (dx < 0) ? -dx : dx;
+    ady = (dy < 0) ? -dy : dy;
+    if (adx >= g_viewTilesW || ady >= g_viewTilesH) {
+        PaintMapTiles(g_camera);
+        return;
+    }
+
+    /* Move the tiles that are still good. Source measured from the positive
+     * part of the delta, destination from the negative -- one of the two is
+     * always zero, which is what makes this one expression for both
+     * directions. */
+    {
+        int32_t sx = (dx > 0) ? dx : 0;
+        int32_t sy = (dy > 0) ? dy : 0;
+
+        src.left   = sx << TILE_SHIFT;
+        src.top    = sy << TILE_SHIFT;
+        src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
+        src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
+
+        IDirectDrawSurface_BltFast(cache,
+                                   (DWORD)(((dx > 0) ? 0 : -dx) << TILE_SHIFT),
+                                   (DWORD)(((dy > 0) ? 0 : -dy) << TILE_SHIFT),
+                                   cache, (LPRECT)&src, DDBLTFAST_WAIT);
+    }
+
+    wide.left  = g_camera->left;
+    wide.right = g_camera->right;
+
+    if (dx > 0) {
+        tall.left  = g_camera->right - dx;
+        tall.right = g_camera->right;
+        wide.right = tall.left;
+    } else if (dx < 0) {
+        tall.left  = g_camera->left;
+        tall.right = g_camera->left - dx;
+        wide.left  = tall.right;
+    }
+    if (dx != 0) {
+        tall.top    = g_camera->top;
+        tall.bottom = g_camera->bottom;
+        PaintMapTiles(&tall);
+    }
+
+    if (dy == 0)
+        return;
+    if (dy > 0) {
+        wide.top    = g_camera->bottom - dy;
+        wide.bottom = g_camera->bottom;
+    } else {
+        wide.top    = g_camera->top;
+        wide.bottom = g_camera->top - dy;
+    }
+    PaintMapTiles(&wide);
+}
 
 void __cdecl ScrollView(void)
 {
@@ -568,6 +702,8 @@ int mapdraw_install(void)
 
     rc |= patch_replace(ADDR_MERGE_DIRTY, (const void *)ScrollView,
                         "ScrollView", 0);
+    rc |= patch_replace(ADDR_SCROLL_MAP_CACHE, (const void *)ScrollMapCache,
+                        "ScrollMapCache", 0);
 
     rc |= patch_replace(ADDR_COMPOSE_FRAME, (const void *)ComposeFrame,
                         "ComposeFrame", 0);

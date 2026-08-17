@@ -377,7 +377,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
   `OpenAudioStream`, `AudioTimerProc`, both input pollers, `ComposeFrame`,
-  `ScrollView` and the comm object's constructor and destructor. The window, the message queue, the display mode,
+  `ScrollView`, `ScrollMapCache` and the comm object's constructor and
+  destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -423,7 +424,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | ~~`0x0040CED0`~~ | **Done.** Two functions: `AudioTimerProc` at `0x0040D020` (1456 B, the streaming refill) and `OpenAudioStream` at `0x0040CED0` (336 B, opens the `.WAV` and creates the buffer). Both reconstructed; the whole audio stream is ours |
   | `0x00412FE0` 1184B, 4 | menu logic; no strings |
   | `0x0042FF60` 448B, 1 | starts a multiplayer game — it calls `CommOpenSession`, `CommCreatePlayer` and `PlaySoundAt`, all of which are ours. Genuinely menu logic |
-  | `0x0041B0E0`, `0x0042D6D0` | The rest of the frame path. Three of this row's five are now done — `ComposeFrame` (`0x0042DA30`), `ScrollView` (`0x0041D060`) and `BlitMapBackdrop` (`0x0042D9B0`, which had been reconstructed while still listed here). No strings, so the last two are unread rather than declined |
+  | `0x0041B0E0` | The palette builder: `ReleasePalette`, two `CreatePalette`s, `SetPalette`, `CalibratePalette`, then ~1200 bytes of colour matching. Four of this row's original five are done — `ComposeFrame`, `ScrollView`, `ScrollMapCache` and `BlitMapBackdrop` |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
 - **The import side is done, in the only sense the word can bear here.** Every
@@ -438,6 +439,13 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   count and is *not* finished: 3 functions with 5 calls on objects
   `tools/comcalls.py` can name, plus a share of the sites whose object it
   cannot. Do not read "the boundary is done" off this bullet alone.
+
+  That figure moves less than the work does, and `ScrollMapCache` is the
+  example: its `BltFast` reaches the surface through a stack slot, so
+  `comcalls.py` cannot name the object and the call was never in the 5 to
+  begin with. Reconstructing it closed a real DirectDraw call and left the
+  headline number untouched. The `any COM dispatch` row went 74 to 75, which is
+  where that kind of progress shows up.
 
   The outer bracket — every function with any unreconstructed COM dispatch —
   is now **8**, down from 42, because the classifier fix moved 33 pure-C++

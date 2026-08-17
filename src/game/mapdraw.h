@@ -62,6 +62,11 @@ void __cdecl ComposeFrame(void);
  * scroll exposed. */
 void __cdecl ScrollView(void);
 
+/* Original: 0x0042D6D0, called from ComposeFrame. Follow the view with the
+ * camera, scroll the painted map cache by the tile delta, and repaint the
+ * strips that exposed. */
+void __cdecl ScrollMapCache(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus
