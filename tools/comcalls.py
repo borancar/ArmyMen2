@@ -184,23 +184,45 @@ def call_abi(insns, i, obj_reg):
     COM's slot 0 is QueryInterface and takes three arguments, so a one-argument
     slot-0 call is never COM.
     """
-    # A CDECL DISCRIMINATOR WAS TRIED HERE AND DOES NOT WORK. The idea was
-    # sound -- a COM method is stdcall and cleans its own arguments, so an
-    # `add esp` after the call means the callee did not and it is a callback --
-    # and it correctly identifies 0x0041F060, which walks a linked list calling
-    # each node's function pointer.
+    # CDECL, decided by counting rather than by peeking. A COM method is
+    # stdcall and cleans its own arguments; a call through a function pointer
+    # that is cdecl leaves the caller to do it. So an `add esp, N` after the
+    # call means cdecl -- but ONLY if the N is this call's arguments and not
+    # somebody else's.
     #
-    # It is still wrong, because these functions push cdecl arguments AROUND
-    # their COM calls, so the `add esp` after a COM call is routinely the
-    # enclosing call's cleanup. Even reading only the instruction immediately
-    # after, it reclassified SetSurfaceColorKey's SetColorKey and ClearRegion's
-    # Blt; with a few instructions of slack it also took PresentFrame's BltFast,
-    # its Restore, and BlitMapBackdrop's BltFast. Five real DirectDraw calls
-    # would have left the COM count to make a total read 75/75 instead of 77/78.
+    # That qualifier is the whole difficulty, and ignoring it was wrong twice.
+    # These functions push cdecl arguments AROUND their COM calls, so the
+    # cleanup that follows a COM call is routinely the enclosing call's:
+    # SetSurfaceColorKey's SetColorKey is followed by `add esp, 8` with three
+    # arguments pushed, and ClearRegion's Blt by `add esp, 116` with six. Both
+    # are real DirectDraw calls and a peephole reads both as callbacks.
     #
-    # Deciding this properly needs the stack depth tracked across the call, not
-    # a peephole. Until then 0x0041F060 stays "?" -- one honest unknown is worth
-    # more than a complete-looking number that is quietly missing five calls.
+    # Counting settles it. Take the pushes belonging to this call and accept
+    # the cleanup only when it is exactly four bytes each. 0x0041F060 pushes
+    # eight and cleans 0x20, so it is the callback it looks like; every COM
+    # call above mismatches and stays COM.
+    pushes = 0
+    for j in range(i - 1, -1, -1):
+        m = insns[j].mnemonic
+        if m == "push":
+            pushes += 1
+        elif m in ("mov", "lea", "xor", "test", "cmp"):
+            continue
+        else:
+            break
+    for j in range(i + 1, min(i + 4, len(insns))):
+        m = insns[j].mnemonic
+        if m == "add" and insns[j].op_str.startswith("esp,"):
+            try:
+                cleaned = int(insns[j].op_str.split(",")[1], 16)
+            except ValueError:
+                break
+            if cleaned == pushes * 4:
+                return "cdecl"
+            break
+        if m in ("push", "call", "ret", "jmp", "pop"):
+            break
+
     if obj_reg is None:
         return "?"
     for j in range(i - 1, max(-1, i - LOOKBACK) - 1, -1):

@@ -192,9 +192,11 @@ def main():
                 fn = owner_of(fn, int(r["site"], 16))
                 # A thiscall dispatch is the engine's own C++ virtual, never
                 # COM: under CINTERFACE every COM method takes the interface as
-                # a pushed first argument. Excluding those is what turns the
-                # upper bracket from a guess into a measurement.
-                if r.get("abi") != "thiscall":
+                # a pushed first argument. A cdecl one is a callback: the
+                # caller cleans exactly this call's arguments, which a COM
+                # method never leaves it to do. Excluding both is what turns
+                # the upper bracket from a guess into a measurement.
+                if r.get("abi") not in ("thiscall", "cdecl"):
                     any_com.add(fn)
                 else:
                     cxx_only.add(fn)

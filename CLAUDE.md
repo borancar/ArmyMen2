@@ -498,23 +498,24 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `tools/comcalls.py` finds below the CRT — are inside reconstructed functions,
   and the named-object figure is 35 of 35 with 0 calls left.
 
-  One site is not counted and should not be forgotten: `0x0041F060`, in
-  `0x0041EF80`, which `comcalls.py` still records as `?`. It walks a linked
-  list calling each node's function pointer with eight arguments and cleaning
-  the stack itself, so it is a callback and not COM at all — but that was
-  established by reading it, not by the tool, and the tool is right to keep
-  saying it does not know.
+  There is no longer an unclassified site: `abi` is `stdcall`, `thiscall` or
+  `cdecl` for all 356, and the outer bracket reads 79 of 79.
 
-  A discriminator for it was written and then reverted, which is the part worth
-  keeping. A COM method is stdcall and cleans its own arguments, so an
-  `add esp` after the call should mean cdecl. It does not: these functions push
-  cdecl arguments *around* their COM calls, so that cleanup routinely belongs to
-  the enclosing call. Even reading only the next instruction it reclassified
-  `SetSurfaceColorKey`'s `SetColorKey` and `ClearRegion`'s `Blt`; with a little
-  slack it also took `PresentFrame`'s `BltFast` and `Restore` and
-  `BlitMapBackdrop`'s. Five real DirectDraw calls would have quietly left the
-  COM count to make a total read 75/75 instead of 77/78. Deciding it properly
-  needs the stack depth tracked across the call, not a peephole.
+  **The cdecl rule counts, and a first attempt that only peeked was wrong.** A
+  COM method is stdcall and cleans its own arguments, so an `add esp` after the
+  call ought to mean cdecl. It does not on its own: these functions push cdecl
+  arguments *around* their COM calls, so that cleanup routinely belongs to the
+  enclosing one. `SetSurfaceColorKey`'s `SetColorKey` is followed by
+  `add esp, 8` with three arguments pushed, and `ClearRegion`'s `Blt` by
+  `add esp, 116` with six — a peephole reads both as callbacks, and with a
+  little slack it also takes `PresentFrame`'s `BltFast` and `Restore` and
+  `BlitMapBackdrop`'s.
+
+  Counting the pushes that belong to the call and requiring the cleanup to be
+  exactly four bytes each settles it. `0x0041F060` pushes eight and cleans
+  0x20, so it is the linked-list callback it looks like; every COM call above
+  mismatches and stays COM. The check that it is safe is that reclassifying it
+  moved exactly one line of `docs/comcalls.tsv` and left `stdcall` at 210.
 
   That figure moves less than the work does, and `ScrollMapCache` is the
   example: its `BltFast` reaches the surface through a stack slot, so
