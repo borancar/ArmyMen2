@@ -50,6 +50,29 @@ so the sites are still there, still import the symbol, and can
 never execute. A site that cannot run is not outstanding boundary
 work, and counting it as such overstates what is left.
 
+## Interfaces kept in struct fields
+
+The section above can only name an interface it can trace to a
+global. These are the ones it cannot -- reached through a field of
+some object -- and they are not a lesser category: a whole
+subsystem tends to live behind one displacement. DirectPlay is
+*entirely* `comm+0x3EC` and appears nowhere above, and the sprite
+surfaces are all `sprite+0x10`. Both were found by grouping on the
+displacement rather than by any ranking.
+
+| field | what it holds | reconstructed | left |
+|---|---|---:|---:|
+| `0x10` | IDirectDrawSurface, in a sprite or map descriptor | 5 | 4 |
+| `0x3ec` | IDirectPlay4A, in the comm object | 5 | 3 |
+| `0x800` | IDirectDrawPalette, in a palette holder | 3 | 0 |
+| `0x3f4` | — | 0 | 2 |
+| `0x78` | — | 2 | 0 |
+| `0x8` | — | 2 | 0 |
+| `0x4` | — | 2 | 0 |
+| `0x34` | — | 0 | 1 |
+| `0x74` | — | 1 | 0 |
+| `0x20` | — | 0 | 1 |
+
 ## DirectX through COM
 
 These own no import site and so appear nowhere above. A function can

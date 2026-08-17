@@ -58,6 +58,15 @@ DIRECTX_OBJECTS = {
     0x00512FD8: "input device",
 }
 
+# What each struct field is known to hold, where it has been established by
+# reconstructing something that uses it. An unnamed one is not a mystery to be
+# solved before it counts -- it is simply a cluster nobody has read yet.
+FIELD_INTERFACES = {
+    "0x3ec": "IDirectPlay4A, in the comm object",
+    "0x10":  "IDirectDrawSurface, in a sprite or map descriptor",
+    "0x800": "IDirectDrawPalette, in a palette holder",
+}
+
 # Imports that are a fact of running on Windows rather than a channel to the
 # outside world. A function whose only boundary contact is one of these is
 # ordinary game logic that happens to ask the clock or poke its own queue.
@@ -241,6 +250,38 @@ def main():
             w("There are none. Every non-incidental import site in the image is\n"
               "inside reconstructed code.\n")
         w("\n")
+
+        # Interfaces kept in struct fields. comcalls.py cannot name these, but
+        # it can group them, and a displacement usually is a subsystem.
+        by_field = collections.defaultdict(lambda: [set(), set()])
+        if os.path.exists(compath):
+            for r in csv.DictReader(open(compath), delimiter="\t"):
+                if r.get("abi") != "stdcall" or not r.get("field"):
+                    continue
+                fn = int(r["func"], 16)
+                if not fn or fn >= CRT_START:
+                    continue
+                slot = by_field[r["field"]]
+                # is_done(), not membership of done_fns: that set only covers
+                # functions that own an import site, and a DirectPlay or sprite
+                # function need not own one at all.
+                (slot[0] if is_done(fn) else slot[1]).add(fn)
+
+        if by_field:
+            w("## Interfaces kept in struct fields\n\n")
+            w("The section above can only name an interface it can trace to a\n"
+              "global. These are the ones it cannot -- reached through a field of\n"
+              "some object -- and they are not a lesser category: a whole\n"
+              "subsystem tends to live behind one displacement. DirectPlay is\n"
+              "*entirely* `comm+0x3EC` and appears nowhere above, and the sprite\n"
+              "surfaces are all `sprite+0x10`. Both were found by grouping on the\n"
+              "displacement rather than by any ranking.\n\n")
+            w("| field | what it holds | reconstructed | left |\n|---|---|---:|---:|\n")
+            for off, (did, left) in sorted(by_field.items(),
+                                           key=lambda kv: -(len(kv[1][0]) + len(kv[1][1]))):
+                what = FIELD_INTERFACES.get(off, "—")
+                w(f"| `{off}` | {what} | {len(did)} | {len(left)} |\n")
+            w("\n")
 
         w("## DirectX through COM\n\n")
         w("These own no import site and so appear nowhere above. A function can\n"

@@ -110,21 +110,27 @@ def find_vtable_load(insns, i, reg):
     # mov vt, [global] -- the vtable pointer was itself read straight out of a
     # global, so the global holds the object and `this` is that address.
     if src.mem.base == 0 and src.mem.index == 0:
-        return (src.mem.disp & 0xFFFFFFFF, at, None)
+        return (src.mem.disp & 0xFFFFFFFF, at, None, None)
     if src.mem.index != 0 or src.mem.disp != 0:
         # [reg + something] is a member fetch, not a plain vtable load.
-        return (0, at, None)
+        return (0, at, None, None)
 
-    # mov vt, [obj] -- chase `obj` back one more level to see whether the
-    # interface came from a global.
+    # mov vt, [obj] -- chase `obj` back one more level to see where it came
+    # from: a global, which names it, or a struct field, which does not name it
+    # but does group it. The second case is not a lesser answer. DirectPlay is
+    # reached entirely through comm+0x3EC and the sprite surfaces through
+    # sprite+0x10, so a whole subsystem can live behind one displacement and be
+    # invisible to a survey that only looks for globals.
     obj_reg = insns[at].reg_name(src.mem.base)
     outer = defining_load(insns, at, obj_reg)
     if outer is None:
-        return (0, at, obj_reg)
+        return (0, at, obj_reg, None)
     osrc, _oat = outer
     if osrc.type == OP_MEM and osrc.mem.base == 0 and osrc.mem.index == 0:
-        return (osrc.mem.disp & 0xFFFFFFFF, at, obj_reg)
-    return (0, at, obj_reg)
+        return (osrc.mem.disp & 0xFFFFFFFF, at, obj_reg, None)
+    if osrc.type == OP_MEM and osrc.mem.index == 0 and osrc.mem.disp != 0:
+        return (0, at, obj_reg, osrc.mem.disp & 0xFFFFFFFF)
+    return (0, at, obj_reg, None)
 
 
 def call_abi(insns, i, obj_reg):
@@ -195,24 +201,33 @@ def main():
         found = find_vtable_load(insns, i, reg)
         if found is None:
             continue
-        this_global, _at, obj_reg = found
+        this_global, _at, obj_reg, field = found
         abi = call_abi(insns, i, obj_reg)
         own = owner(insn.address, funcs, addrs)
         fn, tu = own if own else (0, "?")
-        rows.append((insn.address, fn, tu, disp // 4, disp, this_global, abi))
+        rows.append((insn.address, fn, tu, disp // 4, disp, this_global, abi,
+                     field))
 
     rows.sort()
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as fh:
-        fh.write("site\tfunc\ttu\tslot\tdisp\tthis\tabi\n")
-        for addr, fn, tu, slot, disp, this, abi in rows:
+        fh.write("site\tfunc\ttu\tslot\tdisp\tthis\tabi\tfield\n")
+        for addr, fn, tu, slot, disp, this, abi, field in rows:
             fh.write(f"0x{addr:08x}\t0x{fn:08x}\t{tu}\t{slot}\t"
-                     f"0x{disp:02x}\t0x{this:08x}\t{abi}\n")
+                     f"0x{disp:02x}\t0x{this:08x}\t{abi}\t"
+                     f"{'' if field is None else f'0x{field:x}'}\n")
 
     game = [r for r in rows if r[1] and r[1] < CRT_START]
     fns = {r[1] for r in game}
     print(f"\n{len(rows)} COM-shaped dispatch sites -> {os.path.relpath(OUT, REPO)}")
     print(f"{len(game)} in game code, across {len(fns)} functions")
+
+    fields = collections.Counter(r[7] for r in game
+                                 if r[7] is not None and r[6] == "stdcall")
+    if fields:
+        print("\n  interfaces held in struct fields (a subsystem per displacement):")
+        for off, n in fields.most_common(8):
+            print(f"    +0x{off:<5x} {n:3d} sites")
 
     by_abi = collections.Counter(r[6] for r in game)
     com = [r for r in game if r[6] == "stdcall"]
