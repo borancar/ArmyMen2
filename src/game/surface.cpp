@@ -406,6 +406,32 @@ void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key)
     IDirectDrawSurface_SetColorKey(surf, DDCKEY_SRCBLT, &ck);
 }
 
+void __cdecl ClearRegion(const RECT *r, uint8_t colour)
+{
+    RECT    dest;
+    DDBLTFX fx;
+
+    /* A locked surface cannot be Blt'd to. Silently nothing, as the original. */
+    if (g_surfaceLocked)
+        return;
+    if (!IntersectRect(&dest, r, g_screenClip))
+        return;
+
+    if (g_lockedSurface == g_primarySurface) {
+        /* Game coordinates are relative to the client area; the primary is the
+         * whole desktop. Shift, or the fill lands somewhere else entirely. */
+        dest.left   += g_screenRect.left;
+        dest.top    += g_screenRect.top;
+        dest.right  += g_screenRect.left;
+        dest.bottom += g_screenRect.top;
+    }
+
+    fx.dwSize      = sizeof fx;
+    fx.dwFillColor = colour;
+    IDirectDrawSurface_Blt(g_lockedSurface, &dest, NULL, NULL,
+                           DDBLT_COLORFILL | DDBLT_WAIT, &fx);
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -424,6 +450,8 @@ int surface_install(void)
                         "RestoreLostSurfaces", 0);
     rc |= patch_replace(ADDR_REFRESH_SCREEN, (const void *)RefreshScreen,
                         "RefreshScreen", 0);
+    rc |= patch_replace(ADDR_CLEAR_REGION, (const void *)ClearRegion,
+                        "ClearRegion", 2);
     rc |= patch_replace(ADDR_RELEASE_PALETTE, (const void *)ReleasePalette,
                         "ReleasePalette", 1);
     rc |= patch_replace(ADDR_SET_PALETTE_RANGE, (const void *)SetPaletteRange,

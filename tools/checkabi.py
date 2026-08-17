@@ -96,6 +96,7 @@ FUNCS = [
     (0x00446450, "CreateGameFont",   "cdecl"),
     (0x0040CBF0, "WaveReadFile",      "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
+    (0x0041CE20, "ClearRegion",      "cdecl"),
     (0x0044D6D0, "RefreshScreen",    "cdecl"),
     (0x0041B6A0, "ReleasePalette",   "cdecl"),
     (0x0041B720, "SetPaletteRange",  "cdecl"),

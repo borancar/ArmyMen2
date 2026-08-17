@@ -125,6 +125,15 @@ void __cdecl SetPaletteRange(PALETTEENTRY *entries, uint32_t first,
  * how every sprite gets its transparent index. */
 void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key);
 
+/* Original: 0x0041CE20. Fill one clipped rectangle of the draw target.
+ *
+ * Refuses to run while a lock is held, because Blt needs the surface back
+ * first -- which is why this is a no-op rather than a failure in that case.
+ * The rectangle is clipped to the screen and, when the target is the primary,
+ * shifted by the client origin: the primary is the whole desktop in a window,
+ * so a rectangle in game coordinates is in the wrong place on it. */
+void __cdecl ClearRegion(const RECT *r, uint8_t colour);
+
 int surface_install(void);
 
 #ifdef __cplusplus

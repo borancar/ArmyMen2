@@ -12,9 +12,9 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 33 | 125 |
+| reconstructed | 34 | 126 |
 | still boundary | 5 | 16 |
-| game logic, incidental calls only | 84 | 135 |
+| game logic, incidental calls only | 83 | 134 |
 | **total** | **122** | **276** |
 
 ## DirectX through COM
@@ -35,8 +35,8 @@ Treat the number below as "known to be outstanding", never as
 
 | | functions | call sites |
 |---|---:|---:|
-| known DirectX, reconstructed | 19 | 60 |
-| known DirectX, still to do | 14 | 35 |
+| known DirectX, reconstructed | 20 | 61 |
+| known DirectX, still to do | 13 | 34 |
 
 And the bracket the caveat above implies. Counting every function
 that dispatches through a vtable at all, whether or not the object
@@ -44,8 +44,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 33 |
-| any COM dispatch, not | 128 |
+| any COM dispatch, reconstructed | 34 |
+| any COM dispatch, not | 127 |
 
 The true DirectX total sits between the two, and most of what the
 second row holds is the game's own C++ objects rather than DirectX.
@@ -58,7 +58,6 @@ second row holds is the game's own C++ objects rather than DirectX.
 - `0x0041b0e0` 1472B, 2 calls — IDirectDraw x1, primary x1
 - `0x00425af0` 288B, 2 calls — back buffer x1, primary x1
 - `0x0040b8f0` 1024B, 1 calls — DirectSound x1
-- `0x0041ce20` 160B, 1 calls — locked x1
 - `0x0041d060` 432B, 1 calls — offscreen x1
 - `0x0042d9b0` 128B, 1 calls — offscreen x1
 - `0x0042da30` 272B, 1 calls — back buffer x1
@@ -88,7 +87,7 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 62 |
+| USER32.dll | 130 | 63 |
 | KERNEL32.dll | 99 | 18 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |

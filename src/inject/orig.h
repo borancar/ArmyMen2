@@ -399,6 +399,7 @@
  * and it is a colour fill. */
 #define ADDR_CREATE_OFFSCREEN    0x0041B850u  /* surface *(w, h, caps, int32 key) */
 #define ADDR_CLEAR_SURFACE       0x0041AD30u  /* int32_t(surface *, uint32_t colour) */
+#define ADDR_CLEAR_REGION        0x0041CE20u  /* void(const RECT *, uint8_t) */
 
 /* DirectInput. The GUIDs and data formats are the game's own copies in .rdata,
  * so nothing here needs dxguid. */
