@@ -539,16 +539,19 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. Currently 144 of the 148 genuine
-  boundary sites are ours, across 43 functions. What is left is **one function
-  and four sites**, and all four are `MessageBoxA` — the "insert the CD" dialog,
-  which cannot execute at all, because every CD check in this build is patched
-  to jump past it (`docs/binarypatches.md`). The other 128 sites in the binary
-  are game logic that happens to read a clock or call `IntersectRect`.
+  drift from what the harness installs. What is left outside is **3 functions
+  and 6 sites** — three `MessageBoxA` calls and the `GetActiveWindow` each one
+  passes as its owner — and all three sit behind CD checks this build has
+  patched to jump past them (`docs/binarypatches.md`), so none can execute. The
+  other 122 sites are game logic that happens to read a clock or call
+  `IntersectRect`.
 
-  Re-read those numbers from `docs/boundary.md` rather than from here. The
-  figures in this bullet were stale by three commits when they were last
-  checked, which is the failure mode of quoting a generated number in prose.
+  **Re-read those numbers from `docs/boundary.md`, never from here**, and
+  expect them to move for reasons that are not progress. This bullet said "one
+  function and four sites" until `tools/merges.py` learned to count unaligned
+  references; the extra two functions were always outside, hidden behind a
+  containment match against a merged neighbour. A number going *up* after a
+  tooling fix is the tool getting more honest, not the work going backwards.
 - **`obj -> table -> slot` with no `this` is a real shape in this binary, and
   it needs two dereferences.** `0x0065A058` (the repaint object) and
   `0x006568A0` (the current movie) are both reached as
