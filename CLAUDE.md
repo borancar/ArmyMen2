@@ -97,6 +97,14 @@ Click QUIT on the title screen, then OK on the CONFIRM GAME EXIT dialog
 (roughly `306,383` then `475,224`), and the game leaves the way it was meant
 to — which is the only way to reach `CommShutdown` and the comm teardown.
 
+**The campaign is a third gameplay path, and reaching it needs typing.** SINGLE
+PLAYER → RECRUIT → type a name → OK drops straight into MAP 01, a different map
+from Boot Camp with a different object count. Typing needs *real* X key events,
+not the control socket: the socket injects DirectInput, and a text field reads
+`WM_CHAR`, which only exists if Wine saw a genuine key press. XTEST through
+python-xlib does it, and it is the only way `WM_CHAR` in `winproc.cpp` gets
+exercised at all.
+
 **`ARGS=-dbg` — dropping the default `-nointro` — is a second configuration
 worth having.** The Smacker intro is a code path of its own: it is the only
 caller of `SnapshotSystemPalette`, and the movie coming out in the right
@@ -139,10 +147,25 @@ Note that this makes the counts *less* informative the further the
 reconstruction gets. It is a measure of what still crosses an original
 boundary, not of what runs.
 
-**The registry invariant is the sharpest single check available.** `FirstItem`
-walks × objects registered == `NextItem` calls, exactly — e.g.
-91,173 × 1,609 == 146,697,357. It has held on every run so far; if it ever
-does not, something is genuinely wrong.
+**The registry invariant is the sharpest single check available — on Boot
+Camp.** `FirstItem` walks × objects registered == `NextItem` calls, exactly —
+e.g. 91,173 × 1,609 == 146,697,357.
+
+It is narrower than it looks, and the scope matters. The identity holds only
+while the object count is constant across every walk, which is true of Boot
+Camp because the whole map is registered during load, before anything walks.
+On campaign MAP 01 it does not hold: 1,951 walks, 618,491 `NextItem`, 325
+registered, 0 removed — and 1,951 × 325 is 634,075, not 618,491. The game was
+demonstrably fine, rendering the map and HUD correctly. 618,491 / 1,951 is
+317.01, i.e. slightly *fewer* objects per walk than the final total, which is
+what "some objects were registered after walking began" predicts and is not
+what a broken reconstruction would look like.
+
+So: an exact match on Boot Camp is strong evidence. A mismatch anywhere else is
+not evidence of a fault on its own — check whether registration overlapped the
+walks first. (The obvious confirmation, watching the ratio converge on 325 as
+more walks happen at the final count, was not completed: the mission's opening
+dialog would not dismiss and the run ended.)
 
 **Compare `ret N` explicitly before assuming a shared signature.** A diff that
 normalises jump targets hides the epilogue. Getting this wrong is what made

@@ -35,8 +35,20 @@ Treat the number below as "known to be outstanding", never as
 
 | | functions | call sites |
 |---|---:|---:|
-| reconstructed | 19 | 60 |
-| still to do | 14 | 35 |
+| known DirectX, reconstructed | 19 | 60 |
+| known DirectX, still to do | 14 | 35 |
+
+And the bracket the caveat above implies. Counting every function
+that dispatches through a vtable at all, whether or not the object
+could be named, gives the other end of the range:
+
+| | functions |
+|---|---:|
+| any COM dispatch, reconstructed | 33 |
+| any COM dispatch, not | 128 |
+
+The true DirectX total sits between the two, and most of what the
+second row holds is the game's own C++ objects rather than DirectX.
 
 - `0x0040ced0` 1792B, 12 calls — DirectSound x12
 - `0x00427070` 944B, 5 calls — input device x5

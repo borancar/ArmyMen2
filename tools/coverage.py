@@ -122,16 +122,19 @@ def main():
 
     # The other half of the boundary: DirectX through COM, which owns no import.
     com = collections.defaultdict(list)
+    any_com = set()
     compath = os.path.join(REPO, "docs", "comcalls.tsv")
     if os.path.exists(compath):
         for r in csv.DictReader(open(compath), delimiter="\t"):
             try:
                 this = int(r["this"], 16)
             except ValueError:
-                continue
+                this = 0
             fn = int(r["func"], 16)
-            if this in DIRECTX_OBJECTS and fn and fn < CRT_START:
-                com[fn].append(DIRECTX_OBJECTS[this])
+            if fn and fn < CRT_START:
+                any_com.add(fn)
+                if this in DIRECTX_OBJECTS:
+                    com[fn].append(DIRECTX_OBJECTS[this])
 
     # A reconstructed address does not always equal the function address the
     # import inventory used: functions.tsv merges a thunk with the body it
@@ -165,6 +168,7 @@ def main():
             total_com += 1
             if not r["this"] or r["this"] == "0x00000000":
                 unresolved += 1
+    any_done = {f for f in any_com if is_done(f)}
     com_done = {f: v for f, v in com.items() if is_done(f)}
     com_left = {f: v for f, v in com.items() if not is_done(f)}
 
@@ -199,8 +203,16 @@ def main():
           "Treat the number below as \"known to be outstanding\", never as\n"
           "\"all that is outstanding\".\n\n")
         w("| | functions | call sites |\n|---|---:|---:|\n")
-        w(f"| reconstructed | {len(com_done)} | {sites(com_done)} |\n")
-        w(f"| still to do | {len(com_left)} | {sites(com_left)} |\n\n")
+        w(f"| known DirectX, reconstructed | {len(com_done)} | {sites(com_done)} |\n")
+        w(f"| known DirectX, still to do | {len(com_left)} | {sites(com_left)} |\n\n")
+        w("And the bracket the caveat above implies. Counting every function\n"
+          "that dispatches through a vtable at all, whether or not the object\n"
+          "could be named, gives the other end of the range:\n\n")
+        w("| | functions |\n|---|---:|\n")
+        w(f"| any COM dispatch, reconstructed | {len(any_done)} |\n")
+        w(f"| any COM dispatch, not | {len(any_com) - len(any_done)} |\n\n")
+        w("The true DirectX total sits between the two, and most of what the\n"
+          "second row holds is the game's own C++ objects rather than DirectX.\n\n")
         for f, v in sorted(com_left.items(), key=lambda kv: -len(kv[1])):
             objs = collections.Counter(v)
             w(f"- `{f:#010x}` {sizes.get(f, 0)}B, {len(v)} calls — "
@@ -265,8 +277,9 @@ def main():
     print(f"reconstructed {len(done_fns)} functions / "
           f"{sites({f: per_fn[f] for f in done_fns})} sites")
     print(f"still boundary {len(real)} functions / {sites(real)} sites")
-    print(f"DirectX COM    {len(com_done)}/{len(com)} functions done, "
+    print(f"DirectX COM    {len(com_done)}/{len(com)} named-object functions done, "
           f"{sites(com_left)} calls left")
+    print(f"any COM        {len(any_done)}/{len(any_com)} functions done")
     print(f"game logic     {len(incidental)} functions / {sites(incidental)} sites")
     return 0
 
