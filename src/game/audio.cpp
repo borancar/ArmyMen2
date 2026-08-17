@@ -108,6 +108,21 @@ void __cdecl StartAudioStream(void *track, int32_t which)
                              0, TIME_PERIODIC);
 }
 
+#define g_dsBufA (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_A)
+#define g_dsBufB (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_B)
+#define g_dsBufC (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_C)
+
+void __cdecl ReleaseSoundBuffers(void)
+{
+    /* Released without being nulled -- see audio.h. */
+    if (g_dsBufA)
+        IDirectSoundBuffer_Release(g_dsBufA);
+    if (g_dsBufB)
+        IDirectSoundBuffer_Release(g_dsBufB);
+    if (g_dsBufC)
+        IDirectSoundBuffer_Release(g_dsBufC);
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -116,5 +131,7 @@ int audio_install(void)
                         "StopAudioStream", 0);
     rc |= patch_replace(ADDR_START_AUDIO_STREAM, (const void *)StartAudioStream,
                         "StartAudioStream", 2);
+    rc |= patch_replace(ADDR_RELEASE_SOUND_BUFS, (const void *)ReleaseSoundBuffers,
+                        "ReleaseSoundBuffers", 0);
     return rc;
 }

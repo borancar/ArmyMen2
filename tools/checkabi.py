@@ -96,6 +96,8 @@ FUNCS = [
     (0x00446450, "CreateGameFont",   "cdecl"),
     (0x0040CBF0, "WaveReadFile",      "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
+    (0x0041A8B0, "RestoreLostSurfaces", "cdecl"),
+    (0x0040C7D0, "ReleaseSoundBuffers", "cdecl"),
     (0x00426EA0, "ShutdownInput",    "cdecl"),
     (0x00426F20, "AcquireMouse",     "cdecl"),
     (0x0041A950, "ShutdownDirectDraw", "cdecl"),

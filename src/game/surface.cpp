@@ -296,6 +296,45 @@ release_v2:
     }
 }
 
+#define g_surface514e94 (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_SURFACE_514E94)
+#define g_mapSurfaceDesc (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
+#define MAP_DESC_FLAG    0x08u
+#define MAP_DESC_SURFACE 0x10u
+
+typedef void (__cdecl *am2_void_fn)(void);
+#define orig_on_map_restored (*(am2_void_fn)ADDR_ON_MAP_RESTORED)
+
+/* IsLost answers DD_OK when the surface is fine, so a non-zero result is the
+ * thing to act on. */
+static void RestoreIfLost(LPDIRECTDRAWSURFACE surf)
+{
+    if (surf && IDirectDrawSurface_IsLost(surf) != DD_OK)
+        IDirectDrawSurface_Restore(surf);
+}
+
+void __cdecl RestoreLostSurfaces(void)
+{
+    RestoreIfLost(g_primarySurface);
+    RestoreIfLost(g_offscreen);
+    RestoreIfLost(g_surface514e94);
+
+    /* The map keeps its surface in a descriptor, and only wants it restored
+     * while the flag at +8 is clear. */
+    if (g_mapSurfaceDesc &&
+        *(int32_t *)(g_mapSurfaceDesc + MAP_DESC_FLAG) == 0) {
+        LPDIRECTDRAWSURFACE surf =
+            *(LPDIRECTDRAWSURFACE *)(g_mapSurfaceDesc + MAP_DESC_SURFACE);
+
+        if (surf && IDirectDrawSurface_IsLost(surf) != DD_OK) {
+            /* Reload through the descriptor rather than the local: the restore
+             * is what the original re-reads it for. */
+            surf = *(LPDIRECTDRAWSURFACE *)(g_mapSurfaceDesc + MAP_DESC_SURFACE);
+            if (IDirectDrawSurface_Restore(surf) == DD_OK)
+                orig_on_map_restored();   /* the pixels are gone; redraw them */
+        }
+    }
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -310,5 +349,7 @@ int surface_install(void)
                         "PresentFrame", 0);
     rc |= patch_replace(ADDR_SHUTDOWN_DDRAW, (const void *)ShutdownDirectDraw,
                         "ShutdownDirectDraw", 0);
+    rc |= patch_replace(ADDR_RESTORE_LOST, (const void *)RestoreLostSurfaces,
+                        "RestoreLostSurfaces", 0);
     return rc;
 }

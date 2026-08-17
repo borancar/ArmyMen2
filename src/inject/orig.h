@@ -72,6 +72,12 @@
  * from the back buffer when windowed, because a window has no flipping chain.
  * Gated by 0x004FA030 -- clear it and the game runs with nothing appearing. */
 #define ADDR_PRESENT_FRAME  0x0041AC60u  /* void(void) */
+/* Run at the top of every frame: any surface that has been lost -- to an
+ * alt-tab or a mode change -- is restored before anything draws. */
+#define ADDR_RESTORE_LOST   0x0041A8B0u  /* void(void) */
+#define ADDR_SURFACE_514E94 0x00514E94u  /* IDirectDrawSurface * */
+#define ADDR_MAP_SURFACE    0x00514E90u  /* desc; +8 a flag, +0x10 the surface */
+#define ADDR_ON_MAP_RESTORED 0x0042C0E0u /* tail-called after a map restore */
 #define ADDR_PRESENT_ENABLED 0x004FA030u /* int32_t */
 #define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
 #define ADDR_UNLOCK_SURFACE 0x0041BA40u  /* int32_t(void) */
@@ -173,6 +179,10 @@
 #define ADDR_AUDIO_ENABLED       0x004FA468u  /* int32_t; nothing runs while clear */
 #define ADDR_AUDIO_BUFFER        0x004FA404u  /* IDirectSoundBuffer *, the stream */
 #define ADDR_AUDIO_BUFFER_2      0x004FA440u  /* IDirectSoundBuffer *, the one played */
+#define ADDR_RELEASE_SOUND_BUFS  0x0040C7D0u  /* void(void), 8 call sites */
+#define ADDR_DSOUND_BUF_A        0x004FA470u
+#define ADDR_DSOUND_BUF_B        0x004FA474u
+#define ADDR_DSOUND_BUF_C        0x004FA46Cu
 #define ADDR_AUDIO_TIMER_ID      0x004FA408u
 #define ADDR_AUDIO_TIMER_RUN     0x004FA464u
 #define ADDR_AUDIO_PERIOD        0x004FA448u  /* divided by 4 for timeBeginPeriod */

@@ -44,6 +44,13 @@ void __cdecl StopAudioStream(void);
  * the buffer is stopped again rather than left playing a loop nobody refills. */
 void __cdecl StartAudioStream(void *track, int32_t which);
 
+/* Original: 0x0040C7D0, 8 call sites. Release three DirectSound buffers.
+ *
+ * They are released and not nulled, so calling this twice would release them
+ * twice. That is what the original does; every call site drops them
+ * immediately afterwards. */
+void __cdecl ReleaseSoundBuffers(void);
+
 int audio_install(void);
 
 #ifdef __cplusplus

@@ -88,6 +88,19 @@ void __cdecl PresentFrame(void);
  * bring-up, which is why WinMain can run it unconditionally on the way out. */
 void __cdecl ShutdownDirectDraw(void);
 
+/* Original: 0x0041A8B0, 2 call sites. Restore anything the display took back.
+ *
+ * Run at the top of every frame. A DirectDraw surface in an exclusive-mode
+ * application is lost whenever the user alt-tabs or the mode changes, and a
+ * lost surface fails every operation until it is restored -- so this asks each
+ * one whether it is lost and restores the ones that say yes.
+ *
+ * The map's surface is the interesting case: it is reached through a
+ * descriptor rather than a global, and restoring it successfully tail-calls
+ * back into the map code, because the pixels are gone even though the surface
+ * is back and something has to redraw them. */
+void __cdecl RestoreLostSurfaces(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus
