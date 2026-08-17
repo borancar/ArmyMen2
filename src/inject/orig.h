@@ -172,6 +172,10 @@
 #define ADDR_MOVIE_DRAW_FRAME    0x004453C0u  /* thiscall void(this, arg) */
 #define ADDR_MOVIE_FINISHED      0x00445600u  /* void(void); posts WM_USER */
 #define ADDR_MOVIE_START         0x004451F0u  /* thiscall int32(this, arg) */
+/* Lives inside what docs/functions.tsv reports as one 160-byte function at
+ * 0x00445320 -- the inventory merged the two. It is a separate function. */
+#define ADDR_MOVIE_POLL          0x00445390u  /* thiscall int32(this) */
+#define ADDR_IAT_SMACK_WAIT      0x0046F2BCu
 #define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall void(this, surface) */
 #define ADDR_MOVIE_CURRENT       0x006568A0u  /* the movie being played, or null */
 #define ADDR_MOVIE_TIMER_PROC    0x004455E0u  /* the timer callback, stays original */

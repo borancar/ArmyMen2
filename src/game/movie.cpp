@@ -68,6 +68,7 @@ typedef void (__stdcall *am2_smack_volumepan_fn)(void *smack, uint32_t trackFlag
 #define smack_doframe   (*(am2_smack_frame_fn *)(uintptr_t)ADDR_IAT_SMACK_DO_FRAME)
 #define smack_nextframe (*(am2_smack_frame_fn *)(uintptr_t)ADDR_IAT_SMACK_NEXT_FRAME)
 #define smack_open      (*(am2_smack_open_fn *)(uintptr_t)ADDR_IAT_SMACK_OPEN)
+#define smack_wait      (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_WAIT)
 #define smack_ddtype    (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_DDTYPE)
 #define smack_use_dsound (*(am2_smack_use_dsound_fn *)(uintptr_t)ADDR_IAT_SMACK_USE_DSOUND)
 
@@ -399,6 +400,24 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
     }
 }
 
+/* Original: 0x00445390, 2 call sites. Draw a frame if one is due.
+ *
+ * Called from the game's own loop, not from the timer, and asks Smacker whether
+ * the next frame's time has come -- SmackWait answers non-zero while it is
+ * still early. So the timer is not the only thing driving playback: whichever
+ * of the two notices first gets the frame, and SmackWait is what stops them
+ * drawing it twice.
+ *
+ * Note the surface it draws to is the primary, passed straight through. That is
+ * what MovieDrawFrame's second argument has been all along. */
+int32_t __attribute__((thiscall)) MoviePoll(void *movie)
+{
+    if (fld(movie, MOVIE_TIMER_RUN, int32_t) &&
+        smack_wait(fld(movie, MOVIE_SMACK, void *)) == 0)
+        MovieDrawFrame(movie, *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+    return 1;
+}
+
 int movie_install(void)
 {
     int rc = 0;
@@ -412,6 +431,7 @@ int movie_install(void)
                         "MovieFinished", 0);
     rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);
     rc |= patch_replace(ADDR_MOVIE_START, (const void *)MovieStart, "MovieStart", 1);
+    rc |= patch_replace(ADDR_MOVIE_POLL, (const void *)MoviePoll, "MoviePoll", 0);
     rc |= patch_replace(ADDR_MOVIE_APPLY_PALETTE, (const void *)MovieApplyPalette,
                         "MovieApplyPalette", 1);
     return rc;

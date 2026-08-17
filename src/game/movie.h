@@ -57,6 +57,11 @@ void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
                                           int32_t wantW, int32_t wantH,
                                           int32_t big);
 
+/* Original: 0x00445390, 2 call sites. Draw a frame if Smacker says one is due.
+ * Called from the game loop rather than the timer -- both drive playback, and
+ * SmackWait is what stops them drawing the same frame twice. */
+int32_t __attribute__((thiscall)) MoviePoll(void *movie);
+
 int movie_install(void);
 
 #ifdef __cplusplus

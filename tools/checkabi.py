@@ -80,6 +80,11 @@ FUNCS = [
      "is nothing to clean -- indistinguishable from the tool's `thiscall?`"),
     (0x00445280, "MovieSetVolume",   "thiscall"),
     (0x004451F0, "MovieStart",       "thiscall"),
+    # Not a function start in docs/functions.tsv -- the inventory merged it into
+    # 0x00445320 -- so the scan is unbounded and picks up a neighbour's `ret 4`.
+    # It agrees by luck rather than by evidence; verified by hand as thiscall
+    # with no stack arguments.
+    (0x00445390, "MoviePoll",        "thiscall"),
     (0x00445320, "MovieApplyPalette", "thiscall"),
     (0x00444FC0, "MovieOpen",        "thiscall"),
     (0x004453C0, "MovieDrawFrame",   "thiscall"),

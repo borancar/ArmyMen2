@@ -98,6 +98,12 @@ def main():
     # import inventory used: functions.tsv merges a thunk with the body it
     # jumps into, so WndProc's sites are filed under the thunk at 0x0040A6A0
     # while the address we patch is 0x0040A6B0. Match by containment.
+    #
+    # The same merging can over-credit, and did: 0x00445320 and 0x00445390 are
+    # two functions the inventory reports as one, so patching the first marked
+    # the second's SmackWait covered when it was not. Both are reconstructed
+    # now, but if this number ever looks too good, that is the first thing to
+    # check -- containment cannot tell a thunk from a neighbour.
     def is_done(fn):
         end = fn + sizes.get(fn, 0)
         return any(fn <= d < end for d in done)
