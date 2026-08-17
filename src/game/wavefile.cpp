@@ -2,9 +2,10 @@
  *
  *   WaveOpenFile       0x0040CA10   1 call site
  *   WaveStartDataRead  0x0040CBB0   4 call sites
+ *   WaveReadFile       0x0040CBF0   6 call sites
  *   WaveCloseReadFile  0x0040CCE0   2 call sites
  *
- * Eleven import sites and no game logic whatsoever -- the densest remaining
+ * Fourteen import sites and no game logic whatsoever -- the densest remaining
  * corner of the boundary after the palette. Everything here is WINMM's
  * multimedia file services plus a pair of GlobalAlloc/GlobalFree, and it is the
  * only file I/O in the game that does not go through the CRT.
@@ -145,6 +146,65 @@ MMRESULT __cdecl WaveStartDataRead(HMMIO *phmmioIn, MMCKINFO *pckIn,
     return mmioDescend(*phmmioIn, pckIn, pckInRIFF, MMIO_FINDCHUNK);
 }
 
+MMRESULT __cdecl WaveReadFile(HMMIO hmmio, uint32_t cbRead, uint8_t *pbDest,
+                              MMCKINFO *pckIn, uint32_t *cbActualRead)
+{
+    MMIOINFO mmioinfo;
+    MMRESULT mmr;
+    uint32_t cbDataIn;
+    uint32_t cT;
+
+    mmr = mmioGetInfo(hmmio, &mmioinfo, 0);
+    if (mmr != MMSYSERR_NOERROR)
+        goto fail;
+
+    /* Never read past the end of the chunk, and charge whatever is taken
+     * against what is left of it. */
+    cbDataIn = cbRead;
+    if (cbDataIn > pckIn->cksize)
+        cbDataIn = pckIn->cksize;
+    pckIn->cksize -= cbDataIn;
+
+    /* Copy out of mmio's own buffer rather than through mmioRead, refilling it
+     * with mmioAdvance whenever it runs dry. That is what makes this worth
+     * having over a plain read: one buffer, no second copy. */
+    for (cT = 0; cT < cbDataIn; ) {
+        uint32_t cbActual;
+
+        if (mmioinfo.pchNext == mmioinfo.pchEndRead) {
+            mmr = mmioAdvance(hmmio, &mmioinfo, 0);
+            if (mmr != MMSYSERR_NOERROR)
+                goto fail;
+            if (mmioinfo.pchNext == mmioinfo.pchEndRead) {
+                /* Advanced and still empty: the file ended early. Reported as
+                 * -1 rather than an MMRESULT, since no call failed. */
+                *cbActualRead = 0;
+                return (MMRESULT)-1;
+            }
+        }
+
+        cbActual = (uint32_t)(mmioinfo.pchEndRead - mmioinfo.pchNext);
+        if (cbDataIn - cT < cbActual)
+            cbActual = cbDataIn - cT;
+        memcpy(pbDest + cT, mmioinfo.pchNext, cbActual);
+        cT += cbActual;
+        mmioinfo.pchNext += cbActual;
+    }
+
+    /* Hand the advanced cursor back, or the next read starts in the wrong
+     * place. */
+    mmr = mmioSetInfo(hmmio, &mmioinfo, 0);
+    if (mmr != MMSYSERR_NOERROR)
+        goto fail;
+
+    *cbActualRead = cbDataIn;
+    return MMSYSERR_NOERROR;
+
+fail:
+    *cbActualRead = 0;
+    return mmr;
+}
+
 MMRESULT __cdecl WaveCloseReadFile(HMMIO *phmmio, WAVEFORMATEX **ppwfxSrc)
 {
     if (*ppwfxSrc) {
@@ -166,6 +226,8 @@ int wavefile_install(void)
                         "WaveOpenFile", 4);
     rc |= patch_replace(ADDR_WAVE_START_DATA, (const void *)WaveStartDataRead,
                         "WaveStartDataRead", 3);
+    rc |= patch_replace(ADDR_WAVE_READ_FILE, (const void *)WaveReadFile,
+                        "WaveReadFile", 5);
     rc |= patch_replace(ADDR_WAVE_CLOSE_FILE, (const void *)WaveCloseReadFile,
                         "WaveCloseReadFile", 2);
     return rc;

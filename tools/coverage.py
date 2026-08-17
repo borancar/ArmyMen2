@@ -1,0 +1,177 @@
+"""How much of the Win32/DirectX boundary is reconstructed, and what is left.
+
+The question this answers is the one the port exists to answer: has the game's
+communication with the outside world been taken over? Asserting that in prose
+goes stale within a commit or two, so it is computed instead.
+
+The set of reconstructed functions is not maintained here. It is read out of the
+`patch_replace(ADDR_X, ...)` calls in src/game/*.cpp and the ADDR_X definitions
+in src/inject/orig.h, so it cannot drift from what the harness actually
+installs. Functions installed some other way -- WndProc is registered into the
+WNDCLASS rather than patched -- are listed in REGISTERED below, which is the one
+thing that does have to be kept by hand.
+
+Every remaining import site is then classified, because "not reconstructed" and
+"still crossing the boundary" are not the same thing. A 5,760-byte unit-AI
+routine that reads GetTickCount once is not boundary code, and porting it to
+capture that read would be reconstructing the game rather than its edges.
+
+Writes docs/boundary.md.
+"""
+
+import collections
+import csv
+import os
+import re
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(REPO, "docs", "boundary.md")
+CRT_START = 0x0045C000
+
+# Reached without a patch: registered into the WNDCLASS by InitApplication.
+REGISTERED = {"ADDR_WND_PROC"}
+
+# Imports that are a fact of running on Windows rather than a channel to the
+# outside world. A function whose only boundary contact is one of these is
+# ordinary game logic that happens to ask the clock or poke its own queue.
+INCIDENTAL = {
+    "GetTickCount", "QueryPerformanceCounter", "QueryPerformanceFrequency",
+    "Sleep", "PostMessageA", "SendMessageA", "InterlockedExchange",
+    "WaitForSingleObject", "WaitForMultipleObjects", "ReleaseMutex",
+    "CreateMutexA", "CloseHandle", "SetEvent", "ResetEvent", "CreateEventA",
+    "EnterCriticalSection", "LeaveCriticalSection", "GetLastError",
+    "GetCurrentThreadId", "CreateThread", "TerminateThread", "ExitThread",
+    "SetThreadPriority", "IntersectRect", "SetRect", "OffsetRect",
+    "InflateRect", "UnionRect", "PtInRect", "IsRectEmpty", "SetRectEmpty",
+    "CopyRect", "EqualRect", "GetActiveWindow", "GetFocus", "wsprintfA",
+}
+
+
+def addr_table():
+    """{ADDR_NAME: address} from src/inject/orig.h."""
+    out = {}
+    path = os.path.join(REPO, "src", "inject", "orig.h")
+    pat = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+0x([0-9A-Fa-f]+)u?")
+    with open(path) as fh:
+        for line in fh:
+            m = pat.match(line.strip())
+            if m:
+                out[m.group(1)] = int(m.group(2), 16)
+    return out
+
+
+def reconstructed(names):
+    """Addresses the harness installs, read from the install sites themselves."""
+    game = os.path.join(REPO, "src", "game")
+    pat = re.compile(r"patch_replace\(\s*(ADDR_[A-Z0-9_]+)")
+    found = set(REGISTERED)
+    for fn in sorted(os.listdir(game)):
+        if not fn.endswith(".cpp"):
+            continue
+        with open(os.path.join(game, fn)) as fh:
+            found.update(pat.findall(fh.read()))
+    missing = sorted(n for n in found if n not in names)
+    return {names[n] for n in found if n in names}, missing
+
+
+def main():
+    names = addr_table()
+    done, missing = reconstructed(names)
+    if missing:
+        print("warning: patched names with no address in orig.h:", missing)
+
+    rows = list(csv.DictReader(open(os.path.join(REPO, "docs", "imports.tsv")),
+                               delimiter="\t"))
+    sizes = {int(r["addr"], 16): int(r["size"])
+             for r in csv.DictReader(
+                 open(os.path.join(REPO, "docs", "functions.tsv")),
+                 delimiter="\t")}
+
+    per_fn = collections.defaultdict(list)
+    for r in rows:
+        fn = int(r["func"], 16)
+        if fn and fn < CRT_START:
+            per_fn[fn].append(r)
+
+    # A reconstructed address does not always equal the function address the
+    # import inventory used: functions.tsv merges a thunk with the body it
+    # jumps into, so WndProc's sites are filed under the thunk at 0x0040A6A0
+    # while the address we patch is 0x0040A6B0. Match by containment.
+    def is_done(fn):
+        end = fn + sizes.get(fn, 0)
+        return any(fn <= d < end for d in done)
+
+    done_fns = {f for f in per_fn if is_done(f)}
+    rest = {f: v for f, v in per_fn.items() if f not in done_fns}
+
+    # Split what is left: functions whose every import is incidental are game
+    # logic, not boundary.
+    real, incidental = {}, {}
+    for f, v in rest.items():
+        (incidental if all(r["symbol"] in INCIDENTAL for r in v)
+         else real)[f] = v
+
+    sites = lambda d: sum(len(v) for v in d.values())
+    total_sites = sites(per_fn)
+
+    with open(OUT, "w") as fh:
+        w = fh.write
+        w("# Win32 / DirectX boundary coverage\n\n")
+        w("Generated by `tools/coverage.py`; do not edit. The reconstructed set\n"
+          "is read from the `patch_replace` calls in `src/game/*.cpp`, so it\n"
+          "cannot disagree with what the harness installs.\n\n")
+        w("Only game code is counted. The statically linked MSVC CRT above\n"
+          f"{CRT_START:#x} reaches plenty of kernel32 itself and is replaced\n"
+          "wholesale by libc rather than function by function.\n\n")
+
+        w("## Where it stands\n\n")
+        w("| | functions | import sites |\n|---|---:|---:|\n")
+        w(f"| reconstructed | {len(done_fns)} | {sites({f: per_fn[f] for f in done_fns})} |\n")
+        w(f"| still boundary | {len(real)} | {sites(real)} |\n")
+        w(f"| game logic, incidental calls only | {len(incidental)} | {sites(incidental)} |\n")
+        w(f"| **total** | **{len(per_fn)}** | **{total_sites}** |\n\n")
+
+        w("The middle row is the work that remains. The bottom row is not work:\n"
+          "those functions touch Win32 only through things every Windows program\n"
+          "does -- reading the clock, posting to its own message queue, taking a\n"
+          "mutex, intersecting a rectangle. Reconstructing a 5KB unit-AI routine\n"
+          "to capture one `GetTickCount` would be porting the game, not its edges.\n\n")
+
+        w("## Still boundary\n\n")
+        w("Ranked by density, because that is what distinguishes a boundary\n"
+          "function from game logic with a call in it.\n\n")
+        w("| function | size | sites | B/site | imports |\n")
+        w("|---|---:|---:|---:|---|\n")
+        for f, v in sorted(real.items(),
+                           key=lambda kv: sizes.get(kv[0], 9999) / len(kv[1])):
+            syms = sorted({r["symbol"] for r in v})
+            shown = ", ".join(syms[:6]) + (" …" if len(syms) > 6 else "")
+            sz = sizes.get(f, 0)
+            w(f"| `{f:#010x}` | {sz} | {len(v)} | {sz // len(v)} | {shown} |\n")
+
+        w("\n## By library\n\n")
+        w("| dll | sites | reconstructed |\n|---|---:|---:|\n")
+        by_dll = collections.Counter(r["dll"] for r in rows
+                                     if int(r["func"], 16) and
+                                     int(r["func"], 16) < CRT_START)
+        for dll, n in by_dll.most_common():
+            got = sum(1 for r in rows
+                      if r["dll"] == dll and int(r["func"], 16) in done_fns)
+            w(f"| {dll} | {n} | {got} |\n")
+
+        w("\nNo networking library appears above, and that is not an omission:\n"
+          "the game imports none. Its multiplayer transport is DirectPlay,\n"
+          "obtained through `CoCreateInstance`, so the only trace in the import\n"
+          "table is ole32. Both of those sites are reconstructed.\n")
+
+    print(f"-> {os.path.relpath(OUT, REPO)}")
+    print(f"reconstructed {len(done_fns)} functions / "
+          f"{sites({f: per_fn[f] for f in done_fns})} sites")
+    print(f"still boundary {len(real)} functions / {sites(real)} sites")
+    print(f"game logic     {len(incidental)} functions / {sites(incidental)} sites")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

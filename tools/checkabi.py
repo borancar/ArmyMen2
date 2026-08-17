@@ -75,6 +75,7 @@ FUNCS = [
     (0x0041E750, "FatalError",        "cdecl"),
     (0x0040CA10, "WaveOpenFile",      "cdecl"),
     (0x0040CBB0, "WaveStartDataRead", "cdecl"),
+    (0x0040CBF0, "WaveReadFile",      "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
     (0x0040DD20, "CommCreateDirectPlay", "thiscall"),
     (0x0040DDD0, "CreateDirectPlayLobby", "stdcall",

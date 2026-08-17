@@ -93,6 +93,7 @@ new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
 | `tools/imports.py` | every use of the import table, and which function makes it |
 | `tools/comcalls.py` | COM vtable dispatch — the DirectX calls no import scan sees |
 | `tools/disasm.py` | one function, annotated with imports, COM slots and strings |
+| `tools/coverage.py` | how much of the boundary is reconstructed, and what is left |
 | `tools/am2ctl.py` | client for the control socket — drives the running game |
 | `tools/drive.sh` | headless launch, screenshot and menu navigation on Xvfb |
 
@@ -104,6 +105,7 @@ Most write a `.tsv` into `docs/`. Regenerate in dependency order:
 ./.venv/bin/python tools/find_logs.py
 ./.venv/bin/python tools/imports.py
 ./.venv/bin/python tools/comcalls.py
+./.venv/bin/python tools/coverage.py
 ```
 
 `imports.py` and `comcalls.py` together map the boundary between the game and

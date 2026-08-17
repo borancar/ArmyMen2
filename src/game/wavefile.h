@@ -41,6 +41,20 @@ MMRESULT __cdecl WaveOpenFile(char *fileName, HMMIO *phmmioIn,
 MMRESULT __cdecl WaveStartDataRead(HMMIO *phmmioIn, MMCKINFO *pckIn,
                                    MMCKINFO *pckInRIFF);
 
+/* Original: 0x0040CBF0. Read up to `cbRead` bytes of the current chunk. 6 call
+ * sites -- the most-used of the four.
+ *
+ * Reads out of mmio's own buffer rather than through mmioRead, calling
+ * mmioAdvance to refill it whenever it runs dry, which is what makes it worth
+ * having: one buffer and no second copy. Never reads past the end of the chunk
+ * and subtracts whatever it takes from `pckIn->cksize`, so repeated calls walk
+ * the chunk to its end.
+ *
+ * Returns 0 with the byte count in *cbActualRead. A short file -- advanced and
+ * still empty -- answers -1 rather than an MMRESULT, since nothing failed. */
+MMRESULT __cdecl WaveReadFile(HMMIO hmmio, uint32_t cbRead, uint8_t *pbDest,
+                              MMCKINFO *pckIn, uint32_t *cbActualRead);
+
 /* Original: 0x0040CCE0. Release both halves of what WaveOpenFile produced and
  * null the caller's pointers. Safe on either being already null; always
  * returns 0. */
