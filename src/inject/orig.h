@@ -324,6 +324,19 @@
 /* Inclusive: the original's loop is `cmp edi,0x4FA400 / jle`, so the entry AT
  * this address is processed too -- 17 pointers, not 16. */
 #define ADDR_SOUND_DYNAMIC_LAST  0x004FA400u
+/* Bulk operations over those two tables. */
+#define ADDR_FREE_DYN_SOUNDS     0x0040B800u  /* void(void) */
+#define ADDR_INIT_WAVE_SOUNDS    0x0040C710u  /* int32(void) */
+#define ADDR_LOAD_WAVE_SOUND     0x0040C530u  /* int32(slot, IDirectSound*, name) */
+#define ADDR_WAVE_NAMES          0x00474360u  /* const char *[32] */
+#define ADDR_WAVE_NAMES_END      0x00474440u
+#define ADDR_WAVE_DIR            0x004852CCu  /* const char *, probed first */
+#define ADDR_STR_WAVE_INIT_FAIL  0x00474E8Cu  /* "Unable to initialize wave %d\n" */
+#define SOUND_SLOT_STRIDE        0x10u
+#define SOUND_SLOT_OFF_BUFFER    0x00u   /* IDirectSoundBuffer * */
+#define SOUND_SLOT_OFF_BYTES     0x04u   /* DSBCAPS.dwBufferBytes */
+#define SOUND_DYN_OFF_BUFFER     0x00u
+#define SOUND_DYN_OFF_DATA       0x04u
 #define SOUND_SLOT_STRIDE        0x10u
 #define ADDR_RELEASE_SOUND_BUFS  0x0040C7D0u  /* void(void), 8 call sites */
 #define ADDR_INIT_DIRECTSOUND    0x0040C800u  /* int32_t(void); 1 on success */

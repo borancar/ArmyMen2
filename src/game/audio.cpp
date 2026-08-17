@@ -421,6 +421,94 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
     return 1;
 }
 
+/* Bring the fixed wave sounds up -- 0x0040C710.
+ *
+ * Thirty-two names in a table, each loaded into one of the sixteen-byte slots
+ * at ADDR_SOUND_SLOTS. What makes it boundary code rather than a loop is the
+ * second half of each iteration: having got a buffer, it asks DirectSound how
+ * big that buffer actually is and records the answer beside it, because the
+ * length the file claims and the length the buffer got need not agree.
+ *
+ * DSBCAPS is identified by its size: the original writes 0x14 into the
+ * descriptor before the call, and reads back the field at +8, which is
+ * dwBufferBytes. Slot 3 on IDirectSoundBuffer is GetCaps.
+ *
+ * A wave that fails to load leaves its slot null and says which index it was.
+ * Nothing stops on it; the game runs with that sound silent. Always answers 1.
+ *
+ * Unexercised here -- with no audio device there is no IDirectSound to load
+ * into, and the loader fails at the first step. */
+static_assert(sizeof(DSBCAPS) == 0x14, "DSBCAPS");
+
+typedef int32_t (__cdecl *am2_load_wave_fn)(void *slot, LPDIRECTSOUND ds,
+                                            const char *name);
+#define orig_load_wave (*(am2_load_wave_fn)ADDR_LOAD_WAVE_SOUND)
+#define g_waveNames    ((const char *const *)(uintptr_t)ADDR_WAVE_NAMES)
+#define g_soundSlots   ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS)
+#define g_dsound       (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
+
+#define WAVE_COUNT \
+    ((ADDR_WAVE_NAMES_END - ADDR_WAVE_NAMES) / sizeof(const char *))
+
+int32_t __cdecl InitWaveSounds(void)
+{
+    int32_t i;
+
+    /* The directory is probed and the answer thrown away, exactly as written. */
+    orig_check_path(*(void **)(uintptr_t)ADDR_WAVE_DIR);
+
+    for (i = 0; i < (int32_t)WAVE_COUNT; i++) {
+        uint8_t *slot = g_soundSlots + i * SOUND_SLOT_STRIDE;
+        DSBCAPS  caps;
+
+        if (!orig_load_wave(slot, g_dsound, g_waveNames[i])) {
+            orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_INIT_FAIL, i);
+            *(void **)(slot + SOUND_SLOT_OFF_BUFFER) = NULL;
+            continue;
+        }
+
+        caps.dwSize = sizeof caps;
+        IDirectSoundBuffer_GetCaps(
+            *(LPDIRECTSOUNDBUFFER *)(slot + SOUND_SLOT_OFF_BUFFER), &caps);
+        *(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES) = caps.dwBufferBytes;
+    }
+    return 1;
+}
+
+/* Let the dynamic sounds go -- 0x0040B800.
+ *
+ * The seventeen slots at ADDR_SOUND_DYNAMIC, which unlike the fixed ones above
+ * are allocated per use and owned outright: the DirectSound buffer is
+ * Released, the sample data freed, and the record itself freed. StopAllSounds
+ * treats the two tables the same way and for the same reason.
+ *
+ * The bound is inclusive -- the original compares against the last slot's
+ * address with `jle`, not one past it -- so all seventeen are covered rather
+ * than sixteen. */
+void __cdecl FreeDynamicSounds(void)
+{
+    uint8_t **slot;
+
+    if (!g_audioEnabled)
+        return;
+
+    for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC;
+         slot <= (uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC_LAST;
+         slot++) {
+        uint8_t *snd = *slot;
+
+        if (!snd)
+            continue;
+        if (*(void **)(snd + SOUND_DYN_OFF_BUFFER))
+            IDirectSoundBuffer_Release(
+                *(LPDIRECTSOUNDBUFFER *)(snd + SOUND_DYN_OFF_BUFFER));
+        if (*(void **)(snd + SOUND_DYN_OFF_DATA))
+            orig_free(*(void **)(snd + SOUND_DYN_OFF_DATA));
+        orig_free(snd);
+        *slot = NULL;
+    }
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -435,6 +523,10 @@ int audio_install(void)
                         "InitDirectSound", 0);
     rc |= patch_replace(ADDR_FILL_SOUND_BUFFER, (const void *)FillSoundBuffer,
                         "FillSoundBuffer", 3);
+    rc |= patch_replace(ADDR_INIT_WAVE_SOUNDS, (const void *)InitWaveSounds,
+                        "InitWaveSounds", 0);
+    rc |= patch_replace(ADDR_FREE_DYN_SOUNDS, (const void *)FreeDynamicSounds,
+                        "FreeDynamicSounds", 0);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
                         "SetStreamVolume", 1);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,

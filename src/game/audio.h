@@ -91,6 +91,15 @@ void __cdecl FreeSound(void *snd);
 int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
                                 uint32_t size);
 
+/* Original: 0x0040C710. Load the 32 fixed wave sounds and record how big
+ * DirectSound actually made each buffer. Always answers 1; a wave that fails
+ * leaves its slot null and names its index in the log.
+ *
+ * Original: 0x0040B800. Release, free and clear the 17 dynamic sound slots,
+ * which unlike the fixed ones are owned outright. */
+int32_t __cdecl InitWaveSounds(void);
+void __cdecl FreeDynamicSounds(void);
+
 int audio_install(void);
 
 #ifdef __cplusplus
