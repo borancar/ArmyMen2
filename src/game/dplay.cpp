@@ -142,6 +142,8 @@ void __cdecl CommShutdown(void)
 /* The comm object lives behind a pointer; these three reach the interface the
  * same way CommCreateDirectPlay does. */
 #define g_commObject (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define g_commEnumCount (*(int32_t *)(uintptr_t)ADDR_COMM_ENUM_COUNT)
+#define g_hwnd          (*(HWND *)(uintptr_t)ADDR_HWND)
 
 int32_t __cdecl CommClose(void)
 {
@@ -1262,6 +1264,54 @@ int32_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t val
                                              &msg, sizeof msg) >= 0;
 }
 
+/* Ask DirectPlay who is in the session -- 0x0040E200.
+ *
+ * The last DirectPlay call outside the reconstruction, and the smallest
+ * remaining boundary function in the image at 128 bytes for one COM call. It
+ * was ranked at 432 bytes and three places lower until tools/merges.py learned
+ * to count unaligned `push imm32` operands as references: the function after
+ * this one is reached only that way, so its start was invisible and its bytes
+ * were charged to this one.
+ *
+ * Every slot is emptied before the enumeration rather than after it, because
+ * the callback fills them by the running count and has no way to know which
+ * were stale. A reset slot has index 0x63, no player id and an empty name.
+ *
+ * The callback stays original. It is the other half of the same enumeration
+ * and touches no import; only the EnumPlayers call itself is boundary.
+ *
+ * Returns 1 when DirectPlay answered DP_OK and 0 otherwise -- the original
+ * spells that `neg`/`sbb`/`inc`, which is the usual MSVC idiom for
+ * `hr == 0` and not a sign that anything subtle is happening.
+ *
+ * NOT EXERCISED HERE, and it cannot be without AM2_MULTIPLAYER=1: with the
+ * button patched out the whole DirectPlay subsystem is unreachable. Verified
+ * by reading, like the rest of dplay.cpp. */
+int32_t __cdecl CommEnumPlayers(void)
+{
+    uint8_t       *comm = g_commObject;
+    LPDIRECTPLAY4A dp;
+    int32_t        i;
+
+    dp = *(LPDIRECTPLAY4A *)(comm + COMM_OFF_DPLAY);
+    if (!dp)
+        return 0;
+
+    for (i = 0; i < 4; i++) {
+        uint8_t *slot = comm + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+
+        comm_u32(slot, COMM_SLOT_OFF_INDEX) = COMM_SLOT_INDEX_NONE;
+        comm_u32(slot, COMM_SLOT_OFF_ID)    = 0;
+        slot[COMM_SLOT_OFF_NAME]            = 0;
+    }
+    g_commEnumCount = 0;
+
+    return IDirectPlayX_EnumPlayers(dp, *(GUID **)comm,
+                                    (LPDPENUMPLAYERSCALLBACK2)
+                                        (uintptr_t)ADDR_ENUM_PLAYERS_CB,
+                                    (LPVOID)g_hwnd, 0) == DP_OK;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1279,6 +1329,8 @@ int dplay_install(void)
                         "CommSetSessionDesc", 2);
     rc |= patch_replace(ADDR_COMM_GET_SESSION, (const void *)CommGetSessionDesc,
                         "CommGetSessionDesc", 0);
+    rc |= patch_replace(ADDR_COMM_ENUM_PLAYERS, (const void *)CommEnumPlayers,
+                        "CommEnumPlayers", 0);
     rc |= patch_replace(ADDR_COMM_CONSTRUCT, (const void *)CommConstruct,
                         "CommConstruct", 0);
     rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,

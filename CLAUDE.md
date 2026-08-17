@@ -377,8 +377,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
   `OpenAudioStream`, `AudioTimerProc`, both input pollers, `ComposeFrame`,
-  `ScrollView`, `ScrollMapCache` and the comm object's constructor and
-  destructor. The window, the message queue, the display mode,
+  `ScrollView`, `ScrollMapCache`, `CommEnumPlayers` and the comm object's
+  constructor and destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.

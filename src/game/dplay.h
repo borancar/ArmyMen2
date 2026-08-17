@@ -115,6 +115,10 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
  * dplay.cpp. */
 int32_t __attribute__((thiscall)) CommOnConnected(void *self);
 
+/* Original: 0x0040E200. Empty the four player slots and ask DirectPlay to
+ * enumerate the session's players into them. Answers 1 on DP_OK. */
+int32_t __cdecl CommEnumPlayers(void);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

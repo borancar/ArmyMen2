@@ -652,6 +652,17 @@
 /* The comm subsystem object; -debugComm, -traceComm and -logComm set flags
  * inside it rather than in globals of their own. */
 #define ADDR_COMM_OBJECT         0x004751B0u  /* void ** */
+/* Reset to 0 before an enumeration and used by the callback as the slot it
+ * fills next, so after EnumPlayers returns it is how many were found. */
+#define ADDR_COMM_ENUM_COUNT     0x004751B4u  /* int32_t */
+/* EnumPlayers' DPENUMPLAYERSCALLBACK2. Left original -- it is the other side
+ * of the same enumeration and touches no import. */
+#define ADDR_ENUM_PLAYERS_CB     0x0040E0B0u
+#define ADDR_COMM_ENUM_PLAYERS   0x0040E200u  /* int32_t(void) */
+/* A player slot's index field, which the session carries as dwUser1. 0x63
+ * is what a reset slot holds -- no player. */
+#define COMM_SLOT_OFF_INDEX      0x004u
+#define COMM_SLOT_INDEX_NONE     0x63u
 
 /* The menu's "do this next" pair. StartSelectedGame writes a request code into
  * the first and raises the flag in the second; the menu loop acts on it. The
