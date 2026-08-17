@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 39 | 139 |
-| still boundary | 2 | 6 |
+| reconstructed | 40 | 141 |
+| still boundary | 1 | 4 |
 | game logic, incidental calls only | 81 | 131 |
 | **total** | **122** | **276** |
 
@@ -25,7 +25,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 71 | 130 |  |
+| USER32 | 73 | 130 |  |
 | KERNEL32 | 21 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -41,7 +41,7 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
-| `MessageBoxA` | 3 |
+| `MessageBoxA` | 2 |
 
 Read that table with `docs/binarypatches.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
@@ -62,11 +62,11 @@ displacement rather than by any ranking.
 
 | field | what it holds | reconstructed | left |
 |---|---|---:|---:|
-| `0x3ec` | IDirectPlay4A, in the comm object | 6 | 1 |
+| `0x3ec` | IDirectPlay4A, in the comm object | 7 | 0 |
 | `0x10` | IDirectDrawSurface, in a sprite or map descriptor | 4 | 1 |
 | `0x800` | IDirectDrawPalette, in a palette holder | 3 | 0 |
 | `0x4` | — | 2 | 0 |
-| `0x3f4` | — | 0 | 1 |
+| `0x3f4` | — | 1 | 0 |
 
 ## DirectX through COM
 
@@ -95,8 +95,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 49 |
-| any COM dispatch, not | 61 |
+| any COM dispatch, reconstructed | 50 |
+| any COM dispatch, not | 60 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -132,13 +132,12 @@ function from game logic with a call in it.
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
 | `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
-| `0x0040ed10` | 1056 | 2 | 528 | GetActiveWindow, MessageBoxA |
 
 ## By library
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 71 |
+| USER32.dll | 130 | 73 |
 | KERNEL32.dll | 99 | 21 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |

@@ -24,6 +24,7 @@
  */
 
 #include "dplay.h"
+#include "cdcheck.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -790,6 +791,203 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
     return 0;
 }
 
+/* Start the game from a DirectPlay lobby -- 0x0040ED10, thiscall.
+ *
+ * The last DirectPlay function, and the one path into the game that no menu
+ * reaches: another application launches it through DirectPlay, hands over the
+ * connection settings it has already chosen, and the game joins whatever
+ * session was arranged for it.
+ *
+ * The shape is ask, adjust, connect. GetConnectionSettings fetches the
+ * DPLCONNECTION the launcher prepared; the session description inside it is
+ * amended with this game's own requirements -- host migration, four players,
+ * and dwUser1..4 set to 1, 2, 3, 4 -- and SetConnectionSettings hands it back
+ * before Connect makes it real. What Connect returns is an IDirectPlay2, so
+ * the very next thing is a QueryInterface for IID_IDirectPlay4A, which is the
+ * interface everything else in this file uses; the intermediate is released
+ * immediately.
+ *
+ * DPERR_NOTLOBBIED is the ordinary answer, not a failure. It means nobody
+ * launched us through a lobby, and it exits quietly -- releasing the lobby
+ * interface and the buffer -- where every other error is named in the log
+ * first.
+ *
+ * Host or slave is decided by DirectPlay rather than by the launcher: GetCaps
+ * is called and DPCAPS_ISHOST picked out of the flags, which is the `>> 1 & 1`
+ * in the original. A slave then fetches the session description to learn the
+ * player count; a host already knows it.
+ *
+ * The CD check on the way through is one of the five patched to unconditional,
+ * so the "insert the CD" dialog after it is unreachable. Reproduced through
+ * RequireGameCD like the others -- see cdcheck.h.
+ *
+ * NOT EXERCISABLE HERE, and not for want of trying: it needs a DirectPlay
+ * lobby application to launch the game, which is a thing that no longer
+ * exists. Verified by reading. */
+static_assert((uint32_t)DPERR_NOTLOBBIED == 0x8877042Eu, "DPERR_NOTLOBBIED");
+static_assert((uint32_t)DPERR_INVALIDINTERFACE == 0x88770406u, "DPERR_INVALIDINTERFACE");
+static_assert((uint32_t)DPERR_INVALIDOBJECT == 0x88770082u, "DPERR_INVALIDOBJECT");
+static_assert(DPCAPS_ISHOST == 2, "DPCAPS_ISHOST");
+static_assert(sizeof(DPLCONNECTION) <= LOBBY_CONN_BUF_SIZE, "the 0x800 buffer");
+
+typedef void (__cdecl *am2_lobby_void_fn)(void);
+typedef int32_t (__attribute__((thiscall)) *am2_create_player_fn)(
+    void *comm, const char *name, int32_t a, int32_t b, int32_t c);
+#define orig_read_mp_maps    (*(am2_lobby_void_fn)ADDR_READ_MP_MAPS)
+#define orig_mark_lobbied    (*(am2_lobby_void_fn)ADDR_COMM_MARK_LOBBIED)
+#define orig_on_lobby_slave  (*(am2_lobby_void_fn)ADDR_ON_LOBBY_SLAVE)
+#define orig_create_player   (*(am2_create_player_fn)ADDR_COMM_CREATE_PLAYER)
+#define orig_apply_settings  (*(am2_lobby_void_fn)ADDR_APPLY_GAME_SETTINGS)
+
+/* Release the lobby interface and the connection buffer, in that order. Used
+ * by the quiet DPERR_NOTLOBBIED exit and by the dead copy-protection path. */
+static void LobbyGiveUp(uint8_t *self)
+{
+    LPDIRECTPLAYLOBBY3A *lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+
+    if (*lobby) {
+        IDirectPlayLobby_Release(*lobby);
+        *lobby = NULL;
+        if (comm_u32(self, COMM_OFF_LOBBY_BUF)) {
+            orig_free(*(void **)(self + COMM_OFF_LOBBY_BUF));
+            comm_u32(self, COMM_OFF_LOBBY_BUF) = 0;
+        }
+    }
+}
+
+int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
+{
+    uint8_t             *self  = (uint8_t *)comm;
+    LPDIRECTPLAYLOBBY3A *lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+    uint8_t             *shared;
+    LPDPLCONNECTION      conn;
+    LPDPSESSIONDESC2     sd;
+    LPDIRECTPLAY2A       dp2 = NULL;
+    DPCAPS               caps;
+    DWORD                size = LOBBY_CONN_BUF_SIZE;
+    HRESULT              hr;
+    const char          *playerName;
+
+    comm_u32(self, COMM_OFF_LOBBY_STARTING) = 1;
+    orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_START);
+    orig_read_mp_maps();
+
+    /* Answers 0 or 1, never negative, so this test can only ever pass -- the
+     * original's, kept. */
+    if (CreateDirectPlayLobby(lobby) < 0) {
+        *lobby = NULL;
+        return 0;
+    }
+
+    conn = (LPDPLCONNECTION)orig_malloc(size);
+    *(void **)(self + COMM_OFF_LOBBY_BUF) = conn;
+    if (!conn) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_NOMEM);
+        return 0;
+    }
+
+    shared = g_commObject;
+    hr = IDirectPlayLobby_GetConnectionSettings(
+             *(LPDIRECTPLAYLOBBY3A *)(shared + COMM_OFF_LOBBY), 0, conn, &size);
+    if (hr < 0) {
+        /* Nobody launched us. Ordinary, and silent. */
+        if (hr == (HRESULT)DPERR_NOTLOBBIED && *lobby) {
+            LobbyGiveUp(self);
+            return 0;
+        }
+        orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_GCS_FAIL, hr);
+        if (hr == (HRESULT)DPERR_BUFFERTOOSMALL)
+            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_SMALL);
+        else if (hr == (HRESULT)DPERR_INVALIDINTERFACE)
+            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_IFACE);
+        else if (hr == (HRESULT)DPERR_INVALIDOBJECT)
+            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_OBJECT);
+        else if (hr == E_INVALIDARG)
+            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_PARAMS);
+        else if (hr == E_OUTOFMEMORY)
+            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_MEMORY);
+        return 0;
+    }
+
+    /* Disabled in this build; the refusal below cannot run. */
+    if (!RequireGameCD()) {
+        LobbyGiveUp(self);
+        return 0;
+    }
+
+    /* The launcher chose the transport; the game chooses the rest. */
+    conn = *(LPDPLCONNECTION *)(self + COMM_OFF_LOBBY_BUF);
+    sd = conn->lpSessionDesc;
+    sd->dwUser1      = 1;
+    sd->dwUser2      = 2;
+    sd->dwUser3      = 3;
+    sd->dwUser4      = 4;
+    sd->dwFlags      = DPSESSION_MIGRATEHOST;
+    sd->dwMaxPlayers = AM2_MAX_PLAYERS;
+
+    if (IDirectPlayLobby_SetConnectionSettings(
+            *(LPDIRECTPLAYLOBBY3A *)(g_commObject + COMM_OFF_LOBBY),
+            0, 0, conn) < 0)
+        return 0;
+
+    orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_CONNECT);
+    hr = IDirectPlayLobby_Connect(
+             *(LPDIRECTPLAYLOBBY3A *)(g_commObject + COMM_OFF_LOBBY),
+             0, &dp2, NULL);
+    orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_CONNRET, hr);
+    if (hr < 0)
+        return 0;
+
+    /* Connect hands back an IDirectPlay2; everything else here wants a 4A. */
+    if (dp2) {
+        hr = IDirectPlayX_QueryInterface(dp2, kIID_IDirectPlay4A,
+                                         (LPVOID *)DirectPlaySlot(self));
+        IDirectPlayX_Release(dp2);
+        if (hr < 0)
+            return 0;
+    }
+
+    shared = g_commObject;
+    comm_u32(shared, 0x3E0) = 0;
+    caps.dwSize = sizeof caps;
+    IDirectPlayX_GetCaps(*DirectPlaySlot(shared), &caps, 0);
+    comm_u32(shared, COMM_OFF_IS_HOST) = (caps.dwFlags >> 1) & 1;
+
+    conn = *(LPDPLCONNECTION *)(self + COMM_OFF_LOBBY_BUF);
+    playerName = conn->lpPlayerName->lpszShortNameA;
+
+    if (!comm_u32(g_commObject, COMM_OFF_IS_HOST)) {
+        /* A slave has to be told how many players there are. */
+        CommGetSessionDesc(g_commObject);
+        comm_u32(g_commObject, COMM_OFF_PLAYER_COUNT) =
+            ((LPDPSESSIONDESC2)*(void **)(g_commObject + COMM_OFF_SESSION_DESC))
+                ->dwCurrentPlayers;
+    }
+
+    if (orig_create_player(g_commObject, playerName, 0, 0, 0) < 0)
+        return 0;
+
+    orig_log((const char *)(uintptr_t)
+             (comm_u32(g_commObject, COMM_OFF_IS_HOST)
+              ? ADDR_STR_LOBBY_AS_HOST : ADDR_STR_LOBBY_AS_SLAVE),
+             comm_u32(g_commObject, COMM_OFF_OUR_PLAYER_ID));
+
+    comm_u32(g_commObject, COMM_OFF_LOBBIED) = 1;
+    orig_mark_lobbied();
+
+    if (!comm_u32(g_commObject, COMM_OFF_IS_HOST)) {
+        orig_on_lobby_slave();
+    } else {
+        /* The host records its own name in the slot it occupies. */
+        char *slotName = (char *)(g_commObject + COMM_SLOT_BASE
+                                  + g_hostSlot * COMM_SLOT_STRIDE
+                                  + COMM_SLOT_OFF_NAME);
+        strcpy(slotName, playerName);
+    }
+    orig_apply_settings();
+    return 1;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -822,5 +1020,7 @@ int dplay_install(void)
                         "CommOnConnected", 0);
     rc |= patch_replace(ADDR_COMM_DROP_DPLAY, (const void *)CommDropDirectPlay,
                         "CommDropDirectPlay", 0);
+    rc |= patch_replace(ADDR_COMM_LOBBY_START, (const void *)CommLobbyStart,
+                        "CommLobbyStart", 0);
     return rc;
 }

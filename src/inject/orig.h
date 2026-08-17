@@ -221,6 +221,31 @@
 #define ADDR_IID_DPLAY_LOBBY3A   0x0046F768u  /* IID_IDirectPlayLobby3A */
 /* Both thiscall on the comm object, both taking nothing but `this`. */
 #define ADDR_COMM_DROP_DPLAY     0x0040EA40u  /* thiscall int32(this) */
+/* The DirectPlay lobby launch, reached when another application starts the
+ * game through DirectPlay rather than the user starting it. */
+#define ADDR_COMM_LOBBY_START    0x0040ED10u  /* thiscall int32(this) */
+#define ADDR_READ_MP_MAPS        0x0043ECC0u  /* void(void), stays original */
+#define ADDR_COMM_CREATE_PLAYER  0x0040DE10u  /* thiscall int32(this,name,a,b,c) */
+#define ADDR_COMM_MARK_LOBBIED   0x0040F130u  /* void(void); sets comm+0x404 */
+#define ADDR_ON_LOBBY_SLAVE      0x00410F70u  /* void(void), stays original */
+#define COMM_OFF_LOBBY_BUF       0x3F0u   /* DPLCONNECTION, 0x800 bytes */
+#define COMM_OFF_IS_HOST         0x3D8u   /* from DPCAPS_ISHOST */
+#define COMM_OFF_SESSION_DESC    0x3E8u   /* the fetched DPSESSIONDESC2 */
+#define COMM_OFF_LOBBIED         0x3F8u
+#define COMM_OFF_LOBBY_STARTING  0x3FCu
+#define LOBBY_CONN_BUF_SIZE      0x800u
+#define ADDR_STR_LOBBY_START     0x004756A4u
+#define ADDR_STR_LOBBY_NOMEM     0x0047566Cu
+#define ADDR_STR_LOBBY_GCS_FAIL  0x0047563Cu
+#define ADDR_STR_LOBBY_E_SMALL   0x00475624u
+#define ADDR_STR_LOBBY_E_IFACE   0x00475608u
+#define ADDR_STR_LOBBY_E_OBJECT  0x004755F0u
+#define ADDR_STR_LOBBY_E_PARAMS  0x004755D8u
+#define ADDR_STR_LOBBY_E_MEMORY  0x004755C4u
+#define ADDR_STR_LOBBY_CONNECT   0x00475548u
+#define ADDR_STR_LOBBY_CONNRET   0x0047552Cu
+#define ADDR_STR_LOBBY_AS_HOST   0x00475504u
+#define ADDR_STR_LOBBY_AS_SLAVE  0x004754DCu
 #define COMM_OFF_LOBBY           0x3F4u   /* IDirectPlayLobby3A; the store at
                                            * 0x0040ED3C names it */
 #define COMM_OFF_SEND_BUF        0x3E8u   /* game heap */
@@ -511,6 +536,9 @@
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
 #define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */
 #define COMM_OFF_READY           0x3D8u
+#define COMM_SLOT_OFF_NAME       0x00Cu   /* 0x40-byte string; CommConstruct
+                                           * clears it, StartSelectedGame writes
+                                           * "Computer%d" into it */
 #define COMM_SLOT_OFF_ID         0x008u
 #define COMM_SLOT_OFF_UNACKED    0x058u
 #define COMM_STAT_RING           30u

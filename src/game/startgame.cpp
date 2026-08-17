@@ -60,7 +60,6 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
  * the human; 1..3 are filled in here. */
 #define COMM_SLOT_BASE    0x20C
 #define COMM_SLOT_STRIDE  0x70
-#define SLOT_OFF_NAME     0x0C   /* the 0x40-byte buffer CommConstruct clears */
 #define SLOT_OFF_ACTIVE   0x50
 
 /* COMM_OFF_LOCAL, COMM_OFF_READY and COMM_OFF_DPLAY are in orig.h. */
@@ -125,7 +124,7 @@ void __cdecl StartSelectedGame(void)
         uint8_t *slot = comm + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
 
         *(int32_t *)(slot + SLOT_OFF_ACTIVE) = 1;
-        orig_sprintf((char *)(slot + SLOT_OFF_NAME),
+        orig_sprintf((char *)(slot + COMM_SLOT_OFF_NAME),
                      (const char *)(uintptr_t)ADDR_FMT_COMPUTER_N, i);
     }
 
