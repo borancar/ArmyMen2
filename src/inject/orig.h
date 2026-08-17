@@ -190,6 +190,16 @@
 #define ADDR_AUDIO_ENABLED       0x004FA468u  /* int32_t; nothing runs while clear */
 #define ADDR_AUDIO_BUFFER        0x004FA404u  /* IDirectSoundBuffer *, the stream */
 #define ADDR_AUDIO_BUFFER_2      0x004FA440u  /* IDirectSoundBuffer *, the one played */
+#define ADDR_STOP_ALL_SOUNDS     0x0040D730u  /* void(void) */
+#define ADDR_FREE_SOUND          0x0040C6E0u  /* void(AM2_Sound *) */
+/* 56 fixed slots of 16 bytes, then 17 pointers to allocated sounds. */
+#define ADDR_SOUND_SLOTS         0x004FA040u
+#define ADDR_SOUND_SLOTS_END     0x004FA3C0u
+#define ADDR_SOUND_DYNAMIC       0x004FA3C0u  /* == SLOTS_END; the tables abut */
+/* Inclusive: the original's loop is `cmp edi,0x4FA400 / jle`, so the entry AT
+ * this address is processed too -- 17 pointers, not 16. */
+#define ADDR_SOUND_DYNAMIC_LAST  0x004FA400u
+#define SOUND_SLOT_STRIDE        0x10u
 #define ADDR_RELEASE_SOUND_BUFS  0x0040C7D0u  /* void(void), 8 call sites */
 #define ADDR_INIT_DIRECTSOUND    0x0040C800u  /* int32_t(void); 1 on success */
 #define ADDR_SET_STREAM_VOLUME   0x0040CE90u  /* void(int32 pan) */

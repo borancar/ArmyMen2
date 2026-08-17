@@ -101,6 +101,10 @@ FUNCS = [
     (0x0041B720, "SetPaletteRange",  "cdecl"),
     (0x0041B970, "SetSurfaceColorKey", "cdecl"),
     (0x0041A8B0, "RestoreLostSurfaces", "cdecl"),
+    (0x0040D730, "StopAllSounds",    "cdecl",
+     "opens `push ecx` to allocate the DWORD GetStatus writes into; ecx on "
+     "entry is never read, so cdecl -- the fourth instance of this idiom"),
+    (0x0040C6E0, "FreeSound",        "cdecl"),
     (0x0040C800, "InitDirectSound",  "cdecl"),
     (0x0040CE90, "SetStreamVolume",  "cdecl"),
     (0x0040C7D0, "ReleaseSoundBuffers", "cdecl"),

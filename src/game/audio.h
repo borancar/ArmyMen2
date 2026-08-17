@@ -67,6 +67,20 @@ int32_t __cdecl InitDirectSound(void);
  * the volume did not take. */
 void __cdecl SetStreamVolume(int32_t pan);
 
+/* Original: 0x0040D730. Silence everything and let the dynamic sounds go.
+ *
+ * Two tables, treated differently. The 56 fixed slots are only stopped -- they
+ * are owned elsewhere and will be wanted again. The 17 dynamic ones are stopped,
+ * released and freed, because they were allocated for one use. The music stream
+ * goes last, through StopAudioStream. */
+void __cdecl StopAllSounds(void);
+
+/* Original: 0x0040C6E0. Release one sound's buffer and free it.
+ *
+ * Both the sample data and the record itself come from the game's heap and go
+ * back to it, not ours. */
+void __cdecl FreeSound(void *snd);
+
 int audio_install(void);
 
 #ifdef __cplusplus

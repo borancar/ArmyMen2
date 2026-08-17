@@ -213,6 +213,90 @@ void __cdecl SetStreamVolume(int32_t pan)
     IDirectSoundBuffer_SetPan(g_buffer, pan);
 }
 
+/* A sound: its buffer, its sample data, and a flag at +0x18 the player uses. */
+#define SOUND_BUFFER 0x00u
+#define SOUND_DATA   0x04u
+#define SOUND_FLAG   0x18u
+#define sfld(s, off, type) (*(type *)((uint8_t *)(s) + (off)))
+
+typedef void (__cdecl *am2_free_fn)(void *);
+#define orig_free (*(am2_free_fn)ADDR_GAME_FREE)
+
+static_assert(DSBSTATUS_PLAYING == 1, "DSBSTATUS_PLAYING");
+
+/* Stop the buffer if it is playing. Asking first because Stop on an idle
+ * buffer also rewinds it, and these are stopped in places that do not want
+ * that. */
+static void StopIfPlaying(LPDIRECTSOUNDBUFFER buf)
+{
+    /* Initialised, which the original does not bother to do -- it tests
+     * whatever GetStatus left. Identical unless GetStatus fails without
+     * writing, in which case the original tests stack garbage and this does
+     * not stop the buffer. Deliberate, and the only place in this file that
+     * departs from the original at all. */
+    DWORD status = 0;
+
+    IDirectSoundBuffer_GetStatus(buf, &status);
+    if (status & DSBSTATUS_PLAYING)
+        IDirectSoundBuffer_Stop(buf);
+}
+
+void __cdecl FreeSound(void *snd)
+{
+    if (!snd)
+        return;
+
+    if (sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER))
+        IDirectSoundBuffer_Release(sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER));
+    if (sfld(snd, SOUND_DATA, void *))
+        orig_free(sfld(snd, SOUND_DATA, void *));
+    orig_free(snd);
+}
+
+void __cdecl StopAllSounds(void)
+{
+    uint8_t **slot;
+    void    **dyn;
+
+    /* The fixed slots are borrowed, not owned -- stop them and leave them. */
+    for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS;
+         slot < (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS_END;
+         slot = (uint8_t **)((uint8_t *)slot + SOUND_SLOT_STRIDE)) {
+        void *snd = *slot;
+
+        if (snd && sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER))
+            StopIfPlaying(sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER));
+    }
+
+    /* The dynamic ones were allocated for one use, so they go entirely. This
+     * is FreeSound's body written out rather than called -- the original does
+     * the same, and it also clears the flag at +0x18 on the way, which
+     * FreeSound does not. */
+    for (dyn = (void **)(uintptr_t)ADDR_SOUND_DYNAMIC;
+         dyn <= (void **)(uintptr_t)ADDR_SOUND_DYNAMIC_LAST; dyn++) {
+        void *snd = *dyn;
+
+        if (!snd)
+            continue;
+
+        if (sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER)) {
+            LPDIRECTSOUNDBUFFER buf = sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER);
+
+            StopIfPlaying(buf);
+            sfld(snd, SOUND_FLAG, int32_t) = 0;
+            IDirectSoundBuffer_Release(buf);
+            sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER) = NULL;
+        }
+        if (sfld(snd, SOUND_DATA, void *))
+            orig_free(sfld(snd, SOUND_DATA, void *));
+        sfld(snd, SOUND_DATA, void *) = NULL;
+        orig_free(snd);
+        *dyn = NULL;
+    }
+
+    StopAudioStream();
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -227,5 +311,8 @@ int audio_install(void)
                         "InitDirectSound", 0);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
                         "SetStreamVolume", 1);
+    rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,
+                        "StopAllSounds", 0);
+    rc |= patch_replace(ADDR_FREE_SOUND, (const void *)FreeSound, "FreeSound", 1);
     return rc;
 }
