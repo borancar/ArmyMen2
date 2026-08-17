@@ -406,6 +406,69 @@ void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key)
     IDirectDrawSurface_SetColorKey(surf, DDCKEY_SRCBLT, &ck);
 }
 
+/* STANDING NOTE -- both failure paths after the Lock return 1, which is the
+ * value the caller reads as success. The surface is Released, the buffer freed
+ * and an error logged, and then the function claims it worked. Worse, neither
+ * path Unlocks first, so a surface that was locked successfully is Released
+ * while still locked. That is what the original does and it is reproduced here.
+ *
+ * The two paths also share one message. A copy that fails reports "Error on
+ * Lock", because the original jumps into the middle of the Lock handler rather
+ * than writing a second string -- so do not trust that message to mean the Lock
+ * is what failed.
+ *
+ * Reaching any of this needs a surface that is lost or a malformed sprite in a
+ * stream, so none of it is exercised by an ordinary run. */
+int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
+                                    uint32_t nbytes, int32_t width, int32_t height,
+                                    const uint8_t *remap, uint32_t flags)
+{
+    DDSURFACEDESC ddsd;
+    uint8_t      *pixels;
+
+    /* The game's heap: the buffer is handed to the game's own fread and freed
+     * by the game's own free on every path out of here. */
+    pixels = (uint8_t *)orig_malloc(nbytes);
+    if (orig_fread(pixels, nbytes, 1, fp) != 1) {
+        orig_log("Error sprite from stream in ReloadBitmapSurface().\n");
+        orig_free(pixels);
+        return 0;
+    }
+
+    memset(&ddsd, 0, sizeof ddsd);
+    ddsd.dwSize = sizeof ddsd;
+    if (IDirectDrawSurface_GetSurfaceDesc(surf, &ddsd) != DD_OK) {
+        orig_log("Unable to get surface desc in ReloadBitmapSurface()\n");
+        orig_free(pixels);
+        return 0;
+    }
+
+    if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
+        IDirectDrawSurface_Release(surf);
+        orig_log("Error on Lock in ReloadBitmapSurface()");
+        orig_free(pixels);
+        return 1;
+    }
+
+    /* `nbytes` goes in as the byte count and is read back afterwards as the
+     * transparent index, so it has to be passed by address and re-read -- see
+     * ADDR_BLIT_BITMAP_IN. Caching it across this call would silently key the
+     * surface on the wrong colour. */
+    if (!orig_blit_bitmap_in(ddsd.lpSurface, ddsd.lPitch, pixels,
+                             width, height, remap, &nbytes)) {
+        IDirectDrawSurface_Release(surf);
+        orig_log("Error on Lock in ReloadBitmapSurface()");
+        orig_free(pixels);
+        return 1;
+    }
+
+    IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
+    if (!(flags & 1))
+        SetSurfaceColorKey(surf, (uint8_t)nbytes);
+    orig_free(pixels);
+    return 1;
+}
+
 void __cdecl ClearRegion(const RECT *r, uint8_t colour)
 {
     RECT    dest;
@@ -458,5 +521,7 @@ int surface_install(void)
                         "SetPaletteRange", 3);
     rc |= patch_replace(ADDR_SET_SURF_COLORKEY, (const void *)SetSurfaceColorKey,
                         "SetSurfaceColorKey", 2);
+    rc |= patch_replace(ADDR_RELOAD_BITMAP, (const void *)ReloadBitmapSurface,
+                        "ReloadBitmapSurface", 7);
     return rc;
 }

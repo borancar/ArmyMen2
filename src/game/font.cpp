@@ -234,10 +234,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define font_offsets(f) ((uint16_t *)(uintptr_t)(ADDR_GLYPH_OFFSETS + (f) * ADDR_FONT_STRIDE))
 #define font_base(f)    (*(uint8_t **)(uintptr_t)(ADDR_FONT_BASES + (f) * ADDR_FONT_STRIDE))
 
-typedef void *(__cdecl *am2_malloc_fn)(size_t);
-typedef void  (__cdecl *am2_free_fn)(void *);
-#define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
-#define orig_free   (*(am2_free_fn)ADDR_GAME_FREE)
 
 int32_t __cdecl BuildFont(int32_t font)
 {

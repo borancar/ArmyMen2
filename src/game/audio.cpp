@@ -219,8 +219,6 @@ void __cdecl SetStreamVolume(int32_t pan)
 #define SOUND_FLAG   0x18u
 #define sfld(s, off, type) (*(type *)((uint8_t *)(s) + (off)))
 
-typedef void (__cdecl *am2_free_fn)(void *);
-#define orig_free (*(am2_free_fn)ADDR_GAME_FREE)
 
 static_assert(DSBSTATUS_PLAYING == 1, "DSBSTATUS_PLAYING");
 

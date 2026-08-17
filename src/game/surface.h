@@ -125,6 +125,24 @@ void __cdecl SetPaletteRange(PALETTEENTRY *entries, uint32_t first,
  * how every sprite gets its transparent index. */
 void __cdecl SetSurfaceColorKey(LPDIRECTDRAWSURFACE surf, uint8_t key);
 
+/* Original: 0x00424280, 1 call site. Re-read one sprite from an open stream
+ * straight into a surface.
+ *
+ * Reads `nbytes` from `fp`, gets the surface descriptor, locks it, copies the
+ * bitmap in through the `remap` table, unlocks, and keys the surface on the
+ * transparent index unless bit 0 of `flags` says not to.
+ *
+ * `nbytes` is in/out: it arrives as the byte count and is read again after the
+ * copy as the colour-key index. It is passed by value here because the address
+ * taken inside is of this function's own parameter slot, exactly as in the
+ * original.
+ *
+ * Returns 0 when the read or the descriptor fails and 1 otherwise -- including,
+ * wrongly, when the lock or the copy fails. See the note in surface.cpp. */
+int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
+                                    uint32_t nbytes, int32_t width, int32_t height,
+                                    const uint8_t *remap, uint32_t flags);
+
 /* Original: 0x0041CE20. Fill one clipped rectangle of the draw target.
  *
  * Refuses to run while a lock is held, because Blt needs the surface back

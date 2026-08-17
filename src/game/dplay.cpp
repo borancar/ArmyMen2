@@ -180,10 +180,6 @@ int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
 static_assert((uint32_t)DPERR_BUFFERTOOSMALL == 0x8877001Eu,
               "DPERR_BUFFERTOOSMALL");
 
-typedef void *(__cdecl *am2_malloc_fn)(size_t);
-typedef void  (__cdecl *am2_free_fn)(void *);
-#define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
-#define orig_free   (*(am2_free_fn)ADDR_GAME_FREE)
 
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm)
 {

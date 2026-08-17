@@ -84,6 +84,17 @@
 #define ADDR_SET_PALETTE_RANGE 0x0041B720u  /* void(PALETTEENTRY*, first, last) */
 #define ADDR_SET_SURF_COLORKEY 0x0041B970u  /* void(surface *, uint8_t key) */
 #define PALETTE_HOLDER_OFF     0x800u       /* where the DD palette hangs */
+
+/* Copy a bottom-up 8-bit bitmap into a locked surface, optionally remapping
+ * every byte through a 256-entry table. Stays original: pure pixel work with no
+ * boundary in it, and shared by four callers.
+ *
+ * The last argument is a pointer, and every caller points it at a value it then
+ * reads again afterwards -- so treat it as in/out and do not cache the value
+ * across the call. Whether this routine actually writes through it was not
+ * traced; passing the address and re-reading is faithful either way. */
+#define ADDR_BLIT_BITMAP_IN  0x0041BA90u
+#define ADDR_RELOAD_BITMAP   0x00424280u  /* int32(surface*, FILE*, ...) */
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_SURFACE_514E94 0x00514E94u  /* IDirectDrawSurface * */
@@ -513,11 +524,26 @@ typedef size_t (__cdecl *am2_fread_fn)(void *buf, size_t size, size_t count,
                                        am2_FILE *fp);
 typedef void   (__cdecl *am2_log_fn)(const char *fmt, ...);
 
+typedef void *(__cdecl *am2_malloc_fn)(size_t n);
+typedef void  (__cdecl *am2_free_fn)(void *p);
 typedef void *(__cdecl *am2_realloc_fn)(void *p, size_t n);
 typedef void *(__cdecl *am2_memmove_fn)(void *dst, const void *src, size_t n);
 
+/* See ADDR_BLIT_BITMAP_IN. `inout` is genuinely in/out; take its address from
+ * a variable you re-read afterwards rather than from a temporary. */
+typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
+                                                 const void *src,
+                                                 int32_t width, int32_t height,
+                                                 const uint8_t *remap,
+                                                 uint32_t *inout);
+
 #define orig_fread   (*(am2_fread_fn)ADDR_FREAD)
 #define orig_log     (*(am2_log_fn)ADDR_LOG)
+/* The game's heap, not ours -- msvcrt has a different one entirely, so anything
+ * the game allocated must be freed here and vice versa. */
+#define orig_malloc  (*(am2_malloc_fn)ADDR_GAME_MALLOC)
+#define orig_free    (*(am2_free_fn)ADDR_GAME_FREE)
+#define orig_blit_bitmap_in (*(am2_blit_bitmap_in_fn)ADDR_BLIT_BITMAP_IN)
 /* The object table was allocated by the game's CRT, so it must be grown by the
  * game's CRT -- our msvcrt has a different heap entirely. */
 #define orig_realloc (*(am2_realloc_fn)ADDR_REALLOC)

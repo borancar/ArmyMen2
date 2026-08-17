@@ -139,12 +139,8 @@ typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
 #define g_cdPath      ((char *)(uintptr_t)ADDR_CD_PATH)
 #define g_cdLabel     ((const char *)(uintptr_t)ADDR_CD_LABEL)
 
-typedef void   *(__cdecl *am2_malloc_fn)(size_t);
-typedef void    (__cdecl *am2_free_fn)(void *);
 typedef int32_t (__cdecl *am2_stricmp_fn)(const char *, const char *);
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
-#define orig_malloc  (*(am2_malloc_fn)ADDR_GAME_MALLOC)
-#define orig_free    (*(am2_free_fn)ADDR_GAME_FREE)
 #define orig_stricmp (*(am2_stricmp_fn)ADDR_GAME_STRICMP)
 #define orig_sprintf (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
