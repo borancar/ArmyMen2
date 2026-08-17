@@ -557,6 +557,78 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
                            DDBLT_COLORFILL | DDBLT_WAIT, &fx);
 }
 
+/* One little vertical meter, drawn straight onto the back buffer.
+ *
+ * 0x004624A0. Three pixels wide, sixteen tall, and three colour fills: the
+ * whole column in the background colour, the filled part of it in the caller's
+ * colour, and a single-pixel row somewhere along it as a marker.
+ *
+ * The filled height is `(value - base) * 16 / 60`, capped at the bar's own
+ * sixteen. The divisor is not obvious from the code -- the original divides by
+ * multiplying by 0x88888889 and shifting -- so it was worked out by running
+ * that sequence over sample values rather than read off: 60, 120 and 300 give
+ * 1, 2 and 5.
+ *
+ * The marker sits at `base % 16` above the bottom, and is drawn in the
+ * caller's colour when it is above the filled part and in the background colour
+ * when it is not, which is what makes it read as a mark rather than a gap.
+ *
+ * A failed Blt is logged and otherwise ignored, three separate times with the
+ * same message. */
+static_assert(sizeof(DDBLTFX) == 0x64, "DDBLTFX");
+static_assert((DDBLT_COLORFILL | DDBLT_WAIT) == 0x01000400, "colour fill");
+
+#define g_backBufferSurf (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_seqBarBg       (*(const uint8_t *)(uintptr_t)ADDR_SEQ_BAR_BG)
+
+#define SEQ_BAR_WIDTH  3
+#define SEQ_BAR_HEIGHT 16
+#define SEQ_BAR_SCALE  60
+
+/* Every fill is the same shape: a rectangle and a colour. */
+static void SeqBarFill(int32_t left, int32_t top, int32_t right, int32_t bottom,
+                       uint32_t colour)
+{
+    RECT    dest;
+    DDBLTFX fx;
+
+    dest.left   = left;
+    dest.top    = top;
+    dest.right  = right;
+    dest.bottom = bottom;
+
+    /* Only dwSize and the colour are set, as elsewhere in this file:
+     * DDBLT_COLORFILL reads nothing else. */
+    fx.dwSize      = sizeof fx;
+    fx.dwFillColor = colour;
+
+    if (IDirectDrawSurface_Blt(g_backBufferSurf, &dest, NULL, NULL,
+                               DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
+        orig_log((const char *)(uintptr_t)ADDR_STR_SEQ_BLT_FAIL);
+}
+
+void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
+                        int32_t value, int32_t base)
+{
+    int32_t filled = ((value - base) * SEQ_BAR_HEIGHT) / SEQ_BAR_SCALE;
+    int32_t mark;
+
+    if (filled > SEQ_BAR_HEIGHT)
+        filled = SEQ_BAR_HEIGHT;
+
+    /* The empty bar. */
+    SeqBarFill(x, bottom - (SEQ_BAR_HEIGHT - 1), x + SEQ_BAR_WIDTH, bottom + 1,
+               g_seqBarBg);
+    /* However much of it is full. */
+    SeqBarFill(x, bottom - filled, x + SEQ_BAR_WIDTH, bottom + 1,
+               colour & 0xFF);
+
+    /* And the marker, which disappears into the fill once the fill reaches it. */
+    mark = base % SEQ_BAR_HEIGHT;
+    SeqBarFill(x, bottom - mark, x + SEQ_BAR_WIDTH, bottom - mark + 1,
+               (mark > filled) ? (colour & 0xFF) : g_seqBarBg);
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -587,5 +659,7 @@ int surface_install(void)
                         "CreateBitmapSurface", 6);
     rc |= patch_replace(ADDR_RELOAD_BITMAP, (const void *)ReloadBitmapSurface,
                         "ReloadBitmapSurface", 7);
+    rc |= patch_replace(ADDR_DRAW_SEQ_BAR, (const void *)DrawSeqBar,
+                        "DrawSeqBar", 5);
     return rc;
 }

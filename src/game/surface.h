@@ -166,6 +166,14 @@ int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
  * so a rectangle in game coordinates is in the wrong place on it. */
 void __cdecl ClearRegion(const RECT *r, uint8_t colour);
 
+/* Original: 0x004624A0, 1 call site. A three-by-sixteen vertical meter drawn
+ * directly onto the back buffer with three colour fills: the empty column, the
+ * filled part, and a one-pixel marker at `base % 16`.
+ *
+ * The filled height is `(value - base) * 16 / 60`, capped at 16. */
+void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
+                        int32_t value, int32_t base);
+
 int surface_install(void);
 
 #ifdef __cplusplus

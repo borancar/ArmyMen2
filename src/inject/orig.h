@@ -130,6 +130,9 @@
 #define ADDR_RESTORE_CHAIN       0x00445EB0u  /* void(AM2_Sprite*) */
 /* Sprite lifetime. The registry is a count at 0x006598C0 and a table of
  * AM2_Sprite* at 0x006598C4; the lookup walks it for a matching id. */
+#define ADDR_DRAW_SEQ_BAR        0x004624A0u  /* void(x,y,colour,value,base) */
+#define ADDR_SEQ_BAR_BG          0x00502AD9u  /* uint8_t, the unfilled colour */
+#define ADDR_STR_SEQ_BLT_FAIL    0x0048CBE8u  /* "Couldn't Blt Seq Pixels\n" */
 #define ADDR_RELEASE_SPRITE      0x00445D80u  /* void(AM2_Sprite *) */
 #define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
 #define ADDR_SPRITE_SLOT_OF      0x00445990u  /* int32(uint32 id); <0 when absent */
