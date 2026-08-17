@@ -40,6 +40,9 @@
  */
 
 #include "winmain.h"
+/* Compiled for the check, not called: see the header. The retail copy
+ * protection is recorded there because this binary has it patched out. */
+#include "cdcheck.h"
 #include "winproc.h"
 #include "rect.h"
 #include "surface.h"

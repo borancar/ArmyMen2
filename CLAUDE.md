@@ -289,6 +289,21 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
+- **The copy protection in this executable is patched out, and that is not the
+  same as absent.** `FindGameCD` is called from five places; all five branch on
+  the result with `EB` (`jmp`) where a `75` (`jne`) has to have been, so the
+  check always passes and the "insert the CD" `MessageBoxA` after it can never
+  run. The tell is the `test eax, eax` left in front of each one setting flags
+  nothing reads — no compiler emits that. `tools/cdchecks.py` finds them and
+  `docs/copyprotection.md` lists the one byte per site that puts each back.
+
+  Two consequences worth keeping. Five of the six `MessageBoxA` sites that
+  `docs/boundary.md` reports as outstanding are unreachable, so the leftover
+  count overstates the work. And a reconstruction of any of those menu
+  functions must reproduce the patched behaviour, not the retail behaviour, or
+  it will fail the A/B against the original for a reason that has nothing to do
+  with being correct — which is why `src/game/cdcheck.h` records the retail
+  check behind an `#ifdef` that is off.
 - **The game has no networking imports at all** — no ws2_32, no wsock32, no
   dplayx, and not even those strings in `.text`. Its multiplayer transport is
   DirectPlay reached through COM, so the only trace in the import table is

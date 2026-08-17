@@ -219,6 +219,11 @@
 /* Where the registry key and the application GUID live in the image. Neither is
  * restated here -- the game's own copies are used, as with the DirectPlay
  * CLSIDs. The GUID is {2777D2A2-89D1-11D2-A387-00C04F79DCEB}. */
+/* The copy-protection dialog's two strings. Every one of the five CD checks
+ * uses this pair; see docs/copyprotection.md, and note that all five checks are
+ * patched to unconditional in this build so none of them can appear. */
+#define ADDR_CD_REQUIRED_TEXT    0x00475578u  /* "The ARMYMEN2 CD must be..." */
+#define ADDR_CD_REQUIRED_CAPTION 0x004755B4u  /* "Copy Protection" */
 #define ADDR_REGISTRY_KEY        0x004751E8u  /* "Software\\The 3DO Company\\Army Men II" */
 #define ADDR_APP_GUID            0x0046F8A8u  /* GUID, the DirectPlay application id */
 #define ADDR_COMM_CLOSE          0x0040DCF0u  /* int32_t(void) */
