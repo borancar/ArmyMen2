@@ -117,13 +117,22 @@ same scripted run can be played on the original code and on ours and the
 results compared. `run-stock` drops the harness too, which means it cannot be
 driven, cannot be logged, and does not in fact start on this machine.
 
-Done once, on Boot Camp: the game's own log is byte-identical across the two,
-all 15 messages including the map-script parse (`lines: 101  tokens: 372
-names: 43  compounds: 16`), and the final screenshots differ in 22 pixels out
-of 786,432 — scattered, and attributable to animation phase between two runs
-that are not frame-synchronised. Repeat this after any large batch of
-reconstruction; it is far stronger than the invariant, which only checks one
-subsystem. Note the counts are empty under `AM2_NOPATCH` — the counters *are*
+Done on all three configurations, and the results are worth quoting:
+
+| run | game's own log | pixels differing |
+|---|---|---|
+| Boot Camp, fullscreen | identical, 15 messages | 22 / 786,432 |
+| intro, `ARGS=-dbg` | identical, 6 messages | n/a, film is playing |
+| windowed, `-w` | identical, 7 messages | **0** |
+
+The windowed frame is static, and it comes out *pixel-perfect* — which also
+settles the Boot Camp figure, since a scene with nothing moving gives exactly
+zero and one with animation gives 22 scattered pixels. Windowed also reproduces
+the screen rectangle byte for byte, `04000000 1e000000 84020000 fe010000`,
+so `PositionWindow`'s windowed branch is confirmed numerically and not by eye.
+
+Repeat this after any large batch of reconstruction; it is far stronger than the
+invariant, which only checks one subsystem. Note the counts are empty under `AM2_NOPATCH` — the counters *are*
 the trace stubs, installed by `patch_replace` — so the evidence is the log and
 the pixels, not the counters.
 
