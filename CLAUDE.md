@@ -238,18 +238,54 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette`). Next bottom-up:
   `0x00454F00` (144B), `0x00414620` (224B, tooltip renderer), `0x00413610`
   (256B), `0x00433350` (304B).
+- **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
+  COM method takes the interface as an explicit first argument, so it goes on
+  the stack; an i386 MSVC C++ virtual is thiscall and keeps `this` in `ecx`.
+  The two compile to the same `mov vt,[obj]` / `call [vt+N]` pair, so a survey
+  that matches only on shape reports the engine's own destructor chains as
+  DirectX — and the densest-looking candidates, 48 bytes of nothing but vtable
+  calls, are exactly those. `push 1` into slot 0 is the clearest tell: that is
+  the MSVC scalar deleting destructor, and COM's slot 0 is `QueryInterface`,
+  which takes three arguments. `tools/comcalls.py` records this as its `abi`
+  column; 90 of 353 in-game sites are C++ rather than COM.
 - The Win32/DirectX boundary is inventoried and being worked outward-in: 122
-  functions below the CRT touch the import table (`docs/imports.tsv`) and 161
-  contain COM-shaped dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
+  functions below the CRT touch the import table (`docs/imports.tsv`) and 110
+  contain genuine COM dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
-  the three `Wave*` helpers, and both DirectPlay creators. The window, the
+  the three `Wave*` helpers, both DirectPlay creators, and the two bitmap
+  loaders (`CreateBitmapSurface`, `ReloadBitmapSurface`). The window, the
   message queue, the display mode, every surface, both input devices, the GDI
-  palette, every message box, all `.WAV` reading and the whole network
-  transport are ours. What is left is ~105 functions holding ~188 import sites,
-  and most of those are a `GetTickCount` or a `PostMessageA` inside something
-  that is otherwise game logic.
+  palette, every message box, all `.WAV` reading, sprite upload from a stream
+  and the whole network transport are ours.
+
+  Do not read the leftover as work outstanding. Of the 88 import-touching
+  functions not reconstructed, `tools/coverage.py` classes 83 as game logic —
+  a `GetTickCount` or a `PostMessageA` inside something that is otherwise not
+  boundary at all — leaving 5 functions and 16 sites, all `MessageBoxA` and
+  registry reads inside menu code. The channels themselves are owned: every
+  DirectX object in the process is created, configured and destroyed by
+  reconstructed code. What still dispatches through COM is game logic holding a
+  handle it did not make.
+- **Read and deliberately left original.** These come back to the top of every
+  candidate ranking, so they are listed here rather than re-read each time. All
+  are game logic that happens to hold a device handle, and the standing brief
+  says to use original functions for pure game and menu logic.
+
+  | | why |
+  |---|---|
+  | `0x0040BCF0` 256B, 4 | 3D audio update: distance model decides, DirectSound only executes. Also unreachable here — it returns at instruction one while `ADDR_AUDIO_ENABLED` is clear — and its `+0x10`/`+0x12` word fields alias in a way that would be guesswork |
+  | `0x0040B860` 144B, 2 | walks the dynamic sound table comparing names byte by byte |
+  | `0x0040CED0` 1792B, 12 | the sound engine proper |
+  | `0x0040B8F0` 1024B, 12 | sound playback dispatch |
+  | `0x00427070` 944B, 5 | input-to-command translation |
+  | `0x0041BE80` 832B, 8 | sprite cache management |
+  | `0x00412FE0` 1184B, 4 | menu logic |
+  | `0x00425AF0` 288B, 5 | map object placement |
+  | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
+  | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
+
 - **The game has no networking imports at all** — no ws2_32, no wsock32, no
   dplayx, and not even those strings in `.text`. Its multiplayer transport is
   DirectPlay reached through COM, so the only trace in the import table is
