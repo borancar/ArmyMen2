@@ -33,6 +33,7 @@
 #include "../game/surface.h"
 #include "../game/text.h"
 #include "../game/device.h"
+#include "../game/dplay.h"
 #include "../game/wavefile.h"
 #include "../game/winmain.h"
 
@@ -131,6 +132,10 @@ static const struct {
       { 0x56, 0x8B, 0x74, 0x24, 0x10, 0x57, 0x8B, 0x7C }, 8 },
     { ADDR_WAVE_CLOSE_FILE, "WaveCloseReadFile",
       { 0x56, 0x8B, 0x74, 0x24, 0x0C, 0x8B, 0x06, 0x85 }, 8 },
+    { ADDR_COMM_CREATE_DPLAY, "CommCreateDirectPlay",
+      { 0x53, 0x8B, 0xD9, 0x56, 0x57, 0x8B, 0x83, 0xEC }, 8 },
+    { ADDR_CREATE_LOBBY, "CreateDirectPlayLobby",
+      { 0x51, 0x8D, 0x44, 0x24, 0x00, 0xC7, 0x44, 0x24 }, 8 },
     /* Both are jmp-through-IAT thunks we call rather than import. If either
      * moved, we would be calling into something else entirely. */
     { ADDR_DIRECTDRAWCREATE, "DirectDrawCreate thunk",
@@ -206,6 +211,7 @@ static void install(void)
     mapdraw_install();
     report_install();
     wavefile_install();
+    dplay_install();
     palette_install();
     blit_install();
     sprite_install();

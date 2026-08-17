@@ -181,11 +181,24 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
-  and the three `Wave*` helpers. The window, the message queue, the display
-  mode, every surface, both input devices, the GDI palette, every message box
-  and all `.WAV` reading are ours. What is left is 107 functions holding 190
-  import sites, and most of those are a `GetTickCount` or a `PostMessageA`
-  inside something that is otherwise game logic.
+  the three `Wave*` helpers, and both DirectPlay creators. The window, the
+  message queue, the display mode, every surface, both input devices, the GDI
+  palette, every message box, all `.WAV` reading and the whole network
+  transport are ours. What is left is ~105 functions holding ~188 import sites,
+  and most of those are a `GetTickCount` or a `PostMessageA` inside something
+  that is otherwise game logic.
+- **The game has no networking imports at all** — no ws2_32, no wsock32, no
+  dplayx, and not even those strings in `.text`. Its multiplayer transport is
+  DirectPlay reached through COM, so the only trace in the import table is
+  ole32's `CoCreateInstance`, twice. Both are now `src/game/dplay.cpp`. Worth
+  remembering when looking for a subsystem that seems to be missing: an absent
+  import does not mean an absent channel.
+- The remaining genuinely-boundary clusters are the mutex-guarded comm message
+  list in `air.cpp` (`0x00401050` and friends — `WaitForSingleObject` and
+  `ReleaseMutex` around a linked list, and multi-threaded, so a mistake there
+  is a race rather than a crash), the Smacker movie class (`0x00444FC0`, all
+  thiscall methods on a class whose layout would have to be reconstructed
+  first), and the registry pair behind `0x0040DB50`.
 - **Pick the next target by boundary density, not by import count.** Ranking
   what is left by sites-per-byte finds functions that are boundary code;
   ranking by sites alone finds 5,760-byte game-logic functions whose only

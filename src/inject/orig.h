@@ -116,6 +116,26 @@
 #define ADDR_LOGPALETTE_ENTRIES  0x00477A64u  /* PALETTEENTRY[256] */
 #define ADDR_SYSTEM_PALETTE      0x006564A0u  /* PALETTEENTRY[256], read back from GDI */
 
+/* ---- DirectPlay -------------------------------------------------------
+ *
+ * The last outward channel, and the least visible one. The game imports no
+ * networking library at all -- no ws2_32, no wsock32, no dplayx, and not even
+ * the strings -- because its multiplayer transport is DirectPlay obtained
+ * through COM. These two CoCreateInstance sites are the whole of it.
+ *
+ * Reconstructed in src/game/dplay.cpp. The GUIDs are the game's own copies.
+ */
+#define ADDR_COMM_CREATE_DPLAY   0x0040DD20u  /* thiscall int32(this, void *conn) */
+#define ADDR_CREATE_LOBBY        0x0040DDD0u  /* int32 __stdcall(LPDIRECTPLAYLOBBY3A *) */
+#define ADDR_CLSID_DIRECTPLAY    0x0046F6D8u  /* CLSID_DirectPlay */
+#define ADDR_IID_DIRECTPLAY4A    0x0046F6C8u  /* IID_IDirectPlay4A */
+#define ADDR_CLSID_DPLAY_LOBBY   0x0046F778u  /* CLSID_DirectPlayLobby */
+#define ADDR_IID_DPLAY_LOBBY3A   0x0046F768u  /* IID_IDirectPlayLobby3A */
+/* Both thiscall on the comm object, both taking nothing but `this`. */
+#define ADDR_COMM_DROP_DPLAY     0x0040EA40u  /* tears down an existing one */
+#define ADDR_COMM_CONNECTED      0x0040E660u  /* run once the connection is up */
+#define COMM_OFF_DPLAY           0x3ECu       /* IDirectPlay4A * inside the comm object */
+
 /* .WAV reading through WINMM's multimedia file services -- the only file I/O
  * in the game that does not go through the CRT. Reconstructed in
  * src/game/wavefile.cpp; these are the DirectX SDK sample's names. */

@@ -63,7 +63,8 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/winproc.cpp \
             src/game/device.cpp \
             src/game/report.cpp \
-            src/game/wavefile.cpp
+            src/game/wavefile.cpp \
+            src/game/dplay.cpp
 
 HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
             $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))

@@ -76,6 +76,10 @@ FUNCS = [
     (0x0040CA10, "WaveOpenFile",      "cdecl"),
     (0x0040CBB0, "WaveStartDataRead", "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
+    (0x0040DD20, "CommCreateDirectPlay", "thiscall"),
+    (0x0040DDD0, "CreateDirectPlayLobby", "stdcall",
+     "opens `push ecx` to allocate one local, then overwrites the slot with 0 "
+     "before anything reads it -- ecx on entry is dead, so stdcall"),
     (0x0041C710, "BlitGlyph",          "fastcall"),
     (0x0041C2B0, "BlitCopy16",         "fastcall"),
     (0x0041C1C0, "BlitCopy32",         "fastcall"),
@@ -185,23 +189,40 @@ def main():
           f"{'ret':>8}  verdict")
     print("  " + "-" * 68)
     sizes = load_sizes()
-    for va, name, declared in FUNCS:
+    notes = []
+    for entry in FUNCS:
+        va, name, declared = entry[0], entry[1], entry[2]
+        # A fourth field is a hand-verified override: the machine-code
+        # heuristic disagrees and has been checked by reading the function.
+        # Recording why here keeps the audit green without it going quiet.
+        waived = entry[3] if len(entry) > 3 else None
         rc, rd, rets = analyse(img, va, sizes.get(va))
         got = expected(rc, rd, rets)
         retstr = ",".join(hex(r) if r else "-" for r in sorted(rets)) or "?"
         ok = (got == declared)
         # cdecl and stdcall are indistinguishable from the entry registers
         # alone; only a mismatch on the ecx/edx axis is a real finding.
-        flag = "ok" if ok else ("MISMATCH" if "this" in got or "fast" in got
-                                or "fast" in declared else f"note: {got}")
-        if flag.startswith("MISMATCH"):
+        if ok:
+            flag = "ok"
+        elif waived:
+            flag = "ok (hand-checked)"
+            notes.append((name, got, waived))
+        elif "this" in got or "fast" in got or "fast" in declared:
+            flag = "MISMATCH"
             bad += 1
+        else:
+            flag = f"note: {got}"
         print(f"{name:<20}{va:#010x}  {declared:<10}"
               f"{('yes' if rc else 'no'):>5}{('yes' if rd else 'no'):>5}"
               f"{retstr:>8}  {flag}"
               .replace("True ", " yes ").replace("False", "  no "))
 
     print()
+    for name, got, why in notes:
+        print(f"{name} reads as {got}; declared otherwise on purpose:")
+        print(f"  {why}")
+    if notes:
+        print()
     if bad:
         print(f"{bad} function(s) may use a register convention we did not declare")
     else:
