@@ -44,6 +44,23 @@ int32_t __stdcall CreateDirectPlayLobby(LPDIRECTPLAYLOBBY3A *out);
  * exit code and close the handles. */
 void __cdecl CommShutdown(void);
 
+/* Original: 0x0040DCF0. Close the DirectPlay session.
+ *
+ * Answers 1 when there was no session to close, which is the same answer as
+ * closing one successfully -- the caller only wants to know it can carry on. */
+int32_t __cdecl CommClose(void);
+
+/* Original: 0x0040DD90. Point the DirectPlay object at a connection.
+ *
+ * The same InitializeConnection CommCreateDirectPlay makes, reached separately
+ * for a session that already has an object. Names the failure in the log. */
+int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
+                                                           void *connection);
+
+/* Original: 0x0040E630. Set the session description. */
+int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
+                                                     uint32_t flags);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

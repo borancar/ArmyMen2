@@ -179,6 +179,11 @@
 #define ADDR_COMM_DROP_DPLAY     0x0040EA40u  /* tears down an existing one */
 #define ADDR_COMM_CONNECTED      0x0040E660u  /* run once the connection is up */
 #define COMM_OFF_DPLAY           0x3ECu       /* IDirectPlay4A * inside the comm object */
+/* Thin wrappers over the IDirectPlay4A the comm object holds. All three answer
+ * 1 for success, and all three do nothing at all when there is no session. */
+#define ADDR_COMM_CLOSE          0x0040DCF0u  /* int32_t(void) */
+#define ADDR_COMM_INIT_CONN      0x0040DD90u  /* thiscall int32(this, conn) */
+#define ADDR_COMM_SET_SESSION    0x0040E630u  /* thiscall int32(this, desc, flags) */
 
 /* ---- streaming audio ---------------------------------------------------
  *

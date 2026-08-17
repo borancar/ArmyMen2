@@ -113,6 +113,9 @@ FUNCS = [
     (0x0041A950, "ShutdownDirectDraw", "cdecl"),
     (0x0040D5D0, "StopAudioStream",  "cdecl"),
     (0x0040D680, "StartAudioStream", "cdecl"),
+    (0x0040DCF0, "CommClose",        "cdecl"),
+    (0x0040DD90, "CommInitializeConnection", "thiscall"),
+    (0x0040E630, "CommSetSessionDesc", "thiscall"),
     (0x004020A0, "CommShutdown",     "cdecl",
      "opens `push ecx` to allocate the DWORD that GetExitCodeThread fills in; "
      "ecx on entry is never read, so cdecl -- the third instance of this idiom"),

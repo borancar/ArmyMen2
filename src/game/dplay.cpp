@@ -133,6 +133,47 @@ void __cdecl CommShutdown(void)
     g_commEvent2 = NULL;
 }
 
+/* The comm object lives behind a pointer; these three reach the interface the
+ * same way CommCreateDirectPlay does. */
+#define g_commObject (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+
+int32_t __cdecl CommClose(void)
+{
+    LPDIRECTPLAY4A dp = *DirectPlaySlot(g_commObject);
+
+    /* Nothing open is as good as closed, from the caller's point of view. */
+    if (!dp)
+        return 1;
+    return IDirectPlayX_Close(dp) == DP_OK;
+}
+
+int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
+                                                           void *connection)
+{
+    LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
+
+    /* No object, so nothing to point anywhere -- and the original answers 0
+     * here by falling through with the null still in the return register. */
+    if (!dp)
+        return 0;
+
+    if (IDirectPlayX_InitializeConnection(dp, connection, 0) != DP_OK) {
+        orig_log("Unable to intialize connection\n");
+        return 0;
+    }
+    return 1;
+}
+
+int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
+                                                     uint32_t flags)
+{
+    LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
+
+    if (!dp)
+        return 0;
+    return IDirectPlayX_SetSessionDesc(dp, (LPDPSESSIONDESC2)desc, flags) == DP_OK;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -143,5 +184,10 @@ int dplay_install(void)
                         "CreateDirectPlayLobby", 1);
     rc |= patch_replace(ADDR_COMM_SHUTDOWN, (const void *)CommShutdown,
                         "CommShutdown", 0);
+    rc |= patch_replace(ADDR_COMM_CLOSE, (const void *)CommClose, "CommClose", 0);
+    rc |= patch_replace(ADDR_COMM_INIT_CONN, (const void *)CommInitializeConnection,
+                        "CommInitializeConnection", 1);
+    rc |= patch_replace(ADDR_COMM_SET_SESSION, (const void *)CommSetSessionDesc,
+                        "CommSetSessionDesc", 2);
     return rc;
 }
