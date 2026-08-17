@@ -5,7 +5,8 @@
 #   tools/ab.sh bootcamp     fullscreen, into the first Boot Camp mission
 #   tools/ab.sh windowed     -w, title screen only; the frame is static
 #   tools/ab.sh intro        -dbg, so the Smacker film plays
-#   tools/ab.sh all          all three
+#   tools/ab.sh audio        Boot Camp again, with a silent sound device
+#   tools/ab.sh all          all four
 #
 # This is the strongest check available and the only one that compares against
 # the original rather than against expectations. The registry invariant checks
@@ -56,6 +57,14 @@ play() {
         bootcamp) args="-nointro -dbg"    ; wait=20 ;;
         windowed) args="-nointro -dbg -w" ; wait=30 ;;
         intro)    args="-dbg"             ; wait=40 ;;
+        # The same run as bootcamp, but with an audio device. Without one
+        # DirectSound never starts and nine reconstructed functions -- the
+        # whole streaming path, InitDirectSound, InitWaveSounds -- do not
+        # execute at all, so `bootcamp` compares them not at all. ALSA's `null`
+        # plugin supplies a device that discards everything and needs no sound
+        # server. See tools/alsa/asoundrc.
+        audio)    args="-nointro -dbg"    ; wait=20
+                  export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
     esac
 
@@ -63,7 +72,7 @@ play() {
     AM2_MAKEVARS="TRACE=1" drive start "$wait" "ARGS=$args" >/dev/null 2>&1
 
     # Boot Camp needs driving; the other two show what they show.
-    if [ "$cfg" = bootcamp ]; then
+    if [ "$cfg" = bootcamp ] || [ "$cfg" = audio ]; then
         "$REPO/tools/point.py" 306 143 --click >/dev/null 2>&1
         sleep 25
         drive ctl "key RETURN tap" >/dev/null 2>&1
@@ -129,7 +138,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio"
 
 fail=0
 for cfg in $cfgs; do

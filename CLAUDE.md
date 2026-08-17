@@ -165,6 +165,15 @@ Done on all three configurations, and the results are worth quoting:
 | Boot Camp, fullscreen | identical, 14 messages | 22 / 786,432 |
 | intro, `ARGS=-dbg` | identical, 5 messages | 81,494 — the film is playing |
 | windowed, `-w` | identical, 6 messages | **0** |
+| audio, silent ALSA device | identical, 13 messages | 22 / 786,432 |
+
+`audio` is the same run as Boot Camp with a sound device attached, and it is
+not redundant: without one, DirectSound never starts and nine reconstructed
+functions never execute, so `bootcamp` compares them not at all. With it,
+`WaveOpenFile`, `WaveStartDataRead`, `WaveReadFile` (498 calls), `RefillAudioBuffer`,
+`StartAudioStream`, `StopAudioStream`, `SetStreamVolume`, `InitDirectSound` and
+`InitWaveSounds` all run and all match. Its log is one message shorter because
+the wave-loading failures are gone.
 
 The message counts drift by one or two between builds as reconstructed code
 takes over lines the original logged; what matters is that the two sides of a
@@ -495,8 +504,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
-- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`, the
-  four `Wave*` helpers, and `RefreshScreen` — that last has 7 callers and is
+- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
+  `WaveCloseReadFile`, and `RefreshScreen` — that last has 7 callers and is
   reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever
   forces an out-of-band repaint is somewhere further in. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
