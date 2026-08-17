@@ -421,6 +421,108 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
     return 1;
 }
 
+/* Load one wave into a DirectSound buffer -- 0x0040C530.
+ *
+ * The middle of the chain: InitWaveSounds picks the names, this makes a buffer
+ * and reads the file, and FillSoundBuffer writes the samples in. The slot the
+ * caller passes does not hold the buffer -- it holds a 0x20-byte record, and
+ * the buffer is that record's first field, which is why InitWaveSounds needs
+ * two dereferences to reach it.
+ *
+ * The buffer is asked for with DSBCAPS_STATIC, 3D, frequency, pan, volume and
+ * GETCURRENTPOSITION2 -- 0x100F2. Note that CTRL3D and CTRLPAN together is not
+ * a combination DirectSound honours, a 3D buffer having no pan of its own;
+ * asked for anyway, as written.
+ *
+ * Failure unwinds in stages and the stages differ, so they are kept apart
+ * rather than merged: a name that will not allocate frees only the record, and
+ * anything later frees the raw samples and the name too. The record is always
+ * freed and the caller's slot always nulled before answering 0.
+ *
+ * Unexercised: no audio device, so CreateSoundBuffer never gets the chance to
+ * fail or succeed. */
+static_assert(sizeof(DSBUFFERDESC) == 0x14, "DSBUFFERDESC");
+static_assert((DSBCAPS_STATIC | DSBCAPS_CTRL3D | DSBCAPS_CTRLFREQUENCY
+               | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
+               | DSBCAPS_GETCURRENTPOSITION2) == 0x100F2, "the buffer flags");
+
+typedef int32_t (__cdecl *am2_read_wave_fn)(int32_t zero, const char *name,
+                                            void *a, void *b, void *c, void *d);
+#define orig_read_wave (*(am2_read_wave_fn)ADDR_READ_WAVE_FILE)
+
+int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
+{
+    uint8_t      *rec;
+    char         *nameCopy;
+    void         *raw = NULL;      /* the samples, freed once uploaded */
+    void         *fmt = NULL;
+    uint32_t      len = 0;
+    void         *extra = NULL;
+    DSBUFFERDESC  desc;
+    size_t        n;
+
+    rec = (uint8_t *)orig_malloc(SOUND_RECORD_SIZE);
+    *slot = rec;
+    if (!rec) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_DATA);
+        return 0;
+    }
+
+    *(void **)(rec + SOUND_REC_OFF_BUFFER) = NULL;
+    *(void **)(rec + SOUND_REC_OFF_NAME)   = NULL;
+    *(void **)(rec + SOUND_REC_OFF_STATE)  = NULL;
+
+    n = strlen(name) + 1;
+    nameCopy = (char *)orig_malloc(n);
+    *(void **)(rec + SOUND_REC_OFF_NAME) = nameCopy;
+    if (!nameCopy) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_NAME);
+        orig_free(rec);
+        *slot = NULL;
+        return 0;
+    }
+    memcpy(nameCopy, name, n);
+
+    if (!orig_read_wave(0, name, &extra, &raw, &len, &fmt)) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOLOAD, name);
+        goto give_up;
+    }
+
+    memset(&desc, 0, sizeof desc);
+    desc.dwSize  = sizeof desc;
+    desc.dwFlags = DSBCAPS_STATIC | DSBCAPS_CTRL3D | DSBCAPS_CTRLFREQUENCY
+                 | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
+                 | DSBCAPS_GETCURRENTPOSITION2;
+
+    if (IDirectSound_CreateSoundBuffer(
+            ds, &desc, (LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
+            NULL) != DS_OK) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOBUFFER, name);
+        goto give_up;
+    }
+
+    if (!FillSoundBuffer(*(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
+                         (const uint8_t *)raw, len)) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOFILL, name);
+        IDirectSoundBuffer_Release(
+            *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
+        goto give_up;
+    }
+
+    *(void **)(rec + SOUND_REC_OFF_STATE) = NULL;
+    orig_free(raw);
+    return 1;
+
+give_up:
+    if (raw)
+        orig_free(raw);
+    if (*(void **)(rec + SOUND_REC_OFF_NAME))
+        orig_free(*(void **)(rec + SOUND_REC_OFF_NAME));
+    orig_free(rec);
+    *slot = NULL;
+    return 0;
+}
+
 /* Bring the fixed wave sounds up -- 0x0040C710.
  *
  * Thirty-two names in a table, each loaded into one of the sixteen-byte slots
@@ -440,9 +542,6 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
  * into, and the loader fails at the first step. */
 static_assert(sizeof(DSBCAPS) == 0x14, "DSBCAPS");
 
-typedef int32_t (__cdecl *am2_load_wave_fn)(void *slot, LPDIRECTSOUND ds,
-                                            const char *name);
-#define orig_load_wave (*(am2_load_wave_fn)ADDR_LOAD_WAVE_SOUND)
 #define g_waveNames    ((const char *const *)(uintptr_t)ADDR_WAVE_NAMES)
 #define g_soundSlots   ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS)
 #define g_dsound       (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
@@ -461,15 +560,21 @@ int32_t __cdecl InitWaveSounds(void)
         uint8_t *slot = g_soundSlots + i * SOUND_SLOT_STRIDE;
         DSBCAPS  caps;
 
-        if (!orig_load_wave(slot, g_dsound, g_waveNames[i])) {
+        if (!LoadWaveSound((void **)slot, g_dsound, g_waveNames[i])) {
             orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_INIT_FAIL, i);
-            *(void **)(slot + SOUND_SLOT_OFF_BUFFER) = NULL;
+            *(void **)slot = NULL;
             continue;
         }
 
+        /* TWO dereferences. The slot holds a record, and the buffer is that
+         * record's first field -- `mov eax,[esi]` then `mov eax,[eax]` in the
+         * original. One dereference would call the record's first word as a
+         * vtable, and with no audio device on this machine nothing would ever
+         * have shown it. See the note in CLAUDE.md about this exact shape. */
         caps.dwSize = sizeof caps;
         IDirectSoundBuffer_GetCaps(
-            *(LPDIRECTSOUNDBUFFER *)(slot + SOUND_SLOT_OFF_BUFFER), &caps);
+            *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_SLOT_OFF_BUFFER),
+            &caps);
         *(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES) = caps.dwBufferBytes;
     }
     return 1;
@@ -525,6 +630,8 @@ int audio_install(void)
                         "FillSoundBuffer", 3);
     rc |= patch_replace(ADDR_INIT_WAVE_SOUNDS, (const void *)InitWaveSounds,
                         "InitWaveSounds", 0);
+    rc |= patch_replace(ADDR_LOAD_WAVE_SOUND, (const void *)LoadWaveSound,
+                        "LoadWaveSound", 3);
     rc |= patch_replace(ADDR_FREE_DYN_SOUNDS, (const void *)FreeDynamicSounds,
                         "FreeDynamicSounds", 0);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,

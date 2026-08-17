@@ -97,6 +97,11 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
  *
  * Original: 0x0040B800. Release, free and clear the 17 dynamic sound slots,
  * which unlike the fixed ones are owned outright. */
+/* Original: 0x0040C530. Load one wave: allocate a record, copy the name, read
+ * the file, create the DirectSound buffer and fill it. `slot` receives the
+ * record, whose first field is the buffer -- not the buffer itself. */
+int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name);
+
 int32_t __cdecl InitWaveSounds(void);
 void __cdecl FreeDynamicSounds(void);
 

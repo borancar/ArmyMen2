@@ -327,7 +327,17 @@
 /* Bulk operations over those two tables. */
 #define ADDR_FREE_DYN_SOUNDS     0x0040B800u  /* void(void) */
 #define ADDR_INIT_WAVE_SOUNDS    0x0040C710u  /* int32(void) */
-#define ADDR_LOAD_WAVE_SOUND     0x0040C530u  /* int32(slot, IDirectSound*, name) */
+#define ADDR_LOAD_WAVE_SOUND     0x0040C530u  /* int32(void **slot, ds, name) */
+#define ADDR_READ_WAVE_FILE      0x0040C340u  /* int32(0,name,&fmt,&data,&len,&raw) */
+#define SOUND_RECORD_SIZE        0x20u    /* what a slot points at */
+#define SOUND_REC_OFF_BUFFER     0x00u    /* IDirectSoundBuffer * */
+#define SOUND_REC_OFF_NAME       0x04u    /* strdup of the wave's name */
+#define SOUND_REC_OFF_STATE      0x08u
+#define ADDR_STR_WAVE_NOMEM_DATA 0x00474D44u
+#define ADDR_STR_WAVE_NOMEM_NAME 0x00474D18u
+#define ADDR_STR_WAVE_NOLOAD     0x00474CF8u
+#define ADDR_STR_WAVE_NOBUFFER   0x00474CD0u
+#define ADDR_STR_WAVE_NOFILL     0x00474CA4u
 #define ADDR_WAVE_NAMES          0x00474360u  /* const char *[32] */
 #define ADDR_WAVE_NAMES_END      0x00474440u
 #define ADDR_WAVE_DIR            0x004852CCu  /* const char *, probed first */
