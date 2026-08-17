@@ -101,6 +101,16 @@ void __cdecl ShutdownDirectDraw(void);
  * is back and something has to redraw them. */
 void __cdecl RestoreLostSurfaces(void);
 
+/* Original: 0x0044D6D0, 7 call sites. Put the current picture on screen now.
+ *
+ * Used when something has to be visible before the next frame would arrive --
+ * a load, a mode change, a dialog. It clears the flag PresentFrame checks, so
+ * the ordinary present cannot fire underneath it, draws the scene twice, blits
+ * straight to the primary itself, and then restores the flag to whatever it
+ * was rather than to 1. That last detail matters: the caller may have had
+ * presenting turned off for its own reasons. */
+void __cdecl RefreshScreen(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus

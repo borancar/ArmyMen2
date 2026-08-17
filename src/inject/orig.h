@@ -75,6 +75,10 @@
 /* Run at the top of every frame: any surface that has been lost -- to an
  * alt-tab or a mode change -- is restored before anything draws. */
 #define ADDR_RESTORE_LOST   0x0041A8B0u  /* void(void) */
+/* Force what is drawn onto the screen now, outside the normal frame rhythm. */
+#define ADDR_REFRESH_SCREEN 0x0044D6D0u  /* void(void), 7 call sites */
+#define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
+#define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_SURFACE_514E94 0x00514E94u  /* IDirectDrawSurface * */
 #define ADDR_MAP_SURFACE    0x00514E90u  /* desc; +8 a flag, +0x10 the surface */
 #define ADDR_ON_MAP_RESTORED 0x0042C0E0u /* tail-called after a map restore */

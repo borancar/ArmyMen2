@@ -270,8 +270,10 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
-- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`, and
-  the three `WaveOpenFile` helpers. `CalibratePalette` came off this list once
+- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`, the
+  four `Wave*` helpers, and `RefreshScreen` — that last has 7 callers and is
+  reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever
+  forces an out-of-band repaint is somewhere further in. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
   `SnapshotSystemPalette` came off it once the intro movie was allowed to play.
 - **There is no audio here at all.** `0x004FA468` reads 0, so both

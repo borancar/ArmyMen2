@@ -24,8 +24,8 @@ call DirectDraw all day without the import table showing it.
 
 | | functions | call sites |
 |---|---:|---:|
-| reconstructed | 18 | 59 |
-| still to do | 15 | 36 |
+| reconstructed | 19 | 60 |
+| still to do | 14 | 35 |
 
 - `0x0040ced0` 1792B, 12 calls — DirectSound x12
 - `0x00427070` 944B, 5 calls — input device x5
@@ -41,7 +41,6 @@ call DirectDraw all day without the import table showing it.
 - `0x0042da30` 272B, 1 calls — back buffer x1
 - `0x0042f170` 720B, 1 calls — IDirectDraw x1
 - `0x0042ff60` 448B, 1 calls — IDirectDraw x1
-- `0x0044d6d0` 96B, 1 calls — primary x1
 
 The middle row is the work that remains. The bottom row is not work:
 those functions touch Win32 only through things every Windows program

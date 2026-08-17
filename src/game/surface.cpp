@@ -335,6 +335,33 @@ void __cdecl RestoreLostSurfaces(void)
     }
 }
 
+typedef void (__cdecl *am2_gate_fn)(int32_t);
+#define orig_refresh_gate (*(am2_gate_fn)ADDR_REFRESH_GATE)
+#define orig_refresh_draw (*(am2_void_fn)ADDR_REFRESH_DRAW)
+#define g_presentEnabledRW (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
+
+void __cdecl RefreshScreen(void)
+{
+    /* Saved rather than assumed: presenting may already have been off. */
+    const int32_t wasEnabled = g_presentEnabledRW;
+
+    orig_refresh_gate(0);
+    g_presentEnabledRW = 0;
+
+    /* Twice, because the scene is double buffered and one pass would leave the
+     * other buffer holding whatever was there before. */
+    orig_refresh_draw();
+    orig_refresh_draw();
+
+    IDirectDrawSurface_BltFast(g_primarySurface,
+                               (DWORD)g_screenRect.left,
+                               (DWORD)g_screenRect.top,
+                               g_backBuffer, g_screenClip, DDBLTFAST_WAIT);
+
+    orig_refresh_gate(1);
+    g_presentEnabledRW = wasEnabled;
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -351,5 +378,7 @@ int surface_install(void)
                         "ShutdownDirectDraw", 0);
     rc |= patch_replace(ADDR_RESTORE_LOST, (const void *)RestoreLostSurfaces,
                         "RestoreLostSurfaces", 0);
+    rc |= patch_replace(ADDR_REFRESH_SCREEN, (const void *)RefreshScreen,
+                        "RefreshScreen", 0);
     return rc;
 }
