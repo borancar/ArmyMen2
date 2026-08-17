@@ -97,6 +97,12 @@ int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list);
  * is no session to make. */
 int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name);
 
+/* Original: 0x0040DE10. Create the local player in the open session and record
+ * its DPID. Declared here now that HostBattle calls it directly. */
+int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
+                                                   HANDLE event, void *data,
+                                                   DWORD length);
+
 /* Original: 0x0040EA40, thiscall. Give the DirectPlay connection back.
  *
  * Frees the two heap buffers, releases the IDirectPlay4A and the lobby

@@ -224,9 +224,84 @@ void __cdecl StartMultiplayerGame(void)
     ShowCursor(FALSE);
 }
 
+/* Host a new battle -- 0x0042FFF0.
+ *
+ * The OK on ENTER BATTLE NAME, and the last named DirectDraw call in the menu
+ * layer. The dialog carries two strings inside the paint object: the battle's
+ * name and the hosting player's. Both must be non-empty; either blank refuses
+ * with the error sound and nothing else happens.
+ *
+ * WHY A GRAPHICS CALL IS HERE AT ALL. FlipToGDISurface hands the display back
+ * to GDI before the two comm calls, which open a DirectPlay session and create
+ * a player and can block for as long as the network takes. Without it a
+ * fullscreen exclusive-mode game would sit on an undrawable primary while that
+ * happened. It is the one line in this function that is not menu logic, and it
+ * is why the function is reconstructed rather than declined.
+ *
+ * The failure paths share their tail with the success path in the original: the
+ * three zero arguments PlaySoundAt needs are pushed BEFORE the branch that
+ * decides which sound to play, and the failing branch jumps into the middle of
+ * the sequence to push the remaining two. Written out as two calls here; the
+ * arguments are identical either way and only the index differs.
+ *
+ * Both comm calls are already ours, so this is glue over reconstructed code
+ * plus one DirectDraw call.
+ *
+ * NOT EXERCISED without AM2_MULTIPLAYER=1 -- the whole path is behind the
+ * patched-out button. Verified by reading. */
+#define REQUEST_HOSTED 7
+
+#define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
+#define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
+
+/* strcpy, which is what the original inlines as scasb-then-movsd. */
+static void CopyName(char *dst, const char *src)
+{
+    while ((*dst++ = *src++) != 0)
+        ;
+}
+
+void __cdecl HostBattle(void)
+{
+    uint8_t    *dlg    = g_paintObject;
+    const char *battle = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
+    const char *player = (const char *)(dlg + DLG_OFF_PLAYER_NAME);
+
+    if (!*battle || !*player) {
+        orig_play_sound(3, 0, 0, 0, 0);
+        return;
+    }
+
+    /* Give the screen back to GDI before anything that can block. */
+    IDirectDraw_FlipToGDISurface(g_ddraw);
+
+    if (!CommOpenSession(g_commObject, battle)) {
+        orig_play_sound(3, 0, 0, 0, 0);
+        return;
+    }
+    if (!CommCreatePlayer(g_commObject, player, NULL, NULL, 0)) {
+        orig_play_sound(3, 0, 0, 0, 0);
+        return;
+    }
+
+    /* The host is always slot 0. */
+    CopyName((char *)(g_commObject + COMM_SLOT_BASE + COMM_SLOT_OFF_NAME),
+             player);
+
+    orig_play_sound(2, 0, 0, 0, 0);
+    g_menuRequest    = REQUEST_HOSTED;
+    g_menuRequestSet = 1;
+
+    CopyName((char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME, player);
+    CopyName((char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME, battle);
+}
+
 int startgame_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_HOST_BATTLE, (const void *)HostBattle,
+                        "HostBattle", 0);
 
     rc |= patch_replace(ADDR_START_SELECTED_GAME, (const void *)StartSelectedGame,
                         "StartSelectedGame", 0);

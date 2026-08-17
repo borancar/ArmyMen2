@@ -608,6 +608,14 @@
 /* State the window procedure reads. */
 #define ADDR_DIRECTDRAW          0x004FDF78u  /* IDirectDraw * */
 #define ADDR_PAINT_OBJECT        0x0065A058u  /* see winproc.cpp -- not COM */
+/* The two text fields of the ENTER BATTLE NAME dialog, inside the paint
+ * object: the session's name and the hosting player's. */
+#define DLG_OFF_BATTLE_NAME      0x064u
+#define DLG_OFF_PLAYER_NAME      0x084u
+/* Where HostBattle keeps the two names after the session is up. */
+#define ADDR_SAVED_PLAYER_NAME   0x00516094u  /* char[] */
+#define ADDR_SAVED_BATTLE_NAME   0x005160D5u  /* char[] */
+#define ADDR_HOST_BATTLE         0x0042FFF0u  /* void(void) */
 #define ADDR_APP_ACTIVE          0x004FA02Cu  /* int32_t; RunFrame ticks only if set */
 #define ADDR_CHAR_HANDLER        0x005125B8u  /* void(*)(wparam, lo, hi), may be null */
 #define ADDR_GAME_STATE          0x00511DA4u  /* int32_t, 0..4 */

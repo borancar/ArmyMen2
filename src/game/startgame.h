@@ -23,6 +23,11 @@ extern "C" {
  * cdcheck.h and docs/binarypatches.md. */
 void __cdecl StartSelectedGame(void);
 
+/* Original: 0x0042FFF0. The OK on ENTER BATTLE NAME: validate the two typed
+ * names, hand the display back to GDI, open a DirectPlay session and create
+ * the hosting player. */
+void __cdecl HostBattle(void);
+
 int startgame_install(void);
 
 #ifdef __cplusplus
