@@ -98,7 +98,7 @@
 #define ADDR_RELOAD_BITMAP   0x00424280u  /* int32(surface*, FILE*, ...) */
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
-#define ADDR_SURFACE_514E94 0x00514E94u  /* IDirectDrawSurface * */
+#define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
 #define ADDR_MAP_SURFACE    0x00514E90u  /* desc; +8 a flag, +0x10 the surface */
 #define ADDR_ON_MAP_RESTORED 0x0042C0E0u /* tail-called after a map restore */
 #define ADDR_PRESENT_ENABLED 0x004FA030u /* int32_t */
@@ -135,13 +135,24 @@
  * scaled by 16 when converting to screen space. */
 #define ADDR_SET_DRAW_TARGET     0x0041AC40u  /* void(LPDIRECTDRAWSURFACE) */
 #define ADDR_REDRAW_MAP_REGION   0x0041CF90u  /* void(const AM2_Rect*) */
-#define ADDR_PREPARE_SCREEN_RECT 0x0042D9B0u  /* void(AM2_Rect by value) */
+#define ADDR_BLIT_MAP_BACKDROP   0x0042D9B0u  /* void(AM2_Rect by value) */
 #define ADDR_DRAW_MAP_TILES      0x0041E440u  /* void(const AM2_Rect*,void*,int32) */
 /* A second offscreen surface, the same size again, and NOT the back buffer
  * despite the name -- that is ADDR_FONT_SURFACE. Kept as-is because the name is
  * already spread across mapdraw.cpp; the comment is the correction. */
 #define ADDR_BACK_SURFACE        0x00503100u  /* IDirectDrawSurface *, offscreen */
 #define ADDR_MAP_DESC            0x00514F20u  /* map descriptor; +4 is a row count */
+/* The left and top of the visible-area rectangle -- these are its first two
+ * fields, not two loose globals: RedrawMapRegion is called with 0x00514E14
+ * itself as its AM2_Rect *, which the trace shows plainly, so the four edges
+ * run 0x514E14..0x514E20.
+ *
+ * Distinct from the camera below, which is in tiles: BlitMapBackdrop subtracts
+ * the camera from the SOURCE rectangle and these from the DESTINATION point,
+ * and they are not the same offset. Also distinct from ADDR_ORIGIN_DX/DY,
+ * which shift for a windowed primary. */
+#define ADDR_VIEW_ORIGIN_X       0x00514E14u  /* int32_t */
+#define ADDR_VIEW_ORIGIN_Y       0x00514E18u  /* int32_t */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
 

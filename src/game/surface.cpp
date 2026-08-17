@@ -296,7 +296,7 @@ release_v2:
     }
 }
 
-#define g_surface514e94 (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_SURFACE_514E94)
+#define g_mapCache      (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
 #define g_mapSurfaceDesc (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
 #define MAP_DESC_FLAG    0x08u
 #define MAP_DESC_SURFACE 0x10u
@@ -316,7 +316,7 @@ void __cdecl RestoreLostSurfaces(void)
 {
     RestoreIfLost(g_primarySurface);
     RestoreIfLost(g_offscreen);
-    RestoreIfLost(g_surface514e94);
+    RestoreIfLost(g_mapCache);
 
     /* The map keeps its surface in a descriptor, and only wants it restored
      * while the flag at +8 is clear. */

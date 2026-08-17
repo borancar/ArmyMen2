@@ -33,6 +33,14 @@ void __cdecl SetDrawTarget(LPDIRECTDRAWSURFACE surf);
  * happens, so a zero-width or zero-height region costs nothing. */
 void __cdecl RedrawMapRegion(const AM2_Rect *world);
 
+/* Original: 0x0042D9B0, 1 call site -- RedrawMapRegion, above. Copies one
+ * rectangle of the already-painted map cache into the back buffer.
+ *
+ * Takes the rectangle BY VALUE, which is why it cannot hand a transformed one
+ * back and why RedrawMapRegion still passes world space to the tile walker
+ * afterwards. */
+void __cdecl BlitMapBackdrop(AM2_Rect world);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

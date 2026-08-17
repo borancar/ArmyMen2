@@ -29,18 +29,52 @@
 #define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
 #define g_mapDesc    ((void *)(uintptr_t)ADDR_MAP_DESC)
 
-/* 0x0042D9B0: screen-space setup for the region, taking the rectangle by
- * value. Not reconstructed. */
-typedef void (__cdecl *am2_prepare_screen_rect_fn)(AM2_Rect world);
-#define orig_prepare_screen_rect \
-    (*(am2_prepare_screen_rect_fn)ADDR_PREPARE_SCREEN_RECT)
-
 /* 0x0041E440: the recursive tile walker. Shifts the rectangle's edges right by
  * 8 to get tile indices and bounds-checks them against the map descriptor.
  * Not reconstructed. */
 typedef void (__cdecl *am2_draw_map_tiles_fn)(const AM2_Rect *world,
                                               void *mapDesc, int32_t flag);
 #define orig_draw_map_tiles (*(am2_draw_map_tiles_fn)ADDR_DRAW_MAP_TILES)
+
+/* The map is painted once into a cache surface and the visible part copied out
+ * of it a rectangle at a time; this is that copy. Both surfaces and both
+ * origins come from globals, so the whole of the caller's rectangle is consumed
+ * as geometry.
+ *
+ * Two different origins are subtracted, which is the only subtle thing here.
+ * The SOURCE rectangle is measured from the camera, in tiles scaled by 16 --
+ * that is where the region sits on the painted map. The DESTINATION point is
+ * measured from the screen origin instead. They are not the same offset and
+ * using one for both would slide the backdrop against the sprites drawn over
+ * it.
+ *
+ * Nothing checks the result. A failed BltFast leaves whatever was in the back
+ * buffer and the tile walker draws over it regardless, as in the original. */
+static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");
+
+#define g_mapCache (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
+#define g_cameraX  (*(const int32_t *)(uintptr_t)ADDR_CAMERA_X)
+#define g_cameraY  (*(const int32_t *)(uintptr_t)ADDR_CAMERA_Y)
+#define g_viewX  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+#define g_viewY  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y)
+
+/* Tiles are 16 pixels, so the camera scales by 16 to reach pixels. */
+#define TILE_SHIFT 4
+
+void __cdecl BlitMapBackdrop(AM2_Rect world)
+{
+    RECT src;
+
+    src.left   = world.left   - (g_cameraX << TILE_SHIFT);
+    src.top    = world.top    - (g_cameraY << TILE_SHIFT);
+    src.right  = world.right  - (g_cameraX << TILE_SHIFT);
+    src.bottom = world.bottom - (g_cameraY << TILE_SHIFT);
+
+    IDirectDrawSurface_BltFast(g_backBuffer,
+                               (DWORD)(world.left - g_viewX),
+                               (DWORD)(world.top  - g_viewY),
+                               g_mapCache, &src, DDBLTFAST_WAIT);
+}
 
 void __cdecl SetDrawTarget(LPDIRECTDRAWSURFACE surf)
 {
@@ -60,7 +94,7 @@ void __cdecl RedrawMapRegion(const AM2_Rect *world)
     if (world->left == world->right)
         return;
 
-    orig_prepare_screen_rect(*world);
+    BlitMapBackdrop(*world);
 
     SetDrawTarget(g_backBuffer);
     if (!LockSurface(g_backBuffer))
@@ -77,5 +111,7 @@ int mapdraw_install(void)
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_REDRAW_MAP_REGION, (const void *)RedrawMapRegion,
                         "RedrawMapRegion", 1);
+    rc |= patch_replace(ADDR_BLIT_MAP_BACKDROP, (const void *)BlitMapBackdrop,
+                        "BlitMapBackdrop", 4);
     return rc;
 }
