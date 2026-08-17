@@ -349,7 +349,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
-  `AudioTimerProc` and the comm object's constructor and destructor. The window, the message queue, the display mode,
+  `OpenAudioStream`, `AudioTimerProc` and the comm object's constructor and
+  destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -392,7 +393,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | | what it actually is |
   |---|---|
   | ~~`0x0042BEA0`~~ | **Done.** The entry was four functions; `RestoreTileSet` at `0x0042C0E0` (624B, `Lock`+`Unlock`) held both COM calls and is reconstructed in `mapdraw.cpp`. See the merge note under boundary density |
-  | `0x0040CED0` 1792B, 12 | **Half done.** Two functions: the 1456-byte one at `0x0040D020` is `AudioTimerProc`, the streaming refill, and is reconstructed. `0x0040CED0` itself is 336 B with two `CreateSoundBuffer` calls and is still original |
+  | ~~`0x0040CED0`~~ | **Done.** Two functions: `AudioTimerProc` at `0x0040D020` (1456 B, the streaming refill) and `OpenAudioStream` at `0x0040CED0` (336 B, opens the `.WAV` and creates the buffer). Both reconstructed; the whole audio stream is ours |
   | `0x00427070` 944B, 5 | input-to-command translation; no strings |
   | `0x00412FE0` 1184B, 4 | menu logic; no strings |
   | `0x0042FF60` 448B, 1 | starts a multiplayer game — it calls `CommOpenSession`, `CommCreatePlayer` and `PlaySoundAt`, all of which are ours. Genuinely menu logic |
@@ -522,6 +523,22 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   exits instantly with nothing useful in the log. Cost an iteration; use a
   named local for the object and another for the table rather than a nested
   cast.
+- **A coverage number that credits a whole merged entry is worth less than no
+  number.** `tools/coverage.py` decided "is this reconstructed?" by asking
+  whether *any* patched address fell inside the `functions.tsv` entry holding
+  the site. Where the entry is two functions, reconstructing either one marked
+  both done. It happened twice: patching `MovieApplyPalette` marked
+  `MoviePoll`'s `SmackWait` covered, and reconstructing `AudioTimerProc` marked
+  `OpenAudioStream`'s `CreateSoundBuffer` and `GetCaps` covered a commit before
+  they were — so "24 DirectX calls left" was really 14.
+
+  Sites are now attributed to the real function through `tools/merges.py` before
+  anything is counted. Containment still applies *within* a real function, which
+  is what keeps `WndProc` (patched at `0x0040A6B0`, filed under `0x0040A6A0`)
+  working. The tool's own comment had predicted this failure and said "if this
+  number ever looks too good, that is the first thing to check"; it looked too
+  good and nobody checked.
+
 - **Pick the next target by boundary density, not by import count.** Ranking
   what is left by sites-per-byte finds functions that are boundary code;
   ranking by sites alone finds 5,760-byte game-logic functions whose only

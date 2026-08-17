@@ -12,10 +12,10 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 44 | 148 |
-| still boundary | 1 | 4 |
-| game logic, incidental calls only | 77 | 124 |
-| **total** | **122** | **276** |
+| reconstructed | 45 | 148 |
+| still boundary | 2 | 4 |
+| game logic, incidental calls only | 83 | 124 |
+| **total** | **130** | **276** |
 
 ## By library
 
@@ -92,7 +92,7 @@ Treat the number below as "known to be outstanding", never as
 
 | | functions | call sites |
 |---|---:|---:|
-| known DirectX, reconstructed | 27 | 83 |
+| known DirectX, reconstructed | 28 | 83 |
 | known DirectX, still to do | 6 | 12 |
 
 And the bracket the caveat above implies. Counting every function
@@ -101,15 +101,15 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 69 |
-| any COM dispatch, not | 8 |
+| any COM dispatch, reconstructed | 70 |
+| any COM dispatch, not | 9 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
 `tools/comcalls.py` now separates the two by how `this` is passed.
 COM is stdcall and pushes the interface as an explicit first
 argument; an i386 MSVC C++ virtual is thiscall and puts it in ecx.
-88 functions dispatch only that way and have been dropped from
+95 functions dispatch only that way and have been dropped from
 the bracket entirely -- they are destructor chains and object
 teardown, not boundary code.
 
@@ -133,17 +133,18 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
+| `0x0044d110` | 1472 | 2 | 736 | GetActiveWindow, MessageBoxA |
+| `0x0044d3c0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 
 ## By library
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 76 |
-| KERNEL32.dll | 99 | 25 |
+| USER32.dll | 130 | 69 |
+| KERNEL32.dll | 99 | 23 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
-| smackw32.dll | 9 | 9 |
+| smackw32.dll | 9 | 8 |
 | ole32.dll | 3 | 3 |
 | ADVAPI32.dll | 2 | 2 |
 

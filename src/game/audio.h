@@ -65,7 +65,18 @@ int32_t __cdecl InitDirectSound(void);
  *
  * Volume comes from a global and pan from the caller, and the pan is skipped if
  * the volume did not take. */
-void __cdecl SetStreamVolume(int32_t pan);
+/* Original: 0x0040CED0, 1 call site -- StartAudioStream. Open a .WAV for
+ * streaming and create the DirectSound buffer that plays it, priming the
+ * buffer with one full refill before returning.
+ *
+ * Answers 0 on success and -1 if the file will not open, is not PCM, or has no
+ * readable data chunk. A DirectSound failure comes back as the HRESULT. */
+int32_t __cdecl OpenAudioStream(const char *name);
+
+/* Original: 0x0040CE90. Set the stream buffer's volume, and its pan if that
+ * took. The pan is the SECOND argument -- the first is pushed by both call
+ * sites and never read. See the note in audio.cpp. */
+void __cdecl SetStreamVolume(int32_t unused, int32_t pan);
 
 /* Original: 0x0040D730. Silence everything and let the dynamic sounds go.
  *

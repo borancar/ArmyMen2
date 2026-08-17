@@ -36,6 +36,10 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import am2
+import merges
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, "docs", "boundary.md")
 CRT_START = 0x0045C000
@@ -131,11 +135,26 @@ def main():
                  open(os.path.join(REPO, "docs", "functions.tsv")),
                  delimiter="\t")}
 
+    # Re-key everything by the REAL function holding each site rather than by
+    # the functions.tsv entry, which merges neighbours. Done here, once, so that
+    # every count downstream is split-aware instead of each having to remember.
+    img = am2.Image()
+    merged = merges.real_functions(img)
+    real_sizes = dict(sizes)
+
+    def owner_of(entry, site):
+        if entry in merged:
+            starts, size = merged[entry]
+            fn, real = merges.owner(starts, size, site)
+            real_sizes[fn] = real
+            return fn
+        return entry
+
     per_fn = collections.defaultdict(list)
     for r in rows:
         fn = int(r["func"], 16)
         if fn and fn < CRT_START:
-            per_fn[fn].append(r)
+            per_fn[owner_of(fn, int(r["site"], 16))].append(r)
 
     # The other half of the boundary: DirectX through COM, which owns no import.
     com = collections.defaultdict(list)
@@ -150,6 +169,7 @@ def main():
                 this = 0
             fn = int(r["func"], 16)
             if fn and fn < CRT_START:
+                fn = owner_of(fn, int(r["site"], 16))
                 # A thiscall dispatch is the engine's own C++ virtual, never
                 # COM: under CINTERFACE every COM method takes the interface as
                 # a pushed first argument. Excluding those is what turns the
@@ -162,17 +182,22 @@ def main():
                     com[fn].append(DIRECTX_OBJECTS[this])
 
     # A reconstructed address does not always equal the function address the
-    # import inventory used: functions.tsv merges a thunk with the body it
-    # jumps into, so WndProc's sites are filed under the thunk at 0x0040A6A0
-    # while the address we patch is 0x0040A6B0. Match by containment.
+    # inventories used: functions.tsv merges neighbours, so WndProc's sites are
+    # filed under 0x0040A6A0 while the address we patch is 0x0040A6B0. That has
+    # to be matched by containment.
     #
-    # The same merging can over-credit, and did: 0x00445320 and 0x00445390 are
-    # two functions the inventory reports as one, so patching the first marked
-    # the second's SmackWait covered when it was not. Both are reconstructed
-    # now, but if this number ever looks too good, that is the first thing to
-    # check -- containment cannot tell a thunk from a neighbour.
+    # But plain containment OVER-CREDITS, and did so twice. 0x00445320 and
+    # 0x00445390 are two functions reported as one, so patching the first marked
+    # the second's SmackWait covered when it was not. Then 0x0040CED0 and
+    # 0x0040D020 -- reconstructing AudioTimerProc marked OpenAudioStream's
+    # CreateSoundBuffer and GetCaps done a commit before they were.
+    #
+    # So containment is now applied to the REAL function, using the split points
+    # tools/merges.py confirms by xref, and only falls back to the whole entry
+    # where no split was found. A thunk and its body stay one unit, which is
+    # what makes WndProc keep working; two neighbours do not.
     def is_done(fn):
-        end = fn + sizes.get(fn, 0)
+        end = fn + real_sizes.get(fn, 0)
         return any(fn <= d < end for d in done)
 
     done_fns = {f for f in per_fn if is_done(f)}
@@ -222,6 +247,10 @@ def main():
             fn = int(r["func"], 16)
             if not fn or fn >= CRT_START:
                 continue
+            # Through owner_of, like everything else -- done_fns is keyed by the
+            # real function, and looking up the merged entry here reported
+            # MoviePoll's SmackWait as outstanding when MoviePoll is ours.
+            fn = owner_of(fn, int(r["site"], 16))
             d = per_dll[r["dll"].upper().replace(".DLL", "")]
             d[1] += 1
             if fn in done_fns:

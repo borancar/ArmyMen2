@@ -31,7 +31,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 #define g_playBuffer    (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_AUDIO_BUFFER_2)
 #define g_timerId       (*(UINT *)(uintptr_t)ADDR_AUDIO_TIMER_ID)
 #define g_timerRunning  (*(int32_t *)(uintptr_t)ADDR_AUDIO_TIMER_RUN)
-#define g_period        (*(const uint32_t *)(uintptr_t)ADDR_AUDIO_PERIOD)
+#define g_period        (*(uint32_t *)(uintptr_t)ADDR_AUDIO_PERIOD)
 #define g_inCallback    (*(LONG *)(uintptr_t)ADDR_AUDIO_IN_CALLBACK)
 #define g_looping       (*(int32_t *)(uintptr_t)ADDR_AUDIO_LOOPING)
 #define g_hmmio         (*(HMMIO *)(uintptr_t)ADDR_AUDIO_HMMIO)
@@ -44,9 +44,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 #define AUDIO_TIMER_RES    0x0A
 #define AUDIO_DRAIN_MS     0x12C   /* 300ms between tries */
 
-typedef void    (__cdecl *am2_audio_prepare_fn)(void *track);
 typedef int32_t (__cdecl *am2_audio_check_fn)(void *arg);
-#define orig_prepare_track (*(am2_audio_prepare_fn)ADDR_AUDIO_PREPARE)
 #define orig_check_path    (*(am2_audio_check_fn)ADDR_DATA_PATH_EXISTS)
 
 void __cdecl StopAudioStream(void)
@@ -89,7 +87,7 @@ void __cdecl StartAudioStream(void *track, int32_t which)
     if (!orig_check_path(g_pathArg))
         return;
 
-    orig_prepare_track(track);
+    OpenAudioStream((const char *)track);
     g_looping = which;
 
     if (!g_buffer)
@@ -208,8 +206,21 @@ int32_t __cdecl InitDirectSound(void)
     return 1;
 }
 
-void __cdecl SetStreamVolume(int32_t pan)
+/* TWO arguments, and the pan is the SECOND. This took one parameter until
+ * OpenAudioStream was read: the original loads `[esp+8]` for SetPan and never
+ * touches `[esp+4]`, and both of its call sites -- 0x0040D002 and 0x0044F308 --
+ * push two words. With one parameter we were passing the slot the original
+ * ignores.
+ *
+ * It made no observable difference and could not have: both call sites push
+ * (0, 0), so the right answer and the wrong one are the same number. That is
+ * exactly why the A/B never flinched, and why arity is worth checking against
+ * `add esp, N` at the call site rather than inferring from what the body
+ * happens to read first. */
+void __cdecl SetStreamVolume(int32_t unused, int32_t pan)
 {
+    (void)unused;
+
     if (!g_audioEnabled)
         return;
     if (!g_buffer)
@@ -308,7 +319,7 @@ void __cdecl StopAllSounds(void)
  * a dword to fill with `rep stosd`. */
 #define SILENCE_8BIT  0x80u
 
-#define g_bufferSize (*(const uint32_t *)(uintptr_t)ADDR_AUDIO_BUFFER_SIZE)
+#define g_bufferSize (*(uint32_t *)(uintptr_t)ADDR_AUDIO_BUFFER_SIZE)
 #define g_readFailed  (*(int32_t *)(uintptr_t)ADDR_AUDIO_READ_FAILED)
 #define g_atEnd       (*(int32_t *)(uintptr_t)ADDR_AUDIO_AT_END)
 #define g_validBytes  (*(uint32_t *)(uintptr_t)ADDR_AUDIO_VALID_BYTES)
@@ -378,6 +389,103 @@ unlock:
     g_cursorB = 0;
 }
 
+/* Open a .WAV for streaming and build the buffer it plays through -- 0x0040CED0.
+ *
+ * The other half of the entry AudioTimerProc came out of, and the front end of
+ * the same subsystem: this creates the buffer, the timer callback keeps it fed.
+ * It went into orig.h as ADDR_AUDIO_PREPARE with "stays original" and no reason.
+ *
+ * Opens the file, insists on PCM, positions at the `data` chunk, asks
+ * DirectSound for a buffer six seconds long, and primes it with one full
+ * RefillAudioBuffer before anything plays.
+ *
+ * THE BUFFER IS NOT SIX SECONDS. The request is nSamplesPerSec * 6 BYTES --
+ * `lea eax,[eax+eax*2]` then `shl eax,1` on WAVEFORMATEX+4, which is
+ * nSamplesPerSec, not nAvgBytesPerSec at +8. Those are only the same number for
+ * 8-bit mono, and this game's streams are not: title.wav is 11025 Hz, 16-bit,
+ * stereo, so 44,100 bytes a second. The 66,150 bytes it asks for are therefore
+ * 1.5 seconds of audio, and the derived timer period agrees -- 375 ms, a
+ * quarter of the buffer, which StartAudioStream shifts again to ~93 ms.
+ *
+ * Whether the original meant six seconds and got the field wrong is not
+ * knowable from the bytes; what is knowable is that this reads samples and
+ * measures bytes, so the buffer scales with sample rate and not with the data
+ * rate. Transcribed as written.
+ *
+ * The size that matters is then read back rather than assumed: GetCaps reports
+ * what DirectSound actually allocated, and that is the wrap modulus every later
+ * refill uses. 66,150 asked, 66,152 given -- measured, both here and in
+ * AudioTimerProc, which is a useful cross-check that the two agree.
+ *
+ * TWO ORDERING DETAILS, both the original's and both easy to normalise away.
+ * RefillAudioBuffer is called BEFORE the looping and read-failed flags are
+ * cleared, so the priming read uses whatever the previous stream left in them;
+ * and StartAudioStream assigns the real looping flag only after this returns.
+ * Written in the original's order.
+ *
+ * The two failure paths differ in what they answer. A file that will not open,
+ * is not PCM, or has no readable data chunk gives -1. A DirectSound failure
+ * gives the HRESULT through, because the original simply falls out of the
+ * function with it still in eax. */
+static_assert(sizeof(DSBUFFERDESC) == 0x14, "DSBUFFERDESC");
+static_assert(sizeof(DSBCAPS) == 0x14, "DSBCAPS");
+static_assert((DSBCAPS_CTRLFREQUENCY | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
+               | DSBCAPS_GETCURRENTPOSITION2) == 0x000100E0, "the buffer flags");
+
+#define STREAM_SECONDS 6
+
+int32_t __cdecl OpenAudioStream(const char *name)
+{
+    DSBUFFERDESC desc;
+    DSBCAPS      caps;
+    HRESULT      hr;
+
+    g_buffer = NULL;
+
+    /* WaveOpenFile takes a mutable pointer -- mmioOpen's first argument is
+     * `LPSTR`, not `LPCSTR`, and the reader passes it straight through. */
+    if (WaveOpenFile((char *)name, &g_hmmio, &g_waveFormat, g_riffChunk) != 0)
+        return -1;
+
+    if (g_waveFormat->wFormatTag != WAVE_FORMAT_PCM
+        || WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk) != 0) {
+        WaveCloseReadFile(&g_hmmio, &g_waveFormat);
+        return -1;
+    }
+
+    desc.dwSize        = sizeof(desc);
+    desc.dwFlags       = DSBCAPS_CTRLFREQUENCY | DSBCAPS_CTRLPAN
+                       | DSBCAPS_CTRLVOLUME | DSBCAPS_GETCURRENTPOSITION2;
+    desc.dwBufferBytes = g_waveFormat->nSamplesPerSec * STREAM_SECONDS;
+    desc.dwReserved    = 0;
+    desc.lpwfxFormat   = g_waveFormat;
+
+    hr = IDirectSound_CreateSoundBuffer(g_dsound, &desc, &g_buffer, NULL);
+    if (hr != DS_OK)
+        return (int32_t)hr;
+
+    caps.dwSize = sizeof(caps);
+    hr = IDirectSoundBuffer_GetCaps(g_buffer, &caps);
+    if (hr != DS_OK)
+        return (int32_t)hr;
+
+    g_bufferSize = caps.dwBufferBytes;
+    g_atEnd      = 0;
+    g_playBuffer = g_buffer;
+    g_validBytes = 0;
+
+    /* A quarter of the buffer's duration in milliseconds. StartAudioStream
+     * shifts it right by two again before handing it to timeSetEvent. */
+    g_period = (caps.dwBufferBytes * 1000u / g_waveFormat->nAvgBytesPerSec) >> 2;
+
+    RefillAudioBuffer();
+
+    g_readFailed = 0;
+    g_looping    = 0;
+    SetStreamVolume(0, 0);
+    return 0;
+}
+
 /* The streaming refill, driven by a multimedia timer -- 0x0040D020.
  *
  * StartAudioStream hands this to timeSetEvent, so it is an LPTIMECALLBACK and
@@ -442,7 +550,6 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 /* Posted to the game window when the stream runs dry. WM_USER + 0x100. */
 #define AUDIO_STREAM_DONE 0x0500u
 
-#define g_playBuffer  (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_AUDIO_BUFFER_2)
 #define g_hwnd        (*(HWND *)(uintptr_t)ADDR_HWND)
 
 /* 0x80 for unsigned 8-bit PCM, 0 for signed 16-bit. The original derives it
@@ -1464,8 +1571,10 @@ int audio_install(void)
                         "PlaySoundAt", 5);
     rc |= patch_replace(ADDR_PLAY_DYNAMIC_SOUND, (const void *)PlayDynamicSound,
                         "PlayDynamicSound", 8);
+    rc |= patch_replace(ADDR_OPEN_AUDIO_STREAM, (const void *)OpenAudioStream,
+                        "OpenAudioStream", 1);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
-                        "SetStreamVolume", 1);
+                        "SetStreamVolume", 2);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,
                         "StopAllSounds", 0);
     rc |= patch_replace(ADDR_REFILL_AUDIO, (const void *)RefillAudioBuffer,

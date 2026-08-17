@@ -474,7 +474,10 @@
  * address because the harness fingerprints it and because a probe may want to
  * hand the original back to timeSetEvent. */
 #define ADDR_AUDIO_TIMER_PROC    0x0040D020u  /* LPTIMECALLBACK */
-#define ADDR_AUDIO_PREPARE       0x0040CED0u  /* void(void *), stays original */
+/* Opens the .WAV and creates the streaming buffer -- reconstructed as
+ * OpenAudioStream. It went in as ADDR_AUDIO_PREPARE, from the one call site
+ * in StartAudioStream, before anyone read the body. */
+#define ADDR_OPEN_AUDIO_STREAM   0x0040CED0u  /* int32_t(const char *) */
 /* Prefixes the install directory at 0x0051235C onto a relative path and answers
  * whether it is there. 82 callers and nothing audio-specific about it -- it was
  * ADDR_AUDIO_CHECK_PATH, named from the first call site it was seen at, which
