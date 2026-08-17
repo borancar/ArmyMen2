@@ -116,6 +116,13 @@
 #define ADDR_LOGPALETTE_ENTRIES  0x00477A64u  /* PALETTEENTRY[256] */
 #define ADDR_SYSTEM_PALETTE      0x006564A0u  /* PALETTEENTRY[256], read back from GDI */
 
+/* .WAV reading through WINMM's multimedia file services -- the only file I/O
+ * in the game that does not go through the CRT. Reconstructed in
+ * src/game/wavefile.cpp; these are the DirectX SDK sample's names. */
+#define ADDR_WAVE_OPEN_FILE      0x0040CA10u  /* MMRESULT(char*,HMMIO*,WAVEFORMATEX**,MMCKINFO*) */
+#define ADDR_WAVE_START_DATA     0x0040CBB0u  /* MMRESULT(HMMIO*,MMCKINFO*,MMCKINFO*) */
+#define ADDR_WAVE_CLOSE_FILE     0x0040CCE0u  /* MMRESULT(HMMIO*,WAVEFORMATEX**) */
+
 /* Error reporting. Both format into the game's own static buffers and put a
  * message box up; both return 0, which is what lets callers `return` them. */
 #define ADDR_FATAL_ERROR         0x0041E750u  /* int32_t(const char *fmt, ...) */

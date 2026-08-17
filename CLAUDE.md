@@ -180,9 +180,12 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   contain COM-shaped dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
-  `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`.
-  The window, the message queue, the display mode, every surface, both input
-  devices, the GDI palette and every message box are ours.
+  `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
+  and the three `Wave*` helpers. The window, the message queue, the display
+  mode, every surface, both input devices, the GDI palette, every message box
+  and all `.WAV` reading are ours. What is left is 107 functions holding 190
+  import sites, and most of those are a `GetTickCount` or a `PostMessageA`
+  inside something that is otherwise game logic.
 - **Pick the next target by boundary density, not by import count.** Ranking
   what is left by sites-per-byte finds functions that are boundary code;
   ranking by sites alone finds 5,760-byte game-logic functions whose only
@@ -225,8 +228,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
-- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`.
-  `CalibratePalette` came off this list once `-w` was understood — it runs
-  twice per windowed startup.
+- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`, and
+  the three `WaveOpenFile` helpers. `CalibratePalette` came off this list once
+  `-w` was understood — it runs twice per windowed startup, and
+  `SnapshotSystemPalette` came off it once the intro movie was allowed to play.
+- **There is no audio here at all.** Every DirectSound buffer global reads
+  NULL, so nothing ever asks for a `.WAV` and the whole `src/game/wavefile.cpp`
+  path is unreachable. This is the environment, not the game: `/dev/snd` exists
+  but no PipeWire or PulseAudio session does, and pointing Wine's audio driver
+  at ALSA directly changes nothing. Anyone with sound should re-check those
+  three counts — Boot Camp alone should move them.
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.
