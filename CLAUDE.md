@@ -704,6 +704,16 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and
   the wrong name survived a commit. Reading the callee costs a minute;
   a wrong name in `orig.h` propagates into every module that picks it up.
+- **`tools/checkhooks.py` guards the one failure that no A/B can see.** It
+  reads the IAT slot `src/inject/dinput_hook.c` patches, resolves which symbol
+  that is from the game's own import directory, and fails if `am2hook.dll`
+  imports it. Tested by pointing the hook at `PostMessageA`, which the harness
+  does import: it reports the clash and exits 1.
+
+  Worth having because the failure mode is invisible. Both sides of an A/B
+  would be equally undriven, so the logs and the pixels would agree perfectly
+  while every scripted click went nowhere.
+
 - **A reconstruction can break the harness rather than the game.**
   `src/inject/dinput_hook.c` works by patching the game's IAT slot for
   `DirectInputCreateA`. A reconstructed `InitInput` that imported the symbol
