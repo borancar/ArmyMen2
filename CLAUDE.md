@@ -162,9 +162,15 @@ Done on all three configurations, and the results are worth quoting:
 
 | run | game's own log | pixels differing |
 |---|---|---|
-| Boot Camp, fullscreen | identical, 15 messages | 22 / 786,432 |
-| intro, `ARGS=-dbg` | identical, 6 messages | n/a, film is playing |
-| windowed, `-w` | identical, 7 messages | **0** |
+| Boot Camp, fullscreen | identical, 14 messages | 22 / 786,432 |
+| intro, `ARGS=-dbg` | identical, 5 messages | 81,494 — the film is playing |
+| windowed, `-w` | identical, 6 messages | **0** |
+
+The message counts drift by one or two between builds as reconstructed code
+takes over lines the original logged; what matters is that the two sides of a
+run agree, not the absolute number. The intro's pixel figure is meaningless by
+construction — two unsynchronised playbacks of the same movie — so its log is
+the only evidence it carries.
 
 The windowed frame is static, and it comes out *pixel-perfect* — which also
 settles the Boot Camp figure, since a scene with nothing moving gives exactly
