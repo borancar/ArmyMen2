@@ -57,13 +57,30 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CRT_START = 0x0045C000
 
 
+# Instructions that carry a 32-bit address as an immediate operand, so the
+# address sits wherever the instruction stream put it rather than on a 4-byte
+# boundary. 0x68 is `push imm32`; 0xB8-0xBF are `mov reg, imm32`.
+IMM32_OPCODES = {0x68} | set(range(0xB8, 0xC0))
+
+
 def referenced_addresses(img):
-    """Everything the image points at: call/jmp rel32 targets and stored VAs."""
+    """Everything the image points at: call/jmp rel32 targets and stored VAs.
+
+    UNALIGNED OPERANDS COUNT. CLAUDE.md records that a function address can
+    arrive as `push imm32`, so an aligned-dword scan under-reports references --
+    and this scan was making exactly that mistake. 0x0040E280 is a function
+    whose only reference is a pointer at 0x0040E436, which is 2 mod 4, so it was
+    invisible and the function before it was reported as 432 bytes when it is
+    128. Reading an immediate's opcode byte first keeps this from degenerating
+    into "every four consecutive bytes that look like an address".
+    """
     out = set()
     for _name, start, _end, data in img.sections:
         for j in range(len(data) - 5):
             if data[j] in (0xE8, 0xE9):
                 out.add(start + j + 5 + struct.unpack_from("<i", data, j + 1)[0])
+            elif data[j] in IMM32_OPCODES:
+                out.add(struct.unpack_from("<I", data, j + 1)[0])
         for j in range((-start) % 4, len(data) - 4, 4):
             out.add(struct.unpack_from("<I", data, j)[0])
     return out

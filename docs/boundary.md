@@ -12,10 +12,10 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 47 | 150 |
-| still boundary | 2 | 4 |
+| reconstructed | 47 | 148 |
+| still boundary | 3 | 6 |
 | game logic, incidental calls only | 81 | 122 |
-| **total** | **130** | **276** |
+| **total** | **131** | **276** |
 
 ## By library
 
@@ -25,7 +25,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 77 | 130 |  |
+| USER32 | 75 | 130 |  |
 | KERNEL32 | 26 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -41,7 +41,7 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
-| `MessageBoxA` | 2 |
+| `MessageBoxA` | 3 |
 
 Read that table with `docs/binarypatches.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
@@ -109,13 +109,13 @@ be mostly the game's own C++ objects, and that is no longer a guess:
 `tools/comcalls.py` now separates the two by how `this` is passed.
 COM is stdcall and pushes the interface as an explicit first
 argument; an i386 MSVC C++ virtual is thiscall and puts it in ecx.
-95 functions dispatch only that way and have been dropped from
+100 functions dispatch only that way and have been dropped from
 the bracket entirely -- they are destructor chains and object
 teardown, not boundary code.
 
 - `0x00412fe0` 1184B, 2 calls — locked x2
 - `0x0041b0e0` 1472B, 2 calls — IDirectDraw x1, primary x1
-- `0x0042ff60` 448B, 1 calls — IDirectDraw x1
+- `0x0042fff0` 0B, 1 calls — IDirectDraw x1
 
 The middle row is the work that remains. The bottom row is not work:
 those functions touch Win32 only through things every Windows program
@@ -130,14 +130,15 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x0044d110` | 1472 | 2 | 736 | GetActiveWindow, MessageBoxA |
-| `0x0044d3c0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
+| `0x0042f290` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
+| `0x0044d2e0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
+| `0x0044d3f0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 
 ## By library
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 70 |
+| USER32.dll | 130 | 68 |
 | KERNEL32.dll | 99 | 22 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
