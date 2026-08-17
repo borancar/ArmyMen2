@@ -308,6 +308,14 @@ static void install(void)
      * Note the counts are empty under it: the per-function counters are the
      * trace stubs, and those are installed by patch_replace along with
      * everything else. The evidence is the game's log, not the counters. */
+    /* Before the AM2_NOPATCH gate on purpose. This is not reconstruction --
+     * it undoes an edit made to the shipping binary -- so it has to apply to
+     * both sides of an A/B or the two runs are not the same scenario. Without
+     * it here, the original side would have no MULTIPLAYER button and the
+     * multiplayer path could never be compared at all. Still off unless
+     * AM2_MULTIPLAYER=1; see restore.c. */
+    restore_install();
+
     {
         const char *nopatch = getenv("AM2_NOPATCH");
 
@@ -334,9 +342,6 @@ static void install(void)
     dplay_install();
     startgame_install();
 
-    /* Not reconstruction: undoes edits made to the shipping binary. Off
-     * unless asked for; see restore.c. */
-    restore_install();
     movie_install();
     audio_install();
     palette_install();
