@@ -298,9 +298,233 @@ void __cdecl AcquireMouse(void)
         g_mouseAcquired = 1;
 }
 
+/* Read the mouse -- 0x00427070.
+ *
+ * BUFFERED, not polled state: InitInput sets a buffer size property on the
+ * device, so this drains a queue of DIDEVICEOBJECTDATA one event at a time
+ * until GetDeviceData reports none left. Each event is one axis or one button,
+ * never a snapshot, which is why the switch exists and why the per-poll deltas
+ * are cleared once at the top and then accumulated.
+ *
+ * That queue is also why tools/point.py has to close the loop on a screenshot:
+ * what arrives here are relative deltas that Wine has already scaled, so a
+ * computed absolute move overshoots. See CLAUDE.md.
+ *
+ * DIERR_INPUTLOST is expected, not exceptional -- it is what an alt-tab looks
+ * like -- so it re-acquires and retries once. Anything else fails the poll and
+ * leaves the state alone.
+ *
+ * The wheel does NOT set the moved flag, only X and Y do. Kept: something
+ * downstream distinguishes "the pointer moved" from "the wheel turned".
+ *
+ * Reached from PollInput, which is `call PollMouse; jmp PollKeyboard`. The
+ * per-event callee 0x00426F40 stays original -- it accumulates the deltas into
+ * an absolute cursor and clamps it to the screen, and its only Win32 contact is
+ * a GetTickCount. */
+static_assert(DIMOFS_X == 0 && DIMOFS_Y == 4 && DIMOFS_Z == 8, "axis offsets");
+static_assert(DIMOFS_BUTTON0 == 12 && DIMOFS_BUTTON1 == 13
+              && DIMOFS_BUTTON2 == 14, "button offsets");
+static_assert((uint32_t)DIERR_INPUTLOST == 0x8007001Eu, "DIERR_INPUTLOST");
+
+/* DirectInput marks a key or button down with the top bit of its byte. */
+#define BUTTON_DOWN 0x80u
+static_assert(sizeof(DIDEVICEOBJECTDATA) == 16, "DIDEVICEOBJECTDATA");
+
+#define g_mouseDX      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DX)
+#define g_mouseDY      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DY)
+#define g_mouseDZ      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DZ)
+#define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+#define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+#define g_mouseClaimed ((int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED)
+#define g_mouseMoved   (*(int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
+
+typedef void (__cdecl *am2_void_fn)(void);
+#define orig_mouse_event (*(am2_void_fn)ADDR_MOUSE_EVENT)
+
+/* One button event. `changed` is against the previous state rather than a
+ * simple "went down", so a release marks it too -- and only a release clears
+ * the claim the menus set. */
+static void MouseButton(int32_t n, uint32_t data)
+{
+    int32_t was = g_mouseButton[n];
+    int32_t now = (data & BUTTON_DOWN) ? 1 : 0;
+
+    g_mouseButton[n]  = now;
+    if (!now)
+        g_mouseClaimed[n] = 0;
+    g_mouseChanged[n] = (now != was);
+}
+
+void __cdecl PollMouse(void)
+{
+    DIDEVICEOBJECTDATA od;
+    DWORD              count = 1;
+
+    if (!g_diMouse)
+        return;
+    if (!g_mouseAcquired)
+        AcquireMouse();
+
+    g_mouseDX = g_mouseDY = g_mouseDZ = 0;
+    g_mouseChanged[0] = g_mouseChanged[1] = g_mouseChanged[2] = 0;
+    g_mouseMoved = 0;
+
+    for (;;) {
+        HRESULT hr = IDirectInputDevice_GetDeviceData(g_diMouse, sizeof(od),
+                                                      &od, &count, 0);
+        if ((uint32_t)hr == (uint32_t)DIERR_INPUTLOST) {
+            g_mouseAcquired = 0;
+            AcquireMouse();
+            if (IDirectInputDevice_GetDeviceData(g_diMouse, sizeof(od),
+                                                 &od, &count, 0) != DI_OK) {
+                g_mouseAcquired = 0;
+                return;
+            }
+        } else if (hr != DI_OK) {
+            return;
+        }
+
+        if (count == 0)
+            return;
+
+        switch (od.dwOfs) {
+        case DIMOFS_X:
+            g_mouseMoved = 1;
+            g_mouseDX = (int32_t)od.dwData;
+            break;
+        case DIMOFS_Y:
+            g_mouseMoved = 1;
+            g_mouseDY = (int32_t)od.dwData;
+            break;
+        case DIMOFS_Z:
+            g_mouseDZ = (int32_t)od.dwData;
+            break;
+        case DIMOFS_BUTTON0: MouseButton(0, od.dwData); break;
+        case DIMOFS_BUTTON1: MouseButton(1, od.dwData); break;
+        case DIMOFS_BUTTON2: MouseButton(2, od.dwData); break;
+        default:
+            /* Every other offset falls straight through to the event hook,
+             * which is what the jump table\'s default entry points at. */
+            break;
+        }
+
+        orig_mouse_event();
+    }
+}
+
+/* Read the keyboard -- 0x004272D0.
+ *
+ * The other end of the input channel from InitInput: that one creates the
+ * device, this one reads it, every frame, through IDirectInputDevice. It is the
+ * densest boundary function left in the image at 112 bytes per DirectX call.
+ *
+ * It was invisible until now. docs/functions.tsv runs it together with the
+ * mouse poller, and between the two sits a jump table that linear disassembly
+ * cannot get past, so the pair looked like one 944-byte function with five
+ * scattered DirectInput calls. See tools/merges.py.
+ *
+ * DOUBLE-BUFFERED, and the swap is the first thing it does. Two adjacent
+ * 256-byte buffers with two pointers into them; the pointers exchange, so what
+ * was current becomes previous and the fresh read lands on top of the older
+ * copy. Edge detection later is then just a byte compare between the two.
+ *
+ * A failed read is retried exactly once, through Acquire -- which is the normal
+ * path after an alt-tab, not an error. If the retry fails the state is left as
+ * it was rather than cleared, so keys do not spuriously release while the
+ * window is inactive.
+ *
+ * MODIFIERS ARE MIRRORED, not merged. If either shift is down the other is made
+ * to match, and likewise for control and alt, so the rest of the game can test
+ * one scancode without caring which key the player used. The direction matters:
+ * the left key wins if it is down, otherwise the right one is copied leftward.
+ *
+ * The repeat is 250 ms to the first repeat and 150 ms between, both measured
+ * against GetTickCount. Note what the not-yet-due branch does NOT do: it leaves
+ * the pressed flag alone rather than clearing it, so a caller that has not
+ * consumed the previous press still sees it. Only a key that is physically up
+ * clears the flag.
+ *
+ * The devices come from the globals rather than from an import, so the calls go
+ * through whatever src/inject/dinput_hook.c wrapped them with -- which is what
+ * makes injected input keep working. See the note at the top of this file. */
+static_assert(DIK_LSHIFT == 0x2A && DIK_RSHIFT == 0x36, "shift scancodes");
+static_assert(DIK_LCONTROL == 0x1D && DIK_RCONTROL == 0x9D, "control scancodes");
+static_assert(DIK_LMENU == 0x38 && DIK_RMENU == 0xB8, "alt scancodes");
+
+#define KEY_STATES        256
+#define KEY_DOWN          BUTTON_DOWN
+#define REPEAT_FIRST_MS   250u
+#define REPEAT_NEXT_MS    150u
+
+#define g_curKeys    (*(uint8_t **)(uintptr_t)ADDR_INPUT_CURSOR_A)
+#define g_prevKeys   (*(uint8_t **)(uintptr_t)ADDR_INPUT_CURSOR_B)
+#define g_keyRepeat  ((uint32_t *)(uintptr_t)ADDR_KEY_REPEAT_AT)
+#define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)
+
+/* If `a` is down, make `b` match it; otherwise if `b` is down, make `a` match.
+ * The original writes this out three times. */
+static void MirrorModifier(uint8_t *keys, uint32_t a, uint32_t b)
+{
+    if (keys[a] & KEY_DOWN)
+        keys[b] = keys[a];
+    else if (keys[b] & KEY_DOWN)
+        keys[a] = keys[b];
+}
+
+void __cdecl PollKeyboard(void)
+{
+    uint8_t  *keys, *prev;
+    uint32_t  now;
+    int32_t   i;
+
+    if (!g_diKeyboard)
+        return;
+
+    /* Exchange the buffers, then read into what is now the current one. */
+    keys       = g_prevKeys;
+    g_prevKeys = g_curKeys;
+    g_curKeys  = keys;
+
+    if (IDirectInputDevice_GetDeviceState(g_diKeyboard, KEY_STATES, keys) != DI_OK) {
+        if (IDirectInputDevice_Acquire(g_diKeyboard) != DI_OK)
+            return;
+        if (IDirectInputDevice_GetDeviceState(g_diKeyboard, KEY_STATES,
+                                              g_curKeys) != DI_OK)
+            return;
+    }
+
+    keys = g_curKeys;
+    MirrorModifier(keys, DIK_LSHIFT, DIK_RSHIFT);
+    MirrorModifier(keys, DIK_LCONTROL, DIK_RCONTROL);
+    MirrorModifier(keys, DIK_LMENU, DIK_RMENU);
+
+    now = GetTickCount();
+    for (i = 0; i < KEY_STATES; i++) {
+        keys = g_curKeys;
+        if (!(keys[i] & KEY_DOWN)) {
+            g_keyPressed[i] = 0;
+            continue;
+        }
+        prev = g_prevKeys;
+        if ((prev[i] ^ keys[i]) & KEY_DOWN) {
+            /* Newly down this frame. */
+            g_keyPressed[i] = 1;
+            g_keyRepeat[i]  = now + REPEAT_FIRST_MS;
+        } else if (now > g_keyRepeat[i]) {
+            g_keyPressed[i] = 1;
+            g_keyRepeat[i]  = now + REPEAT_NEXT_MS;
+        }
+    }
+}
+
 int device_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_POLL_MOUSE, (const void *)PollMouse,
+                        "PollMouse", 0);
+    rc |= patch_replace(ADDR_POLL_KEYBOARD, (const void *)PollKeyboard,
+                        "PollKeyboard", 0);
 
     rc |= patch_replace(ADDR_INIT_DIRECTDRAW, (const void *)InitDirectDraw,
                         "InitDirectDraw", 1);

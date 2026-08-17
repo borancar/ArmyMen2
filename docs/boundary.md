@@ -12,9 +12,9 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 45 | 148 |
+| reconstructed | 46 | 149 |
 | still boundary | 2 | 4 |
-| game logic, incidental calls only | 83 | 124 |
+| game logic, incidental calls only | 82 | 123 |
 | **total** | **130** | **276** |
 
 ## By library
@@ -26,7 +26,7 @@ this library ours yet?
 | library | reconstructed | sites | |
 |---|---:|---:|---|
 | USER32 | 76 | 130 |  |
-| KERNEL32 | 25 | 99 |  |
+| KERNEL32 | 26 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
 | SMACKW32 | 9 | 9 | **complete** |
@@ -92,8 +92,8 @@ Treat the number below as "known to be outstanding", never as
 
 | | functions | call sites |
 |---|---:|---:|
-| known DirectX, reconstructed | 28 | 83 |
-| known DirectX, still to do | 7 | 12 |
+| known DirectX, reconstructed | 30 | 88 |
+| known DirectX, still to do | 5 | 7 |
 
 And the bracket the caveat above implies. Counting every function
 that dispatches through a vtable at all, whether or not the object
@@ -101,8 +101,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 70 |
-| any COM dispatch, not | 10 |
+| any COM dispatch, reconstructed | 72 |
+| any COM dispatch, not | 8 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -113,10 +113,8 @@ argument; an i386 MSVC C++ virtual is thiscall and puts it in ecx.
 the bracket entirely -- they are destructor chains and object
 teardown, not boundary code.
 
-- `0x004272d0` 0B, 3 calls — input device x3
 - `0x00412fe0` 1184B, 2 calls — locked x2
 - `0x0041b0e0` 1472B, 2 calls — IDirectDraw x1, primary x1
-- `0x00427070` 944B, 2 calls — input device x2
 - `0x0041d060` 432B, 1 calls — offscreen x1
 - `0x0042da30` 272B, 1 calls — back buffer x1
 - `0x0042ff60` 448B, 1 calls — IDirectDraw x1

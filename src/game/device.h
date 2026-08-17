@@ -69,6 +69,15 @@ void __cdecl ShutdownInput(void);
  * failing is ordinary rather than exceptional. */
 void __cdecl AcquireMouse(void);
 
+/* Original: 0x00427070, reached from PollInput. Drain the mouse's buffered
+ * event queue into the per-poll deltas and the button state. */
+void __cdecl PollMouse(void);
+
+/* Original: 0x004272D0, reached from PollInput. Read the keyboard into the
+ * double-buffered state array, re-acquiring once if the read fails, mirror the
+ * left/right modifier pairs, and run the 250/150 ms auto-repeat. */
+void __cdecl PollKeyboard(void);
+
 int device_install(void);
 
 #ifdef __cplusplus

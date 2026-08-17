@@ -349,8 +349,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
-  `OpenAudioStream`, `AudioTimerProc` and the comm object's constructor and
-  destructor. The window, the message queue, the display mode,
+  `OpenAudioStream`, `AudioTimerProc`, both input pollers and the comm
+  object's constructor and destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -394,7 +394,6 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   |---|---|
   | ~~`0x0042BEA0`~~ | **Done.** The entry was four functions; `RestoreTileSet` at `0x0042C0E0` (624B, `Lock`+`Unlock`) held both COM calls and is reconstructed in `mapdraw.cpp`. See the merge note under boundary density |
   | ~~`0x0040CED0`~~ | **Done.** Two functions: `AudioTimerProc` at `0x0040D020` (1456 B, the streaming refill) and `OpenAudioStream` at `0x0040CED0` (336 B, opens the `.WAV` and creates the buffer). Both reconstructed; the whole audio stream is ours |
-  | `0x00427070` 944B, 5 | input-to-command translation; no strings |
   | `0x00412FE0` 1184B, 4 | menu logic; no strings |
   | `0x0042FF60` 448B, 1 | starts a multiplayer game — it calls `CommOpenSession`, `CommCreatePlayer` and `PlaySoundAt`, all of which are ours. Genuinely menu logic |
   | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042D6D0` | ≥270 B per COM call and no strings to name them by. Unverified descriptions; treat as unread |
@@ -409,7 +408,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `docs/binarypatches.md` explains why they cannot fire.
 
   This claim is about the IAT only. DirectX reached through COM is a separate
-  count and is *not* finished: 6 functions with 12 calls on objects
+  count and is *not* finished: 5 functions with 7 calls on objects
   `tools/comcalls.py` can name, plus a share of the sites whose object it
   cannot. Do not read "the boundary is done" off this bullet alone.
 

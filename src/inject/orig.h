@@ -784,6 +784,28 @@
 #define ADDR_INPUT_CURSOR_B      0x005127CCu
 #define ADDR_INPUT_BUFFER_A      0x005125C8u
 #define ADDR_INPUT_BUFFER_B      0x005126C8u
+/* Auto-repeat state, one entry per DIK scancode. PollKeyboard writes both and
+ * 0x00427430 reads the second -- `KeyPressed(dik)` is `g_keyPressed[dik & 0xff]`,
+ * which is how the array's length and purpose were established. */
+#define ADDR_KEY_REPEAT_AT       0x005127D0u  /* uint32_t[256], GetTickCount due */
+#define ADDR_KEY_PRESSED         0x00512BD0u  /* int32_t[256] */
+/* Mouse state, all written by PollMouse and read by the menus and the game.
+ * The deltas are cleared at the top of every poll and the buffered events
+ * accumulated into them; 0x00426F40 turns them into an absolute cursor. */
+#define ADDR_MOUSE_DX            0x00485458u  /* int32_t, this poll */
+#define ADDR_MOUSE_DY            0x0048545Cu  /* int32_t */
+#define ADDR_MOUSE_DZ            0x00485460u  /* int32_t, the wheel */
+#define ADDR_MOUSE_BUTTON        0x00485470u  /* int32_t[3], 1 while down */
+#define ADDR_MOUSE_CHANGED       0x0048547Cu  /* int32_t[3], differs from last */
+/* int32_t[3]. Menu code sets one when it takes responsibility for a click
+ * (0x004142C8); PollMouse clears it when the button comes back up. */
+#define ADDR_MOUSE_CLAIMED       0x00485488u
+#define ADDR_MOUSE_MOVED         0x00485494u  /* int32_t, X or Y moved */
+#define ADDR_MOUSE_EVENT         0x00426F40u  /* void(void), after every event */
+/* PollInput is `call PollMouse; jmp PollKeyboard` and nothing else. */
+#define ADDR_POLL_INPUT          0x00427420u  /* void(void) */
+#define ADDR_POLL_MOUSE          0x00427070u  /* void(void) */
+#define ADDR_POLL_KEYBOARD       0x004272D0u  /* void(void) */
 #define ADDR_RELEASE_APP_MUTEX   0x0040B220u  /* void(void) */
 /* Look for the game CD: walk the logical drives, find one that is a CD-ROM and
  * whose volume label is ARMYMEN2, and remember where it is. */
