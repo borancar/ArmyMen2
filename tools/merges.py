@@ -44,6 +44,7 @@ and are meant to be. Read it as "at least this much", never as a full census.
 import collections
 import csv
 import os
+import re
 import struct
 import sys
 
@@ -103,12 +104,55 @@ def real_functions(img):
     return out
 
 
+def reconstructed():
+    """Addresses patch_replace installs over, read from the sources themselves.
+
+    Without this the --com ranking recommends work that is already done: it
+    reads comcalls.tsv, which describes the ORIGINAL image and has no idea what
+    has been replaced. That is not hypothetical either -- the first target this
+    tool proposed, 0x00445320, had been reconstructed as MovieApplyPalette for
+    some time. checkcom.py already did this; not carrying it over was the bug.
+    """
+    names = {}
+    pat = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+0x([0-9A-Fa-f]+)u?")
+    with open(os.path.join(REPO, "src", "inject", "orig.h")) as fh:
+        for line in fh:
+            m = pat.match(line.strip())
+            if m:
+                names[m.group(1)] = int(m.group(2), 16)
+
+    out = set()
+    game = os.path.join(REPO, "src", "game")
+    call = re.compile(r"patch_replace\(\s*(ADDR_[A-Z0-9_]+)")
+    for fn in os.listdir(game):
+        if fn.endswith(".cpp"):
+            with open(os.path.join(game, fn)) as fh:
+                for m in call.finditer(fh.read()):
+                    if m.group(1) in names:
+                        out.add(names[m.group(1)])
+
+    # NOT EVERY RECONSTRUCTION IS A PATCH. WndProc is reached only through the
+    # WNDCLASS field InitApplication fills in, so it is registered rather than
+    # detoured and appears in no patch_replace call -- while being as
+    # reconstructed as anything else. Reading the patch list alone therefore
+    # reports its whole functions.tsv entry as outstanding COM work.
+    #
+    # Kept as an explicit list because there is exactly one of them and a
+    # heuristic for "installed some other way" would be guesswork. If a second
+    # appears, add it here; CLAUDE.md describes the shape to look for.
+    out.update(names[n] for n in ("ADDR_WND_PROC",) if n in names)
+    return out
+
+
 def com_sites():
     """{function address: [call site, ...]}, genuine COM dispatch only."""
     out = collections.defaultdict(list)
     with open(os.path.join(REPO, "docs", "comcalls.tsv")) as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
-            if row.get("abi") == "thiscall":
+            # Require CONFIRMED COM. Excluding only "thiscall" lets the
+            # unclassified through as if they were DirectX, and that is how this
+            # tool first recommended a batch of script.cpp virtuals.
+            if row.get("abi") != "stdcall":
                 continue
             func = int(row["func"], 16)
             if func and func < CRT_START:
@@ -144,7 +188,10 @@ def main():
         return 0
 
     sites = com_sites()
-    print("COM-bearing entries, density recomputed on the real function:\n")
+    done = reconstructed()
+    print("COM-bearing entries NOT yet reconstructed, density recomputed on the\n"
+          "real function. A split function counts as done only if that split is\n"
+          "itself patched -- the listed address being patched proves nothing.\n")
     print(f"{'listed':<12} {'real fn':<12} {'was':>10} {'now':>10}  sites")
     changed = []
     for addr, (starts, size) in merged.items():
@@ -155,6 +202,8 @@ def main():
             real, real_size = owner(starts, size, site)
             per[(real, real_size)].append(site)
         for (real, real_size), got in sorted(per.items()):
+            if real in done:
+                continue
             was = size / len(sites[addr])
             now = real_size / len(got)
             changed.append((now, addr, real, was, now, len(got)))

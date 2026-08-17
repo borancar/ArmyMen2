@@ -5,9 +5,9 @@ replaces. This counts them on both sides -- the original from
 docs/comcalls.tsv, ours by matching `IDirectSomething_Method(` in the
 function body -- and prints the pairs that disagree.
 
-It is a review aid, not a test, and it will not pass cleanly. Three things
-make it disagree without anything being wrong, and all three are worth knowing
-before reading its output:
+It is a review aid, not a test, and it will not pass cleanly. Two things make
+it disagree without anything being wrong, and both are worth knowing before
+reading its output. A third used to, and has been fixed instead:
 
   OURS LOWER, because the call moved into a helper or a loop. ClearSprite and
   ReleaseSprite share a FreeSpriteContents; DrawSeqBar does its three fills
@@ -15,10 +15,14 @@ before reading its output:
   ReleaseDevice, and StopAllSounds walks 73 slots through one StopIfPlaying.
   The calls are all there, just not once each in that function body.
 
-  ORIGINAL HIGHER, because docs/functions.tsv merges neighbours. It reports
-  0x0040DFC0 as 1008 bytes when the function is 226, so every COM site in the
-  next function is attributed to this one. Anything that looked like a merge
-  when it was reconstructed will show up here.
+  MERGED NEIGHBOURS -- no longer a reason, and worth saying so. This used to
+  read "original higher, because docs/functions.tsv merges neighbours", which
+  was true and was left as an excuse for years of noise. It cuts BOTH ways: a
+  site in a reconstructed function attributed to the merged entry makes the
+  original look emptier than it is, which is how RestoreTileSet came out 0
+  against 2 and looked like a reconstruction inventing COM calls. Sites are now
+  re-attributed to the real function through tools/merges.py, and that removed
+  two of the thirteen disagreements outright.
 
   ORIGINAL LOWER, because comcalls.py cannot always find the vtable register.
   It scans backwards from the call and stops at a `ret`, correctly -- a block
@@ -37,6 +41,9 @@ import csv
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import am2
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CRT_START = 0x0045C000
@@ -89,14 +96,28 @@ def main():
              for r in csv.DictReader(
                  open(os.path.join(REPO, "docs", "functions.tsv")), delimiter="\t")}
 
+    # comcalls.tsv files each site under its functions.tsv entry, and those
+    # entries merge neighbours -- so a site in a reconstructed function can be
+    # attributed to the merged address instead, and this reports the
+    # reconstruction as making COM calls its "original" does not. RestoreTileSet
+    # read 0 against 2 for exactly that. merges.py knows where the real
+    # boundaries are; re-attribute through it.
+    import merges
+    img = am2.Image()
+    merged = merges.real_functions(img)
+
     per_fn = collections.Counter()
     with open(os.path.join(REPO, "docs", "comcalls.tsv")) as fh:
         for r in csv.DictReader(fh, delimiter="\t"):
-            if r.get("abi") == "thiscall":
-                continue            # a C++ virtual, not COM
+            if r.get("abi") != "stdcall":
+                continue            # a C++ virtual, or not decidable
             fn = int(r["func"], 16)
-            if fn and fn < CRT_START:
-                per_fn[fn] += 1
+            if not fn or fn >= CRT_START:
+                continue
+            if fn in merged:
+                starts, size = merged[fn]
+                fn, _real_size = merges.owner(starts, size, int(r["site"], 16))
+            per_fn[fn] += 1
 
     differ = []
     for va, (name, fname) in sorted(patched.items(), key=lambda kv: kv[1][0].lower()):

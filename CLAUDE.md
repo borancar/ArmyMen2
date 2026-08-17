@@ -325,10 +325,25 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   calls, are exactly those. `push 1` into slot 0 is the clearest tell: that is
   the MSVC scalar deleting destructor, and COM's slot 0 is `QueryInterface`,
   which takes three arguments. `tools/comcalls.py` records this as its `abi`
-  column; 90 of 353 in-game sites are C++ rather than COM.
+  column; **145 of 353 in-game sites are C++ rather than COM**.
+
+  That number was 90 until the classifier learned its second tell. It looked for
+  `push <obj>` (COM) and for the object already being in `ecx` (C++), and gave
+  up on anything else — but a virtual method that takes ARGUMENTS pushes those
+  arguments and then does `mov ecx, <obj>` immediately before the call, so it
+  showed both patterns and landed in `?`. That bucket was 56 sites, 45 of them
+  in `script.cpp..unit.cpp`, i.e. the engine's own object model.
+
+  The rule that resolves it: whichever appears CLOSEST to the call wins, because
+  that is the one establishing the convention — COM pushes `this` last, thiscall
+  loads `ecx` last. `?` went from 56 sites to 1, and **`stdcall` did not move at
+  all**, which is the check that matters: the change only reclassified unknowns
+  and took nothing out of the COM set.
 - The Win32/DirectX boundary is inventoried and being worked outward-in: 122
-  functions below the CRT touch the import table (`docs/imports.tsv`) and 110
-  contain genuine COM dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
+  functions below the CRT touch the import table (`docs/imports.tsv`) and 77
+  contain genuine COM dispatch (`docs/comcalls.tsv`) — that second figure was
+  110 before the ABI classifier was fixed, and the 33 that left were never
+  boundary code at all. Done so far: `WinMain`,
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
@@ -393,9 +408,16 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `docs/binarypatches.md` explains why they cannot fire.
 
   This claim is about the IAT only. DirectX reached through COM is a separate
-  count and is *not* finished: 10 functions with 30 calls on objects
-  `tools/comcalls.py` can name, plus an unmeasured share of the 182 sites whose
-  object it cannot. Do not read "the boundary is done" off this bullet alone.
+  count and is *not* finished: 7 functions with 24 calls on objects
+  `tools/comcalls.py` can name, plus a share of the sites whose object it
+  cannot. Do not read "the boundary is done" off this bullet alone.
+
+  The outer bracket — every function with any unreconstructed COM dispatch —
+  is now **9**, down from 42, because the classifier fix moved 33 pure-C++
+  functions out of it. Ranked by density with merged sizes corrected there are
+  12 real functions left and **not one is under 50 bytes per call site**; the
+  densest is 146. By this project's own threshold there is no remaining COM
+  function that is boundary code rather than game logic holding a handle.
 - **A function address can arrive as `push imm32`, so an aligned-dword scan
   under-reports references.** Menu handlers in this binary are registered by
   pushing the function as an argument — `push 0x42ecf0; push 0x20; push 0x51`
@@ -520,6 +542,22 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   threshold. The entry is four functions; the one holding both calls is
   `RestoreTileSet` at `0x0042C0E0`, 624 B, a file-to-surface loader, and it is
   now reconstructed. Run `tools/merges.py --com` before ranking anything.
+
+  **A tool that recommends targets has to know what is already done, and three
+  separate ways of not knowing all bit within an hour of writing this one.** It
+  first proposed `0x00445320`, which had been `MovieApplyPalette` for some time,
+  because it ranked straight out of `comcalls.tsv` — a description of the
+  ORIGINAL image, which has no idea what has been replaced. Then, once it read
+  the patch list, it proposed a batch of `script.cpp..unit.cpp` virtuals,
+  because it excluded only `abi == "thiscall"` and let the unclassified through
+  as if unknown meant COM. Then it reported `WndProc`'s whole entry as
+  outstanding, because **not every reconstruction is a patch** — that one is
+  registered into the `WNDCLASS` and appears in no `patch_replace` call.
+
+  The shape is the same each time: the tool was measuring the binary when the
+  question was about the binary *minus what we have done to it*. Require
+  positive evidence (`abi == "stdcall"`, not "not thiscall"), and subtract the
+  reconstructed set by every route it can be installed through.
 
   Note the split points are only trusted when something *references* them.
   Linear disassembly desynchronises on data in `.text` and then invents `ret`s:

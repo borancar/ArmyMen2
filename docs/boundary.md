@@ -102,14 +102,14 @@ could be named, gives the other end of the range:
 | | functions |
 |---|---:|
 | any COM dispatch, reconstructed | 68 |
-| any COM dispatch, not | 42 |
+| any COM dispatch, not | 9 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
 `tools/comcalls.py` now separates the two by how `this` is passed.
 COM is stdcall and pushes the interface as an explicit first
 argument; an i386 MSVC C++ virtual is thiscall and puts it in ecx.
-63 functions dispatch only that way and have been dropped from
+88 functions dispatch only that way and have been dropped from
 the bracket entirely -- they are destructor chains and object
 teardown, not boundary code.
 

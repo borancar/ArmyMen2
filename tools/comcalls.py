@@ -194,10 +194,23 @@ def call_abi(insns, i, obj_reg):
             op = insn.operands[0]
             if op.type == OP_REG and insn.reg_name(op.reg) == obj_reg:
                 return "stdcall"
-        # Anything that redefines the object register ends the window: what is
-        # pushed beyond this point is not the same pointer.
         if insn.mnemonic == "mov" and len(insn.operands) == 2:
-            dst = insn.operands[0]
+            dst, src = insn.operands
+            # `mov ecx, <object>` is thiscall being set up, and it settles the
+            # question even when something was pushed as well -- those pushes
+            # are the method's own arguments. Whichever of the two appears
+            # CLOSEST to the call wins, because that is the one establishing the
+            # convention: COM pushes `this` last, thiscall loads ecx last.
+            #
+            # Without this every virtual method that takes an argument lands in
+            # "?", and "?" was 56 sites -- 45 of them in script.cpp..unit.cpp,
+            # i.e. the engine's own object model. Anything ranking targets by
+            # COM density then floods its top with game logic.
+            if (dst.type == OP_REG and insn.reg_name(dst.reg) == "ecx"
+                    and src.type == OP_REG and insn.reg_name(src.reg) == obj_reg):
+                return "thiscall"
+            # Anything that redefines the object register ends the window: what
+            # is pushed beyond this point is not the same pointer.
             if dst.type == OP_REG and insn.reg_name(dst.reg) == obj_reg:
                 break
     return "thiscall" if obj_reg == "ecx" else "?"
