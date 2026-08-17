@@ -53,9 +53,12 @@ static inline LPDIRECTPLAY4A *DirectPlaySlot(void *comm)
     return (LPDIRECTPLAY4A *)((uint8_t *)comm + COMM_OFF_DPLAY);
 }
 
-/* Both defined further down; called from here. */
+/* All defined further down; called from here. */
 int32_t __attribute__((thiscall)) CommOnConnected(void *self);
 int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
+int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
+                                                   HANDLE event, void *data,
+                                                   DWORD length);
 
 int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connection)
 {
@@ -836,12 +839,10 @@ static_assert(DPCAPS_ISHOST == 2, "DPCAPS_ISHOST");
 static_assert(sizeof(DPLCONNECTION) <= LOBBY_CONN_BUF_SIZE, "the 0x800 buffer");
 
 typedef void (__cdecl *am2_lobby_void_fn)(void);
-typedef int32_t (__attribute__((thiscall)) *am2_create_player_fn)(
-    void *comm, const char *name, int32_t a, int32_t b, int32_t c);
+/* CommCreatePlayer is reconstructed; called directly below. */
 #define orig_read_mp_maps    (*(am2_lobby_void_fn)ADDR_READ_MP_MAPS)
 #define orig_mark_lobbied    (*(am2_lobby_void_fn)ADDR_COMM_MARK_LOBBIED)
 #define orig_on_lobby_slave  (*(am2_lobby_void_fn)ADDR_ON_LOBBY_SLAVE)
-#define orig_create_player   (*(am2_create_player_fn)ADDR_COMM_CREATE_PLAYER)
 #define orig_apply_settings  (*(am2_lobby_void_fn)ADDR_APPLY_GAME_SETTINGS)
 
 /* Release the lobby interface and the connection buffer, in that order. Used
@@ -969,7 +970,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
                 ->dwCurrentPlayers;
     }
 
-    if (orig_create_player(g_commObject, playerName, 0, 0, 0) < 0)
+    if (CommCreatePlayer(g_commObject, playerName, NULL, NULL, 0) < 0)
         return 0;
 
     orig_log((const char *)(uintptr_t)
@@ -990,6 +991,89 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
         strcpy(slotName, playerName);
     }
     orig_apply_settings();
+    return 1;
+}
+
+/* Make our player -- 0x0040DE10, thiscall, `ret 0x10`.
+ *
+ * A local game short-circuits it: there is no DirectPlay to tell, so the
+ * hosting slot is simply marked taken with a player id of 1 and that is that.
+ * Everything below is the networked case.
+ *
+ * The DPNAME is built on the stack and only its short name is set, which is
+ * the name the player typed. hEvent defaults to the comm event when the caller
+ * passes none, so a player made without one still wakes the packet thread.
+ *
+ * Afterwards, host and joiner diverge. A host writes its own id into its slot
+ * and marks it taken; a joiner instead bumps the shared player count and says
+ * so in the log. Both then mark the comm object as joined and register the id.
+ *
+ * Not exercised -- it needs a session, and CommLobbyStart is one of the two
+ * callers, which needs a lobby. Read, not run. */
+static_assert(sizeof(DPNAME) == 0x10, "DPNAME");
+
+typedef void (__cdecl *am2_register_self_fn)(DPID id);
+#define orig_register_self (*(am2_register_self_fn)ADDR_COMM_REGISTER_SELF)
+#define g_defaultPlayerEvent (*(HANDLE *)(uintptr_t)ADDR_DEFAULT_PLAYER_EVT)
+
+int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
+                                                   HANDLE event, void *data,
+                                                   DWORD length)
+{
+    uint8_t        *self   = (uint8_t *)comm;
+    uint8_t        *shared = g_commObject;
+    LPDIRECTPLAY4A  dp;
+    DPNAME          who;
+    HRESULT         hr;
+
+    memset(&who, 0, sizeof who);
+    who.dwSize          = sizeof who;
+    who.lpszShortNameA  = (LPSTR)name;
+
+    /* Offline: nobody to tell, so just claim the slot. */
+    if (comm_u32(shared, COMM_OFF_LOCAL)) {
+        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+                         + COMM_SLOT_OFF_TAKEN) = 1;
+        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+                         + COMM_SLOT_OFF_ID) = 1;
+        comm_u32(self, COMM_OFF_PLAYER_MADE) = 1;
+        return 1;
+    }
+
+    dp = *DirectPlaySlot(shared);
+    if (!dp)
+        return 0;
+
+    if (!event)
+        event = g_defaultPlayerEvent;
+
+    hr = IDirectPlayX_CreatePlayer(dp, (LPDPID)(self + COMM_OFF_OUR_PLAYER_ID),
+                                   &who, event, data, length, 0);
+    if (hr != DP_OK) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_CREATE_PLAYER_FAIL, hr);
+        return 0;
+    }
+
+    if (comm_u32(self, COMM_OFF_IS_HOST)) {
+        comm_u32(self, COMM_OFF_PLAYER_MADE) = 1;
+    } else {
+        /* One more of us. */
+        comm_u32(shared, COMM_OFF_PLAYER_COUNT) += 1;
+        orig_log((const char *)(uintptr_t)ADDR_STR_NUM_PLAYERS,
+                 comm_u32(shared, COMM_OFF_PLAYER_COUNT));
+    }
+
+    if (comm_u32(self, COMM_OFF_IS_HOST)) {
+        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+                         + COMM_SLOT_OFF_ID) =
+            comm_u32(self, COMM_OFF_OUR_PLAYER_ID);
+        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+                         + COMM_SLOT_OFF_TAKEN) = 1;
+    }
+
+    comm_u32(shared, COMM_OFF_READY)  = 1;
+    comm_u32(shared, COMM_OFF_JOINED) = 1;
+    orig_register_self((DPID)comm_u32(shared, COMM_OFF_OUR_PLAYER_ID));
     return 1;
 }
 
@@ -1216,6 +1300,8 @@ int dplay_install(void)
                         "CommJoinSession", 1);
     rc |= patch_replace(ADDR_COMM_RECEIVE, (const void *)CommReceive,
                         "CommReceive", 5);
+    rc |= patch_replace(ADDR_COMM_CREATE_PLAYER, (const void *)CommCreatePlayer,
+                        "CommCreatePlayer", 4);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;

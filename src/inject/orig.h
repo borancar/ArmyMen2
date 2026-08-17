@@ -232,7 +232,12 @@
  * game through DirectPlay rather than the user starting it. */
 #define ADDR_COMM_LOBBY_START    0x0040ED10u  /* thiscall int32(this) */
 #define ADDR_READ_MP_MAPS        0x0043ECC0u  /* void(void), stays original */
-#define ADDR_COMM_CREATE_PLAYER  0x0040DE10u  /* thiscall int32(this,name,a,b,c) */
+#define ADDR_COMM_CREATE_PLAYER  0x0040DE10u  /* thiscall int32(this,name,evt,data,len) */
+#define ADDR_COMM_REGISTER_SELF  0x004027F0u  /* void(DPID), stays original */
+#define ADDR_DEFAULT_PLAYER_EVT  0x004F48C0u  /* HANDLE, used when none is given */
+#define COMM_OFF_PLAYER_MADE     0x3E4u
+#define COMM_OFF_JOINED          0x3DCu
+#define COMM_SLOT_OFF_TAKEN      0x050u   /* the field StartSelectedGame sets */
 #define ADDR_COMM_MARK_LOBBIED   0x0040F130u  /* void(void); sets comm+0x404 */
 #define ADDR_ON_LOBBY_SLAVE      0x00410F70u  /* void(void), stays original */
 #define COMM_OFF_LOBBY_BUF       0x3F0u   /* DPLCONNECTION, 0x800 bytes */
@@ -576,6 +581,8 @@
 #define ADDR_COMM_SEND_PROPERTY  0x0040FAA0u  /* thiscall int32(this, uint32) */
 #define ADDR_GUID_NULL           0x0046FD98u  /* all zeroes, as guidPlayer */
 #define ADDR_GUID_GAME_PROPERTY  0x0046F888u  /* {BDD4B95F-D35C-11D0-...} */
+#define ADDR_STR_CREATE_PLAYER_FAIL 0x00475248u
+#define ADDR_STR_NUM_PLAYERS     0x00475230u
 #define ADDR_STR_OPEN_FAILED     0x00475410u  /* " Open Session Failed returned %x \n" */
 #define ADDR_ENUM_SESSIONS_CB    0x0040E280u  /* LPDPENUMSESSIONSCALLBACK2 */
 /* The service-provider browser and its callback. The callback drops two
