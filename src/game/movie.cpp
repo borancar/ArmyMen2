@@ -14,6 +14,7 @@
  */
 
 #include "movie.h"
+#include "palette.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -27,6 +28,17 @@
 #define MOVIE_TIMER_ID 0x28u
 
 #define MOVIE_TIMER_RUN 0x0Cu   /* cleared when the last frame is reached */
+#define MOVIE_UNKNOWN14 0x14u
+#define MOVIE_SIZED     0x10u   /* non-zero when the caller gave a size */
+#define MOVIE_BIG       0x18u   /* selects which Smacker buffer size to ask for */
+#define MOVIE_UNKNOWN20 0x20u
+#define MOVIE_NAME      0x2Cu   /* the filename, copied in */
+#define MOVIE_SRC_X     0xACu
+#define MOVIE_SRC_Y     0xB0u
+#define MOVIE_SRC_W     0xB4u
+#define MOVIE_SRC_H     0xB8u
+#define MOVIE_WANT_W    0xBCu   /* -1 for "whatever the film is" */
+#define MOVIE_WANT_H    0xC0u
 #define MOVIE_DD_TYPE   0x24u   /* what SmackDDSurfaceType made of the surface */
 
 #define fld(m, off, type) (*(type *)((uint8_t *)(m) + (off)))
@@ -40,6 +52,10 @@
 /* smackw32 entry points, called through the game's IAT exactly as it does. */
 typedef void (__stdcall *am2_smack_close_fn)(void *smack);
 typedef void (__stdcall *am2_smack_frame_fn)(void *smack);
+typedef void *(__stdcall *am2_smack_open_fn)(const char *name, uint32_t flags,
+                                             uint32_t extra);
+typedef uint32_t (__stdcall *am2_smack_ddtype_fn)(void *surface);
+typedef void (__stdcall *am2_smack_use_dsound_fn)(void *dsound);
 typedef void (__stdcall *am2_smack_tobuffer_fn)(void *smack, uint32_t left,
                                                 uint32_t top, uint32_t pitch,
                                                 uint32_t destHeight, void *dest,
@@ -51,6 +67,17 @@ typedef void (__stdcall *am2_smack_volumepan_fn)(void *smack, uint32_t trackFlag
 #define smack_tobuffer  (*(am2_smack_tobuffer_fn *)(uintptr_t)ADDR_IAT_SMACK_TO_BUFFER)
 #define smack_doframe   (*(am2_smack_frame_fn *)(uintptr_t)ADDR_IAT_SMACK_DO_FRAME)
 #define smack_nextframe (*(am2_smack_frame_fn *)(uintptr_t)ADDR_IAT_SMACK_NEXT_FRAME)
+#define smack_open      (*(am2_smack_open_fn *)(uintptr_t)ADDR_IAT_SMACK_OPEN)
+#define smack_ddtype    (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_DDTYPE)
+#define smack_use_dsound (*(am2_smack_use_dsound_fn *)(uintptr_t)ADDR_IAT_SMACK_USE_DSOUND)
+
+/* Smack handle fields used only by the opener. */
+#define SMACK_WIDTH 0x004u
+
+typedef LPDIRECTDRAWSURFACE (__cdecl *am2_make_surface_fn)(int32_t w, int32_t h);
+#define orig_make_surface (*(am2_make_surface_fn)ADDR_MOVIE_MAKE_SURFACE)
+#define g_movieDSound (*(void **)(uintptr_t)ADDR_MOVIE_DSOUND)
+#define g_soundReady  (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
 
 /* Still in the original image: the palette apply and the blit to screen are
  * game logic, and the timer callback that drives all this is never ours. */
@@ -106,6 +133,90 @@ void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume)
     for (i = 0, track = SMACK_TRACK_FIRST; i < SMACK_TRACK_COUNT; i++, track <<= 1)
         smack_volumepan(fld(movie, MOVIE_SMACK, void *), track,
                         (uint32_t)volume, SMACK_PAN_CENTRE);
+}
+
+/* Original: 0x00444FC0, 1 call site. Open a .SMK and get ready to play it.
+ *
+ * `wantW` of -1 means "whatever size the film is"; anything else is a requested
+ * extent, and the source rectangle is then the caller's rather than the film's.
+ * `big` picks between two Smacker buffer sizes -- the larger one is roughly
+ * double, which is what a full-screen movie needs and a corner inset does not.
+ *
+ * Handing Smacker the DirectSound object is done once for the whole process
+ * rather than once per movie, which is what the flag guards. It is also the
+ * only place DirectSound appears outside device.cpp, and it is skipped entirely
+ * when there is no DirectSound to hand over -- as here, where there is none.
+ *
+ * Returns `this`, in the way a C++ constructor-ish method does. */
+void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
+                                          int32_t wantW, int32_t wantH,
+                                          int32_t big)
+{
+    void *smack;
+
+    fld(movie, MOVIE_WANT_H, int32_t) = wantH;
+    fld(movie, MOVIE_BIG, int32_t)    = big;
+    fld(movie, MOVIE_WANT_W, int32_t) = wantW;
+
+    fld(movie, MOVIE_VTABLE, uint32_t)    = ADDR_MOVIE_VTABLE;
+    fld(movie, MOVIE_ACTIVE, int32_t)     = 0;
+    fld(movie, MOVIE_TIMER_RUN, int32_t)  = 0;
+    fld(movie, MOVIE_SIZED, int32_t)      = 0;
+    fld(movie, MOVIE_UNKNOWN14, int32_t)  = 0;
+    fld(movie, MOVIE_SRC_X, int32_t)      = 0;
+    fld(movie, MOVIE_SRC_Y, int32_t)      = 0;
+    fld(movie, MOVIE_SRC_W, int32_t)      = 0;
+    fld(movie, MOVIE_SRC_H, int32_t)      = 0;
+    fld(movie, MOVIE_TIMER_ID, uint32_t)  = 0;
+    fld(movie, MOVIE_SMACK, void *)       = NULL;
+    fld(movie, MOVIE_UNKNOWN20, int32_t)  = 0;
+
+    strcpy((char *)movie + MOVIE_NAME, name);
+
+    if (fld(movie, MOVIE_WANT_W, int32_t) != -1)
+        fld(movie, MOVIE_SIZED, int32_t) = 1;
+
+    /* Once per process, and only if there is a DirectSound to give. */
+    if (!g_soundReady && g_movieDSound) {
+        smack_use_dsound(g_movieDSound);
+        g_soundReady = 1;
+    }
+
+    fld(movie, MOVIE_SRC_X, int32_t) = 0;
+    fld(movie, MOVIE_SRC_Y, int32_t) = 0;
+
+    smack = smack_open(name, big ? 0x1FE440u : 0x000FE040u, 0xFFFFFFFFu);
+    fld(movie, MOVIE_SMACK, void *) = smack;
+
+    if (smack) {
+        if (fld(movie, MOVIE_SIZED, int32_t)) {
+            /* The caller named an extent, so the source rectangle is inclusive
+             * of the last pixel rather than one past it. */
+            fld(movie, MOVIE_SRC_W, int32_t) =
+                fld(movie, MOVIE_WANT_W, int32_t) - 1;
+            fld(movie, MOVIE_SRC_H, int32_t) =
+                fld(movie, MOVIE_WANT_H, int32_t) - 1;
+        } else {
+            fld(movie, MOVIE_SRC_W, int32_t) = fld(smack, SMACK_WIDTH, int32_t);
+            fld(movie, MOVIE_SRC_H, int32_t) = fld(smack, SMACK_HEIGHT, int32_t);
+        }
+    }
+
+    /* Note this runs whether or not the open succeeded, on a source rectangle
+     * that is still zero if it did not. Kept as written. */
+    fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE) =
+        orig_make_surface(fld(movie, MOVIE_SRC_W, int32_t) -
+                          fld(movie, MOVIE_SRC_X, int32_t),
+                          fld(movie, MOVIE_SRC_H, int32_t) -
+                          fld(movie, MOVIE_SRC_Y, int32_t));
+    fld(movie, MOVIE_DD_TYPE, uint32_t) =
+        smack_ddtype(fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE));
+
+    /* Called with `this` in ecx, and ignores it -- it reads only globals, takes
+     * no stack arguments and ends in a plain `ret`, so our cdecl declaration of
+     * it is ABI-identical. */
+    SnapshotSystemPalette();
+    return movie;
 }
 
 /* Original: 0x00445600, 2 call sites. Tell the window the movie ended.
@@ -201,5 +312,6 @@ int movie_install(void)
                         "MovieDrawFrame", 1);
     rc |= patch_replace(ADDR_MOVIE_FINISHED, (const void *)MovieFinished,
                         "MovieFinished", 0);
+    rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);
     return rc;
 }

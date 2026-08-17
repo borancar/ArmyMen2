@@ -51,6 +51,12 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg);
  * which is how a finished cutscene becomes a game state change. */
 void __cdecl MovieFinished(void);
 
+/* Original: 0x00444FC0, 1 call site. Open a .SMK and prepare to play it. A
+ * `wantW` of -1 means "whatever size the film is". Returns `this`. */
+void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
+                                          int32_t wantW, int32_t wantH,
+                                          int32_t big);
+
 int movie_install(void);
 
 #ifdef __cplusplus

@@ -163,6 +163,12 @@
 #define ADDR_MOVIE_SET_VOLUME    0x00445280u  /* thiscall void(this, int32) */
 #define ADDR_MOVIE_VTABLE        0x0046FAB4u  /* stamped into the object */
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
+#define ADDR_MOVIE_OPEN          0x00444FC0u  /* thiscall this(this,name,w,h,big) */
+#define ADDR_MOVIE_MAKE_SURFACE  0x00445690u  /* surface *(w, h), stays original */
+#define ADDR_MOVIE_DSOUND        0x004FA46Cu  /* the DirectSound object, may be null */
+#define ADDR_IAT_SMACK_OPEN      0x0046F2C8u
+#define ADDR_IAT_SMACK_DDTYPE    0x0046F2CCu
+#define ADDR_IAT_SMACK_USE_DSOUND 0x0046F2C4u
 #define ADDR_MOVIE_DRAW_FRAME    0x004453C0u  /* thiscall void(this, arg) */
 #define ADDR_MOVIE_FINISHED      0x00445600u  /* void(void); posts WM_USER */
 #define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall, stays original */
