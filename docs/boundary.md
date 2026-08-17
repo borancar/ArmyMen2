@@ -93,7 +93,7 @@ Treat the number below as "known to be outstanding", never as
 | | functions | call sites |
 |---|---:|---:|
 | known DirectX, reconstructed | 28 | 83 |
-| known DirectX, still to do | 6 | 12 |
+| known DirectX, still to do | 7 | 12 |
 
 And the bracket the caveat above implies. Counting every function
 that dispatches through a vtable at all, whether or not the object
@@ -102,7 +102,7 @@ could be named, gives the other end of the range:
 | | functions |
 |---|---:|
 | any COM dispatch, reconstructed | 70 |
-| any COM dispatch, not | 9 |
+| any COM dispatch, not | 10 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -113,9 +113,10 @@ argument; an i386 MSVC C++ virtual is thiscall and puts it in ecx.
 the bracket entirely -- they are destructor chains and object
 teardown, not boundary code.
 
-- `0x00427070` 944B, 5 calls — input device x5
+- `0x004272d0` 0B, 3 calls — input device x3
 - `0x00412fe0` 1184B, 2 calls — locked x2
 - `0x0041b0e0` 1472B, 2 calls — IDirectDraw x1, primary x1
+- `0x00427070` 944B, 2 calls — input device x2
 - `0x0041d060` 432B, 1 calls — offscreen x1
 - `0x0042da30` 272B, 1 calls — back buffer x1
 - `0x0042ff60` 448B, 1 calls — IDirectDraw x1
@@ -141,12 +142,12 @@ function from game logic with a call in it.
 | dll | sites | reconstructed |
 |---|---:|---:|
 | USER32.dll | 130 | 69 |
-| KERNEL32.dll | 99 | 23 |
+| KERNEL32.dll | 99 | 22 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
 | smackw32.dll | 9 | 8 |
 | ole32.dll | 3 | 3 |
-| ADVAPI32.dll | 2 | 2 |
+| ADVAPI32.dll | 2 | 0 |
 
 ## The filesystem
 

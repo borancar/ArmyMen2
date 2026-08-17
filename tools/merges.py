@@ -70,12 +70,33 @@ def referenced_addresses(img):
 
 
 def split_points(img, addr, size, md):
-    """Addresses inside [addr, addr+size) that begin after `ret` + NOP padding."""
+    """Addresses inside [addr, addr+size) that look like a new function.
+
+    Two rules, and the second exists because the first is blind to data.
+
+    RET THEN PADDING. Walk the disassembly; a `ret` followed by 0x90 filler and
+    then an instruction starts something new.
+
+    PADDING ALONE, found by scanning bytes rather than instructions. MSVC parks
+    jump tables in .text between the switch that uses them and the next
+    function, and linear disassembly desynchronises on them -- so the rule above
+    never reaches the code on the far side. 0x00427070 is the example: a mouse
+    handler, a 7-entry jump table with a 15-byte index table after it, 0x90
+    filler, and then a keyboard handler at 0x004272D0 that the first rule cannot
+    see at all.
+
+    Padding is what makes this safe. The jump table's own targets are inside the
+    switch and follow ordinary code, so they are never preceded by filler; a
+    function that MSVC aligned always is. Combined with the xref requirement the
+    caller applies, a candidate has to be both aligned-with-padding and pointed
+    at by something before it counts.
+    """
+    out = []
     try:
         insns = list(md.disasm(img.read(addr, size), addr))
     except Exception:
-        return []
-    out, after_ret, pad = [], False, 0
+        insns = []
+    after_ret, pad = False, 0
     for insn in insns:
         if insn.mnemonic == "nop":
             pad += 1
@@ -84,7 +105,17 @@ def split_points(img, addr, size, md):
             out.append(insn.address)
         after_ret = insn.mnemonic.startswith("ret")
         pad = 0
-    return out
+
+    # Padding exists to align what follows, so an unaligned candidate is not one
+    # -- and that requirement is what makes a byte scan safe. 0x90 turns up
+    # inside immediate operands all the time (`mov eax, 0x90123456`), and
+    # without the alignment test those bytes invent functions: 0x00408A60 came
+    # out as 23 of them in 704 bytes before this line was added.
+    data = img.read(addr, size)
+    for j in range(1, len(data)):
+        if data[j] != 0x90 and data[j - 1] == 0x90 and (addr + j) % 4 == 0:
+            out.append(addr + j)
+    return sorted(set(out))
 
 
 def real_functions(img):
