@@ -108,6 +108,26 @@ def addr_table():
     return out
 
 
+def callers_of(img, target):
+    """Every `call rel32` that lands on `target`."""
+    import struct as _s
+    out = []
+    for _name, start, _end, data in img.sections:
+        for j in range(len(data) - 5):
+            if data[j] == 0xE8 and (start + j + 5
+                                    + _s.unpack_from("<i", data, j + 1)[0]) == target:
+                out.append(start + j)
+    return out
+
+
+def owner_of_addr(addr, sizes):
+    """The functions.tsv entry containing `addr`, or None."""
+    for fn, size in sizes.items():
+        if fn <= addr < fn + size:
+            return fn
+    return None
+
+
 def reconstructed(names):
     """Addresses the harness installs, read from the install sites themselves."""
     game = os.path.join(REPO, "src", "game")
@@ -211,6 +231,36 @@ def main():
          else real)[f] = v
 
     sites = lambda d: sum(len(v) for v in d.values())
+
+    # The other ways out, each counted the same way: a site is outstanding only
+    # if the function holding it is not reconstructed.
+    # An import by ordinal shows up as a one-instruction thunk, and the thunk
+    # lives with the CRT rather than in game code -- so counting the recorded
+    # site answers about the thunk and not about anything that uses it. What
+    # matters is who CALLS the thunk. DSOUND.dll #1 is DirectSoundCreate, whose
+    # only caller is InitDirectSound.
+    ordinal_left = 0
+    for r in rows:
+        if not r["symbol"].startswith("#"):
+            continue
+        thunk = int(r["func"], 16)
+        for caller in callers_of(img, thunk):
+            fn = owner_of_addr(caller, sizes)
+            if fn is None:
+                continue
+            if fn in merged:
+                starts, size = merged[fn]
+                fn, _ = merges.owner(starts, size, caller)
+            if not is_done(fn):
+                ordinal_left += 1
+    dynamic_left = sum(1 for r in rows
+                       if r["symbol"] in ("LoadLibraryA", "LoadLibraryW",
+                                          "GetProcAddress")
+                       and int(r["func"], 16) < CRT_START
+                       and not is_done(owner_of(int(r["func"], 16),
+                                                int(r["site"], 16))))
+    com_sites_left = sum(len(v) for f, v in com.items() if not is_done(f))
+    delay = "none in this image"
     total_sites = sites(per_fn)
     total_com = unresolved = 0
     if os.path.exists(compath):
@@ -231,6 +281,38 @@ def main():
         w("Only game code is counted. The statically linked MSVC CRT above\n"
           f"{CRT_START:#x} reaches plenty of kernel32 itself and is replaced\n"
           "wholesale by libc rather than function by function.\n\n")
+
+        # Every mechanism by which this image can reach outside itself, and
+        # whether anything using it is still original. The per-symbol and
+        # per-slot tables below answer "how much is left" within a mechanism;
+        # this answers the prior question, which is whether the inventory can
+        # see the mechanism at all. tools/comcalls.py exists because the first
+        # version of this file could not see COM, and reported the boundary as
+        # nearly finished with 23 functions and 66 DirectX calls outside it.
+        w("## Ways out of the process\n\n")
+        w("Each mechanism this image can use to reach the outside world, and\n"
+          "whether anything still uses it from unreconstructed code. The tables\n"
+          "below measure how much is left WITHIN a mechanism; this one is about\n"
+          "whether a mechanism is being measured at all.\n\n")
+        w("| channel | how it is found | outstanding |\n|---|---|---|\n")
+        w(f"| named imports | `docs/imports.tsv` | {sites(real)} non-incidental "
+          f"site(s) |\n")
+        w(f"| imports by ordinal | `#N` in the same file, checked through the "
+          f"callers of its thunk | {ordinal_left} |\n")
+        w(f"| COM vtables | `docs/comcalls.tsv`, `stdcall` only | "
+          f"{com_sites_left} |\n")
+        w(f"| runtime resolution | `LoadLibraryA` + `GetProcAddress` sites | "
+          f"{dynamic_left} |\n")
+        w(f"| delay-loaded imports | PE delay-import directory | "
+          f"{delay} |\n")
+        w("\nThe six named-import sites are three `MessageBoxA` calls and the\n"
+          "`GetActiveWindow` each passes as its owner, and\n"
+          "`docs/binarypatches.md` shows nothing in the image can reach any of\n"
+          "them. The value of this table is not the zeroes -- it is that each\n"
+          "mechanism was looked for at all. `tools/comcalls.py` exists because\n"
+          "an earlier version of this file could not see COM and reported the\n"
+          "boundary as nearly finished with 23 functions and 66 DirectX calls\n"
+          "outside it.\n\n")
 
         w("## Where it stands\n\n")
         w("| | functions | import sites |\n|---|---:|---:|\n")

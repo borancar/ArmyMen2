@@ -8,6 +8,30 @@ Only game code is counted. The statically linked MSVC CRT above
 0x45c000 reaches plenty of kernel32 itself and is replaced
 wholesale by libc rather than function by function.
 
+## Ways out of the process
+
+Each mechanism this image can use to reach the outside world, and
+whether anything still uses it from unreconstructed code. The tables
+below measure how much is left WITHIN a mechanism; this one is about
+whether a mechanism is being measured at all.
+
+| channel | how it is found | outstanding |
+|---|---|---|
+| named imports | `docs/imports.tsv` | 6 non-incidental site(s) |
+| imports by ordinal | `#N` in the same file, checked through the callers of its thunk | 0 |
+| COM vtables | `docs/comcalls.tsv`, `stdcall` only | 0 |
+| runtime resolution | `LoadLibraryA` + `GetProcAddress` sites | 0 |
+| delay-loaded imports | PE delay-import directory | none in this image |
+
+The six named-import sites are three `MessageBoxA` calls and the
+`GetActiveWindow` each passes as its owner, and
+`docs/binarypatches.md` shows nothing in the image can reach any of
+them. The value of this table is not the zeroes -- it is that each
+mechanism was looked for at all. `tools/comcalls.py` exists because
+an earlier version of this file could not see COM and reported the
+boundary as nearly finished with 23 functions and 66 DirectX calls
+outside it.
+
 ## Where it stands
 
 | | functions | import sites |

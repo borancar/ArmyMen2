@@ -446,6 +446,25 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | ~~all of them~~ | **Done.** Every entry that was ever on this list is reconstructed — the last were `SetGamePalette` (`0x0041B0E0`) and `DrawMenuCursor` (`0x00412FE0`) |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 
+- **Ask what the inventory can SEE, and `docs/boundary.md` now answers that
+  first.** Its opening table lists every mechanism this image has for reaching
+  outside itself — named imports, imports by ordinal, COM vtables, runtime
+  resolution through `LoadLibraryA`/`GetProcAddress`, delay-loaded imports —
+  and what is outstanding on each. The zeroes are not the point; the list is.
+  `tools/comcalls.py` exists because an earlier `coverage.py` could not see COM
+  at all and called the boundary nearly finished with 23 functions and 66
+  DirectX calls outside it.
+
+  Two of those rows needed care to be true rather than merely green. An import
+  by ordinal appears as a one-instruction thunk that lives with the CRT, so
+  counting its recorded site answers about the thunk and not about anything
+  using it — `DSOUND.dll #1` is `DirectSoundCreate` and what matters is that
+  its only caller, `InitDirectSound`, is ours. And runtime resolution is a real
+  channel here: `DetectCpuSpeed` loads `cpuinf32.dll` and calls `wincpuid` and
+  `cpunormspeed` through pointers no static scan can follow. It is
+  reconstructed, so the channel is ours, but nothing about an import table
+  would have told you it existed.
+
 - **The import side is done, in the only sense the word can bear here.** Every
   Win32 call site in the image that can actually execute is now either inside
   reconstructed code or incidental — a `GetTickCount`, an `IntersectRect`, a
