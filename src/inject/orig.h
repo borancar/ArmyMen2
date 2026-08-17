@@ -140,6 +140,9 @@
 #define ADDR_FILL_SOUND_BUFFER   0x0040C440u  /* int32(buf, const void *, uint32) */
 #define ADDR_STR_SND_LOCK_FAIL   0x00474E6Cu  /* "Unable to lock sound buffer\n" */
 #define ADDR_STR_SND_NO_ARGS     0x00474E44u  /* "Fill sound buffer missing arguments\n" */
+#define ADDR_BLIT_CENTRED        0x00445500u  /* thiscall void(this, surface *) */
+#define BLIT_SRC_OFF_SURFACE     0x04u   /* the source, inside `this` */
+#define BLIT_SRC_OFF_DESC        0x1Cu   /* -> {?, width, height} */
 #define ADDR_DRAW_SEQ_BAR        0x004624A0u  /* void(x,y,colour,value,base) */
 #define ADDR_SEQ_BAR_BG          0x00502AD9u  /* uint8_t, the unfilled colour */
 #define ADDR_STR_SEQ_BLT_FAIL    0x0048CBE8u  /* "Couldn't Blt Seq Pixels\n" */

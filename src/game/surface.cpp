@@ -650,6 +650,58 @@ void __cdecl FreeMapSurfaces(void)
     }
 }
 
+/* Put a picture in the middle of the screen -- 0x00445500, thiscall.
+ *
+ * All of it is arithmetic around one Blt: the source is centred in the screen
+ * clip rectangle, `(right - left - width) / 2` on each axis, and blitted whole.
+ *
+ * The primary is special in the way it always is here. When the destination is
+ * the primary the client origin is added, because the primary is the whole
+ * desktop in a window and a rectangle in game coordinates would otherwise land
+ * somewhere else -- the same correction ClearSurface and ClearRegion make.
+ *
+ * DDBLT_ASYNC alongside DDBLT_WAIT is the original's. The two are less
+ * contradictory than they look -- WAIT governs what to do about a busy
+ * blitter, ASYNC asks to be queued -- and both are passed as written.
+ *
+ * FIDELITY NOTE: immediately before the call the original fetches the current
+ * movie, reads a field of it and compares it against zero, and never uses the
+ * answer. It is genuinely there and genuinely discarded, like the IsIconic in
+ * WndProc. There is nothing to write here that would have the same effect, so
+ * it is recorded rather than reproduced. */
+static_assert((DDBLT_WAIT | DDBLT_ASYNC) == 0x01000200, "the blit flags");
+
+#define g_originDx (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
+#define g_originDy (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
+
+void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest)
+{
+    const int32_t *desc =
+        *(const int32_t **)((uint8_t *)self + BLIT_SRC_OFF_DESC);
+    LPDIRECTDRAWSURFACE src =
+        *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE);
+    int32_t width  = desc[1];
+    int32_t height = desc[2];
+    RECT    to, from;
+
+    to.left = (g_screenClip->right - g_screenClip->left - width) / 2;
+    to.top  = (g_screenClip->bottom - g_screenClip->top - height) / 2;
+    if (dest == g_primarySurface) {
+        to.left += g_originDx;
+        to.top  += g_originDy;
+    }
+    to.right  = to.left + width;
+    to.bottom = to.top + height;
+
+    from.left   = 0;
+    from.top    = 0;
+    from.right  = width;
+    from.bottom = height;
+
+    IDirectDrawSurface_Blt(dest, &to, src, &from,
+                           DDBLT_WAIT | DDBLT_ASYNC, NULL);
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -682,6 +734,8 @@ int surface_install(void)
                         "ReloadBitmapSurface", 7);
     rc |= patch_replace(ADDR_DRAW_SEQ_BAR, (const void *)DrawSeqBar,
                         "DrawSeqBar", 5);
+    rc |= patch_replace(ADDR_BLIT_CENTRED, (const void *)BlitCentred,
+                        "BlitCentred", 1);
     rc |= patch_replace(ADDR_FREE_MAP_SURFACES, (const void *)FreeMapSurfaces,
                         "FreeMapSurfaces", 0);
     return rc;
