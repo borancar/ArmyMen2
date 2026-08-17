@@ -318,6 +318,14 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   configured and destroyed by reconstructed code, and the registry is opened
   and closed by ours. What still dispatches through COM is game logic holding a
   handle it did not make.
+- **A decline is worth revisiting when the reason was uncertainty rather than
+  scope.** `0x0040BCF0` sat on the list below for most of a session because its
+  position fields looked like they aliased — `[eax+0x12]` on one path and
+  `[eax+0x10]` on another, apparently two overlapping fields of one record. They
+  are not the same record: a lookup call between them reassigns `eax`, so one is
+  the game object's position and the other the sound's, and both are plain
+  `AM2_Point`. Reading it a second time took minutes. "I could not follow this"
+  ages differently from "this is game logic"; only the second is a decision.
 - **Read and deliberately left original.** These come back to the top of every
   candidate ranking, so they are listed here rather than re-read each time. All
   are game logic that happens to hold a device handle, and the standing brief
@@ -325,7 +333,6 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
   | | why |
   |---|---|
-  | `0x0040BCF0` 256B, 4 | 3D audio update: distance model decides, DirectSound only executes. Also unreachable here — it returns at instruction one while `ADDR_AUDIO_ENABLED` is clear — and its `+0x10`/`+0x12` word fields alias in a way that would be guesswork |
   | `0x0040B860` 144B, 2 | walks the dynamic sound table comparing names byte by byte |
   | `0x0040CED0` 1792B, 12 | the sound engine proper |
   | `0x0040B8F0` 1024B, 12 | sound playback dispatch |

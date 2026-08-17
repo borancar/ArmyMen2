@@ -102,6 +102,11 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
  * record, whose first field is the buffer -- not the buffer itself. */
 int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name);
 
+/* Original: 0x0040BCF0. Once a frame, give every playing dynamic sound a
+ * volume for where it is: silence past 800 units, otherwise the base volume
+ * less three per unit. A sound whose owner has gone is stopped instead. */
+void __cdecl Update3DAudioVolumes(void);
+
 int32_t __cdecl InitWaveSounds(void);
 void __cdecl FreeDynamicSounds(void);
 

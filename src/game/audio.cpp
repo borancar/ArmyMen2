@@ -15,6 +15,7 @@
  */
 
 #include "audio.h"
+#include "dist.h"
 #include "wavefile.h"
 #include "../inject/patch.h"
 
@@ -421,6 +422,102 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
     return 1;
 }
 
+/* Follow the sounds around -- 0x0040BCF0.
+ *
+ * Once a frame, every playing sound in the dynamic table is asked where it is
+ * and given a volume for it. Sixteen slots, from 1 rather than 0.
+ *
+ * Where a sound is comes from one of three places, in order: the object that
+ * made it, if that object is still alive; the position stored on the sound
+ * itself; or a default. An owner that has gone away is not a position at all --
+ * the sound is stopped and the slot cleared, which is how a sound outliving its
+ * source is cleaned up.
+ *
+ * The falloff is linear and blunt: silence past 800 units, and otherwise the
+ * base volume less three per unit of distance. DirectSound volume is in
+ * hundredths of a decibel and DSBVOLUME_MIN is -10000, which is the 0xFFFFD8F0
+ * the original pushes.
+ *
+ * WHY THIS WAS DECLINED ONCE AND IS NOT NOW. It reads a position from
+ * `[eax+0x12]` on one path and `[eax+0x10]` on another, which looked like two
+ * overlapping fields of one record and therefore like guesswork. They are not
+ * the same record: the lookup call in between reassigns eax, so +0x12 is the
+ * game object's position and +0x10 is the sound's. Both are AM2_Point, and
+ * ApproxDist -- already reconstructed -- takes exactly that.
+ *
+ * Unexercised: it returns at the first instruction while there is no audio. */
+static_assert(DSBSTATUS_PLAYING == 1, "DSBSTATUS_PLAYING");
+static_assert(DSBVOLUME_MIN == -10000, "DSBVOLUME_MIN");
+
+typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
+#define orig_lookup_uid (*(am2_lookup_uid_fn)ADDR_LOOKUP_BY_UID)
+#define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
+#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_DEFAULT_SOUND_POS)
+#define g_volumeAtZero  (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
+
+void __cdecl Update3DAudioVolumes(void)
+{
+    uint8_t **slot;
+
+    if (!g_audioEnabled)
+        return;
+
+    /* From the second slot, not the first -- 0x004FA3C4, not 0x004FA3C0. */
+    for (slot = (uint8_t **)(uintptr_t)(ADDR_SOUND_DYNAMIC + 4);
+         slot < (uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC_LAST;
+         slot++) {
+        uint8_t             *rec = *slot;
+        LPDIRECTSOUNDBUFFER  buf;
+        DWORD                status;
+        AM2_Point            where;
+        uint32_t             owner;
+        int32_t              dist;
+
+        if (!rec)
+            continue;
+        buf = *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER);
+        if (!buf)
+            continue;
+
+        IDirectSoundBuffer_GetStatus(buf, &status);
+        if (!(status & DSBSTATUS_PLAYING)) {
+            *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+            continue;
+        }
+
+        where = g_defaultPos;
+        owner = *(uint32_t *)(rec + SOUND_REC_OFF_OWNER);
+
+        if (owner) {
+            void *obj = orig_lookup_uid(owner);
+
+            if (!obj) {
+                /* Whatever was making this noise is gone. */
+                *(uint32_t *)(rec + SOUND_REC_OFF_OWNER) = 0;
+                IDirectSoundBuffer_Stop(
+                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
+                *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+                continue;
+            }
+            where = *(const AM2_Point *)((uint8_t *)obj + OBJ_OFF_POS);
+        } else if (((const AM2_Point *)(rec + SOUND_REC_OFF_POS))->x != 0) {
+            where = *(const AM2_Point *)(rec + SOUND_REC_OFF_POS);
+        }
+
+        /* A zero x means nowhere, and nowhere gets left alone -- note this
+         * path does NOT clear the active flag, unlike the two above. */
+        if (where.x == 0)
+            continue;
+
+        dist = ApproxDist(&g_listenerPos, &where);
+        if (dist > SOUND_3D_CUTOFF)
+            IDirectSoundBuffer_SetVolume(buf, DSBVOLUME_MIN);
+        else
+            IDirectSoundBuffer_SetVolume(
+                buf, g_volumeAtZero - dist * SOUND_3D_FALLOFF);
+    }
+}
+
 /* Load one wave into a DirectSound buffer -- 0x0040C530.
  *
  * The middle of the chain: InitWaveSounds picks the names, this makes a buffer
@@ -634,6 +731,8 @@ int audio_install(void)
                         "LoadWaveSound", 3);
     rc |= patch_replace(ADDR_FREE_DYN_SOUNDS, (const void *)FreeDynamicSounds,
                         "FreeDynamicSounds", 0);
+    rc |= patch_replace(ADDR_UPDATE_3D_AUDIO, (const void *)Update3DAudioVolumes,
+                        "Update3DAudioVolumes", 0);
     rc |= patch_replace(ADDR_SET_STREAM_VOLUME, (const void *)SetStreamVolume,
                         "SetStreamVolume", 1);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,

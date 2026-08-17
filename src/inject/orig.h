@@ -326,6 +326,17 @@
 #define ADDR_SOUND_DYNAMIC_LAST  0x004FA400u
 /* Bulk operations over those two tables. */
 #define ADDR_FREE_DYN_SOUNDS     0x0040B800u  /* void(void) */
+#define ADDR_UPDATE_3D_AUDIO     0x0040BCF0u  /* void(void) */
+#define ADDR_LISTENER_POS        0x00514E0Cu  /* AM2_Point, the ear */
+#define ADDR_DEFAULT_SOUND_POS   0x005125A0u  /* AM2_Point, used when a sound
+                                               * has neither owner nor place */
+#define ADDR_VOLUME_AT_ZERO      0x00512318u  /* int32_t, volume at no distance */
+#define SOUND_REC_OFF_POS        0x10u   /* AM2_Point */
+#define SOUND_REC_OFF_OWNER      0x14u   /* uid; the object making the sound */
+#define SOUND_REC_OFF_ACTIVE     0x18u
+#define OBJ_OFF_POS              0x12u   /* AM2_Point inside a game object */
+#define SOUND_3D_CUTOFF          0x320   /* silence beyond this */
+#define SOUND_3D_FALLOFF         3       /* volume lost per unit */
 #define ADDR_INIT_WAVE_SOUNDS    0x0040C710u  /* int32(void) */
 #define ADDR_LOAD_WAVE_SOUND     0x0040C530u  /* int32(void **slot, ds, name) */
 #define ADDR_READ_WAVE_FILE      0x0040C340u  /* int32(0,name,&fmt,&data,&len,&raw) */
