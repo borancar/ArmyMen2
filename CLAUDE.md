@@ -541,8 +541,24 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   the game failed. The reader writes both fields straight into that structure,
   which is why the original only assigns `dwSize` and `dwFlags` by hand.
 
-  Still not covered: the Lock/copy/Unlock inside `FillSoundBuffer`, which needs
-  a buffer somebody can read back.
+  A mission, not just the title screen, is what exercises the rest. Clicking
+  BOOT CAMP and then pressing `RETURN` at the briefing gives, over one run:
+
+  | function | calls |
+  |---|---:|
+  | `WaveReadFile` | 498 |
+  | `Update3DAudioVolumes` | 121 |
+  | `PlaySoundAt` | 35 |
+  | `WaveOpenFile`, `StartAudioStream`, `SetStreamVolume`, `RefillAudioBuffer` | 2 each |
+  | `InitDirectSound`, `InitWaveSounds`, `FillSoundBuffer` | 1 each |
+
+  `tools/ab.sh audio` drives that same sequence, so all of it is compared
+  against the original and not merely run.
+
+  Still at zero, and all of them teardown: `StopNamedSound`,
+  `FreeDynamicSounds`, `StopAllSounds`, `FreeSound`, `ReleaseSoundBuffers`,
+  `WaveCloseReadFile`. Leaving a mission cleanly is the obvious way to reach
+  them and has not been tried.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal
