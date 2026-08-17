@@ -142,6 +142,17 @@
  * Reconstructed in src/game/dplay.cpp. The GUIDs are the game's own copies.
  */
 #define ADDR_COMM_CREATE_DPLAY   0x0040DD20u  /* thiscall int32(this, void *conn) */
+/* Comm teardown: destroy the four mutex-guarded message lists, wake the packet
+ * thread, wait for it and close the handles. */
+#define ADDR_COMM_SHUTDOWN       0x004020A0u  /* void(void) */
+#define ADDR_DESTROY_MSG_LIST    0x00402170u  /* void(list *), stays original */
+#define ADDR_MSG_LIST_A          0x0048D8E8u
+#define ADDR_MSG_LIST_B          0x004F48C8u
+#define ADDR_MSG_LIST_C          0x0048D8D8u
+#define ADDR_MSG_LIST_D          0x004F8780u
+#define ADDR_COMM_EVENT          0x0048D8F8u  /* HANDLE, signalled to stop the thread */
+#define ADDR_COMM_EVENT_2        0x0048D8FCu  /* HANDLE */
+#define ADDR_PACKET_THREAD       0x004F48D8u  /* HANDLE */
 #define ADDR_CREATE_LOBBY        0x0040DDD0u  /* int32 __stdcall(LPDIRECTPLAYLOBBY3A *) */
 #define ADDR_CLSID_DIRECTPLAY    0x0046F6D8u  /* CLSID_DirectPlay */
 #define ADDR_IID_DIRECTPLAY4A    0x0046F6C8u  /* IID_IDirectPlay4A */

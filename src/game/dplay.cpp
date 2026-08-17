@@ -7,6 +7,10 @@
  * its entire outward network surface. See dplay.h for why that surface is two
  * functions long.
  *
+ * It also holds the comm subsystem's teardown, which is the other half of the
+ * same boundary: DirectPlay is created here and the threads that feed it are
+ * stopped here.
+ *
  * The identification came out of the GUIDs rather than out of any name. The
  * game carries its own copies in .rdata, and they are CLSID_DirectPlay with
  * IID_IDirectPlay4A, and CLSID_DirectPlayLobby with IID_IDirectPlayLobby3A.
@@ -35,6 +39,13 @@ static_assert(CLSCTX_INPROC_SERVER == 1, "CLSCTX_INPROC_SERVER");
 typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
 #define orig_drop_directplay (*(am2_comm_method_fn)ADDR_COMM_DROP_DPLAY)
 #define orig_comm_connected  (*(am2_comm_method_fn)ADDR_COMM_CONNECTED)
+
+typedef void (__cdecl *am2_destroy_list_fn)(void *list);
+#define orig_destroy_msg_list (*(am2_destroy_list_fn)ADDR_DESTROY_MSG_LIST)
+
+#define g_commEvent    (*(HANDLE *)(uintptr_t)ADDR_COMM_EVENT)
+#define g_commEvent2   (*(HANDLE *)(uintptr_t)ADDR_COMM_EVENT_2)
+#define g_packetThread (*(HANDLE *)(uintptr_t)ADDR_PACKET_THREAD)
 
 /* The interface pointer lives inside the comm object rather than in a global,
  * so it is reached through `this` like any other member. */
@@ -83,6 +94,45 @@ int32_t __stdcall CreateDirectPlayLobby(LPDIRECTPLAYLOBBY3A *out)
     return hr == S_OK;
 }
 
+/* Original: 0x004020A0, 1 call site. Shut the comm subsystem down.
+ *
+ * Four message lists go first -- each one closes its own mutex -- then the
+ * packet thread is woken by signalling its event and its exit code collected,
+ * and finally both event handles are closed.
+ *
+ * The wait is not really a wait. GetExitCodeThread is retried until the *call*
+ * succeeds, which it does immediately; the loop does not look at the code it
+ * gets back, so a thread still running reports STILL_ACTIVE and the log says it
+ * "exited" anyway. That is what the original does, and it is why the shutdown
+ * lines appear in every run's log whether or not the thread had finished. */
+void __cdecl CommShutdown(void)
+{
+    DWORD exitCode;
+
+    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_A);
+    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_B);
+    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_C);
+    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_D);
+
+    orig_log("Setting Event 0 \n");
+    SetEvent(g_commEvent);
+
+    if (g_packetThread) {
+        /* Retried until the call itself succeeds -- see the note above. */
+        while (!GetExitCodeThread(g_packetThread, &exitCode))
+            ;
+        orig_log("Packet Thread Exited with return code %d\n", exitCode);
+        CloseHandle(g_packetThread);
+    }
+
+    if (g_commEvent)
+        CloseHandle(g_commEvent);
+    g_commEvent = NULL;
+    if (g_commEvent2)
+        CloseHandle(g_commEvent2);
+    g_commEvent2 = NULL;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -91,5 +141,7 @@ int dplay_install(void)
                         "CommCreateDirectPlay", 1);
     rc |= patch_replace(ADDR_CREATE_LOBBY, (const void *)CreateDirectPlayLobby,
                         "CreateDirectPlayLobby", 1);
+    rc |= patch_replace(ADDR_COMM_SHUTDOWN, (const void *)CommShutdown,
+                        "CommShutdown", 0);
     return rc;
 }

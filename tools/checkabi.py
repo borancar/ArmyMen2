@@ -96,6 +96,9 @@ FUNCS = [
     (0x00446450, "CreateGameFont",   "cdecl"),
     (0x0040CBF0, "WaveReadFile",      "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
+    (0x004020A0, "CommShutdown",     "cdecl",
+     "opens `push ecx` to allocate the DWORD that GetExitCodeThread fills in; "
+     "ecx on entry is never read, so cdecl -- the third instance of this idiom"),
     (0x0040DD20, "CommCreateDirectPlay", "thiscall"),
     (0x0040DDD0, "CreateDirectPlayLobby", "stdcall",
      "opens `push ecx` to allocate one local, then overwrites the slot with 0 "

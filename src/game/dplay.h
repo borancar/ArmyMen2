@@ -39,6 +39,11 @@ int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connect
  * the caller's pointer untouched. Returns 1 on success. */
 int32_t __stdcall CreateDirectPlayLobby(LPDIRECTPLAYLOBBY3A *out);
 
+/* Original: 0x004020A0. Shut the comm subsystem down: destroy the four
+ * mutex-guarded message lists, signal the packet thread's event, collect its
+ * exit code and close the handles. */
+void __cdecl CommShutdown(void);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

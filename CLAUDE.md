@@ -91,6 +91,12 @@ engine, so it proves very little. From the briefing screen, **`RETURN` starts
 the mission** — the cursor is hidden there, so `tools/point.py` cannot find it
 and clicking is not an option.
 
+**Quitting through the menu exercises code that killing the process cannot.**
+`tools/drive.sh stop` kills the tree, so the whole shutdown path never runs.
+Click QUIT on the title screen, then OK on the CONFIRM GAME EXIT dialog
+(roughly `306,383` then `475,224`), and the game leaves the way it was meant
+to — which is the only way to reach `CommShutdown` and the comm teardown.
+
 **`ARGS=-dbg` — dropping the default `-nointro` — is a second configuration
 worth having.** The Smacker intro is a code path of its own: it is the only
 caller of `SnapshotSystemPalette`, and the movie coming out in the right
@@ -202,7 +208,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. Currently 116 of the 140 genuine
+  drift from what the harness installs. Currently 119 of the 140 genuine
   boundary sites are ours; the other 136 sites in the binary are game logic
   that happens to read a clock.
 - **`obj -> table -> slot` with no `this` is a real shape in this binary, and
