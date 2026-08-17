@@ -294,6 +294,9 @@ def main():
           "`LockSurface` is the obvious example: it takes the surface as an\n"
           "argument, so its own `Lock` call is one of the unclassifiable ones,\n"
           "and it has been reconstructed since long before this section existed.\n"
+          "There is a second undercount too: the scan gives up when the vtable\n"
+          "register was loaded in a basic block it cannot see, which is why\n"
+          "`PresentFrame` shows three calls here and makes four.\n"
           "Treat the number below as \"known to be outstanding\", never as\n"
           "\"all that is outstanding\".\n\n")
         w("| | functions | call sites |\n|---|---:|---:|\n")

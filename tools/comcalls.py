@@ -17,6 +17,14 @@ same basic block loaded that register from a pointer dereference. Scanning
 backwards is bounded and stops at anything that redefines the register, at a
 branch target, and at a call, since the register would not survive one.
 
+This UNDERCOUNTS, and in two ways rather than one. The interface often cannot
+be named, which the `this` column already says. Less obviously, the vtable
+register itself sometimes cannot be found: the backward scan stops at a `ret`,
+correctly, because a block reached by a branch may have had the register loaded
+in a predecessor this scan cannot see. PresentFrame's first Flip is exactly
+that -- a real DirectDraw call, in a reconstructed function, absent from this
+file. Anything derived from these counts is a floor.
+
 The slot number is reported rather than a method name: which interface a
 register holds is not decidable from one site, so naming is left to whoever
 reads the result against the SDK vtable order. `this` is recovered when the

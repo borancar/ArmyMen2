@@ -81,6 +81,9 @@ struct field. Some of them are DirectX and are not counted here.
 `LockSurface` is the obvious example: it takes the surface as an
 argument, so its own `Lock` call is one of the unclassifiable ones,
 and it has been reconstructed since long before this section existed.
+There is a second undercount too: the scan gives up when the vtable
+register was loaded in a basic block it cannot see, which is why
+`PresentFrame` shows three calls here and makes four.
 Treat the number below as "known to be outstanding", never as
 "all that is outstanding".
 
