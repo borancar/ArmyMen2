@@ -582,6 +582,12 @@
  * codes seen so far are 1 (refused), 0xA (joined a session) and 0xB (start a
  * local game). */
 #define ADDR_MENU_REQUEST        0x00511DC8u  /* int32_t, the code */
+#define ADDR_MENU_MODE           0x00511DBCu  /* int32_t; 0x21 = back to play */
+#define ADDR_OVERLAY_DIRTY       0x00511DC0u  /* int32_t; the primary needs saving */
+#define ADDR_DRAW_MENU_OVERLAY   0x00425AF0u  /* void(void) */
+#define ADDR_OVERLAY_PREPARE     0x00412D30u  /* void(int32, int32) */
+#define ADDR_OVERLAY_DRAW        0x00412FE0u  /* void(void) */
+#define MENU_MODE_PLAYING        0x21
 /* The multiplayer session object and the two routines either side of it. */
 #define ADDR_SESSION_OBJECT      0x00516130u  /* void *, made on demand */
 #define ADDR_SESSION_CTOR        0x00453910u  /* thiscall void(this, int32) */

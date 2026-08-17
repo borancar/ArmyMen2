@@ -28,6 +28,7 @@
 
 #include "surface.h"
 #include "sprite.h"
+#include "mapdraw.h"   /* SetDrawTarget */
 #include "rect.h"
 #include "winmain.h"
 #include "report.h"
@@ -869,6 +870,92 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
     }
 }
 
+/* Show or dismiss the menu overlay -- 0x00425AF0.
+ *
+ * Two jobs in one function, chosen by whether a menu request is pending.
+ *
+ * With one pending it is a teardown: the paint object is deleted, the mode
+ * goes back to 0x21, and presenting is switched back on -- the game resumes.
+ *
+ * Without one it draws. Presenting is switched off first so the ordinary frame
+ * cannot appear underneath, the primary is saved into the back buffer the
+ * first time through, the overlay is drawn, and the result is blitted back to
+ * the primary at the client origin.
+ *
+ * The paint object is reached through two ordinary C++ virtuals rather than
+ * COM -- `this` in ecx, nothing pushed -- so they do not appear in the DirectX
+ * survey at all. Slot 1 takes the object's own rectangle BY VALUE, which is
+ * where the original does something worth knowing about: it leaves
+ * SetDrawTarget's pushed argument on the stack, subtracts only twelve more
+ * bytes, and writes sixteen. The earlier push is the first of the four dwords.
+ * Written normally here -- GCC balances its own calls -- because the effect is
+ * identical and the trick is not.
+ *
+ * The saved-primary blit uses the screen RECT and the restore uses the clip
+ * RECT; they are different rectangles and swapping them would be invisible in
+ * fullscreen and wrong in a window. */
+typedef void (__attribute__((thiscall)) *am2_paint_slot1_fn)(void *self, RECT area);
+typedef void (__attribute__((thiscall)) *am2_paint_slot2_fn)(void *self);
+typedef void (__cdecl *am2_overlay_prep_fn)(int32_t a, int32_t b);
+typedef void (__cdecl *am2_overlay_draw_fn)(void);
+typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
+
+#define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
+#define g_menuMode      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
+#define g_menuPending   (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
+#define g_overlayDirty  (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+#define g_presenting    (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
+#define g_screenRectPtr ((LPRECT)(uintptr_t)ADDR_SCREEN_RECT)
+#define orig_overlay_prepare (*(am2_overlay_prep_fn)ADDR_OVERLAY_PREPARE)
+#define orig_overlay_draw    (*(am2_overlay_draw_fn)ADDR_OVERLAY_DRAW)
+
+void __cdecl DrawMenuOverlay(void)
+{
+    uint8_t *paint = g_paintObj;
+
+    if (g_menuPending) {
+        /* Going back to the game: drop the overlay and let frames through. */
+        if (paint) {
+            void **vt = *(void ***)paint;
+            (*(am2_delete_fn)vt[0])(paint, 1);
+            g_paintObj = NULL;
+        }
+        g_menuMode     = MENU_MODE_PLAYING;
+        g_menuPending  = 0;
+        g_overlayDirty = 0;
+        g_presenting   = 1;
+        return;
+    }
+
+    if (g_overlayDirty) {
+        g_presenting = 0;
+        if (paint) {
+            void **vt = *(void ***)paint;
+
+            SetDrawTarget(g_primarySurface);
+            (*(am2_paint_slot1_fn)vt[1])(paint, *(const RECT *)(paint + 0x14));
+        }
+        /* Keep what was on screen, so the overlay can be drawn over a copy. */
+        IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, g_primarySurface,
+                                   g_screenRectPtr, DDBLTFAST_WAIT);
+        g_overlayDirty = 0;
+    }
+
+    SetDrawTarget(g_backBuffer);
+    if (paint) {
+        void **vt = *(void ***)paint;
+        (*(am2_paint_slot2_fn)vt[2])(paint);
+    }
+    SetDrawTarget(g_backBuffer);
+
+    orig_overlay_prepare(0, 1);
+    orig_overlay_draw();
+
+    IDirectDrawSurface_BltFast(g_primarySurface, (DWORD)g_originDx,
+                               (DWORD)g_originDy, g_backBuffer,
+                               g_screenClip, DDBLTFAST_WAIT);
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -905,6 +992,8 @@ int surface_install(void)
                         "BlitCentred", 1);
     rc |= patch_replace(ADDR_MAKE_BITMAP, (const void *)MakeBitmap,
                         "MakeBitmap", 4);
+    rc |= patch_replace(ADDR_DRAW_MENU_OVERLAY, (const void *)DrawMenuOverlay,
+                        "DrawMenuOverlay", 0);
     rc |= patch_replace(ADDR_FREE_MAP_SURFACES, (const void *)FreeMapSurfaces,
                         "FreeMapSurfaces", 0);
     return rc;

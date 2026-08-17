@@ -367,7 +367,6 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | `0x0040CED0` 1792B, 12 | the sound engine proper |
   | `0x00427070` 944B, 5 | input-to-command translation |
   | `0x00412FE0` 1184B, 4 | menu logic |
-  | `0x00425AF0` 288B, 5 | map object placement |
   | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
   | `0x00453BC0` 48B | not COM at all — a C++ destructor chain, per the `abi` note above |
 

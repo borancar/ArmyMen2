@@ -92,8 +92,8 @@ Treat the number below as "known to be outstanding", never as
 
 | | functions | call sites |
 |---|---:|---:|
-| known DirectX, reconstructed | 25 | 69 |
-| known DirectX, still to do | 8 | 26 |
+| known DirectX, reconstructed | 26 | 71 |
+| known DirectX, still to do | 7 | 24 |
 
 And the bracket the caveat above implies. Counting every function
 that dispatches through a vtable at all, whether or not the object
@@ -101,8 +101,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 66 |
-| any COM dispatch, not | 44 |
+| any COM dispatch, reconstructed | 67 |
+| any COM dispatch, not | 43 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -117,7 +117,6 @@ teardown, not boundary code.
 - `0x00427070` 944B, 5 calls — input device x5
 - `0x00412fe0` 1184B, 2 calls — locked x2
 - `0x0041b0e0` 1472B, 2 calls — IDirectDraw x1, primary x1
-- `0x00425af0` 288B, 2 calls — back buffer x1, primary x1
 - `0x0041d060` 432B, 1 calls — offscreen x1
 - `0x0042da30` 272B, 1 calls — back buffer x1
 - `0x0042ff60` 448B, 1 calls — IDirectDraw x1
