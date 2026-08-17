@@ -465,6 +465,25 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   reconstructed, so the channel is ours, but nothing about an import table
   would have told you it existed.
 
+- **"Incidental" is a judgement, and it was wrong about threads.** The claim
+  that the import side is finished rests on a hand-kept list in
+  `tools/coverage.py` of symbols that are a fact of running on Windows rather
+  than a channel out. `CreateThread`, `CreateEventA`, `CreateMutexA`,
+  `SetThreadPriority` and `CloseHandle` were on it, which meant `0x004021A0` —
+  which creates an event, starts the comm thread and sets its priority — was
+  being dismissed as game logic, while CLAUDE.md separately called that cluster
+  genuinely boundary. Both cannot be true.
+
+  The line now is the one this project already draws for DirectX: **creating or
+  destroying an OS object is boundary work, operating on a handle you were
+  given is not.** `docs/boundary.md` says of COM that what is left "is game
+  logic holding a handle it did not make"; the kernel side has to mean the same
+  thing or the word stops meaning anything. Waiting on a handle and releasing a
+  mutex stay incidental.
+
+  Correcting it moved the outstanding figure from 3 functions and 6 sites to 6
+  and 11 — the extra three being the comm thread's mutex, event and thread.
+
 - **The import side is done, in the only sense the word can bear here.** Every
   Win32 call site in the image that can actually execute is now either inside
   reconstructed code or incidental — a `GetTickCount`, an `IntersectRect`, a

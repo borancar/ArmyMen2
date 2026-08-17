@@ -82,14 +82,26 @@ FIELD_INTERFACES = {
 # Imports that are a fact of running on Windows rather than a channel to the
 # outside world. A function whose only boundary contact is one of these is
 # ordinary game logic that happens to ask the clock or poke its own queue.
+#
+# THE LINE IS THE SAME ONE THIS PROJECT DRAWS FOR DIRECTX: creating or
+# destroying an OS object is boundary work, operating on a handle you were given
+# is not. docs/boundary.md already says of COM that "what still dispatches
+# through COM is game logic holding a handle it did not make", and the kernel
+# side has to mean the same thing or the word stops meaning anything.
+#
+# CreateThread, CreateEventA, CreateMutexA, SetThreadPriority and CloseHandle
+# used to sit in this list and do not belong here. 0x004021A0 creates an event,
+# starts a thread and sets its priority -- that is the comm thread, which
+# CLAUDE.md separately calls a genuinely-boundary cluster, being dismissed here
+# as incidental. Waiting on a handle or releasing a mutex stays incidental,
+# because that is operating on something already made.
 INCIDENTAL = {
     "GetTickCount", "QueryPerformanceCounter", "QueryPerformanceFrequency",
     "Sleep", "PostMessageA", "SendMessageA", "InterlockedExchange",
     "WaitForSingleObject", "WaitForMultipleObjects", "ReleaseMutex",
-    "CreateMutexA", "CloseHandle", "SetEvent", "ResetEvent", "CreateEventA",
+    "SetEvent", "ResetEvent",
     "EnterCriticalSection", "LeaveCriticalSection", "GetLastError",
-    "GetCurrentThreadId", "CreateThread", "TerminateThread", "ExitThread",
-    "SetThreadPriority", "IntersectRect", "SetRect", "OffsetRect",
+    "GetCurrentThreadId", "IntersectRect", "SetRect", "OffsetRect",
     "InflateRect", "UnionRect", "PtInRect", "IsRectEmpty", "SetRectEmpty",
     "CopyRect", "EqualRect", "GetActiveWindow", "GetFocus", "wsprintfA",
 }

@@ -17,7 +17,7 @@ whether a mechanism is being measured at all.
 
 | channel | how it is found | outstanding |
 |---|---|---|
-| named imports | `docs/imports.tsv` | 6 non-incidental site(s) |
+| named imports | `docs/imports.tsv` | 11 non-incidental site(s) |
 | imports by ordinal | `#N` in the same file, checked through the callers of its thunk | 0 |
 | COM vtables | `docs/comcalls.tsv`, `stdcall` only | 0 |
 | runtime resolution | `LoadLibraryA` + `GetProcAddress` sites | 0 |
@@ -37,8 +37,8 @@ outside it.
 | | functions | import sites |
 |---|---:|---:|
 | reconstructed | 48 | 149 |
-| still boundary | 3 | 6 |
-| game logic, incidental calls only | 80 | 121 |
+| still boundary | 6 | 11 |
+| game logic, incidental calls only | 77 | 116 |
 | **total** | **131** | **276** |
 
 ## By library
@@ -65,7 +65,12 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
+| `CloseHandle` | 1 |
+| `CreateEventA` | 1 |
+| `CreateMutexA` | 1 |
+| `CreateThread` | 1 |
 | `MessageBoxA` | 3 |
+| `SetThreadPriority` | 1 |
 
 Read that table with `docs/binarypatches.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
@@ -151,6 +156,9 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
+| `0x00402170` | 48 | 1 | 48 | CloseHandle |
+| `0x00401000` | 64 | 1 | 64 | CreateMutexA |
+| `0x004021a0` | 304 | 3 | 101 | CreateEventA, CreateThread, SetThreadPriority |
 | `0x0042f290` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 | `0x0044d2e0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 | `0x0044d3f0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
