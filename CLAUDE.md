@@ -146,6 +146,24 @@ A BATTLE with an empty session list. It exercises `CommCreateDirectPlay`,
 `StartMultiplayerGame` and `CommEnumSessions` — the last polled repeatedly
 while the browser is open, so its count climbs on its own.
 
+**The multiplayer path can be A/B'd, so "verified by reading" is weaker than
+it needs to be.** START A WAR reaches ENTER BATTLE NAME, which has two text
+fields and an OK, so the whole sequence is drivable with `point.py` and
+`ctl "type ..."` -- and the same sequence runs under `AM2_NOPATCH=1`.
+Screenshots at the same two points came out 90 and 100 pixels apart of 786,432,
+which is the blinking caret and the cursor.
+
+That is how `HostBattle` was checked rather than merely read. Its counter reads
+1; `CommOpenSession` and `CommCreatePlayer` read 0 because it calls them
+directly, which is the usual blind spot and here confirms the path is ours. The
+frame after OK matching the original's is the part that matters: the original
+also stays on the dialog, so the failure path taken -- DirectPlay will not open
+a TCP/IP session on this machine -- is its behaviour and not a defect.
+
+`point.py` needs the exact button centre here. A click two pixels above
+MULTI-PLAYER lands between buttons, does nothing, and reads exactly like a dead
+code path.
+
 Two readings not to misinterpret. Choosing the last row, "Play Against
 Computer Only", takes `StartSelectedGame`'s local branch and ends at ENTER
 BATTLE NAME. And `CommInitializeConnection` and `FindGameCD` stay at 0
