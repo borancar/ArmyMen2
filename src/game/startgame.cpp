@@ -67,9 +67,7 @@ typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
 #define SLOT_OFF_NAME     0x0C   /* the 0x40-byte buffer CommConstruct clears */
 #define SLOT_OFF_ACTIVE   0x50
 
-#define COMM_OFF_HAS_DPLAY 0x3EC
-#define COMM_OFF_LOCAL     0x400
-#define COMM_OFF_READY     0x3D8
+/* COMM_OFF_LOCAL, COMM_OFF_READY and COMM_OFF_DPLAY are in orig.h. */
 
 /* Menu request codes, as written to ADDR_MENU_REQUEST. */
 #define REQUEST_REFUSED   1
@@ -123,7 +121,7 @@ void __cdecl StartSelectedGame(void)
 
     /* A DirectPlay object left over from browsing sessions is dropped: a local
      * game has no use for it and it would otherwise stay connected. */
-    if (*(void **)(comm + COMM_OFF_HAS_DPLAY))
+    if (*(void **)(comm + COMM_OFF_DPLAY))
         orig_drop_directplay(comm);
 
     /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */

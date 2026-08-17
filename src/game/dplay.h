@@ -90,6 +90,13 @@ int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list);
  * appended last. The callback drops the two dead matchmaking services. */
 int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list);
 
+/* Original: 0x0040DFC0, thiscall. Create the DirectPlay session -- START A WAR.
+ *
+ * DPOPEN_CREATE, host migration on, four players, named by whatever the player
+ * typed. A local game skips the whole thing and reports success, because there
+ * is no session to make. */
+int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

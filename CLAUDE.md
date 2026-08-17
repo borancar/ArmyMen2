@@ -99,11 +99,26 @@ to — which is the only way to reach `CommShutdown` and the comm teardown.
 
 **The campaign is a third gameplay path, and reaching it needs typing.** SINGLE
 PLAYER → RECRUIT → type a name → OK drops straight into MAP 01, a different map
-from Boot Camp with a different object count. Typing needs *real* X key events,
-not the control socket: the socket injects DirectInput, and a text field reads
-`WM_CHAR`, which only exists if Wine saw a genuine key press. XTEST through
-python-xlib does it, and it is the only way `WM_CHAR` in `winproc.cpp` gets
-exercised at all.
+from Boot Camp with a different object count.
+
+**Typing is `drive.sh ctl "type <text>"`, and no X cooperation is needed.** A
+text field reads `WM_CHAR`, which the socket's `key` command cannot produce —
+that injects DirectInput, which is what the game polls for menus and movement.
+Posting the messages to the window does, entirely inside the process. Two of
+this game's behaviours decide how, and both fail silently if ignored:
+
+- `WndProc` drops a `WM_CHAR` whose predecessor was also a `WM_CHAR`, because a
+  real keystroke is a keydown then a char, so two running can only be a
+  duplicate. Post a bare string and only its first character arrives.
+- `PumpMessage` calls `TranslateMessage`, so the `WM_KEYDOWN` produces a second
+  `WM_CHAR` by itself — lower case, since no shift is held. Send keydown and
+  char together and everything doubles: `Bbiigg Bbaattttllee`.
+
+The working shape is the full `WM_KEYDOWN`, `WM_CHAR`, `WM_KEYUP` a keyboard
+sends, with a pause before the keyup so the pump dispatches our char and the
+translated copy back to back and the game's own duplicate check eats the
+second. See `src/inject/control.c`. This is also the only way `WM_CHAR` in
+`winproc.cpp` gets exercised.
 
 **`ARGS=-dbg` — dropping the default `-nointro` — is a second configuration
 worth having.** The Smacker intro is a code path of its own: it is the only

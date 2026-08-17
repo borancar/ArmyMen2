@@ -556,6 +556,65 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
     return 1;
 }
 
+/* Create the session -- 0x0040DFC0, thiscall, `ret 4`, 226 bytes.
+ *
+ * START A WAR ends up here. Slot 24 is Open and the flag is DPOPEN_CREATE, so
+ * unlike CommEnumSessions this makes a session rather than looking for one.
+ *
+ * The descriptor is worth reading as a statement of what a game of Army Men II
+ * is: DPSESSION_MIGRATEHOST, four players maximum -- the same four the comm
+ * object keeps slots for -- the battle name the player typed as the session
+ * name, and the application GUID so only this game finds it.
+ *
+ * A local game short-circuits the whole thing. StartSelectedGame sets +0x400
+ * when the chosen row was "Play Against Computer Only", and that is checked
+ * first: there is nothing to open, and the function reports success without
+ * touching DirectPlay at all. */
+static_assert(DPOPEN_CREATE == 2, "DPOPEN_CREATE");
+static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
+
+#define g_hostSlot     (*(int32_t *)(uintptr_t)ADDR_HOST_SLOT)
+#define g_joinContext  (*(int32_t *)(uintptr_t)ADDR_JOIN_CONTEXT)
+#define g_defaultOwner (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+
+#define AM2_MAX_PLAYERS 4
+
+int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
+{
+    uint8_t        *comm = g_commObject;
+    DPSESSIONDESC2  desc;
+    LPDIRECTPLAY4A  dp;
+    const GUID     *app;
+
+    /* Only a networked game needs a session. */
+    if (!comm_u32(comm, COMM_OFF_LOCAL)) {
+        dp = *DirectPlaySlot(comm);
+        if (!dp)
+            return 0;
+
+        memset(&desc, 0, sizeof desc);
+        desc.dwSize        = sizeof desc;
+        desc.dwFlags       = DPSESSION_MIGRATEHOST;
+        desc.dwMaxPlayers  = AM2_MAX_PLAYERS;
+        desc.lpszSessionNameA = (LPSTR)name;
+        /* The hosting slot's index field, carried across as user data. */
+        desc.dwUser1 = comm_u32((uint8_t *)self,
+                                COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE + 4);
+
+        app = *(const GUID **)(comm + COMM_OFF_APP_GUID);
+        if (app)
+            desc.guidApplication = *app;
+
+        if (IDirectPlayX_Open(dp, &desc, DPOPEN_CREATE) != DP_OK)
+            return 0;
+    }
+
+    g_joinContext  = 0;
+    g_defaultOwner = 0;
+    g_hostSlot     = 0;
+    return 1;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -582,5 +641,7 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, (const void *)CommEnumConnections,
                         "CommEnumConnections", 1);
     rc |= patch_replace(ADDR_COMM_SEND, (const void *)CommSend, "CommSend", 4);
+    rc |= patch_replace(ADDR_COMM_OPEN_SESSION, (const void *)CommOpenSession,
+                        "CommOpenSession", 1);
     return rc;
 }

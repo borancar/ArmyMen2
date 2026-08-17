@@ -2,6 +2,7 @@
 #include "hooklog.h"
 #include "input.h"
 #include "trace.h"
+#include "orig.h"
 
 #include <winsock2.h>
 #include <windows.h>
@@ -68,10 +69,67 @@ static int button_from_name(const char *s)
  * two polls and never be observed. */
 #define DEFAULT_TAP_MS 120
 
+/* One frame is plenty; the field consumes a character per pump. */
+#define TYPE_GAP_MS    40
+
 static void handle_line(SOCKET s, char *line)
 {
     char *argv[8];
-    int   argc = tokenize(line, argv, 8);
+    int   argc;
+
+    /* `type <text>` goes first, before the line is split: the text is the rest
+     * of the line verbatim, spaces and all, and tokenising would eat them.
+     *
+     * A text field reads WM_CHAR, which DirectInput never produces -- so the
+     * `key` command below, which is what the game polls for menus and
+     * movement, cannot fill one in. Posting WM_CHAR to the window directly
+     * does, and it needs no X server cooperation at all: no XTEST, no real
+     * key events, nothing outside the process. */
+    if (!strncmp(line, "type ", 5)) {
+        HWND        hwnd = *(HWND *)(uintptr_t)ADDR_HWND;
+        const char *p    = line + 5;
+        int         n    = 0;
+
+        if (!hwnd) {
+            reply(s, "err no window yet");
+            return;
+        }
+        /* The real thing: WM_KEYDOWN, WM_CHAR, WM_KEYUP for every character.
+         *
+         * Two behaviours of this game decide the timing between them, and
+         * getting either wrong is silent.
+         *
+         * WndProc drops a WM_CHAR when the previously dispatched message was
+         * also a WM_CHAR -- reproduced from the original in winproc.cpp,
+         * because a genuine keystroke is a keydown followed by a char, so two
+         * chars running can only be a duplicate. Post a bare string and its
+         * first character arrives and the rest vanish.
+         *
+         * And PumpMessage calls TranslateMessage, which turns our keydown into
+         * a WM_CHAR of its own and appends it to the queue. So every character
+         * is delivered twice unless something eats one -- and the duplicate
+         * check above is exactly the thing that will, provided the translated
+         * copy lands immediately after ours rather than after the keyup.
+         *
+         * Hence the pause before the keyup: it lets the pump dispatch our char
+         * and the translated one back to back, so the game discards the second
+         * itself. The two together produce one character, correctly cased,
+         * from the full three-message sequence a keyboard would send. */
+        for (; *p; p++, n++) {
+            unsigned char c  = (unsigned char)*p;
+            WPARAM        vk = (c >= 'a' && c <= 'z') ? (WPARAM)(c - 32) : (WPARAM)c;
+
+            PostMessageA(hwnd, WM_KEYDOWN, vk, 1);
+            PostMessageA(hwnd, WM_CHAR, (WPARAM)c, 1);
+            Sleep(TYPE_GAP_MS);
+            PostMessageA(hwnd, WM_KEYUP, vk, 0xC0000001u);
+            Sleep(TYPE_GAP_MS);
+        }
+        reply(s, "ok typed %d char(s)", n);
+        return;
+    }
+
+    argc = tokenize(line, argv, 8);
 
     if (argc == 0)
         return;

@@ -442,6 +442,10 @@
 #define ADDR_COMM_ENUM_CONNECTIONS 0x0040E530u /* thiscall int32(this, void *) */
 #define ADDR_ENUM_CONNECTIONS_CB 0x0040E460u  /* LPDPENUMCONNECTIONSCALLBACK */
 #define ADDR_CONNECTION_LIST     0x004FA900u  /* void *, what that callback fills */
+#define ADDR_HOST_SLOT           0x004FA904u  /* int32_t, which player slot hosts */
+#define ADDR_JOIN_CONTEXT        0x004751B4u  /* int32_t, cleared once a session exists */
+/* Creates the DirectPlay session -- slot 24 is Open, with DPOPEN_CREATE. */
+#define ADDR_COMM_OPEN_SESSION   0x0040DFC0u  /* thiscall int32(this, const char *) */
 /* Appends one named entry to a list object. 16 callers. */
 #define ADDR_LIST_ADD            0x00453A30u  /* thiscall void(this, const char *, void *) */
 #define ADDR_STR_COMPUTER_ONLY   0x00475300u  /* "Play Against Computer Only" */
@@ -464,6 +468,8 @@
 #define COMM_OFF_STAT_PACKETS    0x200u
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
+#define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */
+#define COMM_OFF_READY           0x3D8u
 #define COMM_SLOT_OFF_ID         0x008u
 #define COMM_SLOT_OFF_UNACKED    0x058u
 #define COMM_STAT_RING           30u
