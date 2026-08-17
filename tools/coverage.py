@@ -296,7 +296,10 @@ def main():
           "and it has been reconstructed since long before this section existed.\n"
           "There is a second undercount too: the scan gives up when the vtable\n"
           "register was loaded in a basic block it cannot see, which is why\n"
-          "`PresentFrame` shows three calls here and makes four.\n"
+          "`PresentFrame` shows three calls here and makes four. That one has\n"
+          "been measured -- it is five sites across the whole image, all in\n"
+          "functions already reconstructed, and no function is missing from the\n"
+          "survey because of it.\n"
           "Treat the number below as \"known to be outstanding\", never as\n"
           "\"all that is outstanding\".\n\n")
         w("| | functions | call sites |\n|---|---:|---:|\n")

@@ -17,13 +17,29 @@ same basic block loaded that register from a pointer dereference. Scanning
 backwards is bounded and stops at anything that redefines the register, at a
 branch target, and at a call, since the register would not survive one.
 
-This UNDERCOUNTS, and in two ways rather than one. The interface often cannot
-be named, which the `this` column already says. Less obviously, the vtable
-register itself sometimes cannot be found: the backward scan stops at a `ret`,
-correctly, because a block reached by a branch may have had the register loaded
-in a predecessor this scan cannot see. PresentFrame's first Flip is exactly
-that -- a real DirectDraw call, in a reconstructed function, absent from this
-file. Anything derived from these counts is a floor.
+This UNDERCOUNTS, in two ways rather than one, and the second was measured
+rather than guessed at.
+
+The interface often cannot be named, which the `this` column already says.
+
+Less obviously, the vtable register itself sometimes cannot be found. The
+backward scan gives up at a `call`, because a call genuinely clobbers the
+scratch registers being chased, and at a `ret`, because the block is then a
+branch target whose predecessor is not visible. Both are correct and neither
+can be relaxed: crossing the `ret` was tried and recovers nothing, since a
+`call` sits between the load and the use in every one of these cases.
+
+The size of that miss is known. Sweeping every `call [reg+disp]` below the CRT
+with a plausible vtable displacement and subtracting what is recorded here
+leaves EIGHT sites. Five are real DirectX calls -- PresentFrame's first Flip,
+ClearSurface's Blt, InitDirectDraw's SetCooperativeLevel, and a Release in each
+of the two bitmap loaders -- and all five are in functions that are already
+reconstructed. The other three are not COM at all: two `call [esp+N]` callbacks
+and one function pointer in a member field.
+
+So the per-function counts are a floor, by five across the whole image, and no
+function is missing from this file. That is a much stronger statement than
+"lower bound" and it is worth re-measuring if the scan ever changes.
 
 The slot number is reported rather than a method name: which interface a
 register holds is not decidable from one site, so naming is left to whoever

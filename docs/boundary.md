@@ -83,7 +83,10 @@ argument, so its own `Lock` call is one of the unclassifiable ones,
 and it has been reconstructed since long before this section existed.
 There is a second undercount too: the scan gives up when the vtable
 register was loaded in a basic block it cannot see, which is why
-`PresentFrame` shows three calls here and makes four.
+`PresentFrame` shows three calls here and makes four. That one has
+been measured -- it is five sites across the whole image, all in
+functions already reconstructed, and no function is missing from the
+survey because of it.
 Treat the number below as "known to be outstanding", never as
 "all that is outstanding".
 
