@@ -99,6 +99,14 @@
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
+#define ADDR_PAINT_MAP_TILES   0x0042D580u /* void(const AM2_Rect *tiles) */
+#define ADDR_MAP_TILES         0x00514EB8u /* uint16 *, one index per tile */
+#define ADDR_MAP_ROW_SHIFT     0x00514DE4u /* int32, log2 of the map's width */
+/* The camera doubles as the top-left of the visible-tile rectangle: the four
+ * dwords from ADDR_CAMERA_X are used as a RECT to clip against. */
+#define ADDR_VISIBLE_TILES     0x00514EA8u /* AM2_Rect, in tiles */
+#define MAP_TILE_SIZE          16
+#define MAP_SHEET_COLUMNS      0x1F   /* mask; the sheet is 32 tiles wide */
 #define ADDR_FREE_MAP_SURFACES 0x0042D390u /* void(void) */
 /* The menu's sprite table: 190 AM2_Sprite* laid out as 19 rows of 10, one more
  * slot just past the end, and a surface of its own. */

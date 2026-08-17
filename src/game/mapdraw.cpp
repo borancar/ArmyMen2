@@ -104,6 +104,90 @@ void __cdecl RedrawMapRegion(const AM2_Rect *world)
     UnlockSurface();
 }
 
+/* Paint the map into its cache surface, one tile at a time -- 0x0042D580.
+ *
+ * This is where the map actually becomes pixels. Everything else in this file
+ * moves the result about; this makes it.
+ *
+ * The caller asks for a rectangle in tile coordinates, it is clipped against
+ * the visible area, and every surviving tile is blitted from the tile sheet
+ * into the cache. Two things are worth knowing.
+ *
+ * The visible area is the camera. The four dwords from ADDR_CAMERA_X are read
+ * as a RECT here and handed straight to IntersectRect, so the camera position
+ * and the visible-tile rectangle are the same four words seen two ways.
+ *
+ * And the tile index is the source coordinates. The low five bits are the
+ * column, scaled by sixteen, so the sheet is 32 tiles across and the index
+ * decodes to a position in it with no lookup table at all.
+ *
+ * The row is `(idx >> 5) * 16`, and the original writes it as `sar eax,1` then
+ * `and al,0xF0` -- which masks only the LOW BYTE and leaves everything above
+ * bit 7 alone. Reading that as `& 0xF0` caps the row at 15 and puts every tile
+ * with an index of 512 or more in the wrong place; the Boot Camp A/B went from
+ * 22 differing pixels to 33,137 and said so immediately. `& ~0xF` is the
+ * faithful reading, and is exactly `(idx >> 5) * 16`.
+ *
+ * Exercised by every map repaint, so an error here is visible immediately --
+ * which is the point of doing it. */
+static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
+
+#define g_mapCacheSurf (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE)
+#define g_mapSprite    (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
+#define g_mapTiles     (*(const uint16_t **)(uintptr_t)ADDR_MAP_TILES)
+#define g_mapRowShift  (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+#define g_visibleTiles ((const AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES)
+
+void __cdecl PaintMapTiles(const AM2_Rect *tiles)
+{
+    LPDIRECTDRAWSURFACE dest = g_mapCacheSurf;
+    LPDIRECTDRAWSURFACE sheet;
+    AM2_Rect            clipped;
+    int32_t             row, top;
+
+    if (!dest)
+        return;
+    sheet = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + 0x10);
+    if (!sheet)
+        return;
+
+    if (!IntersectRect((LPRECT)&clipped, (const RECT *)tiles,
+                       (const RECT *)g_visibleTiles))
+        return;
+
+    /* Tile coordinates become pixels relative to the camera. */
+    top = (clipped.top - g_visibleTiles->top) * MAP_TILE_SIZE;
+
+    for (row = clipped.top; row < clipped.bottom; row++) {
+        const uint16_t *cell = g_mapTiles
+                             + ((row << g_mapRowShift) + tiles->left);
+        int32_t         left = (clipped.left - g_visibleTiles->left)
+                               * MAP_TILE_SIZE;
+        int32_t         col;
+
+        for (col = clipped.left; col < clipped.right; col++) {
+            uint16_t idx = *cell;
+            RECT     to, from;
+
+            to.left   = left;
+            to.top    = top;
+            to.right  = left + MAP_TILE_SIZE;
+            to.bottom = top + MAP_TILE_SIZE;
+
+            from.left   = (idx & MAP_SHEET_COLUMNS) * MAP_TILE_SIZE;
+            from.top    = (int32_t)((idx >> 1) & ~0xFu);
+            from.right  = from.left + MAP_TILE_SIZE;
+            from.bottom = from.top + MAP_TILE_SIZE;
+
+            IDirectDrawSurface_Blt(dest, &to, sheet, &from, DDBLT_WAIT, NULL);
+
+            left += MAP_TILE_SIZE;
+            cell++;
+        }
+        top += MAP_TILE_SIZE;
+    }
+}
+
 int mapdraw_install(void)
 {
     int rc = 0;
@@ -113,5 +197,7 @@ int mapdraw_install(void)
                         "RedrawMapRegion", 1);
     rc |= patch_replace(ADDR_BLIT_MAP_BACKDROP, (const void *)BlitMapBackdrop,
                         "BlitMapBackdrop", 4);
+    rc |= patch_replace(ADDR_PAINT_MAP_TILES, (const void *)PaintMapTiles,
+                        "PaintMapTiles", 1);
     return rc;
 }

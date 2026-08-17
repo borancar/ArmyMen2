@@ -12,9 +12,9 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 42 | 143 |
+| reconstructed | 43 | 144 |
 | still boundary | 1 | 4 |
-| game logic, incidental calls only | 79 | 129 |
+| game logic, incidental calls only | 78 | 128 |
 | **total** | **122** | **276** |
 
 ## By library
@@ -25,7 +25,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 73 | 130 |  |
+| USER32 | 74 | 130 |  |
 | KERNEL32 | 23 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -101,8 +101,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 64 |
-| any COM dispatch, not | 46 |
+| any COM dispatch, reconstructed | 65 |
+| any COM dispatch, not | 45 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:
@@ -142,7 +142,7 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 73 |
+| USER32.dll | 130 | 74 |
 | KERNEL32.dll | 99 | 23 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
