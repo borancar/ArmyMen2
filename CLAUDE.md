@@ -395,8 +395,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
   `OpenAudioStream`, `AudioTimerProc`, both input pollers, `ComposeFrame`,
-  `ScrollView`, `ScrollMapCache`, `CommEnumPlayers` and the comm object's
-  constructor and destructor. The window, the message queue, the display mode,
+  `ScrollView`, `ScrollMapCache`, `CommEnumPlayers`, `HostBattle`,
+  `SetGamePalette` and the comm object's constructor and destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -452,6 +452,14 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   sit behind copy-protection checks that have been patched to skip them, so
   none can run. `tools/coverage.py` reports the symbols and
   `docs/binarypatches.md` explains why they cannot fire.
+
+  **The DirectX object claim was false until the palette was reconstructed.**
+  "Every DirectX object in the process is created, configured and destroyed by
+  reconstructed code" read well and was wrong: `0x0041B132` is the image's only
+  `CreatePalette`, it sits in `SetGamePalette`, and that function was original.
+  The display palette was the one object the port did not make. It is
+  reconstructed now and the sentence is true, but it was worth finding out that
+  nobody had checked it.
 
   This claim is about the IAT only. DirectX reached through COM is a separate
   count and is *not* finished: 3 functions with 5 calls on objects

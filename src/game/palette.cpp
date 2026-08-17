@@ -198,9 +198,172 @@ void __cdecl SnapshotSystemPalette(void)
     ReleaseDC(g_hWnd, dc);
 }
 
+/* Install a palette and build every table derived from it -- 0x0041B0E0.
+ *
+ * THE LAST DIRECTX OBJECT THE PORT DID NOT CREATE. 0x0041B132 is the only
+ * CreatePalette in the image, so while this stayed original the claim that
+ * every DirectX object is made by reconstructed code was false -- the display
+ * palette was the exception, and nobody had checked.
+ *
+ * Windowed and fullscreen ask for different things, which is the only part of
+ * the DirectDraw section that is not boilerplate. Fullscreen passes the game's
+ * own palette with DDPCAPS_ALLOW256, because it owns the display. Windowed
+ * passes a fixed table and only DDPCAPS_8BIT, because the desktop owns the
+ * palette and the game may not set 256 entries under it -- and windowed is also
+ * the only path that then calls CalibratePalette to find out what actually
+ * displays.
+ *
+ * Entry 0 is forced to black before anything else, so index 0 is dependably
+ * transparent-black whatever the file said.
+ *
+ * The rest is table building, and it is the bulk of the function: seven remap
+ * tables of 256 bytes and 23 named colour indices, all resolved through the
+ * nearest-colour matcher. Nothing in it touches the outside world.
+ *
+ * THE ARITHMETIC IS x87 AND HAS TO STAY x87. The shade tables multiply an
+ * integer channel by a double and truncate, and the original does that on the
+ * FPU at 80-bit precision. i686 GCC evaluates double expressions the same way
+ * by default, so `(uint8_t)(c * 0.7)` matches; it would not if this were built
+ * with SSE math, where 0.7 * 100 rounds differently at the truncation boundary.
+ * Recorded because nothing in the build makes that dependency visible.
+ *
+ * Verified where it is sharpest: it runs on every palette load, and the
+ * windowed A/B has a budget of ZERO differing pixels. A wrong entry anywhere in
+ * any of these tables shows up there immediately. */
+static_assert(DDPCAPS_8BIT == 0x04, "DDPCAPS_8BIT");
+static_assert(DDPCAPS_ALLOW256 == 0x40, "DDPCAPS_ALLOW256");
+
+#define PALETTE_ENTRIES   256
+#define REMAP_DARK_LIMIT  0x30   /* at or below this, darkening is a no-op */
+#define REMAP_LIFT_LIMIT  0xA0   /* at or below this, brighten instead */
+#define REMAP_LIFT        0x80
+#define DARK_SCALE        0.7
+
+#define g_ddraw        (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
+#define g_primarySurf  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_windowedMode (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
+typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
+#define orig_realize_palette (*(am2_realize_fn)ADDR_REALIZE_PALETTE)
+#define g_remapIdent   (*(uint8_t **)(uintptr_t)ADDR_REMAP_IDENTITY)
+#define g_remapDark    (*(uint8_t **)(uintptr_t)ADDR_REMAP_DARK)
+#define g_remapBright  (*(uint8_t **)(uintptr_t)ADDR_REMAP_BRIGHT)
+#define g_remapTint    (*(uint8_t **)(uintptr_t)ADDR_REMAP_TINT)
+#define g_remapShades  ((uint8_t **)(uintptr_t)ADDR_REMAP_SHADES)
+
+typedef void (__cdecl *am2_void_fn)(void);
+#define orig_palette_loaded (*(am2_void_fn)ADDR_PALETTE_LOADED)
+
+/* 0x0041B820: pack three channels and ask the matcher, which is what the
+ * original calls 23 times over. */
+static uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
+{
+    return orig_nearest_index((const uint32_t *)pal,
+                              r | (g << 8) | (b << 16), 9);
+}
+
+/* Every colour the engine looks up by name, in the original's order. */
+static const struct { uint32_t addr, r, g, b; } kNamedColours[] = {
+    { 0x00502AD9, 0x00, 0x00, 0x00 }, { 0x004FD768, 0xFF, 0xFF, 0xFF },
+    { 0x004FE090, 0xC0, 0xC0, 0xC0 }, { 0x004FE089, 0x00, 0xFF, 0x00 },
+    { 0x00507234, 0xDA, 0x4E, 0x00 }, { 0x004FDF7C, 0x00, 0x00, 0xFF },
+    { 0x0050712C, 0xAC, 0xE8, 0x00 }, { 0x00502ACC, 0x88, 0x88, 0x88 },
+    { 0x00502AD8, 0x00, 0x84, 0x00 }, { 0x00502CE5, 0xAC, 0x00, 0x00 },
+    { 0x004FD760, 0x00, 0x00, 0xAC }, { 0x005022C0, 0x88, 0xC0, 0x00 },
+    { 0x004FE092, 0xFF, 0xFF, 0x00 }, { 0x004FE091, 0x69, 0xA9, 0x52 },
+    { 0x004FDF74, 0x32, 0x71, 0x26 }, { 0x004FDF75, 0xEF, 0xD9, 0xA0 },
+    { 0x004FE1AE, 0x65, 0x57, 0x30 }, { 0x004FE1AC, 0x92, 0xB8, 0xDF },
+    { 0x004FE088, 0x32, 0x5D, 0x8A }, { 0x004FE093, 0xAB, 0xAB, 0xAB },
+    { 0x00502CE4, 0x54, 0x54, 0x54 }, { 0x004FE1AD, 0xFF, 0xFF, 0xFF },
+    { 0x004FE094, 0x00, 0x00, 0x00 },
+};
+
+void __cdecl SetGamePalette(uint8_t *pal)
+{
+    static const double kShade[4] = { 0.4, 0.5, 0.6, 0.85 };
+    LPDIRECTDRAWPALETTE *held;
+    uint32_t             i, k;
+
+    if (!pal)
+        return;
+
+    ReleasePalette(pal);
+    pal[0] = pal[1] = pal[2] = 0;
+    orig_realize_palette((const uint32_t *)pal);
+
+    held = (LPDIRECTDRAWPALETTE *)(pal + PALETTE_HOLDER_OFF);
+    if (g_windowedMode)
+        IDirectDraw_CreatePalette(g_ddraw, DDPCAPS_8BIT,
+                                  (LPPALETTEENTRY)(uintptr_t)ADDR_GDI_PALETTE,
+                                  held, NULL);
+    else
+        IDirectDraw_CreatePalette(g_ddraw, DDPCAPS_8BIT | DDPCAPS_ALLOW256,
+                                  (LPPALETTEENTRY)pal, held, NULL);
+
+    IDirectDrawSurface_SetPalette(g_primarySurf, *held);
+
+    memcpy((void *)(uintptr_t)ADDR_PALETTE_COPY, pal, 0x201 * 4);
+
+    if (g_windowedMode)
+        CalibratePalette((uint32_t *)pal);
+
+    /* Four 256-byte blocks, back to back. */
+    g_remapShades[0] = (uint8_t *)(uintptr_t)ADDR_REMAP_SHADE_STORE;
+    for (k = 1; k < 4; k++)
+        g_remapShades[k] = g_remapShades[k - 1] + PALETTE_ENTRIES;
+
+    for (i = 0; i < PALETTE_ENTRIES; i++) {
+        uint32_t r = pal[i * 4 + 0], g = pal[i * 4 + 1], b = pal[i * 4 + 2];
+        uint8_t  cr, cg, cb;
+
+        g_remapIdent[i] = (uint8_t)i;
+
+        /* Already dark enough that 70% would not change the match. */
+        if (r <= REMAP_DARK_LIMIT && g <= REMAP_DARK_LIMIT
+            && b <= REMAP_DARK_LIMIT)
+            g_remapDark[i] = (uint8_t)i;
+        else
+            g_remapDark[i] = MatchRGB(pal, (uint32_t)(r * DARK_SCALE),
+                                      (uint32_t)(g * DARK_SCALE),
+                                      (uint32_t)(b * DARK_SCALE));
+
+        /* Dark colours are lifted, light ones darkened -- one table doing
+         * "make this stand out" in both directions. */
+        if (r <= REMAP_LIFT_LIMIT && g <= REMAP_LIFT_LIMIT
+            && b <= REMAP_LIFT_LIMIT) {
+            cr = (r + REMAP_LIFT < 0xFF) ? (uint8_t)(r + REMAP_LIFT) : 0xFF;
+            cg = (g + REMAP_LIFT < 0xFF) ? (uint8_t)(g + REMAP_LIFT) : 0xFF;
+            cb = (b + REMAP_LIFT < 0xFF) ? (uint8_t)(b + REMAP_LIFT) : 0xFF;
+        } else {
+            cr = (uint8_t)(r * DARK_SCALE);
+            cg = (uint8_t)(g * DARK_SCALE);
+            cb = (uint8_t)(b * DARK_SCALE);
+        }
+        g_remapBright[i] = MatchRGB(pal, cr, cg, cb);
+
+        /* Two colours by parity, so a run of indices alternates. */
+        g_remapTint[i] = (i & 1) ? MatchRGB(pal, 0xD6, 0xEF, 0x29)
+                                 : MatchRGB(pal, 0xFF, 0xFF, 0x00);
+
+        for (k = 0; k < 4; k++)
+            g_remapShades[k][i] = MatchRGB(pal, (uint32_t)(r * kShade[k]),
+                                           (uint32_t)(g * kShade[k]),
+                                           (uint32_t)(b * kShade[k]));
+    }
+
+    for (i = 0; i < sizeof kNamedColours / sizeof kNamedColours[0]; i++)
+        *(uint8_t *)(uintptr_t)kNamedColours[i].addr =
+            MatchRGB(pal, kNamedColours[i].r, kNamedColours[i].g,
+                     kNamedColours[i].b);
+
+    orig_palette_loaded();
+}
+
 int palette_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_SET_GAME_PALETTE, (const void *)SetGamePalette,
+                        "SetGamePalette", 1);
 
     rc |= patch_replace(ADDR_CALIBRATE_PALETTE, (const void *)CalibratePalette,
                         "CalibratePalette", 1);

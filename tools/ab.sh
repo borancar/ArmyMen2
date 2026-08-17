@@ -64,9 +64,29 @@ HARNESS='^(patch:|trace |trace:|verify:|am2hook|gamelog:|dinput:|\]|  [A-Za-z_]+
 # and reported a difference that was entirely wall-clock. Same shape as the `]`
 # loading-progress lines already in HARNESS, and the same fix.
 #
-# How many were dropped is printed, because a filter that can silently eat the
-# whole log is how an A/B comes to pass on nothing.
-VOLATILE='^[_ac]$'
+# ANY single character, not a list of them. This started as `^[_ac]$` because
+# those were the three seen; a later run produced `e`, `g` and `i` instead, so
+# the set is not fixed and enumerating it just fails again later with a
+# different letter. A one-character line carries no information to compare.
+#
+# How many were dropped is printed, and MIN_FRAMES below turns "none at all"
+# into a failure, because a filter that can silently eat the whole log is
+# exactly how an A/B comes to pass on nothing.
+VOLATILE='^.$'
+
+# Configurations that are supposed to reach live gameplay, and the least number
+# of per-frame markers that proves they did.
+#
+# This is not belt and braces. A mission run had the reconstruction reach
+# gameplay and the original stop at the briefing on "Press SPACE to continue",
+# and with the frame markers filtered that compares 14 lines against 14 and
+# reports CLEAN. The run that found it only failed because the marker character
+# had changed and the filter missed it -- so the check that caught the bug was
+# an accident, and this is the one that will not be.
+#
+# AM2_AB_MIN_FRAMES overrides it, mainly so the check itself can be tested --
+# the same reason AM2_AB_PIXELS exists.
+MIN_FRAMES="${AM2_AB_MIN_FRAMES:-500}"
 
 drive() { AM2_DISPLAY="$DISP" "$REPO/tools/drive.sh" "$@"; }
 
@@ -165,6 +185,14 @@ compare() {
     vr=$(cat "$WORK/$cfg-recon.volatile" 2>/dev/null || echo 0)
     if [ "$vo" -gt 0 ] || [ "$vr" -gt 0 ]; then
         echo "  frames  $vo/$vr per-frame markers dropped as volatile"
+    fi
+
+    if [ "$cfg" = mission ] && { [ "$vo" -lt "$MIN_FRAMES" ] || [ "$vr" -lt "$MIN_FRAMES" ]; }; then
+        echo "  frames  TOO FEW -- $cfg is supposed to reach live gameplay and"
+        echo "          at least one side did not ($vo/$vr, want $MIN_FRAMES+)."
+        echo "          Comparing these logs would compare the two ways of not"
+        echo "          getting there. Re-run; the drive is not reliable."
+        rc=1
     fi
 
     if diff -q "$WORK/$cfg-orig.log" "$WORK/$cfg-recon.log" >/dev/null; then

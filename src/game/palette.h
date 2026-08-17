@@ -58,6 +58,13 @@ void __cdecl RealizeSystemPalette(const uint32_t *palette);
  * flags of 0 and map onto the system colours as usual. */
 void __cdecl SnapshotSystemPalette(void);
 
+/* Original: 0x0041B0E0, 5 call sites. Install a palette: create the
+ * DirectDraw palette, attach it to the primary, and rebuild the seven remap
+ * tables and 23 named colour indices derived from it.
+ *
+ * The image's only CreatePalette is in here. */
+void __cdecl SetGamePalette(uint8_t *palette);
+
 int palette_install(void);
 
 #ifdef __cplusplus

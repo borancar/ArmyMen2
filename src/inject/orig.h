@@ -287,6 +287,29 @@
 /* The GDI half of the palette. The game is 8-bit, so what it can actually show
  * is negotiated with Windows rather than chosen. */
 #define ADDR_REALIZE_PALETTE     0x0041AF00u  /* void(const uint32_t *palette) */
+/* SetGamePalette -- creates the DirectDraw palette and builds every remap
+ * table the software blitters use. 0x0041B132 is the image's ONLY
+ * CreatePalette, so until this was reconstructed the display palette was the
+ * one DirectX object the port did not create. */
+#define ADDR_SET_GAME_PALETTE    0x0041B0E0u  /* void(uint8_t *palette) */
+#define ADDR_PALETTE_LOADED      0x00423C50u  /* void(void), run afterwards */
+/* The fixed 256-entry table handed to CreatePalette when windowed, where the
+ * desktop owns the real palette and the game may not set it. */
+#define ADDR_GDI_PALETTE         0x00477E6Cu  /* PALETTEENTRY[256] */
+/* Where the palette is copied wholesale once it is installed: 0x201 dwords,
+ * which is the 256 entries plus the DirectDraw palette pointer after them. */
+#define ADDR_PALETTE_COPY        0x005022C8u
+/* Remap tables, one byte per palette index, all rebuilt by SetGamePalette. */
+#define ADDR_REMAP_IDENTITY      0x004FD764u  /* uint8_t *, index -> itself */
+#define ADDR_REMAP_DARK          0x004FE084u  /* uint8_t *, 70% brightness */
+#define ADDR_REMAP_BRIGHT        0x00507230u  /* uint8_t *, +0x80 or 70% */
+#define ADDR_REMAP_TINT          0x0047826Cu  /* uint8_t *, two colours by parity */
+/* Four more, at 40/50/60/85% brightness, whose 256-byte blocks sit back to
+ * back from 0x00502CEC. */
+#define ADDR_REMAP_SHADES        0x004FE2B0u  /* uint8_t *[4] */
+#define ADDR_REMAP_SHADE_STORE   0x00502CECu
+/* Palette indices of the colours the engine asks for by name. */
+#define ADDR_COLOUR_TABLE_BASE   0x004FE084u
 #define ADDR_SNAPSHOT_PALETTE    0x00445170u  /* void(void) */
 /* A LOGPALETTE living in .data with palVersion and palNumEntries already set
  * to 0x300 and 256; only the 256 entries after them are ever written. */
