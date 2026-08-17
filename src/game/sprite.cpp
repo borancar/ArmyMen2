@@ -155,6 +155,52 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
     }
 }
 
+/* The three reload routines and the -df switch that picks between two of
+ * them. All original; this function only decides which applies. */
+typedef int32_t (__cdecl *am2_reload_named_fn)(AM2_Sprite *, const char *, int32_t);
+typedef int32_t (__cdecl *am2_rebuild_fn)(AM2_Sprite *, int32_t);
+#define orig_sprite_reload_named (*(am2_reload_named_fn)ADDR_SPRITE_RELOAD_NAMED)
+#define orig_sprite_rebuild_df   (*(am2_rebuild_fn)ADDR_SPRITE_REBUILD_DF)
+#define orig_sprite_rebuild_alt  (*(am2_rebuild_fn)ADDR_SPRITE_REBUILD_ALT)
+#define g_optDf                  (*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
+
+/* Put a lost sprite back. See sprite.h.
+ *
+ * The order matters: Restore first, because a surface that will not come back
+ * cannot be filled, and then the pixels, because DirectDraw hands a restored
+ * surface back with its contents undefined. Restoring without refilling would
+ * leave the sprite drawing garbage rather than nothing.
+ *
+ * `flags & 0x1D` is passed on rather than the whole word. Those are bit 0 --
+ * the colour-key bit -- and bits 2, 3 and 4 of the software-path selector; bit
+ * 5 is dropped. Kept exactly, since the reload routines are the original's and
+ * expect what the original gave them. */
+void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
+{
+    int32_t flags;
+
+    if (IDirectDrawSurface_Restore(spr->image.surface) != DD_OK)
+        return;
+
+    flags = (int32_t)(spr->flags & 0x1D);
+
+    if (spr->source) {
+        if (orig_sprite_reload_named(spr, spr->source, flags))
+            return;
+        orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_S, spr->source);
+        return;
+    }
+
+    if (g_optDf) {
+        if (orig_sprite_rebuild_df(spr, flags))
+            return;
+    } else {
+        if (orig_sprite_rebuild_alt(spr, flags))
+            return;
+    }
+    orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_X, spr->id);
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -162,5 +208,7 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
                         "DrawSpriteClipped", 5);
+    rc |= patch_replace(ADDR_RESTORE_CHAIN, (const void *)RestoreSpriteSurface,
+                        "RestoreSpriteSurface", 1);
     return rc;
 }

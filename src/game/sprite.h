@@ -25,7 +25,8 @@ extern "C" {
  * from one call site.
  */
 typedef struct {
-    uint8_t  pad00[8];
+    uint32_t id;                 /* +0x00  logged as %x when a restore fails */
+    uint8_t  pad04[4];
     uint32_t format;             /* +0x08  1, 2 or 3; selects the blitter */
     uint32_t flags;              /* +0x0C  bit0 clear => source colour key;
                                   *        bits 2..5 (0x3C) => software path */
@@ -43,6 +44,10 @@ typedef struct {
     AM2_Rle16 *overlay;          /* +0x30  second layer, drawn after the first */
     uint8_t *lut;                /* +0x34  256-entry remap table, may be NULL */
     void    *palette;            /* +0x38  overlay palette; NULL means default */
+    char    *source;             /* +0x3C  where it was loaded from, or NULL.
+                                  *        RestoreSpriteSurface reloads through
+                                  *        it after a lost surface, and names it
+                                  *        in the failure message. */
 } AM2_Sprite;
 
 /* DrawSprite -- original 0x00445FF0, 24 call sites.
@@ -58,6 +63,20 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode);
  * the optional overlay layer. */
 void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
                                const AM2_Rect *clipped, int32_t mode);
+
+/* RestoreSpriteSurface -- original 0x00445EB0, the recovery chain reached when
+ * DrawSpriteClipped's BltFast answers DDERR_SURFACELOST.
+ *
+ * Restores the surface and then puts the pixels back, because a restored
+ * DirectDraw surface comes back with its memory undefined. Which route depends
+ * on where the sprite came from: one that remembers a `source` is reloaded from
+ * it, and one that does not is rebuilt by whichever of the two other paths `-df`
+ * selects. Failure is logged and otherwise ignored -- the sprite simply draws
+ * wrong.
+ *
+ * UNTESTED, like the other Restore path in surface.cpp: reaching it needs a
+ * surface to be lost, which wants an alt-tab or a display mode change. */
+void __cdecl RestoreSpriteSurface(AM2_Sprite *spr);
 
 int sprite_install(void);
 

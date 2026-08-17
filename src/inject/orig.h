@@ -128,6 +128,13 @@
 #define ADDR_DRAW_SPRITE_CLIPPED 0x00446070u  /* void(spr,x,y,const AM2_Rect*,mode) */
 #define ADDR_BLIT_OVERLAY        0x0041C480u  /* __fastcall(x,y,data,AM2_Rect) */
 #define ADDR_RESTORE_CHAIN       0x00445EB0u  /* void(AM2_Sprite*) */
+/* The three ways a sprite's pixels are put back after its surface is restored.
+ * All stay original; which one applies is decided in RestoreSpriteSurface. */
+#define ADDR_SPRITE_RELOAD_NAMED 0x004456B0u  /* int32(spr, const char *, flags) */
+#define ADDR_SPRITE_REBUILD_DF   0x004243B0u  /* int32(spr, flags), when -df is set */
+#define ADDR_SPRITE_REBUILD_ALT  0x00445C00u  /* int32(spr, flags), when it is not */
+#define ADDR_STR_RESTORE_FAIL_S  0x004897ACu  /* "unable to restore sprite %s.\n" */
+#define ADDR_STR_RESTORE_FAIL_X  0x0048978Cu  /* "unable to restore sprite %x.\n" */
 #define ADDR_OVERLAY_PALETTE     0x004FE1A4u  /* void *, set before the overlay blit */
 #define ADDR_DEFAULT_PALETTE     0x004FE084u  /* void *, used when the sprite has none */
 
