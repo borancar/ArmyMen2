@@ -702,6 +702,173 @@ void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest)
                            DDBLT_WAIT | DDBLT_ASYNC, NULL);
 }
 
+/* Turn a loaded bitmap into something drawable -- 0x0041BE80.
+ *
+ * The third of the family, after CreateBitmapSurface and ReloadBitmapSurface,
+ * and the one that chooses between them: given a bitmap and its palette it
+ * either encodes it for the software blitters or puts it in a DirectDraw
+ * surface, and records which in the destination's flags.
+ *
+ * A palette remap comes first unless the caller supplies one. Every source
+ * entry is turned into a colour and matched against the active palette, and
+ * the search starts at ten rather than zero when the RESERVE10 flag is clear --
+ * which is how the first ten entries are kept for something else. With no
+ * active palette the table is the identity.
+ *
+ * The size test picks the encoder: 60,000 pixels or more goes to one routine
+ * and less to another, and the flag written afterwards -- 4, 8 or 0x10 -- is
+ * how everything downstream knows which shape the result is in.
+ *
+ * The DirectDraw path is CreateOffscreenSurface's dance again. Video memory is
+ * asked for unless the record already says system memory, and it is asked
+ * *politely*: GetAvailableVidMem is consulted first and the request downgraded
+ * if the bitmap would not fit, which is a better citizen than simply failing
+ * and retrying. It still retries once if the create fails anyway.
+ *
+ * MATCHED ARGUMENT, worth recording. The palette matcher's third argument is
+ * read from a slot whose low byte alone is ever written, so its top three bytes
+ * are whatever the stack held. That is not a defect: 0x0041B7C0 does `and ebx,
+ * 0xff` before using it. Passing the byte is faithful, and it was worth
+ * checking rather than reproducing an apparent bug that was not one.
+ *
+ * Exercised by every sprite the game loads, so the Boot Camp pixel budget is
+ * the check that matters here. */
+static_assert((DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH) == 7, "the descriptor flags");
+static_assert(DDSCAPS_OFFSCREENPLAIN == 0x40, "DDSCAPS_OFFSCREENPLAIN");
+static_assert(DDSCAPS_SYSTEMMEMORY == 0x800, "DDSCAPS_SYSTEMMEMORY");
+
+typedef uint32_t (__cdecl *am2_colour_of_fn)(uint32_t entry);
+typedef uint8_t (__cdecl *am2_match_colour_fn)(const void *palette,
+                                               uint32_t colour, uint32_t from);
+typedef int32_t (__cdecl *am2_encode_fn)(const void *pixels, void *dest,
+                                         int32_t w, int32_t h,
+                                         const uint8_t *remap);
+#define orig_colour_of    (*(am2_colour_of_fn)ADDR_COLOUR_OF_ENTRY)
+#define orig_match_colour (*(am2_match_colour_fn)ADDR_MATCH_COLOUR)
+#define orig_encode_big   (*(am2_encode_fn)ADDR_ENCODE_BIG)
+#define orig_encode_small (*(am2_encode_fn)ADDR_ENCODE_SMALL)
+#define g_activePalette   (*(void **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+#define g_ddraw2obj       (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
+
+int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
+                           uint8_t *dest, const uint8_t *remap)
+{
+    uint8_t   table[256];
+    uint32_t  flags   = *(uint32_t *)(dest + BMP_OFF_FLAGS);
+    int32_t   reserve = (flags & BMP_FLAG_RESERVE10) == 0;
+    int32_t   w, h, i;
+
+    /* Copy the geometry across first; the original does this before anything
+     * can fail, so the record is consistent even on the error paths. */
+    *(uint32_t *)(dest + BMP_OFF_WIDTH)  = src[1];
+    *(uint32_t *)(dest + BMP_OFF_HEIGHT) = src[2];
+    *(uint32_t *)(dest + 0x0C)           = src[6];
+    *(uint32_t *)(dest + 0x10)           = src[7];
+
+    if (!remap) {
+        int32_t from = 0;
+
+        if (reserve) {
+            for (i = 0; i < BMP_RESERVED_ENTRIES; i++)
+                table[i] = (uint8_t)i;
+            from = BMP_RESERVED_ENTRIES;
+        }
+        if (g_activePalette) {
+            for (i = from; i < 256; i++)
+                table[i] = orig_match_colour(g_activePalette,
+                                             orig_colour_of(src[10 + i]),
+                                             (uint32_t)from);
+        } else {
+            for (i = from; i < 256; i++)
+                table[i] = (uint8_t)i;
+        }
+        remap = table;
+    }
+
+    w = (int32_t)*(uint32_t *)(dest + BMP_OFF_WIDTH);
+    h = (int32_t)*(uint32_t *)(dest + BMP_OFF_HEIGHT);
+
+    if (flags & BMP_FLAG_SOFTWARE) {
+        int32_t result;
+
+        flags &= ~BMP_FLAG_SOFTWARE;
+        *(uint32_t *)(dest + BMP_OFF_FLAGS) = flags;
+        dest[BMP_OFF_KEY] = 0;
+
+        if (w * h >= BMP_SOFTWARE_LIMIT) {
+            result = orig_encode_big(pixels, dest, w, h, remap);
+            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
+        } else {
+            result = orig_encode_small(pixels, dest, w, h, remap);
+            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= reserve ? 8 : 0x10;
+        }
+        return result;
+    }
+
+    {
+        DDSURFACEDESC       ddsd;
+        DDSCAPS             want;
+        DWORD               total = 0, freeVid = 0;
+        LPDIRECTDRAWSURFACE surf = NULL;
+        int32_t             copied;
+
+        memset(&ddsd, 0, sizeof ddsd);
+        ddsd.dwSize   = sizeof ddsd;
+        ddsd.dwFlags  = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
+        ddsd.dwWidth  = (DWORD)w;
+        ddsd.dwHeight = (DWORD)h;
+        ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+        want.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+
+        /* Ask before taking: if the card has not got room, do not make it say
+         * so by failing. */
+        if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
+            IDirectDraw2_GetAvailableVidMem(g_ddraw2obj, &want, &total, &freeVid);
+            if (freeVid < (DWORD)(w * h))
+                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
+        }
+        if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)
+            ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+
+        if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
+            if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM) {
+                orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_SURF);
+                return 0;
+            }
+            /* Only worth saying when video memory was what we asked for. */
+            orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_VIDMEM);
+            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
+            ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+            if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
+                orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_SURF);
+                return 0;
+            }
+        }
+
+        IDirectDrawSurface_Restore(surf);
+        if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
+            IDirectDrawSurface_Release(surf);
+            orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_LOCK);
+            return 0;
+        }
+
+        copied = orig_blit_bitmap_in(ddsd.lpSurface, ddsd.lPitch, pixels, w, h,
+                                     remap, (uint32_t *)(dest + BMP_OFF_KEY));
+        if (!copied) {
+            IDirectDrawSurface_Release(surf);
+            orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_LOCK);
+            return 0;
+        }
+
+        IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
+        *(LPDIRECTDRAWSURFACE *)(dest + BMP_OFF_SURFACE) = surf;
+
+        if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_NO_COLORKEY))
+            SetSurfaceColorKey(surf, dest[BMP_OFF_KEY]);
+        return copied;
+    }
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -736,6 +903,8 @@ int surface_install(void)
                         "DrawSeqBar", 5);
     rc |= patch_replace(ADDR_BLIT_CENTRED, (const void *)BlitCentred,
                         "BlitCentred", 1);
+    rc |= patch_replace(ADDR_MAKE_BITMAP, (const void *)MakeBitmap,
+                        "MakeBitmap", 4);
     rc |= patch_replace(ADDR_FREE_MAP_SURFACES, (const void *)FreeMapSurfaces,
                         "FreeMapSurfaces", 0);
     return rc;

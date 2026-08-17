@@ -93,6 +93,27 @@
  * reads again afterwards -- so treat it as in/out and do not cache the value
  * across the call. Whether this routine actually writes through it was not
  * traced; passing the address and re-reading is faithful either way. */
+#define ADDR_MAKE_BITMAP     0x0041BE80u  /* int32(src, pixels, dest, remap) */
+#define ADDR_COLOUR_OF_ENTRY 0x0041AE90u  /* uint32(uint32 palette entry) */
+#define ADDR_MATCH_COLOUR    0x0041B7C0u  /* uint8(palette, colour, uint8 from) */
+#define ADDR_ENCODE_BIG      0x0041BBC0u  /* the >= 60000 pixel encoder */
+#define ADDR_ENCODE_SMALL    0x0041BD20u
+#define ADDR_ACTIVE_PALETTE  0x00477A58u  /* NULL means no remapping */
+/* The record MakeBitmap fills in. Not an AM2_Sprite despite the resemblance. */
+#define BMP_OFF_SURFACE      0x00u
+#define BMP_OFF_WIDTH        0x04u
+#define BMP_OFF_HEIGHT       0x08u
+#define BMP_OFF_FLAGS        0x14u
+#define BMP_OFF_KEY          0x18u   /* in: byte count, out: transparent index */
+#define BMP_FLAG_NO_COLORKEY 0x0001u
+#define BMP_FLAG_SYSMEM      0x0040u
+#define BMP_FLAG_RESERVE10   0x0080u /* clear => reserve the first ten entries */
+#define BMP_FLAG_SOFTWARE    0x1000u
+#define BMP_SOFTWARE_LIMIT   0xEA60  /* 60000 pixels */
+#define BMP_RESERVED_ENTRIES 10
+#define ADDR_STR_BMP_NO_VIDMEM 0x00478280u
+#define ADDR_STR_BMP_NO_SURF   0x00478304u
+#define ADDR_STR_BMP_NO_LOCK   0x004782E4u
 #define ADDR_BLIT_BITMAP_IN  0x0041BA90u
 #define ADDR_CREATE_BITMAP   0x00423D90u  /* surface *(FILE*, ...) */
 #define ADDR_RELOAD_BITMAP   0x00424280u  /* int32(surface*, FILE*, ...) */

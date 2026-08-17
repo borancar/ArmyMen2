@@ -366,7 +366,6 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   |---|---|
   | `0x0040CED0` 1792B, 12 | the sound engine proper |
   | `0x00427070` 944B, 5 | input-to-command translation |
-  | `0x0041BE80` 832B, 8 | **mislabelled, and worth doing.** It is `MakeBitmap` — its own error strings say so — the third sibling of `CreateBitmapSurface` and `ReloadBitmapSurface`, using the same blit helper at `0x0041BA90` and the reconstructed `SetSurfaceColorKey`. Not cache management at all. Left only because it is large and branchy: a 256-entry palette remap is built first (two ways, depending on `0x00477A58`), then `w*h >= 0xEA60` picks between two software encoders (`0x0041BD20`, `0x0041BBC0`) and the DirectDraw path, and the result is flagged back into `+0x14` of the sprite. At 104 bytes per COM call it is the densest thing left; it needs a careful sitting, not a quick one |
   | `0x00412FE0` 1184B, 4 | menu logic |
   | `0x00425AF0` 288B, 5 | map object placement |
   | `0x0041B0E0`, `0x0041D060`, `0x0042D9B0`, `0x0042DA30`, `0x0042F170`, `0x0042FF60` | all ≥120 B per COM call, all game logic |
