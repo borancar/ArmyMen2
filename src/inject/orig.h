@@ -220,7 +220,16 @@
 #define ADDR_CLSID_DPLAY_LOBBY   0x0046F778u  /* CLSID_DirectPlayLobby */
 #define ADDR_IID_DPLAY_LOBBY3A   0x0046F768u  /* IID_IDirectPlayLobby3A */
 /* Both thiscall on the comm object, both taking nothing but `this`. */
-#define ADDR_COMM_DROP_DPLAY     0x0040EA40u  /* tears down an existing one */
+#define ADDR_COMM_DROP_DPLAY     0x0040EA40u  /* thiscall int32(this) */
+#define COMM_OFF_LOBBY           0x3F4u   /* IDirectPlayLobby3A; the store at
+                                           * 0x0040ED3C names it */
+#define COMM_OFF_SEND_BUF        0x3E8u   /* game heap */
+#define COMM_OFF_RECV_BUF        0x3F0u   /* game heap */
+#define ADDR_REMOVE_PLAYER       0x004029B0u  /* void(uint32 id), 7 callers */
+#define ADDR_CLEAR_EVENT_FLAGS   0x00426800u  /* void(uint32 bits); ANDs them out */
+#define COMM_DROP_EVENT_MASK     0x1E78F0u    /* what the teardown clears */
+#define ADDR_STR_RELEASING_COMM  0x00475434u  /* "Releasing Comm Connection \n" */
+#define ADDR_COMM_UNKNOWN_4F48E0 0x004F48E0u  /* cleared with the connection */
 #define ADDR_COMM_CONNECTED      0x0040E660u  /* thiscall int32(this) */
 #define COMM_OFF_CAPS            0x42Cu   /* DPCAPS, filled by GetCaps */
 #define COMM_OFF_BUFFER_MAX      0x410u   /* set to 0x400 by CommConstruct */

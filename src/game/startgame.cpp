@@ -39,10 +39,6 @@ typedef void (__cdecl *am2_play_sound_fn)(int32_t, int32_t, int32_t, int32_t,
                                           int32_t);
 typedef void (__cdecl *am2_void_fn)(void);
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
-/* Tears down an existing DirectPlay object. Takes the comm object in ecx and
- * nothing else; stays original, as in dplay.cpp. */
-typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
-#define orig_drop_directplay (*(am2_comm_method_fn)ADDR_COMM_DROP_DPLAY)
 
 #define orig_play_sound          (*(am2_play_sound_fn)ADDR_PLAY_SOUND)
 #define orig_apply_game_settings (*(am2_void_fn)ADDR_APPLY_GAME_SETTINGS)
@@ -122,7 +118,7 @@ void __cdecl StartSelectedGame(void)
     /* A DirectPlay object left over from browsing sessions is dropped: a local
      * game has no use for it and it would otherwise stay connected. */
     if (*(void **)(comm + COMM_OFF_DPLAY))
-        orig_drop_directplay(comm);
+        CommDropDirectPlay(comm);
 
     /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */
     for (i = 1; i < 4; i++) {

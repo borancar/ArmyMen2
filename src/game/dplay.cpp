@@ -37,7 +37,6 @@ static_assert(CLSCTX_INPROC_SERVER == 1, "CLSCTX_INPROC_SERVER");
 
 /* Both take the comm object in ecx and nothing else. */
 typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
-#define orig_drop_directplay (*(am2_comm_method_fn)ADDR_COMM_DROP_DPLAY)
 
 typedef void (__cdecl *am2_destroy_list_fn)(void *list);
 #define orig_destroy_msg_list (*(am2_destroy_list_fn)ADDR_DESTROY_MSG_LIST)
@@ -53,8 +52,9 @@ static inline LPDIRECTPLAY4A *DirectPlaySlot(void *comm)
     return (LPDIRECTPLAY4A *)((uint8_t *)comm + COMM_OFF_DPLAY);
 }
 
-/* Defined further down; called from here as soon as a connection exists. */
+/* Both defined further down; called from here. */
 int32_t __attribute__((thiscall)) CommOnConnected(void *self);
+int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
 
 int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connection)
 {
@@ -64,7 +64,7 @@ int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connect
     /* Whatever is there now goes first; creating a second one over the top
      * would leak the interface and the socket underneath it. */
     if (*slot)
-        orig_drop_directplay(comm);
+        CommDropDirectPlay(comm);
 
     hr = CoCreateInstance(kCLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER,
                           kIID_IDirectPlay4A, (LPVOID *)slot);
@@ -323,7 +323,7 @@ void __attribute__((thiscall)) CommDestruct(void *comm)
 {
     uint8_t *self = (uint8_t *)comm;
 
-    orig_drop_directplay(comm);
+    CommDropDirectPlay(comm);
     CommShutdown();
     comm_u32(self, 0x3DC) = 0;
     comm_u32(self, 0x404) = 0;
@@ -685,6 +685,99 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
     return 1;
 }
 
+/* Give the connection back -- 0x0040EA40, thiscall, and the last of the
+ * DirectPlay surface.
+ *
+ * Everything the connection owns goes: two heap buffers, the IDirectPlay4A
+ * itself, every remote player, and finally the lobby interface at +0x3F4 --
+ * which is named by the store at 0x0040ED3C, where CreateDirectPlayLobby is
+ * handed that exact address to fill.
+ *
+ * The four player slots are not merely cleared, they are put back to what
+ * CommConstruct built: zeroed apart from the slot index and a fresh
+ * GetTickCount, with the 0x40-byte name buffer blanked. That is the third
+ * function to write this layout -- the constructor, StartSelectedGame's
+ * computer-player fill, and now this -- and all three agree.
+ *
+ * Only remote players are destroyed. Ours, at +0x3CC, is skipped inside the
+ * loop and removed afterwards, so it outlives the slots it appears in.
+ *
+ * Returns 0 always, which every caller ignores. */
+typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
+typedef void (__cdecl *am2_clear_flags_fn)(uint32_t bits);
+#define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
+#define orig_clear_event_flags (*(am2_clear_flags_fn)ADDR_CLEAR_EVENT_FLAGS)
+#define g_defaultOwnerSlot     (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define g_commUnknown4F48E0    (*(int32_t *)(uintptr_t)ADDR_COMM_UNKNOWN_4F48E0)
+
+int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
+{
+    uint8_t             *self = (uint8_t *)comm;
+    LPDIRECTPLAY4A      *dp    = DirectPlaySlot(comm);
+    LPDIRECTPLAYLOBBY3A *lobby =
+        (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+    uint32_t             ours;
+    int32_t              i;
+
+    if (comm_u32(self, COMM_OFF_SEND_BUF)) {
+        orig_free(*(void **)(self + COMM_OFF_SEND_BUF));
+        comm_u32(self, COMM_OFF_SEND_BUF) = 0;
+    }
+    if (comm_u32(self, COMM_OFF_RECV_BUF)) {
+        orig_free(*(void **)(self + COMM_OFF_RECV_BUF));
+        comm_u32(self, COMM_OFF_RECV_BUF) = 0;
+    }
+    if (*dp) {
+        IDirectPlayX_Release(*dp);
+        *dp = NULL;
+    }
+    comm_u32(self, 0x3DC) = 0;
+
+    orig_log((const char *)(uintptr_t)ADDR_STR_RELEASING_COMM);
+
+    comm_u32(self, COMM_OFF_PLAYER_COUNT) = 1;   /* just us again */
+    comm_u32(self, 0x3E4) = 0;
+
+    ours = comm_u32(self, COMM_OFF_OUR_PLAYER_ID);
+
+    for (i = 0; i < 4; i++) {
+        uint8_t *slot = self + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint32_t id;
+
+        comm_u32(slot, 0x00) = 0;
+        comm_u32(slot, 0x64) = 0;
+        comm_u32(slot, 0x68) = 0;
+        comm_u32(slot, 0x50) = 0;
+        comm_u32(slot, 0x4C) = 0;
+        comm_u32(slot, 0x04) = (uint32_t)i;
+        comm_u32(slot, 0x54) = 0;
+
+        /* Remote players are destroyed; ours is left for the call below. */
+        id = comm_u32(slot, COMM_SLOT_OFF_ID);
+        if (id && id != ours)
+            orig_remove_player(id);
+        comm_u32(slot, COMM_SLOT_OFF_ID) = 0;
+
+        comm_u32(slot, 0x58) = 0;
+        comm_u32(slot, 0x5C) = 0;
+        comm_u32(slot, 0x60) = GetTickCount();
+        memset(slot + 0x0C, 0, 0x40);
+    }
+
+    orig_remove_player(ours);
+    comm_u32(self, COMM_OFF_OUR_PLAYER_ID) = 0;
+
+    if (*lobby) {
+        IDirectPlayLobby_Release(*lobby);
+        *lobby = NULL;
+    }
+
+    orig_clear_event_flags(COMM_DROP_EVENT_MASK);
+    g_defaultOwnerSlot  = 0;
+    g_commUnknown4F48E0 = 0;
+    return 0;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -715,5 +808,7 @@ int dplay_install(void)
                         "CommOpenSession", 1);
     rc |= patch_replace(ADDR_COMM_CONNECTED, (const void *)CommOnConnected,
                         "CommOnConnected", 0);
+    rc |= patch_replace(ADDR_COMM_DROP_DPLAY, (const void *)CommDropDirectPlay,
+                        "CommDropDirectPlay", 0);
     return rc;
 }

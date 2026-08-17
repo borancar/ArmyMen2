@@ -97,6 +97,16 @@ int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list);
  * is no session to make. */
 int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name);
 
+/* Original: 0x0040EA40, thiscall. Give the DirectPlay connection back.
+ *
+ * Frees the two heap buffers, releases the IDirectPlay4A and the lobby
+ * interface, destroys every remote player, and puts the four player slots back
+ * to the state CommConstruct built them in. Ours is removed after the loop
+ * rather than inside it, so it outlives the slots that name it.
+ *
+ * Returns 0 always; every caller ignores it. */
+int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus
