@@ -36,6 +36,7 @@
 #include "../game/text.h"
 #include "../game/device.h"
 #include "../game/dplay.h"
+#include "../game/startgame.h"
 #include "../game/wavefile.h"
 #include "../game/winmain.h"
 
@@ -208,6 +209,8 @@ static const struct {
       { 0x8B, 0x81, 0xEC, 0x03, 0x00, 0x00, 0x85, 0xC0 }, 8 },
     { ADDR_COMM_GET_SESSION, "CommGetSessionDesc",
       { 0x51, 0x56, 0x8B, 0xF1, 0x8B, 0x86, 0xEC, 0x03 }, 8 },
+    { ADDR_START_SELECTED_GAME, "StartSelectedGame",
+      { 0xA1, 0x58, 0xA0, 0x65, 0x00, 0x53, 0x56, 0x57 }, 8 },
     { ADDR_COMM_CONSTRUCT, "CommConstruct",
       { 0x51, 0x53, 0x55, 0x56, 0x57, 0x8B, 0xF1, 0xE8 }, 8 },
     { ADDR_COMM_DESTRUCT, "CommDestruct",
@@ -318,6 +321,7 @@ static void install(void)
     report_install();
     wavefile_install();
     dplay_install();
+    startgame_install();
     movie_install();
     audio_install();
     palette_install();

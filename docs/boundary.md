@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 35 | 129 |
-| still boundary | 4 | 13 |
+| reconstructed | 36 | 131 |
+| still boundary | 3 | 11 |
 | game logic, incidental calls only | 83 | 134 |
 | **total** | **122** | **276** |
 
@@ -25,7 +25,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 63 | 130 |  |
+| USER32 | 65 | 130 |  |
 | KERNEL32 | 19 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -41,7 +41,7 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
-| `MessageBoxA` | 6 |
+| `MessageBoxA` | 5 |
 | `ShowCursor` | 1 |
 
 Read that table with `docs/copyprotection.md` beside it. Most of
@@ -116,7 +116,6 @@ function from game logic with a call in it.
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
-| `0x0042ece0` | 352 | 2 | 176 | GetActiveWindow, MessageBoxA |
 | `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
 | `0x0040ed10` | 1056 | 2 | 528 | GetActiveWindow, MessageBoxA |
 
@@ -124,7 +123,7 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 63 |
+| USER32.dll | 130 | 65 |
 | KERNEL32.dll | 99 | 19 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |

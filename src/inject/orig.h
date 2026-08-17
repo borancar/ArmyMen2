@@ -411,6 +411,21 @@
 /* The comm subsystem object; -debugComm, -traceComm and -logComm set flags
  * inside it rather than in globals of their own. */
 #define ADDR_COMM_OBJECT         0x004751B0u  /* void ** */
+
+/* The menu's "do this next" pair. StartSelectedGame writes a request code into
+ * the first and raises the flag in the second; the menu loop acts on it. The
+ * codes seen so far are 1 (refused), 0xA (joined a session) and 0xB (start a
+ * local game). */
+#define ADDR_MENU_REQUEST        0x00511DC8u  /* int32_t, the code */
+#define ADDR_MENU_REQUEST_SET    0x00511DC4u  /* int32_t, non-zero when one is pending */
+
+/* Copies the pending settings block at 0x00516xxx over the active one at
+ * 0x00515Fxx, resets the comm slots and copies the two player-name strings.
+ * Named for what its body does; stays original. */
+#define ADDR_APPLY_GAME_SETTINGS 0x0042F170u  /* void(void) */
+#define ADDR_PLAY_SOUND          0x0040C040u  /* void(int32, int32, int32, int32, int32) */
+#define ADDR_FMT_COMPUTER_N      0x00486EC4u  /* "Computer%d" */
+#define ADDR_START_SELECTED_GAME 0x0042ECF0u  /* void(void), a button handler */
 #define COMM_OFF_DEBUG           0x418u
 #define COMM_OFF_TRACE           0x470u
 #define COMM_OFF_LOG             0x474u
