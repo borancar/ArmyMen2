@@ -62,7 +62,7 @@ displacement rather than by any ranking.
 
 | field | what it holds | reconstructed | left |
 |---|---|---:|---:|
-| `0x3ec` | IDirectPlay4A, in the comm object | 5 | 2 |
+| `0x3ec` | IDirectPlay4A, in the comm object | 6 | 1 |
 | `0x10` | IDirectDrawSurface, in a sprite or map descriptor | 4 | 1 |
 | `0x800` | IDirectDrawPalette, in a palette holder | 3 | 0 |
 | `0x4` | — | 2 | 0 |
@@ -95,8 +95,8 @@ could be named, gives the other end of the range:
 
 | | functions |
 |---|---:|
-| any COM dispatch, reconstructed | 47 |
-| any COM dispatch, not | 63 |
+| any COM dispatch, reconstructed | 48 |
+| any COM dispatch, not | 62 |
 
 The true DirectX total sits between the two. The second row used to
 be mostly the game's own C++ objects, and that is no longer a guess:

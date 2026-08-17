@@ -221,7 +221,18 @@
 #define ADDR_IID_DPLAY_LOBBY3A   0x0046F768u  /* IID_IDirectPlayLobby3A */
 /* Both thiscall on the comm object, both taking nothing but `this`. */
 #define ADDR_COMM_DROP_DPLAY     0x0040EA40u  /* tears down an existing one */
-#define ADDR_COMM_CONNECTED      0x0040E660u  /* run once the connection is up */
+#define ADDR_COMM_CONNECTED      0x0040E660u  /* thiscall int32(this) */
+#define COMM_OFF_CAPS            0x42Cu   /* DPCAPS, filled by GetCaps */
+#define COMM_OFF_BUFFER_MAX      0x410u   /* set to 0x400 by CommConstruct */
+#define COMM_OFF_BUFFER_DEFAULT  0x428u   /* set to 0x3E4 by CommConstruct */
+#define ADDR_STR_CAPS_HEAD       0x00475400u
+#define ADDR_STR_CAPS_PACKET     0x004753E8u
+#define ADDR_STR_CAPS_HEADER     0x004753D0u
+#define ADDR_STR_CAPS_LATENCY    0x004753B8u
+#define ADDR_STR_CAPS_TIMEOUT    0x004753A0u
+#define ADDR_STR_CAPS_GUAR_YES   0x0047537Cu
+#define ADDR_STR_CAPS_GUAR_NO    0x00475354u
+#define ADDR_STR_CAPS_BUFFERS    0x0047531Cu
 #define COMM_OFF_DPLAY           0x3ECu       /* IDirectPlay4A * inside the comm object */
 /* Thin wrappers over the IDirectPlay4A the comm object holds. All three answer
  * 1 for success, and all three do nothing at all when there is no session. */

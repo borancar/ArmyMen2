@@ -38,7 +38,6 @@ static_assert(CLSCTX_INPROC_SERVER == 1, "CLSCTX_INPROC_SERVER");
 /* Both take the comm object in ecx and nothing else. */
 typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
 #define orig_drop_directplay (*(am2_comm_method_fn)ADDR_COMM_DROP_DPLAY)
-#define orig_comm_connected  (*(am2_comm_method_fn)ADDR_COMM_CONNECTED)
 
 typedef void (__cdecl *am2_destroy_list_fn)(void *list);
 #define orig_destroy_msg_list (*(am2_destroy_list_fn)ADDR_DESTROY_MSG_LIST)
@@ -53,6 +52,9 @@ static inline LPDIRECTPLAY4A *DirectPlaySlot(void *comm)
 {
     return (LPDIRECTPLAY4A *)((uint8_t *)comm + COMM_OFF_DPLAY);
 }
+
+/* Defined further down; called from here as soon as a connection exists. */
+int32_t __attribute__((thiscall)) CommOnConnected(void *self);
 
 int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connection)
 {
@@ -76,7 +78,7 @@ int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connect
         hr = IDirectPlayX_InitializeConnection(*slot, connection, 0);
         if (hr != S_OK)
             return 0;
-        orig_comm_connected(comm);
+        CommOnConnected(comm);
     }
     return 1;
 }
@@ -615,6 +617,74 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
     return 1;
 }
 
+/* Settle the transport's limits once a connection exists -- 0x0040E660.
+ *
+ * CommCreateDirectPlay calls this immediately after InitializeConnection
+ * succeeds. It asks DirectPlay what the provider can do and then trims the comm
+ * object's buffer sizes to fit, because a modem and a LAN do not carry the same
+ * packet and the defaults were chosen without knowing which was in use.
+ *
+ * The defaults it trims are the ones CommConstruct writes -- 0x400 for the
+ * maximum and 0x3E4 for the working size -- and the two agree without being
+ * made to. Neither is raised, only lowered: a provider that can carry more than
+ * 1024 bytes does not get to.
+ *
+ * The 0x14 subtracted from the working size is DirectPlay's own per-message
+ * overhead, left in the number rather than accounted for anywhere else.
+ *
+ * The whole capabilities dump is behind `-debugComm`, which is the flag at
+ * +0x418. It is also the confirmation that this is a DPCAPS: each of the four
+ * values it prints sits exactly where that structure puts the field the message
+ * names, and the bit it tests for guaranteed messaging is 0x40, which is
+ * DPCAPS_GUARANTEEDSUPPORTED. */
+static_assert(sizeof(DPCAPS) == 0x28, "DPCAPS");
+static_assert(DPCAPS_GUARANTEEDSUPPORTED == 0x40, "DPCAPS_GUARANTEEDSUPPORTED");
+
+/* DirectPlay's per-message overhead, subtracted from the usable payload. */
+#define DPLAY_MESSAGE_OVERHEAD 0x14
+
+#define g_commDebug(self) comm_u32((uint8_t *)(self), COMM_OFF_DEBUG)
+
+int32_t __attribute__((thiscall)) CommOnConnected(void *self)
+{
+    LPDIRECTPLAY4A dp   = *DirectPlaySlot(self);
+    uint8_t       *comm = g_commObject;
+    LPDPCAPS       caps = (LPDPCAPS)(comm + COMM_OFF_CAPS);
+    uint32_t       usable;
+
+    if (!dp)
+        return 0;
+
+    caps->dwSize = sizeof *caps;
+    if (IDirectPlayX_GetCaps(dp, caps, 0) != DP_OK)
+        return 0;
+
+    if (g_commDebug(self)) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_HEAD);
+        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_PACKET, caps->dwMaxBufferSize);
+        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_HEADER, caps->dwHeaderLength);
+        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_LATENCY, caps->dwLatency);
+        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_TIMEOUT, caps->dwTimeout);
+        orig_log((const char *)(uintptr_t)
+                 ((caps->dwFlags & DPCAPS_GUARANTEEDSUPPORTED)
+                  ? ADDR_STR_CAPS_GUAR_YES : ADDR_STR_CAPS_GUAR_NO));
+    }
+
+    /* Lowered to fit the provider, never raised past what was asked for. */
+    if (caps->dwMaxBufferSize < comm_u32(comm, COMM_OFF_BUFFER_MAX))
+        comm_u32(comm, COMM_OFF_BUFFER_MAX) = caps->dwMaxBufferSize;
+
+    usable = caps->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD;
+    if (usable < comm_u32(comm, COMM_OFF_BUFFER_DEFAULT))
+        comm_u32(comm, COMM_OFF_BUFFER_DEFAULT) = usable;
+
+    if (g_commDebug(self))
+        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_BUFFERS,
+                 comm_u32(comm, COMM_OFF_BUFFER_MAX),
+                 comm_u32(comm, COMM_OFF_BUFFER_DEFAULT));
+    return 1;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -643,5 +713,7 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_COMM_SEND, (const void *)CommSend, "CommSend", 4);
     rc |= patch_replace(ADDR_COMM_OPEN_SESSION, (const void *)CommOpenSession,
                         "CommOpenSession", 1);
+    rc |= patch_replace(ADDR_COMM_CONNECTED, (const void *)CommOnConnected,
+                        "CommOnConnected", 0);
     return rc;
 }
