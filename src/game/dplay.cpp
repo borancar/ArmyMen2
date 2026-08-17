@@ -211,6 +211,123 @@ int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm)
     return hr == DP_OK;
 }
 
+/* ---- the comm object's own lifetime ------------------------------------
+ *
+ * These two are the game's entire registry surface. There is no third call:
+ * the import table lists RegCreateKeyExA and RegCloseKey once each, and both
+ * sites are below, and there is no RegQueryValue or RegSetValue anywhere in
+ * the image. The key is created with KEY_ALL_ACCESS at startup, the handle is
+ * parked at +0x204, and it is closed again at exit without a single value ever
+ * being read or written through it. The `\1.00` subkey that exists under it in
+ * a real install is the installer's, not the game's.
+ *
+ * The constructor runs from the CRT's static-initialiser table before WinMain,
+ * and the destructor is handed to atexit by a thunk at 0x0040DB60, so a run
+ * that is killed rather than quit never reaches it. Both are thiscall on the
+ * single global at ADDR_COMM_OBJECT; the two thunks that supply ecx are left
+ * original, which is why the bodies are patched and not their entry points.
+ *
+ * Most of the constructor is field initialisation whose meaning is not
+ * recoverable from one function, and it is transcribed rather than
+ * interpreted -- offsets and constants exactly as the original writes them,
+ * in the order it writes them. */
+
+/* The two constants the original hardcodes. HKEY_LOCAL_MACHINE is a cast
+ * pointer and so cannot be static_asserted; it is 0x80000002, which is the
+ * value pushed at 0x0040DC27. */
+static_assert(KEY_ALL_ACCESS == 0xF003F, "KEY_ALL_ACCESS");
+
+#define comm_u32(base, off) (*(uint32_t *)((uint8_t *)(base) + (off)))
+
+typedef void (__cdecl *am2_comm_void_fn)(void);
+#define orig_comm_init_sync     (*(am2_comm_void_fn)ADDR_COMM_INIT_SYNC)
+#define orig_comm_init_defaults (*(am2_comm_void_fn)ADDR_COMM_INIT_DEFAULTS)
+#define orig_comm_reset_state   (*(am2_comm_method_fn)ADDR_COMM_RESET_STATE)
+/* The logger is called with no arguments at all. It is stubbed to `ret` in the
+ * shipping image, so this is a no-op either way, but it is reproduced rather
+ * than dropped -- see ADDR_LOG. */
+#define orig_log_noargs         (*(am2_comm_void_fn)ADDR_LOG)
+
+/* Four of these, back to back at +0x20C. Only the index and a timestamp are
+ * ever set to anything; the rest is cleared. */
+#define COMM_SLOT_BASE   0x20C
+#define COMM_SLOT_STRIDE 0x70
+
+void *__attribute__((thiscall)) CommConstruct(void *comm)
+{
+    uint8_t *self = (uint8_t *)comm;
+    uint32_t now;
+    int32_t  i;
+
+    orig_comm_init_sync();
+    orig_comm_init_defaults();
+    now = GetTickCount();
+
+    comm_u32(self, 0x3EC) = 0;
+    comm_u32(self, 0x3F4) = 0;
+
+    for (i = 0; i < 4; i++) {
+        uint8_t *slot = self + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+
+        comm_u32(slot, 0x00) = 0;
+        comm_u32(slot, 0x64) = 0;
+        comm_u32(slot, 0x68) = 0;
+        comm_u32(slot, 0x04) = (uint32_t)i;
+        comm_u32(slot, 0x54) = 0;
+        comm_u32(slot, 0x08) = 0;
+        comm_u32(slot, 0x50) = 0;
+        comm_u32(slot, 0x4C) = 0;
+        comm_u32(slot, 0x58) = 0;
+        comm_u32(slot, 0x5C) = 0;
+        comm_u32(slot, 0x60) = now;
+        memset(slot + 0x0C, 0, 0x40);
+    }
+
+    comm_u32(self, 0x008) = 0;
+    comm_u32(self, 0x408) = now;
+    comm_u32(self, 0x004) = 0;
+    comm_u32(self, 0x410) = 0x400;
+    orig_comm_reset_state(comm);
+
+    /* The one key the game ever touches. Created, never read. */
+    RegCreateKeyExA(HKEY_LOCAL_MACHINE, (const char *)(uintptr_t)ADDR_REGISTRY_KEY,
+                    0, NULL, 0, KEY_ALL_ACCESS, NULL,
+                    (PHKEY)(self + 0x204), (LPDWORD)(self + 0x208));
+
+    comm_u32(self, 0x3D4) = ADDR_APP_GUID;   /* the DirectPlay application id */
+    comm_u32(self, 0x3D0) = 1;
+    comm_u32(self, 0x3E4) = 0;
+    comm_u32(self, 0x3D8) = 0;
+    comm_u32(self, 0x3DC) = 0;
+    comm_u32(self, 0x404) = 0;
+    comm_u32(self, 0x414) = 0;
+    comm_u32(self, 0x3FC) = 0;
+    comm_u32(self, 0x3F8) = 0;
+    comm_u32(self, 0x418) = 0;
+    comm_u32(self, 0x41C) = 0;
+    comm_u32(self, 0x454) = 1;
+    comm_u32(self, 0x420) = 100;
+    comm_u32(self, 0x424) = 1000;
+    comm_u32(self, 0x428) = 996;
+    orig_log_noargs();
+    comm_u32(self, 0x478) = 1;
+    comm_u32(self, 0x47C) = 2;
+
+    /* A constructor returns its object. */
+    return comm;
+}
+
+void __attribute__((thiscall)) CommDestruct(void *comm)
+{
+    uint8_t *self = (uint8_t *)comm;
+
+    orig_drop_directplay(comm);
+    CommShutdown();
+    comm_u32(self, 0x3DC) = 0;
+    comm_u32(self, 0x404) = 0;
+    RegCloseKey((HKEY)(uintptr_t)comm_u32(self, 0x204));
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -228,5 +345,9 @@ int dplay_install(void)
                         "CommSetSessionDesc", 2);
     rc |= patch_replace(ADDR_COMM_GET_SESSION, (const void *)CommGetSessionDesc,
                         "CommGetSessionDesc", 0);
+    rc |= patch_replace(ADDR_COMM_CONSTRUCT, (const void *)CommConstruct,
+                        "CommConstruct", 0);
+    rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,
+                        "CommDestruct", 0);
     return rc;
 }

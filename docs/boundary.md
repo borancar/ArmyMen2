@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 34 | 126 |
-| still boundary | 5 | 16 |
+| reconstructed | 35 | 129 |
+| still boundary | 4 | 13 |
 | game logic, incidental calls only | 83 | 134 |
 | **total** | **122** | **276** |
 
@@ -82,7 +82,6 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x0040db50` | 416 | 3 | 138 | GetTickCount, RegCloseKey, RegCreateKeyExA |
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
 | `0x0042ece0` | 352 | 2 | 176 | GetActiveWindow, MessageBoxA |
 | `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
@@ -93,12 +92,12 @@ function from game logic with a call in it.
 | dll | sites | reconstructed |
 |---|---:|---:|
 | USER32.dll | 130 | 63 |
-| KERNEL32.dll | 99 | 18 |
+| KERNEL32.dll | 99 | 19 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
 | smackw32.dll | 9 | 9 |
 | ole32.dll | 3 | 3 |
-| ADVAPI32.dll | 2 | 0 |
+| ADVAPI32.dll | 2 | 2 |
 
 ## The filesystem
 

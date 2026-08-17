@@ -69,6 +69,13 @@ int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
  * reads the size out of the complaint. Returns 1 on success. */
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 
+/* Original: 0x0040DB80 and 0x0040DCC0, thiscall on the single global comm
+ * object. The game's entire registry surface lives in these two: the key is
+ * created at static-initialisation time and closed again from atexit, and
+ * nothing is ever stored under it. See dplay.cpp. */
+void *__attribute__((thiscall)) CommConstruct(void *comm);
+void  __attribute__((thiscall)) CommDestruct(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

@@ -254,19 +254,22 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
-  the three `Wave*` helpers, both DirectPlay creators, and the two bitmap
-  loaders (`CreateBitmapSurface`, `ReloadBitmapSurface`). The window, the
-  message queue, the display mode, every surface, both input devices, the GDI
-  palette, every message box, all `.WAV` reading, sprite upload from a stream
-  and the whole network transport are ours.
+  the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
+  (`CreateBitmapSurface`, `ReloadBitmapSurface`) and the comm object's
+  constructor and destructor. The window, the message queue, the display mode,
+  every surface, both input devices, the GDI palette, all `.WAV` reading,
+  sprite upload from a stream, the whole network transport and the entire
+  registry surface are ours.
 
-  Do not read the leftover as work outstanding. Of the 88 import-touching
+  Do not read the leftover as work outstanding. Of the 87 import-touching
   functions not reconstructed, `tools/coverage.py` classes 83 as game logic —
   a `GetTickCount` or a `PostMessageA` inside something that is otherwise not
-  boundary at all — leaving 5 functions and 16 sites, all `MessageBoxA` and
-  registry reads inside menu code. The channels themselves are owned: every
-  DirectX object in the process is created, configured and destroyed by
-  reconstructed code. What still dispatches through COM is game logic holding a
+  boundary at all — leaving 4 functions and 13 sites: `0x0042F170`,
+  `0x0042ECE0`, `0x0044D110` and `0x0040ED10`, every one of them a
+  `MessageBoxA` and its `GetActiveWindow` inside menu code. The channels
+  themselves are owned: every DirectX object in the process is created,
+  configured and destroyed by reconstructed code, and the registry is opened
+  and closed by ours. What still dispatches through COM is game logic holding a
   handle it did not make.
 - **Read and deliberately left original.** These come back to the top of every
   candidate ranking, so they are listed here rather than re-read each time. All

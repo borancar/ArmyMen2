@@ -193,6 +193,23 @@
 #define COMM_OFF_DPLAY           0x3ECu       /* IDirectPlay4A * inside the comm object */
 /* Thin wrappers over the IDirectPlay4A the comm object holds. All three answer
  * 1 for success, and all three do nothing at all when there is no session. */
+/* The comm object itself: a single global built by a C++ constructor that the
+ * CRT runs before main, with the matching destructor handed to atexit. Both
+ * are thiscall on the object at ADDR_COMM_OBJECT, and between them they hold
+ * the game's ENTIRE registry surface -- one RegCreateKeyExA and one
+ * RegCloseKey, and there is no third registry call anywhere in the image. */
+#define ADDR_COMM_GLOBAL         0x004FA480u  /* the object itself; ADDR_COMM_OBJECT points at it */
+#define ADDR_COMM_CONSTRUCT      0x0040DB80u  /* thiscall void *(this) */
+#define ADDR_COMM_DESTRUCT       0x0040DCC0u  /* thiscall void(this) */
+/* Called by the constructor, all three left original. */
+#define ADDR_COMM_INIT_SYNC      0x004021A0u  /* void(void); mirrors CommShutdown */
+#define ADDR_COMM_INIT_DEFAULTS  0x0040FD40u  /* void(void); fills a global table */
+#define ADDR_COMM_RESET_STATE    0x0040F380u  /* thiscall void(this) */
+/* Where the registry key and the application GUID live in the image. Neither is
+ * restated here -- the game's own copies are used, as with the DirectPlay
+ * CLSIDs. The GUID is {2777D2A2-89D1-11D2-A387-00C04F79DCEB}. */
+#define ADDR_REGISTRY_KEY        0x004751E8u  /* "Software\\The 3DO Company\\Army Men II" */
+#define ADDR_APP_GUID            0x0046F8A8u  /* GUID, the DirectPlay application id */
 #define ADDR_COMM_CLOSE          0x0040DCF0u  /* int32_t(void) */
 #define ADDR_COMM_INIT_CONN      0x0040DD90u  /* thiscall int32(this, conn) */
 #define ADDR_COMM_SET_SESSION    0x0040E630u  /* thiscall int32(this, desc, flags) */
