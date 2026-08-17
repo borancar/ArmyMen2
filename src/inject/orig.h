@@ -152,6 +152,20 @@
 #define ADDR_COMM_CONNECTED      0x0040E660u  /* run once the connection is up */
 #define COMM_OFF_DPLAY           0x3ECu       /* IDirectPlay4A * inside the comm object */
 
+/* ---- Smacker video ----------------------------------------------------
+ *
+ * smackw32.dll has no SDK header and no import library, so its entry points are
+ * reached through the game's own IAT slots -- the only place their addresses
+ * exist. Reconstructed in src/game/movie.cpp; the movie object is thiscall and
+ * deliberately opaque, with only the fields actually touched named there.
+ */
+#define ADDR_MOVIE_STOP          0x00445120u  /* thiscall void(this) */
+#define ADDR_MOVIE_SET_VOLUME    0x00445280u  /* thiscall void(this, int32) */
+#define ADDR_MOVIE_VTABLE        0x0046FAB4u  /* stamped into the object */
+#define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
+#define ADDR_IAT_SMACK_CLOSE     0x0046F2C0u
+#define ADDR_IAT_SMACK_VOLUMEPAN 0x0046F2ACu
+
 /* .WAV reading through WINMM's multimedia file services -- the only file I/O
  * in the game that does not go through the CRT. Reconstructed in
  * src/game/wavefile.cpp; these are the DirectX SDK sample's names. */

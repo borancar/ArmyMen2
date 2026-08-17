@@ -12,8 +12,8 @@ wholesale by libc rather than function by function.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 23 | 102 |
-| still boundary | 14 | 38 |
+| reconstructed | 25 | 105 |
+| still boundary | 12 | 35 |
 | game logic, incidental calls only | 85 | 136 |
 | **total** | **122** | **276** |
 
@@ -30,7 +30,6 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x00445120` | 80 | 2 | 40 | _SmackClose@4, timeKillEvent |
 | `0x0040d5d0` | 176 | 4 | 44 | InterlockedExchange, Sleep, timeEndPeriod, timeKillEvent |
 | `0x004020a0` | 208 | 3 | 69 | CloseHandle, GetExitCodeThread, SetEvent |
 | `0x004451f0` | 144 | 2 | 72 | PostMessageA, timeSetEvent |
@@ -39,7 +38,6 @@ function from game logic with a call in it.
 | `0x00444fc0` | 352 | 3 | 117 | _SmackDDSurfaceType@4, _SmackOpen@12, _SmackSoundUseDirectSound@4 |
 | `0x0040db50` | 416 | 3 | 138 | GetTickCount, RegCloseKey, RegCreateKeyExA |
 | `0x0042f170` | 720 | 5 | 144 | GetActiveWindow, MessageBoxA, ShowCursor |
-| `0x00445280` | 160 | 1 | 160 | _SmackVolumePan@16 |
 | `0x00445320` | 160 | 1 | 160 | _SmackWait@4 |
 | `0x0042ece0` | 352 | 2 | 176 | GetActiveWindow, MessageBoxA |
 | `0x0044d110` | 1472 | 4 | 368 | GetActiveWindow, MessageBoxA |
@@ -51,9 +49,9 @@ function from game logic with a call in it.
 |---|---:|---:|
 | USER32.dll | 130 | 59 |
 | KERNEL32.dll | 99 | 13 |
-| WINMM.dll | 17 | 11 |
+| WINMM.dll | 17 | 12 |
 | GDI32.dll | 16 | 16 |
-| smackw32.dll | 9 | 0 |
+| smackw32.dll | 9 | 2 |
 | ole32.dll | 3 | 3 |
 | ADVAPI32.dll | 2 | 0 |
 

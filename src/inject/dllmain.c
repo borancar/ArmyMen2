@@ -25,6 +25,7 @@
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
+#include "../game/movie.h"
 #include "../game/palette.h"
 #include "../game/rect.h"
 #include "../game/report.h"
@@ -130,6 +131,10 @@ static const struct {
       { 0x8B, 0x44, 0x24, 0x0C, 0x8B, 0x4C, 0x24, 0x04 }, 8 },
     { ADDR_WAVE_START_DATA, "WaveStartDataRead",
       { 0x56, 0x8B, 0x74, 0x24, 0x10, 0x57, 0x8B, 0x7C }, 8 },
+    { ADDR_MOVIE_STOP, "MovieStop",
+      { 0x56, 0x8B, 0xF1, 0x8B, 0x46, 0x1C, 0xC7, 0x06 }, 8 },
+    { ADDR_MOVIE_SET_VOLUME, "MovieSetVolume",
+      { 0xA1, 0xA8, 0x98, 0x65, 0x00, 0x56, 0x85, 0xC0 }, 8 },
     { ADDR_FIND_GAME_CD, "FindGameCD",
       { 0x53, 0x55, 0x56, 0x57, 0x8B, 0x3D, 0xB4, 0xF0 }, 8 },
     { ADDR_BUILD_FONT, "BuildFont",
@@ -224,6 +229,7 @@ static void install(void)
     report_install();
     wavefile_install();
     dplay_install();
+    movie_install();
     palette_install();
     blit_install();
     sprite_install();

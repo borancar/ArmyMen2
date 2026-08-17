@@ -75,6 +75,10 @@ FUNCS = [
     (0x0041E750, "FatalError",        "cdecl"),
     (0x0040CA10, "WaveOpenFile",      "cdecl"),
     (0x0040CBB0, "WaveStartDataRead", "cdecl"),
+    (0x00445120, "MovieStop",        "thiscall",
+     "thiscall taking no stack arguments, so a plain `ret` is right and there "
+     "is nothing to clean -- indistinguishable from the tool's `thiscall?`"),
+    (0x00445280, "MovieSetVolume",   "thiscall"),
     (0x00426B50, "FindGameCD",       "cdecl"),
     (0x004466E0, "BuildFont",        "cdecl"),
     (0x0041AC60, "PresentFrame",     "cdecl"),
