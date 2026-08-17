@@ -128,6 +128,14 @@
 #define ADDR_DRAW_SPRITE_CLIPPED 0x00446070u  /* void(spr,x,y,const AM2_Rect*,mode) */
 #define ADDR_BLIT_OVERLAY        0x0041C480u  /* __fastcall(x,y,data,AM2_Rect) */
 #define ADDR_RESTORE_CHAIN       0x00445EB0u  /* void(AM2_Sprite*) */
+/* Sprite lifetime. The registry is a count at 0x006598C0 and a table of
+ * AM2_Sprite* at 0x006598C4; the lookup walks it for a matching id. */
+#define ADDR_RELEASE_SPRITE      0x00445D80u  /* void(AM2_Sprite *) */
+#define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
+#define ADDR_SPRITE_SLOT_OF      0x00445990u  /* int32(uint32 id); <0 when absent */
+#define ADDR_SPRITE_TABLE        0x006598C4u  /* AM2_Sprite ** */
+#define ADDR_STR_RELEASE_WRONG   0x00489768u  /* "Error in release: Wrong sprite!\n" */
+#define ADDR_STR_RELEASE_MISSING 0x00489740u  /* "Error in release: Sprite not found!\n" */
 /* The three ways a sprite's pixels are put back after its surface is restored.
  * All stay original; which one applies is decided in RestoreSpriteSurface. */
 #define ADDR_SPRITE_RELOAD_NAMED 0x004456B0u  /* int32(spr, const char *, flags) */

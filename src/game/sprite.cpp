@@ -201,6 +201,81 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
     orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_X, spr->id);
 }
 
+/* ---- sprite lifetime ---------------------------------------------------
+ *
+ * The record is 64 bytes and the original says so itself: ClearSprite blanks it
+ * with `rep stosd` for 0x10 dwords. */
+static_assert(sizeof(AM2_Sprite) == 0x40, "AM2_Sprite is 64 bytes");
+
+typedef int32_t (__cdecl *am2_slot_of_fn)(uint32_t id);
+#define orig_sprite_slot_of (*(am2_slot_of_fn)ADDR_SPRITE_SLOT_OF)
+#define g_spriteTable       (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)
+
+/* What both teardowns do to the sprite's contents.
+ *
+ * `format` is the discriminator, and zero is the interesting value: it means
+ * `image` is a DirectDraw surface and has to be Released, where anything else
+ * means RLE pixel data on the game's heap and has to be freed. Getting that
+ * backwards would either leak a surface or hand a COM object to free(). */
+static void FreeSpriteContents(AM2_Sprite *spr)
+{
+    if (spr->image.surface) {
+        if (spr->format == 0)
+            IDirectDrawSurface_Release(spr->image.surface);
+        else
+            orig_free(spr->image.rle16);
+        spr->image.surface = NULL;
+    }
+    if (spr->overlay) {
+        orig_free(spr->overlay);
+        spr->overlay = NULL;
+    }
+    /* Freed and not nulled, as the original. Both callers below make the
+     * pointer unreachable immediately afterwards. */
+    if (spr->source)
+        orig_free(spr->source);
+}
+
+void __cdecl ClearSprite(AM2_Sprite *spr)
+{
+    if (!spr)
+        return;
+    FreeSpriteContents(spr);
+    memset(spr, 0, sizeof *spr);
+}
+
+void __cdecl ReleaseSprite(AM2_Sprite *spr)
+{
+    int32_t slot;
+
+    if (!spr)
+        return;
+
+    /* 0xFFFFFFFF means it was never registered, so there is no count to keep
+     * and nothing to unhook -- it just goes. */
+    if (spr->id != 0xFFFFFFFFu) {
+        slot = orig_sprite_slot_of(spr->id);
+        if (slot < 0) {
+            orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_MISSING);
+        } else if (g_spriteTable[slot] != spr) {
+            /* Someone else holds that slot. Reported only when this sprite
+             * still claims a reference, which is the case that cannot be
+             * explained by an ordinary double release. */
+            if (spr->refs != 0)
+                orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_WRONG);
+        } else {
+            if (spr->refs > 0)
+                spr->refs--;
+            if (spr->refs > 0)
+                return;              /* still wanted elsewhere */
+            g_spriteTable[slot] = NULL;
+        }
+    }
+
+    FreeSpriteContents(spr);
+    orig_free(spr);
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -210,5 +285,9 @@ int sprite_install(void)
                         "DrawSpriteClipped", 5);
     rc |= patch_replace(ADDR_RESTORE_CHAIN, (const void *)RestoreSpriteSurface,
                         "RestoreSpriteSurface", 1);
+    rc |= patch_replace(ADDR_CLEAR_SPRITE, (const void *)ClearSprite,
+                        "ClearSprite", 1);
+    rc |= patch_replace(ADDR_RELEASE_SPRITE, (const void *)ReleaseSprite,
+                        "ReleaseSprite", 1);
     return rc;
 }

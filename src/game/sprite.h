@@ -25,9 +25,13 @@ extern "C" {
  * from one call site.
  */
 typedef struct {
-    uint32_t id;                 /* +0x00  logged as %x when a restore fails */
-    uint8_t  pad04[4];
-    uint32_t format;             /* +0x08  1, 2 or 3; selects the blitter */
+    uint32_t id;                 /* +0x00  0xFFFFFFFF when unregistered */
+    int32_t  refs;               /* +0x04  ReleaseSprite frees at zero */
+    uint32_t format;             /* +0x08  1, 2 or 3 selects a software blitter;
+                                  *        ZERO means `image` is a DirectDraw
+                                  *        surface, which is how the teardown
+                                  *        below decides between Release and
+                                  *        free */
     uint32_t flags;              /* +0x0C  bit0 clear => source colour key;
                                   *        bits 2..5 (0x3C) => software path */
     /* Which arm applies is decided by `flags & 0x3C` and then by `format`:
@@ -77,6 +81,21 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
  * UNTESTED, like the other Restore path in surface.cpp: reaching it needs a
  * surface to be lost, which wants an alt-tab or a display mode change. */
 void __cdecl RestoreSpriteSurface(AM2_Sprite *spr);
+
+/* ClearSprite -- original 0x00445E40. Give back everything the sprite owns and
+ * blank the record, leaving it reusable in place.
+ *
+ * ReleaseSprite -- original 0x00445D80. The same, one reference at a time: the
+ * sprite is looked up in the registry, its count decremented, and only at zero
+ * is the slot cleared and the record itself freed. A sprite the registry does
+ * not hold, or holds under someone else's slot, is reported and freed anyway.
+ *
+ * Both free the `source` string without nulling it, unlike `image` and
+ * `overlay`. That is the original's asymmetry and it is kept; ClearSprite
+ * blanks the whole record immediately afterwards, and ReleaseSprite frees it,
+ * so neither leaves a dangling pointer anyone can reach. */
+void __cdecl ClearSprite(AM2_Sprite *spr);
+void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
 int sprite_install(void);
 
