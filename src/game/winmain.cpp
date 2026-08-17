@@ -42,6 +42,7 @@
 #include "winmain.h"
 #include "winproc.h"
 #include "rect.h"
+#include "surface.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -107,7 +108,6 @@ typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
 #define orig_start_intro      (*(am2_void_fn)ADDR_START_INTRO)
 #define orig_run_frame        (*(am2_void_fn)ADDR_RUN_FRAME)
 #define orig_shutdown_423d20  (*(am2_void_fn)ADDR_SHUTDOWN_423D20)
-#define orig_shutdown_ddraw   (*(am2_void_fn)ADDR_SHUTDOWN_DDRAW)
 #define orig_report_leaks     (*(am2_void_fn)ADDR_REPORT_LEAKS)
 #define orig_free_mem_tracker (*(am2_void_fn)ADDR_FREE_MEM_TRACKER)
 
@@ -483,7 +483,7 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
 
     orig_shutdown_423d20();
-    orig_shutdown_ddraw();
+    ShutdownDirectDraw();
     orig_report_leaks();
     orig_free_mem_tracker();
 

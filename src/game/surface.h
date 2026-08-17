@@ -77,6 +77,17 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour);
  * PostQuitMessage. A lost surface is restored and the frame abandoned. */
 void __cdecl PresentFrame(void);
 
+/* Original: 0x0041A950, 2 call sites. Release every DirectDraw object.
+ *
+ * Reverses InitDirectDraw, in order: clipper, offscreen surface, the palette
+ * hanging off the movie palette holder, the primary -- and with it the back
+ * buffer, which was never separately owned -- then the display mode goes back
+ * and both interface generations are released.
+ *
+ * Every step is guarded, so it is safe to call twice or after a failed
+ * bring-up, which is why WinMain can run it unconditionally on the way out. */
+void __cdecl ShutdownDirectDraw(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus

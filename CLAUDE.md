@@ -205,6 +205,13 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   is a race rather than a crash), the Smacker movie class (`0x00444FC0`, all
   thiscall methods on a class whose layout would have to be reconstructed
   first), and the registry pair behind `0x0040DB50`.
+- **Import sites are only half the boundary.** DirectDraw, DirectSound and
+  DirectInput are reached through COM vtables and own no import, so a function
+  can call DirectX all day and appear nowhere in `docs/imports.tsv`.
+  `tools/coverage.py` counted only imports for several commits and reported the
+  boundary as nearly finished while 23 functions and 66 DirectX calls sat
+  outside it. It counts both now. When adding a new kind of outward call, ask
+  what the *inventory* can see before trusting what it says.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot

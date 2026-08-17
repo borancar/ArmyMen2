@@ -96,6 +96,7 @@ FUNCS = [
     (0x00446450, "CreateGameFont",   "cdecl"),
     (0x0040CBF0, "WaveReadFile",      "cdecl"),
     (0x0040CCE0, "WaveCloseReadFile", "cdecl"),
+    (0x0041A950, "ShutdownDirectDraw", "cdecl"),
     (0x0040D5D0, "StopAudioStream",  "cdecl"),
     (0x0040D680, "StartAudioStream", "cdecl"),
     (0x004020A0, "CommShutdown",     "cdecl",

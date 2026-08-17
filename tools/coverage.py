@@ -16,6 +16,17 @@ Every remaining import site is then classified, because "not reconstructed" and
 routine that reads GetTickCount once is not boundary code, and porting it to
 capture that read would be reconstructing the game rather than its edges.
 
+Import sites are not the whole boundary. DirectDraw, DirectSound and
+DirectInput are reached through COM vtables and appear nowhere in the import
+table, so a function can talk to DirectX all day without owning a single import
+site. Those are counted too, from docs/comcalls.tsv, filtered to the interface
+pointers that are known to be DirectX -- the game's own C++ virtual calls have
+the identical machine-code shape and must not be mistaken for them.
+
+Leaving them out was an actual mistake in this tool, not a hypothetical one: it
+reported the boundary as nearly finished while 23 functions and 66 DirectX calls
+sat outside it.
+
 Writes docs/boundary.md.
 """
 
@@ -31,6 +42,21 @@ CRT_START = 0x0045C000
 
 # Reached without a patch: registered into the WNDCLASS by InitApplication.
 REGISTERED = {"ADDR_WND_PROC"}
+
+# COM interface pointers known to be DirectX, identified in docs/comcalls.tsv by
+# chasing the object back to a global. Anything else reached the same way is one
+# of the game's own C++ objects -- 0x0065A058 (the repainter) and 0x006568A0
+# (the current movie) both look exactly like COM and are not.
+DIRECTX_OBJECTS = {
+    0x004FDF78: "IDirectDraw",   0x004FE098: "IDirectDraw2",
+    0x00502AD4: "primary",       0x00507128: "locked",
+    0x00503100: "offscreen",     0x004FE08C: "back buffer",
+    0x004FA440: "DirectSound",   0x004FA404: "DirectSound",
+    0x004FA46C: "DirectSound",   0x004FA470: "DirectSound",
+    0x004FA474: "DirectSound",
+    0x00512FD0: "IDirectInput",  0x00512FD4: "input device",
+    0x00512FD8: "input device",
+}
 
 # Imports that are a fact of running on Windows rather than a channel to the
 # outside world. A function whose only boundary contact is one of these is
@@ -94,6 +120,19 @@ def main():
         if fn and fn < CRT_START:
             per_fn[fn].append(r)
 
+    # The other half of the boundary: DirectX through COM, which owns no import.
+    com = collections.defaultdict(list)
+    compath = os.path.join(REPO, "docs", "comcalls.tsv")
+    if os.path.exists(compath):
+        for r in csv.DictReader(open(compath), delimiter="\t"):
+            try:
+                this = int(r["this"], 16)
+            except ValueError:
+                continue
+            fn = int(r["func"], 16)
+            if this in DIRECTX_OBJECTS and fn and fn < CRT_START:
+                com[fn].append(DIRECTX_OBJECTS[this])
+
     # A reconstructed address does not always equal the function address the
     # import inventory used: functions.tsv merges a thunk with the body it
     # jumps into, so WndProc's sites are filed under the thunk at 0x0040A6A0
@@ -120,6 +159,8 @@ def main():
 
     sites = lambda d: sum(len(v) for v in d.values())
     total_sites = sites(per_fn)
+    com_done = {f: v for f, v in com.items() if is_done(f)}
+    com_left = {f: v for f, v in com.items() if not is_done(f)}
 
     with open(OUT, "w") as fh:
         w = fh.write
@@ -137,6 +178,18 @@ def main():
         w(f"| still boundary | {len(real)} | {sites(real)} |\n")
         w(f"| game logic, incidental calls only | {len(incidental)} | {sites(incidental)} |\n")
         w(f"| **total** | **{len(per_fn)}** | **{total_sites}** |\n\n")
+
+        w("## DirectX through COM\n\n")
+        w("These own no import site and so appear nowhere above. A function can\n"
+          "call DirectDraw all day without the import table showing it.\n\n")
+        w("| | functions | call sites |\n|---|---:|---:|\n")
+        w(f"| reconstructed | {len(com_done)} | {sites(com_done)} |\n")
+        w(f"| still to do | {len(com_left)} | {sites(com_left)} |\n\n")
+        for f, v in sorted(com_left.items(), key=lambda kv: -len(kv[1])):
+            objs = collections.Counter(v)
+            w(f"- `{f:#010x}` {sizes.get(f, 0)}B, {len(v)} calls — "
+              + ", ".join(f"{k} x{n}" for k, n in objs.most_common()) + "\n")
+        w("\n")
 
         w("The middle row is the work that remains. The bottom row is not work:\n"
           "those functions touch Win32 only through things every Windows program\n"
@@ -175,6 +228,8 @@ def main():
     print(f"reconstructed {len(done_fns)} functions / "
           f"{sites({f: per_fn[f] for f in done_fns})} sites")
     print(f"still boundary {len(real)} functions / {sites(real)} sites")
+    print(f"DirectX COM    {len(com_done)}/{len(com)} functions done, "
+          f"{sites(com_left)} calls left")
     print(f"game logic     {len(incidental)} functions / {sites(incidental)} sites")
     return 0
 

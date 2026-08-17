@@ -389,7 +389,8 @@
 #define ADDR_START_INTRO         0x0040B7A0u  /* honours -nointro */
 #define ADDR_RUN_FRAME           0x0040B000u  /* one tick; state machine of 5 */
 #define ADDR_SHUTDOWN_423D20     0x00423D20u
-#define ADDR_SHUTDOWN_DDRAW      0x0041A950u  /* Release on every DirectDraw object */
+#define ADDR_SHUTDOWN_DDRAW      0x0041A950u  /* void(void) */
+#define ADDR_DD_CLIPPER          0x00507340u  /* IDirectDrawClipper * */
 #define ADDR_REPORT_LEAKS        0x0041E690u  /* "Unreleased memory (%d) blocks:" */
 #define ADDR_FREE_MEM_TRACKER    0x0041E710u
 

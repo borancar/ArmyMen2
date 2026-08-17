@@ -238,6 +238,64 @@ void __cdecl PresentFrame(void)
     }
 }
 
+#define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
+#define g_clipper     (*(LPDIRECTDRAWCLIPPER *)(uintptr_t)ADDR_DD_CLIPPER)
+#define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
+#define g_backBuffer2 (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_palHolder   (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
+#define MOVIE_PALETTE_OFF 0x800u
+
+void __cdecl ShutdownDirectDraw(void)
+{
+    /* Nothing was ever created, so there is nothing to undo. */
+    if (!g_ddraw)
+        goto release_v2;
+
+    if (g_clipper) {
+        IDirectDrawClipper_Release(g_clipper);
+        g_clipper = NULL;
+    }
+    if (g_offscreen) {
+        IDirectDrawSurface_Release(g_offscreen);
+        g_offscreen = NULL;
+    }
+
+    /* The palette is not a global of its own -- it hangs off the same holder
+     * the movie player reads it from. */
+    if (g_palHolder) {
+        LPDIRECTDRAWPALETTE pal =
+            *(LPDIRECTDRAWPALETTE *)(g_palHolder + MOVIE_PALETTE_OFF);
+
+        if (pal) {
+            IDirectDrawPalette_Release(pal);
+            *(LPDIRECTDRAWPALETTE *)(g_palHolder + MOVIE_PALETTE_OFF) = NULL;
+        }
+        g_palHolder = NULL;
+    }
+
+    if (g_primarySurface) {
+        IDirectDrawSurface_Release(g_primarySurface);
+        g_primarySurface = NULL;
+        /* Cleared rather than released: fullscreen it was attached to the
+         * primary and never separately owned, and windowed it is the offscreen
+         * surface already let go above. */
+        g_backBuffer2 = NULL;
+    }
+
+    IDirectDraw_RestoreDisplayMode(g_ddraw);
+    IDirectDraw_Release(g_ddraw);
+    g_ddraw = NULL;
+
+release_v2:
+    /* Outside the guard, so the v2 interface is released even when the v1 was
+     * already gone -- QueryInterface can have succeeded and everything after it
+     * failed. */
+    if (g_ddraw2) {
+        IDirectDraw2_Release(g_ddraw2);
+        g_ddraw2 = NULL;
+    }
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -250,5 +308,7 @@ int surface_install(void)
                         "ClearSurface", 2);
     rc |= patch_replace(ADDR_PRESENT_FRAME, (const void *)PresentFrame,
                         "PresentFrame", 0);
+    rc |= patch_replace(ADDR_SHUTDOWN_DDRAW, (const void *)ShutdownDirectDraw,
+                        "ShutdownDirectDraw", 0);
     return rc;
 }
