@@ -123,6 +123,7 @@ def main():
     # The other half of the boundary: DirectX through COM, which owns no import.
     com = collections.defaultdict(list)
     any_com = set()
+    cxx_only = set()
     compath = os.path.join(REPO, "docs", "comcalls.tsv")
     if os.path.exists(compath):
         for r in csv.DictReader(open(compath), delimiter="\t"):
@@ -132,7 +133,14 @@ def main():
                 this = 0
             fn = int(r["func"], 16)
             if fn and fn < CRT_START:
-                any_com.add(fn)
+                # A thiscall dispatch is the engine's own C++ virtual, never
+                # COM: under CINTERFACE every COM method takes the interface as
+                # a pushed first argument. Excluding those is what turns the
+                # upper bracket from a guess into a measurement.
+                if r.get("abi") != "thiscall":
+                    any_com.add(fn)
+                else:
+                    cxx_only.add(fn)
                 if this in DIRECTX_OBJECTS:
                     com[fn].append(DIRECTX_OBJECTS[this])
 
@@ -211,8 +219,14 @@ def main():
         w("| | functions |\n|---|---:|\n")
         w(f"| any COM dispatch, reconstructed | {len(any_done)} |\n")
         w(f"| any COM dispatch, not | {len(any_com) - len(any_done)} |\n\n")
-        w("The true DirectX total sits between the two, and most of what the\n"
-          "second row holds is the game's own C++ objects rather than DirectX.\n\n")
+        w("The true DirectX total sits between the two. The second row used to\n"
+          "be mostly the game's own C++ objects, and that is no longer a guess:\n"
+          "`tools/comcalls.py` now separates the two by how `this` is passed.\n"
+          "COM is stdcall and pushes the interface as an explicit first\n"
+          "argument; an i386 MSVC C++ virtual is thiscall and puts it in ecx.\n"
+          f"{len(cxx_only)} functions dispatch only that way and have been dropped from\n"
+          "the bracket entirely -- they are destructor chains and object\n"
+          "teardown, not boundary code.\n\n")
         for f, v in sorted(com_left.items(), key=lambda kv: -len(kv[1])):
             objs = collections.Counter(v)
             w(f"- `{f:#010x}` {sizes.get(f, 0)}B, {len(v)} calls — "

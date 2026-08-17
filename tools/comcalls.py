@@ -110,21 +110,61 @@ def find_vtable_load(insns, i, reg):
     # mov vt, [global] -- the vtable pointer was itself read straight out of a
     # global, so the global holds the object and `this` is that address.
     if src.mem.base == 0 and src.mem.index == 0:
-        return (src.mem.disp & 0xFFFFFFFF, at)
+        return (src.mem.disp & 0xFFFFFFFF, at, None)
     if src.mem.index != 0 or src.mem.disp != 0:
         # [reg + something] is a member fetch, not a plain vtable load.
-        return (0, at)
+        return (0, at, None)
 
     # mov vt, [obj] -- chase `obj` back one more level to see whether the
     # interface came from a global.
     obj_reg = insns[at].reg_name(src.mem.base)
     outer = defining_load(insns, at, obj_reg)
     if outer is None:
-        return (0, at)
+        return (0, at, obj_reg)
     osrc, _oat = outer
     if osrc.type == OP_MEM and osrc.mem.base == 0 and osrc.mem.index == 0:
-        return (osrc.mem.disp & 0xFFFFFFFF, at)
-    return (0, at)
+        return (osrc.mem.disp & 0xFFFFFFFF, at, obj_reg)
+    return (0, at, obj_reg)
+
+
+def call_abi(insns, i, obj_reg):
+    """Tell a COM dispatch from an ordinary C++ virtual call.
+
+    Both compile to the same two instructions, but they do not pass `this` the
+    same way, and that *is* decidable from one site:
+
+      COM      is stdcall. Under CINTERFACE every method takes the interface as
+               an explicit first argument, so `this` is PUSHED like any other.
+      C++      is thiscall on i386 MSVC. `this` travels in ecx and is never
+               pushed.
+
+    Returns "stdcall", "thiscall", or "?" when neither pattern is visible.
+
+    This matters more than it looks. Without it the survey reports every
+    virtual method call in the engine as DirectX, and the densest-looking
+    candidates -- tiny functions that are three vtable calls and nothing else --
+    turn out to be C++ destructor chains rather than boundary code. The MSVC
+    scalar deleting destructor is the clearest example: `push 1` then slot 0.
+    COM's slot 0 is QueryInterface and takes three arguments, so a one-argument
+    slot-0 call is never COM.
+    """
+    if obj_reg is None:
+        return "?"
+    for j in range(i - 1, max(-1, i - LOOKBACK) - 1, -1):
+        insn = insns[j]
+        if insn.mnemonic in ("call", "ret", "jmp"):
+            break
+        if insn.mnemonic == "push" and insn.operands:
+            op = insn.operands[0]
+            if op.type == OP_REG and insn.reg_name(op.reg) == obj_reg:
+                return "stdcall"
+        # Anything that redefines the object register ends the window: what is
+        # pushed beyond this point is not the same pointer.
+        if insn.mnemonic == "mov" and len(insn.operands) == 2:
+            dst = insn.operands[0]
+            if dst.type == OP_REG and insn.reg_name(dst.reg) == obj_reg:
+                break
+    return "thiscall" if obj_reg == "ecx" else "?"
 
 
 def main():
@@ -155,23 +195,32 @@ def main():
         found = find_vtable_load(insns, i, reg)
         if found is None:
             continue
-        this_global, _at = found
+        this_global, _at, obj_reg = found
+        abi = call_abi(insns, i, obj_reg)
         own = owner(insn.address, funcs, addrs)
         fn, tu = own if own else (0, "?")
-        rows.append((insn.address, fn, tu, disp // 4, disp, this_global))
+        rows.append((insn.address, fn, tu, disp // 4, disp, this_global, abi))
 
     rows.sort()
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as fh:
-        fh.write("site\tfunc\ttu\tslot\tdisp\tthis\n")
-        for addr, fn, tu, slot, disp, this in rows:
+        fh.write("site\tfunc\ttu\tslot\tdisp\tthis\tabi\n")
+        for addr, fn, tu, slot, disp, this, abi in rows:
             fh.write(f"0x{addr:08x}\t0x{fn:08x}\t{tu}\t{slot}\t"
-                     f"0x{disp:02x}\t0x{this:08x}\n")
+                     f"0x{disp:02x}\t0x{this:08x}\t{abi}\n")
 
     game = [r for r in rows if r[1] and r[1] < CRT_START]
     fns = {r[1] for r in game}
     print(f"\n{len(rows)} COM-shaped dispatch sites -> {os.path.relpath(OUT, REPO)}")
     print(f"{len(game)} in game code, across {len(fns)} functions")
+
+    by_abi = collections.Counter(r[6] for r in game)
+    com = [r for r in game if r[6] == "stdcall"]
+    print(f"  by how `this` is passed: "
+          + ", ".join(f"{k} {v}" for k, v in sorted(by_abi.items())))
+    print(f"  {len(com)} sites across {len({r[1] for r in com})} functions pass it"
+          f" pushed, so those are the real COM boundary; the thiscall ones are"
+          f" the engine's own C++ virtuals.")
 
     print("\nmost-dispatched vtable slots:")
     per_slot = collections.Counter(r[3] for r in game)
