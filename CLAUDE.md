@@ -111,6 +111,32 @@ caller of `SnapshotSystemPalette`, and the movie coming out in the right
 colours is a direct check on the GDI palette code that nothing else exercises.
 Between this, `-w`, and plain Boot Camp there are three distinct startup paths.
 
+**The multiplayer path is a fourth configuration, and it needs
+`AM2_MULTIPLAYER=1`.** Without it the title screen has no MULTI-PLAYER entry —
+that button was patched out of this build, see `docs/binarypatches.md` — and
+the entire DirectPlay subsystem is unreachable, so every reconstructed comm
+function is verifiable only by reading. With it:
+
+```
+AM2_DISPLAY=:99 AM2_MAKEVARS="TRACE=1" tools/drive.sh start 25 AM2_MULTIPLAYER=1
+tools/point.py 306 222 --click     # MULTI-PLAYER
+tools/point.py 200 176 --click     # the TCP/IP row
+tools/point.py 515 221 --click     # SELECT
+tools/point.py 321 262 --click     # JOIN A WAR  (321,222 is START A WAR)
+```
+
+That reaches COMM. CHANNEL SELECT, then START A WAR / JOIN A WAR, then CHOOSE
+A BATTLE with an empty session list. It exercises `CommCreateDirectPlay`,
+`CommEnumConnections`, `CommClose`, `StartSelectedGame`,
+`StartMultiplayerGame` and `CommEnumSessions` — the last polled repeatedly
+while the browser is open, so its count climbs on its own.
+
+Two readings not to misinterpret. Choosing the last row, "Play Against
+Computer Only", takes `StartSelectedGame`'s local branch and ends at ENTER
+BATTLE NAME. And `CommInitializeConnection` and `FindGameCD` stay at 0
+throughout, because the reconstructed callers reach them directly rather than
+through the patched entry — the usual blind spot, not a failure.
+
 **`AM2_NOPATCH=1` is the A/B, and `run-stock` is not.** It installs the harness
 — logger, input hook, control socket — and none of the reconstruction, so the
 same scripted run can be played on the original code and on ours and the
