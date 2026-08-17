@@ -31,6 +31,7 @@
  */
 
 #include "device.h"
+#include "report.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -83,11 +84,6 @@ typedef HRESULT (WINAPI *am2_dinput_create_fn)(HINSTANCE, DWORD,
                                                LPDIRECTINPUTA *, IUnknown *);
 #define orig_DirectDrawCreate  (*(am2_ddraw_create_fn)ADDR_DIRECTDRAWCREATE)
 #define orig_DirectInputCreate (*(am2_dinput_create_fn)ADDR_DIRECTINPUTCREATE)
-
-/* Reported and then returned: it always answers 0, so `return ReportError(...)`
- * is how both of these say "failed". */
-typedef int32_t (__cdecl *am2_report_error_fn)(HRESULT hr, const char *fmt, ...);
-#define orig_report_error (*(am2_report_error_fn)ADDR_REPORT_ERROR)
 
 /* Game helpers, left in the original image. Both are themselves DirectDraw
  * callers and are on the list to reconstruct next. */
@@ -218,39 +214,39 @@ int32_t __cdecl InitInput(HWND hWnd)
     hr = orig_DirectInputCreate(g_hInstance, DIRECTINPUT_VERSION, &g_dinput,
                                 NULL);
     if (hr)
-        return orig_report_error(hr, "DirectInputCreate()");
+        return ReportError(hr, "DirectInputCreate()");
 
     /* Mouse: exclusive, so the system pointer goes away and motion arrives
      * raw, and buffered, so it arrives as deltas rather than positions. */
     hr = IDirectInput_CreateDevice(g_dinput, kGuidSysMouse, &g_diMouse, NULL);
     if (hr)
-        return orig_report_error(hr, "CreateDevice (mouse)");
+        return ReportError(hr, "CreateDevice (mouse)");
     hr = IDirectInputDevice_SetDataFormat(g_diMouse, kFormatMouse);
     if (hr)
-        return orig_report_error(hr, "SetDataFormat (mouse)");
+        return ReportError(hr, "SetDataFormat (mouse)");
     hr = IDirectInputDevice_SetCooperativeLevel(g_diMouse, hWnd,
                                                 DISCL_EXCLUSIVE |
                                                 DISCL_FOREGROUND);
     if (hr)
-        return orig_report_error(hr, "SetCooperativeLevel (mouse)");
+        return ReportError(hr, "SetCooperativeLevel (mouse)");
     hr = IDirectInputDevice_SetProperty(g_diMouse, DIPROP_BUFFERSIZE,
                                         kBufferSizeProp);
     if (hr)
-        return orig_report_error(hr, "Set buffer size (mouse)");
+        return ReportError(hr, "Set buffer size (mouse)");
 
     /* Keyboard: non-exclusive. Taking it exclusively would take Alt-Tab too. */
     hr = IDirectInput_CreateDevice(g_dinput, kGuidSysKeyboard, &g_diKeyboard,
                                    NULL);
     if (hr)
-        return orig_report_error(hr, "CreateDevice (keyboard)");
+        return ReportError(hr, "CreateDevice (keyboard)");
     hr = IDirectInputDevice_SetDataFormat(g_diKeyboard, kFormatKeyboard);
     if (hr)
-        return orig_report_error(hr, "SetDataFormat (keyboard)");
+        return ReportError(hr, "SetDataFormat (keyboard)");
     hr = IDirectInputDevice_SetCooperativeLevel(g_diKeyboard, hWnd,
                                                 DISCL_NONEXCLUSIVE |
                                                 DISCL_FOREGROUND);
     if (hr)
-        return orig_report_error(hr, "SetCooperativeLevel (keyboard)");
+        return ReportError(hr, "SetCooperativeLevel (keyboard)");
 
     /* Rewind the two input cursors to the starts of their buffers.
      *

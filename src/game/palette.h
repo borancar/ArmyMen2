@@ -36,6 +36,28 @@ extern "C" {
  */
 void __cdecl CalibratePalette(uint32_t *palette);
 
+/* Original: 0x0041AF00. Hand a 256-entry palette to GDI and make it current.
+ *
+ * The densest boundary function in the game -- nine import sites in 192 bytes,
+ * and nothing else. It copies the caller's 0x00BBGGRR entries into a LOGPALETTE
+ * that lives in the image, creates a palette from it, selects it into the
+ * screen DC long enough to realize it, and throws it away again.
+ *
+ * The pair of SetSystemPaletteUse calls at the top is not redundant. Setting
+ * NOSTATIC and immediately STATIC again is the documented way to make the
+ * driver release and reload its static entries; either call on its own is a
+ * no-op. */
+void __cdecl RealizeSystemPalette(const uint32_t *palette);
+
+/* Original: 0x00445170. Read the system palette back and mark what is ours.
+ *
+ * Windows reserves twenty entries, ten at each end. This reads the current 256
+ * into the game's own table and then flags the 236 in between PC_NOCOLLAPSE,
+ * which tells GDI to give each one a palette slot of its own instead of folding
+ * it onto the nearest colour already realized. The twenty at the ends keep
+ * flags of 0 and map onto the system colours as usual. */
+void __cdecl SnapshotSystemPalette(void);
+
 int palette_install(void);
 
 #ifdef __cplusplus

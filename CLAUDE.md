@@ -59,7 +59,7 @@ file and screenshot directory are all derived from `ID`, which defaults from
 it is harness, not game.
 
 The reason is the ABI survey (`tools/checkabi.py`): of the 1,239 game functions
-below the CRT, **114 are thiscall**, which on i386 means non-static member
+below the CRT, **100 are thiscall**, which on i386 means non-static member
 functions. Reconstructing those in C would mean hand-written
 `__attribute__((thiscall))` shims around what the original wrote as ordinary
 methods.
@@ -90,6 +90,12 @@ the lock/unlock bracket. The title screen alone touches almost none of the
 engine, so it proves very little. From the briefing screen, **`RETURN` starts
 the mission** — the cursor is hidden there, so `tools/point.py` cannot find it
 and clicking is not an option.
+
+**`ARGS=-dbg` — dropping the default `-nointro` — is a second configuration
+worth having.** The Smacker intro is a code path of its own: it is the only
+caller of `SnapshotSystemPalette`, and the movie coming out in the right
+colours is a direct check on the GDI palette code that nothing else exercises.
+Between this, `-w`, and plain Boot Camp there are three distinct startup paths.
 
 **Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
 `setsid make -s run ... &` issued from a script or an agent shell starts the
@@ -173,11 +179,16 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   functions below the CRT touch the import table (`docs/imports.tsv`) and 161
   contain COM-shaped dispatch (`docs/comcalls.tsv`). Done so far: `WinMain`,
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
-  `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface` — the
-  application layer, device bring-up and surface creation. The window, the
-  message queue, the display mode, every surface and both input devices are now
-  ours. What remains is spread thin: the largest single boundary function left
-  is under 600 bytes.
+  `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
+  `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`.
+  The window, the message queue, the display mode, every surface, both input
+  devices, the GDI palette and every message box are ours.
+- **Pick the next target by boundary density, not by import count.** Ranking
+  what is left by sites-per-byte finds functions that are boundary code;
+  ranking by sites alone finds 5,760-byte game-logic functions whose only
+  contact with Win32 is a `GetTickCount`. Reconstructing one of those to
+  capture a timer read is exactly what this port is not for. Everything under
+  ~50 bytes per import site is worth looking at; above that, read it first.
 - **Name a function from its body, not from one call site.** `0x0041AD30` went
   in as `AttachPalette` because that is what it looked like where
   `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and

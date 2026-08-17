@@ -27,6 +27,7 @@
 #include "../game/packkey.h"
 #include "../game/palette.h"
 #include "../game/rect.h"
+#include "../game/report.h"
 #include "../game/savetag.h"
 #include "../game/sprite.h"
 #include "../game/surface.h"
@@ -115,6 +116,14 @@ static const struct {
       { 0x83, 0xEC, 0x78, 0x56, 0x57, 0xB9, 0x1B, 0x00 }, 8 },
     { ADDR_CLEAR_SURFACE, "ClearSurface",
       { 0x83, 0xEC, 0x74, 0xA1, 0x30, 0x53, 0x48, 0x00 }, 8 },
+    { ADDR_REALIZE_PALETTE, "RealizeSystemPalette",
+      { 0x53, 0x55, 0x56, 0x57, 0x6A, 0x00, 0xFF, 0x15 }, 8 },
+    { ADDR_SNAPSHOT_PALETTE, "SnapshotSystemPalette",
+      { 0xA1, 0x5C, 0x24, 0x51, 0x00, 0x56, 0x50, 0xFF }, 8 },
+    { ADDR_REPORT_ERROR, "ReportError",
+      { 0x8B, 0x4C, 0x24, 0x08, 0x8D, 0x44, 0x24, 0x0C }, 8 },
+    { ADDR_FATAL_ERROR, "FatalError",
+      { 0x8B, 0x4C, 0x24, 0x04, 0x8D, 0x44, 0x24, 0x08 }, 8 },
     /* Both are jmp-through-IAT thunks we call rather than import. If either
      * moved, we would be calling into something else entirely. */
     { ADDR_DIRECTDRAWCREATE, "DirectDrawCreate thunk",
@@ -188,6 +197,7 @@ static void install(void)
     text_install();
     font_install();
     mapdraw_install();
+    report_install();
     palette_install();
     blit_install();
     sprite_install();

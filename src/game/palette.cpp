@@ -111,8 +111,102 @@ void __cdecl CalibratePalette(uint32_t *palette)
         palette[i] = scratch[i];
 }
 
+/* ---- the GDI half ------------------------------------------------------ */
+
+static_assert(SYSPAL_NOSTATIC == 2 && SYSPAL_STATIC == 1, "SYSPAL_*");
+/* The original writes 4, which is PC_NOCOLLAPSE and not PC_RESERVED -- those
+ * two are easy to transpose and mean different things. A static_assert on the
+ * wrong one is what caught it. */
+static_assert(PC_NOCOLLAPSE == 4, "PC_NOCOLLAPSE");
+static_assert(sizeof(PALETTEENTRY) == 4, "PALETTEENTRY");
+
+#define g_hWnd          (*(HWND *)(uintptr_t)ADDR_HWND)
+#define g_logPalette    ((LPLOGPALETTE)(uintptr_t)ADDR_LOGPALETTE)
+/* Indexed past the LOGPALETTE header rather than through its one-element
+ * array member, which is the same address without the out-of-bounds fiction. */
+#define g_logEntries    ((LPPALETTEENTRY)(uintptr_t)ADDR_LOGPALETTE_ENTRIES)
+#define g_systemPalette ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)
+
+/* Windows keeps twenty entries of the system palette for itself, ten at each
+ * end, and an 8-bit application gets the 236 in between. */
+#define SYSTEM_RESERVED 10
+
+void __cdecl RealizeSystemPalette(const uint32_t *palette)
+{
+    HPALETTE hpal;
+    int32_t  i;
+
+    /* Toggling the system palette use to NOSTATIC and straight back is how the
+     * static entries are made to let go: the first call releases them, the
+     * second takes the default arrangement again, and the display driver
+     * reloads its table in between. Neither call on its own does anything. */
+    {
+        HDC dc = GetDC(NULL);
+
+        SetSystemPaletteUse(dc, SYSPAL_NOSTATIC);
+        SetSystemPaletteUse(dc, SYSPAL_STATIC);
+        ReleaseDC(NULL, dc);
+    }
+
+    /* The caller's entries are 0x00BBGGRR dwords, the same packing
+     * CalibratePalette works in, so the three colour bytes transfer straight
+     * across. palVersion and palNumEntries are already in the image. */
+    for (i = 0; i < PALETTE_ENTRIES; i++) {
+        const uint8_t *src = (const uint8_t *)&palette[i];
+
+        g_logEntries[i].peRed   = src[0];
+        g_logEntries[i].peGreen = src[1];
+        g_logEntries[i].peBlue  = src[2];
+        g_logEntries[i].peFlags = 0;
+    }
+
+    hpal = CreatePalette(g_logPalette);
+    if (!hpal)
+        return;
+
+    {
+        HDC      dc  = GetDC(NULL);
+        HPALETTE old = SelectPalette(dc, hpal, FALSE);
+
+        RealizePalette(dc);
+        SelectPalette(dc, old, FALSE);
+        DeleteObject(hpal);
+        ReleaseDC(NULL, dc);
+    }
+}
+
+void __cdecl SnapshotSystemPalette(void)
+{
+    HDC     dc = GetDC(g_hWnd);
+    int32_t i;
+
+    GetSystemPaletteEntries(dc, 0, PALETTE_ENTRIES, g_systemPalette);
+
+    /* Mark which entries the game means to own outright. The twenty Windows
+     * keeps are left at flags 0, so they map onto the system colours as usual;
+     * everything between them is PC_NOCOLLAPSE, which tells GDI not to fold the
+     * entry onto an existing colour but to give it a slot of its own. That is
+     * what makes the game's 236 colours come out as asked for rather than
+     * approximated to whatever is already realized. */
+    for (i = 0; i < SYSTEM_RESERVED; i++)
+        g_systemPalette[i].peFlags = 0;
+    for (i = SYSTEM_RESERVED; i < PALETTE_ENTRIES - SYSTEM_RESERVED; i++)
+        g_systemPalette[i].peFlags = PC_NOCOLLAPSE;
+    for (i = PALETTE_ENTRIES - SYSTEM_RESERVED; i < PALETTE_ENTRIES; i++)
+        g_systemPalette[i].peFlags = 0;
+
+    ReleaseDC(g_hWnd, dc);
+}
+
 int palette_install(void)
 {
-    return patch_replace(ADDR_CALIBRATE_PALETTE, (const void *)CalibratePalette,
-                         "CalibratePalette", 1);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_CALIBRATE_PALETTE, (const void *)CalibratePalette,
+                        "CalibratePalette", 1);
+    rc |= patch_replace(ADDR_REALIZE_PALETTE, (const void *)RealizeSystemPalette,
+                        "RealizeSystemPalette", 1);
+    rc |= patch_replace(ADDR_SNAPSHOT_PALETTE, (const void *)SnapshotSystemPalette,
+                        "SnapshotSystemPalette", 0);
+    return rc;
 }

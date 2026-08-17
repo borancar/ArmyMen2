@@ -106,6 +106,23 @@
 #define ADDR_CALIBRATE_PALETTE   0x0041AFC0u  /* void(uint32_t *palette[512]) */
 #define ADDR_NEAREST_PAL_INDEX   0x0041B7C0u  /* uint8_t(const uint32_t*,uint32_t,uint32_t) */
 
+/* The GDI half of the palette. The game is 8-bit, so what it can actually show
+ * is negotiated with Windows rather than chosen. */
+#define ADDR_REALIZE_PALETTE     0x0041AF00u  /* void(const uint32_t *palette) */
+#define ADDR_SNAPSHOT_PALETTE    0x00445170u  /* void(void) */
+/* A LOGPALETTE living in .data with palVersion and palNumEntries already set
+ * to 0x300 and 256; only the 256 entries after them are ever written. */
+#define ADDR_LOGPALETTE          0x00477A60u
+#define ADDR_LOGPALETTE_ENTRIES  0x00477A64u  /* PALETTEENTRY[256] */
+#define ADDR_SYSTEM_PALETTE      0x006564A0u  /* PALETTEENTRY[256], read back from GDI */
+
+/* Error reporting. Both format into the game's own static buffers and put a
+ * message box up; both return 0, which is what lets callers `return` them. */
+#define ADDR_FATAL_ERROR         0x0041E750u  /* int32_t(const char *fmt, ...) */
+#define ADDR_ERROR_TEXT          0x0050B5E0u  /* char[], the formatted message */
+#define ADDR_ERROR_TEXT_DD       0x0050B1E0u  /* char[], the same with an HRESULT */
+#define ADDR_VSPRINTF            0x00465A45u  /* the game's own CRT vsprintf */
+
 /* ---- application, window and message loop -----------------------------
  *
  * The outermost layer of the process: WinMain parses the command line, brings

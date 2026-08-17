@@ -6,7 +6,7 @@
 # the game's own 32-bit address space, which means PE.
 
 # The harness in src/inject is C; the reconstruction in src/game is C++, because
-# the original is C++ -- the savegame anchors name .cpp files and ~114 game
+# the original is C++ -- the savegame anchors name .cpp files and ~100 game
 # functions take `this` in ecx. A non-static member function is thiscall on i386
 # by default, so C++ is the natural vehicle for those; doing it in C would mean
 # fighting the language with __attribute__((thiscall)).
@@ -61,7 +61,8 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/palette.cpp \
             src/game/winmain.cpp \
             src/game/winproc.cpp \
-            src/game/device.cpp
+            src/game/device.cpp \
+            src/game/report.cpp
 
 HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
             $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))

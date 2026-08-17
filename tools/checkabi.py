@@ -69,6 +69,10 @@ FUNCS = [
     (0x00426D30, "InitInput",          "cdecl"),
     (0x0041B850, "CreateOffscreenSurface", "cdecl"),
     (0x0041AD30, "ClearSurface",       "cdecl"),
+    (0x0041AF00, "RealizeSystemPalette", "cdecl"),
+    (0x00445170, "SnapshotSystemPalette", "cdecl"),
+    (0x0041E7A0, "ReportError",       "cdecl"),
+    (0x0041E750, "FatalError",        "cdecl"),
     (0x0041C710, "BlitGlyph",          "fastcall"),
     (0x0041C2B0, "BlitCopy16",         "fastcall"),
     (0x0041C1C0, "BlitCopy32",         "fastcall"),
@@ -94,8 +98,27 @@ def idiom_is_write_only(insn):
     return False
 
 
-def analyse(img, va):
+def load_sizes():
+    """{addr: size} from docs/functions.tsv, or {} if it is not there yet."""
+    import csv
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "docs", "functions.tsv")
+    if not os.path.exists(path):
+        return {}
+    with open(path) as fh:
+        return {int(r["addr"], 16): int(r["size"])
+                for r in csv.DictReader(fh, delimiter="\t")}
+
+
+def analyse(img, va, size=None):
     """Return (reads_ecx, reads_edx, ret_immediates).
+
+    `size` bounds the scan to the function. Without it the disassembly runs off
+    the end into whatever follows and collects that function's `ret N` as if it
+    were this one's -- which reported SnapshotSystemPalette, 128 bytes and
+    plainly cdecl, as possibly stdcall. The whole-binary survey was reading the
+    same way, so the convention counts it prints were wrong too.
 
     Known false positive, left in deliberately: MSVC 6 allocates a single
     4-byte local with `push ecx`, which reads ecx and so reports as thiscall.
@@ -112,7 +135,7 @@ def analyse(img, va):
     settled = {"ecx": False, "edx": False}
     rets = set()
 
-    for n, insn in enumerate(md.disasm(img.read(va, 800), va)):
+    for n, insn in enumerate(md.disasm(img.read(va, size or 800), va)):
         if insn.mnemonic == "ret":
             rets.add(int(insn.op_str, 0) if insn.op_str else 0)
             if n > SCAN:
@@ -158,8 +181,9 @@ def main():
     print(f"{'function':<20}{'addr':<12}{'declared':<10}{'ecx':>5}{'edx':>5}"
           f"{'ret':>8}  verdict")
     print("  " + "-" * 68)
+    sizes = load_sizes()
     for va, name, declared in FUNCS:
-        rc, rd, rets = analyse(img, va)
+        rc, rd, rets = analyse(img, va, sizes.get(va))
         got = expected(rc, rd, rets)
         retstr = ",".join(hex(r) if r else "-" for r in sorted(rets)) or "?"
         ok = (got == declared)
@@ -208,7 +232,7 @@ def survey(img):
             va = int(row["addr"], 16)
             if va >= 0x0045C000:          # MSVC CRT, not game code
                 continue
-            rc, rd, rets = analyse(img, va)
+            rc, rd, rets = analyse(img, va, int(row["size"]))
             kind = expected(rc, rd, rets)
             # A plain `ret` with ecx live on entry is NOT thiscall -- thiscall
             # is callee-cleaned. Keep them apart rather than collapsing them.

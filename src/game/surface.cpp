@@ -28,6 +28,7 @@
 
 #include "surface.h"
 #include "rect.h"
+#include "report.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -102,9 +103,6 @@ int32_t __cdecl UnlockSurface(void)
 #define g_ddraw2     (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
 #define g_screenRect (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_RECT)
 
-typedef int32_t (__cdecl *am2_report_error_fn)(HRESULT hr, const char *fmt, ...);
-#define orig_report_error (*(am2_report_error_fn)ADDR_REPORT_ERROR)
-
 static_assert(DDSD_CAPS + DDSD_HEIGHT + DDSD_WIDTH + DDSD_PIXELFORMAT == 0x1007,
               "the descriptor fields it fills in");
 static_assert(DDSCAPS_SYSTEMMEMORY == 0x800, "DDSCAPS_SYSTEMMEMORY");
@@ -129,7 +127,7 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
     ddsd.dwSize = sizeof ddsd;
     hr = IDirectDrawSurface_GetSurfaceDesc(g_primarySurface, &ddsd);
     if (hr) {
-        orig_report_error(hr, "GetSurfaceDesc()");
+        ReportError(hr, "GetSurfaceDesc()");
         return NULL;
     }
 
@@ -144,14 +142,14 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
     if (hr) {
         /* Only worth retrying if we had not already asked for system memory. */
         if (forceSystem) {
-            orig_report_error(hr, "CreateSurface()");
+            ReportError(hr, "CreateSurface()");
             return NULL;
         }
         orig_log("Failed to put surface into video memory!\n");
         ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
         hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL);
         if (hr) {
-            orig_report_error(hr, "CreateSurface()");
+            ReportError(hr, "CreateSurface()");
             return NULL;
         }
     }
