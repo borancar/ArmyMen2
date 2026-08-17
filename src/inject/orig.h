@@ -221,7 +221,18 @@
 #define ADDR_AUDIO_TIMER_RUN     0x004FA464u
 #define ADDR_AUDIO_PERIOD        0x004FA448u  /* divided by 4 for timeBeginPeriod */
 #define ADDR_AUDIO_IN_CALLBACK   0x004FA478u  /* set while the refill is running */
-#define ADDR_AUDIO_TRACK_ARG     0x004FA45Cu
+/* StartAudioStream's second argument, and RefillAudioBuffer shows what it is:
+ * non-zero means rewind and keep going at the end of the file. */
+#define ADDR_AUDIO_LOOPING       0x004FA45Cu
+#define ADDR_REFILL_AUDIO        0x0040CD20u  /* void(void) */
+#define ADDR_AUDIO_REFILL_BYTES  0x004FA444u  /* how much to write each time */
+#define ADDR_AUDIO_READ_FAILED   0x004FA458u
+#define ADDR_AUDIO_AT_END        0x004FA460u
+#define ADDR_AUDIO_VALID_BYTES   0x004FA454u  /* good data before the silence */
+#define ADDR_AUDIO_DATA_CHUNK    0x004FA418u  /* MMCKINFO, the `data` chunk */
+#define ADDR_AUDIO_RIFF_CHUNK    0x004FA42Cu  /* MMCKINFO, the RIFF */
+#define ADDR_AUDIO_CURSOR_A      0x004FA450u  /* both cleared after a refill */
+#define ADDR_AUDIO_CURSOR_B      0x004FA44Cu
 #define ADDR_AUDIO_HMMIO         0x004FA414u  /* HMMIO, closed by WaveCloseReadFile */
 #define ADDR_AUDIO_WAVEFORMAT    0x004FA410u  /* WAVEFORMATEX * */
 #define ADDR_AUDIO_TIMER_PROC    0x0040D020u  /* the refill callback, stays original */

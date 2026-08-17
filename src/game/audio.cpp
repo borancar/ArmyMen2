@@ -29,7 +29,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 #define g_timerRunning  (*(int32_t *)(uintptr_t)ADDR_AUDIO_TIMER_RUN)
 #define g_period        (*(const uint32_t *)(uintptr_t)ADDR_AUDIO_PERIOD)
 #define g_inCallback    (*(LONG *)(uintptr_t)ADDR_AUDIO_IN_CALLBACK)
-#define g_trackArg      (*(int32_t *)(uintptr_t)ADDR_AUDIO_TRACK_ARG)
+#define g_looping       (*(int32_t *)(uintptr_t)ADDR_AUDIO_LOOPING)
 #define g_hmmio         (*(HMMIO *)(uintptr_t)ADDR_AUDIO_HMMIO)
 #define g_waveFormat    (*(WAVEFORMATEX **)(uintptr_t)ADDR_AUDIO_WAVEFORMAT)
 #define g_pathArg       (*(void **)(uintptr_t)ADDR_AUDIO_PATH_ARG)
@@ -86,7 +86,7 @@ void __cdecl StartAudioStream(void *track, int32_t which)
         return;
 
     orig_prepare_track(track);
-    g_trackArg = which;
+    g_looping = which;
 
     if (!g_buffer)
         return;
@@ -297,6 +297,81 @@ void __cdecl StopAllSounds(void)
     StopAudioStream();
 }
 
+/* 8-bit PCM is unsigned, so its silence is 0x80; 16-bit is signed and silence
+ * is 0. The original derives this branchlessly and then smears the byte across
+ * a dword to fill with `rep stosd`. */
+#define SILENCE_8BIT  0x80u
+
+#define g_refillBytes (*(const uint32_t *)(uintptr_t)ADDR_AUDIO_REFILL_BYTES)
+#define g_readFailed  (*(int32_t *)(uintptr_t)ADDR_AUDIO_READ_FAILED)
+#define g_atEnd       (*(int32_t *)(uintptr_t)ADDR_AUDIO_AT_END)
+#define g_validBytes  (*(uint32_t *)(uintptr_t)ADDR_AUDIO_VALID_BYTES)
+#define g_dataChunk   ((MMCKINFO *)(uintptr_t)ADDR_AUDIO_DATA_CHUNK)
+#define g_riffChunk   ((MMCKINFO *)(uintptr_t)ADDR_AUDIO_RIFF_CHUNK)
+#define g_cursorA     (*(int32_t *)(uintptr_t)ADDR_AUDIO_CURSOR_A)
+#define g_cursorB     (*(int32_t *)(uintptr_t)ADDR_AUDIO_CURSOR_B)
+
+/* Original: 0x0040CD20. Top the streaming buffer up from the .WAV.
+ *
+ * Called from the multimedia timer StartAudioStream installs. Locks the buffer,
+ * reads into it through src/game/wavefile.cpp, and unlocks. What happens at the
+ * end of the file is the whole of the interesting part: looping rewinds to the
+ * `data` chunk and keeps reading until the buffer is full, and not looping
+ * records how much was real and pads the rest with silence -- 0x80 for 8-bit
+ * PCM, which is unsigned, and 0 for 16-bit, which is not.
+ *
+ * The Lock-failed path still runs the Unlock, with nulls, exactly as the
+ * original does. */
+void __cdecl RefillAudioBuffer(void)
+{
+    void    *ptr1 = NULL, *ptr2 = NULL;
+    DWORD    len1 = 0, len2 = 0;
+    uint32_t got  = 0;
+
+    if (IDirectSoundBuffer_Lock(g_buffer, 0, g_refillBytes, &ptr1, &len1,
+                                &ptr2, &len2, 0) != DS_OK) {
+        ptr1 = ptr2 = NULL;
+        len1 = len2 = 0;
+        goto unlock;
+    }
+    if (len1 == 0)
+        goto unlock;
+
+    if (WaveReadFile(g_hmmio, len1, (uint8_t *)ptr1, g_dataChunk, &got) != 0) {
+        g_readFailed = 1;
+        goto unlock;
+    }
+    if (got >= len1)
+        goto unlock;
+
+    if (g_looping) {
+        /* Round again, and again if need be: rewind to the start of the data
+         * chunk and keep filling from where the last read stopped. The cursor
+         * and the count are both carried across iterations, so a file shorter
+         * than the buffer is repeated as many times as it takes. */
+        uint8_t *dest      = (uint8_t *)ptr1;
+        uint32_t remaining = len1;
+
+        do {
+            dest      += got;
+            remaining -= got;
+            WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk);
+            WaveReadFile(g_hmmio, remaining, dest, g_dataChunk, &got);
+        } while (got < remaining);
+    } else {
+        uint8_t silence = (g_waveFormat->wBitsPerSample == 8) ? SILENCE_8BIT : 0;
+
+        g_atEnd      = 1;
+        g_validBytes = got;
+        memset((uint8_t *)ptr1 + got, silence, len1 - got);
+    }
+
+unlock:
+    IDirectSoundBuffer_Unlock(g_buffer, ptr1, len1, ptr2, len2);
+    g_cursorA = 0;
+    g_cursorB = 0;
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -313,6 +388,8 @@ int audio_install(void)
                         "SetStreamVolume", 1);
     rc |= patch_replace(ADDR_STOP_ALL_SOUNDS, (const void *)StopAllSounds,
                         "StopAllSounds", 0);
+    rc |= patch_replace(ADDR_REFILL_AUDIO, (const void *)RefillAudioBuffer,
+                        "RefillAudioBuffer", 0);
     rc |= patch_replace(ADDR_FREE_SOUND, (const void *)FreeSound, "FreeSound", 1);
     return rc;
 }
