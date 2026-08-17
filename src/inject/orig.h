@@ -388,6 +388,8 @@
  * it, and it means "this machine is fast enough". WinMain clears it first. */
 #define ADDR_FAST_MACHINE        0x00512584u  /* int32_t */
 #define ADDR_HWND                0x0051245Cu  /* HWND, the one game window */
+/* Both DirectPlay enumerations pass this same handle as their lpContext, and
+ * CommSend posts to it -- so an "lpContext" in this game is the window. */
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE "ArmyMenMutex" */
 #define ADDR_LAST_MESSAGE        0x004F9FE4u  /* uint32_t, last dispatched message */
 #define ADDR_SCREEN_W            0x004852D8u  /* int32_t */
@@ -443,8 +445,29 @@
 /* Appends one named entry to a list object. 16 callers. */
 #define ADDR_LIST_ADD            0x00453A30u  /* thiscall void(this, const char *, void *) */
 #define ADDR_STR_COMPUTER_ONLY   0x00475300u  /* "Play Against Computer Only" */
+
+/* The packet transmit and the three helpers its watchdog uses. */
+#define ADDR_COMM_SEND           0x0040EB70u  /* thiscall int32(this,id,flags,buf,len) */
+#define ADDR_FIND_PLAYER_BY_ID   0x00402990u  /* void *(uint32 id); NULL when unknown */
+#define ADDR_GET_EVENT_FLAGS     0x00426840u  /* uint32(void), reads 0x005122FC */
+#define ADDR_SET_EVENT_FLAGS     0x004267C0u  /* void(uint32 bits), ORs into it */
+#define ADDR_STR_SEND_BADPLAYER  0x004754ACu
+#define ADDR_STR_SEND_BADPARAM   0x00475478u
+#define ADDR_STR_SEND_NOENTRY    0x00475450u
+/* Comm object fields the send path uses. Slots are at COMM_SLOT_BASE with
+ * stride 0x70; +0x08 is the player id and +0x58 the unacknowledged counter. */
+#define COMM_OFF_STAT_INDEX      0x004u   /* ring cursor, 0..29 */
+#define COMM_OFF_STAT_TIMES      0x00Cu   /* uint32[30] */
+#define COMM_OFF_STAT_SIZES      0x084u   /* uint32[30] */
+#define COMM_OFF_STAT_MAX        0x1F0u
+#define COMM_OFF_STAT_BYTES      0x1F8u
+#define COMM_OFF_STAT_PACKETS    0x200u
+#define COMM_OFF_OUR_PLAYER_ID   0x3CCu
+#define COMM_OFF_PLAYER_COUNT    0x3D0u
+#define COMM_SLOT_OFF_ID         0x008u
+#define COMM_SLOT_OFF_UNACKED    0x058u
+#define COMM_STAT_RING           30u
 #define ADDR_SESSION_LIST        0x004FA908u  /* void *, what the callback fills */
-#define ADDR_ENUM_CONTEXT        0x0051245Cu  /* void *, lpContext */
 #define COMM_OFF_APP_GUID        0x3D4u       /* GUID *, set by CommConstruct */
 /* Calls ADDR_SESSION_RESET on the object at 0x0051612C when there is one. */
 #define ADDR_DROP_OBJ_51612C     0x00431D70u  /* void(void) */

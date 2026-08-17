@@ -353,7 +353,8 @@ typedef void (__attribute__((thiscall)) *am2_session_reset_fn)(void *);
 #define orig_session_reset (*(am2_session_reset_fn)ADDR_SESSION_RESET)
 
 #define g_sessionList  (*(void **)(uintptr_t)ADDR_SESSION_LIST)
-#define g_enumContext  (*(void **)(uintptr_t)ADDR_ENUM_CONTEXT)
+/* lpContext for both enumerations is the game window; see orig.h. */
+#define g_enumContext  (*(void **)(uintptr_t)ADDR_HWND)
 
 int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
 {
@@ -435,6 +436,126 @@ int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
     return 1;
 }
 
+/* The packet transmit -- 0x0040EB70, thiscall, `ret 0x10`.
+ *
+ * The DirectPlay call in the middle is three lines; the rest is a statistics
+ * ring in front of it and a per-player watchdog behind it. Both are the comm
+ * object's own bookkeeping and neither is optional, because the counters they
+ * keep are read elsewhere.
+ *
+ * The watchdog is the interesting half. Every successful send bumps an
+ * unacknowledged counter on each *other* live player, and when one passes 30 a
+ * bit -- 0x800 shifted by the slot index -- is raised in the global event flags,
+ * once. That is how a player who has stopped answering is noticed: not by a
+ * timeout, but by getting too far ahead of them.
+ *
+ * On failure it posts 0x046C to the game window, which is one of the six comm
+ * messages WndProc forwards to the original.
+ *
+ * Two faithfulness details. The maximum-size comparison is UNSIGNED in the
+ * original (`jbe`), so a length with the top bit set would be recorded as the
+ * new maximum and nothing else would ever beat it -- kept. And the watchdog
+ * reads the slot id twice, once through `this` and once through the comm
+ * global; those are the same object in every call that exists, but the original
+ * does both and so does this. */
+static_assert((uint32_t)DPERR_INVALIDPLAYER == 0x88770096u, "DPERR_INVALIDPLAYER");
+static_assert((uint32_t)E_INVALIDARG == 0x80070057u, "E_INVALIDARG");
+
+typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
+typedef uint32_t (__cdecl *am2_get_flags_fn)(void);
+typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
+
+#define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
+#define orig_get_flags   (*(am2_get_flags_fn)ADDR_GET_EVENT_FLAGS)
+#define orig_set_flags   (*(am2_set_flags_fn)ADDR_SET_EVENT_FLAGS)
+#define g_hwnd           (*(HWND *)(uintptr_t)ADDR_HWND)
+
+/* 0x046C -- WndProc forwards this one to the original. */
+#define AM2_WM_COMM_SEND_FAILED 0x046Cu
+
+int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
+                                           uint32_t flags, void *data,
+                                           uint32_t size)
+{
+    uint8_t       *self = (uint8_t *)comm;
+    LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
+    uint32_t       at, i, n;
+    uint8_t       *other;
+    HRESULT        hr;
+
+    if (!dp)
+        return 0;
+
+    /* Statistics first, whether or not the send goes through. */
+    at = comm_u32(self, COMM_OFF_STAT_INDEX);
+    comm_u32(self, COMM_OFF_STAT_TIMES + at * 4) = GetTickCount();
+    comm_u32(self, COMM_OFF_STAT_SIZES + at * 4) = size;
+    comm_u32(self, COMM_OFF_STAT_BYTES)   += size;
+    comm_u32(self, COMM_OFF_STAT_PACKETS) += 1;
+    if (size > comm_u32(self, COMM_OFF_STAT_MAX))
+        comm_u32(self, COMM_OFF_STAT_MAX) = size;
+    if (++at >= COMM_STAT_RING)
+        at = 0;
+    comm_u32(self, COMM_OFF_STAT_INDEX) = at;
+
+    hr = IDirectPlayX_Send(dp, comm_u32(self, COMM_OFF_OUR_PLAYER_ID), idTo,
+                           flags, data, size);
+
+    if (hr != DP_OK) {
+        uint8_t *cm = g_commObject;
+        int32_t  found = 0;
+
+        /* Only these two are reported; anything else fails silently. */
+        if (hr == E_INVALIDARG)
+            orig_log((const char *)(uintptr_t)ADDR_STR_SEND_BADPARAM, idTo);
+        else if (hr == (HRESULT)DPERR_INVALIDPLAYER)
+            orig_log((const char *)(uintptr_t)ADDR_STR_SEND_BADPLAYER, idTo);
+        else
+            return 0;
+
+        n = comm_u32(cm, COMM_OFF_PLAYER_COUNT);
+        for (i = 0; i < n; i++) {
+            if (comm_u32(cm, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+                             + COMM_SLOT_OFF_ID) == idTo) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found)
+            orig_log((const char *)(uintptr_t)ADDR_STR_SEND_NOENTRY, idTo);
+
+        PostMessageA(g_hwnd, AM2_WM_COMM_SEND_FAILED, (WPARAM)idTo, 0);
+        return 0;
+    }
+
+    /* Sent. Everyone else who is live and reachable is now one packet further
+     * behind, and past 30 that is worth raising once. */
+    other = g_commObject;
+    n = comm_u32(other, COMM_OFF_PLAYER_COUNT);
+    for (i = 0; i < n; i++) {
+        uint8_t *slot = self  + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint32_t id;
+        uint32_t bit;
+
+        if (comm_u32(slot, COMM_SLOT_OFF_ID) == 0xFFFFFFFFu)
+            continue;
+        id = comm_u32(other, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+                             + COMM_SLOT_OFF_ID);
+        if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
+            continue;
+        if (!orig_find_player(id))
+            continue;
+
+        bit = 0x800u << i;
+        if (++comm_u32(slot, COMM_SLOT_OFF_UNACKED) <= COMM_STAT_RING)
+            continue;
+        if (orig_get_flags() & bit)
+            continue;
+        orig_set_flags(bit);
+    }
+    return 1;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -460,5 +581,6 @@ int dplay_install(void)
                         "CommEnumSessions", 1);
     rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, (const void *)CommEnumConnections,
                         "CommEnumConnections", 1);
+    rc |= patch_replace(ADDR_COMM_SEND, (const void *)CommSend, "CommSend", 4);
     return rc;
 }
