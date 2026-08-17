@@ -497,5 +497,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   but no PipeWire or PulseAudio session does, and pointing Wine's audio driver
   at ALSA directly changes nothing. Anyone with sound should re-check those
   three counts — Boot Camp alone should move them.
+- **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
+  Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
+  branch, and that function's single caller at `0x0042EE78` passes a literal
+  `0`. So the branch is dead and so is everything behind it — including the
+  `InitializeConnection` in the same branch. The transport is actually brought
+  up by `CommInitializeConnection` from `StartSelectedGame`.
+
+  Worth checking for before spending time trying to exercise something: a
+  function can be reachable, called from live code, and still never run because
+  the argument that gates it is a constant at the one call site.
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.

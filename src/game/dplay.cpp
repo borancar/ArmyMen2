@@ -632,6 +632,18 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
  * The 0x14 subtracted from the working size is DirectPlay's own per-message
  * overhead, left in the number rather than accounted for anywhere else.
  *
+ * UNREACHABLE IN THIS BUILD, and that is structural rather than a gap in
+ * testing. The only reference to it is the call at 0x0040DD72, inside
+ * CommCreateDirectPlay's `if (connection)` branch -- and CommCreateDirectPlay
+ * has exactly one caller, at 0x0042EE78, which passes a literal 0. So the
+ * branch is never taken and neither is this. The transport is initialised
+ * through CommInitializeConnection instead, from StartSelectedGame, which
+ * matches what driving the multiplayer path shows: the connection comes up,
+ * START A WAR works, and this counter stays at zero.
+ *
+ * It is reconstructed anyway because it is DirectPlay boundary code and the
+ * cost is a fingerprint, but do not go looking for a way to exercise it.
+ *
  * The whole capabilities dump is behind `-debugComm`, which is the flag at
  * +0x418. It is also the confirmation that this is a DPCAPS: each of the four
  * values it prints sits exactly where that structure puts the field the message

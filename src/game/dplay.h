@@ -107,6 +107,14 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name);
  * Returns 0 always; every caller ignores it. */
 int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
 
+/* Original: 0x0040E660, thiscall. Ask the provider what it can carry and trim
+ * the comm object's buffer sizes to fit.
+ *
+ * UNREACHABLE in this build: its only caller is CommCreateDirectPlay's
+ * `if (connection)` branch, and the one call to that passes a literal 0. See
+ * dplay.cpp. */
+int32_t __attribute__((thiscall)) CommOnConnected(void *self);
+
 int dplay_install(void);
 
 #ifdef __cplusplus
