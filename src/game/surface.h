@@ -174,6 +174,10 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour);
 void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
                         int32_t value, int32_t base);
 
+/* FreeMapSurfaces -- original 0x0042D390. Release the map sprite and the cache
+ * surface it was painted into. */
+void __cdecl FreeMapSurfaces(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus

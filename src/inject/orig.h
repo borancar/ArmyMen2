@@ -99,6 +99,13 @@
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
+#define ADDR_FREE_MAP_SURFACES 0x0042D390u /* void(void) */
+/* The menu's sprite table: 190 AM2_Sprite* laid out as 19 rows of 10, one more
+ * slot just past the end, and a surface of its own. */
+#define ADDR_FREE_MENU_SPRITES 0x00412F80u /* void(void) */
+#define ADDR_MENU_SPRITES      0x004FCAACu /* AM2_Sprite *[190] */
+#define ADDR_MENU_SPRITES_END  0x004FCDA4u /* one past; also cleared as a slot */
+#define ADDR_MENU_SURFACE      0x004FCDF4u /* IDirectDrawSurface * */
 #define ADDR_MAP_SURFACE    0x00514E90u  /* desc; +8 a flag, +0x10 the surface */
 #define ADDR_ON_MAP_RESTORED 0x0042C0E0u /* tail-called after a map restore */
 #define ADDR_PRESENT_ENABLED 0x004FA030u /* int32_t */

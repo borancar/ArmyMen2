@@ -276,6 +276,41 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
     orig_free(spr);
 }
 
+/* Let the menu's sprites go -- 0x00412F80.
+ *
+ * 190 of them, and the original walks them as 19 rows of ten rather than as a
+ * flat run -- an inner counter of ten inside an outer bound check. The two are
+ * exactly equivalent here, so this is written flat; the nesting is what a two
+ * dimensional array compiles to, not a difference in behaviour.
+ *
+ * The slot immediately past the array is cleared too, without being released.
+ * That is the original's, and it is a slot rather than a stray write: the loop
+ * stops at that address precisely because it is the end of the array. */
+#define g_menuSprites  ((AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES)
+#define g_menuSpritesEnd (*(uint32_t *)(uintptr_t)ADDR_MENU_SPRITES_END)
+#define g_menuSurface  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
+
+#define MENU_SPRITE_COUNT \
+    ((ADDR_MENU_SPRITES_END - ADDR_MENU_SPRITES) / sizeof(AM2_Sprite *))
+
+void __cdecl FreeMenuSprites(void)
+{
+    uint32_t i;
+
+    for (i = 0; i < MENU_SPRITE_COUNT; i++) {
+        if (g_menuSprites[i]) {
+            ReleaseSprite(g_menuSprites[i]);
+            g_menuSprites[i] = NULL;
+        }
+    }
+    g_menuSpritesEnd = 0;
+
+    if (g_menuSurface) {
+        IDirectDrawSurface_Release(g_menuSurface);
+        g_menuSurface = NULL;
+    }
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -289,5 +324,7 @@ int sprite_install(void)
                         "ClearSprite", 1);
     rc |= patch_replace(ADDR_RELEASE_SPRITE, (const void *)ReleaseSprite,
                         "ReleaseSprite", 1);
+    rc |= patch_replace(ADDR_FREE_MENU_SPRITES, (const void *)FreeMenuSprites,
+                        "FreeMenuSprites", 0);
     return rc;
 }

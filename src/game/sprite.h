@@ -97,6 +97,10 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr);
 void __cdecl ClearSprite(AM2_Sprite *spr);
 void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
+/* FreeMenuSprites -- original 0x00412F80. Release all 190 menu sprites, the
+ * slot past them, and the surface they were drawn from. */
+void __cdecl FreeMenuSprites(void);
+
 int sprite_install(void);
 
 #ifdef __cplusplus

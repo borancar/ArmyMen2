@@ -27,6 +27,7 @@
  */
 
 #include "surface.h"
+#include "sprite.h"
 #include "rect.h"
 #include "winmain.h"
 #include "report.h"
@@ -629,6 +630,26 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
                (mark > filled) ? (colour & 0xFF) : g_seqBarBg);
 }
 
+/* Let the map go -- 0x0042D390.
+ *
+ * Two objects, released two different ways, which is the whole content: the
+ * map is an AM2_Sprite and goes through ReleaseSprite, while the cache surface
+ * it was painted into is a raw IDirectDrawSurface and takes a plain Release.
+ *
+ * The sprite pointer lives at ADDR_MAP_SURFACE, whose comment in orig.h --
+ * "desc; +8 a flag, +0x10 the surface" -- was describing AM2_Sprite's layout
+ * without knowing it: +0x10 is `image`, exactly where ReleaseSprite looks. */
+void __cdecl FreeMapSurfaces(void)
+{
+    ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_MAP_SURFACE);
+    *(AM2_Sprite **)(uintptr_t)ADDR_MAP_SURFACE = NULL;
+
+    if (g_mapCache) {
+        IDirectDrawSurface_Release(g_mapCache);
+        g_mapCache = NULL;
+    }
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -661,5 +682,7 @@ int surface_install(void)
                         "ReloadBitmapSurface", 7);
     rc |= patch_replace(ADDR_DRAW_SEQ_BAR, (const void *)DrawSeqBar,
                         "DrawSeqBar", 5);
+    rc |= patch_replace(ADDR_FREE_MAP_SURFACES, (const void *)FreeMapSurfaces,
+                        "FreeMapSurfaces", 0);
     return rc;
 }
