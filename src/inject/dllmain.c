@@ -31,6 +31,7 @@
 #include "../game/sprite.h"
 #include "../game/surface.h"
 #include "../game/text.h"
+#include "../game/winmain.h"
 
 #include <windows.h>
 #include <stdlib.h>
@@ -93,6 +94,14 @@ static const struct {
       { 0x8B, 0x44, 0x24, 0x04, 0x8B, 0x0D, 0x28, 0x71 }, 8 },
     { ADDR_CALIBRATE_PALETTE, "CalibratePalette",
       { 0xA1, 0xD4, 0x2A, 0x50, 0x00, 0x81, 0xEC, 0x0C }, 8 },
+    { ADDR_WIN_MAIN, "WinMain",
+      { 0x83, 0xEC, 0x1C, 0xB9, 0x07, 0x00, 0x00, 0x00 }, 8 },
+    { ADDR_INIT_APPLICATION, "InitApplication",
+      { 0x83, 0xEC, 0x28, 0x68, 0x50, 0x43, 0x47, 0x00 }, 8 },
+    { ADDR_PUMP_MESSAGE, "PumpMessage",
+      { 0x56, 0x8B, 0x74, 0x24, 0x08, 0x83, 0x7E, 0x04 }, 8 },
+    { ADDR_POSITION_WINDOW, "PositionWindow",
+      { 0xA1, 0x44, 0x73, 0x50, 0x00, 0x83, 0xEC, 0x20 }, 8 },
 };
 
 static int verify_image(void)
@@ -164,6 +173,7 @@ static void install(void)
     blit_install();
     sprite_install();
     surface_install();
+    winmain_install();
     observe_hot_functions();
 
     /* Input interception is independent of the reconstruction: it exists so

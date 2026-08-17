@@ -87,14 +87,45 @@ tools/drive.sh stop
 
 Boot Camp reaches gameplay quickly and exercises the map, sprites, HUD text and
 the lock/unlock bracket. The title screen alone touches almost none of the
-engine, so it proves very little.
+engine, so it proves very little. From the briefing screen, **`RETURN` starts
+the mission** — the cursor is hidden there, so `tools/point.py` cannot find it
+and clicking is not an option.
+
+**Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
+`setsid make -s run ... &` issued from a script or an agent shell starts the
+game, gets as far as `system speed:` in the log, then fails inside `InitInput`
+and exits — in every configuration, including ones that work perfectly through
+`drive.sh`. The mechanism is not understood. What matters is that it fails
+*silently and plausibly*, deep in DirectInput setup, so it reads exactly like a
+broken reconstruction. An afternoon was lost to this: it produced a completely
+convincing false result that windowed mode was broken, which survived several
+rounds of A/B against `run-stock` because `run-stock` was being launched the
+same way and failing for the same reason. If a run fails in a way that seems to
+implicate recent work, re-run it through `drive.sh` before believing it.
+
+To pass switches through, use `drive.sh start`'s trailing `VAR=VAL` arguments,
+which reach `make` as single words. `AM2_MAKEVARS` is word-split, so a value
+containing spaces breaks apart — and `AM2_MAKEVARS="ARGS='-nointro -w'"` hands
+make a bare `-w`, which it takes as `--print-directory`:
+
+```
+AM2_DISPLAY=:99 tools/drive.sh start 25 "ARGS=-nointro -dbg -w"
+```
 
 **A count of 0 does not mean "broken" and does not mean "never called".** When a
 reconstructed function's callers are *also* reconstructed, the direct call
 bypasses the patched entry point and the counter never moves. The two cases are
 indistinguishable from the outside; resolve it with a temporary probe rather
 than by guessing. `BlitCopy16`, `BlitCopy32` and `EncodeGlyph` all read 0 for
-exactly this reason.
+exactly this reason, and so now do `InitApplication`, `PumpMessage` and
+`PositionWindow` — reconstructing `WinMain` swallowed the whole layer below it
+in one go. `AM2_PROBE_NOWIN=1` is the probe for that particular blind spot: it
+leaves the four application-layer functions original and every other patch in
+place, which is something `run-stock` cannot do.
+
+Note that this makes the counts *less* informative the further the
+reconstruction gets. It is a measure of what still crosses an original
+boundary, not of what runs.
 
 **The registry invariant is the sharpest single check available.** `FirstItem`
 walks × objects registered == `NextItem` calls, exactly — e.g.
@@ -138,17 +169,29 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette`). Next bottom-up:
   `0x00454F00` (144B), `0x00414620` (224B, tooltip renderer), `0x00413610`
   (256B), `0x00433350` (304B).
-- The Win32/DirectX boundary is inventoried but mostly unported: 111 functions
-  below the CRT touch the import table (`docs/imports.tsv`) and 161 contain
-  COM-shaped dispatch (`docs/comcalls.tsv`). The window and message cluster is
-  the interesting one — `0x0040B600` (`CreateMutexA`/`CreateWindowExA`, almost
-  certainly WinMain), `0x0040A6A0` (2256B, `BeginPaint`/`DefWindowProcA`, the
-  window procedure) and `0x0040B070` (`AdjustWindowRectEx`/`GetWindowRect`).
+- The Win32/DirectX boundary is inventoried and being worked outward-in: 111
+  functions below the CRT touch the import table (`docs/imports.tsv`) and 161
+  contain COM-shaped dispatch (`docs/comcalls.tsv`). The application layer is
+  done — `WinMain`, `InitApplication`, `PumpMessage`, `PositionWindow`. Next is
+  the window procedure at `0x0040A6B0` (2256B, 17 import sites,
+  `BeginPaint`/`DefWindowProcA`/`GetUpdateRect`), then `InitDirectDraw`
+  (`0x0041AA10`) and `InitInput` (`0x00426D30`).
+- **`-w` is windowed mode**, global `0x00507344`, and it gates far more than it
+  looks: the window border and repositioning, the palettized primary in
+  `InitDirectDraw`, and `CalibratePalette`. Anything that reads 0 under the
+  default fullscreen run may simply be behind it. The other switches are in
+  `orig.h`; three are developer names, and `-rob` is the flag that was already
+  known as `ADDR_DEBUG_ITEMLIST`.
+- Windowed mode runs and is worth using as a second configuration — the window
+  is created, sized and positioned correctly (client area 640x480 at (4,30))
+  and `CalibratePalette` fires — but Wine hands back no lockable primary, so
+  `LockSurface` never succeeds and the client area stays black. Fullscreen
+  remains the configuration to verify against.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
-- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
-  `CalibratePalette` — the last is gated on `0x00507344`, which is 0 whenever
-  DirectDraw does not hand back a palettized primary, as under Xvfb.
+- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`.
+  `CalibratePalette` came off this list once `-w` was understood — it runs
+  twice per windowed startup.
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.

@@ -10,7 +10,11 @@
 #include <string.h>
 
 #define DEFAULT_PORT 31337
-#define MAX_LINE     512
+/* Big enough for `counts` to name all MAX_TRACED functions at once. At 512 it
+ * was not: the reply stopped mid-list and the four functions patched last never
+ * appeared at all, which reads exactly like they were never installed. The
+ * client frames on a newline and does not care how long a line is. */
+#define MAX_LINE     2048
 
 static SOCKET g_listen = INVALID_SOCKET;
 static HANDLE g_thread;

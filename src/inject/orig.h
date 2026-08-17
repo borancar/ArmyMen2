@@ -98,6 +98,81 @@
 #define ADDR_CALIBRATE_PALETTE   0x0041AFC0u  /* void(uint32_t *palette[512]) */
 #define ADDR_NEAREST_PAL_INDEX   0x0041B7C0u  /* uint8_t(const uint32_t*,uint32_t,uint32_t) */
 
+/* ---- application, window and message loop -----------------------------
+ *
+ * The outermost layer of the process: WinMain parses the command line, brings
+ * up the window and DirectDraw, then runs a PeekMessage loop that ticks a frame
+ * whenever the queue is empty.
+ *
+ * 0x00507344 is the single most useful global here. `-w` sets it, and it gates
+ * every windowed-mode behaviour in the game -- the window gets a border and is
+ * repositioned, DirectDraw asks for a palettized primary, and CalibratePalette
+ * runs. Without it the game is fullscreen and none of that happens, which is
+ * why CalibratePalette never fires under the harness as it is normally driven.
+ */
+#define ADDR_WIN_MAIN            0x0040B360u  /* int32 __stdcall(inst,prev,cmd,show) */
+#define ADDR_INIT_APPLICATION    0x0040B600u  /* int32_t(HINSTANCE, int32_t nCmdShow) */
+#define ADDR_PUMP_MESSAGE        0x0040B280u  /* int32_t(MSG *) -- 0 on WM_QUIT */
+#define ADDR_POSITION_WINDOW     0x0040B070u  /* void(void) */
+#define ADDR_WND_PROC            0x0040A6B0u  /* the window procedure, not ours yet */
+
+#define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
+#define ADDR_HINSTANCE_AUX       0x00512584u  /* cleared beside it; unidentified */
+#define ADDR_HWND                0x0051245Cu  /* HWND, the one game window */
+#define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE "ArmyMenMutex" */
+#define ADDR_LAST_MESSAGE        0x004F9FE4u  /* uint32_t, last dispatched message */
+#define ADDR_SCREEN_W            0x004852D8u  /* int32_t */
+#define ADDR_SCREEN_H            0x004852DCu  /* int32_t */
+/* AM2_Rect. ADDR_ORIGIN_DX and ADDR_ORIGIN_DY above are its first two members:
+ * PositionWindow writes all four, as the client area in screen coordinates
+ * when windowed and as (0,0,w,h) when not. */
+#define ADDR_SCREEN_RECT         0x00485330u
+
+/* Command-line switches, all set to 1 when the flag is present. Recovered from
+ * WinMain's strstr chain; three are developer names. */
+#define ADDR_OPT_WINDOWED        0x00507344u  /* -w */
+#define ADDR_OPT_NO_INTRO        0x004FA038u  /* -nointro */
+#define ADDR_OPT_TRACE_PF        0x0050C35Cu  /* -tracePF */
+#define ADDR_OPT_TRACE_VEH       0x0050C360u  /* -traceVEH */
+#define ADDR_OPT_TRACE_WIN       0x0050C354u  /* -tracewin */
+#define ADDR_OPT_DBG             0x0050C358u  /* -dbg */
+#define ADDR_OPT_ROB             0x004FD73Cu  /* -rob; same as ADDR_DEBUG_ITEMLIST */
+#define ADDR_OPT_PETER           0x004FD744u  /* -peter */
+#define ADDR_OPT_DAN             0x004FD740u  /* -dan */
+#define ADDR_OPT_DF              0x0047894Cu  /* -df clears it; 1 by default */
+#define ADDR_OPT_MUSIC           0x005125C4u  /* -bm sets, -sm clears */
+#define ADDR_OPT_NM              0x0051259Cu  /* -nm */
+#define ADDR_OPT_MAP_NAME        0x004F9FECu  /* char[], the text after -map: */
+/* The comm subsystem object; -debugComm, -traceComm and -logComm set flags
+ * inside it rather than in globals of their own. */
+#define ADDR_COMM_OBJECT         0x004751B0u  /* void ** */
+#define COMM_OFF_DEBUG           0x418u
+#define COMM_OFF_TRACE           0x470u
+#define COMM_OFF_LOG             0x474u
+
+/* Startup and shutdown steps WinMain drives. Named where the imports or the
+ * COM calls inside them say what they are, left at their address where they do
+ * not -- these are pure game logic and stay in the original image. */
+#define ADDR_CHECK_BASE_PATH     0x00422DB0u  /* getcwd, complains past 255 chars */
+#define ADDR_STARTUP_40B2B0      0x0040B2B0u  /* LoadLibraryA/FreeLibrary probe */
+#define ADDR_INIT_TIMER          0x00426C50u  /* QueryPerformanceFrequency/Counter */
+#define ADDR_INIT_INPUT          0x00426D30u  /* int32_t(HWND); IDirectInputDevice */
+#define ADDR_INIT_DIRECTDRAW     0x0041AA10u  /* int32_t(HWND); 0 on success */
+#define ADDR_REPORT_ERROR        0x0041E7A0u  /* void(int32_t, const char *) MessageBox */
+#define ADDR_RELEASE_APP_MUTEX   0x0040B220u  /* void(void) */
+#define ADDR_STARTUP_426B50      0x00426B50u
+#define ADDR_STARTUP_4249C0      0x004249C0u
+#define ADDR_STARTUP_42DC30      0x0042DC30u
+#define ADDR_STARTUP_409920      0x00409920u
+#define ADDR_STARTUP_40C9B0      0x0040C9B0u
+#define ADDR_STARTUP_42E580      0x0042E580u
+#define ADDR_START_INTRO         0x0040B7A0u  /* honours -nointro */
+#define ADDR_RUN_FRAME           0x0040B000u  /* one tick; state machine of 5 */
+#define ADDR_SHUTDOWN_423D20     0x00423D20u
+#define ADDR_SHUTDOWN_DDRAW      0x0041A950u  /* Release on every DirectDraw object */
+#define ADDR_REPORT_LEAKS        0x0041E690u  /* "Unreleased memory (%d) blocks:" */
+#define ADDR_FREE_MEM_TRACKER    0x0041E710u
+
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u

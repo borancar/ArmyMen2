@@ -139,6 +139,12 @@ void trace_describe(char *out, uint32_t cap)
         at += (uint32_t)_snprintf(out + at, cap - at, "%s%s=%u",
                                   i ? " " : "", g_entries[i].name,
                                   g_entries[i].calls);
+    /* Say so rather than just stopping. A list that ends early is
+     * indistinguishable from a function that was never patched, and that is a
+     * bad thing to have to guess about -- the whole point of the counts is to
+     * tell "not called" apart from "not installed". */
+    if (i < g_count)
+        _snprintf(out + at, cap - at, " (+%d truncated)", g_count - i);
     out[cap - 1] = '\0';
 }
 

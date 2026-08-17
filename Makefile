@@ -58,14 +58,15 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/surface.cpp \
             src/game/font.cpp \
             src/game/mapdraw.cpp \
-            src/game/palette.cpp
+            src/game/palette.cpp \
+            src/game/winmain.cpp
 
 HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
             $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))
 
 # ws2_32 for the control socket; gdi32/user32 for the runtime font generator,
 # which draws each glyph with GDI before encoding it.
-HOOK_LIBS := -lws2_32 -lgdi32 -luser32
+HOOK_LIBS := -lws2_32 -lgdi32 -luser32 -lole32
 
 HOOK_DEP := $(HOOK_OBJ:.o=.d)
 
