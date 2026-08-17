@@ -115,6 +115,16 @@ void __cdecl StopNamedSound(const char *name, int32_t index);
 int32_t __cdecl InitWaveSounds(void);
 void __cdecl FreeDynamicSounds(void);
 
+/* Original: 0x0040D020. The streaming refill, run off the multimedia timer
+ * StartAudioStream installs -- so it runs on winmm's thread and not the
+ * game's, and it guards itself with InterlockedExchange against overlapping
+ * ticks.
+ *
+ * Registered rather than patched, like WndProc: the only reference to the
+ * original is the timeSetEvent call, which is ours. */
+void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
+                             DWORD_PTR dw1, DWORD_PTR dw2);
+
 int audio_install(void);
 
 #ifdef __cplusplus

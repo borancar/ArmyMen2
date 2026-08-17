@@ -452,7 +452,12 @@
  * non-zero means rewind and keep going at the end of the file. */
 #define ADDR_AUDIO_LOOPING       0x004FA45Cu
 #define ADDR_REFILL_AUDIO        0x0040CD20u  /* void(void) */
-#define ADDR_AUDIO_REFILL_BYTES  0x004FA444u  /* how much to write each time */
+/* The streaming buffer's size in bytes. It went in as ADDR_AUDIO_REFILL_BYTES
+ * because RefillAudioBuffer hands it to Lock as the byte count -- which it does
+ * only because that one fills the whole buffer in a single go. AudioTimerProc
+ * uses it as the wrap modulus and as "how much to rewrite after a restore",
+ * which is what it actually is. Another name taken from one call site. */
+#define ADDR_AUDIO_BUFFER_SIZE  0x004FA444u  /* uint32_t */
 #define ADDR_AUDIO_READ_FAILED   0x004FA458u
 #define ADDR_AUDIO_AT_END        0x004FA460u
 #define ADDR_AUDIO_VALID_BYTES   0x004FA454u  /* good data before the silence */
@@ -462,7 +467,13 @@
 #define ADDR_AUDIO_CURSOR_B      0x004FA44Cu
 #define ADDR_AUDIO_HMMIO         0x004FA414u  /* HMMIO, closed by WaveCloseReadFile */
 #define ADDR_AUDIO_WAVEFORMAT    0x004FA410u  /* WAVEFORMATEX * */
-#define ADDR_AUDIO_TIMER_PROC    0x0040D020u  /* the refill callback, stays original */
+/* The streaming refill callback. RECONSTRUCTED as AudioTimerProc in
+ * src/game/audio.cpp, but registered rather than patched -- StartAudioStream's
+ * timeSetEvent is the only reference to this address in the image, and that
+ * call is ours, so a detour here would be jumped to by nobody. Kept as an
+ * address because the harness fingerprints it and because a probe may want to
+ * hand the original back to timeSetEvent. */
+#define ADDR_AUDIO_TIMER_PROC    0x0040D020u  /* LPTIMECALLBACK */
 #define ADDR_AUDIO_PREPARE       0x0040CED0u  /* void(void *), stays original */
 /* Prefixes the install directory at 0x0051235C onto a relative path and answers
  * whether it is there. 82 callers and nothing audio-specific about it -- it was

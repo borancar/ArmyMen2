@@ -131,16 +131,16 @@ def reconstructed():
                     if m.group(1) in names:
                         out.add(names[m.group(1)])
 
-    # NOT EVERY RECONSTRUCTION IS A PATCH. WndProc is reached only through the
-    # WNDCLASS field InitApplication fills in, so it is registered rather than
-    # detoured and appears in no patch_replace call -- while being as
-    # reconstructed as anything else. Reading the patch list alone therefore
-    # reports its whole functions.tsv entry as outstanding COM work.
+    # NOT EVERY RECONSTRUCTION IS A PATCH. A callback the game hands to somebody
+    # else -- WndProc into the WNDCLASS, AudioTimerProc into timeSetEvent -- is
+    # registered rather than detoured, appears in no patch_replace call, and is
+    # as reconstructed as anything else. Reading the patch list alone reports
+    # its whole functions.tsv entry as outstanding COM work.
     #
-    # Kept as an explicit list because there is exactly one of them and a
-    # heuristic for "installed some other way" would be guesswork. If a second
-    # appears, add it here; CLAUDE.md describes the shape to look for.
-    out.update(names[n] for n in ("ADDR_WND_PROC",) if n in names)
+    # Shared with coverage.py rather than copied, so the two cannot disagree
+    # about what is done; keeping a second list here is how they would.
+    import coverage
+    out.update(names[n] for n in coverage.REGISTERED if n in names)
     return out
 
 

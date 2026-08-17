@@ -108,9 +108,13 @@ void __cdecl StartAudioStream(void *track, int32_t which)
         return;
     }
 
+    /* Ours, not the image's. This is the WndProc shape again -- the callback is
+     * REGISTERED rather than detoured, and 0x0040D020 has exactly one reference
+     * in the whole binary, which is this call. Patching it would install a jump
+     * nothing ever reaches. The consequence is that it has no trace counter,
+     * because the counters are the patch stubs. */
     g_timerId = timeSetEvent(g_period >> AUDIO_PERIOD_SHIFT, AUDIO_TIMER_RES,
-                             (LPTIMECALLBACK)(uintptr_t)ADDR_AUDIO_TIMER_PROC,
-                             0, TIME_PERIODIC);
+                             AudioTimerProc, 0, TIME_PERIODIC);
 }
 
 #define g_dsBufA (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_A)
@@ -304,7 +308,7 @@ void __cdecl StopAllSounds(void)
  * a dword to fill with `rep stosd`. */
 #define SILENCE_8BIT  0x80u
 
-#define g_refillBytes (*(const uint32_t *)(uintptr_t)ADDR_AUDIO_REFILL_BYTES)
+#define g_bufferSize (*(const uint32_t *)(uintptr_t)ADDR_AUDIO_BUFFER_SIZE)
 #define g_readFailed  (*(int32_t *)(uintptr_t)ADDR_AUDIO_READ_FAILED)
 #define g_atEnd       (*(int32_t *)(uintptr_t)ADDR_AUDIO_AT_END)
 #define g_validBytes  (*(uint32_t *)(uintptr_t)ADDR_AUDIO_VALID_BYTES)
@@ -330,7 +334,7 @@ void __cdecl RefillAudioBuffer(void)
     DWORD    len1 = 0, len2 = 0;
     uint32_t got  = 0;
 
-    if (IDirectSoundBuffer_Lock(g_buffer, 0, g_refillBytes, &ptr1, &len1,
+    if (IDirectSoundBuffer_Lock(g_buffer, 0, g_bufferSize, &ptr1, &len1,
                                 &ptr2, &len2, 0) != DS_OK) {
         ptr1 = ptr2 = NULL;
         len1 = len2 = 0;
@@ -372,6 +376,230 @@ unlock:
     IDirectSoundBuffer_Unlock(g_buffer, ptr1, len1, ptr2, len2);
     g_cursorA = 0;
     g_cursorB = 0;
+}
+
+/* The streaming refill, driven by a multimedia timer -- 0x0040D020.
+ *
+ * StartAudioStream hands this to timeSetEvent, so it is an LPTIMECALLBACK and
+ * runs on winmm's thread, not the game's. It is the last DirectSound cluster
+ * outside the reconstruction: GetStatus, Restore, GetCurrentPosition, Lock,
+ * Unlock and Play, plus InterlockedExchange and PostMessageA. RefillAudioBuffer
+ * is its sibling and fills the whole buffer once; this one keeps up with the
+ * play cursor forever after.
+ *
+ * It had sat in orig.h as "the refill callback, stays original" with no reason
+ * given, which CLAUDE.md says is the kind of decline worth revisiting.
+ *
+ * The shape is the standard circular-buffer chase. Whatever the play cursor has
+ * passed since last time is free to overwrite, so that span is locked -- which
+ * can come back as two regions when it wraps the end -- refilled from the .WAV,
+ * and unlocked. A lost buffer is restored and then rewritten in full, because
+ * restoring gets the memory back and not the samples.
+ *
+ * RE-ENTRANCY IS THE FIRST THING IT DOES. InterlockedExchange(&flag, 1) returns
+ * what was there, so a non-zero answer means another tick is still inside and
+ * this one returns immediately. Every exit path clears it. That is also why the
+ * function is written with one exit label rather than early returns.
+ *
+ * Two asymmetries between the two lock regions are the original's, not slips.
+ * The first region checks WaveReadFile's return and posts the end-of-stream
+ * message if it failed; the second ignores the return entirely. And the
+ * end-of-file bookkeeping -- setting AT_END and working out how many bytes are
+ * still real -- is duplicated rather than shared.
+ *
+ * A THIRD, and the one most likely to be audible: when the file ends mid-way
+ * through the SECOND lock region and the stream is not looping, the silence
+ * fill starts at the beginning of that region rather than after the bytes just
+ * read, so those samples are thrown away. Region one gets this right. The
+ * difference is two instructions -- `sub` and `lea` -- present in the first
+ * fill and absent from the second.
+ *
+ * A FOURTH, kept: when that first read fails the function jumps straight
+ * to clearing the re-entrancy flag WITHOUT unlocking, so the buffer stays
+ * locked and every later refill fails. Same shape as the Lock-failure paths,
+ * which also skip the Unlock -- correctly, since there is nothing to unlock --
+ * except that here there is.
+ *
+ * THE RESTORED FLAG IS READ UNINITIALISED, and this is a genuine defect in the
+ * original rather than a misreading. Its stack slot is written in exactly one
+ * place, the buffer-lost branch; the whole function contains only two stores
+ * into its frame and the other is `status = 0`. MSVC kept the variable in ebx,
+ * spilled it only on the branch that reassigns ebx, and never emitted the store
+ * for the common path -- so the reload near the end picks up whatever the
+ * previous tick left in that slot.
+ *
+ * It is initialised to 0 here. C cannot express "read uninitialised stack"
+ * without undefined behaviour, and the whole observable consequence is a
+ * possible extra Play(0, 0, DSBPLAY_LOOPING) on a buffer that is already
+ * playing and looping, which DirectSound treats as a no-op. Written down rather
+ * than quietly fixed, because it is a behavioural difference however small.
+ *
+ * Exercised: the stream runs whenever there is a device, so the ALSA null
+ * configuration in CLAUDE.md reaches it. */
+static_assert(DSBSTATUS_BUFFERLOST == 2, "DSBSTATUS_BUFFERLOST");
+static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
+
+/* Posted to the game window when the stream runs dry. WM_USER + 0x100. */
+#define AUDIO_STREAM_DONE 0x0500u
+
+#define g_playBuffer  (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_AUDIO_BUFFER_2)
+#define g_hwnd        (*(HWND *)(uintptr_t)ADDR_HWND)
+
+/* 0x80 for unsigned 8-bit PCM, 0 for signed 16-bit. The original derives it
+ * branchlessly with setne/dec/and and smears it across a dword; the four
+ * places it does so are identical, so it is one helper here. */
+static void fill_silence(void *dest, uint32_t bytes)
+{
+    memset(dest, (g_waveFormat->wBitsPerSample == 8) ? SILENCE_8BIT : 0, bytes);
+}
+
+/* The end-of-file bookkeeping the original writes out twice, once per region:
+ * mark the stream ended, and record how much of the buffer is still real as the
+ * distance from the PLAY cursor round to where we have written. Note it is the
+ * play cursor and not the write cursor -- the original reads the slot
+ * GetCurrentPosition filled with the former -- which is what makes the number
+ * mean "samples still to be heard". */
+static void mark_stream_end(uint32_t playCursor)
+{
+    g_atEnd = 1;
+    g_validBytes = (playCursor > (uint32_t)g_cursorB)
+                 ? g_bufferSize - playCursor + (uint32_t)g_cursorB
+                 : (uint32_t)g_cursorB - playCursor;
+}
+
+/* Rewind to the start of the `data` chunk and keep reading until `bytes` of
+ * `dest` are full, however many times round the file that takes. */
+static void refill_looping(uint8_t *dest, uint32_t bytes, uint32_t got)
+{
+    do {
+        dest  += got;
+        bytes -= got;
+        WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk);
+        WaveReadFile(g_hmmio, bytes, dest, g_dataChunk, &got);
+    } while (got < bytes);
+}
+
+void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
+                             DWORD_PTR dw1, DWORD_PTR dw2)
+{
+    void    *ptr1 = NULL, *ptr2 = NULL;
+    DWORD    len1 = 0, len2 = 0;
+    DWORD    status = 0, statusAgain, play = 0, write = 0;
+    uint32_t avail, toWrite, got = 0;
+    int32_t  restored = 0;          /* see the note above -- the original's is
+                                       uninitialised on the common path */
+
+    (void)uID; (void)uMsg; (void)dwUser; (void)dw1; (void)dw2;
+
+    if (InterlockedExchange(&g_inCallback, 1))
+        return;                     /* a previous tick has not finished */
+
+    IDirectSoundBuffer_GetStatus(g_playBuffer, &status);
+    if (status & DSBSTATUS_BUFFERLOST) {
+        if (IDirectSoundBuffer_Restore(g_playBuffer) != DS_OK)
+            goto done;
+        restored  = 1;
+        g_cursorB = 0;
+    }
+
+    /* Asked for and discarded, as in the original. */
+    IDirectSoundBuffer_GetStatus(g_playBuffer, &statusAgain);
+    IDirectSoundBuffer_GetCurrentPosition(g_playBuffer, &play, &write);
+
+    /* Nothing has been consumed since last time, and nothing was lost. */
+    if (play == (DWORD)g_cursorB && !restored)
+        goto done;
+
+    /* Ended, and the last real samples have now played out. Tell the game
+     * once. */
+    if (g_atEnd && !g_validBytes) {
+        if (!g_readFailed) {
+            g_readFailed = 1;
+            PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
+        }
+        goto done;
+    }
+
+    avail = (play >= (DWORD)g_cursorB)
+          ? play - (uint32_t)g_cursorB
+          : g_bufferSize - (uint32_t)g_cursorB + play;
+
+    /* A restored buffer has lost every sample in it, so rewrite all of it. */
+    toWrite    = restored ? g_bufferSize : avail;
+    g_cursorA += (int32_t)avail;
+
+    if (g_atEnd && g_validBytes) {
+        /* Past the end of the file: keep the buffer fed with silence and count
+         * down what is still real ahead of the play cursor. */
+        g_validBytes = (avail > g_validBytes) ? 0 : g_validBytes - avail;
+
+        if (IDirectSoundBuffer_Lock(g_playBuffer, (DWORD)g_cursorB, toWrite,
+                                    &ptr1, &len1, &ptr2, &len2, 0) != DS_OK)
+            goto done;
+
+        fill_silence(ptr1, len1);
+        if (ptr2 && len2)
+            fill_silence(ptr2, len2);
+    } else {
+        if (IDirectSoundBuffer_Lock(g_playBuffer, (DWORD)g_cursorB, toWrite,
+                                    &ptr1, &len1, &ptr2, &len2, 0) != DS_OK)
+            goto done;
+
+        if (len1) {
+            if (g_readFailed) {
+                fill_silence(ptr1, len1);
+            } else if (WaveReadFile(g_hmmio, len1, (uint8_t *)ptr1,
+                                    g_dataChunk, &got) != 0) {
+                /* Only the first region reports a read failure. */
+                if (!g_readFailed) {
+                    g_readFailed = 1;
+                    PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
+                }
+                goto done;
+            } else if (got < len1) {
+                if (g_looping)
+                    refill_looping((uint8_t *)ptr1, len1, got);
+                else {
+                    fill_silence((uint8_t *)ptr1 + got, len1 - got);
+                    mark_stream_end(play);
+                }
+            }
+        }
+
+        if (len2) {
+            if (g_readFailed) {
+                fill_silence(ptr2, len2);
+            } else {
+                /* The second region does NOT check the return. Original. */
+                WaveReadFile(g_hmmio, len2, (uint8_t *)ptr2, g_dataChunk, &got);
+                if (got < len2) {
+                    if (g_looping)
+                        refill_looping((uint8_t *)ptr2, len2, got);
+                    else {
+                        /* THE WHOLE REGION, from its start -- not from `got`
+                         * as region 1 does. The original has `sub ecx,edx` and
+                         * `lea edi,[edx+esi]` in the first fill and neither in
+                         * this one, so the samples just read are overwritten
+                         * with silence. Kept; see the note at the top. */
+                        fill_silence(ptr2, len2);
+                        mark_stream_end(play);
+                    }
+                }
+            }
+        }
+    }
+
+    IDirectSoundBuffer_Unlock(g_playBuffer, ptr1, len1, ptr2, len2);
+
+    g_cursorB += (int32_t)toWrite;
+    if ((uint32_t)g_cursorB >= g_bufferSize)
+        g_cursorB -= (int32_t)g_bufferSize;
+
+    if (restored)
+        IDirectSoundBuffer_Play(g_playBuffer, 0, 0, DSBPLAY_LOOPING);
+
+done:
+    InterlockedExchange(&g_inCallback, 0);
 }
 
 /* Put sample data into a DirectSound buffer -- 0x0040C440.

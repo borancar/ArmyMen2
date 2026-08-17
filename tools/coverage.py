@@ -40,8 +40,16 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, "docs", "boundary.md")
 CRT_START = 0x0045C000
 
-# Reached without a patch: registered into the WNDCLASS by InitApplication.
-REGISTERED = {"ADDR_WND_PROC"}
+# Reached without a patch. Both are callbacks the game hands to somebody else,
+# and in both cases the address's ONLY reference in the image is the
+# registration -- which is reconstructed -- so detouring it would install a jump
+# nothing can reach. They are as replaced as anything installed by
+# patch_replace, and have to be listed by hand because there is no call to read
+# them out of.
+REGISTERED = {
+    "ADDR_WND_PROC",          # into the WNDCLASS, by InitApplication
+    "ADDR_AUDIO_TIMER_PROC",  # into timeSetEvent, by StartAudioStream
+}
 
 # COM interface pointers known to be DirectX, identified in docs/comcalls.tsv by
 # chasing the object back to a global. Anything else reached the same way is one

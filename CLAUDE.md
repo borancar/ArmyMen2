@@ -348,8 +348,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
   the three `Wave*` helpers, both DirectPlay creators, the two bitmap loaders
-  (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet` and the comm
-  object's constructor and destructor. The window, the message queue, the display mode,
+  (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
+  `AudioTimerProc` and the comm object's constructor and destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
@@ -392,7 +392,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   | | what it actually is |
   |---|---|
   | ~~`0x0042BEA0`~~ | **Done.** The entry was four functions; `RestoreTileSet` at `0x0042C0E0` (624B, `Lock`+`Unlock`) held both COM calls and is reconstructed in `mapdraw.cpp`. See the merge note under boundary density |
-  | `0x0040CED0` 1792B, 12 | the sound engine. Carries no strings, so unverified as a description; now exercisable, since audio runs |
+  | `0x0040CED0` 1792B, 12 | **Half done.** Two functions: the 1456-byte one at `0x0040D020` is `AudioTimerProc`, the streaming refill, and is reconstructed. `0x0040CED0` itself is 336 B with two `CreateSoundBuffer` calls and is still original |
   | `0x00427070` 944B, 5 | input-to-command translation; no strings |
   | `0x00412FE0` 1184B, 4 | menu logic; no strings |
   | `0x0042FF60` 448B, 1 | starts a multiplayer game — it calls `CommOpenSession`, `CommCreatePlayer` and `PlaySoundAt`, all of which are ours. Genuinely menu logic |
@@ -408,12 +408,12 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `docs/binarypatches.md` explains why they cannot fire.
 
   This claim is about the IAT only. DirectX reached through COM is a separate
-  count and is *not* finished: 7 functions with 24 calls on objects
+  count and is *not* finished: 6 functions with 12 calls on objects
   `tools/comcalls.py` can name, plus a share of the sites whose object it
   cannot. Do not read "the boundary is done" off this bullet alone.
 
   The outer bracket — every function with any unreconstructed COM dispatch —
-  is now **9**, down from 42, because the classifier fix moved 33 pure-C++
+  is now **8**, down from 42, because the classifier fix moved 33 pure-C++
   functions out of it. Ranked by density with merged sizes corrected there are
   12 real functions left and **not one is under 50 bytes per call site**; the
   densest is 146. By this project's own threshold there is no remaining COM
@@ -583,7 +583,16 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   thunks (`0x00463396`, `0x00464410`) instead, which read the patched slot at
   call time. Check for a harness hook before reconstructing anything that calls
   an import.
-- **Not every reconstruction has to be a patch.** `WndProc` is registered, not
+- **Not every reconstruction has to be a patch, and there are two now.**
+  `AudioTimerProc` (`0x0040D020`) is the second: `StartAudioStream` hands it to
+  `timeSetEvent`, that call is the address's only reference in the image, and
+  the call is ours — so a detour would install a jump nothing reaches. Both are
+  listed in `tools/coverage.py`'s `REGISTERED`, which `tools/merges.py` imports
+  rather than copying, because two lists of "what is done" is how they come to
+  disagree. The cost is that neither gets a trace counter, since the counters
+  *are* the patch stubs; verify those with a temporary probe.
+
+  `WndProc` is registered, not
   detoured: the only reference to `0x0040A6B0` in the whole image is the
   `WNDCLASS` field in `InitApplication`, and that is ours now. Because the
   original is left intact it stays *callable*, so the six comm messages that
