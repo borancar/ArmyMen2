@@ -501,14 +501,39 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   forces an out-of-band repaint is somewhere further in. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
   `SnapshotSystemPalette` came off it once the intro movie was allowed to play.
-- **There is no audio here at all.** `0x004FA468` reads 0, so both
-  `src/game/audio.cpp` functions return at their first line — verified, but only
-  their early exits are. Every DirectSound buffer global reads
-  NULL, so nothing ever asks for a `.WAV` and the whole `src/game/wavefile.cpp`
-  path is unreachable. This is the environment, not the game: `/dev/snd` exists
-  but no PipeWire or PulseAudio session does, and pointing Wine's audio driver
-  at ALSA directly changes nothing. Anyone with sound should re-check those
-  three counts — Boot Camp alone should move them.
+- **Audio can be exercised without a sound device, and must be.** There is no
+  PipeWire or PulseAudio session here, so DirectSound will not start and every
+  audio function returns at its first line. That left the largest block of
+  reconstruction in the tree verified by reading alone — and the build, the
+  fingerprints and the A/B on all three configurations all pass whether that
+  code is right or wrong.
+
+  ALSA's `null` plugin is built into libasound and needs no server at all:
+
+  ```
+  export ALSA_CONFIG_PATH=$PWD/tools/alsa/asoundrc AM2_DUMP_SOUND=1
+  AM2_DISPLAY=:99 tools/drive.sh start 25 "ARGS=-nointro -dbg"
+  tools/checkwaves.py
+  ```
+
+  DirectSound then starts, all 56 waves load, and `checkwaves.py` confirms the
+  bytes handed to each buffer are byte-for-byte the `.WAV`'s `data` chunk —
+  which exercises `WaveOpenFile`, `WaveReadFile`, `LoadWaveSound` and
+  everything under them.
+
+  That config is deliberately self-contained rather than including
+  `/usr/share/alsa/alsa.conf`: that file pre-loads `alsa.conf.d`, where
+  `99-pipewire-default` re-points `default` at PipeWire through a hook that
+  runs after anything a later override says. The only symptom is "Host is
+  down".
+
+  It earned its keep immediately: `LoadWaveSound` was leaving the
+  `DSBUFFERDESC` with no format and no length, so every `CreateSoundBuffer` in
+  the game failed. The reader writes both fields straight into that structure,
+  which is why the original only assigns `dwSize` and `dwFlags` by hand.
+
+  Still not covered: the Lock/copy/Unlock inside `FillSoundBuffer`, which needs
+  a buffer somebody can read back.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal

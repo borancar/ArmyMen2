@@ -16,6 +16,9 @@
 
 #include "audio.h"
 #include "dist.h"
+#include "../inject/hooklog.h"
+
+#include <stdlib.h>
 #include "wavefile.h"
 #include "../inject/patch.h"
 
@@ -422,6 +425,50 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
     return 1;
 }
 
+/* ---- observing the sample path without an audio device -----------------
+ *
+ * AM2_DUMP_SOUND=1 makes each wave report what it is about to hand to
+ * DirectSound: the name, the byte count, and an FNV-1a hash of the samples.
+ *
+ * This is the answer to a real problem. Nearly every function in this file is
+ * unexercised, because DirectSound will not start without a device, and the
+ * usual checks -- build, fingerprints, the A/B -- all pass whether the code is
+ * right or wrong. Making sound audible is not the point and would not help
+ * anyway; what is wanted is evidence that the bytes reaching the buffer are the
+ * bytes in the file, and that can be had by printing a hash of them and
+ * computing the same hash from the .WAV on disk.
+ *
+ * It covers WaveOpenFile, WaveReadFile, LoadWaveSound and everything they use
+ * -- the whole read half of the path. It says nothing about the Lock/copy/
+ * Unlock inside FillSoundBuffer, which is the half that needs a real buffer.
+ *
+ * Off unless asked for, and it writes through the harness logger rather than
+ * the game's, so it cannot be mistaken for 1999 debug output. */
+static int sound_dump_on(void)
+{
+    static int on = -1;
+
+    if (on < 0) {
+        const char *opt = getenv("AM2_DUMP_SOUND");
+        on = (opt && *opt == '1');
+    }
+    return on;
+}
+
+static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
+{
+    uint32_t hash = 2166136261u;   /* FNV-1a */
+    uint32_t i;
+
+    if (!sound_dump_on() || !data)
+        return;
+    for (i = 0; i < len; i++) {
+        hash ^= data[i];
+        hash *= 16777619u;
+    }
+    hooklog("sound: %-20s %7u bytes  fnv1a=%08x", name, len, hash);
+}
+
 /* Stop one dynamic sound, by slot and by name -- 0x0040B860.
  *
  * The slot says which sound and the name says which sound it had better be:
@@ -601,8 +648,14 @@ static_assert((DSBCAPS_STATIC | DSBCAPS_CTRL3D | DSBCAPS_CTRLFREQUENCY
                | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
                | DSBCAPS_GETCURRENTPOSITION2) == 0x100F2, "the buffer flags");
 
+/* The reader fills four out-parameters, and two of them are fields of the
+ * DSBUFFERDESC itself -- which is why the original only ever assigns dwSize
+ * and dwFlags by hand. Getting that wrong leaves the descriptor with no format
+ * and no length, and CreateSoundBuffer refuses every wave in the game. */
 typedef int32_t (__cdecl *am2_read_wave_fn)(int32_t zero, const char *name,
-                                            void *a, void *b, void *c, void *d);
+                                            LPWAVEFORMATEX *format,
+                                            void **samples, DWORD *length,
+                                            void **owned);
 #define orig_read_wave (*(am2_read_wave_fn)ADDR_READ_WAVE_FILE)
 
 int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
@@ -610,9 +663,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     uint8_t      *rec;
     char         *nameCopy;
     void         *raw = NULL;      /* the samples, freed once uploaded */
-    void         *fmt = NULL;
-    uint32_t      len = 0;
-    void         *extra = NULL;
+    void         *owned = NULL;    /* the reader's own block, freed either way */
     DSBUFFERDESC  desc;
     size_t        n;
 
@@ -638,12 +689,16 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     }
     memcpy(nameCopy, name, n);
 
-    if (!orig_read_wave(0, name, &extra, &raw, &len, &fmt)) {
+    memset(&desc, 0, sizeof desc);
+
+    /* Straight into the descriptor: the format and the length are the reader's
+     * answers, not ours. */
+    if (!orig_read_wave(0, name, &desc.lpwfxFormat, &raw, &desc.dwBufferBytes,
+                        &owned)) {
         orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOLOAD, name);
         goto give_up;
     }
 
-    memset(&desc, 0, sizeof desc);
     desc.dwSize  = sizeof desc;
     desc.dwFlags = DSBCAPS_STATIC | DSBCAPS_CTRL3D | DSBCAPS_CTRLFREQUENCY
                  | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
@@ -656,8 +711,10 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
         goto give_up;
     }
 
+    sound_dump(name, (const uint8_t *)raw, desc.dwBufferBytes);
+
     if (!FillSoundBuffer(*(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
-                         (const uint8_t *)raw, len)) {
+                         (const uint8_t *)raw, desc.dwBufferBytes)) {
         orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOFILL, name);
         IDirectSoundBuffer_Release(
             *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
@@ -665,12 +722,12 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     }
 
     *(void **)(rec + SOUND_REC_OFF_STATE) = NULL;
-    orig_free(raw);
+    orig_free(owned);
     return 1;
 
 give_up:
-    if (raw)
-        orig_free(raw);
+    if (owned)
+        orig_free(owned);
     if (*(void **)(rec + SOUND_REC_OFF_NAME))
         orig_free(*(void **)(rec + SOUND_REC_OFF_NAME));
     orig_free(rec);

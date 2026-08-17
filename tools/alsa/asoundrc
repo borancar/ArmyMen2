@@ -1,0 +1,16 @@
+# A silent ALSA default, so Wine's audio driver has something to open.
+#
+# This machine has /dev/snd but no PipeWire or PulseAudio session, so the usual
+# `default` device cannot be opened, DirectSound fails at its first step, and
+# every reconstructed audio function reads 0. ALSA's `null` plugin is built
+# into libasound and needs no server: it accepts a stream and discards it.
+#
+#   ALSA_CONFIG_PATH=$PWD/tools/alsa/asoundrc
+#
+# Deliberately self-contained rather than including /usr/share/alsa/alsa.conf.
+# That file pre-loads /usr/share/alsa/alsa.conf.d, where 99-pipewire-default
+# points `default` at PipeWire through a hook that runs after anything this
+# file says -- so an override here is simply lost, with "Host is down" as the
+# only clue.
+pcm.!default { type null }
+ctl.!default { type null }
