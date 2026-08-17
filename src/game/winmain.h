@@ -56,6 +56,11 @@ int32_t __cdecl PumpMessage(MSG *msg);
  * that every locked-surface write is offset by. */
 void __cdecl PositionWindow(void);
 
+/* Original: 0x0040B2B0. Decide whether this machine is fast enough, by loading
+ * cpuinf32.dll and asking it. Publishes the answer to two globals and logs the
+ * `system speed:` line. See winmain.cpp for what "fast" meant in 1999. */
+void __cdecl DetectCpuSpeed(void);
+
 int winmain_install(void);
 
 #ifdef __cplusplus

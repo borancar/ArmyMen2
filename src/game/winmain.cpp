@@ -141,7 +141,7 @@ typedef int32_t (__cdecl *am2_cpuspeed_fn)(int32_t);
 #define MIN_CPU_FAMILY 5      /* Pentium */
 #define MIN_CPU_MHZ    0x85   /* 133 */
 
-static void DetectCpuSpeed(void)
+void __cdecl DetectCpuSpeed(void)
 {
     HMODULE  dll;
     int32_t  family, mhz, fast;
@@ -443,6 +443,8 @@ int winmain_install(void)
                         "PumpMessage", 1);
     rc |= patch_replace(ADDR_INIT_APPLICATION, (const void *)InitApplication,
                         "InitApplication", 2);
+    rc |= patch_replace(ADDR_DETECT_CPU_SPEED, (const void *)DetectCpuSpeed,
+                        "DetectCpuSpeed", 0);
     rc |= patch_replace(ADDR_WIN_MAIN, (const void *)WinMain, "WinMain", 4);
     return rc;
 }
