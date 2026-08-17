@@ -388,6 +388,53 @@ int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
     return hr == DP_OK;
 }
 
+/* Ask DirectPlay which transports are available, and offer them as menu rows.
+ *
+ * 0x0040E530, thiscall, `ret 4`, 97 bytes. Slot 35 is EnumConnections. The
+ * callback at 0x0040E460 stays original and does two things worth knowing
+ * about: it compares each provider's name against "Play on HEAT" and "Play on
+ * Mplayer" and drops those two, and it copies the names it keeps onto the
+ * game's heap before adding them.
+ *
+ * Whatever the providers come to, "Play Against Computer Only" is appended
+ * afterwards, so the offline choice is always the last row and is there even
+ * when DirectPlay offers nothing at all.
+ *
+ * lpguidApplication is the same GUID pointer CommConstruct installs, so the
+ * enumeration is filtered to providers that can carry this game. */
+typedef void (__attribute__((thiscall)) *am2_list_add_fn)(void *list,
+                                                          const char *name,
+                                                          void *data);
+#define orig_list_add     (*(am2_list_add_fn)ADDR_LIST_ADD)
+#define g_connectionList  (*(void **)(uintptr_t)ADDR_CONNECTION_LIST)
+
+int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
+{
+    LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
+    const GUID    *app;
+    HRESULT        hr;
+
+    if (!dp)
+        return 0;
+
+    /* As with the session browser, the callback finds the list here rather
+     * than through lpContext, which carries something else. */
+    g_connectionList = list;
+
+    app = *(const GUID **)((uint8_t *)comm + COMM_OFF_APP_GUID);
+    hr = IDirectPlayX_EnumConnections(dp, app,
+                                      (LPDPENUMCONNECTIONSCALLBACK)(uintptr_t)ADDR_ENUM_CONNECTIONS_CB,
+                                      g_enumContext, 0);
+    if (hr != DP_OK)
+        return 0;
+
+    /* Read back through the global rather than the argument, as the original
+     * does -- they are the same object, but only because nothing reassigned it. */
+    orig_list_add(g_connectionList,
+                  (const char *)(uintptr_t)ADDR_STR_COMPUTER_ONLY, NULL);
+    return 1;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -411,5 +458,7 @@ int dplay_install(void)
                         "CommDestruct", 0);
     rc |= patch_replace(ADDR_COMM_ENUM_SESSIONS, (const void *)CommEnumSessions,
                         "CommEnumSessions", 1);
+    rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, (const void *)CommEnumConnections,
+                        "CommEnumConnections", 1);
     return rc;
 }

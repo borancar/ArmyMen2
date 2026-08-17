@@ -433,6 +433,16 @@
  * inside the comm object rather than in a global. */
 #define ADDR_COMM_ENUM_SESSIONS  0x0040E3B0u  /* thiscall int32(this, void *) */
 #define ADDR_ENUM_SESSIONS_CB    0x0040E280u  /* LPDPENUMSESSIONSCALLBACK2 */
+/* The service-provider browser and its callback. The callback drops two
+ * providers by name before adding the rest -- "Play on HEAT" and "Play on
+ * Mplayer", both matchmaking services that no longer exist -- and its `ret 0x18`
+ * matches LPDPENUMCONNECTIONSCALLBACK's six arguments exactly. */
+#define ADDR_COMM_ENUM_CONNECTIONS 0x0040E530u /* thiscall int32(this, void *) */
+#define ADDR_ENUM_CONNECTIONS_CB 0x0040E460u  /* LPDPENUMCONNECTIONSCALLBACK */
+#define ADDR_CONNECTION_LIST     0x004FA900u  /* void *, what that callback fills */
+/* Appends one named entry to a list object. 16 callers. */
+#define ADDR_LIST_ADD            0x00453A30u  /* thiscall void(this, const char *, void *) */
+#define ADDR_STR_COMPUTER_ONLY   0x00475300u  /* "Play Against Computer Only" */
 #define ADDR_SESSION_LIST        0x004FA908u  /* void *, what the callback fills */
 #define ADDR_ENUM_CONTEXT        0x0051245Cu  /* void *, lpContext */
 #define COMM_OFF_APP_GUID        0x3D4u       /* GUID *, set by CommConstruct */

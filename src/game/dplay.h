@@ -85,6 +85,11 @@ void  __attribute__((thiscall)) CommDestruct(void *comm);
  * been found; the callback at 0x0040E280 does the finding. */
 int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list);
 
+/* Original: 0x0040E530, thiscall. List the DirectPlay service providers that
+ * can carry this game, as menu rows, with "Play Against Computer Only" always
+ * appended last. The callback drops the two dead matchmaking services. */
+int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list);
+
 int dplay_install(void);
 
 #ifdef __cplusplus
