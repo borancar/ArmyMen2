@@ -68,8 +68,13 @@ wine explorer /desktop=amii,800x600 "C:\GOG Games\Army Men II\ArmyMen2.exe"
 Python tooling:
 
 ```sh
-python3 -m venv .venv && ./.venv/bin/pip install pefile capstone
+python3 -m venv .venv && ./.venv/bin/pip install pefile capstone Pillow numpy
 ```
+
+`pefile` and `capstone` cover the static analysis. `Pillow` and `numpy` are
+needed only by `tools/point.py`, which imports them inside the function that
+locates the cursor — so a venv without them looks fine until the first time
+something actually points at the screen.
 
 Host toolchain: `i686-w64-mingw32-gcc/g++` (32-bit PE — Wine 11 here is
 new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
@@ -85,16 +90,28 @@ new-WoW64 and cannot build 32-bit winelib), `radare2`, `Xvfb`.
 | `tools/checkdetour.py` | verifies an address is safe to overwrite with a 5-byte jmp |
 | `tools/checkabi.py` | audits declared calling conventions against the machine code |
 | `tools/callsites.py` | exact direct call sites of a function, for observation |
+| `tools/imports.py` | every use of the import table, and which function makes it |
+| `tools/comcalls.py` | COM vtable dispatch — the DirectX calls no import scan sees |
+| `tools/disasm.py` | one function, annotated with imports, COM slots and strings |
 | `tools/am2ctl.py` | client for the control socket — drives the running game |
 | `tools/drive.sh` | headless launch, screenshot and menu navigation on Xvfb |
 
-Each writes a `.tsv` into `docs/`. Regenerate in dependency order:
+Most write a `.tsv` into `docs/`. Regenerate in dependency order:
 
 ```sh
 ./.venv/bin/python tools/find_savetags.py
 ./.venv/bin/python tools/functions.py
 ./.venv/bin/python tools/find_logs.py
+./.venv/bin/python tools/imports.py
+./.venv/bin/python tools/comcalls.py
 ```
+
+`imports.py` and `comcalls.py` together map the boundary between the game and
+the outside world — the one being closed by reconstruction. Neither alone is
+enough: DirectDraw, DirectSound and DirectInput are reached through vtables and
+never appear in the import table, while the game's own C++ virtual calls have
+the identical machine-code shape. `comcalls.py` separates them by chasing the
+object pointer back to a global.
 
 ## Conventions
 

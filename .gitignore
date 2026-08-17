@@ -7,3 +7,5 @@ __pycache__/
 *.pyc
 am2.log
 am2-*.log
+/setup.exe
+.claude/*.local.md
