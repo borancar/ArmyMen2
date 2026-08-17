@@ -57,6 +57,11 @@ void __cdecl RestoreTileSet(void);
  * frame's for the dirty-rectangle merge to compare against. */
 void __cdecl ComposeFrame(void);
 
+/* Original: 0x0041D060, called from ComposeFrame. Move the part of the view
+ * that is still valid to where it now belongs and repaint the strips the
+ * scroll exposed. */
+void __cdecl ScrollView(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

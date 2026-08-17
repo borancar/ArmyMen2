@@ -453,9 +453,121 @@ void __cdecl ComposeFrame(void)
     g_fullRedraw = 0;
 }
 
+/* Scroll the offscreen surface and repaint what that exposed -- 0x0041D060.
+ *
+ * ComposeFrame's other branch: when nothing has invalidated the whole view,
+ * this is what keeps it current. The map has already been drawn once, so
+ * scrolling by a few pixels does not need it drawn again -- the part still on
+ * screen is copied to where it now belongs and only the newly exposed strips
+ * are painted.
+ *
+ * THE BLIT IS THE SURFACE ONTO ITSELF. Source and destination are both the
+ * offscreen surface, which is what makes this a scroll rather than a copy.
+ * DirectDraw is being asked to move a region within one surface, and it is only
+ * safe because the two rectangles are the same size and BltFast handles the
+ * overlap.
+ *
+ * The three rectangles are the whole of the logic. `now` is the current view
+ * clipped to the map, `was` is last frame's -- ComposeFrame saved it -- and
+ * `common` is what they share. No overlap at all means the view jumped further
+ * than its own size, and then there is nothing to salvage and the lot is
+ * repainted.
+ *
+ * The two strips are computed in the two coordinate systems that matter, which
+ * is the easy thing to get wrong. The BLIT SOURCE is measured from the OLD
+ * view's origin, because that is where those pixels currently sit; the
+ * destination point is measured from the NEW one. Subtracting the same origin
+ * twice would slide the map against itself by exactly the scroll distance.
+ *
+ * One rectangle is reused for both strips, and the halves are filled in at
+ * different times: the vertical pass sets its top and bottom -- even in the
+ * branch where it paints nothing -- and the horizontal pass then sets left and
+ * right. That is the original\'s shape, and it is why the no-vertical-scroll
+ * branch still writes two fields.
+ *
+ * Exercised by `tools/ab.sh mission`, which exists because nothing else got
+ * here: while either opening dialog is up the game composes no frames at all,
+ * so this ran zero times under every earlier configuration. */
+#define g_mapBounds  ((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)
+#define g_viewPrev   ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV)
+
+typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
+#define orig_repaint_dirty (*(am2_rect_fn)ADDR_REPAINT_DIRTY_LIST)
+
+void __cdecl ScrollView(void)
+{
+    AM2_Rect now, was, common, strip;
+
+    IntersectRect((LPRECT)&now, (const RECT *)g_viewRect,
+                  (const RECT *)g_mapBounds);
+    IntersectRect((LPRECT)&was, (const RECT *)g_viewPrev,
+                  (const RECT *)g_mapBounds);
+
+    if (!IntersectRect((LPRECT)&common, (const RECT *)&now,
+                       (const RECT *)&was)) {
+        /* The view moved further than its own width or height. */
+        RedrawMapRegion(&now);
+        return;
+    }
+
+    /* Only worth moving if it actually moved. */
+    if (now.left != was.left || now.top != was.top) {
+        AM2_Rect src;
+
+        src.left   = common.left   - was.left;
+        src.top    = common.top    - was.top;
+        src.right  = common.right  - was.left;
+        src.bottom = common.bottom - was.top;
+
+        IDirectDrawSurface_BltFast(g_offscreen,
+                                   (DWORD)(common.left - now.left),
+                                   (DWORD)(common.top  - now.top),
+                                   g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
+    }
+
+    orig_repaint_dirty(&common);
+
+    /* The horizontal band the scroll exposed, and the vertical extent the
+     * next strip will use. */
+    if (was.top < now.top) {
+        strip.left   = now.left;
+        strip.top    = common.bottom;
+        strip.right  = now.right;
+        strip.bottom = now.bottom;
+        RedrawMapRegion(&strip);
+        strip.top    = now.top;
+        strip.bottom = common.bottom;
+    } else if (was.top > now.top) {
+        strip.left   = now.left;
+        strip.top    = now.top;
+        strip.right  = now.right;
+        strip.bottom = common.top;
+        RedrawMapRegion(&strip);
+        strip.top    = common.top;
+        strip.bottom = now.bottom;
+    } else {
+        strip.top    = now.top;
+        strip.bottom = now.bottom;
+    }
+
+    /* The vertical band, over whatever rows the pass above settled on. */
+    if (was.left < now.left) {
+        strip.left  = common.right;
+        strip.right = now.right;
+        RedrawMapRegion(&strip);
+    } else if (was.left > now.left) {
+        strip.left  = now.left;
+        strip.right = common.left;
+        RedrawMapRegion(&strip);
+    }
+}
+
 int mapdraw_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_MERGE_DIRTY, (const void *)ScrollView,
+                        "ScrollView", 0);
 
     rc |= patch_replace(ADDR_COMPOSE_FRAME, (const void *)ComposeFrame,
                         "ComposeFrame", 0);

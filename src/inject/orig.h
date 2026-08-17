@@ -255,6 +255,13 @@
 #define ADDR_SCROLL_DECAY        0x0042B420u  /* void(void) */
 #define ADDR_DRAW_SCENE          0x0042D6D0u  /* void(void) */
 #define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
+/* The rectangle the view is clipped against before anything is compared --
+ * the map's extent on screen. */
+#define ADDR_MAP_BOUNDS          0x00514DE8u  /* AM2_Rect */
+/* Walks the registered dirty rectangles at 0x00508AC4 and repaints the ones
+ * meeting the given region. Its only import is IntersectRect, so it is game
+ * logic by the coverage rules and stays original. */
+#define ADDR_REPAINT_DIRTY_LIST  0x0041D000u  /* void(const AM2_Rect *) */
 #define ADDR_RESET_DRAW_COUNTS   0x0041DCE0u  /* void(void) */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
