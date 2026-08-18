@@ -8,6 +8,39 @@ Only game code is counted. The statically linked MSVC CRT above
 0x45c000 reaches plenty of kernel32 itself and is replaced
 wholesale by libc rather than function by function.
 
+## What the CRT line hides
+
+Every figure here counts only functions below `0x0045c000`.
+That is a big exclusion and it deserves to be examined rather than
+trusted: above the line are
+**138** import sites, of which **117** are not
+incidental.
+
+They are the statically linked MSVC 6 CRT -- `HeapAlloc`,
+`LCMapStringW`, `MultiByteToWideChar`, `RtlUnwind`,
+`SetUnhandledExceptionFilter` and the rest of locale, heap, stdio
+and startup. This port replaces the CRT with libc wholesale rather
+than function by function, so they are out of scope by design. It
+is also where every `CreateFileA`, `ReadFile` and `FindFirstFileA`
+in the image lives, which is why the game appears never to open a
+file.
+
+Three entries up there are NOT CRT, and they are the ones that
+matter: the one-instruction import thunks the linker parked among
+it. Each is reached only from reconstructed code.
+
+| entry point | thunk | called from |
+|---|---|---|
+| DSOUND!#1 | `0x00463390` | `0x0040c80c` |
+| DDRAW!DirectDrawCreate | `0x00463396` | `0x0041aa4f` |
+| DINPUT!DirectInputCreateA | `0x00464410` | `0x00426d43` |
+
+Game code does live above the line -- `DrawSeqBar` at
+`0x004624A0` is there, with three `Blt` calls -- so the constant is
+a rule of thumb and not a real boundary. What matters is that
+nothing outstanding hides behind it: the only COM dispatch above
+the line is `DrawSeqBar`'s, and that is reconstructed.
+
 ## Ways out of the process
 
 Each mechanism this image can use to reach the outside world, and

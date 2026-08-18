@@ -625,6 +625,26 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   its own `Lock` is unclassifiable and was reconstructed long before the count
   existed. Read `docs/boundary.md` as "known to be outstanding", never as "all
   that is outstanding".
+- **`CRT_START` is a rule of thumb, and every figure in the project rests on
+  it.** All the tools count only functions below `0x0045C000`, which drops 138
+  of the image's 414 import sites — an exclusion nobody had examined until
+  `docs/boundary.md` was made to report it.
+
+  It survives examination, but not in the way the constant implies. Above the
+  line is genuinely the CRT — heap, locale, stdio, `RtlUnwind`,
+  `SetUnhandledExceptionFilter` — which this port replaces with libc wholesale.
+  But **game code lives up there too**: `DrawSeqBar` is at `0x004624A0` and has
+  three `Blt` calls, so the boundary is not where the constant says. What makes
+  the exclusion safe is not the address, it is that the only COM dispatch above
+  the line is `DrawSeqBar`'s and that is reconstructed, and that the three
+  DirectX entry thunks the linker parked among the CRT — `DirectDrawCreate`,
+  `DirectInputCreateA` and `DSOUND #1` — are each reached only from
+  reconstructed code.
+
+  So "207 of 207 COM sites" was true and its denominator was quietly smaller
+  than the image. Read it as "below the CRT line", and read the CRT section of
+  `docs/boundary.md` for what that omits.
+
 - **The game never opens a file itself.** Every `CreateFileA`, `ReadFile` and
   `FindFirstFileA` is reached from inside the statically linked CRT, which this
   port replaces with libc wholesale rather than function by function. The one

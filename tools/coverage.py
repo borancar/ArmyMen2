@@ -246,6 +246,22 @@ def main():
 
     sites = lambda d: sum(len(v) for v in d.values())
 
+    # Above the CRT line: how much is up there, how much of it is not
+    # incidental, and where the three DirectX entry thunks are called from.
+    crt_sites = sum(1 for r in rows if int(r["func"], 16) >= CRT_START)
+    crt_real = sum(1 for r in rows if int(r["func"], 16) >= CRT_START
+                   and r["symbol"] not in INCIDENTAL)
+    directx_thunks = []
+    for r in rows:
+        if r["symbol"] not in ("DirectDrawCreate", "DirectInputCreateA", "#1"):
+            continue
+        thunk = int(r["func"], 16)
+        if thunk < CRT_START:
+            continue
+        name = f"{r['dll'].upper().replace('.DLL', '')}!{r['symbol']}"
+        directx_thunks.append((name, thunk, callers_of(img, thunk)))
+    directx_thunks.sort(key=lambda t: t[1])
+
     # The other ways out, each counted the same way: a site is outstanding only
     # if the function holding it is not reconstructed.
     # An import by ordinal shows up as a one-instruction thunk, and the thunk
@@ -303,6 +319,37 @@ def main():
         # see the mechanism at all. tools/comcalls.py exists because the first
         # version of this file could not see COM, and reported the boundary as
         # nearly finished with 23 functions and 66 DirectX calls outside it.
+        # The CRT exclusion, stated rather than left as a constant nobody
+        # looks at. Every count in this file drops sites at or above
+        # CRT_START, which is a large exclusion -- 138 of the 414 import sites
+        # -- and it had never been checked.
+        w("## What the CRT line hides\n\n")
+        w(f"Every figure here counts only functions below `{CRT_START:#010x}`.\n"
+          "That is a big exclusion and it deserves to be examined rather than\n"
+          "trusted: above the line are\n"
+          f"**{crt_sites}** import sites, of which **{crt_real}** are not\n"
+          "incidental.\n\n")
+        w("They are the statically linked MSVC 6 CRT -- `HeapAlloc`,\n"
+          "`LCMapStringW`, `MultiByteToWideChar`, `RtlUnwind`,\n"
+          "`SetUnhandledExceptionFilter` and the rest of locale, heap, stdio\n"
+          "and startup. This port replaces the CRT with libc wholesale rather\n"
+          "than function by function, so they are out of scope by design. It\n"
+          "is also where every `CreateFileA`, `ReadFile` and `FindFirstFileA`\n"
+          "in the image lives, which is why the game appears never to open a\n"
+          "file.\n\n")
+        w("Three entries up there are NOT CRT, and they are the ones that\n"
+          "matter: the one-instruction import thunks the linker parked among\n"
+          "it. Each is reached only from reconstructed code.\n\n")
+        w("| entry point | thunk | called from |\n|---|---|---|\n")
+        for sym, thunk, callers in directx_thunks:
+            who = ", ".join(f"`{c:#010x}`" for c in callers) or "nothing"
+            w(f"| {sym} | `{thunk:#010x}` | {who} |\n")
+        w("\nGame code does live above the line -- `DrawSeqBar` at\n"
+          "`0x004624A0` is there, with three `Blt` calls -- so the constant is\n"
+          "a rule of thumb and not a real boundary. What matters is that\n"
+          "nothing outstanding hides behind it: the only COM dispatch above\n"
+          "the line is `DrawSeqBar`'s, and that is reconstructed.\n\n")
+
         w("## Ways out of the process\n\n")
         w("Each mechanism this image can use to reach the outside world, and\n"
           "whether anything still uses it from unreconstructed code. The tables\n"
