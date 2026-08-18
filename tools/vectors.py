@@ -182,6 +182,29 @@ class Emu:
                 bytes(self.uc.mem_read(SCRATCH, SCRATCH_SZ)))
 
 
+_PROJECT = None
+
+
+def _project(angr):
+    """One Project for the whole run.
+
+    It was being built inside angr_inputs, which runs once per function, so a
+    sweep re-loaded and re-analysed the same 2.5 MB image for every one. The
+    image does not change between functions and nothing about the Project is
+    per-function.
+
+    Measured rather than assumed: on the 19-function validation set this makes
+    no visible difference, because those functions are tiny and angr finishes in
+    milliseconds. It matters for a sweep, where the fixed cost is paid once
+    instead of ninety-seven times.
+    """
+    global _PROJECT
+    if _PROJECT is None:
+        _PROJECT = angr.Project(am2.EXE, auto_load_libs=False,
+                                main_opts={"base_addr": IMAGE_BASE})
+    return _PROJECT
+
+
 def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
     """Argument sets that cover distinct paths, found by symbolic execution.
 
@@ -205,8 +228,7 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
 
     RET = 0xDEADBEEF
     try:
-        proj = angr.Project(am2.EXE, auto_load_libs=False,
-                            main_opts={"base_addr": IMAGE_BASE})
+        proj = _project(angr)
         syms = [claripy.BVS("a%d" % i, 32) for i in range(nargs)]
         conc = []
         mem = {}                     # scratch offset -> symbolic byte vector
@@ -227,8 +249,19 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
         for off, bv in mem.items():
             st.memory.store(SCRATCH + off, bv)
 
+        # BOUNDED. The budget below used to be a parameter that the body
+        # never read, so explore() ran unbounded and a single function with a
+        # loop hung the whole sweep -- which is what a full pass over 97
+        # functions did, silently, for twenty minutes. Symbolic execution needs
+        # a deadline or it does not terminate; that is the normal case, not the
+        # exception.
+        import time as _time
+        deadline = _time.time() + timeout
         sm = proj.factory.simulation_manager(st)
-        sm.explore(find=lambda s: s.addr == RET, num_find=limit)
+        while sm.active and len(sm.found) < limit:
+            if _time.time() > deadline:
+                break
+            sm.explore(find=lambda s: s.addr == RET, num_find=limit, n=16)
         out = []
         for f in sm.found:
             row, writes = [], []
