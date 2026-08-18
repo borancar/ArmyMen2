@@ -46,7 +46,48 @@ int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
     return dx + dy - (lo >> 1);
 }
 
+/* 0x0042DE20. The same octagonal approximation as ApproxDist -- max + min/2,
+ * written as dx + dy - min/2 -- but handed the deltas rather than two points.
+ * ApproxDist is this with the subtraction done for it. */
+int32_t __cdecl ApproxDistXY(int32_t dx, int32_t dy)
+{
+    int32_t lo;
+
+    if (dx < 0)
+        dx = -dx;
+    if (dy < 0)
+        dy = -dy;
+
+    lo = (dx < dy) ? dx : dy;
+
+    return dx - (lo >> 1) + dy;
+}
+
+/* 0x0042DD90. Wraps in BOTH directions -- see the note in dist.h. */
+int32_t __cdecl AngleDelta(uint32_t from, uint32_t to)
+{
+    int32_t d = (int32_t)(to & 0xFFu) - (int32_t)(from & 0xFFu);
+
+    if (d > 0x80)
+        d -= 0x100;
+    else if (d < -0x80)
+        d += 0x100;
+    return d;
+}
+
+/* 0x0042DFB0. The mask to 8 bits happens AFTER the rounding term is added. */
+int32_t __cdecl RoundTo8(int32_t value, uint32_t bits)
+{
+    uint32_t b = bits & 0xFFu;
+    int32_t  rounded = (int32_t)((uint32_t)(value + (1 << (7 - b))) & 0xFFu);
+
+    return rounded >> (8 - b);
+}
+
 int dist_install(void)
 {
     return patch_replace(ADDR_APPROX_DIST, (const void *)ApproxDist, "ApproxDist", 2);
+    patch_replace(ADDR_APPROX_DIST_XY, (const void *)ApproxDistXY, "ApproxDistXY", 2);
+    patch_replace(ADDR_ANGLE_DELTA, (const void *)AngleDelta, "AngleDelta", 2);
+    patch_replace(ADDR_ROUND_TO_8, (const void *)RoundTo8, "RoundTo8", 2);
 }

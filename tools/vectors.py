@@ -422,7 +422,9 @@ def main():
                 "ADDR_CLIP_RECT", "ADDR_FIND_SLOT", "ADDR_FIRST_ITEM",
                 "ADDR_NEXT_ITEM", "ADDR_SET_DRAW_TARGET",
                 "ADDR_UID_ARMY", "ADDR_UID_ON_WIRE",
-                "ADDR_OBJ_FIELD_A", "ADDR_OBJ_SET_FIELD_A", "ADDR_OBJ_FIELD_B"]
+                "ADDR_OBJ_FIELD_A", "ADDR_OBJ_SET_FIELD_A", "ADDR_OBJ_FIELD_B",
+                "ADDR_APPROX_DIST_XY", "ADDR_ANGLE_DELTA", "ADDR_ROUND_TO_8",
+                "ADDR_MAKE_POINT"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -471,6 +473,8 @@ def main():
         "ADDR_UID_ARMY": "UidArmy", "ADDR_UID_ON_WIRE": "UidOnWire",
         "ADDR_OBJ_FIELD_A": "ObjFieldA", "ADDR_OBJ_SET_FIELD_A": "ObjSetFieldA",
         "ADDR_OBJ_FIELD_B": "ObjFieldB",
+        "ADDR_APPROX_DIST_XY": "ApproxDistXY", "ADDR_ANGLE_DELTA": "AngleDelta",
+        "ADDR_ROUND_TO_8": "RoundTo8", "ADDR_MAKE_POINT": "MakePoint",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the

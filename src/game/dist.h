@@ -21,6 +21,27 @@ typedef struct {
  * points -- max(|dx|,|dy|) + min(|dx|,|dy|)/2. */
 int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b);
 
+/* 0x0042DE20. ApproxDist's own formula, taking the deltas instead of two
+ * points -- identical arithmetic, so the two agree by construction. */
+int32_t __cdecl ApproxDistXY(int32_t dx, int32_t dy);
+
+/* 0x0042DD90. Signed difference between two 8-bit headings, 256 to the turn,
+ * wrapped into -128..128 in both directions.
+ *
+ * Worth recording how this was nearly got wrong: the first reading stopped at
+ * the function's first `ret` and saw only the `d > 0x80` correction, and was
+ * written up as a deliberate asymmetry with a confident comment explaining
+ * behaviour the function does not have. The second branch lives past that ret.
+ * The vectors caught it on the first run -- AngleDelta(255, 2) is 3, not -253.
+ * A function with two returns is not unusual and a disassembly helper that
+ * stops at the first one will misread it every time. */
+int32_t __cdecl AngleDelta(uint32_t from, uint32_t to);
+
+/* 0x0042DFB0. Rounds an 8-bit value to `bits` significant bits, adding half a
+ * step first. The mask to 8 bits happens AFTER the rounding term, so a value
+ * carrying past 255 wraps rather than saturating. */
+int32_t __cdecl RoundTo8(int32_t value, uint32_t bits);
+
 int dist_install(void);
 
 #ifdef __cplusplus

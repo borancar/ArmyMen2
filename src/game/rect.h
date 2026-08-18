@@ -58,6 +58,11 @@ int32_t __cdecl PointInRect(const AM2_Rect *r, const AM2_Point *p);
 int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
                          int32_t *x, int32_t *y, AM2_Rect *out);
 
+/* 0x0042E1A0. Packs two 16-bit coordinates into the dword an AM2_Point is:
+ * x in the low half, y in the high half. ApproxDist reads points back with
+ * movsx from +0 and +2, which is the same layout seen from the other side. */
+uint32_t __cdecl MakePoint(uint32_t x, uint32_t y);
+
 int rect_install(void);
 
 #ifdef __cplusplus

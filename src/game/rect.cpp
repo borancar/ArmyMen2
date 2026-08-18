@@ -121,11 +121,19 @@ int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
     return 1;
 }
 
+/* 0x0042E1A0. The original builds the pair on its own argument slots and reads
+ * them back as one dword, which is where the layout comes from. */
+uint32_t __cdecl MakePoint(uint32_t x, uint32_t y)
+{
+    return (x & 0xFFFFu) | ((y & 0xFFFFu) << 16);
+}
+
 int rect_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_RECT_SET, (const void *)RectSet, "RectSet", 5);
+    patch_replace(ADDR_MAKE_POINT, (const void *)MakePoint, "MakePoint", 2);
     rc |= patch_replace(ADDR_CLAMP, (const void *)Clamp, "Clamp", 3);
     rc |= patch_replace(ADDR_POINT_IN_RECT, (const void *)PointInRect, "PointInRect", 2);
     rc |= patch_replace(ADDR_CLIP_RECT, (const void *)ClipRect, "ClipRect", 5);

@@ -119,6 +119,14 @@ Consequences to remember:
 
 ## Differential testing without the game
 
+**It has already caught a misreading that would have shipped.** `AngleDelta`
+was written from a disassembly that stopped at the function's first `ret`,
+which hid a second branch, and went in with a confident comment explaining an
+asymmetry the function does not have. The vectors failed on the first run:
+`AngleDelta(255, 2)` is 3, not -253. A function with two returns is ordinary,
+and any helper that stops at the first one will misread it every time -- check
+the whole body, or let the vectors tell you.
+
 **`make selftest` checks a reconstruction against the original binary with no
 part of the game running.** `tools/vectors.py` emulates the ORIGINAL function
 with Unicorn over the mapped PE image, records (inputs → output) vectors into

@@ -1106,6 +1106,10 @@
 #define ADDR_OBJ_IS_TYPE3   0x00457490u
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
+#define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */
+#define ADDR_ANGLE_DELTA    0x0042DD90u  /* int32_t(from, to), 8-bit headings */
+#define ADDR_ROUND_TO_8     0x0042DFB0u  /* int32_t(value, bits) */
+#define ADDR_MAKE_POINT     0x0042E1A0u  /* uint32_t(x, y) -> packed AM2_Point */
 #define ADDR_FIND_SLOT      0x004277A0u  /* int32_t(uint32_t uid, int32_t *insert_at) */
 #define ADDR_LOOKUP_BY_UID  0x00427820u  /* void *(uint32_t uid) */
 
