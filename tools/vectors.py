@@ -310,20 +310,41 @@ def pure_leaves(img, md, sizes):
     for a, s in sorted(game.items()):
         if isdone(a, s):
             continue
-        glob = False
-        calls = False
-        for i in md.disasm(img.read(a, s), a):
-            if i.mnemonic in ("call", "jmp") and i.op_str.startswith("0x"):
-                t = int(i.op_str, 16)
-                if 0x401000 <= t < CRT_FRONTIER:
-                    o = owner(t)
-                    if o is not None and o != a and not isdone(o, game[o]):
-                        calls = True
-            for tok in pat.findall(i.op_str):
-                v = int(tok, 16)
-                if DATA_LO <= v < DATA_HI or RDATA_LO <= v < RDATA_HI:
-                    glob = True
-        if not calls and not glob:
+        body = list(md.disasm(img.read(a, s), a))
+        if not body:
+            continue
+
+        # ANY call disqualifies, not merely a call to something unreconstructed.
+        # 0x00434C80 is "free it if non-null" and would really free memory;
+        # 0x00427420 is PollInput, `call PollMouse; jmp PollKeyboard`, which is
+        # nothing but side effects and looked like a leaf because both callees
+        # are already ours.
+        if any(i.mnemonic == "call" for i in body):
+            continue
+        if any(i.mnemonic == "jmp" and i.op_str.startswith("0x")
+               and 0x401000 <= int(i.op_str, 16) < CRT_FRONTIER
+               and not (a <= int(i.op_str, 16) < a + s) for i in body):
+            continue
+
+        # ecx used as a base without ever being loaded is the implicit `this`
+        # of a thiscall method -- 0x00432D40 writes a byte to [ecx+0x70]. There
+        # is no way to supply that from the stack, so it is not testable here.
+        loaded_ecx = False
+        thiscall = False
+        for i in body:
+            op = i.op_str
+            if not loaded_ecx and re.search(r"\[ecx", op):
+                thiscall = True
+            if re.match(r"ecx\s*,", op) and i.mnemonic in ("mov", "lea", "xor",
+                                                           "pop", "movsx", "movzx"):
+                loaded_ecx = True
+        if thiscall:
+            continue
+
+        glob = any(DATA_LO <= int(t, 16) < DATA_HI or
+                   RDATA_LO <= int(t, 16) < RDATA_HI
+                   for i in body for t in pat.findall(i.op_str))
+        if not glob:
             out.append((a, s))
     return out
 
