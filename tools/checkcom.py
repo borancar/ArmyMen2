@@ -5,15 +5,26 @@ replaces. This counts them on both sides -- the original from
 docs/comcalls.tsv, ours by matching `IDirectSomething_Method(` in the
 function body -- and prints the pairs that disagree.
 
-It is a review aid, not a test, and it will not pass cleanly. Two things make
-it disagree without anything being wrong, and both are worth knowing before
-reading its output. A third used to, and has been fixed instead:
+It IS a test now, in the only sense that matters: it exits non-zero when a
+difference is not accounted for. It did not used to be. It printed ten
+disagreements every run under the heading "read them, do not assume", which is
+a standing instruction nobody carries out on the tenth reading -- and a real
+defect would have looked exactly like the other nine.
 
-  OURS LOWER, because the call moved into a helper or a loop. ClearSprite and
-  ReleaseSprite share a FreeSpriteContents; DrawSeqBar does its three fills
-  through one SeqBarFill; ShutdownInput releases three devices through one
-  ReleaseDevice, and StopAllSounds walks 73 slots through one StopIfPlaying.
-  The calls are all there, just not once each in that function body.
+Two things make a direct count differ without anything being wrong, and the
+tool now does the arithmetic for both rather than describing them:
+
+  OURS LOWER, because the call moved into a static helper. ClearSprite and
+  ReleaseSprite share a FreeSpriteContents; ShutdownInput releases three
+  devices through one ReleaseDevice; RestoreLostSurfaces restores three
+  surfaces through one RestoreIfLost. The `+helpers` column adds them back, and
+  all seven such functions then match their original EXACTLY.
+
+  Only `static` helpers count. A non-static callee is a peer -- its own
+  reconstruction with its own row -- and counting its calls again would double
+  them. StopAllSounds calls StopAudioStream and CommLobbyStart calls
+  CommGetSessionDesc and CommCreatePlayer; without that rule both overcount and
+  look like defects.
 
   MERGED NEIGHBOURS -- no longer a reason, and worth saying so. This used to
   read "original higher, because docs/functions.tsv merges neighbours", which
@@ -81,6 +92,34 @@ def patched_functions(names):
                 if m.group(1) in names:
                     out[names[m.group(1)]] = (m.group(2), fn)
     return out
+
+
+def static_helpers(src):
+    """Names of file-local (static) functions in `src`.
+
+    The discriminator between a helper and a peer. A `static` function was
+    factored out of the reconstruction and its COM calls belong to whoever
+    calls it; a non-static one is a reconstruction in its own right with its
+    own row in the survey, so counting its calls again would double them.
+    Without this the accounting overcounts -- StopAllSounds calls
+    StopAudioStream, which is a peer, and CommLobbyStart calls two more.
+    """
+    return set(re.findall(r"^static\s+[A-Za-z_][^\n;=]*?\b([A-Za-z_]\w*)\s*\(",
+                          src, re.M))
+
+
+def com_calls_including_helpers(src, name, helpers, depth=0):
+    """COM calls in `name`, plus those in the static helpers it calls."""
+    body = body_of(src, name)
+    if body is None or depth > 3:
+        return 0
+    total = len(re.findall(r"\bIDirect\w+_\w+\s*\(", body))
+    for helper in helpers:
+        n = len(re.findall(r"\b" + re.escape(helper) + r"\s*\(", body))
+        if n and helper != name:
+            total += n * com_calls_including_helpers(src, helper, helpers,
+                                                     depth + 1)
+    return total
 
 
 def body_of(src, name):
@@ -183,7 +222,9 @@ def main():
         ours = len(re.findall(r"\bIDirect\w+_\w+\s*\(", body))
         theirs = per_fn.get(va, 0)
         if ours != theirs:
-            differ.append((name, fname, theirs, ours, sizes.get(va, 0)))
+            with_helpers = com_calls_including_helpers(
+                src, name, static_helpers(src))
+            differ.append((name, fname, theirs, ours, with_helpers))
 
     # The scan's own blind spot, re-measured rather than remembered. Use the
     # full reconstructed set, not just patch_replace: WndProc and
@@ -209,14 +250,33 @@ def main():
         print("every reconstruction makes as many COM calls as its original")
         return 0
 
-    print(f"{len(differ)} of {len(patched)} disagree -- read them, do not assume\n")
-    print(f"{'function':<24} {'file':<16} {'orig':>5} {'ours':>5}  likely reason")
-    for name, fname, theirs, ours, size in differ:
-        if ours < theirs:
-            why = "a helper or a loop, or a merged neighbour"
-        else:
+    by_helper = [d for d in differ if d[4] == d[2]]
+    by_scan = [d for d in differ if d[4] != d[2] and d[3] > d[2]]
+    unexplained = [d for d in differ if d not in by_helper and d not in by_scan]
+
+    print(f"{len(differ)} of {len(patched)} differ on a direct count: "
+          f"{len(by_helper)} accounted for by static helpers, "
+          f"{len(by_scan)} by the scan's\nknown undercount, "
+          f"{len(unexplained)} unexplained\n")
+    print(f"{'function':<24} {'file':<16} {'orig':>5} {'ours':>5} {'+helpers':>9}  note")
+    for name, fname, theirs, ours, total in differ:
+        if total == theirs:
+            why = "accounted for"
+        elif ours > theirs:
             why = "comcalls lost the vtable register at a branch"
-        print(f"{name:<24} {fname:<16} {theirs:>5} {ours:>5}  {why}")
+        else:
+            why = "READ THIS ONE"
+        print(f"{name:<24} {fname:<16} {theirs:>5} {ours:>5} {total:>9}  {why}")
+    if unexplained:
+        print("\nThe unexplained ones are the whole point of this tool: a "
+              "reconstruction that\nmakes a call its original does not, or "
+              "misses one it does.")
+        return 1
+    print("\nNothing unexplained. The `+helpers` column is the direct count "
+          "plus the COM\ncalls of every static -- file-local -- helper the "
+          "body calls, which is what a\nfactored-out reconstruction looks "
+          "like. Peers are excluded: they are separate\nreconstructions with "
+          "their own row, and counting them again would double.")
     return 0
 
 
