@@ -890,12 +890,20 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   this list at all, and the lesson is the one already written above: resolve a
   zero with a probe rather than adding it to a list of things to try harder at.
 
-  `StopNamedSound` and `StopAllSounds` are genuinely unexecuted, and the route
-  to them is now known rather than guessed. `RunFrame` dispatches on a state at
-  `0x00511DA4` through a jump table; **state 2 is the level teardown**, which
-  tail-jumps to `0x004256F0` and calls `StopAllSounds` unconditionally. So they
-  need a mission to *end* — completed or abandoned — and no amount of quitting
-  from the title screen will reach them.
+  `StopNamedSound` and `StopAllSounds` are genuinely unexecuted, and the
+  mechanism is now mapped rather than guessed at. `RunFrame` dispatches on the
+  state at `ADDR_GAME_STATE` through a table; state 2's handler jumps to the
+  level teardown **only when `ADDR_STATE_PENDING` is set**, and that flag is
+  raised by `ADDR_REQUEST_STATE` and lowered by `ADDR_COMMIT_STATE`.
+
+  So the teardown runs when a state change is requested while the game is
+  *already* in state 2 — on LEAVING a level. Entering Boot Camp is a transition
+  into the state and does not trigger it, which is why driving the whole
+  title → briefing → mission path leaves both counters at 0; measured, not
+  assumed. Quitting from the title screen cannot reach it either.
+
+  What is still missing is only the UI action that leaves a mission. `ESCAPE`
+  is already recorded as doing nothing there.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal

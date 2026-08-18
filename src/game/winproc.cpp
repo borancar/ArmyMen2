@@ -97,7 +97,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define orig_on_app_activated  (*(am2_void_fn)ADDR_ON_APP_ACTIVATED)
 #define orig_current_state     (*(am2_int_fn)ADDR_CURRENT_STATE)
 #define orig_state_leave       (*(am2_void_fn)ADDR_STATE_LEAVE)
-#define orig_state_enter       (*(am2_int_arg_fn)ADDR_STATE_ENTER)
+#define orig_request_state       (*(am2_int_arg_fn)ADDR_REQUEST_STATE)
 
 /* The original, still in the image and still callable because we never wrote
  * over it. The comm messages go straight back to it. */
@@ -224,7 +224,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             g_stateDispatch[orig_current_state()].fn();
         else {
             orig_state_leave();
-            orig_state_enter(g_stateArg);
+            orig_request_state(g_stateArg);
         }
         break;
 

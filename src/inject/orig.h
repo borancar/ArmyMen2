@@ -725,7 +725,23 @@
 #define ADDR_ON_APP_ACTIVATED    0x004269B0u  /* void(void) */
 #define ADDR_CURRENT_STATE       0x0042E5D0u  /* int32_t(void), indexes the above */
 #define ADDR_STATE_LEAVE         0x0042E720u  /* void(void) */
-#define ADDR_STATE_ENTER         0x00424AD0u  /* void(int32_t) */
+/* The game is a five-state machine driven by RunFrame, and changing state is
+ * two functions rather than one -- which the old name ADDR_STATE_ENTER hid.
+ *
+ * REQUEST stores the wanted state and raises a pending flag; it does NOT change
+ * the current state. COMMIT, a separate function, moves the pending state into
+ * the live one and lowers the flag.
+ *
+ * That flag is what makes the level teardown reachable: the state-2 handler at
+ * ADDR_LEVEL_TEARDOWN checks it, so the teardown runs when a transition is
+ * requested while the game is ALREADY in state 2 -- that is, on leaving a
+ * level. It is the only route to StopAllSounds, which is why no amount of
+ * entering Boot Camp reaches it: entering is a transition INTO the state, and
+ * only leaving triggers the teardown. */
+#define ADDR_REQUEST_STATE       0x00424AD0u  /* void(int32_t) */
+#define ADDR_COMMIT_STATE        0x00424AF0u  /* void(void) */
+#define ADDR_STATE_PENDING       0x00511DACu  /* int32_t, a change is wanted */
+#define ADDR_STATE_WANTED        0x00511DB0u  /* int32_t, -1 when none */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
 /* Not HINSTANCE-related at all, despite sitting beside it: DetectCpuSpeed sets
