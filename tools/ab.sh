@@ -7,7 +7,8 @@
 #   tools/ab.sh intro        -dbg, so the Smacker film plays
 #   tools/ab.sh audio        Boot Camp again, with a silent sound device
 #   tools/ab.sh mission      past both dialogs into live play, and scrolling
-#   tools/ab.sh all          all five
+#   tools/ab.sh quit         out through the menu, so the teardown runs
+#   tools/ab.sh all          all six
 #
 # This is the strongest check available and the only one that compares against
 # the original rather than against expectations. The registry invariant checks
@@ -51,7 +52,12 @@ mkdir -p "$WORK" || exit 1
 # which is why an earlier `^\]$` never matched them and this compared them for
 # a while by accident, passing only because the two counts happened to agree.
 # Line endings are normalised before filtering for the same reason.
-HARNESS='^(patch:|trace |trace:|verify:|am2hook|gamelog:|dinput:|\]|  [A-Za-z_]+ +[0-9]+$|==== session)'
+# The counter-dump pattern allows DIGITS in the name. It read `[A-Za-z_]+`,
+# which silently let through every function whose name has one in it --
+# BlitCopy16, ObjIsType2, Update3DAudioVolumes. That never showed up until
+# `quit`, because trace_report() runs on DLL_PROCESS_DETACH and every other
+# configuration kills the process instead of letting it leave.
+HARNESS='^(patch:|trace |trace:|verify:|am2hook|gamelog:|dinput:|\]|  [A-Za-z_][A-Za-z0-9_]* +[0-9]+$|==== session)'
 
 # Game output whose COUNT depends on how long the run lived, not on whether the
 # reconstruction is right. Kept apart from HARNESS above on purpose: that filter
@@ -129,6 +135,13 @@ play() {
         # long as the instruction sign was on screen, and the scroll merge at
         # 0x0041D060 never ran once.
         mission)  args="-nointro -dbg"    ; wait=20 ;;
+        # Leaving through the menu, which is the only way the teardown runs at
+        # all: drive.sh stop kills the tree, so ShutdownDirectDraw,
+        # ShutdownInput, ReleaseSoundBuffers and the sprite and sound frees
+        # had never executed once in this project's life. The first time this
+        # was driven it found a real bug -- see ReleaseSprite in sprite.cpp.
+        quit)     args="-nointro -dbg"    ; wait=25
+                  export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
     esac
 
@@ -164,6 +177,20 @@ play() {
             drive ctl "mouse move 0 200" >/dev/null 2>&1
         done
         sleep 6
+    fi
+
+    if [ "$cfg" = quit ]; then
+        # QUIT, then OK on CONFIRM GAME EXIT. The process then leaves on its
+        # own; the counters reach the log because trace_report() runs on
+        # DLL_PROCESS_DETACH, which is the only way to see a teardown count.
+        "$REPO/tools/point.py" 306 383 --click >/dev/null 2>&1
+        sleep 4
+        "$REPO/tools/point.py" 475 224 --click >/dev/null 2>&1
+        local waited=0
+        while pgrep -f 'ArmyMen2[.]exe' >/dev/null 2>&1 && [ $waited -lt 40 ]; do
+            sleep 2
+            waited=$((waited + 2))
+        done
     fi
 
     drive shot "ab-$cfg-$side" >/dev/null 2>&1
@@ -251,6 +278,9 @@ compare() {
         intro)    budget=-1 ;;      # -1 disables the check
         # Measured, not guessed -- see the note below the case.
         mission)  budget=-1 ;;
+        # The process is gone by the time the shot is taken, so there is no
+        # frame to compare. The log is the evidence.
+        quit)     budget=-1 ;;
         *)        budget=500 ;;
     esac
     # Overridable, mainly so the check itself can be tested.
@@ -285,7 +315,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission quit"
 
 fail=0
 for cfg in $cfgs; do

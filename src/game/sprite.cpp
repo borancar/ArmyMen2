@@ -258,10 +258,20 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
         if (slot < 0) {
             orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_MISSING);
         } else if (g_spriteTable[slot] != spr) {
-            /* Someone else holds that slot. Reported only when this sprite
-             * still claims a reference, which is the case that cannot be
-             * explained by an ordinary double release. */
-            if (spr->refs != 0)
+            /* The slot holds something other than us. Complain only if it
+             * holds SOMETHING -- an empty slot is an ordinary double release
+             * and is silent.
+             *
+             * The condition is on the slot's occupant, not on this sprite.
+             * This read `spr->refs != 0` until the shutdown path was driven
+             * for the first time and produced "Error in release: Wrong
+             * sprite!" where the original produced nothing: the original
+             * tests the register still holding `table[slot]` from the compare
+             * immediately above, and I had misread it as the reference count
+             * and then written a plausible comment explaining the wrong
+             * behaviour. Nothing reaches this path before shutdown, which is
+             * why it survived every A/B until the teardown was exercised. */
+            if (g_spriteTable[slot] != NULL)
                 orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_WRONG);
         } else {
             if (spr->refs > 0)

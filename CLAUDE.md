@@ -91,6 +91,26 @@ engine, so it proves very little. From the briefing screen, **`RETURN` starts
 the mission** — the cursor is hidden there, so `tools/point.py` cannot find it
 and clicking is not an option.
 
+**`tools/ab.sh quit` covers the teardown, and it found a real bug the first
+time it ran.** Until it existed, `ShutdownDirectDraw`, `ShutdownInput`,
+`ReleaseSoundBuffers`, `FreeSound`, `FreeDynamicSounds` and the sprite frees
+had never executed once — every configuration killed the process instead. A
+clean exit runs all of them, and `trace_report()` on `DLL_PROCESS_DETACH` is
+the only way their counts are ever visible.
+
+What it found: `ReleaseSprite` logged "Error in release: Wrong sprite!" where
+the original logged nothing. The original tests the register still holding
+`table[slot]` from the compare above it — "is the slot occupied by someone
+else" — and I had read it as `spr->refs` and then written a confident comment
+explaining the wrong behaviour. Nothing reaches that path before shutdown, so
+it survived every A/B in the project.
+
+The same run exposed a filter bug worth knowing: `ab.sh`'s counter-dump pattern
+was `[A-Za-z_]+`, which does not match a function name containing a digit, so
+`BlitCopy16` and friends leaked into the compared log. It could only ever show
+up here, because this is the only configuration where the process exits
+cleanly enough to dump counters at all.
+
 **Quitting through the menu exercises code that killing the process cannot.**
 `tools/drive.sh stop` kills the tree, so the whole shutdown path never runs.
 Click QUIT on the title screen, then OK on the CONFIRM GAME EXIT dialog
@@ -855,10 +875,11 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `tools/ab.sh audio` drives that same sequence, so all of it is compared
   against the original and not merely run.
 
-  Still at zero, and all of them teardown: `StopNamedSound`,
-  `FreeDynamicSounds`, `StopAllSounds`, `FreeSound`, `ReleaseSoundBuffers`,
-  `WaveCloseReadFile`. Leaving a mission cleanly is the obvious way to reach
-  them and has not been tried.
+  `FreeDynamicSounds`, `FreeSound` (56 calls) and `ReleaseSoundBuffers` came
+  off this list once `tools/ab.sh quit` existed. Still at zero after a clean
+  exit from the title screen: `StopNamedSound`, `StopAllSounds` and
+  `WaveCloseReadFile` — quitting from inside a mission, rather than from the
+  menu, is the remaining thing to try.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal
