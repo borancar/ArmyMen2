@@ -281,6 +281,20 @@ make a bare `-w`, which it takes as `--print-directory`:
 AM2_DISPLAY=:99 tools/drive.sh start 25 "ARGS=-nointro -dbg -w"
 ```
 
+**`tools/blindspots.py` says which counters can move, so the question below
+does not have to be re-derived every time.** Of 138 traced functions, 44 have
+every caller reconstructed and their counters are 0 by construction; 4 more are
+reached by address. It gets `WaveCloseReadFile`, `MovieDrawFrame`,
+`MovieApplyPalette`, `SnapshotSystemPalette`, `BlitCopy16` and `EncodeGlyph`
+right — every case this file has ever had to explain by hand.
+
+It exists because the rule below has been ignored three times, twice in one
+session: once putting `WaveCloseReadFile` on a list of things to try harder at
+while `StopAudioStream` was calling it all along, and once writing up a whole
+commit claiming the intro no longer plays the movie, when `MovieDrawFrame` runs
+200 frames at a time. A rule that is written down and forgotten should be
+turned into a tool.
+
 **A count of 0 does not mean "broken" and does not mean "never called".** When a
 reconstructed function's callers are *also* reconstructed, the direct call
 bypasses the patched entry point and the counter never moves. The two cases are
