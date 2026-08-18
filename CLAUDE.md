@@ -1005,24 +1005,37 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   flag. So the chain is: menu request while in state 2 → pending flag → the
   state-2 handler jumps to the teardown → `StopAllSounds`.
 
-  What is missing is only the in-game UI that raises such a request, and the
-  cheap answers are now eliminated rather than untried:
+  **`StopAllSounds` has now been executed, and the chain above is confirmed by
+  running it rather than by reading.** A temporary `poke` command in the control
+  socket set `ADDR_MENU_REQUEST`/`ADDR_MENU_REQUEST_SET` during a live Boot Camp
+  mission — exactly what the ESCAPE handler writes — and the counter went 0 to
+  1, `FreeMapSurfaces` with it, while the game returned cleanly to the title
+  with `StartAudioStream("title.wav")` and `CommDropDirectPlay` in the log. So
+  the whole path holds: menu request raised while in state 2 →
+  `ADDR_TAKE_MENU_REQUEST` consumes it → `ADDR_STATE_PENDING` →
+  `ADDR_STATE2_FRAME` tail-jumps to `ADDR_LEVEL_TEARDOWN` → `StopAllSounds`.
 
-  - **Keys.** `ESCAPE`, `F1`, `F9`, `F10`, `TAB` and `Q`, each pressed in a
-    live mission. None moves the counter.
-  - **The HUD.** Six clicks across the panel, the top bar and the COMMANDS
-    row. None either.
-  - **`DrawMenuOverlay` is not the in-game menu.** It looks like a candidate
-    because it reads `ADDR_MENU_REQUEST_SET`, but its counter freezes the
-    moment gameplay starts — 36,004 and then never again while `ComposeFrame`
-    climbs past 53,000. It is the menu-screen overlay, and there is no in-game
-    one.
+  Poking `ADDR_STATE_PENDING` directly also works and is the cruder version of
+  the same thing; prefer the menu-request form, since that is the route the
+  game itself takes and it exercises `TakeMenuRequest` too.
 
-  So the remaining trigger is most likely a mission ENDING — completed or
-  failed — which needs Sarge actually played rather than a scripted click.
-  That is a gameplay-automation problem, not a reconstruction one: both
-  functions are reconstructed, and everything on either side of the trigger is
-  mapped and confirmed.
+  Two readings from the same session, both measured. The in-mission sub-state
+  `ADDR_MENU_REQUEST_TAKEN` reads **33** throughout Boot Camp play, which is
+  why the ESCAPE arm — number 34 — never runs. And `ADDR_STATE_WANTED` really
+  does sit at -1 while nothing is pending, as `orig.h` claims.
+
+  **`StopNamedSound` is still unexecuted and is a harder case than it looks.**
+  Its only call site is `0x00424DC3`, guarded by the name buffer at
+  `0x00511D58` being non-empty. That buffer stays all-zero for an entire Boot
+  Camp mission — polled repeatedly — so nothing is ever named to be stopped.
+  Forcing a name into it does not help either: the counter stays at 0 through
+  90,000 further frames, so the code path holding that call is not reached in
+  this mission at all. Note `tools/merges.py` does NOT split the entry at
+  `0x00424CA0`, which really is several functions — the call sits past a `ret`
+  at `0x00424CD3` — so attributing that site by entry gives the wrong caller.
+  A reminder that the split list is a lower bound, exactly as its docstring
+  says.
+
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal
