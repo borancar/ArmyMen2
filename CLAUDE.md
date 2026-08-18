@@ -920,15 +920,32 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   callback, a vtable, a dispatch table. It buys back the thing detouring costs,
   which is the ability to defer.
 
-  That deferral has now been taken back: the six comm messages `WndProc` used
-  to forward to the original are reconstructed, so nothing in `winproc.cpp`
-  calls `0x0040A6B0` any more. **Only one of the six can be exercised here.**
-  `0x0500` is posted by `OpenAudioStream` and `InitInput`, so it runs in every
-  session — `StopAudioStream` still reads 2 through a Boot Camp briefing, which
-  with the forward gone can only have come through our handler. The other five
-  need a live DirectPlay session with a second player: a join, a leave, a host
-  migration, a session end, an empty send pool. They are verified by reading,
-  which is weaker than the rest of the tree and should be said plainly.
+  That deferral has now been taken back: the six messages `WndProc` used to
+  forward to the original are reconstructed, so nothing in `winproc.cpp` calls
+  `0x0040A6B0` any more.
+
+  **Name a window message from what POSTS it.** Decoding forward from each
+  `push <msg>` to the `PostMessageA` that follows gives every sender, and it
+  also removes two candidates that a bare constant scan reports: `InitInput`'s
+  `push 0x500` is DirectInput's *version number* on its way to `0x00464410`,
+  and six `push 0x464` sites are arguments to a CRT call. The senders are
+  `PacketThreadProc` for `0x0464` and `0x046B`; `0x00410090`
+  ("DestroyPlayer Id=%x"), `0x00411C20` ("TIMING OUT PLAYER") and `CommSend`
+  for `0x046C`; `0x00410090` again for `0x046D`; the ready/end-setup handshake
+  for `0x046E`; and `AudioTimerProc` for `0x0500`.
+
+  That last one settles something the old names hid: **`0x0500` is not comm
+  traffic at all.** It shared a case label with the other five only because
+  `WndProc` forwarded them together. The constants are now
+  `AM2_WM_PACKETS_READY`, `AM2_WM_NO_BUFFERS`, `AM2_WM_PLAYER_GONE`,
+  `AM2_WM_HOST_CHANGED`, `AM2_WM_SETUP_DONE` and `AM2_WM_STREAM_DONE`.
+
+  **Only `0x0500` can be exercised here**, and `AudioTimerProc` posting it means
+  it runs in every session: `StopAudioStream` still reads 2 through a Boot Camp
+  briefing, which with the forward gone can only have come through our handler.
+  The other five need a live DirectPlay session with a second player, so they
+  are verified by reading — weaker than the rest of the tree, and worth saying
+  plainly.
 
   `g_charHandler` is NOT the same kind of thing and was left alone. It is a
   slot, not a function: the menu's text fields write their own consumer into

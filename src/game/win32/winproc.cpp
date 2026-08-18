@@ -51,12 +51,32 @@
  * these -- 0x400 when a film finishes, 0x402 when one could not be started --
  * and both mean "advance the state machine". They were named for their
  * neighbours before the movie player was read. */
-#define AM2_WM_COMM_464      0x0464u
-#define AM2_WM_COMM_46B      0x046Bu
-#define AM2_WM_COMM_46C      0x046Cu
-#define AM2_WM_COMM_46D      0x046Du
-#define AM2_WM_COMM_46E      0x046Eu
-#define AM2_WM_COMM_500      0x0500u
+/* Named from what POSTS them, which is the half of a window message that can
+ * be checked. Every sender below was found by decoding forward from the
+ * `push <msg>` to the PostMessageA that follows it -- and two candidates fell
+ * out at that step: InitInput's `push 0x500` is DirectInput's version number
+ * on its way to 0x00464410, and six `push 0x464` sites in the 0x0044E-0x00452
+ * range are arguments to a CRT call. A constant that looks like a message is
+ * not one.
+ *
+ *   0x0464  PacketThreadProc, when it has queued packets for the main thread
+ *   0x046B  PacketThreadProc, when the send pool is empty
+ *           -- both from the thread, which is why they are posted and not called
+ *   0x046C  0x00410090 "DestroyPlayer Id=%x, to = %x", 0x00411C20
+ *           "TIMING OUT PLAYER %d %s", and CommSend
+ *   0x046D  0x00410090, the same DirectPlay system-message handler
+ *   0x046E  the ready/end-setup handshake: 0x00410A10 "SendGameReadyMsg",
+ *           0x00410B70 "ReceiveEndSetupMsg", 0x00410BB0 "ReceiveGameReadyMsg"
+ *           and 0x00410CE0 "Sending EndSetupMessage"
+ *   0x0500  AudioTimerProc, twice -- NOT comm traffic at all. It shared a case
+ *           label with the others only because WndProc forwarded all six.
+ */
+#define AM2_WM_PACKETS_READY 0x0464u
+#define AM2_WM_NO_BUFFERS    0x046Bu
+#define AM2_WM_PLAYER_GONE   0x046Cu
+#define AM2_WM_HOST_CHANGED  0x046Du
+#define AM2_WM_SETUP_DONE    0x046Eu
+#define AM2_WM_STREAM_DONE   0x0500u
 
 static_assert(SC_SCREENSAVE == 0xF140 && SC_MONITORPOWER == 0xF170, "SC_*");
 static_assert((RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN |
@@ -125,7 +145,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_EVENT_FLAGS)
 #define g_aiControlled (*(int32_t *)(uintptr_t)ADDR_AI_CONTROLLED)
 #define g_hostChanged  (*(int32_t *)(uintptr_t)ADDR_COMM_HOST_CHANGED)
-#define g_missionLive  (*(int32_t *)(uintptr_t)ADDR_MISSION_LIVE)
+#define g_netGame  (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
 #define g_gameOverFlags (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)
 #define g_hostSlot     (*(const int32_t *)(uintptr_t)ADDR_HOST_SLOT)
@@ -258,7 +278,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
     }
 
     slot = orig_player_slot(comm, id);
-    if (orig_player_left(comm, id) && g_gameState == 2 && g_missionLive
+    if (orig_player_left(comm, id) && g_gameState == 2 && g_netGame
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
         orig_end_setup();
     orig_remove_player(id);
@@ -298,13 +318,12 @@ static LRESULT OnHostMigrated(void)
     return 1;
 }
 
-/* 0x0046E. The session is over: hand the abandoned armies to the AI, stop
- * treating the mission as live, and tear the comm state down. */
-static LRESULT OnSessionEnded(void)
+/* 0x0046E. The ready/end-setup handshake finished. */
+static LRESULT OnSetupDone(void)
 {
     uint8_t *comm = g_commObject;
 
-    g_missionLive = 0;
+    g_netGame = 0;
     orig_set_ai((int32_t)((g_gameOverFlags >> 18) & 1u));
     orig_play_dynamic((const char *)(uintptr_t)ADDR_STR_ALLRIGHT_WAV,
                       0, 0, 0, 0, 0, 3, 0);
@@ -438,26 +457,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         break;
 
-    case AM2_WM_COMM_464:
+    case AM2_WM_PACKETS_READY:
         orig_drain_msgs();
         return 1;
 
-    case AM2_WM_COMM_46B:
+    case AM2_WM_NO_BUFFERS:
         orig_no_buffers();
         return 1;
 
-    case AM2_WM_COMM_46C:
+    case AM2_WM_PLAYER_GONE:
         return OnPlayerDestroyed(wParam);
 
-    case AM2_WM_COMM_46D:
+    case AM2_WM_HOST_CHANGED:
         return OnHostMigrated();
 
-    case AM2_WM_COMM_46E:
-        return OnSessionEnded();
+    case AM2_WM_SETUP_DONE:
+        return OnSetupDone();
 
-    case AM2_WM_COMM_500:
-        /* Stops the stream and then lets DefWindowProcA have it, which is
-         * what the original does -- it falls through rather than returning. */
+    case AM2_WM_STREAM_DONE:
+        /* AudioTimerProc posts this when a stream runs out. Stop it and then
+         * let DefWindowProcA have the message, which is what the original
+         * does -- it falls through rather than returning. */
         orig_stop_stream();
         break;
 

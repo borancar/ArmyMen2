@@ -520,7 +520,11 @@
 #define ADDR_AI_CONTROLLED       0x00476FB0u  /* int32_t, set by ADDR_SET_AI_CONTROL */
 #define ADDR_EVENT_FLAGS         0x005122FCu  /* uint32_t, what ADDR_GET_EVENT_FLAGS reads */
 #define ADDR_COMM_HOST_CHANGED   0x00511DA0u  /* int32_t, raised on host migration */
-#define ADDR_MISSION_LIVE        0x00511DD4u  /* int32_t, cleared when the game ends */
+/* Raised by 0x00411000 and lowered by the 0x046E handler, and read from 21
+ * places -- the lobby, the overlay, TakeMenuRequest and the mission code. The
+ * shape of a "this is a network game" flag; named for what is observed rather
+ * than for the one call site that happened to be in front of me. */
+#define ADDR_NET_GAME            0x00511DD4u  /* int32_t */
 #define ADDR_GAME_OVER_FLAGS     0x00515FD8u  /* uint32_t, bit 18 selects the AI mode */
 #define ADDR_HUD_MESSAGE_COLOUR  0x00507234u  /* uint8_t, colour for ADDR_HUD_MESSAGE */
 #define ADDR_MP_LEAVE_SPRITE     0x0045A030u  /* const void *, passed to 0x00457820 */
