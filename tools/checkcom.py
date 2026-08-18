@@ -33,6 +33,13 @@ So a difference means "read this one", not "this one is broken". What it is
 good for is the fourth case, which is a genuine defect: a reconstruction that
 makes a call the original does not, or misses one it does.
 
+It also re-measures comcalls.py's own blind spot. That scan gives up when it
+cannot find the vtable load, so it undercounts, and its docstring quantified
+the miss and said to re-measure if the scan ever changed. It has changed --
+the cdecl rule -- so this measures it instead of leaving a note to go stale.
+Eight vtable-shaped calls go unrecorded; five are real DirectX in reconstructed
+functions and three are callbacks.
+
 Run it after a batch, the way tools/ab.sh is run after a batch.
 """
 
@@ -88,6 +95,54 @@ def body_of(src, name):
     return rest[:end] if end >= 0 else rest
 
 
+def sweep_missed(img, merged, sizes, done):
+    """Every `call [reg+disp]` below the CRT that comcalls.py did not record.
+
+    comcalls.py finds a COM dispatch by walking back for the vtable load, and
+    gives up at a call or a ret. Its docstring quantifies the resulting miss
+    and says it is worth re-measuring if the scan ever changes. It has changed,
+    so this measures it rather than leaving the note to go stale.
+
+    Returns (site, owning function, reconstructed?) for each.
+    """
+    import capstone as _cs
+    md = _cs.Cs(_cs.CS_ARCH_X86, _cs.CS_MODE_32)
+    md.detail = True
+
+    recorded = set()
+    with open(os.path.join(REPO, "docs", "comcalls.tsv")) as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            recorded.add(int(row["site"], 16))
+
+    out = []
+    for insn in img.disasm(".text"):
+        if insn.address >= CRT_START or insn.mnemonic != "call":
+            continue
+        if "ptr [" not in insn.op_str or insn.address in recorded:
+            continue
+        ops = insn.operands
+        if not ops or ops[0].type != _cs.x86.X86_OP_MEM:
+            continue
+        mem = ops[0].mem
+        # [reg + disp] with a plausible vtable displacement. An index register
+        # means an array walk and a zero base means an absolute address, and
+        # neither is a vtable dispatch.
+        if mem.base == 0 or mem.index != 0:
+            continue
+        if not 0 <= mem.disp <= 0x200 or mem.disp % 4:
+            continue
+
+        fn = next((f for f, sz in sizes.items() if f <= insn.address < f + sz),
+                  None)
+        size = sizes.get(fn, 0)
+        if fn in merged:
+            starts, msz = merged[fn]
+            fn, size = merges.owner(starts, msz, insn.address)
+        ours = fn is not None and any(fn <= d < fn + size for d in done)
+        out.append((insn.address, fn or 0, ours))
+    return out
+
+
 def main():
     names = addr_table()
     patched = patched_functions(names)
@@ -129,6 +184,26 @@ def main():
         theirs = per_fn.get(va, 0)
         if ours != theirs:
             differ.append((name, fname, theirs, ours, sizes.get(va, 0)))
+
+    # The scan's own blind spot, re-measured rather than remembered. Use the
+    # full reconstructed set, not just patch_replace: WndProc and
+    # AudioTimerProc are registered rather than detoured and would otherwise
+    # look outstanding.
+    missed = sweep_missed(img, merged, sizes, merges.reconstructed())
+    if missed:
+        left = [m for m in missed if not m[2]]
+        print(f"{len(missed)} vtable-shaped call(s) the scan did not record, "
+              f"{len(left)} in unreconstructed code")
+        for site, fn, ours in missed:
+            if not ours:
+                print(f"    {site:#010x} in {fn:#010x}")
+        if left:
+            print("    Read each one. As of this writing all three are callbacks\n"
+                  "    rather than COM -- two `call [esp+N]` and one function\n"
+                  "    pointer in a member field at +0x60, called with the object\n"
+                  "    pushed and the CALLER cleaning up, so cdecl and not COM.\n"
+                  "    A new entry here is not covered by that and needs reading.")
+        print()
 
     if not differ:
         print("every reconstruction makes as many COM calls as its original")
