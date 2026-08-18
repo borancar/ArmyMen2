@@ -41,9 +41,17 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** Seven analysis
+**`make check` runs everything that does not need the game.** Eight analysis
 tools plus a drift check that fails if any generated file under `docs/` no
-longer matches what the tools produce. Seconds, no display, and it is the half
+longer matches what the tools produce.
+
+One of the eight is `tools/checkclaims.py`, which reads the numeric claims out
+of *this file* and recomputes them. It exists because three separate figures
+here were found stale by measuring rather than reading, each from the same
+cause: a tool changed, some prose was updated, the rest kept asserting the old
+number. It is deliberately short — most of this file is judgement and cannot be
+checked, which is the argument for keeping numbers in `docs/boundary.md` and
+pointing at them from here. Seconds, no display, and it is the half
 of verification `tools/ab.sh all` is not.
 
 It catches a tool whose output changed without being regenerated — tested by
