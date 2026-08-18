@@ -141,26 +141,22 @@ second. See `src/inject/control.c`. This is also the only way `WM_CHAR` in
 `winproc.cpp` gets exercised.
 
 **`ARGS=-dbg` — dropping the default `-nointro` — is a second configuration
-worth having, but it does NOT currently test what it was added for.** The
-Smacker intro is a code path of its own and the only caller of
-`SnapshotSystemPalette`.
+worth having.** The Smacker intro is a code path of its own: it is the only
+caller of `SnapshotSystemPalette`, and the movie coming out in the right
+colours is a direct check on the GDI palette code that nothing else exercises.
+Between this, `-w`, and plain Boot Camp there are three distinct startup paths.
 
-Measured now: `MovieOpen` 2, `MovieStart` 2, `MovieSetVolume` 2, `MoviePoll`
-447,444 — and `MovieDrawFrame` **0**, `MovieApplyPalette` **0**,
-`SnapshotSystemPalette` **0**. The movie is opened, started and polled half a
-million times without a single frame being decoded. The `.smk` files and
-`SMACKW32.DLL` are both present, so the likeliest cause is `SmackWait` never
-reporting a frame ready under this Wine.
+**Its counters read 0 and the movie plays anyway** — do not repeat the mistake
+of reading them as coverage. `MovieDrawFrame`, `MovieApplyPalette` and
+`SnapshotSystemPalette` all sit behind reconstructed callers (`MoviePoll` calls
+the first directly, which calls the second), so none of their counters can
+move. Probes show `MovieDrawFrame` past 200 calls and `SnapshotSystemPalette`
+twice, on this machine, today.
 
-**This is not a regression**, and the A/B says so: the logs are identical and
-the pixel difference is 0, so neither side plays it. The historical figures in
-the table below — 5 messages and 81,494 differing pixels, "the film is playing"
-— are simply no longer what this machine does, and the 0 should be read as
-"nothing is moving" rather than as a strong pass.
-
-So the intro exercises movie SETUP only, `SnapshotSystemPalette` is unexercised
-again, and anyone wanting the GDI palette path covered needs the movie actually
-decoding first.
+**The pixel figure depends on when the screenshot lands.** It was 81,494 when
+the shot fell mid-film and is 0 when the film has already finished — the run
+waits 40 seconds. A 0 here is neither a pass nor a failure; it means the screen
+was static at that moment. As with `mission`, the log is the evidence.
 
 **The multiplayer path is a fourth configuration, and it needs
 `AM2_MULTIPLAYER=1`.** Without it the title screen has no MULTI-PLAYER entry —
@@ -843,8 +839,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
 - Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
-  `RestoreTileSet`, `SnapshotSystemPalette`, `MovieDrawFrame`,
-  `MovieApplyPalette`, and `RefreshScreen` — that last has 7 callers and is
+  `RestoreTileSet`, and `RefreshScreen` — that last has 7 callers and is
   reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever
   forces an out-of-band repaint is somewhere further in. `RestoreTileSet` is a
   different case and probably a permanent one: it runs only when DirectDraw
@@ -852,9 +847,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   under Xvfb does either. Anyone on a real display should alt-tab out of a
   mission and back. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
-  `SnapshotSystemPalette` came off this list once, when the intro movie played;
-  it is back on it, because the movie no longer decodes here — see the intro
-  note above.
+  `SnapshotSystemPalette` came off this list once the intro movie was allowed to
+  play, and stays off it: its counter reads 0 only because its caller is ours.
 - **Audio can be exercised without a sound device, and must be.** There is no
   PipeWire or PulseAudio session here, so DirectSound will not start and every
   audio function returns at its first line. That left the largest block of
