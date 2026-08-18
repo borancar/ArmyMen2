@@ -141,10 +141,26 @@ second. See `src/inject/control.c`. This is also the only way `WM_CHAR` in
 `winproc.cpp` gets exercised.
 
 **`ARGS=-dbg` — dropping the default `-nointro` — is a second configuration
-worth having.** The Smacker intro is a code path of its own: it is the only
-caller of `SnapshotSystemPalette`, and the movie coming out in the right
-colours is a direct check on the GDI palette code that nothing else exercises.
-Between this, `-w`, and plain Boot Camp there are three distinct startup paths.
+worth having, but it does NOT currently test what it was added for.** The
+Smacker intro is a code path of its own and the only caller of
+`SnapshotSystemPalette`.
+
+Measured now: `MovieOpen` 2, `MovieStart` 2, `MovieSetVolume` 2, `MoviePoll`
+447,444 — and `MovieDrawFrame` **0**, `MovieApplyPalette` **0**,
+`SnapshotSystemPalette` **0**. The movie is opened, started and polled half a
+million times without a single frame being decoded. The `.smk` files and
+`SMACKW32.DLL` are both present, so the likeliest cause is `SmackWait` never
+reporting a frame ready under this Wine.
+
+**This is not a regression**, and the A/B says so: the logs are identical and
+the pixel difference is 0, so neither side plays it. The historical figures in
+the table below — 5 messages and 81,494 differing pixels, "the film is playing"
+— are simply no longer what this machine does, and the 0 should be read as
+"nothing is moving" rather than as a strong pass.
+
+So the intro exercises movie SETUP only, `SnapshotSystemPalette` is unexercised
+again, and anyone wanting the GDI palette path covered needs the movie actually
+decoding first.
 
 **The multiplayer path is a fourth configuration, and it needs
 `AM2_MULTIPLAYER=1`.** Without it the title screen has no MULTI-PLAYER entry —
@@ -827,7 +843,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
 - Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
-  `WaveCloseReadFile`, `RestoreTileSet`, and `RefreshScreen` — that last has 7 callers and is
+  `RestoreTileSet`, `SnapshotSystemPalette`, `MovieDrawFrame`,
+  `MovieApplyPalette`, and `RefreshScreen` — that last has 7 callers and is
   reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever
   forces an out-of-band repaint is somewhere further in. `RestoreTileSet` is a
   different case and probably a permanent one: it runs only when DirectDraw
@@ -835,7 +852,9 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   under Xvfb does either. Anyone on a real display should alt-tab out of a
   mission and back. `CalibratePalette` came off this list once
   `-w` was understood — it runs twice per windowed startup, and
-  `SnapshotSystemPalette` came off it once the intro movie was allowed to play.
+  `SnapshotSystemPalette` came off this list once, when the intro movie played;
+  it is back on it, because the movie no longer decodes here — see the intro
+  note above.
 - **Audio can be exercised without a sound device, and must be.** There is no
   PipeWire or PulseAudio session here, so DirectSound will not start and every
   audio function returns at its first line. That left the largest block of
