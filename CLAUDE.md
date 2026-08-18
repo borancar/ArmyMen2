@@ -142,6 +142,19 @@ caught by only 13 of 512 random vectors. angr solves for one input per path
 instead. It never gets a vote on what the original does — that always comes
 from the Unicorn run, so there is one source of truth.
 
+**Coverage is measured, not claimed.** A Unicorn code hook records every
+instruction a vector set reaches, and `tools/vectors.py` prints the percentage
+per function; trailing `nop`/`int3` padding is excluded, since the linker's
+alignment is not reachable and counting it would put 100% out of reach for
+everything. All twelve pure functions in the validation set reach **100%**.
+
+Getting there needed one thing that is obvious in hindsight: **NULL belongs in
+the pointer candidate set.** Almost every accessor in this binary opens with
+`test eax,eax; jne; ret`, and generating only valid pointers left that early
+return unreached — which is exactly the instruction a reconstruction is most
+likely to forget. `ObjIsItem`, `ObjIsType2` and `ObjIsType3` sat at 90-92% for
+that one reason.
+
 **A pointer argument's variation is in the memory it points AT.** The first
 version left that concrete and found 8 "paths" through `ApproxDist` that all
 had identical inputs, because both its arguments are pointers and there was

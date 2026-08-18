@@ -42,7 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import am2
 import capstone
 import pefile
-from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32
+from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_ESP)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -158,6 +158,11 @@ class Emu:
             self.uc.mem_write(IMAGE_BASE + s.VirtualAddress, s.get_data())
         self.uc.mem_map(STACK, STACK_SZ)
         self.uc.mem_map(SCRATCH, SCRATCH_SZ)
+        # Which instructions a vector set actually reaches. "100% coverage" is
+        # a claim that has to be measured; without this the tool can only say
+        # how many vectors it made, which is not the same thing at all.
+        self.seen = set()
+        self.uc.hook_add(UC_HOOK_CODE, lambda uc, a, sz, _u: self.seen.add(a))
 
     def call(self, addr, args, scratch_bytes):
         self.uc.mem_write(SCRATCH, scratch_bytes)
@@ -241,6 +246,19 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
         return []
 
 
+def body_addrs(img, md, addr, size):
+    """Instruction addresses in the function, minus trailing alignment padding.
+
+    Linear decode: these are leaves with no data in the middle. int3 and nop
+    runs at the end are the linker aligning the next function and are not
+    reachable, so counting them would put 100% out of reach for every function.
+    """
+    ins = list(md.disasm(img.read(addr, size), addr))
+    while ins and ins[-1].mnemonic in ("nop", "int3"):
+        ins.pop()
+    return {i.address for i in ins}
+
+
 def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
     """[(args, eax, scratch-writes)]. Interesting values first, then random."""
     rnd = random.Random(seed)
@@ -262,7 +280,13 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         args = []
         for i in range(nargs):
             if kinds.get(i) == "ptr":
-                args.append(SCRATCH + rnd.randrange(0, 0x400, 4))
+                # NULL belongs in the candidate set. Almost every accessor here
+                # opens with `test eax,eax; jne; ret`, and passing only valid
+                # pointers leaves that early return unreached -- which is
+                # exactly the instruction a reconstruction is most likely to
+                # forget.
+                args.append(0 if k % 7 == 3
+                            else SCRATCH + rnd.randrange(0, 0x400, 4))
             elif k < len(EDGE):
                 args.append(EDGE[(k + i) % len(EDGE)])
             else:
@@ -372,19 +396,31 @@ def main():
     if want and want[0] == "--all":
         leaves = pure_leaves(img, md, sizes)
         print("  %d pure unreconstructed leaves\n" % len(leaves))
-        ok = nover = 0
-        by_args = {}
+        ok = nover = full = 0
+        short = []
         for a, size in leaves:
             nargs, kinds = analyse(img, md, a, size)
-            vs = vectors_for(emu, a, nargs, kinds)
-            by_args[nargs] = by_args.get(nargs, 0) + 1
-            if vs:
-                ok += 1
-            else:
+            paths = angr_inputs(a, nargs, kinds) if use_angr else []
+            emu.seen = set()
+            vs = vectors_for(emu, a, nargs, kinds, extra=paths)
+            if not vs:
                 nover += 1
+                continue
+            ok += 1
+            body = body_addrs(img, md, a, size)
+            hit = len(body & emu.seen)
+            if body and hit == len(body):
+                full += 1
+            elif body:
+                short.append((a, size, 100.0 * hit / len(body), len(body) - hit))
         print("  vectors generated for %d, none for %d" % (ok, nover))
-        print("  arity spread: %s"
-              % ", ".join("%d args: %d" % (k, v) for k, v in sorted(by_args.items())))
+        print("  of those with vectors, %d reach 100%% instruction coverage,"
+              " %d fall short" % (full, len(short)))
+        if short:
+            print("\n  short of full coverage -- these need better inputs before"
+                  "\n  a reconstruction of them can be called checked:\n")
+            for a, size, pct, miss in sorted(short, key=lambda r: r[2])[:20]:
+                print("    0x%08x %5dB  %5.1f%%  %d unreached" % (a, size, pct, miss))
         return 0
 
     todo = VALIDATE if (not want or want[0] == "--validate") else want
@@ -400,8 +436,8 @@ def main():
     }
     out = []
 
-    print("  %-24s %-12s %4s %-14s %5s %5s"
-          % ("name", "addr", "args", "kinds", "vecs", "paths"))
+    print("  %-24s %-12s %4s %-14s %5s %5s %6s"
+          % ("name", "addr", "args", "kinds", "vecs", "paths", "cov"))
     for nm in todo:
         addr = names.get(nm) or int(nm, 16)
         size = sizes.get(addr, 0)
@@ -410,10 +446,15 @@ def main():
             continue
         nargs, kinds = analyse(img, md, addr, size)
         paths = angr_inputs(addr, nargs, kinds) if use_angr else []
+        emu.seen = set()
         vs = vectors_for(emu, addr, nargs, kinds, extra=paths)
+        body = body_addrs(img, md, addr, size)
+        hit = len(body & emu.seen)
+        cov = 100.0 * hit / len(body) if body else 0.0
         ks = ",".join(kinds.get(i, "-")[0] for i in range(nargs))
-        print("  %-24s 0x%08x %4d %-14s %5d %5d"
-              % (nm, addr, nargs, ks, len(vs), len(paths)))
+        print("  %-24s 0x%08x %4d %-14s %5d %5d  %5.1f%% %s"
+              % (nm, addr, nargs, ks, len(vs), len(paths), cov,
+                 "" if cov >= 99.99 else "<-- %d unreached" % (len(body) - hit)))
         if emit and nm in PURE:
             out.append((PURE[nm], nargs, kinds, vs))
 
