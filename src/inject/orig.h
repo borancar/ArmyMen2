@@ -1121,6 +1121,12 @@
 #define ADDR_OBJ_IS_ITEM    0x00433860u  /* types 1, 4 */
 #define ADDR_OBJ_IS_TYPE2   0x00457470u
 #define ADDR_OBJ_IS_TYPE3   0x00457490u
+#define ADDR_OBJ_IS_TYPE8   0x004574B0u  /* int32_t(const AM2_Object *) */
+#define ADDR_OBJ_IS_TYPE4   0x0045EEB0u
+#define ADDR_FIELD_53C         0x0045AFA0u  /* uint32_t(const void *) */
+#define ADDR_ADD_BYTE_SAT      0x0045F440u  /* int32_t(base, add) */
+#define ADDR_COMPARE_DWORD     0x0043E150u  /* int32_t(const void*, const void*) */
+#define ADDR_COPY_BYTE_IF_SET  0x00408560u  /* void(unused, uint8_t*, const void*) */
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
 #define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */

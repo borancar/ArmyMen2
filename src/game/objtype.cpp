@@ -45,6 +45,27 @@ int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj)
     return (obj->type == 2 || obj->type == 3 || obj->type == 8) ? 1 : 0;
 }
 
+/* 0x004574B0 and 0x0045EEB0. The two remaining single-type tests, in the same
+ * shape as the three above: null gives 0, otherwise the type word at +0 is
+ * compared and the answer normalised to 0 or 1 with sete.
+ *
+ * These complete the family -- ObjIsTypeIn238 already tested 2, 3 and 8
+ * together, and ObjIsItem tests 1 or 4, so every type either has its own
+ * predicate now or appears in a combined one. */
+int32_t __cdecl ObjIsType8(const AM2_Object *obj)
+{
+    if (!obj)
+        return 0;
+    return (obj->type == 8) ? 1 : 0;
+}
+
+int32_t __cdecl ObjIsType4(const AM2_Object *obj)
+{
+    if (!obj)
+        return 0;
+    return (obj->type == 4) ? 1 : 0;
+}
+
 int objtype_install(void)
 {
     int rc = 0;

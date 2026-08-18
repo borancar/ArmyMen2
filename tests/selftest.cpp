@@ -20,6 +20,8 @@
 #include "../src/game/item.h"
 #include "../src/game/msgslot.h"
 #include "../src/game/objflag.h"
+#include "../src/game/misc.h"
+#include "../src/game/objtype.h"
 
 #include "vectors.h"
 

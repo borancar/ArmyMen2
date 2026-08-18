@@ -429,7 +429,10 @@ def main():
                 "ADDR_MSGSLOT_B0", "ADDR_MSGSLOT_B1", "ADDR_MSGSLOT_B2",
                 "ADDR_MSG_FIELD_12", "ADDR_COMM_MEAN_32",
                 "ADDR_OBJ_FLAG_SET0", "ADDR_OBJ_FLAG_CLEAR0",
-                "ADDR_OBJ_FLAG_BIT0", "ADDR_OBJ_FLAG_BIT1"]
+                "ADDR_OBJ_FLAG_BIT0", "ADDR_OBJ_FLAG_BIT1",
+                "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4",
+                "ADDR_FIELD_53C", "ADDR_ADD_BYTE_SAT", "ADDR_COMPARE_DWORD",
+                "ADDR_COPY_BYTE_IF_SET"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -487,6 +490,10 @@ def main():
         "ADDR_OBJ_FLAG_SET0": "ObjFlagSet0",
         "ADDR_OBJ_FLAG_CLEAR0": "ObjFlagClear0",
         "ADDR_OBJ_FLAG_BIT0": "ObjFlagBit0", "ADDR_OBJ_FLAG_BIT1": "ObjFlagBit1",
+        "ADDR_OBJ_IS_TYPE8": "ObjIsType8", "ADDR_OBJ_IS_TYPE4": "ObjIsType4",
+        "ADDR_FIELD_53C": "Field53C", "ADDR_ADD_BYTE_SAT": "AddByteSat",
+        "ADDR_COMPARE_DWORD": "CompareDword",
+        "ADDR_COPY_BYTE_IF_SET": "CopyByteIfSet",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -496,7 +503,7 @@ def main():
     # the harness has to be told, since it cannot see a C declaration.
     VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
-            "ObjFlagSet0", "ObjFlagClear0"}
+            "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"
@@ -504,6 +511,17 @@ def main():
     for nm in todo:
         addr = names.get(nm) or int(nm, 16)
         size = sizes.get(addr, 0)
+        if not size:
+            # functions.tsv merges neighbours, so a real function can have no
+            # entry of its own -- CompareDword at 0x0043E150 is one. merges.py
+            # knows where the real boundaries are; ask it before giving up,
+            # otherwise a reconstruction silently gets no vectors at all.
+            import merges as _m
+            _merged = _m.real_functions(img)
+            for _e, (_starts, _sz) in _merged.items():
+                if addr in _starts:
+                    _fn, size = _m.owner(_starts, _sz, addr)
+                    break
         if not size:
             print("  %-24s not in functions.tsv" % nm)
             continue
