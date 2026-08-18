@@ -194,6 +194,31 @@ ifeq ($(ISOLATE),1)
 PREFIX := $(CURDIR)/.wine-$(ID)
 endif
 
+# Differential test: replay vectors recorded from the ORIGINAL function against
+# the reconstruction. Needs no display, no mission and no scripted clicks -- the
+# binary is the specification and Unicorn executes it.
+#
+# Only functions that read no global data can be checked this way; one that
+# reads a global needs that global mapped, and mapping it means starting the
+# game, which is the thing this avoids.
+SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
+                src/game/packkey.cpp
+
+.PHONY: selftest
+selftest: $(BUILD)/selftest.exe
+	@WINEPREFIX="$(PREFIX)" wine $(BUILD)/selftest.exe
+
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
+	    -o $@ $(SELFTEST_SRC)
+
+# Re-record from the original. Slow with --angr (symbolic execution per
+# function), so it is not part of `make selftest`.
+.PHONY: vectors
+vectors:
+	./.venv/bin/python tools/vectors.py --validate --angr --emit
+
 # Everything that can be checked without launching the game. The A/B is the
 # real verification and needs a display and about forty minutes -- run
 # `tools/ab.sh all` for that -- but these catch a different class of problem

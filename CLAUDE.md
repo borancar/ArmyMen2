@@ -117,6 +117,43 @@ Consequences to remember:
 - C++ will not implicitly convert a function pointer to `const void *`, which is
   what `patch_replace` takes, so install sites cast explicitly.
 
+## Differential testing without the game
+
+**`make selftest` checks a reconstruction against the original binary with no
+part of the game running.** `tools/vectors.py` emulates the ORIGINAL function
+with Unicorn over the mapped PE image, records (inputs → output) vectors into
+`tests/vectors.h`, and `tests/selftest.cpp` replays them against our C++. A
+failure names one function and the arguments that expose it, which the
+whole-game A/B has never been able to do.
+
+It only works for functions that read no global data — one that reads a global
+needs that global mapped, and mapping it means starting the game. **161 of the
+433 unreconstructed leaves qualify**, and 99 of those already yield vectors.
+
+Validated on the 17 pure functions that were already reconstructed: 533 vectors,
+all passing. Tested in the failing direction too, and the two results are the
+point of it — replacing `lo >> 1` with `lo / 2` in `ApproxDist` still passes,
+because for non-negative operands they are the same function, while swapping
+`min` for `max` fails 21 vectors with the arguments printed.
+
+**angr supplies inputs, Unicorn supplies expected outputs, and the split
+matters.** Random arguments are weak at branch coverage: the min/max swap was
+caught by only 13 of 512 random vectors. angr solves for one input per path
+instead. It never gets a vote on what the original does — that always comes
+from the Unicorn run, so there is one source of truth.
+
+**A pointer argument's variation is in the memory it points AT.** The first
+version left that concrete and found 8 "paths" through `ApproxDist` that all
+had identical inputs, because both its arguments are pointers and there was
+nothing symbolic left to solve. 16 bytes behind each pointer are symbolic now,
+and the bytes angr chooses travel with the vector.
+
+**The purity test must cover the whole data range.** A first version matched
+only addresses beginning `0x4`, which silently skipped everything at `0x5xxxxx`
+and `0x6xxxxx` — and `.data` runs to `0x667000`. It reported **315** pure
+functions where there are **161**, because `NextItem` reading `[0x514F08]`
+looked like a pure function of its arguments.
+
 ## Verifying a reconstruction
 
 Build, install, run, drive, screenshot, check counts:

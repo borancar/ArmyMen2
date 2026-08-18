@@ -1,0 +1,460 @@
+"""Generate differential-test vectors for pure functions, from the original.
+
+The project's verification has always been whole-game A/B: drive the original
+and the reconstruction through the same script and compare logs and pixels.
+That works for the boundary, because the boundary is observable -- get
+InitDirectDraw wrong and the screen is wrong. It does not scale to the
+simulation, where a subtly wrong distance or clipping function produces a
+different but entirely plausible game, and where two live missions already
+differ by ~22% of the frame for reasons that are nobody's fault.
+
+A large part of what is left does not need the game at all. 315 of the 433
+unreconstructed leaf functions read no global data: they are pure functions of
+their arguments. For those the original binary IS the specification, and it can
+be executed directly -- no Wine, no display, no mission.
+
+This emulates the original function with Unicorn over the mapped PE image and
+records (inputs -> output) vectors. tests/selftest.cpp then replays them against
+the reconstruction. A mismatch is a defect, located at one function, with the
+exact arguments that expose it.
+
+Arguments are classified before they are generated, because passing a random
+integer where the function expects a pointer only ever produces a fault:
+
+  SCALAR   the slot is read and used as a value
+  POINTER  the slot is read and then used as a memory base, so it gets a
+           pointer into a scratch page seeded with random bytes. Whatever the
+           function writes back there is part of the output and is compared.
+
+    tools/vectors.py --validate     # against the 17 already-reconstructed ones
+    tools/vectors.py ADDR_CLAMP     # one function, by name or hex address
+    tools/vectors.py --all          # every pure leaf, into tests/vectors/
+"""
+
+import csv
+import os
+import random
+import re
+import struct
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import am2
+import capstone
+import pefile
+from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32
+from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_ESP)
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IMAGE_BASE = 0x00400000
+STACK, STACK_SZ = 0x10000000, 0x20000
+SCRATCH, SCRATCH_SZ = 0x20000000, 0x4000
+RET_MAGIC = 0x5EADBEE0
+# Deterministic, and reproduced byte for byte by tests/selftest.cpp, so the
+# vectors carry only offsets and never the buffer itself.
+SCRATCH_PATTERN = bytes(((i * 7 + 13) & 0xFF) for i in range(0x4000))
+MAX_ARGS = 6
+CRT_FRONTIER = 0x00464420      # measured by tools/crt.py, not the old constant
+DATA_LO, DATA_HI = 0x00473000, 0x00667000
+RDATA_LO, RDATA_HI = 0x0046F000, 0x00473000
+PTR_SYMBOLIC = 16          # bytes made symbolic behind each pointer argument
+NVECTORS = 64
+REG = r"e(?:ax|bx|cx|dx|si|di)"
+
+
+def addr_names():
+    out = {}
+    pat = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+0x([0-9A-Fa-f]+)u?")
+    with open(os.path.join(REPO, "src", "inject", "orig.h")) as fh:
+        for line in fh:
+            m = pat.match(line.strip())
+            if m:
+                out[m.group(1)] = int(m.group(2), 16)
+    return out
+
+
+def analyse(img, md, addr, size):
+    """(argument count, {index: 'ptr'|'scalar'}) read out of the body.
+
+    Both conventions put argument i at [esp + 4 + 4i] on entry, and at
+    [ebp + 8 + 4i] once a frame is set up. The esp form is only usable if the
+    stack pointer is tracked -- ApproxDist reads both its arguments and THEN
+    pushes esi, so a later [esp + 4] is not argument 0 any more.
+
+    An argument is a pointer as soon as a register holding it is used as a
+    memory base. Capstone prints small displacements in decimal and large ones
+    in hex, which is worth knowing: a regex written for 0x... alone silently
+    matches nothing and every function comes out with no arguments at all.
+    """
+    slots = {}
+    kinds = {}
+    highest = -1
+    delta = 0          # how far esp has moved since entry
+    has_frame = False
+
+    for ins in md.disasm(img.read(addr, size), addr):
+        op = ins.op_str
+        m = ins.mnemonic
+
+        if m == "push":
+            delta += 4
+        elif m == "pop":
+            delta -= 4
+        elif m in ("sub", "add") and op.startswith("esp,"):
+            try:
+                n = int(op.split(",")[1].strip(), 0)
+                delta += n if m == "sub" else -n
+            except ValueError:
+                pass
+        if m == "mov" and op.replace(" ", "") == "ebp,esp":
+            has_frame = True
+
+        for mm in re.finditer(r"\[(esp|ebp) \+ (0x[0-9a-f]+|\d+)\]", op):
+            base, off = mm.group(1), int(mm.group(2), 0)
+            if base == "ebp":
+                if not has_frame or off < 8:
+                    continue
+                idx = (off - 8) // 4
+            else:
+                rel = off - delta
+                if rel < 4:
+                    continue
+                idx = (rel - 4) // 4
+            if idx < 0 or idx >= MAX_ARGS or (off % 4):
+                continue
+            highest = max(highest, idx)
+            kinds.setdefault(idx, "scalar")
+            dst = op.split(",")[0].strip()
+            if m in ("mov", "movsx", "movzx") and re.fullmatch(REG, dst):
+                slots[dst] = idx
+
+        # A copy carries the slot with it. RectSet loads its rectangle into eax
+        # and immediately does `mov ebx, eax`, then writes through ebx -- miss
+        # that and argument 0 looks like a scalar, every generated call writes
+        # to a nonsense address, and the function yields no vectors at all.
+        if m == "mov" and "," in op and "[" not in op:
+            dst, src = (x.strip() for x in op.split(",", 1))
+            if re.fullmatch(REG, dst):
+                if src in slots:
+                    slots[dst] = slots[src]
+                else:
+                    slots.pop(dst, None)
+
+        for mm in re.finditer(r"\[(%s)\b" % REG, op):
+            reg = mm.group(1)
+            if reg in slots:
+                kinds[slots[reg]] = "ptr"
+
+    return highest + 1, kinds
+
+
+class Emu:
+    def __init__(self):
+        pe = pefile.PE(am2.EXE, fast_load=True)
+        self.uc = Uc(UC_ARCH_X86, UC_MODE_32)
+        size = (pe.OPTIONAL_HEADER.SizeOfImage + 0xFFF) & ~0xFFF
+        self.uc.mem_map(IMAGE_BASE, size)
+        for s in pe.sections:
+            self.uc.mem_write(IMAGE_BASE + s.VirtualAddress, s.get_data())
+        self.uc.mem_map(STACK, STACK_SZ)
+        self.uc.mem_map(SCRATCH, SCRATCH_SZ)
+
+    def call(self, addr, args, scratch_bytes):
+        self.uc.mem_write(SCRATCH, scratch_bytes)
+        sp = STACK + STACK_SZ - 0x1000
+        for a in reversed(args):
+            sp -= 4
+            self.uc.mem_write(sp, struct.pack("<I", a & 0xFFFFFFFF))
+        sp -= 4
+        self.uc.mem_write(sp, struct.pack("<I", RET_MAGIC))
+        self.uc.reg_write(UC_X86_REG_ESP, sp)
+        self.uc.reg_write(UC_X86_REG_EBP, sp)
+        try:
+            self.uc.emu_start(addr, RET_MAGIC, timeout=500000, count=100000)
+        except UcError:
+            return None, None
+        return (self.uc.reg_read(UC_X86_REG_EAX),
+                bytes(self.uc.mem_read(SCRATCH, SCRATCH_SZ)))
+
+
+def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
+    """Argument sets that cover distinct paths, found by symbolic execution.
+
+    Random inputs are weak at branch coverage: swapping min for max in
+    ApproxDist -- a real defect -- was caught by only 13 of 512 random vectors,
+    because it only shows when |dx| and |dy| straddle. angr solves for one
+    input per path instead, which is what a branch actually needs.
+
+    angr supplies INPUTS ONLY. The expected output always comes from the
+    Unicorn run, so there is one source of truth for what the original does and
+    angr never gets a vote on it.
+    """
+    try:
+        import logging
+        for n in ("angr", "cle", "pyvex", "claripy"):
+            logging.getLogger(n).setLevel("ERROR")
+        import angr
+        import claripy
+    except Exception:
+        return []
+
+    RET = 0xDEADBEEF
+    try:
+        proj = angr.Project(am2.EXE, auto_load_libs=False,
+                            main_opts={"base_addr": IMAGE_BASE})
+        syms = [claripy.BVS("a%d" % i, 32) for i in range(nargs)]
+        conc = []
+        mem = {}                     # scratch offset -> symbolic byte vector
+        for i in range(nargs):
+            if kinds.get(i) == "ptr":
+                off = 0x40 * (i + 1)
+                conc.append(SCRATCH + off)
+                mem[off] = claripy.BVS("m%d" % i, PTR_SYMBOLIC * 8)
+            else:
+                conc.append(syms[i])
+        st = proj.factory.call_state(addr, *conc, ret_addr=RET)
+
+        # A pointer argument's interesting variation is in the memory it points
+        # AT, not in the pointer. Leaving that concrete is why the first version
+        # of this found 8 "paths" through ApproxDist that all had identical
+        # inputs -- both its arguments are pointers, so there was nothing
+        # symbolic left to solve for and every path agreed.
+        for off, bv in mem.items():
+            st.memory.store(SCRATCH + off, bv)
+
+        sm = proj.factory.simulation_manager(st)
+        sm.explore(find=lambda s: s.addr == RET, num_find=limit)
+        out = []
+        for f in sm.found:
+            row, writes = [], []
+            for i in range(nargs):
+                if kinds.get(i) == "ptr":
+                    off = 0x40 * (i + 1)
+                    row.append(SCRATCH + off)
+                    raw = f.solver.eval(mem[off], cast_to=bytes)
+                    writes += [(off + j, raw[j]) for j in range(len(raw))]
+                else:
+                    row.append(f.solver.eval(syms[i], cast_to=int))
+            out.append((row, writes))
+        return out
+    except Exception:
+        return []
+
+
+def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
+    """[(args, eax, scratch-writes)]. Interesting values first, then random."""
+    rnd = random.Random(seed)
+    EDGE = [0, 1, -1, 2, -2, 7, 255, 256, 0x7FFFFFFF, -0x80000000, 100, -100]
+    out = []
+
+    for args, pre in extra:                 # path-covering, from angr
+        before = bytearray(SCRATCH_PATTERN)
+        for o, b in pre:
+            before[o] = b
+        before = bytes(before)
+        eax, after = emu.call(addr, args, before)
+        if eax is None:
+            continue
+        writes = [(o, after[o]) for o in range(0, 0x900) if after[o] != before[o]]
+        out.append((list(args), eax, writes, pre))
+
+    for k in range(n):
+        args = []
+        for i in range(nargs):
+            if kinds.get(i) == "ptr":
+                args.append(SCRATCH + rnd.randrange(0, 0x400, 4))
+            elif k < len(EDGE):
+                args.append(EDGE[(k + i) % len(EDGE)])
+            else:
+                args.append(rnd.randint(-0x40000, 0x40000))
+        scratch = SCRATCH_PATTERN
+        eax, after = emu.call(addr, args, scratch)
+        if eax is None:
+            continue
+        writes = [(off, after[off]) for off in range(0, 0x900)
+                  if after[off] != scratch[off]]
+        out.append((args, eax, writes, ()))
+    return out
+
+
+def pure_leaves(img, md, sizes):
+    """Unreconstructed functions that call nothing and read no global.
+
+    The global test must cover the WHOLE data range. A first version matched
+    only addresses beginning 0x4, which silently skipped everything at
+    0x5xxxxx and 0x6xxxxx -- and .data runs to 0x667000. That reported 315 pure
+    functions where there are 161, because NextItem reading [0x514F08] looked
+    like a pure function of its arguments.
+    """
+    import merges
+    merged = merges.real_functions(img)
+    done = merges.reconstructed()
+    real = {}
+    for a, s in sizes.items():
+        if a in merged:
+            st, m = merged[a]
+            for i, x in enumerate(st):
+                real[x] = (st[i + 1] if i + 1 < len(st) else a + m) - x
+        else:
+            real[a] = s
+    game = {a: s for a, s in real.items() if a < CRT_FRONTIER}
+
+    def isdone(a, s):
+        return any(a <= d < a + max(s, 1) for d in done)
+
+    def owner(t):
+        return next((f for f in game if f <= t < f + game[f]), None)
+
+    pat = re.compile(r"0x[0-9a-f]{6,8}")
+    out = []
+    for a, s in sorted(game.items()):
+        if isdone(a, s):
+            continue
+        glob = False
+        calls = False
+        for i in md.disasm(img.read(a, s), a):
+            if i.mnemonic in ("call", "jmp") and i.op_str.startswith("0x"):
+                t = int(i.op_str, 16)
+                if 0x401000 <= t < CRT_FRONTIER:
+                    o = owner(t)
+                    if o is not None and o != a and not isdone(o, game[o]):
+                        calls = True
+            for tok in pat.findall(i.op_str):
+                v = int(tok, 16)
+                if DATA_LO <= v < DATA_HI or RDATA_LO <= v < RDATA_HI:
+                    glob = True
+        if not calls and not glob:
+            out.append((a, s))
+    return out
+
+
+def main():
+    img = am2.Image()
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    sizes = {int(r["addr"], 16): int(r["size"])
+             for r in csv.DictReader(
+                 open(os.path.join(REPO, "docs", "functions.tsv")), delimiter="\t")}
+    names = addr_names()
+    emu = Emu()
+
+    VALIDATE = ["ADDR_CLAMP", "ADDR_APPROX_DIST", "ADDR_POINT_IN_RECT",
+                "ADDR_RECT_SET", "ADDR_PACK_KEY", "ADDR_KEY_FIELD_A",
+                "ADDR_KEY_FIELD_B", "ADDR_KEY_FIELD_C", "ADDR_OBJ_IS_ITEM",
+                "ADDR_OBJ_IS_TYPE2", "ADDR_OBJ_IS_TYPE3", "ADDR_OBJ_IS_TYPE238",
+                "ADDR_CLIP_RECT", "ADDR_FIND_SLOT", "ADDR_FIRST_ITEM",
+                "ADDR_NEXT_ITEM", "ADDR_SET_DRAW_TARGET"]
+
+    want = sys.argv[1:] or ["--validate"]
+    emit = "--emit" in want
+    use_angr = "--angr" in want
+    want = [w for w in want if w not in ("--emit", "--angr")]
+    if want and want[0] == "--all":
+        leaves = pure_leaves(img, md, sizes)
+        print("  %d pure unreconstructed leaves\n" % len(leaves))
+        ok = nover = 0
+        by_args = {}
+        for a, size in leaves:
+            nargs, kinds = analyse(img, md, a, size)
+            vs = vectors_for(emu, a, nargs, kinds)
+            by_args[nargs] = by_args.get(nargs, 0) + 1
+            if vs:
+                ok += 1
+            else:
+                nover += 1
+        print("  vectors generated for %d, none for %d" % (ok, nover))
+        print("  arity spread: %s"
+              % ", ".join("%d args: %d" % (k, v) for k, v in sorted(by_args.items())))
+        return 0
+
+    todo = VALIDATE if (not want or want[0] == "--validate") else want
+
+    # Only the truly pure ones can be replayed outside the game: a function
+    # that reads a global needs that global mapped, and the point of this is to
+    # test without the game running. PURE maps each to its C++ name.
+    PURE = {
+        "ADDR_CLAMP": "Clamp", "ADDR_APPROX_DIST": "ApproxDist",
+        "ADDR_POINT_IN_RECT": "PointInRect", "ADDR_RECT_SET": "RectSet",
+        "ADDR_PACK_KEY": "PackKey", "ADDR_KEY_FIELD_A": "KeyFieldA",
+        "ADDR_KEY_FIELD_B": "KeyFieldB", "ADDR_KEY_FIELD_C": "KeyFieldC",
+    }
+    out = []
+
+    print("  %-24s %-12s %4s %-14s %5s %5s"
+          % ("name", "addr", "args", "kinds", "vecs", "paths"))
+    for nm in todo:
+        addr = names.get(nm) or int(nm, 16)
+        size = sizes.get(addr, 0)
+        if not size:
+            print("  %-24s not in functions.tsv" % nm)
+            continue
+        nargs, kinds = analyse(img, md, addr, size)
+        paths = angr_inputs(addr, nargs, kinds) if use_angr else []
+        vs = vectors_for(emu, addr, nargs, kinds, extra=paths)
+        ks = ",".join(kinds.get(i, "-")[0] for i in range(nargs))
+        print("  %-24s 0x%08x %4d %-14s %5d %5d"
+              % (nm, addr, nargs, ks, len(vs), len(paths)))
+        if emit and nm in PURE:
+            out.append((PURE[nm], nargs, kinds, vs))
+
+    if emit:
+        path = os.path.join(REPO, "tests", "vectors.h")
+        with open(path, "w") as fh:
+            fh.write("/* GENERATED by tools/vectors.py -- do not edit.\n"
+                     " *\n"
+                     " * Recorded by emulating the ORIGINAL function over the\n"
+                     " * mapped PE image, so the binary is the specification and\n"
+                     " * no part of the game has to run to check a\n"
+                     " * reconstruction against it. */\n")
+            fh.write("#include <stdint.h>\n\n")
+            fh.write("#define AM2_SCRATCH_LEN %d\n" % 0x900)
+            fh.write("typedef struct {\n"
+                     "    const char *name;\n"
+                     "    void       *fn;\n"
+                     "    int32_t     nargs;\n"
+                     "    uint8_t     isptr[6];\n"
+                     "    uint32_t    arg[6];\n"
+                     "    uint32_t    eax;\n"
+                     "    uint8_t     eax_is_ptr;  /* eax is scratch+eax, not a literal */\n"
+                     "    int32_t     nwrites;\n"
+                     "    const uint32_t *writes;   /* offset, byte pairs */\n"
+                     "    int32_t     ninputs;\n"
+                     "    const uint32_t *inputs;   /* offset, byte pairs, written first */\n"
+                     "} AM2_Vector;\n\n")
+            for cname, nargs, kinds, vs in out:
+                for k, (args, eax, writes, pre) in enumerate(vs):
+                    if writes:
+                        fh.write("static const uint32_t w_%s_%d[] = {%s};\n"
+                                 % (cname, k, ",".join("%d,%d" % (o, b) for o, b in writes)))
+                    if pre:
+                        fh.write("static const uint32_t i_%s_%d[] = {%s};\n"
+                                 % (cname, k, ",".join("%d,%d" % (o, b) for o, b in pre)))
+            fh.write("\nstatic const AM2_Vector kVectors[] = {\n")
+            for cname, nargs, kinds, vs in out:
+                for k, (args, eax, writes, pre) in enumerate(vs):
+                    a = [(x - SCRATCH) if kinds.get(i) == "ptr" else x
+                         for i, x in enumerate(args)]
+                    a += [0] * (6 - len(a))
+                    p = [1 if kinds.get(i) == "ptr" else 0 for i in range(6)]
+                    # A function that returns one of its pointer arguments --
+                    # RectSet hands the rectangle back -- records an address
+                    # from the emulator's scratch page, which the replay's own
+                    # buffer will never match. Store the offset and a flag.
+                    eaxp = 1 if SCRATCH <= eax < SCRATCH + SCRATCH_SZ else 0
+                    eaxv = (eax - SCRATCH) if eaxp else eax
+                    fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, %d, '
+                             '%d, %s, %d, %s},\n'
+                             % (cname, cname, nargs,
+                                ",".join(str(x) for x in p),
+                                ",".join("0x%08xu" % (x & 0xFFFFFFFF) for x in a),
+                                eaxv & 0xFFFFFFFF, eaxp, len(writes),
+                                ("w_%s_%d" % (cname, k)) if writes else "0",
+                                len(pre),
+                                ("i_%s_%d" % (cname, k)) if pre else "0"))
+            fh.write("};\n")
+        print("\n-> tests/vectors.h  (%d functions, %d vectors)"
+              % (len(out), sum(len(v[3]) for v in out)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
