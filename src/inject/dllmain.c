@@ -24,6 +24,7 @@
 #include "../game/dist.h"
 #include "../game/win32/font.h"
 #include "../game/win32/mapdraw.h"
+#include "../game/item.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
@@ -409,6 +410,7 @@ static void install(void)
     savetag_install();
     rect_install();
     dist_install();
+    item_install();
     objtable_install();
     objtype_install();
     packkey_install();

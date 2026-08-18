@@ -387,7 +387,8 @@ def main():
                 "ADDR_KEY_FIELD_B", "ADDR_KEY_FIELD_C", "ADDR_OBJ_IS_ITEM",
                 "ADDR_OBJ_IS_TYPE2", "ADDR_OBJ_IS_TYPE3", "ADDR_OBJ_IS_TYPE238",
                 "ADDR_CLIP_RECT", "ADDR_FIND_SLOT", "ADDR_FIRST_ITEM",
-                "ADDR_NEXT_ITEM", "ADDR_SET_DRAW_TARGET"]
+                "ADDR_NEXT_ITEM", "ADDR_SET_DRAW_TARGET",
+                "ADDR_UID_ARMY", "ADDR_UID_ON_WIRE"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -433,6 +434,7 @@ def main():
         "ADDR_POINT_IN_RECT": "PointInRect", "ADDR_RECT_SET": "RectSet",
         "ADDR_PACK_KEY": "PackKey", "ADDR_KEY_FIELD_A": "KeyFieldA",
         "ADDR_KEY_FIELD_B": "KeyFieldB", "ADDR_KEY_FIELD_C": "KeyFieldC",
+        "ADDR_UID_ARMY": "UidArmy", "ADDR_UID_ON_WIRE": "UidOnWire",
     }
     out = []
 

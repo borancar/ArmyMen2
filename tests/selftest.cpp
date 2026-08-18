@@ -17,6 +17,7 @@
 #include "../src/game/rect.h"
 #include "../src/game/dist.h"
 #include "../src/game/packkey.h"
+#include "../src/game/item.h"
 
 #include "vectors.h"
 

@@ -48,6 +48,7 @@ HOOK_C   := src/inject/dllmain.c \
             src/inject/control.c
 
 HOOK_CXX := src/game/savetag.cpp \
+            src/game/item.cpp \
             src/game/win32/startgame.cpp \
             src/game/rect.cpp \
             src/game/dist.cpp \
@@ -202,7 +203,7 @@ endif
 # reads a global needs that global mapped, and mapping it means starting the
 # game, which is the thing this avoids.
 SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
-                src/game/packkey.cpp
+                src/game/packkey.cpp src/game/item.cpp
 
 .PHONY: selftest
 selftest: $(BUILD)/selftest.exe

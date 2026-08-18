@@ -1116,6 +1116,12 @@
 #define ADDR_OBJ_CAPACITY   0x00514F00u  /* int32_t */
 
 #define ADDR_ADD_TO_ITEM_LIST 0x00429740u /* uint32_t(AM2_Object*, uint32_t) */
+/* item.cpp accessors. UID_ARMY is `uid >> 29`, the owner half of a uid -- the
+ * same field AM2_UID_OWNER_SHIFT names, and what 0x0042A930 logs as "army".
+ * UID_ON_WIRE returns its argument and is applied to uids crossing a comm
+ * message; see src/game/item.h for why it is kept. */
+#define ADDR_UID_ARMY        0x0042A7A0u  /* uint32_t(uint32_t uid) */
+#define ADDR_UID_ON_WIRE     0x0042A7B0u  /* uint32_t(uint32_t uid) */
 #define ADDR_REMOVE_FROM_ITEM_LIST 0x00428590u /* int32_t(AM2_Object*) */
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */
