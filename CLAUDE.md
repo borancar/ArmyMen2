@@ -912,9 +912,24 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   flag. So the chain is: menu request while in state 2 → pending flag → the
   state-2 handler jumps to the teardown → `StopAllSounds`.
 
-  What is missing is only the in-game UI that raises such a request. `ESCAPE`,
-  `F1`, `F10`, `TAB` and `Q` were each tried in a live mission and none of them
-  moves the counter, so they are ruled out rather than untried.
+  What is missing is only the in-game UI that raises such a request, and the
+  cheap answers are now eliminated rather than untried:
+
+  - **Keys.** `ESCAPE`, `F1`, `F9`, `F10`, `TAB` and `Q`, each pressed in a
+    live mission. None moves the counter.
+  - **The HUD.** Six clicks across the panel, the top bar and the COMMANDS
+    row. None either.
+  - **`DrawMenuOverlay` is not the in-game menu.** It looks like a candidate
+    because it reads `ADDR_MENU_REQUEST_SET`, but its counter freezes the
+    moment gameplay starts — 36,004 and then never again while `ComposeFrame`
+    climbs past 53,000. It is the menu-screen overlay, and there is no in-game
+    one.
+
+  So the remaining trigger is most likely a mission ENDING — completed or
+  failed — which needs Sarge actually played rather than a scripted click.
+  That is a gameplay-automation problem, not a reconstruction one: both
+  functions are reconstructed, and everything on either side of the trigger is
+  mapped and confirmed.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal
