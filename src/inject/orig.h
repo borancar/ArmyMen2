@@ -733,7 +733,8 @@
  * the live one and lowers the flag.
  *
  * That flag is what makes the level teardown reachable: the state-2 handler at
- * ADDR_LEVEL_TEARDOWN checks it, so the teardown runs when a transition is
+ * ADDR_STATE2_FRAME checks it and tail-jumps to ADDR_LEVEL_TEARDOWN, so the
+ * teardown runs when a transition is
  * requested while the game is ALREADY in state 2 -- that is, on leaving a
  * level. It is the only route to StopAllSounds, which is why no amount of
  * entering Boot Camp reaches it: entering is a transition INTO the state, and
@@ -1016,7 +1017,26 @@
  * functions therefore need a mission to END; no amount of quitting from the
  * title screen reaches them. */
 #define ADDR_RUN_FRAME_TABLE     0x0040B050u  /* void(*[5])(void), by ADDR_GAME_STATE */
-#define ADDR_LEVEL_TEARDOWN      0x004260C0u  /* state 2 */
+/* Named from the RunFrame jump table at 0x0040B050, whose third entry this is,
+ * and not from the one thing it does that anybody had looked at. It runs EVERY
+ * FRAME of a mission. Two things come out of it:
+ *
+ *   - if ADDR_STATE_PENDING is set it tail-jumps to ADDR_LEVEL_TEARDOWN, which
+ *     is a DIFFERENT function and the one that calls StopAllSounds;
+ *   - otherwise it dispatches on ADDR_MENU_REQUEST_TAKEN, biased by 22, over a
+ *     13-entry table at 0x00426230 -- the in-mission sub-states. */
+#define ADDR_STATE2_FRAME        0x004260C0u  /* void(void), state 2 per frame */
+/* The actual teardown, and it was called ADDR_STATE2_FRAME's address for as
+ * long as anyone had written the name down. Reached ONLY by the tail jump at
+ * 0x004260C9 -- no call site anywhere -- which is why a reachability scan that
+ * looks for `call` and `push imm32` reports it as dead code. It calls
+ * ADDR_STOP_ALL_SOUNDS as its second instruction-level call. */
+#define ADDR_LEVEL_TEARDOWN      0x004256F0u  /* void(void), on leaving a level */
+/* Sub-state 34 of ADDR_STATE2_FRAME's table, and the only in-mission code that
+ * reads a key and raises a menu request. The test is `!IsKeyDown(ESC) &&
+ * KeyChanged(ESC)`, i.e. ESCAPE on RELEASE. It does nothing during ordinary
+ * play because the sub-state is not 34 then -- measured, not assumed. */
+#define ADDR_SUBSTATE34_ESCAPE   0x00425DA0u  /* void(void) */
 #define ADDR_SHUTDOWN_423D20     0x00423D20u
 #define ADDR_SHUTDOWN_DDRAW      0x0041A950u  /* void(void) */
 #define ADDR_DD_CLIPPER          0x00507340u  /* IDirectDrawClipper * */

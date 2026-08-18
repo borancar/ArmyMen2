@@ -393,8 +393,14 @@ of the way.
 It is also where Boot Camp's invariant can be read cleanly: one run gave
 `FirstItem` 519 and `NextItem` 835,071, and 519 × 1,609 is 835,071 exactly.
 
-`ESCAPE` does nothing there — there is no in-game menu behind it — so this is
-not a route to the shutdown path.
+`ESCAPE` does nothing there, and the reason is now mapped rather than
+observed. There IS an in-mission ESCAPE handler — `0x00425DA0`, which tests
+`!IsKeyDown(ESC) && KeyChanged(ESC)`, i.e. the key being RELEASED, and raises a
+menu request. It is arm 34 of a 13-entry sub-state table at `0x00426230`, and
+ordinary gameplay is not in sub-state 34, so it never runs. Pressing and
+releasing ESCAPE for 1.5 s in a live mission leaves `StopAllSounds` at 0 while
+`ComposeFrame` climbs from 8,165 to 22,353 — so this is not a route to the
+shutdown path, but not for the reason "there is no handler".
 
 **Compare `ret N` explicitly before assuming a shared signature.** A diff that
 normalises jump targets hides the epilogue. Getting this wrong is what made
@@ -983,6 +989,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   The state machine is confirmed rather than inferred: a probe in
   `PollKeyboard`, which runs every frame, shows `0` at startup, `1` on the
   menu and `2` in a Boot Camp mission.
+
+  **`ADDR_LEVEL_TEARDOWN` named the wrong function**, which is why the mechanism
+  read as murkier than it is. `0x004260C0` is the state-2 handler — RunFrame's
+  jump table at `0x0040B050` dispatches to it every frame of a mission — and it
+  tail-jumps to the real teardown at `0x004256F0` when the pending flag is set.
+  That one calls `StopAllSounds`. The names are now `ADDR_STATE2_FRAME` and
+  `ADDR_LEVEL_TEARDOWN` respectively. Third instance of naming a function from
+  a call site rather than its body; the giveaway was already in the file, where
+  a comment called it "the state-2 handler at `ADDR_LEVEL_TEARDOWN`".
 
   The in-game trigger is a **menu request**. `0x00425EE0` consumes the
   `ADDR_MENU_REQUEST` / `ADDR_MENU_REQUEST_SET` pair — the same two globals
