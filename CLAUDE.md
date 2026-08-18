@@ -396,18 +396,21 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   (`CreateBitmapSurface`, `ReloadBitmapSurface`), `RestoreTileSet`,
   `OpenAudioStream`, `AudioTimerProc`, both input pollers, `ComposeFrame`,
   `ScrollView`, `ScrollMapCache`, `CommEnumPlayers`, `HostBattle`,
-  `SetGamePalette`, `DrawMenuCursor` and the comm object's constructor and
-  destructor. The window, the message queue, the display mode,
+  `SetGamePalette`, `DrawMenuCursor`, `StartPacketThread` and the comm
+  object's constructor and destructor. The window, the message queue, the display mode,
   every surface, both input devices, the GDI palette, all `.WAV` reading,
   sprite upload from a stream, the whole network transport and the entire
   registry surface are ours.
 
-  Do not read the leftover as work outstanding. Of the 87 import-touching
-  functions not reconstructed, `tools/coverage.py` classes 83 as game logic —
-  a `GetTickCount` or a `PostMessageA` inside something that is otherwise not
-  boundary at all — leaving 4 functions and 13 sites: `0x0042F170`,
-  `0x0042ECE0`, `0x0044D110` and `0x0040ED10`, every one of them a
-  `MessageBoxA` and its `GetActiveWindow` inside menu code. The channels
+  Do not read the leftover as work outstanding, and **read the figures from
+  `docs/boundary.md` rather than from this paragraph** — the ones that used to
+  be quoted here (87 functions, 83 game logic, 4 and 13 outstanding, naming
+  four addresses) were stale by many commits, which is what quoting a generated
+  number in prose always comes to. Of the 80 import-touching functions not
+  reconstructed, 77 are game logic — a `GetTickCount` or a `PostMessageA`
+  inside something that is otherwise not boundary at all — leaving 3 functions
+  and 6 sites, every one a `MessageBoxA` and its `GetActiveWindow` inside menu
+  code that no branch in the image can reach. The channels
   themselves are owned: every DirectX object in the process is created,
   configured and destroyed by reconstructed code, and the registry is opened
   and closed by ours. What still dispatches through COM is game logic holding a
@@ -483,6 +486,9 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
   Correcting it moved the outstanding figure from 3 functions and 6 sites to 6
   and 11 — the extra three being the comm thread's mutex, event and thread.
+  Those three are now reconstructed (`StartPacketThread`, `MsgListInit`,
+  `EventClose`), so it is back to 3 and 6, and all six are the unreachable CD
+  dialogs.
 
 - **The import side is done, in the only sense the word can bear here.** Every
   Win32 call site in the image that can actually execute is now either inside

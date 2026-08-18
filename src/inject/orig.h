@@ -455,7 +455,38 @@
 #define ADDR_COMM_CONSTRUCT      0x0040DB80u  /* thiscall void *(this) */
 #define ADDR_COMM_DESTRUCT       0x0040DCC0u  /* thiscall void(this) */
 /* Called by the constructor, all three left original. */
-#define ADDR_COMM_INIT_SYNC      0x004021A0u  /* void(void); mirrors CommShutdown */
+/* Brings the packet subsystem up: four message lists, 400 buffers, two events
+ * and the packet thread. It went in as "mirrors CommShutdown", guessed from the
+ * call site; its own error string says "Error launching packet thread". */
+#define ADDR_START_PACKET_THREAD 0x004021A0u  /* int32_t(void) */
+#define ADDR_MSG_LIST_INIT       0x00401000u  /* int32_t(void *list) */
+#define ADDR_MSG_LIST_ADD        0x00401050u  /* void(void *list, void *node) */
+#define ADDR_EVENT_CLOSE         0x00402170u  /* void(void *holder) */
+/* The four lists, in the order they are created. */
+#define ADDR_MSG_LIST_POOL       0x0048D8E8u  /* the free-buffer pool */
+#define ADDR_MSG_LIST_B          0x004F48C8u
+#define ADDR_MSG_LIST_C          0x0048D8D8u
+#define ADDR_MSG_LIST_D          0x004F8780u
+/* 400 records of 0x28 bytes, each pointing at 0x400 bytes of buffer. */
+#define ADDR_PACKET_RECORDS      0x004F48F8u
+#define ADDR_PACKET_BUFFERS      0x0048D978u
+#define ADDR_PACKET_BUFFERS_END  0x004F1978u
+#define PACKET_RECORD_STRIDE     0x28u
+#define PACKET_REC_OFF_SIZE      0x10u
+#define PACKET_REC_OFF_DATA      0x20u
+#define PACKET_BUFFER_BYTES      0x400u
+/* Two auto-reset events, the second kept in two places. */
+#define ADDR_PACKET_EVENT_A      0x0048D8F8u
+#define ADDR_PACKET_EVENT_B      0x0048D8FCu
+#define ADDR_PACKET_EVENT_B2     0x004F48C0u
+#define ADDR_PACKET_STATE        0x004F877Cu  /* int32_t, set to 2 */
+#define ADDR_PACKET_SLOT_RESET   0x00402750u  /* void(int32_t), six times */
+#define ADDR_PACKET_THREAD_PROC  0x00401F00u  /* the thread, stays original */
+#define ADDR_PACKET_THREAD_ID    0x004F8B90u  /* DWORD */
+#define ADDR_PACKET_THREAD       0x004F48D8u  /* HANDLE */
+#define ADDR_STR_THREAD_FAILED   0x0047384Cu  /* "Error launching packet thread" */
+#define ADDR_GAME_SRAND          0x00464416u  /* void(uint32_t) */
+#define ADDR_GAME_RAND           0x00464420u  /* int32_t(void) */
 #define ADDR_COMM_INIT_DEFAULTS  0x0040FD40u  /* void(void); fills a global table */
 #define ADDR_COMM_RESET_STATE    0x0040F380u  /* thiscall void(this) */
 /* Where the registry key and the application GUID live in the image. Neither is

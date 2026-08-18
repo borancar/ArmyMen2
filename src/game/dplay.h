@@ -125,6 +125,17 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self);
  * enumerate the session's players into them. Answers 1 on DP_OK. */
 int32_t __cdecl CommEnumPlayers(void);
 
+/* Original: 0x004021A0, from CommConstruct. Bring the packet subsystem up:
+ * four message lists, 400 buffers, two events and the packet thread. Named
+ * from its own error string, "Error launching packet thread". */
+int32_t __cdecl StartPacketThread(void);
+
+/* Original: 0x00401000. Clear a message list and give it a mutex. */
+int32_t __cdecl MsgListInit(void *list);
+
+/* Original: 0x00402170. Close a handle and forget it. */
+void __cdecl EventClose(void *holder);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

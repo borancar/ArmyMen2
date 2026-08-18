@@ -17,7 +17,7 @@ whether a mechanism is being measured at all.
 
 | channel | how it is found | outstanding |
 |---|---|---|
-| named imports | `docs/imports.tsv` | 11 non-incidental site(s) |
+| named imports | `docs/imports.tsv` | 6 non-incidental site(s) |
 | imports by ordinal | `#N` in the same file, checked through the callers of its thunk | 0 |
 | COM vtables | `docs/comcalls.tsv`, `stdcall` only | 0 |
 | runtime resolution | `LoadLibraryA` + `GetProcAddress` sites | 0 |
@@ -36,8 +36,8 @@ outside it.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 48 | 149 |
-| still boundary | 6 | 11 |
+| reconstructed | 51 | 154 |
+| still boundary | 3 | 6 |
 | game logic, incidental calls only | 77 | 116 |
 | **total** | **131** | **276** |
 
@@ -50,7 +50,7 @@ this library ours yet?
 | library | reconstructed | sites | |
 |---|---:|---:|---|
 | USER32 | 76 | 130 |  |
-| KERNEL32 | 26 | 99 |  |
+| KERNEL32 | 31 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
 | SMACKW32 | 9 | 9 | **complete** |
@@ -65,12 +65,7 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
-| `CloseHandle` | 1 |
-| `CreateEventA` | 1 |
-| `CreateMutexA` | 1 |
-| `CreateThread` | 1 |
 | `MessageBoxA` | 3 |
-| `SetThreadPriority` | 1 |
 
 Read that table with `docs/binarypatches.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
@@ -156,9 +151,6 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x00402170` | 48 | 1 | 48 | CloseHandle |
-| `0x00401000` | 64 | 1 | 64 | CreateMutexA |
-| `0x004021a0` | 304 | 3 | 101 | CreateEventA, CreateThread, SetThreadPriority |
 | `0x0042f290` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 | `0x0044d2e0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 | `0x0044d3f0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
@@ -168,7 +160,7 @@ function from game logic with a call in it.
 | dll | sites | reconstructed |
 |---|---:|---:|
 | USER32.dll | 130 | 69 |
-| KERNEL32.dll | 99 | 22 |
+| KERNEL32.dll | 99 | 27 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
 | smackw32.dll | 9 | 8 |

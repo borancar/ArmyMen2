@@ -74,6 +74,22 @@ HARNESS='^(patch:|trace |trace:|verify:|am2hook|gamelog:|dinput:|\]|  [A-Za-z_]+
 # exactly how an A/B comes to pass on nothing.
 VOLATILE='^.$'
 
+# Whether DirectSound came up is a fact about the MACHINE, not about the
+# reconstruction, in every configuration that attaches no sound device. Wine
+# sometimes finds a device and sometimes does not, so "Unable to create
+# directsound object" appears on one side and not the other and the run fails
+# for a reason that has nothing to do with the code.
+#
+# It has done that twice now, several commits apart, and both times three
+# re-runs came back clean. Re-running until it passes is how a real difference
+# gets explained away, so it is filtered instead -- but ONLY where there is no
+# device to find.
+#
+# tools/ab.sh audio attaches one deliberately, and there DirectSound MUST
+# start. This filter is not applied to it, so a reconstruction that broke
+# buffer creation still fails the configuration built to catch that.
+DEVICELESS='^Unable to create directsound object$'
+
 # Configurations that are supposed to reach live gameplay, and the least number
 # of per-frame markers that proves they did.
 #
@@ -166,7 +182,17 @@ play() {
         > "$WORK/$cfg-$side.raw"
     grep -cE "$VOLATILE" "$WORK/$cfg-$side.raw" > "$WORK/$cfg-$side.volatile" \
         || echo 0 > "$WORK/$cfg-$side.volatile"
-    grep -vE "$VOLATILE" "$WORK/$cfg-$side.raw" > "$WORK/$cfg-$side.log"
+    # See DEVICELESS above: dropped everywhere except `audio`, which is the one
+    # configuration where a sound device is supposed to be there.
+    if [ "$cfg" = audio ]; then
+        env_filter='^$'
+    else
+        env_filter="$DEVICELESS"
+    fi
+    grep -cE "$env_filter" "$WORK/$cfg-$side.raw" > "$WORK/$cfg-$side.envdrop" \
+        || echo 0 > "$WORK/$cfg-$side.envdrop"
+    grep -vE "$VOLATILE" "$WORK/$cfg-$side.raw" \
+        | grep -vE "$env_filter" > "$WORK/$cfg-$side.log"
     if [ ! -s "$WORK/$cfg-$side.log" ]; then
         echo "ab.sh: $cfg/$side produced no game log lines -- refusing to" >&2
         echo "       call that a match. Check AM2_GAMELOG and the filter." >&2
@@ -185,6 +211,15 @@ compare() {
     vr=$(cat "$WORK/$cfg-recon.volatile" 2>/dev/null || echo 0)
     if [ "$vo" -gt 0 ] || [ "$vr" -gt 0 ]; then
         echo "  frames  $vo/$vr per-frame markers dropped as volatile"
+    fi
+
+    local eo er
+    eo=$(cat "$WORK/$cfg-orig.envdrop" 2>/dev/null || echo 0)
+    er=$(cat "$WORK/$cfg-recon.envdrop" 2>/dev/null || echo 0)
+    if [ "$eo" != "$er" ]; then
+        echo "  device  DirectSound started on one side and not the other"
+        echo "          ($eo/$er) -- environment, not the reconstruction. Use"
+        echo "          tools/ab.sh audio to compare the audio path itself."
     fi
 
     if [ "$cfg" = mission ] && { [ "$vo" -lt "$MIN_FRAMES" ] || [ "$vr" -lt "$MIN_FRAMES" ]; }; then

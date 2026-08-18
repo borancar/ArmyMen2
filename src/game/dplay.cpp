@@ -248,7 +248,6 @@ static_assert(KEY_ALL_ACCESS == 0xF003F, "KEY_ALL_ACCESS");
 #define comm_u32(base, off) (*(uint32_t *)((uint8_t *)(base) + (off)))
 
 typedef void (__cdecl *am2_comm_void_fn)(void);
-#define orig_comm_init_sync     (*(am2_comm_void_fn)ADDR_COMM_INIT_SYNC)
 #define orig_comm_init_defaults (*(am2_comm_void_fn)ADDR_COMM_INIT_DEFAULTS)
 #define orig_comm_reset_state   (*(am2_comm_method_fn)ADDR_COMM_RESET_STATE)
 /* The logger is called with no arguments at all. It is stubbed to `ret` in the
@@ -267,7 +266,7 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     uint32_t now;
     int32_t  i;
 
-    orig_comm_init_sync();
+    StartPacketThread();
     orig_comm_init_defaults();
     now = GetTickCount();
 
@@ -586,7 +585,7 @@ static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 typedef int32_t (__attribute__((thiscall)) *am2_slot_of_id_fn)(void *, DPID);
 typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
 #define orig_slot_of_id     (*(am2_slot_of_id_fn)ADDR_COMM_SLOT_OF_ID)
-#define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_FREE)
+#define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_POOL)
 #define g_joinContext  (*(int32_t *)(uintptr_t)ADDR_JOIN_CONTEXT)
 #define g_defaultOwner (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 
@@ -1312,6 +1311,124 @@ int32_t __cdecl CommEnumPlayers(void)
                                     (LPVOID)g_hwnd, 0) == DP_OK;
 }
 
+/* Bring the packet subsystem up -- 0x004021A0.
+ *
+ * The last boundary work in the image, and it was hidden by a classification
+ * rather than by being hard: CreateThread, CreateEventA, CreateMutexA and
+ * SetThreadPriority were all on coverage.py's incidental list, so a function
+ * that starts a thread counted as game logic. Creating an OS object is the same
+ * kind of act as creating a DirectDraw surface.
+ *
+ * Named from its own error string, "Error launching packet thread". It went
+ * into orig.h as ADDR_COMM_INIT_SYNC with the note "mirrors CommShutdown",
+ * which is where it is called from and not what it does.
+ *
+ * Four message lists, then 400 records each owning a kilobyte of buffer, then
+ * two events, then the thread. The buffers are filled with rand() after
+ * srand(0) -- a fixed seed, so the contents are the same every run, which is
+ * the only reason that is not simply strange. Transcribed as written.
+ *
+ * EVERY FAILURE RETURNS EARLY WITHOUT UNDOING ANYTHING. A list that cannot get
+ * its mutex leaves the earlier ones created and returns, and the caller --
+ * CommConstruct -- ignores the answer entirely. Kept: it is the original's, and
+ * the alternative would be inventing a teardown path that does not exist.
+ *
+ * The thread procedure at 0x00401F00 stays original. It is the packet pump and
+ * it is game logic; what is boundary here is asking the OS for the thread. */
+static_assert(sizeof(HANDLE) == 4, "a 32-bit handle");
+
+#define g_packetRecords ((uint8_t *)(uintptr_t)ADDR_PACKET_RECORDS)
+#define g_packetThread  (*(HANDLE *)(uintptr_t)ADDR_PACKET_THREAD)
+#define g_packetState   (*(int32_t *)(uintptr_t)ADDR_PACKET_STATE)
+
+typedef void (__cdecl *am2_msg_add_fn)(void *list, void *node);
+typedef void (__cdecl *am2_slot_reset_fn)(int32_t slot);
+typedef void (__cdecl *am2_srand_fn)(uint32_t seed);
+typedef int32_t (__cdecl *am2_rand_fn)(void);
+
+#define orig_msg_add    (*(am2_msg_add_fn)ADDR_MSG_LIST_ADD)
+#define orig_slot_reset (*(am2_slot_reset_fn)ADDR_PACKET_SLOT_RESET)
+#define orig_srand      (*(am2_srand_fn)ADDR_GAME_SRAND)
+#define orig_rand       (*(am2_rand_fn)ADDR_GAME_RAND)
+
+/* 0x00401000. Clear the list and give it a mutex. Answers 0 if the mutex
+ * could not be had, and leaves the list zeroed either way. */
+int32_t __cdecl MsgListInit(void *list)
+{
+    uint32_t *l = (uint32_t *)list;
+
+    l[1] = 0;
+    l[2] = 0;
+    l[3] = 0;
+    l[0] = (uint32_t)(uintptr_t)CreateMutexA(NULL, FALSE, NULL);
+    return l[0] != 0;
+}
+
+/* 0x00402170. Close a handle and forget it, along with two fields beside it.
+ * Safe on a holder that never got one. */
+void __cdecl EventClose(void *holder)
+{
+    uint32_t *h = (uint32_t *)holder;
+    HANDLE    handle = (HANDLE)(uintptr_t)h[0];
+
+    h[1] = 0;
+    h[2] = 0;
+    if (handle)
+        CloseHandle(handle);
+    h[0] = 0;
+}
+
+int32_t __cdecl StartPacketThread(void)
+{
+    uint8_t *rec  = g_packetRecords;
+    uint8_t *data = (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS;
+    int32_t  i;
+
+    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_POOL)) return 0;
+    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_B))    return 0;
+    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_C))    return 0;
+    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_D))    return 0;
+
+    /* A fixed seed, so every run fills the buffers identically. */
+    orig_srand(0);
+
+    while (data < (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS_END) {
+        uint32_t *w = (uint32_t *)data;
+
+        *(uint32_t *)(rec + PACKET_REC_OFF_SIZE) = PACKET_BUFFER_BYTES;
+        *(uint32_t **)(rec + PACKET_REC_OFF_DATA) = w;
+
+        for (i = 0; i < (int32_t)(PACKET_BUFFER_BYTES / 4); i++)
+            *w++ = (uint32_t)orig_rand();
+
+        orig_msg_add((void *)(uintptr_t)ADDR_MSG_LIST_POOL, rec);
+        rec  += PACKET_RECORD_STRIDE;
+        data  = (uint8_t *)w;
+    }
+
+    *(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_A =
+        CreateEventA(NULL, FALSE, FALSE, NULL);
+    *(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_B =
+        CreateEventA(NULL, FALSE, FALSE, NULL);
+    *(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_B2 =
+        *(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_B;
+
+    g_packetState = 2;
+    for (i = 0; i < 6; i++)
+        orig_slot_reset(i);
+
+    g_packetThread = CreateThread(NULL, 0,
+                                  (LPTHREAD_START_ROUTINE)
+                                      (uintptr_t)ADDR_PACKET_THREAD_PROC,
+                                  NULL, 0,
+                                  (LPDWORD)(uintptr_t)ADDR_PACKET_THREAD_ID);
+    if (!g_packetThread) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_THREAD_FAILED, 0, 0, 0);
+        return 0;
+    }
+    return SetThreadPriority(g_packetThread, THREAD_PRIORITY_HIGHEST) != 0;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1329,6 +1446,12 @@ int dplay_install(void)
                         "CommSetSessionDesc", 2);
     rc |= patch_replace(ADDR_COMM_GET_SESSION, (const void *)CommGetSessionDesc,
                         "CommGetSessionDesc", 0);
+    rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
+                        "StartPacketThread", 0);
+    rc |= patch_replace(ADDR_MSG_LIST_INIT, (const void *)MsgListInit,
+                        "MsgListInit", 1);
+    rc |= patch_replace(ADDR_EVENT_CLOSE, (const void *)EventClose,
+                        "EventClose", 1);
     rc |= patch_replace(ADDR_COMM_ENUM_PLAYERS, (const void *)CommEnumPlayers,
                         "CommEnumPlayers", 0);
     rc |= patch_replace(ADDR_COMM_CONSTRUCT, (const void *)CommConstruct,
