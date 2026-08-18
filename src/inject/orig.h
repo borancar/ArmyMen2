@@ -984,6 +984,16 @@
 #define ADDR_STARTUP_42E580      0x0042E580u
 #define ADDR_START_INTRO         0x0040B7A0u  /* honours -nointro */
 #define ADDR_RUN_FRAME           0x0040B000u  /* one tick; state machine of 5 */
+/* RunFrame is a state machine. It returns at once unless ADDR_APP_ACTIVE is
+ * set, then restores lost surfaces, polls input, and dispatches on
+ * ADDR_GAME_STATE through the table below.
+ *
+ * State 2 is the level teardown, and it tail-JUMPS to 0x004256F0 rather than
+ * calling it -- which is the only route to StopAllSounds. Those audio teardown
+ * functions therefore need a mission to END; no amount of quitting from the
+ * title screen reaches them. */
+#define ADDR_RUN_FRAME_TABLE     0x0040B050u  /* void(*[5])(void), by ADDR_GAME_STATE */
+#define ADDR_LEVEL_TEARDOWN      0x004260C0u  /* state 2 */
 #define ADDR_SHUTDOWN_423D20     0x00423D20u
 #define ADDR_SHUTDOWN_DDRAW      0x0041A950u  /* void(void) */
 #define ADDR_DD_CLIPPER          0x00507340u  /* IDirectDrawClipper * */

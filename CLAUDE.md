@@ -589,6 +589,12 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   and see whether it is the operand of a `push` — the byte before an
   address-shaped dword being `68` is the whole tell.
 
+  **It has now been made twice, and the second time the scan was mine.** Asking
+  whether `0x004256F0` was referenced, I checked `call rel32` and `push imm32`
+  and concluded it was dead code — and it is reached by a `jmp` tail call from
+  `0x004260C9`, which neither pattern matches. A reachability scan has to
+  include every control transfer, not just the two that look like calls.
+
   Note this affects *function* reachability only. Whether a block inside a
   function can be reached is a different question and the answer there — that
   the five copy-protection dialogs are unreachable — was checked with a scan
@@ -876,10 +882,20 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   against the original and not merely run.
 
   `FreeDynamicSounds`, `FreeSound` (56 calls) and `ReleaseSoundBuffers` came
-  off this list once `tools/ab.sh quit` existed. Still at zero after a clean
-  exit from the title screen: `StopNamedSound`, `StopAllSounds` and
-  `WaveCloseReadFile` — quitting from inside a mission, rather than from the
-  menu, is the remaining thing to try.
+  off this list once `tools/ab.sh quit` existed.
+
+  **`WaveCloseReadFile` was never cold — it was the count-of-0 blind spot.**
+  `StopAudioStream` is ours and calls it directly, so the counter cannot move.
+  A probe shows it running once with a real `HMMIO`. It should not have been on
+  this list at all, and the lesson is the one already written above: resolve a
+  zero with a probe rather than adding it to a list of things to try harder at.
+
+  `StopNamedSound` and `StopAllSounds` are genuinely unexecuted, and the route
+  to them is now known rather than guessed. `RunFrame` dispatches on a state at
+  `0x00511DA4` through a jump table; **state 2 is the level teardown**, which
+  tail-jumps to `0x004256F0` and calls `StopAllSounds` unconditionally. So they
+  need a mission to *end* — completed or abandoned — and no amount of quitting
+  from the title screen will reach them.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal
