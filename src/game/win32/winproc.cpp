@@ -41,7 +41,7 @@
 #include "winproc.h"
 #include "winmain.h"
 #include "mapdraw.h"
-#include "rect.h"
+#include "../rect.h"
 
 #include <stdint.h>
 

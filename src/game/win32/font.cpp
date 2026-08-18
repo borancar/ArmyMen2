@@ -15,7 +15,7 @@
  */
 
 #include "font.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 #include "surface.h"
 #include <string.h>
 

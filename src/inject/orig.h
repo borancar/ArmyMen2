@@ -371,7 +371,7 @@
  * the strings -- because its multiplayer transport is DirectPlay obtained
  * through COM. These two CoCreateInstance sites are the whole of it.
  *
- * Reconstructed in src/game/dplay.cpp. The GUIDs are the game's own copies.
+ * Reconstructed in src/game/win32/dplay.cpp. The GUIDs are the game's own copies.
  */
 #define ADDR_COMM_CREATE_DPLAY   0x0040DD20u  /* thiscall int32(this, void *conn) */
 /* Comm teardown: destroy the four mutex-guarded message lists, wake the packet
@@ -508,7 +508,7 @@
 /* ---- streaming audio ---------------------------------------------------
  *
  * A looping DirectSound buffer kept fed by a multimedia timer, reading through
- * src/game/wavefile.cpp. Reconstructed in src/game/audio.cpp.
+ * src/game/win32/wavefile.cpp. Reconstructed in src/game/win32/audio.cpp.
  */
 #define ADDR_STOP_AUDIO_STREAM   0x0040D5D0u  /* void(void) */
 #define ADDR_START_AUDIO_STREAM  0x0040D680u  /* void(void *track, int32) */
@@ -610,7 +610,7 @@
 #define ADDR_AUDIO_HMMIO         0x004FA414u  /* HMMIO, closed by WaveCloseReadFile */
 #define ADDR_AUDIO_WAVEFORMAT    0x004FA410u  /* WAVEFORMATEX * */
 /* The streaming refill callback. RECONSTRUCTED as AudioTimerProc in
- * src/game/audio.cpp, but registered rather than patched -- StartAudioStream's
+ * src/game/win32/audio.cpp, but registered rather than patched -- StartAudioStream's
  * timeSetEvent is the only reference to this address in the image, and that
  * call is ours, so a detour here would be jumped to by nobody. Kept as an
  * address because the harness fingerprints it and because a probe may want to
@@ -631,7 +631,7 @@
  *
  * smackw32.dll has no SDK header and no import library, so its entry points are
  * reached through the game's own IAT slots -- the only place their addresses
- * exist. Reconstructed in src/game/movie.cpp; the movie object is thiscall and
+ * exist. Reconstructed in src/game/win32/movie.cpp; the movie object is thiscall and
  * deliberately opaque, with only the fields actually touched named there.
  */
 #define ADDR_MOVIE_STOP          0x00445120u  /* thiscall void(this) */
@@ -657,7 +657,7 @@
 #define ADDR_GAME_DELETE         0x004648F5u  /* the game's own operator delete */
 /* Posted to the window to advance the game state machine: 0x400 when a movie
  * finishes, 0x402 when one could not be started. Both land in the same handler,
- * which is why src/game/winproc.cpp forwards them together. */
+ * which is why src/game/win32/winproc.cpp forwards them together. */
 #define AM2_WM_STATE_ADVANCE     0x0400u
 #define AM2_WM_STATE_ABORT       0x0402u
 #define ADDR_MOVIE_BLIT          0x00445500u  /* thiscall, stays original */
@@ -670,7 +670,7 @@
 
 /* .WAV reading through WINMM's multimedia file services -- the only file I/O
  * in the game that does not go through the CRT. Reconstructed in
- * src/game/wavefile.cpp; these are the DirectX SDK sample's names. */
+ * src/game/win32/wavefile.cpp; these are the DirectX SDK sample's names. */
 #define ADDR_WAVE_OPEN_FILE      0x0040CA10u  /* MMRESULT(char*,HMMIO*,WAVEFORMATEX**,MMCKINFO*) */
 #define ADDR_WAVE_START_DATA     0x0040CBB0u  /* MMRESULT(HMMIO*,MMCKINFO*,MMCKINFO*) */
 #define ADDR_WAVE_READ_FILE      0x0040CBF0u  /* MMRESULT(HMMIO,uint32,uint8*,MMCKINFO*,uint32*) */
@@ -699,7 +699,7 @@
 #define ADDR_INIT_APPLICATION    0x0040B600u  /* int32_t(HINSTANCE, int32_t nCmdShow) */
 #define ADDR_PUMP_MESSAGE        0x0040B280u  /* int32_t(MSG *) -- 0 on WM_QUIT */
 #define ADDR_POSITION_WINDOW     0x0040B070u  /* void(void) */
-/* The window procedure. Reconstructed in src/game/winproc.cpp, but NOT patched:
+/* The window procedure. Reconstructed in src/game/win32/winproc.cpp, but NOT patched:
  * it is reached only through the WNDCLASS field that InitApplication fills in,
  * so pointing that at our own leaves the original intact and callable. The
  * messages that are pure comm and game logic are forwarded straight back to it
@@ -922,7 +922,7 @@
 /* ---- device bring-up --------------------------------------------------
  *
  * The two functions that create every DirectDraw and DirectInput object the
- * game owns. Both are reconstructed in src/game/device.cpp.
+ * game owns. Both are reconstructed in src/game/win32/device.cpp.
  *
  * They call DirectDrawCreate and DirectInputCreateA through the game's own
  * import thunks rather than through ours. For DirectDraw that is only tidiness;
@@ -941,7 +941,7 @@
 #define ADDR_DIRECTDRAW2         0x004FE098u  /* IDirectDraw2 * */
 #define ADDR_IID_DIRECTDRAW2     0x0046F338u  /* the game's own copy of the IID */
 #define ADDR_PIXEL_FORMAT_BYTE   0x00502AD9u  /* uint8_t, passed to AttachPalette */
-/* Both reconstructed in src/game/surface.cpp.
+/* Both reconstructed in src/game/win32/surface.cpp.
  *
  * ClearSurface was called ADDR_ATTACH_PALETTE for one commit, guessed from its
  * call site in InitDirectDraw. It is nothing of the kind: vtable slot 5 is Blt,

@@ -2,8 +2,8 @@
 #define AM2_WINPROC_H
 
 #include <stdint.h>
-#include "../inject/orig.h"
-#include "../inject/win32.h"
+#include "../../inject/orig.h"
+#include "../../inject/win32.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */

@@ -84,13 +84,12 @@ def patched_functions(names):
     pat = re.compile(r"patch_replace\(\s*(ADDR_[A-Z0-9_]+)\s*,\s*"
                      r"\(const void \*\)\s*(\w+)")
     out = {}
-    for fn in sorted(os.listdir(game)):
-        if not fn.endswith(".cpp"):
-            continue
-        with open(os.path.join(game, fn)) as fh:
+    for path in am2.game_sources():
+        with open(path) as fh:
             for m in pat.finditer(fh.read()):
                 if m.group(1) in names:
-                    out[names[m.group(1)]] = (m.group(2), fn)
+                    out[names[m.group(1)]] = (m.group(2),
+                                              os.path.relpath(path, game))
     return out
 
 
@@ -258,7 +257,7 @@ def main():
           f"{len(by_helper)} accounted for by static helpers, "
           f"{len(by_scan)} by the scan's\nknown undercount, "
           f"{len(unexplained)} unexplained\n")
-    print(f"{'function':<24} {'file':<16} {'orig':>5} {'ours':>5} {'+helpers':>9}  note")
+    print(f"{'function':<24} {'file':<20} {'orig':>5} {'ours':>5} {'+helpers':>9}  note")
     for name, fname, theirs, ours, total in differ:
         if total == theirs:
             why = "accounted for"
@@ -266,7 +265,7 @@ def main():
             why = "comcalls lost the vtable register at a branch"
         else:
             why = "READ THIS ONE"
-        print(f"{name:<24} {fname:<16} {theirs:>5} {ours:>5} {total:>9}  {why}")
+        print(f"{name:<24} {fname:<20} {theirs:>5} {ours:>5} {total:>9}  {why}")
     if unexplained:
         print("\nThe unexplained ones are the whole point of this tool: a "
               "reconstruction that\nmakes a call its original does not, or "

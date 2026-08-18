@@ -32,7 +32,7 @@
 
 #include "device.h"
 #include "report.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

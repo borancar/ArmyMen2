@@ -67,14 +67,12 @@ def patch_labels():
                 names[m.group(1)] = int(m.group(2), 16)
 
     out = {}
-    game = os.path.join(REPO, "src", "game")
     call = re.compile(r'patch_replace\(\s*(ADDR_[A-Z0-9_]+)\s*,[^,]*,\s*"([^"]+)"')
-    for fn in sorted(os.listdir(game)):
-        if fn.endswith(".cpp"):
-            with open(os.path.join(game, fn)) as fh:
-                for m in call.finditer(fh.read()):
-                    if m.group(1) in names:
-                        out[names[m.group(1)]] = m.group(2)
+    for path in am2.game_sources():
+        with open(path) as fh:
+            for m in call.finditer(fh.read()):
+                if m.group(1) in names:
+                    out[names[m.group(1)]] = m.group(2)
     return out
 
 

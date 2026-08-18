@@ -2,10 +2,10 @@
 #define AM2_SPRITE_H
 
 #include <stdint.h>
-#include "../inject/orig.h"
-#include "../inject/win32.h"
-#include "blit.h"
-#include "rect.h"
+#include "../../inject/orig.h"
+#include "../../inject/win32.h"
+#include "../blit.h"
+#include "../rect.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */

@@ -19,9 +19,9 @@
  */
 
 #include "sprite.h"
-#include "blit.h"
-#include "rect.h"
-#include "../inject/patch.h"
+#include "../blit.h"
+#include "../rect.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

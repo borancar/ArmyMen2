@@ -35,7 +35,7 @@
 #include "palette.h"
 #include "surface.h"
 #include "mapdraw.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

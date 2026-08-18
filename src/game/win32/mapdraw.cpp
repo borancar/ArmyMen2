@@ -21,7 +21,7 @@
 
 #include "mapdraw.h"
 #include "surface.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */

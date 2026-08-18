@@ -11,7 +11,7 @@ game would run, look completely healthy, and silently ignore every scripted
 click and keypress -- and the A/B would still pass, because both sides would be
 equally undriven.
 
-src/game/device.cpp avoids it by calling the game's own one-instruction import
+src/game/win32/device.cpp avoids it by calling the game's own one-instruction import
 thunks rather than importing DirectInput. That is a convention, and conventions
 are the sort of thing that survives until someone writes the obvious code
 instead. This turns it into a check.
@@ -97,7 +97,7 @@ def main():
         for dll, name in clashes:
             print(f"    {dll}!{name}")
         print("\nCall the game's own import thunk instead -- see the note at the")
-        print("top of src/game/device.cpp. Injected input is silently dead")
+        print("top of src/game/win32/device.cpp. Injected input is silently dead")
         print("until this is fixed, and no A/B will notice.")
         return 1
 

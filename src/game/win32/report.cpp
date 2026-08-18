@@ -25,7 +25,7 @@
  */
 
 #include "report.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 #include <stdarg.h>

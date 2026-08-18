@@ -225,7 +225,7 @@ libc rather than function by function.
 Called only from the CRT: `CreateDirectoryA`, `CreateFileA`, `DeleteFileA`, `FileTimeToLocalFileTime`, `FileTimeToSystemTime`, `FindFirstFileA`, `FindNextFileA`, `FlushFileBuffers`, `GetCurrentDirectoryA`, `GetFileAttributesA`, `GetFileType`, `GetModuleFileNameA`, `ReadFile`, `RemoveDirectoryA`, `SetCurrentDirectoryA`, `SetEndOfFile`, `SetFileAttributesA`, `SetFilePointer`, `WriteFile`
 
 Called from game code: none. The only file the game opens for itself is a `.WAV`, through
-WINMM rather than the CRT, and that is `src/game/wavefile.cpp`.
+WINMM rather than the CRT, and that is `src/game/win32/wavefile.cpp`.
 
 No networking library appears above, and that is not an omission:
 the game imports none. Its multiplayer transport is DirectPlay,

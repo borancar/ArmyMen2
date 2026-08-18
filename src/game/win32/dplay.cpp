@@ -25,7 +25,7 @@
 
 #include "dplay.h"
 #include "cdcheck.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

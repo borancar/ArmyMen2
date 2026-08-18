@@ -15,7 +15,7 @@
 
 #include "movie.h"
 #include "palette.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 #include <string.h>

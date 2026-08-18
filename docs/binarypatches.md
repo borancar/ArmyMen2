@@ -40,7 +40,7 @@ so none of those dialogs can appear:
 The call itself was left alone -- only the branch on its result --
 so `FindGameCD` still runs and still sets what it sets. A faithful
 reconstruction calls it and discards the answer, which is what
-`src/game/cdcheck.h` does; that header also carries the retail check
+`src/game/win32/cdcheck.h` does; that header also carries the retail check
 as compilable source behind `#ifdef AM2_COPY_PROTECTION`, off by
 default.
 

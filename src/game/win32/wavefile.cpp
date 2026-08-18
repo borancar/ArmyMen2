@@ -22,7 +22,7 @@
  */
 
 #include "wavefile.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 #include <string.h>

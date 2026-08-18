@@ -29,10 +29,10 @@
 #include "surface.h"
 #include "sprite.h"
 #include "mapdraw.h"   /* SetDrawTarget */
-#include "rect.h"
+#include "../rect.h"
 #include "winmain.h"
 #include "report.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

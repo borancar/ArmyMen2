@@ -15,12 +15,12 @@
  */
 
 #include "audio.h"
-#include "dist.h"
-#include "../inject/hooklog.h"
+#include "../dist.h"
+#include "../../inject/hooklog.h"
 
 #include <stdlib.h>
 #include "wavefile.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

@@ -71,6 +71,32 @@ Runs are independent so several can go at once: desktop name, control port, log
 file and screenshot directory are all derived from `ID`, which defaults from
 `$DISPLAY`.
 
+## Source layout
+
+`src/game/win32/` holds every module that talks to Win32 or DirectX; the flat
+part of `src/game/` holds the reconstruction that touches no API at all —
+`blit`, `dist`, `objtable`, `objtype`, `packkey`, `rect`, `savetag`, `text`.
+Those eight are software rasterisers, rectangle and distance maths, the object
+tables, key packing and save tags: pure computation over memory the caller
+supplies. Everything else — 14 modules — is the boundary, and the split is the
+answer to "what still talks to the outside world" in directory form.
+
+The test for which side a file belongs on is whether it names a Win32 or COM
+type at all. `blit.cpp` mentions `IDirectDrawSurface` once, in a comment
+explaining where the original's fallback came from, and stays flat; it operates
+on a locked pointer somebody else obtained.
+
+Includes are written out in full rather than resolved by `-I` flags, so a
+module's directory is visible at its use sites: `win32/` sources reach the
+harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
+
+**Four tools derive "what is reconstructed" by scanning these sources**, and
+all four used a non-recursive `listdir` before the split. Adding a
+subdirectory would have made every one of them miss fourteen modules silently
+and report the boundary as barely started. They now share `am2.game_sources()`
+— one definition, for the same reason `tools/merges.py` imports
+`coverage.REGISTERED` rather than copying it.
+
 ## Language split
 
 `src/game/` is **C++** (`.cpp` sources, `.h` headers). `src/inject/` is **C** —
@@ -713,12 +739,12 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   count overstates the work. And a reconstruction of any of those menu
   functions must reproduce the patched behaviour, not the retail behaviour, or
   it will fail the A/B against the original for a reason that has nothing to do
-  with being correct — which is why `src/game/cdcheck.h` records the retail
+  with being correct — which is why `src/game/win32/cdcheck.h` records the retail
   check behind an `#ifdef` that is off.
 - **The game has no networking imports at all** — no ws2_32, no wsock32, no
   dplayx, and not even those strings in `.text`. Its multiplayer transport is
   DirectPlay reached through COM, so the only trace in the import table is
-  ole32's `CoCreateInstance`, twice. Both are now `src/game/dplay.cpp`. Worth
+  ole32's `CoCreateInstance`, twice. Both are now `src/game/win32/dplay.cpp`. Worth
   remembering when looking for a subsystem that seems to be missing: an absent
   import does not mean an absent channel.
 - The remaining genuinely-boundary clusters are the mutex-guarded comm message
@@ -874,7 +900,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `DirectInputCreateA`. A reconstructed `InitInput` that imported the symbol
   into `am2hook.dll` would resolve through *our* IAT, walk straight past the
   hook and silently disable all injected input — the game would still run and
-  look perfectly healthy. `src/game/device.cpp` calls the game's own import
+  look perfectly healthy. `src/game/win32/device.cpp` calls the game's own import
   thunks (`0x00463396`, `0x00464410`) instead, which read the patched slot at
   call time. Check for a harness hook before reconstructing anything that calls
   an import.
@@ -908,7 +934,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   remains the configuration to verify against.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
-  Restore without re-locking. Kept as-is deliberately; see `src/game/surface.cpp`.
+  Restore without re-locking. Kept as-is deliberately; see `src/game/win32/surface.cpp`.
 - Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
   `RestoreTileSet`, and `RefreshScreen` — that last has 7 callers and is
   reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever

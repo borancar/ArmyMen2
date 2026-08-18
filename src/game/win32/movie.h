@@ -2,8 +2,8 @@
 #define AM2_MOVIE_H
 
 #include <stdint.h>
-#include "../inject/orig.h"
-#include "../inject/win32.h"
+#include "../../inject/orig.h"
+#include "../../inject/win32.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -17,7 +17,7 @@ extern "C" {
  * library, so unlike DirectDraw or WINMM there is nothing to include and
  * nothing to link. Its entry points are reached the way the game reaches them:
  * through the import thunks in its own IAT, read at the moment of the call.
- * That is the same reasoning as src/game/device.cpp uses for DirectInput, for a
+ * That is the same reasoning as src/game/win32/device.cpp uses for DirectInput, for a
  * different reason -- there it preserves a harness hook, here it is simply the
  * only way to name a function nobody declared.
  *

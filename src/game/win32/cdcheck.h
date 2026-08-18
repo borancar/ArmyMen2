@@ -2,8 +2,8 @@
 #define AM2_CDCHECK_H
 
 #include <stdint.h>
-#include "../inject/orig.h"
-#include "../inject/win32.h"
+#include "../../inject/orig.h"
+#include "../../inject/win32.h"
 #include "winmain.h"
 
 /* The copy protection, written back out.

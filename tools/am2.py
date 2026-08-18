@@ -109,3 +109,23 @@ def find_string_vas(img, needle, section=None):
             out.append(start + at)
             at += 1
     return out
+
+
+# src/game is split: win32/ holds every module that talks to Win32 or DirectX,
+# and the flat part holds the pure computation -- rasterisers, rect maths,
+# object tables, save tags -- which touches no API at all.
+#
+# Four separate tools derive "what is reconstructed" by scanning these sources
+# for patch_replace calls, and all four used a NON-RECURSIVE listdir. Adding the
+# subdirectory would have made every one of them silently miss fourteen modules
+# and report the boundary as barely started, which docs/boundary.md would then
+# have asserted in writing. One definition, used by all of them, for the same
+# reason coverage.REGISTERED is imported rather than copied.
+def game_sources(ext=".cpp"):
+    """Every reconstruction source under src/game, at any depth."""
+    root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "src", "game")
+    out = []
+    for base, _dirs, files in os.walk(root):
+        out += [os.path.join(base, f) for f in files if f.endswith(ext)]
+    return sorted(out)

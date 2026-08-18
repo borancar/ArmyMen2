@@ -19,27 +19,27 @@
 #include "restore.h"
 #include "sites.h"
 #include "trace.h"
-#include "../game/audio.h"
+#include "../game/win32/audio.h"
 #include "../game/blit.h"
 #include "../game/dist.h"
-#include "../game/font.h"
-#include "../game/mapdraw.h"
+#include "../game/win32/font.h"
+#include "../game/win32/mapdraw.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
-#include "../game/movie.h"
-#include "../game/palette.h"
+#include "../game/win32/movie.h"
+#include "../game/win32/palette.h"
 #include "../game/rect.h"
-#include "../game/report.h"
+#include "../game/win32/report.h"
 #include "../game/savetag.h"
-#include "../game/sprite.h"
-#include "../game/surface.h"
+#include "../game/win32/sprite.h"
+#include "../game/win32/surface.h"
 #include "../game/text.h"
-#include "../game/device.h"
-#include "../game/dplay.h"
-#include "../game/startgame.h"
-#include "../game/wavefile.h"
-#include "../game/winmain.h"
+#include "../game/win32/device.h"
+#include "../game/win32/dplay.h"
+#include "../game/win32/startgame.h"
+#include "../game/win32/wavefile.h"
+#include "../game/win32/winmain.h"
 
 #include <windows.h>
 #include <stdlib.h>
@@ -160,7 +160,7 @@ static const struct {
       { 0x56, 0x8B, 0x74, 0x24, 0x08, 0x83, 0x7E, 0x04 }, 8 },
     { ADDR_POSITION_WINDOW, "PositionWindow",
       { 0xA1, 0x44, 0x73, 0x50, 0x00, 0x83, 0xEC, 0x20 }, 8 },
-    /* Never patched -- but src/game/winproc.cpp forwards the comm messages
+    /* Never patched -- but src/game/win32/winproc.cpp forwards the comm messages
      * into it, so its entry has to be the one we read. */
     { ADDR_WND_PROC, "WndProc",
       { 0x81, 0xEC, 0xF8, 0x00, 0x00, 0x00, 0x53, 0x8B }, 8 },

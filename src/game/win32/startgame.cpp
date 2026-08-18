@@ -26,7 +26,7 @@
 #include "startgame.h"
 #include "cdcheck.h"
 #include "dplay.h"
-#include "../inject/patch.h"
+#include "../../inject/patch.h"
 
 #include <stdint.h>
 

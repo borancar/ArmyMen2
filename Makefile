@@ -48,7 +48,7 @@ HOOK_C   := src/inject/dllmain.c \
             src/inject/control.c
 
 HOOK_CXX := src/game/savetag.cpp \
-            src/game/startgame.cpp \
+            src/game/win32/startgame.cpp \
             src/game/rect.cpp \
             src/game/dist.cpp \
             src/game/objtable.cpp \
@@ -56,19 +56,19 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/packkey.cpp \
             src/game/text.cpp \
             src/game/blit.cpp \
-            src/game/sprite.cpp \
-            src/game/surface.cpp \
-            src/game/font.cpp \
-            src/game/mapdraw.cpp \
-            src/game/palette.cpp \
-            src/game/winmain.cpp \
-            src/game/winproc.cpp \
-            src/game/device.cpp \
-            src/game/report.cpp \
-            src/game/wavefile.cpp \
-            src/game/dplay.cpp \
-            src/game/movie.cpp \
-            src/game/audio.cpp
+            src/game/win32/sprite.cpp \
+            src/game/win32/surface.cpp \
+            src/game/win32/font.cpp \
+            src/game/win32/mapdraw.cpp \
+            src/game/win32/palette.cpp \
+            src/game/win32/winmain.cpp \
+            src/game/win32/winproc.cpp \
+            src/game/win32/device.cpp \
+            src/game/win32/report.cpp \
+            src/game/win32/wavefile.cpp \
+            src/game/win32/dplay.cpp \
+            src/game/win32/movie.cpp \
+            src/game/win32/audio.cpp
 
 HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
             $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))

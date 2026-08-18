@@ -142,13 +142,10 @@ def owner_of_addr(addr, sizes):
 
 def reconstructed(names):
     """Addresses the harness installs, read from the install sites themselves."""
-    game = os.path.join(REPO, "src", "game")
     pat = re.compile(r"patch_replace\(\s*(ADDR_[A-Z0-9_]+)")
     found = set(REGISTERED)
-    for fn in sorted(os.listdir(game)):
-        if not fn.endswith(".cpp"):
-            continue
-        with open(os.path.join(game, fn)) as fh:
+    for path in am2.game_sources():
+        with open(path) as fh:
             found.update(pat.findall(fh.read()))
     missing = sorted(n for n in found if n not in names)
     return {names[n] for n in found if n in names}, missing
@@ -563,7 +560,7 @@ def main():
         w("Called from game code: "
           + (", ".join(f"`{x}`" for x in game_fileish) if game_fileish else "none")
           + ". The only file the game opens for itself is a `.WAV`, through\n"
-            "WINMM rather than the CRT, and that is `src/game/wavefile.cpp`.\n")
+            "WINMM rather than the CRT, and that is `src/game/win32/wavefile.cpp`.\n")
 
         w("\nNo networking library appears above, and that is not an omission:\n"
           "the game imports none. Its multiplayer transport is DirectPlay,\n"

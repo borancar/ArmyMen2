@@ -225,7 +225,7 @@ def main():
         w("\nThe call itself was left alone -- only the branch on its result --\n"
           "so `FindGameCD` still runs and still sets what it sets. A faithful\n"
           "reconstruction calls it and discards the answer, which is what\n"
-          "`src/game/cdcheck.h` does; that header also carries the retail check\n"
+          "`src/game/win32/cdcheck.h` does; that header also carries the retail check\n"
           "as compilable source behind `#ifdef AM2_COPY_PROTECTION`, off by\n"
           "default.\n\n")
 

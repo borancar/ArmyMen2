@@ -2,8 +2,8 @@
 #define AM2_AUDIO_H
 
 #include <stdint.h>
-#include "../inject/orig.h"
-#include "../inject/win32.h"
+#include "../../inject/orig.h"
+#include "../../inject/win32.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -16,7 +16,7 @@ extern "C" {
  * A DirectSound buffer is played on a loop while a multimedia timer refills it
  * from a .WAV on disk, which is what makes this the last piece of the boundary
  * that is genuinely about talking to the outside world rather than about game
- * state: WINMM's timer, DirectSound's buffer and src/game/wavefile.cpp's reader
+ * state: WINMM's timer, DirectSound's buffer and src/game/win32/wavefile.cpp's reader
  * all meet here.
  *
  * Both functions begin by checking whether streaming is on and whether there is

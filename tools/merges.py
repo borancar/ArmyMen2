@@ -170,14 +170,12 @@ def reconstructed():
                 names[m.group(1)] = int(m.group(2), 16)
 
     out = set()
-    game = os.path.join(REPO, "src", "game")
     call = re.compile(r"patch_replace\(\s*(ADDR_[A-Z0-9_]+)")
-    for fn in os.listdir(game):
-        if fn.endswith(".cpp"):
-            with open(os.path.join(game, fn)) as fh:
-                for m in call.finditer(fh.read()):
-                    if m.group(1) in names:
-                        out.add(names[m.group(1)])
+    for path in am2.game_sources():
+        with open(path) as fh:
+            for m in call.finditer(fh.read()):
+                if m.group(1) in names:
+                    out.add(names[m.group(1)])
 
     # NOT EVERY RECONSTRUCTION IS A PATCH. A callback the game hands to somebody
     # else -- WndProc into the WNDCLASS, AudioTimerProc into timeSetEvent -- is
