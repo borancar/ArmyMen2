@@ -421,10 +421,23 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
 ## Open items
 
-- Lock/Unlock bracket batch: 5 of 22 done (`DrawText`, `DrawSprite`,
-  `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette`). Next bottom-up:
-  `0x00454F00` (144B), `0x00414620` (224B, tooltip renderer), `0x00413610`
-  (256B), `0x00433350` (304B).
+- **The Lock/Unlock bracket batch is a different goal from the boundary, and
+  its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
+  `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
+  all. Measured: **29 functions** call the bracket and **4** are reconstructed
+  — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
+  the last of which the old list predates.
+
+  The sizes quoted for the next candidates were off as well (`0x00413610` is
+  128 B, not 256; `0x00433350` is `0x00433360` at 288 B), which is what
+  `tools/merges.py` was written to fix.
+
+  Worth being clear about what this item is: the bracket finds the game's
+  software RASTERISERS, which are a rewrite goal of their own. It is not the
+  Win32/DirectX boundary and finishing it is not required for that boundary to
+  be complete — every lock in the image already goes through our `LockSurface`.
+  Smallest first: `0x00413610` (128 B), `0x00454F00` (144 B), `0x0041CBA0`
+  (160 B), `0x0041CC40` (160 B), `0x0041C7F0` (176 B).
 - **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
   COM method takes the interface as an explicit first argument, so it goes on
   the stack; an i386 MSVC C++ virtual is thiscall and keeps `this` in `ecx`.
