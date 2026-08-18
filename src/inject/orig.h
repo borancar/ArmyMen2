@@ -1122,6 +1122,12 @@
  * message; see src/game/item.h for why it is kept. */
 #define ADDR_UID_ARMY        0x0042A7A0u  /* uint32_t(uint32_t uid) */
 #define ADDR_UID_ON_WIRE     0x0042A7B0u  /* uint32_t(uint32_t uid) */
+/* A 3-bit field at bit 18 of the object's word at +8, get and set. Named for
+ * its position rather than its meaning; src/game/item.h records what points at
+ * an army index and what argues against it. */
+#define ADDR_OBJ_FIELD_A     0x0042A810u  /* uint32_t(const void *obj) */
+#define ADDR_OBJ_SET_FIELD_A 0x0042A7F0u  /* void(void *obj, uint32_t) */
+#define ADDR_OBJ_FIELD_B     0x00429560u  /* int32_t(const void *obj), +0x64 */
 #define ADDR_REMOVE_FROM_ITEM_LIST 0x00428590u /* int32_t(AM2_Object*) */
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */

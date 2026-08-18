@@ -421,7 +421,8 @@ def main():
                 "ADDR_OBJ_IS_TYPE2", "ADDR_OBJ_IS_TYPE3", "ADDR_OBJ_IS_TYPE238",
                 "ADDR_CLIP_RECT", "ADDR_FIND_SLOT", "ADDR_FIRST_ITEM",
                 "ADDR_NEXT_ITEM", "ADDR_SET_DRAW_TARGET",
-                "ADDR_UID_ARMY", "ADDR_UID_ON_WIRE"]
+                "ADDR_UID_ARMY", "ADDR_UID_ON_WIRE",
+                "ADDR_OBJ_FIELD_A", "ADDR_OBJ_SET_FIELD_A", "ADDR_OBJ_FIELD_B"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -468,7 +469,16 @@ def main():
         "ADDR_PACK_KEY": "PackKey", "ADDR_KEY_FIELD_A": "KeyFieldA",
         "ADDR_KEY_FIELD_B": "KeyFieldB", "ADDR_KEY_FIELD_C": "KeyFieldC",
         "ADDR_UID_ARMY": "UidArmy", "ADDR_UID_ON_WIRE": "UidOnWire",
+        "ADDR_OBJ_FIELD_A": "ObjFieldA", "ADDR_OBJ_SET_FIELD_A": "ObjSetFieldA",
+        "ADDR_OBJ_FIELD_B": "ObjFieldB",
     }
+    # Functions whose C prototype is void. The original still leaves something
+    # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
+    # object pointer is still there -- and the emulator faithfully records it.
+    # Comparing that would test the calling convention rather than the
+    # function. The one caller ignores eax, so void is the right prototype and
+    # the harness has to be told, since it cannot see a C declaration.
+    VOID = {"ObjSetFieldA"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"
@@ -512,6 +522,7 @@ def main():
                      "    uint32_t    arg[6];\n"
                      "    uint32_t    eax;\n"
                      "    uint8_t     eax_is_ptr;  /* eax is scratch+eax, not a literal */\n"
+                     "    uint8_t     void_ret;     /* prototype is void: do not compare eax */\n"
                      "    int32_t     nwrites;\n"
                      "    const uint32_t *writes;   /* offset, byte pairs */\n"
                      "    int32_t     ninputs;\n"
@@ -538,12 +549,13 @@ def main():
                     # buffer will never match. Store the offset and a flag.
                     eaxp = 1 if SCRATCH <= eax < SCRATCH + SCRATCH_SZ else 0
                     eaxv = (eax - SCRATCH) if eaxp else eax
-                    fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, %d, '
-                             '%d, %s, %d, %s},\n'
+                    fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, '
+                             '%d, %d, %d, %s, %d, %s},\n'
                              % (cname, cname, nargs,
                                 ",".join(str(x) for x in p),
                                 ",".join("0x%08xu" % (x & 0xFFFFFFFF) for x in a),
-                                eaxv & 0xFFFFFFFF, eaxp, len(writes),
+                                eaxv & 0xFFFFFFFF, eaxp,
+                                1 if cname in VOID else 0, len(writes),
                                 ("w_%s_%d" % (cname, k)) if writes else "0",
                                 len(pre),
                                 ("i_%s_%d" % (cname, k)) if pre else "0"))

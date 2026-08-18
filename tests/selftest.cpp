@@ -58,7 +58,7 @@ int main(void)
         uint32_t want_eax = t->eax_is_ptr
                           ? (uint32_t)(uintptr_t)(g_scratch + t->eax)
                           : t->eax;
-        int bad = (got != want_eax);
+        int bad = t->void_ret ? 0 : (got != want_eax);
         for (int32_t w = 0; w < t->nwrites && !bad; w++) {
             uint32_t off = t->writes[w * 2], want = t->writes[w * 2 + 1];
             if (g_scratch[off] != (uint8_t)want)
