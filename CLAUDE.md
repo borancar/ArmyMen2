@@ -902,8 +902,19 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   title → briefing → mission path leaves both counters at 0; measured, not
   assumed. Quitting from the title screen cannot reach it either.
 
-  What is still missing is only the UI action that leaves a mission. `ESCAPE`
-  is already recorded as doing nothing there.
+  The state machine is confirmed rather than inferred: a probe in
+  `PollKeyboard`, which runs every frame, shows `0` at startup, `1` on the
+  menu and `2` in a Boot Camp mission.
+
+  The in-game trigger is a **menu request**. `0x00425EE0` consumes the
+  `ADDR_MENU_REQUEST` / `ADDR_MENU_REQUEST_SET` pair — the same two globals
+  `StartSelectedGame` and `HostBattle` write — and raises the state-pending
+  flag. So the chain is: menu request while in state 2 → pending flag → the
+  state-2 handler jumps to the teardown → `StopAllSounds`.
+
+  What is missing is only the in-game UI that raises such a request. `ESCAPE`,
+  `F1`, `F10`, `TAB` and `Q` were each tried in a live mission and none of them
+  moves the counter, so they are ruled out rather than untried.
 - **`CommOnConnected` (`0x0040E660`) cannot run, and the reason generalises.**
   Its only reference is inside `CommCreateDirectPlay`'s `if (connection)`
   branch, and that function's single caller at `0x0042EE78` passes a literal

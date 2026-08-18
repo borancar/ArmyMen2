@@ -742,6 +742,13 @@
 #define ADDR_COMMIT_STATE        0x00424AF0u  /* void(void) */
 #define ADDR_STATE_PENDING       0x00511DACu  /* int32_t, a change is wanted */
 #define ADDR_STATE_WANTED        0x00511DB0u  /* int32_t, -1 when none */
+/* The other way the pending flag goes up, and the one that matters for the
+ * teardown: 0x00425EE0 consumes a MENU REQUEST -- the same ADDR_MENU_REQUEST /
+ * ADDR_MENU_REQUEST_SET pair StartSelectedGame and HostBattle write -- moves
+ * the code to 0x00511DBC and raises the flag. So the in-game route to the
+ * level teardown is a menu request raised while the game is in state 2. */
+#define ADDR_TAKE_MENU_REQUEST   0x00425EE0u  /* void(void) */
+#define ADDR_MENU_REQUEST_TAKEN  0x00511DBCu  /* int32_t, the consumed code */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
 /* Not HINSTANCE-related at all, despite sitting beside it: DetectCpuSpeed sets
