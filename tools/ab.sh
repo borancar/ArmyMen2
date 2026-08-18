@@ -110,6 +110,20 @@ DEVICELESS='^Unable to create directsound object$'
 # the same reason AM2_AB_PIXELS exists.
 MIN_FRAMES="${AM2_AB_MIN_FRAMES:-500}"
 
+# Lines emitted by the comm threads rather than the main one. Their CONTENT is
+# deterministic and worth comparing; their POSITION is not, because the packet
+# thread and the receive thread finish whenever the scheduler lets them.
+#
+# Seen twice: "Packet Thread Exited with return code 259" and " Receive thread
+# got event 0" swap places between runs. Both logs then hold the same ten
+# lines and diff still fails, on ordering alone.
+#
+# So these are pulled out and compared as a sorted set, and the rest of the log
+# is compared in sequence exactly as before. Sorting the WHOLE log instead
+# would hide a genuine ordering change anywhere in it, which is a real thing to
+# want to catch -- the map loader and the palette have to happen in order.
+THREADED='(Packet Thread|Receive thread)'
+
 drive() { AM2_DISPLAY="$DISP" "$REPO/tools/drive.sh" "$@"; }
 
 # Play one configuration once. $1 = side (orig|recon), $2 = config name.
@@ -219,7 +233,10 @@ play() {
     grep -cE "$env_filter" "$WORK/$cfg-$side.raw" > "$WORK/$cfg-$side.envdrop" \
         || echo 0 > "$WORK/$cfg-$side.envdrop"
     grep -vE "$VOLATILE" "$WORK/$cfg-$side.raw" \
-        | grep -vE "$env_filter" > "$WORK/$cfg-$side.log"
+        | grep -vE "$env_filter" > "$WORK/$cfg-$side.all"
+    grep -vE "$THREADED" "$WORK/$cfg-$side.all" > "$WORK/$cfg-$side.log"
+    grep -E "$THREADED" "$WORK/$cfg-$side.all" | sort \
+        > "$WORK/$cfg-$side.threaded"
     if [ ! -s "$WORK/$cfg-$side.log" ]; then
         echo "ab.sh: $cfg/$side produced no game log lines -- refusing to" >&2
         echo "       call that a match. Check AM2_GAMELOG and the filter." >&2
@@ -254,6 +271,14 @@ compare() {
         echo "          at least one side did not ($vo/$vr, want $MIN_FRAMES+)."
         echo "          Comparing these logs would compare the two ways of not"
         echo "          getting there. Re-run; the drive is not reliable."
+        rc=1
+    fi
+
+    if ! diff -q "$WORK/$cfg-orig.threaded" "$WORK/$cfg-recon.threaded" \
+            >/dev/null 2>&1; then
+        echo "  threads DIFFER (compared as a set, so this is real):"
+        diff "$WORK/$cfg-orig.threaded" "$WORK/$cfg-recon.threaded" \
+            | sed 's/^/          /'
         rc=1
     fi
 

@@ -98,6 +98,14 @@ had never executed once — every configuration killed the process instead. A
 clean exit runs all of them, and `trace_report()` on `DLL_PROCESS_DETACH` is
 the only way their counts are ever visible.
 
+It is also the one configuration where line ORDER is not deterministic. The
+packet thread and the receive thread each log a line as they finish, and those
+two swap places between runs — leaving both sides with the same ten lines and
+a `diff` that fails on ordering alone. They are pulled out and compared as a
+sorted set while everything else is still compared in sequence; sorting the
+whole log would hide a genuine ordering change, and the load order of the map
+and the palette is exactly the sort of thing worth catching.
+
 What it found: `ReleaseSprite` logged "Error in release: Wrong sprite!" where
 the original logged nothing. The original tests the register still holding
 `table[slot]` from the compare above it — "is the slot occupied by someone
