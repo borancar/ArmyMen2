@@ -780,6 +780,25 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   than the image. Read it as "below the CRT line", and read the CRT section of
   `docs/boundary.md` for what that omits.
 
+  **`tools/crt.py` now says exactly what is up there, and the constant is
+  26 KB too low.** Game code runs to `0x00462600` — item and vehicle comm
+  messages, `CreateWeapon`, `DrawSeqBar`, "Game type: %s" — and the CRT proper
+  starts at `0x00464420`, with the six-entry thunk table parked in between.
+  Above the nominal line are **112 game functions**, which is many more than
+  this file used to imply by naming one.
+
+  The exclusion still holds, and now for a measured reason. The entire outside
+  contact of those 112 is two `GetTickCount` reads, three `IntersectRect`
+  calls and one COM dispatch — `DrawSeqBar`, which is reconstructed. **106 of
+  the 112 touch nothing at all.**
+
+  Nothing is left unlabelled: 58 CRT functions are identified from their own
+  body (import signature, or text like "Microsoft Visual C++ Runtime Library"
+  and the `1#INF`/`1#QNAN` spellings, or in two cases arithmetic — MSVC's
+  `rand` is the LCG `imul 0x343FD` / `add 0x269EC3`, and `_ftol` is the
+  `fnstcw`/`fistp` dance), and the remaining 171 are CRT by sitting above the
+  evidenced frontier. That list is what libc replaces on a native build.
+
 - **The game never opens a file itself.** Every `CreateFileA`, `ReadFile` and
   `FindFirstFileA` is reached from inside the statically linked CRT, which this
   port replaces with libc wholesale rather than function by function. The one
