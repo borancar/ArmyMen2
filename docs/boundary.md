@@ -100,6 +100,19 @@ site still outside reconstructed code:
 |---|---:|
 | `MessageBoxA` | 3 |
 
+**These three are a decision, not an omission.** Each of
+`0x0042F290`, `0x0044D2E0` and `0x0044D3F0` holds exactly two
+import sites -- a `MessageBoxA` and the `GetActiveWindow` it
+passes as owner -- and no COM dispatch at all. Both sit inside a
+block the section above proves nothing can reach. Everything else
+in them is menu logic: sound requests, menu state, calls into
+other game code.
+
+Porting them would move pure menu logic into the reconstruction
+to capture a dialog that cannot appear -- the opposite of what
+ranking targets by boundary density is for. The figure stays at
+three by choice.
+
 Read that table with `docs/binarypatches.md` beside it. Most of
 those `MessageBoxA` sites are the "insert the CD" dialog, and
 every CD check in this executable has been patched to skip it --

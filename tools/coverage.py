@@ -420,6 +420,17 @@ def main():
             w("| symbol | sites |\n|---|---:|\n")
             for sym, n in real_left:
                 w(f"| `{sym}` | {n} |\n")
+            w("\n**These three are a decision, not an omission.** Each of\n"
+              "`0x0042F290`, `0x0044D2E0` and `0x0044D3F0` holds exactly two\n"
+              "import sites -- a `MessageBoxA` and the `GetActiveWindow` it\n"
+              "passes as owner -- and no COM dispatch at all. Both sit inside a\n"
+              "block the section above proves nothing can reach. Everything else\n"
+              "in them is menu logic: sound requests, menu state, calls into\n"
+              "other game code.\n\n"
+              "Porting them would move pure menu logic into the reconstruction\n"
+              "to capture a dialog that cannot appear -- the opposite of what\n"
+              "ranking targets by boundary density is for. The figure stays at\n"
+              "three by choice.\n")
             w("\nRead that table with `docs/binarypatches.md` beside it. Most of\n"
               "those `MessageBoxA` sites are the \"insert the CD\" dialog, and\n"
               "every CD check in this executable has been patched to skip it --\n"

@@ -550,6 +550,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   mutex wait. What is left outside is three `MessageBoxA` calls, and all three
   sit behind copy-protection checks that have been patched to skip them.
 
+  **Those three are a decision and the number stays at three.** `0x0042F290`,
+  `0x0044D2E0` and `0x0044D3F0` hold exactly two import sites each — a
+  `MessageBoxA` and the `GetActiveWindow` it passes as owner — and no COM
+  dispatch at all. Everything else in them is menu logic: sound requests, menu
+  state, calls into other game code. Porting them would move pure menu logic
+  into the reconstruction to capture a dialog that cannot appear, which is the
+  opposite of what ranking by boundary density is for. Measured, not assumed:
+  `docs/boundary.md` prints the reasoning with the count.
+
   **That last step is now proved rather than asserted**, and the proof needed
   two corrections to be worth anything. `tools/binpatches.py` checks each
   skipped `MessageBoxA` against every branch target and stored address in the
