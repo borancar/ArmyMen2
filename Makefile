@@ -194,6 +194,46 @@ ifeq ($(ISOLATE),1)
 PREFIX := $(CURDIR)/.wine-$(ID)
 endif
 
+# Everything that can be checked without launching the game. The A/B is the
+# real verification and needs a display and about forty minutes -- run
+# `tools/ab.sh all` for that -- but these catch a different class of problem
+# and take seconds.
+#
+# The drift check is the point. docs/boundary.md, docs/comcalls.tsv and the
+# rest are generated, and a tool changing without its output being regenerated
+# leaves the repository asserting something no tool currently produces. That
+# has happened: figures quoted in CLAUDE.md were stale by many commits before
+# anyone noticed, which is the prose version of the same fault.
+#
+# What it catches is a TOOL changing its output without the output being
+# regenerated and committed -- tested by making coverage.py print a different
+# heading, which fails the target. What it does not catch is a hand-edit to a
+# generated file: the tools rewrite those before git is consulted, so the edit
+# is silently healed rather than reported. That is the right outcome and the
+# wrong message, and it is worth knowing before trusting a green run to mean
+# nobody has touched docs/ by hand.
+.PHONY: check
+check:
+	@rc=0; \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots; do \
+	    printf '  %-12s ' "$$t"; \
+	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
+	        echo ok; \
+	    else \
+	        echo FAILED; rc=1; \
+	    fi; \
+	done; \
+	if [ -n "$$(git status --porcelain docs/)" ]; then \
+	    echo "  generated docs DRIFTED from what is committed:"; \
+	    git status --short docs/ | sed 's/^/    /'; \
+	    echo "    regenerate and commit, or find out why a tool changed its mind"; \
+	    rc=1; \
+	else \
+	    echo "  docs         ok (regenerate identically)"; \
+	fi; \
+	[ $$rc -eq 0 ] && echo "all static checks pass; tools/ab.sh all is the other half"; \
+	exit $$rc
+
 # Machine-readable, so tools/drive.sh can source these rather than
 # re-deriving them and drifting out of step.
 .PHONY: config
