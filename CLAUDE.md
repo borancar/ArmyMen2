@@ -915,12 +915,27 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 
   `WndProc` is registered, not
   detoured: the only reference to `0x0040A6B0` in the whole image is the
-  `WNDCLASS` field in `InitApplication`, and that is ours now. Because the
-  original is left intact it stays *callable*, so the six comm messages that
-  are pure game logic are forwarded to it instead of being reconstructed. Look
-  for this shape before detouring anything reached through a function pointer —
-  a callback, a vtable, a dispatch table. It buys back the thing detouring
-  costs, which is the ability to defer.
+  `WNDCLASS` field in `InitApplication`, and that is ours now. Look for this
+  shape before detouring anything reached through a function pointer — a
+  callback, a vtable, a dispatch table. It buys back the thing detouring costs,
+  which is the ability to defer.
+
+  That deferral has now been taken back: the six comm messages `WndProc` used
+  to forward to the original are reconstructed, so nothing in `winproc.cpp`
+  calls `0x0040A6B0` any more. **Only one of the six can be exercised here.**
+  `0x0500` is posted by `OpenAudioStream` and `InitInput`, so it runs in every
+  session — `StopAudioStream` still reads 2 through a Boot Camp briefing, which
+  with the forward gone can only have come through our handler. The other five
+  need a live DirectPlay session with a second player: a join, a leave, a host
+  migration, a session end, an empty send pool. They are verified by reading,
+  which is weaker than the rest of the tree and should be said plainly.
+
+  `g_charHandler` is NOT the same kind of thing and was left alone. It is a
+  slot, not a function: the menu's text fields write their own consumer into
+  `0x005125B8` and `WndProc` just calls whatever is there. Porting "it" means
+  porting the text-field system — `0x00417790`, `0x00418480`, `0x00454CC0` and
+  the two handlers they install — which is about 2.5 KB with no Win32 or COM
+  anywhere in it.
 - **`-w` is windowed mode**, global `0x00507344`, and it gates far more than it
   looks: the window border and repositioning, the palettized primary in
   `InitDirectDraw`, and `CalibratePalette`. Anything that reads 0 under the

@@ -489,6 +489,53 @@
 #define ADDR_GAME_RAND           0x00464420u  /* int32_t(void) */
 #define ADDR_COMM_INIT_DEFAULTS  0x0040FD40u  /* void(void); fills a global table */
 #define ADDR_COMM_RESET_STATE    0x0040F380u  /* thiscall void(this) */
+
+/* The six window messages WndProc used to hand back to the original. They are
+ * comm traffic -- players joining and leaving, the host migrating, the session
+ * ending -- reached through PostMessage from the DirectPlay callbacks.
+ *
+ * Names carry only what the BODY shows. Four of these name themselves in their
+ * own format strings and are named accordingly; the rest say what was observed
+ * and nothing more, because naming a function from the one call site that
+ * happens to be in front of you is the mistake this file has already recorded
+ * three times. */
+#define ADDR_COMM_DRAIN_MSGS     0x00402690u  /* void(void), walks the msg list */
+#define ADDR_COMM_NO_BUFFERS     0x00403280u  /* void(void), "COMM ERROR: NO BUFFERS" */
+#define ADDR_COMM_PLAYER_SLOT    0x0040F320u  /* thiscall int32(this,id), 16 bytes */
+#define ADDR_COMM_FIND_PLAYER    0x0040F330u  /* thiscall int32(this,id), -1 if absent */
+#define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
+                                               * "Remove Player numPlayers now = %d" */
+#define ADDR_COMM_PLAYER_LEFT    0x0040F790u  /* thiscall int32(this,id), 272 bytes */
+#define ADDR_COMM_END_SETUP      0x00410CE0u  /* void(void) -- "Sending EndSetupMessage" */
+#define ADDR_COMM_SEND_PLAYERS   0x00411270u  /* void(int32) -- "SendPlayerMsg for %d" */
+#define ADDR_COMM_SESSION_OVER   0x0040FB70u  /* thiscall void(this), tail-calls 0x40FAA0 */
+#define ADDR_SHOW_MP_RESULT      0x00426A90u  /* void(int32) -- loads bitmaps/mpwon.bmp */
+#define ADDR_SET_AI_CONTROL      0x004295C0u  /* void(int32), sets 0x00476FB0 */
+#define ADDR_LOBBY_RESET         0x00413480u  /* void(void), 320 bytes */
+#define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */
+#define ADDR_MENU_MESSAGE        0x00431C30u  /* void(const char *, int32, int32) */
+#define ADDR_CHAT_APPEND         0x00411E90u  /* void(const char *, int32), 128 bytes */
+#define ADDR_SPRITE_DROP_NAMED   0x00457820u  /* void(int32, const void *), 128 bytes */
+
+#define ADDR_AI_CONTROLLED       0x00476FB0u  /* int32_t, set by ADDR_SET_AI_CONTROL */
+#define ADDR_EVENT_FLAGS         0x005122FCu  /* uint32_t, what ADDR_GET_EVENT_FLAGS reads */
+#define ADDR_COMM_HOST_CHANGED   0x00511DA0u  /* int32_t, raised on host migration */
+#define ADDR_MISSION_LIVE        0x00511DD4u  /* int32_t, cleared when the game ends */
+#define ADDR_GAME_OVER_FLAGS     0x00515FD8u  /* uint32_t, bit 18 selects the AI mode */
+#define ADDR_HUD_MESSAGE_COLOUR  0x00507234u  /* uint8_t, colour for ADDR_HUD_MESSAGE */
+#define ADDR_MP_LEAVE_SPRITE     0x0045A030u  /* const void *, passed to 0x00457820 */
+#define ADDR_STR_ALLRIGHT_WAV    0x00474194u  /* "AllRight.wav" */
+#define ADDR_STR_HOST_NOW        0x00474178u  /* "Player %s is now the host." */
+#define ADDR_STR_LEFT_AI         0x004741ECu  /* "Player %s has left the game - now AI" */
+#define ADDR_STR_LEFT_GAME       0x004741CCu  /* "Player %s has left the game." */
+#define ADDR_STR_SET_SESSION_FAIL 0x004741A4u /* "Set Session Failed to reopen Session" */
+#define ADDR_STR_DESTROYPLAYER   0x00474220u  /* "DESTROYPLAYER Win Message ..." */
+
+/* The player records live at COMM_OFF_PLAYERS, 112 bytes apart, and the name is
+ * the first field -- which is how both "Player %s ..." messages are built. */
+#define COMM_OFF_PLAYERS         0x218u
+#define COMM_PLAYER_STRIDE       112u
+#define COMM_OFF_VERBOSE         0x418u   /* non-zero: log every DESTROYPLAYER */
 /* Where the registry key and the application GUID live in the image. Neither is
  * restated here -- the game's own copies are used, as with the DirectPlay
  * CLSIDs. The GUID is {2777D2A2-89D1-11D2-A387-00C04F79DCEB}. */
