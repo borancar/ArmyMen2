@@ -460,12 +460,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   that is the one establishing the convention — COM pushes `this` last, thiscall
   loads `ecx` last. `?` went from 56 sites to 1, and **`stdcall` did not move at
   all**, which is the check that matters: the change only reclassified unknowns
-  and took nothing out of the COM set.
+  and took nothing out of the COM set. The last `?` went later still, when the
+  cdecl rule identified it as a linked-list callback, so the column now reads
+  `stdcall`, `thiscall` or `cdecl` for all 356 with nothing unknown.
 - The Win32/DirectX boundary is inventoried and being worked outward-in: 122
-  functions below the CRT touch the import table (`docs/imports.tsv`) and 77
+  functions below the CRT touch the import table (`docs/imports.tsv`) and 76
   contain genuine COM dispatch (`docs/comcalls.tsv`) — that second figure was
-  110 before the ABI classifier was fixed, and the 33 that left were never
-  boundary code at all. Done so far: `WinMain`,
+  110 before the ABI classifier was fixed, and the 34 that left were never
+  boundary code at all: 33 were the engine's own C++ virtuals and the
+  thirty-fourth was the cdecl callback. Done so far: `WinMain`,
   `InitApplication`, `PumpMessage`, `PositionWindow`, `WndProc`,
   `InitDirectDraw`, `InitInput`, `CreateOffscreenSurface`, `ClearSurface`,
   `RealizeSystemPalette`, `SnapshotSystemPalette`, `ReportError`, `FatalError`,
