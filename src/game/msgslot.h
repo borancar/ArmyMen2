@@ -35,6 +35,18 @@ void __cdecl MsgSlotB0(void *comm, uint32_t seq);
 void __cdecl MsgSlotB1(void *comm, uint32_t seq);
 void __cdecl MsgSlotB2(void *comm, uint32_t seq);
 
+/* 0x00401040. The dword at +0xC of a comm message. Callers are CommReceive,
+ * PacketThreadProc and RemovePlayer, so it is the message rather than the comm
+ * object; the same callers read the uid at +4. */
+uint32_t __cdecl MsgField12(const void *msg);
+
+/* 0x00402E90. Mean of the 32 dwords at +0x3A0 of the comm object, divided with
+ * round-toward-zero rather than an arithmetic shift: the original adds 31 when
+ * the sum is negative before shifting by 5. A plain `sum >> 5` would round the
+ * wrong way for negative totals. Thirty-two samples on the comm object is the
+ * shape of a latency or rate average. */
+int32_t __cdecl CommMean32(const void *comm);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

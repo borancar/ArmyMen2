@@ -426,7 +426,10 @@ def main():
                 "ADDR_APPROX_DIST_XY", "ADDR_ANGLE_DELTA", "ADDR_ROUND_TO_8",
                 "ADDR_MAKE_POINT",
                 "ADDR_MSGSLOT_A0", "ADDR_MSGSLOT_A1", "ADDR_MSGSLOT_A2",
-                "ADDR_MSGSLOT_B0", "ADDR_MSGSLOT_B1", "ADDR_MSGSLOT_B2"]
+                "ADDR_MSGSLOT_B0", "ADDR_MSGSLOT_B1", "ADDR_MSGSLOT_B2",
+                "ADDR_MSG_FIELD_12", "ADDR_COMM_MEAN_32",
+                "ADDR_OBJ_FLAG_SET0", "ADDR_OBJ_FLAG_CLEAR0",
+                "ADDR_OBJ_FLAG_BIT0", "ADDR_OBJ_FLAG_BIT1"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -480,6 +483,10 @@ def main():
         "ADDR_MSGSLOT_A0": "MsgSlotA0", "ADDR_MSGSLOT_A1": "MsgSlotA1",
         "ADDR_MSGSLOT_A2": "MsgSlotA2", "ADDR_MSGSLOT_B0": "MsgSlotB0",
         "ADDR_MSGSLOT_B1": "MsgSlotB1", "ADDR_MSGSLOT_B2": "MsgSlotB2",
+        "ADDR_MSG_FIELD_12": "MsgField12", "ADDR_COMM_MEAN_32": "CommMean32",
+        "ADDR_OBJ_FLAG_SET0": "ObjFlagSet0",
+        "ADDR_OBJ_FLAG_CLEAR0": "ObjFlagClear0",
+        "ADDR_OBJ_FLAG_BIT0": "ObjFlagBit0", "ADDR_OBJ_FLAG_BIT1": "ObjFlagBit1",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -488,7 +495,8 @@ def main():
     # function. The one caller ignores eax, so void is the right prototype and
     # the harness has to be told, since it cannot see a C declaration.
     VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
-            "MsgSlotB0", "MsgSlotB1", "MsgSlotB2"}
+            "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
+            "ObjFlagSet0", "ObjFlagClear0"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

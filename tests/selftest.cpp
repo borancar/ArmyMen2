@@ -19,6 +19,7 @@
 #include "../src/game/packkey.h"
 #include "../src/game/item.h"
 #include "../src/game/msgslot.h"
+#include "../src/game/objflag.h"
 
 #include "vectors.h"
 

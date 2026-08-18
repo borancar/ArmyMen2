@@ -468,6 +468,14 @@
 #define ADDR_MSGSLOT_B1          0x00403350u
 #define ADDR_MSGSLOT_B0          0x00403380u
 #define ADDR_MSGSLOT_B2          0x004033B0u
+#define ADDR_MSG_FIELD_12        0x00401040u  /* uint32_t(const void *msg) */
+#define ADDR_COMM_MEAN_32        0x00402E90u  /* int32_t(const void *comm) */
+/* Bit 0 and bit 1 of the word at an object's +0. The tests return the masked
+ * value, 1 or 2, not a boolean -- see src/game/objflag.h. */
+#define ADDR_OBJ_FLAG_SET0       0x0040A010u  /* void(void *obj) */
+#define ADDR_OBJ_FLAG_CLEAR0     0x0040A020u
+#define ADDR_OBJ_FLAG_BIT0       0x0040A030u  /* uint32_t(const void *obj) */
+#define ADDR_OBJ_FLAG_BIT1       0x0040A040u
 #define ADDR_MSG_LIST_INIT       0x00401000u  /* int32_t(void *list) */
 #define ADDR_MSG_LIST_ADD        0x00401050u  /* void(void *list, void *node) */
 #define ADDR_EVENT_CLOSE         0x00402170u  /* void(void *holder) */

@@ -21,6 +21,24 @@ void __cdecl MsgSlotB0(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLO
 void __cdecl MsgSlotB1(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_B_OFF, 1); }
 void __cdecl MsgSlotB2(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_B_OFF, 2); }
 
+uint32_t __cdecl MsgField12(const void *msg)
+{
+    return *(const uint32_t *)((const uint8_t *)msg + 0x0C);
+}
+
+/* cdq/and 0x1F/add/sar is the compiler's signed divide by 32, not a shift. */
+int32_t __cdecl CommMean32(const void *comm)
+{
+    const int32_t *p = (const int32_t *)((const uint8_t *)comm + 0x3A0);
+    int32_t        sum = 0;
+    int32_t        i;
+
+    for (i = 0; i < 32; i++)
+        sum += p[i];
+
+    return (sum + (sum < 0 ? 31 : 0)) >> 5;
+}
+
 int msgslot_install(void)
 {
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
@@ -29,5 +47,7 @@ int msgslot_install(void)
     patch_replace(ADDR_MSGSLOT_B0, (const void *)MsgSlotB0, "MsgSlotB0", 2);
     patch_replace(ADDR_MSGSLOT_B1, (const void *)MsgSlotB1, "MsgSlotB1", 2);
     patch_replace(ADDR_MSGSLOT_B2, (const void *)MsgSlotB2, "MsgSlotB2", 2);
+    patch_replace(ADDR_MSG_FIELD_12, (const void *)MsgField12, "MsgField12", 1);
+    patch_replace(ADDR_COMM_MEAN_32, (const void *)CommMean32, "CommMean32", 1);
     return 0;
 }
