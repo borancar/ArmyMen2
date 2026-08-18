@@ -18,6 +18,7 @@
 #include "../src/game/dist.h"
 #include "../src/game/packkey.h"
 #include "../src/game/item.h"
+#include "../src/game/msgslot.h"
 
 #include "vectors.h"
 

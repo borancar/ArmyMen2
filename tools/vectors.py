@@ -424,7 +424,9 @@ def main():
                 "ADDR_UID_ARMY", "ADDR_UID_ON_WIRE",
                 "ADDR_OBJ_FIELD_A", "ADDR_OBJ_SET_FIELD_A", "ADDR_OBJ_FIELD_B",
                 "ADDR_APPROX_DIST_XY", "ADDR_ANGLE_DELTA", "ADDR_ROUND_TO_8",
-                "ADDR_MAKE_POINT"]
+                "ADDR_MAKE_POINT",
+                "ADDR_MSGSLOT_A0", "ADDR_MSGSLOT_A1", "ADDR_MSGSLOT_A2",
+                "ADDR_MSGSLOT_B0", "ADDR_MSGSLOT_B1", "ADDR_MSGSLOT_B2"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -475,6 +477,9 @@ def main():
         "ADDR_OBJ_FIELD_B": "ObjFieldB",
         "ADDR_APPROX_DIST_XY": "ApproxDistXY", "ADDR_ANGLE_DELTA": "AngleDelta",
         "ADDR_ROUND_TO_8": "RoundTo8", "ADDR_MAKE_POINT": "MakePoint",
+        "ADDR_MSGSLOT_A0": "MsgSlotA0", "ADDR_MSGSLOT_A1": "MsgSlotA1",
+        "ADDR_MSGSLOT_A2": "MsgSlotA2", "ADDR_MSGSLOT_B0": "MsgSlotB0",
+        "ADDR_MSGSLOT_B1": "MsgSlotB1", "ADDR_MSGSLOT_B2": "MsgSlotB2",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -482,7 +487,8 @@ def main():
     # Comparing that would test the calling convention rather than the
     # function. The one caller ignores eax, so void is the right prototype and
     # the harness has to be told, since it cannot see a C declaration.
-    VOID = {"ObjSetFieldA"}
+    VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
+            "MsgSlotB0", "MsgSlotB1", "MsgSlotB2"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"
@@ -543,10 +549,20 @@ def main():
             fh.write("\nstatic const AM2_Vector kVectors[] = {\n")
             for cname, nargs, kinds, vs in out:
                 for k, (args, eax, writes, pre) in enumerate(vs):
-                    a = [(x - SCRATCH) if kinds.get(i) == "ptr" else x
-                         for i, x in enumerate(args)]
+                    # A NULL pointer argument is a literal, not an offset. It
+                    # was being emitted as 0 - SCRATCH, i.e. 0xE0000000, which
+                    # the replay then rebased onto its own buffer and wrote to.
+                    # The fault only appears for functions that TOLERATE null:
+                    # everything before these dereferenced unconditionally, so
+                    # the emulator faulted and those vectors were dropped
+                    # before they could be emitted.
+                    a, p = [], []
+                    for i, x in enumerate(args):
+                        isptr = kinds.get(i) == "ptr" and x != 0
+                        a.append((x - SCRATCH) if isptr else x)
+                        p.append(1 if isptr else 0)
                     a += [0] * (6 - len(a))
-                    p = [1 if kinds.get(i) == "ptr" else 0 for i in range(6)]
+                    p += [0] * (6 - len(p))
                     # A function that returns one of its pointer arguments --
                     # RectSet hands the rectangle back -- records an address
                     # from the emulator's scratch page, which the replay's own

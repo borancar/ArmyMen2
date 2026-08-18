@@ -25,6 +25,7 @@
 #include "../game/win32/font.h"
 #include "../game/win32/mapdraw.h"
 #include "../game/item.h"
+#include "../game/msgslot.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
@@ -411,6 +412,7 @@ static void install(void)
     rect_install();
     dist_install();
     item_install();
+    msgslot_install();
     objtable_install();
     objtype_install();
     packkey_install();

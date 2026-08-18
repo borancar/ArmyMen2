@@ -459,6 +459,15 @@
  * and the packet thread. It went in as "mirrors CommShutdown", guessed from the
  * call site; its own error string says "Error launching packet thread". */
 #define ADDR_START_PACKET_THREAD 0x004021A0u  /* int32_t(void) */
+/* Two 120-entry state arrays on the comm object, at +0x420 and +0x600, six
+ * setters differing only in array and value. See src/game/msgslot.h -- nothing
+ * in the image READS either array. */
+#define ADDR_MSGSLOT_A1          0x004032C0u  /* void(comm, seq) */
+#define ADDR_MSGSLOT_A0          0x004032F0u
+#define ADDR_MSGSLOT_A2          0x00403320u
+#define ADDR_MSGSLOT_B1          0x00403350u
+#define ADDR_MSGSLOT_B0          0x00403380u
+#define ADDR_MSGSLOT_B2          0x004033B0u
 #define ADDR_MSG_LIST_INIT       0x00401000u  /* int32_t(void *list) */
 #define ADDR_MSG_LIST_ADD        0x00401050u  /* void(void *list, void *node) */
 #define ADDR_EVENT_CLOSE         0x00402170u  /* void(void *holder) */
