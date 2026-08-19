@@ -309,12 +309,47 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
 
 
 def body_addrs(img, md, addr, size):
-    """Instruction addresses in the function, minus trailing alignment padding.
+    """Instruction addresses in the function -- the coverage denominator.
 
-    Linear decode: these are leaves with no data in the middle. int3 and nop
-    runs at the end are the linker aligning the next function and are not
-    reachable, so counting them would put 100% out of reach for every function.
+    angr's CFG first, linear decode as a fallback. The difference is not
+    cosmetic: a jump-table dispatch keeps its index table and its target table
+    INSIDE the function, and linear decode turns that data into instructions
+    nothing can ever reach. 0x00406920 decodes to 59 "instructions" of which
+    27 are two tables, so its coverage could never pass 54% however good the
+    inputs were. The CFG sees 32.
+
+    Trailing nop/int3 padding is dropped either way: that is the linker
+    aligning the next function, not code.
     """
+    try:
+        import angr
+        proj = _project(angr)
+        cfg = proj.analyses.CFGFast(regions=[(addr, addr + size)], normalize=True)
+
+        # Blocks REACHABLE FROM THE ENTRY, not every block angr finds in the
+        # range. Taking them all puts the alignment padding back in: the
+        # logger at 0x0045CAA0 is one `ret` followed by fifteen nops, and
+        # CFGFast happily makes blocks out of the nops.
+        start = cfg.model.get_any_node(addr)
+        if start is None:
+            raise ValueError("no entry node")
+        out, seen, stack = set(), set(), [start]
+        while stack:
+            node = stack.pop()
+            if node.addr in seen or not (addr <= node.addr < addr + size):
+                continue
+            seen.add(node.addr)
+            try:
+                out.update(proj.factory.block(node.addr,
+                                              size=node.size).instruction_addrs)
+            except Exception:
+                pass
+            stack.extend(cfg.model.get_successors(node))
+        if out:
+            return out
+    except Exception:
+        pass
+
     ins = list(md.disasm(img.read(addr, size), addr))
     while ins and ins[-1].mnemonic in ("nop", "int3"):
         ins.pop()
