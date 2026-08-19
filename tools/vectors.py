@@ -532,7 +532,9 @@ def main():
                 "ADDR_REVERSE_BLOCKS", "ADDR_SCRIPT_COMPARE",
                 "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4",
                 "ADDR_COMPARE_PAIR", "ADDR_MAP_CODE",
-                "ADDR_POINTS_EQUAL", "ADDR_POINTS_DIFFER"]
+                "ADDR_POINTS_EQUAL", "ADDR_POINTS_DIFFER",
+                "ADDR_COMPARE_TRIPLE", "ADDR_TYPES_COMPATIBLE",
+                "ADDR_SET_FACING_14", "ADDR_SET_FACING_08"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -608,6 +610,9 @@ def main():
         "ADDR_SCRIPT_COMPARE": "ScriptCompare",
         "ADDR_COMPARE_PAIR": "ComparePair", "ADDR_MAP_CODE": "MapCode",
         "ADDR_POINTS_EQUAL": "PointsEqual", "ADDR_POINTS_DIFFER": "PointsDiffer",
+        "ADDR_COMPARE_TRIPLE": "CompareTriple",
+        "ADDR_TYPES_COMPATIBLE": "TypesCompatible",
+        "ADDR_SET_FACING_14": "SetFacing14", "ADDR_SET_FACING_08": "SetFacing08",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -618,7 +623,7 @@ def main():
     VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
             "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet",
-            "TitleCaseName", "ResetPairMask"}
+            "TitleCaseName", "ResetPairMask", "SetFacing14", "SetFacing08"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

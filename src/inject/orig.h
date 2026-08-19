@@ -1142,6 +1142,10 @@
 #define ADDR_SCRIPT_COMPARE    0x004374F0u  /* int32_t(a, op, b) */
 #define ADDR_COMPARE_PAIR      0x00435EB0u  /* int32_t(const void*, const void*) */
 #define ADDR_MAP_CODE          0x00406920u  /* int32_t(int32_t) */
+#define ADDR_COMPARE_TRIPLE    0x00435A80u  /* int32_t(const void*, const void*) */
+#define ADDR_TYPES_COMPATIBLE  0x00433570u  /* int32_t(int32_t a, int32_t b) */
+#define ADDR_SET_FACING_14     0x0043D450u  /* void(facing, src, out) */
+#define ADDR_SET_FACING_08     0x0045C5E0u
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */

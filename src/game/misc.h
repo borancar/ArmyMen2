@@ -104,6 +104,36 @@ int32_t __cdecl ComparePair(const void *a, const void *b);
  * 30-entry index table into eight arms -- so it is a table here too. */
 int32_t __cdecl MapCode(int32_t code);
 
+/* 0x00435A80. ComparePair with a third field: keys at +0, +4 and +8, first
+ * difference wins, difference returned rather than its sign. */
+int32_t __cdecl CompareTriple(const void *a, const void *b);
+
+/* 0x00433570. Whether two type codes go together. Only 8, 9 and 10 can say
+ * yes, and each has its own rule -- 8 pairs with 29, 9 with anything but 9,
+ * 10 with 29 or 8. Everything else is no.
+ *
+ * The dispatch is a 22-entry index table over five arms, so the shape is a
+ * switch the compiler flattened rather than a formula. Written out as the
+ * three cases it is. */
+int32_t __cdecl TypesCompatible(int32_t a, int32_t b);
+
+/* 0x0043D450 and 0x0045C5E0. The same function twice, over two different
+ * records: an eight-way selector writes a mode field and a character taken
+ * from src+0x40, shifted by 0x20 up, down, or not at all.
+ *
+ * 0x20 on a byte is the ASCII case bit, so what these produce is a letter in
+ * one case or the other -- the shape of building an animation or file name
+ * from a base letter and a facing. The mode field takes 2 or 1 in the first
+ * and 4 or 1 in the second, and the pair of them differ only in the offsets
+ * they write, so the two records are laid out differently and hold the same
+ * thing.
+ *
+ * Selector 1 jumps into selector 3's body past its first instruction, so those
+ * two arms are the same and are written that way. Above 7 nothing is written
+ * at all -- the out record is left as it was, not zeroed. */
+void __cdecl SetFacing14(int32_t facing, const void *src, void *out);
+void __cdecl SetFacing08(int32_t facing, const void *src, void *out);
+
 int misc_install(void);
 
 #ifdef __cplusplus

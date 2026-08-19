@@ -182,6 +182,96 @@ int32_t __cdecl MapCode(int32_t code)
     return kCodeMap[i];
 }
 
+int32_t __cdecl CompareTriple(const void *a, const void *b)
+{
+    const int32_t *x = (const int32_t *)a;
+    const int32_t *y = (const int32_t *)b;
+
+    if (x[0] != y[0])
+        return x[0] - y[0];
+    if (x[1] != y[1])
+        return x[1] - y[1];
+    if (x[2] != y[2])
+        return x[2] - y[2];
+    return 0;
+}
+
+int32_t __cdecl TypesCompatible(int32_t a, int32_t b)
+{
+    switch (a) {
+    case 8:  return (b == 29) ? 1 : 0;
+    case 9:  return (b != 9) ? 1 : 0;
+    case 10: return (b == 29 || b == 8) ? 1 : 0;
+    default: return 0;
+    }
+}
+
+/* Shared body: `mode` is the value written for the wide facings, `narrow` for
+ * the two that use the other one, and the offsets say which record. */
+static void SetFacing(int32_t facing, const void *src, void *out,
+                      uint32_t off_mode, uint32_t off_flag,
+                      int32_t wide, int32_t narrow)
+{
+    uint8_t *o = (uint8_t *)out;
+    uint8_t  base;
+
+    /* The read of src+0x40 belongs INSIDE the arms. Hoisting it here is the
+     * obvious tidy-up and it is wrong: for a facing above 7 the original never
+     * touches src at all, so a null src is harmless there and fatal if the
+     * read has been lifted. The vectors found it immediately -- a page fault
+     * reading address 0x40. */
+    if ((uint32_t)facing > 7)
+        return;
+    base = *((const uint8_t *)src + 0x40);
+
+    switch (facing) {
+    case 0:
+        *(int32_t *)(o + off_mode) = wide;
+        o[0] = base;
+        break;
+    case 1:
+    case 3:
+        *(int32_t *)(o + off_flag) = 1;
+        *(int32_t *)(o + off_mode) = wide;
+        o[0] = (uint8_t)(base + 0x20);
+        break;
+    case 2:
+        *(int32_t *)(o + off_mode) = narrow;
+        o[0] = (uint8_t)(base + 0x20);
+        break;
+    case 4:
+        *(int32_t *)(o + off_flag) = 1;
+        *(int32_t *)(o + off_mode) = wide;
+        o[0] = base;
+        break;
+    case 5:
+        *(int32_t *)(o + off_flag) = 1;
+        *(int32_t *)(o + off_mode) = wide;
+        o[0] = (uint8_t)(base - 0x20);
+        break;
+    case 6:
+        *(int32_t *)(o + off_mode) = narrow;
+        o[0] = (uint8_t)(base - 0x20);
+        break;
+    case 7:
+        *(int32_t *)(o + off_mode) = wide;
+        o[0] = (uint8_t)(base - 0x20);
+        break;
+    default:
+        break;                       /* above 7 writes nothing */
+    }
+}
+
+void __cdecl SetFacing14(int32_t facing, const void *src, void *out)
+{
+    SetFacing(facing, src, out, 0x14, 0x18, 2, 1);
+}
+
+void __cdecl SetFacing08(int32_t facing, const void *src, void *out)
+{
+    SetFacing(facing, src, out, 0x08, 0x0C, 4, 1);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -210,5 +300,11 @@ int misc_install(void)
                   "ScriptCompare", 3);
     patch_replace(ADDR_COMPARE_PAIR, (const void *)ComparePair, "ComparePair", 2);
     patch_replace(ADDR_MAP_CODE, (const void *)MapCode, "MapCode", 1);
+    patch_replace(ADDR_COMPARE_TRIPLE, (const void *)CompareTriple,
+                  "CompareTriple", 2);
+    patch_replace(ADDR_TYPES_COMPATIBLE, (const void *)TypesCompatible,
+                  "TypesCompatible", 2);
+    patch_replace(ADDR_SET_FACING_14, (const void *)SetFacing14, "SetFacing14", 3);
+    patch_replace(ADDR_SET_FACING_08, (const void *)SetFacing08, "SetFacing08", 3);
     return 0;
 }
