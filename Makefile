@@ -256,7 +256,7 @@ vectors:
 .PHONY: check
 check:
 	@rc=0; \
-	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions; do \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions checkpatches; do \
 	    printf '  %-12s ' "$$t"; \
 	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
 	        echo ok; \

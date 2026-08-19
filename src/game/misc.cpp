@@ -88,17 +88,6 @@ int32_t __cdecl IsKind7(const void *p)
     return (*(const int32_t *)p == 7) ? 1 : 0;
 }
 
-int32_t __cdecl IsBlank(uint8_t c)
-{
-    return (c == ' ' || c == '\t' || c == '\r') ? 1 : 0;
-}
-
-int32_t __cdecl IsScriptDelim(uint8_t c)
-{
-    return (c == ')' || c == '(' || c == ',' || c == '<' || c == '=' ||
-            c == '>' || c == '{' || c == '}' || c == '&' || c == '+') ? 1 : 0;
-}
-
 uint32_t __cdecl SwapColourBytes(uint32_t colour, uint32_t unused)
 {
     (void)unused;
@@ -137,16 +126,6 @@ int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
         s -= n;
     }
     return 1;
-}
-
-int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)
-{
-    switch (op) {
-    case 0:  return (b == a) ? 1 : 0;
-    case 1:  return (b < a) ? 1 : 0;
-    case 2:  return (b > a) ? 1 : 0;
-    default: return 0;
-    }
 }
 
 int32_t __cdecl ComparePair(const void *a, const void *b)
@@ -546,9 +525,6 @@ int misc_install(void)
     patch_replace(ADDR_RESET_PAIR_MASK, (const void *)ResetPairMask,
                   "ResetPairMask", 2);
     patch_replace(ADDR_IS_KIND_7, (const void *)IsKind7, "IsKind7", 1);
-    patch_replace(ADDR_IS_BLANK, (const void *)IsBlank, "IsBlank", 1);
-    patch_replace(ADDR_IS_SCRIPT_DELIM, (const void *)IsScriptDelim,
-                  "IsScriptDelim", 1);
     patch_replace(ADDR_SWAP_COLOUR_BYTES, (const void *)SwapColourBytes,
                   "SwapColourBytes", 2);
     patch_replace(ADDR_NULL_STUB_4, (const void *)NullStub4, "NullStub4", 1);
@@ -557,8 +533,6 @@ int misc_install(void)
     patch_replace(ADDR_RETURN_ONE, (const void *)ReturnOne, "ReturnOne", 0);
     patch_replace(ADDR_REVERSE_BLOCKS, (const void *)ReverseBlocks,
                   "ReverseBlocks", 4);
-    patch_replace(ADDR_SCRIPT_COMPARE, (const void *)ScriptCompare,
-                  "ScriptCompare", 3);
     patch_replace(ADDR_COMPARE_PAIR, (const void *)ComparePair, "ComparePair", 2);
     patch_replace(ADDR_MAP_CODE, (const void *)MapCode, "MapCode", 1);
     patch_replace(ADDR_COMPARE_TRIPLE, (const void *)CompareTriple,

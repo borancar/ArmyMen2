@@ -16,6 +16,16 @@
 extern "C" {
 #endif
 
+/* 0x0043EE80. Space, tab or carriage return. NOT newline -- a reconstruction
+ * that included it would still tokenise every shipped script correctly, since
+ * NextToken tests for newline separately before asking. */
+int32_t __cdecl IsBlank(uint8_t c);
+
+/* 0x0043EEA0. One of ) ( , < = > { } & +. Exactly the first character of each
+ * of the thirteen operator tokens, which is what makes the pairing of <=, >=
+ * and <> a second step rather than part of this. */
+int32_t __cdecl IsScriptDelim(uint8_t c);
+
 /* 0x0043EEE0. The id for a keyword, or -1.
  *
  * A linear walk of the 185-entry table at 0x00487C90, comparing with an inlined

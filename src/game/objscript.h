@@ -55,7 +55,7 @@ AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o);
 /* 0x004374F0. Compare `b` against `a`: op 0 equal, 1 less, 2 greater. The
  * argument order is the surprise -- the value under test is the THIRD
  * argument, and everything else answers 0. */
-int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b);
+int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b);
 
 /* 0x00436C20. One `state <name>` block: the name, then frames until the next
  * `state` or the next top-level statement. */

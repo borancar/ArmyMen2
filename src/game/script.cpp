@@ -24,6 +24,17 @@ typedef struct {
 #define kScriptTokens   ((const AM2_ScriptToken *)AM2_IMAGE(0x00487C90u))
 #define kScriptTokenEnd ((const AM2_ScriptToken *)AM2_IMAGE(0x00488258u))
 
+int32_t __cdecl IsBlank(uint8_t c)
+{
+    return (c == ' ' || c == '\t' || c == '\r') ? 1 : 0;
+}
+
+int32_t __cdecl IsScriptDelim(uint8_t c)
+{
+    return (c == ')' || c == '(' || c == ',' || c == '<' || c == '=' ||
+            c == '>' || c == '{' || c == '}' || c == '&' || c == '+') ? 1 : 0;
+}
+
 int32_t __cdecl ScriptLookupToken(const char *word)
 {
     const AM2_ScriptToken *e;
@@ -2957,6 +2968,10 @@ int script_install(void)
     am2_parse_all = getenv("AM2_PARSE_ALL") != 0;
     am2_orig_actions = getenv("AM2_ORIG_ACTIONS") != 0;
 
+    rc |= patch_replace(ADDR_IS_BLANK,
+                        (const void *)IsBlank, "IsBlank", 1);
+    rc |= patch_replace(ADDR_IS_SCRIPT_DELIM,
+                        (const void *)IsScriptDelim, "IsScriptDelim", 1);
     rc |= patch_replace(ADDR_SCRIPT_LOOKUP_TOKEN,
                         (const void *)ScriptLookupToken,
                         "ScriptLookupToken", 1);

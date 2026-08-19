@@ -41,6 +41,7 @@
 #include "../game/packkey.h"
 #include "../game/objtype.h"
 #include "../game/misc.h"
+#include "../game/script.h"
 #include "../game/item.h"
 #include "../game/objflag.h"
 #include "../game/msgslot.h"

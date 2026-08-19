@@ -9,6 +9,10 @@
 
 #include <stdint.h>
 
+/* IsBlank and IsScriptDelim moved to script.cpp: 0x0043EE80 and 0x0043EEA0
+ * are inside script.cpp's own address band, and they are the tokeniser's two
+ * character predicates. */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,17 +59,7 @@ void __cdecl ResetPairMask(uint32_t *a, uint32_t *b);
  * family, so it is not one of them however much it looks like one. */
 int32_t __cdecl IsKind7(const void *p);
 
-/* 0x0043EE80. Space, tab or carriage return. NOT newline -- a reconstruction
- * that reached for isspace() would accept '\n' and this does not. */
-int32_t __cdecl IsBlank(uint8_t c);
 
-/* 0x0043EEA0. One of ) ( , < = > { } & +.
- *
- * Confirmed rather than guessed: the parser's keyword table gives tokens 1 to
- * 13 as ( ) , < <= = > >= <> { } & + , and this set is exactly the first
- * character of each. It is the lexer asking "does a delimiter start here".
- * See docs/scripttokens.md. */
-int32_t __cdecl IsScriptDelim(uint8_t c);
 
 /* 0x0041AE90. Reverses the low three bytes and zeroes the fourth: 0x00BBGGRR
  * becomes 0x00RRGGBB. Sits beside the palette expander, so it is the channel

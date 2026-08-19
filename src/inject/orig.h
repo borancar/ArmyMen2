@@ -1034,7 +1034,7 @@
 #define ADDR_OBJ_FRAME_NEW_ACTION 0x00437010u  /* 72-byte entries */
 #define ADDR_OBJ_STATE_NEW_FRAME  0x00437070u  /* 20-byte entries */
 #define ADDR_OBJ_SCRIPT_NEW_STATE 0x004370D0u  /* 16-byte entries */
-#define ADDR_SCRIPT_COMPARE3      0x004374F0u  /* int32_t(a, op, b) */
+#define ADDR_SCRIPT_COMPARE       0x004374F0u  /* int32_t(a, op, b) */
 #define ADDR_SCRIPT_NAME_UID      0x0043F9F0u  /* int32_t(const char *) */
 #define ADDR_SCRIPT_INT_OR_VAR    0x00442F80u  /* (ctx,at,&val,&isliteral) */
 #define ADDR_SCRIPT_OBJECT_UID    0x0043FF00u  /* (ctx,at,&zero,&uid) */
@@ -1427,7 +1427,6 @@
 #define ADDR_RETURN_ZERO       0x0042E980u  /* int32_t(void) */
 #define ADDR_RETURN_ONE        0x004354F0u  /* int32_t(void) */
 #define ADDR_REVERSE_BLOCKS    0x004231A0u  /* int32_t(dst, src, total, count) */
-#define ADDR_SCRIPT_COMPARE    0x004374F0u  /* int32_t(a, op, b) */
 #define ADDR_COMPARE_PAIR      0x00435EB0u  /* int32_t(const void*, const void*) */
 #define ADDR_MAP_CODE          0x00406920u  /* int32_t(int32_t) */
 #define ADDR_COMPARE_TRIPLE    0x00435A80u  /* int32_t(const void*, const void*) */

@@ -69,7 +69,7 @@ AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o)
     return p;
 }
 
-int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b)
+int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)
 {
     switch (op) {
     case 0:  return b == a;
@@ -281,8 +281,8 @@ int objscript_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_SCRIPT_COMPARE3,
-                        (const void *)ScriptCompare3, "ScriptCompare3", 1);
+    rc |= patch_replace(ADDR_SCRIPT_COMPARE,
+                        (const void *)ScriptCompare, "ScriptCompare", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);
