@@ -266,7 +266,7 @@ const char *__cdecl ScriptTokenName(int32_t id)
     return 0;
 }
 
-#define kScriptNameCount (*(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
+#define kScriptNameCount (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
 #define kScriptNames     (*(AM2_ScriptName **)AM2_IMAGE(ADDR_SCRIPT_NAMES))
 
 int32_t __cdecl ScriptFindName(const char *name)
@@ -285,6 +285,55 @@ int32_t __cdecl ScriptFindName(const char *name)
             return i;
     }
     return -1;
+}
+
+#define kScriptNameCap   (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_CAP))
+#define kNextUid         (*(int32_t *)AM2_IMAGE(ADDR_NEXT_UID))
+#define kKindName(k)     ((const char *)AM2_IMAGE( \
+                             ((const uint32_t *)AM2_IMAGE( \
+                                 ADDR_SCRIPT_KIND_NAMES))[k]))
+
+int32_t __cdecl AllocUid(void)
+{
+    return kNextUid++;
+}
+
+int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid)
+{
+    if (kScriptNameCount >= kScriptNameCap) {
+        kScriptNameCap += 10;
+        kScriptNames = (AM2_ScriptName *)am2_realloc(
+            kScriptNames, (size_t)kScriptNameCap * sizeof(AM2_ScriptName));
+    }
+
+    AM2_ScriptName *e = &kScriptNames[kScriptNameCount];
+
+    /* strlen+1, because the `repne scasb` that sizes the block counts the
+     * terminator -- the same arithmetic that caught ParseNumber out. */
+    size_t len = strlen(name) + 1;
+    e->name = (char *)am2_malloc(len);
+    memcpy(e->name, name, len);
+    e->live = 1;
+    e->type = type;
+
+    switch (type) {
+    case 0:
+        e->value = AllocUid();
+        break;
+    case 1:
+    case 2:
+    case 3:
+        e->value = uid;
+        break;
+    default:
+        am2_log("AddNameTableName: invalid type; %s has type %d and uid %d\n",
+                name, type, uid);
+        /* Stored anyway, and the count still advances. */
+        e->value = uid;
+        break;
+    }
+
+    return kScriptNameCount++;
 }
 
 char *__cdecl ScriptTokenText(const AM2_ScriptTok *tok, char *out)
@@ -358,6 +407,60 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
     }
 }
 
+int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    /* Every step advances *at first and then checks, so a truncated statement
+     * leaves the index past the last token it consumed. */
+    if (++(*at) >= ctx->count) {
+        am2_log("Unexpected end of script.\n");
+        return 0;
+    }
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+    if (tok->kind != AM2_TOKEN_STRING) {
+        /* The type name is pushed before the text is rendered, and the render
+         * uses the shared word buffer -- so the order matters here in a way it
+         * would not if either side were a plain value. */
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_STRING));
+        return 0;
+    }
+
+    if (ScriptFindName((const char *)tok->value) >= 0) {
+        am2_log("Line [%4d]:  Duplicate variable name.\n",
+                ctx->tokens[*at].line);
+        return 0;
+    }
+
+    int32_t slot = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                    AM2_NAME_TYPE_INTEGER, 0);
+
+    /* The token owned that string; the name table has its own copy now. */
+    am2_free(ctx->tokens[*at].value);
+    ctx->tokens[*at].kind = 7;
+    ctx->tokens[*at].value = (void *)(uintptr_t)slot;
+
+    if (++(*at) >= ctx->count) {
+        am2_log("Unexpected end of script.\n");
+        return 0;
+    }
+
+    tok = &ctx->tokens[*at];
+    if (tok->kind != AM2_TOKEN_INTEGER) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_INTEGER));
+        return 0;
+    }
+
+    kScriptNames[slot].value = (int32_t)(uintptr_t)tok->value;
+    (*at)++;
+    return 1;
+}
+
 /* The five statement handlers are still the original's. Each takes the context
  * and a pointer to the walk index, which it advances past its own statement --
  * so ReadScript's loop makes no assumption about statement length. They are
@@ -408,8 +511,7 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
                 continue;
             }
             if (id == 133) {
-                ((am2_script_handler)(uintptr_t)
-                     ADDR_SCRIPT_VARIABLE)(ctx, &at);
+                ScriptVariable(ctx, &at);
                 continue;
             }
             if (id == 44) {
@@ -448,6 +550,26 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
     }
 
     return ok;
+}
+
+void am2_script_reset_names(void)
+{
+    for (int32_t i = 0; i < kScriptNameCount; i++)
+        am2_free(kScriptNames[i].name);
+    am2_free(kScriptNames);
+    kScriptNames = 0;
+    kScriptNameCount = 0;
+    kScriptNameCap = 0;
+}
+
+int32_t am2_script_name_count(void)
+{
+    return kScriptNameCount;
+}
+
+const AM2_ScriptName *am2_script_name(int32_t i)
+{
+    return &kScriptNames[i];
 }
 
 int script_install(void)
@@ -494,5 +616,14 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_PARSE_FILE,
                         (const void *)ReadScript,
                         "ReadScript", 1);
+    rc |= patch_replace(ADDR_SCRIPT_ALLOC_UID,
+                        (const void *)AllocUid,
+                        "AllocUid", 1);
+    rc |= patch_replace(ADDR_SCRIPT_ADD_NAME,
+                        (const void *)AddNameTableName,
+                        "AddNameTableName", 1);
+    rc |= patch_replace(ADDR_SCRIPT_VARIABLE,
+                        (const void *)ScriptVariable,
+                        "ScriptVariable", 1);
     return rc;
 }

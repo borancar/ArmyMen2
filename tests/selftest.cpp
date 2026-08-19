@@ -48,6 +48,7 @@ static void FillScratch(void)
 static int ScriptTokens(int *passed);
 static int ScriptLines(int *passed);
 static int ScriptSpine(int *passed);
+static int ScriptVariables(int *passed);
 
 int main(void)
 {
@@ -108,7 +109,73 @@ int main(void)
     fail += ScriptTokens(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);
+    fail += ScriptVariables(&pass);
     return fail ? 1 : 0;
+}
+
+/* The `variable` statement, over every such line the scripts contain plus the
+ * malformed shapes they never take -- which is most of the value here, since a
+ * handler with four exits and three of them errors gets one exit exercised by
+ * a shipped script.
+ *
+ * `variable x 1.5` is absent for the same reason kind 4 is absent above: its
+ * error path renders the Float through ScriptTokenText and "%6.2f" does not
+ * emulate.
+ */
+static int ScriptVariables(int *passed)
+{
+    am2_crt_use_host();
+
+    int pass = 0, fail = 0;
+    for (uint32_t i = 0; i < sizeof am2_script_vars /
+                             sizeof am2_script_vars[0]; i++) {
+        const AM2_ScriptVarVec *v = &am2_script_vars[i];
+        AM2_ScriptCtx ctx = { 0, 0, 0 };
+        int32_t at = 0;
+
+        /* Each case starts from an empty name table, so the entry it leaves
+         * behind is the whole of what it added. */
+        am2_script_reset_names();
+
+        /* A `pre` line runs first against the same table -- the only route to
+         * the duplicate-name path, which nothing in the corpus takes. */
+        if (v->pre) {
+            AM2_ScriptCtx p = { 0, 0, 0 };
+            int32_t pat = 0;
+            ScriptNextToken(v->pre, &p, 5);
+            ScriptVariable(&p, &pat);
+            ScriptResetTokens(&p);
+        }
+
+        ScriptNextToken(v->line, &ctx, 5);
+        int32_t rc = ScriptVariable(&ctx, &at);
+
+        int32_t names = am2_script_name_count();
+        const AM2_ScriptName *n0 = names ? am2_script_name(0) : 0;
+        int32_t kind1 = ctx.count > 1 ? ctx.tokens[1].kind : -1;
+
+        int bad = rc != v->rc || at != v->at || ctx.count != v->count ||
+                  names != v->names || kind1 != v->kind0;
+        if (!bad && names) {
+            bad = strcmp(n0->name, v->name0) || n0->type != v->type0 ||
+                  n0->value != v->value0;
+        }
+
+        if (bad) {
+            if (fail < 6)
+                printf("  FAIL variable %-28s rc %d/%d at %d/%d "
+                       "names %d/%d kind1 %d/%d\n",
+                       v->line, (int)rc, (int)v->rc, (int)at, (int)v->at,
+                       (int)names, (int)v->names, (int)kind1, (int)v->kind0);
+            fail++;
+        } else {
+            pass++;
+        }
+        ScriptResetTokens(&ctx);
+    }
+    printf("  %d variable cases: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
 }
 
 /* The layer above the tokeniser: ScriptTokenName, ScriptTokenText and

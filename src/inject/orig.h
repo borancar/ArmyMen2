@@ -861,9 +861,24 @@
 /* The script's name table -- declared variables and objects. Sixteen bytes an
  * entry, the first field a `char *`. Written at runtime, so the offline test
  * cannot reach it; only the in-process check can. */
+#define ADDR_SCRIPT_NAME_CAP     0x00656460u
 #define ADDR_SCRIPT_NAME_COUNT   0x00656464u
 #define ADDR_SCRIPT_NAMES        0x00656468u
 #define AM2_SCRIPT_NAME_SIZE     0x10u
+#define ADDR_SCRIPT_ADD_NAME     0x0043F7A0u  /* AddNameTableName */
+#define ADDR_SCRIPT_ALLOC_UID    0x0041E7F0u  /* int32_t(void) */
+#define ADDR_NEXT_UID            0x00511DF4u
+
+/* The seven kind names, indexed by kind -- "Unknown", "Control Character",
+ * "Reserved", "Integer", "Float", "String", "Name". The handlers pass entries
+ * of this array straight into their "expected token of type %s" message. */
+#define ADDR_SCRIPT_KIND_NAMES   0x00487C74u
+
+/* A declared name's type, as AddNameTableName takes it. 0 allocates a fresh
+ * uid; 1..3 store the one passed. Anything else is an error and stores it
+ * anyway. Type 3 is what `variable` declares. */
+#define AM2_NAME_TYPE_OBJECT     0
+#define AM2_NAME_TYPE_INTEGER    3
 
 /* Non-zero suppresses ReadScript's closing summary. */
 #define ADDR_SCRIPT_QUIET        0x00511DA0u

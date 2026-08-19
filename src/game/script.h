@@ -90,13 +90,40 @@ int32_t __cdecl ScriptParseNumber(const char *text, int32_t *ival, float *fval);
 void __cdecl ScriptNextToken(const char *line, AM2_ScriptCtx *ctx,
                              int32_t lineno);
 
-/* A declared name -- a script variable or object. Sixteen bytes; only the
- * first field is established, and the rest is whatever ScriptDeclareVar
- * (0x0043F7A0) writes. Named opaquely rather than guessed at. */
+/* A declared name -- a script variable or object. Sixteen bytes, and every
+ * field is established by AddNameTableName, which writes all four. */
 typedef struct {
-    const char *name;
-    uint8_t     rest[12];
+    char   *name;       /* a malloc'd copy; the table owns it */
+    int32_t type;       /* AM2_NAME_TYPE_* */
+    int32_t value;      /* a uid for type 0, the caller's value otherwise */
+    int32_t live;       /* always written as 1 */
 } AM2_ScriptName;
+
+/* 0x0041E7F0. The next object uid. A bare post-increment of a global. */
+int32_t __cdecl AllocUid(void);
+
+/* 0x0043F7A0. Append a name to the table and return its index.
+ *
+ * Named from its own error string. Grows ten entries at a time like the token
+ * list, copies the name onto the game's heap, and marks the entry live.
+ *
+ * Type 0 ignores `uid` and allocates a fresh one; 1, 2 and 3 store what they
+ * are given. Any other type logs and then stores it anyway -- the entry is
+ * still appended and the count still advances, so this is a complaint rather
+ * than a rejection. */
+int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid);
+
+/* 0x00443F70. The `variable` statement: `variable <name> <integer>`.
+ *
+ * Declares the name with type 3 and then overwrites its value with the
+ * integer that follows. Returns 1 on success, 0 on any error, and on error
+ * leaves *at wherever it got to -- ReadScript then carries on from there.
+ *
+ * It REWRITES the name token in place: the String token becomes kind 7 with
+ * the table index as its value, and the string it owned is freed. That is
+ * where kind 7 comes from, and why ScriptTokenText's kind-7 arm resolves
+ * through the name table. */
+int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at);
 
 /* 0x0043EF40. The keyword whose id this is, or NULL. The reverse of
  * ScriptLookupToken, over the same table and just as linear. */
@@ -136,6 +163,13 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
  * Tokens already in the context are left alone -- the walk starts at the count
  * on entry -- so a caller can accumulate several files into one list. */
 int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx);
+
+/* For the offline test only: the name table lives in the image, so the test
+ * needs a way to empty it between cases and to read an entry back. Not part of
+ * the reconstruction -- nothing in the game calls these. */
+void                  am2_script_reset_names(void);
+int32_t               am2_script_name_count(void);
+const AM2_ScriptName *am2_script_name(int32_t i);
 
 int script_install(void);
 

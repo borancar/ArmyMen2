@@ -7,8 +7,9 @@
 #   tools/ab.sh intro        -dbg, so the Smacker film plays
 #   tools/ab.sh audio        Boot Camp again, with a silent sound device
 #   tools/ab.sh mission      past both dialogs into live play, and scrolling
+#   tools/ab.sh campaign     SINGLE PLAYER into MAP 01, the only `variable` path
 #   tools/ab.sh quit         out through the menu, so the teardown runs
-#   tools/ab.sh all          all six
+#   tools/ab.sh all          all seven
 #
 # This is the strongest check available and the only one that compares against
 # the original rather than against expectations. The registry invariant checks
@@ -154,6 +155,11 @@ play() {
         # ShutdownInput, ReleaseSoundBuffers and the sprite and sound frees
         # had never executed once in this project's life. The first time this
         # was driven it found a real bug -- see ReleaseSprite in sprite.cpp.
+        # The campaign, which is a different map from Boot Camp and the only
+        # path that reaches a `variable` statement: kitchen1.txt declares two
+        # and no Boot Camp script declares any. So ScriptVariable and the whole
+        # name-table layer are compared here or nowhere.
+        campaign) args="-nointro -dbg"    ; wait=25 ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
@@ -168,6 +174,27 @@ play() {
         sleep 25
         drive ctl "key RETURN tap" >/dev/null 2>&1
         sleep 30
+    fi
+
+    if [ "$cfg" = campaign ]; then
+        # SINGLE PLAYER -> the player row -> SELECT -> NEW. The recruit dialog
+        # is deliberately NOT used: a name that already exists is rejected in
+        # silence, so a run that had gone before would sit on the dialog and
+        # look exactly like a broken reconstruction. Selecting the existing
+        # player is idempotent and the first run creates it.
+        "$REPO/tools/point.py" 306 182 --click >/dev/null 2>&1
+        sleep 6
+        if "$REPO/tools/point.py" 240 177 --click >/dev/null 2>&1; then :; fi
+        sleep 4
+        "$REPO/tools/point.py" 455 221 --click >/dev/null 2>&1   # SELECT
+        sleep 6
+        "$REPO/tools/point.py" 455 181 --click >/dev/null 2>&1   # NEW
+        sleep 25
+        # MAP 01: KITCHEN, the strategic map. RETURN starts the mission.
+        drive ctl "key RETURN tap" >/dev/null 2>&1
+        sleep 25
+        drive ctl "mouse left tap" >/dev/null 2>&1
+        sleep 8
     fi
 
     if [ "$cfg" = mission ]; then
@@ -303,6 +330,10 @@ compare() {
         intro)    budget=-1 ;;      # -1 disables the check
         # Measured, not guessed -- see the note below the case.
         mission)  budget=-1 ;;
+        # Live play again: two runs of a mission never sit on the same frame,
+        # so the pixel figure is meaningless by construction. The log is the
+        # evidence, as with intro and mission.
+        campaign) budget=-1 ;;
         # The process is gone by the time the shot is taken, so there is no
         # frame to compare. The log is the evidence.
         quit)     budget=-1 ;;
@@ -340,7 +371,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign quit"
 
 fail=0
 for cfg in $cfgs; do

@@ -18,9 +18,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import am2
-from vectors import Emu, SCRATCH, SCRATCH_SZ, SCRATCH_PATTERN
-from unicorn import UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_EIP, UC_X86_REG_ESP
+from vectors import (Emu, SCRATCH, SCRATCH_SZ, SCRATCH_PATTERN,
+                     STACK, STACK_SZ, RET_MAGIC)
+from unicorn import UC_HOOK_CODE, UC_PROT_ALL
+from unicorn import UcError
+from unicorn.x86_const import (UC_X86_REG_EIP, UC_X86_REG_ESP,
+                               UC_X86_REG_EAX, UC_X86_REG_EBP)
 
 GAME_DIR = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), ".wine/drive_c/GOG Games/Army Men II")
@@ -30,6 +33,19 @@ ADDR_TOKEN_NAME = 0x0043EF40
 ADDR_TOKEN_TEXT = 0x00444A90
 ADDR_IS_STMT = 0x00444B80
 TOK_AT, OUT_AT, STR_AT = 0x100, 0x200, 0x400
+
+# The game's own CRT allocator. Under emulation these reach HeapAlloc, which
+# is an import and does not exist, so they are serviced by a bump allocator in
+# a region of their own -- see Heap. With that, AddToken and AddNameTableName
+# run for real instead of being hooked away, and a statement handler can be
+# emulated end to end.
+ADDR_CRT_MALLOC = 0x004647F8
+ADDR_CRT_REALLOC = 0x004646D8
+ADDR_CRT_FREE = 0x004646A9
+HEAP, HEAP_SZ = 0x60000000, 0x100000
+
+ADDR_NAME_CAP, ADDR_NAME_COUNT, ADDR_NAMES = 0x00656460, 0x00656464, 0x00656468
+ADDR_SCRIPT_VARIABLE = 0x00443F70
 ADDR_ADD_TOKEN = 0x0043F370
 LINE_AT = 0x1000          # where the line under test goes, inside SCRATCH
 CTX_AT = 0x0800           # a dummy context; AddToken never runs, so it is
@@ -158,6 +174,81 @@ def token_stream(emu, line, lineno):
     return None if eax is None else out
 
 
+class Heap:
+    """A bump allocator for the emulated CRT.
+
+    Nothing is ever reclaimed. That is deliberate: `free` becoming a no-op
+    cannot change what a correct caller observes, and a real allocator would
+    add a second thing to be wrong about when the point is to test the caller.
+    A megabyte outlasts any script line by a wide margin.
+    """
+
+    def __init__(self, emu):
+        self.uc = emu.uc
+        self.uc.mem_map(HEAP, HEAP_SZ, UC_PROT_ALL)
+        self.reset()
+        self.uc.hook_add(UC_HOOK_CODE, self._hook)
+
+    def reset(self):
+        self.next = HEAP + 0x10
+        self.sizes = {}
+
+    def _alloc(self, n):
+        n = (n + 15) & ~15
+        p = self.next
+        self.next += n
+        if self.next >= HEAP + HEAP_SZ:
+            raise RuntimeError("emulated heap exhausted")
+        self.sizes[p] = n
+        return p
+
+    def _hook(self, uc, addr, size, _user):
+        if addr not in (ADDR_CRT_MALLOC, ADDR_CRT_REALLOC, ADDR_CRT_FREE):
+            return
+        esp = uc.reg_read(UC_X86_REG_ESP)
+        args = struct.unpack("<3I", bytes(uc.mem_read(esp, 12)))
+        ret = args[0]
+        if addr == ADDR_CRT_MALLOC:
+            eax = self._alloc(args[1])
+        elif addr == ADDR_CRT_FREE:
+            eax = 0
+        else:
+            old, n = args[1], args[2]
+            eax = self._alloc(n)
+            if old:
+                keep = min(self.sizes.get(old, n), n)
+                uc.mem_write(eax, bytes(uc.mem_read(old, keep)))
+        uc.reg_write(UC_X86_REG_EAX, eax)
+        uc.reg_write(UC_X86_REG_EIP, ret)
+        uc.reg_write(UC_X86_REG_ESP, esp + 4)
+
+
+def raw_call(emu, addr, args, count=4000000):
+    """Emulate a call WITHOUT resetting scratch.
+
+    Emu.call rewrites the whole scratch region on every invocation, which is
+    right for independent vectors and wrong here: a handler test builds a token
+    list with one call and then runs the handler over it with another, so the
+    memory has to survive in between.
+    """
+    uc = emu.uc
+    sp = STACK + STACK_SZ - 0x2000
+    for a in reversed(args):
+        sp -= 4
+        uc.mem_write(sp, struct.pack("<I", a & 0xFFFFFFFF))
+    sp -= 4
+    uc.mem_write(sp, struct.pack("<I", RET_MAGIC))
+    uc.reg_write(UC_X86_REG_ESP, sp)
+    uc.reg_write(UC_X86_REG_EBP, sp)
+    try:
+        uc.emu_start(addr, RET_MAGIC, timeout=5000000, count=count)
+    except UcError:
+        return None
+    if uc.reg_read(UC_X86_REG_EIP) != RET_MAGIC:
+        return None
+    return uc.reg_read(UC_X86_REG_EAX)
+
+
 def token_text(emu, kind, value, text):
     """What the ORIGINAL ScriptTokenText renders for one token.
 
@@ -195,6 +286,98 @@ def script_lines():
                 if len(line) < 0x200:
                     seen.setdefault(line, n)
     return sorted(seen.items())
+
+
+def variable_lines():
+    """Every distinct `variable ...` line the scripts contain, plus the error
+    shapes they never exercise.
+
+    The malformed ones matter more than usual here: this handler has four exit
+    paths and three of them are errors, and a shipped script naturally takes
+    none of them.
+    """
+    out = []
+    seen = set()
+    for _line, _n in script_lines():
+        t = _line.strip()
+        if t.lower().startswith(b"variable") and t not in seen:
+            seen.add(t)
+            out.append((None, t))
+    # `variable x 1.5` is deliberately absent. Its error path renders the
+    # offending Float token through ScriptTokenText, whose "%6.2f" goes
+    # through the MSVC CRT and does not emulate -- the same gap that keeps
+    # kind 4 out of the text corpus. A Float where an Integer belongs is
+    # therefore verified by reading, like the rest of that arm.
+    for extra in (b"variable", b"variable 7 3", b"variable onlyname",
+                  b"variable x y", b"variable \"q\" 4"):
+        if extra not in seen:
+            seen.add(extra)
+            out.append((None, extra))
+
+    # The duplicate-name check needs a name to already be there, and every
+    # case above starts from an empty table -- so without these, deleting the
+    # check outright passes all 196. Measured, by deleting it.
+    out.append((b"variable dup 1", b"variable dup 2"))
+    out.append((b"variable Dup 1", b"variable dup 2"))
+    return out
+
+
+def run_variable(emu, heap, line, pre=None):
+    """Tokenise one line and run the ORIGINAL `variable` handler over it.
+
+    The name table is zeroed first, so each case starts from an empty table and
+    the recorded entry list is the whole of what the handler added.
+    """
+    uc = emu.uc
+    CTX, AT, LINE = 0x40, 0x60, 0x1000
+    heap.reset()
+    uc.mem_write(SCRATCH, SCRATCH_PATTERN[:SCRATCH_SZ])
+    uc.mem_write(ADDR_NAME_CAP, struct.pack("<3I", 0, 0, 0))
+
+    # A `pre` line runs first against the same name table, which is the only
+    # way to reach the duplicate-name path.
+    if pre is not None:
+        uc.mem_write(SCRATCH + CTX, struct.pack("<3I", 0, 0, 0))
+        uc.mem_write(SCRATCH + LINE, pre + b"\0")
+        if raw_call(emu, ADDR_NEXT_TOKEN,
+                    [SCRATCH + LINE, SCRATCH + CTX, 5]) is None:
+            return None
+        uc.mem_write(SCRATCH + AT, struct.pack("<i", 0))
+        if raw_call(emu, ADDR_SCRIPT_VARIABLE,
+                    [SCRATCH + CTX, SCRATCH + AT]) is None:
+            return None
+
+    uc.mem_write(SCRATCH + CTX, struct.pack("<3I", 0, 0, 0))
+    uc.mem_write(SCRATCH + LINE, line + b"\0")
+
+    if raw_call(emu, ADDR_NEXT_TOKEN, [SCRATCH + LINE, SCRATCH + CTX, 5]) is None:
+        return None
+    _cap, count, toks = struct.unpack(
+        "<3I", bytes(uc.mem_read(SCRATCH + CTX, 12)))
+
+    uc.mem_write(SCRATCH + AT, struct.pack("<i", 0))
+    rc = raw_call(emu, ADDR_SCRIPT_VARIABLE, [SCRATCH + CTX, SCRATCH + AT])
+    if rc is None:
+        return None
+    at = struct.unpack("<i", bytes(uc.mem_read(SCRATCH + AT, 4)))[0]
+
+    _ncap, ncount, arr = struct.unpack(
+        "<3I", bytes(uc.mem_read(ADDR_NAME_CAP, 12)))
+    names = []
+    for i in range(ncount):
+        p, ty, val, live = struct.unpack(
+            "<Iiii", bytes(uc.mem_read(arr + i * 16, 16)))
+        nm = bytearray()
+        while uc.mem_read(p + len(nm), 1)[0]:
+            nm.append(uc.mem_read(p + len(nm), 1)[0])
+        names.append((bytes(nm), ty, val, live))
+
+    kinds = []
+    for i in range(count):
+        k, _ln, v = struct.unpack("<iiI", bytes(uc.mem_read(toks + i * 12, 12)))
+        kinds.append((k, v if k != 5 else 0))
+
+    return dict(rc=rc, at=at, count=count, names=names, kinds=kinds)
 
 
 def main():
@@ -327,10 +510,40 @@ def main():
             fh.write("    { 0, %d },   /* %d */\n" % (yes, tid))
         fh.write("};\n")
 
+    heap = Heap(emu)
+    vcases = []
+    for pre, line in variable_lines():
+        got = run_variable(emu, heap, line, pre)
+        if got is None:
+            sys.exit("variable handler failed on %r" % line)
+        vcases.append((pre, line, got))
+
+    with open(OUT, "a") as fh:
+        fh.write("\n/* The `variable` statement, run through the ORIGINAL\n"
+                 " * handler over every such line the scripts contain plus the\n"
+                 " * malformed shapes they never take. The CRT allocator is\n"
+                 " * serviced by a bump allocator in the emulator, so AddToken\n"
+                 " * and AddNameTableName run for real. */\n")
+        fh.write("typedef struct { const char *pre; const char *line;\n"
+                 "                 int32_t rc; int32_t at;\n"
+                 "                 int32_t count; int32_t names;\n"
+                 "                 const char *name0; int32_t type0;\n"
+                 "                 int32_t value0; int32_t kind0; }\n"
+                 "        AM2_ScriptVarVec;\n\n")
+        fh.write("static const AM2_ScriptVarVec am2_script_vars[] = {\n")
+        for pre, line, g in vcases:
+            n0 = g["names"][0] if g["names"] else (b"", 0, 0, 0)
+            k1 = g["kinds"][1][0] if len(g["kinds"]) > 1 else -1
+            fh.write('    { %s, "%s", %d, %d, %d, %d, "%s", %d, %d, %d },\n'
+                     % (('"%s"' % cstr(pre)) if pre else "0",
+                        cstr(line), g["rc"], g["at"], g["count"],
+                        len(g["names"]), cstr(n0[0]), n0[1], n0[2], k1))
+        fh.write("};\n")
+
     print("-> %s  (%d words, %d keywords, %d files; %d lines, %d tokens; "
-          "%d rendered)"
+          "%d rendered, %d variable)"
           % (os.path.relpath(OUT), len(rows), named, len(script_files()),
-             len(lines), len(toks), len(rendered)))
+             len(lines), len(toks), len(rendered), len(vcases)))
 
 
 if __name__ == "__main__":
