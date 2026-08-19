@@ -128,12 +128,26 @@ uint32_t __cdecl MakePoint(uint32_t x, uint32_t y)
     return (x & 0xFFFFu) | ((y & 0xFFFFu) << 16);
 }
 
+int32_t __cdecl PointsEqual(uint32_t a, uint32_t b)
+{
+    return ((uint16_t)a == (uint16_t)b && (uint16_t)(a >> 16) == (uint16_t)(b >> 16))
+           ? 1 : 0;
+}
+
+int32_t __cdecl PointsDiffer(uint32_t a, uint32_t b)
+{
+    return ((uint16_t)a == (uint16_t)b && (uint16_t)(a >> 16) == (uint16_t)(b >> 16))
+           ? 0 : 1;
+}
+
 int rect_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_RECT_SET, (const void *)RectSet, "RectSet", 5);
     patch_replace(ADDR_MAKE_POINT, (const void *)MakePoint, "MakePoint", 2);
+    patch_replace(ADDR_POINTS_EQUAL, (const void *)PointsEqual, "PointsEqual", 2);
+    patch_replace(ADDR_POINTS_DIFFER, (const void *)PointsDiffer, "PointsDiffer", 2);
     rc |= patch_replace(ADDR_CLAMP, (const void *)Clamp, "Clamp", 3);
     rc |= patch_replace(ADDR_POINT_IN_RECT, (const void *)PointInRect, "PointInRect", 2);
     rc |= patch_replace(ADDR_CLIP_RECT, (const void *)ClipRect, "ClipRect", 5);

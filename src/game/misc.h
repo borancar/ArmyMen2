@@ -93,6 +93,17 @@ int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b);
  * sites, every one of them a message this build does not print. */
 void __cdecl GameLog(const char *fmt, ...);
 
+/* 0x00435EB0. Orders two records on a two-dword key: the first field, then the
+ * second. It returns the DIFFERENCE of whichever field decided, not the sign,
+ * so it overflows for far-apart values -- a qsort comparator written the way
+ * everyone writes them and wrong for the same reason. */
+int32_t __cdecl ComparePair(const void *a, const void *b);
+
+/* 0x00406920. Maps 1..30 to a small constant through a jump table, everything
+ * else to zero. The mapping is not a formula -- the original really is a
+ * 30-entry index table into eight arms -- so it is a table here too. */
+int32_t __cdecl MapCode(int32_t code);
+
 int misc_install(void);
 
 #ifdef __cplusplus

@@ -49,7 +49,10 @@ from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_EIP,
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IMAGE_BASE = 0x00400000
 STACK, STACK_SZ = 0x10000000, 0x20000
-SCRATCH, SCRATCH_SZ = 0x20000000, 0x4000
+# Deliberately not a round number: 0x20000000 is the kind of value ordinary
+# arithmetic lands on, and a computed result that collides with the scratch
+# base gets mistaken for a pointer into it.
+SCRATCH, SCRATCH_SZ = 0x51ED0000, 0x4000
 RET_MAGIC = 0x5EADBEE0
 # Deterministic, and reproduced byte for byte by tests/selftest.cpp, so the
 # vectors carry only offsets and never the buffer itself.
@@ -527,7 +530,9 @@ def main():
                 "ADDR_IS_BLANK", "ADDR_IS_SCRIPT_DELIM",
                 "ADDR_SWAP_COLOUR_BYTES", "ADDR_RETURN_ZERO", "ADDR_RETURN_ONE",
                 "ADDR_REVERSE_BLOCKS", "ADDR_SCRIPT_COMPARE",
-                "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4"]
+                "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4",
+                "ADDR_COMPARE_PAIR", "ADDR_MAP_CODE",
+                "ADDR_POINTS_EQUAL", "ADDR_POINTS_DIFFER"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -601,6 +606,8 @@ def main():
         "ADDR_RETURN_ZERO": "ReturnZero", "ADDR_RETURN_ONE": "ReturnOne",
         "ADDR_REVERSE_BLOCKS": "ReverseBlocks",
         "ADDR_SCRIPT_COMPARE": "ScriptCompare",
+        "ADDR_COMPARE_PAIR": "ComparePair", "ADDR_MAP_CODE": "MapCode",
+        "ADDR_POINTS_EQUAL": "PointsEqual", "ADDR_POINTS_DIFFER": "PointsDiffer",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -701,7 +708,14 @@ def main():
                     # RectSet hands the rectangle back -- records an address
                     # from the emulator's scratch page, which the replay's own
                     # buffer will never match. Store the offset and a flag.
-                    eaxp = 1 if SCRATCH <= eax < SCRATCH + SCRATCH_SZ else 0
+                    # Only a function that was GIVEN a scratch pointer can
+                    # return one. ApproxDistXY(0xA0000000, 0x80000000) computes
+                    # 0x20000000, which happened to equal SCRATCH, so it was
+                    # recorded as "returns scratch + 0" and the replay compared
+                    # against its own buffer address. Requiring a pointer
+                    # argument makes the coincidence harmless.
+                    has_ptr = any(kinds.get(i) == "ptr" for i in range(nargs))
+                    eaxp = 1 if (has_ptr and SCRATCH <= eax < SCRATCH + SCRATCH_SZ) else 0
                     eaxv = (eax - SCRATCH) if eaxp else eax
                     fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, '
                              '%d, %d, %d, %s, %d, %s},\n'

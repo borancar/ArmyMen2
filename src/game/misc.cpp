@@ -154,6 +154,34 @@ void __cdecl GameLog(const char *fmt, ...)
     (void)fmt;
 }
 
+int32_t __cdecl ComparePair(const void *a, const void *b)
+{
+    const int32_t *x = (const int32_t *)a;
+    const int32_t *y = (const int32_t *)b;
+
+    if (x[0] != y[0])
+        return x[0] - y[0];
+    if (x[1] != y[1])
+        return x[1] - y[1];
+    return 0;
+}
+
+/* Read out of the byte table at 0x00406988 and the eight arms it selects
+ * through 0x00406968; entries that land on the default arm are 0. */
+static const uint8_t kCodeMap[30] = {
+    1, 2, 5, 7, 6, 9, 3, 6, 1, 2, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 6, 7,
+};
+
+int32_t __cdecl MapCode(int32_t code)
+{
+    uint32_t i = (uint32_t)(code - 1);
+
+    if (i > 0x1Du)
+        return 0;
+    return kCodeMap[i];
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -180,5 +208,7 @@ int misc_install(void)
                   "ReverseBlocks", 4);
     patch_replace(ADDR_SCRIPT_COMPARE, (const void *)ScriptCompare,
                   "ScriptCompare", 3);
+    patch_replace(ADDR_COMPARE_PAIR, (const void *)ComparePair, "ComparePair", 2);
+    patch_replace(ADDR_MAP_CODE, (const void *)MapCode, "MapCode", 1);
     return 0;
 }

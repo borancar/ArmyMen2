@@ -1140,6 +1140,10 @@
 #define ADDR_RETURN_ONE        0x004354F0u  /* int32_t(void) */
 #define ADDR_REVERSE_BLOCKS    0x004231A0u  /* int32_t(dst, src, total, count) */
 #define ADDR_SCRIPT_COMPARE    0x004374F0u  /* int32_t(a, op, b) */
+#define ADDR_COMPARE_PAIR      0x00435EB0u  /* int32_t(const void*, const void*) */
+#define ADDR_MAP_CODE          0x00406920u  /* int32_t(int32_t) */
+#define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
+#define ADDR_POINTS_DIFFER     0x0042E110u
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
 #define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */

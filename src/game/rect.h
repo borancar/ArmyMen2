@@ -63,6 +63,13 @@ int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
  * movsx from +0 and +2, which is the same layout seen from the other side. */
 uint32_t __cdecl MakePoint(uint32_t x, uint32_t y);
 
+/* 0x0042E140 and 0x0042E110. Two packed AM2_Points compared by value: the
+ * halves are read as words from +0 and +2 of each argument slot, which is the
+ * same layout MakePoint builds. One answers equal, the other differs -- the
+ * original has both rather than one and a negation. */
+int32_t __cdecl PointsEqual(uint32_t a, uint32_t b);
+int32_t __cdecl PointsDiffer(uint32_t a, uint32_t b);
+
 int rect_install(void);
 
 #ifdef __cplusplus
