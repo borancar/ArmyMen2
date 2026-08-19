@@ -860,9 +860,28 @@
  * every one of these handlers is named by the language rather than by us, and
  * the five of them are the whole top-level grammar: exactly the statements a
  * mission file contains. */
+/* The parse context and the token record, read out of the `variable` handler
+ * at 0x00443F70 -- 368 bytes and every field it touches is one of these.
+ *
+ *   ctx + 0x04   token count
+ *   ctx + 0x08   token array
+ *   token + 0x00 kind      (the array at 0x00487C74 names them)
+ *   token + 0x04 text      the word as it appeared, used in error messages
+ *   token + 0x08 id        the number docs/scripttokens.md lists
+ *
+ * Every handler is called as handler(int32_t *pos, ctx *), where *pos is the
+ * index of the keyword and the handler advances it over what it consumes.
+ *
+ * One thing to know before writing a caller: an UNQUOTED identifier tokenises
+ * as kind 5, which the kind array calls "String". `variable stopcloning 0`
+ * requires kind 5 for the name. So "String" here means a word, not a quoted
+ * literal, and kind 6 "Name" is something else again. */
 #define AM2_SCRIPT_TOKEN_SIZE    12u
 #define AM2_SCRIPT_TOK_KIND      0x00u
+#define AM2_SCRIPT_TOK_TEXT      0x04u
 #define AM2_SCRIPT_TOK_ID        0x08u
+#define AM2_SCRIPT_CTX_COUNT     0x04u
+#define AM2_SCRIPT_CTX_TOKENS    0x08u
 
 #define ADDR_SCRIPT_PRELOADSPRITE 0x00444900u  /* keyword 25 */
 #define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
@@ -881,7 +900,18 @@
  *
  * It also reports the token KIND by name when it rejects something --
  * "'%s' found, but expected token of type %s" -- which is what the array at
- * 0x00487C74 is for. */
+ * 0x00487C74 is for.
+ *
+ * The others do the same. `if` carries "Missing 'after' in if-statement.",
+ * "Missing 'of' in if-repeat statement.", "Missing 'then' in if-statement.",
+ * "Incomplete testvar clause.", "Unrecognized operator in testvar clause."
+ * and "TIMEABSOLUTE time must be positive" -- with "Exptected" misspelled,
+ * which is a good sign these are verbatim. `variable` carries "Duplicate
+ * variable name."
+ *
+ * `object` carries "Invalid token in GenerateObjScriptFromTokens", which is a
+ * FUNCTION NAME out of the original source -- the only one recovered so far
+ * that was not inferred. */
 
 #define ADDR_SCRIPT_CONTEXT      0x00656478u  /* what reset and parse are given */
 #define ADDR_MAP_NAME            0x00511A88u  /* char[], "kitchen" */
