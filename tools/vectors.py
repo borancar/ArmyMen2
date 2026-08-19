@@ -84,7 +84,7 @@ ARG_KIND_OVERRIDE = {
 }
 
 
-def analyse(img, md, addr, size):
+def analyse(img, md, addr, size, reachable=None):
     """(argument count, {index: 'ptr'|'scalar'}) read out of the body.
 
     Both conventions put argument i at [esp + 4 + 4i] on entry, and at
@@ -104,6 +104,12 @@ def analyse(img, md, addr, size):
     has_frame = False
 
     for ins in md.disasm(img.read(addr, size), addr):
+        # Skip anything the CFG says is not code. A jump table sits inside the
+        # function and decodes into plausible-looking instructions -- one of
+        # 0x00406920's tables disassembles as `cmp ebp, [ecx + 0x40]`, which
+        # made its switch selector look like a pointer being dereferenced.
+        if reachable is not None and ins.address not in reachable:
+            continue
         op = ins.op_str
         m = ins.mnemonic
 
@@ -156,9 +162,23 @@ def analyse(img, md, addr, size):
         # by 1000 is three `lea eax,[eax+eax*4]` chains -- so the vectors
         # passed a scratch address where the function wanted a number, and the
         # reconstruction failed a test that was wrong.
+        # The register must be the BASE. In `jmp [eax*4 + 0x43D524]` eax is a
+        # scale-index into a jump table and the value is a switch selector, not
+        # a pointer -- and classifying it as one concretises it, so angr cannot
+        # explore the arms and every one of them stays unreached. Same family
+        # as the lea case below it: an address being COMPUTED from a value does
+        # not make that value a pointer.
         if m != "lea":
-            for mm in re.finditer(r"\[(%s)\b" % REG, op):
-                reg = mm.group(1)
+            for mm in re.finditer(r"\[(%s)(?!\s*\*)\b([^\]]*)\]" % REG, op):
+                reg, rest = mm.group(1), mm.group(2)
+                # A displacement that is itself an address in the image means
+                # the register indexes a static table -- 0x00406920 dispatches
+                # through `mov dl, [ecx + 0x406988]`, where ecx is a switch
+                # selector and 0x406988 is the table. A pointer argument has a
+                # small struct offset instead.
+                disp = re.search(r"\+ (0x[0-9a-f]+)", rest)
+                if disp and int(disp.group(1), 16) >= 0x00400000:
+                    continue
                 if reg in slots:
                     kinds[slots[reg]] = "ptr"
 
@@ -287,12 +307,18 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
         import time as _time
         deadline = _time.time() + timeout
         sm = proj.factory.simulation_manager(st)
-        while sm.active and len(sm.found) < limit:
+        # `sm.found` RAISES until the stash exists, which is only after the
+        # first explore(). Reading it as the loop condition threw on iteration
+        # zero, the outer handler swallowed it, and this returned [] every
+        # time -- angr contributed nothing at all while appearing to. Always go
+        # through the stashes dict.
+        while sm.active and len(sm.stashes.get("found", [])) < limit:
             if _time.time() > deadline:
                 break
             sm.explore(find=lambda s: s.addr == RET, num_find=limit, n=16)
+        found = sm.stashes.get("found", [])
         out = []
-        for f in sm.found:
+        for f in found:
             row, writes = [], []
             for i in range(nargs):
                 if kinds.get(i) == "ptr":
@@ -513,7 +539,8 @@ def main():
         ok = nover = full = 0
         short = []
         for a, size in leaves:
-            nargs, kinds = analyse(img, md, a, size)
+            body = body_addrs(img, md, a, size)
+            nargs, kinds = analyse(img, md, a, size, body)
             paths = angr_inputs(a, nargs, kinds) if use_angr else []
             emu.seen = set()
             vs = vectors_for(emu, a, nargs, kinds, extra=paths)
@@ -521,7 +548,6 @@ def main():
                 nover += 1
                 continue
             ok += 1
-            body = body_addrs(img, md, a, size)
             hit = len(body & emu.seen)
             if body and hit == len(body):
                 full += 1
@@ -537,7 +563,11 @@ def main():
                 print("    0x%08x %5dB  %5.1f%%  %d unreached" % (a, size, pct, miss))
         return 0
 
+    # The list is edited by hand as functions are ported, so it acquires
+    # duplicates; two of the same name emit two identically-named vector
+    # arrays and the test binary fails to link.
     todo = VALIDATE if (not want or want[0] == "--validate") else want
+    todo = list(dict.fromkeys(todo))
 
     # Only the truly pure ones can be replayed outside the game: a function
     # that reads a global needs that global mapped, and the point of this is to
@@ -603,11 +633,11 @@ def main():
         if not size:
             print("  %-24s not in functions.tsv" % nm)
             continue
-        nargs, kinds = analyse(img, md, addr, size)
+        body = body_addrs(img, md, addr, size)
+        nargs, kinds = analyse(img, md, addr, size, body)
         paths = angr_inputs(addr, nargs, kinds) if use_angr else []
         emu.seen = set()
         vs = vectors_for(emu, addr, nargs, kinds, extra=paths)
-        body = body_addrs(img, md, addr, size)
         hit = len(body & emu.seen)
         cov = 100.0 * hit / len(body) if body else 0.0
         ks = ",".join(kinds.get(i, "-")[0] for i in range(nargs))
