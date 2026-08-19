@@ -444,6 +444,11 @@ void                  am2_script_reset_names(void);
 int32_t               am2_script_name_count(void);
 const AM2_ScriptName *am2_script_name(int32_t i);
 
+/* Non-zero makes every parsed action record print. Set from AM2_DUMP_ACTIONS
+ * so the same scripted run can be compared with the original parser and with
+ * ours, in the game, without an emulator. */
+extern int32_t am2_dump_actions;
+
 int script_install(void);
 
 #ifdef __cplusplus

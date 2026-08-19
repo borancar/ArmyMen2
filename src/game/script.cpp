@@ -1179,6 +1179,49 @@ int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b)
     }
 }
 
+/* Set from AM2_DUMP_ACTIONS and AM2_PARSE_ALL. */
+int32_t am2_dump_actions = 0;
+static int32_t am2_parse_all = 0;
+static void ScriptParseAll(void);
+
+/* 0x00440D70. Still the original -- 8,608 bytes and 59 keywords. Named and
+ * routed through a symbol so the dump below sits in one place and the
+ * transcription can replace the body without touching any call site. */
+static int32_t ScriptParseAction(AM2_ScriptCtx *ctx, int32_t *at,
+                                 uint8_t *action)
+{
+    return ((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, uint8_t *))
+        (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, action);
+}
+
+/* Every action goes through here, so one place can dump what was parsed.
+ *
+ * AM2_DUMP_ACTIONS=1 prints the 0x48-byte record for each action the scripts
+ * produce. Run the game once with the original parser and once with ours and
+ * diff the two logs: that compares every action the shipped missions actually
+ * contain, in the real process, with no emulator and no translation. The
+ * offline harness cannot reach this code at all -- it opens files and calls
+ * into the image -- and would be slower than the game if it could. */
+static int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, uint8_t *action)
+{
+    int32_t line = *at < ctx->count ? ctx->tokens[*at].line : -1;
+
+    int32_t rc = ScriptParseAction(ctx, at, action);
+
+    if (am2_dump_actions) {
+        /* One call, not eighteen: the game's logger writes a line per call
+         * and drops a fragment that does not end in a newline. */
+        char buf[0x48 / 4 * 9 + 40];
+        const uint32_t *w = (const uint32_t *)action;
+        int n = sprintf(buf, "ACT %4d %d", line, rc);
+        for (int32_t i = 0; i < 0x48 / 4; i++)
+            n += sprintf(buf + n, " %08X", w[i]);
+        sprintf(buf + n, "\n");
+        am2_log("%s", buf);
+    }
+    return rc;
+}
+
 int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
 {
     uint8_t action[0x48];
@@ -1216,8 +1259,7 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
                 break;
         }
 
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, uint8_t *))
-                  (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, action))
+        if (!ScriptAction(ctx, at, action))
             return 0;
         memcpy(ObjFrameNewAction(frame), action, 0x48);
 
@@ -1880,8 +1922,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
                 goto end_of_script_late;
         }
 
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, uint8_t *))
-                  (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, action))
+        if (!ScriptAction(ctx, at, action))
             goto fail;
         if (cond->mode == 3)
             *(int32_t *)(action + 0x44) = objname;
@@ -1962,6 +2003,9 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
     char line[0x100];
     int32_t ok = 1;
 
+    if (am2_dump_actions)
+        am2_log("READSCRIPT %s\n", path);
+
     FILE *fh = fopen(path, "rt");
     if (!fh) {
         am2_log("ReadScript: Could not open %s for reading.\n", path);
@@ -2024,6 +2068,12 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
         at++;
     }
 
+    if (am2_parse_all) {
+        /* Once, and not from inside itself. */
+        am2_parse_all = 0;
+        ScriptParseAll();
+    }
+
     if (*(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_QUIET) == 0) {
         /* The token count comes from the GLOBAL context, not the one passed
          * in. They are the same object for every caller in the image, but the
@@ -2059,6 +2109,101 @@ const AM2_ScriptName *am2_script_name(int32_t i)
     return &kScriptNames[i];
 }
 
+/* AM2_PARSE_ALL=1: after the game's own first script load, parse every other
+ * script it ships and dump what each action came out as.
+ *
+ * The point is coverage. bootcamp and the campaign between them reach 24 of
+ * the 59 action keywords; 48 appear in at least one shipped file, and the only
+ * way to see all 48 in one run is to feed the parser every file. Doing that
+ * inside the game costs one run and needs no emulator -- the parser, the
+ * allocator, the name table and the pad tables are all the real ones.
+ *
+ * It wrecks the game's own state, so this is a probe configuration and nothing
+ * else. The file list comes from tools/scriptlist.py because enumerating a
+ * directory is Win32 and this file does not name a Win32 type. */
+/* Count, capacity AND the array together. Zeroing only the count leaves
+ * NewObjScript with a capacity it believes, so it hands back entry 0 without
+ * clearing it -- stale state list, stale counts -- and the next `state` writes
+ * past an array that is not there any more. That took the sweep down after two
+ * files. */
+static void ScriptResetObjScripts(void)
+{
+    *(int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT) = 0;
+    *(int32_t *)AM2_IMAGE(ADDR_OBJ_SCRIPT_CAP) = 0;
+    *(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS) = 0;
+}
+
+static void ScriptParseAll(void)
+{
+    /* An absolute path from the environment: the game chdirs into the map
+     * directory before loading, so ReadScript sees a bare filename and
+     * nothing relative to the game root can be opened from here. */
+    const char *list = getenv("AM2_SCRIPTS");
+    FILE *fh = list ? fopen(list, "rt") : 0;
+    if (!fh) {
+        am2_log("ScriptParseAll: cannot open %s\n", list ? list : "(unset)");
+        return;
+    }
+
+    /* State accumulates across the sweep and the fixed tables eventually
+     * overflow -- it gets through about seventy files before the process goes
+     * down. Clearing between files is worse, not better: it took the sweep
+     * down after two, because the arrays and their capacities have to be
+     * cleared together and the entries the game itself is holding must not be
+     * freed. Two runs with the list in opposite orders cover everything, which
+     * is cheaper than getting a reset exactly right for a probe.
+     *
+     * The sweep still gets tables of its own. Reusing the game's and clearing
+     * between files frees names the loaded mission is still holding, which
+     * takes the process down on the first file -- measured. Saving the
+     * pointers and starting from empty leaves the live state untouched. */
+    AM2_ScriptName *save_names = kScriptNames;
+    int32_t save_ncount = kScriptNameCount, save_ncap = kScriptNameCap;
+    int32_t save_pads = kPadCount;
+    int32_t save_obj = *(int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT);
+    AM2_ObjScript *save_objarr = *(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS);
+    int32_t save_objcap = *(int32_t *)AM2_IMAGE(ADDR_OBJ_SCRIPT_CAP);
+    static int16_t save_padnum[256];
+    for (int32_t i = 0; i < 256; i++) {
+        save_padnum[i] = kPadNumbers[i].count;
+        kPadNumbers[i].count = 0;
+    }
+    kScriptNames = 0;
+    kScriptNameCount = 0;
+    kScriptNameCap = 0;
+    kPadCount = 0;
+    ScriptResetObjScripts();
+
+    char line[0x100];
+    int32_t files = 0;
+    while (fgets(line, sizeof line, fh)) {
+        size_t n = strlen(line);
+        while (n && (line[n - 1] == '\n' || line[n - 1] == '\r'))
+            line[--n] = 0;
+        if (!n)
+            continue;
+
+        AM2_ScriptCtx ctx = { 0, 0, 0 };
+        am2_log("PARSEALL %s\n", line);
+        ReadScript(line, &ctx);
+        ScriptResetTokens(&ctx);
+        files++;
+    }
+    fclose(fh);
+
+    kScriptNames = save_names;
+    kScriptNameCount = save_ncount;
+    kScriptNameCap = save_ncap;
+    kPadCount = save_pads;
+    *(int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT) = save_obj;
+    *(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS) = save_objarr;
+    *(int32_t *)AM2_IMAGE(ADDR_OBJ_SCRIPT_CAP) = save_objcap;
+    for (int32_t i = 0; i < 256; i++)
+        kPadNumbers[i].count = save_padnum[i];
+
+    am2_log("PARSEALL done: %d files\n", files);
+}
+
 int script_install(void)
 {
     int rc = 0;
@@ -2066,6 +2211,9 @@ int script_install(void)
     /* Token buffers pass between our code and the original's, so both sides
      * have to be on the game's heap. */
     am2_crt_use_game();
+
+    am2_dump_actions = getenv("AM2_DUMP_ACTIONS") != 0;
+    am2_parse_all = getenv("AM2_PARSE_ALL") != 0;
 
     rc |= patch_replace(ADDR_SCRIPT_LOOKUP_TOKEN,
                         (const void *)ScriptLookupToken,
