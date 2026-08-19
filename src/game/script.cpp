@@ -1182,16 +1182,1021 @@ int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b)
 /* Set from AM2_DUMP_ACTIONS and AM2_PARSE_ALL. */
 int32_t am2_dump_actions = 0;
 static int32_t am2_parse_all = 0;
+static int32_t am2_orig_actions = 0;
 static void ScriptParseAll(void);
 
-/* 0x00440D70. Still the original -- 8,608 bytes and 59 keywords. Named and
- * routed through a symbol so the dump below sits in one place and the
- * transcription can replace the body without touching any call site. */
+/* ---------------------------------------------------------- actions ---- */
+
+#define ACT(off) (*(int32_t *)(action + (off)))
+
+/* Advance one token. Zero, with the message, at the end of the script. */
+static int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    if (++(*at) < ctx->count)
+        return 1;
+    am2_log("Unexpected end of script.\n");
+    return 0;
+}
+
+static void ActTypeErr(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind)
+{
+    am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+            ctx->tokens[*at].line,
+            ScriptTokenText(&ctx->tokens[*at], kScriptWord),
+            kKindName(kind));
+}
+
+/* `createtrooper`, `createvehicle`: a location and an army, and the army's
+ * own result decides the return. */
+static int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
+                               uint8_t *action)
+{
+    if (!ActStep(ctx, at))
+        return 0;
+    if (!ScriptLocation(ctx, at, action, 0))
+        return 0;
+    int32_t army = ScriptArmyColour(ctx, at);
+    ACT(0x40) = army;
+    return army >= 0;
+}
+
+/* The weapon a `createtrooper` carries. -1 for one the keyword table has but
+ * the trooper table rejects. */
+static int32_t ActWeapon(int32_t id)
+{
+    switch (id) {
+    case 81:  return 1;     /* rifle     */
+    case 82:  return 4;     /* bazooka   */
+    case 83:  return 2;     /* grenade   */
+    case 84:  return 3;     /* flamer    */
+    case 85:  return 5;     /* mortar    */
+    case 86:  return 10;    /* autorifle */
+    case 91:  return 20;    /* sweeper   */
+    case 93:  return 29;    /* vulcan    */
+    case 95:  return 30;    /* sniper    */
+    default:  return -1;    /* flak, yours, explosive, detonator, lure,
+                             * heavymg -- weapons the powerup table has and
+                             * this one does not */
+    }
+}
+
+static int32_t ActChassis(int32_t id)
+{
+    switch (id) {
+    case 35: return 1;      /* tank      */
+    case 37: return 0;      /* jeep      */
+    case 38: return 2;      /* halftrack */
+    case 39: return 3;      /* convoy    */
+    case 40: return 5;      /* boat      */
+    default: return -1;     /* `vehicle` itself is not a chassis */
+    }
+}
+
+static int32_t ActPickup(int32_t id)
+{
+    switch (id) {
+    case 82:  return 4;     case 83:  return 2;     case 84:  return 3;
+    case 85:  return 5;     case 86:  return 10;    case 87:  return 28;
+    case 88:  return 11;    case 89:  return 12;    case 91:  return 20;
+    case 92:  return 14;    case 93:  return 29;    case 94:  return 8;
+    case 95:  return 30;    case 96:  return 32;    case 97:  return 31;
+    case 98:  return 33;    case 99:  return 34;    case 100: return 35;
+    case 101: return 36;    case 102: return 37;    case 103: return 38;
+    case 104: return 39;    case 105: return 40;    case 106: return 42;
+    case 107: return 23;    case 108: return 22;    case 109: return 24;
+    case 110: return 25;    case 111: return 26;    case 112: return 41;
+    default:  return -1;    /* `detonator` is not a pickup */
+    }
+}
+
+/* projectile, fire, crush, explosion -- shared by `damage` and
+ * `setdamagepad`, and the codes are not in keyword order. */
+static int32_t ActDamageKind(int32_t id)
+{
+    switch (id) {
+    case 126: return 2;     /* projectile */
+    case 127: return 1;     /* fire       */
+    case 128: return 4;     /* crush      */
+    case 129: return 3;     /* explosion  */
+    default:  return -1;
+    }
+}
+
+/* attack, defend, ignore, evade -- shared by `order ... inmode` and
+ * `setaimode`, and the codes are neither sequential nor in keyword order. */
+static int32_t ActAiMode(int32_t id)
+{
+    switch (id) {
+    case 155: return 6;     /* attack */
+    case 156: return 7;     /* defend */
+    case 157: return 2;     /* ignore */
+    case 158: return 5;     /* evade  */
+    default:  return -1;
+    }
+}
+
+/* A variable name that must already be declared, for the several actions that
+ * take one. The message differs per caller, so it comes in. */
+static int32_t ActVarName(AM2_ScriptCtx *ctx, int32_t *at, uint8_t *action,
+                          const char *undeclared)
+{
+    int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
+    if (idx < 0 || kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER) {
+        am2_log(undeclared, ctx->tokens[*at].line, ctx->tokens[*at].value);
+        return 0;
+    }
+    ACT(0x28) = idx;
+    (*at)++;
+    return 1;
+}
+
+/* 0x00440D70. One action, into a 0x48-byte record.
+ *
+ * 59 keywords behind a byte-index dispatch, four of which dispatch again.
+ * docs/scriptactions.md lists the whole vocabulary; the field each writes is
+ * the interesting part and it is not consistent -- +0x18 and +0x1C hold names
+ * and armies, +0x28 a variable, +0x30 a string, +0x34/+0x38/+0x3C/+0x40/+0x44
+ * whatever that action needs.
+ *
+ * Failures split three ways and it matters which: some log and return 0, some
+ * return 0 in silence because the callee has already spoken, and several
+ * return 1 having simply stopped early -- an optional argument that was not
+ * there. */
+static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
+                                      uint8_t *action)
+{
+    memset(action, 0, 0x48);
+    ACT(0x00) = -2;
+
+    if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
+        return 0;
+    int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+    if (id < 64 || id > 186)
+        return 0;
+
+    switch (id) {
+
+    case 76:                                    /* restorecamerafocus */
+        (*at)++;
+        ACT(0x14) = 0x1E;
+        return 1;
+
+    case 75:                                    /* setcamerafocus */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x1D;
+        return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
+
+    case 73:                                    /* suspendai */
+    case 74:                                    /* reviveai   */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 73) ? 0x1B : 0x1C;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING)
+            return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
+        /* No name means everyone, which is the same built-in uid the
+         * resolver's unreachable id-15 arm would have given. */
+        ACT(0x18) = *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ID15);
+        return 1;
+
+    case 64:                                    /* showmessage       */
+    case 65:                                    /* showbitmap        */
+    case 66:                                    /* showbitmapnopause */
+    case 71:                                    /* showfailure       */
+    case 72:                                    /* showpda           */
+    case 151:                                   /* setbriefing       */
+    case 152:                                   /* setbriefvo        */
+    case 153: {                                 /* setstratmap       */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        static const struct { int32_t id, code; } kShow[] = {
+            { 64, 1 }, { 65, 2 }, { 66, 3 }, { 71, 4 }, { 72, 5 },
+            { 151, 0x27 }, { 152, 0x28 }, { 153, 0x29 },
+        };
+        for (uint32_t i = 0; i < sizeof kShow / sizeof kShow[0]; i++)
+            if (kShow[i].id == id)
+                ACT(0x14) = kShow[i].code;
+        /* The record keeps the token's own string. Nothing copies it and
+         * nothing frees it here. */
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+    }
+
+    case 67:                                    /* playsound */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        ACT(0x14) = 6;
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        ACT(0x38) = 0;
+        ACT(0x3C) = 1;
+        ACT(0x44) = 0;
+        if (++(*at) >= ctx->count)
+            return 1;
+        ScriptLocation(ctx, at, action, 1);
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (++(*at) >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x3C) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        /* No bounds check before this one, unlike the two above. */
+        if (ctx->tokens[++(*at)].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x44) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 68:                                    /* playitemsound */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        ACT(0x14) = 7;
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        ACT(0x38) = 0;
+        ACT(0x3C) = 1;
+        ACT(0x44) = 0;
+        if (++(*at) >= ctx->count)
+            return 1;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (++(*at) >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x3C) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (ctx->tokens[++(*at)].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x44) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 69:                                    /* playmusic */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 8;
+        ACT(0x30) = 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING)
+            return 1;
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (++(*at) >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 70:                                    /* tracevar */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 9;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        return ActVarName(ctx, at, action,
+            "Line [%4d]:  expected variable name in TRACEVAR but variable "
+            "%s not declared\n");
+    case 78:                                    /* trigger */
+        if (!ActStep(ctx, at))
+            return 0;
+        /* The uid lands at +0x00, over the -2 the record opens with, and the
+         * zero at +0x04 -- the call pushes the record and then the record
+         * plus four. */
+        return ScriptObjectUid(ctx, at, &ACT(0x04), &ACT(0x00)) != 0;
+
+    case 79:                                    /* triggerdelay */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
+            (int32_t)(uintptr_t)ctx->tokens[*at].value == 136) {   /* refvar */
+            if (!ActStep(ctx, at))
+                return 0;
+            if (!ActVarName(ctx, at, action,
+                    "Line [%4d]:  expected variable name but variable %s not "
+                    "declared\n"))
+                return 0;
+        } else if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            ACT(0x08) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            if (ACT(0x08) < 0) {
+                am2_log("Line[%4d]:  Negative time set for a TRIGGERDELAY.\n",
+                        ctx->tokens[*at].line);
+                return 0;
+            }
+            (*at)++;
+        } else {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        return ScriptObjectUid(ctx, at, &ACT(0x04), &ACT(0x00)) != 0;
+
+    case 80:                                    /* createtrooper */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x0D;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t w = ActWeapon((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (w < 0) {
+                am2_log("Line [%4d]:  Illegal weapon type '%s'\n",
+                        ctx->tokens[*at].line,
+                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
+                return 0;
+            }
+            ACT(0x34) = w;
+        }
+        return ActPlaceAndArmy(ctx, at, action);
+
+    case 113:                                   /* createvehicle */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x0F;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t c = ActChassis((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (c < 0) {
+                am2_log("Line [%4d]:  Illegal vehicle type '%s'\n",
+                        ctx->tokens[*at].line,
+                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
+                return 0;
+            }
+            ACT(0x38) = c;
+        }
+        return ActPlaceAndArmy(ctx, at, action);
+
+    case 114:                                   /* createpowerup */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x10;
+        /* The name is optional here, unlike the other two creates. */
+        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+            ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            if (!ActStep(ctx, at))
+                return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t p = ActPickup((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (p < 0) {
+                am2_log("Line [%4d]:  Illegal powerup type '%s'\n",
+                        ctx->tokens[*at].line,
+                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
+                return 0;
+            }
+            ACT(0x34) = p;
+        }
+        if (!ActStep(ctx, at))
+            return 1;
+        if (!ScriptLocation(ctx, at, action, 0))
+            return 0;
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 115:                                   /* createexplosion */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x0E;
+        if (!ScriptLocation(ctx, at, action, 0))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (ACT(0x38) < 0x78 || ACT(0x38) > 0x95) {
+            am2_log("Line[%4d]:  Invalid explosion type.\n",
+                    ctx->tokens[*at].line);
+            ACT(0x38) = 0x7F;
+        }
+        ACT(0x3C) = 0;
+        ACT(0x40) = 4;
+        if (++(*at) >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x3C) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (++(*at) >= ctx->count)
+            return 1;
+        ACT(0x40) = ScriptArmyColour(ctx, at);
+        if (ACT(0x40) < 0)
+            ACT(0x40) = 4;
+        return 1;
+
+    case 116:                                   /* createroach */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x11;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        ACT(0x30) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (!ScriptLocation(ctx, at, action, 0))
+            return 0;
+        ACT(0x40) = ScriptArmyColour(ctx, at);
+        return 1;
+
+    case 138:                                   /* setobjstate */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x25;
+        /* The object at +0x1C and the state at +0x18 -- the other way round
+         * from how the statement reads. */
+        if (!ScriptResolveName(ctx, at, &ACT(0x1C), 0))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        {
+            int32_t st = ScriptFindName((const char *)ctx->tokens[*at].value);
+            if (st < 0)
+                st = AddNameTableName(
+                    (const char *)ctx->tokens[*at].value, 2, 0);
+            ACT(0x18) = st;
+        }
+        if (++(*at) >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 137:                                   /* setobjbmp    */
+    case 124:                                   /* heal         */
+    case 123:                                   /* setmaxhealth */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 137) ? 0x24 : (id == 124) ? 0x0A : 0x0B;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 125:                                   /* damage */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x0C;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        ACT(0x44) = 0;
+        if (++(*at) >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
+            return 1;
+        {
+            int32_t k = ActDamageKind(
+                (int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (k < 0)
+                return 1;
+            ACT(0x44) = k;
+        }
+        (*at)++;
+        return 1;
+
+    case 143:                                   /* deploy */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x12;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count)
+            return 1;
+        /* Quiet, and the result is thrown away: `deploy <name>,` is legal and
+         * the comma is not a location. */
+        ScriptLocation(ctx, at, action, 1);
+        return 1;
+
+    case 144:                                   /* undeploy */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x13;
+        return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
+
+    case 145:                                   /* resurrect */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x14;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count)
+            return 1;
+        ScriptLocation(ctx, at, action, 1);      /* as `deploy` */
+        return 1;
+
+    case 146:                                   /* ally   */
+    case 147:                                   /* unally */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 146) ? 0x15 : 0x16;
+        ACT(0x18) = ScriptArmyColour(ctx, at);
+        if (ACT(0x18) < 0)
+            return 0;
+        ACT(0x1C) = ScriptArmyColour(ctx, at);
+        return 1;
+
+    case 148:                                   /* setforcecolor */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x17;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        ACT(0x1C) = ScriptArmyColour(ctx, at);
+        return 1;
+
+    case 77:                                    /* moveitem */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x1F;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        return ScriptLocation(ctx, at, action, 0) != 0;
+
+    case 117:                                   /* setfacing    */
+    case 118:                                   /* setgunfacing */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 117) ? 0x20 : 0x21;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+            return 1;
+        }
+        /* A facing may be `refvar <name>` instead of a literal. Anything
+         * else is accepted and leaves the field at zero. */
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
+            (int32_t)(uintptr_t)ctx->tokens[*at].value != 136)
+            return 1;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        return ActVarName(ctx, at, action,
+            "Line [%4d]:  expected variable name but variable %s not "
+            "declared\n");
+
+    case 134:                                   /* setvar */
+    case 135:                                   /* addvar */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 134) ? 0x23 : 0x22;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+            return 1;
+        }
+        if (id == 135 && ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        return ActVarName(ctx, at, action,
+            id == 134
+                ? "Line [%4d]:  expected variable name in SetVar but "
+                  "variable %s not declared\n"
+                : "Line [%4d]:  expected variable name in AddVar but "
+                  "variable %s not declared\n");
+
+    case 149:                                   /* activateregion   */
+    case 150:                                   /* inactivateregion */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x26;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x38) = (id == 149);
+        ACT(0x18) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 119: {                                 /* order */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+            if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+                return 0;
+            ACT(0x44) = 0;
+        } else {
+            if (!ScriptOrderTarget(ctx, at, &ACT(0x44), &ACT(0x18),
+                                   &ACT(0x40)))
+                return 0;
+        }
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        /* `order <who> follow <whom>` or `order <who> <somewhere>`. */
+        int32_t verb = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (verb == 120) {                      /* follow */
+            if (!ActStep(ctx, at))
+                return 0;
+            ACT(0x14) = 0x19;
+            if (!ScriptResolveName(ctx, at, &ACT(0x1C), 0))
+                return 0;
+        } else if (verb == 121) {               /* moveto */
+            if (!ActStep(ctx, at))
+                return 0;
+            ACT(0x14) = 0x18;
+            if (!ScriptLocation(ctx, at, action, 0))
+                return 0;
+        } else {
+            return 0;
+        }
+        ACT(0x38) = -1;
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
+            (int32_t)(uintptr_t)ctx->tokens[*at].value != 122)   /* inmode */
+            return 1;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t m = ActAiMode((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (m < 0)
+                return 0;
+            ACT(0x38) = m;
+        }
+        (*at)++;
+        return 1;
+    }
+
+    case 154:                                   /* setaimode */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x2A;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+            if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+                return 0;
+            ACT(0x44) = 0;
+        } else if (!ScriptOrderTarget(ctx, at, &ACT(0x44), &ACT(0x18),
+                                      &ACT(0x40))) {
+            return 0;
+        }
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t m = ActAiMode((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (m < 0) {
+                am2_log("Line [%4d]:  Expected {attack|defend|ignore|evade} "
+                        "in setaimode\n", ctx->tokens[*at].line);
+                return 0;
+            }
+            ACT(0x38) = m;
+        }
+        (*at)++;
+        return 1;
+
+    case 159:                                   /* setaipose */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x2B;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t m = (int32_t)(uintptr_t)ctx->tokens[*at].value - 160;
+            if (m < 0 || m > 3) {
+                am2_log("Line [%4d]:  Expected {stand|kneel|prone|none} in "
+                        "setaipose\n", ctx->tokens[*at].line);
+                return 0;
+            }
+            /* stand 1, kneel 2, prone 3, none 0. */
+            ACT(0x38) = (m == 3) ? 0 : m + 1;
+        }
+        (*at)++;
+        return 1;
+
+    case 164:                                   /* setspeed */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x2C;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t v = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            if (v == 165)                       /* slow   */
+                ACT(0x38) = 1;
+            else if (v == 166)                  /* normal */
+                ACT(0x38) = 0;
+            else {
+                am2_log("Line [%4d]:  Expected {slow|normal} in setspeed\n",
+                        ctx->tokens[*at].line);
+                return 0;
+            }
+        }
+        (*at)++;
+        return 1;
+
+    case 167:                                   /* setnpc    */
+    case 176:                                   /* addexp    */
+    case 185:                                   /* setuilock */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 167) ? 0x2D : (id == 176) ? 0x35 : 0x39;
+        if (id != 185 && !ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 173:                                   /* setitemflag */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        if ((int32_t)(uintptr_t)ctx->tokens[*at].value != 174) {  /* strategic */
+            am2_log("Line [%4d]:  Expected {strategic} in setitemflag\n",
+                    ctx->tokens[*at].line);
+            return 0;
+        }
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x33;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 186:                                   /* setdamagepad */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x3A;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        {
+            int32_t p = ScriptFindName((const char *)ctx->tokens[*at].value);
+            if (p < 0) {
+                am2_log("Line [%4d]:  Name required after SetDamagePad\n",
+                        ctx->tokens[*at].line);
+                return 0;
+            }
+            if (kScriptNames[p].type != 1) {
+                am2_log("Line [%4d]:  SetDamagePad name was not a pad\n",
+                        ctx->tokens[*at].line);
+                return 0;
+            }
+            /* The pad it resolves to, not the name-table index. */
+            ACT(0x18) = kScriptNames[p].value;
+        }
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        ACT(0x3C) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x38) = 0;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            (*at)++;
+        }
+        ACT(0x44) = 0;
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
+            return 1;
+        {
+            int32_t k = ActDamageKind(
+                (int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (k < 0)
+                return 1;
+            ACT(0x44) = k;
+        }
+        (*at)++;
+        return 1;
+
+    case 175:                                   /* setitemowner */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x34;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            ACT(0x38) = 4;
+            return 1;
+        }
+        ACT(0x38) = ScriptArmyColour(ctx, at);
+        return ACT(0x38) >= 0;
+
+    case 168:                                   /* setm80 */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x2E;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        ACT(0x40) = ScriptArmyColour(ctx, at);
+        if (ACT(0x40) < 0)
+            ACT(0x40) = 4;
+        return 1;
+
+    case 180:                                   /* dropitem */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = 0x38;
+        /* The item goes to +0x40 and whoever drops it to +0x18, which is the
+         * other way round from every other two-name action. */
+        if (!ScriptResolveName(ctx, at, &ACT(0x40), 0))
+            return 0;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        return ScriptLocation(ctx, at, action, 0) != 0;
+
+    case 169:                                   /* setzombie    */
+    case 170:                                   /* setscientist */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 169) ? 0x2F : 0x30;
+        return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
+
+    case 171:                                   /* makesmoke */
+    case 172:                                   /* makeflame */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 171) ? 0x31 : 0x32;
+        if (!ScriptLocation(ctx, at, action, 0))
+            return 0;
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+            return 1;
+        ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 177:                                   /* fireweapon */
+    case 178:                                   /* unitfire   */
+        if (!ActStep(ctx, at))
+            return 0;
+        ACT(0x14) = (id == 177) ? 0x36 : 0x37;
+        if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
+            return 0;
+        if (id == 177 && !ScriptResolveName(ctx, at, &ACT(0x40), 0))
+            return 0;
+        if (*at < ctx->count &&
+            ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+            ACT(0x38) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+            if (++(*at) >= ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
+        } else {
+            ACT(0x38) = -1;
+        }
+        return ScriptLocation(ctx, at, action, 0) != 0;
+
+    default:
+        /* Every other reserved word in 64..186 -- the weapons, the pickups,
+         * the AI modes and the poses. They are arguments, not actions. */
+        return 0;
+    }
+}
+
+/* Ours unless AM2_ORIG_ACTIONS is set, which is how the reference dump in
+ * tests/actions-reference.txt was taken and how it is re-taken. */
 static int32_t ScriptParseAction(AM2_ScriptCtx *ctx, int32_t *at,
                                  uint8_t *action)
 {
-    return ((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, uint8_t *))
-        (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, action);
+    if (am2_orig_actions)
+        return ((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, uint8_t *))
+            (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, action);
+    return ScriptParseActionRecon(ctx, at, action);
 }
 
 /* Every action goes through here, so one place can dump what was parsed.
@@ -2214,6 +3219,7 @@ int script_install(void)
 
     am2_dump_actions = getenv("AM2_DUMP_ACTIONS") != 0;
     am2_parse_all = getenv("AM2_PARSE_ALL") != 0;
+    am2_orig_actions = getenv("AM2_ORIG_ACTIONS") != 0;
 
     rc |= patch_replace(ADDR_SCRIPT_LOOKUP_TOKEN,
                         (const void *)ScriptLookupToken,
