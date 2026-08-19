@@ -51,18 +51,16 @@ int32_t __cdecl IsScriptDelim(uint8_t c)
 
 int32_t __cdecl ScriptLookupToken(const char *word)
 {
-    const AM2_ScriptToken *e;
-
-    for (e = kScriptTokens; e < kScriptTokenEnd; e++) {
+    for (int32_t i = 0; i < AM2_SCRIPT_TOKEN_COUNT; i++) {
         const char *a = word;
-        const char *b = (const char *)AM2_IMAGE(e->name);
+        const char *b = am2_script_tokens[i].name;
 
         while (*a && *a == *b) {
             a++;
             b++;
         }
         if (*a == *b)
-            return e->id;
+            return am2_script_tokens[i].id;
     }
     return -1;
 }
@@ -283,11 +281,9 @@ void __cdecl ScriptNextToken(const char *line, AM2_ScriptCtx *ctx,
 
 const char *__cdecl ScriptTokenName(int32_t id)
 {
-    const AM2_ScriptToken *e;
-
-    for (e = kScriptTokens; e < kScriptTokenEnd; e++)
-        if (e->id == id)
-            return (const char *)AM2_IMAGE(e->name);
+    for (int32_t i = 0; i < AM2_SCRIPT_TOKEN_COUNT; i++)
+        if (am2_script_tokens[i].id == id)
+            return am2_script_tokens[i].name;
 
     return 0;
 }

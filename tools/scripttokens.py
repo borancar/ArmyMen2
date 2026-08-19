@@ -102,7 +102,7 @@ HEADER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
                       "src/game/scripttokens.h")
 
 
-def emit_header(tokens, spellings):
+def emit_header(tokens, spellings, table):
     """Constants for every keyword id, generated rather than typed.
 
     The ids come out of the image, so a generated header cannot drift from the
@@ -129,6 +129,34 @@ def emit_header(tokens, spellings):
             if sym is None:
                 sym = name.upper()
             fh.write("#define AM2_TOK_%-16s %3d\n" % (sym, tid))
+        fh.write("""
+/* The table itself, in the order ScriptLookupToken walks it -- which matters,
+ * because that walk is linear and returns the first match. Two spellings share
+ * id 88 and the order decides which of them a reverse lookup reports.
+ *
+ * Carried here rather than read out of the image. It is the same 185 words
+ * docs/scripttokens.md lists, generated from the same array, so the repository
+ * gains nothing it did not already hold -- and the reconstruction stops
+ * needing the image mapped to answer what a keyword means. The native build,
+ * which has no image to read, needs exactly this.
+ *
+ * tests/selftest.cpp replays every word in the shipped scripts against the
+ * ORIGINAL's answers, so a copy that drifted from the binary would fail there
+ * rather than in the game.
+ */
+typedef struct {
+    const char *name;
+    int32_t     id;
+} AM2_ScriptToken;
+
+static const AM2_ScriptToken am2_script_tokens[] = {
+""")
+        for name, tid in table:
+            fh.write('    { "%s", %3d },\n' % (name.replace("\\", "\\\\"), tid))
+        fh.write("};\n\n"
+                 "#define AM2_SCRIPT_TOKEN_COUNT "
+                 "((int32_t)(sizeof am2_script_tokens / "
+                 "sizeof am2_script_tokens[0]))\n")
         fh.write("\n#endif /* AM2_SCRIPTTOKENS_H */\n")
 
 
@@ -242,7 +270,7 @@ def main():
           "owner bits could hold.\n")
 
     words = spellings(img)
-    emit_header(tok, words)
+    emit_header(tok, words, words)
     print("-> docs/scripttokens.md + src/game/scripttokens.h  (%d ids, "
           "%d spellings)" % (len(tok), len(words)))
     for v in sorted(tok)[:14]:

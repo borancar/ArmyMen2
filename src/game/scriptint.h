@@ -32,13 +32,9 @@ extern "C" {
  *
  * Anything NOT in this group is written by the reconstruction, and the types
  * below say which is which. */
-typedef struct {
-    const char *name;
-    int32_t     id;
-} AM2_ScriptToken;
-
-#define kScriptTokens    ((const AM2_ScriptToken *)AM2_IMAGE(ADDR_SCRIPT_TOKENS))
-#define kScriptTokenEnd  ((const AM2_ScriptToken *)AM2_IMAGE(ADDR_SCRIPT_TOKENS_END))
+/* The keyword table is no longer among these: it is written out in
+ * scripttokens.h and carried, so nothing has to be mapped to answer what a
+ * word means. See the comment there. */
 #define kKindName(k)     ((const char *)AM2_IMAGE( \
                              ((const uint32_t *)AM2_IMAGE( \
                                  ADDR_SCRIPT_KIND_NAMES))[k]))

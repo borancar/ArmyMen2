@@ -858,9 +858,12 @@
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
 
-/* The keyword table itself: 185 {const char *, int32_t} pairs. The bounds are
- * ScriptLookupToken's own -- it walks from the first and stops at the second.
- * Read by three functions and written by none; see game/scriptint.h. */
+/* Where the ORIGINAL's keyword table is: 185 {const char *, int32_t} pairs,
+ * the bounds being ScriptLookupToken's own -- it walks from the first and
+ * stops at the second. The reconstruction no longer reads it; the table is
+ * written out in game/scripttokens.h and generated from here, so these stay
+ * as the record of where it came from and as what tools/scripttokens.py
+ * reads. Nothing in the image writes it. */
 #define ADDR_SCRIPT_TOKENS       0x00487C90u
 #define ADDR_SCRIPT_TOKENS_END   0x00488258u
 #define ADDR_SCRIPT_ADD_TOKEN    0x0043F370u  /* void(ctx, kind, value, line) */
