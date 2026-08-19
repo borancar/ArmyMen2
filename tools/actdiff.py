@@ -13,25 +13,38 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import am2
 
 
-def norm(w):
-    """Heap pointers shift as soon as anything earlier allocates differently,
-    so one real divergence makes every later string look wrong. Masking them
-    shows the logic differences on their own; AM2_ACTDIFF_RAW=1 keeps them."""
+def norm(w, seen):
+    """Renumber heap pointers in first-seen order.
+
+    Two things make the raw values useless for comparison. One real divergence
+    early on shifts every later allocation, so a single bug makes thousands of
+    strings look wrong. And the whole heap moves when the injected DLL changes
+    size at all -- splitting script.cpp in two displaced every pointer by
+    0x70000 while the parse was byte-identical.
+
+    What IS meaningful is which records share a pointer, and renumbering keeps
+    that: two records that pointed at the same string still do. AM2_ACTDIFF_RAW
+    keeps the addresses, which is only worth doing when comparing two runs of
+    the same binary.
+    """
     if os.environ.get("AM2_ACTDIFF_RAW"):
         return w
     v = int(w, 16)
-    return "HEAPPTR__" if 0x01000000 <= v < 0x10000000 else w
+    if not (0x01000000 <= v < 0x10000000):
+        return w
+    return "P%d" % seen.setdefault(v, len(seen))
 
 
 def load(path):
     """[(file, line, rc, words)] in order."""
-    out, cur = [], "?"
+    out, cur, seen = [], "?", {}
     for raw in open(path):
         f = raw.split()
         if raw.startswith("PARSEALL "):
             cur = raw.split(None, 1)[1].strip()
         elif raw.startswith("ACT "):
-            out.append((cur, int(f[1]), int(f[2]), [norm(x) for x in f[3:]]))
+            out.append((cur, int(f[1]), int(f[2]),
+                        [norm(x, seen) for x in f[3:]]))
     return out
 
 

@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 
+#include "objscript.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,7 +41,7 @@ typedef struct {
     void   *value;           /* kind 5 owns a copy; 1..4 hold a dword */
 } AM2_ScriptTok;
 
-typedef struct {
+typedef struct AM2_ScriptCtx {
     int32_t        capacity;
     int32_t        count;
     AM2_ScriptTok *tokens;
@@ -173,50 +175,86 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx);
  * leaves the token for ReadScript to dispatch. */
 int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at);
 
-/* The object-script data model, recovered from the three grow-and-append
- * helpers and their two callers. Four levels, each owning the next:
+
+/* A pad: a region of the map that triggers when something enters it. The
+ * parser writes the first ten fields; the record is 72 bytes. */
+typedef struct {
+    int32_t id;             /* +0x00, its own index */
+    int32_t number;         /* +0x04, the number the script gave, 0..255 */
+    int32_t name;           /* +0x08, name-table index */
+    int32_t compared;       /* +0x0C, 1 once a <, = or > has been seen */
+    int32_t specific;       /* +0x10, 1 when a named item is the trigger */
+    int32_t trigger;        /* +0x14, the flag set -- or the name index when
+                             * `specific`, which is why the two are exclusive */
+    int32_t compare;        /* +0x18, 0 for '=', 1 for '<', 2 for '>' */
+    int32_t threshold;      /* +0x1C */
+    int32_t delay0;         /* +0x20, from the optional `delay` clause */
+    int32_t delay1;         /* +0x24 */
+    uint8_t rest[72 - 0x28];
+} AM2_Pad;
+
+/* Everything sharing one pad number, and where that number sits on the map.
+ * The centroid is in sixteenths of a cell. */
+typedef struct {
+    int16_t count;          /* +0x00 */
+    int16_t pads[32];       /* +0x02, indices into the pad array */
+    int16_t cx;             /* +0x42 */
+    int16_t cy;             /* +0x44 */
+    uint8_t rest[76 - 0x46];
+} AM2_PadNumber;
+
+/* 0x004440E0. `pad <name> <number> <trigger-words...> [<=> <int>] [delay a b]`.
  *
- *   object/objclass  ->  state <name>  ->  frame <a> <b>  ->  action, ...
+ * Declares the name with type 1, rewrites the name token to kind 7 as
+ * `variable` does, computes the region's centroid the first time a number is
+ * seen, then reads trigger keywords until one it does not recognise. */
+int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at);
+
+/* One event term in an `if` condition -- three values from the event parser,
+ * and a fourth field it always writes as zero. */
+typedef struct {
+    int32_t a, b, c, d;
+} AM2_ScriptEvent;
+
+/* One `testvar` comparison: two operand triples and an operator code. */
+typedef struct {
+    int32_t left[3];
+    int32_t right[3];
+    int32_t op;         /* 0 '=', 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=' */
+} AM2_ScriptTest;
+
+/* An `if` statement. Malloc'd, zeroed, and pushed onto the list at
+ * ADDR_SCRIPT_CONDITIONS when it parses. 0x34 bytes. */
+typedef struct {
+    int32_t           kind;       /* +0x00, see ScriptIf */
+    int32_t           number;     /* +0x04, the count for repeat/count/time */
+    int32_t           nevents;    /* +0x08 */
+    AM2_ScriptEvent  *events;     /* +0x0C */
+    int32_t           unused10;   /* +0x10 */
+    int32_t           ntests;     /* +0x14 */
+    AM2_ScriptTest   *tests;      /* +0x18 */
+    int32_t           nactions;   /* +0x1C */
+    uint8_t          *actions;    /* +0x20, 0x48 bytes each */
+    int32_t           mode;       /* +0x24, 0 none 1 random 2 sequential
+                                   *        3 onobjstate */
+    int32_t           unused28;   /* +0x28 */
+    int32_t           objstate;   /* +0x2C, a name index when mode is 3 */
+    void             *next;       /* +0x30 */
+} AM2_ScriptCond;
+
+/* 0x004432F0. The `if` statement -- by a wide margin the largest of the five.
  *
- * Every level is the same shape -- capacity, count, array -- and each grows by
- * a fixed step rather than doubling: five states, ten frames, five actions. */
-typedef struct {
-    int32_t  a;             /* +0x00 */
-    int32_t  b;             /* +0x04 */
-    int32_t  actioncap;     /* +0x08 */
-    int32_t  actioncount;   /* +0x0C */
-    uint8_t *actions;       /* +0x10, 0x48 bytes each */
-} AM2_ObjFrame;             /* 20 bytes */
-
-typedef struct {
-    int32_t       name;     /* +0x00, name-table index */
-    int32_t       framecap; /* +0x04 */
-    int32_t       framecount; /* +0x08 */
-    AM2_ObjFrame *frames;   /* +0x0C */
-} AM2_ObjState;             /* 16 bytes */
-
-typedef struct {
-    int32_t form;           /* +0x00, 0 = object, 1 = objclass */
-    union {
-        int32_t  name;      /* +0x04 for `object` */
-        uint16_t cls[2];    /* +0x04 and +0x06 for `objclass` */
-    } u;
-    int32_t       statecap;   /* +0x08 */
-    int32_t       statecount; /* +0x0C */
-    AM2_ObjState *states;     /* +0x10 */
-} AM2_ObjScript;            /* 20 bytes */
-
-/* 0x00437010, 0x00437070, 0x004370D0. Append one entry, growing first. Each
- * returns the new entry, zeroed. */
-uint8_t      *__cdecl ObjFrameNewAction(AM2_ObjFrame *f);
-AM2_ObjFrame *__cdecl ObjStateNewFrame(AM2_ObjState *s);
-AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o);
-
-/* 0x004374F0. Compare `b` against `a`: op 0 equal, 1 less, 2 greater. The
- * argument order is the surprise -- the value under test is the THIRD
- * argument, and everything else answers 0. */
-int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b);
-
+ *   if [timeabsolute <n> | allof | inorder | repeat <n> of | count <n> of
+ *      | <event> after <event> [and ...] | <expr> [butnot <event>]]
+ *      [testvar <value> <op> <value> [and ...]]
+ *      then [random|sequential|onobjstate <name>] <action> [, <action>...]
+ *
+ * `kind` records which form was taken: 0 plain, 1 allof, 2 inorder, 3 count,
+ * 4 repeat, 5 timeabsolute, 6 after-chain, 7 butnot after a keyword form,
+ * 8 butnot after a string form.
+ *
+ * Returns 1 on success, having pushed the record onto the condition list.
+ * ReadScript counts those returns as its `compounds` total. */
 /* 0x0043F9F0. The uid a name stands for, declaring it if it is new.
  *
  * Only type 0 -- object -- names qualify; a name already declared as anything
@@ -328,106 +366,6 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
 int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
                               int32_t want, int32_t stop);
 
-/* 0x00436C20. One `state <name>` block: the name, then frames until the next
- * `state` or the next top-level statement. */
-int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at);
-
-/* 0x004369E0. One `frame <int> <int>` block: two integers, then actions
- * separated by commas until `state`, `frame`, or a top-level statement. */
-int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at);
-
-/* 0x00436D60. `object <name>` and `objclass <int> <int>`, then a block of
- * attribute statements -- GenerateObjScriptFromTokens, named from its own
- * error string.
- *
- * Both forms select a set of objects and stamp the current script onto each,
- * then read attribute statements until ScriptIsStatementStart says the next
- * top-level statement has begun. `object` resolves one name to one uid;
- * `objclass` takes two 16-bit class fields and walks every object matching.
- *
- * It is the only handler that reads its own keyword rather than being told
- * which one it is, which is how one function serves two ids. */
-int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at);
-
-/* A pad: a region of the map that triggers when something enters it. The
- * parser writes the first ten fields; the record is 72 bytes. */
-typedef struct {
-    int32_t id;             /* +0x00, its own index */
-    int32_t number;         /* +0x04, the number the script gave, 0..255 */
-    int32_t name;           /* +0x08, name-table index */
-    int32_t compared;       /* +0x0C, 1 once a <, = or > has been seen */
-    int32_t specific;       /* +0x10, 1 when a named item is the trigger */
-    int32_t trigger;        /* +0x14, the flag set -- or the name index when
-                             * `specific`, which is why the two are exclusive */
-    int32_t compare;        /* +0x18, 0 for '=', 1 for '<', 2 for '>' */
-    int32_t threshold;      /* +0x1C */
-    int32_t delay0;         /* +0x20, from the optional `delay` clause */
-    int32_t delay1;         /* +0x24 */
-    uint8_t rest[72 - 0x28];
-} AM2_Pad;
-
-/* Everything sharing one pad number, and where that number sits on the map.
- * The centroid is in sixteenths of a cell. */
-typedef struct {
-    int16_t count;          /* +0x00 */
-    int16_t pads[32];       /* +0x02, indices into the pad array */
-    int16_t cx;             /* +0x42 */
-    int16_t cy;             /* +0x44 */
-    uint8_t rest[76 - 0x46];
-} AM2_PadNumber;
-
-/* 0x004440E0. `pad <name> <number> <trigger-words...> [<=> <int>] [delay a b]`.
- *
- * Declares the name with type 1, rewrites the name token to kind 7 as
- * `variable` does, computes the region's centroid the first time a number is
- * seen, then reads trigger keywords until one it does not recognise. */
-int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at);
-
-/* One event term in an `if` condition -- three values from the event parser,
- * and a fourth field it always writes as zero. */
-typedef struct {
-    int32_t a, b, c, d;
-} AM2_ScriptEvent;
-
-/* One `testvar` comparison: two operand triples and an operator code. */
-typedef struct {
-    int32_t left[3];
-    int32_t right[3];
-    int32_t op;         /* 0 '=', 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=' */
-} AM2_ScriptTest;
-
-/* An `if` statement. Malloc'd, zeroed, and pushed onto the list at
- * ADDR_SCRIPT_CONDITIONS when it parses. 0x34 bytes. */
-typedef struct {
-    int32_t           kind;       /* +0x00, see ScriptIf */
-    int32_t           number;     /* +0x04, the count for repeat/count/time */
-    int32_t           nevents;    /* +0x08 */
-    AM2_ScriptEvent  *events;     /* +0x0C */
-    int32_t           unused10;   /* +0x10 */
-    int32_t           ntests;     /* +0x14 */
-    AM2_ScriptTest   *tests;      /* +0x18 */
-    int32_t           nactions;   /* +0x1C */
-    uint8_t          *actions;    /* +0x20, 0x48 bytes each */
-    int32_t           mode;       /* +0x24, 0 none 1 random 2 sequential
-                                   *        3 onobjstate */
-    int32_t           unused28;   /* +0x28 */
-    int32_t           objstate;   /* +0x2C, a name index when mode is 3 */
-    void             *next;       /* +0x30 */
-} AM2_ScriptCond;
-
-/* 0x004432F0. The `if` statement -- by a wide margin the largest of the five.
- *
- *   if [timeabsolute <n> | allof | inorder | repeat <n> of | count <n> of
- *      | <event> after <event> [and ...] | <expr> [butnot <event>]]
- *      [testvar <value> <op> <value> [and ...]]
- *      then [random|sequential|onobjstate <name>] <action> [, <action>...]
- *
- * `kind` records which form was taken: 0 plain, 1 allof, 2 inorder, 3 count,
- * 4 repeat, 5 timeabsolute, 6 after-chain, 7 butnot after a keyword form,
- * 8 butnot after a string form.
- *
- * Returns 1 on success, having pushed the record onto the condition list.
- * ReadScript counts those returns as its `compounds` total. */
 int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at);
 
 /* 0x00440600. Events until a `then`, `butnot` or `testvar`, appended to the

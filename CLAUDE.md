@@ -73,6 +73,14 @@ file and screenshot directory are all derived from `ID`, which defaults from
 
 ## Source layout
 
+**Two module names come from the image itself.** It carries
+`C:\ArmyMen2\source\script.cpp` and `C:\ArmyMen2\source\objscript.cpp`, and
+the functions referencing each sit in bands of their own -- objscript around
+`0x004364A0..0x004375A0`, script from `0x0043EE80` up. The reconstruction is
+split the same way rather than along a line of our choosing, with
+`scriptint.h` as the private surface between them. Where the original's own
+division is visible, use it.
+
 `src/game/win32/` holds every module that talks to Win32 or DirectX; the flat
 part of `src/game/` holds the reconstruction that touches no API at all —
 `blit`, `dist`, `objtable`, `objtype`, `packkey`, `rect`, `savetag`, `text`.
