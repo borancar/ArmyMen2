@@ -344,6 +344,24 @@ each put their two names in the opposite fields from how the statement reads;
 and the AI modes are attack 6, defend 7, ignore 2, evade 5 -- neither
 sequential nor in keyword order. Reading alone got all of them wrong.
 
+**A switch that selects the original has to skip the patch too, and mine had
+silently stopped working.** `tests/actions-reference.txt` is recorded by running
+the ORIGINAL action parser under our `ReadScript` and our dump, which needed a
+runtime flag because `ScriptIf` calls the reconstruction directly and would
+never reach `0x00440D70` at all. But once `ScriptParseAction` was itself
+detoured, calling through that address came straight back to us -- there is no
+trampoline -- so the flag quietly re-recorded the oracle from the very code it
+was meant to check. `AM2_PROBE_NOACTION` now both skips the `patch_replace` and
+routes the call through the address, because neither half reaches the original
+alone.
+
+Proved by mutation rather than by reading, and the first attempt proved nothing:
+a `sed` that did not match the padded `case` column left the code untouched, and
+both runs "passed". With `attack` actually returning 99, the probe reproduces
+all 9,934 records and the same build without it diverges on 37 -- `setaimode`
+and, because a bad mode ends the statement, `order`. **A test that cannot fail
+has not passed** -- check the mutation landed before believing the result.
+
 **A handler can call the original's callees, and that is the strongest test
 available.** Every one of the five is reconstructed while the parsers below it
 stay original and are reached by address, so our code runs in the middle of a

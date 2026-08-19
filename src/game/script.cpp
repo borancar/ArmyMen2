@@ -1127,7 +1127,7 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
 /* Set from AM2_DUMP_ACTIONS and AM2_PARSE_ALL. */
 int32_t am2_dump_actions = 0;
 static int32_t am2_parse_all = 0;
-static int32_t am2_orig_actions = 0;
+static int32_t am2_probe_noaction = 0;
 static void ScriptParseAll(void);
 
 /* ---------------------------------------------------------- actions ---- */
@@ -2151,12 +2151,21 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     }
 }
 
-/* Ours unless AM2_ORIG_ACTIONS is set, which is how the reference dump in
- * tests/actions-reference.txt was taken and how it is re-taken. */
+/* AM2_PROBE_NOACTION runs the ORIGINAL action parser under our ReadScript and
+ * our dump, which is how tests/actions-reference.txt is recorded.
+ *
+ * It takes two things at once and they cannot be separated. Not installing the
+ * detour is not enough, because ScriptIf and ScriptObjFrame call this
+ * reconstruction directly and would never reach 0x00440D70 at all. Calling
+ * through the address is not enough either: patch_replace overwrites the
+ * original's first five bytes with a jump and leaves no trampoline, so with
+ * the detour in place that address is us and the call would come straight back
+ * here. So the one flag both skips the patch in script_install and sends this
+ * call through the address, and the flag is read before either is used. */
 static int32_t ScriptParseAction(AM2_ScriptCtx *ctx, int32_t *at,
                                  AM2_ScriptAction *act)
 {
-    if (am2_orig_actions)
+    if (am2_probe_noaction)
         return orig_parse_action(ctx, at, act);
     return ScriptParseActionRecon(ctx, at, act);
 }
@@ -3086,7 +3095,7 @@ int script_install(void)
 
     am2_dump_actions = getenv("AM2_DUMP_ACTIONS") != 0;
     am2_parse_all = getenv("AM2_PARSE_ALL") != 0;
-    am2_orig_actions = getenv("AM2_ORIG_ACTIONS") != 0;
+    am2_probe_noaction = getenv("AM2_PROBE_NOACTION") != 0;
 
     rc |= patch_replace(ADDR_IS_BLANK,
                         (const void *)IsBlank, "IsBlank", 1);
@@ -3178,10 +3187,12 @@ int script_install(void)
     /* Worth detouring even though our own ScriptIf and ScriptObjFrame call it
      * directly: ADDR_SCRIPT_RUN_LINE is still the original's and reaches it by
      * address, so without this a typed cheat code would run the original
-     * parser while every script ran ours. */
-    rc |= patch_replace(ADDR_SCRIPT_PARSE_ACTION,
-                        (const void *)ScriptParseActionRecon,
-                        "ScriptParseAction", 3);
+     * parser while every script ran ours. Skipped under AM2_PROBE_NOACTION,
+     * which is the only way the address still leads to the original. */
+    if (!am2_probe_noaction)
+        rc |= patch_replace(ADDR_SCRIPT_PARSE_ACTION,
+                            (const void *)ScriptParseActionRecon,
+                            "ScriptParseAction", 3);
     rc |= patch_replace(ADDR_SCRIPT_LOCATION,
                         (const void *)ScriptLocation, "ScriptLocation", 1);
     return rc;
