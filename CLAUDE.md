@@ -223,6 +223,23 @@ all 13,956 lines, because no token the game ships is 63 characters long. That
 path stays verified by reading, and the test's own comment says so. A test
 whose gaps are unstated reads as more coverage than it has.
 
+**An emulated heap makes whole statement handlers testable.** `AddToken` and
+`AddNameTableName` reach the game's `malloc`, which reaches `HeapAlloc`, which
+does not exist under emulation -- so they had to be hooked away, and anything
+built on them could not be run at all. A bump allocator in a region of its own
+lets both run for real, and `tools/scriptcheck.py` now emulates `variable` end
+to end: tokenise a line, run the handler, read back the name table. Nothing is
+reclaimed on purpose; `free` becoming a no-op cannot change what a correct
+caller observes, and a real allocator would be a second thing to be wrong
+about.
+
+**A handler's value is in the exits a shipped script never takes.**
+`ScriptVariable` has four and the scripts reach one. Declaring with the wrong
+type and failing to rewrite the name token both fail the corpus -- but deleting
+the duplicate-name check passed all 196 cases, because every case started from
+an empty table. Two cases now run a prior declaration first. Ask what state a
+check needs before believing a corpus covers it.
+
 **`Emu.call`'s instruction cap is a runaway-loop guard, not a budget.** It was
 hardcoded at 100,000, sized for the pure leaves it was written for, and the
 tokeniser exceeds it honestly: `LookupToken` walks all 185 keywords for every
@@ -285,6 +302,36 @@ to carry were taken off a call site and were wrong about the middle field,
 which is the LINE NUMBER. Kinds 1..4 store a dword by value, kind 5 owns a
 `malloc`'d copy, and kind 0 or 6 advances the count leaving the value untouched
 -- the switch covers exactly `kind - 1` in `0..4`.
+
+**Boot Camp is not MAP 01, and confusing them costs a verification path.**
+Boot Camp is `data/bootcamp/` and declares no `variable` at all; `kitchen` is
+MAP 01 of the campaign and declares two. Only four map directories use the
+statement -- `kitchen`, `homeland`, `frontyard`, `8ball` -- so the whole
+name-table layer is compared on the campaign or nowhere. `tools/ab.sh campaign`
+exists for that, and it is clean.
+
+Its evidence is better than the usual log match. `ReadScript` prints its own
+summary, `lines: 1225  tokens: 2895  names: 316  compounds: 91`, and that is
+four independent totals agreeing rather than one message being identical.
+
+**Do not drive the campaign through RECRUIT.** A name that already exists is
+rejected in silence, so the second run of a scripted sequence sits on the
+dialog looking exactly like a broken reconstruction. Select the existing player
+instead -- SINGLE PLAYER, the player row, SELECT, NEW -- which is idempotent
+and creates the player on the first run.
+
+**A statement handler rewrites its own tokens, and that is where kind 7 comes
+from.** `ScriptTokenText` has eight arms for seven kinds and they do not line
+up: kind 6 -- the one the kind table calls `Name` -- writes nothing, while kind
+7, which the kind table has no entry for at all, resolves through the name
+table. `NextToken` emits neither. `ScriptVariable` is what produces kind 7: it
+turns its String name token into a kind-7 reference to the table entry it just
+made, and frees the string the token owned.
+
+A name-table entry is sixteen bytes -- a `malloc`'d name, a type, a value and a
+flag always written as 1. `AddNameTableName` type 0 takes a fresh uid from the
+counter at `0x00511DF4`; types 1..3 store what they are given; anything else
+logs and stores it anyway, so that arm complains rather than rejects.
 
 **Token buffers cross between our code and the original's, so the allocator
 has to be the game's.** `src/game/crt.h` points `am2_malloc`/`am2_realloc`/
@@ -1306,10 +1353,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   entry. The same run gives `FirstItem` 363 and `NextItem` 584,067, and
   363 x 1,609 is 584,067 exactly, so the registry invariant holds with the
   tokeniser in place. `tools/ab.sh mission` is clean on the same build.
-- The interpreter's top-level grammar is mapped but the handlers are not
-  written: `preloadsprite` (25) -> `0x00444900`, `pad` (26) -> `0x004440E0`,
-  `variable` (133) -> `0x00443F70`, `if` (44) -> `0x004432F0`, `object`
-  (139) -> `0x00436D60`. `GenerateObjScriptFromTokens` is a real source name,
-  recovered from a string.
+- The interpreter's top-level grammar is mapped and one of five handlers is
+  written. `ReadScript` dispatches on exactly six ids, which is also the set
+  `ScriptIsStatementStart` answers yes for: `preloadsprite` (25) ->
+  `0x00444900`, `pad` (26) -> `0x004440E0`, `if` (44) -> `0x004432F0`,
+  `variable` (133) -> `0x00443F70` (**done**), and `object` (139) and
+  `objclass` (140) sharing `0x00436D60`. The four left are 2,080 B, 2,896 B,
+  400 B and 688 B, and they reach into sprite loading, object creation and an
+  8,608-byte expression evaluator at `0x00440D70` -- that last is also what
+  `ParseLine` (`0x00444C40`) needs, which is why ParseLine is not done either.
+  `GenerateObjScriptFromTokens` is a real source name, recovered from a string.
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.
