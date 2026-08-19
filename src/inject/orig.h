@@ -959,6 +959,16 @@
 #define ADDR_PAD_DEFAULT_POS      0x005125A0u  /* both centroid words at once */
 #define ADDR_SCRIPT_VARIABLE      0x00443F70u  /* keyword 133 */
 #define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */
+
+/* The sub-parsers `if` drives. All four stay the original's. */
+#define ADDR_SCRIPT_SCAN_FOR      0x00442F10u  /* int32_t(ctx,from,want,stop) */
+#define ADDR_SCRIPT_PARSE_EVENT   0x0043FF90u  /* (ctx,at,&a,&b,&c) */
+#define ADDR_SCRIPT_PARSE_EVENTS  0x00440600u  /* (ctx,at,cond) */
+#define ADDR_SCRIPT_PARSE_VALUE   0x00443010u  /* (ctx,at,&a,&b,&c) */
+#define ADDR_SCRIPT_PARSE_ACTION  0x00440D70u  /* (ctx,at,uint8_t[0x48]) */
+
+/* Head of the condition list; each record links through its +0x30. */
+#define ADDR_SCRIPT_CONDITIONS    0x00510214u
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --
                                                * GenerateObjScriptFromTokens,
                                                * from its own error string */

@@ -219,6 +219,53 @@ typedef struct {
  * seen, then reads trigger keywords until one it does not recognise. */
 int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at);
 
+/* One event term in an `if` condition -- three values from the event parser,
+ * and a fourth field it always writes as zero. */
+typedef struct {
+    int32_t a, b, c, d;
+} AM2_ScriptEvent;
+
+/* One `testvar` comparison: two operand triples and an operator code. */
+typedef struct {
+    int32_t left[3];
+    int32_t right[3];
+    int32_t op;         /* 0 '=', 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=' */
+} AM2_ScriptTest;
+
+/* An `if` statement. Malloc'd, zeroed, and pushed onto the list at
+ * ADDR_SCRIPT_CONDITIONS when it parses. 0x34 bytes. */
+typedef struct {
+    int32_t           kind;       /* +0x00, see ScriptIf */
+    int32_t           number;     /* +0x04, the count for repeat/count/time */
+    int32_t           nevents;    /* +0x08 */
+    AM2_ScriptEvent  *events;     /* +0x0C */
+    int32_t           unused10;   /* +0x10 */
+    int32_t           ntests;     /* +0x14 */
+    AM2_ScriptTest   *tests;      /* +0x18 */
+    int32_t           nactions;   /* +0x1C */
+    uint8_t          *actions;    /* +0x20, 0x48 bytes each */
+    int32_t           mode;       /* +0x24, 0 none 1 random 2 sequential
+                                   *        3 onobjstate */
+    int32_t           unused28;   /* +0x28 */
+    int32_t           objstate;   /* +0x2C, a name index when mode is 3 */
+    void             *next;       /* +0x30 */
+} AM2_ScriptCond;
+
+/* 0x004432F0. The `if` statement -- by a wide margin the largest of the five.
+ *
+ *   if [timeabsolute <n> | allof | inorder | repeat <n> of | count <n> of
+ *      | <event> after <event> [and ...] | <expr> [butnot <event>]]
+ *      [testvar <value> <op> <value> [and ...]]
+ *      then [random|sequential|onobjstate <name>] <action> [, <action>...]
+ *
+ * `kind` records which form was taken: 0 plain, 1 allof, 2 inorder, 3 count,
+ * 4 repeat, 5 timeabsolute, 6 after-chain, 7 butnot after a keyword form,
+ * 8 butnot after a string form.
+ *
+ * Returns 1 on success, having pushed the record onto the condition list.
+ * ReadScript counts those returns as its `compounds` total. */
+int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at);
+
 /* For the offline test only: the name table lives in the image, so the test
  * needs a way to empty it between cases and to read an entry back. Not part of
  * the reconstruction -- nothing in the game calls these. */
