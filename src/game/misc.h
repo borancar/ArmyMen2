@@ -279,6 +279,16 @@ void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg);
 int32_t __cdecl FacingFromDelta08(const void *rec, int32_t delta);
 int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta);
 
+/* 0x00406A40. Maps a code in 0x18..0x28 to a small constant, everything else
+ * to zero: 0x18 gives 8, 0x19 gives 2, 0x1A gives 1, 0x27 gives 4, 0x28 gives
+ * 6. Seventeen entries over five arms, so a table there and a table here. */
+int32_t __cdecl MapCode18To28(int32_t code);
+
+/* 0x00409650. Three conditions, all of which must hold: bit 2 of the byte at
+ * +8 CLEAR, the dword at +0 equal to 1, and the dword at the start of the
+ * record pointed to by +0x94 equal to 0x1F. */
+int32_t __cdecl MeetsAllThree(const void *p);
+
 int misc_install(void);
 
 #ifdef __cplusplus

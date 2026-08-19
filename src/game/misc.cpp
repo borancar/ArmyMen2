@@ -509,6 +509,30 @@ int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta)
     return FacingFromDelta(rec, delta, 0x14, 0x18);
 }
 
+/* Read out of the index table at 0x00406A94 and the five arms at 0x00406A7C. */
+int32_t __cdecl MapCode18To28(int32_t code)
+{
+    static const uint8_t kMap[17] = {
+        8, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 6,
+    };
+    uint32_t i = (uint32_t)(code - 0x18);
+
+    if (i > 0x10)
+        return 0;
+    return kMap[i];
+}
+
+int32_t __cdecl MeetsAllThree(const void *p)
+{
+    const uint8_t *b = (const uint8_t *)p;
+
+    if (b[8] & 4)
+        return 0;
+    if (*(const int32_t *)b != 1)
+        return 0;
+    return (**(const int32_t *const *)(b + 0x94) == 0x1F) ? 1 : 0;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -570,5 +594,9 @@ int misc_install(void)
                   "FacingFromDelta08", 2);
     patch_replace(ADDR_FACING_DELTA_14, (const void *)FacingFromDelta14,
                   "FacingFromDelta14", 2);
+    patch_replace(ADDR_MAP_CODE_18_28, (const void *)MapCode18To28,
+                  "MapCode18To28", 1);
+    patch_replace(ADDR_MEETS_ALL_THREE, (const void *)MeetsAllThree,
+                  "MeetsAllThree", 1);
     return 0;
 }

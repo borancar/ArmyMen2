@@ -72,7 +72,7 @@ RDATA_LO, RDATA_HI = 0x0046F000, 0x00473000
 # -- 0x0040D860 sat at 80% with its `return 1` arm never taken. The window has
 # to be the size of a struct, not the size of a header.
 PTR_SYMBOLIC = 0x600       # bytes made symbolic behind each pointer argument
-NVECTORS = 64
+NVECTORS = 96
 # Coverage alone is not enough to call a function checked. 0x00429F20 measured
 # 100% on ONE surviving vector, because it walks a linked list and every
 # generated pointer graph but one faulted. One vector cannot distinguish a
@@ -130,6 +130,8 @@ SEED = {
     0x0040D860: [(0, 0x538, "u32v", 13)],
     0x00408520: [(2, 0x2C, "u32v", 0x40), (2, 0x10, "u32v", 0)],
     0x0045C870: [(0, 0x08, "u32v", 1), (0, 0x0C, "u32v", 0)],
+    0x00409650: [(0, 0x00, "u32v", 1), (0, 0x08, "u32v", 0),
+                 (0, 0x94, "ptr", 0x900), (-1, 0x900, "u32v", 0x1F)],
     0x0043D550: [(0, 0x14, "u32v", 1), (0, 0x18, "u32v", 0)],
     0x00429F20: [(1, 0x00, "ptr", 0x900)],
 }
@@ -463,7 +465,55 @@ def split_writes(before, after):
     byte = [(o, after[o]) for o in changed if o not in taken]
     return byte, ptr
 
-def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
+def range_hints(img, md, addr, size, reachable=None):
+    """Input values a biased range check makes interesting.
+
+    A switch over a run of codes compiles to `add reg, -N` (or `sub reg, N`)
+    then `cmp reg, M` then `ja default`, so the arms are only reachable for
+    inputs N..N+M. Generic values almost never land there -- 0x00406A40
+    dispatches on 0x18..0x28 and reached a third of itself, and every table
+    function in this binary has the same shape.
+
+    Returns the endpoints and a spread through each range found, plus one value
+    either side so the default arm is exercised too.
+    """
+    out = set()
+    pend = None
+    for ins in md.disasm(img.read(addr, size), addr):
+        if reachable is not None and ins.address not in reachable:
+            continue
+        op = ins.op_str
+        # `dec reg` is `sub reg, 1` and the compiler prefers it, so a pattern
+        # written for add/sub alone misses every switch biased by one --
+        # MapCode's `dec ecx / cmp ecx, 0x1D` among them.
+        if ins.mnemonic in ("dec", "inc") and re.fullmatch(REG, op):
+            pend = (op, 1 if ins.mnemonic == "dec" else -1)
+            continue
+
+        m = re.match(r"(e[a-d]x|e[sd]i), (-?0x[0-9a-f]+|-?\d+)$", op)
+        if m and ins.mnemonic in ("add", "sub"):
+            n = int(m.group(2), 0)
+            pend = (m.group(1), -n if ins.mnemonic == "add" else n)
+        elif m and ins.mnemonic == "cmp" and pend and m.group(1) == pend[0]:
+            lo, span = pend[1], int(m.group(2), 0)
+            if 0 < span < 0x400:
+                out.add(lo - 1)
+                out.add(lo + span + 1)
+                # Every value for a small range. A spread misses arms: MapCode
+                # dispatches 30 codes over 8 arms, and sampling every other one
+                # left a third of them unvisited.
+                step = 1 if span <= 96 else max(1, (span + 1) // 24)
+                for j in range(0, span + 1, step):
+                    out.add(lo + j)
+                out.add(lo + span)
+            pend = None
+        elif ins.mnemonic not in ("xor", "movzx", "mov"):
+            pend = None
+    return sorted(out)
+
+
+def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
+                hints=()):
     """[(args, eax, scratch-writes)]. Interesting values first, then random."""
     rnd = random.Random(seed)
     EDGE = [0, 1, -1, 2, -2, 7, 255, 256, 0x7FFFFFFF, -0x80000000, 100, -100]
@@ -491,6 +541,12 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
                 # forget.
                 args.append(0 if k % 7 == 3
                             else SCRATCH + PTR_STRIDE * (i + 1))
+            elif hints and k % 4 != 3:
+                # Not `k % 2 == 0`: that is disjoint from the correlation cases
+                # below, which fire on odd k, so a correlated vector could never
+                # be built out of in-range values. TypesCompatible needs its two
+                # arguments EQUAL and both inside 8..29, and never saw it.
+                args.append(hints[(k // 2 + i) % len(hints)])
             elif k < len(EDGE):
                 args.append(EDGE[(k + i) % len(EDGE)])
             else:
@@ -515,9 +571,26 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
                     # of them only ever saw the combinations that k happened to
                     # line up -- 0x0045C870 has three arms selected by two
                     # fields and reached two thirds of itself.
-                    step = (k // (seed_i + 1)) % 16
-                    struct.pack_into("<I", b, at,
-                                     (val + step - 4) & 0xFFFFFFFF)
+                    # Co-prime periods. Stepping by k//(i+1) modulo 16 gave
+                    # seeds periods of 16, 32, 48 ... which share factors, so
+                    # two fields could stay out of phase forever: 0x00409650
+                    # wanted one field to be 1 while a bit in another was
+                    # clear, and in 96 vectors that never once happened.
+                    # Half the vectors put EVERY seed on its nominal value at
+                    # once. The nominal value is the one chosen to satisfy the
+                    # check, so a function gated on three fields needs all
+                    # three there simultaneously -- and with each varying on
+                    # its own period that coincidence is rare enough that
+                    # 0x00409650 never once reached its success return.
+                    # The other half varies, on co-prime periods, to reach the
+                    # failure arms.
+                    if k % 2 == 0:
+                        struct.pack_into("<I", b, at, val & 0xFFFFFFFF)
+                    else:
+                        period = (11, 13, 17, 19, 23, 29)[seed_i % 6]
+                        step = (k // (seed_i + 1)) % period
+                        struct.pack_into("<I", b, at,
+                                         (val + step - period // 2) & 0xFFFFFFFF)
                 else:
                     struct.pack_into("<I", b, at, val)
             # Vary the field a chain leads to, so the vectors exercise it
@@ -726,7 +799,8 @@ def main():
                 "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN",
                 "ADDR_OBJ_KIND538_10_17", "ADDR_FILTER_MATCHES",
                 "ADDR_CONSUME_PENDING", "ADDR_FACING_DELTA_08",
-                "ADDR_FACING_DELTA_14"]
+                "ADDR_FACING_DELTA_14", "ADDR_MAP_CODE_18_28",
+                "ADDR_MEETS_ALL_THREE"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -742,7 +816,8 @@ def main():
             nargs, kinds = analyse(img, md, a, size, body)
             paths = angr_inputs(a, nargs, kinds) if use_angr else []
             emu.seen = set()
-            vs = vectors_for(emu, a, nargs, kinds, extra=paths)
+            vs = vectors_for(emu, a, nargs, kinds, extra=paths,
+                             hints=range_hints(img, md, a, size, body))
             if not vs:
                 nover += 1
                 continue
@@ -823,6 +898,8 @@ def main():
         "ADDR_CONSUME_PENDING": "ConsumePendingByte",
         "ADDR_FACING_DELTA_08": "FacingFromDelta08",
         "ADDR_FACING_DELTA_14": "FacingFromDelta14",
+        "ADDR_MAP_CODE_18_28": "MapCode18To28",
+        "ADDR_MEETS_ALL_THREE": "MeetsAllThree",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -860,7 +937,8 @@ def main():
         nargs, kinds = analyse(img, md, addr, size, body)
         paths = angr_inputs(addr, nargs, kinds) if use_angr else []
         emu.seen = set()
-        vs = vectors_for(emu, addr, nargs, kinds, extra=paths)
+        vs = vectors_for(emu, addr, nargs, kinds, extra=paths,
+                         hints=range_hints(img, md, addr, size, body))
         hit = len(body & emu.seen)
         cov = 100.0 * hit / len(body) if body else 0.0
         ks = ",".join(kinds.get(i, "-")[0] for i in range(nargs))
