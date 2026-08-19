@@ -288,12 +288,16 @@ names come from the program's own vocabulary rather than from us. The chain is
 `WinMain -> RunFrame -> ADDR_STATE2_FRAME -> LoadLevelScript (0x00425060) ->
 ReadScript (0x00444CD0) -> NextToken (0x0043F450)`.
 
-**`ParseLine` was never in that chain**, and it sat in this file for several
-commits as though it were. `ReadScript` tokenises with `NextToken` directly and
-never calls `0x00444C40`; that function's only callers are inside `0x00417B80`,
-the menu text field, and it parses one typed line and runs it. A call chain is
-worth checking with a cross-reference rather than assuming the obvious middle
-step exists.
+**`0x00444C40` was never in that chain**, and it sat in this file for several
+commits as though it were, under a name -- `ParseLine` -- that is as invented as
+`ParseScriptFile` was. `ReadScript` tokenises with `NextToken` directly and
+never calls it. A call chain is worth checking with a cross-reference rather
+than assuming the obvious middle step exists.
+
+What it actually does comes from its only caller. `0x00417B80` carries
+`Cheat!!!`, `I am the Juggernaut!`, `I can fly!` and `Aye aye Captain!`, so the
+typed line is a **cheat code** and `0x00444C40` is what runs one. A function
+that names itself nowhere can still be identified from the one that calls it.
 
 **And the name `ParseScriptFile` was mine, not the program's.** There is no such
 string anywhere in the image; `0x00444CD0` calls itself `ReadScript`, in
@@ -1436,8 +1440,8 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   What is still original is everything *below* a statement, reached by address:
   the event parser (`0x0043FF90`), the event-list parser (`0x00440600`), the
   testvar value parser (`0x00443010`) and the 8,608-byte action parser
-  (`0x00440D70`). That last is also what `ParseLine` (`0x00444C40`) needs,
-  which is why ParseLine is not done.
+  (`0x00440D70`, now reconstructed). `0x00444C40` -- the cheat-code runner --
+  is the other caller of that parser and is still original.
 
   **The handler A/B has better evidence than a log match.** `ReadScript` prints
   four totals that count exactly what the handlers produce -- Boot Camp

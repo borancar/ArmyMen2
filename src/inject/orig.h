@@ -843,11 +843,17 @@
  * of tokens 1..13. They are the lexer's character classes. */
 #define ADDR_LOAD_LEVEL_SCRIPT   0x00425060u  /* void(void) */
 #define ADDR_READ_SCRIPT         0x00444CD0u  /* int32_t(const char *, ctx *) */
-/* NOT part of the ReadScript path, which was recorded here wrongly for
- * several commits. ReadScript tokenises with NextToken directly and never
- * calls this; 0x00444C40's only callers are inside 0x00417B80, the menu text
- * field. It parses one typed line and runs it. */
-#define ADDR_SCRIPT_RUN_LINE     0x00444C40u  /* the other caller of the lexer */
+/* Parse one typed line and run it -- the other caller of the tokeniser, and
+ * NOT part of the ReadScript path, which was recorded here wrongly for several
+ * commits. ReadScript tokenises with NextToken directly and never calls this.
+ *
+ * It names itself nowhere, so it has no name here either; the earlier
+ * `ParseLine` was invented, like `ParseScriptFile` before it. What it is for
+ * comes from its only caller instead: 0x00417B80 carries "Cheat!!!",
+ * "I am the Juggernaut!", "I can fly!" and "Aye aye Captain!", so the typed
+ * line is a cheat code and this is what executes one. */
+#define ADDR_SCRIPT_RUN_LINE     0x00444C40u
+#define ADDR_CHEAT_ENTRY         0x00417B80u
 #define ADDR_SCRIPT_NEXT_TOKEN   0x0043F450u  /* the tokeniser; stops at // */
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
