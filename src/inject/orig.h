@@ -857,6 +857,12 @@
 #define ADDR_SCRIPT_NEXT_TOKEN   0x0043F450u  /* the tokeniser; stops at // */
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
+
+/* The keyword table itself: 185 {const char *, int32_t} pairs. The bounds are
+ * ScriptLookupToken's own -- it walks from the first and stops at the second.
+ * Read by three functions and written by none; see game/scriptint.h. */
+#define ADDR_SCRIPT_TOKENS       0x00487C90u
+#define ADDR_SCRIPT_TOKENS_END   0x00488258u
 #define ADDR_SCRIPT_ADD_TOKEN    0x0043F370u  /* void(ctx, kind, value, line) */
 #define ADDR_SCRIPT_WORD_BUF     0x00656354u  /* char[0x40], the scratch word */
 #define ADDR_SCRIPT_FREE_TOKEN   0x0043F000u  /* void(token *) */

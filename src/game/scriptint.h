@@ -22,15 +22,40 @@
 extern "C" {
 #endif
 
-/* The globals both modules reach. */
+/* Image data we only READ. Every one of these is const, and that is a fact
+ * about the binary rather than a convention: nothing in the image writes into
+ * any of them. The keyword table is the case that was checked exhaustively --
+ * three readers, all reconstructed, no writer anywhere -- and the rest are
+ * string and index tables of the same kind. They sit in .data rather than
+ * .rdata only because MSVC 6 puts an initialised aggregate holding pointers
+ * there, for the relocations this image no longer carries.
+ *
+ * Anything NOT in this group is written by the reconstruction, and the types
+ * below say which is which. */
+typedef struct {
+    const char *name;
+    int32_t     id;
+} AM2_ScriptToken;
+
+#define kScriptTokens    ((const AM2_ScriptToken *)AM2_IMAGE(ADDR_SCRIPT_TOKENS))
+#define kScriptTokenEnd  ((const AM2_ScriptToken *)AM2_IMAGE(ADDR_SCRIPT_TOKENS_END))
+#define kKindName(k)     ((const char *)AM2_IMAGE( \
+                             ((const uint32_t *)AM2_IMAGE( \
+                                 ADDR_SCRIPT_KIND_NAMES))[k]))
+#define kUnknownWord     ((const char *)AM2_IMAGE( \
+                             *(const uint32_t *)AM2_IMAGE( \
+                                 ADDR_SCRIPT_UNKNOWN_STR)))
+#define kPadBit(n)       (((const int32_t *)AM2_IMAGE(ADDR_PAD_BIT_TABLE))[n])
+#define kImageStr(a)     ((const char *)AM2_IMAGE( \
+                             *(const uint32_t *)AM2_IMAGE(a)))
+#define kCommObject      (*(uint8_t *const *)AM2_IMAGE(ADDR_COMM_OBJECT))
+
+/* Image data the reconstruction WRITES. */
 #define kScriptWord      ((char *)AM2_IMAGE(ADDR_SCRIPT_WORD_BUF))
 #define kScriptNames     (*(AM2_ScriptName **)AM2_IMAGE(ADDR_SCRIPT_NAMES))
 #define kScriptNameCount (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
 #define kScriptNameCap   (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_CAP))
 #define kObjScripts      (*(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS))
-#define kKindName(k)     ((const char *)AM2_IMAGE( \
-                             ((const uint32_t *)AM2_IMAGE( \
-                                 ADDR_SCRIPT_KIND_NAMES))[k]))
 
 /* Advance one token and check its kind, with the two messages the original
  * writes out at every argument. NULL after logging; *at moves either way. */

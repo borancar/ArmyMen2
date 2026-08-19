@@ -15,27 +15,6 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-/* The table's bounds are the ones the original's loop uses, not a guess: it
- * starts at 0x00487C90 and stops when the cursor reaches 0x00488258.
- *
- * Nothing in the image writes into it, and only three functions read it --
- * ScriptLookupToken, ScriptTokenName, and ScriptTokenText for the `char *` at
- * 0x00488258 that sits immediately past the last entry and points at
- * "unknown". All three are reconstructed, so the whole table is accounted
- * for and `const` is the truth about it.
- *
- * It lives in .data rather than .rdata despite never being written, which is
- * what MSVC 6 does with an initialised aggregate containing pointers: the
- * pointers need relocations at link time. This image has its relocations
- * stripped, so the table is fixed where it is and nothing can move it. */
-typedef struct {
-    const char *name;
-    int32_t     id;
-} AM2_ScriptToken;
-
-#define kScriptTokens   ((const AM2_ScriptToken *)AM2_IMAGE(0x00487C90u))
-#define kScriptTokenEnd ((const AM2_ScriptToken *)AM2_IMAGE(0x00488258u))
-
 /* ---- what stays in the original image --------------------------------- */
 
 typedef void    (__cdecl *am2_void_fn)(void);
@@ -389,8 +368,7 @@ char *__cdecl ScriptTokenText(const AM2_ScriptTok *tok, char *out)
          * right pointer and then follows it into whatever the test process has
          * at 0x0048825C, which came back as leftover script text rather than
          * as a fault. Any pointer stored IN the image needs AM2_IMAGE twice. */
-        src = (const char *)AM2_IMAGE(
-            *(const uint32_t *)AM2_IMAGE(ADDR_SCRIPT_UNKNOWN_STR));
+        src = kUnknownWord;
         break;
 
     case AM2_TOKEN_CONTROL_CHAR:
@@ -2253,7 +2231,7 @@ static void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
         layer = *(const uint8_t **)AM2_IMAGE(ADDR_MAP_PAD_LAYER);
     } else {
         layer = *(const uint8_t **)AM2_IMAGE(ADDR_MAP_PADBIT_LAYER);
-        mask = ((const int32_t *)AM2_IMAGE(ADDR_PAD_BIT_TABLE))[number];
+        mask = kPadBit(number);
     }
     if (!layer)
         return;
@@ -2912,8 +2890,6 @@ const AM2_ScriptName *am2_script_name(int32_t i)
 #define kMpScriptName ((const char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME))
 #define kLevelIndex   (*(const int32_t *)AM2_IMAGE(ADDR_LEVEL_INDEX))
 #define kMpSession    (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION))
-#define kCommObject   (*(uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT))
-#define kImageStr(a)  ((const char *)AM2_IMAGE(*(const uint32_t *)AM2_IMAGE(a)))
 
 /* Change into one of the game's data directories. Everything the script loader
  * opens is relative to wherever this last left us. */
