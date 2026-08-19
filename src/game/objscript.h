@@ -19,13 +19,14 @@ extern "C" {
 #endif
 
 struct AM2_ScriptCtx;
+struct AM2_ScriptAction;
 
 typedef struct {
     int32_t  a;             /* +0x00 */
     int32_t  b;             /* +0x04 */
     int32_t  actioncap;     /* +0x08 */
     int32_t  actioncount;   /* +0x0C */
-    uint8_t *actions;       /* +0x10, 0x48 bytes each */
+    struct AM2_ScriptAction *actions;  /* +0x10 */
 } AM2_ObjFrame;             /* 20 bytes */
 
 typedef struct {
@@ -48,7 +49,7 @@ typedef struct {
 
 /* 0x00437010, 0x00437070, 0x004370D0. Append one entry, growing first. Each
  * returns the new entry, zeroed. */
-uint8_t      *__cdecl ObjFrameNewAction(AM2_ObjFrame *f);
+struct AM2_ScriptAction *__cdecl ObjFrameNewAction(AM2_ObjFrame *f);
 AM2_ObjFrame *__cdecl ObjStateNewFrame(AM2_ObjState *s);
 AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o);
 

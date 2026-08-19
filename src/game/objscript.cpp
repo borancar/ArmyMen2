@@ -28,15 +28,16 @@ static AM2_ObjScript *ScriptCurrentObj(void)
                         - 1];
 }
 
-uint8_t *__cdecl ObjFrameNewAction(AM2_ObjFrame *f)
+AM2_ScriptAction *__cdecl ObjFrameNewAction(AM2_ObjFrame *f)
 {
     if (f->actioncap <= f->actioncount) {
         int32_t cap = f->actioncap + 5;
-        f->actions = (uint8_t *)am2_realloc(f->actions, (size_t)cap * 0x48);
-        memset(f->actions + (size_t)f->actioncount * 0x48, 0, 5 * 0x48);
+        f->actions = (AM2_ScriptAction *)am2_realloc(
+            f->actions, (size_t)cap * sizeof(AM2_ScriptAction));
+        memset(&f->actions[f->actioncount], 0, 5 * sizeof(AM2_ScriptAction));
         f->actioncap = cap;
     }
-    uint8_t *p = f->actions + (size_t)f->actioncount * 0x48;
+    AM2_ScriptAction *p = &f->actions[f->actioncount];
     f->actioncount++;
     return p;
 }
@@ -82,7 +83,7 @@ int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)
 
 int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
 {
-    uint8_t action[0x48];
+    AM2_ScriptAction act;
 
     AM2_ObjScript *obj = ScriptCurrentObj();
     AM2_ObjState *state = &obj->states[obj->statecount - 1];
@@ -117,9 +118,9 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
                 break;
         }
 
-        if (!ScriptAction(ctx, at, action))
+        if (!ScriptAction(ctx, at, &act))
             return 0;
-        memcpy(ObjFrameNewAction(frame), action, 0x48);
+        *ObjFrameNewAction(frame) = act;
 
         if (*at < ctx->count &&
             ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR &&

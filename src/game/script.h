@@ -221,6 +221,52 @@ typedef struct {
  * seen, then reads trigger keywords until one it does not recognise. */
 int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at);
 
+/* One parsed action -- 0x48 bytes, and what every statement that does
+ * something produces. ScriptParseAction fills it and the runtime consumes it.
+ *
+ * The fields are reused heavily, because 59 actions share one record: what
+ * `subject` and `target` mean depends on `code`, and `n0`/`n1`/`army`/`extra`
+ * are whatever that action needed. The names below are the dominant role, and
+ * the notable exceptions are:
+ *
+ *   subject   the object, army, pad or region the action is about -- but
+ *             `activateregion` puts a region NUMBER there, and `setvar` a
+ *             variable's name index
+ *   target    the second name or army; also where ScriptLocation puts a
+ *             location it resolved to a name
+ *   xvar/yvar a coordinate given as `refvar <name>` -- and xvar doubles as
+ *             the variable for `tracevar`, `setvar` and `setfacing refvar`
+ *   army      an army colour, but `dropitem` puts the item there and
+ *             `fireweapon` the weapon
+ *   extra     a damage kind, an order form, or `onobjstate`'s name
+ *
+ * uid/uid2 are only used by `trigger` and `triggerdelay`; the two unused
+ * dwords are never written by the parser at all and stay zero from the memset.
+ */
+typedef struct AM2_ScriptAction {
+    int32_t uid;            /* +0x00, opens as -2 */
+    int32_t uid2;           /* +0x04 */
+    int32_t delay;          /* +0x08 */
+    int32_t unused0c;       /* +0x0C, never written here */
+    int32_t unused10;       /* +0x10, never written here */
+    int32_t code;           /* +0x14, which action -- see docs/scriptactions.md */
+    int32_t subject;        /* +0x18 */
+    int32_t target;         /* +0x1C */
+    union {
+        struct { int16_t x, y; } pos;   /* +0x20 */
+        int32_t                  both;  /* a pad centroid, two words at once */
+    } u;
+    int32_t relative;       /* +0x24, a leading `+` on the coordinates */
+    int32_t xvar;           /* +0x28 */
+    int32_t yvar;           /* +0x2C */
+    char   *text;           /* +0x30, the token's own string, not a copy */
+    int32_t item;           /* +0x34, a weapon or pickup code */
+    int32_t n0;             /* +0x38 */
+    int32_t n1;             /* +0x3C */
+    int32_t army;           /* +0x40 */
+    int32_t extra;          /* +0x44 */
+} AM2_ScriptAction;
+
 /* One event term in an `if` condition -- three values from the event parser,
  * and a fourth field it always writes as zero. */
 typedef struct {
@@ -245,7 +291,7 @@ typedef struct {
     int32_t           ntests;     /* +0x14 */
     AM2_ScriptTest   *tests;      /* +0x18 */
     int32_t           nactions;   /* +0x1C */
-    uint8_t          *actions;    /* +0x20, 0x48 bytes each */
+    AM2_ScriptAction *actions;    /* +0x20 */
     int32_t           mode;       /* +0x24, 0 none 1 random 2 sequential
                                    *        3 onobjstate */
     int32_t           unused28;   /* +0x28 */
@@ -371,7 +417,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
  *
  * `quiet` is passed on to ScriptResolveName and reaches nothing else. */
 int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
-                               uint8_t *action, int32_t quiet);
+                               AM2_ScriptAction *act, int32_t quiet);
 
 /* 0x00442F10. Does `want` appear before `stop`, scanning from `from`? */
 int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,

@@ -38,7 +38,8 @@ AM2_ScriptTok *ScriptExpect(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind);
 
 /* One action, through the dump switch. objscript.cpp's frame blocks and
  * script.cpp's `if` both append actions, so both go through here. */
-int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, uint8_t *action);
+int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at,
+                     AM2_ScriptAction *act);
 
 #ifdef __cplusplus
 }
