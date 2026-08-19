@@ -613,7 +613,236 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
     return 1;
 }
 
-/* The remaining statement handlers are still the original's. Each takes the context
+#define kPads       ((AM2_Pad *)AM2_IMAGE(ADDR_PADS))
+#define kPadCount   (*(int32_t *)AM2_IMAGE(ADDR_PAD_COUNT))
+#define kPadNumbers ((AM2_PadNumber *)AM2_IMAGE(ADDR_PAD_NUMBERS))
+
+/* The trigger keyword each Reserved id contributes, for ids 16..42. Zero ends
+ * the run -- the loop stops at the first word it does not recognise and leaves
+ * it for what follows.
+ *
+ * Two entries look like slips in the original and are reproduced as they are.
+ * `army0`..`army3` duplicate `green`/`tan`/`blue`/`grey`, which is reasonable.
+ * `halftrack` shares 0x0200 with `grey`, which is not -- but nothing here can
+ * tell whether that was intended, so it stands. */
+static const uint32_t kPadTriggerBit[27] = {
+    0x0040,  /* 16 green         */  0x0080,  /* 17 tan           */
+    0x0100,  /* 18 blue          */  0x0200,  /* 19 grey          */
+    0,       /* 20 me            */  0x0040,  /* 21 army0         */
+    0x0080,  /* 22 army1         */  0x0100,  /* 23 army2         */
+    0x0200,  /* 24 army3         */  0,       /* 25 preloadsprite */
+    0,       /* 26 pad           */  0,       /* 27 padon         */
+    0,       /* 28 padoff        */  0x0001,  /* 29 everything    */
+    0,       /* 30 item          */  0,       /* 31               */
+    0x0002,  /* 32 sarge         */  0x0004,  /* 33 unit          */
+    0x0008,  /* 34 trooper       */  0x0010,  /* 35 tank          */
+    0x0020,  /* 36 vehicle       */  0,       /* 37 jeep          */
+    0x0200,  /* 38 halftrack     */  0x0400,  /* 39 convoy        */
+    0x0800,  /* 40 boat          */  0x1000,  /* 41 groundvehicle */
+    0x2000,  /* 42 npc           */
+};
+
+/* Where on the map this pad number is, in sixteenths of a cell. Only computed
+ * the first time a number is defined -- a second `pad` with the same number
+ * joins the existing entry and leaves the centroid alone. */
+static void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
+{
+    const uint8_t *layer;
+    int32_t mask = 0;
+
+    if (number >= 8) {
+        layer = *(const uint8_t **)AM2_IMAGE(ADDR_MAP_PAD_LAYER);
+    } else {
+        layer = *(const uint8_t **)AM2_IMAGE(ADDR_MAP_PADBIT_LAYER);
+        mask = ((const int32_t *)AM2_IMAGE(ADDR_PAD_BIT_TABLE))[number];
+    }
+    if (!layer)
+        return;
+
+    /* One dword store covering both words -- the default before the scan. */
+    *(int32_t *)&pn->cx = *(const int32_t *)AM2_IMAGE(ADDR_PAD_DEFAULT_POS);
+
+    int32_t w = *(const int32_t *)AM2_IMAGE(ADDR_MAP_WIDTH);
+    int32_t total = w * *(const int32_t *)AM2_IMAGE(ADDR_MAP_HEIGHT);
+    if (total <= 0)
+        return;
+
+    int32_t sx = 0, sy = 0, n = 0;
+    for (int32_t i = 0; i < total; i++) {
+        if (number >= 8) {
+            if ((int32_t)layer[i] != number)
+                continue;
+        } else if ((layer[i] | mask) == 0) {
+            /* Faithfully `or`, which is what the image holds -- 0B C2 at
+             * 0x00444365. The mask is 1 << number and so never zero, which
+             * makes this test always false: every cell on the map counts,
+             * and the centroid for a low-numbered pad is the map's centre.
+             * `and` is plainly what was meant. Pad numbers 5 and 6 do ship,
+             * so this is live rather than theoretical. */
+            continue;
+        }
+        sx += i % w;
+        sy += i / w;
+        n++;
+    }
+    if (n <= 0)
+        return;
+
+    /* Sixteenths, rounded. */
+    pn->cx = (int16_t)((sx * 16 + 8) / n);
+    pn->cy = (int16_t)((sy * 16 + 8) / n);
+}
+
+int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    AM2_ScriptTok *tok = ScriptExpect(ctx, at, AM2_TOKEN_STRING);
+    if (!tok)
+        return 0;
+
+    if (ScriptFindName((const char *)tok->value) >= 0) {
+        am2_log("Line [%4d]:  Duplicate pad name.\n", ctx->tokens[*at].line);
+        return 0;
+    }
+
+    /* Type 1, where `variable` uses 3. */
+    int32_t name = AddNameTableName((const char *)ctx->tokens[*at].value, 1, 0);
+    am2_free(ctx->tokens[*at].value);
+    ctx->tokens[*at].kind = 7;
+    ctx->tokens[*at].value = (void *)(uintptr_t)name;
+
+    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+    if (!tok)
+        return 0;
+
+    int32_t number = (int32_t)(uintptr_t)tok->value;
+    if (number < 0 || number >= 0x100) {
+        am2_log("Line [%4d]:  Illegal Pad Number\n", ctx->tokens[*at].line);
+        return 0;
+    }
+
+    AM2_PadNumber *pn = &kPadNumbers[number];
+    if (pn->count == 0)
+        ScriptPadCentroid(pn, number);
+
+    /* The pad being built. It is not counted until the very end, so every
+     * write below addresses the same record. */
+    AM2_Pad *pad = &kPads[kPadCount];
+    pad->id = kPadCount;
+    pad->name = name;
+    pad->compared = 0;
+    pad->number = number;
+
+    /* Note what is NOT cleared: trigger, specific, compare, threshold and both
+     * delays keep whatever the previous use of this slot left. The array is
+     * static and the count resets between maps, so a pad can inherit a stale
+     * trigger set. Reproduced, because the `or` below depends on it. */
+
+    pn->pads[pn->count] = (int16_t)kPadCount;
+    pn->count++;
+
+    if (++(*at) >= ctx->count) {
+        am2_log("Unexpected end of script.\n");
+        return 0;
+    }
+
+    /* Trigger words, until one that is not a trigger word. */
+    for (;;) {
+        tok = &ctx->tokens[*at];
+        if (tok->kind != AM2_TOKEN_RESERVED)
+            break;
+
+        int32_t id = (int32_t)(uintptr_t)tok->value;
+        if (id < 16 || id > 42 || kPadTriggerBit[id - 16] == 0)
+            break;
+
+        pad->trigger |= (int32_t)kPadTriggerBit[id - 16];
+        if (++(*at) >= ctx->count)
+            break;
+    }
+
+    /* A String here names one specific item instead, which the flags exclude. */
+    if (*at < ctx->count && ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+        if (pad->trigger != 0) {
+            am2_log("Line [%4d]:  Pad can't have both specific item and "
+                    "generic triggers\n", ctx->tokens[*at].line);
+            return 0;
+        }
+        int32_t item = 0;
+        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, int32_t *,
+                                   int32_t))(uintptr_t)
+                  ADDR_SCRIPT_RESOLVE_NAME)(ctx, at, &item, 0))
+            return 0;
+        pad->specific = 1;
+        pad->trigger = item;
+    }
+
+    /* An optional comparison, then the count it compares against. */
+    if (*at < ctx->count &&
+        ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR) {
+        int32_t op = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (op == 4)                    /* '<' */
+            pad->compare = 1;
+        else if (op == 6)               /* '=' */
+            pad->compare = 0;
+        else if (op == 7)               /* '>' */
+            pad->compare = 2;
+        else {
+            am2_log("Line [%4d]:  Unexpected symbol in pad definition "
+                    "should be '<=>'\n", ctx->tokens[*at].line);
+            return 0;
+        }
+
+        if (++(*at) >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+
+        pad->compared = 1;
+
+        tok = &ctx->tokens[*at];
+        if (tok->kind != AM2_TOKEN_INTEGER) {
+            am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                    ctx->tokens[*at].line,
+                    ScriptTokenText(tok, kScriptWord),
+                    kKindName(AM2_TOKEN_INTEGER));
+            return 0;
+        }
+        pad->threshold = (int32_t)(uintptr_t)tok->value;
+        (*at)++;
+
+        /* `delay <int> <int>`, optional, and only after a comparison. */
+        if (*at < ctx->count &&
+            ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
+            (int32_t)(uintptr_t)ctx->tokens[*at].value == 43) {
+
+            tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+            if (!tok)
+                return 0;
+            pad->delay0 = (int32_t)(uintptr_t)tok->value;
+
+            tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+            if (!tok)
+                return 0;
+            pad->delay1 = (int32_t)(uintptr_t)tok->value;
+            (*at)++;
+        }
+
+        /* Only reached with a comparison. A pad that ends after its trigger
+         * words -- or whose next token is not a control character -- jumps
+         * straight to binding the name, so it is never finalised. That is the
+         * original's control flow, not an omission: both of those paths land
+         * on 0x00444842, past the call. */
+        ((void (__cdecl *)(AM2_Pad *, int32_t))(uintptr_t)
+            ADDR_PAD_FINALISE)(pad, 0);
+    }
+
+    /* The name resolves to the pad, and only now does the pad count move. */
+    kScriptNames[pad->name].value = kPadCount;
+    kPadCount++;
+    return 1;
+}
+
+/* The remaining statement handler is still the original's. Each takes the context
  * and a pointer to the walk index, which it advances past its own statement --
  * so ReadScript's loop makes no assumption about statement length. They are
  * reached by address because they are not reconstructed; nothing else about
@@ -658,7 +887,7 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
                 continue;
             }
             if (id == 26) {
-                ((am2_script_handler)(uintptr_t)ADDR_SCRIPT_PAD)(ctx, &at);
+                ScriptPad(ctx, &at);
                 continue;
             }
             if (id == 133) {
@@ -783,5 +1012,8 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_OBJECT,
                         (const void *)GenerateObjScriptFromTokens,
                         "GenerateObjScriptFromTokens", 1);
+    rc |= patch_replace(ADDR_SCRIPT_PAD,
+                        (const void *)ScriptPad,
+                        "ScriptPad", 1);
     return rc;
 }

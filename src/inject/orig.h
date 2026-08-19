@@ -939,6 +939,24 @@
  * ".sha" -- so the statement's three integers are a sprite identity triple. */
 #define ADDR_PRELOAD_SPRITE       0x00445B00u
 #define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
+
+/* Pads -- the script's trigger regions. Two tables: one of pad records in
+ * definition order, and one indexed by the pad NUMBER a script gives, which
+ * several pads may share. */
+#define ADDR_PADS                 0x00516198u  /* AM2_Pad[], stride 72 */
+#define ADDR_PAD_COUNT            0x00511DF8u
+#define ADDR_PAD_NUMBERS          0x0051F198u  /* AM2_PadNumber[], stride 76 */
+#define ADDR_PAD_FINALISE         0x004375A0u  /* void(AM2_Pad *, int32_t) */
+
+/* The two map layers the centroid scan reads, one byte per cell. The first
+ * holds a pad number per cell and serves numbers 8 and above; the second holds
+ * a bitmask and serves 0..7, with ADDR_PAD_BIT_TABLE giving the bit. */
+#define ADDR_MAP_PAD_LAYER        0x00514EC8u
+#define ADDR_MAP_PADBIT_LAYER     0x00514EC4u
+#define ADDR_PAD_BIT_TABLE        0x00486444u  /* int32_t[8], 1<<n */
+#define ADDR_MAP_WIDTH            0x00514DE0u
+#define ADDR_MAP_HEIGHT           0x00514DDCu
+#define ADDR_PAD_DEFAULT_POS      0x005125A0u  /* both centroid words at once */
 #define ADDR_SCRIPT_VARIABLE      0x00443F70u  /* keyword 133 */
 #define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --

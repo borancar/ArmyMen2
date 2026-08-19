@@ -185,6 +185,40 @@ int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at);
  * which one it is, which is how one function serves two ids. */
 int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at);
 
+/* A pad: a region of the map that triggers when something enters it. The
+ * parser writes the first ten fields; the record is 72 bytes. */
+typedef struct {
+    int32_t id;             /* +0x00, its own index */
+    int32_t number;         /* +0x04, the number the script gave, 0..255 */
+    int32_t name;           /* +0x08, name-table index */
+    int32_t compared;       /* +0x0C, 1 once a <, = or > has been seen */
+    int32_t specific;       /* +0x10, 1 when a named item is the trigger */
+    int32_t trigger;        /* +0x14, the flag set -- or the name index when
+                             * `specific`, which is why the two are exclusive */
+    int32_t compare;        /* +0x18, 0 for '=', 1 for '<', 2 for '>' */
+    int32_t threshold;      /* +0x1C */
+    int32_t delay0;         /* +0x20, from the optional `delay` clause */
+    int32_t delay1;         /* +0x24 */
+    uint8_t rest[72 - 0x28];
+} AM2_Pad;
+
+/* Everything sharing one pad number, and where that number sits on the map.
+ * The centroid is in sixteenths of a cell. */
+typedef struct {
+    int16_t count;          /* +0x00 */
+    int16_t pads[32];       /* +0x02, indices into the pad array */
+    int16_t cx;             /* +0x42 */
+    int16_t cy;             /* +0x44 */
+    uint8_t rest[76 - 0x46];
+} AM2_PadNumber;
+
+/* 0x004440E0. `pad <name> <number> <trigger-words...> [<=> <int>] [delay a b]`.
+ *
+ * Declares the name with type 1, rewrites the name token to kind 7 as
+ * `variable` does, computes the region's centroid the first time a number is
+ * seen, then reads trigger keywords until one it does not recognise. */
+int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at);
+
 /* For the offline test only: the name table lives in the image, so the test
  * needs a way to empty it between cases and to read an entry back. Not part of
  * the reconstruction -- nothing in the game calls these. */
