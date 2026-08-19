@@ -117,6 +117,36 @@ Consequences to remember:
 - C++ will not implicitly convert a function pointer to `const void *`, which is
   what `patch_replace` takes, so install sites cast explicitly.
 
+## Differential testing in the game's own process
+
+**`AM2_SELFCHECK=1` calls each reconstruction and the original it replaces,
+side by side, inside the running game.** The harness is already injected, so
+the original is at its address in the same address space: no emulator, and more
+to the point no translation. One set of pointers, one set of globals, a scratch
+buffer both sides address identically.
+
+It must run BEFORE `install()` patches anything. A patch overwrites the
+original's first five bytes with a jump and there is no trampoline, so after
+that the original is not callable at all — that one moment is the whole
+opportunity.
+
+5,504 calls across 43 functions, and swapping `min` for `max` in `ApproxDistXY`
+makes 124 of them disagree with the argument printed.
+
+**It cannot pass NULL, and that is the one thing the offline harness does
+better.** A null argument that faults simply drops a vector under Unicorn; here
+it takes the game down, and `ApproxDist` — which dereferences unconditionally —
+killed the process on the second function tested. Null paths stay the emulator's
+job.
+
+**Everything the offline harness needed fixing for was a consequence of having
+two address spaces**: a NULL argument emitted as `0 - SCRATCH`, written pointers
+that could not be compared byte for byte, a replay buffer smaller than the
+emulator's map, seeded pointer chains that had to be rebased on arrival. None of
+those exist in-process. The emulator is still worth having because it runs in
+seconds with no game at all, which is what makes it usable while writing a
+function — but it was the wrong default and the injection was there all along.
+
 ## Differential testing without the game
 
 **It has already caught a misreading that would have shipped.** `AngleDelta`

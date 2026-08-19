@@ -37,6 +37,7 @@ GAMEEXE   := C:\\GOG Games\\Army Men II\\ArmyMen2.exe
 LAUNCHEXE := C:\\GOG Games\\Army Men II\\launcher.exe
 
 HOOK_C   := src/inject/dllmain.c \
+            src/inject/selfcheck.c \
             src/inject/patch.c \
             src/inject/restore.c \
             src/inject/trace.c \

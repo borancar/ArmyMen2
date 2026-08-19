@@ -12,6 +12,7 @@
 #include "control.h"
 #include "dinput_hook.h"
 #include "gamelog.h"
+#include "selfcheck.h"
 #include "input.h"
 #include "observe.h"
 #include "orig.h"
@@ -410,6 +411,10 @@ static void install(void)
             return;
         }
     }
+    /* Before any patch: a patch overwrites the original's first five bytes and
+     * there is no trampoline, so this is the only moment both can be called. */
+    selfcheck_run();
+
     savetag_install();
     rect_install();
     dist_install();
