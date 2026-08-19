@@ -52,16 +52,26 @@ STACK, STACK_SZ = 0x10000000, 0x20000
 # Deliberately not a round number: 0x20000000 is the kind of value ordinary
 # arithmetic lands on, and a computed result that collides with the scratch
 # base gets mistaken for a pointer into it.
-SCRATCH, SCRATCH_SZ = 0x51ED0000, 0x4000
+SCRATCH, SCRATCH_SZ = 0x51ED0000, 0x8000
+# How much of the scratch a vector describes: the pointer arguments are spaced
+# PTR_STRIDE apart and each gets PTR_SYMBOLIC symbolic bytes, so this has to
+# cover the last one. tests/selftest.cpp sizes its buffer from the same number.
+PTR_STRIDE = 0x800
+SCRATCH_USED = PTR_STRIDE * (6 + 1)
 RET_MAGIC = 0x5EADBEE0
 # Deterministic, and reproduced byte for byte by tests/selftest.cpp, so the
 # vectors carry only offsets and never the buffer itself.
-SCRATCH_PATTERN = bytes(((i * 7 + 13) & 0xFF) for i in range(0x4000))
+SCRATCH_PATTERN = bytes(((i * 7 + 13) & 0xFF) for i in range(0x8000))
 MAX_ARGS = 6
 CRT_FRONTIER = 0x00464420      # measured by tools/crt.py, not the old constant
 DATA_LO, DATA_HI = 0x00473000, 0x00667000
 RDATA_LO, RDATA_HI = 0x0046F000, 0x00473000
-PTR_SYMBOLIC = 16          # bytes made symbolic behind each pointer argument
+# Struct fields live at real offsets: 0x0040D860 reads +0x538, ObjType2Field548
+# reads +0x548. With a 16-byte window angr could not make those symbolic, so
+# the branches depending on them were unreachable however many paths it found
+# -- 0x0040D860 sat at 80% with its `return 1` arm never taken. The window has
+# to be the size of a struct, not the size of a header.
+PTR_SYMBOLIC = 0x600       # bytes made symbolic behind each pointer argument
 NVECTORS = 64
 # Coverage alone is not enough to call a function checked. 0x00429F20 measured
 # 100% on ONE surviving vector, because it walks a linked list and every
@@ -291,7 +301,7 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
         mem = {}                     # scratch offset -> symbolic byte vector
         for i in range(nargs):
             if kinds.get(i) == "ptr":
-                off = 0x40 * (i + 1)
+                off = PTR_STRIDE * (i + 1)
                 conc.append(SCRATCH + off)
                 mem[off] = claripy.BVS("m%d" % i, PTR_SYMBOLIC * 8)
             else:
@@ -330,7 +340,7 @@ def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
             row, writes = [], []
             for i in range(nargs):
                 if kinds.get(i) == "ptr":
-                    off = 0x40 * (i + 1)
+                    off = PTR_STRIDE * (i + 1)
                     row.append(SCRATCH + off)
                     raw = f.solver.eval(mem[off], cast_to=bytes)
                     writes += [(off + j, raw[j]) for j in range(len(raw))]
@@ -404,7 +414,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         eax, after = emu.call(addr, args, before)
         if eax is None:
             continue
-        writes = [(o, after[o]) for o in range(0, 0x900) if after[o] != before[o]]
+        writes = [(o, after[o]) for o in range(0, SCRATCH_USED) if after[o] != before[o]]
         out.append((list(args), eax, writes, pre))
 
     for k in range(n):
@@ -417,7 +427,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
                 # exactly the instruction a reconstruction is most likely to
                 # forget.
                 args.append(0 if k % 7 == 3
-                            else SCRATCH + rnd.randrange(0, 0x400, 4))
+                            else SCRATCH + PTR_STRIDE * (i + 1))
             elif k < len(EDGE):
                 args.append(EDGE[(k + i) % len(EDGE)])
             else:
@@ -426,7 +436,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         eax, after = emu.call(addr, args, scratch)
         if eax is None:
             continue
-        writes = [(off, after[off]) for off in range(0, 0x900)
+        writes = [(off, after[off]) for off in range(0, SCRATCH_USED)
                   if after[off] != scratch[off]]
         out.append((args, eax, writes, ()))
     return out
@@ -692,7 +702,7 @@ def main():
                      " * no part of the game has to run to check a\n"
                      " * reconstruction against it. */\n")
             fh.write("#include <stdint.h>\n\n")
-            fh.write("#define AM2_SCRATCH_LEN %d\n" % 0x900)
+            fh.write("#define AM2_SCRATCH_LEN %d\n" % SCRATCH_USED)
             fh.write("typedef struct {\n"
                      "    const char *name;\n"
                      "    void       *fn;\n"

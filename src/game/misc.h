@@ -59,8 +59,12 @@ int32_t __cdecl IsKind7(const void *p);
  * that reached for isspace() would accept '\n' and this does not. */
 int32_t __cdecl IsBlank(uint8_t c);
 
-/* 0x0043EEA0. One of ) ( , < = > { } & +. It lives between the pad.cpp and
- * script.cpp anchors, so these are the script language's delimiters. */
+/* 0x0043EEA0. One of ) ( , < = > { } & +.
+ *
+ * Confirmed rather than guessed: the parser's keyword table gives tokens 1 to
+ * 13 as ( ) , < <= = > >= <> { } & + , and this set is exactly the first
+ * character of each. It is the lexer asking "does a delimiter start here".
+ * See docs/scripttokens.md. */
 int32_t __cdecl IsScriptDelim(uint8_t c);
 
 /* 0x0041AE90. Reverses the low three bytes and zeroes the fourth: 0x00BBGGRR
@@ -83,10 +87,13 @@ int32_t  __cdecl   ReturnOne(void);           /* 0x004354F0 */
 int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
                               int32_t count);
 
-/* 0x004374F0. The script language's comparison, between the objscript.cpp and
- * pad.cpp anchors: op 0 is equal, 1 is less, 2 is greater, anything else is
- * false. Note the operand order -- every arm compares the THIRD argument
- * against the first, so op 1 answers `b < a`. */
+/* 0x004374F0. The script language's comparison: op 0 is equal, 1 is less, 2 is
+ * greater, anything else false. That is the reduced form of tokens 6, 4 and 7
+ * -- the scripts write `if test3 testvar tankilled = 3 then` and
+ * `... reztimes < 15 ...`, which is where these three come from.
+ *
+ * Note the operand order: every arm compares the THIRD argument against the
+ * first, so op 1 answers `b < a`. */
 int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b);
 
 /* 0x0045CAA0. The debug logger, a bare `ret` in the retail build. 617 call
