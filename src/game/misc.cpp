@@ -149,11 +149,6 @@ int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)
     }
 }
 
-void __cdecl GameLog(const char *fmt, ...)
-{
-    (void)fmt;
-}
-
 int32_t __cdecl ComparePair(const void *a, const void *b)
 {
     const int32_t *x = (const int32_t *)a;

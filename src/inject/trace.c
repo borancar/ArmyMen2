@@ -6,17 +6,25 @@
 #include <stdio.h>
 #include <string.h>
 
-/* The arena below holds ARENA_BYTES/STUB_BYTES stubs, which is 151, so this is
- * the binding limit and not the memory. It was 64, and the reconstruction went
- * past it: the last nine patches installed correctly -- trace_wrap falls back to
- * the unwrapped function -- but vanished from `counts`, which reads exactly like
- * they were never installed. The log does say "table full", but nobody reads a
- * log line for a function they are not suspicious of yet. */
-#define MAX_TRACED   128
+/* Both limits have to move together: the arena holds ARENA_BYTES/STUB_BYTES
+ * stubs, so whichever is smaller is the real cap.
+ *
+ * This has now overflowed twice. It was 64, the reconstruction went past it,
+ * and the last nine patches installed correctly -- trace_wrap falls back to
+ * the unwrapped function -- but vanished from `counts`, which reads exactly
+ * like they were never installed. Raised to 128, and the run of pure-leaf
+ * reconstructions went past that too: about sixty functions lost their
+ * counters at once, and the only sign was "table full, cannot wrap ..." in a
+ * log nobody reads until they are already suspicious.
+ *
+ * Sized well clear of the reconstruction now rather than just above it. If it
+ * ever fills again the message is real and the limits want raising, not the
+ * message suppressing. */
+#define MAX_TRACED   512
 #define MAX_ARGS     8
 #define LOG_FIRST_N  12
 #define STUB_BYTES   27
-#define ARENA_BYTES  4096
+#define ARENA_BYTES  16384
 
 struct entry {
     const char *name;

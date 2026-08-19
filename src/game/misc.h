@@ -96,9 +96,11 @@ int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
  * first, so op 1 answers `b < a`. */
 int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b);
 
-/* 0x0045CAA0. The debug logger, a bare `ret` in the retail build. 617 call
- * sites, every one of them a message this build does not print. */
-void __cdecl GameLog(const char *fmt, ...);
+/* The debug logger at 0x0045CAA0 is NOT here. src/inject/gamelog.c already
+ * un-stubs it behind AM2_GAMELOG=1, and does it defensively -- some call sites
+ * pass binary data where a format string should be, because the body was a
+ * no-op for the whole of the game's shipping life and nothing ever validated
+ * them. A plain vsnprintf there is a reliable segfault. */
 
 /* 0x00435EB0. Orders two records on a two-dword key: the first field, then the
  * second. It returns the DIFFERENCE of whichever field decided, not the sign,
