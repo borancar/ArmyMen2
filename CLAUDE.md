@@ -280,6 +280,40 @@ names come from the program's own vocabulary rather than from us. The chain is
 `WinMain -> RunFrame -> ADDR_STATE2_FRAME -> LoadLevelScript (0x00425060) ->
 ReadScript (0x00444CD0) -> ParseLine (0x00444C40) -> NextToken (0x0043F450)`.
 
+**The whole script parser is reconstructed** -- `ParseScriptFile` and every
+function under it, 42 in all, from the file down to the last action operand.
+What is still original below it is engine: DirectDraw, comm, bitmap loading,
+event dispatch, reached *through* the handlers rather than being parser code.
+
+**Parse the game's own data in the game, not in an emulator.** I was about to
+build a Unicorn harness with hooked file I/O to cover the action parser's 59
+keywords, of which bootcamp and the campaign reach 24. `AM2_PARSE_ALL=1` makes
+our `ReadScript`, after the game's first script load, parse every other script
+the game ships and dump each 0x48-byte action record; `AM2_DUMP_ACTIONS=1`
+prints them. 104 files, 9,934 records, 48 distinct action codes -- which is
+exactly how many action keywords appear in any shipped script, so the sweep
+reaches everything reachable. Byte-identical across runs, so it is an exact
+oracle. `tests/actions-reference.txt` is the recording and `tools/actdiff.py`
+maps a differing record back to its file, line and keyword.
+
+Three things it took: the game chdirs into the map directory before loading, so
+the file list must be absolute (`AM2_SCRIPTS`); feeding `EULA.txt` to the
+statement dispatcher takes the process down, so the sweep covers `data/` and
+`rules/` only; and state accumulates until the fixed tables overflow after
+about seventy files, so two runs with the list in opposite orders cover all 104
+-- clearing between files is worse, because the arrays and their capacities
+have to be cleared together and the names the loaded mission still holds must
+not be freed.
+
+**That oracle found nine defects an A/B cannot see.** A mis-parsed action still
+produces an action, so the log and the pixels agree either way. Among them:
+`playsound` initialises two fields to zero and I had transcribed a scaled token
+index, having read a dump with the `xor eax, eax` filtered out; `order`'s
+`follow` and `goto` were swapped; `dropitem`, `setobjstate` and `fireweapon`
+each put their two names in the opposite fields from how the statement reads;
+and the AI modes are attack 6, defend 7, ignore 2, evade 5 -- neither
+sequential nor in keyword order. Reading alone got all of them wrong.
+
 **A handler can call the original's callees, and that is the strongest test
 available.** Every one of the five is reconstructed while the parsers below it
 stay original and are reached by address, so our code runs in the middle of a
