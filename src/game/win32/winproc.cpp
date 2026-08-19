@@ -144,7 +144,9 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 #define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_EVENT_FLAGS)
 #define g_aiControlled (*(int32_t *)(uintptr_t)ADDR_AI_CONTROLLED)
-#define g_hostChanged  (*(int32_t *)(uintptr_t)ADDR_COMM_HOST_CHANGED)
+/* Becoming the host is written into the same global that says whether
+ * this is a multiplayer session at all -- see ADDR_MP_SESSION. */
+#define g_hostChanged  (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_netGame  (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
 #define g_gameOverFlags (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)

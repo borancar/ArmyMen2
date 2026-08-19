@@ -2848,7 +2848,9 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
         ScriptParseAll();
     }
 
-    if (*(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_QUIET) == 0) {
+    /* Single player only: a multiplayer load goes on to read the rules and
+     * the per-army AI scripts, and the summary would be one of four. */
+    if (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION) == 0) {
         /* The token count comes from the GLOBAL context, not the one passed
          * in. They are the same object for every caller in the image, but the
          * original reads the global and so does this. */
@@ -2881,6 +2883,110 @@ int32_t am2_script_name_count(void)
 const AM2_ScriptName *am2_script_name(int32_t i)
 {
     return &kScriptNames[i];
+}
+
+
+#define kMapName      ((const char *)AM2_IMAGE(ADDR_MAP_NAME))
+#define kMapFolder    ((const char *)AM2_IMAGE(ADDR_MAP_FOLDER))
+#define kMpScriptName ((const char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME))
+#define kLevelIndex   (*(const int32_t *)AM2_IMAGE(ADDR_LEVEL_INDEX))
+#define kMpSession    (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION))
+#define kCommObject   (*(uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT))
+#define kImageStr(a)  ((const char *)AM2_IMAGE(*(const uint32_t *)AM2_IMAGE(a)))
+
+/* Change into one of the game's data directories. Everything the script loader
+ * opens is relative to wherever this last left us. */
+static void ScriptSetDataDir(const char *dir)
+{
+    ((void (__cdecl *)(const char *))(uintptr_t)ADDR_SET_DATA_DIR)(dir);
+}
+
+/* Read one script, with the progress line the comm object's verbose flag asks
+ * for. The three sites in LoadLevelScript are identical but for the path. */
+static void ScriptReadWithLog(const char *path)
+{
+    int32_t verbose = *(const int32_t *)(kCommObject + AM2_COMM_VERBOSE) != 0;
+
+    if (verbose)
+        am2_log("reading script %s: ", path);
+
+    int32_t ok = ReadScript(path, (AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT));
+
+    /* Re-read the flag: ReadScript can have changed it. */
+    if (*(const int32_t *)(kCommObject + AM2_COMM_VERBOSE))
+        am2_log(ok ? "worked!\n" : "FAILED!\n");
+}
+
+void __cdecl LoadLevelScript(void)
+{
+    char path[0x40];
+
+    ScriptSetDataDir(kMapFolder);
+
+    /* Level 0 is the map's only script and drops the number. */
+    if (kLevelIndex > 0)
+        sprintf(path, "%s%d.txt", kMapName, kLevelIndex);
+    else
+        sprintf(path, "%s.txt", kMapName);
+
+    ScriptResetTokens((AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT));
+
+    /* The five score variables, declared before anything can reference them.
+     * `gamescorelimit` is seeded with the configured limit and its index is
+     * thrown away -- scripts reach it by name and nothing writes it back --
+     * while the four army scores keep theirs, because the runtime updates
+     * those by index. */
+    AddNameTableName(kImageStr(ADDR_NAME_SCORE_LIMIT), AM2_NAME_TYPE_INTEGER,
+                     *(const int32_t *)AM2_IMAGE(ADDR_SCORE_LIMIT));
+    *(int32_t *)AM2_IMAGE(ADDR_SVAR_GREENSCORE) =
+        AddNameTableName(kImageStr(ADDR_NAME_GREENSCORE),
+                         AM2_NAME_TYPE_INTEGER, 0);
+    *(int32_t *)AM2_IMAGE(ADDR_SVAR_TANSCORE) =
+        AddNameTableName(kImageStr(ADDR_NAME_TANSCORE),
+                         AM2_NAME_TYPE_INTEGER, 0);
+    *(int32_t *)AM2_IMAGE(ADDR_SVAR_BLUESCORE) =
+        AddNameTableName(kImageStr(ADDR_NAME_BLUESCORE),
+                         AM2_NAME_TYPE_INTEGER, 0);
+    *(int32_t *)AM2_IMAGE(ADDR_SVAR_GREYSCORE) =
+        AddNameTableName(kImageStr(ADDR_NAME_GREYSCORE),
+                         AM2_NAME_TYPE_INTEGER, 0);
+
+    ScriptReadWithLog(path);
+
+    if (kMpSession) {
+        static const uint32_t kColourName[4] = {
+            0x00476A68u, 0x00485148u, 0x00485140u, 0x00485138u,
+        };
+        char aipath[0x40];
+
+        ScriptSetDataDir(kImageStr(ADDR_RULES_DIR_STR));
+        sprintf(path, "%s.txt", kMpScriptName);
+        ScriptReadWithLog(path);
+
+        for (int32_t i = 0; i < AM2_PLAYERS_MAX; i++) {
+            uint8_t *slot = kCommObject + (size_t)i * AM2_PLAYER_STRIDE;
+
+            if (!*(const int32_t *)(slot + AM2_PLAYER_ACTIVE))
+                continue;
+            /* A slot the machine plays needs no AI script of its own. */
+            if (((int32_t (__thiscall *)(void *, int32_t))(uintptr_t)
+                     ADDR_COMM_PLAYER_IS_AI)(kCommObject, i))
+                continue;
+
+            int32_t army = *(const int32_t *)(slot + AM2_PLAYER_ARMY);
+            /* An army above 3 leaves the pointer at whatever the call above
+             * returned -- zero -- and the format prints from NULL. No slot
+             * carries one, and this is the original's own omission. */
+            const char *colour = 0;
+            if ((uint32_t)army <= 3)
+                colour = (const char *)AM2_IMAGE(kColourName[army]);
+
+            sprintf(aipath, "%s_ai_%s.txt", kMpScriptName, colour);
+            ScriptReadWithLog(aipath);
+        }
+    }
+
+    ((void (__cdecl *)(void))(uintptr_t)ADDR_DECLARE_RULE_VARS)();
 }
 
 /* AM2_PARSE_ALL=1: after the game's own first script load, parse every other
@@ -3027,6 +3133,8 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_IS_STMT,
                         (const void *)ScriptIsStatementStart,
                         "ScriptIsStatementStart", 1);
+    rc |= patch_replace(ADDR_LOAD_LEVEL_SCRIPT,
+                        (const void *)LoadLevelScript, "LoadLevelScript", 0);
     rc |= patch_replace(ADDR_READ_SCRIPT,
                         (const void *)ReadScript,
                         "ReadScript", 1);

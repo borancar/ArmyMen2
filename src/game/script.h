@@ -178,6 +178,18 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
  * on entry -- so a caller can accumulate several files into one list. */
 int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx);
 
+/* 0x00425060. Everything a level needs read, in order.
+ *
+ * Changes into the map's own directory -- which is why ReadScript is handed a
+ * bare "bootcamp1.txt" and why the AM2_PARSE_ALL probe needs absolute paths --
+ * builds `<map><N>.txt`, or `<map>.txt` when the level index is zero, empties
+ * the global token context, declares the five score variables, and reads it.
+ *
+ * A multiplayer session then reads two more kinds: `rules/<rules>.txt`, and
+ * one `rules/<rules>_ai_<colour>.txt` per player slot that is filled and not
+ * AI-controlled. Single player reads neither. */
+void __cdecl LoadLevelScript(void);
+
 /* 0x00444900. `preloadsprite <int> <int> <int> [<int>]`.
  *
  * Three required integers identifying a sprite, and an optional fourth that

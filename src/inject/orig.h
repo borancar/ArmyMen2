@@ -536,7 +536,6 @@
 
 #define ADDR_AI_CONTROLLED       0x00476FB0u  /* int32_t, set by ADDR_SET_AI_CONTROL */
 #define ADDR_EVENT_FLAGS         0x005122FCu  /* uint32_t, what ADDR_GET_EVENT_FLAGS reads */
-#define ADDR_COMM_HOST_CHANGED   0x00511DA0u  /* int32_t, raised on host migration */
 /* Raised by 0x00411000 and lowered by the 0x046E handler, and read from 21
  * places -- the lobby, the overlay, TakeMenuRequest and the mission code. The
  * shape of a "this is a network game" flag; named for what is observed rather
@@ -886,8 +885,21 @@
 #define AM2_NAME_TYPE_REF        2   /* a name used before declaring  */
 #define AM2_NAME_TYPE_INTEGER    3   /* `variable`                    */
 
-/* Non-zero suppresses ReadScript's closing summary. */
-#define ADDR_SCRIPT_QUIET        0x00511DA0u
+/* Whether this is a multiplayer session, and which end of it. Zero is single
+ * player; four places write it and only ever 1 or 2 -- the MULTI-PLAYER host
+ * screen (0x004317C0, "Host is ready - waiting for players") writes 1, the
+ * join screen (0x00433480) writes 2, and host migration writes 1 because you
+ * have just become the host.
+ *
+ * Both readers this project has traced only test it against zero:
+ * LoadLevelScript reads the rules and per-army AI scripts when it is set, and
+ * ReadScript prints its summary when it is not. Ninety more sites read it, so
+ * treat 1-versus-2 as unsettled -- the title screen also writes 2, which a
+ * plain host/client reading does not explain, and nothing here needed to know.
+ *
+ * The two names this address carried before, ADDR_SCRIPT_QUIET and
+ * ADDR_COMM_HOST_CHANGED, were each a guess from one call site. */
+#define ADDR_MP_SESSION          0x00511DA0u
 
 /* A `char *` to the string "unknown", parked immediately after the keyword
  * table -- it points at 0x0048825C, which is the table's own end address. */
@@ -1083,15 +1095,43 @@
 #define ADDR_SCRIPT_CONTEXT      0x00656478u  /* what reset and parse are given */
 #define ADDR_MAP_NAME            0x00511A88u  /* char[], "kitchen" */
 #define ADDR_LEVEL_INDEX         0x00511D9Cu  /* int32_t; 0 means "<map>.txt" */
+
+/* LoadLevelScript's world. */
+#define ADDR_SET_DATA_DIR        0x00422DE0u  /* void(const char *subdir) */
+#define ADDR_MAP_FOLDER          0x00511AC8u  /* the map's own directory */
+#define ADDR_RULES_DIR_STR       0x00485110u  /* a `char *` to "rules"    */
+#define ADDR_SCORE_LIMIT         0x00515FF0u  /* seeds `gamescorelimit`   */
+#define ADDR_DECLARE_RULE_VARS   0x00421C70u  /* greenwins, tanwins, ...  */
+
+/* The five score variables' names, as `char *` in the image. Only the four
+ * army ones keep the index AddNameTableName returns; `gamescorelimit`'s is
+ * discarded, because scripts reach it by name and nothing updates it. */
+#define ADDR_NAME_SCORE_LIMIT    0x00487C60u
+#define ADDR_NAME_GREENSCORE     0x00487C64u
+#define ADDR_NAME_TANSCORE       0x00487C68u
+#define ADDR_NAME_BLUESCORE      0x00487C6Cu
+#define ADDR_NAME_GREYSCORE      0x00487C70u
+#define ADDR_SVAR_GREENSCORE     0x00656488u
+#define ADDR_SVAR_TANSCORE       0x0065648Cu
+#define ADDR_SVAR_BLUESCORE      0x00656490u
+#define ADDR_SVAR_GREYSCORE      0x00656494u
+
+/* One entry per player in the comm object, stride 0x70. */
+#define AM2_PLAYER_STRIDE        0x70u
+#define AM2_PLAYERS_MAX          4
+#define AM2_PLAYER_ARMY          0x210u
+#define AM2_PLAYER_ACTIVE        0x25Cu
+#define AM2_COMM_VERBOSE         0x418u   /* gates the per-script logging */
+#define ADDR_COMM_PLAYER_IS_AI   0x0040F200u  /* thiscall int32_t(int32_t) */
 #define ADDR_MP_SCRIPT_NAME      0x00511C08u  /* char[], the multiplayer script */
 
-/* Handles returned by ADDR_SCRIPT_DECLARE_VAR, in declaration order. These are
- * the variables a mission script can read by name -- see the `testvar` and
- * `setvar` keywords in docs/scripttokens.md. */
-#define ADDR_SVAR_GAMESCORELIMIT 0x00656488u
-#define ADDR_SVAR_GREENSCORE     0x0065648Cu
-#define ADDR_SVAR_TANSCORE       0x00656490u
-#define ADDR_SVAR_BLUESCORE      0x00656494u
+/* The three names that used to live here -- GREENSCORE at 0x0065648C and so on
+ * -- were shifted by one. They were read as though each store followed its own
+ * call, and the stores lag: `mov [0x656488], eax` sits after the SECOND
+ * AddNameTableName, so 0x656488 holds greenscore and not gamescorelimit.
+ * Five names are declared and four indices kept; the one dropped is
+ * gamescorelimit's. See ADDR_SVAR_GREENSCORE above.
+ */
 
 /* Token kinds, from the name array at 0x00487C74 indexed by kind. The score
  * variables are declared as kind 3, which is Integer -- so the argument that
