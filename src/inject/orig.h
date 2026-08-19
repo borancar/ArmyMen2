@@ -850,6 +850,26 @@
 #define ADDR_SCRIPT_DECLARE_VAR  0x0043F7A0u  /* handle(const char *, kind, init) */
 #define ADDR_SCRIPT_FIND_FILE    0x00421890u  /* probes <map><n>.txt via _findfirst */
 
+/* ReadScript names itself: "ReadScript: Could not open %s for ...". It fopen's
+ * the file, fgets a line at a time, tokenises, and dispatches on the first
+ * token of each statement.
+ *
+ * A token is 12 bytes: kind at +0, id at +8. The dispatch tests kind == 2,
+ * which the kind array calls "Reserved" -- a keyword -- and then switches on
+ * the id, which is the number docs/scripttokens.md lists against each word. So
+ * every one of these handlers is named by the language rather than by us, and
+ * the five of them are the whole top-level grammar: exactly the statements a
+ * mission file contains. */
+#define AM2_SCRIPT_TOKEN_SIZE    12u
+#define AM2_SCRIPT_TOK_KIND      0x00u
+#define AM2_SCRIPT_TOK_ID        0x08u
+
+#define ADDR_SCRIPT_PRELOADSPRITE 0x00444900u  /* keyword 25 */
+#define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
+#define ADDR_SCRIPT_VARIABLE      0x00443F70u  /* keyword 133 */
+#define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */
+#define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keyword 139 */
+
 #define ADDR_SCRIPT_CONTEXT      0x00656478u  /* what reset and parse are given */
 #define ADDR_MAP_NAME            0x00511A88u  /* char[], "kitchen" */
 #define ADDR_LEVEL_INDEX         0x00511D9Cu  /* int32_t; 0 means "<map>.txt" */

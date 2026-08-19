@@ -208,6 +208,25 @@ rather than guessed.
 The tokeniser stops at `/` and `\`, which is the `//` comment marker the
 mission scripts actually use.
 
+## The top-level grammar
+
+`ReadScript` dispatches on the first token of each statement. A token is 12
+bytes with its kind at +0 and its id at +8; the dispatch tests kind == 2,
+which the kind table calls `Reserved`, and then switches on the id.
+
+| keyword | id | handler |
+|---|---:|---|
+| `preloadsprite` | 25 | `0x00444900` |
+| `pad` | 26 | `0x004440e0` |
+| `variable` | 133 | `0x00443f70` |
+| `if` | 44 | `0x004432f0` |
+| `object` | 139 | `0x00436d60` |
+
+Those five are the whole top level, and they are exactly the statements a
+mission file contains -- `preloadsprite 43 600 1`, `Pad portal1 99`,
+`object portal1`, `if ... then`. Each handler is named by the language
+rather than by us.
+
 ## What this settles
 
 `IsScriptDelim` at `0x0043EEA0` accepts `( ) , < = > { } & +` -- exactly the

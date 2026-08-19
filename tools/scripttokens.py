@@ -127,6 +127,23 @@ def main():
         w("The tokeniser stops at `/` and `\\`, which is the `//` comment "
           "marker the\nmission scripts actually use.\n\n")
 
+        w("## The top-level grammar\n\n")
+        w("`ReadScript` dispatches on the first token of each statement. A "
+          "token is 12\nbytes with its kind at +0 and its id at +8; the "
+          "dispatch tests kind == 2,\nwhich the kind table calls `Reserved`, "
+          "and then switches on the id.\n\n")
+        w("| keyword | id | handler |\n|---|---:|---|\n")
+        for kw, tid, h in (("preloadsprite", 25, 0x00444900),
+                           ("pad", 26, 0x004440E0),
+                           ("variable", 133, 0x00443F70),
+                           ("if", 44, 0x004432F0),
+                           ("object", 139, 0x00436D60)):
+            w("| `%s` | %d | `%#010x` |\n" % (kw, tid, h))
+        w("\nThose five are the whole top level, and they are exactly the "
+          "statements a\nmission file contains -- `preloadsprite 43 600 1`, "
+          "`Pad portal1 99`,\n`object portal1`, `if ... then`. Each handler "
+          "is named by the language\nrather than by us.\n\n")
+
         w("## What this settles\n\n")
         w("`IsScriptDelim` at `0x0043EEA0` accepts `( ) , < = > { } & +` -- "
           "exactly the\nfirst character of each of tokens 1 to 13. "
