@@ -847,6 +847,9 @@
 #define ADDR_SCRIPT_PARSE_LINE   0x00444C40u  /* the other caller of the lexer */
 #define ADDR_SCRIPT_NEXT_TOKEN   0x0043F450u  /* the tokeniser; stops at // */
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
+#define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
+#define ADDR_SCRIPT_ADD_TOKEN    0x0043F370u  /* void(ctx, kind, value, line) */
+#define ADDR_SCRIPT_WORD_BUF     0x00656354u  /* char[0x40], the scratch word */
 #define ADDR_SCRIPT_DECLARE_VAR  0x0043F7A0u  /* handle(const char *, kind, init) */
 #define ADDR_SCRIPT_FIND_FILE    0x00421890u  /* probes <map><n>.txt via _findfirst */
 

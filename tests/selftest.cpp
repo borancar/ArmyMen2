@@ -6,9 +6,10 @@
  * scripted clicks. A failure names one function and the arguments that expose
  * it, which the whole-game A/B has never been able to do.
  *
- * Only functions that touch no global data can be checked this way. One that
- * reads a global would need that global mapped, and mapping it means starting
- * the game, which is the thing this avoids.
+ * Functions that read constant tables in the image are checkable too, since
+ * tests/loadimage.h copies the sections in from the file -- still with no part
+ * of the game running. What stays out of reach is a global the game WRITES at
+ * runtime; those need the in-process check (AM2_SELFCHECK=1).
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -23,7 +24,11 @@
 #include "../src/game/misc.h"
 #include "../src/game/objtype.h"
 
+#include "../src/game/script.h"
+
+#include "loadimage.h"
 #include "vectors.h"
+#include "scriptvec.h"
 
 static uint8_t g_scratch[AM2_SCRATCH_LEN];
 
@@ -38,6 +43,8 @@ static void FillScratch(void)
     for (uint32_t i = 0; i < sizeof g_scratch; i++)
         g_scratch[i] = (uint8_t)((i * 7 + 13) & 0xFF);
 }
+
+static int ScriptTokens(int *passed);
 
 int main(void)
 {
@@ -94,7 +101,49 @@ int main(void)
         }
     }
     printf("\n  %d vectors: %d pass, %d fail\n", pass + fail, pass, fail);
+
+    fail += ScriptTokens(&pass);
     return fail ? 1 : 0;
+}
+
+/* The script tokeniser, against every distinct word the game ships.
+ *
+ * A different kind of test from the vectors above and a stronger one for this
+ * function: a keyword lookup learns nothing from a random 32-bit argument, and
+ * everything from the 9,000-odd words that appear in the real missions. The
+ * expected ids come from the original under Unicorn (tools/scriptcheck.py), so
+ * this is still the binary as the specification.
+ */
+static int ScriptTokens(int *passed)
+{
+    /* The prefix is in-tree, so the image has a fixed path relative to the
+     * repository root -- which is where `make selftest` runs from. */
+    if (am2_load_image(".wine/drive_c/GOG Games/Army Men II/ArmyMen2.exe")
+        != 0) {
+        printf("\n  script tokens: SKIPPED (no image)\n");
+        return 1;
+    }
+
+    int pass = 0, fail = 0, keywords = 0;
+    for (uint32_t i = 0; i < sizeof am2_script_vectors /
+                             sizeof am2_script_vectors[0]; i++) {
+        const AM2_ScriptVec *v = &am2_script_vectors[i];
+        int32_t got = ScriptLookupToken(v->word);
+        if (v->id >= 0)
+            keywords++;
+        if (got != v->id) {
+            if (fail < 10)
+                printf("  FAIL ScriptLookupToken(\"%s\") -> %d, want %d\n",
+                       v->word, got, v->id);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+    printf("  %d script words (%d keywords): %d pass, %d fail\n",
+           pass + fail, keywords, pass, fail);
+    *passed += pass;
+    return fail;
 }
 
 /* The reconstruction sources end with an install function that registers each

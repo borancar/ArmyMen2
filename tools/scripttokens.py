@@ -34,7 +34,12 @@ import am2
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, "docs", "scripttokens.md")
-TABLE_LO, TABLE_HI = 0x00487A00, 0x00488100
+# The bounds are not guessed: LookupToken at 0x0043EEE0 walks the table with
+# `mov edi, 0x487C90` and stops at `cmp edi, 0x488258`, eight bytes a step. An
+# earlier version of this tool guessed 0x487A00..0x488100 and reported 141
+# tokens where there are 185 -- `hasitem`, `dropitem`, `isally`, `teamscore`
+# and forty others were simply outside the window. Read the loop, not the data.
+TABLE_LO, TABLE_HI = 0x00487C90, 0x00488258
 STRINGS_LO, STRINGS_HI = 0x00470000, 0x00490000
 
 
@@ -45,7 +50,7 @@ def tokens(img):
         if not (STRINGS_LO <= p < STRINGS_HI):
             continue
         s = img.cstring(p)
-        if s is None or not (0 < len(s) < 24) or v > 400:
+        if s is None:
             continue
         out.setdefault(v, s)
     return out
@@ -81,7 +86,8 @@ def main():
         ("Variables and armies", 14, 24),
         ("Entities and pads", 25, 42),
         ("Trigger and flow control", 43, 79),
-        ("Actions, weapons and power-ups", 80, 400),
+        ("Actions, weapons and power-ups", 80, 148),
+        ("Queries and later additions", 149, 400),
     ]
 
     with open(OUT, "w") as fh:

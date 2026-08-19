@@ -53,6 +53,8 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/msgslot.cpp \
             src/game/objflag.cpp \
             src/game/misc.cpp \
+            src/game/script.cpp \
+            src/game/image.cpp \
             src/game/win32/startgame.cpp \
             src/game/rect.cpp \
             src/game/dist.cpp \
@@ -207,19 +209,26 @@ endif
 # reads a global needs that global mapped, and mapping it means starting the
 # game, which is the thing this avoids.
 SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
-                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp
+                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/script.cpp src/game/image.cpp
 
 .PHONY: selftest
 selftest: $(BUILD)/selftest.exe
 	@WINEPREFIX="$(PREFIX)" wine $(BUILD)/selftest.exe
 
-$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
 	    -o $@ $(SELFTEST_SRC)
 
 # Re-record from the original. Slow with --angr (symbolic execution per
 # function), so it is not part of `make selftest`.
+# Re-record the script tokeniser's answers from the original. Separate from
+# `check` because it emulates 15,000 words and takes minutes; the recorded
+# header is what `selftest` replays.
+.PHONY: scriptvec
+scriptvec:
+	./.venv/bin/python tools/scriptcheck.py
+
 .PHONY: vectors
 vectors:
 	./.venv/bin/python tools/vectors.py --validate --angr --emit

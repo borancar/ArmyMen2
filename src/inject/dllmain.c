@@ -29,6 +29,7 @@
 #include "../game/msgslot.h"
 #include "../game/objflag.h"
 #include "../game/misc.h"
+#include "../game/script.h"
 #include "../game/objtable.h"
 #include "../game/objtype.h"
 #include "../game/packkey.h"
@@ -422,6 +423,7 @@ static void install(void)
     msgslot_install();
     objflag_install();
     misc_install();
+    script_install();
     objtable_install();
     objtype_install();
     packkey_install();
