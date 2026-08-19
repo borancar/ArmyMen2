@@ -202,6 +202,27 @@ uint32_t __cdecl XorChecksum(const void *record);
  * or 0 when that pointer is null. */
 uint32_t __cdecl ChainField14(const void *p);
 
+/* 0x00429F20. Pushes a node onto the front of a doubly linked list: prev at
+ * +4, next at +8, and `head` is the address of the head pointer. */
+void __cdecl ListPushFront(void *node, void **head);
+
+/* 0x00434E90. Writes `value` into the dword at +0x2C of every element of an
+ * array the record describes -- base at +8, count at +4, elements 0x60 apart.
+ * Returns the number written, which is 0 when the count is not positive.
+ *
+ * Base and count are re-read from the record on EVERY iteration rather than
+ * held in registers, and that is reproduced: if the array ever overlapped the
+ * record, the loop would see its own writes, and hoisting them would quietly
+ * change that. */
+int32_t __cdecl SetFieldInAll(void *record, void *value);
+
+/* 0x0040A490. Whether the byte at +0x51 is at least the word at +6 of the
+ * record pointed to by +0x44; no record means no.
+ *
+ * The byte is zero-extended to 16 bits and the comparison is SIGNED, so a
+ * threshold above 0x7FFF reads as negative and everything passes. */
+int32_t __cdecl Field51MeetsMin(const void *p);
+
 int misc_install(void);
 
 #ifdef __cplusplus

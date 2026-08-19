@@ -74,6 +74,16 @@ int main(void)
             if (g_scratch[off] != (uint8_t)want)
                 bad = 1;
         }
+        /* Pointers the function was expected to write. These cannot be
+         * compared byte for byte: the value is an address, and the emulator
+         * and the replay have different buffers. */
+        for (int32_t w = 0; w < t->nwptr && !bad; w++) {
+            uint32_t at = t->wptr[w * 2], target = t->wptr[w * 2 + 1];
+            if (*(uint32_t *)(g_scratch + at)
+                != (uint32_t)(uintptr_t)(g_scratch + target))
+                bad = 1;
+        }
+
         if (bad) {
             if (fail < 10)
                 printf("  FAIL %-14s (%08x,%08x,%08x) -> %08x, want %08x\n",

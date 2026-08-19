@@ -112,13 +112,17 @@ ARG_KIND_OVERRIDE = {
 #          -- a pattern dword means tens of millions of iterations, the run hits
 #          the instruction cap, and every vector is discarded.
 #
-# {function: [(offset, kind, value), ...]} where offset is relative to the first
-# pointer argument's region, and for "ptr" the value is the scratch offset to
-# point at.
+# {function: [(arg, offset, kind, value), ...]}. `arg` is which pointer
+# argument's region the offset is in, counting from 0; -1 means an absolute
+# scratch offset, for seeding a record something else points AT. For "ptr" the
+# value is the scratch offset to point to.
 SEED = {
-    0x0040D7E0: [(0x74, "ptr", 0x900)],
-    0x00402700: [(0x04, "u32", 0x40)],
-    0x004010B0: [(0x04, "ptr", 0x900)],
+    0x0040D7E0: [(0, 0x74, "ptr", 0x900)],
+    0x00402700: [(0, 0x04, "u32", 0x40)],
+    0x004010B0: [(0, 0x04, "ptr", 0x900)],
+    0x0040A490: [(0, 0x44, "ptr", 0x900), (-1, 0x906, "u32", 4)],
+    0x00434E90: [(0, 0x04, "u32", 8), (0, 0x08, "ptr", 0x900)],
+    0x00429F20: [(1, 0x00, "ptr", 0x900)],
 }
 
 
@@ -426,6 +430,30 @@ def body_addrs(img, md, addr, size):
     return {i.address for i in ins}
 
 
+
+def split_writes(before, after):
+    """(byte writes, pointer writes) -- a written POINTER cannot be compared
+    byte for byte.
+
+    ListPushFront stores node addresses into the list it is splicing, and those
+    are addresses in the emulator's scratch. The replay has a buffer of its own,
+    so every such write differed and the vectors failed with identical-looking
+    values printed either side. A dword landing inside the scratch range is
+    recorded as (where, what-it-points-at) and compared after rebasing.
+    """
+    changed = [o for o in range(0, SCRATCH_USED) if after[o] != before[o]]
+    ptr, taken = [], set()
+    for o in changed:
+        base = o - (o % 4)
+        if base in taken or base + 4 > SCRATCH_USED:
+            continue
+        v = struct.unpack_from("<I", after, base)[0]
+        if SCRATCH <= v < SCRATCH + SCRATCH_SZ:
+            ptr.append((base, v - SCRATCH))
+            taken.update(range(base, base + 4))
+    byte = [(o, after[o]) for o in changed if o not in taken]
+    return byte, ptr
+
 def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
     """[(args, eax, scratch-writes)]. Interesting values first, then random."""
     rnd = random.Random(seed)
@@ -440,8 +468,8 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         eax, after = emu.call(addr, args, before)
         if eax is None:
             continue
-        writes = [(o, after[o]) for o in range(0, SCRATCH_USED) if after[o] != before[o]]
-        out.append((list(args), eax, writes, pre, ()))
+        writes, wptr = split_writes(before, after)
+        out.append((list(args), eax, writes, pre, (), tuple(wptr)))
 
     for k in range(n):
         args = []
@@ -462,17 +490,18 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         chain = SEED.get(addr)
         if chain:
             b = bytearray(scratch)
-            base = PTR_STRIDE * 1          # the first pointer argument
-            for at, kind, val in chain:
+            for arg, at, kind, val in chain:
+                base = PTR_STRIDE * (arg + 1) if arg >= 0 else 0
+                at = base + at
                 if kind == "ptr":
                     # NULL some of the time. A seeded pointer that is always
                     # valid leaves the "and if it is null" arm unreached, which
                     # is the arm a reconstruction most easily forgets --
                     # 0x004010B0 sat at 85.7% for exactly that one instruction.
-                    struct.pack_into("<I", b, base + at,
+                    struct.pack_into("<I", b, at,
                                      0 if k % 5 == 2 else SCRATCH + val)
                 else:
-                    struct.pack_into("<I", b, base + at, val)
+                    struct.pack_into("<I", b, at, val)
             # Vary the field a chain leads to, so the vectors exercise it
             # rather than reading one constant every time.
             struct.pack_into("<h", b, 0x900 + 0x4C, (k * 7) % 90 - 5)
@@ -480,8 +509,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         eax, after = emu.call(addr, args, scratch)
         if eax is None:
             continue
-        writes = [(off, after[off]) for off in range(0, SCRATCH_USED)
-                  if after[off] != scratch[off]]
+        writes, wptr = split_writes(scratch, after)
         pre_in = ()
         fx = ()
         if chain:
@@ -491,20 +519,21 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
             # is rebased on the other side.
             pre_in = tuple((0x900 + 0x4C + i, scratch[0x900 + 0x4C + i])
                            for i in range(2))
-            pre_in += tuple((PTR_STRIDE + at + i,
-                             scratch[PTR_STRIDE + at + i])
-                            for at, kind, _v in chain if kind != "ptr"
+            def _at(arg, off):
+                return (PTR_STRIDE * (arg + 1) if arg >= 0 else 0) + off
+            pre_in += tuple((_at(arg, at) + i, scratch[_at(arg, at) + i])
+                            for arg, at, kind, _v in chain if kind != "ptr"
                             for i in range(4))
-            fx = tuple((PTR_STRIDE + at, val)
-                       for at, kind, val in chain
+            fx = tuple((_at(arg, at), val)
+                       for arg, at, kind, val in chain
                        if kind == "ptr" and k % 5 != 2)
             # A NULLed seed travels as plain bytes, since there is no address
             # to rebase.
             if k % 5 == 2:
-                pre_in += tuple((PTR_STRIDE + at + i, 0)
-                                for at, kind, _v in chain if kind == "ptr"
+                pre_in += tuple((_at(arg, at) + i, 0)
+                                for arg, at, kind, _v in chain if kind == "ptr"
                                 for i in range(4))
-        out.append((args, eax, writes, pre_in, fx))
+        out.append((args, eax, writes, pre_in, fx, tuple(wptr)))
     return out
 
 
@@ -626,7 +655,8 @@ def main():
                 "ADDR_OBJ_TYPE2_FIELD548", "ADDR_CLASSIFY_CODE74",
                 "ADDR_KIND_IN_SET_A", "ADDR_KIND_IN_SET_B",
                 "ADDR_MASK_PIXEL_SOLID", "ADDR_XOR_CHECKSUM",
-                "ADDR_CHAIN_FIELD_14"]
+                "ADDR_CHAIN_FIELD_14", "ADDR_LIST_PUSH_FRONT",
+                "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -715,6 +745,9 @@ def main():
         "ADDR_KIND_IN_SET_A": "KindInSetA", "ADDR_KIND_IN_SET_B": "KindInSetB",
         "ADDR_MASK_PIXEL_SOLID": "MaskPixelSolid",
         "ADDR_XOR_CHECKSUM": "XorChecksum", "ADDR_CHAIN_FIELD_14": "ChainField14",
+        "ADDR_LIST_PUSH_FRONT": "ListPushFront",
+        "ADDR_SET_FIELD_IN_ALL": "SetFieldInAll",
+        "ADDR_FIELD51_MEETS_MIN": "Field51MeetsMin",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -725,7 +758,8 @@ def main():
     VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
             "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet",
-            "TitleCaseName", "ResetPairMask", "SetFacing14", "SetFacing08"}
+            "TitleCaseName", "ResetPairMask", "SetFacing14", "SetFacing08",
+            "ListPushFront"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"
@@ -800,10 +834,12 @@ def main():
                      "    int32_t     ninputs;\n"
                      "    const uint32_t *inputs;   /* offset, byte pairs, written first */\n"
                      "    int32_t     nfixups;\n"
-                     "    const uint32_t *fixups;   /* offset, scratch-offset: a pointer */\n"
+                     "    const uint32_t *fixups;   /* offset, scratch-offset: written first */\n"
+                     "    int32_t     nwptr;\n"
+                     "    const uint32_t *wptr;     /* offset, scratch-offset: expected write */\n"
                      "} AM2_Vector;\n\n")
             for cname, nargs, kinds, vs in out:
-                for k, (args, eax, writes, pre, fx) in enumerate(vs):
+                for k, (args, eax, writes, pre, fx, wp) in enumerate(vs):
                     if writes:
                         fh.write("static const uint32_t w_%s_%d[] = {%s};\n"
                                  % (cname, k, ",".join("%d,%d" % (o, b) for o, b in writes)))
@@ -813,9 +849,12 @@ def main():
                     if fx:
                         fh.write("static const uint32_t f_%s_%d[] = {%s};\n"
                                  % (cname, k, ",".join("%d,%d" % (o, t) for o, t in fx)))
+                    if wp:
+                        fh.write("static const uint32_t p_%s_%d[] = {%s};\n"
+                                 % (cname, k, ",".join("%d,%d" % (o, t) for o, t in wp)))
             fh.write("\nstatic const AM2_Vector kVectors[] = {\n")
             for cname, nargs, kinds, vs in out:
-                for k, (args, eax, writes, pre, fx) in enumerate(vs):
+                for k, (args, eax, writes, pre, fx, wp) in enumerate(vs):
                     # A NULL pointer argument is a literal, not an offset. It
                     # was being emitted as 0 - SCRATCH, i.e. 0xE0000000, which
                     # the replay then rebased onto its own buffer and wrote to.
@@ -844,7 +883,7 @@ def main():
                     eaxp = 1 if (has_ptr and SCRATCH <= eax < SCRATCH + SCRATCH_SZ) else 0
                     eaxv = (eax - SCRATCH) if eaxp else eax
                     fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, '
-                             '%d, %d, %d, %s, %d, %s, %d, %s},\n'
+                             '%d, %d, %d, %s, %d, %s, %d, %s, %d, %s},\n'
                              % (cname, cname, nargs,
                                 ",".join(str(x) for x in p),
                                 ",".join("0x%08xu" % (x & 0xFFFFFFFF) for x in a),
@@ -854,7 +893,9 @@ def main():
                                 len(pre),
                                 ("i_%s_%d" % (cname, k)) if pre else "0",
                                 len(fx),
-                                ("f_%s_%d" % (cname, k)) if fx else "0"))
+                                ("f_%s_%d" % (cname, k)) if fx else "0",
+                                len(wp),
+                                ("p_%s_%d" % (cname, k)) if wp else "0"))
             fh.write("};\n")
         print("\n-> tests/vectors.h  (%d functions, %d vectors)"
               % (len(out), sum(len(v[3]) for v in out)))

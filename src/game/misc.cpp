@@ -383,6 +383,51 @@ uint32_t __cdecl ChainField14(const void *p)
     return *(const uint32_t *)(q + 0x14);
 }
 
+void __cdecl ListPushFront(void *node, void **head)
+{
+    uint8_t *n = (uint8_t *)node;
+    void    *old = *head;
+
+    *(void **)(n + 4) = 0;              /* prev */
+    *(void **)(n + 8) = old;            /* next */
+    if (old)
+        *(void **)((uint8_t *)old + 4) = node;
+    *head = node;
+}
+
+int32_t __cdecl SetFieldInAll(void *record, void *value)
+{
+    uint8_t *r = (uint8_t *)record;
+    int32_t  i = 0;
+    uint32_t off = 0;
+
+    if (*(const int32_t *)(r + 4) <= 0)
+        return 0;
+
+    do {
+        uint8_t *base = *(uint8_t **)(r + 8);   /* re-read, as the original */
+
+        i++;
+        *(void **)(base + off + 0x2C) = value;
+        off += 0x60;
+    } while (i < *(const int32_t *)(r + 4));
+
+    return i;
+}
+
+int32_t __cdecl Field51MeetsMin(const void *p)
+{
+    const uint8_t *b = (const uint8_t *)p;
+    const uint8_t *rec = *(const uint8_t *const *)(b + 0x44);
+
+    if (!rec)
+        return 0;
+    /* zero-extended byte, signed 16-bit compare */
+    if ((int16_t)(uint16_t)b[0x51] < *(const int16_t *)(rec + 6))
+        return 0;
+    return 1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -428,5 +473,11 @@ int misc_install(void)
     patch_replace(ADDR_XOR_CHECKSUM, (const void *)XorChecksum, "XorChecksum", 1);
     patch_replace(ADDR_CHAIN_FIELD_14, (const void *)ChainField14,
                   "ChainField14", 1);
+    patch_replace(ADDR_LIST_PUSH_FRONT, (const void *)ListPushFront,
+                  "ListPushFront", 2);
+    patch_replace(ADDR_SET_FIELD_IN_ALL, (const void *)SetFieldInAll,
+                  "SetFieldInAll", 2);
+    patch_replace(ADDR_FIELD51_MEETS_MIN, (const void *)Field51MeetsMin,
+                  "Field51MeetsMin", 1);
     return 0;
 }
