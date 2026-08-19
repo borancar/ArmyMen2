@@ -3192,6 +3192,13 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_PARSE_EVENT,
                         (const void *)ScriptParseEvent,
                         "ScriptParseEvent", 1);
+    /* Worth detouring even though our own ScriptIf and ScriptObjFrame call it
+     * directly: ParseLine (0x00444C40) is still the original's and reaches it
+     * by address, so without this the menu's typed-command path would run the
+     * original parser while every script ran ours. */
+    rc |= patch_replace(ADDR_SCRIPT_PARSE_ACTION,
+                        (const void *)ScriptParseActionRecon,
+                        "ScriptParseAction", 3);
     rc |= patch_replace(ADDR_SCRIPT_LOCATION,
                         (const void *)ScriptLocation, "ScriptLocation", 1);
     return rc;
