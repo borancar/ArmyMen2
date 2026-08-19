@@ -1157,6 +1157,7 @@
 #define ADDR_LIST_PUSH_FRONT   0x00429F20u  /* void(void *node, void **head) */
 #define ADDR_SET_FIELD_IN_ALL  0x00434E90u  /* int32_t(void *record, void *v) */
 #define ADDR_FIELD51_MEETS_MIN 0x0040A490u  /* int32_t(const void *p) */
+#define ADDR_OBJ_KIND538_10_17 0x0040D860u  /* int32_t(const void *obj) */
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u

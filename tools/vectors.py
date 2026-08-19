@@ -108,6 +108,11 @@ ARG_KIND_OVERRIDE = {
 #   "ptr"  a pointer to follow. A flat buffer satisfies one hop; a function
 #          walking obj->[a]->[b] reads pattern bytes at the second, faults, and
 #          yields no vectors at all.
+#   "u32v" a field a branch turns on, varied around the given value so both
+#          sides of the test are reached. A fixed seed makes the function
+#          runnable and still leaves half of it unvisited: 0x0040D860 asks
+#          whether a field is between 10 and 17, and the fill pattern never
+#          put it there.
 #   "u32"  a count or a length. 0x00402700 takes its loop count from the record
 #          -- a pattern dword means tens of millions of iterations, the run hits
 #          the instruction cap, and every vector is discarded.
@@ -122,6 +127,7 @@ SEED = {
     0x004010B0: [(0, 0x04, "ptr", 0x900)],
     0x0040A490: [(0, 0x44, "ptr", 0x900), (-1, 0x906, "u32", 4)],
     0x00434E90: [(0, 0x04, "u32", 8), (0, 0x08, "ptr", 0x900)],
+    0x0040D860: [(0, 0x538, "u32v", 13)],
     0x00429F20: [(1, 0x00, "ptr", 0x900)],
 }
 
@@ -500,6 +506,9 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
                     # 0x004010B0 sat at 85.7% for exactly that one instruction.
                     struct.pack_into("<I", b, at,
                                      0 if k % 5 == 2 else SCRATCH + val)
+                elif kind == "u32v":
+                    struct.pack_into("<I", b, at,
+                                     (val + (k % 16) - 4) & 0xFFFFFFFF)
                 else:
                     struct.pack_into("<I", b, at, val)
             # Vary the field a chain leads to, so the vectors exercise it
@@ -656,7 +665,8 @@ def main():
                 "ADDR_KIND_IN_SET_A", "ADDR_KIND_IN_SET_B",
                 "ADDR_MASK_PIXEL_SOLID", "ADDR_XOR_CHECKSUM",
                 "ADDR_CHAIN_FIELD_14", "ADDR_LIST_PUSH_FRONT",
-                "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN"]
+                "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN",
+                "ADDR_OBJ_KIND538_10_17"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -748,6 +758,7 @@ def main():
         "ADDR_LIST_PUSH_FRONT": "ListPushFront",
         "ADDR_SET_FIELD_IN_ALL": "SetFieldInAll",
         "ADDR_FIELD51_MEETS_MIN": "Field51MeetsMin",
+        "ADDR_OBJ_KIND538_10_17": "ObjKind538In10To17",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the

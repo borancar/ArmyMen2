@@ -14,6 +14,15 @@
  * byte for byte, a replay buffer smaller than the emulator's map. None of that
  * exists here.
  *
+ * NOT every reconstruction can be listed here. A function that follows a
+ * pointer out of its argument, or takes a loop count from it, needs that field
+ * to hold something sensible -- offline the emulator faults and the vector is
+ * quietly dropped, but here a fault kills the game before anything is
+ * reported. XorChecksum, ChainField14 and Field51MeetsMin were added and
+ * removed again for exactly that: the run died with 47 functions announced and
+ * no summary. They need the same seeding tools/vectors.py has, which this does
+ * not have yet.
+ *
  * This must run before install() patches anything. A patch overwrites the
  * original's first five bytes with a jump, and there is no trampoline, so
  * after that the original is not callable at all.
@@ -111,6 +120,8 @@ static const struct check kChecks[] = {
     { "CompareDword",   ADDR_COMPARE_DWORD,  (void *)CompareDword,   2, {1,1,0,0} },
     { "Field53C",       ADDR_FIELD_53C,      (void *)Field53C,       1, {1,0,0,0} },
     { "MaskPixelSolid", ADDR_MASK_PIXEL_SOLID,(void *)MaskPixelSolid,3, {0,0,1,0} },
+    { "ObjKind538In10To17", ADDR_OBJ_KIND538_10_17,
+                            (void *)ObjKind538In10To17, 1, {1,0,0,0} },
 };
 
 /* A cheap deterministic generator: the interesting values first, then a

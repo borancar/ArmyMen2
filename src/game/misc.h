@@ -223,6 +223,11 @@ int32_t __cdecl SetFieldInAll(void *record, void *value);
  * threshold above 0x7FFF reads as negative and everything passes. */
 int32_t __cdecl Field51MeetsMin(const void *p);
 
+/* 0x0040D860. Whether the dword at +0x538 is between 10 and 17 inclusive --
+ * the same range IsKind10To17 tests, read from the object instead of taken as
+ * an argument. Signed comparisons, so a negative value is outside. */
+int32_t __cdecl ObjKind538In10To17(const void *obj);
+
 int misc_install(void);
 
 #ifdef __cplusplus

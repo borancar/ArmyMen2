@@ -428,6 +428,13 @@ int32_t __cdecl Field51MeetsMin(const void *p)
     return 1;
 }
 
+int32_t __cdecl ObjKind538In10To17(const void *obj)
+{
+    int32_t v = *(const int32_t *)((const uint8_t *)obj + 0x538);
+
+    return (v >= 10 && v <= 17) ? 1 : 0;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -479,5 +486,7 @@ int misc_install(void)
                   "SetFieldInAll", 2);
     patch_replace(ADDR_FIELD51_MEETS_MIN, (const void *)Field51MeetsMin,
                   "Field51MeetsMin", 1);
+    patch_replace(ADDR_OBJ_KIND538_10_17, (const void *)ObjKind538In10To17,
+                  "ObjKind538In10To17", 1);
     return 0;
 }
