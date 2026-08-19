@@ -257,7 +257,16 @@ class Emu:
         self.seen = set()
         self.uc.hook_add(UC_HOOK_CODE, lambda uc, a, sz, _u: self.seen.add(a))
 
-    def call(self, addr, args, scratch_bytes):
+    def call(self, addr, args, scratch_bytes, count=100000):
+        """One emulated call. `count` caps instructions -- see below.
+
+        The cap is a runaway-loop guard, not a budget, and the default suits
+        the pure leaves it was written for. Something that legitimately does
+        real work needs more: the script tokeniser walks all 185 keywords for
+        every word and re-runs strlen per character inside ParseNumber, so a
+        200-character line of prose reaches 100,000 instructions honestly and
+        is then discarded as a failure. Raise it rather than assume a fault.
+        """
         self.uc.mem_write(SCRATCH, scratch_bytes)
         sp = STACK + STACK_SZ - 0x1000
         for a in reversed(args):
@@ -268,7 +277,7 @@ class Emu:
         self.uc.reg_write(UC_X86_REG_ESP, sp)
         self.uc.reg_write(UC_X86_REG_EBP, sp)
         try:
-            self.uc.emu_start(addr, RET_MAGIC, timeout=500000, count=100000)
+            self.uc.emu_start(addr, RET_MAGIC, timeout=500000, count=count)
         except UcError:
             return None, None
 

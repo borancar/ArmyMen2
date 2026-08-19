@@ -850,6 +850,15 @@
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
 #define ADDR_SCRIPT_ADD_TOKEN    0x0043F370u  /* void(ctx, kind, value, line) */
 #define ADDR_SCRIPT_WORD_BUF     0x00656354u  /* char[0x40], the scratch word */
+#define ADDR_SCRIPT_FREE_TOKEN   0x0043F000u  /* void(token *) */
+#define ADDR_SCRIPT_GROW_TOKENS  0x0043F340u  /* void(ctx *) */
+#define ADDR_SCRIPT_PARSE_NUMBER 0x0043EF70u  /* int32_t(const char *, int32_t *, float *) */
+
+/* The game's own statically linked MSVC CRT. Blocks cross between our code and
+ * the original's, so the allocator has to be the same one; see game/crt.h. */
+#define ADDR_CRT_MALLOC          0x004647F8u
+#define ADDR_CRT_REALLOC         0x004646D8u
+#define ADDR_CRT_FREE            0x004646A9u
 #define ADDR_SCRIPT_DECLARE_VAR  0x0043F7A0u  /* handle(const char *, kind, init) */
 #define ADDR_SCRIPT_FIND_FILE    0x00421890u  /* probes <map><n>.txt via _findfirst */
 
@@ -880,9 +889,14 @@
  * requires kind 5 for the name. So "String" here means a word, not a quoted
  * literal, and kind 6 "Name" is something else again. */
 #define AM2_SCRIPT_TOKEN_SIZE    12u
+/* AddToken stores its second argument at +0x00, its fourth at +0x04 and the
+ * value at +0x08 -- so the middle field is the LINE NUMBER, not the text. The
+ * earlier labels here (TOK_TEXT/TOK_ID) were read off a call site rather than
+ * out of the body, which is the mistake this project keeps making. */
 #define AM2_SCRIPT_TOK_KIND      0x00u
-#define AM2_SCRIPT_TOK_TEXT      0x04u
-#define AM2_SCRIPT_TOK_ID        0x08u
+#define AM2_SCRIPT_TOK_LINE      0x04u
+#define AM2_SCRIPT_TOK_VALUE     0x08u
+#define AM2_SCRIPT_CTX_CAPACITY  0x00u
 #define AM2_SCRIPT_CTX_COUNT     0x04u
 #define AM2_SCRIPT_CTX_TOKENS    0x08u
 

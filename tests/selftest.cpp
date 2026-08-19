@@ -25,6 +25,7 @@
 #include "../src/game/objtype.h"
 
 #include "../src/game/script.h"
+#include "../src/game/crt.h"
 
 #include "loadimage.h"
 #include "vectors.h"
@@ -45,6 +46,7 @@ static void FillScratch(void)
 }
 
 static int ScriptTokens(int *passed);
+static int ScriptLines(int *passed);
 
 int main(void)
 {
@@ -103,7 +105,94 @@ int main(void)
     printf("\n  %d vectors: %d pass, %d fail\n", pass + fail, pass, fail);
 
     fail += ScriptTokens(&pass);
+    fail += ScriptLines(&pass);
     return fail ? 1 : 0;
+}
+
+/* The tokeniser over every distinct line the game ships.
+ *
+ * The expected stream comes from the ORIGINAL NextToken under Unicorn with
+ * AddToken hooked, so what is compared is the sequence of tokens it asked to
+ * append -- kind, line number and value, and the text itself for strings.
+ *
+ * It found a real misreading on its first run: ParseNumber's loop bound is
+ * `i < len`, not `i < len - 1`, because the `repne scasb` that measures the
+ * string counts the terminator as well. With the off-by-one "1." came out as
+ * the integer 1 where the original gives the float 1.0. What exposed it was
+ * the numbered headings in the EULA text that ships beside the scripts --
+ * nothing in a mission file happens to end a number with a dot.
+ *
+ * What the corpus does NOT reach: the 0x3F clamp on word length. Moving it to
+ * 0x40 passes all 13,956 lines, because no token the game ships is 63
+ * characters long. That path and its "Token too long" message are read-only
+ * verification.
+ */
+static int ScriptLines(int *passed)
+{
+    /* The reconstruction's token list is on this build's heap, not the
+     * game's. */
+    am2_crt_use_host();
+
+    int pass = 0, fail = 0;
+    for (uint32_t i = 0; i < sizeof am2_script_lines /
+                             sizeof am2_script_lines[0]; i++) {
+        const AM2_ScriptLineVec *lv = &am2_script_lines[i];
+        AM2_ScriptCtx ctx = { 0, 0, 0 };
+        int bad = 0, at = -1;
+
+        ScriptNextToken(lv->line, &ctx, lv->lineno);
+
+        if (ctx.count != lv->count) {
+            bad = 1;
+        } else {
+            for (int32_t k = 0; k < ctx.count; k++) {
+                const AM2_ScriptTokVec *w = &am2_script_toks[lv->at + k];
+                const AM2_ScriptTok *g = &ctx.tokens[k];
+                if (g->kind != w->kind || g->line != w->line) {
+                    bad = 1;
+                } else if (w->text) {
+                    if (!g->value || strcmp((const char *)g->value, w->text))
+                        bad = 1;
+                } else if ((uint32_t)(uintptr_t)g->value != w->value) {
+                    bad = 1;
+                }
+                if (bad) {
+                    at = k;
+                    break;
+                }
+            }
+        }
+
+        if (bad) {
+            if (fail < 6) {
+                printf("  FAIL line %d: %.60s\n", lv->lineno, lv->line);
+                if (at < 0) {
+                    printf("     got %d tokens, want %d\n",
+                           (int)ctx.count, (int)lv->count);
+                } else {
+                    const AM2_ScriptTokVec *w = &am2_script_toks[lv->at + at];
+                    const AM2_ScriptTok *g = &ctx.tokens[at];
+                    printf("     token %d: got kind %d value ", at, g->kind);
+                    if (g->kind == AM2_TOKEN_STRING)
+                        printf("\"%s\"", (const char *)g->value);
+                    else
+                        printf("0x%08X", (unsigned)(uintptr_t)g->value);
+                    printf(", want kind %d value ", w->kind);
+                    if (w->text)
+                        printf("\"%s\"\n", w->text);
+                    else
+                        printf("0x%08X\n", (unsigned)w->value);
+                }
+            }
+            fail++;
+        } else {
+            pass++;
+        }
+        ScriptResetTokens(&ctx);
+    }
+    printf("  %d script lines: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
 }
 
 /* The script tokeniser, against every distinct word the game ships.

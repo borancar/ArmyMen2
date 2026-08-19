@@ -19,16 +19,41 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import am2
 from vectors import Emu, SCRATCH, SCRATCH_SZ, SCRATCH_PATTERN
+from unicorn import UC_HOOK_CODE
+from unicorn.x86_const import UC_X86_REG_EIP, UC_X86_REG_ESP
 
 GAME_DIR = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), ".wine/drive_c/GOG Games/Army Men II")
 ADDR_LOOKUP_TOKEN = 0x0043EEE0
+ADDR_NEXT_TOKEN = 0x0043F450
+ADDR_ADD_TOKEN = 0x0043F370
+LINE_AT = 0x1000          # where the line under test goes, inside SCRATCH
+CTX_AT = 0x0800           # a dummy context; AddToken never runs, so it is
+                          # never touched -- only its address is observed
 OUT = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "tests/scriptvec.h")
 
 # The tokeniser splits on IsScriptDelim and blanks; this is the same split done
 # crudely, which is all that is needed to harvest candidate words.
 WORD = re.compile(rb"[^\s(),<>={}&+\"]+")
+
+
+def cstr(b):
+    """A C string literal for arbitrary bytes.
+
+    Octal rather than hex, because \\x is greedy in C: "\\x41" followed by a
+    digit is one very large escape, and the script text has digits after
+    non-ASCII bytes in at least one file.
+    """
+    out = []
+    for ch in b:
+        if ch == 0x22 or ch == 0x5C:
+            out.append("\\" + chr(ch))
+        elif 0x20 <= ch < 0x7F:
+            out.append(chr(ch))
+        else:
+            out.append("\\%03o" % ch)
+    return "".join(out)
 
 
 def script_files():
@@ -81,6 +106,72 @@ def harvest():
     return sorted(words)
 
 
+def token_stream(emu, line, lineno):
+    """The tokens the ORIGINAL NextToken emits for one line.
+
+    AddToken is not executed. It reaches the game's malloc, which reaches
+    HeapAlloc, which is an import and does not exist here -- and running it
+    would only rebuild a list this already has. Hooking its entry, reading the
+    four cdecl arguments off the stack and returning gives exactly the stream,
+    which is the thing being compared.
+    """
+    uc = emu.uc
+    out = []
+
+    def at_add_token(u, addr, size, _user):
+        if addr != ADDR_ADD_TOKEN:
+            return
+        esp = u.reg_read(UC_X86_REG_ESP)
+        ret, _ctx, kind, value, ln = struct.unpack(
+            "<IIiIi", bytes(u.mem_read(esp, 20)))
+        if kind == 5:
+            text = bytearray()
+            while True:
+                b = u.mem_read(value + len(text), 1)[0]
+                if b == 0 or len(text) > 0x100:
+                    break
+                text.append(b)
+            out.append((kind, ln, bytes(text)))
+        elif 1 <= kind <= 4:
+            out.append((kind, ln,
+                        struct.unpack("<I", bytes(u.mem_read(value, 4)))[0]))
+        else:
+            out.append((kind, ln, None))
+        # cdecl: the caller cleans up, so returning is just popping the address.
+        u.reg_write(UC_X86_REG_EIP, ret)
+        u.reg_write(UC_X86_REG_ESP, esp + 4)
+
+    h = uc.hook_add(UC_HOOK_CODE, at_add_token)
+    try:
+        buf = bytearray(SCRATCH_PATTERN[:SCRATCH_SZ])
+        buf[LINE_AT:LINE_AT + len(line) + 1] = line + b"\0"
+        eax, _mem = emu.call(ADDR_NEXT_TOKEN,
+                             [SCRATCH + LINE_AT, SCRATCH + CTX_AT, lineno],
+                             bytes(buf), count=4000000)
+    finally:
+        uc.hook_del(h)
+
+    return None if eax is None else out
+
+
+def script_lines():
+    """Distinct lines from the shipped scripts, with a line number.
+
+    Deduplicated: `undeploy greenflag1,` appears in dozens of rule files and
+    emulating it dozens of times tests nothing further. The line number travels
+    with the token, so one occurrence of each is kept with the number it first
+    had.
+    """
+    seen = {}
+    for path in script_files():
+        with open(path, "rb") as fh:
+            for n, line in enumerate(fh, 1):
+                line = line.rstrip(b"\r\n")
+                if len(line) < 0x200:
+                    seen.setdefault(line, n)
+    return sorted(seen.items())
+
+
 def main():
     if not os.path.isdir(GAME_DIR):
         sys.exit("no game directory at %s" % GAME_DIR)
@@ -111,8 +202,42 @@ def main():
             fh.write('    { "%s", %d },\n' % (esc, v))
         fh.write("};\n")
 
-    print("-> %s  (%d words, %d keywords, %d files)"
-          % (os.path.relpath(OUT), len(rows), named, len(script_files())))
+    lines = script_lines()
+    toks, index = [], []
+    for line, lineno in lines:
+        got = token_stream(emu, line, lineno)
+        if got is None:
+            sys.exit("emulation failed on %r" % line)
+        index.append((line, lineno, len(toks), len(got)))
+        toks.extend(got)
+
+    with open(OUT, "a") as fh:
+        fh.write("\n/* The token stream the original NextToken emits for every\n"
+                 " * distinct line in those files. AddToken is hooked rather\n"
+                 " * than executed -- it reaches HeapAlloc, which does not exist\n"
+                 " * under emulation -- so what is recorded is exactly the\n"
+                 " * sequence of (kind, line, value) it was asked to append.\n */\n")
+        fh.write("typedef struct { int32_t kind; int32_t line; uint32_t value;\n"
+                 "                 const char *text; } AM2_ScriptTokVec;\n")
+        fh.write("typedef struct { const char *line; int32_t lineno;\n"
+                 "                 int32_t at; int32_t count; }"
+                 " AM2_ScriptLineVec;\n\n")
+        fh.write("static const AM2_ScriptTokVec am2_script_toks[] = {\n")
+        for kind, ln, val in toks:
+            if isinstance(val, bytes):
+                fh.write('    { %d, %d, 0, "%s" },\n' % (kind, ln, cstr(val)))
+            else:
+                fh.write("    { %d, %d, 0x%08Xu, 0 },\n"
+                         % (kind, ln, val if val is not None else 0))
+        fh.write("};\n\nstatic const AM2_ScriptLineVec am2_script_lines[] = {\n")
+        for line, lineno, at, count in index:
+            fh.write('    { "%s", %d, %d, %d },\n'
+                     % (cstr(line), lineno, at, count))
+        fh.write("};\n")
+
+    print("-> %s  (%d words, %d keywords, %d files; %d lines, %d tokens)"
+          % (os.path.relpath(OUT), len(rows), named, len(script_files()),
+             len(lines), len(toks)))
 
 
 if __name__ == "__main__":
