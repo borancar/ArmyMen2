@@ -1152,6 +1152,8 @@
 #define ADDR_KIND_IN_SET_A     0x0045EE20u  /* int32_t(int32_t kind) */
 #define ADDR_KIND_IN_SET_B     0x00433520u  /* int32_t(int32_t kind) */
 #define ADDR_MASK_PIXEL_SOLID  0x0041CF20u  /* int32_t(x, y, const void *mask) */
+#define ADDR_XOR_CHECKSUM      0x00402700u  /* uint32_t(const void *record) */
+#define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u

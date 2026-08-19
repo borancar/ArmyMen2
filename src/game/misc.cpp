@@ -360,6 +360,29 @@ int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
     }
 }
 
+uint32_t __cdecl XorChecksum(const void *record)
+{
+    const uint32_t *d = (const uint32_t *)record;
+    int32_t         n = (int32_t)(d[1] >> 2);
+    uint32_t        acc = 0;
+
+    if (n <= 0)
+        return 0;
+    do {
+        acc ^= *d++;
+    } while (--n);
+    return acc;
+}
+
+uint32_t __cdecl ChainField14(const void *p)
+{
+    const uint8_t *q = *(const uint8_t *const *)((const uint8_t *)p + 4);
+
+    if (!q)
+        return 0;
+    return *(const uint32_t *)(q + 0x14);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -402,5 +425,8 @@ int misc_install(void)
     patch_replace(ADDR_KIND_IN_SET_B, (const void *)KindInSetB, "KindInSetB", 1);
     patch_replace(ADDR_MASK_PIXEL_SOLID, (const void *)MaskPixelSolid,
                   "MaskPixelSolid", 3);
+    patch_replace(ADDR_XOR_CHECKSUM, (const void *)XorChecksum, "XorChecksum", 1);
+    patch_replace(ADDR_CHAIN_FIELD_14, (const void *)ChainField14,
+                  "ChainField14", 1);
     return 0;
 }

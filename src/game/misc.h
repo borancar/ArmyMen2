@@ -190,6 +190,18 @@ int32_t __cdecl KindInSetB(int32_t kind);   /* range 1..29 */
  * which is why there is no signed check anywhere. */
 int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask);
 
+/* 0x00402700. XOR of the record's own dwords, its length taken from inside it:
+ * the dword at +4 is a BYTE count, shifted right by two for a dword count. The
+ * sum starts at +0, so the length field is folded into its own checksum.
+ *
+ * The count is shifted unsigned and then tested signed, which after a shift by
+ * two can only be zero -- so `jle` there is `== 0` however it reads. */
+uint32_t __cdecl XorChecksum(const void *record);
+
+/* 0x004010B0. Follows the pointer at +4 and returns the dword at +0x14 of it,
+ * or 0 when that pointer is null. */
+uint32_t __cdecl ChainField14(const void *p);
+
 int misc_install(void);
 
 #ifdef __cplusplus

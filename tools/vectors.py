@@ -101,16 +101,24 @@ ARG_KIND_OVERRIDE = {
     0x004231A0: {0: "ptr", 1: "ptr"},   # ReverseBlocks(dst, src, total, count)
 }
 
-# Pointer chains the generator cannot discover. A flat scratch buffer satisfies
-# one hop; a function that walks obj->[a]->[b] reads whatever the fill pattern
-# left at the second, faults, and yields no vectors at all -- 0x0040D7E0 wants
-# obj+0x74 to be a pointer before its real argument, a signed word at +0x4C of
-# THAT, is reachable.
+# What a record has to contain before a function can be run at all. The
+# generator fills scratch with a fixed pattern, which is fine for a leaf field
+# and useless for two kinds of field it cannot guess:
 #
-# {function: [(offset_in_scratch, offset_it_should_point_at), ...]}, relative to
-# the first pointer argument's region.
-PTR_CHAIN = {
-    0x0040D7E0: [(0x74, 0x900)],
+#   "ptr"  a pointer to follow. A flat buffer satisfies one hop; a function
+#          walking obj->[a]->[b] reads pattern bytes at the second, faults, and
+#          yields no vectors at all.
+#   "u32"  a count or a length. 0x00402700 takes its loop count from the record
+#          -- a pattern dword means tens of millions of iterations, the run hits
+#          the instruction cap, and every vector is discarded.
+#
+# {function: [(offset, kind, value), ...]} where offset is relative to the first
+# pointer argument's region, and for "ptr" the value is the scratch offset to
+# point at.
+SEED = {
+    0x0040D7E0: [(0x74, "ptr", 0x900)],
+    0x00402700: [(0x04, "u32", 0x40)],
+    0x004010B0: [(0x04, "ptr", 0x900)],
 }
 
 
@@ -451,16 +459,23 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
             else:
                 args.append(rnd.randint(-0x40000, 0x40000))
         scratch = SCRATCH_PATTERN
-        chain = PTR_CHAIN.get(addr)
+        chain = SEED.get(addr)
         if chain:
             b = bytearray(scratch)
             base = PTR_STRIDE * 1          # the first pointer argument
-            for at, target in chain:
-                struct.pack_into("<I", b, base + at, SCRATCH + target)
-            # Vary the field the chain leads to, so the vectors actually
-            # exercise it rather than reading one constant.
-            struct.pack_into("<h", b, 0x900 + 0x4C,
-                             (k * 7) % 90 - 5)
+            for at, kind, val in chain:
+                if kind == "ptr":
+                    # NULL some of the time. A seeded pointer that is always
+                    # valid leaves the "and if it is null" arm unreached, which
+                    # is the arm a reconstruction most easily forgets --
+                    # 0x004010B0 sat at 85.7% for exactly that one instruction.
+                    struct.pack_into("<I", b, base + at,
+                                     0 if k % 5 == 2 else SCRATCH + val)
+                else:
+                    struct.pack_into("<I", b, base + at, val)
+            # Vary the field a chain leads to, so the vectors exercise it
+            # rather than reading one constant every time.
+            struct.pack_into("<h", b, 0x900 + 0x4C, (k * 7) % 90 - 5)
             scratch = bytes(b)
         eax, after = emu.call(addr, args, scratch)
         if eax is None:
@@ -476,7 +491,19 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
             # is rebased on the other side.
             pre_in = tuple((0x900 + 0x4C + i, scratch[0x900 + 0x4C + i])
                            for i in range(2))
-            fx = tuple((PTR_STRIDE + at, target) for at, target in chain)
+            pre_in += tuple((PTR_STRIDE + at + i,
+                             scratch[PTR_STRIDE + at + i])
+                            for at, kind, _v in chain if kind != "ptr"
+                            for i in range(4))
+            fx = tuple((PTR_STRIDE + at, val)
+                       for at, kind, val in chain
+                       if kind == "ptr" and k % 5 != 2)
+            # A NULLed seed travels as plain bytes, since there is no address
+            # to rebase.
+            if k % 5 == 2:
+                pre_in += tuple((PTR_STRIDE + at + i, 0)
+                                for at, kind, _v in chain if kind == "ptr"
+                                for i in range(4))
         out.append((args, eax, writes, pre_in, fx))
     return out
 
@@ -598,7 +625,8 @@ def main():
                 "ADDR_IS_KIND_10_17", "ADDR_IS_KIND_14_22",
                 "ADDR_OBJ_TYPE2_FIELD548", "ADDR_CLASSIFY_CODE74",
                 "ADDR_KIND_IN_SET_A", "ADDR_KIND_IN_SET_B",
-                "ADDR_MASK_PIXEL_SOLID"]
+                "ADDR_MASK_PIXEL_SOLID", "ADDR_XOR_CHECKSUM",
+                "ADDR_CHAIN_FIELD_14"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -686,6 +714,7 @@ def main():
         "ADDR_CLASSIFY_CODE74": "ClassifyByCode74",
         "ADDR_KIND_IN_SET_A": "KindInSetA", "ADDR_KIND_IN_SET_B": "KindInSetB",
         "ADDR_MASK_PIXEL_SOLID": "MaskPixelSolid",
+        "ADDR_XOR_CHECKSUM": "XorChecksum", "ADDR_CHAIN_FIELD_14": "ChainField14",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
