@@ -16,7 +16,18 @@
 #include "../inject/patch.h"
 
 /* The table's bounds are the ones the original's loop uses, not a guess: it
- * starts at 0x00487C90 and stops when the cursor reaches 0x00488258. */
+ * starts at 0x00487C90 and stops when the cursor reaches 0x00488258.
+ *
+ * Nothing in the image writes into it, and only three functions read it --
+ * ScriptLookupToken, ScriptTokenName, and ScriptTokenText for the `char *` at
+ * 0x00488258 that sits immediately past the last entry and points at
+ * "unknown". All three are reconstructed, so the whole table is accounted
+ * for and `const` is the truth about it.
+ *
+ * It lives in .data rather than .rdata despite never being written, which is
+ * what MSVC 6 does with an initialised aggregate containing pointers: the
+ * pointers need relocations at link time. This image has its relocations
+ * stripped, so the table is fixed where it is and nothing can move it. */
 typedef struct {
     const char *name;
     int32_t     id;
