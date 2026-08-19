@@ -1127,6 +1127,17 @@
 #define ADDR_ADD_BYTE_SAT      0x0045F440u  /* int32_t(base, add) */
 #define ADDR_COMPARE_DWORD     0x0043E150u  /* int32_t(const void*, const void*) */
 #define ADDR_COPY_BYTE_IF_SET  0x00408560u  /* void(unused, uint8_t*, const void*) */
+#define ADDR_SCALE_32_BLOCKS   0x0042E4F0u  /* int32_t(int32_t) */
+#define ADDR_TITLE_CASE        0x0042E510u  /* void(char *) */
+#define ADDR_RESET_PAIR_MASK   0x0042F120u  /* void(uint32_t*, uint32_t*) */
+#define ADDR_IS_KIND_7         0x00435640u  /* int32_t(const void *) */
+#define ADDR_IS_BLANK          0x0043EE80u  /* int32_t(uint8_t) -- no '\n' */
+#define ADDR_IS_SCRIPT_DELIM   0x0043EEA0u  /* int32_t(uint8_t) */
+#define ADDR_SWAP_COLOUR_BYTES 0x0041AE90u  /* uint32_t(colour, unused) */
+#define ADDR_NULL_STUB_4       0x004170E0u  /* void __stdcall(uint32_t) */
+#define ADDR_NULL_STUB         0x0042E170u  /* void(void) */
+#define ADDR_RETURN_ZERO       0x0042E980u  /* int32_t(void) */
+#define ADDR_RETURN_ONE        0x004354F0u  /* int32_t(void) */
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
 #define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */

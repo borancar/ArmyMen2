@@ -140,10 +140,16 @@ def analyse(img, md, addr, size):
                 else:
                     slots.pop(dst, None)
 
-        for mm in re.finditer(r"\[(%s)\b" % REG, op):
-            reg = mm.group(1)
-            if reg in slots:
-                kinds[slots[reg]] = "ptr"
+        # lea COMPUTES an address, it does not dereference one. Counting it
+        # made ScaleBy32Blocks look like it took a pointer, because multiplying
+        # by 1000 is three `lea eax,[eax+eax*4]` chains -- so the vectors
+        # passed a scratch address where the function wanted a number, and the
+        # reconstruction failed a test that was wrong.
+        if m != "lea":
+            for mm in re.finditer(r"\[(%s)\b" % REG, op):
+                reg = mm.group(1)
+                if reg in slots:
+                    kinds[slots[reg]] = "ptr"
 
     return highest + 1, kinds
 
@@ -432,7 +438,10 @@ def main():
                 "ADDR_OBJ_FLAG_BIT0", "ADDR_OBJ_FLAG_BIT1",
                 "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4",
                 "ADDR_FIELD_53C", "ADDR_ADD_BYTE_SAT", "ADDR_COMPARE_DWORD",
-                "ADDR_COPY_BYTE_IF_SET"]
+                "ADDR_COPY_BYTE_IF_SET", "ADDR_SCALE_32_BLOCKS",
+                "ADDR_TITLE_CASE", "ADDR_RESET_PAIR_MASK", "ADDR_IS_KIND_7",
+                "ADDR_IS_BLANK", "ADDR_IS_SCRIPT_DELIM",
+                "ADDR_SWAP_COLOUR_BYTES", "ADDR_RETURN_ZERO", "ADDR_RETURN_ONE"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -494,6 +503,12 @@ def main():
         "ADDR_FIELD_53C": "Field53C", "ADDR_ADD_BYTE_SAT": "AddByteSat",
         "ADDR_COMPARE_DWORD": "CompareDword",
         "ADDR_COPY_BYTE_IF_SET": "CopyByteIfSet",
+        "ADDR_SCALE_32_BLOCKS": "ScaleBy32Blocks",
+        "ADDR_TITLE_CASE": "TitleCaseName",
+        "ADDR_RESET_PAIR_MASK": "ResetPairMask", "ADDR_IS_KIND_7": "IsKind7",
+        "ADDR_IS_BLANK": "IsBlank", "ADDR_IS_SCRIPT_DELIM": "IsScriptDelim",
+        "ADDR_SWAP_COLOUR_BYTES": "SwapColourBytes",
+        "ADDR_RETURN_ZERO": "ReturnZero", "ADDR_RETURN_ONE": "ReturnOne",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -503,7 +518,8 @@ def main():
     # the harness has to be told, since it cannot see a C declaration.
     VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
-            "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet"}
+            "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet",
+            "TitleCaseName", "ResetPairMask"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"
