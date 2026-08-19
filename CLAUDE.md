@@ -180,6 +180,56 @@ caught by only 13 of 512 random vectors. angr solves for one input per path
 instead. It never gets a vote on what the original does — that always comes
 from the Unicorn run, so there is one source of truth.
 
+**A reconstruction that reads a constant table in the image is testable
+offline too, and the header that said otherwise was half wrong.**
+`tests/selftest.cpp` used to state that a function reading a global "would need
+that global mapped, and mapping it means starting the game". Only the first
+half is true. `tests/loadimage.h` copies the image's sections in from the file
+with nothing executed and no game running.
+
+It cannot put them at `0x00400000`, and no link-time base fixes that: Wine's
+loader maps `locale.nls` across `0x00380000..0x00443000`, then `c_1252`,
+`c_437` and `sortdefault` through `0x0084A000`, before any user code runs. So
+the image lands wherever `VirtualAlloc` puts it and `src/game/image.h` carries
+the difference -- an image address is written `AM2_IMAGE(0x00487C90)` and
+resolves through a slide that is zero in the game. One add. The native ELF,
+where `0x00400000` is equally unavailable, will need exactly this and nothing
+more. What stays out of reach is a global the game WRITES at runtime, and a
+call into the image; those still need `AM2_SELFCHECK=1`.
+
+**Where the program ships its own input, use that instead of vectors.**
+A keyword lookup learns nothing from a random 32-bit argument.
+`tools/scriptcheck.py` runs the ORIGINAL tokeniser under Unicorn over every
+distinct word and every distinct line in the 109 shipped `.txt` files --
+15,228 words and 13,956 lines, 72,209 tokens -- and `selftest` replays the lot.
+`AddToken` is hooked rather than executed, because it reaches `HeapAlloc`,
+which does not exist under emulation, and running it would only rebuild a list
+the hook already has.
+
+It caught a misreading on its first run. `ParseNumber`'s loop bound is
+`i < len`, not `i < len - 1`: the `repne scasb` that measures the string counts
+the terminator, so `not ecx` gives len+1 and the following `dec` gives len.
+With the off-by-one `"1."` parsed as the integer 1 where the original gives the
+float 1.0. Nothing in a mission file ends a number with a dot -- what exposed
+it was the numbered headings in the EULA that ships beside the scripts, which
+the corpus includes because it takes every `.txt` under the prefix and not only
+the ones the game loads. **Take the whole corpus, including the parts that are
+not input.**
+
+**Say which mutations the corpus does NOT catch.** Making `/` not end a line
+fails on every `// comment`, and stopping `>` from pairing splits `<>` in the
+mission conditionals -- but moving the word clamp from `0x3F` to `0x40` passes
+all 13,956 lines, because no token the game ships is 63 characters long. That
+path stays verified by reading, and the test's own comment says so. A test
+whose gaps are unstated reads as more coverage than it has.
+
+**`Emu.call`'s instruction cap is a runaway-loop guard, not a budget.** It was
+hardcoded at 100,000, sized for the pure leaves it was written for, and the
+tokeniser exceeds it honestly: `LookupToken` walks all 185 keywords for every
+word and `ParseNumber` re-runs `strlen` per character, so a 213-character line
+of prose reached it and was discarded as a fault. It is a parameter now. Raise
+it before concluding a function faulted.
+
 **Coverage is measured, not claimed.** A Unicorn code hook records every
 instruction a vector set reaches, and `tools/vectors.py` prints the percentage
 per function; trailing `nop`/`int3` padding is excluded, since the linker's
@@ -204,6 +254,43 @@ only addresses beginning `0x4`, which silently skipped everything at `0x5xxxxx`
 and `0x6xxxxx` — and `.data` runs to `0x667000`. It reported **315** pure
 functions where there are **161**, because `NextItem` reading `[0x514F08]`
 looked like a pure function of its arguments.
+
+## The script interpreter
+
+The game ships its missions as readable text -- `data/<map>/<map>N.txt` and
+`rules/*.txt`, 109 files under the prefix -- so this is the one subsystem whose
+names come from the program's own vocabulary rather than from us. The chain is
+`WinMain -> RunFrame -> ADDR_STATE2_FRAME -> LoadLevelScript (0x00425060) ->
+ReadScript (0x00444CD0) -> ParseLine (0x00444C40) -> NextToken (0x0043F450)`.
+
+**Read the loop, not the data, when a table's bounds are in question.**
+`tools/scripttokens.py` was reading a range I guessed -- `0x00487A00` to
+`0x00488100` -- and reported 141 keywords. `ScriptLookupToken` walks from
+`0x00487C90` and stops at `0x00488258`, eight bytes a step, so there are
+**185**. The 44 it was missing are not filler: they are the whole AI vocabulary
+-- `setaimode` with `attack`/`defend`/`ignore`/`evade`, `setaipose` with
+`stand`/`kneel`/`prone`, `setnpc`, `setzombie`, `setscientist`, `fireweapon`,
+`unitfire`, `hasitem`, `dropitem`, `isally`, `teamscore`, `group`, `setuilock`,
+`setdamagepad`. `docs/scripttokens.md` is generated and lists all of them.
+
+Lookup is case-sensitive over a lower-case table; the caller lower-cases first
+through `_strlwr` at `0x0046D7D6`, whose ASCII path is the plain
+`cmp 0x41 / cmp 0x5A / add 0x20`. That is why the scripts write `Pad`, `pad`
+and `PAD` interchangeably.
+
+The token record is `{kind, line, value}` -- 12 bytes -- and the context is
+`{capacity, count, tokens}`, growing ten entries at a time. Both were read out
+of `AddToken`'s body; the `TOK_TEXT`/`TOK_ID` labels this file's `orig.h` used
+to carry were taken off a call site and were wrong about the middle field,
+which is the LINE NUMBER. Kinds 1..4 store a dword by value, kind 5 owns a
+`malloc`'d copy, and kind 0 or 6 advances the count leaving the value untouched
+-- the switch covers exactly `kind - 1` in `0..4`.
+
+**Token buffers cross between our code and the original's, so the allocator
+has to be the game's.** `src/game/crt.h` points `am2_malloc`/`am2_realloc`/
+`am2_free` at the statically linked MSVC CRT inside `ArmyMen2.exe`. This is a
+narrow seam, not a general escape hatch: nearly all of `src/game/` is
+arithmetic over memory the caller supplies and needs none of it.
 
 ## Verifying a reconstruction
 
@@ -1211,5 +1298,18 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   Worth checking for before spending time trying to exercise something: a
   function can be reachable, called from live code, and still never run because
   the argument that gates it is a constant at the one call site.
+- **The script family confirms the count-of-0 blind spot rather than
+  contradicting it.** A Boot Camp run reads `ScriptNextToken` 101 and
+  `ScriptResetTokens` 1, while `ScriptLookupToken`, `ScriptAddToken`,
+  `ScriptGrowTokens`, `ScriptParseNumber`, `IsBlank` and `IsScriptDelim` all
+  read 0 -- our `NextToken` calls them directly and never crosses a patched
+  entry. The same run gives `FirstItem` 363 and `NextItem` 584,067, and
+  363 x 1,609 is 584,067 exactly, so the registry invariant holds with the
+  tokeniser in place. `tools/ab.sh mission` is clean on the same build.
+- The interpreter's top-level grammar is mapped but the handlers are not
+  written: `preloadsprite` (25) -> `0x00444900`, `pad` (26) -> `0x004440E0`,
+  `variable` (133) -> `0x00443F70`, `if` (44) -> `0x004432F0`, `object`
+  (139) -> `0x00436D60`. `GenerateObjScriptFromTokens` is a real source name,
+  recovered from a string.
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.
