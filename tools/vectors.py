@@ -130,6 +130,8 @@ SEED = {
     0x0040D860: [(0, 0x538, "u32v", 13)],
     0x00408520: [(2, 0x2C, "u32v", 0x40), (2, 0x10, "u32v", 0)],
     0x0045C870: [(0, 0x08, "u32v", 1), (0, 0x0C, "u32v", 0)],
+    0x00402E50: [(0, 0x39C, "u32v", 28)],
+    0x0041DAD0: [(0, 0x04, "ptr", 0x900), (0, 0x08, "ptr", 0xA00)],
     0x00409650: [(0, 0x00, "u32v", 1), (0, 0x08, "u32v", 0),
                  (0, 0x94, "ptr", 0x900), (-1, 0x900, "u32v", 0x1F)],
     0x0043D550: [(0, 0x14, "u32v", 1), (0, 0x18, "u32v", 0)],
@@ -563,8 +565,13 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                     # valid leaves the "and if it is null" arm unreached, which
                     # is the arm a reconstruction most easily forgets --
                     # 0x004010B0 sat at 85.7% for exactly that one instruction.
+                    # Per-seed NULL decision. Nulling every seeded pointer on
+                    # the same k means a list node always had both its links
+                    # present or both absent, so the unlink at 0x0041DAD0 never
+                    # saw a head or a tail.
+                    null_now = (k // (seed_i + 1)) % 5 == 2
                     struct.pack_into("<I", b, at,
-                                     0 if k % 5 == 2 else SCRATCH + val)
+                                     0 if null_now else SCRATCH + val)
                 elif kind == "u32v":
                     # Each seed varies on its OWN period. Stepping them all by
                     # k made them move in lockstep, so a function gated on two
@@ -659,14 +666,14 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                             for arg, at, kind, _v in chain if kind != "ptr"
                             for i in range(4))
             fx = tuple((_at(arg, at), val)
-                       for arg, at, kind, val in chain
-                       if kind == "ptr" and k % 5 != 2)
+                       for si, (arg, at, kind, val) in enumerate(chain)
+                       if kind == "ptr" and (k // (si + 1)) % 5 != 2)
             # A NULLed seed travels as plain bytes, since there is no address
             # to rebase.
-            if k % 5 == 2:
-                pre_in += tuple((_at(arg, at) + i, 0)
-                                for arg, at, kind, _v in chain if kind == "ptr"
-                                for i in range(4))
+            pre_in += tuple((_at(arg, at) + i, 0)
+                            for si, (arg, at, kind, _v) in enumerate(chain)
+                            if kind == "ptr" and (k // (si + 1)) % 5 == 2
+                            for i in range(4))
         out.append((args, eax, writes, pre_in, fx, tuple(wptr)))
     return out
 
