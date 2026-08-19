@@ -257,6 +257,43 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at);
 int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
                                   int32_t *out, int32_t quiet);
 
+/* 0x00443010. One operand of a `testvar` comparison.
+ *
+ * *kind says which form, and *a and *b carry its arguments:
+ *
+ *   0  an integer literal, in *a
+ *   1  a declared variable, its name index in *a
+ *   2  getdmglvl <obj>          3  gethealth <obj>
+ *   4  getdisguise <obj>        5  hasitem <obj> <item>
+ *   6  iscoloringame <army>     7  isally <army> <army>
+ *   8  teamscore <army>
+ *
+ * Anything else is "Unrecognized operand in testvar clause." */
+int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
+                                 int32_t *kind, int32_t *a, int32_t *b);
+
+/* 0x0043FAB0. Who a `hit` or `killed` event is about.
+ *
+ * Either a named object -- *mask is its name-table index -- or a descriptor
+ * built from an army word and a type word, packed into the top bits:
+ * 0x80000000 always, then green/tan/blue/grey as 0x40/0x20/0x10/0x08000000,
+ * then item 0x04000000, sarge 0x01C00000, trooper 0x01400000, vehicle
+ * 0x00200000. An unrecognised army word gives 0xF8000000, which means all four.
+ *
+ * Its "Unknown item descriptor" message cannot fire: the value starts at
+ * 0x80000000 and is only ever OR'd, so the zero test guarding it is never
+ * true. Kept as the original has it. */
+int32_t __cdecl ScriptHitTarget(AM2_ScriptCtx *ctx, int32_t *at,
+                                int32_t *mask);
+
+/* 0x0043FCF0. Who an `order` or `setaimode` event is about.
+ *
+ * *form is 0 for a named object (then *val is its name index), 1 for an army
+ * (then *army is 0..3 and *val is -1), or 2 for an army plus a `group <n>`
+ * (then *val is the group number). */
+int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
+                                  int32_t *form, int32_t *val, int32_t *army);
+
 /* 0x00442F10. Does `want` appear before `stop`, scanning from `from`? */
 int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
                               int32_t want, int32_t stop);

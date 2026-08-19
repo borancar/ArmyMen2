@@ -646,6 +646,179 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
     }
 }
 
+/* Both descriptor parsers start with "is it just a name?" and resolve it the
+ * same way -- find it, declare it with type 2 if new. */
+static int32_t ScriptNamedTarget(AM2_ScriptCtx *ctx, int32_t *at,
+                                 int32_t *out)
+{
+    int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
+    *out = idx;
+    if (idx < 0)
+        *out = AddNameTableName((const char *)ctx->tokens[*at].value, 2, 0);
+    return *out;
+}
+
+/* Advance past a word, reporting the end of the script. */
+static int ScriptStep(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    if (++(*at) < ctx->count)
+        return 1;
+    am2_log("Unexpected end of script.\n");
+    return 0;
+}
+
+int32_t __cdecl ScriptHitTarget(AM2_ScriptCtx *ctx, int32_t *at, int32_t *mask)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_STRING) {
+        ScriptNamedTarget(ctx, at, mask);
+        (*at)++;
+        return 1;
+    }
+
+    *mask = (int32_t)0x80000000;
+
+    tok = &ctx->tokens[*at];
+    int32_t army = 0;
+    if (tok->kind == AM2_TOKEN_RESERVED) {
+        switch ((int32_t)(uintptr_t)tok->value) {
+        case 16: army = 0x40000000; break;      /* green */
+        case 17: army = 0x20000000; break;      /* tan   */
+        case 18: army = 0x10000000; break;      /* blue  */
+        case 19: army = 0x08000000; break;      /* grey  */
+        default: break;
+        }
+    }
+    if (army) {
+        if (!ScriptStep(ctx, at))
+            return 0;
+        *mask |= army;
+    } else {
+        *mask = (int32_t)0xF8000000;            /* any army */
+    }
+
+    tok = &ctx->tokens[*at];
+    if (tok->kind == AM2_TOKEN_RESERVED) {
+        int32_t type = 0;
+        switch ((int32_t)(uintptr_t)tok->value) {
+        case 30: type = 0x04000000; break;      /* item    */
+        case 32: type = 0x01C00000; break;      /* sarge   */
+        case 34: type = 0x01400000; break;      /* trooper */
+        case 36: type = 0x00200000; break;      /* vehicle */
+        default: break;
+        }
+        if (type) {
+            if (!ScriptStep(ctx, at))
+                return 0;
+            *mask |= type;
+        }
+    }
+
+    /* Unreachable -- see the header. */
+    if (*mask == 0) {
+        am2_log("Unknown item descriptor for HIT or KILLED event\n");
+        return 0;
+    }
+    return 1;
+}
+
+int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
+                                  int32_t *form, int32_t *val, int32_t *army)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_STRING) {
+        ScriptNamedTarget(ctx, at, val);
+        *form = 0;
+        (*at)++;
+        return 1;
+    }
+
+    *val = (int32_t)0x80000000;
+
+    tok = &ctx->tokens[*at];
+    int32_t which = -1;
+    if (tok->kind == AM2_TOKEN_RESERVED) {
+        int32_t id = (int32_t)(uintptr_t)tok->value;
+        if (id >= 16 && id <= 19)
+            which = id - 16;                    /* green tan blue grey */
+    }
+    if (which < 0) {
+        am2_log("Unknown item descriptor for ORDER or SETAIMODE event\n");
+        return 0;
+    }
+    if (!ScriptStep(ctx, at))
+        return 0;
+    *army = which;
+    *form = 1;
+
+    tok = &ctx->tokens[*at];
+    if (tok->kind == AM2_TOKEN_RESERVED &&
+        (int32_t)(uintptr_t)tok->value == 184) {        /* group */
+        if (!ScriptStep(ctx, at))
+            return 0;
+        *form = 2;
+        *val = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (!ScriptStep(ctx, at))
+            return 0;
+    } else {
+        *val = -1;
+    }
+    return 1;
+}
+
+int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
+                                 int32_t *kind, int32_t *a, int32_t *b)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_RESERVED) {
+        int32_t id = (int32_t)(uintptr_t)tok->value;
+        int32_t form = 0, names = 0, armies = 0;
+
+        switch (id) {
+        case 130: form = 2; names  = 1; break;  /* getdmglvl     */
+        case 131: form = 3; names  = 1; break;  /* gethealth     */
+        case 132: form = 4; names  = 1; break;  /* getdisguise   */
+        case 179: form = 5; names  = 2; break;  /* hasitem       */
+        case 181: form = 6; armies = 1; break;  /* iscoloringame */
+        case 182: form = 7; armies = 2; break;  /* isally        */
+        case 183: form = 8; armies = 1; break;  /* teamscore     */
+        default:  form = 0; break;
+        }
+
+        if (form) {
+            if (++(*at) >= ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
+            /* The failures below are silent: the callee has already said
+             * whatever it is going to say. */
+            if (names >= 1 && !ScriptResolveName(ctx, at, a, 0))
+                return 0;
+            if (names >= 2 && !ScriptResolveName(ctx, at, b, 0))
+                return 0;
+            if (armies >= 1)
+                *a = ScriptArmyColour(ctx, at);
+            if (armies >= 2)
+                *b = ScriptArmyColour(ctx, at);
+            *kind = form;
+            return 1;
+        }
+    }
+
+    /* An integer literal or a variable. */
+    int32_t isliteral = 0;
+    if (!ScriptIntOrVar(ctx, at, a, &isliteral)) {
+        am2_log("Line [%4d]:  Unrecognized operand in testvar clause.\n",
+                ctx->tokens[*at].line);
+        return 0;
+    }
+    *kind = isliteral ? 0 : 1;
+    return 1;
+}
+
 int32_t __cdecl ScriptNameUid(const char *name)
 {
     int32_t n = kScriptNameCount;
@@ -1388,8 +1561,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             AM2_ScriptTest test;
             memset(&test, 0, sizeof test);
 
-            if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_VALUE)(
-                    ctx, at, &test.left[0], &test.left[1], &test.left[2]))
+            if (!ScriptParseValue(ctx, at, &test.left[0], &test.left[1],
+                                  &test.left[2]))
                 goto fail;
             if (*at >= ctx->count)
                 goto end_of_script_late;
@@ -1409,8 +1582,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
             if (++(*at) >= ctx->count)
                 goto end_of_script_late;
-            if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_VALUE)(
-                    ctx, at, &test.right[0], &test.right[1], &test.right[2]))
+            if (!ScriptParseValue(ctx, at, &test.right[0], &test.right[1],
+                                  &test.right[2]))
                 goto fail;
             if (*at >= ctx->count)
                 goto end_of_script_late;
@@ -1739,6 +1912,14 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_PARSE_EVENTS,
                         (const void *)ScriptParseEvents,
                         "ScriptParseEvents", 1);
+    rc |= patch_replace(ADDR_SCRIPT_PARSE_VALUE,
+                        (const void *)ScriptParseValue,
+                        "ScriptParseValue", 1);
+    rc |= patch_replace(ADDR_SCRIPT_HIT_TARGET,
+                        (const void *)ScriptHitTarget, "ScriptHitTarget", 1);
+    rc |= patch_replace(ADDR_SCRIPT_ORDER_TARGET,
+                        (const void *)ScriptOrderTarget,
+                        "ScriptOrderTarget", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);

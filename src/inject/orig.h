@@ -963,6 +963,8 @@
 /* The sub-parsers `if` drives. All four stay the original's. */
 #define ADDR_SCRIPT_SCAN_FOR      0x00442F10u  /* int32_t(ctx,from,want,stop) */
 #define ADDR_SCRIPT_PARSE_EVENT   0x0043FF90u  /* (ctx,at,&a,&b,&c) */
+#define ADDR_SCRIPT_HIT_TARGET    0x0043FAB0u  /* (ctx,at,&mask) */
+#define ADDR_SCRIPT_ORDER_TARGET  0x0043FCF0u  /* (ctx,at,&form,&val,&army) */
 #define ADDR_SCRIPT_PARSE_EVENTS  0x00440600u  /* (ctx,at,cond) */
 
 /* The uids the four army keywords and `me` stand for. Not in keyword order,
