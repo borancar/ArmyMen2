@@ -1127,6 +1127,58 @@
 #define AM2_IF_BUTNOT_KEYWORD    7
 #define AM2_IF_BUTNOT_STRING     8
 
+/* Which of the two forms an object script was declared with. */
+#define AM2_OBJSCRIPT_OBJECT     0
+#define AM2_OBJSCRIPT_CLASS      1
+
+/* What an `if` event term is, in the first of its three values. Kind 1 is not
+ * produced by anything. */
+#define AM2_EVT_NAME             0   /* just an object, whatever happens  */
+#define AM2_EVT_PADOFF           2
+#define AM2_EVT_PADON            3
+#define AM2_EVT_KILLED           4
+#define AM2_EVT_HIT              5
+#define AM2_EVT_HEALED           6
+#define AM2_EVT_PICKEDUP         7
+#define AM2_EVT_DROPPED          8
+
+/* What one side of a `testvar` comparison is. */
+#define AM2_VAL_LITERAL          0
+#define AM2_VAL_VARIABLE         1
+#define AM2_VAL_GETDMGLVL        2
+#define AM2_VAL_GETHEALTH        3
+#define AM2_VAL_GETDISGUISE      4
+#define AM2_VAL_HASITEM          5
+#define AM2_VAL_ISCOLORINGAME    6
+#define AM2_VAL_ISALLY           7
+#define AM2_VAL_TEAMSCORE        8
+
+/* Who an `order` or `setaimode` is aimed at. */
+#define AM2_ORDER_NAME           0   /* a named object                    */
+#define AM2_ORDER_ARMY           1   /* a whole army                      */
+#define AM2_ORDER_GROUP          2   /* an army's `group <n>`             */
+
+/* What follows `then`. */
+#define AM2_THEN_NONE            0
+#define AM2_THEN_RANDOM          1
+#define AM2_THEN_SEQUENTIAL      2
+#define AM2_THEN_ONOBJSTATE      3
+
+/* A `testvar` comparison operator. Note this is NOT the encoding a pad uses
+ * for the same three of these -- a pad writes 0/1/2 for =/</> while testvar
+ * writes 0/2/3, with 1 taken by <>. Two encodings for one idea, in one file. */
+#define AM2_CMP_EQ               0
+#define AM2_CMP_NE               1
+#define AM2_CMP_LT               2
+#define AM2_CMP_GT               3
+#define AM2_CMP_LE               4
+#define AM2_CMP_GE               5
+
+/* A pad's comparison, and what ScriptCompare takes. */
+#define AM2_PADCMP_EQ            0
+#define AM2_PADCMP_LT            1
+#define AM2_PADCMP_GT            2
+
 /* Who a `hit`, `killed`, `healed`, `pickedup` or `dropped` event is about,
  * packed into the top bits of one value by ScriptHitTarget.
  *

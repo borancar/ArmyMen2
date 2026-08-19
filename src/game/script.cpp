@@ -685,7 +685,7 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
 
     if (tok->kind == AM2_TOKEN_STRING) {
         ScriptNamedTarget(ctx, at, val);
-        *form = 0;
+        *form = AM2_ORDER_NAME;
         (*at)++;
         return 1;
     }
@@ -706,14 +706,14 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     if (!ScriptStep(ctx, at))
         return 0;
     *army = which;
-    *form = 1;
+    *form = AM2_ORDER_ARMY;
 
     tok = &ctx->tokens[*at];
     if (tok->kind == AM2_TOKEN_RESERVED &&
         (int32_t)(uintptr_t)tok->value == AM2_TOK_GROUP) {        /* group */
         if (!ScriptStep(ctx, at))
             return 0;
-        *form = 2;
+        *form = AM2_ORDER_GROUP;
         *val = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         if (!ScriptStep(ctx, at))
             return 0;
@@ -843,15 +843,15 @@ static const struct {
     const char *missing;
     const char *missing_by;
 } kScriptEvents[5] = {
-    { 57, 4, "Line [%4d]:  Expected item name after KILLED\n",
+    { AM2_TOK_KILLED,   AM2_EVT_KILLED, "Line [%4d]:  Expected item name after KILLED\n",
              "Line [%4d]:  Expected item name after KILLED ... BY\n" },
-    { 58, 5, "Line [%4d]:  Expected item name after HIT\n",
+    { AM2_TOK_HIT,      AM2_EVT_HIT, "Line [%4d]:  Expected item name after HIT\n",
              "Line [%4d]:  Expected item name after HIT ... BY\n" },
-    { 59, 6, "Line [%4d]:  Expected item name after HEALED\n",
+    { AM2_TOK_HEALED,   AM2_EVT_HEALED, "Line [%4d]:  Expected item name after HEALED\n",
              "Line [%4d]:  Expected item name after HEALED ... BY\n" },
-    { 61, 7, "Line [%4d]:  Expected item name after PICKEDUP\n",
+    { AM2_TOK_PICKEDUP, AM2_EVT_PICKEDUP, "Line [%4d]:  Expected item name after PICKEDUP\n",
              "Line [%4d]:  Expected item name after PICKEDUP ... BY\n" },
-    { 62, 8, "Line [%4d]:  Expected item name after DROPPED\n",
+    { AM2_TOK_DROPPED,  AM2_EVT_DROPPED, "Line [%4d]:  Expected item name after DROPPED\n",
              "Line [%4d]:  Expected item name after DROPPED ... BY\n" },
 };
 
@@ -899,13 +899,13 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
         int32_t id = (int32_t)(uintptr_t)tok->value;
 
         if (id == AM2_TOK_PADON) {                                 /* padon */
-            *kind = 3;
+            *kind = AM2_EVT_PADON;
             return ScriptPadEvent(ctx, at, val,
                                   "Line [%4d]:  Name required after PADON\n",
                                   "Line [%4d]:  PADON name was not a pad\n");
         }
         if (id == AM2_TOK_PADOFF) {                                 /* padoff */
-            *kind = 2;
+            *kind = AM2_EVT_PADOFF;
             return ScriptPadEvent(ctx, at, val,
                                   "Line [%4d]:  Name required after PADOFF\n",
                                   "Line [%4d]:  PADOFF name was not a pad\n");
@@ -946,7 +946,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
     }
 
     /* A bare name: the event is that object, whatever happens to it. */
-    *kind = 0;
+    *kind = AM2_EVT_NAME;
     if (tok->kind != AM2_TOKEN_STRING) {
         am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
                 ctx->tokens[*at].line,
@@ -969,17 +969,20 @@ int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
 
     if (tok->kind == AM2_TOKEN_RESERVED) {
         int32_t id = (int32_t)(uintptr_t)tok->value;
+        /* `form` doubles as the flag for "this id IS a keyword form", so
+         * zero means none and is tested as such below -- it is not
+         * AM2_VAL_LITERAL, which the fall-through path sets instead. */
         int32_t form = 0, names = 0, armies = 0;
 
         switch (id) {
-        case AM2_TOK_GETDMGLVL:     form = 2; names  = 1; break;
-        case AM2_TOK_GETHEALTH:     form = 3; names  = 1; break;
-        case AM2_TOK_GETDISGUISE:   form = 4; names  = 1; break;
-        case AM2_TOK_HASITEM:       form = 5; names  = 2; break;
-        case AM2_TOK_ISCOLORINGAME: form = 6; armies = 1; break;
-        case AM2_TOK_ISALLY:        form = 7; armies = 2; break;
-        case AM2_TOK_TEAMSCORE:     form = 8; armies = 1; break;
-        default:  form = 0; break;
+        case AM2_TOK_GETDMGLVL:     form = AM2_VAL_GETDMGLVL;    names  = 1; break;
+        case AM2_TOK_GETHEALTH:     form = AM2_VAL_GETHEALTH;    names  = 1; break;
+        case AM2_TOK_GETDISGUISE:   form = AM2_VAL_GETDISGUISE;  names  = 1; break;
+        case AM2_TOK_HASITEM:       form = AM2_VAL_HASITEM;      names  = 2; break;
+        case AM2_TOK_ISCOLORINGAME: form = AM2_VAL_ISCOLORINGAME; armies = 1; break;
+        case AM2_TOK_ISALLY:        form = AM2_VAL_ISALLY;       armies = 2; break;
+        case AM2_TOK_TEAMSCORE:     form = AM2_VAL_TEAMSCORE;    armies = 1; break;
+        default: form = 0; break;
         }
 
         if (form) {
@@ -1009,7 +1012,7 @@ int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
                 ctx->tokens[*at].line);
         return 0;
     }
-    *kind = isliteral ? 0 : 1;
+    *kind = isliteral ? AM2_VAL_LITERAL : AM2_VAL_VARIABLE;
     return 1;
 }
 
@@ -2357,11 +2360,11 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR) {
         int32_t op = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         if (op == AM2_TOK_LT)                    /* '<' */
-            pad->compare = 1;
+            pad->compare = AM2_PADCMP_LT;
         else if (op == AM2_TOK_EQ)               /* '=' */
-            pad->compare = 0;
+            pad->compare = AM2_PADCMP_EQ;
         else if (op == AM2_TOK_GT)               /* '>' */
-            pad->compare = 2;
+            pad->compare = AM2_PADCMP_GT;
         else {
             am2_log("Line [%4d]:  Unexpected symbol in pad definition "
                     "should be '<=>'\n", ctx->tokens[*at].line);
@@ -2618,12 +2621,12 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (t->kind != AM2_TOKEN_CONTROL_CHAR)
                 goto bad_operator;
             switch ((int32_t)(uintptr_t)t->value) {
-            case AM2_TOK_LT:        test.op = 2; break;         /* <  */
-            case AM2_TOK_LE:        test.op = 4; break;         /* <= */
-            case AM2_TOK_EQ:        test.op = 0; break;         /* =  */
-            case AM2_TOK_GT:        test.op = 3; break;         /* >  */
-            case AM2_TOK_GE:        test.op = 5; break;         /* >= */
-            case AM2_TOK_NE:        test.op = 1; break;         /* <> */
+            case AM2_TOK_LT:        test.op = AM2_CMP_LT; break;
+            case AM2_TOK_LE:        test.op = AM2_CMP_LE; break;
+            case AM2_TOK_EQ:        test.op = AM2_CMP_EQ; break;
+            case AM2_TOK_GT:        test.op = AM2_CMP_GT; break;
+            case AM2_TOK_GE:        test.op = AM2_CMP_GE; break;
+            case AM2_TOK_NE:        test.op = AM2_CMP_NE; break;
             default: goto bad_operator;
             }
 
@@ -2663,29 +2666,29 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED) {
         int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         if (id == AM2_TOK_RANDOM) {                         /* random */
-            cond->mode = 1;
+            cond->mode = AM2_THEN_RANDOM;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
         } else if (id == AM2_TOK_SEQUENTIAL) {                  /* sequential */
-            cond->mode = 2;
+            cond->mode = AM2_THEN_SEQUENTIAL;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
         } else if (id == AM2_TOK_ONOBJSTATE) {                  /* onobjstate */
-            cond->mode = 3;
+            cond->mode = AM2_THEN_ONOBJSTATE;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
             if (!ScriptResolveName(ctx, at, &cond->objstate, 0))
                 goto fail;
         } else {
-            cond->mode = 0;
+            cond->mode = AM2_THEN_NONE;
         }
     } else {
-        cond->mode = 0;
+        cond->mode = AM2_THEN_NONE;
     }
 
     /* ---- the action list ---- */
     for (;;) {
-        if (cond->mode == 3) {
+        if (cond->mode == AM2_THEN_ONOBJSTATE) {
             AM2_ScriptTok *t = &ctx->tokens[*at];
             if (t->kind != AM2_TOKEN_STRING)
                 goto want_string;
@@ -2700,7 +2703,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
         if (!ScriptAction(ctx, at, action))
             goto fail;
-        if (cond->mode == 3)
+        if (cond->mode == AM2_THEN_ONOBJSTATE)
             *(int32_t *)(action + 0x44) = objname;
 
         int32_t n = cond->nactions++;

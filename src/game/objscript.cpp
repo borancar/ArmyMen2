@@ -72,9 +72,9 @@ AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o)
 int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)
 {
     switch (op) {
-    case 0:  return b == a;
-    case 1:  return b < a;
-    case 2:  return b > a;
+    case AM2_PADCMP_EQ: return b == a;
+    case AM2_PADCMP_LT: return b < a;
+    case AM2_PADCMP_GT: return b > a;
     default: return 0;
     }
 }
@@ -210,7 +210,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
             return 0;
         }
 
-        target->form = 0;
+        target->form = AM2_OBJSCRIPT_OBJECT;
 
         int32_t name = 0;
         if (!ScriptResolveName(ctx, at, &name, 0))
@@ -235,7 +235,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
             return 0;
         }
 
-        target->form = 1;
+        target->form = AM2_OBJSCRIPT_CLASS;
 
         /* The index is already on the first integer -- the advance above did
          * it -- so this one is checked in place rather than through
