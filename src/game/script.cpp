@@ -767,6 +767,118 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     return 1;
 }
 
+#define kPads       ((AM2_Pad *)AM2_IMAGE(ADDR_PADS))
+#define kPadCount   (*(int32_t *)AM2_IMAGE(ADDR_PAD_COUNT))
+#define kPadNumbers ((AM2_PadNumber *)AM2_IMAGE(ADDR_PAD_NUMBERS))
+
+/* One coordinate of a location: an integer, or `refvar <name>`. */
+static int32_t ScriptCoord(AM2_ScriptCtx *ctx, int32_t *at,
+                           int16_t *lit, int32_t *var)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_INTEGER) {
+        *lit = (int16_t)(uintptr_t)tok->value;
+        return 1;
+    }
+
+    if (tok->kind != AM2_TOKEN_RESERVED ||
+        (int32_t)(uintptr_t)tok->value != 136) {        /* refvar */
+        am2_log("Line [%4d]:  '%s' found, but expected token of type Integer "
+                "or keyword 'RefVar'\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord));
+        return 0;
+    }
+
+    if (!ScriptStep(ctx, at))
+        return 0;
+
+    int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
+    if (idx == -1 || kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER) {
+        am2_log("Line [%4d]:  expected variable name but variable %s not "
+                "declared\n",
+                ctx->tokens[*at].line, ctx->tokens[*at].value);
+        return 0;
+    }
+    *var = idx;
+    return 1;
+}
+
+int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
+                               uint8_t *action, int32_t quiet)
+{
+    *(int32_t *)(action + AM2_ACT_RELATIVE) = 0;
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_CONTROL_CHAR) {
+        int32_t id = (int32_t)(uintptr_t)tok->value;
+        if (id != 1 && id != 13)        /* '(' or '+' */
+            return 0;                   /* silently, with no message */
+
+        if (id == 13) {                 /* a leading '+' means relative */
+            *(int32_t *)(action + AM2_ACT_RELATIVE) = 1;
+            if (!ScriptStep(ctx, at))
+                return 0;
+        }
+        if (!ScriptStep(ctx, at))       /* past the '(' */
+            return 0;
+
+        if (!ScriptCoord(ctx, at, (int16_t *)(action + AM2_ACT_POS),
+                         (int32_t *)(action + AM2_ACT_XVAR)))
+            return 0;
+        if (!ScriptStep(ctx, at))
+            return 0;
+
+        tok = &ctx->tokens[*at];
+        if (tok->kind != AM2_TOKEN_CONTROL_CHAR ||
+            (int32_t)(uintptr_t)tok->value != 3) {      /* ',' */
+            am2_log("Line [%4d]:  Comma expected in coordinates\n",
+                    ctx->tokens[*at].line);
+            return 0;
+        }
+        if (!ScriptStep(ctx, at))
+            return 0;
+
+        if (!ScriptCoord(ctx, at, (int16_t *)(action + AM2_ACT_POS + 2),
+                         (int32_t *)(action + AM2_ACT_YVAR)))
+            return 0;
+        if (!ScriptStep(ctx, at))
+            return 0;
+
+        tok = &ctx->tokens[*at];
+        if (tok->kind == AM2_TOKEN_CONTROL_CHAR &&
+            (int32_t)(uintptr_t)tok->value == 2) {      /* ')' */
+            (*at)++;
+            return 1;
+        }
+        am2_log("Line [%4d]:  Close parens expected in coordinates\n",
+                ctx->tokens[*at].line);
+        return 0;
+    }
+
+    if (tok->kind == AM2_TOKEN_STRING) {
+        int32_t idx = ScriptFindName((const char *)tok->value);
+        if (idx >= 0 && kScriptNames[idx].type == 1) {          /* a pad */
+            int32_t number = kPads[kScriptNames[idx].value].number;
+            /* Both centroid words at once, exactly as the original. */
+            *(int32_t *)(action + AM2_ACT_POS) =
+                *(const int32_t *)&kPadNumbers[number].cx;
+
+            am2_free(ctx->tokens[*at].value);
+            ctx->tokens[*at].kind = 7;
+            ctx->tokens[*at].value = (void *)(uintptr_t)idx;
+            (*at)++;
+            return 1;
+        }
+        /* Not a pad -- fall through, and the name is resolved below. */
+    }
+
+    return ScriptResolveName(ctx, at, (int32_t *)(action + AM2_ACT_NAME),
+                             quiet) != 0;
+}
+
 /* The five `<verb> <target> [by <target>]` events, which differ only in the
  * kind they record and the two messages they print. */
 static const struct {
@@ -1265,10 +1377,6 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
     }
     return 1;
 }
-
-#define kPads       ((AM2_Pad *)AM2_IMAGE(ADDR_PADS))
-#define kPadCount   (*(int32_t *)AM2_IMAGE(ADDR_PAD_COUNT))
-#define kPadNumbers ((AM2_PadNumber *)AM2_IMAGE(ADDR_PAD_NUMBERS))
 
 /* The trigger keyword each Reserved id contributes, for ids 16..42. Zero ends
  * the run -- the loop stops at the first word it does not recognise and leaves
@@ -2045,6 +2153,8 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_PARSE_EVENT,
                         (const void *)ScriptParseEvent,
                         "ScriptParseEvent", 1);
+    rc |= patch_replace(ADDR_SCRIPT_LOCATION,
+                        (const void *)ScriptLocation, "ScriptLocation", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);

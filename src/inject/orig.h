@@ -964,6 +964,14 @@
 #define ADDR_SCRIPT_SCAN_FOR      0x00442F10u  /* int32_t(ctx,from,want,stop) */
 #define ADDR_SCRIPT_PARSE_EVENT   0x0043FF90u  /* (ctx,at,&a,&b,&c) */
 #define ADDR_SCRIPT_HIT_TARGET    0x0043FAB0u  /* (ctx,at,&mask) */
+#define ADDR_SCRIPT_LOCATION      0x004409F0u  /* (ctx,at,action,quiet) */
+
+/* Offsets into the 0x48-byte action record that ScriptLocation writes. */
+#define AM2_ACT_NAME              0x1Cu
+#define AM2_ACT_POS               0x20u   /* two words, or a pad centroid */
+#define AM2_ACT_RELATIVE          0x24u
+#define AM2_ACT_XVAR              0x28u
+#define AM2_ACT_YVAR              0x2Cu
 #define ADDR_SCRIPT_ORDER_TARGET  0x0043FCF0u  /* (ctx,at,&form,&val,&army) */
 #define ADDR_SCRIPT_PARSE_EVENTS  0x00440600u  /* (ctx,at,cond) */
 

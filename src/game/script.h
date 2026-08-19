@@ -311,6 +311,19 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
 int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
                                  int32_t *kind, int32_t *val, int32_t *val2);
 
+/* 0x004409F0. Where an action happens, written into the action record.
+ *
+ * Three forms. `( <x> , <y> )` writes the pair at +0x20, and a leading `+`
+ * makes it relative, recorded at +0x24; either coordinate may be
+ * `refvar <name>` instead, which stores the variable's name index at +0x28 or
+ * +0x2C and leaves the literal alone. A pad name resolves to that pad
+ * number's centroid, straight into +0x20 as one dword, and rewrites the token
+ * to kind 7. Anything else falls through to ScriptResolveName at +0x1C.
+ *
+ * `quiet` is passed on to ScriptResolveName and reaches nothing else. */
+int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
+                               uint8_t *action, int32_t quiet);
+
 /* 0x00442F10. Does `want` appear before `stop`, scanning from `from`? */
 int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
                               int32_t want, int32_t stop);
