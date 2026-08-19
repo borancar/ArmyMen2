@@ -63,6 +63,11 @@ DATA_LO, DATA_HI = 0x00473000, 0x00667000
 RDATA_LO, RDATA_HI = 0x0046F000, 0x00473000
 PTR_SYMBOLIC = 16          # bytes made symbolic behind each pointer argument
 NVECTORS = 64
+# Coverage alone is not enough to call a function checked. 0x00429F20 measured
+# 100% on ONE surviving vector, because it walks a linked list and every
+# generated pointer graph but one faulted. One vector cannot distinguish a
+# reconstruction from a coincidence, so a function needs both.
+MIN_VECTORS = 8
 REG = r"e(?:ax|bx|cx|dx|si|di)"
 
 
@@ -483,7 +488,13 @@ def pure_leaves(img, md, sizes):
         thiscall = False
         for i in body:
             op = i.op_str
-            if not loaded_ecx and re.search(r"\[ecx", op):
+            # ecx ANYWHERE inside a memory operand, not just at its start.
+            # 0x0040F600 indexes `[edx + ecx + 0x20C]`, so a pattern anchored
+            # to "[ecx" missed it and four thiscall methods were classified
+            # pure. The emulator then ran them with a garbage ecx, nearly every
+            # vector faulted, and the one or two survivors still measured 100%
+            # coverage -- a reconstruction could have passed on two vectors.
+            if not loaded_ecx and re.search(r"\[[^\]]*\becx\b[^\]]*\]", op):
                 thiscall = True
             if re.match(r"ecx\s*,", op) and i.mnemonic in ("mov", "lea", "xor",
                                                            "pop", "movsx", "movzx"):
@@ -556,8 +567,10 @@ def main():
                 continue
             ok += 1
             hit = len(body & emu.seen)
-            if body and hit == len(body):
+            if body and hit == len(body) and len(vs) >= MIN_VECTORS:
                 full += 1
+            elif body and hit == len(body):
+                short.append((a, size, 100.0, len(vs)))
             elif body:
                 short.append((a, size, 100.0 * hit / len(body), len(body) - hit))
         print("  vectors generated for %d, none for %d" % (ok, nover))
@@ -566,8 +579,10 @@ def main():
         if short:
             print("\n  short of full coverage -- these need better inputs before"
                   "\n  a reconstruction of them can be called checked:\n")
-            for a, size, pct, miss in sorted(short, key=lambda r: r[2])[:20]:
-                print("    0x%08x %5dB  %5.1f%%  %d unreached" % (a, size, pct, miss))
+            for a, size, pct, miss in sorted(short, key=lambda r: r[2])[:24]:
+                what = ("only %d vectors" % miss) if pct >= 99.99 \
+                       else ("%d unreached" % miss)
+                print("    0x%08x %5dB  %5.1f%%  %s" % (a, size, pct, what))
         return 0
 
     # The list is edited by hand as functions are ported, so it acquires
@@ -653,9 +668,13 @@ def main():
         hit = len(body & emu.seen)
         cov = 100.0 * hit / len(body) if body else 0.0
         ks = ",".join(kinds.get(i, "-")[0] for i in range(nargs))
+        note = ""
+        if cov < 99.99:
+            note = "<-- %d unreached" % (len(body) - hit)
+        elif len(vs) < MIN_VECTORS:
+            note = "<-- only %d vectors: too thin to check against" % len(vs)
         print("  %-24s 0x%08x %4d %-14s %5d %5d  %5.1f%% %s"
-              % (nm, addr, nargs, ks, len(vs), len(paths), cov,
-                 "" if cov >= 99.99 else "<-- %d unreached" % (len(body) - hit)))
+              % (nm, addr, nargs, ks, len(vs), len(paths), cov, note))
         if emit and nm in PURE:
             out.append((PURE[nm], nargs, kinds, vs))
 
