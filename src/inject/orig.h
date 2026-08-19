@@ -853,6 +853,24 @@
 #define ADDR_SCRIPT_FREE_TOKEN   0x0043F000u  /* void(token *) */
 #define ADDR_SCRIPT_GROW_TOKENS  0x0043F340u  /* void(ctx *) */
 #define ADDR_SCRIPT_PARSE_NUMBER 0x0043EF70u  /* int32_t(const char *, int32_t *, float *) */
+#define ADDR_SCRIPT_TOKEN_NAME   0x0043EF40u  /* const char *(int32_t id) */
+#define ADDR_SCRIPT_FIND_NAME    0x0043F670u  /* int32_t(const char *) */
+#define ADDR_SCRIPT_TOKEN_TEXT   0x00444A90u  /* char *(tok *, char *out) */
+#define ADDR_SCRIPT_IS_STMT      0x00444B80u  /* int32_t(ctx *, int32_t *at) */
+
+/* The script's name table -- declared variables and objects. Sixteen bytes an
+ * entry, the first field a `char *`. Written at runtime, so the offline test
+ * cannot reach it; only the in-process check can. */
+#define ADDR_SCRIPT_NAME_COUNT   0x00656464u
+#define ADDR_SCRIPT_NAMES        0x00656468u
+#define AM2_SCRIPT_NAME_SIZE     0x10u
+
+/* Non-zero suppresses ReadScript's closing summary. */
+#define ADDR_SCRIPT_QUIET        0x00511DA0u
+
+/* A `char *` to the string "unknown", parked immediately after the keyword
+ * table -- it points at 0x0048825C, which is the table's own end address. */
+#define ADDR_SCRIPT_UNKNOWN_STR  0x00488258u
 
 /* The game's own statically linked MSVC CRT. Blocks cross between our code and
  * the original's, so the allocator has to be the same one; see game/crt.h. */

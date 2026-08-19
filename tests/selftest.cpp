@@ -47,6 +47,7 @@ static void FillScratch(void)
 
 static int ScriptTokens(int *passed);
 static int ScriptLines(int *passed);
+static int ScriptSpine(int *passed);
 
 int main(void)
 {
@@ -106,7 +107,78 @@ int main(void)
 
     fail += ScriptTokens(&pass);
     fail += ScriptLines(&pass);
+    fail += ScriptSpine(&pass);
     return fail ? 1 : 0;
+}
+
+/* The layer above the tokeniser: ScriptTokenName, ScriptTokenText and
+ * ScriptIsStatementStart, all of which are table walks over the image.
+ *
+ * ScriptTokenText's kind-4 arm is absent from the corpus: "%6.2f" formats
+ * through the MSVC CRT and does not emulate, so there is no recorded answer to
+ * compare against. That one arm is verified by reading.
+ */
+static int ScriptSpine(int *passed)
+{
+    int pass = 0, fail = 0;
+    char out[0x100];
+
+    for (uint32_t i = 0; i < sizeof am2_script_names /
+                             sizeof am2_script_names[0]; i++) {
+        const AM2_ScriptVec *v = &am2_script_names[i];
+        const char *got = ScriptTokenName(v->id);
+        int bad = v->word ? (!got || strcmp(got, v->word)) : (got != 0);
+        if (bad) {
+            if (fail < 4)
+                printf("  FAIL ScriptTokenName(%d) -> %s, want %s\n",
+                       v->id, got ? got : "(null)",
+                       v->word ? v->word : "(null)");
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+
+    for (uint32_t i = 0; i < sizeof am2_script_stmt /
+                             sizeof am2_script_stmt[0]; i++) {
+        AM2_ScriptTok tok = { AM2_TOKEN_RESERVED, 0, 0 };
+        AM2_ScriptCtx ctx = { 0, 1, &tok };
+        int32_t at = 0;
+        tok.value = (void *)(uintptr_t)i;
+        int32_t got = ScriptIsStatementStart(&ctx, &at);
+        if (got != am2_script_stmt[i].id) {
+            if (fail < 8)
+                printf("  FAIL ScriptIsStatementStart(%u) -> %d, want %d\n",
+                       i, (int)got, (int)am2_script_stmt[i].id);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+
+    for (uint32_t i = 0; i < sizeof am2_script_text /
+                             sizeof am2_script_text[0]; i++) {
+        const AM2_ScriptTextVec *v = &am2_script_text[i];
+        AM2_ScriptTok tok;
+        tok.kind = v->kind;
+        tok.line = 7;
+        tok.value = v->text ? (void *)v->text
+                            : (void *)(uintptr_t)v->value;
+        memset(out, 0, sizeof out);
+        ScriptTokenText(&tok, out);
+        if (strcmp(out, v->want)) {
+            if (fail < 8)
+                printf("  FAIL ScriptTokenText(kind %d) -> \"%s\", want \"%s\"\n",
+                       (int)v->kind, out, v->want);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+
+    printf("  %d spine cases: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
 }
 
 /* The tokeniser over every distinct line the game ships.

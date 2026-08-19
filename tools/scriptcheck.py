@@ -26,6 +26,10 @@ GAME_DIR = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), ".wine/drive_c/GOG Games/Army Men II")
 ADDR_LOOKUP_TOKEN = 0x0043EEE0
 ADDR_NEXT_TOKEN = 0x0043F450
+ADDR_TOKEN_NAME = 0x0043EF40
+ADDR_TOKEN_TEXT = 0x00444A90
+ADDR_IS_STMT = 0x00444B80
+TOK_AT, OUT_AT, STR_AT = 0x100, 0x200, 0x400
 ADDR_ADD_TOKEN = 0x0043F370
 LINE_AT = 0x1000          # where the line under test goes, inside SCRATCH
 CTX_AT = 0x0800           # a dummy context; AddToken never runs, so it is
@@ -154,6 +158,27 @@ def token_stream(emu, line, lineno):
     return None if eax is None else out
 
 
+def token_text(emu, kind, value, text):
+    """What the ORIGINAL ScriptTokenText renders for one token.
+
+    Kind 4 is not emulable: it formats through the MSVC CRT's "%6.2f", which
+    needs more of the runtime than the mapped image provides, and returns a
+    fault every time. Callers skip it -- that arm stays verified by reading.
+    """
+    buf = bytearray(SCRATCH_PATTERN[:SCRATCH_SZ])
+    if text is not None:
+        buf[STR_AT:STR_AT + len(text) + 1] = text + b"\0"
+        value = SCRATCH + STR_AT
+    struct.pack_into("<iiI", buf, TOK_AT, kind, 7, value & 0xFFFFFFFF)
+    buf[OUT_AT:OUT_AT + 0x100] = b"\0" * 0x100
+    eax, mem = emu.call(ADDR_TOKEN_TEXT, [SCRATCH + TOK_AT, SCRATCH + OUT_AT],
+                        bytes(buf), count=2000000)
+    if eax is None:
+        return None
+    out = mem[OUT_AT:OUT_AT + 0x100]
+    return out[:out.index(b"\0")]
+
+
 def script_lines():
     """Distinct lines from the shipped scripts, with a line number.
 
@@ -235,9 +260,77 @@ def main():
                      % (cstr(line), lineno, at, count))
         fh.write("};\n")
 
-    print("-> %s  (%d words, %d keywords, %d files; %d lines, %d tokens)"
+    # ScriptTokenText and ScriptIsStatementStart, over every distinct token
+    # the corpus produces plus the kinds it never produces.
+    distinct = {}
+    for kind, _ln, val in toks:
+        if kind == 4:
+            continue        # not emulable; see token_text
+        key = (kind, val if not isinstance(val, bytes) else None,
+               val if isinstance(val, bytes) else None)
+        distinct.setdefault(key, True)
+    for kind in (0, 6):
+        distinct.setdefault((kind, 0, None), True)
+
+    rendered = []
+    for kind, val, text in sorted(distinct, key=lambda k: (k[0], k[2] or b"",
+                                                           k[1] or 0)):
+        got = token_text(emu, kind, val or 0, text)
+        if got is None:
+            sys.exit("token_text failed on kind %d %r" % (kind, text or val))
+        rendered.append((kind, val or 0, text, got))
+
+    names = []
+    for i in range(-2, 200):
+        eax, _m = emu.call(ADDR_TOKEN_NAME, [i & 0xFFFFFFFF],
+                           SCRATCH_PATTERN[:SCRATCH_SZ])
+        if eax is None:
+            sys.exit("ScriptTokenName failed on %d" % i)
+        names.append((i, am2.Image().cstring(eax) if eax else None))
+
+    stmts = []
+    for tid in range(0, 200):
+        buf = bytearray(SCRATCH_PATTERN[:SCRATCH_SZ])
+        struct.pack_into("<iiI", buf, TOK_AT, 2, 0, tid)      # kind 2
+        struct.pack_into("<iii", buf, 0x80, 0, 1, SCRATCH + TOK_AT)  # ctx
+        struct.pack_into("<i", buf, 0x90, 0)                  # at = 0
+        eax, _m = emu.call(ADDR_IS_STMT, [SCRATCH + 0x80, SCRATCH + 0x90],
+                           bytes(buf))
+        if eax is None:
+            sys.exit("ScriptIsStatementStart failed on %d" % tid)
+        stmts.append((tid, eax))
+
+    with open(OUT, "a") as fh:
+        fh.write("\n/* ScriptTokenText over every distinct token the corpus\n"
+                 " * produces. Kind 4 is absent: its \"%6.2f\" goes through the\n"
+                 " * MSVC CRT and does not emulate. */\n")
+        fh.write("typedef struct { int32_t kind; uint32_t value;\n"
+                 "                 const char *text; const char *want; }\n"
+                 "        AM2_ScriptTextVec;\n\n")
+        fh.write("static const AM2_ScriptTextVec am2_script_text[] = {\n")
+        for kind, val, text, got in rendered:
+            fh.write('    { %d, 0x%08Xu, %s, "%s" },\n'
+                     % (kind, val & 0xFFFFFFFF,
+                        ('"%s"' % cstr(text)) if text is not None else "0",
+                        cstr(got)))
+        fh.write("};\n\n")
+        fh.write("/* ScriptTokenName for every id, including two below zero\n"
+                 " * and everything past the end of the table. */\n")
+        fh.write("static const AM2_ScriptVec am2_script_names[] = {\n")
+        for i, nm in names:
+            fh.write('    { %s, %d },\n'
+                     % (('"%s"' % cstr(nm.encode())) if nm else "0", i))
+        fh.write("};\n\n")
+        fh.write("/* ScriptIsStatementStart over every id. */\n")
+        fh.write("static const AM2_ScriptVec am2_script_stmt[] = {\n")
+        for tid, yes in stmts:
+            fh.write("    { 0, %d },   /* %d */\n" % (yes, tid))
+        fh.write("};\n")
+
+    print("-> %s  (%d words, %d keywords, %d files; %d lines, %d tokens; "
+          "%d rendered)"
           % (os.path.relpath(OUT), len(rows), named, len(script_files()),
-             len(lines), len(toks)))
+             len(lines), len(toks), len(rendered)))
 
 
 if __name__ == "__main__":

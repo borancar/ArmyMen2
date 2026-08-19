@@ -90,6 +90,53 @@ int32_t __cdecl ScriptParseNumber(const char *text, int32_t *ival, float *fval);
 void __cdecl ScriptNextToken(const char *line, AM2_ScriptCtx *ctx,
                              int32_t lineno);
 
+/* A declared name -- a script variable or object. Sixteen bytes; only the
+ * first field is established, and the rest is whatever ScriptDeclareVar
+ * (0x0043F7A0) writes. Named opaquely rather than guessed at. */
+typedef struct {
+    const char *name;
+    uint8_t     rest[12];
+} AM2_ScriptName;
+
+/* 0x0043EF40. The keyword whose id this is, or NULL. The reverse of
+ * ScriptLookupToken, over the same table and just as linear. */
+const char *__cdecl ScriptTokenName(int32_t id);
+
+/* 0x0043F670. The index of a declared name, or -1. */
+int32_t __cdecl ScriptFindName(const char *name);
+
+/* 0x00444A90. Render one token as text into `out`, which it returns.
+ *
+ * Eight arms for seven kinds. Kind 0 gives "unknown", 1 and 2 the keyword's
+ * own spelling, 3 "%d", 4 "%6.2f", 5 the string itself, and 7 the entry in the
+ * name table that the value indexes. Kind 6 -- the one the kind table actually
+ * calls `Name` -- writes NOTHING, sharing its arm with the out-of-range case.
+ *
+ * So the renderer disagrees with the kind table by one: there is no name for
+ * kind 7 (index 7 of the array at 0x00487C74 is the keyword table's first
+ * entry, `(`), yet 7 is the arm that resolves a name. Neither kind is emitted
+ * by NextToken, so both are produced by a later pass, and which is which is
+ * not established here. Recorded rather than tidied. */
+char *__cdecl ScriptTokenText(const AM2_ScriptTok *tok, char *out);
+
+/* 0x00444B80. Does the token at *at begin a top-level statement?
+ *
+ * A byte table over ids 0x19..0x8C, and it answers yes for exactly the six
+ * that ReadScript dispatches on: preloadsprite, pad, if, variable, object and
+ * objclass. The handlers use it to find where their own statement ends. */
+int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
+                                       const int32_t *at);
+
+/* 0x00444CD0. Read a script file, tokenise every line, then interpret.
+ *
+ * Two passes over one context: the whole file is tokenised first, then the
+ * token list is walked and each statement handed to its handler. Returns 0 if
+ * the file could not be opened.
+ *
+ * Tokens already in the context are left alone -- the walk starts at the count
+ * on entry -- so a caller can accumulate several files into one list. */
+int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx);
+
 int script_install(void);
 
 #ifdef __cplusplus

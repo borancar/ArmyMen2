@@ -1,6 +1,7 @@
 /* script.cpp -- see script.h. */
 #include <stdint.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -254,6 +255,201 @@ void __cdecl ScriptNextToken(const char *line, AM2_ScriptCtx *ctx,
     } while (line[at] != 0);
 }
 
+const char *__cdecl ScriptTokenName(int32_t id)
+{
+    const AM2_ScriptToken *e;
+
+    for (e = kScriptTokens; e < kScriptTokenEnd; e++)
+        if (e->id == id)
+            return (const char *)AM2_IMAGE(e->name);
+
+    return 0;
+}
+
+#define kScriptNameCount (*(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
+#define kScriptNames     (*(AM2_ScriptName **)AM2_IMAGE(ADDR_SCRIPT_NAMES))
+
+int32_t __cdecl ScriptFindName(const char *name)
+{
+    int32_t n = kScriptNameCount;
+
+    for (int32_t i = 0; i < n; i++) {
+        const char *a = kScriptNames[i].name;
+        const char *b = name;
+
+        while (*a && *a == *b) {
+            a++;
+            b++;
+        }
+        if (*a == *b)
+            return i;
+    }
+    return -1;
+}
+
+char *__cdecl ScriptTokenText(const AM2_ScriptTok *tok, char *out)
+{
+    const char *src;
+
+    switch (tok->kind) {
+    case AM2_TOKEN_UNKNOWN:
+        /* A `char *` stored in the image, pointing at the string just past the
+         * keyword table -- so BOTH the slot and the pointer it holds are image
+         * addresses and both need the slide. Sliding only the slot reads the
+         * right pointer and then follows it into whatever the test process has
+         * at 0x0048825C, which came back as leftover script text rather than
+         * as a fault. Any pointer stored IN the image needs AM2_IMAGE twice. */
+        src = (const char *)AM2_IMAGE(
+            *(const uint32_t *)AM2_IMAGE(ADDR_SCRIPT_UNKNOWN_STR));
+        break;
+
+    case AM2_TOKEN_CONTROL_CHAR:
+    case AM2_TOKEN_RESERVED:
+        src = ScriptTokenName((int32_t)(uintptr_t)tok->value);
+        break;
+
+    case AM2_TOKEN_INTEGER:
+        sprintf(out, "%d", (int32_t)(uintptr_t)tok->value);
+        return out;
+
+    case AM2_TOKEN_FLOAT: {
+        /* The value field holds the float's bits, not a pointer to them. */
+        float f;
+        memcpy(&f, &tok->value, sizeof f);
+        sprintf(out, "%6.2f", (double)f);
+        return out;
+    }
+
+    case AM2_TOKEN_STRING:
+        src = (const char *)tok->value;
+        break;
+
+    case 7:
+        src = kScriptNames[(uintptr_t)tok->value].name;
+        break;
+
+    default:
+        /* Kind 6, and anything above 7, leave `out` untouched. */
+        return out;
+    }
+
+    strcpy(out, src);
+    return out;
+}
+
+int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
+                                       const int32_t *at)
+{
+    const AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind != AM2_TOKEN_RESERVED)
+        return 0;
+
+    switch ((int32_t)(uintptr_t)tok->value) {
+    case 25:            /* preloadsprite */
+    case 26:            /* pad */
+    case 44:            /* if */
+    case 133:           /* variable */
+    case 139:           /* object */
+    case 140:           /* objclass */
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/* The five statement handlers are still the original's. Each takes the context
+ * and a pointer to the walk index, which it advances past its own statement --
+ * so ReadScript's loop makes no assumption about statement length. They are
+ * reached by address because they are not reconstructed; nothing else about
+ * this function has to wait for them. */
+typedef void (__cdecl *am2_script_handler)(AM2_ScriptCtx *, int32_t *);
+typedef int32_t (__cdecl *am2_script_if_handler)(AM2_ScriptCtx *, int32_t *);
+
+int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
+{
+    char line[0x100];
+    int32_t ok = 1;
+
+    FILE *fh = fopen(path, "rt");
+    if (!fh) {
+        am2_log("ReadScript: Could not open %s for reading.\n", path);
+        ok = 0;
+    }
+
+    int32_t lines = 0;
+    int32_t at = ctx->count;    /* resume past whatever is already parsed */
+
+    if (ok) {
+        while (!feof(fh) && fgets(line, sizeof line, fh)) {
+            ScriptNextToken(line, ctx, lines);
+            lines++;
+        }
+        fclose(fh);
+    }
+
+    /* Second pass: walk the tokens and dispatch each statement. */
+    int32_t compounds = 0;
+    int32_t reported = -1;      /* the last line an error was reported for */
+
+    while (at < ctx->count) {
+        AM2_ScriptTok *tok = &ctx->tokens[at];
+
+        if (tok->kind == AM2_TOKEN_RESERVED) {
+            int32_t id = (int32_t)(uintptr_t)tok->value;
+
+            if (id == 25) {
+                ((am2_script_handler)(uintptr_t)
+                     ADDR_SCRIPT_PRELOADSPRITE)(ctx, &at);
+                continue;
+            }
+            if (id == 26) {
+                ((am2_script_handler)(uintptr_t)ADDR_SCRIPT_PAD)(ctx, &at);
+                continue;
+            }
+            if (id == 133) {
+                ((am2_script_handler)(uintptr_t)
+                     ADDR_SCRIPT_VARIABLE)(ctx, &at);
+                continue;
+            }
+            if (id == 44) {
+                if (((am2_script_if_handler)(uintptr_t)
+                         ADDR_SCRIPT_IF)(ctx, &at) == 1)
+                    compounds++;
+                continue;
+            }
+            /* `object` and `objclass` share a handler. */
+            if (id == 139 || id == 140) {
+                ((am2_script_handler)(uintptr_t)ADDR_SCRIPT_OBJECT)(ctx, &at);
+                continue;
+            }
+        }
+
+        /* Not a statement. Report once per line, not once per token -- a line
+         * of six unknown words would otherwise give six identical messages. */
+        if (tok->line > reported) {
+            am2_log("Line [%4d]: Unknown Initial Word: %s\n",
+                    tok->line, ScriptTokenText(tok, kScriptWord));
+            reported = ctx->tokens[at].line;
+        }
+        at++;
+    }
+
+    if (*(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_QUIET) == 0) {
+        /* The token count comes from the GLOBAL context, not the one passed
+         * in. They are the same object for every caller in the image, but the
+         * original reads the global and so does this. */
+        const AM2_ScriptCtx *g =
+            (const AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT);
+        am2_log("lines: %d  tokens: %d  names: %d  compounds: %d\n",
+                lines, g->count, kScriptNameCount, compounds);
+        am2_log("Finished Processing Script... "
+                "Press SPACE to continue.\n");
+    }
+
+    return ok;
+}
+
 int script_install(void)
 {
     int rc = 0;
@@ -283,5 +479,20 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_NEXT_TOKEN,
                         (const void *)ScriptNextToken,
                         "ScriptNextToken", 1);
+    rc |= patch_replace(ADDR_SCRIPT_TOKEN_NAME,
+                        (const void *)ScriptTokenName,
+                        "ScriptTokenName", 1);
+    rc |= patch_replace(ADDR_SCRIPT_FIND_NAME,
+                        (const void *)ScriptFindName,
+                        "ScriptFindName", 1);
+    rc |= patch_replace(ADDR_SCRIPT_TOKEN_TEXT,
+                        (const void *)ScriptTokenText,
+                        "ScriptTokenText", 1);
+    rc |= patch_replace(ADDR_SCRIPT_IS_STMT,
+                        (const void *)ScriptIsStatementStart,
+                        "ScriptIsStatementStart", 1);
+    rc |= patch_replace(ADDR_SCRIPT_PARSE_FILE,
+                        (const void *)ReadScript,
+                        "ReadScript", 1);
     return rc;
 }
