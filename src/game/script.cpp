@@ -313,7 +313,7 @@ int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid)
     size_t len = strlen(name) + 1;
     e->name = (char *)am2_malloc(len);
     memcpy(e->name, name, len);
-    e->live = 1;
+    e->refs = 1;
     e->type = type;
 
     switch (type) {
@@ -491,18 +491,375 @@ int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
     return 1;
 }
 
-/* The record ADDR_SCRIPT_OBJ_TARGET hands back. The first field selects the
- * form; the second is a name index for `object` and a pair of 16-bit class
- * fields for `objclass`, which overlap it. Written as a union because that is
- * what the original does -- a dword store on one path and two word stores on
- * the other, to the same offset. */
-typedef struct {
-    int32_t form;               /* 0 = object, 1 = objclass */
-    union {
-        int32_t  name;          /* +4, the name-table index */
-        uint16_t cls[2];        /* +4 and +6 */
-    } u;
-} AM2_ScriptObjTarget;
+/* ------------------------------------------------- object script ---- */
+
+#define kObjScripts (*(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS))
+
+/* The record the current statement is filling. NewObjScript has already
+ * incremented the count, so the one being built is the last. */
+static AM2_ObjScript *ScriptCurrentObj(void)
+{
+    return &kObjScripts[*(const int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT)
+                        - 1];
+}
+
+uint8_t *__cdecl ObjFrameNewAction(AM2_ObjFrame *f)
+{
+    if (f->actioncap <= f->actioncount) {
+        int32_t cap = f->actioncap + 5;
+        f->actions = (uint8_t *)am2_realloc(f->actions, (size_t)cap * 0x48);
+        memset(f->actions + (size_t)f->actioncount * 0x48, 0, 5 * 0x48);
+        f->actioncap = cap;
+    }
+    uint8_t *p = f->actions + (size_t)f->actioncount * 0x48;
+    f->actioncount++;
+    return p;
+}
+
+AM2_ObjFrame *__cdecl ObjStateNewFrame(AM2_ObjState *s)
+{
+    if (s->framecap <= s->framecount) {
+        int32_t cap = s->framecap + 10;
+        s->frames = (AM2_ObjFrame *)am2_realloc(
+            s->frames, (size_t)cap * sizeof(AM2_ObjFrame));
+        memset(&s->frames[s->framecount], 0, 10 * sizeof(AM2_ObjFrame));
+        s->framecap = cap;
+    }
+    AM2_ObjFrame *p = &s->frames[s->framecount];
+    s->framecount++;
+    return p;
+}
+
+AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o)
+{
+    if (o->statecap <= o->statecount) {
+        int32_t cap = o->statecap + 5;
+        o->states = (AM2_ObjState *)am2_realloc(
+            o->states, (size_t)cap * sizeof(AM2_ObjState));
+        memset(&o->states[o->statecount], 0, 5 * sizeof(AM2_ObjState));
+        o->statecap = cap;
+    }
+    AM2_ObjState *p = &o->states[o->statecount];
+    o->statecount++;
+    return p;
+}
+
+typedef int32_t (__cdecl *am2_parse3_fn)(AM2_ScriptCtx *, int32_t *,
+                                         int32_t *, int32_t *, int32_t *);
+
+static void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
+{
+    int32_t n = c->nevents++;
+    c->events = (AM2_ScriptEvent *)am2_realloc(
+        c->events, (size_t)c->nevents * sizeof(AM2_ScriptEvent));
+    c->events[n].a = a;
+    c->events[n].b = b;
+    c->events[n].c = d;
+    c->events[n].d = 0;
+}
+
+int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
+                                  int32_t *out, int32_t quiet)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_RESERVED) {
+        uint32_t g = 0;
+        switch ((int32_t)(uintptr_t)tok->value) {
+        case 15: g = ADDR_SVAR_ID15;  break;   /* no keyword maps here */
+        case 16: g = ADDR_SVAR_GREEN; break;
+        case 17: g = ADDR_SVAR_TAN;   break;
+        case 18: g = ADDR_SVAR_BLUE;  break;
+        case 19: g = ADDR_SVAR_GREY;  break;
+        case 20: g = ADDR_SVAR_ME;    break;
+        default:
+            if (!quiet)
+                am2_log("Line [%4d]:  Unexpected use of reserved word\n",
+                        ctx->tokens[*at].line,
+                        ScriptTokenText(tok, kScriptWord));
+            return 0;
+        }
+        *out = *(const int32_t *)AM2_IMAGE(g);
+        (*at)++;
+        return 1;
+    }
+
+    if (tok->kind != AM2_TOKEN_STRING) {
+        if (quiet)
+            return 0;
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_STRING));
+        return 0;
+    }
+
+    int32_t idx = ScriptFindName((const char *)tok->value);
+    *out = idx;
+
+    if (idx >= 0) {
+        int32_t type = kScriptNames[idx].type;
+        if (type != 2 && type != AM2_NAME_TYPE_INTEGER) {
+            am2_log("Line [%4d]:  Name '%s' already used for another type.\n",
+                    ctx->tokens[*at].line,
+                    ScriptTokenText(tok, kScriptWord));
+            return 0;
+        }
+    } else {
+        *out = AddNameTableName((const char *)ctx->tokens[*at].value, 2, 0);
+    }
+
+    /* Either way the token becomes a kind-7 reference and gives up its
+     * string -- including when the name already existed. */
+    am2_free(ctx->tokens[*at].value);
+    ctx->tokens[*at].kind = 7;
+    ctx->tokens[*at].value = (void *)(uintptr_t)*out;
+    (*at)++;
+    return 1;
+}
+
+int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
+                                  AM2_ScriptCond *cond)
+{
+    for (;;) {
+        int32_t k = ctx->tokens[*at].kind;
+        if (k != AM2_TOKEN_STRING && k != AM2_TOKEN_RESERVED)
+            return 1;
+
+        int32_t a = 0, b = 0, c = 0;
+        if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_EVENT)(
+                ctx, at, &a, &b, &c))
+            return 0;                   /* silent -- the callee has spoken */
+        ScriptAddEvent(cond, a, b, c);
+
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+
+        AM2_ScriptTok *t = &ctx->tokens[*at];
+        if (t->kind != AM2_TOKEN_RESERVED)
+            continue;
+        int32_t id = (int32_t)(uintptr_t)t->value;
+        if (id == 45 || id == 47 || id == 14)   /* then, butnot, testvar */
+            return 1;
+    }
+}
+
+int32_t __cdecl ScriptNameUid(const char *name)
+{
+    int32_t n = kScriptNameCount;
+
+    for (int32_t i = 0; i < n; i++) {
+        const char *a = kScriptNames[i].name;
+        const char *b = name;
+        while (*a && *a == *b) {
+            a++;
+            b++;
+        }
+        if (*a != *b)
+            continue;
+
+        if (kScriptNames[i].type != AM2_NAME_TYPE_OBJECT) {
+            am2_log("Duplicate name '%s' used for different types\n",
+                    kScriptNames[i].name);
+            return 0;
+        }
+        kScriptNames[i].refs++;
+        return kScriptNames[i].value;
+    }
+
+    /* Declaring it fresh does NOT bump the count -- it is left at the 1 that
+     * AddNameTableName writes. */
+    return kScriptNames[AddNameTableName(name, AM2_NAME_TYPE_OBJECT, 0)].value;
+}
+
+int32_t __cdecl ScriptIntOrVar(AM2_ScriptCtx *ctx, int32_t *at,
+                               int32_t *value, int32_t *isliteral)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_INTEGER) {
+        *value = (int32_t)(uintptr_t)tok->value;
+        *isliteral = 1;
+        (*at)++;
+        return 1;
+    }
+    if (tok->kind != AM2_TOKEN_STRING)
+        return 0;
+
+    int32_t idx = ScriptFindName((const char *)tok->value);
+    if (idx < 0)
+        return 0;
+    if (kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER)
+        return 0;
+
+    *value = idx;
+    *isliteral = 0;
+    (*at)++;
+    return 1;
+}
+
+int32_t __cdecl ScriptObjectUid(AM2_ScriptCtx *ctx, int32_t *at,
+                                int32_t *zero, int32_t *uid)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind != AM2_TOKEN_STRING) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_STRING));
+        return 0;
+    }
+
+    *zero = 0;
+    *uid = ScriptNameUid((const char *)ctx->tokens[*at].value);
+    if (*uid < 0)
+        return 0;
+
+    (*at)++;
+    return 1;
+}
+
+int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind != AM2_TOKEN_RESERVED) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_RESERVED));
+        return 0;
+    }
+
+    int32_t army;
+    switch ((int32_t)(uintptr_t)tok->value) {
+    case 16: army = 0; break;           /* green */
+    case 17: army = 1; break;           /* tan   */
+    case 18: army = 2; break;           /* blue  */
+    case 19: army = 3; break;           /* grey  */
+    default:
+        am2_log("Line [%4d]:  Expected Army Color instead of '%s'\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord));
+        return -1;
+    }
+
+    /* A thiscall on the army table -- ecx is loaded immediately before the
+     * call, which is the tell CLAUDE.md records for an i386 MSVC member
+     * function as opposed to a COM dispatch. */
+    typedef int32_t (__thiscall *am2_army_fn)(void *, int32_t);
+    int32_t rc = ((am2_army_fn)(uintptr_t)ADDR_ARMY_LOOKUP)(
+        *(void **)AM2_IMAGE(ADDR_ARMY_TABLE), army);
+
+    (*at)++;
+    return rc;
+}
+
+int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b)
+{
+    switch (op) {
+    case 0:  return b == a;
+    case 1:  return b < a;
+    case 2:  return b > a;
+    default: return 0;
+    }
+}
+
+int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    uint8_t action[0x48];
+
+    AM2_ObjScript *obj = ScriptCurrentObj();
+    AM2_ObjState *state = &obj->states[obj->statecount - 1];
+    AM2_ObjFrame *frame = ObjStateNewFrame(state);
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+    if (tok->kind != AM2_TOKEN_RESERVED) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_RESERVED));
+        return 0;
+    }
+
+    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+    if (!tok)
+        return 0;
+    frame->a = (int32_t)(uintptr_t)tok->value;
+
+    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+    if (!tok)
+        return 0;
+    frame->b = (int32_t)(uintptr_t)tok->value;
+    (*at)++;
+
+    while (!ScriptIsStatementStart(ctx, at)) {
+        /* `state` and `frame` both end this frame's action list. */
+        AM2_ScriptTok *t = &ctx->tokens[*at];
+        if (t->kind == AM2_TOKEN_RESERVED) {
+            int32_t id = (int32_t)(uintptr_t)t->value;
+            if (id == 141 || id == 142)
+                break;
+        }
+
+        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, uint8_t *))
+                  (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, action))
+            return 0;
+        memcpy(ObjFrameNewAction(frame), action, 0x48);
+
+        if (*at < ctx->count &&
+            ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR &&
+            (int32_t)(uintptr_t)ctx->tokens[*at].value == 3) {   /* ',' */
+            if (++(*at) >= ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    AM2_ObjScript *obj = ScriptCurrentObj();
+    AM2_ObjState *state = ObjScriptNewState(obj);
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+    if (tok->kind != AM2_TOKEN_RESERVED) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_RESERVED));
+        return 0;
+    }
+
+    tok = ScriptExpect(ctx, at, AM2_TOKEN_STRING);
+    if (!tok)
+        return 0;
+
+    int32_t name = ScriptFindName((const char *)tok->value);
+    if (name < 0)
+        name = AddNameTableName((const char *)ctx->tokens[*at].value, 2, 0);
+
+    /* The name resolves to this state's index within the object, not to
+     * anything global. */
+    kScriptNames[name].value = obj->statecount - 1;
+    state->name = name;
+    (*at)++;
+
+    while (!ScriptIsStatementStart(ctx, at)) {
+        AM2_ScriptTok *t = &ctx->tokens[*at];
+        if (t->kind == AM2_TOKEN_RESERVED &&
+            (int32_t)(uintptr_t)t->value == 141)        /* another `state` */
+            break;
+        if (!ScriptObjFrame(ctx, at))
+            return 0;
+    }
+    return 1;
+}
 
 /* Stamp the current script onto one object. */
 static void ScriptAttachTo(uint8_t *obj)
@@ -521,7 +878,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
      * fail, and the id later stamped onto each object is the incremented
      * count. Reading it as a plain accessor would still call it in the right
      * place, but would misdescribe why the count moves. */
-    AM2_ScriptObjTarget *target = ((AM2_ScriptObjTarget *(__cdecl *)(void))
+    AM2_ObjScript *target = ((AM2_ObjScript *(__cdecl *)(void))
         (uintptr_t)ADDR_NEW_OBJ_SCRIPT)();
 
     AM2_ScriptTok *tok = &ctx->tokens[*at];
@@ -544,9 +901,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
         target->form = 0;
 
         int32_t name = 0;
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, int32_t *,
-                                   int32_t))(uintptr_t)
-                  ADDR_SCRIPT_RESOLVE_NAME)(ctx, at, &name, 0))
+        if (!ScriptResolveName(ctx, at, &name, 0))
             return 0;
 
         target->u.name = name;
@@ -606,8 +961,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 
     /* The attribute block runs until the next top-level statement. */
     while (!ScriptIsStatementStart(ctx, at)) {
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *))(uintptr_t)
-                  ADDR_SCRIPT_OBJ_ATTRIBUTE)(ctx, at))
+        if (!ScriptObjState(ctx, at))
             return 0;
     }
     return 1;
@@ -768,9 +1122,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
             return 0;
         }
         int32_t item = 0;
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, int32_t *,
-                                   int32_t))(uintptr_t)
-                  ADDR_SCRIPT_RESOLVE_NAME)(ctx, at, &item, 0))
+        if (!ScriptResolveName(ctx, at, &item, 0))
             return 0;
         pad->specific = 1;
         pad->trigger = item;
@@ -844,9 +1196,6 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
 
 /* ---------------------------------------------------------------- if ---- */
 
-typedef int32_t (__cdecl *am2_parse3_fn)(AM2_ScriptCtx *, int32_t *,
-                                         int32_t *, int32_t *, int32_t *);
-
 #define kScriptConds (*(AM2_ScriptCond **)AM2_IMAGE(ADDR_SCRIPT_CONDITIONS))
 
 /* 0x00442F10. Does `want` appear before `stop`, scanning from `from`?
@@ -858,8 +1207,8 @@ typedef int32_t (__cdecl *am2_parse3_fn)(AM2_ScriptCtx *, int32_t *,
  * bounds check, so on the last iteration it reads one token past the end.
  * Both are reproduced; neither is safe to tidy without changing which form an
  * ambiguous statement parses as. */
-static int32_t ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
-                             int32_t want, int32_t stop)
+int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
+                              int32_t want, int32_t stop)
 {
     if (from >= ctx->count) {
         am2_log("Unexpected end of script.\n");
@@ -883,17 +1232,6 @@ static int32_t ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
 
     am2_log("Unexpected end of script.\n");
     return 0;
-}
-
-static void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
-{
-    int32_t n = c->nevents++;
-    c->events = (AM2_ScriptEvent *)am2_realloc(
-        c->events, (size_t)c->nevents * sizeof(AM2_ScriptEvent));
-    c->events[n].a = a;
-    c->events[n].b = b;
-    c->events[n].c = d;
-    c->events[n].d = 0;
 }
 
 /* True when the token at *at is Reserved with this id. */
@@ -1008,9 +1346,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             }
         }
 
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *,
-                                   AM2_ScriptCond *))(uintptr_t)
-                  ADDR_SCRIPT_PARSE_EVENTS)(ctx, at, cond))
+        if (!ScriptParseEvents(ctx, at, cond))
             goto fail;
 
         if (ScriptAtWord(ctx, *at, 47)) {       /* butnot */
@@ -1027,9 +1363,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
     } else if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
         cond->kind = 0;
-        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *,
-                                   AM2_ScriptCond *))(uintptr_t)
-                  ADDR_SCRIPT_PARSE_EVENTS)(ctx, at, cond))
+        if (!ScriptParseEvents(ctx, at, cond))
             goto fail;
 
         if (ScriptAtWord(ctx, *at, 47)) {       /* butnot */
@@ -1120,9 +1454,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             cond->mode = 3;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
-            if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, int32_t *,
-                                       int32_t))(uintptr_t)
-                      ADDR_SCRIPT_RESOLVE_NAME)(ctx, at, &cond->objstate, 0))
+            if (!ScriptResolveName(ctx, at, &cond->objstate, 0))
                 goto fail;
         } else {
             cond->mode = 0;
@@ -1389,5 +1721,36 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_IF,
                         (const void *)ScriptIf,
                         "ScriptIf", 1);
+    rc |= patch_replace(ADDR_SCRIPT_SCAN_FOR,
+                        (const void *)ScriptScanFor, "ScriptScanFor", 1);
+    rc |= patch_replace(ADDR_SCRIPT_COMPARE3,
+                        (const void *)ScriptCompare3, "ScriptCompare3", 1);
+    rc |= patch_replace(ADDR_SCRIPT_NAME_UID,
+                        (const void *)ScriptNameUid, "ScriptNameUid", 1);
+    rc |= patch_replace(ADDR_SCRIPT_INT_OR_VAR,
+                        (const void *)ScriptIntOrVar, "ScriptIntOrVar", 1);
+    rc |= patch_replace(ADDR_SCRIPT_OBJECT_UID,
+                        (const void *)ScriptObjectUid, "ScriptObjectUid", 1);
+    rc |= patch_replace(ADDR_SCRIPT_ARMY_COLOUR,
+                        (const void *)ScriptArmyColour, "ScriptArmyColour", 1);
+    rc |= patch_replace(ADDR_SCRIPT_RESOLVE_NAME,
+                        (const void *)ScriptResolveName,
+                        "ScriptResolveName", 1);
+    rc |= patch_replace(ADDR_SCRIPT_PARSE_EVENTS,
+                        (const void *)ScriptParseEvents,
+                        "ScriptParseEvents", 1);
+    rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
+                        (const void *)ObjFrameNewAction,
+                        "ObjFrameNewAction", 1);
+    rc |= patch_replace(ADDR_OBJ_STATE_NEW_FRAME,
+                        (const void *)ObjStateNewFrame,
+                        "ObjStateNewFrame", 1);
+    rc |= patch_replace(ADDR_OBJ_SCRIPT_NEW_STATE,
+                        (const void *)ObjScriptNewState,
+                        "ObjScriptNewState", 1);
+    rc |= patch_replace(ADDR_SCRIPT_OBJ_STATE,
+                        (const void *)ScriptObjState, "ScriptObjState", 1);
+    rc |= patch_replace(ADDR_SCRIPT_OBJ_FRAME,
+                        (const void *)ScriptObjFrame, "ScriptObjFrame", 1);
     return rc;
 }

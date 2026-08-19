@@ -964,6 +964,16 @@
 #define ADDR_SCRIPT_SCAN_FOR      0x00442F10u  /* int32_t(ctx,from,want,stop) */
 #define ADDR_SCRIPT_PARSE_EVENT   0x0043FF90u  /* (ctx,at,&a,&b,&c) */
 #define ADDR_SCRIPT_PARSE_EVENTS  0x00440600u  /* (ctx,at,cond) */
+
+/* The uids the four army keywords and `me` stand for. Not in keyword order,
+ * and the first arm of the resolver's jump table serves id 15 -- which no
+ * entry in the keyword table produces, so it cannot be reached. */
+#define ADDR_SVAR_ID15            0x00656474u  /* unreachable */
+#define ADDR_SVAR_GREEN           0x00656484u
+#define ADDR_SVAR_TAN             0x00656498u
+#define ADDR_SVAR_BLUE            0x00656454u
+#define ADDR_SVAR_GREY            0x0065646Cu
+#define ADDR_SVAR_ME              0x00656458u
 #define ADDR_SCRIPT_PARSE_VALUE   0x00443010u  /* (ctx,at,&a,&b,&c) */
 #define ADDR_SCRIPT_PARSE_ACTION  0x00440D70u  /* (ctx,at,uint8_t[0x48]) */
 
@@ -993,7 +1003,18 @@
 
 /* 0x00436C20. One attribute statement inside an object block. The block ends
  * where ScriptIsStatementStart says the next top-level statement begins. */
-#define ADDR_SCRIPT_OBJ_ATTRIBUTE 0x00436C20u
+#define ADDR_SCRIPT_OBJ_STATE     0x00436C20u  /* `state <name>` */
+#define ADDR_SCRIPT_OBJ_FRAME     0x004369E0u  /* `frame <int> <int>` */
+#define ADDR_OBJ_FRAME_NEW_ACTION 0x00437010u  /* 72-byte entries */
+#define ADDR_OBJ_STATE_NEW_FRAME  0x00437070u  /* 20-byte entries */
+#define ADDR_OBJ_SCRIPT_NEW_STATE 0x004370D0u  /* 16-byte entries */
+#define ADDR_SCRIPT_COMPARE3      0x004374F0u  /* int32_t(a, op, b) */
+#define ADDR_SCRIPT_NAME_UID      0x0043F9F0u  /* int32_t(const char *) */
+#define ADDR_SCRIPT_INT_OR_VAR    0x00442F80u  /* (ctx,at,&val,&isliteral) */
+#define ADDR_SCRIPT_OBJECT_UID    0x0043FF00u  /* (ctx,at,&zero,&uid) */
+#define ADDR_SCRIPT_ARMY_COLOUR   0x00440930u  /* int32_t(ctx,at) */
+#define ADDR_ARMY_TABLE           0x004751B0u  /* the object 0x0040F250 is on */
+#define ADDR_ARMY_LOOKUP          0x0040F250u  /* thiscall, int32_t(int32_t) */
 
 /* Object lookup and iteration. The two iterators take no arguments: they walk
  * whatever the record at ADDR_SCRIPT_OBJ_TARGET selects, which the objclass

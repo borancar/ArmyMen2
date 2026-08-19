@@ -96,7 +96,8 @@ typedef struct {
     char   *name;       /* a malloc'd copy; the table owns it */
     int32_t type;       /* AM2_NAME_TYPE_* */
     int32_t value;      /* a uid for type 0, the caller's value otherwise */
-    int32_t live;       /* always written as 1 */
+    int32_t refs;       /* a reference count: AddNameTableName sets it to 1
+                         * and ScriptNameUid increments it on every reuse */
 } AM2_ScriptName;
 
 /* 0x0041E7F0. The next object uid. A bare post-increment of a global. */
@@ -171,6 +172,102 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx);
  * a non-Integer token there is not an error, it just takes the default and
  * leaves the token for ReadScript to dispatch. */
 int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at);
+
+/* The object-script data model, recovered from the three grow-and-append
+ * helpers and their two callers. Four levels, each owning the next:
+ *
+ *   object/objclass  ->  state <name>  ->  frame <a> <b>  ->  action, ...
+ *
+ * Every level is the same shape -- capacity, count, array -- and each grows by
+ * a fixed step rather than doubling: five states, ten frames, five actions. */
+typedef struct {
+    int32_t  a;             /* +0x00 */
+    int32_t  b;             /* +0x04 */
+    int32_t  actioncap;     /* +0x08 */
+    int32_t  actioncount;   /* +0x0C */
+    uint8_t *actions;       /* +0x10, 0x48 bytes each */
+} AM2_ObjFrame;             /* 20 bytes */
+
+typedef struct {
+    int32_t       name;     /* +0x00, name-table index */
+    int32_t       framecap; /* +0x04 */
+    int32_t       framecount; /* +0x08 */
+    AM2_ObjFrame *frames;   /* +0x0C */
+} AM2_ObjState;             /* 16 bytes */
+
+typedef struct {
+    int32_t form;           /* +0x00, 0 = object, 1 = objclass */
+    union {
+        int32_t  name;      /* +0x04 for `object` */
+        uint16_t cls[2];    /* +0x04 and +0x06 for `objclass` */
+    } u;
+    int32_t       statecap;   /* +0x08 */
+    int32_t       statecount; /* +0x0C */
+    AM2_ObjState *states;     /* +0x10 */
+} AM2_ObjScript;            /* 20 bytes */
+
+/* 0x00437010, 0x00437070, 0x004370D0. Append one entry, growing first. Each
+ * returns the new entry, zeroed. */
+uint8_t      *__cdecl ObjFrameNewAction(AM2_ObjFrame *f);
+AM2_ObjFrame *__cdecl ObjStateNewFrame(AM2_ObjState *s);
+AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o);
+
+/* 0x004374F0. Compare `b` against `a`: op 0 equal, 1 less, 2 greater. The
+ * argument order is the surprise -- the value under test is the THIRD
+ * argument, and everything else answers 0. */
+int32_t __cdecl ScriptCompare3(int32_t a, int32_t op, int32_t b);
+
+/* 0x0043F9F0. The uid a name stands for, declaring it if it is new.
+ *
+ * Only type 0 -- object -- names qualify; a name already declared as anything
+ * else logs "Duplicate name used for different types" and returns 0, which the
+ * caller cannot tell from a legitimate uid of 0. Reusing an existing name
+ * bumps its reference count; declaring a new one does not, so the count is
+ * uses-after-the-first rather than uses. */
+int32_t __cdecl ScriptNameUid(const char *name);
+
+/* 0x00442F80. An integer literal or a declared `variable`.
+ *
+ * On success *value is the literal or the name-table index and *isliteral says
+ * which. Anything else -- a name that is not declared, or declared as
+ * something other than a variable -- returns 0 without a message. */
+int32_t __cdecl ScriptIntOrVar(AM2_ScriptCtx *ctx, int32_t *at,
+                               int32_t *value, int32_t *isliteral);
+
+/* 0x0043FF00. A String naming an object, resolved to its uid. The third
+ * argument is always written as zero and the fourth gets the uid. */
+int32_t __cdecl ScriptObjectUid(AM2_ScriptCtx *ctx, int32_t *at,
+                                int32_t *zero, int32_t *uid);
+
+/* 0x00440930. One of `green`, `tan`, `blue`, `grey` -- ids 16..19 -- looked up
+ * through the army table. Returns -1 on anything else, which is
+ * distinguishable from the lookup's own result only by the caller knowing it. */
+int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at);
+
+/* 0x00440700. Resolve the token at *at to a name-table index.
+ *
+ * Three cases. A Reserved word in 15..20 is one of the built-in uids -- the
+ * four armies and `me` -- and yields it directly. Any other Reserved word is
+ * an error. A String is looked up, declared with type 2 if new, and the token
+ * is REWRITTEN to kind 7 exactly as `variable` does; a name already declared
+ * as something other than type 2 or 3 is rejected.
+ *
+ * `quiet` suppresses both the reserved-word message and the wrong-kind one,
+ * but not the already-used-for-another-type one. Every caller so far passes 0. */
+int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
+                                  int32_t *out, int32_t quiet);
+
+/* 0x00442F10. Does `want` appear before `stop`, scanning from `from`? */
+int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
+                              int32_t want, int32_t stop);
+
+/* 0x00436C20. One `state <name>` block: the name, then frames until the next
+ * `state` or the next top-level statement. */
+int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at);
+
+/* 0x004369E0. One `frame <int> <int>` block: two integers, then actions
+ * separated by commas until `state`, `frame`, or a top-level statement. */
+int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at);
 
 /* 0x00436D60. `object <name>` and `objclass <int> <int>`, then a block of
  * attribute statements -- GenerateObjScriptFromTokens, named from its own
@@ -265,6 +362,13 @@ typedef struct {
  * Returns 1 on success, having pushed the record onto the condition list.
  * ReadScript counts those returns as its `compounds` total. */
 int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at);
+
+/* 0x00440600. Events until a `then`, `butnot` or `testvar`, appended to the
+ * condition. Stops without complaint at anything that is neither a String nor
+ * a Reserved word. */
+int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
+                                  AM2_ScriptCond *cond);
+
 
 /* For the offline test only: the name table lives in the image, so the test
  * needs a way to empty it between cases and to read an entry back. Not part of
