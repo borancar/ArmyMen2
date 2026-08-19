@@ -272,6 +272,16 @@ void __cdecl SetFacing08(int32_t facing, const void *src, void *out)
     SetFacing(facing, src, out, 0x08, 0x0C, 4, 1);
 }
 
+int32_t __cdecl IsKind10To17(int32_t kind)
+{
+    return (kind >= 10 && kind <= 17) ? 1 : 0;
+}
+
+int32_t __cdecl IsKind14Or22(int32_t kind)
+{
+    return (kind == 14 || kind == 22) ? 1 : 0;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -306,5 +316,7 @@ int misc_install(void)
                   "TypesCompatible", 2);
     patch_replace(ADDR_SET_FACING_14, (const void *)SetFacing14, "SetFacing14", 3);
     patch_replace(ADDR_SET_FACING_08, (const void *)SetFacing08, "SetFacing08", 3);
+    patch_replace(ADDR_IS_KIND_10_17, (const void *)IsKind10To17, "IsKind10To17", 1);
+    patch_replace(ADDR_IS_KIND_14_22, (const void *)IsKind14Or22, "IsKind14Or22", 1);
     return 0;
 }

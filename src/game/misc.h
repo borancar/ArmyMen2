@@ -134,6 +134,12 @@ int32_t __cdecl TypesCompatible(int32_t a, int32_t b);
 void __cdecl SetFacing14(int32_t facing, const void *src, void *out);
 void __cdecl SetFacing08(int32_t facing, const void *src, void *out);
 
+/* 0x0044BBF0 and 0x00433500. Two membership tests over the same kind of code
+ * the ObjIsTypeN predicates compare against: 10 through 17 inclusive, and
+ * exactly 14 or 22. Signed comparisons, so a negative code is outside both. */
+int32_t __cdecl IsKind10To17(int32_t kind);
+int32_t __cdecl IsKind14Or22(int32_t kind);
+
 int misc_install(void);
 
 #ifdef __cplusplus

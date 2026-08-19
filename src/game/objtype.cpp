@@ -66,6 +66,15 @@ int32_t __cdecl ObjIsType4(const AM2_Object *obj)
     return (obj->type == 4) ? 1 : 0;
 }
 
+uint32_t __cdecl ObjType2Field548(const AM2_Object *obj)
+{
+    if (!obj)
+        return 0;
+    if (obj->type != 2)
+        return 0;
+    return *(const uint32_t *)((const uint8_t *)obj + 0x548);
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -76,5 +85,7 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_OBJ_IS_TYPE238, (const void *)ObjIsTypeIn238, "ObjIsTypeIn238", 1);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE8, (const void *)ObjIsType8, "ObjIsType8", 1);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE4, (const void *)ObjIsType4, "ObjIsType4", 1);
+    rc |= patch_replace(ADDR_OBJ_TYPE2_FIELD548, (const void *)ObjType2Field548,
+                        "ObjType2Field548", 1);
     return rc;
 }

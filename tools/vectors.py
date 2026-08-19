@@ -545,7 +545,9 @@ def main():
                 "ADDR_COMPARE_PAIR", "ADDR_MAP_CODE",
                 "ADDR_POINTS_EQUAL", "ADDR_POINTS_DIFFER",
                 "ADDR_COMPARE_TRIPLE", "ADDR_TYPES_COMPATIBLE",
-                "ADDR_SET_FACING_14", "ADDR_SET_FACING_08"]
+                "ADDR_SET_FACING_14", "ADDR_SET_FACING_08",
+                "ADDR_IS_KIND_10_17", "ADDR_IS_KIND_14_22",
+                "ADDR_OBJ_TYPE2_FIELD548"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -628,6 +630,8 @@ def main():
         "ADDR_COMPARE_TRIPLE": "CompareTriple",
         "ADDR_TYPES_COMPATIBLE": "TypesCompatible",
         "ADDR_SET_FACING_14": "SetFacing14", "ADDR_SET_FACING_08": "SetFacing08",
+        "ADDR_IS_KIND_10_17": "IsKind10To17", "ADDR_IS_KIND_14_22": "IsKind14Or22",
+        "ADDR_OBJ_TYPE2_FIELD548": "ObjType2Field548",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the

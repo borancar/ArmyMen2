@@ -48,6 +48,10 @@ int32_t __cdecl ObjIsType3(const AM2_Object *obj);
 int32_t __cdecl ObjIsType8(const AM2_Object *obj);
 int32_t __cdecl ObjIsType4(const AM2_Object *obj);
 
+/* 0x00457450. The dword at +0x548, but only for a type 2 object: null gives 0
+ * and so does any other type, so the field is only meaningful on type 2. */
+uint32_t __cdecl ObjType2Field548(const AM2_Object *obj);
+
 /* Original: 0x00457420. Types 2, 3 and 8 -- the owned non-item types. */
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj);
 
