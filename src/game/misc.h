@@ -261,6 +261,24 @@ int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
  * register the first read used, so the original goes back for it. */
 void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg);
 
+/* 0x0045C870 and 0x0043D550. The same function over the two records SetFacing08
+ * and SetFacing14 write -- same offset pairs, +8/+0xC and +0x14/+0x18 -- and it
+ * produces what those two consume: a facing code from 0 to 7.
+ *
+ * A signed delta becomes a code, with a dead zone of +-16 either side of zero:
+ *
+ *   mode == 1        delta < 0 gives 7, otherwise 2
+ *   mode != 1, flag  delta >= 16 gives 5, > -16 gives 4, otherwise 3
+ *   mode != 1, !flag delta >= 16 gives 1, > -16 gives 0, otherwise 7
+ *
+ * The original computes the last two arms with setg and a borrow rather than
+ * branches, and the third does `and al, 0xFB` on the LOW BYTE of a value that
+ * is 0 or -1, so the -1 case comes back as 0xFFFFFFFB and the following add
+ * wraps to 2. Written out as the values it produces, which is what a caller
+ * sees. */
+int32_t __cdecl FacingFromDelta08(const void *rec, int32_t delta);
+int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta);
+
 int misc_install(void);
 
 #ifdef __cplusplus

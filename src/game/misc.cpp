@@ -480,6 +480,35 @@ void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg)
     s[0x104] = 0;
 }
 
+static int32_t FacingFromDelta(const void *rec, int32_t delta,
+                               uint32_t off_mode, uint32_t off_flag)
+{
+    const uint8_t *r = (const uint8_t *)rec;
+
+    if (*(const int32_t *)(r + off_mode) == 1)
+        return (delta < 0) ? 7 : 2;
+
+    if (*(const int32_t *)(r + off_flag) != 0) {
+        if (delta >= 0x10)
+            return 5;
+        return (delta > -0x10) ? 4 : 3;
+    }
+
+    if (delta >= 0x10)
+        return 1;
+    return (delta > -0x10) ? 0 : 7;
+}
+
+int32_t __cdecl FacingFromDelta08(const void *rec, int32_t delta)
+{
+    return FacingFromDelta(rec, delta, 0x08, 0x0C);
+}
+
+int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta)
+{
+    return FacingFromDelta(rec, delta, 0x14, 0x18);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -537,5 +566,9 @@ int misc_install(void)
                   "FilterMatches", 6);
     patch_replace(ADDR_CONSUME_PENDING, (const void *)ConsumePendingByte,
                   "ConsumePendingByte", 3);
+    patch_replace(ADDR_FACING_DELTA_08, (const void *)FacingFromDelta08,
+                  "FacingFromDelta08", 2);
+    patch_replace(ADDR_FACING_DELTA_14, (const void *)FacingFromDelta14,
+                  "FacingFromDelta14", 2);
     return 0;
 }

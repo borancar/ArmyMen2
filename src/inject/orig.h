@@ -1160,6 +1160,8 @@
 #define ADDR_OBJ_KIND538_10_17 0x0040D860u  /* int32_t(const void *obj) */
 #define ADDR_FILTER_MATCHES    0x0041EF20u  /* int32_t(wantA,wantB,haveA,haveB,maskA,maskB) */
 #define ADDR_CONSUME_PENDING   0x00408520u  /* void(src, dst, cfg) */
+#define ADDR_FACING_DELTA_08   0x0045C870u  /* int32_t(const void*, int32_t) */
+#define ADDR_FACING_DELTA_14   0x0043D550u
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u

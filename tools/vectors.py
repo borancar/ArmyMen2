@@ -129,6 +129,8 @@ SEED = {
     0x00434E90: [(0, 0x04, "u32", 8), (0, 0x08, "ptr", 0x900)],
     0x0040D860: [(0, 0x538, "u32v", 13)],
     0x00408520: [(2, 0x2C, "u32v", 0x40), (2, 0x10, "u32v", 0)],
+    0x0045C870: [(0, 0x08, "u32v", 1), (0, 0x0C, "u32v", 0)],
+    0x0043D550: [(0, 0x14, "u32v", 1), (0, 0x18, "u32v", 0)],
     0x00429F20: [(1, 0x00, "ptr", 0x900)],
 }
 
@@ -497,7 +499,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
         chain = SEED.get(addr)
         if chain:
             b = bytearray(scratch)
-            for arg, at, kind, val in chain:
+            for seed_i, (arg, at, kind, val) in enumerate(chain):
                 base = PTR_STRIDE * (arg + 1) if arg >= 0 else 0
                 at = base + at
                 if kind == "ptr":
@@ -508,8 +510,14 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
                     struct.pack_into("<I", b, at,
                                      0 if k % 5 == 2 else SCRATCH + val)
                 elif kind == "u32v":
+                    # Each seed varies on its OWN period. Stepping them all by
+                    # k made them move in lockstep, so a function gated on two
+                    # of them only ever saw the combinations that k happened to
+                    # line up -- 0x0045C870 has three arms selected by two
+                    # fields and reached two thirds of itself.
+                    step = (k // (seed_i + 1)) % 16
                     struct.pack_into("<I", b, at,
-                                     (val + (k % 16) - 4) & 0xFFFFFFFF)
+                                     (val + step - 4) & 0xFFFFFFFF)
                 else:
                     struct.pack_into("<I", b, at, val)
             # Vary the field a chain leads to, so the vectors exercise it
@@ -717,7 +725,8 @@ def main():
                 "ADDR_CHAIN_FIELD_14", "ADDR_LIST_PUSH_FRONT",
                 "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN",
                 "ADDR_OBJ_KIND538_10_17", "ADDR_FILTER_MATCHES",
-                "ADDR_CONSUME_PENDING"]
+                "ADDR_CONSUME_PENDING", "ADDR_FACING_DELTA_08",
+                "ADDR_FACING_DELTA_14"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -812,6 +821,8 @@ def main():
         "ADDR_OBJ_KIND538_10_17": "ObjKind538In10To17",
         "ADDR_FILTER_MATCHES": "FilterMatches",
         "ADDR_CONSUME_PENDING": "ConsumePendingByte",
+        "ADDR_FACING_DELTA_08": "FacingFromDelta08",
+        "ADDR_FACING_DELTA_14": "FacingFromDelta14",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
