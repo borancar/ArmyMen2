@@ -149,6 +149,21 @@ void __cdecl SetFacing08(int32_t facing, const void *src, void *out);
 int32_t __cdecl IsKind10To17(int32_t kind);
 int32_t __cdecl IsKind14Or22(int32_t kind);
 
+/* 0x0040D7E0. Classifies an object into 0, 1 or 2 from a code two hops away:
+ * the pointer at obj+0x74, then a SIGNED 16-bit field at +0x4C of that.
+ *
+ * The code is biased by 7 and looked up in a 64-entry table, so the useful
+ * range is 7..70 and anything outside gives 0. The table is not a formula --
+ * the ones and twos are scattered -- so it is a table here too, read out of
+ * 0x0040D820 and the three arms at 0x0040D814.
+ *
+ * What the classes MEAN is unknown, and so is the record at +0x74. Two things
+ * are worth saying about the shape: the field is signed, so a negative code is
+ * possible and lands outside the range; and 7..70 is the kind of span an
+ * object-type enumeration has, which is the sort of thing data/<map>/object.aai
+ * lists in its Type column. */
+int32_t __cdecl ClassifyByCode74(const void *obj);
+
 int misc_install(void);
 
 #ifdef __cplusplus

@@ -1148,6 +1148,7 @@
 #define ADDR_SET_FACING_08     0x0045C5E0u
 #define ADDR_IS_KIND_10_17     0x0044BBF0u  /* int32_t(int32_t) */
 #define ADDR_IS_KIND_14_22     0x00433500u  /* int32_t(int32_t) */
+#define ADDR_CLASSIFY_CODE74   0x0040D7E0u  /* int32_t(const void *obj) */
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u

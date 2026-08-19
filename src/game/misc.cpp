@@ -277,6 +277,26 @@ int32_t __cdecl IsKind14Or22(int32_t kind)
     return (kind == 14 || kind == 22) ? 1 : 0;
 }
 
+/* Read out of the index table at 0x0040D820 mapped through the three arms at
+ * 0x0040D814, which return 1, 2 and 0. Index 0 is code 7. */
+static const uint8_t kCode74Class[64] = {
+    1, 2, 0, 1, 2, 1, 2, 1, 2, 0, 0, 0, 1, 2, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 2, 2, 2,
+    0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1,
+};
+
+int32_t __cdecl ClassifyByCode74(const void *obj)
+{
+    const uint8_t *sub = *(const uint8_t *const *)((const uint8_t *)obj + 0x74);
+    int32_t        code = *(const int16_t *)(sub + 0x4C);   /* movsx: signed */
+    uint32_t       i = (uint32_t)(code - 7);
+
+    if (i > 0x3F)
+        return 0;
+    return kCode74Class[i];
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -313,5 +333,7 @@ int misc_install(void)
     patch_replace(ADDR_SET_FACING_08, (const void *)SetFacing08, "SetFacing08", 3);
     patch_replace(ADDR_IS_KIND_10_17, (const void *)IsKind10To17, "IsKind10To17", 1);
     patch_replace(ADDR_IS_KIND_14_22, (const void *)IsKind14Or22, "IsKind14Or22", 1);
+    patch_replace(ADDR_CLASSIFY_CODE74, (const void *)ClassifyByCode74,
+                  "ClassifyByCode74", 1);
     return 0;
 }

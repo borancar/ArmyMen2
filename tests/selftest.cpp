@@ -53,6 +53,12 @@ int main(void)
          * path coverage would be worth nothing. */
         for (int32_t w = 0; w < t->ninputs; w++)
             g_scratch[t->inputs[w * 2]] = (uint8_t)t->inputs[w * 2 + 1];
+        /* Pointer chains: a dword in the scratch that must hold the address of
+         * another part of it. These cannot travel as bytes, because the value
+         * is an address and the two sides have different buffers. */
+        for (int32_t w = 0; w < t->nfixups; w++)
+            *(uint32_t *)(g_scratch + t->fixups[w * 2]) =
+                (uint32_t)(uintptr_t)(g_scratch + t->fixups[w * 2 + 1]);
         for (int32_t i = 0; i < 6; i++)
             a[i] = t->isptr[i] ? (uint32_t)(uintptr_t)(g_scratch + t->arg[i])
                                : t->arg[i];
