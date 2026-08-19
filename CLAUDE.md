@@ -280,6 +280,19 @@ names come from the program's own vocabulary rather than from us. The chain is
 `WinMain -> RunFrame -> ADDR_STATE2_FRAME -> LoadLevelScript (0x00425060) ->
 ReadScript (0x00444CD0) -> ParseLine (0x00444C40) -> NextToken (0x0043F450)`.
 
+**A handler can call the original's callees, and that is the strongest test
+available.** Every one of the five is reconstructed while the parsers below it
+stay original and are reached by address, so our code runs in the middle of a
+live path and the A/B compares the result. Nothing had to wait for the layer
+beneath it.
+
+**Re-run an A/B difference before believing it.** One `bootcamp` run reported
+64,391 differing pixels and "the frame is wrong"; it was whole-frame palette
+shifts of one to five per channel, and three further runs of the same build
+gave the usual 22. The failing run had been started seconds after Xvfb itself.
+`ab.sh` already says to read a difference before believing it -- re-running is
+part of reading it.
+
 **Read the loop, not the data, when a table's bounds are in question.**
 `tools/scripttokens.py` was reading a range I guessed -- `0x00487A00` to
 `0x00488100` -- and reported 141 keywords. `ScriptLookupToken` walks from
@@ -1353,15 +1366,25 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   entry. The same run gives `FirstItem` 363 and `NextItem` 584,067, and
   363 x 1,609 is 584,067 exactly, so the registry invariant holds with the
   tokeniser in place. `tools/ab.sh mission` is clean on the same build.
-- The interpreter's top-level grammar is mapped and one of five handlers is
-  written. `ReadScript` dispatches on exactly six ids, which is also the set
-  `ScriptIsStatementStart` answers yes for: `preloadsprite` (25) ->
-  `0x00444900`, `pad` (26) -> `0x004440E0`, `if` (44) -> `0x004432F0`,
-  `variable` (133) -> `0x00443F70` (**done**), and `object` (139) and
-  `objclass` (140) sharing `0x00436D60`. The four left are 2,080 B, 2,896 B,
-  400 B and 688 B, and they reach into sprite loading, object creation and an
-  8,608-byte expression evaluator at `0x00440D70` -- that last is also what
-  `ParseLine` (`0x00444C40`) needs, which is why ParseLine is not done either.
-  `GenerateObjScriptFromTokens` is a real source name, recovered from a string.
+- **The statement layer is complete**: `ReadScript` and all five handlers are
+  reconstructed. It dispatches on exactly six ids, the same set
+  `ScriptIsStatementStart` answers yes for -- `preloadsprite` (25), `pad` (26),
+  `if` (44), `variable` (133), and `object` (139) and `objclass` (140) sharing
+  `GenerateObjScriptFromTokens`, which is a real source name recovered from
+  that function's own error string.
+
+  What is still original is everything *below* a statement, reached by address:
+  the event parser (`0x0043FF90`), the event-list parser (`0x00440600`), the
+  testvar value parser (`0x00443010`) and the 8,608-byte action parser
+  (`0x00440D70`). That last is also what `ParseLine` (`0x00444C40`) needs,
+  which is why ParseLine is not done.
+
+  **The handler A/B has better evidence than a log match.** `ReadScript` prints
+  four totals that count exactly what the handlers produce -- Boot Camp
+  `lines: 101  tokens: 372  names: 43  compounds: 16` and campaign
+  `lines: 1225  tokens: 2895  names: 316  compounds: 91`. `names` counts what
+  `variable`, `pad` and `object` declared; `compounds` counts the `if`
+  statements that parsed. Four independent numbers agreeing on both sides is
+  worth more than "the log is identical".
 - Object types 2, 3 and 8 are still unidentified.
 - `object.aai` complains about `link 33-1..4`; unexplained.
