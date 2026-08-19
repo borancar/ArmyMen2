@@ -25,6 +25,29 @@ typedef struct {
 #define kScriptTokens   ((const AM2_ScriptToken *)AM2_IMAGE(0x00487C90u))
 #define kScriptTokenEnd ((const AM2_ScriptToken *)AM2_IMAGE(0x00488258u))
 
+/* ---- what stays in the original image --------------------------------- */
+
+typedef void    (__cdecl *am2_void_fn)(void);
+typedef void    (__cdecl *am2_str_fn)(const char *s);
+typedef void    (__cdecl *am2_preload_sprite_fn)(int32_t a, int32_t b,
+                                                 int32_t c, int32_t flags,
+                                                 int32_t mode);
+typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
+                                               int32_t *at,
+                                               AM2_ScriptAction *act);
+/* thiscall: ecx is loaded from the army table immediately before the call,
+ * which is the tell for an i386 MSVC member function rather than a COM
+ * dispatch. */
+typedef int32_t (__thiscall *am2_army_lookup_fn)(void *table, int32_t army);
+typedef int32_t (__thiscall *am2_player_is_ai_fn)(void *comm, int32_t slot);
+
+#define orig_preload_sprite    (*(am2_preload_sprite_fn)ADDR_PRELOAD_SPRITE)
+#define orig_parse_action      (*(am2_parse_action_fn)ADDR_SCRIPT_PARSE_ACTION)
+#define orig_army_lookup       (*(am2_army_lookup_fn)ADDR_ARMY_LOOKUP)
+#define orig_player_is_ai      (*(am2_player_is_ai_fn)ADDR_COMM_PLAYER_IS_AI)
+#define orig_set_data_dir      (*(am2_str_fn)ADDR_SET_DATA_DIR)
+#define orig_declare_rule_vars (*(am2_void_fn)ADDR_DECLARE_RULE_VARS)
+
 int32_t __cdecl IsBlank(uint8_t c)
 {
     return (c == ' ' || c == '\t' || c == '\r') ? 1 : 0;
@@ -464,8 +487,7 @@ int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at)
         (*at)++;
     }
 
-    ((void (__cdecl *)(int32_t, int32_t, int32_t, int32_t, int32_t))
-        (uintptr_t)ADDR_PRELOAD_SPRITE)(arg[0], arg[1], arg[2], flags, 1);
+    orig_preload_sprite(arg[0], arg[1], arg[2], flags, 1);
     return 1;
 }
 
@@ -498,9 +520,6 @@ int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
     return 1;
 }
 
-
-typedef int32_t (__cdecl *am2_parse3_fn)(AM2_ScriptCtx *, int32_t *,
-                                         int32_t *, int32_t *, int32_t *);
 
 static void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
 {
@@ -1114,12 +1133,7 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
         return -1;
     }
 
-    /* A thiscall on the army table -- ecx is loaded immediately before the
-     * call, which is the tell CLAUDE.md records for an i386 MSVC member
-     * function as opposed to a COM dispatch. */
-    typedef int32_t (__thiscall *am2_army_fn)(void *, int32_t);
-    int32_t rc = ((am2_army_fn)(uintptr_t)ADDR_ARMY_LOOKUP)(
-        *(void **)AM2_IMAGE(ADDR_ARMY_TABLE), army);
+    int32_t rc = orig_army_lookup(*(void **)AM2_IMAGE(ADDR_ARMY_TABLE), army);
 
     (*at)++;
     return rc;
@@ -2158,8 +2172,7 @@ static int32_t ScriptParseAction(AM2_ScriptCtx *ctx, int32_t *at,
                                  AM2_ScriptAction *act)
 {
     if (am2_orig_actions)
-        return ((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, AM2_ScriptAction *))
-            (uintptr_t)ADDR_SCRIPT_PARSE_ACTION)(ctx, at, act);
+        return orig_parse_action(ctx, at, act);
     return ScriptParseActionRecon(ctx, at, act);
 }
 
@@ -2764,14 +2777,11 @@ fail_nofree:
     return 0;
 }
 
-/* No statement handler is left original. Each takes the context
- * and a pointer to the walk index, which it advances past its own statement --
- * so ReadScript's loop makes no assumption about statement length. They are
- * reached by address because they are not reconstructed; nothing else about
- * this function has to wait for them. */
-typedef void (__cdecl *am2_script_handler)(AM2_ScriptCtx *, int32_t *);
-typedef int32_t (__cdecl *am2_script_if_handler)(AM2_ScriptCtx *, int32_t *);
-
+/* No statement handler is left original. Each takes the context and a pointer
+ * to the walk index, which it advances past its own statement, so the loop
+ * below makes no assumption about statement length -- which is what let them
+ * be reconstructed one at a time while the rest were still reached by
+ * address. */
 int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
 {
     char line[0x100];
@@ -2898,7 +2908,7 @@ const AM2_ScriptName *am2_script_name(int32_t i)
  * opens is relative to wherever this last left us. */
 static void ScriptSetDataDir(const char *dir)
 {
-    ((void (__cdecl *)(const char *))(uintptr_t)ADDR_SET_DATA_DIR)(dir);
+    orig_set_data_dir(dir);
 }
 
 /* Read one script, with the progress line the comm object's verbose flag asks
@@ -2969,8 +2979,7 @@ void __cdecl LoadLevelScript(void)
             if (!*(const int32_t *)(slot + AM2_PLAYER_ACTIVE))
                 continue;
             /* A slot the machine plays needs no AI script of its own. */
-            if (((int32_t (__thiscall *)(void *, int32_t))(uintptr_t)
-                     ADDR_COMM_PLAYER_IS_AI)(kCommObject, i))
+            if (orig_player_is_ai(kCommObject, i))
                 continue;
 
             int32_t army = *(const int32_t *)(slot + AM2_PLAYER_ARMY);
@@ -2986,7 +2995,7 @@ void __cdecl LoadLevelScript(void)
         }
     }
 
-    ((void (__cdecl *)(void))(uintptr_t)ADDR_DECLARE_RULE_VARS)();
+    orig_declare_rule_vars();
 }
 
 /* AM2_PARSE_ALL=1: after the game's own first script load, parse every other

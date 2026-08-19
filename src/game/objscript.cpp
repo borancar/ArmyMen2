@@ -16,6 +16,12 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+/* ---- what stays in the original image --------------------------------- */
+
+typedef AM2_ObjScript *(__cdecl *am2_new_obj_script_fn)(void);
+
+#define orig_new_obj_script (*(am2_new_obj_script_fn)ADDR_NEW_OBJ_SCRIPT)
+
 /* ------------------------------------------------- object script ---- */
 
 
@@ -191,8 +197,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
      * fail, and the id later stamped onto each object is the incremented
      * count. Reading it as a plain accessor would still call it in the right
      * place, but would misdescribe why the count moves. */
-    AM2_ObjScript *target = ((AM2_ObjScript *(__cdecl *)(void))
-        (uintptr_t)ADDR_NEW_OBJ_SCRIPT)();
+    AM2_ObjScript *target = orig_new_obj_script();
 
     AM2_ScriptTok *tok = &ctx->tokens[*at];
     if (tok->kind != AM2_TOKEN_RESERVED) {
