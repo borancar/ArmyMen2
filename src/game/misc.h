@@ -164,6 +164,18 @@ int32_t __cdecl IsKind14Or22(int32_t kind);
  * lists in its Type column. */
 int32_t __cdecl ClassifyByCode74(const void *obj);
 
+/* 0x0045EE20 and 0x00433520. Two membership tests over a kind code, each a
+ * jump table with only "yes" and "no" arms, so what they really are is a
+ * scattered set written as a switch.
+ *
+ * The accepted sets are in the .cpp. They are NOT script tokens -- running the
+ * accepted values through the table in docs/scripttokens.md gives a mix of
+ * delimiters and entity names that means nothing, so this is a different code
+ * space, most likely the object type numbering that object.aai lists. Named
+ * for what they do until that is settled. */
+int32_t __cdecl KindInSetA(int32_t kind);   /* range 2..42 */
+int32_t __cdecl KindInSetB(int32_t kind);   /* range 1..29 */
+
 int misc_install(void);
 
 #ifdef __cplusplus

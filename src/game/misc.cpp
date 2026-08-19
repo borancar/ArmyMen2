@@ -297,6 +297,37 @@ int32_t __cdecl ClassifyByCode74(const void *obj)
     return kCode74Class[i];
 }
 
+/* 0x0045EE20. Accepts 2-6, 11-12, 21-26, 30, 35-42. Biased by 2 over a
+ * 41-entry table; outside 2..42 the answer is no. */
+int32_t __cdecl KindInSetA(int32_t kind)
+{
+    static const uint8_t yes[41] = {
+        1,1,1,1,1, 0,0,0,0, 1,1, 0,0,0,0,0,0,0,0,
+        1,1,1,1,1,1, 0,0,0, 1, 0,0,0,0,
+        1,1,1,1,1,1,1,1,
+    };
+    uint32_t i = (uint32_t)(kind - 2);
+
+    if (i > 0x28)
+        return 0;
+    return yes[i];
+}
+
+/* 0x00433520. Accepts 1, 7-10 and 29. Biased by 1 over a 29-entry table. */
+int32_t __cdecl KindInSetB(int32_t kind)
+{
+    static const uint8_t yes[29] = {
+        1, 0,0,0,0,0, 1,1,1,1,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        1,
+    };
+    uint32_t i = (uint32_t)(kind - 1);
+
+    if (i > 0x1C)
+        return 0;
+    return yes[i];
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -335,5 +366,7 @@ int misc_install(void)
     patch_replace(ADDR_IS_KIND_14_22, (const void *)IsKind14Or22, "IsKind14Or22", 1);
     patch_replace(ADDR_CLASSIFY_CODE74, (const void *)ClassifyByCode74,
                   "ClassifyByCode74", 1);
+    patch_replace(ADDR_KIND_IN_SET_A, (const void *)KindInSetA, "KindInSetA", 1);
+    patch_replace(ADDR_KIND_IN_SET_B, (const void *)KindInSetB, "KindInSetB", 1);
     return 0;
 }
