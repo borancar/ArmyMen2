@@ -128,6 +128,7 @@ SEED = {
     0x0040A490: [(0, 0x44, "ptr", 0x900), (-1, 0x906, "u32", 4)],
     0x00434E90: [(0, 0x04, "u32", 8), (0, 0x08, "ptr", 0x900)],
     0x0040D860: [(0, 0x538, "u32v", 13)],
+    0x00408520: [(2, 0x2C, "u32v", 0x40), (2, 0x10, "u32v", 0)],
     0x00429F20: [(1, 0x00, "ptr", 0x900)],
 }
 
@@ -715,7 +716,8 @@ def main():
                 "ADDR_MASK_PIXEL_SOLID", "ADDR_XOR_CHECKSUM",
                 "ADDR_CHAIN_FIELD_14", "ADDR_LIST_PUSH_FRONT",
                 "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN",
-                "ADDR_OBJ_KIND538_10_17", "ADDR_FILTER_MATCHES"]
+                "ADDR_OBJ_KIND538_10_17", "ADDR_FILTER_MATCHES",
+                "ADDR_CONSUME_PENDING"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -809,6 +811,7 @@ def main():
         "ADDR_FIELD51_MEETS_MIN": "Field51MeetsMin",
         "ADDR_OBJ_KIND538_10_17": "ObjKind538In10To17",
         "ADDR_FILTER_MATCHES": "FilterMatches",
+        "ADDR_CONSUME_PENDING": "ConsumePendingByte",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -820,7 +823,7 @@ def main():
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
             "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet",
             "TitleCaseName", "ResetPairMask", "SetFacing14", "SetFacing08",
-            "ListPushFront"}
+            "ListPushFront", "ConsumePendingByte"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

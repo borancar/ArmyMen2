@@ -1383,6 +1383,116 @@ static const uint32_t i_ObjKind538In10To17_51[] = {2380,55,2381,0,3384,21,3385,0
 static const uint32_t i_ObjKind538In10To17_52[] = {2380,62,2381,0,3384,22,3385,0,3386,0,3387,0};
 static const uint32_t i_ObjKind538In10To17_53[] = {2380,69,2381,0,3384,23,3385,0,3386,0,3387,0};
 static const uint32_t i_ObjKind538In10To17_54[] = {2380,76,2381,0,3384,24,3385,0,3386,0,3387,0};
+static const uint32_t w_ConsumePendingByte_0[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_0[] = {2380,251,2381,255,6188,60,6189,0,6190,0,6191,0,6160,252,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_1[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_1[] = {2380,2,2381,0,6188,61,6189,0,6190,0,6191,0,6160,253,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_2[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_2[] = {2380,9,2381,0,6188,62,6189,0,6190,0,6191,0,6160,254,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_3[] = {2308,0,4096,41};
+static const uint32_t i_ConsumePendingByte_3[] = {2380,23,2381,0,6188,64,6189,0,6190,0,6191,0,6160,0,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_4[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_4[] = {2380,30,2381,0,6188,65,6189,0,6190,0,6191,0,6160,1,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_5[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_5[] = {2380,37,2381,0,6188,66,6189,0,6190,0,6191,0,6160,2,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_6[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_6[] = {2380,44,2381,0,6188,67,6189,0,6190,0,6191,0,6160,3,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_7[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_7[] = {2380,51,2381,0,6188,68,6189,0,6190,0,6191,0,6160,4,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_8[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_8[] = {2380,58,2381,0,6188,69,6189,0,6190,0,6191,0,6160,5,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_9[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_9[] = {2380,72,2381,0,6188,71,6189,0,6190,0,6191,0,6160,7,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_10[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_10[] = {2380,79,2381,0,6188,72,6189,0,6190,0,6191,0,6160,8,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_11[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_11[] = {2380,252,2381,255,6188,73,6189,0,6190,0,6191,0,6160,9,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_12[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_12[] = {2380,3,2381,0,6188,74,6189,0,6190,0,6191,0,6160,10,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_13[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_13[] = {2380,10,2381,0,6188,75,6189,0,6190,0,6191,0,6160,11,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_14[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_14[] = {2380,17,2381,0,6188,60,6189,0,6190,0,6191,0,6160,252,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_15[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_15[] = {2380,31,2381,0,6188,62,6189,0,6190,0,6191,0,6160,254,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_16[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_16[] = {2380,38,2381,0,6188,63,6189,0,6190,0,6191,0,6160,255,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_17[] = {2308,0,4096,41};
+static const uint32_t i_ConsumePendingByte_17[] = {2380,45,2381,0,6188,64,6189,0,6190,0,6191,0,6160,0,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_18[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_18[] = {2380,52,2381,0,6188,65,6189,0,6190,0,6191,0,6160,1,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_19[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_19[] = {2380,59,2381,0,6188,66,6189,0,6190,0,6191,0,6160,2,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_20[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_20[] = {2380,66,2381,0,6188,67,6189,0,6190,0,6191,0,6160,3,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_21[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_21[] = {2380,80,2381,0,6188,69,6189,0,6190,0,6191,0,6160,5,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_22[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_22[] = {2380,253,2381,255,6188,70,6189,0,6190,0,6191,0,6160,6,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_23[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_23[] = {2380,4,2381,0,6188,71,6189,0,6190,0,6191,0,6160,7,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_24[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_24[] = {2380,11,2381,0,6188,72,6189,0,6190,0,6191,0,6160,8,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_25[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_25[] = {2380,18,2381,0,6188,73,6189,0,6190,0,6191,0,6160,9,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_26[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_26[] = {2380,25,2381,0,6188,74,6189,0,6190,0,6191,0,6160,10,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_27[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_27[] = {2380,39,2381,0,6188,60,6189,0,6190,0,6191,0,6160,252,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_28[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_28[] = {2380,46,2381,0,6188,61,6189,0,6190,0,6191,0,6160,253,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_29[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_29[] = {2380,53,2381,0,6188,62,6189,0,6190,0,6191,0,6160,254,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_30[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_30[] = {2380,60,2381,0,6188,63,6189,0,6190,0,6191,0,6160,255,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_31[] = {2308,0,4096,41};
+static const uint32_t i_ConsumePendingByte_31[] = {2380,67,2381,0,6188,64,6189,0,6190,0,6191,0,6160,0,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_32[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_32[] = {2380,74,2381,0,6188,65,6189,0,6190,0,6191,0,6160,1,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_33[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_33[] = {2380,254,2381,255,6188,67,6189,0,6190,0,6191,0,6160,3,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_34[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_34[] = {2380,5,2381,0,6188,68,6189,0,6190,0,6191,0,6160,4,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_35[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_35[] = {2380,12,2381,0,6188,69,6189,0,6190,0,6191,0,6160,5,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_36[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_36[] = {2380,19,2381,0,6188,70,6189,0,6190,0,6191,0,6160,6,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_37[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_37[] = {2380,26,2381,0,6188,71,6189,0,6190,0,6191,0,6160,7,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_38[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_38[] = {2380,33,2381,0,6188,72,6189,0,6190,0,6191,0,6160,8,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_39[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_39[] = {2380,47,2381,0,6188,74,6189,0,6190,0,6191,0,6160,10,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_40[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_40[] = {2380,54,2381,0,6188,75,6189,0,6190,0,6191,0,6160,11,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_41[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_41[] = {2380,61,2381,0,6188,60,6189,0,6190,0,6191,0,6160,252,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_42[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_42[] = {2380,68,2381,0,6188,61,6189,0,6190,0,6191,0,6160,253,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_43[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_43[] = {2380,75,2381,0,6188,62,6189,0,6190,0,6191,0,6160,254,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_44[] = {2308,0};
+static const uint32_t i_ConsumePendingByte_44[] = {2380,82,2381,0,6188,63,6189,0,6190,0,6191,0,6160,255,6161,255,6162,255,6163,255};
+static const uint32_t w_ConsumePendingByte_45[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_45[] = {2380,6,2381,0,6188,65,6189,0,6190,0,6191,0,6160,1,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_46[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_46[] = {2380,13,2381,0,6188,66,6189,0,6190,0,6191,0,6160,2,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_47[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_47[] = {2380,20,2381,0,6188,67,6189,0,6190,0,6191,0,6160,3,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_48[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_48[] = {2380,27,2381,0,6188,68,6189,0,6190,0,6191,0,6160,4,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_49[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_49[] = {2380,34,2381,0,6188,69,6189,0,6190,0,6191,0,6160,5,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_50[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_50[] = {2380,41,2381,0,6188,70,6189,0,6190,0,6191,0,6160,6,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_51[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_51[] = {2380,55,2381,0,6188,72,6189,0,6190,0,6191,0,6160,8,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_52[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_52[] = {2380,62,2381,0,6188,73,6189,0,6190,0,6191,0,6160,9,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_53[] = {2068,3,2069,0,2070,0,2071,0,2308,0};
+static const uint32_t i_ConsumePendingByte_53[] = {2380,69,2381,0,6188,74,6189,0,6190,0,6191,0,6160,10,6161,0,6162,0,6163,0};
+static const uint32_t w_ConsumePendingByte_54[] = {2308,0,4116,3,4117,0,4118,0,4119,0};
+static const uint32_t i_ConsumePendingByte_54[] = {2380,76,2381,0,6188,75,6189,0,6190,0,6191,0,6160,11,6161,0,6162,0,6163,0};
 
 static const AM2_Vector kVectors[] = {
     {"Clamp", (void *)Clamp, 3, {0,0,0,0,0,0}, {0x00000000u,0x00000001u,0xffffffffu,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -5423,4 +5533,59 @@ static const AM2_Vector kVectors[] = {
     {"FilterMatches", (void *)FilterMatches, 6, {0,0,0,0,0,0}, {0xffffffffu,0x000287fdu,0x0001e2cbu,0x000258b2u,0x000287fdu,0x0001e2cbu}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {"FilterMatches", (void *)FilterMatches, 6, {0,0,0,0,0,0}, {0x00010105u,0x00004188u,0xfffded75u,0xfffc9106u,0x00010105u,0xffffffffu}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {"FilterMatches", (void *)FilterMatches, 6, {0,0,0,0,0,0}, {0x00000000u,0x000127e1u,0x0000afd1u,0x0001ce41u,0x00005dcau,0xfffed22fu}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_0, 10, i_ConsumePendingByte_0, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_1, 10, i_ConsumePendingByte_1, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_2, 10, i_ConsumePendingByte_2, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001829u, 1, 1, 2, w_ConsumePendingByte_3, 10, i_ConsumePendingByte_3, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_4, 10, i_ConsumePendingByte_4, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_5, 10, i_ConsumePendingByte_5, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_6, 10, i_ConsumePendingByte_6, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_7, 10, i_ConsumePendingByte_7, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_8, 10, i_ConsumePendingByte_8, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_9, 10, i_ConsumePendingByte_9, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_10, 10, i_ConsumePendingByte_10, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_11, 10, i_ConsumePendingByte_11, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_12, 10, i_ConsumePendingByte_12, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_13, 10, i_ConsumePendingByte_13, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_14, 10, i_ConsumePendingByte_14, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_15, 10, i_ConsumePendingByte_15, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_16, 10, i_ConsumePendingByte_16, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001829u, 1, 1, 2, w_ConsumePendingByte_17, 10, i_ConsumePendingByte_17, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_18, 10, i_ConsumePendingByte_18, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_19, 10, i_ConsumePendingByte_19, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_20, 10, i_ConsumePendingByte_20, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_21, 10, i_ConsumePendingByte_21, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_22, 10, i_ConsumePendingByte_22, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_23, 10, i_ConsumePendingByte_23, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_24, 10, i_ConsumePendingByte_24, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_25, 10, i_ConsumePendingByte_25, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_26, 10, i_ConsumePendingByte_26, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_27, 10, i_ConsumePendingByte_27, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_28, 10, i_ConsumePendingByte_28, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_29, 10, i_ConsumePendingByte_29, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_30, 10, i_ConsumePendingByte_30, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001829u, 1, 1, 2, w_ConsumePendingByte_31, 10, i_ConsumePendingByte_31, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_32, 10, i_ConsumePendingByte_32, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_33, 10, i_ConsumePendingByte_33, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_34, 10, i_ConsumePendingByte_34, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_35, 10, i_ConsumePendingByte_35, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_36, 10, i_ConsumePendingByte_36, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_37, 10, i_ConsumePendingByte_37, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_38, 10, i_ConsumePendingByte_38, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_39, 10, i_ConsumePendingByte_39, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_40, 10, i_ConsumePendingByte_40, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_41, 10, i_ConsumePendingByte_41, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_42, 10, i_ConsumePendingByte_42, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_43, 10, i_ConsumePendingByte_43, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 1, w_ConsumePendingByte_44, 10, i_ConsumePendingByte_44, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_45, 10, i_ConsumePendingByte_45, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_46, 10, i_ConsumePendingByte_46, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_47, 10, i_ConsumePendingByte_47, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_48, 10, i_ConsumePendingByte_48, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_49, 10, i_ConsumePendingByte_49, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_50, 10, i_ConsumePendingByte_50, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_51, 10, i_ConsumePendingByte_51, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00000800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_ConsumePendingByte_52, 10, i_ConsumePendingByte_52, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00000800u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_53, 10, i_ConsumePendingByte_53, 0, 0, 0, 0},
+    {"ConsumePendingByte", (void *)ConsumePendingByte, 3, {1,1,1,0,0,0}, {0x00000800u,0x00001000u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00001800u, 1, 1, 5, w_ConsumePendingByte_54, 10, i_ConsumePendingByte_54, 0, 0, 0, 0},
 };

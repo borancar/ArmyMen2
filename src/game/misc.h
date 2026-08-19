@@ -249,6 +249,18 @@ int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
                               int32_t haveA, int32_t haveB,
                               int32_t maskA, int32_t maskB);
 
+/* 0x00408520. Consumes a pending byte at +0x104 of `src`: does nothing if it
+ * is zero, otherwise writes it into *dst when `cfg` permits, and clears it
+ * either way.
+ *
+ * Two independent decisions come off `cfg`. The byte at +0x2C above 0x40 --
+ * UNSIGNED, so 0x80 counts as above -- sets *(int32 *)(dst + 0x14) to 3. And
+ * the pending byte only reaches *dst when the dword at +0x10 is zero.
+ *
+ * The pending byte is read TWICE, and it has to be: loading `cfg` clobbers the
+ * register the first read used, so the original goes back for it. */
+void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg);
+
 int misc_install(void);
 
 #ifdef __cplusplus

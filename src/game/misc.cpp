@@ -462,6 +462,24 @@ int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
     return 1;
 }
 
+void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg)
+{
+    uint8_t       *s = (uint8_t *)src;
+    uint8_t       *d = (uint8_t *)dst;
+    const uint8_t *c = (const uint8_t *)cfg;
+
+    if (!s[0x104])
+        return;
+
+    if (c[0x2C] > 0x40)                       /* unsigned */
+        *(int32_t *)(d + 0x14) = 3;
+
+    if (*(const uint32_t *)(c + 0x10) == 0)
+        *d = s[0x104];                        /* re-read, as the original */
+
+    s[0x104] = 0;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -517,5 +535,7 @@ int misc_install(void)
                   "ObjKind538In10To17", 1);
     patch_replace(ADDR_FILTER_MATCHES, (const void *)FilterMatches,
                   "FilterMatches", 6);
+    patch_replace(ADDR_CONSUME_PENDING, (const void *)ConsumePendingByte,
+                  "ConsumePendingByte", 3);
     return 0;
 }
