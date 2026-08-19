@@ -43,7 +43,8 @@ import am2
 import capstone
 import pefile
 from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
-from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_ESP)
+from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_EIP,
+                               UC_X86_REG_ESP)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IMAGE_BASE = 0x00400000
@@ -71,6 +72,16 @@ def addr_names():
             if m:
                 out[m.group(1)] = int(m.group(2), 16)
     return out
+
+
+# Argument kinds the classifier gets wrong, with the reason. It follows a slot
+# through `mov` copies, which covers most functions, but not through
+# ARITHMETIC: ReverseBlocks computes its source as `add edx, edi` and then
+# dereferences edx, so slot 1 never looks like a pointer and the vectors feed
+# it an integer. Rather than build dataflow analysis for one case, say so here.
+ARG_KIND_OVERRIDE = {
+    0x004231A0: {0: "ptr", 1: "ptr"},   # ReverseBlocks(dst, src, total, count)
+}
 
 
 def analyse(img, md, addr, size):
@@ -151,6 +162,7 @@ def analyse(img, md, addr, size):
                 if reg in slots:
                     kinds[slots[reg]] = "ptr"
 
+    kinds.update(ARG_KIND_OVERRIDE.get(addr, {}))
     return highest + 1, kinds
 
 
@@ -184,6 +196,17 @@ class Emu:
             self.uc.emu_start(addr, RET_MAGIC, timeout=500000, count=100000)
         except UcError:
             return None, None
+
+        # emu_start's instruction cap and timeout STOP execution without
+        # raising, so a run that never reached the return address still comes
+        # back here with a plausible-looking eax. Recording that as the
+        # expected answer is how ReverseBlocks acquired twelve vectors
+        # demanding 0 from a function whose every exit returns 1: a count of
+        # 0x7FFFFFFF makes total/count zero, and the loop spins two billion
+        # times copying nothing. Only a run that actually returned counts.
+        if self.uc.reg_read(UC_X86_REG_EIP) != RET_MAGIC:
+            return None, None
+
         return (self.uc.reg_read(UC_X86_REG_EAX),
                 bytes(self.uc.mem_read(SCRATCH, SCRATCH_SZ)))
 
@@ -441,7 +464,9 @@ def main():
                 "ADDR_COPY_BYTE_IF_SET", "ADDR_SCALE_32_BLOCKS",
                 "ADDR_TITLE_CASE", "ADDR_RESET_PAIR_MASK", "ADDR_IS_KIND_7",
                 "ADDR_IS_BLANK", "ADDR_IS_SCRIPT_DELIM",
-                "ADDR_SWAP_COLOUR_BYTES", "ADDR_RETURN_ZERO", "ADDR_RETURN_ONE"]
+                "ADDR_SWAP_COLOUR_BYTES", "ADDR_RETURN_ZERO", "ADDR_RETURN_ONE",
+                "ADDR_REVERSE_BLOCKS", "ADDR_SCRIPT_COMPARE",
+                "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -509,6 +534,8 @@ def main():
         "ADDR_IS_BLANK": "IsBlank", "ADDR_IS_SCRIPT_DELIM": "IsScriptDelim",
         "ADDR_SWAP_COLOUR_BYTES": "SwapColourBytes",
         "ADDR_RETURN_ZERO": "ReturnZero", "ADDR_RETURN_ONE": "ReturnOne",
+        "ADDR_REVERSE_BLOCKS": "ReverseBlocks",
+        "ADDR_SCRIPT_COMPARE": "ScriptCompare",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -527,17 +554,17 @@ def main():
     for nm in todo:
         addr = names.get(nm) or int(nm, 16)
         size = sizes.get(addr, 0)
-        if not size:
-            # functions.tsv merges neighbours, so a real function can have no
-            # entry of its own -- CompareDword at 0x0043E150 is one. merges.py
-            # knows where the real boundaries are; ask it before giving up,
-            # otherwise a reconstruction silently gets no vectors at all.
-            import merges as _m
-            _merged = _m.real_functions(img)
-            for _e, (_starts, _sz) in _merged.items():
-                if addr in _starts:
-                    _fn, size = _m.owner(_starts, _sz, addr)
-                    break
+        # functions.tsv merges neighbours, so its size can cover several real
+        # functions. ScriptCompare's entry says 176 bytes where the function is
+        # 80, which put the NEXT function's instructions in the coverage
+        # denominator and its dereferences in the argument classifier. Always
+        # ask merges.py, not only when there is no entry at all.
+        import merges as _m
+        _merged = _m.real_functions(img)
+        for _e, (_starts, _sz) in _merged.items():
+            if addr in _starts:
+                _fn, size = _m.owner(_starts, _sz, addr)
+                break
         if not size:
             print("  %-24s not in functions.tsv" % nm)
             continue

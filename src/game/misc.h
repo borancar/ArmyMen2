@@ -76,6 +76,23 @@ void     __cdecl   NullStub(void);            /* 0x0042E170, bare `ret` */
 int32_t  __cdecl   ReturnZero(void);          /* 0x0042E980 */
 int32_t  __cdecl   ReturnOne(void);           /* 0x004354F0 */
 
+/* 0x004231A0. Copies `count` blocks of `total / count` bytes from src to dst,
+ * taking the SOURCE blocks in reverse order while the destination advances --
+ * a block reverse, which over rows of a bitmap is a vertical flip. Returns 1,
+ * including when count <= 0 and it copies nothing. */
+int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
+                              int32_t count);
+
+/* 0x004374F0. The script language's comparison, between the objscript.cpp and
+ * pad.cpp anchors: op 0 is equal, 1 is less, 2 is greater, anything else is
+ * false. Note the operand order -- every arm compares the THIRD argument
+ * against the first, so op 1 answers `b < a`. */
+int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b);
+
+/* 0x0045CAA0. The debug logger, a bare `ret` in the retail build. 617 call
+ * sites, every one of them a message this build does not print. */
+void __cdecl GameLog(const char *fmt, ...);
+
 int misc_install(void);
 
 #ifdef __cplusplus

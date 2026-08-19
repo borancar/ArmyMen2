@@ -112,6 +112,48 @@ void __cdecl   NullStub(void)          { }
 int32_t __cdecl ReturnZero(void)       { return 0; }
 int32_t __cdecl ReturnOne(void)        { return 1; }
 
+int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
+                              int32_t count)
+{
+    uint8_t       *d = (uint8_t *)dst;
+    const uint8_t *s;
+    int32_t        n, i, j;
+
+    /* The division comes BEFORE the count test in the original, so a count of
+     * zero faults on the idiv rather than returning. Keeping that order means
+     * count == 0 is undefined here as it is fatal there -- no vector can reach
+     * it either way, since the emulator faults on the same instruction and the
+     * vector is dropped. */
+    n = total / count;
+    s = (const uint8_t *)src + (int32_t)(count - 1) * n;
+
+    if (count <= 0)
+        return 1;
+
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < n; j++)
+            d[j] = s[j];
+        d += n;
+        s -= n;
+    }
+    return 1;
+}
+
+int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)
+{
+    switch (op) {
+    case 0:  return (b == a) ? 1 : 0;
+    case 1:  return (b < a) ? 1 : 0;
+    case 2:  return (b > a) ? 1 : 0;
+    default: return 0;
+    }
+}
+
+void __cdecl GameLog(const char *fmt, ...)
+{
+    (void)fmt;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -134,5 +176,9 @@ int misc_install(void)
     patch_replace(ADDR_NULL_STUB, (const void *)NullStub, "NullStub", 0);
     patch_replace(ADDR_RETURN_ZERO, (const void *)ReturnZero, "ReturnZero", 0);
     patch_replace(ADDR_RETURN_ONE, (const void *)ReturnOne, "ReturnOne", 0);
+    patch_replace(ADDR_REVERSE_BLOCKS, (const void *)ReverseBlocks,
+                  "ReverseBlocks", 4);
+    patch_replace(ADDR_SCRIPT_COMPARE, (const void *)ScriptCompare,
+                  "ScriptCompare", 3);
     return 0;
 }
