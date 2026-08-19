@@ -294,6 +294,23 @@ int32_t __cdecl ScriptHitTarget(AM2_ScriptCtx *ctx, int32_t *at,
 int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
                                   int32_t *form, int32_t *val, int32_t *army);
 
+/* 0x0043FF90. One event term of an `if` condition.
+ *
+ *   <name>                          kind 0, *val is its uid
+ *   padoff <name>                   kind 2, *val is the pad index
+ *   padon  <name>                   kind 3
+ *   killed <target> [by <target>]   kind 4
+ *   hit    ...                      kind 5
+ *   healed ...                      kind 6
+ *   pickedup ...                    kind 7
+ *   dropped  ...                    kind 8
+ *
+ * Only seven keywords reach an arm; every other reserved word is "Unexpected
+ * reserved word in if statement." *val2 is zeroed on entry and stays zero
+ * unless a `by` clause supplies it. */
+int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
+                                 int32_t *kind, int32_t *val, int32_t *val2);
+
 /* 0x00442F10. Does `want` appear before `stop`, scanning from `from`? */
 int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
                               int32_t want, int32_t stop);

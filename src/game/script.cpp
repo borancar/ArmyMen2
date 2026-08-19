@@ -627,8 +627,7 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
             return 1;
 
         int32_t a = 0, b = 0, c = 0;
-        if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_EVENT)(
-                ctx, at, &a, &b, &c))
+        if (!ScriptParseEvent(ctx, at, &a, &b, &c))
             return 0;                   /* silent -- the callee has spoken */
         ScriptAddEvent(cond, a, b, c);
 
@@ -765,6 +764,133 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     } else {
         *val = -1;
     }
+    return 1;
+}
+
+/* The five `<verb> <target> [by <target>]` events, which differ only in the
+ * kind they record and the two messages they print. */
+static const struct {
+    int32_t     id;
+    int32_t     kind;
+    const char *missing;
+    const char *missing_by;
+} kScriptEvents[5] = {
+    { 57, 4, "Line [%4d]:  Expected item name after KILLED\n",
+             "Line [%4d]:  Expected item name after KILLED ... BY\n" },
+    { 58, 5, "Line [%4d]:  Expected item name after HIT\n",
+             "Line [%4d]:  Expected item name after HIT ... BY\n" },
+    { 59, 6, "Line [%4d]:  Expected item name after HEALED\n",
+             "Line [%4d]:  Expected item name after HEALED ... BY\n" },
+    { 61, 7, "Line [%4d]:  Expected item name after PICKEDUP\n",
+             "Line [%4d]:  Expected item name after PICKEDUP ... BY\n" },
+    { 62, 8, "Line [%4d]:  Expected item name after DROPPED\n",
+             "Line [%4d]:  Expected item name after DROPPED ... BY\n" },
+};
+
+/* `padon <name>` and `padoff <name>`, which differ only in the kind and the
+ * two messages. */
+static int32_t ScriptPadEvent(AM2_ScriptCtx *ctx, int32_t *at, int32_t *val,
+                              const char *no_name, const char *not_a_pad)
+{
+    if (!ScriptStep(ctx, at))
+        return 0;
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+    if (tok->kind != AM2_TOKEN_STRING) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_STRING));
+        return 0;
+    }
+
+    int32_t idx = ScriptFindName((const char *)tok->value);
+    if (idx < 0) {
+        am2_log(no_name, ctx->tokens[*at].line);
+        return 0;
+    }
+    /* Type 1 is what `pad` declares. */
+    if (kScriptNames[idx].type != 1) {
+        am2_log(not_a_pad, ctx->tokens[*at].line);
+        return 0;
+    }
+
+    *val = kScriptNames[idx].value;
+    (*at)++;
+    return 1;
+}
+
+int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
+                                 int32_t *kind, int32_t *val, int32_t *val2)
+{
+    *val2 = 0;
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+
+    if (tok->kind == AM2_TOKEN_RESERVED) {
+        int32_t id = (int32_t)(uintptr_t)tok->value;
+
+        if (id == 27) {                                 /* padon */
+            *kind = 3;
+            return ScriptPadEvent(ctx, at, val,
+                                  "Line [%4d]:  Name required after PADON\n",
+                                  "Line [%4d]:  PADON name was not a pad\n");
+        }
+        if (id == 28) {                                 /* padoff */
+            *kind = 2;
+            return ScriptPadEvent(ctx, at, val,
+                                  "Line [%4d]:  Name required after PADOFF\n",
+                                  "Line [%4d]:  PADOFF name was not a pad\n");
+        }
+
+        for (uint32_t i = 0; i < 5; i++) {
+            if (kScriptEvents[i].id != id)
+                continue;
+
+            *kind = kScriptEvents[i].kind;
+            if (!ScriptStep(ctx, at))
+                return 0;
+
+            if (!ScriptHitTarget(ctx, at, val)) {
+                am2_log(kScriptEvents[i].missing, ctx->tokens[*at].line);
+                return 0;
+            }
+
+            /* `by <target>` is optional; without it *val2 keeps the zero
+             * written on entry. */
+            tok = &ctx->tokens[*at];
+            if (tok->kind != AM2_TOKEN_RESERVED ||
+                (int32_t)(uintptr_t)tok->value != 60)
+                return 1;
+
+            if (!ScriptStep(ctx, at))
+                return 0;
+            if (!ScriptHitTarget(ctx, at, val2)) {
+                am2_log(kScriptEvents[i].missing_by, ctx->tokens[*at].line);
+                return 0;
+            }
+            return 1;
+        }
+
+        am2_log("Line [%4d]:  Unexpected reserved word in if statement.\n",
+                ctx->tokens[*at].line);
+        return 0;
+    }
+
+    /* A bare name: the event is that object, whatever happens to it. */
+    *kind = 0;
+    if (tok->kind != AM2_TOKEN_STRING) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_STRING));
+        return 0;
+    }
+
+    *val = ScriptNameUid((const char *)tok->value);
+    if (*val < 0)
+        return 0;
+    (*at)++;
     return 1;
 }
 
@@ -1457,8 +1583,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (k != AM2_TOKEN_STRING && k != AM2_TOKEN_RESERVED)
                 break;
 
-            if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_EVENT)(
-                    ctx, at, &a, &b, &c3))
+            if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
             ScriptAddEvent(cond, a, b, c3);
 
@@ -1470,8 +1595,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (++(*at) >= ctx->count)
                 goto end_of_script_late;
 
-            if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_EVENT)(
-                    ctx, at, &a, &b, &c3))
+            if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
             ScriptAddEvent(cond, a, b, c3);
 
@@ -1526,8 +1650,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             cond->kind = 7;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
-            if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_EVENT)(
-                    ctx, at, &a, &b, &c3))
+            if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
             ScriptAddEvent(cond, a, b, c3);
             if (*at >= ctx->count)
@@ -1543,8 +1666,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             cond->kind = 8;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
-            if (!((am2_parse3_fn)(uintptr_t)ADDR_SCRIPT_PARSE_EVENT)(
-                    ctx, at, &a, &b, &c3))
+            if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
             ScriptAddEvent(cond, a, b, c3);
             if (*at >= ctx->count)
@@ -1920,6 +2042,9 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_ORDER_TARGET,
                         (const void *)ScriptOrderTarget,
                         "ScriptOrderTarget", 1);
+    rc |= patch_replace(ADDR_SCRIPT_PARSE_EVENT,
+                        (const void *)ScriptParseEvent,
+                        "ScriptParseEvent", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);
