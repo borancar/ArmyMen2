@@ -829,7 +829,7 @@
  * The chain, from WinMain down:
  *
  *   WinMain -> RunFrame -> ADDR_STATE2_FRAME -> ADDR_LOAD_LEVEL_SCRIPT
- *     -> ADDR_SCRIPT_PARSE_FILE -> ADDR_SCRIPT_PARSE_LINE
+ *     -> ADDR_READ_SCRIPT -> ADDR_SCRIPT_NEXT_TOKEN
  *       -> ADDR_SCRIPT_NEXT_TOKEN -> IsBlank, IsScriptDelim
  *
  * ADDR_LOAD_LEVEL_SCRIPT builds "<map><n>.txt" when the level index is
@@ -843,8 +843,12 @@
  * space/tab/CR and IsScriptDelim accepts exactly the first character of each
  * of tokens 1..13. They are the lexer's character classes. */
 #define ADDR_LOAD_LEVEL_SCRIPT   0x00425060u  /* void(void) */
-#define ADDR_SCRIPT_PARSE_FILE   0x00444CD0u  /* int32_t(const char *, ctx *) */
-#define ADDR_SCRIPT_PARSE_LINE   0x00444C40u  /* the other caller of the lexer */
+#define ADDR_READ_SCRIPT         0x00444CD0u  /* int32_t(const char *, ctx *) */
+/* NOT part of the ReadScript path, which was recorded here wrongly for
+ * several commits. ReadScript tokenises with NextToken directly and never
+ * calls this; 0x00444C40's only callers are inside 0x00417B80, the menu text
+ * field. It parses one typed line and runs it. */
+#define ADDR_SCRIPT_RUN_LINE     0x00444C40u  /* the other caller of the lexer */
 #define ADDR_SCRIPT_NEXT_TOKEN   0x0043F450u  /* the tokeniser; stops at // */
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
@@ -989,6 +993,18 @@
 
 /* Head of the condition list; each record links through its +0x30. */
 #define ADDR_SCRIPT_CONDITIONS    0x00510214u
+/* Names recovered from the error strings the functions print about
+ * themselves. None is reconstructed yet; recorded so the names are here when
+ * they are, rather than being guessed at from a call site again. */
+#define ADDR_SCRIPT_RESURRECT_ITEM 0x0041FEC0u
+#define ADDR_SCRIPT_SET_OBJ_BITMAP 0x00420060u
+#define ADDR_UPDATE_OBJECT_SCRIPT  0x004371A0u  /* also ChangeObjectFrame */
+#define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u
+#define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
+#define ADDR_DEF_GAME_PARSE        0x00424590u
+#define ADDR_DEF_OBJ_PARSE         0x00435B60u
+#define ADDR_DEF_LINK_PARSE        0x00436080u
+
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --
                                                * GenerateObjScriptFromTokens,
                                                * from its own error string */

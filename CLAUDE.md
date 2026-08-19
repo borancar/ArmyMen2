@@ -278,7 +278,25 @@ The game ships its missions as readable text -- `data/<map>/<map>N.txt` and
 `rules/*.txt`, 109 files under the prefix -- so this is the one subsystem whose
 names come from the program's own vocabulary rather than from us. The chain is
 `WinMain -> RunFrame -> ADDR_STATE2_FRAME -> LoadLevelScript (0x00425060) ->
-ReadScript (0x00444CD0) -> ParseLine (0x00444C40) -> NextToken (0x0043F450)`.
+ReadScript (0x00444CD0) -> NextToken (0x0043F450)`.
+
+**`ParseLine` was never in that chain**, and it sat in this file for several
+commits as though it were. `ReadScript` tokenises with `NextToken` directly and
+never calls `0x00444C40`; that function's only callers are inside `0x00417B80`,
+the menu text field, and it parses one typed line and runs it. A call chain is
+worth checking with a cross-reference rather than assuming the obvious middle
+step exists.
+
+**And the name `ParseScriptFile` was mine, not the program's.** There is no such
+string anywhere in the image; `0x00444CD0` calls itself `ReadScript`, in
+"ReadScript: Could not open %s for reading.". The macro said `PARSE_FILE` while
+the function said `ReadScript` for the whole of this work, which is exactly the
+drift the naming rule exists to stop. Nine more real names were sitting in the
+strings unclaimed and are now in `orig.h`: `ScriptResurrectItem`,
+`ScriptSetObjBitmap`, `UpdateObjectScript`, `ChangeObjectFrame`,
+`SetObjScriptState`, `DefParseInfoFile`, `DefGameParse`, `DefObjParse`,
+`DefLinkParse`. Two source filenames come with them -- `script.cpp` and
+`objscript.cpp`.
 
 **The whole script parser is reconstructed** -- `ParseScriptFile` and every
 function under it, 42 in all, from the file down to the last action operand.

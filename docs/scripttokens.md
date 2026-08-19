@@ -243,7 +243,7 @@ declares each score variable with kind 3, and kind 3 is `Integer`.
 
 ```
 WinMain -> RunFrame -> StateFrame -> LoadLevelScript 0x00425060
-  -> ParseScriptFile 0x00444CD0 -> ParseScriptLine 0x00444C40
+  -> ReadScript 0x00444CD0
     -> NextToken 0x0043F450 -> IsBlank 0x0043EE80, IsScriptDelim 0x0043EEA0
 ```
 

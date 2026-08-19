@@ -3254,7 +3254,7 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_IS_STMT,
                         (const void *)ScriptIsStatementStart,
                         "ScriptIsStatementStart", 1);
-    rc |= patch_replace(ADDR_SCRIPT_PARSE_FILE,
+    rc |= patch_replace(ADDR_READ_SCRIPT,
                         (const void *)ReadScript,
                         "ReadScript", 1);
     rc |= patch_replace(ADDR_SCRIPT_ALLOC_UID,

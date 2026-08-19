@@ -121,7 +121,7 @@ def main():
         w("## The interpreter\n\n")
         w("```\n"
           "WinMain -> RunFrame -> StateFrame -> LoadLevelScript 0x00425060\n"
-          "  -> ParseScriptFile 0x00444CD0 -> ParseScriptLine 0x00444C40\n"
+          "  -> ReadScript 0x00444CD0\n"
           "    -> NextToken 0x0043F450 -> IsBlank 0x0043EE80, "
           "IsScriptDelim 0x0043EEA0\n"
           "```\n\n")
