@@ -122,6 +122,7 @@ static const struct check kChecks[] = {
     { "MaskPixelSolid", ADDR_MASK_PIXEL_SOLID,(void *)MaskPixelSolid,3, {0,0,1,0} },
     { "ObjKind538In10To17", ADDR_OBJ_KIND538_10_17,
                             (void *)ObjKind538In10To17, 1, {1,0,0,0} },
+    { "FilterMatches",  ADDR_FILTER_MATCHES, (void *)FilterMatches,  6, {0,0,0,0} },
 };
 
 /* A cheap deterministic generator: the interesting values first, then a
@@ -180,8 +181,10 @@ int selfcheck_run(void)
             checked++;
             if (got != want) {
                 if (!bad)
-                    hooklog("selfcheck: %s(%08x,%08x,%08x) -> %08x, original %08x",
-                            c->name, a[0], a[1], a[2], got, want);
+                    hooklog("selfcheck: %s(%08x,%08x,%08x,%08x,%08x,%08x)"
+                            " -> %08x, original %08x",
+                            c->name, a[0], a[1], a[2], a[3], a[4], a[5],
+                            got, want);
                 bad++;
                 failed++;
             }

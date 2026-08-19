@@ -515,6 +515,49 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=()):
             # rather than reading one constant every time.
             struct.pack_into("<h", b, 0x900 + 0x4C, (k * 7) % 90 - 5)
             scratch = bytes(b)
+        # Independent values almost never satisfy a relation BETWEEN arguments,
+        # and a lot of these functions test exactly that -- FilterMatches asks
+        # whether one argument equals another, or is a subset of it, and sat at
+        # 52.9% because no two generated arguments were ever equal. Correlate
+        # some of them: copy one slot to another, and make one a superset.
+        if nargs >= 2:
+            args = list(args)
+            # Only ever copy between slots of the SAME kind. Copying a
+            # pointer into a scalar slot put a scratch address where RectSet
+            # wanted a coordinate, it got stored into the rectangle, and the
+            # write comparison then read it back as a pointer and failed with
+            # identical-looking values on both sides.
+            same = lambda i, j: kinds.get(i, "scalar") == kinds.get(j, "scalar")
+            if k % 4 == 1:
+                for i in range(nargs // 2, nargs):
+                    if same(i, i - nargs // 2):
+                        args[i] = args[i - nargs // 2]
+            elif k % 4 == 2 and nargs >= 3:
+                if kinds.get(nargs - 1, "scalar") != "ptr":
+                    args[nargs - 1] = -1
+                if same(nargs - 2, 0):
+                    args[nargs - 2] = args[0]
+            elif k % 8 == 3 and nargs >= 3:
+                # All bits set is the natural superset, which is what a subset
+                # test needs on its other side.
+                if kinds.get(nargs - 1, "scalar") != "ptr":
+                    args[nargs - 1] = -1
+                if kinds.get(nargs - 2, "scalar") != "ptr":
+                    args[nargs - 2] = -1
+
+            # Neutralise the FIRST argument, INDEPENDENTLY of the correlations
+            # above. A function that checks its arguments in order early-outs
+            # on the first, so everything after it is unreachable until that one
+            # passes -- the second half of FilterMatches was unvisited for
+            # exactly this reason. -1 and 0 are the two wildcards this binary
+            # uses. (Written as its own `if`: as an `elif` it never fired,
+            # because every k it selects is already claimed above.)
+            if kinds.get(0, "scalar") != "ptr":
+                if k % 8 == 5:
+                    args[0] = 0xFFFFFFFF
+                elif k % 8 == 7:
+                    args[0] = 0
+
         eax, after = emu.call(addr, args, scratch)
         if eax is None:
             continue
@@ -610,6 +653,12 @@ def pure_leaves(img, md, sizes):
             # coverage -- a reconstruction could have passed on two vectors.
             if not loaded_ecx and re.search(r"\[[^\]]*\becx\b[^\]]*\]", op):
                 thiscall = True
+            # ecx read as a VALUE before it is written is the implicit `this`
+            # just as much as ecx used as a base. 0x00453910 opens with
+            # `mov eax, ecx` and writes through eax, so nothing ever indexes
+            # ecx and the pattern above saw a pure function.
+            if not loaded_ecx and re.search(r",\s*ecx\b", op):
+                thiscall = True
             if re.match(r"ecx\s*,", op) and i.mnemonic in ("mov", "lea", "xor",
                                                            "pop", "movsx", "movzx"):
                 loaded_ecx = True
@@ -666,7 +715,7 @@ def main():
                 "ADDR_MASK_PIXEL_SOLID", "ADDR_XOR_CHECKSUM",
                 "ADDR_CHAIN_FIELD_14", "ADDR_LIST_PUSH_FRONT",
                 "ADDR_SET_FIELD_IN_ALL", "ADDR_FIELD51_MEETS_MIN",
-                "ADDR_OBJ_KIND538_10_17"]
+                "ADDR_OBJ_KIND538_10_17", "ADDR_FILTER_MATCHES"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -759,6 +808,7 @@ def main():
         "ADDR_SET_FIELD_IN_ALL": "SetFieldInAll",
         "ADDR_FIELD51_MEETS_MIN": "Field51MeetsMin",
         "ADDR_OBJ_KIND538_10_17": "ObjKind538In10To17",
+        "ADDR_FILTER_MATCHES": "FilterMatches",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the

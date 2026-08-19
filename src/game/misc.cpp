@@ -435,6 +435,33 @@ int32_t __cdecl ObjKind538In10To17(const void *obj)
     return (v >= 10 && v <= 17) ? 1 : 0;
 }
 
+int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
+                              int32_t haveA, int32_t haveB,
+                              int32_t maskA, int32_t maskB)
+{
+    /* -1 in the first criterion returns immediately -- it does not merely
+     * skip that criterion, it skips the second one too. */
+    if (wantA == -1)
+        return 1;
+
+    if (wantA & (int32_t)0x80000000) {
+        if ((wantA & maskA) != wantA)
+            return 0;
+    } else if (wantA != haveA) {
+        return 0;
+    }
+
+    if (wantB != 0) {
+        if (wantB & (int32_t)0x80000000) {
+            if ((wantB & maskB) != wantB)
+                return 0;
+        } else if (wantB != haveB) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -488,5 +515,7 @@ int misc_install(void)
                   "Field51MeetsMin", 1);
     patch_replace(ADDR_OBJ_KIND538_10_17, (const void *)ObjKind538In10To17,
                   "ObjKind538In10To17", 1);
+    patch_replace(ADDR_FILTER_MATCHES, (const void *)FilterMatches,
+                  "FilterMatches", 6);
     return 0;
 }

@@ -228,6 +228,27 @@ int32_t __cdecl Field51MeetsMin(const void *p);
  * an argument. Signed comparisons, so a negative value is outside. */
 int32_t __cdecl ObjKind538In10To17(const void *obj);
 
+/* 0x0041EF20. Two-criterion match, the shape this binary uses wherever a list
+ * is filtered. Each criterion is one of three things:
+ *
+ *   a wildcard    -- -1 for the first, ZERO for the second. They differ, and
+ *                    they differ in more than value: -1 in the first returns
+ *                    immediately, so it skips the SECOND criterion as well,
+ *                    while 0 in the second only ends its own test. Reading
+ *                    that jump target as the start of the second criterion
+ *                    rather than as the success return is how this went in
+ *                    wrong the first time
+ *   a bitmask     -- when the value is negative, i.e. the sign bit is set, it
+ *                    matches if (want & have) == want, so it is a subset test
+ *                    rather than equality
+ *   an exact id   -- otherwise
+ *
+ * Both must pass. `haveA`/`haveB` are the candidate's values and
+ * `maskA`/`maskB` the sets it belongs to. */
+int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
+                              int32_t haveA, int32_t haveB,
+                              int32_t maskA, int32_t maskB);
+
 int misc_install(void);
 
 #ifdef __cplusplus
