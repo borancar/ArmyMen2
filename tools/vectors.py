@@ -284,13 +284,19 @@ def _project(angr):
     return _PROJECT
 
 
-def angr_inputs(addr, nargs, kinds, limit=24, timeout=90):
+def angr_inputs(addr, nargs, kinds, limit=24, timeout=20):
     """Argument sets that cover distinct paths, found by symbolic execution.
 
     Random inputs are weak at branch coverage: swapping min for max in
     ApproxDist -- a real defect -- was caught by only 13 of 512 random vectors,
     because it only shows when |dx| and |dy| straddle. angr solves for one
     input per path instead, which is what a branch actually needs.
+
+    The budget is per function and deliberately small. Most of these are a few
+    dozen instructions and angr finishes in well under a second; the ones that
+    exhaust it will not yield to four times as long, and the validation set is
+    now sixty functions -- at ninety seconds each a full pass cannot finish.
+    Raise it for a single function when that looks worth doing.
 
     angr supplies INPUTS ONLY. The expected output always comes from the
     Unicorn run, so there is one source of truth for what the original does and
@@ -591,7 +597,8 @@ def main():
                 "ADDR_SET_FACING_14", "ADDR_SET_FACING_08",
                 "ADDR_IS_KIND_10_17", "ADDR_IS_KIND_14_22",
                 "ADDR_OBJ_TYPE2_FIELD548", "ADDR_CLASSIFY_CODE74",
-                "ADDR_KIND_IN_SET_A", "ADDR_KIND_IN_SET_B"]
+                "ADDR_KIND_IN_SET_A", "ADDR_KIND_IN_SET_B",
+                "ADDR_MASK_PIXEL_SOLID"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -678,6 +685,7 @@ def main():
         "ADDR_OBJ_TYPE2_FIELD548": "ObjType2Field548",
         "ADDR_CLASSIFY_CODE74": "ClassifyByCode74",
         "ADDR_KIND_IN_SET_A": "KindInSetA", "ADDR_KIND_IN_SET_B": "KindInSetB",
+        "ADDR_MASK_PIXEL_SOLID": "MaskPixelSolid",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -738,7 +746,17 @@ def main():
                      " * no part of the game has to run to check a\n"
                      " * reconstruction against it. */\n")
             fh.write("#include <stdint.h>\n\n")
-            fh.write("#define AM2_SCRATCH_LEN %d\n" % SCRATCH_USED)
+            # The replay's buffer has to be as big as the emulator's mapped
+            # scratch, not merely as big as the region a vector describes. A
+            # record can hold offsets that reach anywhere: MaskPixelSolid's row
+            # table sent it to +0x5637, past the described region, where the
+            # emulator read pattern bytes and the replay read off the end of
+            # its array. Same fill, same size, or the two sides are not running
+            # the same test.
+            fh.write("#define AM2_SCRATCH_LEN %d   /* whole mapped scratch */\n"
+                     % SCRATCH_SZ)
+            fh.write("#define AM2_SCRATCH_CMP %d   /* the part vectors describe */\n"
+                     % SCRATCH_USED)
             fh.write("typedef struct {\n"
                      "    const char *name;\n"
                      "    void       *fn;\n"

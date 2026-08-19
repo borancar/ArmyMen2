@@ -25,7 +25,7 @@
 
 #include "vectors.h"
 
-static uint8_t g_scratch[AM2_SCRATCH_LEN + 0x800];
+static uint8_t g_scratch[AM2_SCRATCH_LEN];
 
 /* Every one of these is cdecl, so a single six-argument invoker serves them
  * all: the caller cleans up, so passing more arguments than the callee reads

@@ -176,6 +176,20 @@ int32_t __cdecl ClassifyByCode74(const void *obj);
 int32_t __cdecl KindInSetA(int32_t kind);   /* range 2..42 */
 int32_t __cdecl KindInSetB(int32_t kind);   /* range 1..29 */
 
+/* 0x0041CF20. Whether pixel (x, y) of a run-length encoded mask is solid.
+ *
+ * The record is a word width at +0, a word height at +2, a table of word row
+ * offsets at +4 -- relative to the START of the record, not to the table --
+ * and then rows encoded as repeating [skip][run][run bytes]: skip transparent
+ * pixels, then `run` solid ones whose data follows inline.
+ *
+ * Everything is compared UNSIGNED and 16-bit. The running total is kept in a
+ * 32-bit register but only `cx` is ever compared, so it wraps at 65536 rather
+ * than saturating, and the reconstruction accumulates in uint16_t to match.
+ * A negative x arrives as a large unsigned word and fails the bounds test,
+ * which is why there is no signed check anywhere. */
+int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask);
+
 int misc_install(void);
 
 #ifdef __cplusplus

@@ -328,6 +328,38 @@ int32_t __cdecl KindInSetB(int32_t kind)
     return yes[i];
 }
 
+int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
+{
+    const uint8_t *m = (const uint8_t *)mask;
+    uint16_t       xw = (uint16_t)x;
+    uint16_t       acc = 0;
+    const uint8_t *row;
+
+    if (xw > *(const uint16_t *)m)
+        return 0;
+    if ((uint16_t)y > *(const uint16_t *)(m + 2))
+        return 0;
+
+    row = m + *(const uint16_t *)(m + 4 + (uint32_t)(uint16_t)y * 2);
+
+    for (;;) {
+        uint8_t skip = *row++;
+        uint8_t run;
+
+        acc = (uint16_t)(acc + skip);
+        if (acc > xw)
+            return 0;               /* x fell inside a transparent run */
+
+        run = *row;
+        acc = (uint16_t)(acc + run);
+        if (acc >= xw)
+            return 1;               /* x fell inside a solid run */
+
+        /* Past the run length byte and the run's own pixels. */
+        row += (uint32_t)run + 1;
+    }
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -368,5 +400,7 @@ int misc_install(void)
                   "ClassifyByCode74", 1);
     patch_replace(ADDR_KIND_IN_SET_A, (const void *)KindInSetA, "KindInSetA", 1);
     patch_replace(ADDR_KIND_IN_SET_B, (const void *)KindInSetB, "KindInSetB", 1);
+    patch_replace(ADDR_MASK_PIXEL_SOLID, (const void *)MaskPixelSolid,
+                  "MaskPixelSolid", 3);
     return 0;
 }
