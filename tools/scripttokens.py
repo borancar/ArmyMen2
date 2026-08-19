@@ -51,6 +51,24 @@ def tokens(img):
     return out
 
 
+KIND_TABLE = 0x00487C74      # name pointers indexed by token kind
+
+
+def kinds(img):
+    # Exactly seven. Reading an eighth runs into the token-name array that
+    # follows and reports `(` as a token kind.
+    out = []
+    for k in range(7):
+        (p,) = struct.unpack_from("<I", img.read(KIND_TABLE + k * 4, 4), 0)
+        if not (STRINGS_LO <= p < STRINGS_HI):
+            break
+        s = img.cstring(p)
+        if not s:
+            break
+        out.append((k, s))
+    return out
+
+
 def main():
     img = am2.Image()
     tok = tokens(img)
@@ -83,6 +101,32 @@ def main():
             for v, s in rows:
                 w("| %d | `%s` |\n" % (v, s))
             w("\n")
+        ks = kinds(img)
+        if ks:
+            w("## Token kinds\n\n")
+            w("Names from the array at `%#010x`, indexed by kind.\n\n"
+              "| kind | name |\n|---:|---|\n" % KIND_TABLE)
+            for k, s in ks:
+                w("| %d | `%s` |\n" % (k, s))
+            w("\nThis settles an argument that looked like a magic number: "
+              "`LoadLevelScript`\ndeclares each score variable with kind 3, "
+              "and kind 3 is `Integer`.\n\n")
+
+        w("## The interpreter\n\n")
+        w("```\n"
+          "WinMain -> RunFrame -> StateFrame -> LoadLevelScript 0x00425060\n"
+          "  -> ParseScriptFile 0x00444CD0 -> ParseScriptLine 0x00444C40\n"
+          "    -> NextToken 0x0043F450 -> IsBlank 0x0043EE80, "
+          "IsScriptDelim 0x0043EEA0\n"
+          "```\n\n")
+        w("`LoadLevelScript` builds `<map><n>.txt` when the level index is\n"
+          "positive and `<map>.txt` otherwise, resets the context, declares "
+          "the five\nscore variables, and parses. It logs `reading script "
+          "%s:` and then\n`worked!` or `FAILED!` -- which is how those three "
+          "functions are named\nrather than guessed.\n\n")
+        w("The tokeniser stops at `/` and `\\`, which is the `//` comment "
+          "marker the\nmission scripts actually use.\n\n")
+
         w("## What this settles\n\n")
         w("`IsScriptDelim` at `0x0043EEA0` accepts `( ) , < = > { } & +` -- "
           "exactly the\nfirst character of each of tokens 1 to 13. "

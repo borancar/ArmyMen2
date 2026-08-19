@@ -817,6 +817,62 @@
  * the code to 0x00511DBC and raises the flag. So the in-game route to the
  * level teardown is a menu request raised while the game is in state 2. */
 #define ADDR_TAKE_MENU_REQUEST   0x00425EE0u  /* void(void) */
+
+/* ---- the mission-script interpreter --------------------------------------
+ *
+ * The game's missions are readable text under data/<map>/, and the engine
+ * parses them at load. That makes this subsystem the one part of the
+ * reconstruction whose names can be taken from the program's own vocabulary
+ * rather than invented: docs/scripttokens.md lists all 141 keywords, and the
+ * interpreter's own log strings say what it is doing.
+ *
+ * The chain, from WinMain down:
+ *
+ *   WinMain -> RunFrame -> ADDR_STATE2_FRAME -> ADDR_LOAD_LEVEL_SCRIPT
+ *     -> ADDR_SCRIPT_PARSE_FILE -> ADDR_SCRIPT_PARSE_LINE
+ *       -> ADDR_SCRIPT_NEXT_TOKEN -> IsBlank, IsScriptDelim
+ *
+ * ADDR_LOAD_LEVEL_SCRIPT builds "<map><n>.txt" when the level index is
+ * positive and "<map>.txt" otherwise -- kitchen1.txt, kitchen2.txt -- resets
+ * the context, declares the five score variables the scripts can read, and
+ * parses. It logs "reading script %s:" and then "worked!" or "FAILED!", which
+ * is how these three are named rather than guessed.
+ *
+ * The two already-reconstructed helpers at the bottom of that chain were
+ * ported from their bodies alone, before any of this was known: IsBlank is
+ * space/tab/CR and IsScriptDelim accepts exactly the first character of each
+ * of tokens 1..13. They are the lexer's character classes. */
+#define ADDR_LOAD_LEVEL_SCRIPT   0x00425060u  /* void(void) */
+#define ADDR_SCRIPT_PARSE_FILE   0x00444CD0u  /* int32_t(const char *, ctx *) */
+#define ADDR_SCRIPT_PARSE_LINE   0x00444C40u  /* the other caller of the lexer */
+#define ADDR_SCRIPT_NEXT_TOKEN   0x0043F450u  /* the tokeniser; stops at // */
+#define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
+#define ADDR_SCRIPT_DECLARE_VAR  0x0043F7A0u  /* handle(const char *, kind, init) */
+#define ADDR_SCRIPT_FIND_FILE    0x00421890u  /* probes <map><n>.txt via _findfirst */
+
+#define ADDR_SCRIPT_CONTEXT      0x00656478u  /* what reset and parse are given */
+#define ADDR_MAP_NAME            0x00511A88u  /* char[], "kitchen" */
+#define ADDR_LEVEL_INDEX         0x00511D9Cu  /* int32_t; 0 means "<map>.txt" */
+#define ADDR_MP_SCRIPT_NAME      0x00511C08u  /* char[], the multiplayer script */
+
+/* Handles returned by ADDR_SCRIPT_DECLARE_VAR, in declaration order. These are
+ * the variables a mission script can read by name -- see the `testvar` and
+ * `setvar` keywords in docs/scripttokens.md. */
+#define ADDR_SVAR_GAMESCORELIMIT 0x00656488u
+#define ADDR_SVAR_GREENSCORE     0x0065648Cu
+#define ADDR_SVAR_TANSCORE       0x00656490u
+#define ADDR_SVAR_BLUESCORE      0x00656494u
+
+/* Token kinds, from the name array at 0x00487C74 indexed by kind. The score
+ * variables are declared as kind 3, which is Integer -- so the argument that
+ * looked like a magic 3 is a type. */
+#define AM2_TOKEN_UNKNOWN        0
+#define AM2_TOKEN_CONTROL_CHAR   1
+#define AM2_TOKEN_RESERVED       2
+#define AM2_TOKEN_INTEGER        3
+#define AM2_TOKEN_FLOAT          4
+#define AM2_TOKEN_STRING         5
+#define AM2_TOKEN_NAME           6
 #define ADDR_MENU_REQUEST_TAKEN  0x00511DBCu  /* int32_t, the consumed code */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */

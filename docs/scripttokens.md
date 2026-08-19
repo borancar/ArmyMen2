@@ -174,6 +174,40 @@ is how a constant in the engine becomes a word: a function comparing against
 | 147 | `unally` |
 | 148 | `setforcecolor` |
 
+## Token kinds
+
+Names from the array at `0x00487c74`, indexed by kind.
+
+| kind | name |
+|---:|---|
+| 0 | `Unknown` |
+| 1 | `Control Character` |
+| 2 | `Reserved` |
+| 3 | `Integer` |
+| 4 | `Float` |
+| 5 | `String` |
+| 6 | `Name` |
+
+This settles an argument that looked like a magic number: `LoadLevelScript`
+declares each score variable with kind 3, and kind 3 is `Integer`.
+
+## The interpreter
+
+```
+WinMain -> RunFrame -> StateFrame -> LoadLevelScript 0x00425060
+  -> ParseScriptFile 0x00444CD0 -> ParseScriptLine 0x00444C40
+    -> NextToken 0x0043F450 -> IsBlank 0x0043EE80, IsScriptDelim 0x0043EEA0
+```
+
+`LoadLevelScript` builds `<map><n>.txt` when the level index is
+positive and `<map>.txt` otherwise, resets the context, declares the five
+score variables, and parses. It logs `reading script %s:` and then
+`worked!` or `FAILED!` -- which is how those three functions are named
+rather than guessed.
+
+The tokeniser stops at `/` and `\`, which is the `//` comment marker the
+mission scripts actually use.
+
 ## What this settles
 
 `IsScriptDelim` at `0x0043EEA0` accepts `( ) , < = > { } & +` -- exactly the
