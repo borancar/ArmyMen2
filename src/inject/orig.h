@@ -870,6 +870,19 @@
 #define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keyword 139 */
 
+/* The handlers describe their own statements, in their own error messages.
+ * The pad handler carries "Duplicate pad name.", "Illegal Pad Number",
+ * "Unexpected symbol in pad definition should be '<=>'" and, best of all,
+ * "Pad can't have both specific item and generic trigger" -- so a pad is a
+ * unique name, a range-checked number, and EITHER a specific item OR a
+ * generic trigger, optionally with a comparison and a count. That is the
+ * syntax the missions use, read out of the binary rather than inferred from
+ * the examples.
+ *
+ * It also reports the token KIND by name when it rejects something --
+ * "'%s' found, but expected token of type %s" -- which is what the array at
+ * 0x00487C74 is for. */
+
 #define ADDR_SCRIPT_CONTEXT      0x00656478u  /* what reset and parse are given */
 #define ADDR_MAP_NAME            0x00511A88u  /* char[], "kitchen" */
 #define ADDR_LEVEL_INDEX         0x00511D9Cu  /* int32_t; 0 means "<map>.txt" */

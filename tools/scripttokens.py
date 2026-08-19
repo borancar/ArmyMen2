@@ -144,6 +144,29 @@ def main():
           "`Pad portal1 99`,\n`object portal1`, `if ... then`. Each handler "
           "is named by the language\nrather than by us.\n\n")
 
+        w("## What a handler tells you about its statement\n\n")
+        w("The `pad` handler at `0x004440E0` carries these, and between them "
+          "they are a\nspecification:\n\n")
+        for msg in ("Duplicate pad name.",
+                    "'%s' found, but expected token of type %s",
+                    "Unexpected symbol in pad definition should be '<=>'",
+                    "Pad can't have both specific item and generic trigger",
+                    "Illegal Pad Number"):
+            w("- `%s`\n" % msg)
+        w("\nSo a pad has a name, which must be unique; a number, which is "
+          "range-checked;\nand then EITHER a specific item OR a generic "
+          "trigger, never both. A comparison\nfrom `< = >` and a count may "
+          "follow. Which is exactly the syntax the missions\nuse:\n\n")
+        w("```\n"
+          "Pad portal1        99                    name and number\n"
+          "Pad victory1       30  GreenSarge1       a specific item\n"
+          "Pad rr_burner_pad  20  UNIT              a generic trigger\n"
+          "Pad cookie         50  GreenSarge1 > 0   with a comparison\n"
+          "```\n\n")
+        w("Note the second message: the parser reports the token KIND by name "
+          "when it\nrejects something, which is what the kind table above is "
+          "for.\n\n")
+
         w("## What this settles\n\n")
         w("`IsScriptDelim` at `0x0043EEA0` accepts `( ) , < = > { } & +` -- "
           "exactly the\nfirst character of each of tokens 1 to 13. "

@@ -227,6 +227,32 @@ mission file contains -- `preloadsprite 43 600 1`, `Pad portal1 99`,
 `object portal1`, `if ... then`. Each handler is named by the language
 rather than by us.
 
+## What a handler tells you about its statement
+
+The `pad` handler at `0x004440E0` carries these, and between them they are a
+specification:
+
+- `Duplicate pad name.`
+- `'%s' found, but expected token of type %s`
+- `Unexpected symbol in pad definition should be '<=>'`
+- `Pad can't have both specific item and generic trigger`
+- `Illegal Pad Number`
+
+So a pad has a name, which must be unique; a number, which is range-checked;
+and then EITHER a specific item OR a generic trigger, never both. A comparison
+from `< = >` and a count may follow. Which is exactly the syntax the missions
+use:
+
+```
+Pad portal1        99                    name and number
+Pad victory1       30  GreenSarge1       a specific item
+Pad rr_burner_pad  20  UNIT              a generic trigger
+Pad cookie         50  GreenSarge1 > 0   with a comparison
+```
+
+Note the second message: the parser reports the token KIND by name when it
+rejects something, which is what the kind table above is for.
+
 ## What this settles
 
 `IsScriptDelim` at `0x0043EEA0` accepts `( ) , < = > { } & +` -- exactly the
