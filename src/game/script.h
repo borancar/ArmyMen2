@@ -164,6 +164,27 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
  * on entry -- so a caller can accumulate several files into one list. */
 int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx);
 
+/* 0x00444900. `preloadsprite <int> <int> <int> [<int>]`.
+ *
+ * Three required integers identifying a sprite, and an optional fourth that
+ * defaults to 0x1000. The optional one is genuinely optional: end of script or
+ * a non-Integer token there is not an error, it just takes the default and
+ * leaves the token for ReadScript to dispatch. */
+int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at);
+
+/* 0x00436D60. `object <name>` and `objclass <int> <int>`, then a block of
+ * attribute statements -- GenerateObjScriptFromTokens, named from its own
+ * error string.
+ *
+ * Both forms select a set of objects and stamp the current script onto each,
+ * then read attribute statements until ScriptIsStatementStart says the next
+ * top-level statement has begun. `object` resolves one name to one uid;
+ * `objclass` takes two 16-bit class fields and walks every object matching.
+ *
+ * It is the only handler that reads its own keyword rather than being told
+ * which one it is, which is how one function serves two ids. */
+int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at);
+
 /* For the offline test only: the name table lives in the image, so the test
  * needs a way to empty it between cases and to read an entry back. Not part of
  * the reconstruction -- nothing in the game calls these. */

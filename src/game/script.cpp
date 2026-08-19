@@ -407,26 +407,66 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
     }
 }
 
-int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
+/* The idiom every statement handler opens each of its arguments with:
+ * advance, check for end of script, check the kind. The original writes it out
+ * inline at each site -- four times in preloadsprite alone -- with identical
+ * text; this is the same sequence, and the messages are the same two strings
+ * the image holds.
+ *
+ * Returns the token on success, NULL after logging. *at is advanced either
+ * way, which is what lets a failed handler leave ReadScript somewhere sane.
+ */
+static AM2_ScriptTok *ScriptExpect(AM2_ScriptCtx *ctx, int32_t *at,
+                                   int32_t kind)
 {
-    /* Every step advances *at first and then checks, so a truncated statement
-     * leaves the index past the last token it consumed. */
     if (++(*at) >= ctx->count) {
         am2_log("Unexpected end of script.\n");
         return 0;
     }
 
     AM2_ScriptTok *tok = &ctx->tokens[*at];
-    if (tok->kind != AM2_TOKEN_STRING) {
-        /* The type name is pushed before the text is rendered, and the render
-         * uses the shared word buffer -- so the order matters here in a way it
-         * would not if either side were a plain value. */
+    if (tok->kind != kind) {
         am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
                 ctx->tokens[*at].line,
                 ScriptTokenText(tok, kScriptWord),
-                kKindName(AM2_TOKEN_STRING));
+                kKindName(kind));
         return 0;
     }
+    return tok;
+}
+
+int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    int32_t arg[3];
+
+    for (int32_t i = 0; i < 3; i++) {
+        AM2_ScriptTok *tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+        if (!tok)
+            return 0;
+        arg[i] = (int32_t)(uintptr_t)tok->value;
+    }
+
+    /* The fourth is optional, and the index advances past the third whether or
+     * not it is there -- so a missing one leaves *at on whatever follows and
+     * ReadScript dispatches that normally. */
+    int32_t flags = 0x1000;
+    (*at)++;
+    if (*at < ctx->count &&
+        ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+        flags = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+    }
+
+    ((void (__cdecl *)(int32_t, int32_t, int32_t, int32_t, int32_t))
+        (uintptr_t)ADDR_PRELOAD_SPRITE)(arg[0], arg[1], arg[2], flags, 1);
+    return 1;
+}
+
+int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    AM2_ScriptTok *tok = ScriptExpect(ctx, at, AM2_TOKEN_STRING);
+    if (!tok)
+        return 0;
 
     if (ScriptFindName((const char *)tok->value) >= 0) {
         am2_log("Line [%4d]:  Duplicate variable name.\n",
@@ -442,26 +482,138 @@ int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
     ctx->tokens[*at].kind = 7;
     ctx->tokens[*at].value = (void *)(uintptr_t)slot;
 
-    if (++(*at) >= ctx->count) {
-        am2_log("Unexpected end of script.\n");
+    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+    if (!tok)
         return 0;
-    }
-
-    tok = &ctx->tokens[*at];
-    if (tok->kind != AM2_TOKEN_INTEGER) {
-        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-                ctx->tokens[*at].line,
-                ScriptTokenText(tok, kScriptWord),
-                kKindName(AM2_TOKEN_INTEGER));
-        return 0;
-    }
 
     kScriptNames[slot].value = (int32_t)(uintptr_t)tok->value;
     (*at)++;
     return 1;
 }
 
-/* The five statement handlers are still the original's. Each takes the context
+/* The record ADDR_SCRIPT_OBJ_TARGET hands back. The first field selects the
+ * form; the second is a name index for `object` and a pair of 16-bit class
+ * fields for `objclass`, which overlap it. Written as a union because that is
+ * what the original does -- a dword store on one path and two word stores on
+ * the other, to the same offset. */
+typedef struct {
+    int32_t form;               /* 0 = object, 1 = objclass */
+    union {
+        int32_t  name;          /* +4, the name-table index */
+        uint16_t cls[2];        /* +4 and +6 */
+    } u;
+} AM2_ScriptObjTarget;
+
+/* Stamp the current script onto one object. */
+static void ScriptAttachTo(uint8_t *obj)
+{
+    *(int32_t *)(obj + AM2_OBJ_SCRIPT) =
+        *(const int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT);
+    *(int32_t *)(obj + AM2_OBJ_SCRIPT_PC) = 0;
+    *(int32_t *)(obj + AM2_OBJ_SCRIPT_WAIT) = -1;
+    *(int32_t *)(obj + AM2_OBJ_SCRIPT_STATE) = 0;
+}
+
+int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
+{
+    /* This APPENDS a record and bumps the count, before the arguments are even
+     * read -- so it happens on every call including the ones that go on to
+     * fail, and the id later stamped onto each object is the incremented
+     * count. Reading it as a plain accessor would still call it in the right
+     * place, but would misdescribe why the count moves. */
+    AM2_ScriptObjTarget *target = ((AM2_ScriptObjTarget *(__cdecl *)(void))
+        (uintptr_t)ADDR_NEW_OBJ_SCRIPT)();
+
+    AM2_ScriptTok *tok = &ctx->tokens[*at];
+    if (tok->kind != AM2_TOKEN_RESERVED) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(tok, kScriptWord),
+                kKindName(AM2_TOKEN_RESERVED));
+        return 0;
+    }
+
+    int32_t id = (int32_t)(uintptr_t)tok->value;
+
+    if (id == 139) {                    /* object <name> */
+        if (++(*at) >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+
+        target->form = 0;
+
+        int32_t name = 0;
+        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *, int32_t *,
+                                   int32_t))(uintptr_t)
+                  ADDR_SCRIPT_RESOLVE_NAME)(ctx, at, &name, 0))
+            return 0;
+
+        target->u.name = name;
+
+        uint8_t *obj = ((uint8_t *(__cdecl *)(int32_t))(uintptr_t)
+            ADDR_OBJ_BY_UID)(kScriptNames[name].value);
+
+        if (!obj || !((int32_t (__cdecl *)(uint8_t *))(uintptr_t)
+                          ADDR_OBJ_TAKES_SCRIPT)(obj)) {
+            am2_log("Token %s is not a valid object.\n",
+                    kScriptNames[name].name);
+            return 0;
+        }
+        ScriptAttachTo(obj);
+
+    } else if (id == 140) {             /* objclass <int> <int> */
+        if (++(*at) >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+
+        target->form = 1;
+
+        /* The index is already on the first integer -- the advance above did
+         * it -- so this one is checked in place rather than through
+         * ScriptExpect, which would advance again. */
+        tok = &ctx->tokens[*at];
+        if (tok->kind != AM2_TOKEN_INTEGER) {
+            am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                    ctx->tokens[*at].line,
+                    ScriptTokenText(tok, kScriptWord),
+                    kKindName(AM2_TOKEN_INTEGER));
+            return 0;
+        }
+        target->u.cls[0] = (uint16_t)(uintptr_t)tok->value;
+
+        tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
+        if (!tok)
+            return 0;
+        target->u.cls[1] = (uint16_t)(uintptr_t)tok->value;
+        (*at)++;
+
+        for (uint8_t *obj = ((uint8_t *(__cdecl *)(void))(uintptr_t)
+                 ADDR_FIRST_SCRIPT_OBJ)();
+             obj;
+             obj = ((uint8_t *(__cdecl *)(void))(uintptr_t)
+                 ADDR_NEXT_SCRIPT_OBJ)()) {
+            if (((int32_t (__cdecl *)(uint8_t *))(uintptr_t)
+                     ADDR_OBJ_TAKES_SCRIPT)(obj))
+                ScriptAttachTo(obj);
+        }
+
+    } else {
+        am2_log("Invalid token in GenerateObjScriptFromTokens\n");
+        return 0;
+    }
+
+    /* The attribute block runs until the next top-level statement. */
+    while (!ScriptIsStatementStart(ctx, at)) {
+        if (!((int32_t (__cdecl *)(AM2_ScriptCtx *, int32_t *))(uintptr_t)
+                  ADDR_SCRIPT_OBJ_ATTRIBUTE)(ctx, at))
+            return 0;
+    }
+    return 1;
+}
+
+/* The remaining statement handlers are still the original's. Each takes the context
  * and a pointer to the walk index, which it advances past its own statement --
  * so ReadScript's loop makes no assumption about statement length. They are
  * reached by address because they are not reconstructed; nothing else about
@@ -502,8 +654,7 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
             int32_t id = (int32_t)(uintptr_t)tok->value;
 
             if (id == 25) {
-                ((am2_script_handler)(uintptr_t)
-                     ADDR_SCRIPT_PRELOADSPRITE)(ctx, &at);
+                ScriptPreloadSprite(ctx, &at);
                 continue;
             }
             if (id == 26) {
@@ -520,9 +671,10 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
                     compounds++;
                 continue;
             }
-            /* `object` and `objclass` share a handler. */
+            /* `object` and `objclass` share a handler, which reads the
+             * keyword itself rather than being told which one it is. */
             if (id == 139 || id == 140) {
-                ((am2_script_handler)(uintptr_t)ADDR_SCRIPT_OBJECT)(ctx, &at);
+                GenerateObjScriptFromTokens(ctx, &at);
                 continue;
             }
         }
@@ -625,5 +777,11 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_VARIABLE,
                         (const void *)ScriptVariable,
                         "ScriptVariable", 1);
+    rc |= patch_replace(ADDR_SCRIPT_PRELOADSPRITE,
+                        (const void *)ScriptPreloadSprite,
+                        "ScriptPreloadSprite", 1);
+    rc |= patch_replace(ADDR_SCRIPT_OBJECT,
+                        (const void *)GenerateObjScriptFromTokens,
+                        "GenerateObjScriptFromTokens", 1);
     return rc;
 }

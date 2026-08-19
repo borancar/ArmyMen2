@@ -934,10 +934,54 @@
 #define AM2_SCRIPT_CTX_TOKENS    0x08u
 
 #define ADDR_SCRIPT_PRELOADSPRITE 0x00444900u  /* keyword 25 */
+/* What the preloadsprite statement drives. Named from the filenames its
+ * callee at 0x004457E0 builds -- "%02d_%03d_%02d_*.bmp" and the matching
+ * ".sha" -- so the statement's three integers are a sprite identity triple. */
+#define ADDR_PRELOAD_SPRITE       0x00445B00u
 #define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
 #define ADDR_SCRIPT_VARIABLE      0x00443F70u  /* keyword 133 */
 #define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */
-#define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keyword 139 */
+#define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --
+                                               * GenerateObjScriptFromTokens,
+                                               * from its own error string */
+
+/* APPENDS an object-script record and returns it -- not the accessor it looks
+ * like from the call site. It grows the array at 0x00516188 twenty entries at
+ * a time, zeroing the new ones, and increments the count at 0x0051618C, which
+ * is the same global the attach below then reads. So the id stamped onto each
+ * object is the count AFTER this call, and the record is 20 bytes.
+ *
+ * +0 is 0 for `object` and 1 for `objclass`; +4 is a dword name index in the
+ * first case and two 16-bit class fields in the second. */
+#define ADDR_NEW_OBJ_SCRIPT       0x00437130u
+#define ADDR_OBJ_SCRIPTS          0x00516188u
+#define ADDR_OBJ_SCRIPT_CAP       0x00516190u
+#define AM2_OBJ_SCRIPT_REC_SIZE   20u
+
+/* 0x00440700. Resolve a name token to its index in the name table, declaring
+ * it if need be -- it reaches both ScriptFindName and AddNameTableName.
+ * int32_t(ctx *, int32_t *at, int32_t *out, int32_t). */
+#define ADDR_SCRIPT_RESOLVE_NAME  0x00440700u
+
+/* 0x00436C20. One attribute statement inside an object block. The block ends
+ * where ScriptIsStatementStart says the next top-level statement begins. */
+#define ADDR_SCRIPT_OBJ_ATTRIBUTE 0x00436C20u
+
+/* Object lookup and iteration. The two iterators take no arguments: they walk
+ * whatever the record at ADDR_SCRIPT_OBJ_TARGET selects, which the objclass
+ * branch has just filled in. */
+#define ADDR_OBJ_BY_UID           0x00427820u  /* obj *(int32_t uid) */
+#define ADDR_FIRST_SCRIPT_OBJ     0x00427850u
+#define ADDR_NEXT_SCRIPT_OBJ      0x00427880u
+#define ADDR_OBJ_TAKES_SCRIPT     0x00433860u  /* int32_t(obj *) */
+
+/* The object-script count, and what gets written into every object the
+ * statement selects -- read AFTER ADDR_NEW_OBJ_SCRIPT has incremented it. */
+#define ADDR_CURRENT_OBJ_SCRIPT   0x0051618Cu
+#define AM2_OBJ_SCRIPT            0xB0u
+#define AM2_OBJ_SCRIPT_PC         0xB4u
+#define AM2_OBJ_SCRIPT_WAIT       0xB8u
+#define AM2_OBJ_SCRIPT_STATE      0xBCu
 
 /* The handlers describe their own statements, in their own error messages.
  * The pad handler carries "Duplicate pad name.", "Illegal Pad Number",
