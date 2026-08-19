@@ -253,6 +253,10 @@ vectors:
 # is silently healed rather than reported. That is the right outcome and the
 # wrong message, and it is worth knowing before trusting a green run to mean
 # nobody has touched docs/ by hand.
+#
+# src/game/scripttokens.h is covered too. It is the one generated file outside
+# docs/ -- 185 keyword constants read from the table the game itself walks, so
+# a case label cannot disagree with the binary about what a number means.
 .PHONY: check
 check:
 	@rc=0; \
@@ -264,13 +268,13 @@ check:
 	        echo FAILED; rc=1; \
 	    fi; \
 	done; \
-	if [ -n "$$(git status --porcelain docs/)" ]; then \
-	    echo "  generated docs DRIFTED from what is committed:"; \
-	    git status --short docs/ | sed 's/^/    /'; \
+	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h)" ]; then \
+	    echo "  generated files DRIFTED from what is committed:"; \
+	    git status --short docs/ src/game/scripttokens.h | sed 's/^/    /'; \
 	    echo "    regenerate and commit, or find out why a tool changed its mind"; \
 	    rc=1; \
 	else \
-	    echo "  docs         ok (regenerate identically)"; \
+	    echo "  generated    ok (regenerate identically)"; \
 	fi; \
 	[ $$rc -eq 0 ] && echo "all static checks pass; tools/ab.sh all is the other half"; \
 	exit $$rc

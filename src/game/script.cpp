@@ -379,7 +379,7 @@ char *__cdecl ScriptTokenText(const AM2_ScriptTok *tok, char *out)
         src = (const char *)tok->value;
         break;
 
-    case 7:
+    case AM2_TOKEN_NAMEREF:
         src = kScriptNames[(uintptr_t)tok->value].name;
         break;
 
@@ -401,12 +401,12 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
         return 0;
 
     switch ((int32_t)(uintptr_t)tok->value) {
-    case 25:            /* preloadsprite */
-    case 26:            /* pad */
-    case 44:            /* if */
-    case 133:           /* variable */
-    case 139:           /* object */
-    case 140:           /* objclass */
+    case AM2_TOK_PRELOADSPRITE:
+    case AM2_TOK_PAD:
+    case AM2_TOK_IF:
+    case AM2_TOK_VARIABLE:
+    case AM2_TOK_OBJECT:
+    case AM2_TOK_OBJCLASS:
         return 1;
     default:
         return 0;
@@ -485,7 +485,7 @@ int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
 
     /* The token owned that string; the name table has its own copy now. */
     am2_free(ctx->tokens[*at].value);
-    ctx->tokens[*at].kind = 7;
+    ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
     ctx->tokens[*at].value = (void *)(uintptr_t)slot;
 
     tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
@@ -521,11 +521,11 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
         uint32_t g = 0;
         switch ((int32_t)(uintptr_t)tok->value) {
         case 15: g = ADDR_SVAR_ID15;  break;   /* no keyword maps here */
-        case 16: g = ADDR_SVAR_GREEN; break;
-        case 17: g = ADDR_SVAR_TAN;   break;
-        case 18: g = ADDR_SVAR_BLUE;  break;
-        case 19: g = ADDR_SVAR_GREY;  break;
-        case 20: g = ADDR_SVAR_ME;    break;
+        case AM2_TOK_GREEN:         g = ADDR_SVAR_GREEN; break;
+        case AM2_TOK_TAN:           g = ADDR_SVAR_TAN;   break;
+        case AM2_TOK_BLUE:          g = ADDR_SVAR_BLUE;  break;
+        case AM2_TOK_GREY:          g = ADDR_SVAR_GREY;  break;
+        case AM2_TOK_ME:            g = ADDR_SVAR_ME;    break;
         default:
             if (!quiet)
                 am2_log("Line [%4d]:  Unexpected use of reserved word\n",
@@ -553,20 +553,21 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
 
     if (idx >= 0) {
         int32_t type = kScriptNames[idx].type;
-        if (type != 2 && type != AM2_NAME_TYPE_INTEGER) {
+        if (type != AM2_NAME_TYPE_REF && type != AM2_NAME_TYPE_INTEGER) {
             am2_log("Line [%4d]:  Name '%s' already used for another type.\n",
                     ctx->tokens[*at].line,
                     ScriptTokenText(tok, kScriptWord));
             return 0;
         }
     } else {
-        *out = AddNameTableName((const char *)ctx->tokens[*at].value, 2, 0);
+        *out = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                    AM2_NAME_TYPE_REF, 0);
     }
 
     /* Either way the token becomes a kind-7 reference and gives up its
      * string -- including when the name already existed. */
     am2_free(ctx->tokens[*at].value);
-    ctx->tokens[*at].kind = 7;
+    ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
     ctx->tokens[*at].value = (void *)(uintptr_t)*out;
     (*at)++;
     return 1;
@@ -594,7 +595,7 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
         if (t->kind != AM2_TOKEN_RESERVED)
             continue;
         int32_t id = (int32_t)(uintptr_t)t->value;
-        if (id == 45 || id == 47 || id == 14)   /* then, butnot, testvar */
+        if (id == AM2_TOK_THEN || id == AM2_TOK_BUTNOT || id == AM2_TOK_TESTVAR)   /* then, butnot, testvar */
             return 1;
     }
 }
@@ -607,7 +608,8 @@ static int32_t ScriptNamedTarget(AM2_ScriptCtx *ctx, int32_t *at,
     int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
     *out = idx;
     if (idx < 0)
-        *out = AddNameTableName((const char *)ctx->tokens[*at].value, 2, 0);
+        *out = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                    AM2_NAME_TYPE_REF, 0);
     return *out;
 }
 
@@ -630,16 +632,16 @@ int32_t __cdecl ScriptHitTarget(AM2_ScriptCtx *ctx, int32_t *at, int32_t *mask)
         return 1;
     }
 
-    *mask = (int32_t)0x80000000;
+    *mask = (int32_t)AM2_HIT_ANY;
 
     tok = &ctx->tokens[*at];
     int32_t army = 0;
     if (tok->kind == AM2_TOKEN_RESERVED) {
         switch ((int32_t)(uintptr_t)tok->value) {
-        case 16: army = 0x40000000; break;      /* green */
-        case 17: army = 0x20000000; break;      /* tan   */
-        case 18: army = 0x10000000; break;      /* blue  */
-        case 19: army = 0x08000000; break;      /* grey  */
+        case AM2_TOK_GREEN:         army = AM2_HIT_GREEN; break;
+        case AM2_TOK_TAN:           army = AM2_HIT_TAN; break;
+        case AM2_TOK_BLUE:          army = AM2_HIT_BLUE; break;
+        case AM2_TOK_GREY:          army = AM2_HIT_GREY; break;
         default: break;
         }
     }
@@ -648,17 +650,17 @@ int32_t __cdecl ScriptHitTarget(AM2_ScriptCtx *ctx, int32_t *at, int32_t *mask)
             return 0;
         *mask |= army;
     } else {
-        *mask = (int32_t)0xF8000000;            /* any army */
+        *mask = (int32_t)AM2_HIT_ALL_ARMIES;
     }
 
     tok = &ctx->tokens[*at];
     if (tok->kind == AM2_TOKEN_RESERVED) {
         int32_t type = 0;
         switch ((int32_t)(uintptr_t)tok->value) {
-        case 30: type = 0x04000000; break;      /* item    */
-        case 32: type = 0x01C00000; break;      /* sarge   */
-        case 34: type = 0x01400000; break;      /* trooper */
-        case 36: type = 0x00200000; break;      /* vehicle */
+        case AM2_TOK_ITEM:          type = AM2_HIT_ITEM; break;
+        case AM2_TOK_SARGE:         type = AM2_HIT_SARGE; break;
+        case AM2_TOK_TROOPER:       type = AM2_HIT_TROOPER; break;
+        case AM2_TOK_VEHICLE:       type = AM2_HIT_VEHICLE; break;
         default: break;
         }
         if (type) {
@@ -688,7 +690,7 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
     }
 
-    *val = (int32_t)0x80000000;
+    *val = (int32_t)AM2_HIT_ANY;
 
     tok = &ctx->tokens[*at];
     int32_t which = -1;
@@ -708,7 +710,7 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
 
     tok = &ctx->tokens[*at];
     if (tok->kind == AM2_TOKEN_RESERVED &&
-        (int32_t)(uintptr_t)tok->value == 184) {        /* group */
+        (int32_t)(uintptr_t)tok->value == AM2_TOK_GROUP) {        /* group */
         if (!ScriptStep(ctx, at))
             return 0;
         *form = 2;
@@ -737,7 +739,7 @@ static int32_t ScriptCoord(AM2_ScriptCtx *ctx, int32_t *at,
     }
 
     if (tok->kind != AM2_TOKEN_RESERVED ||
-        (int32_t)(uintptr_t)tok->value != 136) {        /* refvar */
+        (int32_t)(uintptr_t)tok->value != AM2_TOK_REFVAR) {        /* refvar */
         am2_log("Line [%4d]:  '%s' found, but expected token of type Integer "
                 "or keyword 'RefVar'\n",
                 ctx->tokens[*at].line,
@@ -768,10 +770,10 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
 
     if (tok->kind == AM2_TOKEN_CONTROL_CHAR) {
         int32_t id = (int32_t)(uintptr_t)tok->value;
-        if (id != 1 && id != 13)        /* '(' or '+' */
+        if (id != AM2_TOK_LPAREN && id != AM2_TOK_PLUS)        /* '(' or '+' */
             return 0;                   /* silently, with no message */
 
-        if (id == 13) {                 /* a leading '+' means relative */
+        if (id == AM2_TOK_PLUS) {                 /* a leading '+' means relative */
             *(int32_t *)(action + AM2_ACT_RELATIVE) = 1;
             if (!ScriptStep(ctx, at))
                 return 0;
@@ -787,7 +789,7 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
 
         tok = &ctx->tokens[*at];
         if (tok->kind != AM2_TOKEN_CONTROL_CHAR ||
-            (int32_t)(uintptr_t)tok->value != 3) {      /* ',' */
+            (int32_t)(uintptr_t)tok->value != AM2_TOK_COMMA) {      /* ',' */
             am2_log("Line [%4d]:  Comma expected in coordinates\n",
                     ctx->tokens[*at].line);
             return 0;
@@ -803,7 +805,7 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
 
         tok = &ctx->tokens[*at];
         if (tok->kind == AM2_TOKEN_CONTROL_CHAR &&
-            (int32_t)(uintptr_t)tok->value == 2) {      /* ')' */
+            (int32_t)(uintptr_t)tok->value == AM2_TOK_RPAREN) {      /* ')' */
             (*at)++;
             return 1;
         }
@@ -814,14 +816,14 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
 
     if (tok->kind == AM2_TOKEN_STRING) {
         int32_t idx = ScriptFindName((const char *)tok->value);
-        if (idx >= 0 && kScriptNames[idx].type == 1) {          /* a pad */
+        if (idx >= 0 && kScriptNames[idx].type == AM2_NAME_TYPE_PAD) {          /* a pad */
             int32_t number = kPads[kScriptNames[idx].value].number;
             /* Both centroid words at once, exactly as the original. */
             *(int32_t *)(action + AM2_ACT_POS) =
                 *(const int32_t *)&kPadNumbers[number].cx;
 
             am2_free(ctx->tokens[*at].value);
-            ctx->tokens[*at].kind = 7;
+            ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
             ctx->tokens[*at].value = (void *)(uintptr_t)idx;
             (*at)++;
             return 1;
@@ -876,7 +878,7 @@ static int32_t ScriptPadEvent(AM2_ScriptCtx *ctx, int32_t *at, int32_t *val,
         return 0;
     }
     /* Type 1 is what `pad` declares. */
-    if (kScriptNames[idx].type != 1) {
+    if (kScriptNames[idx].type != AM2_NAME_TYPE_PAD) {
         am2_log(not_a_pad, ctx->tokens[*at].line);
         return 0;
     }
@@ -896,13 +898,13 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
     if (tok->kind == AM2_TOKEN_RESERVED) {
         int32_t id = (int32_t)(uintptr_t)tok->value;
 
-        if (id == 27) {                                 /* padon */
+        if (id == AM2_TOK_PADON) {                                 /* padon */
             *kind = 3;
             return ScriptPadEvent(ctx, at, val,
                                   "Line [%4d]:  Name required after PADON\n",
                                   "Line [%4d]:  PADON name was not a pad\n");
         }
-        if (id == 28) {                                 /* padoff */
+        if (id == AM2_TOK_PADOFF) {                                 /* padoff */
             *kind = 2;
             return ScriptPadEvent(ctx, at, val,
                                   "Line [%4d]:  Name required after PADOFF\n",
@@ -926,7 +928,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
              * written on entry. */
             tok = &ctx->tokens[*at];
             if (tok->kind != AM2_TOKEN_RESERVED ||
-                (int32_t)(uintptr_t)tok->value != 60)
+                (int32_t)(uintptr_t)tok->value != AM2_TOK_BY)
                 return 1;
 
             if (!ScriptStep(ctx, at))
@@ -970,13 +972,13 @@ int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
         int32_t form = 0, names = 0, armies = 0;
 
         switch (id) {
-        case 130: form = 2; names  = 1; break;  /* getdmglvl     */
-        case 131: form = 3; names  = 1; break;  /* gethealth     */
-        case 132: form = 4; names  = 1; break;  /* getdisguise   */
-        case 179: form = 5; names  = 2; break;  /* hasitem       */
-        case 181: form = 6; armies = 1; break;  /* iscoloringame */
-        case 182: form = 7; armies = 2; break;  /* isally        */
-        case 183: form = 8; armies = 1; break;  /* teamscore     */
+        case AM2_TOK_GETDMGLVL:     form = 2; names  = 1; break;
+        case AM2_TOK_GETHEALTH:     form = 3; names  = 1; break;
+        case AM2_TOK_GETDISGUISE:   form = 4; names  = 1; break;
+        case AM2_TOK_HASITEM:       form = 5; names  = 2; break;
+        case AM2_TOK_ISCOLORINGAME: form = 6; armies = 1; break;
+        case AM2_TOK_ISALLY:        form = 7; armies = 2; break;
+        case AM2_TOK_TEAMSCORE:     form = 8; armies = 1; break;
         default:  form = 0; break;
         }
 
@@ -1101,10 +1103,10 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
 
     int32_t army;
     switch ((int32_t)(uintptr_t)tok->value) {
-    case 16: army = 0; break;           /* green */
-    case 17: army = 1; break;           /* tan   */
-    case 18: army = 2; break;           /* blue  */
-    case 19: army = 3; break;           /* grey  */
+    case AM2_TOK_GREEN:             army = 0; break;
+    case AM2_TOK_TAN:               army = 1; break;
+    case AM2_TOK_BLUE:              army = 2; break;
+    case AM2_TOK_GREY:              army = 3; break;
     default:
         am2_log("Line [%4d]:  Expected Army Color instead of '%s'\n",
                 ctx->tokens[*at].line,
@@ -1169,15 +1171,15 @@ static int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
 static int32_t ActWeapon(int32_t id)
 {
     switch (id) {
-    case 81:  return 1;     /* rifle     */
-    case 82:  return 4;     /* bazooka   */
-    case 83:  return 2;     /* grenade   */
-    case 84:  return 3;     /* flamer    */
-    case 85:  return 5;     /* mortar    */
-    case 86:  return 10;    /* autorifle */
-    case 91:  return 20;    /* sweeper   */
-    case 93:  return 29;    /* vulcan    */
-    case 95:  return 30;    /* sniper    */
+    case AM2_TOK_RIFLE:             return 1;
+    case AM2_TOK_BAZOOKA:           return 4;
+    case AM2_TOK_GRENADE:           return 2;
+    case AM2_TOK_FLAMER:            return 3;
+    case AM2_TOK_MORTAR:            return 5;
+    case AM2_TOK_AUTORIFLE:         return 10;
+    case AM2_TOK_SWEEPER:           return 20;
+    case AM2_TOK_VULCAN:            return 29;
+    case AM2_TOK_SNIPER:            return 30;
     default:  return -1;    /* flak, yours, explosive, detonator, lure,
                              * heavymg -- weapons the powerup table has and
                              * this one does not */
@@ -1187,11 +1189,11 @@ static int32_t ActWeapon(int32_t id)
 static int32_t ActChassis(int32_t id)
 {
     switch (id) {
-    case 35: return 1;      /* tank      */
-    case 37: return 0;      /* jeep      */
-    case 38: return 2;      /* halftrack */
-    case 39: return 3;      /* convoy    */
-    case 40: return 5;      /* boat      */
+    case AM2_TOK_TANK:              return 1;
+    case AM2_TOK_JEEP:              return 0;
+    case AM2_TOK_HALFTRACK:         return 2;
+    case AM2_TOK_CONVOY:            return 3;
+    case AM2_TOK_BOAT:              return 5;
     default: return -1;     /* `vehicle` itself is not a chassis */
     }
 }
@@ -1199,16 +1201,36 @@ static int32_t ActChassis(int32_t id)
 static int32_t ActPickup(int32_t id)
 {
     switch (id) {
-    case 82:  return 4;     case 83:  return 2;     case 84:  return 3;
-    case 85:  return 5;     case 86:  return 10;    case 87:  return 28;
-    case 88:  return 11;    case 89:  return 12;    case 91:  return 20;
-    case 92:  return 14;    case 93:  return 29;    case 94:  return 8;
-    case 95:  return 30;    case 96:  return 32;    case 97:  return 31;
-    case 98:  return 33;    case 99:  return 34;    case 100: return 35;
-    case 101: return 36;    case 102: return 37;    case 103: return 38;
-    case 104: return 39;    case 105: return 40;    case 106: return 42;
-    case 107: return 23;    case 108: return 22;    case 109: return 24;
-    case 110: return 25;    case 111: return 26;    case 112: return 41;
+    case AM2_TOK_BAZOOKA:           return 4;
+    case AM2_TOK_GRENADE:           return 2;
+    case AM2_TOK_FLAMER:            return 3;
+    case AM2_TOK_MORTAR:            return 5;
+    case AM2_TOK_AUTORIFLE:         return 10;
+    case AM2_TOK_FLAK:              return 28;
+    case AM2_TOK_MINE:              return 11;
+    case AM2_TOK_EXPLOSIVE:         return 12;
+    case AM2_TOK_SWEEPER:           return 20;
+    case AM2_TOK_LURE:              return 14;
+    case AM2_TOK_VULCAN:            return 29;
+    case AM2_TOK_HEAVYMG:           return 8;
+    case AM2_TOK_SNIPER:            return 30;
+    case AM2_TOK_VEHICLEAMMO:       return 32;
+    case AM2_TOK_VEHICLEARMOR:      return 31;
+    case AM2_TOK_VEHICLENITRO:      return 33;
+    case AM2_TOK_CAMOUFLAGE:        return 34;
+    case AM2_TOK_DISGUISEGREEN:     return 35;
+    case AM2_TOK_DISGUISETAN:       return 36;
+    case AM2_TOK_DISGUISEBLUE:      return 37;
+    case AM2_TOK_DISGUISEGREY:      return 38;
+    case AM2_TOK_MAGNIFYING:        return 39;
+    case AM2_TOK_AEROSOL:           return 40;
+    case AM2_TOK_M80:               return 42;
+    case AM2_TOK_MEDPACK:           return 23;
+    case AM2_TOK_MEDKIT:            return 22;
+    case AM2_TOK_AIRSTRIKE:         return 24;
+    case AM2_TOK_PARATROOPERS:      return 25;
+    case AM2_TOK_RECON:             return 26;
+    case AM2_TOK_WRENCH:            return 41;
     default:  return -1;    /* `detonator` is not a pickup */
     }
 }
@@ -1218,10 +1240,10 @@ static int32_t ActPickup(int32_t id)
 static int32_t ActDamageKind(int32_t id)
 {
     switch (id) {
-    case 126: return 2;     /* projectile */
-    case 127: return 1;     /* fire       */
-    case 128: return 4;     /* crush      */
-    case 129: return 3;     /* explosion  */
+    case AM2_TOK_PROJECTILE:        return 2;
+    case AM2_TOK_FIRE:              return 1;
+    case AM2_TOK_CRUSH:             return 4;
+    case AM2_TOK_EXPLOSION:         return 3;
     default:  return -1;
     }
 }
@@ -1231,10 +1253,10 @@ static int32_t ActDamageKind(int32_t id)
 static int32_t ActAiMode(int32_t id)
 {
     switch (id) {
-    case 155: return 6;     /* attack */
-    case 156: return 7;     /* defend */
-    case 157: return 2;     /* ignore */
-    case 158: return 5;     /* evade  */
+    case AM2_TOK_ATTACK:            return 6;
+    case AM2_TOK_DEFEND:            return 7;
+    case AM2_TOK_IGNORE:            return 2;
+    case AM2_TOK_EVADE:             return 5;
     default:  return -1;
     }
 }
@@ -1280,22 +1302,22 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     switch (id) {
 
-    case 76:                                    /* restorecamerafocus */
+    case AM2_TOK_RESTORECAMERAFOCUS:
         (*at)++;
         ACT(0x14) = 0x1E;
         return 1;
 
-    case 75:                                    /* setcamerafocus */
+    case AM2_TOK_SETCAMERAFOCUS:
         if (!ActStep(ctx, at))
             return 0;
         ACT(0x14) = 0x1D;
         return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
 
-    case 73:                                    /* suspendai */
-    case 74:                                    /* reviveai   */
+    case AM2_TOK_SUSPENDAI:
+    case AM2_TOK_REVIVEAI:
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 73) ? 0x1B : 0x1C;
+        ACT(0x14) = (id == AM2_TOK_SUSPENDAI) ? 0x1B : 0x1C;
         if (ctx->tokens[*at].kind == AM2_TOKEN_STRING)
             return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
         /* No name means everyone, which is the same built-in uid the
@@ -1303,14 +1325,14 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         ACT(0x18) = *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ID15);
         return 1;
 
-    case 64:                                    /* showmessage       */
-    case 65:                                    /* showbitmap        */
-    case 66:                                    /* showbitmapnopause */
-    case 71:                                    /* showfailure       */
-    case 72:                                    /* showpda           */
-    case 151:                                   /* setbriefing       */
-    case 152:                                   /* setbriefvo        */
-    case 153: {                                 /* setstratmap       */
+    case AM2_TOK_SHOWMESSAGE:
+    case AM2_TOK_SHOWBITMAP:
+    case AM2_TOK_SHOWBITMAPNOPAUSE:
+    case AM2_TOK_SHOWFAILURE:
+    case AM2_TOK_SHOWPDA:
+    case AM2_TOK_SETBRIEFING:
+    case AM2_TOK_SETBRIEFVO:
+    case AM2_TOK_SETSTRATMAP:       {
         if (!ActStep(ctx, at))
             return 0;
         if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
@@ -1429,7 +1451,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ActStep(ctx, at))
             return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)ctx->tokens[*at].value == 136) {   /* refvar */
+            (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_REFVAR) {   /* refvar */
             if (!ActStep(ctx, at))
                 return 0;
             if (!ActVarName(ctx, at, action,
@@ -1603,8 +1625,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         {
             int32_t st = ScriptFindName((const char *)ctx->tokens[*at].value);
             if (st < 0)
-                st = AddNameTableName(
-                    (const char *)ctx->tokens[*at].value, 2, 0);
+                st = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                      AM2_NAME_TYPE_REF, 0);
             ACT(0x18) = st;
         }
         if (++(*at) >= ctx->count ||
@@ -1619,7 +1641,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 123:                                   /* setmaxhealth */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 137) ? 0x24 : (id == 124) ? 0x0A : 0x0B;
+        ACT(0x14) = (id == AM2_TOK_SETOBJBMP) ? 0x24 : (id == AM2_TOK_HEAL) ? 0x0A : 0x0B;
         if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
             return 0;
         if (*at >= ctx->count) {
@@ -1697,7 +1719,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 147:                                   /* unally */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 146) ? 0x15 : 0x16;
+        ACT(0x14) = (id == AM2_TOK_ALLY) ? 0x15 : 0x16;
         ACT(0x18) = ScriptArmyColour(ctx, at);
         if (ACT(0x18) < 0)
             return 0;
@@ -1729,7 +1751,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 118:                                   /* setgunfacing */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 117) ? 0x20 : 0x21;
+        ACT(0x14) = (id == AM2_TOK_SETFACING) ? 0x20 : 0x21;
         if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
             return 0;
         if (*at >= ctx->count) {
@@ -1744,7 +1766,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         /* A facing may be `refvar <name>` instead of a literal. Anything
          * else is accepted and leaves the field at zero. */
         if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
-            (int32_t)(uintptr_t)ctx->tokens[*at].value != 136)
+            (int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_REFVAR)
             return 1;
         if (!ActStep(ctx, at))
             return 0;
@@ -1760,7 +1782,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 135:                                   /* addvar */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 134) ? 0x23 : 0x22;
+        ACT(0x14) = (id == AM2_TOK_SETVAR) ? 0x23 : 0x22;
         if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
             return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
@@ -1768,12 +1790,12 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             (*at)++;
             return 1;
         }
-        if (id == 135 && ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+        if (id == AM2_TOK_ADDVAR && ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
             ActTypeErr(ctx, at, AM2_TOKEN_STRING);
             return 0;
         }
         return ActVarName(ctx, at, action,
-            id == 134
+            id == AM2_TOK_SETVAR
                 ? "Line [%4d]:  expected variable name in SetVar but "
                   "variable %s not declared\n"
                 : "Line [%4d]:  expected variable name in AddVar but "
@@ -1788,7 +1810,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
             return 0;
         }
-        ACT(0x38) = (id == 149);
+        ACT(0x38) = (id == AM2_TOK_ACTIVATEREGION);
         ACT(0x18) = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
@@ -1815,13 +1837,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         }
         /* `order <who> follow <whom>` or `order <who> <somewhere>`. */
         int32_t verb = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (verb == 120) {                      /* follow */
+        if (verb == AM2_TOK_FOLLOW) {                      /* follow */
             if (!ActStep(ctx, at))
                 return 0;
             ACT(0x14) = 0x19;
             if (!ScriptResolveName(ctx, at, &ACT(0x1C), 0))
                 return 0;
-        } else if (verb == 121) {               /* moveto */
+        } else if (verb == AM2_TOK_GOTO) {               /* moveto */
             if (!ActStep(ctx, at))
                 return 0;
             ACT(0x14) = 0x18;
@@ -1833,7 +1855,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         ACT(0x38) = -1;
         if (*at >= ctx->count ||
             ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
-            (int32_t)(uintptr_t)ctx->tokens[*at].value != 122)   /* inmode */
+            (int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_INMODE)   /* inmode */
             return 1;
         if (!ActStep(ctx, at))
             return 0;
@@ -1926,9 +1948,9 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         }
         {
             int32_t v = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            if (v == 165)                       /* slow   */
+            if (v == AM2_TOK_SLOW)                       /* slow   */
                 ACT(0x38) = 1;
-            else if (v == 166)                  /* normal */
+            else if (v == AM2_TOK_NORMAL)                  /* normal */
                 ACT(0x38) = 0;
             else {
                 am2_log("Line [%4d]:  Expected {slow|normal} in setspeed\n",
@@ -1944,8 +1966,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 185:                                   /* setuilock */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 167) ? 0x2D : (id == 176) ? 0x35 : 0x39;
-        if (id != 185 && !ScriptResolveName(ctx, at, &ACT(0x18), 0))
+        ACT(0x14) = (id == AM2_TOK_SETNPC) ? 0x2D : (id == AM2_TOK_ADDEXP) ? 0x35 : 0x39;
+        if (id != AM2_TOK_SETUILOCK && !ScriptResolveName(ctx, at, &ACT(0x18), 0))
             return 0;
         if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
             ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
@@ -1968,7 +1990,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
             return 0;
         }
-        if ((int32_t)(uintptr_t)ctx->tokens[*at].value != 174) {  /* strategic */
+        if ((int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_STRATEGIC) {  /* strategic */
             am2_log("Line [%4d]:  Expected {strategic} in setitemflag\n",
                     ctx->tokens[*at].line);
             return 0;
@@ -1999,7 +2021,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                         ctx->tokens[*at].line);
                 return 0;
             }
-            if (kScriptNames[p].type != 1) {
+            if (kScriptNames[p].type != AM2_NAME_TYPE_PAD) {
                 am2_log("Line [%4d]:  SetDamagePad name was not a pad\n",
                         ctx->tokens[*at].line);
                 return 0;
@@ -2087,14 +2109,14 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 170:                                   /* setscientist */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 169) ? 0x2F : 0x30;
+        ACT(0x14) = (id == AM2_TOK_SETZOMBIE) ? 0x2F : 0x30;
         return ScriptResolveName(ctx, at, &ACT(0x18), 0) != 0;
 
     case 171:                                   /* makesmoke */
     case 172:                                   /* makeflame */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 171) ? 0x31 : 0x32;
+        ACT(0x14) = (id == AM2_TOK_MAKESMOKE) ? 0x31 : 0x32;
         if (!ScriptLocation(ctx, at, action, 0))
             return 0;
         if (*at >= ctx->count ||
@@ -2108,10 +2130,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 178:                                   /* unitfire   */
         if (!ActStep(ctx, at))
             return 0;
-        ACT(0x14) = (id == 177) ? 0x36 : 0x37;
+        ACT(0x14) = (id == AM2_TOK_FIREWEAPON) ? 0x36 : 0x37;
         if (!ScriptResolveName(ctx, at, &ACT(0x18), 0))
             return 0;
-        if (id == 177 && !ScriptResolveName(ctx, at, &ACT(0x40), 0))
+        if (id == AM2_TOK_FIREWEAPON && !ScriptResolveName(ctx, at, &ACT(0x40), 0))
             return 0;
         if (*at < ctx->count &&
             ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
@@ -2181,20 +2203,20 @@ int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, uint8_t *action)
  * `halftrack` shares 0x0200 with `grey`, which is not -- but nothing here can
  * tell whether that was intended, so it stands. */
 static const uint32_t kPadTriggerBit[27] = {
-    0x0040,  /* 16 green         */  0x0080,  /* 17 tan           */
-    0x0100,  /* 18 blue          */  0x0200,  /* 19 grey          */
-    0,       /* 20 me            */  0x0040,  /* 21 army0         */
-    0x0080,  /* 22 army1         */  0x0100,  /* 23 army2         */
-    0x0200,  /* 24 army3         */  0,       /* 25 preloadsprite */
-    0,       /* 26 pad           */  0,       /* 27 padon         */
-    0,       /* 28 padoff        */  0x0001,  /* 29 everything    */
-    0,       /* 30 item          */  0,       /* 31               */
-    0x0002,  /* 32 sarge         */  0x0004,  /* 33 unit          */
-    0x0008,  /* 34 trooper       */  0x0010,  /* 35 tank          */
-    0x0020,  /* 36 vehicle       */  0,       /* 37 jeep          */
-    0x0200,  /* 38 halftrack     */  0x0400,  /* 39 convoy        */
-    0x0800,  /* 40 boat          */  0x1000,  /* 41 groundvehicle */
-    0x2000,  /* 42 npc           */
+    /* 16 green */ AM2_PADTRIG_GREEN,   /* 17 tan  */ AM2_PADTRIG_TAN,
+    /* 18 blue  */ AM2_PADTRIG_BLUE,    /* 19 grey */ AM2_PADTRIG_GREY,
+    /* 20 me    */ 0,                   /* 21 army0 */ AM2_PADTRIG_GREEN,
+    /* 22 army1 */ AM2_PADTRIG_TAN,     /* 23 army2 */ AM2_PADTRIG_BLUE,
+    /* 24 army3 */ AM2_PADTRIG_GREY,    /* 25 preloadsprite */ 0,
+    /* 26 pad   */ 0,                   /* 27 padon */ 0,
+    /* 28 padoff */ 0,                  /* 29 everything */ AM2_PADTRIG_EVERYTHING,
+    /* 30 item  */ 0,                   /* 31 (no keyword) */ 0,
+    /* 32 sarge */ AM2_PADTRIG_SARGE,   /* 33 unit    */ AM2_PADTRIG_UNIT,
+    /* 34 trooper */ AM2_PADTRIG_TROOPER, /* 35 tank  */ AM2_PADTRIG_TANK,
+    /* 36 vehicle */ AM2_PADTRIG_VEHICLE, /* 37 jeep  */ 0,
+    /* 38 halftrack */ AM2_PADTRIG_GREY, /* 39 convoy */ AM2_PADTRIG_CONVOY,
+    /* 40 boat  */ AM2_PADTRIG_BOAT,    /* 41 groundvehicle */ AM2_PADTRIG_GROUNDVEH,
+    /* 42 npc   */ AM2_PADTRIG_NPC,
 };
 
 /* Where on the map this pad number is, in sixteenths of a cell. Only computed
@@ -2260,9 +2282,10 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* Type 1, where `variable` uses 3. */
-    int32_t name = AddNameTableName((const char *)ctx->tokens[*at].value, 1, 0);
+    int32_t name = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                    AM2_NAME_TYPE_PAD, 0);
     am2_free(ctx->tokens[*at].value);
-    ctx->tokens[*at].kind = 7;
+    ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
     ctx->tokens[*at].value = (void *)(uintptr_t)name;
 
     tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
@@ -2333,11 +2356,11 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     if (*at < ctx->count &&
         ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR) {
         int32_t op = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (op == 4)                    /* '<' */
+        if (op == AM2_TOK_LT)                    /* '<' */
             pad->compare = 1;
-        else if (op == 6)               /* '=' */
+        else if (op == AM2_TOK_EQ)               /* '=' */
             pad->compare = 0;
-        else if (op == 7)               /* '>' */
+        else if (op == AM2_TOK_GT)               /* '>' */
             pad->compare = 2;
         else {
             am2_log("Line [%4d]:  Unexpected symbol in pad definition "
@@ -2366,7 +2389,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         /* `delay <int> <int>`, optional, and only after a comparison. */
         if (*at < ctx->count &&
             ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)ctx->tokens[*at].value == 43) {
+            (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_DELAY) {
 
             tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
             if (!tok)
@@ -2457,8 +2480,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     AM2_ScriptCond *cond = (AM2_ScriptCond *)am2_malloc(sizeof *cond);
     memset(cond, 0, sizeof *cond);
 
-    if (ScriptAtWord(ctx, *at, 63)) {           /* timeabsolute */
-        cond->kind = 5;
+    if (ScriptAtWord(ctx, *at, AM2_TOK_TIMEABSOLUTE)) {           /* timeabsolute */
+        cond->kind = AM2_IF_TIMEABSOLUTE;
         if (++(*at) >= ctx->count)
             goto end_of_script;
 
@@ -2477,9 +2500,9 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         if (++(*at) >= ctx->count)
             goto end_of_script;
 
-    } else if (ScriptScanFor(ctx, *at, 52 /*after*/, 45 /*then*/)) {
+    } else if (ScriptScanFor(ctx, *at, AM2_TOK_AFTER, AM2_TOK_THEN)) {
         /* An `<event> after <event>` chain. */
-        cond->kind = 6;
+        cond->kind = AM2_IF_AFTER;
         for (;;) {
             int32_t k = ctx->tokens[*at].kind;
             if (k != AM2_TOKEN_STRING && k != AM2_TOKEN_RESERVED)
@@ -2489,7 +2512,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
                 goto fail_nofree;
             ScriptAddEvent(cond, a, b, c3);
 
-            if (!ScriptAtWord(ctx, *at, 52)) {
+            if (!ScriptAtWord(ctx, *at, AM2_TOK_AFTER)) {
                 am2_log("Line [%4d]:  Missing 'after' in if-statement.\n",
                         ctx->tokens[*at].line);
                 goto fail;
@@ -2503,9 +2526,9 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
             if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
                 continue;
-            if (ScriptAtWord(ctx, *at, 45) || ScriptAtWord(ctx, *at, 14))
+            if (ScriptAtWord(ctx, *at, AM2_TOK_THEN) || ScriptAtWord(ctx, *at, AM2_TOK_TESTVAR))
                 break;                          /* then, or testvar */
-            if (!ScriptAtWord(ctx, *at, 53))    /* and */
+            if (!ScriptAtWord(ctx, *at, AM2_TOK_AND))    /* and */
                 continue;
             if (++(*at) >= ctx->count)
                 goto end_of_script_late;
@@ -2516,11 +2539,11 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         int wants_of = 0;
 
         switch (id) {
-        case 46: cond->kind = 1; break;         /* allof   */
-        case 48: cond->kind = 2; break;         /* inorder */
-        case 50: cond->kind = 3; wants_of = 1; break;   /* count  */
-        case 49: cond->kind = 4; wants_of = 1; break;   /* repeat */
-        default: cond->kind = 0; break;         /* butnot, and anything else */
+        case AM2_TOK_ALLOF:         cond->kind = AM2_IF_ALLOF; break;
+        case AM2_TOK_INORDER:       cond->kind = AM2_IF_INORDER; break;
+        case AM2_TOK_COUNT:         cond->kind = AM2_IF_COUNT; wants_of = 1; break;
+        case AM2_TOK_REPEAT:        cond->kind = AM2_IF_REPEAT; wants_of = 1; break;
+        default: cond->kind = AM2_IF_PLAIN; break;         /* butnot, and anything else */
         }
 
         if (id >= 46 && id <= 50) {
@@ -2535,7 +2558,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
                 if (++(*at) >= ctx->count)
                     goto end_of_script;
 
-                if (!ScriptAtWord(ctx, *at, 51)) {      /* of */
+                if (!ScriptAtWord(ctx, *at, AM2_TOK_OF)) {      /* of */
                     am2_log("Line [%4d]:  Missing 'of' in if-repeat "
                             "statement.\n", ctx->tokens[*at].line);
                     goto fail;
@@ -2548,8 +2571,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         if (!ScriptParseEvents(ctx, at, cond))
             goto fail;
 
-        if (ScriptAtWord(ctx, *at, 47)) {       /* butnot */
-            cond->kind = 7;
+        if (ScriptAtWord(ctx, *at, AM2_TOK_BUTNOT)) {       /* butnot */
+            cond->kind = AM2_IF_BUTNOT_KEYWORD;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
             if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
@@ -2560,12 +2583,12 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
         }
 
     } else if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
-        cond->kind = 0;
+        cond->kind = AM2_IF_PLAIN;
         if (!ScriptParseEvents(ctx, at, cond))
             goto fail;
 
-        if (ScriptAtWord(ctx, *at, 47)) {       /* butnot */
-            cond->kind = 8;
+        if (ScriptAtWord(ctx, *at, AM2_TOK_BUTNOT)) {       /* butnot */
+            cond->kind = AM2_IF_BUTNOT_STRING;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
             if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
@@ -2577,11 +2600,11 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* ---- testvar ---- */
-    if (ScriptAtWord(ctx, *at, 14)) {
+    if (ScriptAtWord(ctx, *at, AM2_TOK_TESTVAR)) {
         if (++(*at) >= ctx->count)
             goto end_of_script;
 
-        while (!ScriptAtWord(ctx, *at, 45)) {   /* until `then` */
+        while (!ScriptAtWord(ctx, *at, AM2_TOK_THEN)) {   /* until `then` */
             AM2_ScriptTest test;
             memset(&test, 0, sizeof test);
 
@@ -2595,12 +2618,12 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (t->kind != AM2_TOKEN_CONTROL_CHAR)
                 goto bad_operator;
             switch ((int32_t)(uintptr_t)t->value) {
-            case 4: test.op = 2; break;         /* <  */
-            case 5: test.op = 4; break;         /* <= */
-            case 6: test.op = 0; break;         /* =  */
-            case 7: test.op = 3; break;         /* >  */
-            case 8: test.op = 5; break;         /* >= */
-            case 9: test.op = 1; break;         /* <> */
+            case AM2_TOK_LT:        test.op = 2; break;         /* <  */
+            case AM2_TOK_LE:        test.op = 4; break;         /* <= */
+            case AM2_TOK_EQ:        test.op = 0; break;         /* =  */
+            case AM2_TOK_GT:        test.op = 3; break;         /* >  */
+            case AM2_TOK_GE:        test.op = 5; break;         /* >= */
+            case AM2_TOK_NE:        test.op = 1; break;         /* <> */
             default: goto bad_operator;
             }
 
@@ -2616,9 +2639,9 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (t->kind != AM2_TOKEN_RESERVED)
                 goto incomplete;
             int32_t id = (int32_t)(uintptr_t)t->value;
-            if (id != 45 && id != 53)           /* then, and */
+            if (id != AM2_TOK_THEN && id != AM2_TOK_AND)           /* then, and */
                 goto incomplete;
-            if (id == 53 && ++(*at) >= ctx->count)
+            if (id == AM2_TOK_AND && ++(*at) >= ctx->count)
                 goto end_of_script_late;
 
             int32_t n = cond->ntests++;
@@ -2629,7 +2652,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* ---- then ---- */
-    if (!ScriptAtWord(ctx, *at, 45)) {
+    if (!ScriptAtWord(ctx, *at, AM2_TOK_THEN)) {
         am2_log("Line [%4d]:  Missing 'then' in if-statement.\n",
                 ctx->tokens[*at].line);
         goto fail;
@@ -2639,15 +2662,15 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
     if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED) {
         int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (id == 55) {                         /* random */
+        if (id == AM2_TOK_RANDOM) {                         /* random */
             cond->mode = 1;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
-        } else if (id == 54) {                  /* sequential */
+        } else if (id == AM2_TOK_SEQUENTIAL) {                  /* sequential */
             cond->mode = 2;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
-        } else if (id == 56) {                  /* onobjstate */
+        } else if (id == AM2_TOK_ONOBJSTATE) {                  /* onobjstate */
             cond->mode = 3;
             if (++(*at) >= ctx->count)
                 goto end_of_script;
@@ -2669,7 +2692,8 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             objname = ScriptFindName((const char *)t->value);
             if (objname < 0)
                 objname = AddNameTableName(
-                    (const char *)ctx->tokens[*at].value, 2, 0);
+                    (const char *)ctx->tokens[*at].value,
+                    AM2_NAME_TYPE_REF, 0);
             if (++(*at) >= ctx->count)
                 goto end_of_script_late;
         }
@@ -2688,7 +2712,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             break;
         AM2_ScriptTok *t = &ctx->tokens[*at];
         if (t->kind != AM2_TOKEN_CONTROL_CHAR ||
-            (int32_t)(uintptr_t)t->value != 3)   /* ',' */
+            (int32_t)(uintptr_t)t->value != AM2_TOK_COMMA)   /* ',' */
             break;
         if (++(*at) >= ctx->count)
             goto end_of_script_late;
@@ -2785,26 +2809,26 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
         if (tok->kind == AM2_TOKEN_RESERVED) {
             int32_t id = (int32_t)(uintptr_t)tok->value;
 
-            if (id == 25) {
+            if (id == AM2_TOK_PRELOADSPRITE) {
                 ScriptPreloadSprite(ctx, &at);
                 continue;
             }
-            if (id == 26) {
+            if (id == AM2_TOK_PAD) {
                 ScriptPad(ctx, &at);
                 continue;
             }
-            if (id == 133) {
+            if (id == AM2_TOK_VARIABLE) {
                 ScriptVariable(ctx, &at);
                 continue;
             }
-            if (id == 44) {
+            if (id == AM2_TOK_IF) {
                 if (ScriptIf(ctx, &at) == 1)
                     compounds++;
                 continue;
             }
             /* `object` and `objclass` share a handler, which reads the
              * keyword itself rather than being told which one it is. */
-            if (id == 139 || id == 140) {
+            if (id == AM2_TOK_OBJECT || id == AM2_TOK_OBJCLASS) {
                 GenerateObjScriptFromTokens(ctx, &at);
                 continue;
             }

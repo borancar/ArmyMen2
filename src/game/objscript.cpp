@@ -113,7 +113,7 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
         AM2_ScriptTok *t = &ctx->tokens[*at];
         if (t->kind == AM2_TOKEN_RESERVED) {
             int32_t id = (int32_t)(uintptr_t)t->value;
-            if (id == 141 || id == 142)
+            if (id == AM2_TOK_STATE || id == AM2_TOK_FRAME)
                 break;
         }
 
@@ -123,7 +123,7 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
 
         if (*at < ctx->count &&
             ctx->tokens[*at].kind == AM2_TOKEN_CONTROL_CHAR &&
-            (int32_t)(uintptr_t)ctx->tokens[*at].value == 3) {   /* ',' */
+            (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_COMMA) {   /* ',' */
             if (++(*at) >= ctx->count) {
                 am2_log("Unexpected end of script.\n");
                 return 0;
@@ -153,7 +153,8 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
 
     int32_t name = ScriptFindName((const char *)tok->value);
     if (name < 0)
-        name = AddNameTableName((const char *)ctx->tokens[*at].value, 2, 0);
+        name = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                    AM2_NAME_TYPE_REF, 0);
 
     /* The name resolves to this state's index within the object, not to
      * anything global. */
@@ -164,7 +165,7 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
     while (!ScriptIsStatementStart(ctx, at)) {
         AM2_ScriptTok *t = &ctx->tokens[*at];
         if (t->kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)t->value == 141)        /* another `state` */
+            (int32_t)(uintptr_t)t->value == AM2_TOK_STATE)        /* another `state` */
             break;
         if (!ScriptObjFrame(ctx, at))
             return 0;
@@ -203,7 +204,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 
     int32_t id = (int32_t)(uintptr_t)tok->value;
 
-    if (id == 139) {                    /* object <name> */
+    if (id == AM2_TOK_OBJECT) {                    /* object <name> */
         if (++(*at) >= ctx->count) {
             am2_log("Unexpected end of script.\n");
             return 0;
@@ -228,7 +229,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
         }
         ScriptAttachTo(obj);
 
-    } else if (id == 140) {             /* objclass <int> <int> */
+    } else if (id == AM2_TOK_OBJCLASS) {             /* objclass <int> <int> */
         if (++(*at) >= ctx->count) {
             am2_log("Unexpected end of script.\n");
             return 0;

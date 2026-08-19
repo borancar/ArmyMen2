@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "objscript.h"
+#include "scripttokens.h"
 
 #ifdef __cplusplus
 extern "C" {

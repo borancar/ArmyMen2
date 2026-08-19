@@ -881,8 +881,10 @@
 /* A declared name's type, as AddNameTableName takes it. 0 allocates a fresh
  * uid; 1..3 store the one passed. Anything else is an error and stores it
  * anyway. Type 3 is what `variable` declares. */
-#define AM2_NAME_TYPE_OBJECT     0
-#define AM2_NAME_TYPE_INTEGER    3
+#define AM2_NAME_TYPE_OBJECT     0   /* `object`; takes a fresh uid   */
+#define AM2_NAME_TYPE_PAD        1   /* `pad`                         */
+#define AM2_NAME_TYPE_REF        2   /* a name used before declaring  */
+#define AM2_NAME_TYPE_INTEGER    3   /* `variable`                    */
 
 /* Non-zero suppresses ReadScript's closing summary. */
 #define ADDR_SCRIPT_QUIET        0x00511DA0u
@@ -1105,6 +1107,64 @@
 #define AM2_TOKEN_FLOAT          4
 #define AM2_TOKEN_STRING         5
 #define AM2_TOKEN_NAME           6
+
+/* Kind 7 has no entry in the kind-name array at all -- index 7 there is the
+ * keyword table's first row. Nothing the tokeniser produces carries it; it is
+ * written by the statement handlers, which rewrite a String naming something
+ * into a reference to the name table. ScriptTokenText resolves it. */
+#define AM2_TOKEN_NAMEREF        7
+
+/* Which form an `if` took, recorded in the condition's first field. Derived
+ * from the arms, not from a table -- the keyword each corresponds to is in the
+ * name. */
+#define AM2_IF_PLAIN             0
+#define AM2_IF_ALLOF             1
+#define AM2_IF_INORDER           2
+#define AM2_IF_COUNT             3
+#define AM2_IF_REPEAT            4
+#define AM2_IF_TIMEABSOLUTE      5
+#define AM2_IF_AFTER             6
+#define AM2_IF_BUTNOT_KEYWORD    7
+#define AM2_IF_BUTNOT_STRING     8
+
+/* Who a `hit`, `killed`, `healed`, `pickedup` or `dropped` event is about,
+ * packed into the top bits of one value by ScriptHitTarget.
+ *
+ * The army bits are one each. The class bits are not: `sarge` is three bits
+ * and `trooper` is two of those same three, so a trooper mask is a subset of a
+ * sarge mask -- the scheme is a hierarchy rather than a set of flags, which is
+ * why `sarge` matching implies `trooper` matching and not the other way round.
+ *
+ * ALL_ARMIES is what an unrecognised army word gives, and it is exactly the
+ * base bit with all four armies OR'd in. */
+#define AM2_HIT_ANY          0x80000000u
+#define AM2_HIT_GREEN        0x40000000u
+#define AM2_HIT_TAN          0x20000000u
+#define AM2_HIT_BLUE         0x10000000u
+#define AM2_HIT_GREY         0x08000000u
+#define AM2_HIT_ALL_ARMIES   0xF8000000u
+#define AM2_HIT_ITEM         0x04000000u
+#define AM2_HIT_SARGE        0x01C00000u
+#define AM2_HIT_TROOPER      0x01400000u
+#define AM2_HIT_VEHICLE      0x00200000u
+
+/* What sets a pad off, in the pad record's trigger field. A different and
+ * unrelated encoding from the hit masks above -- low bits, one per class, and
+ * the armies sit in the middle of the class bits rather than above them. */
+#define AM2_PADTRIG_EVERYTHING   0x0001u
+#define AM2_PADTRIG_SARGE        0x0002u
+#define AM2_PADTRIG_UNIT         0x0004u
+#define AM2_PADTRIG_TROOPER      0x0008u
+#define AM2_PADTRIG_TANK         0x0010u
+#define AM2_PADTRIG_VEHICLE      0x0020u
+#define AM2_PADTRIG_GREEN        0x0040u
+#define AM2_PADTRIG_TAN          0x0080u
+#define AM2_PADTRIG_BLUE         0x0100u
+#define AM2_PADTRIG_GREY         0x0200u
+#define AM2_PADTRIG_CONVOY       0x0400u
+#define AM2_PADTRIG_BOAT         0x0800u
+#define AM2_PADTRIG_GROUNDVEH    0x1000u
+#define AM2_PADTRIG_NPC          0x2000u
 #define ADDR_MENU_REQUEST_TAKEN  0x00511DBCu  /* int32_t, the consumed code */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
