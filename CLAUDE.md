@@ -344,6 +344,20 @@ each put their two names in the opposite fields from how the statement reads;
 and the AI modes are attack 6, defend 7, ignore 2, evade 5 -- neither
 sequential nor in keyword order. Reading alone got all of them wrong.
 
+**A colour lookup that is the identity cannot prove much, and the mutation
+said so.** `ScriptArmyColour` ends in `CommSlotForArmy` (`0x0040F250`), which
+walks the comm object's four player records for one holding that army. Making
+its match arm return `i + 1` diverges on 20 files across `createexplosion`,
+`createvehicle`, `ally`, `createroach` and `setforcecolor`, so that arm is
+genuinely covered -- but making the NO-match arm return 3 changes nothing at
+all, and neither does the `army == 4` shortcut.
+
+A probe says why in one run where three mutations would have taken three: the
+slots hold armies 0, 1, 2, 3, and only 0..3 ever arrive. The lookup is the
+identity for every colour a script can write, so two of its three exits are
+verified by reading. **Probe to find out which paths run; mutate to find out
+whether the ones that run are checked.**
+
 **Renumbering heap pointers has to be scoped, and a global sequence turns one
 event into thousands.** `tools/actdiff.py` replaces each pointer with its
 first-seen index so a dump survives the DLL changing size. The first version

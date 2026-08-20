@@ -1064,8 +1064,12 @@
 #define ADDR_SCRIPT_INT_OR_VAR    0x00442F80u  /* (ctx,at,&val,&isliteral) */
 #define ADDR_SCRIPT_OBJECT_UID    0x0043FF00u  /* (ctx,at,&zero,&uid) */
 #define ADDR_SCRIPT_ARMY_COLOUR   0x00440930u  /* int32_t(ctx,at) */
-#define ADDR_ARMY_TABLE           0x004751B0u  /* the object 0x0040F250 is on */
-#define ADDR_ARMY_LOOKUP          0x0040F250u  /* thiscall, int32_t(int32_t) */
+/* Not a table of its own: 0x004751B0 is ADDR_COMM_OBJECT under a second name,
+ * which is how it came to look like one. The army lives in the player record
+ * on the comm object, so this alias is kept only for the `this` these two
+ * accessors want and says what it really is. */
+#define ADDR_ARMY_TABLE           0x004751B0u  /* == ADDR_COMM_OBJECT */
+#define ADDR_COMM_SLOT_FOR_ARMY   0x0040F250u  /* thiscall int32_t(this, army) */
 
 /* Object lookup and iteration. The two iterators take no arguments: they walk
  * whatever the record at ADDR_SCRIPT_OBJ_TARGET selects, which the objclass
@@ -1135,9 +1139,17 @@
 #define AM2_PLAYER_STRIDE        0x70u
 #define AM2_PLAYERS_MAX          4
 #define AM2_PLAYER_ARMY          0x210u
+#define AM2_PLAYER_ID            0x214u   /* the DirectPlay id; 0 or -1 is none */
 #define AM2_PLAYER_ACTIVE        0x25Cu
 #define AM2_COMM_VERBOSE         0x418u   /* gates the per-script logging */
-#define ADDR_COMM_PLAYER_IS_AI   0x0040F200u  /* thiscall int32_t(int32_t) */
+/* This went in as ADDR_COMM_PLAYER_IS_AI, read off the one call site that
+ * skips an AI script when it answers yes -- and it means the opposite. The
+ * field it tests is +0x214, which is the id ADDR_COMM_FIND_PLAYER scans for,
+ * so a slot answers yes while a real networked player still holds it. That
+ * also explains "Player %s has left the game - now AI": losing the player
+ * clears the id, and the slot becomes the AI's. Fourth time a name has been
+ * taken from a call site and been wrong. */
+#define ADDR_COMM_SLOT_HAS_PLAYER 0x0040F200u /* thiscall int32_t(this, slot) */
 #define ADDR_MP_SCRIPT_NAME      0x00511C08u  /* char[], the multiplayer script */
 
 /* The three names that used to live here -- GREENSCORE at 0x0065648C and so on

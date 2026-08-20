@@ -283,6 +283,20 @@ int32_t __cdecl MapCode18To28(int32_t code);
  * record pointed to by +0x94 equal to 0x1F. */
 int32_t __cdecl MeetsAllThree(const void *p);
 
+/* 0x0040F250 and 0x0040F200, both thiscall on the comm object. The player
+ * records start at AM2_PLAYER_ARMY and are AM2_PLAYER_STRIDE apart.
+ *
+ * The first answers which slot flies a colour. Army 4 is answered with 4
+ * before the table is looked at, and a colour no slot holds comes back as slot
+ * 0 -- the same answer as "slot 0 is that colour", so a caller cannot tell the
+ * two apart. That is the original's shape, not a simplification.
+ *
+ * The second answers whether a slot still holds a real player, by testing the
+ * DirectPlay id the find-by-id search matches on. See ADDR_COMM_SLOT_HAS_PLAYER
+ * in orig.h for why it is not the "is AI" it was first taken for. */
+int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
+int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot);
+
 int misc_install(void);
 
 #ifdef __cplusplus

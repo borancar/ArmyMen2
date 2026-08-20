@@ -1,4 +1,5 @@
 /* misc.cpp -- see misc.h. */
+#include <stddef.h>
 #include <stdint.h>
 
 #include "misc.h"
@@ -512,6 +513,31 @@ int32_t __cdecl MeetsAllThree(const void *p)
     return (**(const int32_t *const *)(b + 0x94) == 0x1F) ? 1 : 0;
 }
 
+int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
+{
+    if (army == 4)
+        return 4;
+
+    const uint8_t *p = (const uint8_t *)comm + AM2_PLAYER_ARMY;
+
+    for (int32_t i = 0; i < AM2_PLAYERS_MAX; i++) {
+        if (*(const int32_t *)p == army)
+            return i;
+        p += AM2_PLAYER_STRIDE;
+    }
+    /* No match and slot 0 share an answer. */
+    return 0;
+}
+
+int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot)
+{
+    int32_t id = *(const int32_t *)((const uint8_t *)comm +
+                                    (size_t)slot * AM2_PLAYER_STRIDE +
+                                    AM2_PLAYER_ID);
+
+    return id != 0 && id != -1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -572,5 +598,9 @@ int misc_install(void)
                   "MapCode18To28", 1);
     patch_replace(ADDR_MEETS_ALL_THREE, (const void *)MeetsAllThree,
                   "MeetsAllThree", 1);
+    patch_replace(ADDR_COMM_SLOT_FOR_ARMY, (const void *)CommSlotForArmy,
+                  "CommSlotForArmy", 20);
+    patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
+                  "CommSlotHasPlayer", 5);
     return 0;
 }

@@ -28,13 +28,9 @@ typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
 /* thiscall: ecx is loaded from the army table immediately before the call,
  * which is the tell for an i386 MSVC member function rather than a COM
  * dispatch. */
-typedef int32_t (__thiscall *am2_army_lookup_fn)(void *table, int32_t army);
-typedef int32_t (__thiscall *am2_player_is_ai_fn)(void *comm, int32_t slot);
 
 #define orig_preload_sprite    (*(am2_preload_sprite_fn)ADDR_PRELOAD_SPRITE)
 #define orig_parse_action      (*(am2_parse_action_fn)ADDR_SCRIPT_PARSE_ACTION)
-#define orig_army_lookup       (*(am2_army_lookup_fn)ADDR_ARMY_LOOKUP)
-#define orig_player_is_ai      (*(am2_player_is_ai_fn)ADDR_COMM_PLAYER_IS_AI)
 #define orig_set_data_dir      (*(am2_str_fn)ADDR_SET_DATA_DIR)
 #define orig_declare_rule_vars (*(am2_void_fn)ADDR_DECLARE_RULE_VARS)
 
@@ -1118,7 +1114,7 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
         return -1;
     }
 
-    int32_t rc = orig_army_lookup(*(void **)AM2_IMAGE(ADDR_ARMY_TABLE), army);
+    int32_t rc = CommSlotForArmy(*(void **)AM2_IMAGE(ADDR_ARMY_TABLE), army);
 
     (*at)++;
     return rc;
@@ -2970,8 +2966,10 @@ void __cdecl LoadLevelScript(void)
 
             if (!*(const int32_t *)(slot + AM2_PLAYER_ACTIVE))
                 continue;
-            /* A slot the machine plays needs no AI script of its own. */
-            if (orig_player_is_ai(kCommObject, i))
+            /* A slot a real player still holds needs no AI script. The test
+             * is the DirectPlay id, so this reads the opposite way round from
+             * the name it first went in under -- see ADDR_COMM_SLOT_HAS_PLAYER. */
+            if (CommSlotHasPlayer(kCommObject, i))
                 continue;
 
             int32_t army = *(const int32_t *)(slot + AM2_PLAYER_ARMY);
