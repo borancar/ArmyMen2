@@ -1027,6 +1027,46 @@
 
 /* Head of the condition list; each record links through its +0x30. */
 #define ADDR_SCRIPT_CONDITIONS    0x00510214u
+
+/* event.cpp's registration table and the three things DeclareRuleVars does to
+ * it. The table is 1024 buckets of 16-byte nodes at 0x005101F0, chained
+ * through +0x0C and keyed on the first two arguments of the register call.
+ * All four stay original -- what is reconstructed is the declaring, not the
+ * table. */
+#define ADDR_EVENT_REGISTER      0x0041EE70u  /* void(a, uid, c, fn, arg, f) */
+#define ADDR_EVENT_CLEAR_ALL     0x004223D0u  /* void(void), frees every node */
+#define ADDR_TAKE_UID            0x0041E7F0u  /* int32_t(void), post-increments
+                                               * the counter at ADDR_NEXT_UID */
+/* 26 callers, and suppressed when the multiplayer session flag is set and the
+ * comm object agrees, or when a state word reads 0x22. Named for what it is
+ * observed to do from here -- announce an event -- and not from any one of
+ * those callers. */
+#define ADDR_EVENT_NOTIFY        0x0041F4A0u  /* void(10 args) */
+
+/* The callbacks DeclareRuleVars registers. The first two are six-byte
+ * wrappers over one shared handler differing only in a 0 or a 1, which is what
+ * makes "army" and "team" safe to say; the other three are named for the
+ * global their uid is stored in, because their bodies are not identified. */
+/* Direct string literals, not pointers to them: DeclareRuleVars pushes these
+ * addresses straight into ScriptNameUid. */
+#define ADDR_NAME_GREENWINS      0x00478880u
+#define ADDR_NAME_TANWINS        0x00478878u
+#define ADDR_NAME_BLUEWINS       0x0047886Cu
+#define ADDR_NAME_GREYWINS       0x00478860u
+#define ADDR_NAME_GREENTEAMWINS  0x00478850u
+#define ADDR_NAME_TANTEAMWINS    0x00478844u
+#define ADDR_NAME_BLUETEAMWINS   0x00478834u
+#define ADDR_NAME_GREYTEAMWINS   0x00478824u
+
+#define ADDR_EVT_ARMY_WINS       0x00422250u
+#define ADDR_EVT_TEAM_WINS       0x00422260u
+#define ADDR_EVT_RULE_A          0x00422270u
+#define ADDR_EVT_RULE_B          0x00422310u
+#define ADDR_EVT_RULE_C          0x004223A0u
+#define ADDR_EVT_CONDITION       0x00421E80u  /* every `if` in the script */
+#define ADDR_RULE_UID_A          0x00510218u
+#define ADDR_RULE_UID_B          0x0051021Cu
+#define ADDR_RULE_UID_C          0x00510220u
 /* Names recovered from the error strings the functions print about
  * themselves. None is reconstructed yet; recorded so the names are here when
  * they are, rather than being guessed at from a call site again. */

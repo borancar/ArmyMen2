@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "crt.h"
+#include "event.h"
 #include "gamedir.h"
 #include "misc.h"
 #include "image.h"
@@ -28,7 +29,6 @@ extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
 
 /* ---- what stays in the original image --------------------------------- */
 
-typedef void    (__cdecl *am2_void_fn)(void);
 typedef void    (__cdecl *am2_str_fn)(const char *s);
 typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
                                                int32_t *at,
@@ -38,7 +38,6 @@ typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
  * dispatch. */
 
 #define orig_parse_action      (*(am2_parse_action_fn)ADDR_SCRIPT_PARSE_ACTION)
-#define orig_declare_rule_vars (*(am2_void_fn)ADDR_DECLARE_RULE_VARS)
 
 int32_t __cdecl IsBlank(uint8_t c)
 {
@@ -2991,7 +2990,7 @@ void __cdecl LoadLevelScript(void)
         }
     }
 
-    orig_declare_rule_vars();
+    DeclareRuleVars();
 }
 
 /* AM2_PARSE_ALL=1: after the game's own first script load, parse every other

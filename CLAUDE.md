@@ -344,6 +344,26 @@ each put their two names in the opposite fields from how the statement reads;
 and the AI modes are attack 6, defend 7, ignore 2, evade 5 -- neither
 sequential nor in keyword order. Reading alone got all of them wrong.
 
+**script.cpp reaches into the image for one thing now, and that one is
+deliberate.** The other five `orig_` seams are reconstructed:
+`CommSlotForArmy` and `CommSlotHasPlayer` (misc.cpp), `SetGameDir`
+(gamedir.cpp), `PreloadSprite` (win32/sprite.cpp) and `DeclareRuleVars`
+(event.cpp). What is left is `orig_parse_action`, which exists so
+`AM2_PROBE_NOACTION` can re-record the oracle.
+
+`DeclareRuleVars` is the first of event.cpp and shows the usual shape: the
+registration table, its teardown, the uid counter and the notify all stay
+original and are reached by address, so only the declaring is ours and it runs
+in the middle of a live path. Its counter reads 0 -- `LoadLevelScript` calls it
+directly -- and a probe says `conds=16 terms=17` on Boot Camp, where
+`ReadScript` independently reports `compounds: 16`. Two numbers from different
+places agreeing is better evidence than either alone.
+
+**And that A/B can fail, which was worth checking.** Registering none of the
+condition terms leaves `bootcamp` at 79,748 differing pixels against a budget
+of 500 -- the mission's scripted content never appears, because nothing is
+listening for the events that produce it.
+
 **A colour lookup that is the identity cannot prove much, and the mutation
 said so.** `ScriptArmyColour` ends in `CommSlotForArmy` (`0x0040F250`), which
 walks the comm object's four player records for one holding that army. Making
