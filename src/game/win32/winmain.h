@@ -66,6 +66,21 @@ void __cdecl DetectCpuSpeed(void);
  * and records its root. */
 int32_t __cdecl FindGameCD(void);
 
+/* The chain WinMain drives, all reconstructed. See winmain.cpp for what each
+ * one does and what it leaves original below itself. */
+void    __cdecl CheckBasePath(void);
+void    __cdecl InitTimer(void);
+void    __cdecl ShutdownSubsystems(void);
+void    __cdecl FreeSpriteListAlias(void);
+int32_t __cdecl InitAudio(void);
+int32_t __cdecl ClearGameOver(void);
+void    __cdecl ResetToTitle(void);
+void    __cdecl StartIntro(void);
+void    __cdecl RunFrame(void);
+void    __cdecl FreeSpriteSets(void);
+void    __cdecl ReportLeaks(void);
+void    __cdecl FreeMemTracker(void);
+
 int winmain_install(void);
 
 #ifdef __cplusplus

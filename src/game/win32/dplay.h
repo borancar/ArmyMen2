@@ -136,6 +136,10 @@ int32_t __cdecl MsgListInit(void *list);
 /* Original: 0x00402170. Close a handle and forget it. */
 void __cdecl EventClose(void *holder);
 
+/* 0x0040ED10, thiscall. StartIntro brings the lobby up before deciding
+ * anything, with the comm object already in ecx from the field it just read. */
+int32_t __attribute__((thiscall)) CommLobbyStart(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

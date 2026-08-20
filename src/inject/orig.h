@@ -924,6 +924,7 @@
  * the original's, so the allocator has to be the same one; see game/crt.h. */
 #define ADDR_CRT_MALLOC          0x004647F8u
 #define ADDR_CRT_REALLOC         0x004646D8u
+#define ADDR_CRT_GETCWD          0x00465DB5u  /* _getcwd(buf, max) */
 #define ADDR_CRT_CHDIR           0x00465ED0u  /* _chdir: SetCurrentDirectoryA
                                                * then GetCurrentDirectoryA */
 #define ADDR_CRT_FREE            0x004646A9u
@@ -1584,7 +1585,79 @@
 #define ADDR_POLL_INPUT          0x00427420u  /* void(void) */
 #define ADDR_POLL_MOUSE          0x00427070u  /* void(void) */
 #define ADDR_POLL_KEYBOARD       0x004272D0u  /* void(void) */
-#define ADDR_RELEASE_APP_MUTEX   0x0040B220u  /* void(void) */
+/* The globals and literals the WinMain chain touches. Read out of the bodies
+ * rather than guessed; see src/game/win32/winmain.cpp for what each does. */
+#define ADDR_STR_BASE_PATH_LONG  0x00478954u  /* "The base path is longer..." */
+#define ADDR_PERF_FREQ           0x00512350u  /* int64, QueryPerformanceFrequency */
+#define ADDR_PERF_START          0x00512578u  /* int64, the startup counter */
+#define ADDR_PERF_PERIOD         0x00512570u  /* double, milliseconds per tick */
+#define ADDR_PERF_WORD_A         0x00512568u  /* three int16 cleared with it */
+#define ADDR_PERF_WORD_B         0x0051256Au
+#define ADDR_PERF_WORD_C         0x0051256Cu
+#define ADDR_DBL_MS_PER_SEC      0x0046F990u  /* 1000.0 */
+#define ADDR_DBL_MAX_PERIOD      0x0046F988u  /* 1.0 -- worse than 1 kHz loses */
+#define ADDR_STR_HIGH_PERF       0x00485438u  /* "Using High Performance Counter\n" */
+#define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE, ArmyMenMutex */
+#define ADDR_SHUTDOWN_OBJ        0x00512308u  /* the `this` of the first teardown */
+#define ADDR_FREE_SPRITE_LIST    0x004098B0u  /* what the alias jumps to */
+#define ADDR_CURRENT_MAP_NAME    0x00511A88u  /* what ResetToTitle fills from
+                                               * ADDR_OPT_MAP_NAME, or from the
+                                               * default when that is empty */
+#define ADDR_MAP_NAME_DEFAULT    0x00485108u  /* const char **, used when empty */
+#define ADDR_MP_SCRIPT_DEFAULT   0x0048510Cu  /* const char ** */
+#define ADDR_SPRITE_SET_LOAD     0x004239B0u  /* void(const char *) */
+#define ADDR_SPRITE_SET_FREE     0x00423970u  /* void(void *set) */
+#define ADDR_SPRITE_SET_TITLE    0x00510A40u
+#define ADDR_SPRITE_SET_SHARED   0x00510230u
+#define ADDR_SPRITE_SET_THIRD    0x00511250u
+#define ADDR_SPRITE_SETS_LOADED  0x0047894Cu  /* int32, gates load and free */
+#define ADDR_STR_SET_TITLE       0x00478AC0u  /* "title" */
+#define ADDR_STR_SET_SHARED      0x00478AACu  /* "shared" */
+#define ADDR_PALETTE_SOURCE      0x00477A58u  /* what 0x0041ADE0 and
+                                               * SetGamePalette are handed */
+#define ADDR_FILL_PALETTE        0x0041ADE0u  /* void(void *) */
+#define ADDR_AUDIO_READY         0x004FA468u  /* int32, both audio arms set it */
+#define ADDR_GAME_OVER_STATE     0x00515F88u  /* int32, cleared at startup */
+#define ADDR_FRAME_ENABLED       0x004FA02Cu  /* int32, RunFrame's whole body */
+#define ADDR_GAME_STATE_NOW      0x00511DA4u  /* int32, RunFrame's 0..4 switch */
+#define ADDR_FRAME_PRE           0x0040AF70u  /* before the state handler */
+#define ADDR_FRAME_POST          0x0040AFA0u  /* after it, reached by tail jump */
+#define ADDR_STATE0_FRAME        0x004266B0u
+#define ADDR_STATE1_FRAME        0x00426570u
+#define ADDR_STATE3_FRAME        0x00426760u
+#define ADDR_STATE4_FRAME        0x00426790u
+#define ADDR_INTRO_SEEN          0x004FA038u  /* int32; set skips the movie */
+#define ADDR_COMM_OFF_LOBBY      0x3FCu       /* on the comm object */
+#define ADDR_COMM_OFF_SKIP_INTRO 0x3F8u
+#define ADDR_SET_GAME_OVER       0x0042E5A0u  /* void(int32) */
+#define ADDR_LEAK_COUNT          0x0050C344u  /* int32 */
+#define ADDR_LEAK_TOTAL          0x0050C340u  /* int32 */
+#define ADDR_LEAK_RECORDS        0x0050C348u  /* the 16-byte records */
+#define ADDR_STR_LEAK_HEADER     0x0047834Cu  /* "Unreleased memory (%d) blocks:\n" */
+#define ADDR_STR_LEAK_ROW        0x0047832Cu  /* "%08d bytes  file: %s  line: %d\n" */
+#define ADDR_CRT_STRNCPY         0x00465610u
+
+/* The trig tables and the constants that build them. The store index runs one
+ * ahead of the loop counter in the original, so the cos table really starts at
+ * 0x00515784 and not at the 0x00515780 the first fstp encodes. */
+#define ADDR_TRIG_COS            0x00515784u  /* float[256] */
+#define ADDR_TRIG_SIN            0x00514F80u  /* float[256], scaled by -0.85 */
+/* These two are the CENTRES, not the starts: the original indexes them with a
+ * signed ratio running -512..512, so the table occupies base-512..base+512.
+ * Taking them for starts puts each one 512 bytes late, and the sin one then
+ * lands on top of half the cos table -- which is how it was found. The four
+ * are contiguous and in this order: atanS 0x00515380, cos 0x00515784,
+ * atanC 0x00515B84, with sin at 0x00514F80 ending exactly where atanS begins. */
+#define ADDR_TRIG_ATAN_COS       0x00515D84u  /* int8[1025] centred here */
+#define ADDR_TRIG_ATAN_SIN       0x00515580u  /* int8[1025] centred here */
+#define AM2_TRIG_ATAN_RANGE      512
+#define ADDR_DBL_TWO_PI          0x0046F9C8u  /* 6.283185307 */
+#define ADDR_DBL_ONE_256         0x0046F9C0u  /* 0.00390625 */
+#define ADDR_DBL_SIN_SCALE       0x0046F9B8u  /* -0.85, the isometric squash */
+#define ADDR_DBL_512             0x0046F9B0u  /* 512.0 */
+#define ADDR_DBL_ZERO            0x0046F920u  /* 0.0 */
+
+#define ADDR_SHUTDOWN_SUBSYSTEMS   0x0040B220u  /* void(void) */
 /* Look for the game CD: walk the logical drives, find one that is a CD-ROM and
  * whose volume label is ARMYMEN2, and remember where it is. */
 #define ADDR_FIND_GAME_CD        0x00426B50u  /* int32_t(void) */
@@ -1594,11 +1667,11 @@
 #define ADDR_CD_LABEL            0x004852B8u  /* "ARMYMEN2" */
 #define ADDR_GAME_STRICMP        0x00465F90u  /* the game's own CRT */
 #define ADDR_GAME_SPRINTF        0x00464CE2u
-#define ADDR_STARTUP_4249C0      0x004249C0u
-#define ADDR_STARTUP_42DC30      0x0042DC30u
-#define ADDR_STARTUP_409920      0x00409920u
-#define ADDR_STARTUP_40C9B0      0x0040C9B0u
-#define ADDR_STARTUP_42E580      0x0042E580u
+#define ADDR_RESET_TO_TITLE      0x004249C0u
+#define ADDR_BUILD_TRIG_TABLES      0x0042DC30u
+#define ADDR_FREE_SPRITE_LIST_ALIAS      0x00409920u
+#define ADDR_INIT_AUDIO      0x0040C9B0u
+#define ADDR_CLEAR_GAME_OVER      0x0042E580u
 #define ADDR_START_INTRO         0x0040B7A0u  /* honours -nointro */
 #define ADDR_RUN_FRAME           0x0040B000u  /* one tick; state machine of 5 */
 /* RunFrame is a state machine. It returns at once unless ADDR_APP_ACTIVE is
@@ -1630,7 +1703,7 @@
  * KeyChanged(ESC)`, i.e. ESCAPE on RELEASE. It does nothing during ordinary
  * play because the sub-state is not 34 then -- measured, not assumed. */
 #define ADDR_SUBSTATE34_ESCAPE   0x00425DA0u  /* void(void) */
-#define ADDR_SHUTDOWN_423D20     0x00423D20u
+#define ADDR_FREE_SPRITE_SETS     0x00423D20u
 #define ADDR_SHUTDOWN_DDRAW      0x0041A950u  /* void(void) */
 #define ADDR_DD_CLIPPER          0x00507340u  /* IDirectDrawClipper * */
 #define ADDR_REPORT_LEAKS        0x0041E690u  /* "Unreleased memory (%d) blocks:" */

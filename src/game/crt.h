@@ -42,6 +42,11 @@ extern void (__cdecl *am2_log)(const char *, ...);
  * using. The offline test points it at the host's. */
 extern int32_t (__cdecl *am2_chdir)(const char *);
 
+/* The game's own _getcwd. CheckBasePath asks it for the directory the
+ * executable was launched from, and everything SetGameDir builds is relative
+ * to that -- so both ends of the path handling go through the same CRT. */
+extern char *(__cdecl *am2_getcwd)(char *, int32_t);
+
 /* Point them at the game's own CRT. Called once by the harness, after the
  * image is known to be mapped at its base. */
 void am2_crt_use_game(void);

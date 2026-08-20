@@ -26,6 +26,13 @@ static int32_t __cdecl HostChdir(const char *path)
 
 int32_t (__cdecl *am2_chdir)(const char *) = HostChdir;
 
+static char *__cdecl HostGetcwd(char *buf, int32_t n)
+{
+    return getcwd(buf, (size_t)n);
+}
+
+char *(__cdecl *am2_getcwd)(char *, int32_t) = HostGetcwd;
+
 void am2_crt_use_game(void)
 {
     am2_malloc  = (void *(__cdecl *)(size_t))(uintptr_t)ADDR_CRT_MALLOC;
@@ -33,6 +40,7 @@ void am2_crt_use_game(void)
     am2_free    = (void (__cdecl *)(void *))(uintptr_t)ADDR_CRT_FREE;
     am2_log     = (void (__cdecl *)(const char *, ...))(uintptr_t)ADDR_LOG;
     am2_chdir   = (int32_t (__cdecl *)(const char *))(uintptr_t)ADDR_CRT_CHDIR;
+    am2_getcwd  = (char *(__cdecl *)(char *, int32_t))(uintptr_t)ADDR_CRT_GETCWD;
 }
 
 void am2_crt_use_host(void)
@@ -42,4 +50,5 @@ void am2_crt_use_host(void)
     am2_free    = free;
     am2_log     = DropLog;
     am2_chdir   = HostChdir;
+    am2_getcwd  = HostGetcwd;
 }

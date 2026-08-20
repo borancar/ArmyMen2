@@ -118,7 +118,6 @@ typedef void    (__cdecl *am2_void_fn)(void);
 typedef int32_t (__cdecl *am2_int_fn)(void);
 typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 
-#define orig_release_mutex     (*(am2_void_fn)ADDR_RELEASE_APP_MUTEX)
 #define orig_on_app_activated  (*(am2_void_fn)ADDR_ON_APP_ACTIVATED)
 #define orig_current_state     (*(am2_int_fn)ADDR_CURRENT_STATE)
 #define orig_state_leave       (*(am2_void_fn)ADDR_STATE_LEAVE)
@@ -388,7 +387,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg) {
 
     case WM_DESTROY:
-        orig_release_mutex();
+        ShutdownSubsystems();
         PostQuitMessage(0);
         break;
 

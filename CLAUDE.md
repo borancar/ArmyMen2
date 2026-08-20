@@ -344,6 +344,61 @@ each put their two names in the opposite fields from how the statement reads;
 and the AI modes are attack 6, defend 7, ignore 2, evade 5 -- neither
 sequential nor in keyword order. Reading alone got all of them wrong.
 
+## The WinMain chain
+
+**Twelve functions between WinMain and the engine are reconstructed**, none
+over 320 bytes: `CheckBasePath`, `InitTimer`, `ShutdownSubsystems`,
+`FreeSpriteListAlias`, `InitAudio`, `ClearGameOver`, `ResetToTitle`,
+`StartIntro`, `RunFrame`, `FreeSpriteSets`, `ReportLeaks`, `FreeMemTracker`,
+plus `BuildTrigTables` in `trig.cpp`. One level down stays original -- the
+thirteen teardowns, the five per-state frame handlers, the sprite-set loader.
+
+**Three of winmain.cpp's `orig_` macros pointed at addresses that were already
+patched.** `orig_init_input`, `orig_init_directdraw` and `orig_report_error`
+resolved to the detour and landed in our own `InitInput`, `InitDirectDraw` and
+`ReportError` -- correct behaviour under a name that said the opposite. Harmless
+here, unlike `orig_parse_action`, where the same mistake silently re-recorded
+the oracle. Worth grepping for after any batch: an `orig_` whose address is in
+the patch list is either a deliberate probe or a lie.
+
+**`ShutdownSubsystems` was `ReleaseAppMutex`, which is its last line.** The
+thirteen calls before it are the subsystems coming down in order and only three
+are identified, so they are an ordered table in the source rather than thirteen
+invented names in `orig.h`. The order is the fact worth keeping; a name each
+would be a guess each.
+
+**A table address in this image can be the CENTRE.** The two reverse trig
+tables are indexed `[esi + base]` with `esi` running -512..512, so `0x00515D84`
+and `0x00515580` are their middles, not their starts. Reading them as starts
+put both 512 bytes late and the sin one then wrote over half the cos table --
+which is how it was found, because the cos hash moved and the sin hash did not.
+The four tables are contiguous and that is the check: sin `0x00514F80` ends
+exactly where atanS `0x00515380` begins, which ends exactly where cos
+`0x00515784` begins, which ends exactly where atanC `0x00515B84` begins. If a
+layout does not tile, one of the bases is wrong.
+
+**`tools/trigdump.py` compares the tables byte for byte, and no A/B could.**
+They are 4,098 bytes built once at startup and never rewritten, so reading them
+out of the running game over the control socket and hashing is a complete
+comparison -- run it against our build and again under `AM2_NOPATCH=1`. A wrong
+float in a table the renderer consults per sprite need not be visible at all;
+the mis-centred write above passed `bootcamp` cleanly.
+
+**And the x87 asm in there is conservative, not required.** `fsin` and `fcos`
+are what the original executes, so `trig.cpp` uses them through inline asm
+rather than libm. Then the mutation: building the tables with `__builtin_cos`
+-- which on this target really is a call to libm and not an inlined `fcos` --
+gives the same 4,098 bytes. The results are rounded to float on the way in, and
+24 bits of mantissa hide the disagreement for all 256 of these arguments. Say
+which of two defensible choices was measured and which was merely reasoned.
+
+**`-Wrestrict` caught a reversed `strcpy`.** `ResetToTitle` copies the
+command-line map name into the level's own copy, and I had the operands the
+other way round; the two globals are `0x004F9FEC` and `0x00511A88` and the
+compiler noticed source and destination were the same object. Compiler warnings
+are worth reading on transcribed code -- the wrong direction here would have
+silently cleared the map name.
+
 **script.cpp reaches into the image for one thing now, and that one is
 deliberate.** The other five `orig_` seams are reconstructed:
 `CommSlotForArmy` and `CommSlotHasPlayer` (misc.cpp), `SetGameDir`

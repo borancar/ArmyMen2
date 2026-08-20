@@ -55,6 +55,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/misc.cpp \
             src/game/gamedir.cpp \
             src/game/event.cpp \
+            src/game/trig.cpp \
             src/game/script.cpp \
             src/game/objscript.cpp \
             src/game/image.cpp \

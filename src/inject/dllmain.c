@@ -29,6 +29,7 @@
 #include "../game/msgslot.h"
 #include "../game/objflag.h"
 #include "../game/event.h"
+#include "../game/trig.h"
 #include "../game/gamedir.h"
 #include "../game/misc.h"
 #include "../game/script.h"
@@ -428,6 +429,7 @@ static void install(void)
     misc_install();
     gamedir_install();
     event_install();
+    trig_install();
     script_install();
     objscript_install();
     objtable_install();

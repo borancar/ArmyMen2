@@ -46,6 +46,13 @@
 #include "winproc.h"
 #include "../rect.h"
 #include "surface.h"
+#include "audio.h"
+#include "device.h"
+#include "dplay.h"
+#include "palette.h"
+#include "report.h"
+#include "../crt.h"
+#include "../trig.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -93,30 +100,303 @@ static_assert(sizeof(MSG) == 28, "the 7 dwords WinMain zeroes on entry");
 
 /* ---- what stays in the original image --------------------------------- */
 
-typedef void    (__cdecl *am2_void_fn)(void);
-typedef int32_t (__cdecl *am2_hwnd_fn)(HWND hwnd);
-typedef void    (__cdecl *am2_report_error_fn)(int32_t code, const char *what);
+/* InitInput, InitDirectDraw and ReportError used to be reached by address
+ * here. They are reconstructed, so the address is the patched entry and the
+ * call landed in our own code anyway -- through a jump, and under a name that
+ * said otherwise. They are ordinary calls to device.cpp, surface.cpp and
+ * report.cpp now. */
 
-#define orig_check_base_path  (*(am2_void_fn)ADDR_CHECK_BASE_PATH)
-#define orig_init_timer       (*(am2_void_fn)ADDR_INIT_TIMER)
-#define orig_init_input       (*(am2_hwnd_fn)ADDR_INIT_INPUT)
-#define orig_init_directdraw  (*(am2_hwnd_fn)ADDR_INIT_DIRECTDRAW)
-#define orig_report_error     (*(am2_report_error_fn)ADDR_REPORT_ERROR)
-#define orig_release_mutex    (*(am2_void_fn)ADDR_RELEASE_APP_MUTEX)
-#define orig_startup_4249c0   (*(am2_void_fn)ADDR_STARTUP_4249C0)
-#define orig_startup_42dc30   (*(am2_void_fn)ADDR_STARTUP_42DC30)
-#define orig_startup_409920   (*(am2_void_fn)ADDR_STARTUP_409920)
-#define orig_startup_40c9b0   (*(am2_void_fn)ADDR_STARTUP_40C9B0)
-#define orig_startup_42e580   (*(am2_void_fn)ADDR_STARTUP_42E580)
-#define orig_start_intro      (*(am2_void_fn)ADDR_START_INTRO)
-#define orig_run_frame        (*(am2_void_fn)ADDR_RUN_FRAME)
-#define orig_shutdown_423d20  (*(am2_void_fn)ADDR_SHUTDOWN_423D20)
-#define orig_report_leaks     (*(am2_void_fn)ADDR_REPORT_LEAKS)
-#define orig_free_mem_tracker (*(am2_void_fn)ADDR_FREE_MEM_TRACKER)
+/* What the WinMain chain still leaves original, one level down from here. Each
+ * is called by exactly one of the functions reconstructed below. */
+typedef void (__cdecl *am2_void_fn)(void);
+typedef void (__cdecl *am2_str_fn)(const char *);
+typedef void (__cdecl *am2_ptr_fn)(void *);
+typedef void (__cdecl *am2_i32_fn)(int32_t);
+
+#define orig_free_sprite_list (*(am2_void_fn)ADDR_FREE_SPRITE_LIST)
+#define orig_sprite_set_load  (*(am2_str_fn)ADDR_SPRITE_SET_LOAD)
+#define orig_sprite_set_free  (*(am2_ptr_fn)ADDR_SPRITE_SET_FREE)
+#define orig_fill_palette     (*(am2_ptr_fn)ADDR_FILL_PALETTE)
+#define orig_request_state    (*(am2_i32_fn)ADDR_REQUEST_STATE)
+#define orig_set_game_over    (*(am2_i32_fn)ADDR_SET_GAME_OVER)
+#define orig_frame_pre        (*(am2_void_fn)ADDR_FRAME_PRE)
+#define orig_frame_post       (*(am2_void_fn)ADDR_FRAME_POST)
+#define orig_poll_input       (*(am2_void_fn)ADDR_POLL_INPUT)
+#define orig_strncpy          (*(char *(__cdecl *)(char *, const char *, \
+                                                   uint32_t))ADDR_CRT_STRNCPY)
 
 /* The game statically links its own MSVC 6 CRT and ours is a separate world,
  * but strstr crosses nothing: it reads two strings and returns a pointer into
  * the first. No heap, no FILE, no locale. Ours will do. */
+
+/* ---- the chain WinMain drives ------------------------------------------
+ *
+ * Twelve functions, none over 320 bytes, that WinMain calls in order and that
+ * were reached by address until now. One level down from each of them stays
+ * original: the thirteen teardowns, the five per-state frame handlers, the
+ * sprite-set loader. What is reconstructed is the sequencing.
+ */
+
+/* 0x00422DB0. Where every data path starts.
+ *
+ * The install directory is not configured anywhere -- it is simply the
+ * directory the process was launched in, read once at startup into the global
+ * SetGameDir later concatenates every subdirectory onto. _getcwd fails when
+ * the answer will not fit, which is the only thing that can go wrong and the
+ * only thing the message mentions. */
+void __cdecl CheckBasePath(void)
+{
+    if (!am2_getcwd((char *)(uintptr_t)ADDR_GAME_DIR, 0xFF))
+        FatalError((const char *)(uintptr_t)ADDR_STR_BASE_PATH_LONG);
+}
+
+/* 0x00426C50. Take the high-performance counter, or decide not to.
+ *
+ * The period is milliseconds per tick, and a counter coarser than 1 kHz is
+ * REJECTED by zeroing the frequency -- callers test that, so zero means "use
+ * something else". Note the frequency is only announced when it survives, and
+ * that a QueryPerformanceFrequency failure reaches the same announcement with
+ * whatever it left behind, which is why the test is on the frequency and not
+ * on the call. */
+void __cdecl InitTimer(void)
+{
+    int64_t *freq = (int64_t *)(uintptr_t)ADDR_PERF_FREQ;
+
+    *(int16_t *)(uintptr_t)ADDR_PERF_WORD_A = 0;
+    *(int16_t *)(uintptr_t)ADDR_PERF_WORD_B = 0;
+    *(int16_t *)(uintptr_t)ADDR_PERF_WORD_C = 0;
+
+    if (QueryPerformanceFrequency((LARGE_INTEGER *)freq)) {
+        QueryPerformanceCounter((LARGE_INTEGER *)(uintptr_t)ADDR_PERF_START);
+
+        /* Both constants come out of the image rather than being written as
+         * literals: same bits, and nothing to mistype. */
+        double period = *(const double *)(uintptr_t)ADDR_DBL_MS_PER_SEC
+                        / (double)*freq;
+
+        *(double *)(uintptr_t)ADDR_PERF_PERIOD = period;
+
+        if (period > *(const double *)(uintptr_t)ADDR_DBL_MAX_PERIOD) {
+            *freq = 0;
+            return;
+        }
+    }
+
+    if (*freq > 0)
+        orig_log((const char *)(uintptr_t)ADDR_STR_HIGH_PERF);
+}
+
+/* 0x0040B220. The whole teardown, ending in the mutex.
+ *
+ * It went in as ReleaseAppMutex, which is its last line and nothing else: the
+ * thirteen calls before it are the subsystems coming down in order, and only
+ * three of them are identified. They are a table here rather than thirteen
+ * invented names in orig.h -- the order is the fact worth keeping, and a name
+ * per entry would be a guess per entry.
+ *
+ * The first is thiscall on a fixed object; the rest take nothing. */
+static const uint32_t kTeardown[] = {
+    0x00422850u, 0x0043C720u, 0x0043CD30u, 0x0045A990u, 0x004470D0u,
+    ADDR_FREE_SPRITE_LIST, 0x00445F40u, 0x00446880u, 0x0042E590u,
+    0x0040C9F0u, ADDR_SHUTDOWN_DDRAW, ADDR_SHUTDOWN_INPUT,
+};
+
+void __cdecl ShutdownSubsystems(void)
+{
+    ((void (__attribute__((thiscall)) *)(void *))(uintptr_t)0x0042A680u)(
+        (void *)(uintptr_t)ADDR_SHUTDOWN_OBJ);
+
+    for (uint32_t i = 0; i < sizeof kTeardown / sizeof kTeardown[0]; i++)
+        ((am2_void_fn)(uintptr_t)kTeardown[i])();
+
+    ReleaseMutex(*(HANDLE *)(uintptr_t)ADDR_APP_MUTEX);
+}
+
+/* 0x00409920. A `jmp` and nothing else, to the sprite-list teardown that
+ * ShutdownSubsystems also calls. Reconstructed as the alias it is: WinMain
+ * runs it at STARTUP, where the list is empty and the point is to put the
+ * three globals in a known state rather than to free anything. */
+void __cdecl FreeSpriteListAlias(void)
+{
+    orig_free_sprite_list();
+}
+
+/* 0x0040C9B0. Bring audio up, and say so in a global rather than a return
+ * value -- every arm answers 1, so the caller learns nothing from it.
+ *
+ * All three callees are reconstructed, so this reads as ordinary code. The
+ * shape worth noticing is that a wave-loading failure releases the buffers
+ * again and carries on with audio marked unavailable; only both halves
+ * succeeding sets the flag. */
+int32_t __cdecl InitAudio(void)
+{
+    if (InitDirectSound()) {
+        if (InitWaveSounds()) {
+            *(int32_t *)(uintptr_t)ADDR_AUDIO_READY = 1;
+            return 1;
+        }
+        ReleaseSoundBuffers();
+    }
+    *(int32_t *)(uintptr_t)ADDR_AUDIO_READY = 0;
+    return 1;
+}
+
+/* 0x0042E580. Clears the word 0x0042E5A0 sets, and answers 0 doing it. */
+int32_t __cdecl ClearGameOver(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_GAME_OVER_STATE = 0;
+    return 0;
+}
+
+/* 0x004249C0. Put the process back into the state the title screen expects.
+ *
+ * Three strings first: the map name defaults when the command line left it
+ * empty, and the multiplayer script name is copied unconditionally. Then the
+ * palette. Then the title and shared sprite sets, but only if a flag says they
+ * are wanted -- the same flag FreeSpriteSets tests before releasing them, so
+ * the two are a pair. Then nine globals go to zero, the multiplayer session
+ * flag among them. */
+void __cdecl ResetToTitle(void)
+{
+    /* Two different globals, and it matters which way round: the command-line
+     * option is the SOURCE and the level's own copy is the destination. */
+    char *mapname = (char *)(uintptr_t)ADDR_CURRENT_MAP_NAME;
+
+    strcpy(mapname, (const char *)(uintptr_t)ADDR_OPT_MAP_NAME);
+    if (!mapname[0])
+        strcpy(mapname, *(const char *const *)(uintptr_t)ADDR_MAP_NAME_DEFAULT);
+    strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
+           *(const char *const *)(uintptr_t)ADDR_MP_SCRIPT_DEFAULT);
+
+    uint8_t *palette = *(uint8_t **)(uintptr_t)ADDR_PALETTE_SOURCE;
+
+    orig_fill_palette(palette);
+    SetGamePalette(palette);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_SPRITE_SETS_LOADED) {
+        orig_sprite_set_load((const char *)(uintptr_t)ADDR_STR_SET_TITLE);
+        orig_sprite_set_load((const char *)(uintptr_t)ADDR_STR_SET_SHARED);
+    }
+
+    static const uint32_t kCleared[] = {
+        ADDR_MP_SESSION, 0x00511E14u, 0x00511E18u, 0x00511E1Cu, 0x005122CCu,
+        0x00511E28u, 0x005122D0u, 0x00511E2Cu, 0x00511E44u,
+    };
+    for (uint32_t i = 0; i < sizeof kCleared / sizeof kCleared[0]; i++)
+        *(int32_t *)(uintptr_t)kCleared[i] = 0;
+
+    ((am2_void_fn)(uintptr_t)0x0042F140u)();
+    ((am2_void_fn)(uintptr_t)0x0044D110u)();
+    ((am2_void_fn)(uintptr_t)ADDR_APPLY_GAME_SETTINGS)();
+}
+
+/* 0x0040B7A0. Whether the intro movie plays, and what happens instead.
+ *
+ * Three ways to skip it and they are not interchangeable: a lobby that has not
+ * started yet is started first and then re-read, a comm object that says skip
+ * goes straight to state 1, and a global that remembers the intro was already
+ * seen does the same. Only the fall-through plays it, and that arm also clears
+ * the game-over snapshot -- which is why the state it requests is 0. */
+void __cdecl StartIntro(void)
+{
+    uint8_t *comm = g_commObject;
+
+    if (!*(const int32_t *)(comm + ADDR_COMM_OFF_LOBBY)) {
+        CommLobbyStart(comm);
+        comm = g_commObject;
+    }
+
+    if (*(const int32_t *)(comm + ADDR_COMM_OFF_SKIP_INTRO)) {
+        orig_request_state(1);
+        return;
+    }
+    if (*(const int32_t *)(uintptr_t)ADDR_INTRO_SEEN) {
+        orig_request_state(1);
+        return;
+    }
+
+    orig_request_state(0);
+    orig_set_game_over(0);
+}
+
+/* 0x0040B000. One frame.
+ *
+ * A global gates the whole body, so a frame can be suppressed without the
+ * caller knowing. Then the lost-surface check, the input poll and a pre-step,
+ * then the state handler, then a post-step the original reaches by tail jump
+ * from every arm INCLUDING the out-of-range one -- so a state above 4 is not
+ * an error, it just runs no handler. */
+static const uint32_t kStateFrame[] = {
+    ADDR_STATE0_FRAME, ADDR_STATE1_FRAME, ADDR_STATE2_FRAME,
+    ADDR_STATE3_FRAME, ADDR_STATE4_FRAME,
+};
+
+void __cdecl RunFrame(void)
+{
+    if (!*(const int32_t *)(uintptr_t)ADDR_FRAME_ENABLED)
+        return;
+
+    RestoreLostSurfaces();
+    orig_poll_input();
+    orig_frame_pre();
+
+    uint32_t state = *(const uint32_t *)(uintptr_t)ADDR_GAME_STATE_NOW;
+
+    if (state <= 4)
+        ((am2_void_fn)(uintptr_t)kStateFrame[state])();
+
+    orig_frame_post();
+}
+
+/* 0x00423D20. Release the three sprite sets, behind the flag that says they
+ * were loaded -- the same flag ResetToTitle tests before loading two of them. */
+void __cdecl FreeSpriteSets(void)
+{
+    if (!*(const int32_t *)(uintptr_t)ADDR_SPRITE_SETS_LOADED)
+        return;
+
+    orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_TITLE);
+    orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_SHARED);
+    orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_THIRD);
+}
+
+/* 0x0041E690. What the debug allocator has left over.
+ *
+ * At most fifty rows are printed however many blocks there are, but the count
+ * in the heading is the real one. The file name is four characters: the record
+ * holds them inline and they are copied out with a strncpy that writes no
+ * terminator, which is why the fifth byte of the buffer is zeroed once, before
+ * the loop, and never again. */
+void __cdecl ReportLeaks(void)
+{
+    char name[8];
+    int32_t total = *(const int32_t *)(uintptr_t)ADDR_LEAK_COUNT;
+    int32_t shown = total < 50 ? total : 50;
+
+    name[4] = 0;
+    orig_log((const char *)(uintptr_t)ADDR_STR_LEAK_HEADER, total);
+
+    for (int32_t i = 0; i < shown; i++) {
+        const uint8_t *rec = *(const uint8_t *const *)(uintptr_t)ADDR_LEAK_RECORDS
+                             + (size_t)i * 16;
+
+        orig_strncpy(name, (const char *)(rec + 4), 4);
+        orig_log((const char *)(uintptr_t)ADDR_STR_LEAK_ROW,
+                 *(const int32_t *)(rec + 12), name,
+                 *(const int32_t *)(rec + 8));
+    }
+}
+
+/* 0x0041E710. Drop the record array and the two counters with it. */
+void __cdecl FreeMemTracker(void)
+{
+    void *recs = *(void **)(uintptr_t)ADDR_LEAK_RECORDS;
+
+    *(int32_t *)(uintptr_t)ADDR_LEAK_COUNT = 0;
+    *(int32_t *)(uintptr_t)ADDR_LEAK_TOTAL = 0;
+    orig_free(recs);
+    *(void **)(uintptr_t)ADDR_LEAK_RECORDS = 0;
+}
 
 /* ---- the game CD ------------------------------------------------------- */
 
@@ -400,9 +680,9 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
         UpdateWindow(g_hWnd);
     SetFocus(g_hWnd);
 
-    orig_init_timer();
-    if (!orig_init_input(g_hWnd)) {
-        orig_release_mutex();
+    InitTimer();
+    if (!InitInput(g_hWnd)) {
+        ShutdownSubsystems();
         DestroyWindow(g_hWnd);
         return 0;
     }
@@ -411,10 +691,10 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
      * asks for depend on the window being the shape it means to keep. */
     PositionWindow();
 
-    err = orig_init_directdraw(g_hWnd);
+    err = InitDirectDraw(g_hWnd);
     if (err) {
-        orig_report_error(err, "InitDirectDraw");
-        orig_release_mutex();
+        ReportError(err, "InitDirectDraw");
+        ShutdownSubsystems();
         DestroyWindow(g_hWnd);
         return 0;
     }
@@ -425,10 +705,10 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
     if (g_windowed)
         PositionWindow();
 
-    orig_startup_42dc30();
-    orig_startup_409920();
-    orig_startup_40c9b0();
-    orig_startup_42e580();
+    BuildTrigTables();
+    FreeSpriteListAlias();
+    InitAudio();
+    ClearGameOver();
     return 1;
 }
 
@@ -459,15 +739,15 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     ParseCommandLine(lpCmdLine);
 
     CoInitialize(NULL);
-    orig_check_base_path();
+    CheckBasePath();
     DetectCpuSpeed();
 
     if (!InitApplication(hInstance, nCmdShow))
         return 0;
 
     FindGameCD();
-    orig_startup_4249c0();
-    orig_start_intro();
+    ResetToTitle();
+    StartIntro();
 
     /* Drain the queue, and when there is nothing in it run a frame. A game loop
      * rather than a GetMessage loop: the process never blocks waiting for
@@ -477,14 +757,14 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             if (!PumpMessage(&msg))
                 break;
         } else {
-            orig_run_frame();
+            RunFrame();
         }
     }
 
-    orig_shutdown_423d20();
+    FreeSpriteSets();
     ShutdownDirectDraw();
-    orig_report_leaks();
-    orig_free_mem_tracker();
+    ReportLeaks();
+    FreeMemTracker();
 
     if (g_appMutex)
         ReleaseMutex(g_appMutex);
@@ -518,5 +798,34 @@ int winmain_install(void)
     rc |= patch_replace(ADDR_FIND_GAME_CD, (const void *)FindGameCD,
                         "FindGameCD", 0);
     rc |= patch_replace(ADDR_WIN_MAIN, (const void *)WinMain, "WinMain", 4);
+
+    /* The chain WinMain drives. Every counter here reads 0 for the usual
+     * reason -- our WinMain calls them directly -- except ShutdownSubsystems,
+     * which winproc.cpp also reaches by address. */
+    rc |= patch_replace(ADDR_CHECK_BASE_PATH, (const void *)CheckBasePath,
+                        "CheckBasePath", 1);
+    rc |= patch_replace(ADDR_INIT_TIMER, (const void *)InitTimer,
+                        "InitTimer", 1);
+    rc |= patch_replace(ADDR_SHUTDOWN_SUBSYSTEMS,
+                        (const void *)ShutdownSubsystems,
+                        "ShutdownSubsystems", 3);
+    rc |= patch_replace(ADDR_FREE_SPRITE_LIST_ALIAS,
+                        (const void *)FreeSpriteListAlias,
+                        "FreeSpriteListAlias", 1);
+    rc |= patch_replace(ADDR_INIT_AUDIO, (const void *)InitAudio,
+                        "InitAudio", 1);
+    rc |= patch_replace(ADDR_CLEAR_GAME_OVER, (const void *)ClearGameOver,
+                        "ClearGameOver", 1);
+    rc |= patch_replace(ADDR_RESET_TO_TITLE, (const void *)ResetToTitle,
+                        "ResetToTitle", 1);
+    rc |= patch_replace(ADDR_START_INTRO, (const void *)StartIntro,
+                        "StartIntro", 1);
+    rc |= patch_replace(ADDR_RUN_FRAME, (const void *)RunFrame, "RunFrame", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_SETS, (const void *)FreeSpriteSets,
+                        "FreeSpriteSets", 1);
+    rc |= patch_replace(ADDR_REPORT_LEAKS, (const void *)ReportLeaks,
+                        "ReportLeaks", 1);
+    rc |= patch_replace(ADDR_FREE_MEM_TRACKER, (const void *)FreeMemTracker,
+                        "FreeMemTracker", 1);
     return rc;
 }
