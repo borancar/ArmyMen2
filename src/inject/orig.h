@@ -1070,6 +1070,7 @@
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
 #define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
+#define ADDR_FREE_SCRIPT_CONDS   0x0041EA80u  /* void(void), frees the list */
 #define ADDR_EVT_PLAY_SOUND_AT   0x0041F680u  /* void(name, point, slot, pri, loop) */
 #define ADDR_EVT_PLAY_SOUND_ON   0x0041F6B0u  /* void(name, owner, slot, pri, loop) */
 #define ADDR_EVT_SET_WORD60      0x0041F750u  /* void(uid, int32), clamped */

@@ -327,6 +327,37 @@ void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
     PlayDynamicSound(name, loop, 0, 0, 0, slot, priority, owner);
 }
 
+/* The original re-reads the list head after every free, which is the compiler
+ * assuming free might touch the global. It cannot, and the value is the same
+ * each time, so a local reads identically. The head IS updated once per
+ * record, before moving on, so a teardown interrupted part way leaves the
+ * global pointing at the first record it has not freed. */
+void __cdecl FreeScriptConditions(void)
+{
+    AM2_ScriptCond *cond = kScriptConditions;
+
+    if (!cond) {
+        kScriptConditions = NULL;
+        return;
+    }
+
+    while (cond) {
+        AM2_ScriptCond *next = (AM2_ScriptCond *)cond->next;
+
+        if (cond->events)
+            am2_free(cond->events);
+        if (cond->tests)
+            am2_free(cond->tests);
+        if (cond->actions)
+            am2_free(cond->actions);
+        am2_free(cond);
+
+        kScriptConditions = next;
+        cond = next;
+    }
+    kScriptConditions = NULL;
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -357,6 +388,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_FREE_SCRIPT_CONDS, (const void *)FreeScriptConditions,
+                        "FreeScriptConditions", 0);
     rc |= patch_replace(ADDR_EVT_PLAY_SOUND_AT, (const void *)EvtPlaySoundAt,
                         "EvtPlaySoundAt", 5);
     rc |= patch_replace(ADDR_EVT_PLAY_SOUND_ON, (const void *)EvtPlaySoundOn,

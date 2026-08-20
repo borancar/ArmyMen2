@@ -98,6 +98,18 @@ void __cdecl EvtPlaySoundAt(const char *name, uint32_t point, int32_t slot,
 void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
                             int32_t priority, int32_t loop);
 
+/* 0x0041EA80. Free the whole ADDR_SCRIPT_CONDITIONS list.
+ *
+ * Each record owns three allocations -- events, tests and actions -- and the
+ * three the original frees are at +0x0C, +0x18 and +0x20, which are exactly
+ * those fields of AM2_ScriptCond. `next` at +0x30 matches too, so the struct
+ * script.h already carries is confirmed from the teardown as well as from the
+ * parser that builds it.
+ *
+ * `mode`, `objstate` and the two unused words are not freed, which is right:
+ * they are values rather than pointers. */
+void __cdecl FreeScriptConditions(void);
+
 int event_install(void);
 
 #ifdef __cplusplus
