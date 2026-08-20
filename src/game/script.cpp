@@ -948,7 +948,7 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
     }
 
     /* A bare name: the event is that object, whatever happens to it. */
-    *kind = AM2_EVT_NAME;
+    *kind = AM2_EVT_CONTROL;
     if (tok->kind != AM2_TOKEN_STRING) {
         am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
                 ctx->tokens[*at].line,

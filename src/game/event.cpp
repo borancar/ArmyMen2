@@ -1,6 +1,7 @@
 /* event.cpp -- see event.h. */
 #include <stdint.h>
 
+#include <stdio.h>
 #include <string.h>
 
 #include "crt.h"
@@ -358,6 +359,46 @@ void __cdecl FreeScriptConditions(void)
     kScriptConditions = NULL;
 }
 
+void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
+{
+    switch (kind) {
+    case AM2_EVT_CONTROL:
+        sprintf(out, "unnamed Event_Control %d", number);
+        break;
+    case 1:
+        /* Nothing produces kind 1, and this is the only place that says so in
+         * code rather than by omission: no name at all, not a placeholder. */
+        out[0] = '\0';
+        break;
+    case AM2_EVT_PADOFF:
+        sprintf(out, "unnamed Event_PadDeactivated %d", number);
+        break;
+    case AM2_EVT_PADON:
+        sprintf(out, "unnamed Event_PadActivated %d", number);
+        break;
+    case AM2_EVT_KILLED:
+        sprintf(out, "unnamed Event_ItemDestroyed %d", number);
+        break;
+    case AM2_EVT_HIT:
+        sprintf(out, "unnamed Event_ItemHit %d", number);
+        break;
+    case AM2_EVT_HEALED:
+        sprintf(out, "unnamed Event_ItemHealed %d", number);
+        break;
+    case AM2_EVT_PICKEDUP:
+        sprintf(out, "unnamed Event_ItemPickedup %d", number);
+        break;
+    case AM2_EVT_DROPPED:
+        sprintf(out, "unnamed Event_ItemDropped %d", number);
+        break;
+    default:
+        /* Both values, in the other order -- kind first here, number first in
+         * every arm above. */
+        sprintf(out, "event type %d num %d", kind, number);
+        break;
+    }
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -388,6 +429,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_EVENT_DEFAULT_NAME, (const void *)EventDefaultName,
+                        "EventDefaultName", 3);
     rc |= patch_replace(ADDR_FREE_SCRIPT_CONDS, (const void *)FreeScriptConditions,
                         "FreeScriptConditions", 0);
     rc |= patch_replace(ADDR_EVT_PLAY_SOUND_AT, (const void *)EvtPlaySoundAt,

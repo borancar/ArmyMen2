@@ -1070,6 +1070,7 @@
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
 #define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
+#define ADDR_EVENT_DEFAULT_NAME  0x0041F200u  /* void(kind, number, char *out) */
 #define ADDR_FREE_SCRIPT_CONDS   0x0041EA80u  /* void(void), frees the list */
 #define ADDR_EVT_PLAY_SOUND_AT   0x0041F680u  /* void(name, point, slot, pri, loop) */
 #define ADDR_EVT_PLAY_SOUND_ON   0x0041F6B0u  /* void(name, owner, slot, pri, loop) */
@@ -1286,9 +1287,19 @@
 #define AM2_OBJSCRIPT_OBJECT     0
 #define AM2_OBJSCRIPT_CLASS      1
 
-/* What an `if` event term is, in the first of its three values. Kind 1 is not
- * produced by anything. */
-#define AM2_EVT_NAME             0   /* just an object, whatever happens  */
+/* What an `if` event term is, in the first of its three values.
+ *
+ * The whole enum is confirmed twice over: the parser assigns these codes, and
+ * 0x0041F200 formats a placeholder name per kind and its strings line up one
+ * for one -- Event_PadDeactivated for 2, Event_PadActivated for 3, and so on
+ * down to Event_ItemDropped for 8. Two functions written for different
+ * purposes agreeing is better evidence than either alone.
+ *
+ * Kind 0 was AM2_EVT_NAME here, inferred. The game's own string calls it
+ * Event_Control, so it is AM2_EVT_CONTROL now -- the program's word beats
+ * ours. Kind 1 is produced by nothing, and 0x0041F200 gives it an empty name
+ * rather than a placeholder, which is the same fact from the other side. */
+#define AM2_EVT_CONTROL          0   /* just an object, whatever happens  */
 #define AM2_EVT_PADOFF           2
 #define AM2_EVT_PADON            3
 #define AM2_EVT_KILLED           4

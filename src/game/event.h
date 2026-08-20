@@ -110,6 +110,20 @@ void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
  * they are values rather than pointers. */
 void __cdecl FreeScriptConditions(void);
 
+/* 0x0041F200. Write a placeholder name for an event that the script did not
+ * name, into `out`.
+ *
+ * One arm per event kind, and the strings are the game's own vocabulary for
+ * them -- Event_Control, Event_PadActivated, Event_ItemDestroyed and the rest.
+ * They confirm the AM2_EVT_* codes in orig.h from a second direction: those
+ * were read off the parser, these off the namer, and the two agree kind for
+ * kind. Kind 1 gets an empty string, which is the same "produced by nothing"
+ * the parser already implies.
+ *
+ * `out` is unbounded -- the original sprintf's straight into it. The longest
+ * name it can write is "unnamed Event_PadDeactivated " plus the number. */
+void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out);
+
 int event_install(void);
 
 #ifdef __cplusplus
