@@ -65,6 +65,12 @@ void __cdecl SnapshotSystemPalette(void);
  * The image's only CreatePalette is in here. */
 void __cdecl SetGamePalette(uint8_t *palette);
 
+/* 0x0041B7C0. The palette entry nearest `colour`, searching from `from` up --
+ * callers use that to protect a reserved block of low entries. `from` is
+ * masked to a byte, so 0x100 or more searches nothing and answers 0. */
+uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
+                                uint32_t from);
+
 int palette_install(void);
 
 #ifdef __cplusplus

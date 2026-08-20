@@ -94,8 +94,6 @@
  * across the call. Whether this routine actually writes through it was not
  * traced; passing the address and re-reading is faithful either way. */
 #define ADDR_MAKE_BITMAP     0x0041BE80u  /* int32(src, pixels, dest, remap) */
-#define ADDR_COLOUR_OF_ENTRY 0x0041AE90u  /* uint32(uint32 palette entry) */
-#define ADDR_MATCH_COLOUR    0x0041B7C0u  /* uint8(palette, colour, uint8 from) */
 #define ADDR_ENCODE_BIG      0x0041BBC0u  /* the >= 60000 pixel encoder */
 #define ADDR_ENCODE_SMALL    0x0041BD20u
 #define ADDR_ACTIVE_PALETTE  0x00477A58u  /* NULL means no remapping */
@@ -329,7 +327,12 @@
  * primary surface and reads it back with GDI to learn what actually displays.
  * The colour matcher stays original -- it is pure arithmetic. */
 #define ADDR_CALIBRATE_PALETTE   0x0041AFC0u  /* void(uint32_t *palette[512]) */
+/* Scan the palette from `from` for the entry closest to a colour, by the
+ * metric at ADDR_COLOUR_DISTANCE. Went in twice, as ADDR_NEAREST_PAL_INDEX too. */
 #define ADDR_NEAREST_PAL_INDEX   0x0041B7C0u  /* uint8_t(const uint32_t*,uint32_t,uint32_t) */
+#define ADDR_COLOUR_DISTANCE     0x0041B760u  /* int32_t(const uint32_t *a,
+                                               * const uint32_t *b) */
+#define AM2_COLOUR_DIST_MAX      0x2FFFD      /* the sentinel it starts from */
 
 /* The GDI half of the palette. The game is 8-bit, so what it can actually show
  * is negotiated with Windows rather than chosen. */
@@ -1784,7 +1787,11 @@
 #define ADDR_IS_KIND_7         0x00435640u  /* int32_t(const void *) */
 #define ADDR_IS_BLANK          0x0043EE80u  /* int32_t(uint8_t) -- no '\n' */
 #define ADDR_IS_SCRIPT_DELIM   0x0043EEA0u  /* int32_t(uint8_t) */
-#define ADDR_SWAP_COLOUR_BYTES 0x0041AE90u  /* uint32_t(colour, unused) */
+/* Exchange the first and third bytes of a packed colour, leaving the second
+ * and clearing the fourth: a DIB entry is 0x00RRGGBB and the matcher above
+ * reads 0x00BBGGRR. It was also ADDR_SWAP_COLOUR_BYTES, which named it for the
+ * caller that hands it a bitmap's palette rather than for what it does. */
+#define ADDR_SWAP_COLOUR_BYTES 0x0041AE90u  /* uint32_t(uint32_t) */
 #define ADDR_NULL_STUB_4       0x004170E0u  /* void __stdcall(uint32_t) */
 #define ADDR_NULL_STUB         0x0042E170u  /* void(void) */
 #define ADDR_RETURN_ZERO       0x0042E980u  /* int32_t(void) */

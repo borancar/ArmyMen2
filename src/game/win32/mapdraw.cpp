@@ -22,6 +22,8 @@
 #include "mapdraw.h"
 #include "surface.h"
 #include "../gamedir.h"
+#include "palette.h"
+#include "../misc.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -252,19 +254,14 @@ static_assert(sizeof(DDSURFACEDESC) == 0x6C, "the descriptor the original sizes"
 
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 typedef void *(__cdecl *am2_read_dib_fn)(am2_FILE *fp, uint32_t *header);
-typedef uint32_t (__cdecl *am2_colour_of_fn)(uint32_t entry);
-typedef uint8_t (__cdecl *am2_match_colour_fn)(const void *palette,
-                                               uint32_t colour, uint32_t from);
 
 #define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 #define orig_read_dib      (*(am2_read_dib_fn)ADDR_READ_DIB_CHUNK)
-#define orig_colour_of     (*(am2_colour_of_fn)ADDR_COLOUR_OF_ENTRY)
-#define orig_match_colour  (*(am2_match_colour_fn)ADDR_MATCH_COLOUR)
 
 #define g_tilesetName    ((const char *)(uintptr_t)ADDR_TILESET_NAME)
 #define g_tilesetPath    ((const char *)(uintptr_t)ADDR_TILESET_PATH)
 #define g_tilesetReserve (*(int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
-#define g_activePalette  (*(void **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+#define g_activePalette  (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 /* g_mapSprite, above, is the same record PaintMapTiles reads: the global
  * holds a POINTER to it, so reaching the surface is two dereferences and
  * not one. Width and height sit at +0x1C and +0x20 of the same record. */
@@ -337,8 +334,8 @@ void __cdecl RestoreTileSet(void)
                 from = TILESET_RESERVED;
             }
             for (i = from; i < 256; i++)
-                remap[i] = orig_match_colour(g_activePalette,
-                                             orig_colour_of(header[DIB_PALETTE_INDEX + i]),
+                remap[i] = NearestPalIndex(g_activePalette,
+                                             SwapColourBytes(header[DIB_PALETTE_INDEX + i], 0),
                                              (uint32_t)from);
         } else {
             for (i = 0; i < 256; i++)

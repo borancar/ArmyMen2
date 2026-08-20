@@ -24,6 +24,7 @@
  */
 
 #include "dplay.h"
+#include "frame.h"
 #include "cdcheck.h"
 #include "../../inject/patch.h"
 
@@ -469,11 +470,9 @@ static_assert((uint32_t)DPERR_INVALIDPLAYER == 0x88770096u, "DPERR_INVALIDPLAYER
 static_assert((uint32_t)E_INVALIDARG == 0x80070057u, "E_INVALIDARG");
 
 typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
-typedef uint32_t (__cdecl *am2_get_flags_fn)(void);
 typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
 #define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
-#define orig_get_flags   (*(am2_get_flags_fn)ADDR_GET_PAUSE_FLAGS)
 #define orig_set_flags   (*(am2_set_flags_fn)ADDR_PAUSE_GAME)
 #define g_hwnd           (*(HWND *)(uintptr_t)ADDR_HWND)
 
@@ -556,7 +555,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
         bit = 0x800u << i;
         if (++comm_u32(slot, COMM_SLOT_OFF_UNACKED) <= COMM_STAT_RING)
             continue;
-        if (orig_get_flags() & bit)
+        if (GetPauseFlags() & bit)
             continue;
         orig_set_flags(bit);
     }
@@ -726,9 +725,7 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
  *
  * Returns 0 always, which every caller ignores. */
 typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
-typedef void (__cdecl *am2_clear_flags_fn)(uint32_t bits);
 #define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
-#define orig_clear_event_flags (*(am2_clear_flags_fn)ADDR_UNPAUSE_GAME)
 #define g_defaultOwnerSlot     (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_commUnknown4F48E0    (*(int32_t *)(uintptr_t)ADDR_COMM_UNKNOWN_4F48E0)
 
@@ -794,7 +791,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
         *lobby = NULL;
     }
 
-    orig_clear_event_flags(COMM_DROP_EVENT_MASK);
+    UnPauseGame(COMM_DROP_EVENT_MASK);
     g_defaultOwnerSlot  = 0;
     g_commUnknown4F48E0 = 0;
     return 0;
@@ -1151,8 +1148,8 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
                            + COMM_SLOT_OFF_UNACKED) >= COMM_UNACKED_CLEAR)
             continue;
         bit = 0x800u << i;
-        if (orig_get_flags() & bit)
-            orig_clear_event_flags(bit);
+        if (GetPauseFlags() & bit)
+            UnPauseGame(bit);
     }
 
     /* Room again in the message list: let the senders go. */
@@ -1160,9 +1157,9 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
         int32_t free = orig_msg_list_free((void *)(uintptr_t)ADDR_MSG_LIST_A);
 
         if (free > COMM_FLOW_FREE_OK
-                && (orig_get_flags() & COMM_FLOW_PAUSED_BIT)) {
+                && (GetPauseFlags() & COMM_FLOW_PAUSED_BIT)) {
             orig_log((const char *)(uintptr_t)ADDR_STR_FLOW_UNPAUSE, free);
-            orig_clear_event_flags(COMM_FLOW_PAUSED_BIT);
+            UnPauseGame(COMM_FLOW_PAUSED_BIT);
         }
     }
     return 1;

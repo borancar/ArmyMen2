@@ -32,6 +32,8 @@
 #include "../rect.h"
 #include "winmain.h"
 #include "report.h"
+#include "palette.h"
+#include "../misc.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -738,17 +740,12 @@ static_assert((DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH) == 7, "the descriptor flags
 static_assert(DDSCAPS_OFFSCREENPLAIN == 0x40, "DDSCAPS_OFFSCREENPLAIN");
 static_assert(DDSCAPS_SYSTEMMEMORY == 0x800, "DDSCAPS_SYSTEMMEMORY");
 
-typedef uint32_t (__cdecl *am2_colour_of_fn)(uint32_t entry);
-typedef uint8_t (__cdecl *am2_match_colour_fn)(const void *palette,
-                                               uint32_t colour, uint32_t from);
 typedef int32_t (__cdecl *am2_encode_fn)(const void *pixels, void *dest,
                                          int32_t w, int32_t h,
                                          const uint8_t *remap);
-#define orig_colour_of    (*(am2_colour_of_fn)ADDR_COLOUR_OF_ENTRY)
-#define orig_match_colour (*(am2_match_colour_fn)ADDR_MATCH_COLOUR)
 #define orig_encode_big   (*(am2_encode_fn)ADDR_ENCODE_BIG)
 #define orig_encode_small (*(am2_encode_fn)ADDR_ENCODE_SMALL)
-#define g_activePalette   (*(void **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 #define g_ddraw2obj       (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
 
 int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
@@ -776,8 +773,8 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         }
         if (g_activePalette) {
             for (i = from; i < 256; i++)
-                table[i] = orig_match_colour(g_activePalette,
-                                             orig_colour_of(src[10 + i]),
+                table[i] = NearestPalIndex(g_activePalette,
+                                             SwapColourBytes(src[10 + i], 0),
                                              (uint32_t)from);
         } else {
             for (i = from; i < 256; i++)

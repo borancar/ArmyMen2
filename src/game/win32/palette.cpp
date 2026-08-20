@@ -60,9 +60,9 @@
  * [esp+0x18] with four down is the second (its address goes to 0x0041B760),
  * [esp+0x14] with two down is the third (compared against 0x100), and it
  * returns `ret` with no immediate, so the caller cleans. */
-typedef uint8_t (__cdecl *am2_nearest_index_fn)(const uint32_t *palette,
-                                                uint32_t rgb, uint32_t from);
-#define orig_nearest_index (*(am2_nearest_index_fn)ADDR_NEAREST_PAL_INDEX)
+typedef int32_t (__cdecl *am2_colour_distance_fn)(const uint32_t *a,
+                                                  const uint32_t *b);
+#define orig_colour_distance (*(am2_colour_distance_fn)ADDR_COLOUR_DISTANCE)
 
 void __cdecl CalibratePalette(uint32_t *palette)
 {
@@ -96,7 +96,7 @@ void __cdecl CalibratePalette(uint32_t *palette)
                                       g_originDy + PROBE_ORIGIN);
                 /* COLORREF is already 0x00BBGGRR, which is the packing the
                  * matcher reads. */
-                uint8_t idx = orig_nearest_index(palette,
+                uint8_t idx = NearestPalIndex(palette,
                                                  (uint32_t)c & 0x00FFFFFFu, 0);
 
                 scratch[i] = palette[idx];
@@ -257,7 +257,7 @@ typedef void (__cdecl *am2_void_fn)(void);
  * original calls 23 times over. */
 static uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
 {
-    return orig_nearest_index((const uint32_t *)pal,
+    return NearestPalIndex((const uint32_t *)pal,
                               r | (g << 8) | (b << 16), 9);
 }
 
@@ -358,9 +358,43 @@ void __cdecl SetGamePalette(uint8_t *pal)
     orig_palette_loaded();
 }
 
+/* 0x0041B7C0, 11 call sites. The palette entry nearest a colour, searching
+ * from `from` upward.
+ *
+ * `from` exists because the caller may be protecting the low entries -- the
+ * tileset loader keeps the first block identity-mapped and only remaps above
+ * it -- so this is not "nearest in the palette" but "nearest among the ones
+ * you are allowed to use".
+ *
+ * Two details are the original's rather than choices. `from` is masked to a
+ * byte before the range check, so a value of 0x100 or more searches nothing
+ * and answers 0 rather than reading off the end. And the running best starts
+ * at a sentinel larger than any real distance, so an all-equal palette
+ * answers `from` -- the comparison is strict. */
+uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
+                                uint32_t from)
+{
+    uint32_t i    = from & 0xFFu;
+    int32_t  best = AM2_COLOUR_DIST_MAX;
+    uint8_t  hit  = 0;
+
+    for (; i < 256; i++) {
+        int32_t d = orig_colour_distance(&palette[i], &colour);
+
+        if (d < best) {
+            best = d;
+            hit  = (uint8_t)i;
+        }
+    }
+    return hit;
+}
+
 int palette_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_NEAREST_PAL_INDEX, (const void *)NearestPalIndex,
+                        "NearestPalIndex", 11);
 
     rc |= patch_replace(ADDR_SET_GAME_PALETTE, (const void *)SetGamePalette,
                         "SetGamePalette", 1);

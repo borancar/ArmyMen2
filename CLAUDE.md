@@ -398,6 +398,24 @@ entry, puts `bootcamp` at 79,695 differing pixels against a budget of 500.
 Events in a shipped mission really do share a key and need the second handler
 on one entry.
 
+**A function can already be reconstructed under a name you would not have
+looked for.** `SwapColourBytes` was about to be written a second time as
+`ColourOf`, and `misc.cpp` has had it since long before -- the two bodies came
+out identical. The compiler caught this one, on the conflicting declaration,
+where `checkpatches.py` could not: it only sees duplicate PATCHES, and the
+second patch had not been added yet. Three near-misses now, each caught by a
+different mechanism. **Before reconstructing anything, grep the tree for the
+address as well as for the name.**
+
+**`NearestPalIndex`'s output is 39% of the frame, and its `from` guard is not
+checked at all.** Making it pick a far entry instead of a near one puts
+`bootcamp` at 306,886 differing pixels, so the choice is thoroughly observed.
+Making it ignore `from` and search from 0 changes nothing -- and a probe says
+that is not for want of coverage: `from` arrives as 0, 9, 10, 60 and 100 over
+8,498 calls. The nearest colour simply lies above the reserved block anyway
+for everything Boot Camp remaps. Covered, and still not discriminating; the
+guard stays verified by reading.
+
 **The duplicate-patch check earned its keep a second time.** `TakeUid` was
 about to be a second reconstruction of `AllocUid`, which `script.cpp` had
 already patched at the same address -- the `ScriptCompare` mistake exactly.
