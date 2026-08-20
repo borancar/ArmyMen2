@@ -1071,6 +1071,23 @@
 #define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
 #define ADDR_LOAD_SCRIPT_COND    0x0041EC70u  /* void(FILE *, cond *) */
+#define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
+/* The three handlers a saved event registration is restored with. Two are in
+ * the objscript band and take a pad; the third takes a 16-byte record read
+ * straight from the file. Reached by address -- they are original code. */
+#define ADDR_EVT_PAD_HANDLER_A   0x00437570u
+#define ADDR_EVT_PAD_HANDLER_B   0x00437540u
+#define ADDR_EVT_RECORD_HANDLER  0x0041F3E0u
+/* The event.cpp section's own tag and the path string CheckSaveTag is given.
+ * docs/savetags.tsv lists all fifteen; this is the one at event.cpp:3274. */
+#define AM2_SAVETAG_EVENT        0x06660004u
+#define ADDR_STR_EVENT_CPP       0x004783F8u  /* "C:\\ArmyMen2\\source\\event.cpp" */
+
+/* Chunk tags inside the event.cpp save section. */
+#define AM2_EVTSAVE_RECORD       0x06660000u  /* another registration follows */
+#define AM2_EVTSAVE_PAD_A        0x06670004u
+#define AM2_EVTSAVE_PAD_B        0x06670005u
+#define AM2_EVTSAVE_OWNED        0x06670006u
 #define ADDR_SAVE_SCRIPT_COND    0x0041EB00u  /* void(const cond *, FILE *) */
 #define ADDR_EVENT_DEFAULT_NAME  0x0041F200u  /* void(kind, number, char *out) */
 #define ADDR_FREE_SCRIPT_CONDS   0x0041EA80u  /* void(void), frees the list */

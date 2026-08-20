@@ -9,6 +9,7 @@
 #include "image.h"
 #include "objtable.h"
 #include "objtype.h"
+#include "savetag.h"
 #include "script.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -477,6 +478,55 @@ void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
         orig_fread((uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
 }
 
+#define kPads ((AM2_Pad *)AM2_IMAGE(ADDR_PADS))
+
+int32_t __cdecl LoadEventSection(am2_FILE *fp)
+{
+    int32_t tag, unused, key, kind, idx;
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_EVENT,
+                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0xCCA))
+        return 0;
+
+    orig_fread(&tag, 4, 1, fp);
+    if (tag != (int32_t)AM2_EVTSAVE_RECORD)
+        return 1;
+
+    do {
+        /* Three dwords. The first is read and dropped -- see event.h. */
+        orig_fread(&unused, 4, 1, fp);
+        orig_fread(&key, 4, 1, fp);
+        orig_fread(&kind, 4, 1, fp);
+        (void)unused;
+
+        if (kind == (int32_t)AM2_EVTSAVE_PAD_A ||
+            kind == (int32_t)AM2_EVTSAVE_PAD_B) {
+            AM2_Pad *pad;
+
+            orig_fread(&idx, 4, 1, fp);
+            pad = &kPads[idx];
+            *(int32_t *)pad->rest = key;        /* +0x28 */
+            EventRegister(0, key, 0,
+                          (const void *)(uintptr_t)
+                          (kind == (int32_t)AM2_EVTSAVE_PAD_A
+                           ? ADDR_EVT_PAD_HANDLER_A : ADDR_EVT_PAD_HANDLER_B),
+                          pad, 0);
+        } else if (kind == (int32_t)AM2_EVTSAVE_OWNED) {
+            void *rec = orig_malloc(0x10);
+
+            orig_fread(rec, 0x10, 1, fp);
+            /* owns = 1: the table's teardown frees this one. */
+            EventRegister(1, key, 0,
+                          (const void *)(uintptr_t)ADDR_EVT_RECORD_HANDLER,
+                          rec, 1);
+        }
+
+        orig_fread(&tag, 4, 1, fp);
+    } while (tag == (int32_t)AM2_EVTSAVE_RECORD);
+
+    return 1;
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -507,6 +557,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_LOAD_EVENT_SECTION, (const void *)LoadEventSection,
+                        "LoadEventSection", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
                         "LoadScriptCond", 2);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_COND, (const void *)SaveScriptCond,

@@ -175,6 +175,26 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond);
  * corrupt save overruns the stack. That is the original's behaviour. */
 void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond);
 
+/* 0x004225E0. Read the event.cpp section of a save file back, re-registering
+ * every event it holds. Returns 0 if the section tag is wrong, 1 otherwise --
+ * including when the section is empty.
+ *
+ * Each registration is three dwords and then a kind-dependent tail:
+ *
+ *   AM2_EVTSAVE_PAD_A / _B   one more dword, an index into ADDR_PADS. The pad
+ *                            gets the key stored at +0x28 and is registered in
+ *                            bucket 0 with handler A or B, not owned.
+ *   AM2_EVTSAVE_OWNED        a 16-byte record malloc'd and read from the file,
+ *                            registered in bucket 1 and OWNED, so the table's
+ *                            teardown frees it.
+ *
+ * Two oddities, both reproduced. The first of the three dwords is read and
+ * never used -- the key that reaches EventRegister is the second, and key1 is
+ * passed as a literal 0 rather than the saved value. And that second dword is
+ * read into the incoming `fp` argument's own stack slot, which the original
+ * reuses as a local once it has copied fp into a register. */
+int32_t __cdecl LoadEventSection(am2_FILE *fp);
+
 int event_install(void);
 
 #ifdef __cplusplus
