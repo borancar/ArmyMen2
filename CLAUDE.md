@@ -98,6 +98,19 @@ Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
 
+**`tools/checksplit.py` keeps the split honest, in both directions.** It fails
+if a flat module names a Win32 or COM type — or reaches a Win32 header
+transitively, since a header can be the thing that leaks — and equally if a
+`win32/` module names none, which would mean something is filed as platform
+code that is not. Tested both ways round: a bare `HWND` in `rect.cpp` and a
+`frame.cpp` with its three platform references renamed away both fail it.
+
+Comments are stripped before scanning, and that is not fussiness. `script.cpp`
+carries a comment saying it forward-declares `PreloadSprite` rather than
+including `win32/sprite.h` precisely BECAUSE `AM2_Sprite` has an
+`LPDIRECTDRAWSURFACE` in it — a scan that reads comments fails the very file
+that documents the rule.
+
 **Four tools derive "what is reconstructed" by scanning these sources**, and
 all four used a non-recursive `listdir` before the split. Adding a
 subdirectory would have made every one of them miss fourteen modules silently
