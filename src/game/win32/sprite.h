@@ -24,7 +24,7 @@ extern "C" {
  * hardware path -- the second naming mistake in this file made by generalising
  * from one call site.
  */
-typedef struct {
+typedef struct AM2_Sprite {
     uint32_t id;                 /* +0x00  0xFFFFFFFF when unregistered */
     int32_t  refs;               /* +0x04  ReleaseSprite frees at zero */
     uint32_t format;             /* +0x08  1, 2 or 3 selects a software blitter;
@@ -95,6 +95,19 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr);
  * blanks the whole record immediately afterwards, and ReleaseSprite frees it,
  * so neither leaves a dangling pointer anyone can reach. */
 void __cdecl ClearSprite(AM2_Sprite *spr);
+
+/* PreloadSprite -- original 0x00445B00, 37 call sites, and what the script
+ * statement `preloadsprite` drives.
+ *
+ * The three integers are a sprite identity that the loader turns into
+ * "%02d_%03d_%02d_*.bmp"; here they are packed into the id the registry is
+ * keyed on, `(((set << 12) + index) << 7) + frame`.
+ *
+ * `addref` chooses between the two ways of arriving at an already-loaded
+ * sprite: non-zero counts another holder, zero only guarantees the count is at
+ * least one and leaves an existing count alone. NULL if the load failed. */
+AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
+                                  int32_t flags, int32_t addref);
 void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
 /* FreeMenuSprites -- original 0x00412F80. Release all 190 menu sprites, the

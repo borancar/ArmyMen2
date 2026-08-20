@@ -16,13 +16,20 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+/* PreloadSprite is reconstructed, in win32/sprite.cpp with the rest of the
+ * sprite record. It is declared here rather than by including that header
+ * because script.cpp is on the flat side of the split and must name no Win32
+ * or COM type -- and AM2_Sprite has an LPDIRECTDRAWSURFACE in it. An
+ * incomplete type is enough: the statement discards the sprite. */
+struct AM2_Sprite;
+extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
+                                             int32_t frame, int32_t flags,
+                                             int32_t addref);
+
 /* ---- what stays in the original image --------------------------------- */
 
 typedef void    (__cdecl *am2_void_fn)(void);
 typedef void    (__cdecl *am2_str_fn)(const char *s);
-typedef void    (__cdecl *am2_preload_sprite_fn)(int32_t a, int32_t b,
-                                                 int32_t c, int32_t flags,
-                                                 int32_t mode);
 typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
                                                int32_t *at,
                                                AM2_ScriptAction *act);
@@ -30,7 +37,6 @@ typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
  * which is the tell for an i386 MSVC member function rather than a COM
  * dispatch. */
 
-#define orig_preload_sprite    (*(am2_preload_sprite_fn)ADDR_PRELOAD_SPRITE)
 #define orig_parse_action      (*(am2_parse_action_fn)ADDR_SCRIPT_PARSE_ACTION)
 #define orig_declare_rule_vars (*(am2_void_fn)ADDR_DECLARE_RULE_VARS)
 
@@ -468,7 +474,7 @@ int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at)
         (*at)++;
     }
 
-    orig_preload_sprite(arg[0], arg[1], arg[2], flags, 1);
+    PreloadSprite(arg[0], arg[1], arg[2], flags, 1);
     return 1;
 }
 

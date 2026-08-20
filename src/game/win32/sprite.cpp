@@ -24,6 +24,7 @@
 #include "../../inject/patch.h"
 
 #include <stdint.h>
+#include <string.h>
 
 #define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
@@ -321,6 +322,73 @@ void __cdecl FreeMenuSprites(void)
     }
 }
 
+typedef int32_t (__cdecl *am2_sprite_load_fn)(AM2_Sprite *spr, int32_t a,
+                                              int32_t b, int32_t c,
+                                              int32_t flags);
+typedef void (__cdecl *am2_sprite_register_fn)(AM2_Sprite *spr, uint32_t id);
+
+#define orig_sprite_load_triple (*(am2_sprite_load_fn)ADDR_SPRITE_LOAD_TRIPLE)
+#define orig_sprite_register    (*(am2_sprite_register_fn)ADDR_SPRITE_REGISTER)
+
+/* Allocate and fill one, or give the record back for free()ing. */
+static AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
+                                    int32_t flags)
+{
+    AM2_Sprite *spr = (AM2_Sprite *)orig_malloc(sizeof(AM2_Sprite));
+
+    /* The original zeroes with `rep stosd` for 0x10 dwords and does not check
+     * the allocation, so neither does this. */
+    memset(spr, 0, sizeof(AM2_Sprite));
+
+    if (!orig_sprite_load_triple(spr, set, index, frame, flags)) {
+        orig_free(spr);
+        return 0;
+    }
+    return spr;
+}
+
+AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
+                                  int32_t flags, int32_t addref)
+{
+    uint32_t id = (uint32_t)(((((uint32_t)set << 12) + (uint32_t)index) << 7)
+                             + (uint32_t)frame);
+    int32_t slot = orig_sprite_slot_of(id);
+
+    if (slot >= 0) {
+        AM2_Sprite *spr = g_spriteTable[slot];
+
+        /* A registered slot holding no record. Nothing reaches this in any
+         * run so far, and the original's handling of it is odd enough to be
+         * worth keeping rather than tidying: it builds the record and hands it
+         * back without ever storing it in the slot, so the next lookup finds
+         * the same empty slot again. Reproduced, not corrected. */
+        if (!spr) {
+            spr = LoadSpriteRecord(set, index, frame, flags);
+            if (!spr)
+                return 0;
+            spr->id = id;
+        }
+
+        if (addref) {
+            spr->refs++;
+            return spr;
+        }
+        /* Not an increment: a floor. An existing count is left as it is. */
+        if (spr->refs == 0)
+            spr->refs = 1;
+        return spr;
+    }
+
+    AM2_Sprite *spr = LoadSpriteRecord(set, index, frame, flags);
+    if (!spr)
+        return 0;
+
+    spr->id = id;
+    spr->refs = 1;
+    orig_sprite_register(spr, id);
+    return spr;
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -336,5 +404,7 @@ int sprite_install(void)
                         "ReleaseSprite", 1);
     rc |= patch_replace(ADDR_FREE_MENU_SPRITES, (const void *)FreeMenuSprites,
                         "FreeMenuSprites", 0);
+    rc |= patch_replace(ADDR_PRELOAD_SPRITE, (const void *)PreloadSprite,
+                        "PreloadSprite", 37);
     return rc;
 }

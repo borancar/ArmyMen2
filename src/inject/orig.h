@@ -973,6 +973,13 @@
  * callee at 0x004457E0 builds -- "%02d_%03d_%02d_*.bmp" and the matching
  * ".sha" -- so the statement's three integers are a sprite identity triple. */
 #define ADDR_PRELOAD_SPRITE       0x00445B00u
+/* What PreloadSprite calls once it has decided the sprite is not loaded. The
+ * first builds the two filenames above, chdirs with ADDR_SET_DATA_DIR, and
+ * fills the record; the second grows the registry and puts the record in it.
+ * Both stay original -- they are the bitmap loader and the table, not the
+ * cache decision this port is taking over. */
+#define ADDR_SPRITE_LOAD_TRIPLE   0x004457E0u  /* int32(spr,a,b,c,flags) */
+#define ADDR_SPRITE_REGISTER      0x004459E0u  /* void(spr, id) */
 #define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
 
 /* Pads -- the script's trigger regions. Two tables: one of pad records in
