@@ -1070,6 +1070,7 @@
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
 #define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
+#define ADDR_SAVE_SCRIPT_COND    0x0041EB00u  /* void(const cond *, FILE *) */
 #define ADDR_EVENT_DEFAULT_NAME  0x0041F200u  /* void(kind, number, char *out) */
 #define ADDR_FREE_SCRIPT_CONDS   0x0041EA80u  /* void(void), frees the list */
 #define ADDR_EVT_PLAY_SOUND_AT   0x0041F680u  /* void(name, point, slot, pri, loop) */
@@ -1903,6 +1904,7 @@
 #define ADDR_FOPEN          0x004648E2u  /* FILE *(const char*, const char*) */
 #define ADDR_FCLOSE         0x0046486Cu  /* int32_t(FILE*) */
 #define ADDR_FSEEK          0x00464F18u  /* int32_t(FILE*, int32_t, int32_t) */
+#define ADDR_FWRITE         0x004644B7u  /* size_t(const void*,size_t,size_t,FILE*) */
 #define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */
@@ -1913,6 +1915,8 @@ typedef struct am2_FILE am2_FILE;
 
 typedef size_t (__cdecl *am2_fread_fn)(void *buf, size_t size, size_t count,
                                        am2_FILE *fp);
+typedef size_t (__cdecl *am2_fwrite_fn)(const void *buf, size_t size,
+                                        size_t count, am2_FILE *fp);
 typedef am2_FILE *(__cdecl *am2_fopen_fn)(const char *path, const char *mode);
 typedef int32_t (__cdecl *am2_fclose_fn)(am2_FILE *fp);
 typedef int32_t (__cdecl *am2_fseek_fn)(am2_FILE *fp, int32_t off, int32_t whence);

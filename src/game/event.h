@@ -15,6 +15,11 @@
 
 #include <stdint.h>
 
+/* AM2_ScriptCond and am2_FILE. script.h is on the flat side of the split and
+ * names no Win32 type, so including it here costs nothing in portability. */
+#include "script.h"
+#include "../inject/orig.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -123,6 +128,33 @@ void __cdecl FreeScriptConditions(void);
  * `out` is unbounded -- the original sprintf's straight into it. The longest
  * name it can write is "unnamed Event_PadDeactivated " plus the number. */
 void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out);
+
+/* 0x0041EB00. Write one `if` record to a save file.
+ *
+ * The format, and every size in it is confirmed by a struct script.h already
+ * carries:
+ *
+ *   the record itself, 0x30 bytes -- NOT 0x34, so the `next` pointer is left
+ *     out, which is right for something being serialised
+ *   each event, 0x10 bytes             AM2_ScriptEvent is four ints
+ *   each action, 0x48 bytes            AM2_ScriptAction
+ *   each test, 0x1C bytes              AM2_ScriptTest is seven ints
+ *
+ * The order is record, events, ACTIONS, then tests -- not the order the fields
+ * appear in the struct, where tests come before actions.
+ *
+ * An action's `text` is a pointer, so it cannot be written as it stands. The
+ * original copies the action to a local, replaces the pointer AT +0x30 with
+ * the string's length, writes the copy, and then writes the bytes from the
+ * original pointer. A null text writes a length of zero and nothing after it,
+ * so the reader can tell the two cases apart.
+ *
+ * The FILE is the FIRST parameter, not the second. The prologue loads ebx from
+ * entry esp+8 and ebp from esp+4, then uses ebx as the record and ebp as the
+ * stream -- so the order reads backwards from the order the registers appear
+ * in. Getting it the wrong way round writes the record to a bogus stream, and
+ * the campaign A/B caught it: "Saved 317 items" simply never appeared. */
+void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond);
 
 int event_install(void);
 

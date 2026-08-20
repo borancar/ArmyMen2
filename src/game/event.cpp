@@ -399,6 +399,38 @@ void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
     }
 }
 
+/* The game's own fwrite: the FILE was opened by the game's CRT, so it must be
+ * the same CRT that writes to it -- the reason crt.h exists. */
+#define orig_fwrite (*(am2_fwrite_fn)ADDR_FWRITE)
+
+void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
+{
+    int32_t i;
+
+    orig_fwrite(cond, 0x30, 1, fp);
+
+    for (i = 0; i < cond->nevents; i++)
+        orig_fwrite((const uint8_t *)cond->events + i * 0x10, 0x10, 1, fp);
+
+    for (i = 0; i < cond->nactions; i++) {
+        const uint8_t *act = (const uint8_t *)cond->actions + i * 0x48;
+        const char    *text = *(char *const *)(act + 0x30);
+        uint8_t        copy[0x48];
+        int32_t        len = text ? (int32_t)strlen(text) : 0;
+
+        memcpy(copy, act, sizeof copy);
+        /* The pointer slot carries the length instead. */
+        *(int32_t *)(copy + 0x30) = len;
+
+        orig_fwrite(copy, 0x48, 1, fp);
+        if (len > 0)
+            orig_fwrite(text, (size_t)len, 1, fp);
+    }
+
+    for (i = 0; i < cond->ntests; i++)
+        orig_fwrite((const uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -429,6 +461,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_SAVE_SCRIPT_COND, (const void *)SaveScriptCond,
+                        "SaveScriptCond", 2);
     rc |= patch_replace(ADDR_EVENT_DEFAULT_NAME, (const void *)EventDefaultName,
                         "EventDefaultName", 3);
     rc |= patch_replace(ADDR_FREE_SCRIPT_CONDS, (const void *)FreeScriptConditions,
