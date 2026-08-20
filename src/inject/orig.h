@@ -1549,11 +1549,18 @@
 #define ADDR_DF_MOUSE            0x0046FD80u  /* DIDATAFORMAT c_dfDIMouse */
 #define ADDR_DF_KEYBOARD         0x0046FD68u  /* DIDATAFORMAT c_dfDIKeyboard */
 #define ADDR_DIPROP_BUFFER_SIZE  0x004854F8u  /* DIPROPDWORD, the buffered-input size */
-/* Two pointers into adjacent 256-byte input buffers, reset on bring-up. */
-#define ADDR_INPUT_CURSOR_A      0x005127C8u
-#define ADDR_INPUT_CURSOR_B      0x005127CCu
-#define ADDR_INPUT_BUFFER_A      0x005125C8u
-#define ADDR_INPUT_BUFFER_B      0x005126C8u
+/* The keyboard's double buffer: two 256-byte state arrays and the two pointers
+ * PollKeyboard SWAPS each poll, so which array is current alternates and the
+ * pointers are the only way to know. Nothing to do with the mouse cursor,
+ * which is what the names they went in under -- ADDR_KEYS_NOW_PTR and _B --
+ * read as; "cursor" meant a cursor into a buffer, and next to ADDR_CURSOR_X
+ * that is a trap. Renamed, not aliased. */
+#define ADDR_KEYS_NOW_PTR        0x005127C8u  /* uint8_t *, this poll */
+#define ADDR_KEYS_PREV_PTR       0x005127CCu  /* uint8_t *, the one before */
+#define ADDR_KEYS_BUFFER_A       0x005125C8u  /* uint8_t[256] */
+#define ADDR_KEYS_BUFFER_B       0x005126C8u
+#define AM2_KEY_STATES           256
+#define AM2_KEY_DOWN             0x80u        /* DirectInput's down bit */
 /* Auto-repeat state, one entry per DIK scancode. PollKeyboard writes both and
  * 0x00427430 reads the second -- `KeyPressed(dik)` is `g_keyPressed[dik & 0xff]`,
  * which is how the array's length and purpose were established. */

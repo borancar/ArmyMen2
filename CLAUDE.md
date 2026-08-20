@@ -942,6 +942,36 @@ this removes. Driving title → BOOT CAMP → `RETURN` → both dialogs → live
 mission is now four socket commands, and `Update3DAudioVolumes` reads 16,323
 at the end of it.
 
+**`drive.sh ctl "keys"` is the same idea for the keyboard, and it is a READ
+only.** It reports the game's own state: which scancodes are down, following
+`ADDR_KEYS_NOW_PTR` because `PollKeyboard` SWAPS the two 256-byte buffers each
+poll so which one is current alternates, and which registered a press through
+`ADDR_KEY_PRESSED`, the edge-and-auto-repeat array most of the game actually
+tests. Works under `AM2_NOPATCH=1` for the same reason `cursor` does.
+
+**`state` is intent and `keys` is outcome, and the difference is the point.**
+`state` reports what the HARNESS is injecting. If the DirectInput hook were
+ever bypassed — the failure `tools/checkhooks.py` guards, which no A/B can see
+because both sides would be equally undriven — `state` would keep reporting a
+key as held while the game saw nothing. `keys` reads the other end of the
+channel and would show it.
+
+**There is no way to SET the keys, and that asymmetry is real rather than
+unfinished work.** The cursor ACCUMULATES: `UpdateMouseState` adds the deltas
+to what is already there, so a write survives and becomes the next starting
+point. The key buffer is REPLACED wholesale from `GetDeviceState` on every
+poll, so a poke would last one frame. Keys go in through `key`, and the
+harness already releases a timed hold on a poll rather than from a timer,
+precisely so a tap cannot fall between two polls. Owning the reconstruction
+does not make every global writable; ask whether the game accumulates it or
+overwrites it.
+
+**Two globals renamed on the way**: `ADDR_INPUT_CURSOR_A`/`_B` are the
+keyboard's buffer pointers and have nothing to do with the mouse — "cursor"
+meant a cursor into a buffer, which sitting next to `ADDR_CURSOR_X` is a trap.
+They are `ADDR_KEYS_NOW_PTR` and `ADDR_KEYS_PREV_PTR`. Renamed, not aliased:
+the count in `checkpatches.py` stayed at 39.
+
 **`mouse move DX DY` is still the honest way in when the input path is what is
 under test.** `cursor` writes the globals and reads nothing from the device, so
 it exercises neither `PollMouse` nor `UpdateMouseState`. `ab.sh mission` scrolls

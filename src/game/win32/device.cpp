@@ -256,8 +256,8 @@ int32_t __cdecl InitInput(HWND hWnd)
      * buffers, with the clearing itself gone. edi is restored and eax and ecx
      * are dead on return, so the register writes are provably unobservable and
      * only these two stores are kept. */
-    *(uint32_t *)(uintptr_t)ADDR_INPUT_CURSOR_A = ADDR_INPUT_BUFFER_A;
-    *(uint32_t *)(uintptr_t)ADDR_INPUT_CURSOR_B = ADDR_INPUT_BUFFER_B;
+    *(uint32_t *)(uintptr_t)ADDR_KEYS_NOW_PTR = ADDR_KEYS_BUFFER_A;
+    *(uint32_t *)(uintptr_t)ADDR_KEYS_PREV_PTR = ADDR_KEYS_BUFFER_B;
     return 1;
 }
 
@@ -520,8 +520,8 @@ static_assert(DIK_LMENU == 0x38 && DIK_RMENU == 0xB8, "alt scancodes");
 #define REPEAT_FIRST_MS   250u
 #define REPEAT_NEXT_MS    150u
 
-#define g_curKeys    (*(uint8_t **)(uintptr_t)ADDR_INPUT_CURSOR_A)
-#define g_prevKeys   (*(uint8_t **)(uintptr_t)ADDR_INPUT_CURSOR_B)
+#define g_curKeys    (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)
+#define g_prevKeys   (*(uint8_t **)(uintptr_t)ADDR_KEYS_PREV_PTR)
 #define g_keyRepeat  ((uint32_t *)(uintptr_t)ADDR_KEY_REPEAT_AT)
 #define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)
 

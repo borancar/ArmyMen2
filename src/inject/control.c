@@ -222,6 +222,53 @@ static void handle_line(SOCKET s, char *line)
      * It does NOT exercise PollMouse or UpdateMouseState -- nothing is read
      * from the device. Use `mouse move` when the input path itself is what is
      * under test. */
+    /* `keys` -- what the GAME's keyboard state actually is.
+     *
+     * The counterpart of `cursor`, and it exists for the same reason: `state`
+     * reports what the harness is INJECTING, which is its intent and not the
+     * outcome. If the DirectInput hook were ever bypassed -- the failure
+     * tools/checkhooks.py guards, which no A/B can see because both sides
+     * would be equally undriven -- `state` would keep cheerfully reporting a
+     * key as held while the game saw nothing at all. This reads the other end.
+     *
+     * Two arrays, both the game's own. ADDR_KEYS_NOW_PTR is whichever of the
+     * two 256-byte buffers PollKeyboard filled this poll -- it swaps them, so
+     * the pointer has to be followed rather than assumed -- and the down bit
+     * is DirectInput's 0x80. ADDR_KEY_PRESSED is the edge-and-auto-repeat
+     * array, set for one poll when a key goes down and again on each repeat,
+     * which is what most of the game actually tests.
+     *
+     * There is deliberately no way to SET them here, and that is the
+     * difference from `cursor`. The cursor ACCUMULATES -- UpdateMouseState
+     * adds the deltas to what is already there, so a write survives and is
+     * the next starting point. The key buffer is REPLACED wholesale from
+     * GetDeviceState on every poll, so a poke would last until the next frame
+     * and no longer. Keys go in through `key`, which the harness already
+     * releases on a poll rather than a timer precisely so a tap cannot fall
+     * between two of them. */
+    if (!strcmp(argv[0], "keys")) {
+        const uint8_t *now = *(const uint8_t *const *)(uintptr_t)ADDR_KEYS_NOW_PTR;
+        const int32_t *hit = (const int32_t *)(uintptr_t)ADDR_KEY_PRESSED;
+        char           out[MAX_LINE];
+        uint32_t       at = 0;
+        int32_t        i;
+
+        if (!now || IsBadReadPtr(now, AM2_KEY_STATES)) {
+            reply(s, "err keyboard state not up yet");
+            return;
+        }
+        at += (uint32_t)_snprintf(out + at, sizeof out - at, "down:");
+        for (i = 0; i < AM2_KEY_STATES && at < sizeof out - 16; i++)
+            if (now[i] & AM2_KEY_DOWN)
+                at += (uint32_t)_snprintf(out + at, sizeof out - at, " %02x", i);
+        at += (uint32_t)_snprintf(out + at, sizeof out - at, " pressed:");
+        for (i = 0; i < AM2_KEY_STATES && at < sizeof out - 8; i++)
+            if (hit[i])
+                at += (uint32_t)_snprintf(out + at, sizeof out - at, " %02x", i);
+        out[sizeof out - 1] = '\0';
+        reply(s, "ok %s", out);
+        return;
+    }
     if (!strcmp(argv[0], "cursor")) {
         int32_t       *cx   = (int32_t *)(uintptr_t)ADDR_CURSOR_X;
         int32_t       *cy   = (int32_t *)(uintptr_t)ADDR_CURSOR_Y;
