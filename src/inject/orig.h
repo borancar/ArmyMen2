@@ -1070,6 +1070,8 @@
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
 #define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
+#define ADDR_EVT_SET_WORD60      0x0041F750u  /* void(uid, int32), clamped */
+#define ADDR_EVT_SET_AI_MODE     0x0041F9B0u  /* void(uid, mode), +0xE4/+0xE8 */
 #define ADDR_EVT_MARK_SET        0x0041FF20u  /* void(row, col) -> 1 */
 #define ADDR_EVT_MARK_CLEAR      0x0041FF40u  /* void(row, col) -> 0 */
 #define ADDR_EVT_MARKS           0x00511E60u  /* int32_t[][4] */

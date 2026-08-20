@@ -63,6 +63,23 @@ void __cdecl EvtSetByte40(uint32_t uid, int8_t value);
 void __cdecl EvtMarkSet(int32_t row, int32_t col);
 void __cdecl EvtMarkClear(int32_t row, int32_t col);
 
+/* 0x0041F750. Clamps to 0x7FFF and stores 16 bits at +0x60. The clamp happens
+ * before the lookup, so a value above 32767 is capped even for a uid that
+ * turns out not to exist. Checks both the uid and the pointer. */
+void __cdecl EvtSetWord60(uint32_t uid, int32_t value);
+
+/* 0x0041F9B0. Sets the object's AI mode at +0xE4, pushing the previous one
+ * down to +0xE8 first.
+ *
+ * Mode 7 is `defend` -- script.cpp's ActAiMode maps the four keywords to
+ * 6/7/2/5, which is neither sequential nor in keyword order. Defending with no
+ * post recorded latches the object's own packed position from +0x12, which is
+ * how `setaimode defend` with no coordinates comes to defend where the unit is
+ * standing.
+ *
+ * The emptiness test reads 16 bits at +0xB4 and the store writes 32. Kept. */
+void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode);
+
 int event_install(void);
 
 #ifdef __cplusplus

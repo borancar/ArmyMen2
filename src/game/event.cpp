@@ -263,6 +263,48 @@ void __cdecl EvtSetByte40(uint32_t uid, int8_t value)
     *((int8_t *)obj + 0x40) = value;
 }
 
+/* The clamp is applied to the caller's value before the object is looked up,
+ * so it happens even when the store does not. */
+void __cdecl EvtSetWord60(uint32_t uid, int32_t value)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    if (value > 0x7FFF)
+        value = 0x7FFF;
+    obj = LookupByUID(uid);
+    if (!obj)
+        return;
+    *(int16_t *)((uint8_t *)obj + 0x60) = (int16_t)value;
+}
+
+/* script.cpp's ActAiMode is where these codes come from. Only defend needs
+ * naming here; the others pass through untouched. */
+#define AM2_AI_MODE_DEFEND 7
+
+void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode)
+{
+    uint8_t *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    obj = (uint8_t *)LookupByUID(uid);
+    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+        return;
+
+    *(int32_t *)(obj + 0xE8) = *(int32_t *)(obj + 0xE4);
+    *(int32_t *)(obj + 0xE4) = mode;
+
+    if (mode != AM2_AI_MODE_DEFEND)
+        return;
+    /* Tests sixteen bits and writes thirty-two -- the original's asymmetry,
+     * not a transcription slip. */
+    if (*(int16_t *)(obj + 0xB4) != 0)
+        return;
+    *(int32_t *)(obj + 0xB4) = *(const int32_t *)(obj + 0x12);
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -293,6 +335,10 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_EVT_SET_WORD60, (const void *)EvtSetWord60,
+                        "EvtSetWord60", 2);
+    rc |= patch_replace(ADDR_EVT_SET_AI_MODE, (const void *)EvtSetAiMode,
+                        "EvtSetAiMode", 2);
     rc |= patch_replace(ADDR_EVT_MARK_SET, (const void *)EvtMarkSet,
                         "EvtMarkSet", 2);
     rc |= patch_replace(ADDR_EVT_MARK_CLEAR, (const void *)EvtMarkClear,
