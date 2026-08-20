@@ -431,6 +431,52 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
         orig_fwrite((const uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
 }
 
+#define orig_fread  (*(am2_fread_fn)ADDR_FREAD)
+#define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
+
+#define kScriptContext (*(AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT))
+
+void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
+{
+    char    buf[0x800];
+    int32_t i;
+
+    /* Cleared before the read, not after: the read covers 0x00..0x2F and
+     * `next` sits at +0x30, just past it. */
+    cond->next = NULL;
+    orig_fread(cond, 0x30, 1, fp);
+
+    if (cond->nevents > 0)
+        cond->events = (AM2_ScriptEvent *)orig_malloc((size_t)cond->nevents * 0x10);
+    for (i = 0; i < cond->nevents; i++)
+        orig_fread((uint8_t *)cond->events + i * 0x10, 0x10, 1, fp);
+
+    if (cond->nactions > 0)
+        cond->actions = (AM2_ScriptAction *)orig_malloc((size_t)cond->nactions * 0x48);
+    for (i = 0; i < cond->nactions; i++) {
+        uint8_t *act = (uint8_t *)cond->actions + i * 0x48;
+        int32_t  len;
+
+        orig_fread(act, 0x48, 1, fp);
+        len = *(const int32_t *)(act + 0x30);
+        if (len > 0) {
+            int32_t at = kScriptContext.count;
+
+            orig_fread(buf, (size_t)len, 1, fp);
+            buf[len] = '\0';
+            /* Kind 5 is the one that owns a malloc'd copy, so the token list
+             * becomes the string's owner. `at` is read before the append. */
+            ScriptAddToken(&kScriptContext, AM2_TOKEN_STRING, buf, 0);
+            *(char **)(act + 0x30) = (char *)kScriptContext.tokens[at].value;
+        }
+    }
+
+    if (cond->ntests > 0)
+        cond->tests = (AM2_ScriptTest *)orig_malloc((size_t)cond->ntests * 0x1C);
+    for (i = 0; i < cond->ntests; i++)
+        orig_fread((uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -461,6 +507,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
+                        "LoadScriptCond", 2);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_COND, (const void *)SaveScriptCond,
                         "SaveScriptCond", 2);
     rc |= patch_replace(ADDR_EVENT_DEFAULT_NAME, (const void *)EventDefaultName,

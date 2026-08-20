@@ -156,6 +156,25 @@ void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out);
  * the campaign A/B caught it: "Saved 317 items" simply never appeared. */
 void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond);
 
+/* 0x0041EC70. Read one `if` record back, the mirror of SaveScriptCond, with
+ * the same parameter order: the FILE first.
+ *
+ * It clears `next` BEFORE the read rather than after, which works because the
+ * read is 0x30 bytes and `next` is at +0x30 -- just past the end. The counts
+ * come out of the record itself, so each array is allocated from a number the
+ * file supplied and then filled.
+ *
+ * An action's text was written as a length followed by the bytes. This reads
+ * the length from the +0x30 slot, reads that many bytes into a 2 KB buffer,
+ * terminates it, and hands it to ScriptAddToken as a kind-5 token -- the kind
+ * that owns a malloc'd copy. The action's text then points at the token's
+ * value, so the string outlives this function and is freed with the token list
+ * rather than with the action.
+ *
+ * The buffer is 0x800 bytes and the length is whatever the file says, so a
+ * corrupt save overruns the stack. That is the original's behaviour. */
+void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond);
+
 int event_install(void);
 
 #ifdef __cplusplus
