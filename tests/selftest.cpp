@@ -381,3 +381,17 @@ extern "C" int patch_replace(uint32_t, const void *, const char *, int32_t)
 {
     return 0;
 }
+
+/* script.cpp reaches PreloadSprite, which lives in the win32 half and pulls in
+ * DirectDraw. Nothing here exercises sprite preloading -- the script vectors
+ * cover the tokeniser and the statement handlers -- so a stub keeps the
+ * self-test free of Win32, which is the whole point of it running without the
+ * game. If a vector ever does reach this, it will return 0 rather than load
+ * anything, and that is a wrong answer rather than a link error; worth
+ * knowing before adding sprite coverage here. */
+struct AM2_Sprite;
+extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
+                                             int32_t, int32_t)
+{
+    return 0;
+}

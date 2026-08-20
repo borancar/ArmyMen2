@@ -215,13 +215,17 @@ endif
 # reads a global needs that global mapped, and mapping it means starting the
 # game, which is the thing this avoids.
 SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
-                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp
+                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp
 
 .PHONY: selftest
 selftest: $(BUILD)/selftest.exe
 	@WINEPREFIX="$(PREFIX)" wine $(BUILD)/selftest.exe
 
-$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h
+# Makefile is a prerequisite because SELFTEST_SRC lives in it: without that,
+# removing a module from the list leaves a stale binary that make happily
+# calls up to date, and the link guard in `check` reports ok on a list that
+# no longer links. Verified by removing gamedir.cpp and watching it fail.
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h Makefile
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
 	    -o $@ $(SELFTEST_SRC)
@@ -272,6 +276,16 @@ check:
 	        echo FAILED; rc=1; \
 	    fi; \
 	done; \
+	printf '  %-12s ' "selftest-link"; \
+	if $(MAKE) -s $(BUILD)/selftest.exe >/dev/null 2>&1; then \
+	    echo ok; \
+	else \
+	    echo FAILED; \
+	    echo "    build/selftest.exe does not link. Closing an orig_ seam turns"; \
+	    echo "    a call through an address into a real symbol, so SELFTEST_SRC"; \
+	    echo "    needs the module the function now lives in."; \
+	    rc=1; \
+	fi; \
 	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h)" ]; then \
 	    echo "  generated files DRIFTED from what is committed:"; \
 	    git status --short docs/ src/game/scripttokens.h | sed 's/^/    /'; \
