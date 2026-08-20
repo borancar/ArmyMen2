@@ -30,6 +30,7 @@
 #include "../game/objflag.h"
 #include "../game/event.h"
 #include "../game/trig.h"
+#include "../game/win32/frame.h"
 #include "../game/gamedir.h"
 #include "../game/misc.h"
 #include "../game/script.h"
@@ -430,6 +431,7 @@ static void install(void)
     gamedir_install();
     event_install();
     trig_install();
+    frame_install();
     script_install();
     objscript_install();
     objtable_install();

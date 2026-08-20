@@ -61,6 +61,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/image.cpp \
             src/game/crt.cpp \
             src/game/win32/startgame.cpp \
+            src/game/win32/frame.cpp \
             src/game/rect.cpp \
             src/game/dist.cpp \
             src/game/objtable.cpp \

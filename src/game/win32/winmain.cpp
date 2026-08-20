@@ -49,6 +49,7 @@
 #include "audio.h"
 #include "device.h"
 #include "dplay.h"
+#include "frame.h"
 #include "palette.h"
 #include "report.h"
 #include "../crt.h"
@@ -119,9 +120,6 @@ typedef void (__cdecl *am2_i32_fn)(int32_t);
 #define orig_fill_palette     (*(am2_ptr_fn)ADDR_FILL_PALETTE)
 #define orig_request_state    (*(am2_i32_fn)ADDR_REQUEST_STATE)
 #define orig_set_game_over    (*(am2_i32_fn)ADDR_SET_GAME_OVER)
-#define orig_frame_pre        (*(am2_void_fn)ADDR_FRAME_PRE)
-#define orig_frame_post       (*(am2_void_fn)ADDR_FRAME_POST)
-#define orig_poll_input       (*(am2_void_fn)ADDR_POLL_INPUT)
 #define orig_strncpy          (*(char *(__cdecl *)(char *, const char *, \
                                                    uint32_t))ADDR_CRT_STRNCPY)
 
@@ -232,12 +230,12 @@ int32_t __cdecl InitAudio(void)
 {
     if (InitDirectSound()) {
         if (InitWaveSounds()) {
-            *(int32_t *)(uintptr_t)ADDR_AUDIO_READY = 1;
+            *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 1;
             return 1;
         }
         ReleaseSoundBuffers();
     }
-    *(int32_t *)(uintptr_t)ADDR_AUDIO_READY = 0;
+    *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 0;
     return 1;
 }
 
@@ -252,15 +250,15 @@ int32_t __cdecl ClearGameOver(void)
  *
  * Three strings first: the map name defaults when the command line left it
  * empty, and the multiplayer script name is copied unconditionally. Then the
- * palette. Then the title and shared sprite sets, but only if a flag says they
- * are wanted -- the same flag FreeSpriteSets tests before releasing them, so
- * the two are a pair. Then nine globals go to zero, the multiplayer session
+ * palette. Then the title and shared sprite sets, but only under `-df` -- the
+ * same switch FreeSpriteSets tests before releasing them, so the two are a
+ * pair and both are debug-build behaviour. Then nine globals go to zero, the multiplayer session
  * flag among them. */
 void __cdecl ResetToTitle(void)
 {
     /* Two different globals, and it matters which way round: the command-line
      * option is the SOURCE and the level's own copy is the destination. */
-    char *mapname = (char *)(uintptr_t)ADDR_CURRENT_MAP_NAME;
+    char *mapname = (char *)(uintptr_t)ADDR_MAP_NAME;
 
     strcpy(mapname, (const char *)(uintptr_t)ADDR_OPT_MAP_NAME);
     if (!mapname[0])
@@ -268,12 +266,12 @@ void __cdecl ResetToTitle(void)
     strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
            *(const char *const *)(uintptr_t)ADDR_MP_SCRIPT_DEFAULT);
 
-    uint8_t *palette = *(uint8_t **)(uintptr_t)ADDR_PALETTE_SOURCE;
+    uint8_t *palette = *(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE;
 
     orig_fill_palette(palette);
     SetGamePalette(palette);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_SPRITE_SETS_LOADED) {
+    if (*(const int32_t *)(uintptr_t)ADDR_OPT_DF) {
         orig_sprite_set_load((const char *)(uintptr_t)ADDR_STR_SET_TITLE);
         orig_sprite_set_load((const char *)(uintptr_t)ADDR_STR_SET_SHARED);
     }
@@ -295,8 +293,10 @@ void __cdecl ResetToTitle(void)
  * Three ways to skip it and they are not interchangeable: a lobby that has not
  * started yet is started first and then re-read, a comm object that says skip
  * goes straight to state 1, and a global that remembers the intro was already
- * seen does the same. Only the fall-through plays it, and that arm also clears
- * the game-over snapshot -- which is why the state it requests is 0. */
+ * `-nointro` does the same -- and that third one is the command-line switch,
+ * not a "we already showed it" flag, which is what the name it first went in
+ * under would have suggested. Only the fall-through plays the movie, and that
+ * arm also clears the game-over snapshot, which is why it requests state 0. */
 void __cdecl StartIntro(void)
 {
     uint8_t *comm = g_commObject;
@@ -310,7 +310,7 @@ void __cdecl StartIntro(void)
         orig_request_state(1);
         return;
     }
-    if (*(const int32_t *)(uintptr_t)ADDR_INTRO_SEEN) {
+    if (*(const int32_t *)(uintptr_t)ADDR_OPT_NO_INTRO) {
         orig_request_state(1);
         return;
     }
@@ -321,38 +321,39 @@ void __cdecl StartIntro(void)
 
 /* 0x0040B000. One frame.
  *
- * A global gates the whole body, so a frame can be suppressed without the
- * caller knowing. Then the lost-surface check, the input poll and a pre-step,
+ * The gate is ADDR_APP_ACTIVE: a background window composes no frames at all,
+ * which is a fact about the window and not a "frames enabled" switch. Then the lost-surface check, the input poll and a pre-step,
  * then the state handler, then a post-step the original reaches by tail jump
  * from every arm INCLUDING the out-of-range one -- so a state above 4 is not
  * an error, it just runs no handler. */
-static const uint32_t kStateFrame[] = {
-    ADDR_STATE0_FRAME, ADDR_STATE1_FRAME, ADDR_STATE2_FRAME,
-    ADDR_STATE3_FRAME, ADDR_STATE4_FRAME,
+typedef void (*am2_state_fn)(void);
+
+static const am2_state_fn kStateFrame[] = {
+    State0Frame, State1Frame, State2Frame, State3Frame, State4Frame,
 };
 
 void __cdecl RunFrame(void)
 {
-    if (!*(const int32_t *)(uintptr_t)ADDR_FRAME_ENABLED)
+    if (!*(const int32_t *)(uintptr_t)ADDR_APP_ACTIVE)
         return;
 
     RestoreLostSurfaces();
-    orig_poll_input();
-    orig_frame_pre();
+    PollInput();
+    FramePre();
 
-    uint32_t state = *(const uint32_t *)(uintptr_t)ADDR_GAME_STATE_NOW;
+    uint32_t state = *(const uint32_t *)(uintptr_t)ADDR_GAME_STATE;
 
     if (state <= 4)
-        ((am2_void_fn)(uintptr_t)kStateFrame[state])();
+        kStateFrame[state]();
 
-    orig_frame_post();
+    FramePost();
 }
 
 /* 0x00423D20. Release the three sprite sets, behind the flag that says they
  * were loaded -- the same flag ResetToTitle tests before loading two of them. */
 void __cdecl FreeSpriteSets(void)
 {
-    if (!*(const int32_t *)(uintptr_t)ADDR_SPRITE_SETS_LOADED)
+    if (!*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
         return;
 
     orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_TITLE);

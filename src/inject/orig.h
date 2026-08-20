@@ -1036,8 +1036,6 @@
  * table. */
 #define ADDR_EVENT_REGISTER      0x0041EE70u  /* void(a, uid, c, fn, arg, f) */
 #define ADDR_EVENT_CLEAR_ALL     0x004223D0u  /* void(void), frees every node */
-#define ADDR_TAKE_UID            0x0041E7F0u  /* int32_t(void), post-increments
-                                               * the counter at ADDR_NEXT_UID */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is
  * observed to do from here -- announce an event -- and not from any one of
@@ -1171,13 +1169,6 @@
  * that mattered, because that one ignores the answer. */
 #define ADDR_SET_DATA_DIR        0x00422DE0u  /* int32_t(const char *subdir) */
 #define ADDR_GAME_DIR            0x0051235Cu  /* char[], the install directory */
-#define ADDR_GAME_DIR_ALT        0x00512464u  /* char[], tried when the first
-                                               * chdir fails; carries its own
-                                               * trailing separator */
-#define ADDR_GAME_DIR_ALT_OK     0x00512588u  /* int32_t, gates the fallback */
-#define ADDR_IN_AVI_DIR          0x005125C4u  /* int32_t, latched when the
-                                               * subdir entered is the one
-                                               * ADDR_STR_AVI_DIR names */
 #define ADDR_STR_AVI_DIR         0x004852C8u  /* const char **, -> "avi" */
 #define ADDR_STR_PATH_SEP        0x00478984u  /* "\\" */
 #define ADDR_MAP_FOLDER          0x00511AC8u  /* the map's own directory */
@@ -1579,7 +1570,23 @@
 /* int32_t[3]. Menu code sets one when it takes responsibility for a click
  * (0x004142C8); PollMouse clears it when the button comes back up. */
 #define ADDR_MOUSE_CLAIMED       0x00485488u
-#define ADDR_MOUSE_MOVED         0x00485494u  /* int32_t, X or Y moved */
+/* Not only movement, despite the name it went in under: 0x00426F40 also sets
+ * it when button 0 or button 1 CHANGES, so it is "the mouse did something". */
+#define ADDR_MOUSE_MOVED         0x00485494u  /* int32_t */
+#define ADDR_CURSOR_POINT        0x0048546Cu  /* two int16 -- the clamped
+                                               * cursor, x then y, which is
+                                               * what a press records */
+/* Three {point, tick} pairs, one per button, stamped when that button goes
+ * down. The point is the packed dword above, not a pair of ints. */
+#define ADDR_MOUSE_PRESS         0x00485498u
+#define ADDR_MOUSE_ACTIVITY      0x004854B0u  /* set from ADDR_INPUT_CONTEXT on
+                                               * any movement or button change */
+#define ADDR_MOUSE_B0_EXTRA      0x004854B4u  /* zeroed when button 0 goes down;
+                                               * nothing here reads it */
+/* Read from 157 places and written from three, all of them in the state
+ * machine -- ADDR_TAKE_MENU_REQUEST is one. What it MEANS is not established;
+ * this records only that the mouse stamps it whenever there is input. */
+#define ADDR_INPUT_CONTEXT       0x00511E04u
 #define ADDR_MOUSE_EVENT         0x00426F40u  /* void(void), after every event */
 /* PollInput is `call PollMouse; jmp PollKeyboard` and nothing else. */
 #define ADDR_POLL_INPUT          0x00427420u  /* void(void) */
@@ -1600,9 +1607,6 @@
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE, ArmyMenMutex */
 #define ADDR_SHUTDOWN_OBJ        0x00512308u  /* the `this` of the first teardown */
 #define ADDR_FREE_SPRITE_LIST    0x004098B0u  /* what the alias jumps to */
-#define ADDR_CURRENT_MAP_NAME    0x00511A88u  /* what ResetToTitle fills from
-                                               * ADDR_OPT_MAP_NAME, or from the
-                                               * default when that is empty */
 #define ADDR_MAP_NAME_DEFAULT    0x00485108u  /* const char **, used when empty */
 #define ADDR_MP_SCRIPT_DEFAULT   0x0048510Cu  /* const char ** */
 #define ADDR_SPRITE_SET_LOAD     0x004239B0u  /* void(const char *) */
@@ -1610,23 +1614,47 @@
 #define ADDR_SPRITE_SET_TITLE    0x00510A40u
 #define ADDR_SPRITE_SET_SHARED   0x00510230u
 #define ADDR_SPRITE_SET_THIRD    0x00511250u
-#define ADDR_SPRITE_SETS_LOADED  0x0047894Cu  /* int32, gates load and free */
 #define ADDR_STR_SET_TITLE       0x00478AC0u  /* "title" */
 #define ADDR_STR_SET_SHARED      0x00478AACu  /* "shared" */
-#define ADDR_PALETTE_SOURCE      0x00477A58u  /* what 0x0041ADE0 and
-                                               * SetGamePalette are handed */
 #define ADDR_FILL_PALETTE        0x0041ADE0u  /* void(void *) */
-#define ADDR_AUDIO_READY         0x004FA468u  /* int32, both audio arms set it */
 #define ADDR_GAME_OVER_STATE     0x00515F88u  /* int32, cleared at startup */
-#define ADDR_FRAME_ENABLED       0x004FA02Cu  /* int32, RunFrame's whole body */
-#define ADDR_GAME_STATE_NOW      0x00511DA4u  /* int32, RunFrame's 0..4 switch */
 #define ADDR_FRAME_PRE           0x0040AF70u  /* before the state handler */
+#define ADDR_STATE_ENTERED       0x00511DA8u  /* int32; set on a transition, and
+                                               * the handler clears it after it
+                                               * has run the entry action once */
+#define ADDR_STATE0_TICK         0x00511A60u  /* GetTickCount at state 0 entry */
+#define ADDR_STATE_ENTER_ONCE    0x00511DD0u  /* int32; state 2 only, and it
+                                               * RETURNS after clearing it */
+#define AM2_SUBSTATE_BASE        22           /* what the 13-entry table at
+                                               * 0x00426230 is indexed from */
+#define ADDR_SUBSTATE_TABLE      0x00426230u
+/* The frame chain's own callees, all still original. */
+#define ADDR_COMM_FRAME_PRE_A    0x00411C20u  /* "TIMING OUT PLAYER" */
+#define ADDR_COMM_FRAME_POST_A   0x00410420u  /* void(int32) */
+#define ADDR_COMM_FRAME_POST_B   0x00402F50u
+#define ADDR_COMM_FRAME_POST_C   0x00403050u
+#define AM2_COMM_MIN_BUFFERS     10           /* below this, COMM ERROR: NO BUFFERS */
+#define AM2_COMM_OFF_ACTIVE      0x3DCu       /* gates all the comm frame work */
+#define ADDR_STATE_LEAVE_COMMON  0x00426640u  /* states 0 and 3 tail-jump here */
+#define ADDR_STATE_FRAME_COMMON  0x00426650u  /* and then here */
+#define ADDR_STATE0_ENTER        0x004265F0u
+#define ADDR_STATE3_ENTER        0x004266F0u
+#define ADDR_STATE1_LEAVE        0x004263E0u
+#define ADDR_STATE1_ENTER        0x004262E0u
+#define ADDR_STATE1_MENU         0x00426400u
+#define ADDR_STATE1_COMMON       0x00426270u
+#define ADDR_MOVIE_FRAME_STEP    0x00445630u  /* states 0 and 3, per frame */
+#define ADDR_STATE2_ENTER        0x00425300u
+#define ADDR_SUBSTATE22          0x00425C10u
+#define ADDR_SUBSTATE33_ALT      0x00425CD0u
+#define ADDR_EVENT_FLAG_8_TEST   0x00424900u
+#define ADDR_EVENT_FLAG_8_SEND   0x00410820u  /* void(int32, int32) */
+#define AM2_EVENT_FLAG_8         8
 #define ADDR_FRAME_POST          0x0040AFA0u  /* after it, reached by tail jump */
 #define ADDR_STATE0_FRAME        0x004266B0u
 #define ADDR_STATE1_FRAME        0x00426570u
 #define ADDR_STATE3_FRAME        0x00426760u
 #define ADDR_STATE4_FRAME        0x00426790u
-#define ADDR_INTRO_SEEN          0x004FA038u  /* int32; set skips the movie */
 #define ADDR_COMM_OFF_LOBBY      0x3FCu       /* on the comm object */
 #define ADDR_COMM_OFF_SKIP_INTRO 0x3F8u
 #define ADDR_SET_GAME_OVER       0x0042E5A0u  /* void(int32) */

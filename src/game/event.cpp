@@ -21,7 +21,7 @@ typedef void    (__cdecl *am2_event_notify_fn)(int32_t, int32_t, int32_t,
 
 #define orig_event_register  (*(am2_event_register_fn)ADDR_EVENT_REGISTER)
 #define orig_event_clear_all (*(am2_void_fn)ADDR_EVENT_CLEAR_ALL)
-#define orig_take_uid        (*(am2_take_uid_fn)ADDR_TAKE_UID)
+#define orig_take_uid        (*(am2_take_uid_fn)ADDR_SCRIPT_ALLOC_UID)
 #define orig_event_notify    (*(am2_event_notify_fn)ADDR_EVENT_NOTIFY)
 
 #define kScriptConditions (*(AM2_ScriptCond **)AM2_IMAGE(ADDR_SCRIPT_CONDITIONS))

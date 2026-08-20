@@ -26,6 +26,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# What is aliased today. See the ratchet below before changing it.
+MAX_ALIASES = 39
+
 
 def macros():
     text = open(os.path.join(ROOT, "src/inject/orig.h")).read()
@@ -47,6 +50,23 @@ def main():
     if os.environ.get("AM2_SHOW_ALIASES"):
         for v, names in aliases:
             print("  alias 0x%08X: %s" % (v, ", ".join(sorted(names))))
+
+    # A ratchet, not a limit. Counting them and printing the count was not
+    # enough: a session added thirteen without noticing, and in five cases the
+    # name already on the address was the one that knew what the global was --
+    # ADDR_CD_PATH read as "some other base directory", ADDR_OPT_NO_INTRO read
+    # as "the intro was already seen". Every one of those made a comment wrong.
+    #
+    # So growing the number now fails. Renaming is still free, because
+    # replacing a name leaves the count alone; what this stops is a SECOND name
+    # going on beside a first. If a new alias is genuinely wanted, raise this
+    # by hand and say why in the commit.
+    if len(aliases) > MAX_ALIASES:
+        print("  %d aliased addresses, was %d -- a new name went on an address"
+              % (len(aliases), MAX_ALIASES))
+        print("  that already had one. AM2_SHOW_ALIASES=1 lists them; grep")
+        print("  orig.h for the address before naming a global.")
+        rc = 1
 
     # Two patches for one address.
     sites = {}

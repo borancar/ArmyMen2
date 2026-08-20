@@ -182,6 +182,10 @@ void __cdecl FreeMapSurfaces(void);
  * last function in the image with any COM dispatch. */
 void __cdecl DrawMenuCursor(void);
 
+/* 0x00425AF0. The menu overlay, drawn by ten of state 2's thirteen sub-state
+ * arms after whichever painter that arm selects. */
+void __cdecl DrawMenuOverlay(void);
+
 int surface_install(void);
 
 #ifdef __cplusplus

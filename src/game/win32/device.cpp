@@ -32,6 +32,7 @@
 
 #include "device.h"
 #include "report.h"
+#include "../rect.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -318,9 +319,7 @@ void __cdecl AcquireMouse(void)
  * downstream distinguishes "the pointer moved" from "the wheel turned".
  *
  * Reached from PollInput, which is `call PollMouse; jmp PollKeyboard`. The
- * per-event callee 0x00426F40 stays original -- it accumulates the deltas into
- * an absolute cursor and clamps it to the screen, and its only Win32 contact is
- * a GetTickCount. */
+ * per-event callee is UpdateMouseState below. */
 static_assert(DIMOFS_X == 0 && DIMOFS_Y == 4 && DIMOFS_Z == 8, "axis offsets");
 static_assert(DIMOFS_BUTTON0 == 12 && DIMOFS_BUTTON1 == 13
               && DIMOFS_BUTTON2 == 14, "button offsets");
@@ -338,8 +337,73 @@ static_assert(sizeof(DIDEVICEOBJECTDATA) == 16, "DIDEVICEOBJECTDATA");
 #define g_mouseClaimed ((int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED)
 #define g_mouseMoved   (*(int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
 
-typedef void (__cdecl *am2_void_fn)(void);
-#define orig_mouse_event (*(am2_void_fn)ADDR_MOUSE_EVENT)
+#define g_cursorX      (*(int32_t *)(uintptr_t)ADDR_CURSOR_X)
+#define g_cursorY      (*(int32_t *)(uintptr_t)ADDR_CURSOR_Y)
+#define g_cursorPoint  (*(int32_t *)(uintptr_t)ADDR_CURSOR_POINT)
+#define g_screenClip   (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
+
+/* One per button, in the order the button arrays use. */
+typedef struct {
+    int32_t  point;     /* the packed cursor at the moment it went down */
+    uint32_t tick;      /* GetTickCount then */
+} AM2_MousePress;
+
+#define g_mousePress   ((AM2_MousePress *)(uintptr_t)ADDR_MOUSE_PRESS)
+
+typedef int32_t (__cdecl *am2_clamp_fn)(int32_t v, int32_t lo, int32_t hi);
+#define orig_clamp (*(am2_clamp_fn)ADDR_CLAMP)
+
+/* Run after every mouse event -- 0x00426F40, 8 call sites.
+ *
+ * The deltas PollMouse just wrote are relative, and this is what turns them
+ * into a cursor: add, clamp to the screen rectangle, and pack the result into
+ * the dword the rest of the game reads a position from. The clamp is inclusive
+ * of the far edge minus one, so a 640-wide screen clamps to 639.
+ *
+ * Then the press bookkeeping. A button that is BOTH down and changed has just
+ * gone down, and that stamps the position and the tick -- which is what makes
+ * double-click and drag detection possible elsewhere. Only buttons 0 and 1
+ * raise the moved flag; button 2 stamps its press and says nothing.
+ *
+ * The intermediate stores are kept. The original writes the unclamped sum to
+ * the cursor globals before calling the clamp and the clamped value after, and
+ * although nothing can observe the first write, removing it would be a change
+ * to what the function does rather than to how it is written.
+ *
+ * One branch is not reproduced because it cannot be taken: after stamping
+ * button 0 the original tests flags left by a compare it has already branched
+ * on, so the `je` there always falls through. */
+void __cdecl UpdateMouseState(void)
+{
+    uint32_t tick = GetTickCount();
+
+    g_cursorX += g_mouseDX;
+    g_cursorY += g_mouseDY;
+    g_cursorX = orig_clamp(g_cursorX, g_screenClip.left, g_screenClip.right - 1);
+    g_cursorY = orig_clamp(g_cursorY, g_screenClip.top, g_screenClip.bottom - 1);
+
+    ((int16_t *)&g_cursorPoint)[1] = (int16_t)g_cursorY;
+    ((int16_t *)&g_cursorPoint)[0] = (int16_t)g_cursorX;
+
+    int32_t point = g_cursorPoint;
+
+    for (int32_t n = 0; n < 3; n++) {
+        if (!g_mouseButton[n] || !g_mouseChanged[n])
+            continue;
+
+        g_mousePress[n].point = point;
+        g_mousePress[n].tick  = tick;
+        if (n == 0)
+            *(int32_t *)(uintptr_t)ADDR_MOUSE_B0_EXTRA = 0;
+    }
+
+    if (g_mouseChanged[0] || g_mouseChanged[1])
+        g_mouseMoved = 1;
+
+    if (g_mouseDX || g_mouseDY || g_mouseMoved)
+        *(int32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY =
+            *(const int32_t *)(uintptr_t)ADDR_INPUT_CONTEXT;
+}
 
 /* One button event. `changed` is against the previous state rather than a
  * simple "went down", so a release marks it too -- and only a release clears
@@ -408,7 +472,7 @@ void __cdecl PollMouse(void)
             break;
         }
 
-        orig_mouse_event();
+        UpdateMouseState();
     }
 }
 
@@ -521,6 +585,8 @@ int device_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_MOUSE_EVENT, (const void *)UpdateMouseState,
+                        "UpdateMouseState", 8);
     rc |= patch_replace(ADDR_POLL_MOUSE, (const void *)PollMouse,
                         "PollMouse", 0);
     rc |= patch_replace(ADDR_POLL_KEYBOARD, (const void *)PollKeyboard,

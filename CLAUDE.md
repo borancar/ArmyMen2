@@ -353,6 +353,56 @@ over 320 bytes: `CheckBasePath`, `InitTimer`, `ShutdownSubsystems`,
 plus `BuildTrigTables` in `trig.cpp`. One level down stays original -- the
 thirteen teardowns, the five per-state frame handlers, the sprite-set loader.
 
+**A second name for an address you already named is how a misreading survives,
+and this session added thirteen.** `orig.h` had 39 addresses carrying more than
+one `ADDR_` name before today and 49 after. Some of that is renaming done
+properly -- `ADDR_STARTUP_4249C0` becoming `ADDR_RESET_TO_TITLE` once the body
+was read -- but the rest is a new name invented beside an old one that was
+already there, and in five cases the OLD name was the one that knew something:
+
+| address | I called it | it already was | what that changes |
+|---|---|---|---|
+| `0x00512464` | `ADDR_GAME_DIR_ALT` | `ADDR_CD_PATH` | `SetGameDir`'s fallback is the CD |
+| `0x00512588` | `ADDR_GAME_DIR_ALT_OK` | `ADDR_CD_PRESENT` | and it is gated on the CD being in |
+| `0x004FA038` | `ADDR_INTRO_SEEN` | `ADDR_OPT_NO_INTRO` | `StartIntro`'s third test is the switch |
+| `0x004FA02C` | `ADDR_FRAME_ENABLED` | `ADDR_APP_ACTIVE` | `RunFrame` is gated on the foreground |
+| `0x0047894C` | `ADDR_SPRITE_SETS_LOADED` | `ADDR_OPT_DF` | that pair is behind the `-df` switch |
+
+None of it changed behaviour -- the address is the address -- but every one of
+those comments described the mechanism less well than the name already in the
+file did. **Before naming a global, grep `orig.h` for its address.** The one
+that is genuinely unresolved is `0x005125C4`, which was `ADDR_OPT_MUSIC` and
+which `SetGameDir` latches on entering the `avi` directory; one of the two
+readings is wrong and it is not yet established which.
+
+**Everything RunFrame calls is reconstructed too** -- the input poll, the two
+comm bookkeeping steps around the state handler, and all five per-state
+handlers, in `src/game/win32/frame.cpp`. One level further down stays original.
+
+**A jump table's order is not the order its arms are laid out in.** State 2's
+thirteen sub-state arms are nine of one shape -- repaint if the overlay is
+dirty, then `DrawMenuOverlay` -- differing only in which painter they call, so
+they compress to a table. Reading the bodies top to bottom and numbering as you
+go gets four of them wrong, because the linker emitted them 27, 28, 26, 29, 30,
+31, 25. Take the order from the jump table at `0x00426230`, never from the
+addresses.
+
+That table also confirms what this file worked out by probing: arm 34 is index
+12 and calls `0x00425DA0`, the in-mission ESCAPE handler, and ordinary play
+sits in 33. Two independent routes to the same fact.
+
+**States 0 and 3 check the same two flags in opposite orders.** State 0 tests
+"leaving" first and state 3 tests "entering" first, so a state entered and left
+in the same frame runs its entry action in 3 and not in 0. Reproduced rather
+than tidied; it is not obviously deliberate and it is not ours to decide.
+
+**`ADDR_MOUSE_MOVED` was another name from a call site.** `PollMouse` sets it
+on X or Y movement, which is where the name came from -- but `UpdateMouseState`
+also sets it when button 0 or button 1 CHANGES, so it means "the mouse did
+something". The same function has a `je` that can never be taken: it tests
+flags left by a compare it has already branched on. Not reproduced, and the
+comment says why.
+
 **Three of winmain.cpp's `orig_` macros pointed at addresses that were already
 patched.** `orig_init_input`, `orig_init_directdraw` and `orig_report_error`
 resolved to the detour and landed in our own `InitInput`, `InitDirectDraw` and

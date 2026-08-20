@@ -73,6 +73,10 @@ void __cdecl AcquireMouse(void);
  * event queue into the per-poll deltas and the button state. */
 void __cdecl PollMouse(void);
 
+/* 0x00426F40, 8 call sites. Turn the pending relative deltas into a clamped
+ * absolute cursor and stamp any button that has just gone down. */
+void __cdecl UpdateMouseState(void);
+
 /* Original: 0x004272D0, reached from PollInput. Read the keyboard into the
  * double-buffered state array, re-acquiring once if the read fails, mirror the
  * left/right modifier pairs, and run the 250/150 ms auto-repeat. */
