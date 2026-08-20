@@ -924,6 +924,8 @@
  * the original's, so the allocator has to be the same one; see game/crt.h. */
 #define ADDR_CRT_MALLOC          0x004647F8u
 #define ADDR_CRT_REALLOC         0x004646D8u
+#define ADDR_CRT_CHDIR           0x00465ED0u  /* _chdir: SetCurrentDirectoryA
+                                               * then GetCurrentDirectoryA */
 #define ADDR_CRT_FREE            0x004646A9u
 #define ADDR_SCRIPT_DECLARE_VAR  0x0043F7A0u  /* handle(const char *, kind, init) */
 #define ADDR_SCRIPT_FIND_FILE    0x00421890u  /* probes <map><n>.txt via _findfirst */
@@ -1116,7 +1118,20 @@
 #define ADDR_LEVEL_INDEX         0x00511D9Cu  /* int32_t; 0 means "<map>.txt" */
 
 /* LoadLevelScript's world. */
-#define ADDR_SET_DATA_DIR        0x00422DE0u  /* void(const char *subdir) */
+/* Returns int32_t, not void -- 1 if it got there and 0 if it did not. The
+ * declaration here said void for as long as script.cpp was the only caller
+ * that mattered, because that one ignores the answer. */
+#define ADDR_SET_DATA_DIR        0x00422DE0u  /* int32_t(const char *subdir) */
+#define ADDR_GAME_DIR            0x0051235Cu  /* char[], the install directory */
+#define ADDR_GAME_DIR_ALT        0x00512464u  /* char[], tried when the first
+                                               * chdir fails; carries its own
+                                               * trailing separator */
+#define ADDR_GAME_DIR_ALT_OK     0x00512588u  /* int32_t, gates the fallback */
+#define ADDR_IN_AVI_DIR          0x005125C4u  /* int32_t, latched when the
+                                               * subdir entered is the one
+                                               * ADDR_STR_AVI_DIR names */
+#define ADDR_STR_AVI_DIR         0x004852C8u  /* const char **, -> "avi" */
+#define ADDR_STR_PATH_SEP        0x00478984u  /* "\\" */
 #define ADDR_MAP_FOLDER          0x00511AC8u  /* the map's own directory */
 #define ADDR_RULES_DIR_STR       0x00485110u  /* a `char *` to "rules"    */
 #define ADDR_SCORE_LIMIT         0x00515FF0u  /* seeds `gamescorelimit`   */

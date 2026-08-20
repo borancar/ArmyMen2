@@ -35,6 +35,13 @@ extern void  (__cdecl *am2_free)(void *);
  * to point it somewhere else. Defaults to dropping the message. */
 extern void (__cdecl *am2_log)(const char *, ...);
 
+/* The game's own _chdir -- SetCurrentDirectoryA with the CRT's drive-relative
+ * bookkeeping behind it. Same seam again: SetGameDir is the one reconstructed
+ * function that changes the process's directory, and the process it has to
+ * change is the game's, through the CRT the rest of the image is already
+ * using. The offline test points it at the host's. */
+extern int32_t (__cdecl *am2_chdir)(const char *);
+
 /* Point them at the game's own CRT. Called once by the harness, after the
  * image is known to be mapped at its base. */
 void am2_crt_use_game(void);

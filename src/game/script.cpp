@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "crt.h"
+#include "gamedir.h"
 #include "misc.h"
 #include "image.h"
 #include "objscript.h"
@@ -31,7 +32,6 @@ typedef int32_t (__cdecl *am2_parse_action_fn)(AM2_ScriptCtx *ctx,
 
 #define orig_preload_sprite    (*(am2_preload_sprite_fn)ADDR_PRELOAD_SPRITE)
 #define orig_parse_action      (*(am2_parse_action_fn)ADDR_SCRIPT_PARSE_ACTION)
-#define orig_set_data_dir      (*(am2_str_fn)ADDR_SET_DATA_DIR)
 #define orig_declare_rule_vars (*(am2_void_fn)ADDR_DECLARE_RULE_VARS)
 
 int32_t __cdecl IsBlank(uint8_t c)
@@ -2896,7 +2896,7 @@ const AM2_ScriptName *am2_script_name(int32_t i)
  * opens is relative to wherever this last left us. */
 static void ScriptSetDataDir(const char *dir)
 {
-    orig_set_data_dir(dir);
+    SetGameDir(dir);
 }
 
 /* Read one script, with the progress line the comm object's verbose flag asks

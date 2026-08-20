@@ -53,6 +53,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/msgslot.cpp \
             src/game/objflag.cpp \
             src/game/misc.cpp \
+            src/game/gamedir.cpp \
             src/game/script.cpp \
             src/game/objscript.cpp \
             src/game/image.cpp \

@@ -28,6 +28,7 @@
 #include "../game/item.h"
 #include "../game/msgslot.h"
 #include "../game/objflag.h"
+#include "../game/gamedir.h"
 #include "../game/misc.h"
 #include "../game/script.h"
 #include "../game/objscript.h"
@@ -424,6 +425,7 @@ static void install(void)
     msgslot_install();
     objflag_install();
     misc_install();
+    gamedir_install();
     script_install();
     objscript_install();
     objtable_install();
