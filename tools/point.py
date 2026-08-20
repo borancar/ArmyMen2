@@ -1,95 +1,89 @@
 #!/usr/bin/env python3
-"""Move the game's mouse cursor to an absolute screen position.
+"""Put the game's mouse cursor at an absolute screen position, and read it back.
 
-The control socket speaks relative deltas, because that is what the game reads:
-it takes buffered DirectInput data, not absolute cursor state. Wine applies
-mouse acceleration on the way through, and the gain is not constant -- measured
-at roughly 1.75x for a 100-pixel step and 2.0x for a 300-pixel one -- so a
-single computed delta overshoots. Rather than model the curve, close the loop:
-move, look at where the cursor actually is, correct, repeat. Converges in a
-handful of steps and does not care what the curve looks like.
+    tools/point.py X Y [--port N]        place it there
+    tools/point.py X Y --click           place it there, then left-click
+    tools/point.py --where               print where it is
 
-Finding the cursor: it is a saturated orange arrow, and the exact palette was
-sampled from a frame with the cursor pinned to the corner rather than guessed --
-(239,107,2), (250,126,2), (250,146,2), (254,166,2). The threshold has to be
-tight on red and blue, because a loose one (R>180, B<90) also matches the dirt
-in the title-screen scenery at (181,156,88) and silently reports rubble as the
-pointer.
+This is now a thin wrapper over the control socket's `cursor` command, which
+writes ADDR_CURSOR_X, ADDR_CURSOR_Y and the packed ADDR_CURSOR_POINT that 32
+sites in the image read to decide what the pointer is over. One round trip,
+exact, and it answers with where the cursor ended up.
 
-    tools/point.py X Y [--port N]        move there
-    tools/point.py X Y --click           move there, then left-click
+What it used to be is worth remembering, because the reason it could stop being
+that is the whole point. The game reads BUFFERED DirectInput rather than
+absolute cursor state, so the socket could only offer relative deltas; Wine
+applies non-linear acceleration on top (~1.75x for a 100-pixel step, ~2.0x for
+a 300-pixel one), so a single computed delta overshot. The answer was to close
+the loop on a screenshot: move, find the cursor by colour, correct, repeat. It
+worked, and it carried a palette sampled from a real frame because a loose
+threshold matched title-screen rubble and reported that as the pointer.
+
+Two things it could never do, both of which cost time:
+
+  - Where the cursor is not DRAWN there is nothing to find. The Boot Camp
+    briefing screen and the full-screen instruction sign both defeated it, and
+    the failure was silent -- every click went nowhere and the counters simply
+    did not move.
+  - Two runs of the same script landed in slightly different places, because
+    the acceleration made the correction sequence timing-dependent.
+
+Reconstructing UpdateMouseState (0x00426F40) is what removed the need for any
+of it: the absolute cursor those deltas were feeding is a global, and the
+globals are the GAME's, so this works unchanged under AM2_NOPATCH=1 and both
+halves of an A/B can be driven with identical coordinates.
+
+It does not exercise PollMouse or UpdateMouseState -- nothing is read from the
+device. When the input path itself is what is under test, use
+`drive.sh ctl "mouse move DX DY"`, which is still the honest way in.
 """
 import argparse
 import os
 import subprocess
 import sys
-import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def ctl(port, *args):
-    subprocess.run([os.path.join(REPO, "tools", "am2ctl.py"), "--port", str(port)]
-                   + [str(a) for a in args],
-                   capture_output=True)
-
-
-def cursor(display, tmp):
-    subprocess.run(["import", "-display", display, "-window", "root", tmp],
-                   capture_output=True)
-    from PIL import Image
-    import numpy as np
-    a = np.array(Image.open(tmp).convert("RGB")).astype(int)
-    m = ((a[:, :, 0] >= 230) & (a[:, :, 1] >= 90) &
-         (a[:, :, 1] <= 180) & (a[:, :, 2] <= 20))
-    ys, xs = np.nonzero(m)
-    if len(xs) < 8:          # a real arrow is ~60-80 pixels; fewer is noise
-        return None
-    return int(xs.min()), int(ys.min())
-
-
-def point(port, display, tx, ty, tmp, tries=8):
-    # Pin to the top-left first so the first correction starts from a known
-    # place even if the cursor was parked off in a corner.
-    ctl(port, "mouse", "move", -3000, -3000)
-    time.sleep(0.4)
-    gain = 1.8
-    for _ in range(tries):
-        pos = cursor(display, tmp)
-        if pos is None:
-            return None
-        cx, cy = pos
-        ex, ey = tx - cx, ty - cy
-        if abs(ex) <= 2 and abs(ey) <= 2:
-            return cx, cy
-        ctl(port, "mouse", "move", int(round(ex / gain)), int(round(ey / gain)))
-        time.sleep(0.4)
-        # After the first real step the gain is measurable; use it.
-        npos = cursor(display, tmp)
-        if npos and (npos[0] - cx) != 0 and abs(ex) > 20:
-            g = (npos[0] - cx) / (ex / gain)
-            if 0.5 < g < 4.0:
-                gain = g
-    return cursor(display, tmp)
+def ctl(port, command):
+    out = subprocess.run(
+        [os.path.join(REPO, "tools", "am2ctl.py"), "--port", str(port), command],
+        capture_output=True, text=True)
+    return (out.stdout or "").strip()
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("x", type=int)
-    p.add_argument("y", type=int)
-    p.add_argument("--port", type=int, default=int(os.environ.get("AM2_CTLPORT", 31436)))
-    p.add_argument("--display", default=os.environ.get("AM2_DISPLAY", ":99"))
-    p.add_argument("--click", action="store_true")
-    a = p.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("x", nargs="?", type=int)
+    ap.add_argument("y", nargs="?", type=int)
+    ap.add_argument("--click", action="store_true")
+    # Same default and same env var as before, so ab.sh's calls are unchanged.
+    ap.add_argument("--port", type=int,
+                    default=int(os.environ.get("AM2_CTLPORT", 31436)))
+    ap.add_argument("--where", action="store_true", help="just report it")
+    # Accepted and ignored: the screenshot path is gone, but ab.sh and any
+    # scripted run may still pass it.
+    ap.add_argument("--display", default=os.environ.get("AM2_DISPLAY", ":99"))
+    args = ap.parse_args()
 
-    tmp = os.path.join(REPO, "build", f"cursor-{a.port}.png")
-    got = point(a.port, a.display, a.x, a.y, tmp)
-    print(f"target ({a.x},{a.y}) -> cursor {got}")
-    if got is None:
+    if args.where or args.x is None:
+        print(ctl(args.port, "cursor"))
+        return 0
+
+    reply = ctl(args.port, "cursor %d %d" % (args.x, args.y))
+    if not reply.startswith("ok "):
+        print("cursor failed: %s" % reply, file=sys.stderr)
         return 1
-    if a.click:
-        ctl(a.port, "mouse", "left", "tap")
-        print("clicked")
+
+    # The socket answers with where it ended up, which differs from what was
+    # asked for only when the clamp bit -- so this is a real check, not an echo.
+    got = tuple(int(v) for v in reply.split()[2:4])
+    if got != (args.x, args.y):
+        print("clamped to %d,%d (screen edge)" % got, file=sys.stderr)
+
+    if args.click:
+        ctl(args.port, "mouse left tap")
+    print("%d %d" % got)
     return 0
 
 

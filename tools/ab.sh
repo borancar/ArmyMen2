@@ -198,14 +198,16 @@ play() {
     fi
 
     if [ "$cfg" = mission ]; then
-        # MESSAGE FROM HQ, whose OK point.py can find.
+        # MESSAGE FROM HQ.
         "$REPO/tools/point.py" 476 224 --click >/dev/null 2>&1
         sleep 6
-        # The full-screen instruction sign behind it. Any click clears it, but
-        # point.py CANNOT be used here: it locates the pointer by colour on a
-        # screenshot and this screen defeats it, so every attempt silently did
-        # nothing. A raw button press through the socket needs no cursor at all,
-        # and position does not matter when any click will do.
+        # The full-screen instruction sign behind it; any click clears it, so
+        # position is irrelevant and a raw button press is the honest way to say
+        # that. It used to be the only way -- point.py located the pointer by
+        # colour on a screenshot, this screen draws no pointer, and every
+        # attempt silently did nothing. That is fixed: point.py sets the cursor
+        # globals directly now and works where nothing is drawn. Left as a bare
+        # tap because "anywhere" is still what this click means.
         drive ctl "mouse left tap" >/dev/null 2>&1
         sleep 6
         # Now the mission is live and the view can scroll, which is what brings

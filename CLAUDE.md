@@ -912,14 +912,40 @@ normalises jump targets hides the epilogue. Getting this wrong is what made
 
 ## Driving input
 
-The control socket speaks **relative** deltas, because that is what the game
-reads — it takes buffered DirectInput `GetDeviceData`, not `GetDeviceState`.
-Wine's mouse acceleration is non-linear on top of that (~1.75× for a 100-pixel
-step, ~2.0× for a 300-pixel one), so a single computed delta overshoots. Use
-`tools/point.py`, which closes the loop on a screenshot instead of modelling the
-curve. Its cursor threshold was sampled from a frame with the cursor pinned to
-the corner, not guessed: a loose one also matches title-screen dirt at
-(181,156,88) and will cheerfully report rubble as the pointer.
+**`drive.sh ctl "cursor X Y"` places the pointer, absolutely, in one round
+trip.** Reconstructing `UpdateMouseState` is what made that possible: the
+absolute cursor DirectInput's deltas were feeding is a global, and `cursor`
+writes the three the image reads — `ADDR_CURSOR_X`, `ADDR_CURSOR_Y` and the
+packed `ADDR_CURSOR_POINT` that 32 sites test the pointer against. With no
+argument it reports where the cursor is. `tools/point.py` is a thin wrapper
+over it and keeps its old command line.
+
+**The globals are the GAME's, so this works unchanged under `AM2_NOPATCH=1`** —
+verified by driving the same click both ways and landing on the same screen.
+That is what makes it usable for an A/B: both halves take identical
+coordinates, where a relative delta depended on acceleration and arrived
+somewhere slightly different each run.
+
+What it replaces, and why the replacement matters rather than being a tidy-up.
+The game reads BUFFERED DirectInput `GetDeviceData`, not `GetDeviceState`, so
+the socket could only offer relative motion; Wine's acceleration is non-linear
+on top (~1.75× for a 100-pixel step, ~2.0× for a 300-pixel one), so a computed
+delta overshot. `point.py` closed the loop on a screenshot, finding the pointer
+by colour, with a threshold sampled from a real frame because a loose one
+matched title-screen dirt at (181,156,88) and reported rubble as the pointer.
+
+**It could not work at all where the cursor is not drawn, and failed
+silently.** The Boot Camp briefing screen and the full-screen instruction sign
+both defeated it — every click went nowhere and the counters simply never
+moved, which reads exactly like a broken reconstruction. That is the failure
+this removes. Driving title → BOOT CAMP → `RETURN` → both dialogs → live
+mission is now four socket commands, and `Update3DAudioVolumes` reads 16,323
+at the end of it.
+
+**`mouse move DX DY` is still the honest way in when the input path is what is
+under test.** `cursor` writes the globals and reads nothing from the device, so
+it exercises neither `PollMouse` nor `UpdateMouseState`. `ab.sh mission` scrolls
+with relative motion for exactly that reason.
 
 ## Build and install hazards
 

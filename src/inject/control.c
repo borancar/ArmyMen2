@@ -197,6 +197,63 @@ static void handle_line(SOCKET s, char *line)
         reply(s, "ok key %s(%02x) %s", argv[1], dik, argv[2]);
         return;
     }
+    /* `cursor` reads the pointer, `cursor <x> <y>` puts it somewhere.
+     *
+     * This exists because the reconstruction owns the mouse state now.
+     * UpdateMouseState is what turns DirectInput's relative deltas into the
+     * absolute cursor at ADDR_CURSOR_POINT, which 32 sites in the image read
+     * to decide what the pointer is over -- so writing that trio IS placing
+     * the pointer, and no delta, no acceleration curve and no screenshot are
+     * involved.
+     *
+     * What it replaces was genuinely hard. The game reads BUFFERED DirectInput,
+     * so the socket could only offer relative motion; Wine's acceleration is
+     * non-linear on top of that, so a computed delta overshot; and the fix was
+     * tools/point.py closing the loop on a screenshot by finding the pointer by
+     * colour. That could not work at all where the cursor is not drawn -- the
+     * Boot Camp instruction sign and the briefing screen both defeated it.
+     *
+     * These are the GAME's globals, not ours, so this works identically with
+     * the reconstruction installed and under AM2_NOPATCH=1. That is what makes
+     * it usable for driving both halves of an A/B: the same two numbers land in
+     * the same two places either way, where a relative delta depended on
+     * acceleration and arrived somewhere slightly different each run.
+     *
+     * It does NOT exercise PollMouse or UpdateMouseState -- nothing is read
+     * from the device. Use `mouse move` when the input path itself is what is
+     * under test. */
+    if (!strcmp(argv[0], "cursor")) {
+        int32_t       *cx   = (int32_t *)(uintptr_t)ADDR_CURSOR_X;
+        int32_t       *cy   = (int32_t *)(uintptr_t)ADDR_CURSOR_Y;
+        int16_t       *pt   = (int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
+        const int32_t *clip = (const int32_t *)(uintptr_t)ADDR_SCREEN_CLIP;
+
+        if (argc >= 3) {
+            int32_t x = atoi(argv[1]);
+            int32_t y = atoi(argv[2]);
+
+            /* The same clamp UpdateMouseState applies, so a poke cannot put
+             * the pointer anywhere a real move could not. */
+            if (x < clip[0])
+                x = clip[0];
+            if (x > clip[2] - 1)
+                x = clip[2] - 1;
+            if (y < clip[1])
+                y = clip[1];
+            if (y > clip[3] - 1)
+                y = clip[3] - 1;
+
+            *cx = x;
+            *cy = y;
+            pt[0] = (int16_t)x;
+            pt[1] = (int16_t)y;
+            /* What a real move sets, so hover and repaint behave. PollMouse
+             * clears it again next frame, exactly as after a real one. */
+            *(int32_t *)(uintptr_t)ADDR_MOUSE_MOVED = 1;
+        }
+        reply(s, "ok cursor %d %d", (int)*cx, (int)*cy);
+        return;
+    }
     if (!strcmp(argv[0], "mouse") && argc >= 2) {
         if (!strcmp(argv[1], "move") && argc >= 4) {
             input_mouse_move(atoi(argv[2]), atoi(argv[3]),
