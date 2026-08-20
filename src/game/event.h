@@ -80,6 +80,24 @@ void __cdecl EvtSetWord60(uint32_t uid, int32_t value);
  * The emptiness test reads 16 bits at +0xB4 and the store writes 32. Kept. */
 void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode);
 
+/* Two event sound triggers, both thin wrappers over PlayDynamicSound.
+ *
+ * EvtPlaySoundAt (0x0041F680) takes a packed AM2_Point and splits it into the
+ * x and y parameters. The original does that with an UNALIGNED dword read at
+ * &point + 2, taking y without shifting and carrying the next argument's low
+ * half in the top of the register. That is safe, and it is worth saying why
+ * rather than copying the trick: PlayDynamicSound truncates both to int16_t
+ * on its first two lines, so the rubbish above y is discarded before anything
+ * reads it. `point >> 16` is the same function.
+ *
+ * EvtPlaySoundOn (0x0041F6B0) passes x and y as zero and an owner uid instead.
+ * PlayDynamicSound then looks the object up and takes the position from +0x12
+ * and +0x14, so the sound follows the unit rather than a fixed spot. */
+void __cdecl EvtPlaySoundAt(const char *name, uint32_t point, int32_t slot,
+                            int32_t priority, int32_t loop);
+void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
+                            int32_t priority, int32_t loop);
+
 int event_install(void);
 
 #ifdef __cplusplus

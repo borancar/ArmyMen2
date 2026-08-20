@@ -305,6 +305,28 @@ void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode)
     *(int32_t *)(obj + 0xB4) = *(const int32_t *)(obj + 0x12);
 }
 
+/* PlayDynamicSound is reconstructed, in win32/audio.cpp with the rest of the
+ * sound code. Declared here rather than by including that header because
+ * event.cpp is on the flat side of the split and must name no Win32 or COM
+ * type -- the same reason script.cpp declares PreloadSprite itself. */
+extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
+                                         int32_t unused, int32_t x, int32_t y,
+                                         int32_t slot, int32_t priority,
+                                         uint32_t owner);
+
+void __cdecl EvtPlaySoundAt(const char *name, uint32_t point, int32_t slot,
+                            int32_t priority, int32_t loop)
+{
+    PlayDynamicSound(name, loop, 0, (int32_t)(point & 0xFFFFu),
+                     (int32_t)(point >> 16), slot, priority, 0);
+}
+
+void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
+                            int32_t priority, int32_t loop)
+{
+    PlayDynamicSound(name, loop, 0, 0, 0, slot, priority, owner);
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -335,6 +357,10 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_EVT_PLAY_SOUND_AT, (const void *)EvtPlaySoundAt,
+                        "EvtPlaySoundAt", 5);
+    rc |= patch_replace(ADDR_EVT_PLAY_SOUND_ON, (const void *)EvtPlaySoundOn,
+                        "EvtPlaySoundOn", 5);
     rc |= patch_replace(ADDR_EVT_SET_WORD60, (const void *)EvtSetWord60,
                         "EvtSetWord60", 2);
     rc |= patch_replace(ADDR_EVT_SET_AI_MODE, (const void *)EvtSetAiMode,

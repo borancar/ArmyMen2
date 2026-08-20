@@ -395,3 +395,13 @@ extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
 {
     return 0;
 }
+
+/* event.cpp's two sound triggers reach PlayDynamicSound, which is in the win32
+ * half with the rest of the sound code. Same reasoning as PreloadSprite above:
+ * nothing here plays anything, and pulling win32/audio.cpp in would bring
+ * DirectSound with it. */
+extern "C" void __cdecl PlayDynamicSound(const char *, int32_t, int32_t,
+                                         int32_t, int32_t, int32_t, int32_t,
+                                         uint32_t)
+{
+}
