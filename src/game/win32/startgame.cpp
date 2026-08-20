@@ -26,6 +26,7 @@
 #include "startgame.h"
 #include "cdcheck.h"
 #include "dplay.h"
+#include "../gamedir.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -158,12 +159,10 @@ void __cdecl StartSelectedGame(void)
  * can raise anything for it to have caught.
  */
 
-typedef int32_t (__cdecl *am2_path_exists_fn)(const char *);
 typedef void *(__cdecl *am2_operator_new_fn)(size_t);
 typedef void (__attribute__((thiscall)) *am2_session_ctor_fn)(void *, int32_t);
 typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *);
 
-#define orig_path_exists   (*(am2_path_exists_fn)ADDR_DATA_PATH_EXISTS)
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
 #define orig_session_ctor  (*(am2_session_ctor_fn)ADDR_SESSION_CTOR)
 #define orig_enum_sessions  (*(am2_enum_sessions_fn)ADDR_COMM_ENUM_SESSIONS)
@@ -184,7 +183,7 @@ void __cdecl StartMultiplayerGame(void)
     /* A compact install leaves the multiplayer maps on the CD. This one is a
      * real check with a real conditional -- unlike the five copy-protection
      * checks, it was not patched, so this dialog can appear. */
-    if (!orig_path_exists((const char *)(uintptr_t)ADDR_MP_DATA_PROBE)) {
+    if (!SetGameDir((const char *)(uintptr_t)ADDR_MP_DATA_PROBE)) {
         MessageBoxA(GetActiveWindow(),
                     (const char *)(uintptr_t)ADDR_DATA_MISSING_TEXT,
                     (const char *)(uintptr_t)ADDR_DATA_MISSING_CAPTION,

@@ -473,8 +473,8 @@ typedef uint32_t (__cdecl *am2_get_flags_fn)(void);
 typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
 #define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
-#define orig_get_flags   (*(am2_get_flags_fn)ADDR_GET_EVENT_FLAGS)
-#define orig_set_flags   (*(am2_set_flags_fn)ADDR_SET_EVENT_FLAGS)
+#define orig_get_flags   (*(am2_get_flags_fn)ADDR_GET_PAUSE_FLAGS)
+#define orig_set_flags   (*(am2_set_flags_fn)ADDR_PAUSE_GAME)
 #define g_hwnd           (*(HWND *)(uintptr_t)ADDR_HWND)
 
 /* 0x046C -- WndProc forwards this one to the original. */
@@ -728,7 +728,7 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
 typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
 typedef void (__cdecl *am2_clear_flags_fn)(uint32_t bits);
 #define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
-#define orig_clear_event_flags (*(am2_clear_flags_fn)ADDR_CLEAR_EVENT_FLAGS)
+#define orig_clear_event_flags (*(am2_clear_flags_fn)ADDR_UNPAUSE_GAME)
 #define g_defaultOwnerSlot     (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_commUnknown4F48E0    (*(int32_t *)(uintptr_t)ADDR_COMM_UNKNOWN_4F48E0)
 

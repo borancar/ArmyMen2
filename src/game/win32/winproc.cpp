@@ -141,7 +141,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
  * five need a live DirectPlay session with a second player.
  */
 #define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_EVENT_FLAGS)
+#define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
 #define g_aiControlled (*(int32_t *)(uintptr_t)ADDR_AI_CONTROLLED)
 /* Becoming the host is written into the same global that says whether
  * this is a multiplayer session at all -- see ADDR_MP_SESSION. */

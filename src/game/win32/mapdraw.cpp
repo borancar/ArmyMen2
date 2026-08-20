@@ -21,6 +21,7 @@
 
 #include "mapdraw.h"
 #include "surface.h"
+#include "../gamedir.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -251,14 +252,12 @@ static_assert(sizeof(DDSURFACEDESC) == 0x6C, "the descriptor the original sizes"
 
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 typedef void *(__cdecl *am2_read_dib_fn)(am2_FILE *fp, uint32_t *header);
-typedef int32_t (__cdecl *am2_data_path_exists_fn)(const char *path);
 typedef uint32_t (__cdecl *am2_colour_of_fn)(uint32_t entry);
 typedef uint8_t (__cdecl *am2_match_colour_fn)(const void *palette,
                                                uint32_t colour, uint32_t from);
 
 #define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 #define orig_read_dib      (*(am2_read_dib_fn)ADDR_READ_DIB_CHUNK)
-#define orig_path_exists   (*(am2_data_path_exists_fn)ADDR_DATA_PATH_EXISTS)
 #define orig_colour_of     (*(am2_colour_of_fn)ADDR_COLOUR_OF_ENTRY)
 #define orig_match_colour  (*(am2_match_colour_fn)ADDR_MATCH_COLOUR)
 
@@ -284,9 +283,11 @@ void __cdecl RestoreTileSet(void)
     uint32_t   magic, formSize, chunkId, chunkSize;
     int32_t    offset, i;
 
-    /* The answer is discarded -- the call is kept because it is the original's
-     * and because it resolves the data path as a side effect. */
-    orig_path_exists(g_tilesetPath);
+    /* The answer is discarded, and the call is not optional: SetGameDir
+     * CHDIRS, and the fopen below opens a bare filename that only resolves
+     * because of it. It went in as `orig_path_exists`, which made the chdir
+     * look like a side effect rather than the reason it is here. */
+    SetGameDir(g_tilesetPath);
     orig_sprintf(path, (const char *)(uintptr_t)ADDR_FMT_ATL, g_tilesetName);
 
     fp = orig_fopen(path, (const char *)(uintptr_t)ADDR_MODE_RB);

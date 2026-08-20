@@ -25,6 +25,13 @@
 extern "C" {
 #endif
 
+/* 0x00426840, 0x004267C0, 0x00426800. The pause mask and the two functions
+ * that move it, both named from their own log lines. Each bit is a reason the
+ * game is paused; the frame chain checks the mask before doing work. */
+uint32_t __cdecl GetPauseFlags(void);
+void     __cdecl PauseGame(uint32_t bits);
+void     __cdecl UnPauseGame(uint32_t bits);
+
 void __cdecl PollInput(void);
 void __cdecl FramePre(void);
 void __cdecl FramePost(void);

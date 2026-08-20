@@ -26,6 +26,15 @@ extern "C" {
  * parsed -- which is why it runs after the parse and not before. */
 void __cdecl DeclareRuleVars(void);
 
+/* 0x0041EE70. Add one handler for the (key0, key1) pair in `bucket`, making
+ * the entry if this is the first. `owns` makes the teardown free `arg` too.
+ * A key0 of AM2_EVENT_NO_KEY registers nothing. */
+void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
+                           const void *fn, void *arg, int32_t owns);
+
+/* 0x004223D0. Empty all nine buckets. */
+void __cdecl EventClearAll(void);
+
 int event_install(void);
 
 #ifdef __cplusplus

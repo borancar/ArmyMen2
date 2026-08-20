@@ -20,7 +20,6 @@ typedef int32_t (__cdecl *am2_int_fn)(void);
 typedef int32_t (__cdecl *am2_list_fn)(void *list);
 
 #define call0(a)  (((am2_void_fn)(uintptr_t)(a))())
-#define orig_event_flags   (*(am2_int_fn)ADDR_GET_EVENT_FLAGS)
 #define orig_msg_list_free (*(am2_list_fn)ADDR_MSG_LIST_FREE)
 
 #define g_comm         (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
@@ -28,6 +27,40 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 #define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
 #define g_subState     (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+
+/* ---- the pause mask ----------------------------------------------------
+ *
+ * 0x005122FC is one bit per reason the game is paused, and the two functions
+ * that move it name themselves in their own log lines. That is worth knowing
+ * where it is READ: the frame chain's `if (!GetPauseFlags())` tests below are
+ * "if the game is not paused", not a check on some event queue, which is what
+ * the names they went in under suggested.
+ *
+ * Both log only when the comm object's verbose flag is set, and both re-read
+ * the global afterwards to log the value that landed rather than the one they
+ * computed -- the same thing here, but it is what the original does. */
+uint32_t __cdecl GetPauseFlags(void)
+{
+    return *(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
+}
+
+void __cdecl PauseGame(uint32_t bits)
+{
+    uint32_t *flags = (uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
+
+    *flags |= bits;
+    if (*(const int32_t *)(g_comm + AM2_COMM_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_PAUSE_GAME, *flags, bits);
+}
+
+void __cdecl UnPauseGame(uint32_t bits)
+{
+    uint32_t *flags = (uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
+
+    *flags &= ~bits;
+    if (*(const int32_t *)(g_comm + AM2_COMM_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_UNPAUSE_GAME, *flags, bits);
+}
 
 /* Every comm step in the pre and post is behind the same field. */
 static int32_t CommActive(void)
@@ -48,7 +81,7 @@ void __cdecl PollInput(void)
  * network game, unlike the drain above it. */
 void __cdecl FramePre(void)
 {
-    if (CommActive() && !orig_event_flags())
+    if (CommActive() && !GetPauseFlags())
         call0(ADDR_COMM_DRAIN_MSGS);
 
     call0(ADDR_COMM_FRAME_PRE_A);
@@ -62,7 +95,7 @@ void __cdecl FramePre(void)
  * pool and it hands off to the "COMM ERROR: NO BUFFERS" path by tail jump. */
 void __cdecl FramePost(void)
 {
-    if (CommActive() && !orig_event_flags())
+    if (CommActive() && !GetPauseFlags())
         ((am2_i32_fn)(uintptr_t)ADDR_COMM_FRAME_POST_A)(0);
 
     if (!CommActive())
@@ -126,7 +159,7 @@ void __cdecl State1Frame(void)
         call0(ADDR_STATE1_MENU);
     }
 
-    if (!orig_event_flags()) {
+    if (!GetPauseFlags()) {
         SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
 
         void *obj = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
@@ -189,7 +222,7 @@ void __cdecl State2Frame(void)
             *once = 0;
             return;
         }
-        skipDispatch = orig_event_flags() != 0;
+        skipDispatch = GetPauseFlags() != 0;
     }
 
     if (skipDispatch)
@@ -212,7 +245,7 @@ void __cdecl State2Frame(void)
         DrawMenuOverlay();
     } else if (arm == 11) {
         /* 33 -- ordinary play, and the arm Boot Camp sits in the whole time. */
-        if (orig_event_flags())
+        if (GetPauseFlags())
             call0(ADDR_SUBSTATE33_ALT);
         else
             call0(ADDR_TAKE_MENU_REQUEST);
@@ -220,9 +253,9 @@ void __cdecl State2Frame(void)
         call0(ADDR_SUBSTATE34_ESCAPE);
     }
 
-    if ((orig_event_flags() & AM2_EVENT_FLAG_8)
+    if ((GetPauseFlags() & AM2_EVENT_FLAG_8)
         && ((am2_int_fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)()) {
-        ((am2_i32_fn)(uintptr_t)ADDR_CLEAR_EVENT_FLAGS)(AM2_EVENT_FLAG_8);
+        UnPauseGame(AM2_EVENT_FLAG_8);
         ((am2_i32x2_fn)(uintptr_t)ADDR_EVENT_FLAG_8_SEND)(0, AM2_EVENT_FLAG_8);
     }
 }
@@ -277,5 +310,11 @@ int frame_install(void)
                         "State3Frame", 1);
     rc |= patch_replace(ADDR_STATE4_FRAME, (const void *)State4Frame,
                         "State4Frame", 1);
+    rc |= patch_replace(ADDR_GET_PAUSE_FLAGS, (const void *)GetPauseFlags,
+                        "GetPauseFlags", 13);
+    rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
+                        "PauseGame", 8);
+    rc |= patch_replace(ADDR_UNPAUSE_GAME, (const void *)UnPauseGame,
+                        "UnPauseGame", 19);
     return rc;
 }

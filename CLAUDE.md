@@ -375,6 +375,41 @@ that is genuinely unresolved is `0x005125C4`, which was `ADDR_OPT_MUSIC` and
 which `SetGameDir` latches on entering the `avi` directory; one of the two
 readings is wrong and it is not yet established which.
 
+**The "event flags" are the pause mask, and both functions that move it say
+so themselves.** `0x004267C0` logs `"PauseGame: %x (set: %x)"` and `0x00426800`
+logs `"UnPauseGame: %x (reset: %x)"`, so `0x005122FC` is one bit per reason the
+game is paused. That matters where it is READ rather than where it is written:
+every `if (!GetPauseFlags())` in the frame chain is "if the game is not
+paused", which under the old names read as a check on some event queue.
+`GetPauseFlags` is called 767,153 times in a Boot Camp run and the pair fires
+once each.
+
+**The registration table has NINE buckets, and the teardown's loop bound is
+what says so** -- it walks `0x005101F0` up to `ADDR_SCRIPT_CONDITIONS`, which
+is the next global. This file said 1024, invented. A bucket is a chain of
+entries keyed on a PAIR, each entry a chain of handlers, and the sixth argument
+to a registration decides whether the teardown frees the handler's argument
+too. `DeclareRuleVars` passes 0, so the `if` records it registers are not freed
+by the table pointing at them.
+
+**Reusing an entry for a repeated key pair is load-bearing**, which a mutation
+settles: making the lookup always miss, so every registration makes its own
+entry, puts `bootcamp` at 79,695 differing pixels against a budget of 500.
+Events in a shipped mission really do share a key and need the second handler
+on one entry.
+
+**The duplicate-patch check earned its keep a second time.** `TakeUid` was
+about to be a second reconstruction of `AllocUid`, which `script.cpp` had
+already patched at the same address -- the `ScriptCompare` mistake exactly.
+`tools/checkpatches.py` failed the build before it could be committed.
+
+**And the alias ratchet caught its author.** Naming `0x004267C0`
+`ADDR_PAUSE_GAME` collided with the `ADDR_SET_EVENT_FLAGS` already on it: the
+very rule added above -- grep the address first -- ignored within the hour. It
+failed the check rather than landing. Three modules were also calling
+`SetGameDir` under `orig_path_exists`, which made a chdir look like an
+existence test; that alias is gone too and the ratchet is 38.
+
 **Everything RunFrame calls is reconstructed too** -- the input poll, the two
 comm bookkeeping steps around the state handler, and all five per-state
 handlers, in `src/game/win32/frame.cpp`. One level further down stays original.

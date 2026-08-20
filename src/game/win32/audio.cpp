@@ -20,6 +20,7 @@
 
 #include <stdlib.h>
 #include "wavefile.h"
+#include "../gamedir.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -36,7 +37,7 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 #define g_looping       (*(int32_t *)(uintptr_t)ADDR_AUDIO_LOOPING)
 #define g_hmmio         (*(HMMIO *)(uintptr_t)ADDR_AUDIO_HMMIO)
 #define g_waveFormat    (*(WAVEFORMATEX **)(uintptr_t)ADDR_AUDIO_WAVEFORMAT)
-#define g_pathArg       (*(void **)(uintptr_t)ADDR_AUDIO_PATH_ARG)
+#define g_pathArg       (*(const char **)(uintptr_t)ADDR_AUDIO_PATH_ARG)
 #define g_hWnd          (*(HWND *)(uintptr_t)ADDR_HWND)
 
 /* The timer resolution is stored multiplied by four. */
@@ -44,8 +45,6 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 #define AUDIO_TIMER_RES    0x0A
 #define AUDIO_DRAIN_MS     0x12C   /* 300ms between tries */
 
-typedef int32_t (__cdecl *am2_audio_check_fn)(void *arg);
-#define orig_check_path    (*(am2_audio_check_fn)ADDR_DATA_PATH_EXISTS)
 
 void __cdecl StopAudioStream(void)
 {
@@ -84,7 +83,7 @@ void __cdecl StartAudioStream(void *track, int32_t which)
 
     StopAudioStream();
 
-    if (!orig_check_path(g_pathArg))
+    if (!SetGameDir(g_pathArg))
         return;
 
     OpenAudioStream((const char *)track);
@@ -949,7 +948,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     }
 
     /* Probed and the answer discarded, as in InitWaveSounds. */
-    orig_check_path((void *)(uintptr_t)ADDR_VOS_DIR);
+    SetGameDir((const char *)(uintptr_t)ADDR_VOS_DIR);
 
     if (!rec) {
         orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_DATA);
@@ -1483,7 +1482,7 @@ int32_t __cdecl InitWaveSounds(void)
     int32_t i;
 
     /* The directory is probed and the answer thrown away, exactly as written. */
-    orig_check_path(*(void **)(uintptr_t)ADDR_WAVE_DIR);
+    SetGameDir(*(const char **)(uintptr_t)ADDR_WAVE_DIR);
 
     for (i = 0; i < (int32_t)WAVE_COUNT; i++) {
         uint8_t *slot = g_soundSlots + i * SOUND_SLOT_STRIDE;

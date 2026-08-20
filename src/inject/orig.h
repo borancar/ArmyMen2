@@ -427,7 +427,15 @@
 #define COMM_OFF_SEND_BUF        0x3E8u   /* game heap */
 #define COMM_OFF_RECV_BUF        0x3F0u   /* game heap */
 #define ADDR_REMOVE_PLAYER       0x004029B0u  /* void(uint32 id), 7 callers */
-#define ADDR_CLEAR_EVENT_FLAGS   0x00426800u  /* void(uint32 bits); ANDs them out */
+/* The pause mask and its pair of accessors, and all three name themselves:
+ * 0x004267C0 logs "PauseGame: %x (set: %x)" and 0x00426800 logs
+ * "UnPauseGame: %x (reset: %x)". They went in as event flags, which is what
+ * they look like where the frame chain tests them -- but the tests read "is
+ * the game paused", and each bit is a reason it is. */
+#define ADDR_PAUSE_GAME          0x004267C0u  /* void(uint32 bits); ORs in */
+#define ADDR_UNPAUSE_GAME        0x00426800u  /* void(uint32 bits); ANDs out */
+#define ADDR_STR_PAUSE_GAME      0x00485250u  /* "PauseGame: %x (set: %x)\n" */
+#define ADDR_STR_UNPAUSE_GAME    0x0048526Cu  /* "UnPauseGame: %x (reset: %x)\n" */
 #define COMM_DROP_EVENT_MASK     0x1E78F0u    /* what the teardown clears */
 #define ADDR_STR_RELEASING_COMM  0x00475434u  /* "Releasing Comm Connection \n" */
 #define ADDR_COMM_UNKNOWN_4F48E0 0x004F48E0u  /* cleared with the connection */
@@ -535,7 +543,7 @@
 #define ADDR_SPRITE_DROP_NAMED   0x00457820u  /* void(int32, const void *), 128 bytes */
 
 #define ADDR_AI_CONTROLLED       0x00476FB0u  /* int32_t, set by ADDR_SET_AI_CONTROL */
-#define ADDR_EVENT_FLAGS         0x005122FCu  /* uint32_t, what ADDR_GET_EVENT_FLAGS reads */
+#define ADDR_PAUSE_FLAGS         0x005122FCu  /* uint32_t, one bit per reason */
 /* Raised by 0x00411000 and lowered by the 0x046E handler, and read from 21
  * places -- the lobby, the overlay, TakeMenuRequest and the mission code. The
  * shape of a "this is a network game" flag; named for what is observed rather
@@ -691,7 +699,6 @@
  * whether it is there. 82 callers and nothing audio-specific about it -- it was
  * ADDR_AUDIO_CHECK_PATH, named from the first call site it was seen at, which
  * is the mistake CLAUDE.md warns about. Stays original. */
-#define ADDR_DATA_PATH_EXISTS    0x00422DE0u  /* int32_t(const char *) */
 #define ADDR_AUDIO_PATH_ARG      0x004852D4u
 
 /* ---- Smacker video ----------------------------------------------------
@@ -1034,7 +1041,19 @@
  * through +0x0C and keyed on the first two arguments of the register call.
  * All four stay original -- what is reconstructed is the declaring, not the
  * table. */
-#define ADDR_EVENT_REGISTER      0x0041EE70u  /* void(a, uid, c, fn, arg, f) */
+/* The registration table: NINE buckets at 0x005101F0, ending exactly where
+ * ADDR_SCRIPT_CONDITIONS begins, which is how the count is known -- the
+ * teardown's loop bound says so. It went in here as 1024, invented.
+ *
+ * A bucket holds a chain of 16-byte entries {key0, key1, handlers, next}, and
+ * each entry a chain of 16-byte handlers {fn, arg, owns, next}. `owns` is the
+ * sixth argument to the register call: set, the teardown frees `arg` as well
+ * as the node. DeclareRuleVars passes 0 for it, so the conditions it registers
+ * are not freed by the table that points at them. */
+#define ADDR_EVENT_TABLE         0x005101F0u
+#define AM2_EVENT_BUCKETS        9
+#define AM2_EVENT_NO_KEY         (-2)         /* key0 == -2 registers nothing */
+#define ADDR_EVENT_REGISTER      0x0041EE70u  /* void(bucket,k0,k1,fn,arg,owns) */
 #define ADDR_EVENT_CLEAR_ALL     0x004223D0u  /* void(void), frees every node */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is
@@ -1446,8 +1465,7 @@
 /* The packet transmit and the three helpers its watchdog uses. */
 #define ADDR_COMM_SEND           0x0040EB70u  /* thiscall int32(this,id,flags,buf,len) */
 #define ADDR_FIND_PLAYER_BY_ID   0x00402990u  /* void *(uint32 id); NULL when unknown */
-#define ADDR_GET_EVENT_FLAGS     0x00426840u  /* uint32(void), reads 0x005122FC */
-#define ADDR_SET_EVENT_FLAGS     0x004267C0u  /* void(uint32 bits), ORs into it */
+#define ADDR_GET_PAUSE_FLAGS     0x00426840u  /* uint32(void) */
 #define ADDR_STR_SEND_BADPLAYER  0x004754ACu
 #define ADDR_STR_SEND_BADPARAM   0x00475478u
 #define ADDR_STR_SEND_NOENTRY    0x00475450u
