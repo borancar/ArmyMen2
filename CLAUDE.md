@@ -344,6 +344,27 @@ each put their two names in the opposite fields from how the statement reads;
 and the AI modes are attack 6, defend 7, ignore 2, evade 5 -- neither
 sequential nor in keyword order. Reading alone got all of them wrong.
 
+**Renumbering heap pointers has to be scoped, and a global sequence turns one
+event into thousands.** `tools/actdiff.py` replaces each pointer with its
+first-seen index so a dump survives the DLL changing size. The first version
+numbered across the whole log, and the sweep frees each file's strings before
+the next -- so when `am2hook.dll` grew, one pointer was first seen in a
+different order and every index after it shifted by one. It reported 32 files
+diverging, `P1922` against `P1921`, on a parse that was identical. Allocation
+order is deterministic inside a file and nothing across files is worth
+comparing, so the sequence restarts at each `PARSEALL`.
+
+**Two of the 9,934 records are not stable, and it is the original reading out
+of bounds.** `tests/actions-reference.txt` is otherwise exact, but a
+`triggerdelay` in `rules/koth_ai_green.txt` recorded `72616C75` in the uid
+field -- `"ular"`, a fragment of the `greenRegularOrders` on that very line.
+The name is a forward reference, so `ScriptNameUid` falls through to
+`AddNameTableName`, and past the table overflow the sweep is already known to
+hit after about seventy files that index reads heap that still holds name
+strings. The value tracks heap layout, so it moves between runs of the same
+build. So the oracle is 9,932 exact records and a short unstable tail: a
+divergence there has to reproduce before it is evidence of anything.
+
 **A switch that selects the original has to skip the patch too, and mine had
 silently stopped working.** `tests/actions-reference.txt` is recorded by running
 the ORIGINAL action parser under our `ReadScript` and our dump, which needed a

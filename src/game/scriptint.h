@@ -52,6 +52,8 @@ extern "C" {
 #define kScriptNameCount (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
 #define kScriptNameCap   (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_CAP))
 #define kObjScripts      (*(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS))
+#define kObjScriptCount  (*(int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT))
+#define kObjScriptCap    (*(int32_t *)AM2_IMAGE(ADDR_OBJ_SCRIPT_CAP))
 
 /* Advance one token and check its kind, with the two messages the original
  * writes out at every argument. NULL after logging; *at moves either way. */

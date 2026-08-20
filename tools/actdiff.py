@@ -26,6 +26,15 @@ def norm(w, seen):
     that: two records that pointed at the same string still do. AM2_ACTDIFF_RAW
     keeps the addresses, which is only worth doing when comparing two runs of
     the same binary.
+
+    The numbering is per FILE, and that granularity is the whole of its value.
+    A single global sequence is what the first version used, and it cascades:
+    the sweep frees each file's strings before the next, so the heap hands back
+    a different set of addresses when the DLL moves, one first-seen pointer
+    lands in a different order, and every index after it shifts by one. That
+    reported 32 files diverging on P1922 against P1921 while the parse was
+    identical. Allocation order is deterministic within a file and nothing
+    across files is worth comparing, so the sequence restarts at each marker.
     """
     if os.environ.get("AM2_ACTDIFF_RAW"):
         return w
@@ -42,6 +51,7 @@ def load(path):
         f = raw.split()
         if raw.startswith("PARSEALL "):
             cur = raw.split(None, 1)[1].strip()
+            seen = {}
         elif raw.startswith("ACT "):
             out.append((cur, int(f[1]), int(f[2]),
                         [norm(x, seen) for x in f[3:]]))

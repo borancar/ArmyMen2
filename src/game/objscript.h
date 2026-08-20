@@ -53,6 +53,11 @@ struct AM2_ScriptAction *__cdecl ObjFrameNewAction(AM2_ObjFrame *f);
 AM2_ObjFrame *__cdecl ObjStateNewFrame(AM2_ObjState *s);
 AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o);
 
+/* 0x00437130. The same again on the three globals that hold the object-script
+ * array, stepping twenty. APPENDS -- it is not the accessor its one call site
+ * makes it look like, and the count it leaves behind is the new script's id. */
+AM2_ObjScript *__cdecl NewObjScript(void);
+
 /* 0x004374F0. Compare `b` against `a`: op 0 equal, 1 less, 2 greater. The
  * argument order is the surprise -- the value under test is the THIRD
  * argument, and everything else answers 0. */

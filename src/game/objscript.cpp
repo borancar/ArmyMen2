@@ -16,15 +16,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-/* ---- what stays in the original image --------------------------------- */
-
-typedef AM2_ObjScript *(__cdecl *am2_new_obj_script_fn)(void);
-
-#define orig_new_obj_script (*(am2_new_obj_script_fn)ADDR_NEW_OBJ_SCRIPT)
-
 /* ------------------------------------------------- object script ---- */
-
-
 
 /* The record the current statement is filling. NewObjScript has already
  * incremented the count, so the one being built is the last. */
@@ -73,6 +65,29 @@ AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o)
     }
     AM2_ObjState *p = &o->states[o->statecount];
     o->statecount++;
+    return p;
+}
+
+/* The fourth of the same shape, and the only one whose capacity, count and
+ * array are three globals rather than three fields of a parent -- there is no
+ * record above an object script. It steps by twenty where the others step by
+ * five and ten.
+ *
+ * The count it bumps is the id: ScriptCurrentObj reads the same global back as
+ * count - 1, and ScriptAttachTo stamps it onto each object unadjusted. So the
+ * ids the scripts carry are one-based, and this is where that comes from. */
+AM2_ObjScript *__cdecl NewObjScript(void)
+{
+    if (kObjScriptCap <= kObjScriptCount) {
+        int32_t cap = kObjScriptCap + 20;
+        kObjScripts = (AM2_ObjScript *)am2_realloc(
+            kObjScripts, (size_t)cap * sizeof(AM2_ObjScript));
+        memset(&kObjScripts[kObjScriptCount], 0,
+               20 * sizeof(AM2_ObjScript));
+        kObjScriptCap = cap;
+    }
+    AM2_ObjScript *p = &kObjScripts[kObjScriptCount];
+    kObjScriptCount++;
     return p;
 }
 
@@ -197,7 +212,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
      * fail, and the id later stamped onto each object is the incremented
      * count. Reading it as a plain accessor would still call it in the right
      * place, but would misdescribe why the count moves. */
-    AM2_ObjScript *target = orig_new_obj_script();
+    AM2_ObjScript *target = NewObjScript();
 
     AM2_ScriptTok *tok = &ctx->tokens[*at];
     if (tok->kind != AM2_TOKEN_RESERVED) {
@@ -299,6 +314,8 @@ int objscript_install(void)
     rc |= patch_replace(ADDR_OBJ_SCRIPT_NEW_STATE,
                         (const void *)ObjScriptNewState,
                         "ObjScriptNewState", 1);
+    rc |= patch_replace(ADDR_NEW_OBJ_SCRIPT,
+                        (const void *)NewObjScript, "NewObjScript", 1);
     rc |= patch_replace(ADDR_SCRIPT_OBJ_STATE,
                         (const void *)ScriptObjState, "ScriptObjState", 1);
     rc |= patch_replace(ADDR_SCRIPT_OBJ_FRAME,
