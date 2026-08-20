@@ -1060,6 +1060,19 @@
  * comm object agrees, or when a state word reads 0x22. Named for what it is
  * observed to do from here -- announce an event -- and not from any one of
  * those callers. */
+/* event.cpp's object setters: reach an object by uid and write one field.
+ * They share a shape -- reject a uid below AM2_UID_COUNTER_MIN, look it up,
+ * sometimes check the type or the null, then store. The differences between
+ * them are exactly which of those guards each one has, so they are worth
+ * keeping separate rather than folding into one helper. */
+#define ADDR_EVT_SET_MODE_F0     0x0041FAE0u  /* void(uid, int32), +0xF0, type 2/3/8 */
+#define ADDR_EVT_SET_MODE_94     0x0041FB10u  /* void(uid, int32), +0x94, type 2/3/8 */
+#define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
+#define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
+#define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
+#define ADDR_EVT_MARK_SET        0x0041FF20u  /* void(row, col) -> 1 */
+#define ADDR_EVT_MARK_CLEAR      0x0041FF40u  /* void(row, col) -> 0 */
+#define ADDR_EVT_MARKS           0x00511E60u  /* int32_t[][4] */
 #define ADDR_EVENT_NOTIFY        0x0041F4A0u  /* void(10 args) */
 
 /* The callbacks DeclareRuleVars registers. The first two are six-byte

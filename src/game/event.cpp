@@ -6,6 +6,8 @@
 #include "crt.h"
 #include "event.h"
 #include "image.h"
+#include "objtable.h"
+#include "objtype.h"
 #include "script.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -191,6 +193,86 @@ void __cdecl DeclareRuleVars(void)
     }
 }
 
+/* ---- the object setters ------------------------------------------------ */
+
+/* LookupByUID and ObjIsTypeIn238 are both reconstructed, so these call them
+ * directly rather than through the image. Reaching for an orig_ macro here was
+ * caught by tools/checkseams.py, which exists for exactly that. */
+#define g_evtMarks ((int32_t *)(uintptr_t)ADDR_EVT_MARKS)
+
+/* The two that check the type. LookupByUID's answer goes straight into
+ * ObjIsTypeIn238, which returns 0 for null, so the null case is covered by the
+ * type test rather than by a test of its own. */
+void __cdecl EvtSetModeF0(uint32_t uid, int32_t value)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    obj = LookupByUID(uid);
+    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+        return;
+    *(int32_t *)((uint8_t *)obj + 0xF0) = value;
+}
+
+void __cdecl EvtSetMode94(uint32_t uid, int32_t value)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    obj = LookupByUID(uid);
+    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+        return;
+    *(int32_t *)((uint8_t *)obj + 0x94) = value;
+}
+
+/* Sets or clears bits 4 and 11 together in the flags word at +8 -- the same
+ * word ObjFieldA reads three bits out of at bit 18. No null check: see the
+ * note in event.h. */
+#define AM2_EVT_FLAG810 0x810u
+
+void __cdecl EvtSetFlag810(uint32_t uid, int32_t on)
+{
+    uint32_t *flags;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    flags = (uint32_t *)((uint8_t *)LookupByUID(uid) + 8);
+    if (on)
+        *flags |= AM2_EVT_FLAG810;
+    else
+        *flags &= ~AM2_EVT_FLAG810;
+}
+
+/* +0x10 is AM2_Object.owner, which objtable.h reads with movsx as int8_t. */
+void __cdecl EvtSetOwner(uint32_t uid, int8_t owner)
+{
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    *((int8_t *)LookupByUID(uid) + 0x10) = owner;
+}
+
+/* The one that checks the pointer and not the uid. */
+void __cdecl EvtSetByte40(uint32_t uid, int8_t value)
+{
+    void *obj = LookupByUID(uid);
+
+    if (!obj)
+        return;
+    *((int8_t *)obj + 0x40) = value;
+}
+
+void __cdecl EvtMarkSet(int32_t row, int32_t col)
+{
+    g_evtMarks[col + row * 4] = 1;
+}
+
+void __cdecl EvtMarkClear(int32_t row, int32_t col)
+{
+    g_evtMarks[col + row * 4] = 0;
+}
+
 int event_install(void)
 {
     int rc = 0;
@@ -201,5 +283,19 @@ int event_install(void)
                         "EventRegister", 19);
     rc |= patch_replace(ADDR_EVENT_CLEAR_ALL, (const void *)EventClearAll,
                         "EventClearAll", 2);
+    rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,
+                        "EvtSetModeF0", 2);
+    rc |= patch_replace(ADDR_EVT_SET_MODE_94, (const void *)EvtSetMode94,
+                        "EvtSetMode94", 2);
+    rc |= patch_replace(ADDR_EVT_SET_FLAG810, (const void *)EvtSetFlag810,
+                        "EvtSetFlag810", 2);
+    rc |= patch_replace(ADDR_EVT_SET_OWNER, (const void *)EvtSetOwner,
+                        "EvtSetOwner", 2);
+    rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
+                        "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_EVT_MARK_SET, (const void *)EvtMarkSet,
+                        "EvtMarkSet", 2);
+    rc |= patch_replace(ADDR_EVT_MARK_CLEAR, (const void *)EvtMarkClear,
+                        "EvtMarkClear", 2);
     return rc;
 }

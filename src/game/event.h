@@ -35,6 +35,34 @@ void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
 /* 0x004223D0. Empty all nine buckets. */
 void __cdecl EventClearAll(void);
 
+/* ---- the object setters -------------------------------------------------
+ *
+ * Seven functions that reach an object by uid and write one field. They share
+ * a shape and differ only in which guards they carry, and the differences are
+ * real rather than sloppiness -- reproducing them is the point:
+ *
+ *   uid >= AM2_UID_COUNTER_MIN   rejects a uid below 1000, the value
+ *                                objtable.h documents as the per-owner
+ *                                counter's floor
+ *   type in {2,3,8}              ObjIsTypeIn238 on the looked-up object
+ *   non-null                     only two of them check
+ *
+ * EvtSetOwner and EvtSetFlag810 check the uid but NOT the result, so a uid at
+ * or above 1000 that is not in the table writes through whatever LookupByUID
+ * returned. EvtSetByte40 checks the pointer but not the uid. Neither is
+ * defensible as written, and both are the original's behaviour. */
+void __cdecl EvtSetModeF0(uint32_t uid, int32_t value);
+void __cdecl EvtSetMode94(uint32_t uid, int32_t value);
+void __cdecl EvtSetFlag810(uint32_t uid, int32_t on);
+void __cdecl EvtSetOwner(uint32_t uid, int8_t owner);
+void __cdecl EvtSetByte40(uint32_t uid, int8_t value);
+
+/* 0x0041FF20 and 0x0041FF40, over a table of rows of four dwords at
+ * 0x00511E60. The index arithmetic is `(col + row * 4) * 4`, so `row` selects
+ * a group of four and `col` an entry in it. */
+void __cdecl EvtMarkSet(int32_t row, int32_t col);
+void __cdecl EvtMarkClear(int32_t row, int32_t col);
+
 int event_install(void);
 
 #ifdef __cplusplus
