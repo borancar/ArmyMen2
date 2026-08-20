@@ -40,7 +40,6 @@
  * sprite's own surface and falls back through several drawing paths. Not
  * reconstructed, so it is called in place. */
 typedef void (__cdecl *am2_restore_chain_fn)(AM2_Sprite *spr);
-#define orig_restore_chain (*(am2_restore_chain_fn)ADDR_RESTORE_CHAIN)
 
 void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
 {
@@ -152,7 +151,7 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
                                         (LPDIRECTDRAWSURFACE)spr->image.surface,
                                         (LPRECT)clipped, trans);
         if (hr == DDERR_SURFACELOST)
-            orig_restore_chain(spr);
+            RestoreSpriteSurface(spr);
     }
 }
 

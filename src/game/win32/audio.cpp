@@ -14,6 +14,8 @@
  * the early returns are verified, the bodies are not.
  */
 
+#include "../rect.h"
+#include "../objtable.h"
 #include "audio.h"
 #include "../dist.h"
 #include "../../inject/hooklog.h"
@@ -806,7 +808,6 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
 /* Shared by the three playback functions below: where the ear is, the two
  * volume levels, the object lookup and the wave reader. */
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
-#define orig_lookup_uid (*(am2_lookup_uid_fn)ADDR_LOOKUP_BY_UID)
 #define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
 #define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_DEFAULT_SOUND_POS)
 #define g_volumeAtZero  (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
@@ -874,7 +875,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     /* An owner overrides the caller's coordinates -- and stops being an owner
      * if it has gone away. */
     if (owner) {
-        uint8_t *obj = (uint8_t *)orig_lookup_uid(owner);
+        uint8_t *obj = (uint8_t *)LookupByUID(owner);
 
         if (!obj) {
             owner = 0;
@@ -1094,7 +1095,6 @@ static_assert(DSBVOLUME_MIN == -10000, "DSBVOLUME_MIN");
 typedef int32_t (__cdecl *am2_points_equal_fn)(const AM2_Point *a,
                                                const AM2_Point *b);
 typedef void *(__cdecl *am2_lookup_owner_fn)(uint32_t owner);
-#define orig_points_equal (*(am2_points_equal_fn)ADDR_POINTS_EQUAL)
 #define orig_lookup_owner (*(am2_lookup_owner_fn)ADDR_LOOKUP_OWNER_OBJ)
 #define g_defaultOwner    (*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 
@@ -1144,7 +1144,14 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
             const AM2_Point *at = (const AM2_Point *)((uint8_t *)owner + OBJ_OFF_POS);
             int32_t          d2;
 
-            if (orig_points_equal(&where, at))
+            /* BY VALUE. The original pushes [eax+0x12] and the caller's own
+             * packed point, not their addresses -- it keeps the address in a
+             * register at the same time, for ApproxDist below, which is how a
+             * local typedef here came to declare two pointers and pass them.
+             * That compared two ADDRESSES, so the test could never fire and
+             * the near-distance case was dead: no A/B could see it, because
+             * the only thing it changes is a volume. */
+            if (PointsEqual(*(const uint32_t *)&where, *(const uint32_t *)at))
                 d2 = SOUND_NEAR_DISTANCE;
             else
                 d2 = ApproxDist(at, &where) / 2;
@@ -1319,7 +1326,7 @@ void __cdecl Update3DAudioVolumes(void)
         owner = *(uint32_t *)(rec + SOUND_REC_OFF_OWNER);
 
         if (owner) {
-            void *obj = orig_lookup_uid(owner);
+            void *obj = LookupByUID(owner);
 
             if (!obj) {
                 /* Whatever was making this noise is gone. */

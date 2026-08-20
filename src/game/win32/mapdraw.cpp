@@ -404,8 +404,6 @@ bad:
 
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_scroll_decay      (*(am2_void_fn)ADDR_SCROLL_DECAY)
-#define orig_scroll_map_cache        (*(am2_void_fn)ADDR_SCROLL_MAP_CACHE)
-#define orig_merge_dirty       (*(am2_void_fn)ADDR_MERGE_DIRTY)
 #define orig_reset_draw_counts (*(am2_void_fn)ADDR_RESET_DRAW_COUNTS)
 
 /* Save `n` dwords from `src` to `dst`. The original writes the nine stores out
@@ -423,12 +421,12 @@ void __cdecl ComposeFrame(void)
     AM2_Rect src;
 
     orig_scroll_decay();
-    orig_scroll_map_cache();
+    ScrollMapCache();
 
     if (g_fullRedraw)
         RedrawMapRegion(g_viewRect);
     else
-        orig_merge_dirty();
+        ScrollView();
 
     orig_reset_draw_counts();
 

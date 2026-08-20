@@ -23,6 +23,7 @@
  * reason having nothing to do with whether the reconstruction is right.
  */
 
+#include "audio.h"
 #include "startgame.h"
 #include "cdcheck.h"
 #include "dplay.h"
@@ -41,7 +42,6 @@ typedef void (__cdecl *am2_play_sound_fn)(int32_t, int32_t, int32_t, int32_t,
 typedef void (__cdecl *am2_void_fn)(void);
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 
-#define orig_play_sound          (*(am2_play_sound_fn)ADDR_PLAY_SOUND)
 #define orig_apply_game_settings (*(am2_void_fn)ADDR_APPLY_GAME_SETTINGS)
 #define orig_sprintf             (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
@@ -86,7 +86,7 @@ void __cdecl StartSelectedGame(void)
     if (index < 0 || index >= list[0])
         return;
 
-    orig_play_sound(2, 0, 0, 0, 0);
+    PlaySoundAt(2, 0, 0, 0, 0);
 
     /* { int32 count; Row *rows; } -- the pointer is the second dword. */
     rows = *(uint8_t **)(list + 1);
@@ -165,7 +165,6 @@ typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *
 
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
 #define orig_session_ctor  (*(am2_session_ctor_fn)ADDR_SESSION_CTOR)
-#define orig_enum_sessions  (*(am2_enum_sessions_fn)ADDR_COMM_ENUM_SESSIONS)
 #define orig_drop_obj      (*(am2_void_fn)ADDR_DROP_OBJ_51612C)
 
 #define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
@@ -178,7 +177,7 @@ void __cdecl StartMultiplayerGame(void)
 {
     uint8_t *comm;
 
-    orig_play_sound(2, 0, 0, 0, 0);
+    PlaySoundAt(2, 0, 0, 0, 0);
 
     /* A compact install leaves the multiplayer maps on the CD. This one is a
      * real check with a real conditional -- unlike the five copy-protection
@@ -215,7 +214,7 @@ void __cdecl StartMultiplayerGame(void)
     IDirectDraw_FlipToGDISurface(g_ddraw);
     ShowCursor(TRUE);
 
-    if (!orig_enum_sessions(comm, g_sessionObject)) {
+    if (!CommEnumSessions(comm, g_sessionObject)) {
         g_menuRequest    = REQUEST_REFUSED;
         g_menuRequestSet = 1;
     }
@@ -267,7 +266,7 @@ void __cdecl HostBattle(void)
     const char *player = (const char *)(dlg + DLG_OFF_PLAYER_NAME);
 
     if (!*battle || !*player) {
-        orig_play_sound(3, 0, 0, 0, 0);
+        PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
 
@@ -275,11 +274,11 @@ void __cdecl HostBattle(void)
     IDirectDraw_FlipToGDISurface(g_ddraw);
 
     if (!CommOpenSession(g_commObject, battle)) {
-        orig_play_sound(3, 0, 0, 0, 0);
+        PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
     if (!CommCreatePlayer(g_commObject, player, NULL, NULL, 0)) {
-        orig_play_sound(3, 0, 0, 0, 0);
+        PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
 
@@ -287,7 +286,7 @@ void __cdecl HostBattle(void)
     CopyName((char *)(g_commObject + COMM_SLOT_BASE + COMM_SLOT_OFF_NAME),
              player);
 
-    orig_play_sound(2, 0, 0, 0, 0);
+    PlaySoundAt(2, 0, 0, 0, 0);
     g_menuRequest    = REQUEST_HOSTED;
     g_menuRequestSet = 1;
 

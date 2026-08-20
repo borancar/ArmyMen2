@@ -136,6 +136,18 @@ void __cdecl FreeDynamicSounds(void);
 void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
                              DWORD_PTR dw1, DWORD_PTR dw2);
 
+/* 0x0040C040, and it is what startgame.cpp and the menus reach for. `index`
+ * selects the wave; the two flags are restart-if-playing and
+ * do-not-interrupt. The third parameter is read by nothing. */
+void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
+                         int32_t x, int32_t y);
+
+/* 0x0040B8F0. A named wave at a map position, with a slot and a priority.
+ * WndProc reaches it for the comm messages that carry a sound. */
+void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
+                              int32_t x, int32_t y, int32_t slot,
+                              int32_t priority, uint32_t owner);
+
 int audio_install(void);
 
 #ifdef __cplusplus

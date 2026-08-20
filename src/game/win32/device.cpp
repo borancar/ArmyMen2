@@ -30,6 +30,7 @@
  * bytes the original passed.
  */
 
+#include "surface.h"
 #include "device.h"
 #include "report.h"
 #include "../rect.h"
@@ -92,8 +93,6 @@ typedef LPDIRECTDRAWSURFACE (__cdecl *am2_create_offscreen_fn)(int32_t w, int32_
                                                                int32_t caps,
                                                                int32_t which);
 typedef void (__cdecl *am2_clear_surface_fn)(LPDIRECTDRAWSURFACE s, uint32_t fmt);
-#define orig_create_offscreen (*(am2_create_offscreen_fn)ADDR_CREATE_OFFSCREEN)
-#define orig_clear_surface   (*(am2_clear_surface_fn)ADDR_CLEAR_SURFACE)
 
 /* ---- display ----------------------------------------------------------- */
 
@@ -185,7 +184,7 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
         return hr;
 
     if (g_windowed) {
-        g_backBuffer = orig_create_offscreen(g_screenW, g_screenH,
+        g_backBuffer = CreateOffscreenSurface(g_screenW, g_screenH,
                                              DDSCAPS_OFFSCREENPLAIN, -1);
     } else {
         caps.dwCaps = DDSCAPS_BACKBUFFER;
@@ -195,10 +194,10 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
             return hr;
     }
 
-    g_offscreen  = orig_create_offscreen(g_screenW, g_screenH,
+    g_offscreen  = CreateOffscreenSurface(g_screenW, g_screenH,
                                          DDSCAPS_OFFSCREENPLAIN, -1);
-    orig_clear_surface(g_primary, g_pixelFormatByte);
-    orig_clear_surface(g_backBuffer, g_pixelFormatByte);
+    ClearSurface(g_primary, g_pixelFormatByte);
+    ClearSurface(g_backBuffer, g_pixelFormatByte);
 
     /* Drawing starts aimed at the back buffer, with no lock held. */
     g_lockTarget    = g_backBuffer;
@@ -351,7 +350,6 @@ typedef struct {
 #define g_mousePress   ((AM2_MousePress *)(uintptr_t)ADDR_MOUSE_PRESS)
 
 typedef int32_t (__cdecl *am2_clamp_fn)(int32_t v, int32_t lo, int32_t hi);
-#define orig_clamp (*(am2_clamp_fn)ADDR_CLAMP)
 
 /* Run after every mouse event -- 0x00426F40, 8 call sites.
  *
@@ -379,8 +377,8 @@ void __cdecl UpdateMouseState(void)
 
     g_cursorX += g_mouseDX;
     g_cursorY += g_mouseDY;
-    g_cursorX = orig_clamp(g_cursorX, g_screenClip.left, g_screenClip.right - 1);
-    g_cursorY = orig_clamp(g_cursorY, g_screenClip.top, g_screenClip.bottom - 1);
+    g_cursorX = Clamp(g_cursorX, g_screenClip.left, g_screenClip.right - 1);
+    g_cursorY = Clamp(g_cursorY, g_screenClip.top, g_screenClip.bottom - 1);
 
     ((int16_t *)&g_cursorPoint)[1] = (int16_t)g_cursorY;
     ((int16_t *)&g_cursorPoint)[0] = (int16_t)g_cursorX;

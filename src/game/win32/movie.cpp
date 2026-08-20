@@ -13,6 +13,7 @@
  * probably contradict.
  */
 
+#include "surface.h"
 #include "movie.h"
 #include "palette.h"
 #include "../../inject/patch.h"
@@ -95,7 +96,6 @@ typedef LPDIRECTDRAWSURFACE (__cdecl *am2_make_surface_fn)(int32_t w, int32_t h)
 /* Still in the original image: the palette apply and the blit to screen are
  * game logic, and the timer callback that drives all this is never ours. */
 typedef void (__attribute__((thiscall)) *am2_movie_arg_fn)(void *movie, void *arg);
-#define orig_blit_to_screen (*(am2_movie_arg_fn)ADDR_MOVIE_BLIT)
 
 #define g_moviePaletteOwner (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
 #define MOVIE_PALETTE_OFF 0x800u
@@ -387,7 +387,7 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
     smack_doframe(smack);
     IDirectDrawSurface_Unlock(surf, NULL);
 
-    orig_blit_to_screen(movie, arg);
+    BlitCentred(movie, (LPDIRECTDRAWSURFACE)arg);
 
     /* Last frame ends the movie; anything else advances it. */
     smack = fld(movie, MOVIE_SMACK, void *);

@@ -1,4 +1,5 @@
 /* frame.cpp -- see frame.h. */
+#include "../msgslot.h"
 #include "../../inject/win32.h"
 
 #include <stdint.h>
@@ -20,7 +21,6 @@ typedef int32_t (__cdecl *am2_int_fn)(void);
 typedef int32_t (__cdecl *am2_list_fn)(void *list);
 
 #define call0(a)  (((am2_void_fn)(uintptr_t)(a))())
-#define orig_msg_list_free (*(am2_list_fn)ADDR_MSG_LIST_FREE)
 
 #define g_comm         (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 #define g_statePending (*(const int32_t *)(uintptr_t)ADDR_STATE_PENDING)
@@ -104,7 +104,7 @@ void __cdecl FramePost(void)
     call0(ADDR_COMM_FRAME_POST_B);
     call0(ADDR_COMM_FRAME_POST_C);
 
-    if (orig_msg_list_free((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
+    if (MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
         < AM2_COMM_MIN_BUFFERS)
         call0(ADDR_COMM_NO_BUFFERS);
 }

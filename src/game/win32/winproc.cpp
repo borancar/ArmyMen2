@@ -38,6 +38,8 @@
  *   the game window.
  */
 
+#include "dplay.h"
+#include "audio.h"
 #include "winproc.h"
 #include "winmain.h"
 #include "mapdraw.h"
@@ -182,8 +184,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
 #define orig_session_over   (*(am2_comm_void_fn)ADDR_COMM_SESSION_OVER)
 #define orig_comm_reset     (*(am2_comm_void_fn)ADDR_COMM_RESET_STATE)
-#define orig_get_session    (*(am2_comm_void_fn)ADDR_COMM_GET_SESSION)
-#define orig_set_session    (*(am2_comm_sess_fn)ADDR_COMM_SET_SESSION)
 #define orig_remove_player  (*(am2_int_fn2)ADDR_REMOVE_PLAYER)
 #define orig_show_mp_result (*(am2_int_fn2)ADDR_SHOW_MP_RESULT)
 #define orig_set_ai         (*(am2_int_fn2)ADDR_SET_AI_CONTROL)
@@ -192,8 +192,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_menu_message   (*(am2_str_int2_fn)ADDR_MENU_MESSAGE)
 #define orig_chat_append    (*(am2_str_int_fn)ADDR_CHAT_APPEND)
 #define orig_sprite_drop    (*(am2_drop_fn)ADDR_SPRITE_DROP_NAMED)
-#define orig_play_dynamic   (*(am2_sound_fn)ADDR_PLAY_DYNAMIC_SOUND)
-#define orig_stop_stream    (*(am2_void_fn2)ADDR_STOP_AUDIO_STREAM)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -208,12 +206,12 @@ static void ReopenSession(uint8_t *comm)
 {
     void *desc;
 
-    orig_get_session(comm);
+    CommGetSessionDesc(comm);
     desc = *(void **)(comm + COMM_OFF_SESSION_DESC);
     if (!desc)
         return;
     *(uint32_t *)((uint8_t *)desc + 4) &= ~0x21u;
-    if (orig_set_session(comm, desc, 0) < 0)
+    if (CommSetSessionDesc(comm, desc, 0) < 0)
         orig_log((const char *)(uintptr_t)ADDR_STR_SET_SESSION_FAIL);
 }
 
@@ -326,7 +324,7 @@ static LRESULT OnSetupDone(void)
 
     g_netGame = 0;
     orig_set_ai((int32_t)((g_gameOverFlags >> 18) & 1u));
-    orig_play_dynamic((const char *)(uintptr_t)ADDR_STR_ALLRIGHT_WAV,
+    PlayDynamicSound((const char *)(uintptr_t)ADDR_STR_ALLRIGHT_WAV,
                       0, 0, 0, 0, 0, 3, 0);
     orig_lobby_reset();
     orig_comm_reset(comm);
@@ -479,7 +477,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         /* AudioTimerProc posts this when a stream runs out. Stop it and then
          * let DefWindowProcA have the message, which is what the original
          * does -- it falls through rather than returning. */
-        orig_stop_stream();
+        StopAudioStream();
         break;
 
     default:

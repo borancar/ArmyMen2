@@ -186,6 +186,10 @@ void __cdecl DrawMenuCursor(void);
  * arms after whichever painter that arm selects. */
 void __cdecl DrawMenuOverlay(void);
 
+/* 0x00445500, thiscall. Put a picture in the middle of the screen -- the
+ * movie player's way of showing a frame. */
+void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest);
+
 int surface_install(void);
 
 #ifdef __cplusplus

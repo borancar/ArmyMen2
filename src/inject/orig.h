@@ -380,7 +380,6 @@
 /* Comm teardown: destroy the four mutex-guarded message lists, wake the packet
  * thread, wait for it and close the handles. */
 #define ADDR_COMM_SHUTDOWN       0x004020A0u  /* void(void) */
-#define ADDR_DESTROY_MSG_LIST    0x00402170u  /* void(list *), stays original */
 #define ADDR_MSG_LIST_A          0x0048D8E8u
 #define ADDR_MSG_LIST_B          0x004F48C8u
 #define ADDR_MSG_LIST_C          0x0048D8D8u
@@ -737,7 +736,6 @@
  * which is why src/game/win32/winproc.cpp forwards them together. */
 #define AM2_WM_STATE_ADVANCE     0x0400u
 #define AM2_WM_STATE_ABORT       0x0402u
-#define ADDR_MOVIE_BLIT          0x00445500u  /* thiscall, stays original */
 #define ADDR_MOVIE_PALETTE_OWNER 0x00477A58u  /* void **; +0x800 is a DD palette */
 #define ADDR_IAT_SMACK_TO_BUFFER 0x0046F2B0u
 #define ADDR_IAT_SMACK_DO_FRAME  0x0046F2B4u
@@ -1413,7 +1411,6 @@
 #define ADDR_OVERLAY_DIRTY       0x00511DC0u  /* int32_t; the primary needs saving */
 #define ADDR_DRAW_MENU_OVERLAY   0x00425AF0u  /* void(void) */
 #define ADDR_OVERLAY_PREPARE     0x00412D30u  /* void(int32, int32) */
-#define ADDR_OVERLAY_DRAW        0x00412FE0u  /* void(void) */
 #define MENU_MODE_PLAYING        0x21
 /* The multiplayer session object and the two routines either side of it. */
 #define ADDR_SESSION_OBJECT      0x00516130u  /* void *, made on demand */
@@ -1429,7 +1426,6 @@
 #define ADDR_COMM_JOIN_SESSION   0x0040E7B0u  /* thiscall int32(this, const GUID *) */
 #define ADDR_COMM_RECEIVE        0x0040E8A0u  /* thiscall int32(this,from,to,flags,buf,len) */
 #define ADDR_COMM_SLOT_OF_ID     0x0040F160u  /* thiscall int32(this, DPID) */
-#define ADDR_MSG_LIST_FREE       0x00401040u  /* int32(void *list); free entries */
 #define ADDR_STR_FLOW_UNPAUSE    0x00473A84u  /* "FLOW UNPAUSE nfree = %d\n" */
 /* Receive keeps its own statistics, laid out like the send side's. */
 #define COMM_OFF_RX_INDEX        0x008u
@@ -1505,7 +1501,6 @@
  * 0x00515Fxx, resets the comm slots and copies the two player-name strings.
  * Named for what its body does; stays original. */
 #define ADDR_APPLY_GAME_SETTINGS 0x0042F170u  /* void(void) */
-#define ADDR_PLAY_SOUND          0x0040C040u  /* void(int32, int32, int32, int32, int32) */
 #define ADDR_FMT_COMPUTER_N      0x00486EC4u  /* "Computer%d" */
 #define ADDR_START_SELECTED_GAME 0x0042ECF0u  /* void(void), a button handler */
 #define COMM_OFF_DEBUG           0x418u

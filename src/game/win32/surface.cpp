@@ -306,7 +306,6 @@ release_v2:
 #define MAP_DESC_SURFACE 0x10u
 
 typedef void (__cdecl *am2_void_fn)(void);
-#define orig_restore_tileset (*(am2_void_fn)ADDR_RESTORE_TILESET)
 
 /* IsLost answers DD_OK when the surface is fine, so a non-zero result is the
  * thing to act on. */
@@ -334,7 +333,7 @@ void __cdecl RestoreLostSurfaces(void)
              * is what the original re-reads it for. */
             surf = *(LPDIRECTDRAWSURFACE *)(g_mapSurfaceDesc + MAP_DESC_SURFACE);
             if (IDirectDrawSurface_Restore(surf) == DD_OK)
-                orig_restore_tileset();   /* the pixels are gone; redraw them */
+                RestoreTileSet();   /* the pixels are gone; redraw them */
         }
     }
 }
@@ -904,7 +903,6 @@ typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag
 #define g_presenting    (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
 #define g_screenRectPtr ((LPRECT)(uintptr_t)ADDR_SCREEN_RECT)
 #define orig_overlay_prepare (*(am2_overlay_prep_fn)ADDR_OVERLAY_PREPARE)
-#define orig_overlay_draw    (*(am2_overlay_draw_fn)ADDR_OVERLAY_DRAW)
 
 void __cdecl DrawMenuOverlay(void)
 {
@@ -946,7 +944,7 @@ void __cdecl DrawMenuOverlay(void)
     SetDrawTarget(g_backBuffer);
 
     orig_overlay_prepare(0, 1);
-    orig_overlay_draw();
+    DrawMenuCursor();
 
     IDirectDrawSurface_BltFast(g_primarySurface, (DWORD)g_originDx,
                                (DWORD)g_originDy, g_backBuffer,

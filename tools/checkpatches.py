@@ -27,7 +27,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # What is aliased today. See the ratchet below before changing it.
-MAX_ALIASES = 36
+MAX_ALIASES = 31
 
 
 def macros():

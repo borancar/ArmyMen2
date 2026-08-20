@@ -41,7 +41,6 @@ static_assert(CLSCTX_INPROC_SERVER == 1, "CLSCTX_INPROC_SERVER");
 typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
 
 typedef void (__cdecl *am2_destroy_list_fn)(void *list);
-#define orig_destroy_msg_list (*(am2_destroy_list_fn)ADDR_DESTROY_MSG_LIST)
 
 #define g_commEvent    (*(HANDLE *)(uintptr_t)ADDR_COMM_EVENT)
 #define g_commEvent2   (*(HANDLE *)(uintptr_t)ADDR_COMM_EVENT_2)
@@ -116,10 +115,10 @@ void __cdecl CommShutdown(void)
 {
     DWORD exitCode;
 
-    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_A);
-    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_B);
-    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_C);
-    orig_destroy_msg_list((void *)(uintptr_t)ADDR_MSG_LIST_D);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_A);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_B);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_C);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_D);
 
     orig_log("Setting Event 0 \n");
     SetEvent(g_commEvent);
@@ -473,7 +472,6 @@ typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
 typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
 #define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
-#define orig_set_flags   (*(am2_set_flags_fn)ADDR_PAUSE_GAME)
 #define g_hwnd           (*(HWND *)(uintptr_t)ADDR_HWND)
 
 /* 0x046C -- WndProc forwards this one to the original. */
@@ -557,7 +555,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
             continue;
         if (GetPauseFlags() & bit)
             continue;
-        orig_set_flags(bit);
+        PauseGame(bit);
     }
     return 1;
 }

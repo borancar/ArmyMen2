@@ -398,6 +398,36 @@ entry, puts `bootcamp` at 79,695 differing pixels against a budget of 500.
 Events in a shipped mission really do share a key and need the second handler
 on one entry.
 
+**An `orig_` macro pointing at a reconstructed address is a lie, and there
+were twenty-one of them.** `tools/checkseams.py` resolves every `orig_` macro
+to its address and fails if that address is in the patch list. It exists
+because the same thing had been found by hand four times -- `InitInput` and
+friends in winmain.cpp, `SetGameDir` under `orig_path_exists` in three modules,
+the pause pair in dplay.cpp, `CreateOffscreenSurface` in device.cpp -- and each
+time the comment beside it had gone stale with it: `orig_create_offscreen` sat
+under "on the list to reconstruct next" long after it was done. One entry is
+allowed and named: `orig_parse_action`, which the `AM2_PROBE_NOACTION` switch
+needs.
+
+**Fixing them found a defect no A/B can see.** `PlaySoundAt` tested whether a
+sound is at its owner's position with `PointsEqual(&where, at)` -- two
+POINTERS, under a local typedef that declared them. The original pushes
+`[eax+0x12]` and the caller's packed point, by VALUE, and keeps the address in
+a register at the same time for the `ApproxDist` beside it, which is how the
+confusion arose. So the test compared two addresses, never fired, and the
+near-distance case was dead code. Nothing could have caught it: the only thing
+it changes is a sound's volume, and the A/B compares logs and pixels.
+**A local typedef for a function that already has a header is a place for a
+signature to be wrong in private.**
+
+**The two DirectX creators are NOT this.** `orig_DirectDrawCreate` and
+`orig_DirectInputCreate` name `0x00463396` and `0x00464410`, which are the
+game's own one-instruction `jmp [IAT]` import thunks -- six bytes each, not
+game code, and nothing to reconstruct. For DirectInput going through the thunk
+is required: `dinput_hook.c` patches the IAT slot at `0x0046F014`, and an
+import of our own would resolve through our IAT and walk past the hook.
+`tools/checkhooks.py` guards exactly that.
+
 **A function can already be reconstructed under a name you would not have
 looked for.** `SwapColourBytes` was about to be written a second time as
 `ColourOf`, and `misc.cpp` has had it since long before -- the two bodies came
