@@ -1072,6 +1072,8 @@
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
 #define ADDR_LOAD_SCRIPT_COND    0x0041EC70u  /* void(FILE *, cond *) */
 #define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
+#define ADDR_LOAD_SCRIPT_CONDS   0x0041EDD0u  /* int32_t(FILE *) */
+#define AM2_SAVETAG_CONDS        0x06660003u  /* event.cpp's other tag */
 /* The three handlers a saved event registration is restored with. Two are in
  * the objscript band and take a pad; the third takes a 16-byte record read
  * straight from the file. Reached by address -- they are original code. */

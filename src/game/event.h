@@ -195,6 +195,22 @@ void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond);
  * reuses as a local once it has copied fp into a register. */
 int32_t __cdecl LoadEventSection(am2_FILE *fp);
 
+ /* 0x0041EDD0. Read the whole condition list back from a save.
+ *
+ * Frees whatever is there first, then reads records until the marker stops
+ * matching, and finishes by calling DeclareRuleVars -- which walks the list it
+ * has just built and registers every event term. So loading a save rebuilds
+ * both the conditions and their registrations, and nothing else has to know
+ * the difference between a loaded mission and a parsed one.
+ *
+ * DeclareRuleVars runs even when the section is empty: the early exit for a
+ * wrong first marker jumps INTO the tail rather than returning.
+ *
+ * Records are prepended, so the list comes out in reverse file order. Since
+ * SaveScriptConditions walks the same list to write it, saving and loading
+ * twice returns to the original order. */
+int32_t __cdecl LoadScriptConditions(am2_FILE *fp);
+
 int event_install(void);
 
 #ifdef __cplusplus

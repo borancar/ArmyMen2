@@ -527,6 +527,35 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
     return 1;
 }
 
+int32_t __cdecl LoadScriptConditions(am2_FILE *fp)
+{
+    int32_t tag;
+
+    FreeScriptConditions();
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_CONDS,
+                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0x173))
+        return 0;
+
+    orig_fread(&tag, 4, 1, fp);
+    while (tag == (int32_t)AM2_EVTSAVE_RECORD) {
+        AM2_ScriptCond *cond = (AM2_ScriptCond *)orig_malloc(sizeof *cond);
+
+        memset(cond, 0, sizeof *cond);
+        LoadScriptCond(fp, cond);
+        /* Prepended, so the list ends up in reverse file order. */
+        cond->next = kScriptConditions;
+        kScriptConditions = cond;
+
+        orig_fread(&tag, 4, 1, fp);
+    }
+
+    /* Reached from the loop AND from the wrong-marker exit above, so the
+     * registrations are rebuilt even for an empty section. */
+    DeclareRuleVars();
+    return 1;
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -557,6 +586,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_LOAD_SCRIPT_CONDS, (const void *)LoadScriptConditions,
+                        "LoadScriptConditions", 1);
     rc |= patch_replace(ADDR_LOAD_EVENT_SECTION, (const void *)LoadEventSection,
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
