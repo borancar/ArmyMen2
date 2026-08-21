@@ -36,6 +36,10 @@ typedef struct {
  * are at least two players. */
 void __cdecl ArmyMessageSend(const void *msg);
 
+/* 0x00410820. Tell the other players the game has paused or resumed, with the
+ * reason mask. Does nothing unless the session is joined. Eight callers. */
+void __cdecl SendGamePause(int32_t pause, int32_t mask);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

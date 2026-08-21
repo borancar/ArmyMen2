@@ -1263,6 +1263,15 @@
 /* 0x004105F0, "ArmyMessageSend" from its own three error strings -- 304 bytes
  * and 20 callers, so it is the transport the whole game sends through. */
 #define ADDR_ARMY_MESSAGE_SEND     0x004105F0u
+/* 0x00410820, "SendGamePause from %x  Pause =%s  Flags=%x". Eight callers.
+ * It fills two fields of a message that lives in .bss at 0x004FAA50 and hands
+ * it to SendGameMsg -- the header is set up elsewhere, since nothing in the
+ * file image backs that address. */
+#define ADDR_MSG_GAME_PAUSE        0x004FAA50u
+#define MSG_PAUSE_OFF_PAUSE        8u
+#define MSG_PAUSE_OFF_FLAGS        0x0Cu
+#define ADDR_STR_TRUE              0x00475C20u
+#define ADDR_STR_FALSE             0x00475C18u
 /* The outgoing packet. 0x004FAA68 is its base and 0x004FAA6C is base+4 -- the
  * packet's own length field, which doubles as the write cursor. Flush resets
  * it to 0x14, so the packet header is twenty bytes and the first message lands
@@ -2146,7 +2155,12 @@
 #define ADDR_SUBSTATE22          0x00425C10u
 #define ADDR_SUBSTATE33_ALT      0x00425CD0u
 #define ADDR_EVENT_FLAG_8_TEST   0x00424900u
-#define ADDR_EVENT_FLAG_8_SEND   0x00410820u  /* void(int32, int32) */
+/* Its own log string calls it SendGamePause, so it is renamed rather than
+ * aliased -- the old name came from this one call site. Knowing the body makes
+ * the call site legible: frame.cpp passes (0, AM2_EVENT_FLAG_8), which is
+ * "un-pause, reason 8" told to the other players. CLAUDE.md already records
+ * that the event flags ARE the pause mask; this is the send half. */
+#define ADDR_SEND_GAME_PAUSE     0x00410820u  /* void(int32 pause, int32 mask) */
 #define AM2_EVENT_FLAG_8         8
 #define ADDR_FRAME_POST          0x0040AFA0u  /* after it, reached by tail jump */
 #define ADDR_STATE0_FRAME        0x004266B0u

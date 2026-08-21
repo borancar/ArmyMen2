@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 372 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 372 | 365 of them below the CRT line |
+| `patch_replace` sites | 373 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 373 | 366 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 89,616 / 372,816 B (**24.0%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 89,728 / 372,816 B (**24.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,16 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The alias ratchet has now caught four call-site names this run, and each
+  time the body's name was better.** `ADDR_ARMY_MESSAGE_FLUSH` vs
+  `ADDR_COMM_FRAME_POST_A`, `ADDR_DEF_LINK_PARSE` and `ADDR_DEF_GAME_PARSE` on
+  merged-entry addresses, and now `ADDR_SEND_GAME_PAUSE` vs
+  `ADDR_EVENT_FLAG_8_SEND`. That last one repays the rename immediately:
+  frame.cpp calls it `(0, AM2_EVENT_FLAG_8)`, which under the old name read as
+  a flag poke and under the new one is "tell the other players the game has
+  un-paused, reason 8" -- consistent with CLAUDE.md's finding that the event
+  flags ARE the pause mask.
 
 - **CORRECTION: the "two-word poke" claim was wrong, and the probe that tested
   it says so.** The previous commit asserted that setting `ADDR_VIEW_RECT_ON`

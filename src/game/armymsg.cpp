@@ -87,11 +87,52 @@ void __cdecl ArmyMessageSend(const void *msg)
     }
 }
 
+/* SendGameMsg stays original -- 928 bytes and fourteen callers, the hub this
+ * whole family funnels through. */
+typedef int32_t (__cdecl *AM2_SendGameMsgFn)(void *msg, int32_t a, int32_t b);
+#define orig_send_game_msg \
+    (*(AM2_SendGameMsgFn)AM2_IMAGE(ADDR_SEND_GAME_MSG))
+
+/* 0x00410820. Tell the other players the game has been paused or resumed.
+ *
+ * The message is a single static buffer in .bss, not a local -- nothing in the
+ * file image backs 0x004FAA50, so its length and kind are filled in somewhere
+ * else and this only writes the two payload fields. That also makes it
+ * decidedly not re-entrant, which is the original's design and not a
+ * transcription choice.
+ *
+ * Gated on the session being joined, and nothing else: unlike ArmyMessageSend
+ * it does not care how many players there are.
+ *
+ * The log renders the pause as "TRUE"/"FALSE" from the image's own two string
+ * literals and reports our own player id, so a capture shows who paused. */
+void __cdecl SendGamePause(int32_t pause, int32_t flags)
+{
+    uint8_t *msg = (uint8_t *)AM2_IMAGE(ADDR_MSG_GAME_PAUSE);
+
+    if (kCommField(COMM_OFF_JOINED) == 0)
+        return;
+
+    *(int32_t *)(msg + MSG_PAUSE_OFF_PAUSE) = pause;
+    *(int32_t *)(msg + MSG_PAUSE_OFF_FLAGS) = flags;
+
+    orig_send_game_msg(msg, 0, 1);
+
+    if (kCommField(COMM_OFF_EVENT_DEBUG))
+        orig_log("SendGamePause from %x  Pause =%s  Flags=%x \n",
+                 kCommField(COMM_OFF_OUR_PLAYER_ID),
+                 pause ? (const char *)AM2_IMAGE(ADDR_STR_TRUE)
+                       : (const char *)AM2_IMAGE(ADDR_STR_FALSE),
+                 flags);
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,
+                        "SendGamePause", 2);
     return rc;
 }

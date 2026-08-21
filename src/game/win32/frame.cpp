@@ -256,7 +256,7 @@ void __cdecl State2Frame(void)
     if ((GetPauseFlags() & AM2_EVENT_FLAG_8)
         && ((am2_int_fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)()) {
         UnPauseGame(AM2_EVENT_FLAG_8);
-        ((am2_i32x2_fn)(uintptr_t)ADDR_EVENT_FLAG_8_SEND)(0, AM2_EVENT_FLAG_8);
+        ((am2_i32x2_fn)(uintptr_t)ADDR_SEND_GAME_PAUSE)(0, AM2_EVENT_FLAG_8);
     }
 }
 
