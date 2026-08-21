@@ -1276,7 +1276,7 @@
 #define ADDR_SAVE_OBJSCRIPT_SECTION 0x00436280u  /* int32_t(FILE *) */
 #define ADDR_LOAD_OBJSCRIPT_SECTION 0x004364A0u  /* int32_t(FILE *) */
 /* Frees every level of the object-script table and is what the loader calls
- * first. Three callers; still original, so the loader reaches it by address. */
+ * first. Three callers. Reconstructed, so the loader calls it directly. */
 #define ADDR_FREE_OBJ_SCRIPTS       0x004368D0u  /* void(void) */
 #define ADDR_STR_OBJSCRIPT_CPP      0x0048758Cu  /* "C:\\ArmyMen2\\source\\objscript.cpp" */
 #define AM2_SAVETAG_OBJSCRIPT       0x06660008u
@@ -2160,8 +2160,6 @@ typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
  * the game allocated must be freed here and vice versa. */
 #define orig_malloc  (*(am2_malloc_fn)ADDR_GAME_MALLOC)
 #define orig_free    (*(am2_free_fn)ADDR_GAME_FREE)
-typedef void (__cdecl *am2_void_fn)(void);
-#define orig_free_obj_scripts (*(am2_void_fn)ADDR_FREE_OBJ_SCRIPTS)
 #define orig_blit_bitmap_in (*(am2_blit_bitmap_in_fn)ADDR_BLIT_BITMAP_IN)
 /* The object table was allocated by the game's CRT, so it must be grown by the
  * game's CRT -- our msvcrt has a different heap entirely. */

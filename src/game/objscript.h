@@ -96,4 +96,8 @@ int32_t __cdecl SaveObjScriptSection(am2_FILE *fp);
  * string as a kind-5 token. Returns 0 if the section tag does not match. */
 int32_t __cdecl LoadObjScriptSection(am2_FILE *fp);
 
+/* 0x004368D0. Free all four levels and clear the three globals. An action's
+ * `text` is NOT freed -- the token list owns it. Three callers. */
+void __cdecl FreeObjScripts(void);
+
 #endif /* AM2_OBJSCRIPT_H */

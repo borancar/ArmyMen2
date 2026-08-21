@@ -357,6 +357,59 @@ int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
     return 1;
 }
 
+/* 0x004368D0. Free every level of the object-script table and clear the three
+ * globals. Bottom-up, and each level's array is freed whenever the POINTER is
+ * non-null -- a zero count skips the loop below it but still frees the array,
+ * which is why an empty level the loader allocated does not leak.
+ *
+ * What it never frees is an action's `text`. That string belongs to the token
+ * list on both paths: the parser leaves the token's own pointer there and the
+ * loader points it at a kind-5 token it adds. Freeing it here would be a
+ * double free, and the original does not. */
+void __cdecl FreeObjScripts(void)
+{
+    AM2_ObjScript *tab = kObjScripts;
+
+    if (tab == (AM2_ObjScript *)0)
+        goto done;
+
+    if (kObjScriptCount <= 0)
+        goto freetable;
+
+    for (int32_t i = 0; i < kObjScriptCount; i++) {
+        AM2_ObjScript *o = &tab[i];
+
+        if (o->states == (AM2_ObjState *)0)
+            continue;
+
+        for (int32_t j = 0; j < o->statecount; j++) {
+            AM2_ObjState *st = &o->states[j];
+
+            if (st->frames == (AM2_ObjFrame *)0)
+                continue;
+
+            for (int32_t k = 0; k < st->framecount; k++) {
+                AM2_ObjFrame *fr = &st->frames[k];
+
+                if (fr->actions != (AM2_ScriptAction *)0)
+                    am2_free(fr->actions);
+            }
+
+            am2_free(st->frames);
+        }
+
+        am2_free(o->states);
+    }
+
+freetable:
+    am2_free(tab);
+
+done:
+    kObjScripts     = (AM2_ObjScript *)0;
+    kObjScriptCount = 0;
+    kObjScriptCap   = 0;
+}
+
 /* 0x004364A0. The mirror of the saver, and the last loader in the format.
  *
  * Each level reads its record WHOLE -- pointer field and all -- and then
@@ -381,7 +434,7 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
     char           buf[2048];
     int32_t        count;
 
-    orig_free_obj_scripts();
+    FreeObjScripts();
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_OBJSCRIPT,
                       (const char *)AM2_IMAGE(ADDR_STR_OBJSCRIPT_CPP), 0x68))
@@ -487,6 +540,8 @@ int objscript_install(void)
     rc |= patch_replace(ADDR_LOAD_OBJSCRIPT_SECTION,
                         (const void *)LoadObjScriptSection,
                         "LoadObjScriptSection", 1);
+    rc |= patch_replace(ADDR_FREE_OBJ_SCRIPTS,
+                        (const void *)FreeObjScripts, "FreeObjScripts", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);

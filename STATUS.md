@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 339 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 339 | 332 of them below the CRT line |
+| `patch_replace` sites | 340 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 340 | 333 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 81,872 / 372,816 B (**22.0%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 82,144 / 372,816 B (**22.0%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -105,8 +105,8 @@ counts probe before reading one as coverage -- that is what turned the
    loaders. What it still lacks is EXECUTION of the load half; see 4 below,
    which is now the most valuable single thing left in this area. `LoadGame`
    itself (`0x00425A10`, 224 B) is fully mapped and still unwritten, and
-   `FreeObjScripts` (`0x004368D0`, 272 B, 3 callers) is the one seam the new
-   loader reaches by address.
+   `FreeObjScripts` (`0x004368D0`) is done and, unlike the loaders, actually
+   executes -- its counter reads 1 on a campaign run.
 3. **Fold the pointer-aware comparison into a tool.** It was done by hand for
    objscript here -- walk the section, collect the offsets that hold heap
    pointers, and compare everything else -- and it turned "188 differing bytes"
