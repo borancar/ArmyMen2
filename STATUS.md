@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `3718048`. Working tree clean.
+Last updated: **2026-08-21**, at `d8540fe`. Working tree clean.
 
 ## In flight
 
@@ -68,12 +68,13 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 309 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 309 | 302 of them below the CRT line |
+| `patch_replace` sites | 319 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 319 | 312 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
-| pure unreconstructed leaves | **0** (2 listed, both false positives) | `tools/vectors.py --all` |
+| pure unreconstructed leaves | **0** (2 listed, both false positives) |
+| self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
@@ -97,19 +98,41 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Next
 
-1. Finish `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
-2. **The pure-leaf pool is empty.** `tools/vectors.py` still lists
-   `0x0045caa0` and `0x00427974`; both are false positives (the stubbed
-   logger, reconstructed in `src/inject/gamelog.c` where the scan cannot see
-   it, and a jump table that is not a function). Offline vectors are done as a
-   source of new targets -- from here it is reading plus `tools/ab.sh`, and
-   the next targets come from the action executor at `0x00420410` and its
-   helpers `0x0041FD10`, `0x0041FD30`, `0x0041FEA0`.
-3. The action executor at `0x00420410` (4,096 B) is the layer above the setter
-   family, and `0x0041FD10`, `0x0041FD30`, `0x0041FEA0` are three more of its
-   helpers, all still original.
+1. **Drive a LOAD.** The save half of the serialiser is already exercised --
+   the game autosaves at mission start and `save/sarge/map1_mission1.sav` is
+   written on every campaign run -- but nothing loads one. `LoadGame` is called
+   only from mission start (`0x00425300`), so starting the same mission with a
+   save present should do it, with no menu navigation at all. That would cover
+   `CheckSaveTag`, `LoadScriptCond`, `LoadEventSection`, `LoadScriptConditions`
+   and `LoadItems` in one run.
+2. **Nine save/load section pairs, in the same order, each saver immediately
+   before its loader in the image** -- read out of `SaveGame` and `LoadGame`
+   separately and they agree. That names four unreconstructed targets by
+   structure: `0x0041EC20` (80 B, mirrors the reconstructed
+   `LoadScriptConditions`), `0x00422470` (368 B, mirrors `LoadEventSection`),
+   `0x0041E9E0` (64 B) and `0x0043F0A0` (176 B). Reconstructing a saver whose
+   loader is already ours makes the round trip check both halves at once.
+3. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
+   median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
+   928 B, 14 callers) is the hub two of them already reach by address.
+4. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The savegame SAVE half is verified by execution; the LOAD half is not.**
+  `SaveItems=1` and `SaveScriptCond=91` on the campaign path -- the game
+  autosaves at mission start. Every loader reads 0 and none is blind.
+- **A zero on one half of a pair says nothing about the other half.** I read
+  `CheckSaveTag=0` as "the savegame layer is undriven" and wrote that down. It
+  only meant nothing was LOADED: saving goes through `WriteSaveTag`, which had
+  no counter because it was not reconstructed yet. The prefix settles it --
+  `save/sarge/map1_mission1.sav` is rewritten on every campaign run. Check that
+  the counter you are reading is on the path you are asking about.
+- **The self-naming sweep replaced the pure-leaf pool as the source of
+  targets.** 109 unreconstructed functions below the CRT line push their own
+  name in a string. It is a better basis than naming from a call site, which is
+  how three wrong names got into `orig.h` before -- every function taken since
+  the sweep is named by its own message.
 
 Things believed but not established. Written down so they are not re-derived,
 and not promoted to fact without evidence.
