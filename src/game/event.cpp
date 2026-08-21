@@ -804,17 +804,56 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                                  msg->maskB, msg->removeevent, 1);
 }
 
+/* --------------------------------------------------- name -> uid ---- */
+
+/* 0x0041F520, and fifty-three callers -- the densest thing in this module.
+ *
+ * A script writes names where the engine wants uids, and this is the one place
+ * that turns one into the other. Three ways to get nothing back: an index out
+ * of range at either end, and an entry that is not type 2. Only forward
+ * references carry an object uid, which is the same test ScriptSetObjBitmap
+ * makes before touching an object.
+ *
+ * `me` is the exception and the reason the function exists at all. When the
+ * name is the one ADDR_SVAR_ME holds, the uid does not come from the table --
+ * it comes from `me`, the caller's own context, so an action written once in
+ * a script means a different object each time it fires. A caller with no
+ * context gets the complaint and zero.
+ *
+ * That is also what settles ADDR_SVAR_ME: the argument is bounded against the
+ * name COUNT before the comparison, so the global holds a name-table index,
+ * not a uid as orig.h's group comment says. */
+uint32_t __cdecl ResolveUid(int32_t name, uint32_t me)
+{
+    const AM2_ScriptName *e;
+
+    if (name < 0 || name >= am2_script_name_count())
+        return 0;
+
+    if (name == *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ME)) {
+        if (me != 0)
+            return me;
+
+        orig_log("Bad ME\n");
+        return 0;
+    }
+
+    e = am2_script_name(name);
+
+    if (e->type != AM2_NAME_TYPE_REF)
+        return 0;
+
+    return (uint32_t)e->value;
+}
+
 /* ------------------------------------------- condition actions ---- */
 
-/* Both stay original. The first runs one action of an `if`; the second turns a
- * name into a uid and has 53 callers of its own. */
+/* Only the action runner stays original now. */
 typedef void (__cdecl *AM2_CondRunActionFn)(AM2_ScriptCond *c, int32_t i,
                                             void *arg);
-typedef uint32_t (__cdecl *AM2_NameToUidFn)(int32_t name, void *arg);
 typedef int32_t (__cdecl *AM2_RandFn)(void);
 #define orig_cond_run_action \
     (*(AM2_CondRunActionFn)AM2_IMAGE(ADDR_COND_RUN_ACTION))
-#define orig_name_to_uid (*(AM2_NameToUidFn)AM2_IMAGE(ADDR_EVENT_NAME_TO_UID))
 #define orig_rand        (*(AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
 
 /* 0x00421430. Run an `if` statement's actions the way its `mode` says to.
@@ -871,7 +910,7 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
         AM2_ObjScript *scr;
         int32_t        id;
 
-        obj = (uint8_t *)LookupByUID(orig_name_to_uid(c->objstate, arg));
+        obj = (uint8_t *)LookupByUID(ResolveUid(c->objstate, (uint32_t)(uintptr_t)arg));
 
         if (!ObjIsItem((const AM2_Object *)obj))
             return;
@@ -1091,6 +1130,8 @@ int event_install(void)
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_SAVE_EVENT_SECTION, (const void *)SaveEventSection,
                         "SaveEventSection", 1);
+    rc |= patch_replace(ADDR_RESOLVE_UID, (const void *)ResolveUid,
+                        "ResolveUid", 2);
     rc |= patch_replace(ADDR_COND_RUN_ACTIONS, (const void *)RunCondActions,
                         "RunCondActions", 2);
     rc |= patch_replace(ADDR_EVENT_TRIGGER_IMMED,

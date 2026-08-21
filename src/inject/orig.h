@@ -1063,6 +1063,10 @@
 #define ADDR_SVAR_TAN             0x00656498u
 #define ADDR_SVAR_BLUE            0x00656454u
 #define ADDR_SVAR_GREY            0x0065646Cu
+/* ADDR_SVAR_ME at least is a name-table INDEX rather than a uid: ResolveUid
+ * bounds its argument against ADDR_SCRIPT_NAME_COUNT and then compares it
+ * against this. The group comment above says "uids"; that is right for what a
+ * type-0 entry's value holds and wrong for this global. */
 #define ADDR_SVAR_ME              0x00656458u
 #define ADDR_SCRIPT_PARSE_VALUE   0x00443010u  /* (ctx,at,&a,&b,&c) */
 #define ADDR_SCRIPT_PARSE_ACTION  0x00440D70u  /* (ctx,at,uint8_t[0x48]) */
@@ -1212,9 +1216,11 @@
 /* Runs one action of an `if` -- (cond, index, arg). 32 bytes, four callers,
  * still original; role name. */
 #define ADDR_COND_RUN_ACTION       0x00421410u
-/* Resolves a name-table index to a uid, or something like it -- 80 bytes and
- * FIFTY-THREE callers, so it is worth doing on its own merits. Role name. */
-#define ADDR_EVENT_NAME_TO_UID     0x0041F520u
+/* 0x0041F520, 80 bytes and FIFTY-THREE callers. Resolves a script name index
+ * to the uid it stands for, with `me` taken from the caller's context instead.
+ * It names itself nowhere -- its only string is the complaint "Bad ME" -- so
+ * this is a role name. */
+#define ADDR_RESOLVE_UID           0x0041F520u
 /* 0x00421430, "Tried to switch on invalid state." -- which names the
  * condition, not the function. It runs an `if` statement's action list the way
  * its `mode` says to. Role name. */

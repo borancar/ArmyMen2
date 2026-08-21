@@ -94,6 +94,11 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
  * object's current state. Nine callers. */
 void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg);
 
+/* 0x0041F520. Resolve a script name index to the uid it stands for. `me`
+ * resolves to the caller's context instead; anything out of range, or not a
+ * type-2 entry, gives 0. Fifty-three callers. */
+uint32_t __cdecl ResolveUid(int32_t name, uint32_t me);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.
