@@ -1550,6 +1550,59 @@ void __cdecl EvtPushObjCtx(uint32_t uid)
     *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET) = 1;
 }
 
+/* 0x0041F570 and 0x0041F5C0. A pair over one object flag bit and one global,
+ * and they are CROSSED rather than symmetric:
+ *
+ *              name == ID15                    any other name
+ *   Clear      flag := 1, and SETS the bit     CLEARS the bit on the
+ *              on the ID15 object              resolved object
+ *   Set        flag := 0                       SETS the bit on the
+ *                                              resolved object
+ *
+ * Each sets the bit in one arm and clears it in the other, and only the first
+ * touches an object at all on the ID15 path. The names below describe the
+ * ordinary arm, which is the one a script reaches by naming something; a
+ * symmetric reading would be wrong in three of those four cells.
+ *
+ * ID15 is the id no keyword produces -- see ADDR_SVAR_ID15 -- so these are the
+ * two functions that make that global live at all. */
+void __cdecl EvtFlag40Clear(int32_t name, uint32_t me)
+{
+    uint8_t *obj;
+
+    if (name == *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ID15)) {
+        *(int32_t *)AM2_IMAGE(ADDR_EVT_ID15_FLAG) = 1;
+
+        obj = (uint8_t *)LookupByUID(
+                  *(const uint32_t *)AM2_IMAGE(ADDR_EVT_ID15_UID));
+
+        if (obj != (uint8_t *)0)
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
+
+        return;
+    }
+
+    obj = (uint8_t *)LookupByUID(ResolveUid(name, me));
+
+    if (obj != (uint8_t *)0)
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS8) &= ~(uint32_t)OBJ_FLAG8_BIT40;
+}
+
+void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
+{
+    uint8_t *obj;
+
+    if (name == *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ID15)) {
+        *(int32_t *)AM2_IMAGE(ADDR_EVT_ID15_FLAG) = 0;
+        return;
+    }
+
+    obj = (uint8_t *)LookupByUID(ResolveUid(name, me));
+
+    if (obj != (uint8_t *)0)
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
+}
+
 /* ------------------------------------------- object table record ---- */
 
 /* 0x0041FF60. Point an object at one of the 256-byte records at
@@ -1834,6 +1887,10 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_FLAG40_CLEAR, (const void *)EvtFlag40Clear,
+                        "EvtFlag40Clear", 1);
+    rc |= patch_replace(ADDR_EVT_FLAG40_SET, (const void *)EvtFlag40Set,
+                        "EvtFlag40Set", 1);
     rc |= patch_replace(ADDR_EVT_TYPE238_ACTION,
                         (const void *)EvtType238Action, "EvtType238Action", 1);
     rc |= patch_replace(ADDR_EVT_PUSH_OBJ_CTX, (const void *)EvtPushObjCtx,

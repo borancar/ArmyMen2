@@ -144,6 +144,12 @@ void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg);
 /* 0x0041FC40. The fourth twin, and the only one admitting types 2, 3 and 8. */
 void __cdecl EvtType238Action(uint32_t uid, int32_t arg);
 
+/* 0x0041F570 and 0x0041F5C0. A crossed pair over one object flag bit: each
+ * sets it in one arm and clears it in the other, and only the first touches an
+ * object on the ID15 path. Named for the ordinary arm. */
+void __cdecl EvtFlag40Clear(int32_t name, uint32_t me);
+void __cdecl EvtFlag40Set(int32_t name, uint32_t me);
+
 /* 0x0041FFD0. Push a one-deep "current object" context -- three globals saved
  * into three companions, then overwritten. A second call before the restore
  * loses the first saved value. */

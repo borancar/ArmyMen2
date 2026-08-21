@@ -1453,6 +1453,24 @@
 #define ADDR_EVT_TYPE238_ACTION   0x0041FC40u  /* void(uint32_t, int32_t) */
 #define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
 
+/* 0x0041F570 and 0x0041F5C0. A pair over one object flag bit and one global,
+ * and they are CROSSED rather than symmetric:
+ *
+ *              name == ID15                     any other name
+ *   0x41F570   flag := 1, and SET the bit on    CLEAR the bit on the
+ *              the object at ADDR_EVT_ID15_UID  resolved object
+ *   0x41F5C0   flag := 0                        SET the bit on the
+ *                                               resolved object
+ *
+ * So each sets the bit in one arm and the other clears it, and only 0x41F570
+ * touches an object on the ID15 path at all. Reproduced exactly; a symmetric
+ * reading would be wrong in three of the four cells. */
+#define ADDR_EVT_FLAG40_CLEAR     0x0041F570u  /* void(int32_t, uint32_t) */
+#define ADDR_EVT_FLAG40_SET       0x0041F5C0u  /* void(int32_t, uint32_t) */
+#define ADDR_EVT_ID15_FLAG        0x00511E48u
+#define ADDR_EVT_ID15_UID         0x00511E20u
+#define OBJ_FLAG8_BIT40           0x40u
+
 /* 0x0041FFD0. Pushes a one-deep "current object" context: three globals are
  * copied into three companions before being overwritten. Nothing here says
  * what the context is FOR, so all six keep positional names. */
