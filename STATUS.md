@@ -153,16 +153,29 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
-- **The line trio can be lit up with a two-word poke, which beats driving a
-  different menu.** `DrawViewRect` runs **557 times** on a campaign drive --
-  about once a frame -- and returns at its first line every time, because
-  `ADDR_VIEW_RECT_ON` (`0x004FCF58`) is 0. Setting that flag and putting any
-  sane rectangle in `ADDR_VIEW_RECT` (`0x004FCF70`) would send all four
-  functions through the full path on the very next frame, and the pixels would
-  show it. The control socket has `dump` but no poke; CLAUDE.md's StopAllSounds
-  precedent is exactly this -- a temporary `poke` added to prove a path runs.
-  Cheaper and more certain than the menu-drive guess in the previous commit,
-  which is superseded.
+- **CORRECTION: the "two-word poke" claim was wrong, and the probe that tested
+  it says so.** The previous commit asserted that setting `ADDR_VIEW_RECT_ON`
+  and a rectangle would push DrawViewRect's whole trio through on the next
+  frame. A temporary `poke` command was added to the control socket and it did
+  not happen. What the probe DID establish, by sampling counters at every step
+  of the drive:
+
+  | point | DrawViewRect | flag |
+  |---|---:|---|
+  | title, SINGLE PLAYER, player row, SELECT, loading | 0 | 0 |
+  | mission live | 621 | 0 |
+
+  So it runs only once the mission is live, roughly per frame, and the flag is
+  0 for the whole of a normal drive -- setting it at the title never takes,
+  because nothing has called the function yet. Poking during the mission left
+  DrawViewRect's own counter unmoved over the following four seconds, which
+  means that sampling window was not a rendering one; why is not isolated.
+  DrawRect stayed 0 throughout.
+
+  The claim to carry forward is the narrow one: DrawViewRect is per-frame in a
+  live mission and gated off, so the trio is reachable in principle. Getting
+  the flag set at a moment the function is actually running is the unsolved
+  part, and it is more than a two-word poke.
 
 - **The Lock/Unlock pairing is per FEATURE, not per function.** DrawVLine and
   DrawHLine each Lock and never Unlock; DrawViewRect Locks once, draws the
