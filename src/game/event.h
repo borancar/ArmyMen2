@@ -150,6 +150,14 @@ void __cdecl EvtType238Action(uint32_t uid, int32_t arg);
 void __cdecl EvtFlag40Clear(int32_t name, uint32_t me);
 void __cdecl EvtFlag40Set(int32_t name, uint32_t me);
 
+/* 0x0041F600 and 0x0041F650. Put a full-screen bitmap up, pausing or not. The
+ * pausing form selects the overlay sub-state, marks it dirty, and announces
+ * SendGamePause(1, AM2_EVENT_FLAG_8) -- so pause reason 8 is "a bitmap is up".
+ * The pause is announced BEFORE the load, so a failed load still leaves the
+ * game paused. */
+void __cdecl EvtShowBitmap(const char *name);
+void __cdecl EvtShowBitmapNoPause(const char *name);
+
 /* 0x0041FFD0. Push a one-deep "current object" context -- three globals saved
  * into three companions, then overwritten. A second call before the restore
  * loses the first saved value. */

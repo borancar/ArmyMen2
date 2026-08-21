@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 400 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 400 | 393 of them below the CRT line |
+| `patch_replace` sites | 402 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 402 | 395 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 91,728 / 372,816 B (**24.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 91,856 / 372,816 B (**24.6%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,20 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Pause reason 8 is "a full-screen bitmap is up", and that names a bit of the
+  pause mask.** `EvtShowBitmap` calls `SendGamePause(1, AM2_EVENT_FLAG_8)`
+  where frame.cpp calls `SendGamePause(0, AM2_EVENT_FLAG_8)` -- set and clear
+  of the same reason. CLAUDE.md records the event flags AS the pause mask
+  without naming any bit; this is one named.
+
+- **`showbitmap` selects sub-state 22 and marks the overlay dirty, which
+  confirms CLAUDE.md's reading of that table from a caller.** 0x16 is 22, which
+  is `AM2_SUBSTATE_BASE` -- the first of the thirteen arms, and one of the nine
+  described as "repaint if the overlay is dirty, then DrawMenuOverlay". The
+  companion write is to `ADDR_OVERLAY_DIRTY`, already named, which is exactly
+  that dirty bit. The two writes are one gesture; the alias ratchet is what
+  made them legible, by refusing a second name for the flag.
 
 - **A pair that looks symmetric can be crossed, and drawing the table is what
   shows it.** `EvtFlag40Clear` and `EvtFlag40Set` each have an ordinary arm and
@@ -283,7 +297,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **14 functions are left in the event.cpp band, and most are tiny.** Four
+- **12 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

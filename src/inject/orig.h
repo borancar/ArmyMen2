@@ -1471,6 +1471,33 @@
 #define ADDR_EVT_ID15_UID         0x00511E20u
 #define OBJ_FLAG8_BIT40           0x40u
 
+/* 0x0041F600 and 0x0041F650. The same thing twice -- chdir to `bitmaps`, drop
+ * the bitmap at 0x005122C4 and load a new one -- except that the first also
+ * sets the in-mission sub-state to 0x16, raises a flag, and calls
+ * SendGamePause(1, AM2_EVENT_FLAG_8).
+ *
+ * That settles what pause reason 8 IS: a full-screen bitmap is up. frame.cpp
+ * calls SendGamePause(0, AM2_EVENT_FLAG_8) -- un-pause, reason 8 -- and this
+ * is the matching set. CLAUDE.md records the event flags as the pause mask;
+ * this names one of its bits.
+ *
+ * The two correspond to the script keywords `showbitmap` (65) and
+ * `showbitmapnopause` (66). That correspondence is INFERRED from which one
+ * pauses, not traced through the action dispatcher, and is labelled as such. */
+#define ADDR_EVT_SHOW_BITMAP      0x0041F600u  /* void(const char *) */
+#define ADDR_EVT_SHOW_BITMAP_NP   0x0041F650u  /* void(const char *) */
+#define ADDR_CURRENT_BITMAP       0x005122C4u
+#define ADDR_FREE_BITMAP          0x00446410u  /* void(void **slot) */
+#define ADDR_LOAD_BITMAP          0x004462F0u  /* void *(const char *, int32) */
+#define ADDR_STR_BITMAPS_DIR      0x00478670u  /* "bitmaps" */
+/* 0x16 is 22, which is AM2_SUBSTATE_BASE -- the FIRST arm of the thirteen-entry
+ * sub-state table, and one of the nine that repaint when the overlay is dirty
+ * and then call DrawMenuOverlay. The flag it raises alongside is
+ * ADDR_OVERLAY_DIRTY, already named, which is exactly that dirty bit. So
+ * `showbitmap` selects the overlay arm and marks it needing paint, and
+ * CLAUDE.md's reading of that table is confirmed from a caller. */
+#define AM2_SUBSTATE_BITMAP       0x16
+
 /* 0x0041FFD0. Pushes a one-deep "current object" context: three globals are
  * copied into three companions before being overwritten. Nothing here says
  * what the context is FOR, so all six keep positional names. */

@@ -8,6 +8,8 @@
 #include "event.h"
 #include "image.h"
 #include "misc.h"      /* FilterMatches */
+#include "armymsg.h"   /* SendGamePause */
+#include "gamedir.h"   /* SetGameDir */
 #include "objscript.h" /* AM2_ObjScript, kObjScripts */
 #include "scriptint.h"
 #include "objtable.h"
@@ -1603,6 +1605,53 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
         *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
 }
 
+/* --------------------------------------------------- bitmaps ---- */
+
+typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
+typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
+#define orig_free_bitmap (*(AM2_FreeBitmapFn)AM2_IMAGE(ADDR_FREE_BITMAP))
+#define orig_load_bitmap (*(AM2_LoadBitmapFn)AM2_IMAGE(ADDR_LOAD_BITMAP))
+
+/* 0x0041F600 and 0x0041F650. Put a full-screen bitmap up, pausing or not.
+ *
+ * Both chdir into `bitmaps`, drop whatever bitmap is loaded, and load the
+ * named one. The pausing form additionally sets the in-mission sub-state to
+ * 0x16, raises a flag, and tells the other players with
+ * SendGamePause(1, AM2_EVENT_FLAG_8).
+ *
+ * That last call names a bit. frame.cpp calls SendGamePause(0,
+ * AM2_EVENT_FLAG_8) -- un-pause, reason 8 -- and this is the matching set, so
+ * pause reason 8 is "a full-screen bitmap is up". CLAUDE.md records the event
+ * flags as the pause mask without naming any of its bits; this names one.
+ *
+ * The pair corresponds to the script keywords `showbitmap` and
+ * `showbitmapnopause`, tokens 65 and 66. That is inferred from which of them
+ * pauses rather than traced through the action dispatcher, and is worth
+ * checking against 0x00420410 when that function is read.
+ *
+ * Note the pause is announced BEFORE the bitmap is loaded, so a load that
+ * fails still leaves the game paused. */
+void __cdecl EvtShowBitmap(const char *name)
+{
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+
+    *(int32_t *)AM2_IMAGE(ADDR_MENU_REQUEST_TAKEN) = AM2_SUBSTATE_BITMAP;
+    *(int32_t *)AM2_IMAGE(ADDR_OVERLAY_DIRTY)      = 1;
+
+    SendGamePause(1, AM2_EVENT_FLAG_8);
+
+    orig_free_bitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
+    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = orig_load_bitmap(name, 0);
+}
+
+void __cdecl EvtShowBitmapNoPause(const char *name)
+{
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+
+    orig_free_bitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
+    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = orig_load_bitmap(name, 0);
+}
+
 /* ------------------------------------------- object table record ---- */
 
 /* 0x0041FF60. Point an object at one of the 256-byte records at
@@ -1887,6 +1936,11 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_SHOW_BITMAP, (const void *)EvtShowBitmap,
+                        "EvtShowBitmap", 1);
+    rc |= patch_replace(ADDR_EVT_SHOW_BITMAP_NP,
+                        (const void *)EvtShowBitmapNoPause,
+                        "EvtShowBitmapNoPause", 1);
     rc |= patch_replace(ADDR_EVT_FLAG40_CLEAR, (const void *)EvtFlag40Clear,
                         "EvtFlag40Clear", 1);
     rc |= patch_replace(ADDR_EVT_FLAG40_SET, (const void *)EvtFlag40Set,
