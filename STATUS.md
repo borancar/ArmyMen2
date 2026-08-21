@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `bbefc4e`. Working tree clean.
+Last updated: **2026-08-21**, at `c1f3d5d`. Working tree clean.
 
 ## In flight
 
@@ -23,7 +23,10 @@ Nothing uncommitted.
 - **The pure-leaf pool is nearly empty**: 14 pure unreconstructed leaves left,
   from the 161 this project started that count at. Three of the 14 are false
   positives -- see Leads.
-- **Three holes closed in the vector harness, all found by mutation.** Every
+- **Four holes closed in the vector harness, all found by mutation.** The
+  correlation heuristics -- copy one argument to another, set one to -1 -- were
+  overwriting explicit `ARG_VALUES` sets, so `MaskPixelSolid32` reached only 4
+  of 55 (x, y) combinations and could not tell `acc >= x` from `acc > x`. Every
   pointer argument took its NULL from one shared decision, so they were null
   together and never one at a time -- which made `RemapBytes`' whole copy path
   unreachable. And the scratch fill had period 256 while `PTR_STRIDE` is
@@ -57,12 +60,12 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 301 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 301 | 294 of them below the CRT line |
+| `patch_replace` sites | 302 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 302 | 295 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
-| pure unreconstructed leaves | 12 | `tools/vectors.py --all` |
+| pure unreconstructed leaves | 11 | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
@@ -76,7 +79,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **6,673** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **6,754** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, twice: log identical at 14 messages, 2,571/786,432 pixels both times |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
@@ -87,10 +90,8 @@ counts probe before reading one as coverage -- that is what turned the
 ## Next
 
 1. Finish `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
-2. Keep taking pure leaves: 9 real ones left. `0x0041cec0` is read and ready
-   -- an RLE decoder like `MaskPixelSolid` but with a dword row table rather
-   than a word one. `0x00449ef0` needs a SEED chain; it dereferences
-   `obj->[0xC0]->[0]`.
+2. Keep taking pure leaves: 8 real ones left. `0x00449ef0` needs a SEED chain;
+   it dereferences `obj->[0xC0]->[0]` and switches on codes 0x18..0x28.
 3. The action executor at `0x00420410` (4,096 B) is the layer above the setter
    family, and `0x0041FD10`, `0x0041FD30`, `0x0041FEA0` are three more of its
    helpers, all still original.
@@ -113,6 +114,14 @@ and not promoted to fact without evidence.
   set from `patch_replace` calls in `src/game` only and cannot see a harness
   patch. Worth fixing in `merges.reconstructed()`, which is where the same
   lesson is already written down.
+- **Some things cannot be checked offline at all, and `MaskPixelSolid32` is
+  the clean example.** The only difference between it and `MaskPixelSolid` is
+  that its row table holds dword offsets rather than word ones -- and a row
+  offset must land inside a 0x8000-byte scratch to be followed, so its high
+  word is always zero and the two reads are indistinguishable. Mutating the
+  dword read back to a word passes every vector. Raising `SCRATCH_SZ` past
+  64K would fix it and would re-cut every vector in the set; not done, and
+  recorded here rather than left as a silent gap.
 - **100% instruction coverage is not verification, and there is now a worked
   example.** `RemapBytes` reached every instruction while `count & 3` and
   `count & 7` were indistinguishable, because no count that reached the copy
