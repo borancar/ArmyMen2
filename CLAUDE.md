@@ -83,7 +83,7 @@ division is visible, use it.
 
 `src/game/win32/` holds every module that talks to Win32 or DirectX -- **15**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
-API at all, and there are **24**; the split is the answer to "what still talks
+API at all, and there are **25**; the split is the answer to "what still talks
 to the outside world" in directory form.
 
 **The flat half is the one that grows, and this file's count of it went stale
@@ -1820,4 +1820,12 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   statements that parsed. Four independent numbers agreeing on both sides is
   worth more than "the log is identical".
 - Object types 2, 3 and 8 are still unidentified.
-- `object.aai` complains about `link 33-1..4`; unexplained.
+- **`object.aai`'s `link 33-1..4` complaint is explained, and it is data
+  rather than a defect.** The message is "Object AAI record not found for link
+  %02d-%-3d", emitted by `0x00435FD0` -- a post-parse validator that qsorts the
+  link table (comparator `0x00435EB0`, stride `0x14`) and then checks every
+  parent key against the AAI records. So the numbers are a parent TYPE and four
+  link numbers, and the file declares links from a parent it never defines. It
+  fires identically under `AM2_NOPATCH=1`, which is what settles that it is the
+  original's behaviour: `tools/ab.sh campaign` compares the log and passes with
+  all four lines on both sides.

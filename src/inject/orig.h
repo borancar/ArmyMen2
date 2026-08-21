@@ -1314,7 +1314,36 @@
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
 #define ADDR_DEF_GAME_PARSE        0x00424590u
 #define ADDR_DEF_OBJ_PARSE         0x00435B60u
-#define ADDR_DEF_LINK_PARSE        0x00436080u
+
+/* The object-definition files (.aai) have a command vocabulary of their OWN --
+ * it is not docs/scripttokens.md's. 0x5F is LINK there; in the script table 95
+ * is `sniper`, which is what makes conflating the two easy and wrong. */
+#define ADDR_DEF_LINK_PARSE        0x004360C0u  /* int32_t(int32_t, char *) */
+#define AM2_DEF_CMD_LINK           0x5F
+/* Name -> index over a table of 12-byte entries at 0x00476FE0 {name, value,
+ * ptr}, -1 when absent; DefObjParse is handed the index. Role name: it names
+ * itself nowhere. */
+#define ADDR_DEF_NAME_INDEX        0x0041A640u  /* int32_t(const char *) */
+#define ADDR_DEF_NAME_TABLE        0x00476FE0u
+/* strtol into *out, 0 on failure. Its one string is "Bad or missing number",
+ * which names the condition and not the function -- 48 callers. */
+#define ADDR_DEF_PARSE_NUMBER      0x0041A250u  /* int32_t(int32_t *, const char *) */
+#define ADDR_DEF_SEPARATORS        0x00477A4Cu  /* " \t\n;," */
+/* The link table: 20-byte records, count first. CountLinksWithParent walks it
+ * comparing the parent key at +0, which is how the record's first field is
+ * known to be that key. */
+#define ADDR_DEF_LINKS             0x0051617Cu
+#define ADDR_DEF_LINK_COUNT        0x00516180u
+#define ADDR_DEF_COUNT_LINKS       0x00435FA0u  /* int32_t(int32_t parentkey) */
+#define ADDR_DEF_ADD_LINK          0x00435EE0u  /* void(const AM2_DefLink *) */
+#define ADDR_CRT_STRTOK            0x0046551Cu  /* the game's own; the state is
+                                                 * shared with DefObjParse, so
+                                                 * libc's would be wrong */
+/* NOT DefLinkParse. 0x00436080 is a 52-byte wrapper that searches the link
+ * table -- docs/functions.tsv merges the two and tools/merges.py does not
+ * split them, so this address carried the wrong name until the body was read.
+ * The function with the three "DefLinkParse:" strings is 0x004360C0, above. */
+#define ADDR_DEF_LINK_SEARCH       0x00436080u
 
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --
                                                * GenerateObjScriptFromTokens,

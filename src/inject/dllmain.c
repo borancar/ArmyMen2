@@ -28,6 +28,7 @@
 #include "../game/item.h"
 #include "../game/msgslot.h"
 #include "../game/armymsg.h"
+#include "../game/defparse.h"
 #include "../game/objflag.h"
 #include "../game/event.h"
 #include "../game/trig.h"
@@ -436,6 +437,7 @@ static void install(void)
     item_install();
     msgslot_install();
     armymsg_install();
+    defparse_install();
     objflag_install();
     misc_install();
     gamedir_install();

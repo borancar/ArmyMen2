@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 347 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 347 | 340 of them below the CRT line |
+| `patch_replace` sites | 348 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 348 | 341 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 83,632 / 372,816 B (**22.4%**) | patched entries' sizes over the total |
-| modules | 24 flat + 15 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 84,144 / 372,816 B (**22.6%**) | patched entries' sizes over the total |
+| modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
@@ -152,6 +152,25 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A name collision in orig.h, not an address collision -- and the build said
+  so while a filter ate it.** `ADDR_DEF_LINK_PARSE` already existed, pointing
+  at `0x00436080`, the merged wrapper; adding a second `#define` with
+  `0x004360C0` meant the OLD one won, so the patch landed on the wrong function
+  and the first run logged "'LINK' command not found" with a pointer where the
+  command should be. GCC warned `redefined` and my own `grep -v` for the
+  pre-existing `g_defaultOwner` warning hid it. Two rules, then: grep orig.h
+  for the NAME as well as the address, and never filter `redefined` out of a
+  build you are about to trust. The stale name is now
+  `ADDR_DEF_LINK_SEARCH`, which is what `0x00436080` actually is.
+
+- **`DefLinkParse` is the first reconstruction in several with a
+  DISCRIMINATING A/B.** It runs 49 times at load, and swapping the parent and
+  child keys diverges the log ("Saved 310 items") and moves the pixels from
+  2,571 to 2,575. Contrast the preceding four, where the campaign A/B was
+  clean for mutations too. Worth remembering which subsystems the drive
+  actually observes: load-time parsing yes, event records and outgoing
+  messages no.
 
 - **A function can be live code, correctly wired, and still unreachable from
   anything the game ships.** `ScriptSetObjBitmap` is one arm of the 4096-byte
