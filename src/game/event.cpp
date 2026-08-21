@@ -848,13 +848,26 @@ uint32_t __cdecl ResolveUid(int32_t name, uint32_t me)
 
 /* ------------------------------------------- condition actions ---- */
 
-/* Only the action runner stays original now. */
-typedef void (__cdecl *AM2_CondRunActionFn)(AM2_ScriptCond *c, int32_t i,
-                                            void *arg);
 typedef int32_t (__cdecl *AM2_RandFn)(void);
-#define orig_cond_run_action \
-    (*(AM2_CondRunActionFn)AM2_IMAGE(ADDR_COND_RUN_ACTION))
+/* The action EXECUTOR stays original -- 4096 bytes in this same module, and
+ * the one thing under the condition layer still not reconstructed. */
+typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
+                                              void *arg);
+#define orig_run_script_action_at \
+    (*(AM2_RunScriptActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
 #define orig_rand        (*(AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* 0x00421410. Run the i'th action of a condition.
+ *
+ * All it does is index: the action array is 0x48 bytes a stride, which is
+ * AM2_ScriptAction's size arrived at here for the third time and from a third
+ * direction -- the parser writes that record, SaveObjScriptSection copies it,
+ * and this strides it. Four callers, so it is the shared way in rather than
+ * something RunCondActions invented. */
+static void __cdecl CondRunAction(AM2_ScriptCond *c, int32_t i, void *arg)
+{
+    orig_run_script_action_at(&c->actions[i], arg);
+}
 
 /* 0x00421430. Run an `if` statement's actions the way its `mode` says to.
  *
@@ -890,17 +903,17 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
         if (c->nactions <= 0)
             return;
         for (int32_t i = 0; i < c->nactions; i++)
-            orig_cond_run_action(c, i, arg);
+            CondRunAction(c, i, arg);
         return;
 
     case 1:
-        orig_cond_run_action(c, orig_rand() % c->nactions, arg);
+        CondRunAction(c, orig_rand() % c->nactions, arg);
         return;
 
     case 2: {
         int32_t at = *(const int8_t *)&c->cursor;
 
-        orig_cond_run_action(c, at, arg);
+        CondRunAction(c, at, arg);
         *(int8_t *)&c->cursor = (int8_t)((at + 1) % c->nactions);
         return;
     }
@@ -934,7 +947,7 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
             }
 
             if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) == e->value) {
-                orig_cond_run_action(c, i, arg);
+                CondRunAction(c, i, arg);
                 return;
             }
         }
@@ -1132,6 +1145,8 @@ int event_install(void)
                         "SaveEventSection", 1);
     rc |= patch_replace(ADDR_RESOLVE_UID, (const void *)ResolveUid,
                         "ResolveUid", 2);
+    rc |= patch_replace(ADDR_COND_RUN_ACTION, (const void *)CondRunAction,
+                        "CondRunAction", 4);
     rc |= patch_replace(ADDR_COND_RUN_ACTIONS, (const void *)RunCondActions,
                         "RunCondActions", 2);
     rc |= patch_replace(ADDR_EVENT_TRIGGER_IMMED,

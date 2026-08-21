@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 373 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 373 | 366 of them below the CRT line |
+| `patch_replace` sites | 374 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 374 | 367 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 89,728 / 372,816 B (**24.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 89,760 / 372,816 B (**24.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,15 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A mutation resolves the count-of-0 blind spot as well as a probe does, and
+  verifies the function while it is at it.** `CondRunAction` reads 0 -- its
+  only live caller is our own `RunCondActions` -- and CLAUDE.md's standing
+  advice is to settle that with a temporary probe. Making it always run action
+  0 instead of the i'th puts `campaign` at 294,304 differing pixels, 37.4% of
+  the frame. That proves it runs AND that this drive checks what it does, in
+  one run, with nothing to add or remove from the harness. Prefer it to a probe
+  when the function is small enough to mutate meaningfully.
 
 - **The alias ratchet has now caught four call-site names this run, and each
   time the body's name was better.** `ADDR_ARMY_MESSAGE_FLUSH` vs

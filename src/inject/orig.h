@@ -1244,8 +1244,11 @@
 #define ADDR_EVENT_MESSAGE_SEND    0x0041F150u
 #define ADDR_EVENT_MESSAGE_RECV    0x0041F320u
 #define ADDR_EVENT_TRIGGER_IMMED   0x0041EF80u  /* 464 B, 3 callers */
-/* Runs one action of an `if` -- (cond, index, arg). 32 bytes, four callers,
- * still original; role name. */
+/* Runs one action of an `if` -- (cond, index, arg). Thirty-two bytes and four
+ * callers: it does nothing but index the 0x48-byte action array and hand the
+ * result to the executor, which is a third independent confirmation of
+ * AM2_ScriptAction's size (the parser writes it, the saver copies it, this
+ * strides it). Role name. */
 #define ADDR_COND_RUN_ACTION       0x00421410u
 /* 0x0041F520, 80 bytes and FIFTY-THREE callers. Resolves a script name index
  * to the uid it stands for, with `me` taken from the caller's context instead.
