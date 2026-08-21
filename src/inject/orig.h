@@ -1167,8 +1167,18 @@
  * (0x0041F820, 0x0041F8B0, and 0x0041F780 for a third pair). */
 #define ADDR_EVT_AT_OBJ_POS_A    0x0041F880u  /* void(int32, uint32, int32) */
 #define ADDR_EVT_AT_OBJ_POS_B    0x0041F970u  /* void(int32,int32,uint32,int32) */
-#define ADDR_AT_POINT_A          0x0041F820u  /* void(int32, uint32, int32) */
-#define ADDR_AT_POINT_B          0x0041F8B0u  /* void(int32,int32,uint32,int32) */
+/* The "At" halves are not plain point-takers, which the "On" wrappers above
+ * made them look like. Each takes a UID as well, and a `relative` flag: when
+ * it is set the object's own position is ADDED to the point rather than
+ * replacing it. That flag is AM2_ScriptAction.relative -- the leading `+` on a
+ * script's coordinates -- so this is where that syntax is honoured. */
+#define ADDR_AT_POINT_A          0x0041F820u  /* void(uid, point, relative) */
+#define ADDR_AT_POINT_B          0x0041F8B0u  /* void(int32, uid, point, rel) */
+#define ADDR_AT_POINT_C          0x0041F780u  /* void(uid, point, relative) */
+#define ADDR_POINT_ACTION_A      0x004582F0u  /* void(obj, point) */
+#define ADDR_POINT_ACTION_C      0x00428F80u  /* void(obj, point) */
+#define OBJ_OFF_X                0x12u
+#define OBJ_OFF_Y                0x14u
 #define ADDR_OBJ_ACTION          0x00428DA0u  /* void(void *obj) */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is

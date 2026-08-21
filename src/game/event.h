@@ -130,6 +130,14 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b);
  * the twin takes a point, and pass the object's own position instead. Note the
  * uid is the SECOND and THIRD argument respectively, because it sits where the
  * point sits in each twin's signature. */
+/* 0x0041F820 and 0x0041F780. The "At" halves: each takes its own uid and a
+ * `relative` flag -- AM2_ScriptAction.relative, the leading `+` on a script's
+ * coordinates -- and ADDS the object's position to the point when it is set.
+ * EvtAtPointC additionally declines when the object is already there, on the
+ * non-relative path only. */
+void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative);
+void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative);
+
 void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c);
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d);
 

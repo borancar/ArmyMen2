@@ -823,7 +823,9 @@ typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
 typedef void (__cdecl *AM2_AtPointBFn)(int32_t a, int32_t b, uint32_t point,
                                        int32_t d);
 #define orig_guarded_action (*(AM2_GuardedActionFn)AM2_IMAGE(ADDR_GUARDED_ACTION))
-#define orig_at_point_a     (*(AM2_AtPointAFn)AM2_IMAGE(ADDR_AT_POINT_A))
+typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
+#define orig_point_action_a (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_A))
+#define orig_point_action_c (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_C))
 #define orig_at_point_b     (*(AM2_AtPointBFn)AM2_IMAGE(ADDR_AT_POINT_B))
 
 /* 0x0041FE70. Deploy the object a uid names.
@@ -925,6 +927,80 @@ void __cdecl EvtObjSet(uint32_t uid, int32_t value)
     orig_obj_set(LookupByUID(uid), value, 0);
 }
 
+/* 0x0041F820 and 0x0041F780. The "At" halves, and they are not the plain
+ * point-takers the "On" wrappers made them look like.
+ *
+ * Each takes a uid of its own and a `relative` flag. When that flag is set the
+ * object's position is ADDED to the point rather than replacing it -- which is
+ * AM2_ScriptAction.relative, the leading `+` a script may put on coordinates.
+ * So this is where that syntax is honoured, two levels below the parser that
+ * recorded it.
+ *
+ * They differ in what they do with the result, and in one guard. EvtAtPointA
+ * clears field 0x540 first if the object is type 2 -- the same field
+ * EvtSetField540 exists for -- and always calls its action. EvtAtPointC
+ * declines when the object is ALREADY at the point, but only on the
+ * non-relative path; adding a zero offset would be a no-op anyway, so the
+ * asymmetry costs nothing and is reproduced.
+ *
+ * The original builds the relative sum in its own first argument slot. That is
+ * a register-allocation detail with no observable side, so a local is used. */
+void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative)
+{
+    uint8_t *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = (uint8_t *)LookupByUID(uid);
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    if (relative) {
+        uint16_t x = (uint16_t)(point & 0xFFFFu)
+                   + *(const uint16_t *)(obj + OBJ_OFF_X);
+        uint16_t y = (uint16_t)(point >> 16)
+                   + *(const uint16_t *)(obj + OBJ_OFF_Y);
+
+        point = (uint32_t)x | ((uint32_t)y << 16);
+    }
+
+    if (ObjIsType2((const AM2_Object *)obj))
+        *(int32_t *)(obj + 0x540) = 0;
+
+    orig_point_action_a(obj, point);
+}
+
+void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
+{
+    uint8_t *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = (uint8_t *)LookupByUID(uid);
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    if (relative) {
+        uint16_t x = *(const uint16_t *)(obj + OBJ_OFF_X)
+                   + (uint16_t)(point & 0xFFFFu);
+        uint16_t y = *(const uint16_t *)(obj + OBJ_OFF_Y)
+                   + (uint16_t)(point >> 16);
+
+        orig_point_action_c(obj, (uint32_t)x | ((uint32_t)y << 16));
+        return;
+    }
+
+    if (*(const uint16_t *)(obj + OBJ_OFF_X) == (uint16_t)(point & 0xFFFFu)
+        && *(const uint16_t *)(obj + OBJ_OFF_Y) == (uint16_t)(point >> 16))
+        return;
+
+    orig_point_action_c(obj, point);
+}
+
 /* 0x0041F710. The most guarded member of the family: four tests before it acts.
  *
  * The uid threshold, then the pointer, then a flag bit at +8 that must be
@@ -976,7 +1052,7 @@ void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c)
     if (obj == (const uint8_t *)0)
         return;
 
-    orig_at_point_a(a, *(const uint32_t *)(obj + OBJ_OFF_POS), c);
+    EvtAtPointA(a, *(const uint32_t *)(obj + OBJ_OFF_POS), c);
 }
 
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
@@ -1368,6 +1444,10 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_AT_POINT_A, (const void *)EvtAtPointA,
+                        "EvtAtPointA", 2);
+    rc |= patch_replace(ADDR_AT_POINT_C, (const void *)EvtAtPointC,
+                        "EvtAtPointC", 3);
     rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_A, (const void *)EvtAtObjPosA,
                         "EvtAtObjPosA", 1);
     rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_B, (const void *)EvtAtObjPosB,
