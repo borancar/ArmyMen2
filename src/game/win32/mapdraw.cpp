@@ -692,8 +692,72 @@ void __cdecl ScrollView(void)
     }
 }
 
+/* ------------------------------------------------------ vline ---- */
+
+#define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
+#define g_pitch       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
+#define g_framebuffer (*(uint8_t **)(uintptr_t)ADDR_FRAMEBUFFER)
+/* g_drawTarget above is already this address; one name for it. */
+
+/* 0x0041CBA0. Draw a clipped vertical line one byte at a time.
+ *
+ * A role name -- it says nothing about itself. Four arguments: the column, the
+ * two rows, and the colour byte.
+ *
+ * The first branch is the interesting one. When y0 > y1 the original calls
+ * 0x0042E170, which is ADDR_NULL_STUB -- sixteen bytes containing a single
+ * `ret`. Whatever was there in 1999, a swap or a complaint, is gone from this
+ * build, and the values are used unswapped: the pointer arithmetic below then
+ * puts `end` BEFORE `p`, the unsigned compare catches it, and nothing is
+ * drawn. So an inverted line is silently dropped, and the call that was
+ * supposed to prevent that does nothing. Reproduced, stub and all.
+ *
+ * Clipping is against the shared screen rectangle that text and sprites use.
+ * Note the asymmetry the original has: `right` and `bottom` are exclusive
+ * bounds tested with `>=`, and the bottom clamp is `bottom - 1`, while `left`
+ * and `top` are inclusive.
+ *
+ * It locks the surface and does NOT unlock it -- the pairing is the caller's,
+ * which is why this shows up in the bracket list with only one half. */
+static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
+                              int32_t colour)
+{
+    uint8_t *p;
+    uint8_t *end;
+
+    if (y0 > y1)
+        NullStub();
+
+    if (x < g_screenClip.left || x >= g_screenClip.right)
+        return;
+
+    if (y0 >= g_screenClip.bottom || y1 < g_screenClip.top)
+        return;
+
+    if (y0 < g_screenClip.top)
+        y0 = g_screenClip.top;
+
+    if (y1 >= g_screenClip.bottom)
+        y1 = g_screenClip.bottom - 1;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    p   = g_framebuffer + (int32_t)g_pitch * y0 + x;
+    end = p + (int32_t)g_pitch * (y1 - y0);
+
+    if (p > end)
+        return;
+
+    do {
+        *p = (uint8_t)colour;
+        p += g_pitch;
+    } while (p <= end);
+}
+
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
     int rc = 0;
 
     rc |= patch_replace(ADDR_MERGE_DIRTY, (const void *)ScrollView,

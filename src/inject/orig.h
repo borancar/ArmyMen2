@@ -60,6 +60,10 @@
 #define ADDR_GAME_MALLOC    0x004647F8u  /* the game's own CRT malloc */
 #define ADDR_GAME_FREE      0x004646A9u  /* the game's own CRT free */
 #define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- text and sprites share it */
+/* 0x0041CBA0. A clipped vertical line straight into the locked framebuffer.
+ * It names itself nowhere, so this is a role name; two callers. One of the 29
+ * functions in CLAUDE.md's Lock/Unlock bracket list. */
+#define ADDR_DRAW_VLINE     0x0041CBA0u  /* void(x, y0, y1, colour) */
 
 /* ---- DirectDraw ------------------------------------------------------
  *

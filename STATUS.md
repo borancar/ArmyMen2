@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 368 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 368 | 361 of them below the CRT line |
+| `patch_replace` sites | 369 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 369 | 362 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 88,944 / 372,816 B (**23.9%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 89,104 / 372,816 B (**23.9%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,19 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A rasteriser is not automatically observable.** I switched to CLAUDE.md's
+  Lock/Unlock bracket list precisely because those draw PIXELS and the A/B
+  compares pixels -- and `DrawVLine` still reads 0. Its two call sites are both
+  inside one 96-byte function, `0x0041CDC0`, which has a single caller of its
+  own; the whole trio (`0x0041CBA0` vertical, `0x0041CC40` horizontal,
+  `0x0041CDC0` the rectangle that uses both) never fires on a campaign drive.
+  Subsystem is not the right unit for guessing observability; reachability is.
+
+- **`0x0041CC40` is `DrawVLine`'s horizontal twin** -- same null-stub branch,
+  clips the other pair of edges, and replicates the colour byte into a dword
+  for a wide fill rather than stepping a byte at a time. It is the obvious next
+  one off the bracket list, and `0x0041CDC0` after it completes the trio.
 
 - **Pathfinding is a whole subsystem the drive cannot see.** `AddRegionLink`
   runs 2,230 times building the region graph at map load, and building NO graph
