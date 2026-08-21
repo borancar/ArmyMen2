@@ -40,7 +40,14 @@ int32_t __cdecl CheckSaveTag(am2_FILE *fp, uint32_t expected,
     return 0;
 }
 
+void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag)
+{
+    orig_fwrite(&tag, 4, 1, fp);
+}
+
 int savetag_install(void)
 {
     return patch_replace(ADDR_CHECK_SAVE_TAG, (const void *)CheckSaveTag, "CheckSaveTag", 4);
+    patch_replace(ADDR_WRITE_SAVE_TAG, (const void *)WriteSaveTag,
+                  "WriteSaveTag", 2);
 }

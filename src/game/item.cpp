@@ -10,6 +10,9 @@
 
 #include "item.h"
 #include "objtable.h"
+#include "savetag.h"
+#include "image.h"
+#include "crt.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -75,6 +78,56 @@ int32_t __cdecl ObjFieldB(const void *obj)
     return *(const int8_t *)((const uint8_t *)obj + 0x64);
 }
 
+/* The three below stay original: writing one item, reading one item, and the
+ * reset the loader opens with. Each is a target of its own. */
+typedef void (__cdecl *am2_save_one_fn)(am2_FILE *fp, void *obj);
+typedef void (__cdecl *am2_load_one_fn)(am2_FILE *fp, int32_t flag);
+typedef void (__cdecl *am2_void_fn)(void);
+
+#define orig_save_one_item (*(am2_save_one_fn)ADDR_SAVE_ONE_ITEM)
+#define orig_load_one_item (*(am2_load_one_fn)ADDR_LOAD_ONE_ITEM)
+#define orig_items_reset   (*(am2_void_fn)ADDR_ITEMS_RESET)
+
+int32_t __cdecl SaveItems(am2_FILE *fp)
+{
+    int32_t  count = 0;
+    void    *obj;
+
+    WriteSaveTag(fp, AM2_SAVE_TAG_ITEMS);
+
+    for (obj = FirstItem(); obj; obj = NextItem()) {
+        orig_save_one_item(fp, obj);
+        count++;
+    }
+
+    WriteSaveTag(fp, AM2_SAVE_TAG_END);
+    am2_log("Saved %d items\n", count);
+    return 1;
+}
+
+int32_t __cdecl LoadItems(am2_FILE *fp)
+{
+    uint32_t mark;
+    int32_t  count = 0;
+
+    /* Before the tag check, and before `fp` is even read. */
+    orig_items_reset();
+
+    if (!CheckSaveTag(fp, AM2_SAVE_TAG_ITEMS,
+                      (const char *)AM2_IMAGE(ADDR_STR_ITEM_CPP), 0x4A8))
+        return 0;
+
+    orig_fread(&mark, 4, 1, fp);
+    while (mark == AM2_SAVE_ITEM_MARK) {
+        orig_load_one_item(fp, 0);
+        count++;
+        orig_fread(&mark, 4, 1, fp);
+    }
+
+    am2_log("Loaded %d items\n", count);
+    return 1;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
@@ -83,4 +136,6 @@ void item_install(void)
     patch_replace(ADDR_OBJ_SET_FIELD_A, (const void *)ObjSetFieldA,
                   "ObjSetFieldA", 2);
     patch_replace(ADDR_OBJ_FIELD_B, (const void *)ObjFieldB, "ObjFieldB", 1);
+    patch_replace(ADDR_SAVE_ITEMS, (const void *)SaveItems, "SaveItems", 1);
+    patch_replace(ADDR_LOAD_ITEMS, (const void *)LoadItems, "LoadItems", 1);
 }

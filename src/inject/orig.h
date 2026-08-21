@@ -22,6 +22,12 @@
 
 /* Game code */
 #define ADDR_CHECK_SAVE_TAG 0x004235D0u  /* BOOL(FILE*,uint32_t,const char*,int32_t) */
+/* The mirror, and the reason CheckSaveTag has a tag to check. 46 callers --
+ * three times CheckSaveTag's, because a section that is written once may be
+ * bracketed by several markers. It is `fwrite(&tag, 4, 1, fp)` and nothing
+ * else; the destination-aliasing subtlety CheckSaveTag has does not arise
+ * when the value is going out rather than coming in. */
+#define ADDR_WRITE_SAVE_TAG 0x00423680u  /* void(FILE*, uint32_t) */
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
 #define ADDR_RECT_SET       0x0042E1C0u  /* void(AM2_Rect*,int32,int32,int32,int32) */
 #define ADDR_CLAMP          0x0042E180u  /* int32_t(int32_t v, int32_t lo, int32_t hi) */
@@ -1103,7 +1109,12 @@
 #define AM2_EVTSAVE_PAD_A        0x06670004u
 #define AM2_EVTSAVE_PAD_B        0x06670005u
 #define AM2_EVTSAVE_OWNED        0x06670006u
-#define ADDR_SAVE_SCRIPT_COND    0x0041EB00u  /* void(const cond *, FILE *) */
+/* (fp, cond), NOT (cond, fp). This comment said the latter, which is the order
+ * the reconstruction had before the campaign A/B caught it -- so the fix landed
+ * in the code and the wrong order stayed here describing it. Confirmed twice
+ * over: LoadScriptConditions calls the loader as (fp, cond), and
+ * SaveScriptConditions pushes cond then fp, which is (fp, cond) in cdecl. */
+#define ADDR_SAVE_SCRIPT_COND    0x0041EB00u  /* void(FILE *, const cond *) */
 #define ADDR_EVENT_DEFAULT_NAME  0x0041F200u  /* void(kind, number, char *out) */
 #define ADDR_FREE_SCRIPT_CONDS   0x0041EA80u  /* void(void), frees the list */
 #define ADDR_EVT_PLAY_SOUND_AT   0x0041F680u  /* void(name, point, slot, pri, loop) */
@@ -1952,6 +1963,22 @@
  * same field AM2_UID_OWNER_SHIFT names, and what 0x0042A930 logs as "army".
  * UID_ON_WIRE returns its argument and is applied to uids crossing a comm
  * message; see src/game/item.h for why it is kept. */
+/* item.cpp's savegame section. The saver brackets a FirstItem/NextItem walk
+ * with tags; the loader checks the opening tag and then reads item markers
+ * until one is not AM2_SAVE_ITEM_MARK. docs/savetags.tsv already had the
+ * loader's site -- item.cpp line 1192, tag 0x06660007 -- from the string it
+ * passes CheckSaveTag. */
+#define ADDR_STR_ITEM_CPP    0x00485C58u  /* "C:\\ArmyMen2\\source\\item.cpp" */
+#define ADDR_SAVE_ITEMS     0x00428950u  /* int32_t(FILE *) */
+#define ADDR_LOAD_ITEMS     0x00428BB0u  /* int32_t(FILE *) */
+#define ADDR_SAVE_ONE_ITEM  0x00428870u  /* void(FILE *, void *obj) */
+#define ADDR_LOAD_ONE_ITEM  0x004289E0u  /* void(FILE *, int32_t) */
+#define ADDR_ITEMS_RESET    0x00429450u  /* void(void) */
+
+#define AM2_SAVE_TAG_ITEMS  0x06660007u  /* opens the section */
+#define AM2_SAVE_ITEM_MARK  0x06660000u  /* one before each item */
+#define AM2_SAVE_TAG_END    0x06660001u  /* closes it */
+
 #define ADDR_UID_ARMY        0x0042A7A0u  /* uint32_t(uint32_t uid) */
 #define ADDR_UID_ON_WIRE     0x0042A7B0u  /* uint32_t(uint32_t uid) */
 /* A 3-bit field at bit 18 of the object's word at +8, get and set. Named for
@@ -2019,6 +2046,7 @@ typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
                                                  uint32_t *inout);
 
 #define orig_fread   (*(am2_fread_fn)ADDR_FREAD)
+#define orig_fwrite  (*(am2_fwrite_fn)ADDR_FWRITE)
 /* The game's own stdio, for the same reason as its malloc: a FILE opened by
  * the game's CRT cannot be read or closed by ours. */
 #define orig_fopen   (*(am2_fopen_fn)ADDR_FOPEN)

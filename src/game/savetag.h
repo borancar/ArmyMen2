@@ -15,6 +15,15 @@ extern "C" {
 int32_t __cdecl CheckSaveTag(am2_FILE *fp, uint32_t expected,
                              const char *file, int32_t line);
 
+/* 0x00423680. The other half: write a four-byte section tag. 46 callers.
+ *
+ * CheckSaveTag reads into its own `fp` argument slot so that a short read is
+ * still compared against something defined; nothing like that is needed here,
+ * because the bytes are going out and the value is already in a slot of its
+ * own. It is one fwrite and no error check -- a save that cannot write is not
+ * noticed here. */
+void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag);
+
 int savetag_install(void);
 
 #ifdef __cplusplus

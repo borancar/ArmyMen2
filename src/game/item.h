@@ -9,6 +9,7 @@
 #define AM2_ITEM_H
 
 #include <stdint.h>
+#include "../inject/orig.h"   /* am2_FILE, for the savegame pair */
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +51,30 @@ void     __cdecl ObjSetFieldA(void *obj, uint32_t value);
  * matters: the original uses movsx, so the field is int8_t and negative values
  * are meaningful. */
 int32_t __cdecl ObjFieldB(const void *obj);
+
+/* 0x00428950 and 0x00428BB0. The item section of a savegame, both named by
+ * their own counts -- "Saved %d items" and "Loaded %d items".
+ *
+ * The wire format is settled by reading both ends independently and finding
+ * they agree, which is better evidence than either alone:
+ *
+ *   0x06660007   opens the section        (checked by the loader)
+ *   0x06660000   one before each item     (the loader's continue condition)
+ *   0x06660001   closes it                (anything not 0x06660000 stops it)
+ *
+ * So the terminator is not really a value the loader knows: it stops on the
+ * first marker that is not an item marker, and the saver happens to write
+ * 0x06660001. A save ending any other way would load identically.
+ *
+ * The saver walks FirstItem/NextItem, which are the pair the registry
+ * invariant in CLAUDE.md is about, and counts as it goes. It checks nothing:
+ * a write that fails is not noticed, and it always answers 1.
+ *
+ * The loader clears the list first, and does it BEFORE reading its argument --
+ * so a load that then fails its tag check has already emptied the world. The
+ * failing path answers 0; every other path answers 1. */
+int32_t __cdecl SaveItems(am2_FILE *fp);
+int32_t __cdecl LoadItems(am2_FILE *fp);
 
 void item_install(void);
 
