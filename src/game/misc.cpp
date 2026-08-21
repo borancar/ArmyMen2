@@ -649,6 +649,45 @@ void __cdecl BuildRgb332Palette(void *out)
     }
 }
 
+void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
+{
+    int32_t   n    = *count;
+    int32_t   kept = 0;
+    uint16_t *wr   = values;
+    int32_t   i    = 1;
+
+    if (n <= 1) {
+        *count = 1;
+        return;
+    }
+
+    do {
+        int32_t delta, j;
+
+        /* Advanced before use, so the first pass writes values[1] and reads
+         * values[0] behind it. */
+        wr++;
+        delta = (int32_t)values[i] - (int32_t)wr[-1];
+        kept++;
+
+        for (j = i + 1; j < n; j++) {
+            if ((int32_t)values[i + 1] - (int32_t)values[i] != delta)
+                break;
+            i++;
+        }
+
+        i++;
+        *wr = values[i - 1];
+
+        /* Re-read, as the original does. Nothing in the loop writes it, so it
+         * cannot change -- unless the caller passed a count that lives inside
+         * the array, and reproducing the read costs nothing. */
+        n = *count;
+    } while (i < n);
+
+    *count = kept + 1;
+}
+
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
                               int32_t haveA, int32_t haveB,
                               int32_t maskA, int32_t maskB)
@@ -865,6 +904,8 @@ int misc_install(void)
                   "ObjNextKind538", 1);
     patch_replace(ADDR_BUILD_RGB332, (const void *)BuildRgb332Palette,
                   "BuildRgb332Palette", 1);
+    patch_replace(ADDR_COLLAPSE_DELTAS, (const void *)CollapseEqualDeltas,
+                  "CollapseEqualDeltas", 1);
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     return 0;

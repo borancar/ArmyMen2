@@ -1874,6 +1874,7 @@
 #define ADDR_MASK_PIXEL_SOLID32 0x0041CEC0u  /* same, dword row table */
 #define ADDR_OBJ_MASK_BIT_AT   0x00435390u  /* int32_t(obj, const AM2_Point *) */
 #define ADDR_OBJ_NEXT_KIND538 0x0040D880u  /* int32_t(obj, int32_t want) */
+#define ADDR_COLLAPSE_DELTAS  0x00439CC0u  /* void(uint16_t *, int32_t *) */
 #define ADDR_XOR_CHECKSUM      0x00402700u  /* uint32_t(const void *record) */
 #define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */
 #define ADDR_LIST_PUSH_FRONT   0x00429F20u  /* void(void *node, void **head) */

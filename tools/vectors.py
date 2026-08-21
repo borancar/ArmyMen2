@@ -123,6 +123,10 @@ ARG_KIND_OVERRIDE = {
     # classifier reads it as a scalar because the writes go through a register
     # it has already added a constant to. A scalar there faults every vector.
     0x0041ADE0: {0: "ptr"},
+    # CollapseEqualDeltas(values, count): the count is an in/out pointer, and
+    # the classifier calls it a scalar because the only read through it happens
+    # before any arithmetic marks the slot as a base.
+    0x00439CC0: {1: "ptr"},
     # MaskPixelSolid32(x, y, mask): `y` is scaled by 4 to index the row table,
     # and that scaling is enough to make the classifier call it a pointer --
     # the word-table twin, which scales by 2, is classified correctly. A
@@ -253,6 +257,31 @@ SEED = {
     # not-found walk and the shift-down; kind 5 on the middle record exercises
     # the clamp to 3, which a kind taken from the fill pattern would reach only
     # by accident.
+    # CollapseEqualDeltas(values, count). Eight values holding a run of six at
+    # a constant difference of 10, then a jump of 40, then a step of 1 -- so
+    # one long run, one pair and one singleton, which is every shape the outer
+    # loop has. Counts 0 and 1 take the early return; 2, 3 and 5 stop part way
+    # through the long run, which is what makes the run-continuation test
+    # discriminating rather than merely reached.
+    0x00439CC0: [(1, 0x00, "u32s", (0, 1, 2, 3, 5, 8, 12)),
+                 (0, 0x00, "u32", 0x0014000A),   # 10, 20
+                 (0, 0x04, "u32", 0x0028001E),   # 30, 40
+                 (0, 0x08, "u32", 0x003C0032),   # 50, 60
+                 (0, 0x0C, "u32", 0x00650064),   # 100, 101
+                 # A wrap across zero, arranged so the two readings DIVERGE
+                 # rather than merely differ. Every value above is small, so
+                 # int16 and uint16 give identical differences and the sign of
+                 # the read could not be tested at all.
+                 #
+                 # 0xFFFC is kept, then 0xFFFE makes the running delta 2. The
+                 # next pair, 0xFFFE -> 0x0000, is -65534 read unsigned and +2
+                 # read signed -- so the unsigned walk breaks the run there and
+                 # the signed one carries on through 0x0002 as well. The array
+                 # comes out 8 long one way and 6 the other. Getting a pair
+                 # that straddles zero is not enough on its own; the delta has
+                 # to be the value one reading produces and the other does not.
+                 (0, 0x10, "u32", 0xFFFEFFFC),   # 0xFFFC, 0xFFFE
+                 (0, 0x14, "u32", 0x00020000)],  # 0x0000, 0x0002
     # ObjNextKind538(obj, want). Two fields on the object, a sub-record behind
     # +0x74, a frame count behind that record's +0x44, and a position byte at
     # its +0x51. The count is 5, so `last` is 4 and the position values 0, 3,
@@ -1034,7 +1063,8 @@ def main():
                 "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
                 "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED",
                 "ADDR_COMM_REMOVE_KEYED", "ADDR_OBJ_MASK_BIT_AT",
-                "ADDR_OBJ_NEXT_KIND538", "ADDR_BUILD_RGB332"]
+                "ADDR_OBJ_NEXT_KIND538", "ADDR_BUILD_RGB332",
+                "ADDR_COLLAPSE_DELTAS"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1144,6 +1174,7 @@ def main():
         "ADDR_OBJ_MASK_BIT_AT": "ObjMaskBitAt",
         "ADDR_OBJ_NEXT_KIND538": "ObjNextKind538",
         "ADDR_BUILD_RGB332": "BuildRgb332Palette",
+        "ADDR_COLLAPSE_DELTAS": "CollapseEqualDeltas",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -1173,7 +1204,9 @@ def main():
             # BuildRgb332Palette leaves the last entry's first channel in
             # eax; its one caller (0x00424A45) clobbers it with the very
             # next call, to SetGamePalette.
-            "BuildRgb332Palette"}
+            "BuildRgb332Palette",
+            # CollapseEqualDeltas ends with the kept count in eax.
+            "CollapseEqualDeltas"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

@@ -372,6 +372,32 @@ int32_t __cdecl ObjNextKind538(const void *obj, int32_t want);
  * reach it -- checked against all of them, not argued from the general case. */
 void __cdecl BuildRgb332Palette(void *out);
 
+/* 0x00439CC0. Collapse runs of constant difference in a 16-bit array, in
+ * place, and rewrite the count. The first element is always kept; after that,
+ * every maximal run whose consecutive differences are all equal is replaced by
+ * its LAST element.
+ *
+ *   10 20 30 40 50 60 100 101   count 8
+ *   10 60 100 101               count 4
+ *
+ * A count of 1 or less is not walked at all: the count is set to 1 and the
+ * array left alone, even when the count was 0 or negative.
+ *
+ * Values are read as UNSIGNED 16-bit and subtracted in 32 bits, so a
+ * difference is never negative and never wraps -- 0x0000 after 0xFFFF is a
+ * difference of -65535, not 1. That is the original's arithmetic, from its
+ * `xor edx,edx; mov dx,[...]` pairs, and it is reproduced rather than
+ * corrected.
+ *
+ * The running comparison reads the last KEPT value back out of the array
+ * rather than holding it in a register, which is why the reconstruction does
+ * too: it is what makes the collapse cumulative rather than pairwise.
+ *
+ * Named for the criterion. What the array holds is not established -- one
+ * caller, no strings anywhere near it, and the pad.cpp..script.cpp band is
+ * as far as the evidence goes. */
+void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count);
+
 /* 0x0041EF20. Two-criterion match, the shape this binary uses wherever a list
  * is filtered. Each criterion is one of three things:
  *
