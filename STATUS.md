@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `4069cb1`. Working tree clean.
+Last updated: **2026-08-21**, at `3718048`. Working tree clean.
 
 ## In flight
 
@@ -68,12 +68,12 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 308 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 308 | 301 of them below the CRT line |
+| `patch_replace` sites | 309 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 309 | 302 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
-| pure unreconstructed leaves | 4 | `tools/vectors.py --all` |
+| pure unreconstructed leaves | **0** (2 listed, both false positives) | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
@@ -87,7 +87,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **7,110** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **7,186** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
@@ -98,9 +98,13 @@ counts probe before reading one as coverage -- that is what turned the
 ## Next
 
 1. Finish `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
-2. **One real pure leaf left**: `0x00423ee0` (256B). `0x0045caa0` and
-   `0x00427974` are the two known false positives. After it, offline vectors
-   run out and verification goes back to reading plus `tools/ab.sh`.
+2. **The pure-leaf pool is empty.** `tools/vectors.py` still lists
+   `0x0045caa0` and `0x00427974`; both are false positives (the stubbed
+   logger, reconstructed in `src/inject/gamelog.c` where the scan cannot see
+   it, and a jump table that is not a function). Offline vectors are done as a
+   source of new targets -- from here it is reading plus `tools/ab.sh`, and
+   the next targets come from the action executor at `0x00420410` and its
+   helpers `0x0041FD10`, `0x0041FD30`, `0x0041FEA0`.
 3. The action executor at `0x00420410` (4,096 B) is the layer above the setter
    family, and `0x0041FD10`, `0x0041FD30`, `0x0041FEA0` are three more of its
    helpers, all still original.
@@ -136,6 +140,13 @@ and not promoted to fact without evidence.
   -- where subtracting and adding are the same expression. The sign mutation
   passed all 6982 vectors at 100% coverage. Ask of every seeded field whether
   its value makes the operation on it observable, not merely legal.
+- **The two mask decoders are one format with a parameter, not a duplicated
+  pair.** `MaskPixelSolid` and `MaskPixelSolid32` went in as near-twins
+  differing only in a word row table against a dword one, guessed to be one
+  source function with the width chosen at compile time. `RemapRleRuns` takes
+  that width as an ARGUMENT and walks the same rows, so it is a property of the
+  format. A third function is what settled a question two others could only
+  raise.
 - **A mutation that passes is only evidence when the mutation is a change.**
   Two of `CollapseEqualDeltas`' five mutations left every vector green and
   neither was a gap: both rewrites are provably the same function, confirmed by
