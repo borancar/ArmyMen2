@@ -159,4 +159,8 @@ int audio_install(void);
  * length. Always returns 1. */
 int32_t __cdecl SaveAudioSection(am2_FILE *fp);
 
+/* 0x0040BF00. Read it back, re-issuing PlayDynamicSound per populated slot.
+ * Returns 0 if the section tag does not match, 1 otherwise. */
+int32_t __cdecl LoadAudioSection(am2_FILE *fp);
+
 #endif /* AM2_AUDIO_H */

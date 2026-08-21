@@ -60,8 +60,9 @@ has patched to jump past them.
 
 The front has moved into **game logic**, and the current front is savegame
 serialisation. `SaveGame` writes eleven sections and **all eleven savers are
-now ours**, as are nine of the eleven loaders; the two halves mirror each
-other, which is what keeps confirming each struct's layout from both ends. The newest is `SaveObjScriptSection`, the deepest of them -- four
+now ours**, as are ten of the eleven loaders; the two halves mirror each other,
+which is what keeps confirming each struct's layout from both ends. Only the
+objscript loader is left. The newest is `SaveObjScriptSection`, the deepest of them -- four
 nested levels, with each action's string length-prefixed in place of the
 pointer field it occupies in memory.
 
@@ -69,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 337 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 337 | 330 of them below the CRT line |
+| `patch_replace` sites | 338 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 338 | 331 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 80,560 / 372,816 B (**21.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 80,800 / 372,816 B (**21.7%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -106,20 +107,38 @@ counts probe before reading one as coverage -- that is what turned the
    would check both halves at once. It has to rebuild three pointer levels
    from the raw dwords the saver stored -- states, frames, actions -- and turn
    each action's stored LENGTH back into a `malloc`'d string.
-2. **Two loaders are all that is left of the serialiser**: `0x004364A0`
-   objscript (1072 B) and `0x0040BF00` audio (240 B). Every saver is done.
+2. **One loader is all that is left of the serialiser**: `0x004364A0`
+   objscript, 1072 B, which has to rebuild three pointer levels from the raw
+   dwords the saver stored and turn each action's stored LENGTH back into a
+   `malloc`'d string.
 3. **Fold the pointer-aware comparison into a tool.** It was done by hand for
    objscript here -- walk the section, collect the offsets that hold heap
    pointers, and compare everything else -- and it turned "188 differing bytes"
    into a clean result with a sharp pass criterion. `tools/actdiff.py` already
    renumbers pointers by first-seen index; the savefile deserves the same, and
    then `tools/ab.sh` could carry it as a standing check.
-4. **Drive a LOAD.** The save half is exercised on every campaign run -- the
-   game autosaves at mission start -- but nothing loads one. `LoadGame` is
-   called only from mission start (`0x00425300`), so starting the same mission
-   with a save present should do it, with no menu navigation at all. That
-   covers `CheckSaveTag` and every `Load*` in one run. `LoadGame` itself
-   (`0x00425A10`, 224 B) is fully mapped and not yet written.
+4. **Drive a LOAD -- and the gate is now mapped, which is most of the work.**
+   Attempted three ways and not reached; recorded here so the next attempt
+   starts from the chain rather than from the menu. `LoadGame` (`0x00425A10`)
+   has exactly one caller, `0x004255EE`, inside mission start
+   (`0x00425300`), behind
+
+       if ([0x00511DD8] == 0) LoadLevelScript(); else LoadGame(fp);
+
+   `0x00511DD8` is armed only by the GAME SELECT PANEL's LOAD arm at
+   `0x004520BB` (inside `0x00451E10`, 720 B), which first copies the selected
+   save's NAME into `0x00511B88`. That is a string buffer, not a boolean --
+   `0x0044F1A0` tests its first byte, which is what made it look like a flag.
+   Mission start then calls `0x00425950`, which needs BOTH `0x00511B88` and
+   the player name at `0x00511A68` non-empty, chdirs to `save\<player>` and
+   fopens the save; a 0 from it clears the flag and the load silently becomes
+   a fresh start. Every attempt so far ends with `LoadLevelScript=1`, so the
+   LOAD arm is not running -- the panel is reached and the row is highlighted,
+   but the click is not arming `0x00511B88`.
+
+   Worth knowing what the panel DOES exercise: listing the save reads its
+   header, so `LoadGameProcSection` and `CheckSaveTag` both run for real
+   against a real file (`=1` each). Every other loader is still unexecuted.
 5. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
    median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
    928 B, 14 callers) is the hub two of them already reach by address.

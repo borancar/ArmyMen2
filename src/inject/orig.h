@@ -631,6 +631,7 @@
 #define ADDR_LOAD_AUDIO_SECTION  0x0040BF00u  /* int32_t(FILE *) */
 #define AM2_SAVETAG_AUDIO        0x01326413u
 #define SOUND_DYNAMIC_SAVED      16           /* exclusive bound, see above */
+#define ADDR_STR_AUDIO_CPP      0x00474D7Cu  /* "C:\\ArmyMen2\\source\\audio.cpp" */
 #define ADDR_LISTENER_POS        0x00514E0Cu  /* AM2_Point, the ear */
 #define ADDR_DEFAULT_SOUND_POS   0x005125A0u  /* AM2_Point, used when a sound
                                                * has neither owner nor place */

@@ -24,6 +24,7 @@
 #include "wavefile.h"
 #include "../gamedir.h"
 #include "../savetag.h"
+#include "../image.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -1600,6 +1601,52 @@ int32_t __cdecl SaveAudioSection(am2_FILE *fp)
     return 1;
 }
 
+/* 0x0040BF00. The audio section's loader, and the mirror of the saver above:
+ * for each of the same sixteen slots, a length and -- when it is positive --
+ * a name and the four dwords, handed straight to PlayDynamicSound. The slot
+ * index is the loop counter, so a sound comes back in the slot it was saved
+ * from.
+ *
+ * The name buffer is 256 bytes and the length comes out of the file with no
+ * check against it, so a long enough name overruns the frame. That is the
+ * original's behaviour and it is reproduced rather than tidied; nothing the
+ * game itself writes comes close, since these names are wave filenames.
+ *
+ * The original passes the position's y as an UNALIGNED dword read two bytes
+ * into the packed point, so its high half is whatever follows. That is not
+ * reproduced literally because it cannot matter: PlayDynamicSound stores both
+ * coordinates with `mov word ptr`, discarding the high half. The packed-point
+ * idiom here is the same one EvtPlaySoundAt already uses. */
+int32_t __cdecl LoadAudioSection(am2_FILE *fp)
+{
+    char name[256];
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_AUDIO,
+                      (const char *)AM2_IMAGE(ADDR_STR_AUDIO_CPP), 0x240))
+        return 0;
+
+    for (int32_t i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
+        int32_t  len, loop, priority;
+        uint32_t pos, owner;
+
+        orig_fread(&len, 4, 1, fp);
+        if (len <= 0)
+            continue;
+
+        orig_fread(name, (size_t)len, 1, fp);
+        name[len] = '\0';
+        orig_fread(&loop, 4, 1, fp);
+        orig_fread(&pos, 4, 1, fp);
+        orig_fread(&priority, 4, 1, fp);
+        orig_fread(&owner, 4, 1, fp);
+
+        PlayDynamicSound(name, loop, 0, (int32_t)(pos & 0xFFFFu),
+                         (int32_t)(pos >> 16), i, priority, owner);
+    }
+
+    return 1;
+}
+
 int audio_install(void)
 {
     int rc = 0;
@@ -1608,6 +1655,8 @@ int audio_install(void)
                         "StopAudioStream", 0);
     rc |= patch_replace(ADDR_SAVE_AUDIO_SECTION, (const void *)SaveAudioSection,
                         "SaveAudioSection", 1);
+    rc |= patch_replace(ADDR_LOAD_AUDIO_SECTION, (const void *)LoadAudioSection,
+                        "LoadAudioSection", 1);
     rc |= patch_replace(ADDR_START_AUDIO_STREAM, (const void *)StartAudioStream,
                         "StartAudioStream", 2);
     rc |= patch_replace(ADDR_RELEASE_SOUND_BUFS, (const void *)ReleaseSoundBuffers,
