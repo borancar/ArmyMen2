@@ -1,4 +1,10 @@
-/* msgslot.cpp -- the comm object's two message-slot state arrays.
+/* msgslot.cpp -- the comm object's own bookkeeping: the two message-slot state
+ * arrays, the latency ring, and the keyed removal that empties the send queue.
+ *
+ * The file started as the six slot writers and has grown along the object
+ * rather than along any line of ours, which is the right way round: these are
+ * all fields of one record, and two of them turned out to be a writer and a
+ * reader of the SAME field.
  *
  * Six functions at 0x004032C0..0x004033B0 differing only in which array they
  * write and what value they store. Both arrays hold 120 dwords and are
@@ -46,6 +52,37 @@ uint32_t __cdecl MsgField12(const void *msg);
  * wrong way for negative totals. Thirty-two samples on the comm object is the
  * shape of a latency or rate average. */
 int32_t __cdecl CommMean32(const void *comm);
+
+/* 0x00402E50. The writer for the ring CommMean32 averages: one dword into the
+ * 32 entries at +0x3A0, with the write index at +0x39C, post-incremented and
+ * wrapped to 0 at 32. It overwrites the oldest entry and reports nothing.
+ *
+ * What the samples ARE is now better than a guess. Both call sites are inside
+ * 0x004014C0, the flow-control handler, whose own strings say
+ * "??? PULSE seq %6d latency %d acks for %d msgs %d thru %d" -- and each site
+ * adds the same value to a running total at +0x4C before pushing it. So a
+ * 32-sample moving average of a latency, which is what CommMean32's comment
+ * guessed from the shape alone before its writer was found.
+ *
+ * The wrap test is signed and reads the index back out of memory after storing
+ * it rather than using the register it just wrote. Both are reproduced; neither
+ * changes the result. */
+void __cdecl RingPush32(void *comm, uint32_t value);
+
+/* 0x00402DB0. Remove the first 12-byte record at +0xBC whose leading dword
+ * equals `key`, from an array whose count is the dword at +0xB8. On a match it
+ * bumps one of four tallies at +0x38C, selected by the record's THIRD dword
+ * clamped to 3 -- unsigned, so the clamp is a ceiling and not a range check --
+ * then shifts every later record down by twelve bytes and decrements the count.
+ * No match does nothing at all, silently.
+ *
+ * Named for what it does, not for what it is for. Both callers are in the same
+ * flow-control handler as RingPush32, one of whose messages is "Flow Ack for
+ * Message not in sendqueue sequence %d", so the array is very probably the
+ * send queue and `key` a sequence number -- but that is the CALLER's
+ * vocabulary, and this file has been wrong before about names taken from a
+ * call site. The reading is recorded; the name does not depend on it. */
+void __cdecl CommRemoveKeyed(void *comm, uint32_t key);
 
 int msgslot_install(void);
 

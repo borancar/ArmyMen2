@@ -145,6 +145,15 @@ ARG_KIND_OVERRIDE = {
 #
 # {function: {arg index: [values]}}
 ARG_VALUES = {
+    # CommRemoveKeyed's key: three that match a seeded record and one that
+    # matches none, so the not-found walk runs to the end of the array.
+    # FIVE keys against FOUR counts, and the length matters more than the
+    # values. With four of each, `count = k % 4` and `key = (k+1) % 4` move in
+    # lockstep: the only count that ever met key 0x2000 was 0, so the record
+    # carrying kind 5 was never reached and the clamp to 3 -- one instruction,
+    # `mov eax, 3` -- went unvisited. Co-prime lengths, for the same reason the
+    # SEED periods are co-prime.
+    0x00402DB0: {1: [0x1000, 0x2000, 0x3000, 0x4000, 0x5000]},
     # MaskPixelSolid32: x just past the width and y just past the height, so
     # both bounds returns are reached.
     0x0041CEC0: {0: [0, 1, 2, 3, 7, 16, 31, 32, 63, 64, 65],
@@ -216,6 +225,15 @@ SEED = {
     # to somewhere real and the code behind it has to land near 0x18. Nominal
     # 0x18 on a period of 13 spans 0x12..0x1E, which covers below the range
     # (the `ja` arm), the three codes that answer 0, and the ones that answer 1.
+    # CommRemoveKeyed(comm, key): a record count at +0xB8 and 12-byte records
+    # at +0xBC, each [key][?][kind]. Counts 0..3 reach the empty return, the
+    # not-found walk and the shift-down; kind 5 on the middle record exercises
+    # the clamp to 3, which a kind taken from the fill pattern would reach only
+    # by accident.
+    0x00402DB0: [(0, 0xB8, "u32s", (0, 1, 2, 3)),
+                 (0, 0xBC, "u32", 0x1000), (0, 0xC4, "u32", 1),
+                 (0, 0xC8, "u32", 0x2000), (0, 0xD0, "u32", 5),
+                 (0, 0xD4, "u32", 0x3000), (0, 0xDC, "u32", 2)],
     0x00449EF0: [(0, 0xC0, "ptr", 0x900),
                  (-1, 0x900, "u32s", (0x10, 0x17, 0x18, 0x19, 0x1A, 0x1B,
                                       0x20, 0x26, 0x27, 0x28, 0x29, 0x30))],
@@ -953,7 +971,8 @@ def main():
                 "ADDR_MEETS_ALL_THREE",
                 "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
                 "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
-                "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED"]
+                "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED",
+                "ADDR_COMM_REMOVE_KEYED"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1059,6 +1078,7 @@ def main():
         "ADDR_REMAP_BYTES": "RemapBytes",
         "ADDR_MASK_PIXEL_SOLID32": "MaskPixelSolid32",
         "ADDR_OBJ_CODE_UNMAPPED": "ObjCodeUnmapped",
+        "ADDR_COMM_REMOVE_KEYED": "CommRemoveKeyed",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -1080,7 +1100,11 @@ def main():
             "ListUnlink",
             # RemapBytes leaves dst, or dst+count, in eax; both callers
             # discard it and advance their own pointer instead.
-            "RemapBytes"}
+            "RemapBytes",
+            # CommRemoveKeyed leaves whatever its last computation produced:
+            # the loop counter when nothing matched, the shift pointer after a
+            # removal. Both callers (0x00401EA4, 0x00401EDA) discard eax.
+            "CommRemoveKeyed"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

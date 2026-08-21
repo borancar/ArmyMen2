@@ -39,6 +39,71 @@ int32_t __cdecl CommMean32(const void *comm)
     return (sum + (sum < 0 ? 31 : 0)) >> 5;
 }
 
+#define AM2_RING32_INDEX  0x39C
+#define AM2_RING32_ENTRY  0x3A0
+#define AM2_RING32_COUNT  32
+
+void __cdecl RingPush32(void *comm, uint32_t value)
+{
+    uint8_t  *base  = (uint8_t *)comm;
+    int32_t  *index = (int32_t *)(base + AM2_RING32_INDEX);
+    uint32_t *ring  = (uint32_t *)(base + AM2_RING32_ENTRY);
+
+    ring[*index] = value;
+    *index += 1;
+    if (*index >= AM2_RING32_COUNT)
+        *index = 0;
+}
+
+/* The record array and the four tallies the removal keeps. */
+#define AM2_KEYED_COUNT     0xB8        /* int32_t, how many records */
+#define AM2_KEYED_FIRST     0xBC        /* the records themselves */
+#define AM2_KEYED_STRIDE    12
+#define AM2_KEYED_KIND      8           /* third dword of a record */
+#define AM2_KEYED_TALLY     0x38C       /* four int32_t, indexed by kind */
+#define AM2_KEYED_TALLY_MAX 3
+
+void __cdecl CommRemoveKeyed(void *comm, uint32_t key)
+{
+    uint8_t *base  = (uint8_t *)comm;
+    int32_t *count = (int32_t *)(base + AM2_KEYED_COUNT);
+    uint8_t *rec   = base + AM2_KEYED_FIRST;
+    int32_t  i;
+
+    /* Two tests of the same count, and the original really does make both --
+     * `je` on zero and then `jle`. Only a negative count tells them apart, and
+     * both answer the same way for one; reproduced rather than folded. */
+    if (*count == 0)
+        return;
+    if (*count <= 0)
+        return;
+
+    for (i = 0; i < *count; i++, rec += AM2_KEYED_STRIDE)
+        if (*(uint32_t *)rec == key)
+            break;
+    if (i >= *count)
+        return;
+
+    {
+        uint32_t kind = *(uint32_t *)(rec + AM2_KEYED_KIND);
+        int32_t  j;
+
+        if (kind > AM2_KEYED_TALLY_MAX)
+            kind = AM2_KEYED_TALLY_MAX;
+        *(int32_t *)(base + AM2_KEYED_TALLY + kind * 4) += 1;
+
+        for (j = i + 1; j < *count; j++) {
+            uint8_t *src = base + AM2_KEYED_FIRST + j * AM2_KEYED_STRIDE;
+            uint8_t *dst = src - AM2_KEYED_STRIDE;
+
+            *(uint32_t *)(dst + 0) = *(uint32_t *)(src + 0);
+            *(uint32_t *)(dst + 4) = *(uint32_t *)(src + 4);
+            *(uint32_t *)(dst + 8) = *(uint32_t *)(src + 8);
+        }
+        *count -= 1;
+    }
+}
+
 int msgslot_install(void)
 {
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
@@ -49,5 +114,8 @@ int msgslot_install(void)
     patch_replace(ADDR_MSGSLOT_B2, (const void *)MsgSlotB2, "MsgSlotB2", 2);
     patch_replace(ADDR_MSG_FIELD_12, (const void *)MsgField12, "MsgField12", 1);
     patch_replace(ADDR_COMM_MEAN_32, (const void *)CommMean32, "CommMean32", 1);
+    patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
+    patch_replace(ADDR_COMM_REMOVE_KEYED, (const void *)CommRemoveKeyed,
+                  "CommRemoveKeyed", 2);
     return 0;
 }

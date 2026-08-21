@@ -385,23 +385,6 @@ int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
     return bit & row[x >> 3];
 }
 
-/* Index at +0x39C, 32 dwords at +0x3A0. Post-increment, wrap at 32, no report
- * that the oldest entry went. */
-#define AM2_RING32_INDEX  0x39C
-#define AM2_RING32_ENTRY  0x3A0
-#define AM2_RING32_COUNT  32
-
-void __cdecl RingPush32(void *obj, uint32_t value)
-{
-    uint8_t  *base  = (uint8_t *)obj;
-    int32_t  *index = (int32_t *)(base + AM2_RING32_INDEX);
-    uint32_t *ring  = (uint32_t *)(base + AM2_RING32_ENTRY);
-
-    ring[*index] = value;
-    *index += 1;
-    if (*index >= AM2_RING32_COUNT)
-        *index = 0;
-}
 
 uint32_t __cdecl XorChecksum(const void *record)
 {
@@ -741,7 +724,6 @@ int misc_install(void)
                   "CommSlotHasPlayer", 5);
     patch_replace(ADDR_BITMAP_BIT_SET, (const void *)BitmapBitSet,
                   "BitmapBitSet", 5);
-    patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
     patch_replace(ADDR_LIST_UNLINK, (const void *)ListUnlink, "ListUnlink", 6);
     patch_replace(ADDR_REMAP_BYTES, (const void *)RemapBytes, "RemapBytes", 2);
     patch_replace(ADDR_MASK_PIXEL_SOLID32, (const void *)MaskPixelSolid32,

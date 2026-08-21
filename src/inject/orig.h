@@ -479,6 +479,10 @@
 #define ADDR_MSGSLOT_B0          0x00403380u
 #define ADDR_MSGSLOT_B2          0x004033B0u
 #define ADDR_MSG_FIELD_12        0x00401040u  /* uint32_t(const void *msg) */
+/* Comm object bookkeeping, all on the same record. The 32-dword ring at +0x3A0
+ * is written by one and averaged by the other. */
+#define ADDR_RING_PUSH_32      0x00402E50u  /* void(comm, uint32_t sample) */
+#define ADDR_COMM_REMOVE_KEYED 0x00402DB0u  /* void(comm, uint32_t key) */
 #define ADDR_COMM_MEAN_32        0x00402E90u  /* int32_t(const void *comm) */
 /* Bit 0 and bit 1 of the word at an object's +0. The tests return the masked
  * value, 1 or 2, not a boolean -- see src/game/objflag.h. */
@@ -1862,8 +1866,6 @@
  * bit test. Rows run bottom-up, as a DIB's do. */
 #define ADDR_BITMAP_BIT_SET  0x004232C0u  /* int32(base, x, y, height, stride) */
 
-/* Index at +0x39C, 32 dwords at +0x3A0. */
-#define ADDR_RING_PUSH_32    0x00402E50u  /* void(void *, uint32_t) */
 
 #define ADDR_MASK_PIXEL_SOLID  0x0041CF20u  /* int32_t(x, y, const void *mask) */
 #define ADDR_MASK_PIXEL_SOLID32 0x0041CEC0u  /* same, dword row table */

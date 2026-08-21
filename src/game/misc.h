@@ -224,15 +224,6 @@ int32_t __cdecl MaskPixelSolid32(uint32_t x, uint32_t y, const void *mask);
 int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
                              int32_t height, int32_t stride);
 
-/* 0x00402E50. Push one dword into a 32-entry ring inside the caller's object:
- * the write index is the dword at +0x39C and the entries are the 32 dwords at
- * +0x3A0. The index is post-incremented and wrapped to 0 on reaching 32, so
- * the ring overwrites its oldest entry and nothing reports that it did.
- *
- * The wrap test is signed and reads the index back out of memory after
- * storing it rather than using the register it just wrote -- reproduced,
- * since both are what the original does and neither changes the result. */
-void __cdecl RingPush32(void *obj, uint32_t value);
 
 /* 0x00402700. XOR of the record's own dwords, its length taken from inside it:
  * the dword at +4 is a BYTE count, shifted right by two for a dword count. The
