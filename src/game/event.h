@@ -37,6 +37,43 @@ void __cdecl DeclareRuleVars(void);
 void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
                            const void *fn, void *arg, int32_t owns);
 
+/* The 40-byte message the event system puts on the wire. Derived from BOTH
+ * sides -- EventMessageSend writes these offsets and EventMessageReceive reads
+ * the same ones back -- so the layout is confirmed rather than inferred from
+ * one direction.
+ *
+ * `aux1` and `aux2` are passed straight through in both directions and are not
+ * logged by either function, so what they mean is not established here. They
+ * sit next to (num1, uid1) and (num2, uid2) respectively, which is suggestive
+ * and no more.
+ *
+ * The three padding bytes after `type` are never written. The original leaves
+ * them as whatever the stack held, and so does this -- the struct is a local
+ * and only the named fields are assigned. */
+typedef struct {
+    uint16_t len;          /* +0x00, always 0x28 */
+    uint16_t kind;         /* +0x02, AM2_ARMY_MSG_EVENT */
+    uint32_t zero;         /* +0x04 */
+    uint8_t  type;         /* +0x08, the event type, narrowed to a byte */
+    int32_t  num1;         /* +0x0C */
+    uint32_t uid1;         /* +0x10, through UidOnWire */
+    int32_t  aux1;         /* +0x14 */
+    int32_t  num2;         /* +0x18 */
+    uint32_t uid2;         /* +0x1C, through UidOnWire */
+    int32_t  aux2;         /* +0x20 */
+    int32_t  removeevent;  /* +0x24 */
+} AM2_EventMsg;
+
+/* 0x0041F150. Pack those eight values into a message and hand it to
+ * ArmyMessageSend. */
+void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
+                              int32_t aux1, int32_t num2, uint32_t uid2,
+                              int32_t aux2, int32_t removeevent);
+
+/* 0x0041F320. The other end: unpack one and raise it locally through
+ * EventTriggerImmediate with `remote` set. */
+void __cdecl EventMessageReceive(const AM2_EventMsg *msg);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.

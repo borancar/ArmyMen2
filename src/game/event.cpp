@@ -8,6 +8,7 @@
 #include "event.h"
 #include "image.h"
 #include "objtable.h"
+#include "item.h"   /* UidOnWire */
 #include "objtype.h"
 #include "savetag.h"
 #include "script.h"
@@ -673,14 +674,7 @@ void __cdecl EvtMarkClear(int32_t row, int32_t col)
     g_evtMarks[col + row * 4] = 0;
 }
 
-/* ----------------------------------------------- delayed trigger ---- */
-
-/* CreateTimer stays original and is reached by address. 304 bytes, one caller
- * -- this function -- and it names itself in its own log string. */
-typedef int32_t (__cdecl *AM2_CreateTimerFn)(int32_t delay, int32_t a,
-                                             int32_t b, int32_t c, int32_t d,
-                                             int32_t e);
-#define orig_create_timer (*(AM2_CreateTimerFn)AM2_IMAGE(ADDR_CREATE_TIMER))
+/* ------------------------------------------------ event messages ---- */
 
 /* The event logging switch, a field of the comm object. The logger it gates is
  * stubbed to `ret` in this build, so the whole branch is inert -- reproduced
@@ -689,6 +683,92 @@ typedef int32_t (__cdecl *AM2_CreateTimerFn)(int32_t delay, int32_t a,
 #define kEventDebug \
     (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
                         + COMM_OFF_EVENT_DEBUG))
+
+
+/* Both stay original and are reached by address. ArmyMessageSend is the whole
+ * game's transport -- 20 callers -- and EventTriggerImmediate is the local
+ * raise that Receive feeds. */
+typedef void (__cdecl *AM2_ArmyMessageSendFn)(const void *msg);
+typedef void (__cdecl *AM2_EventTriggerImmedFn)(int32_t type, int32_t num1,
+                                                uint32_t uid1, int32_t aux1,
+                                                int32_t num2, uint32_t uid2,
+                                                int32_t aux2,
+                                                int32_t removeevent,
+                                                int32_t remote);
+#define orig_army_message_send \
+    (*(AM2_ArmyMessageSendFn)AM2_IMAGE(ADDR_ARMY_MESSAGE_SEND))
+#define orig_event_trigger_immediate \
+    (*(AM2_EventTriggerImmedFn)AM2_IMAGE(ADDR_EVENT_TRIGGER_IMMED))
+
+/* 0x0041F150. Pack an event into a 40-byte message and send it.
+ *
+ * The uids go through UidOnWire, which is the identity on this target and a
+ * byte-order hook on any other. Note the log prints five of the eight
+ * arguments and skips aux1 and aux2 entirely -- which is most of why those two
+ * have no better name than their position. */
+void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
+                              int32_t aux1, int32_t num2, uint32_t uid2,
+                              int32_t aux2, int32_t removeevent)
+{
+    AM2_EventMsg msg;
+
+    if (kEventDebug)
+        orig_log("EventMessageSend: type=%d, num1=%d, uid1=%x, num2=%d, "
+                 "uid2=%x\n", type, num1, uid1, num2, uid2);
+
+    msg.len         = 0x28;
+    msg.kind        = AM2_ARMY_MSG_EVENT;
+    msg.zero        = 0;
+    msg.type        = (uint8_t)type;
+    msg.num1        = num1;
+    msg.uid1        = UidOnWire(uid1);
+    msg.aux1        = aux1;
+    msg.num2        = num2;
+    msg.uid2        = UidOnWire(uid2);
+    msg.aux2        = aux2;
+    msg.removeevent = removeevent;
+
+    orig_army_message_send(&msg);
+}
+
+/* 0x0041F320. Unpack one and raise it locally.
+ *
+ * `type` is read back with a SIGNED byte load, where the sender narrowed an
+ * int32 to a byte -- so a type above 127 arrives negative. Reproduced.
+ *
+ * The second log line only appears when the event has a name: the buffer
+ * EventDefaultName fills is tested at its first byte, and kind 1 is the one
+ * that comes back empty. The buffer is the original's 256 bytes. */
+void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
+{
+    if (kEventDebug) {
+        char name[256];
+
+        orig_log("EventMessageReceive: type=%d, num1=%d, uid1=%x, num2=%d, "
+                 "uid2=%x\n", (int32_t)(int8_t)msg->type, msg->num1,
+                 msg->uid1, msg->num2, msg->uid2);
+
+        EventDefaultName((int32_t)(int8_t)msg->type, msg->num1, name);
+
+        if (name[0])
+            orig_log("    Event receive %s remove %d \n", name,
+                     msg->removeevent);
+    }
+
+    orig_event_trigger_immediate((int32_t)(int8_t)msg->type, msg->num1,
+                                 UidOnWire(msg->uid1), msg->aux1,
+                                 msg->num2, UidOnWire(msg->uid2),
+                                 msg->aux2, msg->removeevent, 1);
+}
+
+/* ----------------------------------------------- delayed trigger ---- */
+
+/* CreateTimer stays original and is reached by address. 304 bytes, one caller
+ * -- this function -- and it names itself in its own log string. */
+typedef int32_t (__cdecl *AM2_CreateTimerFn)(int32_t delay, int32_t a,
+                                             int32_t b, int32_t c, int32_t d,
+                                             int32_t e);
+#define orig_create_timer (*(AM2_CreateTimerFn)AM2_IMAGE(ADDR_CREATE_TIMER))
 
 /* 0x0041F410. Arrange for an event to be raised after a delay.
  *
@@ -771,6 +851,11 @@ int event_install(void)
     rc |= patch_replace(ADDR_EVENT_TRIGGER_DELAYED,
                         (const void *)EventTriggerDelayed,
                         "EventTriggerDelayed", 1);
+    rc |= patch_replace(ADDR_EVENT_MESSAGE_SEND,
+                        (const void *)EventMessageSend, "EventMessageSend", 1);
+    rc |= patch_replace(ADDR_EVENT_MESSAGE_RECV,
+                        (const void *)EventMessageReceive,
+                        "EventMessageReceive", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
                         "LoadScriptCond", 2);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_COND, (const void *)SaveScriptCond,

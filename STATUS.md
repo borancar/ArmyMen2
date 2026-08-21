@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 343 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 343 | 336 of them below the CRT line |
+| `patch_replace` sites | 345 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 345 | 338 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 82,768 / 372,816 B (**22.2%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 83,184 / 372,816 B (**22.3%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Single player sends event messages that nobody receives, so the campaign
+  A/B cannot check what is IN one.** `EventMessageSend` runs 12 times a
+  mission -- it is genuinely executed -- and packing `num2`/`uid2` into the
+  `num1`/`uid1` slots still leaves `campaign` with an identical log and 2,571
+  pixels. `EventMessageReceive` never runs at all here; it needs an inbound
+  message. What DOES confirm the 40-byte layout is structural rather than
+  behavioural: the sender writes eleven offsets and the receiver reads the same
+  eleven back, and a native `offsetof` check reproduces all of them plus the
+  0x28 size. The behavioural check needs `AM2_MULTIPLAYER=1` with a second
+  player, which is the configuration this project has never had.
+
+- **The self-naming sweep undercounts, and by a known amount.** The 29 figure
+  comes from matching `Name:` at the start of a log message. `ArmyMessageSend`
+  -- 304 bytes, 20 callers, the transport the whole game sends through -- names
+  itself three times without ever using a colon ("ArmyMessageSend Zero length
+  message"). Anything relying on that list should treat it as a floor.
 
 - **`EventTriggerDelayed` runs seven times a mission and the A/B does not check
   what it puts in the record.** Swapping `uid` and `removeevent` in the

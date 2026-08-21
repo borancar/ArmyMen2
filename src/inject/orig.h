@@ -1201,6 +1201,19 @@
  * %d, delay: %d". */
 #define ADDR_EVENT_TRIGGER_DELAYED 0x0041F410u
 #define ADDR_CREATE_TIMER          0x0041E820u  /* "CreateTimer", 304 B */
+/* The network half of the event system, and the two sides confirm each other:
+ * EventMessageSend packs a 40-byte message and EventMessageReceive unpacks the
+ * same offsets and hands them to EventTriggerImmediate. Each names itself in
+ * its own log string, and EventTriggerImmediate's names the trailing argument
+ * Receive passes as 1 -- "remote". */
+#define ADDR_EVENT_MESSAGE_SEND    0x0041F150u
+#define ADDR_EVENT_MESSAGE_RECV    0x0041F320u
+#define ADDR_EVENT_TRIGGER_IMMED   0x0041EF80u  /* 464 B, 3 callers */
+/* 0x004105F0, "ArmyMessageSend" from its own three error strings -- 304 bytes
+ * and 20 callers, so it is the transport the whole game sends through. */
+#define ADDR_ARMY_MESSAGE_SEND     0x004105F0u
+#define AM2_ARMY_MSG_EVENT         0x0020u   /* the kind word EventMessageSend
+                                              * stamps at offset 2 */
 /* Gates the event logging in EventTriggerDelayed, EventMessageSend and
  * EventMessageReceive -- all three read it before calling the logger, and the
  * logger is stubbed to `ret` in this build, so it is inert either way. */
