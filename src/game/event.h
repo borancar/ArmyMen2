@@ -71,6 +71,19 @@ void __cdecl EvtSetFlag810(uint32_t uid, int32_t on);
 void __cdecl EvtSetOwner(uint32_t uid, int8_t owner);
 void __cdecl EvtSetByte40(uint32_t uid, int8_t value);
 
+/* 0x00420040. EvtSetByte40's type-3 counterpart, and the guard is the whole
+ * difference between them: that one takes whatever LookupByUID returned and
+ * checks only that it is non-null, while this one goes through
+ * LookupType3ByUID and so writes to nothing but a type 3. Neither applies the
+ * uid floor the rest of the family does.
+ *
+ * +0x530 is a third field in the same far tail: ObjType2Field548 reads +0x548
+ * and EvtSetField540 writes +0x540, both on type 2, and this writes +0x530 on
+ * type 3. Two different types with live fields past 0x500 says the two
+ * records are alike out there, which is as much as these three accessors can
+ * establish on their own. */
+void __cdecl EvtSetByte530(uint32_t uid, int8_t value);
+
 /* 0x0041FF20 and 0x0041FF40, over a table of rows of four dwords at
  * 0x00511E60. The index arithmetic is `(col + row * 4) * 4`, so `row` selects
  * a group of four and `col` an entry in it. */

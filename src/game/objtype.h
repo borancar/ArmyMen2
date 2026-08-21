@@ -55,6 +55,15 @@ uint32_t __cdecl ObjType2Field548(const AM2_Object *obj);
 /* Original: 0x00457420. Types 2, 3 and 8 -- the owned non-item types. */
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj);
 
+/* 0x0045D970. The registry lookup and the type test in one: the object
+ * registered for `uid` if it is type 3, and NULL for every other answer --
+ * no such uid, or one that is some other type.
+ *
+ * Eight callers, which is the reason it exists: each would otherwise write
+ * the pair out, and each would have to decide again what to do with a uid
+ * that resolves to the wrong type. */
+AM2_Object *__cdecl LookupType3ByUID(uint32_t uid);
+
 int objtype_install(void);
 
 #ifdef __cplusplus

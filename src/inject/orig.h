@@ -1071,6 +1071,7 @@
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
 #define ADDR_EVT_SET_OWNER       0x0041FB80u  /* void(uid, int8), +0x10 */
 #define ADDR_EVT_SET_BYTE40      0x00420020u  /* void(uid, int8), +0x40 */
+#define ADDR_EVT_SET_BYTE530     0x00420040u  /* void(uid, int8), +0x530, type 3 */
 #define ADDR_LOAD_SCRIPT_COND    0x0041EC70u  /* void(FILE *, cond *) */
 #define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_CONDS   0x0041EDD0u  /* int32_t(FILE *) */
@@ -1823,6 +1824,9 @@
 #define ADDR_OBJ_IS_TYPE3   0x00457490u
 #define ADDR_OBJ_IS_TYPE8   0x004574B0u  /* int32_t(const AM2_Object *) */
 #define ADDR_OBJ_IS_TYPE4   0x0045EEB0u
+
+/* The lookup and the type test in one. Eight callers. */
+#define ADDR_LOOKUP_TYPE3_BY_UID 0x0045D970u  /* AM2_Object *(uint32_t uid) */
 #define ADDR_FIELD_53C         0x0045AFA0u  /* uint32_t(const void *) */
 #define ADDR_ADD_BYTE_SAT      0x0045F440u  /* int32_t(base, add) */
 #define ADDR_COMPARE_DWORD     0x0043E150u  /* int32_t(const void*, const void*) */

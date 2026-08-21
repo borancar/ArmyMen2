@@ -277,6 +277,19 @@ void __cdecl EvtSetByte40(uint32_t uid, int8_t value)
     *((int8_t *)obj + 0x40) = value;
 }
 
+/* The same store one type further along. LookupType3ByUID does the lookup and
+ * the type test together, so the null check here covers both a uid that is not
+ * registered and one that is registered as something else. */
+void __cdecl EvtSetByte530(uint32_t uid, int8_t value)
+{
+    AM2_Object *obj;
+
+    obj = LookupType3ByUID(uid);
+    if (!obj)
+        return;
+    *(int8_t *)((uint8_t *)obj + 0x530) = value;
+}
+
 /* The clamp is applied to the caller's value before the object is looked up,
  * so it happens even when the store does not. */
 void __cdecl EvtSetWord60(uint32_t uid, int32_t value)
@@ -600,6 +613,8 @@ int event_install(void)
                         "EvtSetOwner", 2);
     rc |= patch_replace(ADDR_EVT_SET_BYTE40, (const void *)EvtSetByte40,
                         "EvtSetByte40", 2);
+    rc |= patch_replace(ADDR_EVT_SET_BYTE530, (const void *)EvtSetByte530,
+                        "EvtSetByte530", 2);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_CONDS, (const void *)LoadScriptConditions,
                         "LoadScriptConditions", 1);
     rc |= patch_replace(ADDR_LOAD_EVENT_SECTION, (const void *)LoadEventSection,

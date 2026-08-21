@@ -5,12 +5,17 @@
  *   ObjIsType3      0x00457490   type 3          28 call sites
  *   ObjIsTypeIn238  0x00457420   types 2, 3, 8   40 call sites
  *
+ * and one lookup that ends in a predicate rather than starting from an object:
+ *
+ *   LookupType3ByUID 0x0045D970  uid -> type 3 or NULL   8 call sites
+ *
  * All four accept NULL and answer 0 for it, which is why they are used so
  * freely -- callers do not null-check first. See objtype.h for what is and is
  * not established about the type taxonomy.
  */
 
 #include "objtype.h"
+#include "objtable.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -75,6 +80,23 @@ uint32_t __cdecl ObjType2Field548(const AM2_Object *obj)
     return *(const uint32_t *)((const uint8_t *)obj + 0x548);
 }
 
+/* The lookup and the test together. The original is branchless -- ObjIsType3's
+ * 0-or-1 is turned into an all-ones mask with `neg eax; sbb eax, eax` and
+ * ANDed over the pointer -- which is the same function as the conditional
+ * written here, because the predicate answers only 0 or 1 and never a third
+ * thing. Transcribing the mask would reproduce a compiler's choice rather
+ * than the source's.
+ *
+ * LookupByUID and ObjIsType3 are both reconstructed, so this calls them
+ * directly rather than reaching into the image for either. */
+AM2_Object *__cdecl LookupType3ByUID(uint32_t uid)
+{
+    AM2_Object *obj;
+
+    obj = (AM2_Object *)LookupByUID(uid);
+    return ObjIsType3(obj) ? obj : 0;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -87,5 +109,7 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_OBJ_IS_TYPE4, (const void *)ObjIsType4, "ObjIsType4", 1);
     rc |= patch_replace(ADDR_OBJ_TYPE2_FIELD548, (const void *)ObjType2Field548,
                         "ObjType2Field548", 1);
+    rc |= patch_replace(ADDR_LOOKUP_TYPE3_BY_UID, (const void *)LookupType3ByUID,
+                        "LookupType3ByUID", 1);
     return rc;
 }
