@@ -1346,6 +1346,12 @@
  * or produces "Object AAI record not found for link %02d-%-3d". */
 #define ADDR_DEF_CHECK_LINKS       0x00435FD0u  /* void(void) */
 #define ADDR_DEF_FIND_OBJ_REC      0x00435AC0u  /* void *(int32,int32,int32) */
+/* The object records the .aai files define: 56 bytes each, sorted, and keyed
+ * on their first three dwords -- which is what CompareTriple compares and why
+ * the lookup builds a 56-byte partial record as its search key. */
+#define ADDR_DEF_OBJ_RECS          0x00516170u
+#define ADDR_DEF_OBJ_REC_COUNT     0x00516174u
+#define AM2_DEF_OBJ_REC_SIZE       0x38u
 #define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
 #define ADDR_CRT_QSORT             0x004660B2u
 #define ADDR_CRT_BSEARCH           0x00466280u

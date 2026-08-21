@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 352 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 352 | 345 of them below the CRT line |
+| `patch_replace` sites | 353 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 353 | 346 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 84,560 / 372,816 B (**22.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 84,720 / 372,816 B (**22.7%**) | patched entries' sizes over the total |
 | modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Passing a comparator by ADDRESS rather than as our own symbol keeps its
+  counter honest.** `DefFindObjRec` hands bsearch `AM2_IMAGE(ADDR_COMPARE_TRIPLE)`
+  because that is what the original pushes; the call therefore still crosses
+  the patched entry and `CompareTriple` stayed at 22,535 across the change.
+  Handing it `&CompareTriple` would have been one instruction shorter, silently
+  correct, and would have zeroed a counter that is currently the best evidence
+  the sort is ours. The same choice was made for `ComparePair` in
+  `DefCheckLinks` -- where it is also why `ComparePair` fell rather than
+  vanished when `DefAddLink` landed.
+
+- **The def-object fallback is load-bearing and heavily observed.** Removing
+  the two less-specific bsearches from `DefFindObjRec` puts `campaign` at
+  22,125 differing pixels against a budget of 500, and the save drops from 310
+  items to 303. That is the strongest mutation signal seen in this run of
+  work; contrast the event and message functions, where mutations were
+  invisible.
 
 - **A counter going DOWN can be the evidence you wanted.** `ComparePair` read
   3,022 before `DefAddLink` was reconstructed and 1,846 after. Nothing changed

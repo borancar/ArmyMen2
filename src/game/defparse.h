@@ -51,6 +51,10 @@ void __cdecl DefCheckLinks(void);
 /* 0x00435EE0. Append one link, refusing a duplicate on (parent, siblings). */
 void __cdecl DefAddLink(const AM2_DefLink *link);
 
+/* 0x00435AC0. Find the object record for (type, a, b), falling back through
+ * (type, 0, b) and (type, 0, 0). NULL if none matches. */
+void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b);
+
 /* 0x00436080. bsearch the table for (parent, siblings). Only correct after
  * DefCheckLinks has sorted it. NOT DefLinkParse, which this address was
  * called until the bodies were read. */

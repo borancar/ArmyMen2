@@ -27,15 +27,14 @@ typedef int32_t (__cdecl *AM2_DefParseNumberFn)(int32_t *out, const char *tok);
 
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
-typedef void *(__cdecl *AM2_DefFindObjRecFn)(int32_t a, int32_t b, int32_t c);
 #define orig_qsort (*(AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
 typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
                                        uint32_t n, uint32_t size,
                                        const void *cmp);
 #define orig_bsearch (*(AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
 #define kDefLinkCap    (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_CAP))
-#define orig_def_find_obj_rec \
-    (*(AM2_DefFindObjRecFn)AM2_IMAGE(ADDR_DEF_FIND_OBJ_REC))
+#define kDefObjRecs      (*(void **)AM2_IMAGE(ADDR_DEF_OBJ_RECS))
+#define kDefObjRecCount  (*(int32_t *)AM2_IMAGE(ADDR_DEF_OBJ_REC_COUNT))
 
 #define kDefLinks      (*(AM2_DefLink **)AM2_IMAGE(ADDR_DEF_LINKS))
 #define kDefLinkCount  (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_COUNT))
@@ -112,6 +111,57 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
     return 0;
 }
 
+/* 0x00435AC0. Find the object record for a (type, a, b) triple, falling back
+ * to less specific keys. A role name.
+ *
+ * Three bsearches over the same sorted 56-byte table, each with one more field
+ * blanked:
+ *
+ *     (type, a, b)  ->  (type, 0, b)  ->  (type, 0, 0)
+ *
+ * so an .aai file can give a record for one exact variant, one for any `a`,
+ * and one for the type alone, and the most specific wins. The first hit is
+ * returned; a miss after all three gives whatever the last bsearch returned,
+ * which is NULL.
+ *
+ * Note the cascade is REDUNDANT when b is already 0 -- steps two and three
+ * search for the same key, and DefCheckLinks calls it exactly that way. The
+ * original does the work twice and so does this.
+ *
+ * The key is a 56-byte partial record and only its first three dwords are ever
+ * written; CompareTriple reads no further, so the rest is left uninitialised
+ * as in the original. The comparator is passed by ADDRESS rather than as our
+ * own symbol, which is what the original does and what keeps CompareTriple's
+ * counter meaningful. */
+void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
+{
+    int32_t key[AM2_DEF_OBJ_REC_SIZE / 4];
+    void   *hit;
+
+    key[0] = type;
+    key[1] = a;
+    key[2] = b;
+
+    hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+                       AM2_DEF_OBJ_REC_SIZE,
+                       (const void *)AM2_IMAGE(ADDR_COMPARE_TRIPLE));
+    if (hit != (void *)0)
+        return hit;
+
+    key[1] = 0;
+    hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+                       AM2_DEF_OBJ_REC_SIZE,
+                       (const void *)AM2_IMAGE(ADDR_COMPARE_TRIPLE));
+    if (hit != (void *)0)
+        return hit;
+
+    key[1] = 0;
+    key[2] = 0;
+    return orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
+                        AM2_DEF_OBJ_REC_SIZE,
+                        (const void *)AM2_IMAGE(ADDR_COMPARE_TRIPLE));
+}
+
 /* 0x00435FA0. How many links already name this parent key. Walks the whole
  * table; the caller is the validator below and DefLinkParse, which uses it to
  * stamp each new link with how many siblings preceded it. */
@@ -170,7 +220,7 @@ void __cdecl DefCheckLinks(void)
 
         number = KeyFieldB(key);
         type   = KeyFieldA(key);
-        rec    = (uint8_t *)orig_def_find_obj_rec((int32_t)type,
+        rec    = (uint8_t *)DefFindObjRec((int32_t)type,
                                                   (int32_t)number, 0);
 
         if (rec != (uint8_t *)0)
@@ -267,5 +317,7 @@ int defparse_install(void)
                         "DefAddLink", 1);
     rc |= patch_replace(ADDR_DEF_LINK_SEARCH, (const void *)DefFindLink,
                         "DefFindLink", 2);
+    rc |= patch_replace(ADDR_DEF_FIND_OBJ_REC, (const void *)DefFindObjRec,
+                        "DefFindObjRec", 3);
     return rc;
 }
