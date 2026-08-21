@@ -1424,6 +1424,23 @@
  * That last is the same "a zero x means use its own position" idiom
  * EvtDeployItem and ScriptResurrectItem both use, met a third time. */
 #define ADDR_ACTION_POINT        0x004203A0u  /* uint32_t(act, uint32_t me) */
+/* 0x00421750. Evaluate an `if`'s testvar comparisons -- all of them must pass.
+ * Its jump table confirms script.h's operator codes from the far side: 0 '=',
+ * 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=', in that order, and the 0x1C stride is
+ * AM2_ScriptTest's size. Six callers. */
+#define ADDR_EVAL_COND_TESTS     0x00421750u  /* int32_t(AM2_ScriptCond *) */
+#define ADDR_EVAL_OPERAND        0x00421590u  /* int32_t(a, b, c) -- a triple */
+/* 0x00421C40. Routes the end of a mission: in single player straight to
+ * ADDR_SCRIPT_FIND_FILE, which builds "%s%d.txt" and loads the next script,
+ * and in a multiplayer session to 0x00421800 instead -- which takes an extra
+ * argument the local path drops. Role name; ADDR_MP_SESSION is the only test.
+ *
+ * The local arm already had a name and it is kept. Reading 0x00421C40 alone
+ * suggested "the single-player way of handling a condition", which is what
+ * ADDR_COND_LOCAL would have said; the callee's own "%s%d.txt" says it is the
+ * mission loader, and that is the better description. */
+#define ADDR_ADVANCE_MISSION     0x00421C40u  /* void(int32_t, int32_t) */
+#define ADDR_MISSION_NETWORKED   0x00421800u  /* void(int32_t, int32_t) */
 
 /* The callbacks DeclareRuleVars registers. The first two are six-byte
  * wrappers over one shared handler differing only in a 0 or a 1, which is what

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 393 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 393 | 386 of them below the CRT line |
+| `patch_replace` sites | 395 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 395 | 388 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 91,104 / 372,816 B (**24.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 91,328 / 372,816 B (**24.5%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,15 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Name a function from the body at the OTHER end of its calls too.** The
+  alias ratchet refused `ADDR_COND_LOCAL` on `0x00421890`, which already held
+  `ADDR_SCRIPT_FIND_FILE`. Reading the caller alone -- a two-armed branch on
+  ADDR_MP_SESSION -- suggested "the single-player way of handling a condition".
+  The callee's own "%s%d.txt" says it is the mission-script loader, so the
+  caller is the end-of-mission router and is named `AdvanceMission` instead.
+  The project rule has been "read the body, not the call site"; this is the
+  same rule applied downward, and the ratchet is what forced the check.
 
 - **"A zero x means use the object's own position" is a convention of this
   codebase, not a coincidence.** Three functions now use it -- `EvtDeployItem`,
@@ -243,7 +252,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **21 functions are left in the event.cpp band, and most are tiny.** Four
+- **19 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

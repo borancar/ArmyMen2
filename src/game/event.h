@@ -104,6 +104,14 @@ uint32_t __cdecl ResolveUid(int32_t name, uint32_t me);
  * position otherwise. Fourteen callers. */
 uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me);
 
+/* 0x00421750. Evaluate an `if`'s testvar comparisons -- all must pass, none
+ * passes trivially, and an unknown operator passes. Six callers. */
+int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c);
+
+/* 0x00421C40. Route the end of a mission: the script-file loader in single
+ * player, a networked path otherwise. The two arms take different arguments. */
+void __cdecl AdvanceMission(int32_t a, int32_t b);
+
 /* 0x00422450. Drop the whole script and event state: names, conditions,
  * registrations, flag -- in that order. One caller. */
 void __cdecl ResetScriptState(void);

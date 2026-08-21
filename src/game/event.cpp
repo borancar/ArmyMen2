@@ -1501,6 +1501,72 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
     }
 }
 
+/* ------------------------------------------------ cond tests ---- */
+
+typedef int32_t (__cdecl *AM2_EvalOperandFn)(int32_t a, int32_t b, int32_t c);
+typedef void (__cdecl *AM2_MissionLocalFn)(int32_t a);
+typedef void (__cdecl *AM2_MissionNetFn)(int32_t a, int32_t b);
+#define orig_eval_operand   (*(AM2_EvalOperandFn)AM2_IMAGE(ADDR_EVAL_OPERAND))
+#define orig_mission_local  (*(AM2_MissionLocalFn)AM2_IMAGE(ADDR_SCRIPT_FIND_FILE))
+#define orig_mission_net    (*(AM2_MissionNetFn)AM2_IMAGE(ADDR_MISSION_NETWORKED))
+
+/* 0x00421750. Evaluate an `if`'s testvar comparisons. All must pass; a
+ * condition with none passes trivially.
+ *
+ * Each test is two operand TRIPLES and an operator, and each triple is handed
+ * whole to the operand evaluator -- so a testvar operand is three values, not
+ * one, which is what AM2_ScriptTest's shape already implied and this confirms.
+ *
+ * The operator jump table settles script.h's codes from the far side: 0 '=',
+ * 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=', in exactly that order. Read from the
+ * TABLE rather than from the arm layout, per the rule -- and here the six arms
+ * happen to be laid out in the same order, which is only knowable by checking.
+ *
+ * An operator above 5 falls through to the loop's continue, so an unknown
+ * comparison PASSES rather than failing. Reproduced. */
+int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c)
+{
+    for (int32_t i = 0; i < c->ntests; i++) {
+        const AM2_ScriptTest *t = &c->tests[i];
+        int32_t left  = orig_eval_operand(t->left[0], t->left[1], t->left[2]);
+        int32_t right = orig_eval_operand(t->right[0], t->right[1],
+                                          t->right[2]);
+
+        switch (t->op) {
+        case 0: if (left != right) return 0; break;
+        case 1: if (left == right) return 0; break;
+        case 2: if (left >= right) return 0; break;
+        case 3: if (left <= right) return 0; break;
+        case 4: if (left >  right) return 0; break;
+        case 5: if (left <  right) return 0; break;
+        default: break;                 /* unknown operator passes */
+        }
+    }
+
+    return 1;
+}
+
+/* 0x00421C40. Route the end of a mission.
+ *
+ * In single player it goes straight to the script-file loader, the function
+ * that builds "%s%d.txt" and reads the next mission; in a multiplayer session
+ * it goes somewhere else entirely, and that path takes an extra argument the
+ * local one drops.
+ *
+ * A role name, and a corrected one: reading this function alone suggested "the
+ * single-player way of handling a condition". The callee's own format string
+ * says it is the mission loader, which is why an address should be named from
+ * the body at the OTHER end of the call as well as this one. */
+void __cdecl AdvanceMission(int32_t a, int32_t b)
+{
+    if (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION) == 0) {
+        orig_mission_local(a);
+        return;
+    }
+
+    orig_mission_net(a, b);
+}
+
 /* ---------------------------------------------- action point ---- */
 
 /* 0x004203A0. Work out the point an action refers to. Fourteen callers.
@@ -1669,6 +1735,10 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVAL_COND_TESTS, (const void *)EvalCondTests,
+                        "EvalCondTests", 6);
+    rc |= patch_replace(ADDR_ADVANCE_MISSION, (const void *)AdvanceMission,
+                        "AdvanceMission", 2);
     rc |= patch_replace(ADDR_ACTION_POINT, (const void *)ActionPoint,
                         "ActionPoint", 14);
     rc |= patch_replace(ADDR_EVENT_NOTIFY, (const void *)EventNotify,
