@@ -616,6 +616,21 @@
 #define ADDR_UPDATE_3D_AUDIO     0x0040BCF0u  /* void(void) */
 #define ADDR_STOP_NAMED_SOUND    0x0040B860u  /* void(const char *, int32) */
 #define SOUND_DYNAMIC_MAX_INDEX  0x10         /* inclusive; 17 slots */
+
+/* The audio save section. Its tag is the only one outside the 0x0666xxxx
+ * family. The saver stores, per dynamic slot, exactly the arguments it would
+ * take to call PlayDynamicSound again -- looping, position, priority, owner --
+ * behind a length-prefixed name, or a bare zero length if the slot is not
+ * fully populated.
+ *
+ * Its loop bound is EXCLUSIVE: `cmp ebp,0x4FA400 / jl`, so it covers 16 slots.
+ * FreeDynamicSounds uses `jle` over the same table and covers 17. The two
+ * really do disagree; reproduce each as written rather than making them
+ * agree. */
+#define ADDR_SAVE_AUDIO_SECTION  0x0040BDF0u  /* int32_t(FILE *) */
+#define ADDR_LOAD_AUDIO_SECTION  0x0040BF00u  /* int32_t(FILE *) */
+#define AM2_SAVETAG_AUDIO        0x01326413u
+#define SOUND_DYNAMIC_SAVED      16           /* exclusive bound, see above */
 #define ADDR_LISTENER_POS        0x00514E0Cu  /* AM2_Point, the ear */
 #define ADDR_DEFAULT_SOUND_POS   0x005125A0u  /* AM2_Point, used when a sound
                                                * has neither owner nor place */

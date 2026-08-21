@@ -59,9 +59,9 @@ left are a decision, not an omission: all three sit behind CD checks this build
 has patched to jump past them.
 
 The front has moved into **game logic**, and the current front is savegame
-serialisation. `SaveGame` writes eleven sections and **ten of those savers are
-ours**, as are nine of the eleven loaders; the two halves mirror each other,
-which is what keeps confirming each struct's layout from both ends. The newest is `SaveObjScriptSection`, the deepest of them -- four
+serialisation. `SaveGame` writes eleven sections and **all eleven savers are
+now ours**, as are nine of the eleven loaders; the two halves mirror each
+other, which is what keeps confirming each struct's layout from both ends. The newest is `SaveObjScriptSection`, the deepest of them -- four
 nested levels, with each action's string length-prefixed in place of the
 pointer field it occupies in memory.
 
@@ -69,10 +69,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 336 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 336 | 329 of them below the CRT line |
+| `patch_replace` sites | 337 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 337 | 330 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 80,288 / 372,816 B (**21.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 80,560 / 372,816 B (**21.6%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -91,7 +91,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
 | `make selftest` | current | **7,186** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
-| savegame oracle, objscript section | current | **0 differing bytes of 11,632**, pointers included; whole file 18, all outside it |
+| savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
 A clean A/B is not evidence about a function the run never calls. Check with a
@@ -106,10 +106,8 @@ counts probe before reading one as coverage -- that is what turned the
    would check both halves at once. It has to rebuild three pointer levels
    from the raw dwords the saver stored -- states, frames, actions -- and turn
    each action's stored LENGTH back into a `malloc`'d string.
-2. **The audio section is the last one untouched in either direction**:
-   `0x0040BDF0` saver (272 B) and `0x0040BF00` loader (240 B). It is also the
-   only section whose tag is not in the `0x0666xxxx` family -- `0x01326413`.
-   With it and the objscript loader, the whole serialiser is ours.
+2. **Two loaders are all that is left of the serialiser**: `0x004364A0`
+   objscript (1072 B) and `0x0040BF00` audio (240 B). Every saver is done.
 3. **Fold the pointer-aware comparison into a tool.** It was done by hand for
    objscript here -- walk the section, collect the offsets that hold heap
    pointers, and compare everything else -- and it turned "188 differing bytes"
@@ -128,6 +126,22 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The audio section is the last in the file, which turns its LENGTH into a
+  check.** 68 bytes -- a tag and sixteen zero lengths -- ending exactly at EOF.
+  The saver's loop bound is exclusive (`jl`) where `FreeDynamicSounds` walks
+  the same table with `jle`, so one covers 16 slots and the other 17. Writing
+  the seventeenth would put the file at 176,854 bytes instead of 176,850. The
+  two functions genuinely disagree about that table; neither was made to agree
+  with the other.
+
+- **All sixteen slots are empty at the autosave, so the populated path is
+  verified by READING only.** A dynamic sound has to be looping and active to
+  be written, and none is at mission start. What the oracle checked is the tag,
+  the slot count and the empty-slot arm; the length-prefixed name and the four
+  dwords behind it -- looping, position, priority, owner, which are exactly
+  PlayDynamicSound's arguments -- have never been executed. Driving a mission
+  long enough to start an ambient loop before the save would close that.
 
 - **A structural parse that lands exactly on the next tag proves every record
   boundary, and the objscript section is the strongest case of it yet.** Four

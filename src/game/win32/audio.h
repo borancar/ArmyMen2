@@ -154,4 +154,9 @@ int audio_install(void);
 }
 #endif
 
+/* 0x0040BDF0. Write the audio save section: tag, then 16 dynamic-sound slots,
+ * each a length-prefixed name plus looping/pos/priority/owner, or a bare zero
+ * length. Always returns 1. */
+int32_t __cdecl SaveAudioSection(am2_FILE *fp);
+
 #endif /* AM2_AUDIO_H */

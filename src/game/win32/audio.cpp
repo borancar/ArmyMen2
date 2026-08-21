@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include "wavefile.h"
 #include "../gamedir.h"
+#include "../savetag.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -1549,12 +1550,64 @@ void __cdecl FreeDynamicSounds(void)
     }
 }
 
+/* ------------------------------------------------------ save ---- */
+
+/* 0x0040BDF0. The audio save section -- the last of the eleven, and the only
+ * one whose tag is not in the 0x0666xxxx family.
+ *
+ * Per dynamic slot it writes a length-prefixed name and then four dwords, in
+ * the original's own order: looping, position, priority, owner. Those are
+ * exactly PlayDynamicSound's arguments, so what the section stores is what it
+ * takes to re-issue the call on load. A slot missing its buffer, its name, its
+ * active flag or its looping flag -- or holding an empty name -- writes a bare
+ * zero length and nothing else. The original reaches that through two separate
+ * arms that set up the same zero and jump to one shared fwrite; they differ in
+ * no observable way.
+ *
+ * The bound is EXCLUSIVE, covering 16 of the 17 slots. FreeDynamicSounds walks
+ * the same table with `jle` and covers all 17. Reproduced as written. */
+int32_t __cdecl SaveAudioSection(am2_FILE *fp)
+{
+    void **slots = (void **)(uintptr_t)ADDR_SOUND_DYNAMIC;
+
+    WriteSaveTag(fp, AM2_SAVETAG_AUDIO);
+
+    for (int32_t i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
+        uint8_t    *snd  = (uint8_t *)slots[i];
+        const char *name = snd ? *(const char **)(snd + SOUND_REC_OFF_NAME)
+                               : (const char *)0;
+        int32_t     len;
+
+        if (!snd || !name
+            || *(const void **)(snd + SOUND_REC_OFF_BUFFER) == (const void *)0
+            || *(const int32_t *)(snd + SOUND_REC_OFF_ACTIVE) == 0
+            || *(const int32_t *)(snd + SOUND_REC_OFF_LOOPING) == 0
+            || *name == '\0') {
+            len = 0;
+            orig_fwrite(&len, 4, 1, fp);
+            continue;
+        }
+
+        len = (int32_t)strlen(name);
+        orig_fwrite(&len, 4, 1, fp);
+        orig_fwrite(name, (size_t)len, 1, fp);
+        orig_fwrite(snd + SOUND_REC_OFF_LOOPING,  4, 1, fp);
+        orig_fwrite(snd + SOUND_REC_OFF_POS,      4, 1, fp);
+        orig_fwrite(snd + SOUND_REC_OFF_PRIORITY, 4, 1, fp);
+        orig_fwrite(snd + SOUND_REC_OFF_OWNER,    4, 1, fp);
+    }
+
+    return 1;
+}
+
 int audio_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_STOP_AUDIO_STREAM, (const void *)StopAudioStream,
                         "StopAudioStream", 0);
+    rc |= patch_replace(ADDR_SAVE_AUDIO_SECTION, (const void *)SaveAudioSection,
+                        "SaveAudioSection", 1);
     rc |= patch_replace(ADDR_START_AUDIO_STREAM, (const void *)StartAudioStream,
                         "StartAudioStream", 2);
     rc |= patch_replace(ADDR_RELEASE_SOUND_BUFS, (const void *)ReleaseSoundBuffers,
