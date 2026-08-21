@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+#include "dist.h"   /* AM2_Point, which ObjMaskBitAt takes */
+
 /* IsBlank and IsScriptDelim moved to script.cpp: 0x0043EE80 and 0x0043EEA0
  * are inside script.cpp's own address band, and they are the tokeniser's two
  * character predicates. */
@@ -223,6 +225,33 @@ int32_t __cdecl MaskPixelSolid32(uint32_t x, uint32_t y, const void *mask);
  * caller tests it against zero. */
 int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
                              int32_t height, int32_t stride);
+
+/* 0x00435390. Whether a map point falls on a solid pixel of an object's own
+ * 1bpp mask. The mask hangs off the object at +0x78 and both it and the object
+ * may be null, each answering 0.
+ *
+ * The point is put into mask space by the object's position:
+ *
+ *   x = mask.originX - obj[0x30] + at->x
+ *   y = mask.originY - obj[0x34] + at->y
+ *
+ * with the origin a pair of int16 at +0 and +2 of the mask, the extent another
+ * pair at +4 and +6, and the pixels behind a pointer at +0xC. Rows are
+ * `((width + 31) >> 3) & ~3` bytes -- 1bpp rounded up to a whole dword, the
+ * usual Windows row alignment -- which is the third row stride this file now
+ * carries and the only one that is dword-aligned.
+ *
+ * Accessed by byte offset rather than through a struct on purpose: the record
+ * ends in a pointer, and a struct would be 4 bytes wider on this target and
+ * quietly move every field after it.
+ *
+ * The original selects the bit from a table of {0x80, 0x40 ... 1} it builds on
+ * the stack every call rather than shifting. Reproduced as the shift, which is
+ * the same eight values; the table is a compiler's choice about how to spell
+ * `0x80 >> (x & 7)` and nothing observes the difference.
+ *
+ * Returns the masked BIT, not a boolean, like BitmapBitSet. */
+int32_t __cdecl ObjMaskBitAt(const void *obj, const AM2_Point *at);
 
 
 /* 0x00402700. XOR of the record's own dwords, its length taken from inside it:

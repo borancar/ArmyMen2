@@ -385,6 +385,54 @@ int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
     return bit & row[x >> 3];
 }
 
+/* Mask record: origin at +0 and +2, extent at +4 and +6, pixels at +0xC, all
+ * reached by offset because the record ends in a pointer. See misc.h. */
+#define AM2_OBJMASK_ORIGIN_X  0x00
+#define AM2_OBJMASK_ORIGIN_Y  0x02
+#define AM2_OBJMASK_WIDTH     0x04
+#define AM2_OBJMASK_HEIGHT    0x06
+#define AM2_OBJMASK_BITS      0x0C
+#define AM2_OBJ_MASK          0x78
+#define AM2_OBJ_POS_X         0x30
+#define AM2_OBJ_POS_Y         0x34
+
+int32_t __cdecl ObjMaskBitAt(const void *obj, const AM2_Point *at)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    const uint8_t *m;
+    const uint8_t *bits;
+    int32_t        x, y, w, h, stride;
+
+    if (!obj)
+        return 0;
+    m = *(const uint8_t *const *)(o + AM2_OBJ_MASK);
+    if (!m)
+        return 0;
+
+    x = *(const int16_t *)(m + AM2_OBJMASK_ORIGIN_X)
+        - *(const int32_t *)(o + AM2_OBJ_POS_X) + at->x;
+    y = *(const int16_t *)(m + AM2_OBJMASK_ORIGIN_Y)
+        - *(const int32_t *)(o + AM2_OBJ_POS_Y) + at->y;
+
+    /* Tested in this order, and each bound is loaded only once its coordinate
+     * has passed the zero test -- reproduced as written. */
+    if (x < 0)
+        return 0;
+    w = *(const int16_t *)(m + AM2_OBJMASK_WIDTH);
+    if (x >= w)
+        return 0;
+    if (y < 0)
+        return 0;
+    h = *(const int16_t *)(m + AM2_OBJMASK_HEIGHT);
+    if (y >= h)
+        return 0;
+
+    stride = ((w + 31) >> 3) & ~3;
+    bits   = *(const uint8_t *const *)(m + AM2_OBJMASK_BITS);
+
+    return bits[stride * y + (x >> 3)] & (0x80 >> (x & 7));
+}
+
 
 uint32_t __cdecl XorChecksum(const void *record)
 {
@@ -728,6 +776,8 @@ int misc_install(void)
     patch_replace(ADDR_REMAP_BYTES, (const void *)RemapBytes, "RemapBytes", 2);
     patch_replace(ADDR_MASK_PIXEL_SOLID32, (const void *)MaskPixelSolid32,
                   "MaskPixelSolid32", 2);
+    patch_replace(ADDR_OBJ_MASK_BIT_AT, (const void *)ObjMaskBitAt,
+                  "ObjMaskBitAt", 3);
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     return 0;

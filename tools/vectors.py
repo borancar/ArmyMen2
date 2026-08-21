@@ -230,6 +230,28 @@ SEED = {
     # not-found walk and the shift-down; kind 5 on the middle record exercises
     # the clamp to 3, which a kind taken from the fill pattern would reach only
     # by accident.
+    # ObjMaskBitAt(obj, point): obj->[0x78] is the mask record and the record's
+    # +0xC is the pixels, so it is a two-hop chain. The object's position at
+    # +0x30/+0x34 has to be planted too -- from fill pattern it is enormous and
+    # every point lands outside the mask. Width 16 is chosen to make the stride
+    # discriminating: (16+31)>>3 is 5, which `& ~3` rounds down to 4, so
+    # dropping either half of the formula changes the answer.
+    0x00435390: [(0, 0x78, "ptr", 0x900),
+                 # NOT zero. With the position at the origin, `origin - pos`
+                 # and `origin + pos` are the same expression and mutating the
+                 # subtraction into an addition passed every vector. 4 and 2
+                 # are small enough to keep the shifted points in range.
+                 (0, 0x30, "u32", 4), (0, 0x34, "u32", 2),
+                 (-1, 0x900, "u32", 0x00000000),
+                 (-1, 0x904, "u32", 0x00080010),
+                 (-1, 0x90C, "ptr", 0xA00),
+                 # Points are in OBJECT space now, so each is the mask
+                 # coordinate plus (4, 2): in-range, both bounds, and one
+                 # short of each.
+                 (1, 0x00, "u32s", (0x00020004, 0x00020005, 0x0002000B,
+                                    0x00030010, 0x00090013, 0x00020014,
+                                    0x00020003, 0x000A0004, 0x00040007,
+                                    0x0006000D, 0x0005000E))],
     0x00402DB0: [(0, 0xB8, "u32s", (0, 1, 2, 3)),
                  (0, 0xBC, "u32", 0x1000), (0, 0xC4, "u32", 1),
                  (0, 0xC8, "u32", 0x2000), (0, 0xD0, "u32", 5),
@@ -972,7 +994,7 @@ def main():
                 "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
                 "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
                 "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED",
-                "ADDR_COMM_REMOVE_KEYED"]
+                "ADDR_COMM_REMOVE_KEYED", "ADDR_OBJ_MASK_BIT_AT"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1079,6 +1101,7 @@ def main():
         "ADDR_MASK_PIXEL_SOLID32": "MaskPixelSolid32",
         "ADDR_OBJ_CODE_UNMAPPED": "ObjCodeUnmapped",
         "ADDR_COMM_REMOVE_KEYED": "CommRemoveKeyed",
+        "ADDR_OBJ_MASK_BIT_AT": "ObjMaskBitAt",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
