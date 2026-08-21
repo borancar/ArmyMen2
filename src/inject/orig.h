@@ -1091,6 +1091,15 @@
 #define ADDR_EVT_SET_BYTE530     0x00420040u  /* void(uid, int8), +0x530, type 3 */
 #define ADDR_LOAD_SCRIPT_COND    0x0041EC70u  /* void(FILE *, cond *) */
 #define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
+/* map.cpp's savegame section: one fixed 236-byte block and nothing else, which
+ * is why the pair is 48 and 64 bytes. The block is at 0x00514D90. */
+#define ADDR_SAVE_MAP_SECTION    0x0042DB40u  /* int32_t(FILE *) */
+#define ADDR_LOAD_MAP_SECTION    0x0042DB70u  /* int32_t(FILE *) */
+#define ADDR_MAP_SAVE_BLOCK      0x00514D90u
+#define AM2_MAP_SAVE_SIZE        0xECu        /* 236 bytes */
+#define AM2_SAVETAG_MAP          0x06660009u
+#define ADDR_STR_MAP_CPP         0x00486410u  /* "C:\\ArmyMen2\\source\\map.cpp" */
+
 #define ADDR_SAVE_SCRIPT_CONDS   0x0041EC20u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_CONDS   0x0041EDD0u  /* int32_t(FILE *) */
 #define AM2_SAVETAG_CONDS        0x06660003u  /* event.cpp's other tag */
