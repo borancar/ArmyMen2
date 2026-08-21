@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `834eb84`. Working tree clean.
+Last updated: **2026-08-21**, at `340424d`. Working tree clean.
 
 ## In flight
 
@@ -23,7 +23,11 @@ Nothing uncommitted.
 - **The pure-leaf pool is nearly empty**: 14 pure unreconstructed leaves left,
   from the 161 this project started that count at. Three of the 14 are false
   positives -- see Leads.
-- **Five holes closed in the vector harness, all found by mutation.** The
+- **Six holes closed in the vector harness, all found by mutation.** The
+  newest is a lockstep: a seeded field and an argument set of the SAME list
+  length move together, so `CommRemoveKeyed` never met the record that
+  exercises its clamp. Co-prime lengths, the lesson `vectors.py` already
+  carried for SEED periods. The
   newest: a `u32v` seed varies on a period fixed by its position in the chain,
   so a table with answers at BOTH ends could not be aimed at -- `ObjCodeUnmapped`
   hit 100% coverage with two of its five zero answers never produced. `u32s`
@@ -64,12 +68,12 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 303 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 303 | 296 of them below the CRT line |
+| `patch_replace` sites | 304 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 304 | 297 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
-| pure unreconstructed leaves | 10 | `tools/vectors.py --all` |
+| pure unreconstructed leaves | 9 | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
@@ -83,7 +87,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **6,820** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **6,902** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, twice: log identical at 14 messages, 2,571/786,432 pixels both times |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
@@ -94,9 +98,9 @@ counts probe before reading one as coverage -- that is what turned the
 ## Next
 
 1. Finish `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
-2. Keep taking pure leaves: 7 real ones left -- `0x00402db0`, `0x00439cc0`,
-   `0x0040d880`, `0x0041ade0`, `0x00435390`, `0x00423ee0` and one 16-byte
-   stub. All are 160B or larger, so the easy ones are gone.
+2. Keep taking pure leaves: 6 real ones left -- `0x00439cc0`, `0x0040d880`,
+   `0x0041ade0`, `0x00435390`, `0x00423ee0` and `0x0041bb60`'s neighbours.
+   All 160B or larger, so the easy ones are gone.
 3. The action executor at `0x00420410` (4,096 B) is the layer above the setter
    family, and `0x0041FD10`, `0x0041FD30`, `0x0041FEA0` are three more of its
    helpers, all still original.
@@ -127,6 +131,15 @@ and not promoted to fact without evidence.
   dword read back to a word passes every vector. Raising `SCRATCH_SZ` past
   64K would fix it and would re-cut every vector in the set; not done, and
   recorded here rather than left as a silent gap.
+- **The comm object's flow control is coming into focus.** `0x004014C0` is the
+  ack handler -- `"??? PULSE seq %d latency %d acks for %d msgs %d thru %d"`,
+  `"Flow Ack for Message not in sendqueue sequence %d"` -- and it is the only
+  caller of both `RingPush32` and `CommRemoveKeyed`. So the 32-dword ring at
+  `+0x3A0` that `CommMean32` averages is a **latency** average, which `msgslot.h`
+  had guessed from its shape before the writer was found; and the 12-byte
+  records at `+0xBC` are very probably the send queue, keyed by sequence number.
+  The second reading is the caller's vocabulary, not the function's, so it is
+  recorded and not in a name.
 - **Object codes 0x18..0x28 are a real vocabulary, and two tables agree on
   which five matter.** `MapCode18To28` maps `{0x18,0x19,0x1A,0x27,0x28}` to
   `{8,2,1,4,6}` and everything between to 0; `ObjCodeUnmapped` answers 0 for
