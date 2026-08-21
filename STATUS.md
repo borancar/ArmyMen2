@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 342 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 342 | 335 of them below the CRT line |
+| `patch_replace` sites | 343 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 343 | 336 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 82,624 / 372,816 B (**22.2%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 82,768 / 372,816 B (**22.2%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,16 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`EventTriggerDelayed` runs seven times a mission and the A/B does not check
+  what it puts in the record.** Swapping `uid` and `removeevent` in the
+  16 bytes it allocates leaves `campaign` completely clean -- identical log,
+  2,571 pixels. So the field ORDER is verified by reading only, even though the
+  function is genuinely executed. The likely reason is that the handler fires
+  outside the ~25 s the drive observes. Anything that wants to check it needs
+  to reach `ADDR_EVT_RECORD_HANDLER` firing, not just the registration.
+  Contrast `UpdateObjectScript`, where a one-field mutation is caught
+  immediately -- executing a function often is not the same as observing it.
 
 - **`0x00511E04` is not a clock, and the reading that said so lasted one
   probe.** `UpdateObjectScript` skips an object while `obj[0xBC] >= this` and

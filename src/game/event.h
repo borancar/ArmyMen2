@@ -37,6 +37,14 @@ void __cdecl DeclareRuleVars(void);
 void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
                            const void *fn, void *arg, int32_t owns);
 
+/* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
+ * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
+ * against the timer's id with `owns` set, so the teardown frees the record.
+ * Does nothing further if the timer returns -100 or -101. */
+void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
+                                 int32_t delay, int32_t removeevent,
+                                 int32_t arg);
+
 /* 0x004223D0. Empty all nine buckets. */
 void __cdecl EventClearAll(void);
 

@@ -1193,6 +1193,18 @@
 #define ADDR_EVT_PAD_HANDLER_A   0x00437570u
 #define ADDR_EVT_PAD_HANDLER_B   0x00437540u
 #define ADDR_EVT_RECORD_HANDLER  0x0041F3E0u
+/* The one that BUILDS such a record. EventTriggerDelayed mallocs 16 bytes,
+ * fills it with (type, num, uid, removeevent), starts a timer and registers
+ * ADDR_EVT_RECORD_HANDLER against the timer's id with that record as the
+ * argument -- passing 1 for `owns`, so the teardown frees it. Named by its own
+ * log string, "EventTriggerDelayed: type %d, num: %d, uid: %x, removeevent:
+ * %d, delay: %d". */
+#define ADDR_EVENT_TRIGGER_DELAYED 0x0041F410u
+#define ADDR_CREATE_TIMER          0x0041E820u  /* "CreateTimer", 304 B */
+/* Gates the event logging in EventTriggerDelayed, EventMessageSend and
+ * EventMessageReceive -- all three read it before calling the logger, and the
+ * logger is stubbed to `ret` in this build, so it is inert either way. */
+#define COMM_OFF_EVENT_DEBUG       0x418u
 /* The event.cpp section's own tag and the path string CheckSaveTag is given.
  * docs/savetags.tsv lists all fifteen; this is the one at event.cpp:3274. */
 #define AM2_SAVETAG_EVENT        0x06660004u

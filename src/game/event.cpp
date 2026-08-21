@@ -673,6 +673,65 @@ void __cdecl EvtMarkClear(int32_t row, int32_t col)
     g_evtMarks[col + row * 4] = 0;
 }
 
+/* ----------------------------------------------- delayed trigger ---- */
+
+/* CreateTimer stays original and is reached by address. 304 bytes, one caller
+ * -- this function -- and it names itself in its own log string. */
+typedef int32_t (__cdecl *AM2_CreateTimerFn)(int32_t delay, int32_t a,
+                                             int32_t b, int32_t c, int32_t d,
+                                             int32_t e);
+#define orig_create_timer (*(AM2_CreateTimerFn)AM2_IMAGE(ADDR_CREATE_TIMER))
+
+/* The event logging switch, a field of the comm object. The logger it gates is
+ * stubbed to `ret` in this build, so the whole branch is inert -- reproduced
+ * because the call sites are what carry the format strings that named these
+ * functions in the first place. */
+#define kEventDebug \
+    (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
+                        + COMM_OFF_EVENT_DEBUG))
+
+/* 0x0041F410. Arrange for an event to be raised after a delay.
+ *
+ * Sixteen bytes are allocated and filled with what the event will need when it
+ * fires -- type, num, uid, removeevent -- then a timer is started and
+ * ADDR_EVT_RECORD_HANDLER is registered against the id the timer returns, with
+ * that record as its argument. The last argument to EventRegister is 1, so the
+ * registration OWNS the record and the table's teardown frees it. That is the
+ * opposite of what DeclareRuleVars passes, and the difference is why the `if`
+ * records it registers are not freed by the table.
+ *
+ * -100 and -101 are the timer's two failure returns. On either, the record is
+ * simply dropped -- the original does not free it, and that leak is
+ * reproduced. It is 16 bytes on a path that only runs when timers are
+ * exhausted. */
+void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
+                                 int32_t delay, int32_t removeevent,
+                                 int32_t arg)
+{
+    int32_t *rec;
+    int32_t  id;
+
+    if (kEventDebug)
+        orig_log("EventTriggerDelayed: type %d, num: %d, uid: %x, "
+                 "removeevent: %d, delay: %d\n",
+                 type, num, uid, removeevent, delay);
+
+    rec = (int32_t *)am2_malloc(16);
+
+    rec[0] = type;
+    rec[1] = num;
+    rec[2] = uid;
+    rec[3] = removeevent;
+
+    id = orig_create_timer(delay, 0, 0, 1, -2, arg);
+
+    if (id == -100 || id == -101)
+        return;
+
+    EventRegister(1, id, 0, (const void *)AM2_IMAGE(ADDR_EVT_RECORD_HANDLER),
+                  rec, 1);
+}
+
 int event_install(void)
 {
     int rc = 0;
@@ -709,6 +768,9 @@ int event_install(void)
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_SAVE_EVENT_SECTION, (const void *)SaveEventSection,
                         "SaveEventSection", 1);
+    rc |= patch_replace(ADDR_EVENT_TRIGGER_DELAYED,
+                        (const void *)EventTriggerDelayed,
+                        "EventTriggerDelayed", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
                         "LoadScriptCond", 2);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_COND, (const void *)SaveScriptCond,
