@@ -53,7 +53,8 @@ void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
 typedef struct {
     uint16_t len;          /* +0x00, always 0x28 */
     uint16_t kind;         /* +0x02, AM2_ARMY_MSG_EVENT */
-    uint32_t zero;         /* +0x04 */
+    uint32_t uid;          /* +0x04, the transport's own uid slot;
+                            * EventMessageSend always writes 0 */
     uint8_t  type;         /* +0x08, the event type, narrowed to a byte */
     int32_t  num1;         /* +0x0C */
     uint32_t uid1;         /* +0x10, through UidOnWire */

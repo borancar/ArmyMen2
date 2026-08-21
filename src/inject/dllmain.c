@@ -27,6 +27,7 @@
 #include "../game/win32/mapdraw.h"
 #include "../game/item.h"
 #include "../game/msgslot.h"
+#include "../game/armymsg.h"
 #include "../game/objflag.h"
 #include "../game/event.h"
 #include "../game/trig.h"
@@ -434,6 +435,7 @@ static void install(void)
     dist_install();
     item_install();
     msgslot_install();
+    armymsg_install();
     objflag_install();
     misc_install();
     gamedir_install();

@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 345 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 345 | 338 of them below the CRT line |
+| `patch_replace` sites | 346 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 346 | 339 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 83,184 / 372,816 B (**22.3%**) | patched entries' sizes over the total |
-| modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 83,488 / 372,816 B (**22.4%**) | patched entries' sizes over the total |
+| modules | 24 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
@@ -152,6 +152,18 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A counter of 12 can mean the first line ran twelve times.**
+  `ArmyMessageSend` reads 12 on a campaign mission -- matching
+  `EventMessageSend` exactly, since the event system is single player's only
+  sender -- and every one of those calls returns at the FIRST gate. Probed
+  live: the comm object at `0x004FA480` has `dplay` 0, `joined` 0 and
+  `playerCount` 1, and the packet length at `0x004FAA6C` still holds its
+  initial `0x14`, which is independent proof nothing was ever appended. So the
+  whole body -- the size complaints, the copy, the flush lookahead -- is
+  verified by READING. The blind spot this project already documents is a
+  counter that cannot move; this is the opposite one, a counter that moves
+  without the function doing anything.
 
 - **Single player sends event messages that nobody receives, so the campaign
   A/B cannot check what is IN one.** `EventMessageSend` runs 12 times a

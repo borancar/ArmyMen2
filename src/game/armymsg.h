@@ -1,0 +1,45 @@
+/* armymsg.cpp -- the game's outgoing message transport.
+ *
+ * A name of ours, not the image's. These functions sit in the band between
+ * audio.cpp's last function and event.cpp's first, so the original's own
+ * module boundary is not visible here the way it is for script.cpp and
+ * objscript.cpp; what IS visible is that they call themselves ArmyMessageSend
+ * and ArmyMessageFlush in their own log strings, and that they share one
+ * packet buffer. Named for the family rather than for a file.
+ *
+ * The shape: callers hand ArmyMessageSend a message that opens with an
+ * eight-byte header, it is appended to a packet at ADDR_ARMY_PACKET, and the
+ * packet is flushed when it fills. Twenty callers, so this is how the whole
+ * game talks to its peers.
+ */
+#ifndef AM2_ARMYMSG_H
+#define AM2_ARMYMSG_H
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* The header every message on this transport begins with. ArmyMessageSend
+ * reads all three: the length decides how much is copied, and the uid is fed
+ * to UidArmy for the debug line. */
+typedef struct {
+    uint16_t len;    /* +0x00, bytes to copy, including this header */
+    uint16_t kind;   /* +0x02 */
+    uint32_t uid;    /* +0x04 */
+} AM2_ArmyMsgHdr;
+
+/* 0x004105F0. Append one message to the outgoing packet, flushing first if it
+ * will not fit and again afterwards if the packet has passed its threshold.
+ * Does nothing at all unless DirectPlay is up, the session is joined and there
+ * are at least two players. */
+void __cdecl ArmyMessageSend(const void *msg);
+
+int armymsg_install(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* AM2_ARMYMSG_H */

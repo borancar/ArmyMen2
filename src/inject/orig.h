@@ -1212,6 +1212,18 @@
 /* 0x004105F0, "ArmyMessageSend" from its own three error strings -- 304 bytes
  * and 20 callers, so it is the transport the whole game sends through. */
 #define ADDR_ARMY_MESSAGE_SEND     0x004105F0u
+/* The outgoing packet. 0x004FAA68 is its base and 0x004FAA6C is base+4 -- the
+ * packet's own length field, which doubles as the write cursor. Flush resets
+ * it to 0x14, so the packet header is twenty bytes and the first message lands
+ * at base+0x14. */
+#define ADDR_ARMY_PACKET           0x004FAA68u
+#define ADDR_ARMY_PACKET_LEN       0x004FAA6Cu
+#define AM2_ARMY_PACKET_HDR        0x14u
+/* Every message on this transport opens with the same eight bytes: a length, a
+ * kind, and a uid. ArmyMessageSend reads the third as one -- it logs
+ * UidArmy(UidOnWire(msg->uid)) -- which is how the field is known to be a uid
+ * and not the padding EventMessageSend's always-zero write suggested. */
+#define AM2_ARMY_MSG_HDR           8u
 #define AM2_ARMY_MSG_EVENT         0x0020u   /* the kind word EventMessageSend
                                               * stamps at offset 2 */
 /* Gates the event logging in EventTriggerDelayed, EventMessageSend and
@@ -1929,7 +1941,12 @@
 #define ADDR_SUBSTATE_TABLE      0x00426230u
 /* The frame chain's own callees, all still original. */
 #define ADDR_COMM_FRAME_PRE_A    0x00411C20u  /* "TIMING OUT PLAYER" */
-#define ADDR_COMM_FRAME_POST_A   0x00410420u  /* void(int32) */
+/* Its own log strings call it ArmyMessageFlush, so it is renamed rather than
+ * aliased -- the old name came from the one call site in RunFrame, and knowing
+ * the body means knowing what that step IS: the frame's post-work flushes the
+ * outgoing message packet. ArmyMessageSend calls it too, whenever the packet
+ * fills. Returns zero when it could not send. */
+#define ADDR_ARMY_MESSAGE_FLUSH  0x00410420u  /* int32_t(int32_t) */
 #define ADDR_COMM_FRAME_POST_B   0x00402F50u
 #define ADDR_COMM_FRAME_POST_C   0x00403050u
 #define AM2_COMM_MIN_BUFFERS     10           /* below this, COMM ERROR: NO BUFFERS */
