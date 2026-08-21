@@ -118,7 +118,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
         return 0;
 
     orig_fread(&mark, 4, 1, fp);
-    while (mark == AM2_SAVE_ITEM_MARK) {
+    while (mark == AM2_SAVE_RECORD_MARK) {
         orig_load_one_item(fp, 0);
         count++;
         orig_fread(&mark, 4, 1, fp);

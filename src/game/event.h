@@ -233,6 +233,21 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp);
  * twice returns to the original order. */
 int32_t __cdecl LoadScriptConditions(am2_FILE *fp);
 
+/* 0x0041EC20. The mirror of LoadScriptConditions, and the ninth of nine
+ * save/load section pairs -- SaveGame and LoadGame call their halves in the
+ * same order, each saver sitting immediately before its loader in the image.
+ *
+ * It brackets the list with tags and writes one record marker before each
+ * condition, which is the shape SaveItems has too. Three things it does not
+ * do: it checks no write, it always answers 1, and it does not touch the list
+ * -- so unlike the loader, which frees the list before it starts, this one is
+ * safe to call twice.
+ *
+ * The list is walked HEAD FIRST, and the loader prepends, so a save/load round
+ * trip reverses the order. Two round trips restore it. That was already known
+ * from the loader's side; this is the half that makes it true. */
+int32_t __cdecl SaveScriptConditions(am2_FILE *fp);
+
 int event_install(void);
 
 #ifdef __cplusplus

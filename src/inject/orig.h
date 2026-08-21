@@ -1091,6 +1091,7 @@
 #define ADDR_EVT_SET_BYTE530     0x00420040u  /* void(uid, int8), +0x530, type 3 */
 #define ADDR_LOAD_SCRIPT_COND    0x0041EC70u  /* void(FILE *, cond *) */
 #define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
+#define ADDR_SAVE_SCRIPT_CONDS   0x0041EC20u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_CONDS   0x0041EDD0u  /* int32_t(FILE *) */
 #define AM2_SAVETAG_CONDS        0x06660003u  /* event.cpp's other tag */
 /* The three handlers a saved event registration is restored with. Two are in
@@ -1105,7 +1106,11 @@
 #define ADDR_STR_EVENT_CPP       0x004783F8u  /* "C:\\ArmyMen2\\source\\event.cpp" */
 
 /* Chunk tags inside the event.cpp save section. */
-#define AM2_EVTSAVE_RECORD       0x06660000u  /* another registration follows */
+/* "another record follows", and it is NOT event-specific -- the item section
+ * uses the same marker, and so does every other section that stores a list.
+ * It went in as AM2_EVTSAVE_RECORD when only event.cpp used it, and a second
+ * name for the same value appeared the moment item.cpp needed one. One name. */
+#define AM2_SAVE_RECORD_MARK     0x06660000u
 #define AM2_EVTSAVE_PAD_A        0x06670004u
 #define AM2_EVTSAVE_PAD_B        0x06670005u
 #define AM2_EVTSAVE_OWNED        0x06670006u
@@ -1976,8 +1981,7 @@
 #define ADDR_ITEMS_RESET    0x00429450u  /* void(void) */
 
 #define AM2_SAVE_TAG_ITEMS  0x06660007u  /* opens the section */
-#define AM2_SAVE_ITEM_MARK  0x06660000u  /* one before each item */
-#define AM2_SAVE_TAG_END    0x06660001u  /* closes it */
+#define AM2_SAVE_TAG_END    0x06660001u  /* closes a list section */
 
 #define ADDR_UID_ARMY        0x0042A7A0u  /* uint32_t(uint32_t uid) */
 #define ADDR_UID_ON_WIRE     0x0042A7B0u  /* uint32_t(uint32_t uid) */

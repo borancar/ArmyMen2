@@ -514,7 +514,7 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
         return 0;
 
     orig_fread(&tag, 4, 1, fp);
-    if (tag != (int32_t)AM2_EVTSAVE_RECORD)
+    if (tag != (int32_t)AM2_SAVE_RECORD_MARK)
         return 1;
 
     do {
@@ -547,7 +547,7 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
         }
 
         orig_fread(&tag, 4, 1, fp);
-    } while (tag == (int32_t)AM2_EVTSAVE_RECORD);
+    } while (tag == (int32_t)AM2_SAVE_RECORD_MARK);
 
     return 1;
 }
@@ -563,7 +563,7 @@ int32_t __cdecl LoadScriptConditions(am2_FILE *fp)
         return 0;
 
     orig_fread(&tag, 4, 1, fp);
-    while (tag == (int32_t)AM2_EVTSAVE_RECORD) {
+    while (tag == (int32_t)AM2_SAVE_RECORD_MARK) {
         AM2_ScriptCond *cond = (AM2_ScriptCond *)orig_malloc(sizeof *cond);
 
         memset(cond, 0, sizeof *cond);
@@ -578,6 +578,24 @@ int32_t __cdecl LoadScriptConditions(am2_FILE *fp)
     /* Reached from the loop AND from the wrong-marker exit above, so the
      * registrations are rebuilt even for an empty section. */
     DeclareRuleVars();
+    return 1;
+}
+
+int32_t __cdecl SaveScriptConditions(am2_FILE *fp)
+{
+    const AM2_ScriptCond *cond;
+
+    WriteSaveTag(fp, AM2_SAVETAG_CONDS);
+
+    /* `next` is a void * in the struct -- see script.h, where the field is
+     * typed from its offset rather than from a declaration. */
+    for (cond = kScriptConditions; cond;
+         cond = (const AM2_ScriptCond *)cond->next) {
+        WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
+        SaveScriptCond(fp, cond);
+    }
+
+    WriteSaveTag(fp, AM2_SAVE_TAG_END);
     return 1;
 }
 
@@ -617,6 +635,8 @@ int event_install(void)
                         "EvtSetByte530", 2);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_CONDS, (const void *)LoadScriptConditions,
                         "LoadScriptConditions", 1);
+    rc |= patch_replace(ADDR_SAVE_SCRIPT_CONDS, (const void *)SaveScriptConditions,
+                        "SaveScriptConditions", 1);
     rc |= patch_replace(ADDR_LOAD_EVENT_SECTION, (const void *)LoadEventSection,
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
