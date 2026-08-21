@@ -1119,6 +1119,18 @@
 #define AM2_EVENT_NO_KEY         (-2)         /* key0 == -2 registers nothing */
 #define ADDR_EVENT_REGISTER      0x0041EE70u  /* void(bucket,k0,k1,fn,arg,owns) */
 #define ADDR_EVENT_CLEAR_ALL     0x004223D0u  /* void(void), frees every node */
+/* 0x00422450. Drop the whole script/event state in one go: the name table,
+ * the condition list, the registration table, and one flag. All three callees
+ * are already ours, so this is pure orchestration -- but the ORDER is the
+ * content, and it is names, then conditions, then registrations. Role name;
+ * one caller. */
+#define ADDR_RESET_SCRIPT_STATE  0x00422450u  /* void(void) */
+#define ADDR_SCRIPT_STATE_FLAG   0x00511DFCu  /* cleared by the reset above */
+/* 0x0041FEA0. Look a uid up and, if it resolves, hand the object to
+ * 0x00428DA0 -- 96 bytes with twenty-two callers, unnamed. Both role names:
+ * neither says anything about itself. */
+#define ADDR_EVT_OBJ_ACTION      0x0041FEA0u  /* void(uint32_t uid) */
+#define ADDR_OBJ_ACTION          0x00428DA0u  /* void(void *obj) */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is
  * observed to do from here -- announce an event -- and not from any one of

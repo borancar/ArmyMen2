@@ -804,6 +804,51 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                                  msg->maskB, msg->removeevent, 1);
 }
 
+/* ------------------------------------------------------- reset ---- */
+
+typedef void (__cdecl *AM2_ObjActionFn)(void *obj);
+#define orig_obj_action (*(AM2_ObjActionFn)AM2_IMAGE(ADDR_OBJ_ACTION))
+
+/* 0x00422450. Drop the whole script and event state.
+ *
+ * Every callee is already reconstructed, so nothing here is new machinery --
+ * what this function contributes is the ORDER, and that the four things belong
+ * together at all. Names first, then the condition list, then the registration
+ * table, then the flag.
+ *
+ * The order matters in one direction: EventClearAll frees handler arguments
+ * whose `owns` flag is set, and the condition records those arguments point at
+ * have already been freed by FreeScriptConditions. Nothing reads them in
+ * between, so it is safe -- but it is the kind of sequencing to preserve
+ * exactly rather than tidy. */
+void __cdecl ResetScriptState(void)
+{
+    FreeScriptNames();
+    FreeScriptConditions();
+    EventClearAll();
+
+    *(int32_t *)AM2_IMAGE(ADDR_SCRIPT_STATE_FLAG) = 0;
+}
+
+/* 0x0041FEA0. Resolve a uid and act on the object, if there is one.
+ *
+ * A role name for both halves: this function and the 96-byte one it calls at
+ * 0x00428DA0 name themselves nowhere, and that one has twenty-two callers of
+ * its own so it is somebody else's to identify.
+ *
+ * Note it checks the POINTER rather than the uid -- no AM2_UID_COUNTER_MIN
+ * test -- which puts it with EvtSetByte40 rather than with the majority of
+ * this family. */
+void __cdecl EvtObjAction(uint32_t uid)
+{
+    void *obj = LookupByUID(uid);
+
+    if (obj == (void *)0)
+        return;
+
+    orig_obj_action(obj);
+}
+
 /* --------------------------------------------------- name -> uid ---- */
 
 /* 0x0041F520, and fifty-three callers -- the densest thing in this module.
@@ -1117,6 +1162,10 @@ int event_install(void)
                         "EventRegister", 19);
     rc |= patch_replace(ADDR_EVENT_CLEAR_ALL, (const void *)EventClearAll,
                         "EventClearAll", 2);
+    rc |= patch_replace(ADDR_RESET_SCRIPT_STATE,
+                        (const void *)ResetScriptState, "ResetScriptState", 1);
+    rc |= patch_replace(ADDR_EVT_OBJ_ACTION, (const void *)EvtObjAction,
+                        "EvtObjAction", 1);
     rc |= patch_replace(ADDR_EVT_SET_FIELD_540, (const void *)EvtSetField540,
                         "EvtSetField540", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,

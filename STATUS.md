@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 374 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 374 | 367 of them below the CRT line |
+| `patch_replace` sites | 376 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 376 | 369 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 89,760 / 372,816 B (**24.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 89,824 / 372,816 B (**24.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,14 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **38 functions are left in the event.cpp band, and most are tiny.** Four
+  are 32 bytes, eight are 48, and nearly all have a single caller -- they are
+  the `Evt*` shim family this module already holds ten of: check a uid or a
+  pointer, look the object up, poke one field or call one thing. They are cheap
+  to take a few at a time, and the naming convention is settled. The one that
+  is not tiny is the 4096-byte action executor at `0x00420410`, which is the
+  last thing under the condition layer.
 
 - **A mutation resolves the count-of-0 blind spot as well as a probe does, and
   verifies the function while it is at it.** `CondRunAction` reads 0 -- its

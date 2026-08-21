@@ -99,6 +99,14 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg);
  * type-2 entry, gives 0. Fifty-three callers. */
 uint32_t __cdecl ResolveUid(int32_t name, uint32_t me);
 
+/* 0x00422450. Drop the whole script and event state: names, conditions,
+ * registrations, flag -- in that order. One caller. */
+void __cdecl ResetScriptState(void);
+
+/* 0x0041FEA0. Resolve a uid and act on the object if it resolves. Both this
+ * and its callee are role names. */
+void __cdecl EvtObjAction(uint32_t uid);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.
