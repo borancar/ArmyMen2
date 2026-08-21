@@ -1132,7 +1132,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **6** are reconstructed
+  all. Measured: **29 functions** call the bracket and **7** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates.
 
@@ -1148,10 +1148,13 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   (`0x0041CC40`) and the `DrawRect` (`0x0041CDC0`) that calls both, all in
   `win32/mapdraw.cpp`. Worth knowing before taking the next one: both line
   drawers Lock and never Unlock, so the pairing is the caller's, and several of
-  the 29 will be half-brackets like that. Worth knowing too that none of the
+  the 29 will be half-brackets like that. `DrawViewRect` (`0x00413610`) is the
+  matching half for all three -- it Locks once, draws the whole outline, and
+  Unlocks once -- so **the pairing is per FEATURE, not per function**, and a
+  count of "functions calling the bracket" will keep finding halves. Worth knowing too that none of the
   three executes on any drive this project has -- being a rasteriser does not
   make a function reachable.
-  Smallest first: `0x00413610` (128 B), `0x00454F00` (144 B),
+  Smallest first: `0x00454F00` (144 B),
   (160 B), `0x0041CC40` (160 B), `0x0041C7F0` (176 B).
 - **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
   COM method takes the interface as an explicit first argument, so it goes on

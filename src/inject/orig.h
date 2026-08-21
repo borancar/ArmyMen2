@@ -69,6 +69,23 @@
  * horizontal ones, all four INCLUSIVE of `right` and `bottom` -- which the
  * clipping inside the line drawers treats as exclusive. One caller. */
 #define ADDR_DRAW_RECT      0x0041CDC0u  /* void(const AM2_Rect *, colour) */
+/* 0x00413610. The one caller of DrawRect: it takes a rectangle stored in the
+ * SAME space as ADDR_VIEW_ORIGIN, subtracts that origin to get screen
+ * coordinates, and outlines it. A full Lock/Unlock bracket, unlike the two line
+ * drawers below it.
+ *
+ * docs/functions.tsv gives the entry 256 bytes; the function ends at
+ * 0x00413684 and another begins at 0x00413690. Merged, like so many here.
+ *
+ * The rectangle, its enable flag and its colour are touched by exactly three
+ * functions -- this one and 0x004137D0 and 0x00413E70, all in the same
+ * neighbourhood and none of which names itself. So the role name says what it
+ * DOES; whether the box is a drag-selection, a highlight or something else is
+ * not established. */
+#define ADDR_DRAW_VIEW_RECT     0x00413610u  /* void(void) */
+#define ADDR_VIEW_RECT_ON       0x004FCF58u  /* int32_t, gates the draw */
+#define ADDR_VIEW_RECT          0x004FCF70u  /* AM2_Rect in view space */
+#define ADDR_VIEW_RECT_COLOUR   0x004FE089u  /* uint8_t */
 
 /* ---- DirectDraw ------------------------------------------------------
  *

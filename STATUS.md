@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 371 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 371 | 364 of them below the CRT line |
+| `patch_replace` sites | 372 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 372 | 365 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 89,360 / 372,816 B (**24.0%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 89,616 / 372,816 B (**24.0%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The line trio can be lit up with a two-word poke, which beats driving a
+  different menu.** `DrawViewRect` runs **557 times** on a campaign drive --
+  about once a frame -- and returns at its first line every time, because
+  `ADDR_VIEW_RECT_ON` (`0x004FCF58`) is 0. Setting that flag and putting any
+  sane rectangle in `ADDR_VIEW_RECT` (`0x004FCF70`) would send all four
+  functions through the full path on the very next frame, and the pixels would
+  show it. The control socket has `dump` but no poke; CLAUDE.md's StopAllSounds
+  precedent is exactly this -- a temporary `poke` added to prove a path runs.
+  Cheaper and more certain than the menu-drive guess in the previous commit,
+  which is superseded.
+
+- **The Lock/Unlock pairing is per FEATURE, not per function.** DrawVLine and
+  DrawHLine each Lock and never Unlock; DrawViewRect Locks once, draws the
+  whole outline through DrawRect, and Unlocks once. So a census of "functions
+  calling the bracket" necessarily finds halves, and 29 is not 29 pairs.
+  CLAUDE.md now says so.
 
 - **The line trio is MENU drawing, and that makes it drivable -- just not by
   this drive.** `DrawRect`'s only caller is `0x00413610`, which is itself the

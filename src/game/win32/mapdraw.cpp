@@ -820,11 +820,52 @@ static void __cdecl DrawRect(const AM2_Rect *r, int32_t colour)
     DrawHLine(r->bottom, r->left, r->right, colour);
 }
 
+/* 0x00413610. Outline a rectangle held in view space.
+ *
+ * A role name. The four edges live in the same coordinate space as
+ * ADDR_VIEW_ORIGIN -- the map's scrolled origin -- so subtracting it gives
+ * screen coordinates, which is the whole of what this function computes. What
+ * the box MEANS is not established: its state is touched by exactly three
+ * functions, this one and two neighbours, and none of them names itself.
+ *
+ * This is the full bracket. The two line drawers it reaches through DrawRect
+ * each Lock without Unlocking; the Unlock for all of them is here, once, after
+ * the whole outline is drawn. That is why counting "functions that call the
+ * bracket" finds halves -- the pairing is per FEATURE, not per function.
+ *
+ * The colour is a byte read from its own global rather than passed in. */
+static void __cdecl DrawViewRect(void)
+{
+    const AM2_Rect *box = (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
+    const int32_t   ox  = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+    const int32_t   oy  = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
+    AM2_Rect        on_screen;
+    int32_t         colour;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON == 0)
+        return;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    on_screen.left   = box->left   - ox;
+    on_screen.top    = box->top    - oy;
+    on_screen.right  = box->right  - ox;
+    on_screen.bottom = box->bottom - oy;
+
+    colour = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+
+    DrawRect(&on_screen, colour);
+    UnlockSurface();
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
     patch_replace(ADDR_DRAW_HLINE, (const void *)DrawHLine, "DrawHLine", 2);
     patch_replace(ADDR_DRAW_RECT, (const void *)DrawRect, "DrawRect", 2);
+    patch_replace(ADDR_DRAW_VIEW_RECT, (const void *)DrawViewRect,
+                  "DrawViewRect", 2);
     int rc = 0;
 
     rc |= patch_replace(ADDR_MERGE_DIRTY, (const void *)ScrollView,
