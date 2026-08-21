@@ -441,6 +441,43 @@ void __cdecl ListUnlink(void *node, void **head)
     *(void **)(n + 4) = 0;
 }
 
+/* The remap loop walks dst with the register it was handed, so at `ret` eax is
+ * dst + count on the table path and plain dst on the other two. Both callers
+ * discard it and recompute `dst += count` themselves, so the prototype is
+ * void. */
+void __cdecl RemapBytes(void *dst, const void *src, const void *table,
+                        int32_t count)
+{
+    uint8_t       *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+    const uint8_t *m = (const uint8_t *)table;
+
+    if (m) {
+        if (count <= 0)
+            return;
+        do {
+            *d++ = m[*s++];
+        } while (--count);
+        return;
+    }
+
+    if (d == s)
+        return;
+
+    {
+        uint32_t words = (uint32_t)count >> 2;
+        uint32_t bytes = (uint32_t)count & 3;
+
+        while (words--) {
+            *(uint32_t *)d = *(const uint32_t *)s;
+            d += 4;
+            s += 4;
+        }
+        while (bytes--)
+            *d++ = *s++;
+    }
+}
+
 int32_t __cdecl SetFieldInAll(void *record, void *value)
 {
     uint8_t *r = (uint8_t *)record;
@@ -672,5 +709,6 @@ int misc_install(void)
                   "BitmapBitSet", 5);
     patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
     patch_replace(ADDR_LIST_UNLINK, (const void *)ListUnlink, "ListUnlink", 6);
+    patch_replace(ADDR_REMAP_BYTES, (const void *)RemapBytes, "RemapBytes", 2);
     return 0;
 }

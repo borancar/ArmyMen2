@@ -61,7 +61,16 @@ SCRATCH_USED = PTR_STRIDE * (6 + 1)
 RET_MAGIC = 0x5EADBEE0
 # Deterministic, and reproduced byte for byte by tests/selftest.cpp, so the
 # vectors carry only offsets and never the buffer itself.
-SCRATCH_PATTERN = bytes(((i * 7 + 13) & 0xFF) for i in range(0x8000))
+# Salted per PTR_STRIDE region, and the salt is the whole point. (i*7+13)&0xFF
+# has period 256, PTR_STRIDE is 0x800, and 0x800 is a multiple of 256 -- so
+# every pointer argument's region held a BYTE-IDENTICAL sequence, and a
+# function that copies src to dst changed nothing observable. RemapBytes'
+# `count & 3` mutated to `count & 7` copies four extra bytes and passed at 100%
+# instruction coverage for exactly that reason. `i >> 11` differs per region,
+# so the regions no longer match. tests/selftest.cpp fills its own buffer and
+# the two expressions have to stay identical.
+SCRATCH_PATTERN = bytes(((((i * 7 + 13) ^ (i >> 11))) & 0xFF)
+                        for i in range(0x8000))
 MAX_ARGS = 6
 CRT_FRONTIER = 0x00464420      # measured by tools/crt.py, not the old constant
 DATA_LO, DATA_HI = 0x00473000, 0x00667000
@@ -104,6 +113,12 @@ ARG_KIND_OVERRIDE = {
     # `x >> 3` -- and the classifier picked the one that is finally used as the
     # index, so the base was left a scalar and every vector faulted.
     0x004232C0: {0: "ptr", 1: "scalar"},
+    # RemapBytes(dst, src, table, count). Two pushes before the first argument
+    # read put the analyser two slots out, so it reports six arguments and
+    # calls the count a pointer -- and a pointer-sized count goes into
+    # `rep movsd` when the table is NULL. The last two are not arguments at
+    # all; a cdecl callee simply ignores them.
+    0x0041BB60: {3: "scalar"},
 }
 
 # Per-argument value sets, for functions whose scalars are a geometry rather
@@ -124,6 +139,18 @@ ARG_KIND_OVERRIDE = {
 #
 # {function: {arg index: [values]}}
 ARG_VALUES = {
+    # RemapBytes(dst, src, table, count). The count is a byte at both call
+    # sites (`and edi, 0xFF`) and goes into `rep movsd` unsigned when the
+    # table is NULL, so a random 32-bit one copies 4GB and faults.
+    # Thirteen values, not eleven, and every low-bit pattern present. The
+    # table-NULL path is reached only on the k where argument 2 is nulled, and
+    # with an 11-long list those k picked out indices {0,1,2,3,8,9,10} and
+    # never 4..7 -- so the copy path only ever saw counts 0,1,2,3,16,32,64,
+    # not one of which has bit 2 set. `count & 3` and `count & 7` are the same
+    # function for all of those, and mutating one into the other passed at
+    # 100% instruction coverage. A length coprime with that stride reaches all
+    # thirteen.
+    0x0041BB60: {3: [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 32, 64]},
     0x004232C0: {
         1: [0, 1, 2, 3, 7, 8, 15, 63, -1, -8, -9],   # x
         2: [0, 1, 2, 3, 7],                          # y
@@ -582,7 +609,16 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                 # pointers leaves that early return unreached -- which is
                 # exactly the instruction a reconstruction is most likely to
                 # forget.
-                args.append(0 if k % 7 == 3
+                # Per-ARGUMENT NULL decision, for the same reason the seeds
+                # below take one per seed. `k % 7 == 3` is one decision shared
+                # by every pointer argument, so they were all null together and
+                # never null one at a time -- which meant a function comparing
+                # two of them saw them EQUAL every time it saw a null at all.
+                # RemapBytes falls back to a plain copy when its table is null
+                # and returns early when dst == src, and with both nulled on
+                # the same k the whole copy path was unreachable: 11
+                # instructions, including both `rep movs`.
+                args.append(0 if (k // (i + 1)) % 7 == 3
                             else SCRATCH + PTR_STRIDE * (i + 1))
             elif i in argvals:
                 vals = argvals[i]
@@ -853,7 +889,7 @@ def main():
                 "ADDR_FACING_DELTA_14", "ADDR_MAP_CODE_18_28",
                 "ADDR_MEETS_ALL_THREE",
                 "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
-                "ADDR_LIST_UNLINK"]
+                "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -956,6 +992,7 @@ def main():
         "ADDR_BITMAP_BIT_SET": "BitmapBitSet",
         "ADDR_RING_PUSH_32": "RingPush32",
         "ADDR_LIST_UNLINK": "ListUnlink",
+        "ADDR_REMAP_BYTES": "RemapBytes",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -974,7 +1011,10 @@ def main():
             # next load immediately after the call, so nothing reads it.
             "RingPush32",
             # ListUnlink keeps the node in eax from entry to `ret` too.
-            "ListUnlink"}
+            "ListUnlink",
+            # RemapBytes leaves dst, or dst+count, in eax; both callers
+            # discard it and advance their own pointer instead.
+            "RemapBytes"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

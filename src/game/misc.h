@@ -241,6 +241,23 @@ void __cdecl ListPushFront(void *node, void **head);
  * notice -- reproduced, not defended. */
 void __cdecl ListUnlink(void *node, void **head);
 
+/* 0x0041BB60. Copy `count` bytes from src to dst, each one through `table` if
+ * there is one. With table NULL it is a plain forward copy instead, and the
+ * two paths are not symmetric:
+ *
+ *   table != NULL   `count <= 0` returns, and the copy is a byte loop.
+ *   table == NULL   `dst == src` returns, and there is NO count check at all
+ *                   -- the count goes straight into `rep movsd` / `rep movsb`
+ *                   as unsigned, so a negative one would copy 4GB. Both call
+ *                   sites mask it to a byte first (`and edi, 0xFF`), which is
+ *                   why that has never mattered.
+ *
+ * Reproduced as a dword loop then a byte loop rather than as memcpy, because
+ * `rep movs` copies FORWARD and memcpy is undefined on overlap; dst and src
+ * are only known to be different, not disjoint. */
+void __cdecl RemapBytes(void *dst, const void *src, const void *table,
+                        int32_t count);
+
 /* 0x00434E90. Writes `value` into the dword at +0x2C of every element of an
  * array the record describes -- base at +8, count at +4, elements 0x60 apart.
  * Returns the number written, which is 0 when the count is not positive.

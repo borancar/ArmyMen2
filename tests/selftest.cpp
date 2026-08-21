@@ -51,7 +51,10 @@ typedef uint32_t (__cdecl *am2_any_fn)(uint32_t, uint32_t, uint32_t,
 static void FillScratch(void)
 {
     for (uint32_t i = 0; i < sizeof g_scratch; i++)
-        g_scratch[i] = (uint8_t)((i * 7 + 13) & 0xFF);
+        /* Must match SCRATCH_PATTERN in tools/vectors.py exactly, salt and
+         * all. The salt exists because without it every PTR_STRIDE region
+         * held the same bytes and no copy was observable. */
+        g_scratch[i] = (uint8_t)(((i * 7 + 13) ^ (i >> 11)) & 0xFF);
 }
 
 static int ScriptTokens(int *passed);
