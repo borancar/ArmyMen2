@@ -91,4 +91,9 @@ int objscript_install(void);
  * pointer field; see the body. Always returns 1. */
 int32_t __cdecl SaveObjScriptSection(am2_FILE *fp);
 
+/* 0x004364A0. Read it back: free what is there, then rebuild all four levels,
+ * allocating each from the count it just read and restoring each action's
+ * string as a kind-5 token. Returns 0 if the section tag does not match. */
+int32_t __cdecl LoadObjScriptSection(am2_FILE *fp);
+
 #endif /* AM2_OBJSCRIPT_H */

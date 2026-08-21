@@ -357,6 +357,124 @@ int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
     return 1;
 }
 
+/* 0x004364A0. The mirror of the saver, and the last loader in the format.
+ *
+ * Each level reads its record WHOLE -- pointer field and all -- and then
+ * replaces that stale pointer with a fresh allocation. Note what is not
+ * overwritten: the capacity comes out of the file and is kept, while the
+ * allocation is sized by the COUNT. Where a level was saved with spare
+ * capacity the two disagree afterwards, which is the original's behaviour and
+ * is reproduced rather than corrected. Only the empty arms zero a capacity.
+ *
+ * An action's `text` arrives holding the LENGTH the saver put there. The
+ * string that follows is not strdup'd: it is handed to ScriptAddToken as a
+ * kind-5 token, which owns a malloc'd copy, and `text` is pointed at that
+ * token's value. So a loaded action's string is owned exactly the way a parsed
+ * one's is -- script.h's note that `text` is "the token's own string, not a
+ * copy" holds on both paths, and the token list frees it either way.
+ *
+ * The scratch buffer is the original's 2 KB and the length is not checked
+ * against it. Reproduced; no name in a shipped script comes close. */
+int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
+{
+    AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT);
+    char           buf[2048];
+    int32_t        count;
+
+    orig_free_obj_scripts();
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_OBJSCRIPT,
+                      (const char *)AM2_IMAGE(ADDR_STR_OBJSCRIPT_CPP), 0x68))
+        return 0;
+
+    orig_fread(&count, 4, 1, fp);
+    kObjScriptCount = count;
+    kObjScriptCap   = count;
+
+    if (count == 0) {
+        kObjScriptCap = 0;
+        kObjScripts   = (AM2_ObjScript *)0;
+        return 1;
+    }
+
+    kObjScripts = (AM2_ObjScript *)am2_realloc(
+        kObjScripts, (size_t)count * sizeof(AM2_ObjScript));
+    memset(kObjScripts, 0, (size_t)count * sizeof(AM2_ObjScript));
+
+    for (int32_t i = 0; i < kObjScriptCount; i++) {
+        AM2_ObjScript *o = &kObjScripts[i];
+
+        orig_fread(o, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
+
+        if (o->statecount == 0) {
+            o->statecap = 0;
+            o->states   = (AM2_ObjState *)0;
+            continue;
+        }
+
+        o->states = (AM2_ObjState *)am2_malloc(
+            (size_t)o->statecount * sizeof(AM2_ObjState));
+        memset(o->states, 0, (size_t)o->statecount * sizeof(AM2_ObjState));
+
+        for (int32_t j = 0; j < o->statecount; j++) {
+            AM2_ObjState *st = &o->states[j];
+
+            orig_fread(st, AM2_OBJ_STATE_REC_SIZE, 1, fp);
+
+            if (st->framecount == 0) {
+                st->framecap = 0;
+                st->frames   = (AM2_ObjFrame *)0;
+                continue;
+            }
+
+            st->frames = (AM2_ObjFrame *)am2_malloc(
+                (size_t)st->framecount * sizeof(AM2_ObjFrame));
+            memset(st->frames, 0,
+                   (size_t)st->framecount * sizeof(AM2_ObjFrame));
+
+            for (int32_t k = 0; k < st->framecount; k++) {
+                AM2_ObjFrame *fr = &st->frames[k];
+
+                orig_fread(fr, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
+
+                if (fr->actioncount == 0) {
+                    fr->actioncap = 0;
+                    fr->actions   = (AM2_ScriptAction *)0;
+                    continue;
+                }
+
+                fr->actions = (AM2_ScriptAction *)am2_malloc(
+                    (size_t)fr->actioncount * sizeof(AM2_ScriptAction));
+                memset(fr->actions, 0,
+                       (size_t)fr->actioncount * sizeof(AM2_ScriptAction));
+
+                for (int32_t m = 0; m < fr->actioncount; m++) {
+                    AM2_ScriptAction *a = &fr->actions[m];
+                    int32_t          *textslot;
+                    int32_t           len, idx;
+
+                    orig_fread(a, (size_t)sizeof(AM2_ScriptAction), 1, fp);
+
+                    textslot = (int32_t *)((uint8_t *)a
+                                           + offsetof(AM2_ScriptAction, text));
+                    len = *textslot;
+                    if (len <= 0)
+                        continue;
+
+                    orig_fread(buf, (size_t)len, 1, fp);
+                    buf[len] = '\0';
+
+                    idx = ctx->count;
+                    ScriptAddToken(ctx, AM2_TOKEN_STRING, buf, 0);
+                    a->text = (char *)ctx->tokens[idx].value;
+                }
+            }
+        }
+    }
+
+    return 1;
+}
+
 int objscript_install(void)
 {
     int rc = 0;
@@ -366,6 +484,9 @@ int objscript_install(void)
     rc |= patch_replace(ADDR_SAVE_OBJSCRIPT_SECTION,
                         (const void *)SaveObjScriptSection,
                         "SaveObjScriptSection", 1);
+    rc |= patch_replace(ADDR_LOAD_OBJSCRIPT_SECTION,
+                        (const void *)LoadObjScriptSection,
+                        "LoadObjScriptSection", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);

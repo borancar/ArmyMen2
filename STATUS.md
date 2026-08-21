@@ -60,9 +60,9 @@ has patched to jump past them.
 
 The front has moved into **game logic**, and the current front is savegame
 serialisation. `SaveGame` writes eleven sections and **all eleven savers are
-now ours**, as are ten of the eleven loaders; the two halves mirror each other,
-which is what keeps confirming each struct's layout from both ends. Only the
-objscript loader is left. The newest is `SaveObjScriptSection`, the deepest of them -- four
+now ours, and so are all eleven loaders** -- the serialiser is complete. The two
+halves mirror each other, which is what confirmed each struct's layout from
+both ends. The newest is `SaveObjScriptSection`, the deepest of them -- four
 nested levels, with each action's string length-prefixed in place of the
 pointer field it occupies in memory.
 
@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 338 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 338 | 331 of them below the CRT line |
+| `patch_replace` sites | 339 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 339 | 332 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 80,800 / 372,816 B (**21.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 81,872 / 372,816 B (**22.0%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -101,16 +101,12 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Next
 
-1. **The objscript loader is the last unreconstructed half of a pair.**
-   `0x004364A0`, 1072 B, and it is the first function of the objscript.cpp
-   band. Its saver is now ours and verified byte for byte, so the round trip
-   would check both halves at once. It has to rebuild three pointer levels
-   from the raw dwords the saver stored -- states, frames, actions -- and turn
-   each action's stored LENGTH back into a `malloc`'d string.
-2. **One loader is all that is left of the serialiser**: `0x004364A0`
-   objscript, 1072 B, which has to rebuild three pointer levels from the raw
-   dwords the saver stored and turn each action's stored LENGTH back into a
-   `malloc`'d string.
+1. **The savegame serialiser is complete** -- eleven savers and eleven
+   loaders. What it still lacks is EXECUTION of the load half; see 4 below,
+   which is now the most valuable single thing left in this area. `LoadGame`
+   itself (`0x00425A10`, 224 B) is fully mapped and still unwritten, and
+   `FreeObjScripts` (`0x004368D0`, 272 B, 3 callers) is the one seam the new
+   loader reaches by address.
 3. **Fold the pointer-aware comparison into a tool.** It was done by hand for
    objscript here -- walk the section, collect the offsets that hold heap
    pointers, and compare everything else -- and it turned "188 differing bytes"
