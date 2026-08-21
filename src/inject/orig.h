@@ -896,6 +896,13 @@
 #define ADDR_SCRIPT_NAMES        0x00656468u
 #define AM2_SCRIPT_NAME_SIZE     0x10u
 #define ADDR_SCRIPT_ADD_NAME     0x0043F7A0u  /* AddNameTableName */
+
+/* The name table's value accessors, all three named by their own messages.
+ * The two SetVarValue addresses say the same name because they are almost
+ * certainly two overloads of it -- one taking an index, one a name. */
+#define ADDR_GET_VAR_VALUE       0x00443E40u  /* int32_t(int32_t, int32_t *) */
+#define ADDR_SET_VAR_VALUE       0x00443E90u  /* int32_t(int32_t, int32_t) */
+#define ADDR_SET_VAR_BY_NAME     0x00443ED0u  /* int32_t(const char *, int32_t) */
 #define ADDR_SCRIPT_ALLOC_UID    0x0041E7F0u  /* int32_t(void) */
 #define ADDR_NEXT_UID            0x00511DF4u
 

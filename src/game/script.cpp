@@ -308,6 +308,51 @@ int32_t __cdecl ScriptFindName(const char *name)
     return -1;
 }
 
+int32_t __cdecl GetVarValue(int32_t index, int32_t *out)
+{
+    AM2_ScriptName *e;
+
+    if (index <= 0) {
+        *out = 0;
+        return 0;
+    }
+
+    e = &kScriptNames[index];
+    if (e->type != AM2_NAME_TYPE_INTEGER) {
+        am2_log("GetVarValue: name %s is not a variable!\n", e->name);
+        return 0;
+    }
+
+    *out = e->value;
+    return 1;
+}
+
+/* No index check at all, unlike the getter. */
+int32_t __cdecl SetVarValue(int32_t index, int32_t value)
+{
+    AM2_ScriptName *e = &kScriptNames[index];
+
+    if (e->type != AM2_NAME_TYPE_INTEGER) {
+        am2_log("SetVarValue: name %s is not a variable!\n", e->name);
+        return 0;
+    }
+
+    e->value = value;
+    return 1;
+}
+
+int32_t __cdecl SetVarValueByName(const char *name, int32_t value)
+{
+    int32_t index = ScriptFindName(name);
+
+    if (index <= 0) {
+        am2_log("SetVarValue: bad variable name %s\n", name);
+        return 0;
+    }
+
+    return SetVarValue(index, value);
+}
+
 #define kNextUid         (*(int32_t *)AM2_IMAGE(ADDR_NEXT_UID))
 
 int32_t __cdecl AllocUid(void)
@@ -3128,6 +3173,12 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_TOKEN_NAME,
                         (const void *)ScriptTokenName,
                         "ScriptTokenName", 1);
+    rc |= patch_replace(ADDR_GET_VAR_VALUE, (const void *)GetVarValue,
+                        "GetVarValue", 2);
+    rc |= patch_replace(ADDR_SET_VAR_VALUE, (const void *)SetVarValue,
+                        "SetVarValue", 2);
+    rc |= patch_replace(ADDR_SET_VAR_BY_NAME, (const void *)SetVarValueByName,
+                        "SetVarValueByName", 2);
     rc |= patch_replace(ADDR_SCRIPT_FIND_NAME,
                         (const void *)ScriptFindName,
                         "ScriptFindName", 1);

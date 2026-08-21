@@ -127,6 +127,31 @@ int32_t __cdecl AllocUid(void);
  * than a rejection. */
 int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid);
 
+/* 0x00443E40, 0x00443E90, 0x00443ED0. Read and write a declared name's value.
+ * All three are named by their own error messages, and the two setters share
+ * a name -- "SetVarValue" -- because they are almost certainly two overloads,
+ * one taking a table index and one a name.
+ *
+ * Only type 3 answers, which is what `variable` declares; anything else logs
+ * and fails without touching the value. So an `object` or a `pad` name is
+ * visible to these and refused by them, which is a better error than a silent
+ * wrong answer.
+ *
+ * Two asymmetries, both reproduced.
+ *
+ * GetVarValue rejects an index of 0 or less and clears the caller's output
+ * first; SetVarValue checks NOTHING and indexes the table with whatever it is
+ * given, so a negative index reads and writes before the table. And index 0 is
+ * a perfectly good entry as far as ScriptFindName is concerned -- it returns
+ * indices from 0 and script.cpp tests its result with `>= 0` elsewhere -- yet
+ * the first name ever declared can be neither read by GetVarValue nor reached
+ * through SetVarValueByName.
+ *
+ * Returns 1 on success and 0 on every failure. */
+int32_t __cdecl GetVarValue(int32_t index, int32_t *out);
+int32_t __cdecl SetVarValue(int32_t index, int32_t value);
+int32_t __cdecl SetVarValueByName(const char *name, int32_t value);
+
 /* 0x00443F70. The `variable` statement: `variable <name> <integer>`.
  *
  * Declares the name with type 3 and then overwrites its value with the
