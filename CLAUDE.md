@@ -1654,7 +1654,17 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/win32/surface.cpp`.
-- Unexercised so far: `RemoveFromItemList`, `KeyFieldC`, `CheckSaveTag`,
+- **`RemoveFromItemList` is unexercised for a now-known reason.** Its gated
+  caller is `FreeItem` (`0x004285F0`), which dispatches on the item kind and is
+  the only route that unlinks. Neither runs on a campaign drive: 325 items are
+  added during load and none is destroyed in the ~25 s observed, because
+  nothing in that window shoots anything. Reaching either needs a mission
+  driven long enough for something to die, which is a drive this project does
+  not yet have -- not a missing code path.
+- `CheckSaveTag` executes; it is reached by the save-file header read at
+  `0x00425950` on any campaign start with a save present. The entry below
+  predates that and is left for the others.
+- Unexercised so far: `KeyFieldC`, `CheckSaveTag`,
   `RestoreTileSet`, and `RefreshScreen` — that last has 7 callers and is
   reached by none of Boot Camp, the intro, the HQ dialog or F1, so whatever
   forces an out-of-band repaint is somewhere further in. `RestoreTileSet` is a

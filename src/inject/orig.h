@@ -2313,6 +2313,22 @@
 #define ADDR_OBJ_SET_FIELD_A 0x0042A7F0u  /* void(void *obj, uint32_t) */
 #define ADDR_OBJ_FIELD_B     0x00429560u  /* int32_t(const void *obj), +0x64 */
 #define ADDR_REMOVE_FROM_ITEM_LIST 0x00428590u /* int32_t(AM2_Object*) */
+
+/* 0x004285F0, "FreeItem %0x" -- its own name. A destructor dispatched on the
+ * item kind at +0, with a jump table of eight arms. Four of them share one
+ * callee and the rest have their own, each in a different translation unit,
+ * which is what the kind really selects: whose object this is.
+ *
+ * Role names below, tagged with the kinds that reach them. Nothing here says
+ * what those subsystems are called, and CLAUDE.md still lists object types 2,
+ * 3 and 8 as unidentified -- this narrows where to look rather than answering
+ * it. */
+#define ADDR_FREE_ITEM             0x004285F0u  /* int32_t(void *, int32_t) */
+#define ADDR_FREE_ITEM_COMMON      0x0043BBB0u  /* kinds 1, 5, 6, 8 */
+#define ADDR_FREE_ITEM_KIND2       0x004478C0u
+#define ADDR_FREE_ITEM_KIND3       0x0045B470u
+#define ADDR_FREE_ITEM_KIND4       0x0045F290u  /* the one that logs */
+#define ADDR_FREE_ITEM_KIND7       0x004355F0u
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */
 

@@ -128,9 +128,80 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     return 1;
 }
 
+/* The five per-kind destructors stay original and are reached by address. Each
+ * lives in a different translation unit, which is the real content of the
+ * dispatch: the kind says whose object this is. */
+typedef void (__cdecl *AM2_FreeKindFn)(void *item, int32_t unlink);
+#define orig_free_common (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_COMMON))
+#define orig_free_kind2  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND2))
+#define orig_free_kind3  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND3))
+#define orig_free_kind4  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND4))
+#define orig_free_kind7  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND7))
+
+#define kCommDebug \
+    (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
+                        + COMM_OFF_EVENT_DEBUG))
+
+/* 0x004285F0. Destroy one item, dispatching on its kind.
+ *
+ * `unlink` gates a call to RemoveFromItemList, and a FAILED unlink aborts the
+ * whole thing -- an item that was not in the list is not freed, and 0 comes
+ * back. With `unlink` zero the list is not touched at all and the free always
+ * happens. Both callers matter here because this is one of the two ways
+ * RemoveFromItemList is reached.
+ *
+ * The eight kinds land on five distinct destructors. Kinds 1, 5, 6 and 8 share
+ * one; the compiler emitted four separate arms for them rather than merging,
+ * and kind 8's differs only in whether `pop edi` precedes `mov eax,1`. Reading
+ * that as a real difference would be a mistake -- comparing the arms BYTE for
+ * byte says they differ, because `call rel32` encodes a relative displacement
+ * and identical code at four addresses has four encodings.
+ *
+ * An unknown kind returns 1 -- success -- having done nothing at all, and
+ * without complaining. Reproduced.
+ *
+ * Only kind 4 logs, and it is gated on the comm object's debug flag, the same
+ * one the three event functions read. */
+int32_t __cdecl FreeItem(void *item, int32_t unlink)
+{
+    if (unlink && !RemoveFromItemList((AM2_Object *)item))
+        return 0;
+
+    switch (*(const int32_t *)item) {
+    case 1:
+    case 5:
+    case 6:
+    case 8:
+        orig_free_common(item, unlink);
+        return 1;
+
+    case 2:
+        orig_free_kind2(item, unlink);
+        return 1;
+
+    case 3:
+        orig_free_kind3(item, unlink);
+        return 1;
+
+    case 4:
+        if (kCommDebug)
+            orig_log("FreeItem %0x\n", ((const int32_t *)item)[1]);
+        orig_free_kind4(item, unlink);
+        return 1;
+
+    case 7:
+        orig_free_kind7(item, unlink);
+        return 1;
+
+    default:
+        return 1;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
+    patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
     patch_replace(ADDR_OBJ_FIELD_A, (const void *)ObjFieldA, "ObjFieldA", 1);
     patch_replace(ADDR_OBJ_SET_FIELD_A, (const void *)ObjSetFieldA,

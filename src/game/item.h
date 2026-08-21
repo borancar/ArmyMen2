@@ -82,4 +82,9 @@ void item_install(void);
 }
 #endif
 
+/* 0x004285F0. Destroy one item, dispatching on its kind at +0. `unlink` takes
+ * it out of the item list first, and a failed unlink aborts and returns 0. An
+ * unknown kind returns 1 having done nothing. Two callers. */
+int32_t __cdecl FreeItem(void *item, int32_t unlink);
+
 #endif

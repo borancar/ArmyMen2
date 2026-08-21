@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 366 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 366 | 359 of them below the CRT line |
+| `patch_replace` sites | 367 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 367 | 360 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 88,352 / 372,816 B (**23.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 88,624 / 372,816 B (**23.8%**) | patched entries' sizes over the total |
 | modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,22 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Comparing two code arms BYTE for byte is the wrong test.** `FreeItem`'s
+  kinds 1, 5, 6 and 8 all call the same destructor, and a `memcmp` of their
+  arms says they differ -- because `call rel32` encodes a RELATIVE
+  displacement, so identical code at four addresses has four encodings.
+  Disassembled, kinds 1, 5 and 6 are instruction-for-instruction identical and
+  kind 8 differs only in whether `pop edi` precedes `mov eax, 1`. Reading the
+  byte difference as a real one would have produced four spurious cases.
+
+- **A drive that never kills anything never frees an item.** `FreeItem` and
+  `RemoveFromItemList` both read 0 on a campaign run: 325 items are added
+  during load and none is destroyed in the ~25 s observed. That is what
+  CLAUDE.md's long-standing "RemoveFromItemList unexercised" note has been
+  recording without saying why, and it is now written down there -- the gap is
+  the DRIVE, not a missing code path. A mission driven long enough for
+  something to die would exercise both.
 
 - **The `.aai` files are checksummed for peer agreement, which is why none of
   it runs here.** `Checksum` (`0x0042DBB0`) XORs a file's dwords; the wrapper
