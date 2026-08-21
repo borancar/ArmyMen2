@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 363 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 363 | 356 of them below the CRT line |
+| `patch_replace` sites | 364 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 364 | 357 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 87,792 / 372,816 B (**23.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 88,144 / 372,816 B (**23.6%**) | patched entries' sizes over the total |
 | modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,22 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`AM2_ScriptCond`'s `unused28` is the round-robin cursor.** The parser never
+  writes it, which is why it went in as unused; `RunCondActions` mode 2 reads
+  it as a SIGNED byte, runs that action, and stores `(cursor + 1) % nactions`
+  back. A field the writer leaves alone is not evidence that nobody uses it --
+  the reader is where to look.
+
+- **`AM2_ScriptAction.extra` really is `onobjstate`'s name, in the third of the
+  three roles script.h lists for it.** Mode 3 treats it as a name-table index,
+  considers only type-2 entries, and runs the first action whose value equals
+  the object's current state. So all three readings of that field now have a
+  use site rather than a guess.
+
+- **`0x0041F520` has 53 callers and no name.** 80 bytes, in event.cpp, turning
+  a name into a uid. It is the densest unnamed thing left in that module and
+  worth doing on its own merits rather than as somebody's helper.
 
 - **The event message's two pass-through fields are FilterMatches' masks.**
   They went into `AM2_EventMsg` as `aux1`/`aux2` two weeks of commits ago,

@@ -8,6 +8,8 @@
 #include "event.h"
 #include "image.h"
 #include "misc.h"      /* FilterMatches */
+#include "objscript.h" /* AM2_ObjScript, kObjScripts */
+#include "scriptint.h"
 #include "objtable.h"
 #include "item.h"   /* UidOnWire */
 #include "objtype.h"
@@ -802,6 +804,109 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                                  msg->maskB, msg->removeevent, 1);
 }
 
+/* ------------------------------------------- condition actions ---- */
+
+/* Both stay original. The first runs one action of an `if`; the second turns a
+ * name into a uid and has 53 callers of its own. */
+typedef void (__cdecl *AM2_CondRunActionFn)(AM2_ScriptCond *c, int32_t i,
+                                            void *arg);
+typedef uint32_t (__cdecl *AM2_NameToUidFn)(int32_t name, void *arg);
+typedef int32_t (__cdecl *AM2_RandFn)(void);
+#define orig_cond_run_action \
+    (*(AM2_CondRunActionFn)AM2_IMAGE(ADDR_COND_RUN_ACTION))
+#define orig_name_to_uid (*(AM2_NameToUidFn)AM2_IMAGE(ADDR_EVENT_NAME_TO_UID))
+#define orig_rand        (*(AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* 0x00421430. Run an `if` statement's actions the way its `mode` says to.
+ *
+ * The four modes are the ones script.h already lists from the parser, now
+ * confirmed from the far side:
+ *
+ *   0  every action, in order
+ *   1  one at random
+ *   2  one per firing, round robin
+ *   3  the action whose `onobjstate` name matches the object's current state
+ *
+ * Mode 2 is what settles that +0x28 is not unused. It reads the field as a
+ * SIGNED byte, runs that action, then stores (cursor + 1) % nactions back --
+ * so the field is the round-robin position and script.h now says so.
+ *
+ * Mode 3 walks the actions looking at each one's `extra` field, which script.h
+ * describes as "a damage kind, an order form, or `onobjstate`'s name". Here it
+ * is unambiguously the third: it is a name-table index, and only entries of
+ * type 2 are considered. The first whose value equals the object's current
+ * state runs, and the walk stops.
+ *
+ * Two hazards reproduced. Modes 1 and 2 divide by `nactions` with no check, so
+ * an `if` with a mode and no actions would fault -- the parser cannot produce
+ * one. And mode 3's state bound is `>=` against statecount but the complaint
+ * it logs does not stop the walk; it just skips that action. */
+void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
+{
+    if (c->actions == (AM2_ScriptAction *)0)
+        return;
+
+    switch (c->mode) {
+    case 0:
+        if (c->nactions <= 0)
+            return;
+        for (int32_t i = 0; i < c->nactions; i++)
+            orig_cond_run_action(c, i, arg);
+        return;
+
+    case 1:
+        orig_cond_run_action(c, orig_rand() % c->nactions, arg);
+        return;
+
+    case 2: {
+        int32_t at = *(const int8_t *)&c->cursor;
+
+        orig_cond_run_action(c, at, arg);
+        *(int8_t *)&c->cursor = (int8_t)((at + 1) % c->nactions);
+        return;
+    }
+
+    case 3: {
+        uint8_t       *obj;
+        AM2_ObjScript *scr;
+        int32_t        id;
+
+        obj = (uint8_t *)LookupByUID(orig_name_to_uid(c->objstate, arg));
+
+        if (!ObjIsItem((const AM2_Object *)obj))
+            return;
+
+        id = *(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID);
+        if (id <= 0 || id > kObjScriptCount)
+            return;
+
+        scr = &kObjScripts[id - 1];
+
+        for (int32_t i = 0; i < c->nactions; i++) {
+            const AM2_ScriptName *e =
+                am2_script_name(c->actions[i].extra);
+
+            if (e->type != AM2_NAME_TYPE_REF)
+                continue;
+
+            if (e->value >= scr->statecount) {
+                orig_log("Tried to switch on invalid state.\n");
+                continue;
+            }
+
+            if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) == e->value) {
+                orig_cond_run_action(c, i, arg);
+                return;
+            }
+        }
+        return;
+    }
+
+    default:
+        return;
+    }
+}
+
 /* --------------------------------------------- immediate trigger ---- */
 
 /* Free one entry's handler chain and then the entry. `owns` decides whether
@@ -986,6 +1091,8 @@ int event_install(void)
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_SAVE_EVENT_SECTION, (const void *)SaveEventSection,
                         "SaveEventSection", 1);
+    rc |= patch_replace(ADDR_COND_RUN_ACTIONS, (const void *)RunCondActions,
+                        "RunCondActions", 2);
     rc |= patch_replace(ADDR_EVENT_TRIGGER_IMMED,
                         (const void *)EventTriggerImmediate,
                         "EventTriggerImmediate", 1);

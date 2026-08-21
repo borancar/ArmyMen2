@@ -359,7 +359,9 @@ typedef struct {
     AM2_ScriptAction *actions;    /* +0x20 */
     int32_t           mode;       /* +0x24, 0 none 1 random 2 sequential
                                    *        3 onobjstate */
-    int32_t           unused28;   /* +0x28 */
+    int32_t           cursor;     /* +0x28, NOT unused: mode 2 keeps its
+                                   * round-robin position here, and reads and
+                                   * writes it as a signed BYTE */
     int32_t           objstate;   /* +0x2C, a name index when mode is 3 */
     void             *next;       /* +0x30 */
 } AM2_ScriptCond;

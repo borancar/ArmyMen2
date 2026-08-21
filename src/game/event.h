@@ -89,6 +89,11 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
                                    int32_t maskB, int32_t removeevent,
                                    int32_t remote);
 
+/* 0x00421430. Run an `if` statement's actions according to its mode: all, one
+ * at random, one round-robin, or the one whose `onobjstate` name matches the
+ * object's current state. Nine callers. */
+void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.

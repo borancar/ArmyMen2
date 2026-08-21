@@ -1209,6 +1209,16 @@
 #define ADDR_EVENT_MESSAGE_SEND    0x0041F150u
 #define ADDR_EVENT_MESSAGE_RECV    0x0041F320u
 #define ADDR_EVENT_TRIGGER_IMMED   0x0041EF80u  /* 464 B, 3 callers */
+/* Runs one action of an `if` -- (cond, index, arg). 32 bytes, four callers,
+ * still original; role name. */
+#define ADDR_COND_RUN_ACTION       0x00421410u
+/* Resolves a name-table index to a uid, or something like it -- 80 bytes and
+ * FIFTY-THREE callers, so it is worth doing on its own merits. Role name. */
+#define ADDR_EVENT_NAME_TO_UID     0x0041F520u
+/* 0x00421430, "Tried to switch on invalid state." -- which names the
+ * condition, not the function. It runs an `if` statement's action list the way
+ * its `mode` says to. Role name. */
+#define ADDR_COND_RUN_ACTIONS      0x00421430u
 /* The predicate it walks a bucket with is FilterMatches, 0x0041EF20, which
  * this port already owns -- so no new name here. That is what gives the two
  * pass-through fields of an event a meaning: they are the maskA/maskB
