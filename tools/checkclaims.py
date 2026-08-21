@@ -72,11 +72,25 @@ def lock_bracket():
     return len(seen), ours
 
 
+def module_split():
+    """(flat modules, win32 modules) -- how src/game is divided.
+
+    checksplit.py checks that each module is on the correct side; nothing
+    checked how MANY were, and the prose describing the split was eleven
+    modules out of date before anyone measured it.
+    """
+    srcs = am2.game_sources()
+    win32 = [p for p in srcs
+             if os.path.basename(os.path.dirname(p)) == "win32"]
+    return len(srcs) - len(win32), len(win32)
+
+
 def claims():
     com = com_rows()
     game = [r for r in com if int(r["func"], 16) < CRT_START and r["func"] != "0x00000000"]
     imp = [r for r in import_rows() if int(r["func"], 16) < CRT_START]
     total, ours = lock_bracket()
+    flat, win32 = module_split()
 
     return [
         ("in-game COM-shaped sites that are C++",
@@ -94,6 +108,14 @@ def claims():
         ("total COM-shaped dispatch sites",
          r"`cdecl` for all (\d+) with nothing unknown",
          (len(com),)),
+
+        ("modules under src/game/win32",
+         r"talks to Win32 or DirectX -- \*\*(\d+)\*\*",
+         (win32,)),
+
+        ("modules in the flat half of src/game",
+         r"touches no\s+API at all, and there are \*\*(\d+)\*\*",
+         (flat,)),
 
         ("functions calling the Lock/Unlock bracket, and how many are ours",
          r"Measured: \*\*(\d+) functions\*\* call the bracket and \*\*(\d+)\*\*",

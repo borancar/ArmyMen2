@@ -81,13 +81,25 @@ split the same way rather than along a line of our choosing, with
 `scriptint.h` as the private surface between them. Where the original's own
 division is visible, use it.
 
-`src/game/win32/` holds every module that talks to Win32 or DirectX; the flat
-part of `src/game/` holds the reconstruction that touches no API at all —
-`blit`, `dist`, `objtable`, `objtype`, `packkey`, `rect`, `savetag`, `text`.
-Those eight are software rasterisers, rectangle and distance maths, the object
-tables, key packing and save tags: pure computation over memory the caller
-supplies. Everything else — 14 modules — is the boundary, and the split is the
-answer to "what still talks to the outside world" in directory form.
+`src/game/win32/` holds every module that talks to Win32 or DirectX -- **15**
+of them. The flat part of `src/game/` holds the reconstruction that touches no
+API at all, and there are **19**; the split is the answer to "what still talks
+to the outside world" in directory form.
+
+**The flat half is the one that grows, and this file's count of it went stale
+without anything noticing.** It said eight, naming `blit`, `dist`, `objtable`,
+`objtype`, `packkey`, `rect`, `savetag` and `text` -- software rasterisers,
+rectangle and distance maths, the object tables, key packing and save tags:
+pure computation over memory the caller supplies. Those eight are still there
+and still flat, so the sentence was not wrong about them. What it could not
+survive was eleven more landing beside them -- the script interpreter, the
+event table, the object accessors, the save serialisation -- while the prose
+went on counting the original set and calling everything else the boundary.
+
+`tools/checksplit.py` was checking the only thing it could see, which is that
+each module is on the correct side; nothing was checking how many there were.
+Both counts are `tools/checkclaims.py`'s now, for the same reason every other
+number in this file that kept going stale is.
 
 The test for which side a file belongs on is whether it names a Win32 or COM
 type at all. `blit.cpp` mentions `IDirectDrawSurface` once, in a comment
@@ -113,8 +125,8 @@ that documents the rule.
 
 **Four tools derive "what is reconstructed" by scanning these sources**, and
 all four used a non-recursive `listdir` before the split. Adding a
-subdirectory would have made every one of them miss fourteen modules silently
-and report the boundary as barely started. They now share `am2.game_sources()`
+subdirectory would have made every one of them miss the whole `win32/` half
+silently and report the boundary as barely started. They now share `am2.game_sources()`
 — one definition, for the same reason `tools/merges.py` imports
 `coverage.REGISTERED` rather than copying it.
 
