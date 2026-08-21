@@ -30,6 +30,7 @@
 #include "../game/armymsg.h"
 #include "../game/defparse.h"
 #include "../game/definfo.h"
+#include "../game/region.h"
 #include "../game/objflag.h"
 #include "../game/event.h"
 #include "../game/trig.h"
@@ -440,6 +441,7 @@ static void install(void)
     armymsg_install();
     defparse_install();
     definfo_install();
+    region_install();
     objflag_install();
     misc_install();
     gamedir_install();

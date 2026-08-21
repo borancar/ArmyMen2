@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 367 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 367 | 360 of them below the CRT line |
+| `patch_replace` sites | 368 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 368 | 361 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 88,624 / 372,816 B (**23.8%**) | patched entries' sizes over the total |
-| modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 88,944 / 372,816 B (**23.9%**) | patched entries' sizes over the total |
+| modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
@@ -152,6 +152,22 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Pathfinding is a whole subsystem the drive cannot see.** `AddRegionLink`
+  runs 2,230 times building the region graph at map load, and building NO graph
+  at all leaves `campaign` with an identical log and 2,571 pixels. Not the
+  dedup rule, not the edges -- nothing. The reason is the drive: it clears two
+  dialogs and scrolls, and no unit ever needs to path anywhere in that window.
+  So every function in `region.cpp` will be reading-verified until there is a
+  drive that makes something walk somewhere.
+
+- **A global that holds a POINTER to a table looks exactly like the table.**
+  `0x00514EF0` is `mov edx, dword ptr [0x514ef0]` followed by indexing off
+  `edx` -- one indirection, same as the cell map beside it. Writing it as the
+  array base took the game down instantly on the first run, with 14
+  AddRegionLink log lines and then nothing. CLAUDE.md records the same shape
+  for `obj -> table -> slot`; this is the one-level version and it is just as
+  easy to miss.
 
 - **Comparing two code arms BYTE for byte is the wrong test.** `FreeItem`'s
   kinds 1, 5, 6 and 8 all call the same destructor, and a `memcmp` of their

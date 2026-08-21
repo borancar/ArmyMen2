@@ -1761,6 +1761,21 @@
 #define ADDR_OPT_WINDOWED        0x00507344u  /* -w */
 #define ADDR_OPT_NO_INTRO        0x004FA038u  /* -nointro */
 #define ADDR_OPT_TRACE_PF        0x0050C35Cu  /* -tracePF */
+
+/* What -tracePF traces: the region graph, which is this game's pathfinding
+ * structure. The switch is the evidence for that -- the region log lines are
+ * gated on it and nothing else is.
+ *
+ * ADDR_REGION_OF_CELL is one byte per map cell giving its region id, where 0
+ * means "no region". ADDR_REGIONS is an array of 44-byte records; the two
+ * fields reached here are a link COUNT at +8, a byte, and a pointer to the
+ * links at +0x0C. A link is six bytes. */
+#define ADDR_REGION_OF_CELL        0x00514ECCu  /* uint8_t * */
+#define ADDR_REGIONS               0x00514EF0u
+#define AM2_REGION_SIZE            44
+#define REGION_OFF_NLINKS          8u   /* uint8_t */
+#define REGION_OFF_LINKS           0x0Cu
+#define ADDR_ADD_REGION_LINK       0x0042B860u  /* void(int32_t, int32_t) */
 #define ADDR_OPT_TRACE_VEH       0x0050C360u  /* -traceVEH */
 #define ADDR_OPT_TRACE_WIN       0x0050C354u  /* -tracewin */
 #define ADDR_OPT_DBG             0x0050C358u  /* -dbg */
