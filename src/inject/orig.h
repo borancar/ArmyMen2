@@ -1325,6 +1325,10 @@
  * through a merge, and was right only by luck -- the caller happens to name
  * the callee it just complained about. */
 #define ADDR_DEF_OBJ_LINE          0x00435C20u  /* the OBJ-line parser */
+/* Its sink, analogous to DefAddLink: "duplicate record in object.aai file
+ * %d-%d". Still original. */
+#define ADDR_DEF_ADD_OBJ_REC       0x00435980u  /* void(const int32_t *rec) */
+#define AM2_DEF_OBJ_REC_DWORDS     14
 
 /* The object-definition files (.aai) have a command vocabulary of their OWN --
  * it is not docs/scripttokens.md's. 0x5F is LINK there; in the script table 95

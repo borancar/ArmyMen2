@@ -70,8 +70,8 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 354 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 354 | 347 of them below the CRT line |
+| `patch_replace` sites | 355 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 355 | 348 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 85,488 / 372,816 B (**22.9%**) | patched entries' sizes over the total |
 | modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
@@ -152,6 +152,17 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Mutate a CONTROL before concluding a field is unobserved.** Two field-level
+  mutations of `DefObjLine` passed clean -- keeping `rec[3]` instead of zeroing
+  it, and swapping `rec[1]` with `rec[2]`. On its own that reads as "the drive
+  cannot see this function". It can: making `DefObjLine` return immediately
+  puts `campaign` at 31,494 differing pixels and the save at **25** items
+  instead of 310. So the function is observed as hard as anything in this
+  project, and the honest statement is narrower and more useful -- those three
+  particular slots are not discriminated, while `rec[0]` is (the DefObjParse
+  33->34 mutation is caught in the log). Without the control the first result
+  would have been written up as the wrong claim.
 
 - **The self-naming sweep attributes a string to whatever `functions.tsv` says
   contains it, and merged entries make that a guess.** `DefObjParse`'s own

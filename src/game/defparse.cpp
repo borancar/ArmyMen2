@@ -23,6 +23,10 @@ typedef int32_t (__cdecl *AM2_DefParseNumberFn)(int32_t *out, const char *tok);
 
 #define kSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 
+typedef void (__cdecl *AM2_DefAddObjRecFn)(const int32_t *rec);
+#define orig_def_add_obj_rec \
+    (*(AM2_DefAddObjRecFn)AM2_IMAGE(ADDR_DEF_ADD_OBJ_REC))
+
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
 #define orig_qsort (*(AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
@@ -106,6 +110,59 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
     link.c        = c;
 
     DefAddLink(&link);
+    return 0;
+}
+
+/* 0x00435C20. Parse one OBJ line of an .aai file into a 56-byte record.
+ *
+ *     <keyword> <f1> <f2> ... <f12> [<f13>]
+ *
+ * A role name -- it names itself nowhere. The string it logs,
+ * "DefObjParse: Bad object Constant Type", names its CALLEE; only
+ * docs/functions.tsv merging the two made the sweep attribute it here.
+ *
+ * The record is zeroed whole, then rec[0] comes from DefObjParse and the rest
+ * from thirteen numbers. Three irregularities, all reproduced:
+ *
+ *  - rec[3] is parsed AND checked -- a bad value returns 4 -- and then thrown
+ *    away and forced to 0. That slot is DEF_OBJ_REC_OFF_LINKS, which
+ *    DefCheckLinks fills in later with the parent's link count, so whatever
+ *    the file says there cannot survive.
+ *  - the TWELFTH field failing is not an error. It skips the thirteenth and
+ *    appends the record anyway, returning 0, which is what makes that last
+ *    field optional.
+ *  - the thirteenth field's parse result is never looked at.
+ *
+ * Failure codes are ordinal: 1 for the keyword, then 2..12 for rec[1]..rec[11]
+ * in order. */
+int32_t __cdecl DefObjLine(int32_t cmd, char *line)
+{
+    int32_t rec[AM2_DEF_OBJ_REC_DWORDS];
+
+    for (int32_t i = 0; i < AM2_DEF_OBJ_REC_DWORDS; i++)
+        rec[i] = 0;
+
+    rec[0] = DefObjParse(cmd);
+    if (rec[0] < 0) {
+        orig_log("DefObjParse: Bad object Constant Type\n");
+        return 1;
+    }
+
+    if (!orig_def_number(&rec[1], orig_strtok(line, kSep)))
+        return 2;
+
+    for (int32_t i = 2; i <= 11; i++) {
+        if (!orig_def_number(&rec[i], orig_strtok((char *)0, kSep)))
+            return i + 1;
+
+        if (i == 3)
+            rec[3] = 0;      /* parsed, checked, discarded -- see above */
+    }
+
+    if (orig_def_number(&rec[12], orig_strtok((char *)0, kSep)))
+        (void)orig_def_number(&rec[13], orig_strtok((char *)0, kSep));
+
+    orig_def_add_obj_rec(rec);
     return 0;
 }
 
@@ -353,5 +410,7 @@ int defparse_install(void)
                         "DefFindObjRec", 3);
     rc |= patch_replace(ADDR_DEF_OBJ_PARSE, (const void *)DefObjParse,
                         "DefObjParse", 1);
+    rc |= patch_replace(ADDR_DEF_OBJ_LINE, (const void *)DefObjLine,
+                        "DefObjLine", 1);
     return rc;
 }

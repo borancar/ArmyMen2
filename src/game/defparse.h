@@ -47,6 +47,11 @@ int32_t __cdecl DefCountLinks(int32_t parentkey);
  * type constant, or -1. Logs nothing -- its caller does that. */
 int32_t __cdecl DefObjParse(int32_t token);
 
+/* 0x00435C20. Parse one OBJ line into a 56-byte record and append it. Returns
+ * 0 on success, 1 for a bad keyword, 2..12 for a bad field. The thirteenth
+ * field is optional and the twelfth failing is NOT an error. A role name. */
+int32_t __cdecl DefObjLine(int32_t cmd, char *line);
+
 /* 0x00435FD0. Sort the link table, then check each distinct parent against the
  * object records -- storing its link count, or complaining that the record is
  * missing. A role name; it names itself nowhere. */
