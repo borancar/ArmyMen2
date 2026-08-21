@@ -933,6 +933,37 @@ void __cdecl EvtObjSet(uint32_t uid, int32_t value)
     orig_obj_set(LookupByUID(uid), value, 0);
 }
 
+/* 0x0041FEC0. Resurrect a named item, by its own log line.
+ *
+ * The same "a zero LOW WORD means leave it where it is" idiom EvtDeployItem
+ * uses -- the x tested as 16 bits, so a point with x == 0 and any y counts as
+ * absent -- and then the same DeployItem, differing in ONE argument: 1 here
+ * where EvtDeployItem passes 0. That is the resurrect flag, and it is why the
+ * callee's own message reads "DeployItem(resurrection)". Neither function
+ * explains that string alone; both together do.
+ *
+ * The log is gated on the comm object's debug field, like the rest of this
+ * module, and prints the point as two SIGNED 16-bit halves. */
+void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
+{
+    uint8_t *obj;
+
+    if (kEventDebug)
+        orig_log("ScriptResurrectItem, uid=%x, pos=(%d,%d)\n", uid,
+                 (int32_t)(int16_t)(where & 0xFFFFu),
+                 (int32_t)(int16_t)(where >> 16));
+
+    obj = (uint8_t *)LookupByUID(uid);
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    if ((uint16_t)where == 0)
+        where = *(const uint32_t *)(obj + OBJ_OFF_POS);
+
+    orig_deploy_item(obj, where, AM2_DEPLOY_RESURRECT, 0);
+}
+
 /* 0x0041F8B0. Apply the point action to every object an army owns.
  *
  * Not a peer of the two shims below it, despite sitting between them: it
@@ -1548,6 +1579,9 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_SCRIPT_RESURRECT_ITEM,
+                        (const void *)ScriptResurrectItem,
+                        "ScriptResurrectItem", 1);
     rc |= patch_replace(ADDR_EVT_ARMY_AT_POINT,
                         (const void *)EvtArmyAtPoint, "EvtArmyAtPoint", 3);
     rc |= patch_replace(ADDR_AT_POINT_A, (const void *)EvtAtPointA,

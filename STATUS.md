@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 390 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 390 | 383 of them below the CRT line |
+| `patch_replace` sites | 391 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 391 | 384 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 90,768 / 372,816 B (**24.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 90,864 / 372,816 B (**24.4%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -153,6 +153,19 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **A log string that made no sense alone is explained by two functions
+  together.** `DeployItem`'s own line reads "DeployItem(resurrection)", which
+  looked like a mis-copied message when only `EvtDeployItem` had been read --
+  that one passes 0 for the third argument and has nothing to do with
+  resurrecting. `ScriptResurrectItem` passes 1 for the same argument. So the
+  flag is the resurrect flag and the string is accurate; neither caller
+  explains it, and both together do.
+
+- **`0x0041F4A0` has 26 callers and is the densest thing left in the module.**
+  128 bytes, gated on two globals and a state compare against 0x22, then one of
+  two six-argument calls into `0x0041F410` depending on whether an argument is
+  positive. Worth doing next on call-count alone.
+
 - **`EvtArmyAtPoint` ships an accumulating offset, and it is reproduced.** With
   `relative` set it copies the point into two registers before the loop and
   never reloads them, so the second matching object receives
@@ -205,7 +218,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **24 functions are left in the event.cpp band, and most are tiny.** Four
+- **23 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

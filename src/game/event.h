@@ -111,6 +111,11 @@ void __cdecl EvtObjAction(uint32_t uid);
  * "leave it where it is" and its own position is used. */
 void __cdecl EvtDeployItem(uint32_t uid, uint32_t where);
 
+/* 0x0041FEC0. Resurrect a named item -- the same lookup and the same
+ * zero-low-word idiom as EvtDeployItem, differing only in the resurrect flag
+ * it passes DeployItem. */
+void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where);
+
 /* 0x0041FBE0 and 0x0041FC10. The same shim twice -- uid threshold, lookup,
  * ObjIsType2 -- differing only in which function it then calls. Role names;
  * object type 2 is still unidentified. */

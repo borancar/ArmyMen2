@@ -1427,7 +1427,12 @@
 /* Names recovered from the error strings the functions print about
  * themselves. None is reconstructed yet; recorded so the names are here when
  * they are, rather than being guessed at from a call site again. */
-#define ADDR_SCRIPT_RESURRECT_ITEM 0x0041FEC0u
+/* Its third argument to DeployItem is 1 where EvtDeployItem passes 0, and that
+ * is the resurrect flag -- which is why the callee's own line reads
+ * "DeployItem(resurrection)". Two functions, one flag, and the string
+ * explains itself once both are read. */
+#define ADDR_SCRIPT_RESURRECT_ITEM 0x0041FEC0u  /* void(uint32_t, uint32_t) */
+#define AM2_DEPLOY_RESURRECT       1
 #define ADDR_SCRIPT_SET_OBJ_BITMAP 0x00420060u
 /* 0x004371A0. Advance one object along its object script by one frame, if its
  * deadline has passed. Two of its own log strings name it and its callee:
