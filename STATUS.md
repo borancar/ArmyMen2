@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 391 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 391 | 384 of them below the CRT line |
+| `patch_replace` sites | 392 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 392 | 385 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 90,864 / 372,816 B (**24.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 90,992 / 372,816 B (**24.4%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -153,6 +153,19 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **The event system's authority rule and its off switch are one function.**
+  `EventNotify` refuses twice before dispatching: in a multiplayer session only
+  the HOST raises anything, and nothing is raised at all while the in-mission
+  sub-state is 34 -- the ESCAPE arm CLAUDE.md records ordinary play as never
+  being in. So entering that menu stops the event system rather than merely
+  pausing the frame, which is a stronger statement than the pause mask makes.
+
+- **A delayed event carries less than an immediate one.** `EventTriggerDelayed`
+  takes no masks and no second num/uid pair, so `EventNotify` DROPS four of its
+  ten arguments on that path. `delay 0` and `delay 1` are not the same event
+  arriving at different times. The `delay > 0` boundary is exact and observed:
+  making it `>= 0` puts campaign at 294,304 differing pixels.
+
 - **A log string that made no sense alone is explained by two functions
   together.** `DeployItem`'s own line reads "DeployItem(resurrection)", which
   looked like a mis-copied message when only `EvtDeployItem` had been read --
@@ -218,7 +231,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **23 functions are left in the event.cpp band, and most are tiny.** Four
+- **22 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

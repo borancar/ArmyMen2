@@ -171,6 +171,15 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
                                  int32_t delay, int32_t removeevent,
                                  int32_t arg);
 
+/* 0x0041F4A0. The front door, with twenty-six callers: raise an event now or
+ * after a delay. Refuses in a multiplayer session unless we are the host, and
+ * refuses entirely while the in-mission sub-state is the ESCAPE arm. The
+ * delayed path drops the masks and the second num/uid pair. */
+void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
+                        int32_t maskA, int32_t num2, uint32_t uid2,
+                        int32_t maskB, int32_t delay, int32_t removeevent,
+                        int32_t arg);
+
 /* 0x004223D0. Empty all nine buckets. */
 void __cdecl EventClearAll(void);
 

@@ -1311,6 +1311,25 @@
  * log string, "EventTriggerDelayed: type %d, num: %d, uid: %x, removeevent:
  * %d, delay: %d". */
 #define ADDR_EVENT_TRIGGER_DELAYED 0x0041F410u
+/* 0x0041F4A0, twenty-six callers -- the front door of the event system. It
+ * chooses between the delayed and the immediate trigger on whether `delay` is
+ * positive, and refuses two ways first:
+ *
+ *   - in a multiplayer session, only the HOST raises events (ADDR_MP_SESSION
+ *     set and COMM_OFF_IS_HOST clear means return), which is the authority
+ *     rule stated in one line;
+ *   - and never while ADDR_MENU_REQUEST_TAKEN is 0x22. That is 34, the ESCAPE
+ *     sub-state CLAUDE.md records ordinary play as never being in -- so the
+ *     game stops raising events the moment that menu arm is entered.
+ *
+ * Note the delayed path DROPS four of its arguments: EventTriggerDelayed takes
+ * no masks and no second num/uid pair. A delayed event therefore cannot carry
+ * what an immediate one can.
+ *
+ * The address already had a name -- ADDR_EVENT_NOTIFY, which is what CLAUDE.md
+ * calls "the notify". That one is kept: it describes the same body just as
+ * well, and renaming an established name for a synonym is churn. */
+#define AM2_SUBSTATE_ESCAPE        0x22
 #define ADDR_CREATE_TIMER          0x0041E820u  /* "CreateTimer", 304 B */
 /* The network half of the event system, and the two sides confirm each other:
  * EventMessageSend packs a 40-byte message and EventMessageReceive unpacks the
@@ -1398,7 +1417,7 @@
 #define ADDR_EVT_MARK_SET        0x0041FF20u  /* void(row, col) -> 1 */
 #define ADDR_EVT_MARK_CLEAR      0x0041FF40u  /* void(row, col) -> 0 */
 #define ADDR_EVT_MARKS           0x00511E60u  /* int32_t[][4] */
-#define ADDR_EVENT_NOTIFY        0x0041F4A0u  /* void(10 args) */
+#define ADDR_EVENT_NOTIFY        0x0041F4A0u  /* see EVENT_RAISE note */
 
 /* The callbacks DeclareRuleVars registers. The first two are six-byte
  * wrappers over one shared handler differing only in a 0 or a 1, which is what

@@ -25,7 +25,6 @@ typedef void    (__cdecl *am2_event_notify_fn)(int32_t, int32_t, int32_t,
                                                int32_t, int32_t, int32_t,
                                                int32_t);
 
-#define orig_event_notify    (*(am2_event_notify_fn)ADDR_EVENT_NOTIFY)
 
 #define kScriptConditions (*(AM2_ScriptCond **)AM2_IMAGE(ADDR_SCRIPT_CONDITIONS))
 
@@ -188,7 +187,7 @@ void __cdecl DeclareRuleVars(void)
 
             EventRegister(0, uid, 0, kImageFn(ADDR_EVT_CONDITION),
                                 cond, 0);
-            orig_event_notify(0, uid, 0, 0, 0, 0, 0, cond->number, 1, 0);
+            EventNotify(0, uid, 0, 0, 0, 0, 0, cond->number, 1, 0);
             continue;
         }
 
@@ -1502,6 +1501,51 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
     }
 }
 
+/* ------------------------------------------------------ raise ---- */
+
+/* 0x0041F4A0. The front door: raise an event now, or after a delay.
+ *
+ * Kept under the name the address already had -- ADDR_EVENT_NOTIFY, CLAUDE.md's
+ * "the notify" -- rather than renamed to a synonym.
+ *
+ * Twenty-six callers, and two refusals before either. In a multiplayer session
+ * only the HOST raises anything -- that is the whole authority rule, in one
+ * condition. And nothing is raised while the in-mission sub-state is 34, which
+ * CLAUDE.md records as the ESCAPE arm ordinary play is never in; so entering
+ * that menu stops the event system rather than merely pausing the frame.
+ *
+ * The delayed path DROPS four arguments. EventTriggerDelayed takes no masks
+ * and no second num/uid pair, so a delayed event cannot carry what an
+ * immediate one can -- worth knowing before assuming `delay 0` and `delay 1`
+ * differ only in timing.
+ *
+ * `remote` is passed as 0, which is right: an event raised here is local by
+ * construction and EventTriggerImmediate will broadcast it. */
+void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
+                        int32_t maskA, int32_t num2, uint32_t uid2,
+                        int32_t maskB, int32_t delay, int32_t removeevent,
+                        int32_t arg)
+{
+    const uint8_t *comm = *(const uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT);
+
+    if (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION) != 0
+        && *(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0)
+        return;
+
+    if (*(const int32_t *)AM2_IMAGE(ADDR_MENU_REQUEST_TAKEN)
+        == AM2_SUBSTATE_ESCAPE)
+        return;
+
+    if (delay > 0) {
+        EventTriggerDelayed(type, num1, (int32_t)uid1, delay, removeevent,
+                            arg);
+        return;
+    }
+
+    EventTriggerImmediate(type, num1, uid1, maskA, num2, uid2, maskB,
+                          removeevent, 0);
+}
+
 /* ----------------------------------------------- delayed trigger ---- */
 
 /* CreateTimer stays original and is reached by address. 304 bytes, one caller
@@ -1579,6 +1623,8 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVENT_NOTIFY, (const void *)EventNotify,
+                        "EventNotify", 26);
     rc |= patch_replace(ADDR_SCRIPT_RESURRECT_ITEM,
                         (const void *)ScriptResurrectItem,
                         "ScriptResurrectItem", 1);
