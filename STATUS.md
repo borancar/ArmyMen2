@@ -113,28 +113,44 @@ counts probe before reading one as coverage -- that is what turned the
    into a clean result with a sharp pass criterion. `tools/actdiff.py` already
    renumbers pointers by first-seen index; the savefile deserves the same, and
    then `tools/ab.sh` could carry it as a standing check.
-4. **Drive a LOAD -- and the gate is now mapped, which is most of the work.**
-   Attempted three ways and not reached; recorded here so the next attempt
-   starts from the chain rather than from the menu. `LoadGame` (`0x00425A10`)
-   has exactly one caller, `0x004255EE`, inside mission start
-   (`0x00425300`), behind
+4. **Drive a LOAD -- the arm fires and the flag is then lost, measured not
+   guessed.** This is the most valuable single thing left in this area: eleven
+   loaders are written and only `LoadGameProcSection` has ever executed.
 
-       if ([0x00511DD8] == 0) LoadLevelScript(); else LoadGame(fp);
+   The chain, all of it read from the image: `LoadGame` (`0x00425A10`) has one
+   caller, `0x004255EE`, inside mission start (`0x00425300`), behind
+   `if ([0x00511DD8] == 0) LoadLevelScript(); else LoadGame(fp)`. The GAME
+   SELECT PANEL's LOAD button is `0x00452060`: it takes the selected entry's
+   name from the panel object at `0x0065A058` plus `0x68`, refuses an empty
+   one, `strcpy`s it to `0x00511B88`, sets `0x00511DD8 = 1` and requests a
+   state change. Mission start then clears the flag if the player name at
+   `0x00511A68` is empty, or if `0x00425950` returns 0 -- and that helper
+   chdirs to `save\<player>`, fopens the save, checks the `0x06660666` tag and
+   runs `LoadGameProcSection` before rewinding, so those two calls are its own.
 
-   `0x00511DD8` is armed only by the GAME SELECT PANEL's LOAD arm at
-   `0x004520BB` (inside `0x00451E10`, 720 B), which first copies the selected
-   save's NAME into `0x00511B88`. That is a string buffer, not a boolean --
-   `0x0044F1A0` tests its first byte, which is what made it look like a flag.
-   Mission start then calls `0x00425950`, which needs BOTH `0x00511B88` and
-   the player name at `0x00511A68` non-empty, chdirs to `save\<player>` and
-   fopens the save; a 0 from it clears the flag and the load silently becomes
-   a fresh start. Every attempt so far ends with `LoadLevelScript=1`, so the
-   LOAD arm is not running -- the panel is reached and the row is highlighted,
-   but the click is not arming `0x00511B88`.
+   What a `dump` probe over the control socket says, live:
 
-   Worth knowing what the panel DOES exercise: listing the save reads its
-   header, so `LoadGameProcSection` and `CheckSaveTag` both run for real
-   against a real file (`=1` each). Every other loader is still unexecuted.
+   | global | reads | meaning |
+   |---|---|---|
+   | `0x00511A68` | `"sarge"` | player name is set |
+   | `0x00511B88` | `"map1_mission1.sav"` after the click | the LOAD arm DID run |
+   | `0x00511DD8` | **0** ~4 s after the click, and in mission | the flag is lost |
+
+   So the button works and something clears the flag before `0x004255CB`
+   reads it. Two candidates, and one probe would separate them: `0x00425373`,
+   reached when `0x00425950` returns 0, or `0x00425F8B` in `0x00425EE0` -- the
+   menu-request consumer -- which clears `0x00511DD8` alongside `0x00511DCC`
+   and `0x00511DC0`. `CheckSaveTag=1` and `LoadGameProcSection=1` fit either
+   reading, since the panel reads a header to label the row too.
+
+   Note two of the five remaining references to `0x00511DD8` are NOT
+   instructions -- `xor eax, 0x511dd8` at `0x00425F1B` and `add eax, 0x511dd8`
+   at `0x00426996` are unaligned operand hits, exactly the false positive
+   CLAUDE.md warns about. There is one real write outside mission start.
+
+   The control socket already has `dump <hex addr> [len]`; no probe was needed
+   to get this far, and none should be needed to finish it.
+
 5. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
    median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
    928 B, 14 callers) is the hub two of them already reach by address.
