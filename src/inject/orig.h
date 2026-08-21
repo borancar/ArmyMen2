@@ -1418,6 +1418,12 @@
 #define ADDR_EVT_MARK_CLEAR      0x0041FF40u  /* void(row, col) -> 0 */
 #define ADDR_EVT_MARKS           0x00511E60u  /* int32_t[][4] */
 #define ADDR_EVENT_NOTIFY        0x0041F4A0u  /* see EVENT_RAISE note */
+/* 0x004203A0, fourteen callers. Works out the point an action refers to,
+ * which it can express three ways: a pair of VARIABLES, a literal, or -- when
+ * the literal's x is zero -- the position of the object the action targets.
+ * That last is the same "a zero x means use its own position" idiom
+ * EvtDeployItem and ScriptResurrectItem both use, met a third time. */
+#define ADDR_ACTION_POINT        0x004203A0u  /* uint32_t(act, uint32_t me) */
 
 /* The callbacks DeclareRuleVars registers. The first two are six-byte
  * wrappers over one shared handler differing only in a 0 or a 1, which is what

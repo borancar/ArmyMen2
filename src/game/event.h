@@ -99,6 +99,11 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg);
  * type-2 entry, gives 0. Fifty-three callers. */
 uint32_t __cdecl ResolveUid(int32_t name, uint32_t me);
 
+/* 0x004203A0. Work out the point an action refers to: a pair of variables when
+ * `xvar` is set, a literal when its x is non-zero, or the target object's
+ * position otherwise. Fourteen callers. */
+uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me);
+
 /* 0x00422450. Drop the whole script and event state: names, conditions,
  * registrations, flag -- in that order. One caller. */
 void __cdecl ResetScriptState(void);

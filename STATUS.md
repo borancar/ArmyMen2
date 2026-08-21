@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 392 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 392 | 385 of them below the CRT line |
+| `patch_replace` sites | 393 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 393 | 386 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 90,992 / 372,816 B (**24.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 91,104 / 372,816 B (**24.4%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -153,6 +153,18 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **"A zero x means use the object's own position" is a convention of this
+  codebase, not a coincidence.** Three functions now use it -- `EvtDeployItem`,
+  `ScriptResurrectItem` and `ActionPoint` -- and in every one the test is on
+  the LOW WORD alone, so a point with x == 0 and any y counts as absent. Worth
+  expecting in anything that takes a packed point.
+
+- **Executing a function is not covering its branches, and the count says so.**
+  `ActionPoint` runs 6 times and has three ways to produce a point; removing
+  the object-position fallback entirely leaves `campaign` clean, so all six
+  calls take the literal path. The variable path cannot even be measured from
+  the counters, since `GetVarValue` is ours and reached directly.
+
 - **The event system's authority rule and its off switch are one function.**
   `EventNotify` refuses twice before dispatching: in a multiplayer session only
   the HOST raises anything, and nothing is raised at all while the in-mission
@@ -231,7 +243,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **22 functions are left in the event.cpp band, and most are tiny.** Four
+- **21 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

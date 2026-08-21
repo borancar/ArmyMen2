@@ -1501,6 +1501,52 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
     }
 }
 
+/* ---------------------------------------------- action point ---- */
+
+/* 0x004203A0. Work out the point an action refers to. Fourteen callers.
+ *
+ * A script may express an action's coordinates three ways, and this is where
+ * all three are resolved:
+ *
+ *   - as a pair of VARIABLES, when `xvar` is set -- both are read through
+ *     GetVarValue and packed into one point;
+ *   - as a literal, when the x half is non-zero;
+ *   - and otherwise as "wherever the target object is", which is the same
+ *     zero-x idiom EvtDeployItem and ScriptResurrectItem use. Third sighting,
+ *     and worth treating as a convention of this codebase rather than a
+ *     coincidence.
+ *
+ * The last case falls back to the literal -- that is, to a point whose x is
+ * zero -- when the target does not resolve. Only `xvar` is tested to choose
+ * the variable path; a `yvar` without an `xvar` is ignored.
+ *
+ * The original assembles the result in its own two argument slots. Locals here;
+ * nothing observable turns on it. */
+uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me)
+{
+    void *obj;
+
+    if (act->xvar != 0) {
+        int32_t x = 0;
+        int32_t y = 0;
+
+        GetVarValue(act->xvar, &x);
+        GetVarValue(act->yvar, &y);
+
+        return (uint32_t)(uint16_t)x | ((uint32_t)(uint16_t)y << 16);
+    }
+
+    if (act->u.pos.x != 0)
+        return (uint32_t)act->u.both;
+
+    obj = LookupByUID(ResolveUid(act->target, me));
+
+    if (obj == (void *)0)
+        return (uint32_t)act->u.both;
+
+    return *(const uint32_t *)((const uint8_t *)obj + OBJ_OFF_POS);
+}
+
 /* ------------------------------------------------------ raise ---- */
 
 /* 0x0041F4A0. The front door: raise an event now, or after a delay.
@@ -1623,6 +1669,8 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_ACTION_POINT, (const void *)ActionPoint,
+                        "ActionPoint", 14);
     rc |= patch_replace(ADDR_EVENT_NOTIFY, (const void *)EventNotify,
                         "EventNotify", 26);
     rc |= patch_replace(ADDR_SCRIPT_RESURRECT_ITEM,
