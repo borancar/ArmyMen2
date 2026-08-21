@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 350 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 350 | 343 of them below the CRT line |
+| `patch_replace` sites | 352 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 352 | 345 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 84,368 / 372,816 B (**22.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 84,560 / 372,816 B (**22.7%**) | patched entries' sizes over the total |
 | modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A counter going DOWN can be the evidence you wanted.** `ComparePair` read
+  3,022 before `DefAddLink` was reconstructed and 1,846 after. Nothing changed
+  about the sort: the difference is `DefAddLink`'s duplicate scan, which used
+  to cross the patched entry from original code and now calls our ComparePair
+  directly. So the drop measures exactly the calls that moved inside the
+  reconstruction, and it is a cheap confirmation that the new patch is the one
+  doing the work. Worth reading counter deltas rather than only absolute
+  values.
+
+- **`siblings` is an INDEX, and three separate uses say so.** DefLinkParse
+  fills it with the count of links already sharing the parent; ComparePair
+  orders on (parent, siblings); DefAddLink refuses a duplicate on that pair;
+  DefFindLink bsearches it. So the field is this link's ordinal among its
+  parent's, the pair is unique per link, and the sort DefCheckLinks runs is
+  what makes the search well defined. The name in defparse.h says count
+  because that is how it is COMPUTED; the comment says what it means.
 
 - **The link table is now confirmed from three sides.** `DefLinkParse` PACKS
   `(type, number)` into the parent key with `PackKey`; `DefCheckLinks` UNPACKS

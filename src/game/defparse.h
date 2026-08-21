@@ -48,6 +48,14 @@ int32_t __cdecl DefCountLinks(int32_t parentkey);
  * missing. A role name; it names itself nowhere. */
 void __cdecl DefCheckLinks(void);
 
+/* 0x00435EE0. Append one link, refusing a duplicate on (parent, siblings). */
+void __cdecl DefAddLink(const AM2_DefLink *link);
+
+/* 0x00436080. bsearch the table for (parent, siblings). Only correct after
+ * DefCheckLinks has sorted it. NOT DefLinkParse, which this address was
+ * called until the bodies were read. */
+AM2_DefLink *__cdecl DefFindLink(int32_t parent, int32_t siblings);
+
 int defparse_install(void);
 
 #ifdef __cplusplus

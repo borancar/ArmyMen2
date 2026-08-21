@@ -4,6 +4,8 @@
 #include "defparse.h"
 #include "image.h"
 #include "packkey.h"
+#include "misc.h"      /* ComparePair */
+#include "crt.h"       /* the game's allocator -- this table is its memory */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -14,14 +16,12 @@ typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 typedef int32_t (__cdecl *AM2_DefNameIndexFn)(const char *name);
 typedef int32_t (__cdecl *AM2_DefObjParseFn)(int32_t nameindex);
 typedef int32_t (__cdecl *AM2_DefParseNumberFn)(int32_t *out, const char *tok);
-typedef void (__cdecl *AM2_DefAddLinkFn)(const AM2_DefLink *link);
 
 #define orig_strtok        (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
 #define orig_def_name_index \
     (*(AM2_DefNameIndexFn)AM2_IMAGE(ADDR_DEF_NAME_INDEX))
 #define orig_def_obj_parse (*(AM2_DefObjParseFn)AM2_IMAGE(ADDR_DEF_OBJ_PARSE))
 #define orig_def_number    (*(AM2_DefParseNumberFn)AM2_IMAGE(ADDR_DEF_PARSE_NUMBER))
-#define orig_def_add_link  (*(AM2_DefAddLinkFn)AM2_IMAGE(ADDR_DEF_ADD_LINK))
 
 #define kSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 
@@ -29,6 +29,11 @@ typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
 typedef void *(__cdecl *AM2_DefFindObjRecFn)(int32_t a, int32_t b, int32_t c);
 #define orig_qsort (*(AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
+typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
+                                       uint32_t n, uint32_t size,
+                                       const void *cmp);
+#define orig_bsearch (*(AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
+#define kDefLinkCap    (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_CAP))
 #define orig_def_find_obj_rec \
     (*(AM2_DefFindObjRecFn)AM2_IMAGE(ADDR_DEF_FIND_OBJ_REC))
 
@@ -103,7 +108,7 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
     link.b        = (int16_t)b;
     link.c        = c;
 
-    orig_def_add_link(&link);
+    DefAddLink(&link);
     return 0;
 }
 
@@ -176,6 +181,78 @@ void __cdecl DefCheckLinks(void)
     }
 }
 
+/* 0x00435EE0. Append one link, refusing a duplicate. Role name.
+ *
+ * The table starts at fifty records and grows twenty RECORDS at a time, not
+ * twenty bytes -- the original computes `(cap + 20) * 20` for the realloc.
+ *
+ * The duplicate test is a linear scan with ComparePair, which orders on the
+ * first two fields: parent, then siblings. Since `siblings` is the count of
+ * links already sharing this parent, it is really this link's INDEX among
+ * them, and the pair is therefore unique per link -- which is also what makes
+ * the bsearch below well defined and what the qsort in DefCheckLinks sorts on.
+ * Three uses, one key.
+ *
+ * A duplicate is complained about and DROPPED; the count does not advance. */
+void __cdecl DefAddLink(const AM2_DefLink *link)
+{
+    AM2_DefLink *tab = kDefLinks;
+    int32_t      cap;
+    int32_t      n;
+
+    if (tab == (AM2_DefLink *)0) {
+        tab = (AM2_DefLink *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                        * sizeof(AM2_DefLink));
+        cap = AM2_DEF_LINK_INITIAL;
+        kDefLinks   = tab;
+        kDefLinkCap = cap;
+    } else {
+        cap = kDefLinkCap;
+    }
+
+    n = kDefLinkCount;
+
+    if (n >= cap) {
+        cap += AM2_DEF_LINK_GROW;
+        kDefLinkCap = cap;
+        tab = (AM2_DefLink *)am2_realloc(tab,
+                                         (size_t)cap * sizeof(AM2_DefLink));
+        kDefLinks = tab;
+        n = kDefLinkCount;
+    }
+
+    for (int32_t i = 0; i < n; i++) {
+        if (ComparePair(&tab[i], link) == 0) {
+            orig_log("duplicate link record in object.aai file\n");
+            return;
+        }
+    }
+
+    tab[n] = *link;
+    kDefLinkCount = n + 1;
+}
+
+/* 0x00436080. Find a link by (parent, siblings) -- a bsearch over the table
+ * with the same ComparePair, which only answers correctly because
+ * DefCheckLinks sorted it first. NOT DefLinkParse: this address carried that
+ * name until the bodies were read, because docs/functions.tsv merges the two.
+ *
+ * The key is a partial record built on the stack; only its first two fields
+ * are ever examined, so the rest is left uninitialised exactly as in the
+ * original. */
+AM2_DefLink *__cdecl DefFindLink(int32_t parent, int32_t siblings)
+{
+    AM2_DefLink key;
+
+    key.parent   = parent;
+    key.siblings = siblings;
+
+    return (AM2_DefLink *)orig_bsearch(&key, kDefLinks,
+                                       (uint32_t)kDefLinkCount,
+                                       sizeof(AM2_DefLink),
+                                       (const void *)AM2_IMAGE(ADDR_COMPARE_PAIR));
+}
+
 int defparse_install(void)
 {
     int rc = 0;
@@ -186,5 +263,9 @@ int defparse_install(void)
                         "DefCountLinks", 1);
     rc |= patch_replace(ADDR_DEF_CHECK_LINKS, (const void *)DefCheckLinks,
                         "DefCheckLinks", 1);
+    rc |= patch_replace(ADDR_DEF_ADD_LINK, (const void *)DefAddLink,
+                        "DefAddLink", 1);
+    rc |= patch_replace(ADDR_DEF_LINK_SEARCH, (const void *)DefFindLink,
+                        "DefFindLink", 2);
     return rc;
 }

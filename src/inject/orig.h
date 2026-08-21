@@ -1335,6 +1335,8 @@
 #define ADDR_DEF_LINKS             0x0051617Cu
 #define ADDR_DEF_LINK_COUNT        0x00516180u
 #define ADDR_DEF_COUNT_LINKS       0x00435FA0u  /* int32_t(int32_t parentkey) */
+/* Appends one link, refusing a duplicate. Role name -- its only string is
+ * "duplicate link record in object.aai file". */
 #define ADDR_DEF_ADD_LINK          0x00435EE0u  /* void(const AM2_DefLink *) */
 /* 0x00435FD0 names itself nowhere; this is a ROLE. After every LINK line is
  * parsed it sorts the table with ComparePair (already ours) through the CRT's
@@ -1346,6 +1348,13 @@
 #define ADDR_DEF_FIND_OBJ_REC      0x00435AC0u  /* void *(int32,int32,int32) */
 #define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
 #define ADDR_CRT_QSORT             0x004660B2u
+#define ADDR_CRT_BSEARCH           0x00466280u
+/* The link table's capacity, and how it grows: 50 records to begin with, then
+ * twenty MORE RECORDS at a time -- not twenty bytes. Both numbers are the
+ * original's. */
+#define ADDR_DEF_LINK_CAP          0x00516184u
+#define AM2_DEF_LINK_INITIAL       0x32
+#define AM2_DEF_LINK_GROW          0x14
 #define ADDR_CRT_STRTOK            0x0046551Cu  /* the game's own; the state is
                                                  * shared with DefObjParse, so
                                                  * libc's would be wrong */
@@ -1353,7 +1362,7 @@
  * table -- docs/functions.tsv merges the two and tools/merges.py does not
  * split them, so this address carried the wrong name until the body was read.
  * The function with the three "DefLinkParse:" strings is 0x004360C0, above. */
-#define ADDR_DEF_LINK_SEARCH       0x00436080u
+#define ADDR_DEF_LINK_SEARCH       0x00436080u  /* AM2_DefLink *(int32,int32) */
 
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --
                                                * GenerateObjScriptFromTokens,
