@@ -119,6 +119,10 @@ ARG_KIND_OVERRIDE = {
     # `rep movsd` when the table is NULL. The last two are not arguments at
     # all; a cdecl callee simply ignores them.
     0x0041BB60: {3: "scalar"},
+    # BuildRgb332Palette's only argument is the output buffer, and the
+    # classifier reads it as a scalar because the writes go through a register
+    # it has already added a constant to. A scalar there faults every vector.
+    0x0041ADE0: {0: "ptr"},
     # MaskPixelSolid32(x, y, mask): `y` is scaled by 4 to index the row table,
     # and that scaling is enough to make the classifier call it a pointer --
     # the word-table twin, which scales by 2, is classified correctly. A
@@ -144,6 +148,22 @@ ARG_KIND_OVERRIDE = {
 # is 6 instructions that nothing else reaches.
 #
 # {function: {arg index: [values]}}
+# Functions whose output does not vary with their input, and how many vectors
+# are worth keeping for them.
+#
+# BuildRgb332Palette takes a buffer and fills it with the same 2048 bytes every
+# time. The generator recorded 2046 byte-writes per vector and every write set
+# was identical, so ninety-six of them would have added about two megabytes to
+# tests/vectors.h -- which is already 1.6 -- and not one bit of evidence. One
+# vector proves a constant table; the rest are copies of it.
+#
+# This is a deliberate cap and it is NOT the same as a function being thinly
+# tested: the "too thin" note is replaced with one that says why, so a reader
+# cannot mistake a capped function for an under-covered one.
+VECTOR_CAP = {
+    0x0041ADE0: 4,
+}
+
 ARG_VALUES = {
     # ObjNextKind538's requested code: one from each arm, both ends of the
     # skip set, and one above 0x24 that never reaches the table.
@@ -1014,7 +1034,7 @@ def main():
                 "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
                 "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED",
                 "ADDR_COMM_REMOVE_KEYED", "ADDR_OBJ_MASK_BIT_AT",
-                "ADDR_OBJ_NEXT_KIND538"]
+                "ADDR_OBJ_NEXT_KIND538", "ADDR_BUILD_RGB332"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1123,6 +1143,7 @@ def main():
         "ADDR_COMM_REMOVE_KEYED": "CommRemoveKeyed",
         "ADDR_OBJ_MASK_BIT_AT": "ObjMaskBitAt",
         "ADDR_OBJ_NEXT_KIND538": "ObjNextKind538",
+        "ADDR_BUILD_RGB332": "BuildRgb332Palette",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -1148,7 +1169,11 @@ def main():
             # CommRemoveKeyed leaves whatever its last computation produced:
             # the loop counter when nothing matched, the shift pointer after a
             # removal. Both callers (0x00401EA4, 0x00401EDA) discard eax.
-            "CommRemoveKeyed"}
+            "CommRemoveKeyed",
+            # BuildRgb332Palette leaves the last entry's first channel in
+            # eax; its one caller (0x00424A45) clobbers it with the very
+            # next call, to SetGamePalette.
+            "BuildRgb332Palette"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"
@@ -1174,7 +1199,8 @@ def main():
         nargs, kinds = analyse(img, md, addr, size, body)
         paths = angr_inputs(addr, nargs, kinds) if use_angr else []
         emu.seen = set()
-        vs = vectors_for(emu, addr, nargs, kinds, extra=paths,
+        cap = VECTOR_CAP.get(addr, NVECTORS)
+        vs = vectors_for(emu, addr, nargs, kinds, extra=paths, n=cap,
                          hints=range_hints(img, md, addr, size, body))
         hit = len(body & emu.seen)
         cov = 100.0 * hit / len(body) if body else 0.0
@@ -1182,6 +1208,8 @@ def main():
         note = ""
         if cov < 99.99:
             note = "<-- %d unreached" % (len(body) - hit)
+        elif addr in VECTOR_CAP:
+            note = "<-- capped at %d; output does not vary with input" % len(vs)
         elif len(vs) < MIN_VECTORS:
             note = "<-- only %d vectors: too thin to check against" % len(vs)
         print("  %-24s 0x%08x %4d %-14s %5d %5d  %5.1f%% %s"

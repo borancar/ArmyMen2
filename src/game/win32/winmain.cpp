@@ -53,6 +53,7 @@
 #include "palette.h"
 #include "report.h"
 #include "../crt.h"
+#include "../misc.h"   /* BuildRgb332Palette, which used to be a seam */
 #include "../trig.h"
 #include "../../inject/patch.h"
 
@@ -117,7 +118,6 @@ typedef void (__cdecl *am2_i32_fn)(int32_t);
 #define orig_free_sprite_list (*(am2_void_fn)ADDR_FREE_SPRITE_LIST)
 #define orig_sprite_set_load  (*(am2_str_fn)ADDR_SPRITE_SET_LOAD)
 #define orig_sprite_set_free  (*(am2_ptr_fn)ADDR_SPRITE_SET_FREE)
-#define orig_fill_palette     (*(am2_ptr_fn)ADDR_FILL_PALETTE)
 #define orig_request_state    (*(am2_i32_fn)ADDR_REQUEST_STATE)
 #define orig_set_game_over    (*(am2_i32_fn)ADDR_SET_GAME_OVER)
 #define orig_strncpy          (*(char *(__cdecl *)(char *, const char *, \
@@ -268,7 +268,7 @@ void __cdecl ResetToTitle(void)
 
     uint8_t *palette = *(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE;
 
-    orig_fill_palette(palette);
+    BuildRgb332Palette(palette);
     SetGamePalette(palette);
 
     if (*(const int32_t *)(uintptr_t)ADDR_OPT_DF) {

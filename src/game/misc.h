@@ -348,6 +348,30 @@ int32_t __cdecl ObjKind538In10To17(const void *obj);
  * those established what either holds. */
 int32_t __cdecl ObjNextKind538(const void *obj, int32_t want);
 
+/* 0x0041ADE0. Builds a 3-3-2 palette into the caller's buffer: the top three
+ * bits of the index become the first channel, the next three the second, and
+ * the low two the third, each expanded to 0..255 by `v * 255 / n` with n 7, 7
+ * and 3. Index 0 comes out black and index 0xFF white, which is the check that
+ * the channel order is not reversed.
+ *
+ * Two tables, 256 entries each and 2048 bytes in total:
+ *
+ *   +0x000   four bytes per entry, [c0][c1][c2][0]
+ *   +0x400   one dword per entry, (c2 << 16) | (c1 << 8) | c0
+ *
+ * Those are PALETTEENTRY and COLORREF laid out by hand -- 0xE0 gives
+ * (255, 0, 0) and packs to 0x0000FF, which is COLORREF's 0x00BBGGRR with red
+ * full. The names are in this comment and not in the code: the function names
+ * no Win32 type, takes a buffer the caller supplies and touches nothing else,
+ * so it belongs on the flat side of the split by the same test blit.cpp
+ * passes. Its one caller hands the result straight to SetGamePalette.
+ *
+ * The original divides by 7 and by 3 with the usual MSVC reciprocal-multiply
+ * sequences (0x92492493 shift 2, and 0x55555556). Written as division, which
+ * truncates the same way for the eight and four non-negative values that can
+ * reach it -- checked against all of them, not argued from the general case. */
+void __cdecl BuildRgb332Palette(void *out);
+
 /* 0x0041EF20. Two-criterion match, the shape this binary uses wherever a list
  * is filtered. Each criterion is one of three things:
  *

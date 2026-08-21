@@ -621,6 +621,34 @@ int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
     return want;
 }
 
+#define AM2_RGB332_ENTRIES  256
+#define AM2_RGB332_PACKED   0x400
+
+void __cdecl BuildRgb332Palette(void *out)
+{
+    uint8_t  *quad   = (uint8_t *)out;
+    uint32_t *packed = (uint32_t *)((uint8_t *)out + AM2_RGB332_PACKED);
+    int32_t   i;
+
+    for (i = 0; i < AM2_RGB332_ENTRIES; i++) {
+        int32_t c0 = ((i >> 5) & 7) * 255 / 7;
+        int32_t c1 = ((i >> 2) & 7) * 255 / 7;
+        int32_t c2 = (i & 3) * 255 / 3;
+
+        quad[i * 4 + 0] = (uint8_t)c0;
+        quad[i * 4 + 1] = (uint8_t)c1;
+        quad[i * 4 + 2] = (uint8_t)c2;
+        quad[i * 4 + 3] = 0;
+
+        /* Reassembled from the bytes just stored, not from c0..c2 -- the
+         * original reads them back out of the buffer. Same values, and worth
+         * saying because it means the two tables cannot disagree. */
+        packed[i] = ((uint32_t)quad[i * 4 + 2] << 16)
+                  | ((uint32_t)quad[i * 4 + 1] << 8)
+                  |  (uint32_t)quad[i * 4 + 0];
+    }
+}
+
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
                               int32_t haveA, int32_t haveB,
                               int32_t maskA, int32_t maskB)
@@ -835,6 +863,8 @@ int misc_install(void)
                   "ObjMaskBitAt", 3);
     patch_replace(ADDR_OBJ_NEXT_KIND538, (const void *)ObjNextKind538,
                   "ObjNextKind538", 1);
+    patch_replace(ADDR_BUILD_RGB332, (const void *)BuildRgb332Palette,
+                  "BuildRgb332Palette", 1);
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     return 0;

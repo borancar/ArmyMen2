@@ -1695,7 +1695,10 @@
 #define ADDR_SPRITE_SET_THIRD    0x00511250u
 #define ADDR_STR_SET_TITLE       0x00478AC0u  /* "title" */
 #define ADDR_STR_SET_SHARED      0x00478AACu  /* "shared" */
-#define ADDR_FILL_PALETTE        0x0041ADE0u  /* void(void *) */
+/* Renamed from ADDR_FILL_PALETTE, which was invented -- no such string exists
+ * anywhere in the image. The body builds a 3-3-2 palette into the caller's
+ * buffer: PALETTEENTRY quads at +0 and COLORREFs at +0x400, 256 of each. */
+#define ADDR_BUILD_RGB332        0x0041ADE0u  /* void(void *out) */
 #define ADDR_GAME_OVER_STATE     0x00515F88u  /* int32, cleared at startup */
 #define ADDR_FRAME_PRE           0x0040AF70u  /* before the state handler */
 #define ADDR_STATE_ENTERED       0x00511DA8u  /* int32; set on a transition, and
