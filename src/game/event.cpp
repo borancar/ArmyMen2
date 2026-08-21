@@ -804,6 +804,79 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                                  msg->maskB, msg->removeevent, 1);
 }
 
+/* --------------------------------------------- object shims ---- */
+
+typedef void (__cdecl *AM2_DeployItemFn)(void *obj, uint32_t point,
+                                         int32_t a, int32_t b);
+typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
+#define orig_deploy_item     (*(AM2_DeployItemFn)AM2_IMAGE(ADDR_DEPLOY_ITEM))
+#define orig_type2_action_a  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_A))
+#define orig_type2_action_b  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_B))
+
+/* 0x0041FE70. Deploy the object a uid names.
+ *
+ * `where` is a packed point, and a zero LOW WORD -- the x, tested as a 16-bit
+ * value -- means "leave it where it is", at which point the object's own
+ * position at +0x12 is used instead. Note the test is on the word, not the
+ * whole dword, so a point with x == 0 and any y is treated as absent.
+ *
+ * Checks the pointer rather than the uid, like EvtObjAction and EvtSetByte40.
+ */
+void __cdecl EvtDeployItem(uint32_t uid, uint32_t where)
+{
+    uint8_t *obj = (uint8_t *)LookupByUID(uid);
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    if ((uint16_t)where == 0)
+        where = *(const uint32_t *)(obj + OBJ_OFF_POS);
+
+    orig_deploy_item(obj, where, 0, 0);
+}
+
+/* 0x0041FBE0 and 0x0041FC10. The same shim twice, differing only in which
+ * function it calls on a type-2 object.
+ *
+ * Role names throughout: neither callee says anything about itself, and object
+ * type 2 is one of the three CLAUDE.md still lists as unidentified. What IS
+ * established is the shape -- the uid threshold, the lookup, and the type test
+ * in that order, with the lookup happening BEFORE the type test so a
+ * registered object of the wrong type is looked up and discarded.
+ *
+ * ObjIsType2 is handed whatever LookupByUID returned, null included, which is
+ * safe only because that function opens with a null test; the majority of this
+ * family checks the uid instead, and these two check both. */
+void __cdecl EvtType2ActionA(uint32_t uid)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = LookupByUID(uid);
+
+    if (!ObjIsType2((const AM2_Object *)obj))
+        return;
+
+    orig_type2_action_a(obj);
+}
+
+void __cdecl EvtType2ActionB(uint32_t uid)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = LookupByUID(uid);
+
+    if (!ObjIsType2((const AM2_Object *)obj))
+        return;
+
+    orig_type2_action_b(obj);
+}
+
 /* ------------------------------------------------------- reset ---- */
 
 typedef void (__cdecl *AM2_ObjActionFn)(void *obj);
@@ -1166,6 +1239,12 @@ int event_install(void)
                         (const void *)ResetScriptState, "ResetScriptState", 1);
     rc |= patch_replace(ADDR_EVT_OBJ_ACTION, (const void *)EvtObjAction,
                         "EvtObjAction", 1);
+    rc |= patch_replace(ADDR_EVT_DEPLOY_ITEM, (const void *)EvtDeployItem,
+                        "EvtDeployItem", 1);
+    rc |= patch_replace(ADDR_EVT_TYPE2_ACTION_A,
+                        (const void *)EvtType2ActionA, "EvtType2ActionA", 1);
+    rc |= patch_replace(ADDR_EVT_TYPE2_ACTION_B,
+                        (const void *)EvtType2ActionB, "EvtType2ActionB", 1);
     rc |= patch_replace(ADDR_EVT_SET_FIELD_540, (const void *)EvtSetField540,
                         "EvtSetField540", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,

@@ -107,6 +107,16 @@ void __cdecl ResetScriptState(void);
  * and its callee are role names. */
 void __cdecl EvtObjAction(uint32_t uid);
 
+/* 0x0041FE70. Deploy the object a uid names. A zero LOW WORD in `where` means
+ * "leave it where it is" and its own position is used. */
+void __cdecl EvtDeployItem(uint32_t uid, uint32_t where);
+
+/* 0x0041FBE0 and 0x0041FC10. The same shim twice -- uid threshold, lookup,
+ * ObjIsType2 -- differing only in which function it then calls. Role names;
+ * object type 2 is still unidentified. */
+void __cdecl EvtType2ActionA(uint32_t uid);
+void __cdecl EvtType2ActionB(uint32_t uid);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.

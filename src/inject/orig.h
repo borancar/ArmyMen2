@@ -1130,6 +1130,20 @@
  * 0x00428DA0 -- 96 bytes with twenty-two callers, unnamed. Both role names:
  * neither says anything about itself. */
 #define ADDR_EVT_OBJ_ACTION      0x0041FEA0u  /* void(uint32_t uid) */
+/* 0x0041FE70. Look a uid up and deploy the object. DeployItem names itself --
+ * "DeployItem(resurrection): uid:%x, health:%d" -- and takes the point to
+ * deploy at; passing 0 there means "where it already is". */
+#define ADDR_EVT_DEPLOY_ITEM     0x0041FE70u  /* void(uint32_t, uint32_t) */
+#define ADDR_DEPLOY_ITEM         0x00428CA0u  /* void(obj, point, int32, int32) */
+/* 0x0041FBE0 and 0x0041FC10 are the same shim twice: uid >= 1000, look it up,
+ * and if ObjIsType2 call one function on it -- 0x00448170 for the first and
+ * 0x00448220 for the second. Neither callee names itself and object type 2 is
+ * one of the three CLAUDE.md still lists as unidentified, so these are role
+ * names and the pair is distinguished only by which callee it reaches. */
+#define ADDR_EVT_TYPE2_ACTION_A  0x0041FBE0u  /* void(uint32_t uid) */
+#define ADDR_EVT_TYPE2_ACTION_B  0x0041FC10u  /* void(uint32_t uid) */
+#define ADDR_TYPE2_ACTION_A      0x00448170u  /* void(void *obj) */
+#define ADDR_TYPE2_ACTION_B      0x00448220u  /* void(void *obj) */
 #define ADDR_OBJ_ACTION          0x00428DA0u  /* void(void *obj) */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is
