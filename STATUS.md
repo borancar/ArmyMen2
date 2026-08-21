@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 357 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 357 | 350 of them below the CRT line |
+| `patch_replace` sites | 359 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 359 | 352 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 85,776 / 372,816 B (**23.0%**) | patched entries' sizes over the total |
-| modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 85,952 / 372,816 B (**23.1%**) | patched entries' sizes over the total |
+| modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
@@ -152,6 +152,25 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The .aai handlers are reached through a table, not a call, which is why
+  `tools/callsites.py` reports them as having no callers at all.** Neither
+  `DefObjLine` nor `DefLinkParse` has a single `call rel32`. Scanning for
+  ALIGNED dwords found them in `.data`: sixteen slots at `0x0047739C..0x00477450`
+  and one at `0x0047745C`. Those are the `+8` field of entries 79..95 of the
+  vocabulary table at `0x00476FE0` -- 12 bytes an entry, `{name, value,
+  handler}` -- so the entry INDEX is the command id, 0x4F..0x5E reaching
+  DefObjLine and 0x5F reaching DefLinkParse. That is where `AM2_DEF_CMD_LINK`
+  came from, now confirmed from the data rather than inferred from a compare.
+
+- **"Index is the command id" is not a reading, it is measured.** An off-by-one
+  in `DefFindKeyword` puts `campaign` at 297,845 differing pixels -- 37.9% of
+  the frame -- and the save at 317 items instead of 310.
+
+- **No shipped .aai file uses a hex or octal literal.** `DefParseNumber` calls
+  strtol with base 0; forcing base 10 changes nothing at all. So the base-0
+  behaviour, and the fact that "12abc" is accepted as 12 because only
+  `end != tok` is tested, both stay verified by reading.
 
 - **`defparse.cpp` is complete: ten functions, both .aai tables end to end.**
   DefObjParse, DefObjLine, DefAddObjRec, DefFindObjRec for the object records;

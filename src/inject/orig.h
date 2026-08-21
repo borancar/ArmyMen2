@@ -1345,6 +1345,18 @@
  * itself nowhere. */
 #define ADDR_DEF_NAME_INDEX        0x0041A640u  /* int32_t(const char *) */
 #define ADDR_DEF_NAME_TABLE        0x00476FE0u
+/* Twelve bytes an entry: {const char *name, int32_t value, void *handler}.
+ * The INDEX is the command id -- entries 0x4F..0x5E carry DefObjLine as their
+ * handler and 0x5F carries DefLinkParse, which is how 0x5F was known to be
+ * LINK before any of this was reconstructed. An entry with an empty name ends
+ * the table. */
+#define AM2_DEF_KEYWORD_STRIDE     12
+#define ADDR_CRT_STRTOL            0x00465198u
+/* 0x0041A5F0 is DefParseInfoFile, by its own string; 0x0041A6B0 is the line
+ * dispatcher it drives, and that one names itself nowhere. Both still
+ * original. */
+#define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
+#define ADDR_DEF_DISPATCH_LINE     0x0041A6B0u
 /* strtol into *out, 0 on failure. Its one string is "Bad or missing number",
  * which names the condition and not the function -- 48 callers. */
 #define ADDR_DEF_PARSE_NUMBER      0x0041A250u  /* int32_t(int32_t *, const char *) */
