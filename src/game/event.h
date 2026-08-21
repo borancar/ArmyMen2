@@ -151,6 +151,13 @@ void __cdecl EvtByRefB(int32_t a, int32_t b);
 void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c);
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d);
 
+/* 0x0041F8B0. Apply the point action to every object an army owns, subject to
+ * a flag bit and an ObjFieldA filter that -1 disables. Dead uids are pruned
+ * from the list as it walks. NOTE the relative offset ACCUMULATES across
+ * objects -- a defect in the original, reproduced. */
+void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
+                            int32_t relative);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.

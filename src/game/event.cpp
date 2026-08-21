@@ -820,8 +820,8 @@ typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
 typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
-typedef void (__cdecl *AM2_AtPointBFn)(int32_t a, int32_t b, uint32_t point,
-                                       int32_t d);
+typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
+                                                             int32_t i);
 #define orig_guarded_action (*(AM2_GuardedActionFn)AM2_IMAGE(ADDR_GUARDED_ACTION))
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
 #define orig_point_action_a (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_A))
@@ -831,7 +831,8 @@ typedef void (__cdecl *AM2_ByRefBFn)(int32_t *slot, int32_t b, int32_t c,
                                      int32_t d, int32_t e);
 #define orig_by_ref_a (*(AM2_ByRefAFn)AM2_IMAGE(ADDR_BY_REF_ACTION_A))
 #define orig_by_ref_b (*(AM2_ByRefBFn)AM2_IMAGE(ADDR_BY_REF_ACTION_B))
-#define orig_at_point_b     (*(AM2_AtPointBFn)AM2_IMAGE(ADDR_AT_POINT_B))
+#define orig_list_remove_at \
+    (*(AM2_ListRemoveAtFn)AM2_IMAGE(ADDR_LIST_REMOVE_AT))
 
 /* 0x0041FE70. Deploy the object a uid names.
  *
@@ -930,6 +931,66 @@ void __cdecl EvtObjSet(uint32_t uid, int32_t value)
         return;
 
     orig_obj_set(LookupByUID(uid), value, 0);
+}
+
+/* 0x0041F8B0. Apply the point action to every object an army owns.
+ *
+ * Not a peer of the two shims below it, despite sitting between them: it
+ * resolves the army to a comm slot with CommSlotForArmy -- which is THISCALL,
+ * comm object in ecx, and whose `ret 4` is what makes the stack accounting
+ * around it read oddly -- and walks the object list for that slot.
+ *
+ * Three per-object gates: the same +8 flag bit EvtGuardedAction tests, and a
+ * filter compared against ObjFieldA which -1 disables. A uid that no longer
+ * resolves is REMOVED from the list, and the index is deliberately not
+ * advanced afterwards because the list has shifted under it.
+ *
+ * THE RELATIVE OFFSET ACCUMULATES, and that is a defect in the original rather
+ * than a reading of it. `point` is copied into two registers before the loop
+ * and never reloaded, so with `relative` set the second matching object gets
+ * point + first.pos + second.pos, the third gets all three added, and so on.
+ * The loop's back edge lands after the initialisation, which is what settles
+ * it. Reproduced: nothing in this port may quietly fix a bug the game ships,
+ * and a mission relying on the first object's offset would change behaviour if
+ * it were fixed. */
+void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
+                            int32_t relative)
+{
+    void    *comm = *(void **)AM2_IMAGE(ADDR_COMM_OBJECT);
+    int32_t  slot = CommSlotForArmy(comm, army);
+    uint8_t *list = ((uint8_t **)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+    uint16_t x    = (uint16_t)(point & 0xFFFFu);
+    uint16_t y    = (uint16_t)(point >> 16);
+    int32_t  i    = 0;
+
+    while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
+        const uint32_t *uids = *(const uint32_t **)(list + LIST_OFF_UIDS);
+        uint8_t        *obj  = (uint8_t *)LookupByUID(uids[i]);
+
+        if (obj == (uint8_t *)0) {
+            orig_list_remove_at(list, i);
+            continue;                       /* the list shifted; do not ++ */
+        }
+
+        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BLOCKED) {
+            i++;
+            continue;
+        }
+
+        if (filter != -1 && (int32_t)ObjFieldA(obj) != filter) {
+            i++;
+            continue;
+        }
+
+        if (relative) {
+            x = (uint16_t)(x + *(const uint16_t *)(obj + OBJ_OFF_X));
+            y = (uint16_t)(y + *(const uint16_t *)(obj + OBJ_OFF_Y));
+            point = (uint32_t)x | ((uint32_t)y << 16);
+        }
+
+        orig_point_action_a(obj, point);
+        i++;
+    }
 }
 
 /* 0x0041F820 and 0x0041F780. The "At" halves, and they are not the plain
@@ -1110,7 +1171,7 @@ void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
     if (obj == (const uint8_t *)0)
         return;
 
-    orig_at_point_b(a, b, *(const uint32_t *)(obj + OBJ_OFF_POS), d);
+    EvtArmyAtPoint(a, b, *(const uint32_t *)(obj + OBJ_OFF_POS), d);
 }
 
 /* ------------------------------------------------------- reset ---- */
@@ -1487,6 +1548,8 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_ARMY_AT_POINT,
+                        (const void *)EvtArmyAtPoint, "EvtArmyAtPoint", 3);
     rc |= patch_replace(ADDR_AT_POINT_A, (const void *)EvtAtPointA,
                         "EvtAtPointA", 2);
     rc |= patch_replace(ADDR_AT_POINT_C, (const void *)EvtAtPointC,

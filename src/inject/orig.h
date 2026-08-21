@@ -1173,7 +1173,13 @@
  * replacing it. That flag is AM2_ScriptAction.relative -- the leading `+` on a
  * script's coordinates -- so this is where that syntax is honoured. */
 #define ADDR_AT_POINT_A          0x0041F820u  /* void(uid, point, relative) */
-#define ADDR_AT_POINT_B          0x0041F8B0u  /* void(int32, uid, point, rel) */
+/* NOT a peer of the two shims above, despite the matching address band: it
+ * resolves an ARMY and walks every object that army owns. */
+#define ADDR_EVT_ARMY_AT_POINT   0x0041F8B0u  /* void(army,filter,point,rel) */
+#define ADDR_ARMY_OBJ_LISTS      0x004F9ECCu  /* one list per comm slot */
+#define ADDR_LIST_REMOVE_AT      0x0042A750u  /* thiscall(list, index) */
+#define LIST_OFF_COUNT           4u
+#define LIST_OFF_UIDS            8u
 #define ADDR_AT_POINT_C          0x0041F780u  /* void(uid, point, relative) */
 /* The "On" wrapper for AT_POINT_C, exactly the shape of EvtAtObjPosA. */
 #define ADDR_EVT_AT_OBJ_POS_C    0x0041F7F0u  /* void(uid, uid, int32) */
