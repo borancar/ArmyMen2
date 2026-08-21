@@ -622,6 +622,23 @@ int32_t __cdecl MapCode18To28(int32_t code)
     return kMap[i];
 }
 
+/* The index table at 0x00449F24 selects between two arms, and its entries are
+ * 0 and 1 -- the same values the arms return -- so the table IS the answer.
+ * Read out of the image along with the two-entry jump table at 0x00449F1C. */
+int32_t __cdecl ObjCodeUnmapped(const void *obj)
+{
+    static const uint8_t kAnswer[17] = {
+        0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+    };
+    const uint8_t  *o    = (const uint8_t *)obj;
+    const uint32_t *link = *(const uint32_t *const *)(o + 0xC0);
+    uint32_t        i    = (uint32_t)(*link - 0x18);
+
+    if (i > 0x10)
+        return 1;
+    return kAnswer[i];
+}
+
 int32_t __cdecl MeetsAllThree(const void *p)
 {
     const uint8_t *b = (const uint8_t *)p;
@@ -729,5 +746,7 @@ int misc_install(void)
     patch_replace(ADDR_REMAP_BYTES, (const void *)RemapBytes, "RemapBytes", 2);
     patch_replace(ADDR_MASK_PIXEL_SOLID32, (const void *)MaskPixelSolid32,
                   "MaskPixelSolid32", 2);
+    patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
+                  "ObjCodeUnmapped", 1);
     return 0;
 }

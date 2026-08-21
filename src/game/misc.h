@@ -356,6 +356,23 @@ int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta);
  * 6. Seventeen entries over five arms, so a table there and a table here. */
 int32_t __cdecl MapCode18To28(int32_t code);
 
+/* 0x00449EF0. Reads a code through a pointer -- obj->[0xC0]->[0] -- and answers
+ * 0 for exactly five of them: 0x18, 0x19, 0x1A, 0x27 and 0x28. Everything else
+ * answers 1, including every code outside 0x18..0x28, which the range test
+ * sends straight to the same arm.
+ *
+ * Those five are not an arbitrary set. MapCode18To28 is a different function
+ * in a different part of the image with a table of its own, and the entries it
+ * maps to NONZERO -- 8, 2, 1 at 0x18..0x1A and 4, 6 at 0x27..0x28 -- are the
+ * same five, with 0x1B..0x26 mapping to zero. So this is exactly
+ * `MapCode18To28(code) == 0`, over the whole domain including out of range.
+ *
+ * Reproduced with its own table rather than by calling that one. They are two
+ * functions in the image and the correspondence is an observation about the
+ * two tables, not a guarantee about either; writing one in terms of the other
+ * would make a future divergence impossible to see. */
+int32_t __cdecl ObjCodeUnmapped(const void *obj);
+
 /* 0x00409650. Three conditions, all of which must hold: bit 2 of the byte at
  * +8 CLEAR, the dword at +0 equal to 1, and the dword at the start of the
  * record pointed to by +0x94 equal to 0x1F. */

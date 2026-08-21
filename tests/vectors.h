@@ -2955,6 +2955,138 @@ static const uint32_t i_MaskPixelSolid32_77[] = {2380,78,2381,0,6144,64,6145,0,6
 static const uint32_t i_MaskPixelSolid32_78[] = {2380,251,2381,255,6144,64,6145,0,6146,3,6147,0,6148,64,6149,0,6150,0,6151,0,6152,80,6153,0,6154,0,6155,0,6156,96,6157,0,6158,0,6159,0,6160,112,6161,0,6162,0,6163,0,6208,1,6209,2,6210,0,6211,0,6212,1,6213,2,6214,0,6215,0,6224,5,6225,2,6226,0,6227,0,6228,1,6229,2,6230,0,6231,0,6240,9,6241,2,6242,0,6243,0,6244,1,6245,2,6246,0,6247,0,6256,13,6257,2,6258,0,6259,0,6260,1,6261,2,6262,0,6263,0};
 static const uint32_t i_MaskPixelSolid32_79[] = {2380,2,2381,0,6144,64,6145,0,6146,3,6147,0,6148,64,6149,0,6150,0,6151,0,6152,80,6153,0,6154,0,6155,0,6156,96,6157,0,6158,0,6159,0,6160,112,6161,0,6162,0,6163,0,6208,1,6209,2,6210,0,6211,0,6212,1,6213,2,6214,0,6215,0,6224,5,6225,2,6226,0,6227,0,6228,1,6229,2,6230,0,6231,0,6240,9,6241,2,6242,0,6243,0,6244,1,6245,2,6246,0,6247,0,6256,13,6257,2,6258,0,6259,0,6260,1,6261,2,6262,0,6263,0};
 static const uint32_t i_MaskPixelSolid32_80[] = {2380,9,2381,0,6144,64,6145,0,6146,3,6147,0,6148,64,6149,0,6150,0,6151,0,6152,80,6153,0,6154,0,6155,0,6156,96,6157,0,6158,0,6159,0,6160,112,6161,0,6162,0,6163,0,6208,1,6209,2,6210,0,6211,0,6212,1,6213,2,6214,0,6215,0,6224,5,6225,2,6226,0,6227,0,6228,1,6229,2,6230,0,6231,0,6240,9,6241,2,6242,0,6243,0,6244,1,6245,2,6246,0,6247,0,6256,13,6257,2,6258,0,6259,0,6260,1,6261,2,6262,0,6263,0};
+static const uint32_t i_ObjCodeUnmapped_0[] = {2380,251,2381,255,2304,16,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_0[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_1[] = {2380,2,2381,0,2304,23,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_1[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_2[] = {2380,23,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_2[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_3[] = {2380,30,2381,0,2304,27,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_3[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_4[] = {2380,37,2381,0,2304,32,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_4[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_5[] = {2380,51,2381,0,2304,39,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_5[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_6[] = {2380,58,2381,0,2304,40,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_6[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_7[] = {2380,72,2381,0,2304,48,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_7[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_8[] = {2380,252,2381,255,2304,23,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_8[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_9[] = {2380,3,2381,0,2304,24,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_9[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_10[] = {2380,10,2381,0,2304,25,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_10[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_11[] = {2380,17,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_11[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_12[] = {2380,31,2381,0,2304,32,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_12[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_13[] = {2380,38,2381,0,2304,38,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_13[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_14[] = {2380,45,2381,0,2304,39,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_14[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_15[] = {2380,52,2381,0,2304,40,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_15[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_16[] = {2380,66,2381,0,2304,48,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_16[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_17[] = {2380,80,2381,0,2304,23,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_17[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_18[] = {2380,253,2381,255,2304,24,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_18[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_19[] = {2380,11,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_19[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_20[] = {2380,18,2381,0,2304,27,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_20[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_21[] = {2380,25,2381,0,2304,32,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_21[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_22[] = {2380,46,2381,0,2304,40,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_22[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_23[] = {2380,53,2381,0,2304,41,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_23[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_24[] = {2380,60,2381,0,2304,48,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_24[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_25[] = {2380,67,2381,0,2304,16,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_25[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_26[] = {2380,254,2381,255,2304,25,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_26[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_27[] = {2380,5,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_27[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_28[] = {2380,12,2381,0,2304,27,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_28[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_29[] = {2380,26,2381,0,2304,38,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_29[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_30[] = {2380,33,2381,0,2304,39,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_30[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_31[] = {2380,47,2381,0,2304,41,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_31[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_32[] = {2380,61,2381,0,2304,16,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_32[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_33[] = {2380,68,2381,0,2304,23,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_33[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_34[] = {2380,75,2381,0,2304,24,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_34[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_35[] = {2380,82,2381,0,2304,25,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_35[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_36[] = {2380,6,2381,0,2304,27,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_36[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_37[] = {2380,13,2381,0,2304,32,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_37[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_38[] = {2380,20,2381,0,2304,38,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_38[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_39[] = {2380,27,2381,0,2304,39,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_39[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_40[] = {2380,41,2381,0,2304,41,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_40[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_41[] = {2380,55,2381,0,2304,16,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_41[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_42[] = {2380,62,2381,0,2304,23,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_42[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_43[] = {2380,76,2381,0,2304,25,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_43[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_44[] = {2380,83,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_44[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_45[] = {2380,0,2381,0,2304,27,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_45[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_46[] = {2380,21,2381,0,2304,39,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_46[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_47[] = {2380,28,2381,0,2304,40,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_47[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_48[] = {2380,35,2381,0,2304,41,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_48[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_49[] = {2380,42,2381,0,2304,48,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_49[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_50[] = {2380,63,2381,0,2304,24,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_50[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_51[] = {2380,70,2381,0,2304,25,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_51[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_52[] = {2380,77,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_52[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_53[] = {2380,1,2381,0,2304,32,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_53[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_54[] = {2380,8,2381,0,2304,38,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_54[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_55[] = {2380,22,2381,0,2304,40,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_55[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_56[] = {2380,36,2381,0,2304,48,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_56[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_57[] = {2380,43,2381,0,2304,16,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_57[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_58[] = {2380,50,2381,0,2304,23,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_58[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_59[] = {2380,57,2381,0,2304,24,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_59[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_60[] = {2380,71,2381,0,2304,26,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_60[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_61[] = {2380,78,2381,0,2304,27,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_61[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_62[] = {2380,251,2381,255,2304,32,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_62[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_63[] = {2380,2,2381,0,2304,38,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_63[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_64[] = {2380,16,2381,0,2304,40,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_64[] = {2240,2304};
+static const uint32_t i_ObjCodeUnmapped_65[] = {2380,30,2381,0,2304,48,2305,0,2306,0,2307,0};
+static const uint32_t f_ObjCodeUnmapped_65[] = {2240,2304};
 
 static const AM2_Vector kVectors[] = {
     {"Clamp", (void *)Clamp, 3, {0,0,0,0,0,0}, {0x00000000u,0x00000001u,0xffffffffu,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -9711,4 +9843,70 @@ static const AM2_Vector kVectors[] = {
     {"MaskPixelSolid32", (void *)MaskPixelSolid32, 3, {0,0,1,0,0,0}, {0x00000002u,0x00000001u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 54, i_MaskPixelSolid32_78, 0, 0, 0, 0},
     {"MaskPixelSolid32", (void *)MaskPixelSolid32, 3, {0,0,1,0,0,0}, {0x00000003u,0x00000002u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 54, i_MaskPixelSolid32_79, 0, 0, 0, 0},
     {"MaskPixelSolid32", (void *)MaskPixelSolid32, 3, {0,0,1,0,0,0}, {0x00000007u,0x00000003u,0x00001800u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 54, i_MaskPixelSolid32_80, 0, 0, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_0, 1, f_ObjCodeUnmapped_0, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_1, 1, f_ObjCodeUnmapped_1, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_2, 1, f_ObjCodeUnmapped_2, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_3, 1, f_ObjCodeUnmapped_3, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_4, 1, f_ObjCodeUnmapped_4, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_5, 1, f_ObjCodeUnmapped_5, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_6, 1, f_ObjCodeUnmapped_6, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_7, 1, f_ObjCodeUnmapped_7, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_8, 1, f_ObjCodeUnmapped_8, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_9, 1, f_ObjCodeUnmapped_9, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_10, 1, f_ObjCodeUnmapped_10, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_11, 1, f_ObjCodeUnmapped_11, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_12, 1, f_ObjCodeUnmapped_12, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_13, 1, f_ObjCodeUnmapped_13, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_14, 1, f_ObjCodeUnmapped_14, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_15, 1, f_ObjCodeUnmapped_15, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_16, 1, f_ObjCodeUnmapped_16, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_17, 1, f_ObjCodeUnmapped_17, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_18, 1, f_ObjCodeUnmapped_18, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_19, 1, f_ObjCodeUnmapped_19, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_20, 1, f_ObjCodeUnmapped_20, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_21, 1, f_ObjCodeUnmapped_21, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_22, 1, f_ObjCodeUnmapped_22, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_23, 1, f_ObjCodeUnmapped_23, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_24, 1, f_ObjCodeUnmapped_24, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_25, 1, f_ObjCodeUnmapped_25, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_26, 1, f_ObjCodeUnmapped_26, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_27, 1, f_ObjCodeUnmapped_27, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_28, 1, f_ObjCodeUnmapped_28, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_29, 1, f_ObjCodeUnmapped_29, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_30, 1, f_ObjCodeUnmapped_30, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_31, 1, f_ObjCodeUnmapped_31, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_32, 1, f_ObjCodeUnmapped_32, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_33, 1, f_ObjCodeUnmapped_33, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_34, 1, f_ObjCodeUnmapped_34, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_35, 1, f_ObjCodeUnmapped_35, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_36, 1, f_ObjCodeUnmapped_36, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_37, 1, f_ObjCodeUnmapped_37, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_38, 1, f_ObjCodeUnmapped_38, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_39, 1, f_ObjCodeUnmapped_39, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_40, 1, f_ObjCodeUnmapped_40, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_41, 1, f_ObjCodeUnmapped_41, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_42, 1, f_ObjCodeUnmapped_42, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_43, 1, f_ObjCodeUnmapped_43, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_44, 1, f_ObjCodeUnmapped_44, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_45, 1, f_ObjCodeUnmapped_45, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_46, 1, f_ObjCodeUnmapped_46, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_47, 1, f_ObjCodeUnmapped_47, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_48, 1, f_ObjCodeUnmapped_48, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_49, 1, f_ObjCodeUnmapped_49, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_50, 1, f_ObjCodeUnmapped_50, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_51, 1, f_ObjCodeUnmapped_51, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_52, 1, f_ObjCodeUnmapped_52, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_53, 1, f_ObjCodeUnmapped_53, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_54, 1, f_ObjCodeUnmapped_54, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_55, 1, f_ObjCodeUnmapped_55, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_56, 1, f_ObjCodeUnmapped_56, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_57, 1, f_ObjCodeUnmapped_57, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_58, 1, f_ObjCodeUnmapped_58, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_59, 1, f_ObjCodeUnmapped_59, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_60, 1, f_ObjCodeUnmapped_60, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_61, 1, f_ObjCodeUnmapped_61, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_62, 1, f_ObjCodeUnmapped_62, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_63, 1, f_ObjCodeUnmapped_63, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_64, 1, f_ObjCodeUnmapped_64, 0, 0},
+    {"ObjCodeUnmapped", (void *)ObjCodeUnmapped, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 6, i_ObjCodeUnmapped_65, 1, f_ObjCodeUnmapped_65, 0, 0},
 };

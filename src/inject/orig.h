@@ -1880,6 +1880,7 @@
 #define ADDR_FACING_DELTA_08   0x0045C870u  /* int32_t(const void*, int32_t) */
 #define ADDR_FACING_DELTA_14   0x0043D550u
 #define ADDR_MAP_CODE_18_28    0x00406A40u  /* int32_t(int32_t code) */
+#define ADDR_OBJ_CODE_UNMAPPED 0x00449EF0u  /* int32_t(const void *obj) */
 #define ADDR_MEETS_ALL_THREE   0x00409650u  /* int32_t(const void *p) */
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */

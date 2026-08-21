@@ -181,6 +181,14 @@ ARG_VALUES = {
 #          runnable and still leaves half of it unvisited: 0x0040D860 asks
 #          whether a field is between 10 and 17, and the fill pattern never
 #          put it there.
+#   "u32s" an explicit set of values for the field, cycled by k -- the same
+#          idea as ARG_VALUES, for a field rather than an argument. "u32v"
+#          varies on a fixed period (11, 13, 17 ... by position in the chain),
+#          which spans about a dozen values around the nominal and cannot be
+#          aimed. ObjCodeUnmapped answers 0 for five codes at BOTH ends of a
+#          17-entry table, 0x18..0x1A and 0x27..0x28, and no period reachable
+#          from its position covers both ends -- so it sat at 100% instruction
+#          coverage with two of its five zero answers never once produced.
 #   "u32"  a count or a length. 0x00402700 takes its loop count from the record
 #          -- a pattern dword means tens of millions of iterations, the run hits
 #          the instruction cap, and every vector is discarded.
@@ -204,6 +212,13 @@ SEED = {
                  (0, 0x94, "ptr", 0x900), (-1, 0x900, "u32v", 0x1F)],
     0x0043D550: [(0, 0x14, "u32v", 1), (0, 0x18, "u32v", 0)],
     0x00429F20: [(1, 0x00, "ptr", 0x900)],
+    # ObjCodeUnmapped reads obj->[0xC0]->[0], so the field has to be a pointer
+    # to somewhere real and the code behind it has to land near 0x18. Nominal
+    # 0x18 on a period of 13 spans 0x12..0x1E, which covers below the range
+    # (the `ja` arm), the three codes that answer 0, and the ones that answer 1.
+    0x00449EF0: [(0, 0xC0, "ptr", 0x900),
+                 (-1, 0x900, "u32s", (0x10, 0x17, 0x18, 0x19, 0x1A, 0x1B,
+                                      0x20, 0x26, 0x27, 0x28, 0x29, 0x30))],
     # MaskPixelSolid32(x, y, mask). The row table holds DWORD offsets, so a
     # pattern dword sends `row` gigabytes outside the scratch and the vector
     # faults -- the word-table version survives on raw pattern only because a
@@ -686,6 +701,9 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                     null_now = (k // (seed_i + 1)) % 5 == 2
                     struct.pack_into("<I", b, at,
                                      0 if null_now else SCRATCH + val)
+                elif kind == "u32s":
+                    struct.pack_into("<I", b, at,
+                                     val[k % len(val)] & 0xFFFFFFFF)
                 elif kind == "u32v":
                     # Each seed varies on its OWN period. Stepping them all by
                     # k made them move in lockstep, so a function gated on two
@@ -935,7 +953,7 @@ def main():
                 "ADDR_MEETS_ALL_THREE",
                 "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
                 "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
-                "ADDR_MASK_PIXEL_SOLID32"]
+                "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1040,6 +1058,7 @@ def main():
         "ADDR_LIST_UNLINK": "ListUnlink",
         "ADDR_REMAP_BYTES": "RemapBytes",
         "ADDR_MASK_PIXEL_SOLID32": "MaskPixelSolid32",
+        "ADDR_OBJ_CODE_UNMAPPED": "ObjCodeUnmapped",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
