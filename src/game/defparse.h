@@ -52,6 +52,13 @@ int32_t __cdecl DefObjParse(int32_t token);
  * field is optional and the twelfth failing is NOT an error. A role name. */
 int32_t __cdecl DefObjLine(int32_t cmd, char *line);
 
+/* 0x00435980. Append one 56-byte object record, refusing a duplicate on the
+ * (type, a, b) triple DefFindObjRec searches. */
+void __cdecl DefAddObjRec(const int32_t *rec);
+
+/* 0x00435E60. Free both def tables and zero all six globals. */
+void __cdecl DefFreeTables(void);
+
 /* 0x00435FD0. Sort the link table, then check each distinct parent against the
  * object records -- storing its link count, or complaining that the record is
  * missing. A role name; it names itself nowhere. */

@@ -1329,6 +1329,11 @@
  * %d-%d". Still original. */
 #define ADDR_DEF_ADD_OBJ_REC       0x00435980u  /* void(const int32_t *rec) */
 #define AM2_DEF_OBJ_REC_DWORDS     14
+#define ADDR_DEF_OBJ_REC_CAP       0x00516178u
+/* Frees BOTH def tables and zeroes all six globals. Role name; three callers.
+ * The counts and capacities go to zero before the frees, and the pointers
+ * after, so a caller that faults inside free() still sees consistent zeros. */
+#define ADDR_DEF_FREE_TABLES       0x00435E60u  /* void(void) */
 
 /* The object-definition files (.aai) have a command vocabulary of their OWN --
  * it is not docs/scripttokens.md's. 0x5F is LINK there; in the script table 95

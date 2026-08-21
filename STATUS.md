@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 355 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 355 | 348 of them below the CRT line |
+| `patch_replace` sites | 357 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 357 | 350 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 85,488 / 372,816 B (**22.9%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 85,776 / 372,816 B (**23.0%**) | patched entries' sizes over the total |
 | modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,19 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`defparse.cpp` is complete: ten functions, both .aai tables end to end.**
+  DefObjParse, DefObjLine, DefAddObjRec, DefFindObjRec for the object records;
+  DefLinkParse, DefAddLink, DefFindLink, DefCountLinks, DefCheckLinks for the
+  links; DefFreeTables for both. Every one arrived in this run of work, and
+  each table is now confirmed from at least three directions -- who packs the
+  key, who unpacks it, and what the comparator orders on.
+
+  What is still original below it: the .aai FILE reader that dispatches OBJ and
+  LINK lines, `DefGameParse` (`0x00424590`) and `DefParseInfoFile`, plus the
+  two shared helpers `0x0041A250` (parse a number, 48 callers) and
+  `0x0041A640` (name -> index). Those two sit in the audio.cpp..event.cpp band
+  rather than this one, which is why they are not here.
 
 - **Mutate a CONTROL before concluding a field is unobserved.** Two field-level
   mutations of `DefObjLine` passed clean -- keeping `rec[3]` instead of zeroing

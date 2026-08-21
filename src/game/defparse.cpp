@@ -23,9 +23,7 @@ typedef int32_t (__cdecl *AM2_DefParseNumberFn)(int32_t *out, const char *tok);
 
 #define kSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 
-typedef void (__cdecl *AM2_DefAddObjRecFn)(const int32_t *rec);
-#define orig_def_add_obj_rec \
-    (*(AM2_DefAddObjRecFn)AM2_IMAGE(ADDR_DEF_ADD_OBJ_REC))
+#define kDefObjRecCap  (*(int32_t *)AM2_IMAGE(ADDR_DEF_OBJ_REC_CAP))
 
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
@@ -113,6 +111,81 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
     return 0;
 }
 
+/* 0x00435980. Append one object record, refusing a duplicate. The twin of
+ * DefAddLink: fifty records to begin with -- 0xAF0 is 50 * 56 -- then twenty
+ * MORE RECORDS at a time, and a linear scan before the copy.
+ *
+ * The comparator here is CompareTriple, not ComparePair, so "duplicate" means
+ * the first THREE fields match: the same triple DefFindObjRec searches on.
+ * That is what makes the cascade well defined -- one record per (type, a, b).
+ *
+ * The original computes 56 * cap as ((cap * 8) - cap) << 3, which is the same
+ * number and is written plainly here. */
+void __cdecl DefAddObjRec(const int32_t *rec)
+{
+    int32_t *tab = (int32_t *)kDefObjRecs;
+    int32_t  cap;
+    int32_t  n;
+
+    if (tab == (int32_t *)0) {
+        tab = (int32_t *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                    * AM2_DEF_OBJ_REC_SIZE);
+        cap = AM2_DEF_LINK_INITIAL;
+        kDefObjRecs   = tab;
+        kDefObjRecCap = cap;
+    } else {
+        cap = kDefObjRecCap;
+    }
+
+    n = kDefObjRecCount;
+
+    if (n >= cap) {
+        cap += AM2_DEF_LINK_GROW;
+        kDefObjRecCap = cap;
+        tab = (int32_t *)am2_realloc(tab,
+                                     (size_t)cap * AM2_DEF_OBJ_REC_SIZE);
+        kDefObjRecs = tab;
+        n = kDefObjRecCount;
+    }
+
+    for (int32_t i = 0; i < n; i++) {
+        if (CompareTriple(&tab[i * AM2_DEF_OBJ_REC_DWORDS], rec) == 0) {
+            orig_log("duplicate record in object.aai file %d-%d\n",
+                     rec[0], rec[1]);
+            return;
+        }
+    }
+
+    for (int32_t i = 0; i < AM2_DEF_OBJ_REC_DWORDS; i++)
+        tab[n * AM2_DEF_OBJ_REC_DWORDS + i] = rec[i];
+
+    kDefObjRecCount = n + 1;
+}
+
+/* 0x00435E60. Drop both def tables. Role name.
+ *
+ * The order is worth keeping: all four counts and capacities are zeroed FIRST,
+ * then each pointer is freed and only then cleared. Reproduced as written. */
+void __cdecl DefFreeTables(void)
+{
+    int32_t *recs  = (int32_t *)kDefObjRecs;
+    AM2_DefLink *links;
+
+    kDefObjRecCount = 0;
+    kDefLinkCount   = 0;
+    kDefObjRecCap   = 0;
+    kDefLinkCap     = 0;
+
+    if (recs != (int32_t *)0)
+        am2_free(recs);
+    kDefObjRecs = (void *)0;
+
+    links = kDefLinks;
+    if (links != (AM2_DefLink *)0)
+        am2_free(links);
+    kDefLinks = (AM2_DefLink *)0;
+}
+
 /* 0x00435C20. Parse one OBJ line of an .aai file into a 56-byte record.
  *
  *     <keyword> <f1> <f2> ... <f12> [<f13>]
@@ -162,7 +235,7 @@ int32_t __cdecl DefObjLine(int32_t cmd, char *line)
     if (orig_def_number(&rec[12], orig_strtok((char *)0, kSep)))
         (void)orig_def_number(&rec[13], orig_strtok((char *)0, kSep));
 
-    orig_def_add_obj_rec(rec);
+    DefAddObjRec(rec);
     return 0;
 }
 
@@ -412,5 +485,9 @@ int defparse_install(void)
                         "DefObjParse", 1);
     rc |= patch_replace(ADDR_DEF_OBJ_LINE, (const void *)DefObjLine,
                         "DefObjLine", 1);
+    rc |= patch_replace(ADDR_DEF_ADD_OBJ_REC, (const void *)DefAddObjRec,
+                        "DefAddObjRec", 1);
+    rc |= patch_replace(ADDR_DEF_FREE_TABLES, (const void *)DefFreeTables,
+                        "DefFreeTables", 3);
     return rc;
 }
