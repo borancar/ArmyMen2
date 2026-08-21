@@ -169,6 +169,9 @@ VECTOR_CAP = {
 }
 
 ARG_VALUES = {
+    # RemapRleRuns' `wide`: 1 selects the dword row table and everything else
+    # the word one, so both arms and a couple of non-1 values.
+    0x00423EE0: {2: [1, 3, 0, 2, 1]},
     # ObjNextKind538's requested code: one from each arm, both ends of the
     # skip set, and one above 0x24 that never reaches the table.
     0x0040D880: {1: [0x00, 0x05, 0x03, 0x20, 0x10, 0x30, 0x0F]},
@@ -257,6 +260,28 @@ SEED = {
     # not-found walk and the shift-down; kind 5 on the middle record exercises
     # the clamp to 3, which a kind taken from the fill pattern would reach only
     # by accident.
+    # RemapRleRuns(rle, unused, wide, table). One record that is VALID READ
+    # BOTH WAYS, which is what lets a single seed reach both arms: the row
+    # offsets are stored as dwords 0x20 and 0x30, so the dword arm reads
+    # 0x20 and 0x30 and the word arm reads 0x0020 and 0x0000 -- the second of
+    # which points at the header, where width 4 and height 0 decode as
+    # skip 4, run 0 and end the row without writing. Deterministic on both
+    # sides, which is all a vector needs.
+    #
+    # Row 0x20 is [skip 1][run 2][2 pixels] then [skip 0][run 1][1 pixel],
+    # which reaches width 4 and stops. Row 0x30 is [skip 0][run 4][4 pixels].
+    # A width of 0 in the third variant skips the walk entirely.
+    0x00423EE0: [(0, 0x00, "u32s", (0x00020004, 0x00020000, 0x00010004)),
+                 (0, 0x04, "u32", 0x00000020),
+                 (0, 0x08, "u32", 0x00000030),
+                 (0, 0x20, "u32", 0xBBAA0201),
+                 # [skip 0][run 1][pixel]. The second segment must WRITE
+                 # something: with a run of 0 here, mutating the skip byte to
+                 # go through the remap table changed only how many iterations
+                 # ran, and an iteration that writes nothing is not observable.
+                 (0, 0x24, "u32", 0x00CC0100),
+                 (0, 0x30, "u32", 0x11220400),
+                 (0, 0x34, "u32", 0x00004433)],
     # CollapseEqualDeltas(values, count). Eight values holding a run of six at
     # a constant difference of 10, then a jump of 40, then a step of 1 -- so
     # one long run, one pair and one singleton, which is every shape the outer
@@ -1064,7 +1089,7 @@ def main():
                 "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED",
                 "ADDR_COMM_REMOVE_KEYED", "ADDR_OBJ_MASK_BIT_AT",
                 "ADDR_OBJ_NEXT_KIND538", "ADDR_BUILD_RGB332",
-                "ADDR_COLLAPSE_DELTAS"]
+                "ADDR_COLLAPSE_DELTAS", "ADDR_REMAP_RLE_RUNS"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1175,6 +1200,7 @@ def main():
         "ADDR_OBJ_NEXT_KIND538": "ObjNextKind538",
         "ADDR_BUILD_RGB332": "BuildRgb332Palette",
         "ADDR_COLLAPSE_DELTAS": "CollapseEqualDeltas",
+        "ADDR_REMAP_RLE_RUNS": "RemapRleRuns",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -1206,7 +1232,12 @@ def main():
             # next call, to SetGamePalette.
             "BuildRgb332Palette",
             # CollapseEqualDeltas ends with the kept count in eax.
-            "CollapseEqualDeltas"}
+            "CollapseEqualDeltas",
+            # RemapRleRuns leaves the pixel cursor in eax. Its one caller
+            # (0x00424221) does `add esp, 0x10` and then reloads, never
+            # reading it -- and that stack adjustment is also what confirms
+            # the fourth argument.
+            "RemapRleRuns"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

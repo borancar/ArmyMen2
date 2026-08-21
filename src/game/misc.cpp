@@ -688,6 +688,55 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
     *count = kept + 1;
 }
 
+/* Shared body; `wide` is the only difference between the two arms, exactly as
+ * it is between MaskPixelSolid and MaskPixelSolid32. */
+static void RemapRuns(uint8_t *rle, int32_t wide, const uint8_t *table)
+{
+    uint16_t       width  = *(const uint16_t *)rle;
+    uint16_t       height = *(const uint16_t *)(rle + 2);
+    uint32_t       step   = wide ? 4u : 2u;
+    const uint8_t *row    = rle + 4;
+    const uint8_t *end    = rle + 4 + (uint32_t)height * step;
+
+    while (row < end) {
+        uint8_t *p   = rle + (wide ? *(const uint32_t *)row
+                                   : *(const uint16_t *)row);
+        uint16_t acc = 0;
+
+        /* A width of zero skips the row entirely rather than walking it once:
+         * the original tests the width before the loop, not after. */
+        if (width != 0) {
+            do {
+                uint32_t skip = *p++;
+                uint32_t run;
+
+                acc = (uint16_t)(acc + skip);
+                run = *p++;
+                acc = (uint16_t)(acc + run);
+
+                /* The original's test is signed, on a value it has just masked
+                 * to a byte, so it is `run != 0`. */
+                if (run) {
+                    uint32_t n = run;
+
+                    do {
+                        *p = table[*p];
+                        p++;
+                    } while (--n);
+                }
+            } while (acc < width);
+        }
+        row += step;
+    }
+}
+
+void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
+                          const void *table)
+{
+    (void)unused;
+    RemapRuns((uint8_t *)rle, wide == 1, (const uint8_t *)table);
+}
+
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
                               int32_t haveA, int32_t haveB,
                               int32_t maskA, int32_t maskB)
@@ -906,6 +955,8 @@ int misc_install(void)
                   "BuildRgb332Palette", 1);
     patch_replace(ADDR_COLLAPSE_DELTAS, (const void *)CollapseEqualDeltas,
                   "CollapseEqualDeltas", 1);
+    patch_replace(ADDR_REMAP_RLE_RUNS, (const void *)RemapRleRuns,
+                  "RemapRleRuns", 1);
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     return 0;

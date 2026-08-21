@@ -398,6 +398,31 @@ void __cdecl BuildRgb332Palette(void *out);
  * as far as the evidence goes. */
 void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count);
 
+/* 0x00423EE0. Rewrite every pixel of an RLE image through a 256-byte lookup
+ * table, in place. The format is the one MaskPixelSolid decodes -- width and
+ * height as int16 at +0 and +2, a row-offset table at +4, and rows of
+ * [skip][run][run bytes] walked until the accumulated width reaches the image
+ * width -- and `wide` selects the row table's entry size, dword when it is
+ * exactly 1 and word for every other value.
+ *
+ * That is the same pair MaskPixelSolid and MaskPixelSolid32 are, which is what
+ * this function settles: the two decoders are not near-duplicates that happened
+ * to be compiled twice, they are the two halves of a format that carries its
+ * offset width as a parameter. The one caller passes 3 here.
+ *
+ * The second argument is never read. It is not padding -- the caller pushes a
+ * real value into it -- so it is either vestigial or belongs to a signature
+ * this function shares with something else. Reproduced as an ignored
+ * parameter, because dropping it would silently change the calling
+ * convention.
+ *
+ * The accumulator is 16-bit and only its low half is ever compared, so a row
+ * whose runs overshoot wraps rather than saturating -- the same arithmetic
+ * MaskPixelSolid's comment already describes. A run length of zero writes
+ * nothing and still counts toward the width, which is how a row ends. */
+void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
+                          const void *table);
+
 /* 0x0041EF20. Two-criterion match, the shape this binary uses wherever a list
  * is filtered. Each criterion is one of three things:
  *
