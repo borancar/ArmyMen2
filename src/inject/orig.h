@@ -1144,6 +1144,13 @@
 #define ADDR_EVT_TYPE2_ACTION_B  0x0041FC10u  /* void(uint32_t uid) */
 #define ADDR_TYPE2_ACTION_A      0x00448170u  /* void(void *obj) */
 #define ADDR_TYPE2_ACTION_B      0x00448220u  /* void(void *obj) */
+/* A third of the same twin, with an argument to pass on. */
+#define ADDR_EVT_TYPE2_ACTION_C  0x0041FBA0u  /* void(uint32_t, int32_t) */
+#define ADDR_TYPE2_ACTION_C      0x004480E0u  /* void(void *obj, int32_t) */
+/* 0x0041F6E0. The one that does NOT null-check: it passes whatever LookupByUID
+ * returned straight on. 0x00428370 has eight callers and no name. */
+#define ADDR_EVT_OBJ_SET         0x0041F6E0u  /* void(uint32_t, int32_t) */
+#define ADDR_OBJ_SET             0x00428370u  /* void(obj, int32_t, int32_t) */
 #define ADDR_OBJ_ACTION          0x00428DA0u  /* void(void *obj) */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is

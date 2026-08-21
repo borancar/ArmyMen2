@@ -812,6 +812,11 @@ typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
 #define orig_deploy_item     (*(AM2_DeployItemFn)AM2_IMAGE(ADDR_DEPLOY_ITEM))
 #define orig_type2_action_a  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_A))
 #define orig_type2_action_b  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_B))
+typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
+typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
+#define orig_type2_action_c \
+    (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
+#define orig_obj_set        (*(AM2_ObjSetFn)AM2_IMAGE(ADDR_OBJ_SET))
 
 /* 0x0041FE70. Deploy the object a uid names.
  *
@@ -875,6 +880,41 @@ void __cdecl EvtType2ActionB(uint32_t uid)
         return;
 
     orig_type2_action_b(obj);
+}
+
+/* 0x0041FBA0. The third of the type-2 twins, and the only one that forwards an
+ * argument. Same order as the other two -- threshold, lookup, type test. */
+void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = LookupByUID(uid);
+
+    if (!ObjIsType2((const AM2_Object *)obj))
+        return;
+
+    orig_type2_action_c(obj, arg);
+}
+
+/* 0x0041F6E0. The one in this family that checks NEITHER the pointer nor the
+ * type -- only the uid threshold -- and then passes whatever LookupByUID
+ * returned straight to 0x00428370.
+ *
+ * That is a fourth checking style, and it is the unsafe one: a uid at or above
+ * the threshold that is not registered gives null, and null goes on to a
+ * function with eight callers that this code cannot vouch for. event.h already
+ * records the same hazard for another member of the family. Reproduced, not
+ * guarded -- adding a null test here would be behaviour this build does not
+ * have. */
+void __cdecl EvtObjSet(uint32_t uid, int32_t value)
+{
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    orig_obj_set(LookupByUID(uid), value, 0);
 }
 
 /* ------------------------------------------------------- reset ---- */
@@ -1245,6 +1285,10 @@ int event_install(void)
                         (const void *)EvtType2ActionA, "EvtType2ActionA", 1);
     rc |= patch_replace(ADDR_EVT_TYPE2_ACTION_B,
                         (const void *)EvtType2ActionB, "EvtType2ActionB", 1);
+    rc |= patch_replace(ADDR_EVT_TYPE2_ACTION_C,
+                        (const void *)EvtType2ActionC, "EvtType2ActionC", 1);
+    rc |= patch_replace(ADDR_EVT_OBJ_SET, (const void *)EvtObjSet,
+                        "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_SET_FIELD_540, (const void *)EvtSetField540,
                         "EvtSetField540", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,

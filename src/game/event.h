@@ -116,6 +116,11 @@ void __cdecl EvtDeployItem(uint32_t uid, uint32_t where);
  * object type 2 is still unidentified. */
 void __cdecl EvtType2ActionA(uint32_t uid);
 void __cdecl EvtType2ActionB(uint32_t uid);
+void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg);
+
+/* 0x0041F6E0. Checks only the uid threshold and passes a possibly-null object
+ * on -- the unsafe member of the family. Reproduced as written. */
+void __cdecl EvtObjSet(uint32_t uid, int32_t value);
 
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
