@@ -9,6 +9,7 @@
 #define AM2_SCRIPT_H
 
 #include <stdint.h>
+#include "../inject/orig.h"   /* am2_FILE, for the savegame section */
 
 #include "objscript.h"
 #include "scripttokens.h"
@@ -126,6 +127,33 @@ int32_t __cdecl AllocUid(void);
  * still appended and the count still advances, so this is a complaint rather
  * than a rejection. */
 int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid);
+
+/* 0x0043F030, 0x0043F0A0 and 0x0043F150. The name table's teardown and its
+ * savegame section -- the same free/save/load triad event.cpp already has for
+ * the condition list, which is the original's idiom for a table that owns heap
+ * memory.
+ *
+ * THE FORMAT EXISTS TO AVOID A POINTER. AM2_ScriptName's first field is a
+ * `char *`, so the 16-byte struct cannot be written whole. The name goes out
+ * as a length and then that many bytes with NO terminator, and the 12 bytes
+ * after the pointer -- type, value, refs -- follow raw. The loader reads the
+ * length, the bytes, and the 12, terminates the name itself and strdups it.
+ *
+ * That is worth contrasting with the item section, which writes its pointers
+ * straight out. Items are the only part of a savegame whose bytes differ
+ * between two builds, and this is why: the section that thought about the
+ * problem does not have it.
+ *
+ * FreeScriptNames frees every name AND the table itself, then zeroes all
+ * three globals -- count, capacity and the pointer. The loader calls it after
+ * its tag check, so a foreign save leaves the table alone.
+ *
+ * The loader reads a saved length into a fixed stack buffer without checking
+ * it, and grows the table ten entries at a time exactly as AddNameTableName
+ * does. Both reproduced. */
+void __cdecl FreeScriptNames(void);
+int32_t __cdecl SaveScriptSection(am2_FILE *fp);
+int32_t __cdecl LoadScriptSection(am2_FILE *fp);
 
 /* 0x00443E40, 0x00443E90, 0x00443ED0. Read and write a declared name's value.
  * All three are named by their own error messages, and the two setters share

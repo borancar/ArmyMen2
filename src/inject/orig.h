@@ -1102,6 +1102,16 @@
  * blocks are ADDR_PAD_NUMBERS and ADDR_PADS, already named; the sizes here are
  * confirmed three ways -- the fwrite lengths, the fread lengths, and the reset's
  * `rep stosd` counts of 0x1300 and 0x2400 dwords. */
+/* script.cpp's savegame section, and the table free the loader opens with.
+ * The section exists in this shape because AM2_ScriptName begins with a
+ * POINTER: the struct cannot go out whole, so the name travels as a length and
+ * then the bytes, and only the 12 fields after the pointer are written raw. */
+#define ADDR_FREE_SCRIPT_NAMES   0x0043F030u  /* void(void), 3 callers */
+#define ADDR_SAVE_SCRIPT_SECTION 0x0043F0A0u  /* int32_t(FILE *) */
+#define ADDR_LOAD_SCRIPT_SECTION 0x0043F150u  /* int32_t(FILE *) */
+#define ADDR_STR_SCRIPT_CPP      0x004888A4u  /* "C:\\ArmyMen2\\source\\script.cpp" */
+#define AM2_SAVETAG_SCRIPT       0x06660002u
+
 #define ADDR_SAVE_EVENT_SECTION  0x00422470u  /* int32_t(FILE *) */
 #define ADDR_SAVE_PAD_SECTION    0x00437A90u  /* int32_t(FILE *) */
 #define ADDR_LOAD_PAD_SECTION    0x00437AE0u  /* int32_t(FILE *) */

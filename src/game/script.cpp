@@ -9,6 +9,7 @@
 #include "crt.h"
 #include "event.h"
 #include "gamedir.h"
+#include "savetag.h"
 #include "misc.h"
 #include "image.h"
 #include "objscript.h"
@@ -306,6 +307,91 @@ int32_t __cdecl ScriptFindName(const char *name)
             return i;
     }
     return -1;
+}
+
+/* The original re-reads the count every iteration. Nothing in the loop can
+ * change it, so a plain bound is the same function; noted rather than
+ * transcribed. It frees the TABLE as well as the names, and zeroes all three
+ * globals -- so the table is not merely emptied, it is gone. */
+void __cdecl FreeScriptNames(void)
+{
+    for (int32_t i = 0; i < kScriptNameCount; i++)
+        if (kScriptNames[i].name)
+            am2_free(kScriptNames[i].name);
+
+    am2_free(kScriptNames);
+    kScriptNames     = 0;
+    kScriptNameCount = 0;
+    kScriptNameCap   = 0;
+}
+
+int32_t __cdecl SaveScriptSection(am2_FILE *fp)
+{
+    WriteSaveTag(fp, AM2_SAVETAG_SCRIPT);
+    orig_fwrite(&kScriptNameCount, 4, 1, fp);
+
+    for (int32_t i = 0; i < kScriptNameCount; i++) {
+        AM2_ScriptName *e   = &kScriptNames[i];
+        int32_t         len = (int32_t)strlen(e->name);
+
+        /* Length, then the bytes WITHOUT a terminator, then the three fields
+         * that follow the pointer. */
+        orig_fwrite(&len, 4, 1, fp);
+        orig_fwrite(e->name, (size_t)len, 1, fp);
+        orig_fwrite(&e->type, 0xC, 1, fp);
+    }
+    return 1;
+}
+
+/* The original's frame is 0x118 bytes and the name is read into it with no
+ * bound check at all -- a saved length longer than the buffer walks off the
+ * stack. Reproduced with a buffer of the same order rather than hardened,
+ * because the exact bound is not established and a guard here would be a
+ * behaviour this build does not have. */
+#define AM2_SCRIPT_NAME_BUF 0x100
+
+int32_t __cdecl LoadScriptSection(am2_FILE *fp)
+{
+    char    name[AM2_SCRIPT_NAME_BUF];
+    int32_t meta[3];
+    int32_t count;
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_SCRIPT,
+                      (const char *)AM2_IMAGE(ADDR_STR_SCRIPT_CPP), 0x1F8))
+        return 0;
+
+    /* After the tag check, so a foreign save leaves the table alone. */
+    FreeScriptNames();
+
+    orig_fread(&count, 4, 1, fp);
+
+    for (int32_t i = 0; i < count; i++) {
+        int32_t         len;
+        AM2_ScriptName *e;
+        size_t          n;
+
+        orig_fread(&len, 4, 1, fp);
+        orig_fread(name, (size_t)len, 1, fp);
+        orig_fread(meta, 0xC, 1, fp);
+        name[len] = 0;
+
+        /* Ten at a time, the same step AddNameTableName uses. */
+        if (kScriptNameCount >= kScriptNameCap) {
+            kScriptNameCap += 10;
+            kScriptNames = (AM2_ScriptName *)am2_realloc(
+                kScriptNames, (size_t)kScriptNameCap * sizeof(AM2_ScriptName));
+        }
+
+        e    = &kScriptNames[kScriptNameCount];
+        n    = strlen(name) + 1;
+        e->name = (char *)am2_malloc(n);
+        memcpy(e->name, name, n);
+        e->type  = meta[0];
+        e->value = meta[1];
+        e->refs  = meta[2];
+        kScriptNameCount++;
+    }
+    return 1;
 }
 
 int32_t __cdecl GetVarValue(int32_t index, int32_t *out)
@@ -3179,6 +3265,12 @@ int script_install(void)
                         "SetVarValue", 2);
     rc |= patch_replace(ADDR_SET_VAR_BY_NAME, (const void *)SetVarValueByName,
                         "SetVarValueByName", 2);
+    rc |= patch_replace(ADDR_FREE_SCRIPT_NAMES, (const void *)FreeScriptNames,
+                        "FreeScriptNames", 0);
+    rc |= patch_replace(ADDR_SAVE_SCRIPT_SECTION, (const void *)SaveScriptSection,
+                        "SaveScriptSection", 1);
+    rc |= patch_replace(ADDR_LOAD_SCRIPT_SECTION, (const void *)LoadScriptSection,
+                        "LoadScriptSection", 1);
     rc |= patch_replace(ADDR_SCRIPT_FIND_NAME,
                         (const void *)ScriptFindName,
                         "ScriptFindName", 1);
