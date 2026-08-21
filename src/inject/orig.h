@@ -1065,6 +1065,7 @@
  * sometimes check the type or the null, then store. The differences between
  * them are exactly which of those guards each one has, so they are worth
  * keeping separate rather than folding into one helper. */
+#define ADDR_EVT_SET_FIELD_540   0x0041FAB0u  /* void(uid, int32), type 2 only */
 #define ADDR_EVT_SET_MODE_F0     0x0041FAE0u  /* void(uid, int32), +0xF0, type 2/3/8 */
 #define ADDR_EVT_SET_MODE_94     0x0041FB10u  /* void(uid, int32), +0x94, type 2/3/8 */
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */

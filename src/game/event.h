@@ -56,6 +56,15 @@ void __cdecl EventClearAll(void);
  * or above 1000 that is not in the table writes through whatever LookupByUID
  * returned. EvtSetByte40 checks the pointer but not the uid. Neither is
  * defensible as written, and both are the original's behaviour. */
+/* 0x0041FAB0. Same shape as the two below, but gated on ObjIsType2 alone
+ * rather than the 2/3/8 set, and writing +0x540.
+ *
+ * That offset is worth noting against misc.cpp's Field53C, which READS +0x53C
+ * on some object: the two are adjacent dwords, and a record with fields past
+ * 0x540 is far larger than AM2_Object's header. Whatever type 2 is, it carries
+ * a substantial tail. */
+void __cdecl EvtSetField540(uint32_t uid, int32_t value);
+
 void __cdecl EvtSetModeF0(uint32_t uid, int32_t value);
 void __cdecl EvtSetMode94(uint32_t uid, int32_t value);
 void __cdecl EvtSetFlag810(uint32_t uid, int32_t on);

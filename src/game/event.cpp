@@ -202,6 +202,18 @@ void __cdecl DeclareRuleVars(void)
  * caught by tools/checkseams.py, which exists for exactly that. */
 #define g_evtMarks ((int32_t *)(uintptr_t)ADDR_EVT_MARKS)
 
+void __cdecl EvtSetField540(uint32_t uid, int32_t value)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+    obj = LookupByUID(uid);
+    if (!ObjIsType2((const AM2_Object *)obj))
+        return;
+    *(int32_t *)((uint8_t *)obj + 0x540) = value;
+}
+
 /* The two that check the type. LookupByUID's answer goes straight into
  * ObjIsTypeIn238, which returns 0 for null, so the null case is covered by the
  * type test rather than by a test of its own. */
@@ -576,6 +588,8 @@ int event_install(void)
                         "EventRegister", 19);
     rc |= patch_replace(ADDR_EVENT_CLEAR_ALL, (const void *)EventClearAll,
                         "EventClearAll", 2);
+    rc |= patch_replace(ADDR_EVT_SET_FIELD_540, (const void *)EvtSetField540,
+                        "EvtSetField540", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,
                         "EvtSetModeF0", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_94, (const void *)EvtSetMode94,
