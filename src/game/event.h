@@ -217,6 +217,33 @@ void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond);
  * reuses as a local once it has copied fp into a register. */
 int32_t __cdecl LoadEventSection(am2_FILE *fp);
 
+/* 0x00422470. The mirror of LoadEventSection: walk all nine buckets, and for
+ * every handler that is one of three known kinds write a record.
+ *
+ * It is the saver that explains two things the loader could only show the
+ * shape of.
+ *
+ * The first of the loader's three dwords -- the one it reads and drops -- is
+ * the BUCKET INDEX. So the file records which bucket a registration came from
+ * and the loader ignores it, putting pads in bucket 0 and owned records in
+ * bucket 1 regardless. Reproduced: writing anything else there would be a
+ * change to the format for no reason, and the loader would not notice.
+ *
+ * And a pad handler's argument is a POINTER into ADDR_PADS, which is stored as
+ * an INDEX -- the original divides by 72 with the usual reciprocal multiply,
+ * 0x38E38E39 shifted right by 4. That is the AM2_Pad stride confirmed a fourth
+ * way, after the two block lengths and ResetPads' stosd count.
+ *
+ * ONLY THREE HANDLER KINDS ARE SAVED. Anything registered with a different
+ * function is skipped in silence, so a save does not round-trip the whole
+ * table -- only the pads and the owned records. The two pad arms additionally
+ * require a non-null argument; the owned arm does not check.
+ *
+ * The bucket walk stops at ADDR_SCRIPT_CONDITIONS, the next global, which is
+ * the same bound the teardown uses and the second independent statement that
+ * the table has nine buckets. */
+int32_t __cdecl SaveEventSection(am2_FILE *fp);
+
  /* 0x0041EDD0. Read the whole condition list back from a save.
  *
  * Frees whatever is there first, then reads records until the marker stops

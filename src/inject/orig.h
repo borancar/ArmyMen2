@@ -1102,6 +1102,7 @@
  * blocks are ADDR_PAD_NUMBERS and ADDR_PADS, already named; the sizes here are
  * confirmed three ways -- the fwrite lengths, the fread lengths, and the reset's
  * `rep stosd` counts of 0x1300 and 0x2400 dwords. */
+#define ADDR_SAVE_EVENT_SECTION  0x00422470u  /* int32_t(FILE *) */
 #define ADDR_SAVE_PAD_SECTION    0x00437A90u  /* int32_t(FILE *) */
 #define ADDR_LOAD_PAD_SECTION    0x00437AE0u  /* int32_t(FILE *) */
 #define ADDR_RESET_PADS          0x004373C0u  /* void(void), 2 callers */

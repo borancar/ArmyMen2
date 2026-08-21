@@ -552,6 +552,45 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
     return 1;
 }
 
+int32_t __cdecl SaveEventSection(am2_FILE *fp)
+{
+    WriteSaveTag(fp, AM2_SAVETAG_EVENT);
+
+    for (int32_t b = 0; b < AM2_EVENT_BUCKETS; b++) {
+        for (AM2_EventEntry *e = kEventTable[b]; e; e = e->next) {
+            for (AM2_EventHandler *h = e->handlers; h; h = h->next) {
+                uint32_t kind;
+
+                /* Tested in this order, and the two pad arms want an argument
+                 * while the owned one does not. A pad handler with a null
+                 * argument falls through every arm and is skipped. */
+                if (h->fn == kImageFn(ADDR_EVT_PAD_HANDLER_A) && h->arg)
+                    kind = AM2_EVTSAVE_PAD_A;
+                else if (h->fn == kImageFn(ADDR_EVT_PAD_HANDLER_B) && h->arg)
+                    kind = AM2_EVTSAVE_PAD_B;
+                else if (h->fn == kImageFn(ADDR_EVT_RECORD_HANDLER))
+                    kind = AM2_EVTSAVE_OWNED;
+                else
+                    continue;
+
+                WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
+                WriteSaveTag(fp, (uint32_t)b);       /* the loader drops this */
+                WriteSaveTag(fp, (uint32_t)e->key0);
+                WriteSaveTag(fp, kind);
+
+                if (kind == AM2_EVTSAVE_OWNED)
+                    orig_fwrite(h->arg, 0x10, 1, fp);
+                else
+                    WriteSaveTag(fp,
+                        (uint32_t)((AM2_Pad *)h->arg - kPads));
+            }
+        }
+    }
+
+    WriteSaveTag(fp, AM2_SAVE_TAG_END);
+    return 1;
+}
+
 int32_t __cdecl LoadScriptConditions(am2_FILE *fp)
 {
     int32_t tag;
@@ -668,6 +707,8 @@ int event_install(void)
                         "LoadEventBlock", 1);
     rc |= patch_replace(ADDR_LOAD_EVENT_SECTION, (const void *)LoadEventSection,
                         "LoadEventSection", 1);
+    rc |= patch_replace(ADDR_SAVE_EVENT_SECTION, (const void *)SaveEventSection,
+                        "SaveEventSection", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,
                         "LoadScriptCond", 2);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_COND, (const void *)SaveScriptCond,
