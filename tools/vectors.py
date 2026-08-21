@@ -145,6 +145,9 @@ ARG_KIND_OVERRIDE = {
 #
 # {function: {arg index: [values]}}
 ARG_VALUES = {
+    # ObjNextKind538's requested code: one from each arm, both ends of the
+    # skip set, and one above 0x24 that never reaches the table.
+    0x0040D880: {1: [0x00, 0x05, 0x03, 0x20, 0x10, 0x30, 0x0F]},
     # CommRemoveKeyed's key: three that match a seeded record and one that
     # matches none, so the not-found walk runs to the end of the array.
     # FIVE keys against FOUR counts, and the length matters more than the
@@ -230,6 +233,22 @@ SEED = {
     # not-found walk and the shift-down; kind 5 on the middle record exercises
     # the clamp to 3, which a kind taken from the fill pattern would reach only
     # by accident.
+    # ObjNextKind538(obj, want). Two fields on the object, a sub-record behind
+    # +0x74, a frame count behind that record's +0x44, and a position byte at
+    # its +0x51. The count is 5, so `last` is 4 and the position values 0, 3,
+    # 4 and 9 sit either side of it -- one refusal, one exactly at the bound
+    # and one past. `cur` includes 1 because a current value of 1 skips the
+    # readiness test on its own.
+    #
+    # Lengths 5, 2, 4 against seven codes: co-prime with the code list, so the
+    # combinations do not lock. The 12-byte gap between the position byte and
+    # anything else read means a dword seed at an unaligned offset is safe.
+    0x0040D880: [(0, 0x538, "u32s", (0, 1, 2, 5, 0x0A)),
+                 (0, 0x53C, "u32s", (0, 7)),
+                 (0, 0x74, "ptr", 0x900),
+                 (-1, 0x944, "ptr", 0xA00),
+                 (-1, 0xA00, "u32", 5),
+                 (-1, 0x951, "u32s", (0, 3, 4, 9))],
     # ObjMaskBitAt(obj, point): obj->[0x78] is the mask record and the record's
     # +0xC is the pixels, so it is a two-hop chain. The object's position at
     # +0x30/+0x34 has to be planted too -- from fill pattern it is enormous and
@@ -994,7 +1013,8 @@ def main():
                 "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
                 "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
                 "ADDR_MASK_PIXEL_SOLID32", "ADDR_OBJ_CODE_UNMAPPED",
-                "ADDR_COMM_REMOVE_KEYED", "ADDR_OBJ_MASK_BIT_AT"]
+                "ADDR_COMM_REMOVE_KEYED", "ADDR_OBJ_MASK_BIT_AT",
+                "ADDR_OBJ_NEXT_KIND538"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -1102,6 +1122,7 @@ def main():
         "ADDR_OBJ_CODE_UNMAPPED": "ObjCodeUnmapped",
         "ADDR_COMM_REMOVE_KEYED": "CommRemoveKeyed",
         "ADDR_OBJ_MASK_BIT_AT": "ObjMaskBitAt",
+        "ADDR_OBJ_NEXT_KIND538": "ObjNextKind538",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the

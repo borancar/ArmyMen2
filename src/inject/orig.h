@@ -1870,6 +1870,7 @@
 #define ADDR_MASK_PIXEL_SOLID  0x0041CF20u  /* int32_t(x, y, const void *mask) */
 #define ADDR_MASK_PIXEL_SOLID32 0x0041CEC0u  /* same, dword row table */
 #define ADDR_OBJ_MASK_BIT_AT   0x00435390u  /* int32_t(obj, const AM2_Point *) */
+#define ADDR_OBJ_NEXT_KIND538 0x0040D880u  /* int32_t(obj, int32_t want) */
 #define ADDR_XOR_CHECKSUM      0x00402700u  /* uint32_t(const void *record) */
 #define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */
 #define ADDR_LIST_PUSH_FRONT   0x00429F20u  /* void(void *node, void **head) */

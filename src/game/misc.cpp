@@ -566,6 +566,61 @@ int32_t __cdecl ObjKind538In10To17(const void *obj)
     return (v >= 10 && v <= 17) ? 1 : 0;
 }
 
+/* The three arms, read out of the byte table at 0x0040D8FC. Anything above
+ * 0x24 never reaches the table and behaves as ARM_NEITHER. */
+#define AM2_KIND538_ARM_SKIP      0   /* 0x00, 0x20..0x24 */
+#define AM2_KIND538_ARM_OVERRIDE  1   /* 0x05, 0x08..0x0F */
+#define AM2_KIND538_ARM_NEITHER   2
+
+#define AM2_OBJ_KIND538   0x538
+#define AM2_OBJ_KIND53C   0x53C
+#define AM2_OBJ_SEQ       0x74        /* sub-record the readiness test reads */
+#define AM2_SEQ_FRAMES    0x44        /* pointer; its first int16 is a count */
+#define AM2_SEQ_POS       0x51        /* unsigned byte, the position */
+
+int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
+{
+    static const uint8_t kArm[0x25] = {
+        0, 2, 2, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        0, 0, 0, 0, 0,
+    };
+    const uint8_t *o    = (const uint8_t *)obj;
+    int32_t        cur  = *(const int32_t *)(o + AM2_OBJ_KIND538);
+    int32_t        over = *(const int32_t *)(o + AM2_OBJ_KIND53C);
+    int32_t        alt  = over;
+    int32_t        skip;
+    const uint8_t *seq;
+
+    if (cur == want)
+        return cur;
+
+    skip = (cur == 1) ? 1 : 0;
+    if ((uint32_t)want <= 0x24) {
+        if (kArm[want] == AM2_KIND538_ARM_SKIP)
+            skip = 1;
+        else if (kArm[want] == AM2_KIND538_ARM_OVERRIDE)
+            alt = want;
+    }
+
+    seq = *(const uint8_t *const *)(o + AM2_OBJ_SEQ);
+    if (!skip) {
+        const uint8_t *frames = *(const uint8_t *const *)(seq + AM2_SEQ_FRAMES);
+
+        if (frames) {
+            int32_t last = *(const int16_t *)frames - 1;
+            int32_t pos  = seq[AM2_SEQ_POS];
+
+            if (pos < last)
+                return cur;         /* the sequence has not finished */
+        }
+    }
+
+    if (over)
+        want = alt;
+    return want;
+}
+
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
                               int32_t haveA, int32_t haveB,
                               int32_t maskA, int32_t maskB)
@@ -778,6 +833,8 @@ int misc_install(void)
                   "MaskPixelSolid32", 2);
     patch_replace(ADDR_OBJ_MASK_BIT_AT, (const void *)ObjMaskBitAt,
                   "ObjMaskBitAt", 3);
+    patch_replace(ADDR_OBJ_NEXT_KIND538, (const void *)ObjNextKind538,
+                  "ObjNextKind538", 1);
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     return 0;

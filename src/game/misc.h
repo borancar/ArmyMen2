@@ -320,6 +320,34 @@ int32_t __cdecl Field51MeetsMin(const void *p);
  * an argument. Signed comparisons, so a negative value is outside. */
 int32_t __cdecl ObjKind538In10To17(const void *obj);
 
+/* 0x0040D880. Which value of +0x538 the object should take, given the one
+ * asked for. Returns the CURRENT value when the change is refused, so a caller
+ * that stores the result unconditionally gets "no change" for free.
+ *
+ * Three things decide it, and the two tables at 0x0040D8F0 and 0x0040D8FC put
+ * every code into exactly one of three arms:
+ *
+ *   0x00, 0x20..0x24            skip the readiness test below
+ *   0x05, 0x08..0x0F            use the requested code as the override
+ *   everything else, and every  neither
+ *   code above 0x24
+ *
+ * The readiness test is also skipped when the current value is 1. It reads a
+ * sub-record at +0x74: a pointer at its +0x44 whose first int16 is a count,
+ * against an unsigned byte at its +0x51. If that byte has not reached
+ * count - 1, the change is refused. That is the shape of "this sequence has
+ * not finished yet", with the byte a position and the word a length -- and it
+ * explains the first arm, which is the set of codes allowed to interrupt.
+ *
+ * Then the override: the dword at +0x53C, when it is non-zero, replaces the
+ * answer -- with the requested code itself if the code was in the second arm,
+ * and with +0x53C's own value otherwise.
+ *
+ * Named for the field, not for what the field means. +0x538 is the same one
+ * ObjKind538In10To17 tests and +0x53C the one Field53C reads, and neither of
+ * those established what either holds. */
+int32_t __cdecl ObjNextKind538(const void *obj, int32_t want);
+
 /* 0x0041EF20. Two-criterion match, the shape this binary uses wherever a list
  * is filtered. Each criterion is one of three things:
  *
