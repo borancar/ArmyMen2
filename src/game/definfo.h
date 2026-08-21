@@ -14,6 +14,8 @@
 
 #include <stdint.h>
 
+#include "../inject/orig.h"   /* am2_FILE */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,6 +37,14 @@ int32_t __cdecl DefParseNumber(int32_t *out, const char *tok);
 /* 0x0041A640. The index of `name` in the vocabulary table, or -1. That index
  * is the command id the handlers are given. */
 int32_t __cdecl DefFindKeyword(const char *name);
+
+/* 0x0041A6B0. Read an open .aai file, dispatching each line through the
+ * vocabulary table. Closes `fp` on every exit. 1 if the whole file parsed. */
+int32_t __cdecl DefDispatchFile(am2_FILE *fp);
+
+/* 0x0041A5F0. Open one .aai file and hand it to the dispatcher, which then
+ * owns it. Ten callers. */
+int32_t __cdecl DefParseInfoFile(const char *path);
 
 int definfo_install(void);
 

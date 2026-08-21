@@ -1346,17 +1346,28 @@
 #define ADDR_DEF_NAME_INDEX        0x0041A640u  /* int32_t(const char *) */
 #define ADDR_DEF_NAME_TABLE        0x00476FE0u
 /* Twelve bytes an entry: {const char *name, int32_t value, void *handler}.
- * The INDEX is the command id -- entries 0x4F..0x5E carry DefObjLine as their
- * handler and 0x5F carries DefLinkParse, which is how 0x5F was known to be
- * LINK before any of this was reconstructed. An entry with an empty name ends
- * the table. */
+ * The handler is passed the entry's VALUE, not its index. Those coincide over
+ * the range that matters -- entries 77..96 all have value == index -- but not
+ * generally: entry 1 is "trooperlevel1" with value 45. An earlier note here
+ * said "the index IS the command id", which was true where it was looked at
+ * and wrong as a rule.
+ *
+ * Reading the table by name settles the vocabulary outright. Entries 79..94
+ * are rocks, bush, trees, ground, fence, wall, bridge, barrel, building,
+ * pillbox, aagun, tent, garage, radar, miscellaneous, powerups -- exactly
+ * DefObjParse's sixteen tokens -- and entry 95 is literally "link". An entry
+ * with an empty name ends the table. */
 #define AM2_DEF_KEYWORD_STRIDE     12
 #define ADDR_CRT_STRTOL            0x00465198u
 /* 0x0041A5F0 is DefParseInfoFile, by its own string; 0x0041A6B0 is the line
  * dispatcher it drives, and that one names itself nowhere. Both still
  * original. */
-#define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
-#define ADDR_DEF_DISPATCH_LINE     0x0041A6B0u
+#define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u  /* int32_t(const char *) */
+#define ADDR_DEF_DISPATCH_LINE     0x0041A6B0u  /* int32_t(FILE *) */
+#define ADDR_CRT_FGETS             0x004655B8u
+#define ADDR_CRT_STRLWR           0x0046D7D6u  /* the plain ASCII _strlwr */
+#define ADDR_STR_DEF_FILE_MODE     0x004779F4u  /* "rt" */
+#define AM2_DEF_LINE_MAX           0x140        /* both line buffers */
 /* strtol into *out, 0 on failure. Its one string is "Bad or missing number",
  * which names the condition and not the function -- 48 callers. */
 #define ADDR_DEF_PARSE_NUMBER      0x0041A250u  /* int32_t(int32_t *, const char *) */

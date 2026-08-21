@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 359 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 359 | 352 of them below the CRT line |
+| `patch_replace` sites | 361 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 361 | 354 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 85,952 / 372,816 B (**23.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 86,544 / 372,816 B (**23.2%**) | patched entries' sizes over the total |
 | modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,30 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **CORRECTION to the previous commit: the handler is passed the entry's
+  VALUE, not its index.** The dispatcher reads `[eax + 0x476FE4]`, the `+4`
+  field, and hands that to the handler. Value and index coincide for entries
+  77..96 -- which is every keyword with a handler I had looked at -- so
+  "the index IS the command id" survived the off-by-one mutation that shifts
+  BOTH. It is wrong as a rule: entry 1 is "trooperlevel1" with value 45. And it
+  is observably wrong, not just pedantically: passing the index instead moves
+  `campaign` from 2,571 to 2,616 differing pixels, because the entries where
+  they disagree have a handler of their own at `0x0044CDA0`.
+
+- **The .aai vocabulary can be read by name, which ends the guessing.**
+  Entries 79..94 of the table are rocks, bush, trees, ground, fence, wall,
+  bridge, barrel, building, pillbox, aagun, tent, garage, radar,
+  miscellaneous, powerups -- exactly DefObjParse's sixteen tokens, in order --
+  and entry 95 is literally "link". `AM2_DEF_CMD_LINK = 0x5F` began as an
+  inference from a bare `cmp`; it is now the name in the table.
+
+- **A counter can survive its caller being reconstructed if the call goes
+  through a POINTER in the image.** `DefFindKeyword` fell 395 -> 0 when
+  DefDispatchFile became ours, the ordinary blind spot. `DefObjLine` stayed at
+  183 through the same change, because the dispatcher reaches it through the
+  vocabulary table's function pointer -- the original address, so still the
+  patched entry. Same commit, same caller, opposite outcomes.
 
 - **The .aai handlers are reached through a table, not a call, which is why
   `tools/callsites.py` reports them as having no callers at all.** Neither
