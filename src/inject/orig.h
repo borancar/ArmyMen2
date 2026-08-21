@@ -1314,6 +1314,17 @@
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
 #define ADDR_DEF_GAME_PARSE        0x00424590u
 #define ADDR_DEF_OBJ_PARSE         0x00435B60u
+/* docs/functions.tsv merges THREE things into the 768-byte entry here:
+ * DefObjParse itself (0x00435B60, a jump table over sixteen tokens), the table
+ * at 0x00435BD8, and a separate OBJ-line parser at 0x00435C20 that zeroes a
+ * 56-byte record and calls DefObjParse to fill its first field.
+ *
+ * That matters for naming. DefObjParse's own default arm is `or eax,-1; ret`
+ * and logs NOTHING; the string "DefObjParse: Bad object Constant Type" is at
+ * 0x00435C4C, inside the CALLER. So the self-naming sweep attributed the name
+ * through a merge, and was right only by luck -- the caller happens to name
+ * the callee it just complained about. */
+#define ADDR_DEF_OBJ_LINE          0x00435C20u  /* the OBJ-line parser */
 
 /* The object-definition files (.aai) have a command vocabulary of their OWN --
  * it is not docs/scripttokens.md's. 0x5F is LINK there; in the script table 95

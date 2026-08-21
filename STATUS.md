@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 353 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 353 | 346 of them below the CRT line |
+| `patch_replace` sites | 354 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 354 | 347 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 84,720 / 372,816 B (**22.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 85,488 / 372,816 B (**22.9%**) | patched entries' sizes over the total |
 | modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The self-naming sweep attributes a string to whatever `functions.tsv` says
+  contains it, and merged entries make that a guess.** `DefObjParse`'s own
+  default arm is `or eax,-1; ret` and logs NOTHING. The string "DefObjParse:
+  Bad object Constant Type" is at `0x00435C4C`, inside a DIFFERENT function --
+  the OBJ-line parser at `0x00435C20`, which `functions.tsv` merges into the
+  same 768-byte entry. The sweep got the right name only because a caller
+  happens to name the callee it is complaining about. Treat "function X names
+  itself" as "something inside X's ENTRY names X" until the entry is known not
+  to be merged; that is now three merged entries found in this one band.
+
+- **The .aai chain is verified end to end by one legible mutation.** Changing
+  `DefObjParse`'s token `0x5B` from 33 to 34 turns the startup complaint from
+  "link 33-4" into "link 34-4". So the keyword maps to 33 in DefObjParse,
+  DefLinkParse packs it with PackKey, DefCheckLinks unpacks it with KeyFieldA
+  and prints it -- four reconstructed functions and the game's own message
+  agreeing on one number.
 
 - **Passing a comparator by ADDRESS rather than as our own symbol keeps its
   counter honest.** `DefFindObjRec` hands bsearch `AM2_IMAGE(ADDR_COMPARE_TRIPLE)`

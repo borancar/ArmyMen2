@@ -43,6 +43,10 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line);
 /* 0x00435FA0. How many links already name this parent key. */
 int32_t __cdecl DefCountLinks(int32_t parentkey);
 
+/* 0x00435B60. Map an .aai object keyword (tokens 0x4F..0x5E) to its object
+ * type constant, or -1. Logs nothing -- its caller does that. */
+int32_t __cdecl DefObjParse(int32_t token);
+
 /* 0x00435FD0. Sort the link table, then check each distinct parent against the
  * object records -- storing its link count, or complaining that the record is
  * missing. A role name; it names itself nowhere. */

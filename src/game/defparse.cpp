@@ -14,13 +14,11 @@
  * would be a second, unrelated cursor. */
 typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 typedef int32_t (__cdecl *AM2_DefNameIndexFn)(const char *name);
-typedef int32_t (__cdecl *AM2_DefObjParseFn)(int32_t nameindex);
 typedef int32_t (__cdecl *AM2_DefParseNumberFn)(int32_t *out, const char *tok);
 
 #define orig_strtok        (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
 #define orig_def_name_index \
     (*(AM2_DefNameIndexFn)AM2_IMAGE(ADDR_DEF_NAME_INDEX))
-#define orig_def_obj_parse (*(AM2_DefObjParseFn)AM2_IMAGE(ADDR_DEF_OBJ_PARSE))
 #define orig_def_number    (*(AM2_DefParseNumberFn)AM2_IMAGE(ADDR_DEF_PARSE_NUMBER))
 
 #define kSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
@@ -43,7 +41,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * line; the rest continue from strtok's own state. */
 static int32_t NextType(char *line)
 {
-    return orig_def_obj_parse(orig_def_name_index(orig_strtok(line, kSep)));
+    return DefObjParse(orig_def_name_index(orig_strtok(line, kSep)));
 }
 
 static int32_t NextNumber(int32_t *out)
@@ -109,6 +107,40 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
 
     DefAddLink(&link);
     return 0;
+}
+
+/* 0x00435B60. Map one .aai object keyword to its object type constant.
+ *
+ * A jump table over sixteen consecutive tokens, 0x4F..0x5E, and the mapping is
+ * neither contiguous nor monotonic -- 20..23, then 25..27, 29, then 37, 38,
+ * then 31..33, then 42, 43, 45. Read from the TABLE at 0x00435BD8 rather than
+ * from the order the arms are laid out in, per the rule in CLAUDE.md; here the
+ * two happen to agree, which is exactly what makes the check worth doing
+ * rather than skipping.
+ *
+ * Anything else returns -1 and logs nothing. The string that names this
+ * function lives in its caller, which complains about the -1. */
+int32_t __cdecl DefObjParse(int32_t token)
+{
+    switch (token) {
+    case 0x4F: return 20;
+    case 0x50: return 21;
+    case 0x51: return 22;
+    case 0x52: return 23;
+    case 0x53: return 25;
+    case 0x54: return 26;
+    case 0x55: return 27;
+    case 0x56: return 29;
+    case 0x57: return 37;
+    case 0x58: return 38;
+    case 0x59: return 31;
+    case 0x5A: return 32;
+    case 0x5B: return 33;
+    case 0x5C: return 42;
+    case 0x5D: return 43;
+    case 0x5E: return 45;
+    default:   return -1;
+    }
 }
 
 /* 0x00435AC0. Find the object record for a (type, a, b) triple, falling back
@@ -319,5 +351,7 @@ int defparse_install(void)
                         "DefFindLink", 2);
     rc |= patch_replace(ADDR_DEF_FIND_OBJ_REC, (const void *)DefFindObjRec,
                         "DefFindObjRec", 3);
+    rc |= patch_replace(ADDR_DEF_OBJ_PARSE, (const void *)DefObjParse,
+                        "DefObjParse", 1);
     return rc;
 }
