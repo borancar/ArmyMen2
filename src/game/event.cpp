@@ -1501,6 +1501,56 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
     }
 }
 
+/* ------------------------------------------- object table record ---- */
+
+/* 0x0041FF60. Point an object at one of the 256-byte records at
+ * 0x004F9ACC. What they hold is not established.
+ *
+ * Kinds 2 and 3 are handled identically apart from WHICH pointer is written --
+ * +0x4C0 for one and +0x4C8 for the other, both inside the sub-record at
+ * obj+0x6C -- and then both propagate the same value through SetFieldInAll.
+ * Two nearly-identical arms rather than one with a computed offset is how the
+ * original does it, and reproducing that keeps the two kinds visibly distinct
+ * rather than merged behind an arithmetic trick.
+ *
+ * Any other kind is refused with a complaint that names the CONDITION and not
+ * the function, so this one keeps a role name. Object kinds 2 and 3 are two of
+ * the three CLAUDE.md still lists as unidentified; that they share this
+ * treatment and differ only by one field is a fact about them worth having.
+ *
+ * There is no bounds check on `index`. The record is at
+ * 0x004F9ACC + index * 0x100 whatever `index` is. */
+void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
+{
+    uint8_t *obj = (uint8_t *)LookupByUID(uid);
+    uint8_t *sub;
+    void    *rec;
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    rec = (uint8_t *)AM2_IMAGE(ADDR_OBJ_TABLE_RECORDS)
+        + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE;
+    sub = obj + OBJ_OFF_SUBRECORD;
+
+    switch (*(const int32_t *)obj) {
+    case 2:
+        *(void **)(sub + SUBREC_OFF_TABLE_KIND2) = rec;
+        SetFieldInAll(sub, rec);
+        return;
+
+    case 3:
+        *(void **)(sub + SUBREC_OFF_TABLE_KIND3) = rec;
+        SetFieldInAll(sub, rec);
+        return;
+
+    default:
+        orig_log("Warning: check if this script command works with this "
+                 "object type!\n");
+        return;
+    }
+}
+
 /* ------------------------------------------------ cond tests ---- */
 
 typedef int32_t (__cdecl *AM2_EvalOperandFn)(int32_t a, int32_t b, int32_t c);
@@ -1735,6 +1785,9 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_SCRIPT_SET_OBJ_TABLE,
+                        (const void *)ScriptSetObjTable,
+                        "ScriptSetObjTable", 1);
     rc |= patch_replace(ADDR_EVAL_COND_TESTS, (const void *)EvalCondTests,
                         "EvalCondTests", 6);
     rc |= patch_replace(ADDR_ADVANCE_MISSION, (const void *)AdvanceMission,

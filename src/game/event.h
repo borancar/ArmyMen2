@@ -108,6 +108,11 @@ uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me);
  * passes trivially, and an unknown operator passes. Six callers. */
 int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c);
 
+/* 0x0041FF60. Point an object at one of the 256-byte records and
+ * propagate it. Kinds 2 and 3 only, differing by one field offset; any other
+ * kind is refused with a warning. No bounds check on `index`. */
+void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index);
+
 /* 0x00421C40. Route the end of a mission: the script-file loader in single
  * player, a networked path otherwise. The two arms take different arguments. */
 void __cdecl AdvanceMission(int32_t a, int32_t b);

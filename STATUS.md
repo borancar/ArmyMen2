@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 395 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 395 | 388 of them below the CRT line |
+| `patch_replace` sites | 396 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 396 | 389 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 91,328 / 372,816 B (**24.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 91,440 / 372,816 B (**24.5%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,21 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A redefinition warning caught a name that was a guess AND a clash.**
+  `AM2_OBJ_STATE_REC_SIZE` already meant `AM2_ObjState`'s sixteen bytes; I
+  reused it for a 256-byte record in an unrelated table, on the strength of
+  calling those records "state" without evidence. GCC said `redefined` --
+  audible only because that warning stopped being filtered several commits ago
+  -- and the fix was both to rename and to stop claiming what the records hold.
+  Two mistakes, one warning.
+
+- **Object kinds 2 and 3 get identical treatment differing by one field.**
+  `ScriptSetObjTable` writes `+0x4C0` for kind 2 and `+0x4C8` for kind 3 inside
+  the sub-record at `obj+0x6C`, then propagates the same value through
+  SetFieldInAll for both. Two of the three kinds CLAUDE.md lists as
+  unidentified, and that they are this close together is a fact about them
+  worth keeping.
 
 - **Name a function from the body at the OTHER end of its calls too.** The
   alias ratchet refused `ADDR_COND_LOCAL` on `0x00421890`, which already held
@@ -252,7 +267,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **19 functions are left in the event.cpp band, and most are tiny.** Four
+- **18 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

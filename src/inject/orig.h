@@ -1430,6 +1430,20 @@
  * AM2_ScriptTest's size. Six callers. */
 #define ADDR_EVAL_COND_TESTS     0x00421750u  /* int32_t(AM2_ScriptCond *) */
 #define ADDR_EVAL_OPERAND        0x00421590u  /* int32_t(a, b, c) -- a triple */
+/* 0x0041FF60. Point an object at one of the 256-byte records at 0x004F9ACC
+ * and propagate it with SetFieldInAll. What those records HOLD is not
+ * established -- "state" was a guess, and AM2_OBJ_STATE_REC_SIZE already means
+ * AM2_ObjState's sixteen bytes, which is a different thing entirely. Kinds 2 and 3
+ * are handled identically except for WHICH pointer is written -- +0x4C0 and
+ * +0x4C8 of the sub-record at obj+0x6C -- and any other kind is refused with
+ * "Warning: check if this script command works with this object type!", which
+ * names the condition rather than the function. Role name. */
+#define ADDR_SCRIPT_SET_OBJ_TABLE 0x0041FF60u  /* void(uint32_t, int32_t) */
+#define ADDR_OBJ_TABLE_RECORDS    0x004F9ACCu
+#define AM2_OBJ_TABLE_REC_SIZE    0x100
+#define OBJ_OFF_SUBRECORD         0x6Cu
+#define SUBREC_OFF_TABLE_KIND2    0x4C0u
+#define SUBREC_OFF_TABLE_KIND3    0x4C8u
 /* 0x00421C40. Routes the end of a mission: in single player straight to
  * ADDR_SCRIPT_FIND_FILE, which builds "%s%d.txt" and loads the next script,
  * and in a multiplayer session to 0x00421800 instead -- which takes an extra
