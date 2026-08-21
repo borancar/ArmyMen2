@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `323ff49`. Working tree clean.
+Last updated: **2026-08-21**, at `412efb8`. Working tree clean.
 
 ## In flight
 
@@ -68,8 +68,8 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 320 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 320 | 313 of them below the CRT line |
+| `patch_replace` sites | 328 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 328 | 321 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
@@ -115,20 +115,36 @@ counts probe before reading one as coverage -- that is what turned the
    save present should do it, with no menu navigation at all. That would cover
    `CheckSaveTag`, `LoadScriptCond`, `LoadEventSection`, `LoadScriptConditions`
    and `LoadItems` in one run.
-3. **Nine save/load section pairs, in the same order, each saver immediately
+3. **The savegame subsystem is most of the way done.** Ours now: WriteSaveTag,
+   SaveItems/LoadItems, SaveScriptConditions, SaveMapSection/LoadMapSection,
+   SaveEventBlock/LoadEventBlock, ResetPads/SavePadSection/LoadPadSection and
+   SaveEventSection -- eleven functions across five modules, two of them
+   (`map.cpp`, `pad.cpp`) new and named by the image. Next is the script trio,
+   fully read and needing no new infrastructure: `0x0043F030` FreeScriptNames,
+   `0x0043F0A0` the saver, `0x0043F150` the loader.
+4. **Nine save/load section pairs, in the same order, each saver immediately
    before its loader in the image** -- read out of `SaveGame` and `LoadGame`
    separately and they agree. That names four unreconstructed targets by
    structure: `0x0041EC20` (80 B, mirrors the reconstructed
    `LoadScriptConditions`), `0x00422470` (368 B, mirrors `LoadEventSection`),
    `0x0041E9E0` (64 B) and `0x0043F0A0` (176 B). Reconstructing a saver whose
    loader is already ours makes the round trip check both halves at once.
-4. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
+5. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
    median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
    928 B, 14 callers) is the hub two of them already reach by address.
-5. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
+6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
 
+- **The savegame oracle needs a control, and the campaign drive is not
+  deterministic to the uid.** Two runs of one tree gave 766 differing bytes and
+  then 391 -- every difference a UNIFORM shift of every stored uid, by -125 in
+  one run and -71 in the other, in exactly the two sections that store uids.
+  The two sides reach the autosave having allocated different numbers. So a
+  clean comparison (nothing but heap pointers) is strong evidence, and a
+  difference in a uid-bearing section is not evidence of anything without a
+  control -- the same relationship `ab.sh`'s pixel figure has with its budget.
+  It was read as a regression twice before it was measured.
 - **A savegame is an exact oracle the log-and-pixel A/B cannot be.** A
   mis-serialised save shows in neither the log nor the screen. Comparing the
   `.sav` two runs produce catches what `ab.sh` structurally cannot -- and it
