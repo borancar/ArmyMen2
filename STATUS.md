@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 369 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 369 | 362 of them below the CRT line |
+| `patch_replace` sites | 371 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 371 | 364 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 89,104 / 372,816 B (**23.9%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 89,360 / 372,816 B (**24.0%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,17 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The line trio is MENU drawing, and that makes it drivable -- just not by
+  this drive.** `DrawRect`'s only caller is `0x00413610`, which is itself the
+  first entry on CLAUDE.md's bracket shortlist, and chasing it upward reaches
+  `0x00425EE0` (the menu-request consumer, under `ADDR_STATE2_FRAME`) and a
+  widget helper at `0x0044D6D0` with seven callers spread through the
+  `0x0045xxxx` menu code. So a rectangle outline is a widget border, and the
+  reason all three read 0 is that the campaign drive visits SINGLE PLAYER and
+  nothing else. A drive through OPTIONS or the in-mission menu would very
+  likely light them up -- the cheapest observability win currently on the
+  table, and it needs a drive rather than a reconstruction.
 
 - **A rasteriser is not automatically observable.** I switched to CLAUDE.md's
   Lock/Unlock bracket list precisely because those draw PIXELS and the A/B

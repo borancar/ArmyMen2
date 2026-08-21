@@ -755,9 +755,76 @@ static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
     } while (p <= end);
 }
 
+/* 0x0041CC40. The horizontal twin of DrawVLine.
+ *
+ * Same shape throughout: the same inert ADDR_NULL_STUB call when the ends are
+ * the wrong way round, the same asymmetric clip -- `right` and `bottom`
+ * exclusive, `left` and `top` inclusive -- and the same Lock without an
+ * Unlock.
+ *
+ * Where it differs is the fill. A vertical line steps by the pitch and can
+ * only go a byte at a time; a horizontal one is contiguous, so the original
+ * replicates the colour byte into a dword, `rep stosd` for count/4 and
+ * `rep stosb` for the remaining count&3. That is memset exactly, and it is
+ * written as memset here -- same bytes, and the shift-and-or dance says
+ * nothing a reader needs.
+ *
+ * Note there is no `p > end` guard like DrawVLine's, because the count is
+ * computed as x1 - x0 + 1 and the clip has already ordered them. An inverted
+ * line still cannot reach here: it is dropped by the clip returning early. */
+static void __cdecl DrawHLine(int32_t y, int32_t x0, int32_t x1,
+                              int32_t colour)
+{
+    uint8_t *p;
+    int32_t  count;
+
+    if (x0 > x1)
+        NullStub();
+
+    if (y < g_screenClip.top || y >= g_screenClip.bottom)
+        return;
+
+    if (x0 >= g_screenClip.right || x1 < g_screenClip.left)
+        return;
+
+    if (x0 < g_screenClip.left)
+        x0 = g_screenClip.left;
+
+    if (x1 >= g_screenClip.right)
+        x1 = g_screenClip.right - 1;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    p     = g_framebuffer + (int32_t)g_pitch * y + x0;
+    count = x1 - x0 + 1;
+
+    memset(p, (uint8_t)colour, (size_t)count);
+}
+
+/* 0x0041CDC0. The rectangle outline the two line drawers exist for: left and
+ * right edges, then top and bottom.
+ *
+ * `right` and `bottom` are drawn ON, so the rectangle is inclusive at every
+ * edge -- while the clip inside the line drawers treats those same two as
+ * exclusive bounds of the SCREEN. The two meanings coexist because they are
+ * about different rectangles; it is still the kind of thing to read twice.
+ *
+ * The original pushes all sixteen arguments and cleans them with one
+ * `add esp, 0x40` after the last call. */
+static void __cdecl DrawRect(const AM2_Rect *r, int32_t colour)
+{
+    DrawVLine(r->left,  r->top,  r->bottom, colour);
+    DrawVLine(r->right, r->top,  r->bottom, colour);
+    DrawHLine(r->top,    r->left, r->right, colour);
+    DrawHLine(r->bottom, r->left, r->right, colour);
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
+    patch_replace(ADDR_DRAW_HLINE, (const void *)DrawHLine, "DrawHLine", 2);
+    patch_replace(ADDR_DRAW_RECT, (const void *)DrawRect, "DrawRect", 2);
     int rc = 0;
 
     rc |= patch_replace(ADDR_MERGE_DIRTY, (const void *)ScrollView,

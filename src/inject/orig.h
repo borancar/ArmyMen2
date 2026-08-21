@@ -64,6 +64,11 @@
  * It names itself nowhere, so this is a role name; two callers. One of the 29
  * functions in CLAUDE.md's Lock/Unlock bracket list. */
 #define ADDR_DRAW_VLINE     0x0041CBA0u  /* void(x, y0, y1, colour) */
+#define ADDR_DRAW_HLINE     0x0041CC40u  /* void(y, x0, x1, colour) */
+/* The rectangle outline both of them serve: two vertical edges then two
+ * horizontal ones, all four INCLUSIVE of `right` and `bottom` -- which the
+ * clipping inside the line drawers treats as exclusive. One caller. */
+#define ADDR_DRAW_RECT      0x0041CDC0u  /* void(const AM2_Rect *, colour) */
 
 /* ---- DirectDraw ------------------------------------------------------
  *

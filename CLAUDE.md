@@ -1132,7 +1132,7 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **5** are reconstructed
+  all. Measured: **29 functions** call the bracket and **6** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates.
 
@@ -1144,10 +1144,13 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   software RASTERISERS, which are a rewrite goal of their own. It is not the
   Win32/DirectX boundary and finishing it is not required for that boundary to
   be complete — every lock in the image already goes through our `LockSurface`.
-  `0x0041CBA0` is done -- `DrawVLine` in `win32/mapdraw.cpp`, a clipped
-  vertical line straight into the locked framebuffer. Worth knowing before
-  taking the next one: it Locks and never Unlocks, so the pairing is the
-  caller's, and several of the 29 will be half-brackets like that.
+  The line trio is done -- `DrawVLine` (`0x0041CBA0`), `DrawHLine`
+  (`0x0041CC40`) and the `DrawRect` (`0x0041CDC0`) that calls both, all in
+  `win32/mapdraw.cpp`. Worth knowing before taking the next one: both line
+  drawers Lock and never Unlock, so the pairing is the caller's, and several of
+  the 29 will be half-brackets like that. Worth knowing too that none of the
+  three executes on any drive this project has -- being a rasteriser does not
+  make a function reachable.
   Smallest first: `0x00413610` (128 B), `0x00454F00` (144 B),
   (160 B), `0x0041CC40` (160 B), `0x0041C7F0` (176 B).
 - **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
