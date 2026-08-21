@@ -1336,6 +1336,16 @@
 #define ADDR_DEF_LINK_COUNT        0x00516180u
 #define ADDR_DEF_COUNT_LINKS       0x00435FA0u  /* int32_t(int32_t parentkey) */
 #define ADDR_DEF_ADD_LINK          0x00435EE0u  /* void(const AM2_DefLink *) */
+/* 0x00435FD0 names itself nowhere; this is a ROLE. After every LINK line is
+ * parsed it sorts the table with ComparePair (already ours) through the CRT's
+ * qsort, then walks the distinct parent keys: each is unpacked with KeyFieldA
+ * and KeyFieldB -- confirming from the far side that DefLinkParse packs
+ * (type, number) -- and either has its link count stored into the AAI record
+ * or produces "Object AAI record not found for link %02d-%-3d". */
+#define ADDR_DEF_CHECK_LINKS       0x00435FD0u  /* void(void) */
+#define ADDR_DEF_FIND_OBJ_REC      0x00435AC0u  /* void *(int32,int32,int32) */
+#define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
+#define ADDR_CRT_QSORT             0x004660B2u
 #define ADDR_CRT_STRTOK            0x0046551Cu  /* the game's own; the state is
                                                  * shared with DefObjParse, so
                                                  * libc's would be wrong */

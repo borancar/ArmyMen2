@@ -40,6 +40,14 @@ typedef struct {
  * the CRT's strtok state with whatever else is parsing. */
 int32_t __cdecl DefLinkParse(int32_t cmd, char *line);
 
+/* 0x00435FA0. How many links already name this parent key. */
+int32_t __cdecl DefCountLinks(int32_t parentkey);
+
+/* 0x00435FD0. Sort the link table, then check each distinct parent against the
+ * object records -- storing its link count, or complaining that the record is
+ * missing. A role name; it names itself nowhere. */
+void __cdecl DefCheckLinks(void);
+
 int defparse_install(void);
 
 #ifdef __cplusplus

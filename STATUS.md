@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 348 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 348 | 341 of them below the CRT line |
+| `patch_replace` sites | 350 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 350 | 343 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 84,144 / 372,816 B (**22.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 84,368 / 372,816 B (**22.6%**) | patched entries' sizes over the total |
 | modules | 25 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,21 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The link table is now confirmed from three sides.** `DefLinkParse` PACKS
+  `(type, number)` into the parent key with `PackKey`; `DefCheckLinks` UNPACKS
+  the same key with `KeyFieldA`/`KeyFieldB` to print "link 33-1"; and the
+  qsort it runs first is given stride `0x14` and `ComparePair`, which is the
+  record size arrived at independently from the table's search wrapper. Three
+  readings, one layout, none of them taken from the others.
+
+- **The original makes a bare `Log()` call with no format pushed.**
+  `DefCheckLinks` does it right after qsort: the callee reads whatever sits
+  above the popped arguments. Every observed run has that slot at 0 --
+  `trace Log#10(00000000)` -- so the reconstruction passes a literal 0 rather
+  than reading its own stack garbage, which would be mechanism-faithful and
+  less reproducible. Documented at the call site; the logger is a `ret` here,
+  so nothing but the trace line can see it.
 
 - **A name collision in orig.h, not an address collision -- and the build said
   so while a filter ate it.** `ADDR_DEF_LINK_PARSE` already existed, pointing
