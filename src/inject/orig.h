@@ -1526,7 +1526,21 @@
 
 /* The packet transmit and the three helpers its watchdog uses. */
 #define ADDR_COMM_SEND           0x0040EB70u  /* thiscall int32(this,id,flags,buf,len) */
+/* Kept as PLAYER rather than renamed to FLOWQ, having checked both. The two
+ * accessors below call what this returns a "Flowq" -- "No Flowq for %X" -- and
+ * so does 0x004014C0 ("Interrupt Level Can't find FlowQ for %x"). But CommSend
+ * logs "DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x" for the very same id, so
+ * both words are the program's own: it is a player's record, and the
+ * flow-control code calls that record a FlowQ. One thing, two vocabularies,
+ * and no reason to prefer either name.
+ *
+ * It scans six 0x7E0-byte records at 0x004F1980 and does NOT stop at the first
+ * match -- eax is overwritten each time -- so the LAST match wins. */
 #define ADDR_FIND_PLAYER_BY_ID   0x00402990u  /* void *(uint32 id); NULL when unknown */
+
+/* Two masks out of that record, each named by its own error message. */
+#define ADDR_GET_PLAYER_MASK     0x00402BD0u  /* uint32_t(uint32_t id) -- +0x14 */
+#define ADDR_GET_RESEND_MASK     0x00402C00u  /* uint32_t(uint32_t id) -- +0x18 */
 #define ADDR_GET_PAUSE_FLAGS     0x00426840u  /* uint32(void) */
 #define ADDR_STR_SEND_BADPLAYER  0x004754ACu
 #define ADDR_STR_SEND_BADPARAM   0x00475478u

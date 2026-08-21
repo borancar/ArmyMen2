@@ -3,6 +3,7 @@
 
 #include "msgslot.h"
 #include "../inject/orig.h"
+#include "crt.h"        /* am2_log */
 #include "../inject/patch.h"
 
 /* The null check comes first in every one of the six, before the division, so
@@ -104,6 +105,37 @@ void __cdecl CommRemoveKeyed(void *comm, uint32_t key)
     }
 }
 
+/* The record these read is reached through the image's own lookup, which is
+ * not reconstructed. See ADDR_FIND_PLAYER_BY_ID for why it keeps that name
+ * when these two messages call the record a Flowq. */
+typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
+#define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
+
+#define AM2_FLOW_PLAYER_MASK  0x14
+#define AM2_FLOW_RESEND_MASK  0x18
+
+uint32_t __cdecl GetPlayerMask(uint32_t id)
+{
+    void *q = orig_find_player(id);
+
+    if (!q) {
+        am2_log("ERROR: GetPlayerMask: No Flowq for %X\n", id);
+        return 0;
+    }
+    return *(uint32_t *)((uint8_t *)q + AM2_FLOW_PLAYER_MASK);
+}
+
+uint32_t __cdecl GetReSendMask(uint32_t id)
+{
+    void *q = orig_find_player(id);
+
+    if (!q) {
+        am2_log("ERROR: GetReSendMask: No Flowq for %X\n", id);
+        return 0;
+    }
+    return *(uint32_t *)((uint8_t *)q + AM2_FLOW_RESEND_MASK);
+}
+
 int msgslot_install(void)
 {
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
@@ -117,5 +149,9 @@ int msgslot_install(void)
     patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
     patch_replace(ADDR_COMM_REMOVE_KEYED, (const void *)CommRemoveKeyed,
                   "CommRemoveKeyed", 2);
+    patch_replace(ADDR_GET_PLAYER_MASK, (const void *)GetPlayerMask,
+                  "GetPlayerMask", 4);
+    patch_replace(ADDR_GET_RESEND_MASK, (const void *)GetReSendMask,
+                  "GetReSendMask", 1);
     return 0;
 }

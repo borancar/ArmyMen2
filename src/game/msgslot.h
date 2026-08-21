@@ -84,6 +84,18 @@ void __cdecl RingPush32(void *comm, uint32_t value);
  * call site. The reading is recorded; the name does not depend on it. */
 void __cdecl CommRemoveKeyed(void *comm, uint32_t key);
 
+/* 0x00402BD0 and 0x00402C00. Two dwords out of a player's flow record, looked
+ * up by id through 0x00402990: the mask at +0x14 and the one at +0x18. Both
+ * are named by their own error messages, which are identical but for the
+ * name, and both answer 0 when there is no record for that id -- after
+ * logging, so a missing record is loud rather than silent.
+ *
+ * They are the same function twice with a different offset, which is a shape
+ * this file already has in the six MsgSlot writers. Kept as two, because the
+ * image has them as two and the messages differ. */
+uint32_t __cdecl GetPlayerMask(uint32_t id);
+uint32_t __cdecl GetReSendMask(uint32_t id);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus
