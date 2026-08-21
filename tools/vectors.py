@@ -119,6 +119,12 @@ ARG_KIND_OVERRIDE = {
     # `rep movsd` when the table is NULL. The last two are not arguments at
     # all; a cdecl callee simply ignores them.
     0x0041BB60: {3: "scalar"},
+    # MaskPixelSolid32(x, y, mask): `y` is scaled by 4 to index the row table,
+    # and that scaling is enough to make the classifier call it a pointer --
+    # the word-table twin, which scales by 2, is classified correctly. A
+    # pointer-sized y fails the height check and the decode loop is never
+    # entered at all.
+    0x0041CEC0: {1: "scalar"},
 }
 
 # Per-argument value sets, for functions whose scalars are a geometry rather
@@ -139,6 +145,10 @@ ARG_KIND_OVERRIDE = {
 #
 # {function: {arg index: [values]}}
 ARG_VALUES = {
+    # MaskPixelSolid32: x just past the width and y just past the height, so
+    # both bounds returns are reached.
+    0x0041CEC0: {0: [0, 1, 2, 3, 7, 16, 31, 32, 63, 64, 65],
+                 1: [0, 1, 2, 3, 4]},
     # RemapBytes(dst, src, table, count). The count is a byte at both call
     # sites (`and edi, 0xFF`) and goes into `rep movsd` unsigned when the
     # table is NULL, so a random 32-bit one copies 4GB and faults.
@@ -194,6 +204,30 @@ SEED = {
                  (0, 0x94, "ptr", 0x900), (-1, 0x900, "u32v", 0x1F)],
     0x0043D550: [(0, 0x14, "u32v", 1), (0, 0x18, "u32v", 0)],
     0x00429F20: [(1, 0x00, "ptr", 0x900)],
+    # MaskPixelSolid32(x, y, mask). The row table holds DWORD offsets, so a
+    # pattern dword sends `row` gigabytes outside the scratch and the vector
+    # faults -- the word-table version survives on raw pattern only because a
+    # word cannot exceed 64K. Plant a header (width 0x40, height 3) and four
+    # row offsets; the [skip][run] bytes there stay pattern, which is fine
+    # because the walk stops at the first accumulator past x and x is at
+    # most 65.
+    # Header (width 0x40, height 3), four row offsets, and two [skip][run]
+    # pairs per row. The RLE bytes have to be planted too: left as pattern,
+    # the first skip is a random 0..255 and almost always exceeds x, so every
+    # vector took the transparent-run exit and the entire solid-run half of
+    # the loop -- 13 instructions including the `return 1` -- was unreached.
+    #
+    # A dword 0x00000201 is [skip=1][run=2][pixel][pixel], and the walk lands
+    # on the next pair four bytes along. The first skip differs per row (1, 5,
+    # 9, 13) so the answer depends on y, which a single shared row would not
+    # have tested.
+    0x0041CEC0: [(2, 0x00, "u32", 0x00030040),
+                 (2, 0x04, "u32", 0x40), (2, 0x08, "u32", 0x50),
+                 (2, 0x0C, "u32", 0x60), (2, 0x10, "u32", 0x70),
+                 (2, 0x40, "u32", 0x00000201), (2, 0x44, "u32", 0x00000201),
+                 (2, 0x50, "u32", 0x00000205), (2, 0x54, "u32", 0x00000201),
+                 (2, 0x60, "u32", 0x00000209), (2, 0x64, "u32", 0x00000201),
+                 (2, 0x70, "u32", 0x0000020D), (2, 0x74, "u32", 0x00000201)],
 }
 
 
@@ -696,22 +730,33 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
             # wanted a coordinate, it got stored into the rectangle, and the
             # write comparison then read it back as a pointer and failed with
             # identical-looking values on both sides.
-            same = lambda i, j: kinds.get(i, "scalar") == kinds.get(j, "scalar")
+            same = lambda i, j: (kinds.get(i, "scalar") == kinds.get(j, "scalar")
+                                 and i not in argvals)
+            # An argument with an explicit ARG_VALUES set is not a candidate
+            # for any of this. These correlations are guesses about what a
+            # relation between two unknown arguments might be; a declared value
+            # set says what the argument MEANS, and overwriting it throws that
+            # away. MaskPixelSolid32 lost almost all of its (x, y) pairs to
+            # `args[nargs-2] = args[0]` and `args[0] = -1`: of 55 combinations
+            # only four ever reached the decode loop, and the one that would
+            # have separated `acc >= x` from `acc > x` was not among them.
+            free = lambda i: (kinds.get(i, "scalar") != "ptr"
+                              and i not in argvals)
             if k % 4 == 1:
                 for i in range(nargs // 2, nargs):
                     if same(i, i - nargs // 2):
                         args[i] = args[i - nargs // 2]
             elif k % 4 == 2 and nargs >= 3:
-                if kinds.get(nargs - 1, "scalar") != "ptr":
+                if free(nargs - 1):
                     args[nargs - 1] = -1
                 if same(nargs - 2, 0):
                     args[nargs - 2] = args[0]
             elif k % 8 == 3 and nargs >= 3:
                 # All bits set is the natural superset, which is what a subset
                 # test needs on its other side.
-                if kinds.get(nargs - 1, "scalar") != "ptr":
+                if free(nargs - 1):
                     args[nargs - 1] = -1
-                if kinds.get(nargs - 2, "scalar") != "ptr":
+                if free(nargs - 2):
                     args[nargs - 2] = -1
 
             # Neutralise the FIRST argument, INDEPENDENTLY of the correlations
@@ -721,7 +766,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
             # exactly this reason. -1 and 0 are the two wildcards this binary
             # uses. (Written as its own `if`: as an `elif` it never fired,
             # because every k it selects is already claimed above.)
-            if kinds.get(0, "scalar") != "ptr":
+            if free(0):
                 if k % 8 == 5:
                     args[0] = 0xFFFFFFFF
                 elif k % 8 == 7:
@@ -889,7 +934,8 @@ def main():
                 "ADDR_FACING_DELTA_14", "ADDR_MAP_CODE_18_28",
                 "ADDR_MEETS_ALL_THREE",
                 "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
-                "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES"]
+                "ADDR_LIST_UNLINK", "ADDR_REMAP_BYTES",
+                "ADDR_MASK_PIXEL_SOLID32"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -993,6 +1039,7 @@ def main():
         "ADDR_RING_PUSH_32": "RingPush32",
         "ADDR_LIST_UNLINK": "ListUnlink",
         "ADDR_REMAP_BYTES": "RemapBytes",
+        "ADDR_MASK_PIXEL_SOLID32": "MaskPixelSolid32",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the

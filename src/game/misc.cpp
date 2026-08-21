@@ -318,7 +318,12 @@ int32_t __cdecl KindInSetB(int32_t kind)
     return yes[i];
 }
 
-int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
+/* Shared body. `wide_rows` selects the row table's entry width, which is the
+ * only thing that differs between 0x0041CF20 and 0x0041CEC0 -- and it is a
+ * genuine difference, not a tidy-up: one reads a word at m+4+y*2 and the other
+ * a dword at m+4+y*4. Everything below that line is the same in both. */
+static int32_t MaskSolid(uint32_t x, uint32_t y, const void *mask,
+                         int32_t wide_rows)
 {
     const uint8_t *m = (const uint8_t *)mask;
     uint16_t       xw = (uint16_t)x;
@@ -330,7 +335,9 @@ int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
     if ((uint16_t)y > *(const uint16_t *)(m + 2))
         return 0;
 
-    row = m + *(const uint16_t *)(m + 4 + (uint32_t)(uint16_t)y * 2);
+    row = m + (wide_rows
+               ? *(const uint32_t *)(m + 4 + (uint32_t)(uint16_t)y * 4)
+               : *(const uint16_t *)(m + 4 + (uint32_t)(uint16_t)y * 2));
 
     for (;;) {
         uint8_t skip = *row++;
@@ -348,6 +355,16 @@ int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
         /* Past the run length byte and the run's own pixels. */
         row += (uint32_t)run + 1;
     }
+}
+
+int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
+{
+    return MaskSolid(x, y, mask, 0);
+}
+
+int32_t __cdecl MaskPixelSolid32(uint32_t x, uint32_t y, const void *mask)
+{
+    return MaskSolid(x, y, mask, 1);
 }
 
 /* The other end of the same format: the encoder at 0x00423300 reads its source
@@ -710,5 +727,7 @@ int misc_install(void)
     patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
     patch_replace(ADDR_LIST_UNLINK, (const void *)ListUnlink, "ListUnlink", 6);
     patch_replace(ADDR_REMAP_BYTES, (const void *)RemapBytes, "RemapBytes", 2);
+    patch_replace(ADDR_MASK_PIXEL_SOLID32, (const void *)MaskPixelSolid32,
+                  "MaskPixelSolid32", 2);
     return 0;
 }

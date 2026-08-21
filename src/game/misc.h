@@ -184,6 +184,26 @@ int32_t __cdecl KindInSetB(int32_t kind);   /* range 1..29 */
  * which is why there is no signed check anywhere. */
 int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask);
 
+/* 0x0041CEC0. The same decoder over the same format with ONE difference: the
+ * row table holds dword offsets rather than word ones, so it is read at
+ * `m + 4 + y * 4` and the rows can start beyond 64K. Everything else -- the
+ * two bounds words, the [skip][run] walk, the 16-bit accumulator and both
+ * exits -- is instruction for instruction the same, which is why the two
+ * share a body here.
+ *
+ * It sits immediately below MaskPixelSolid in the image, 0x0041CEC0 against
+ * 0x0041CF20, so the pair was almost certainly one source function with the
+ * row width as a compile-time choice.
+ *
+ * THE VECTORS CANNOT CHECK THE ONE THING THAT DISTINGUISHES IT. A row offset
+ * has to land inside the emulator's 0x8000-byte scratch to be followed at all,
+ * so its high word is always zero, so reading the entry as a word gives the
+ * same answer as reading it as a dword. Mutating the dword read back to a word
+ * passes every vector. The word/dword difference is verified by reading the
+ * two disassemblies and by nothing else; everything below the row lookup is
+ * covered. */
+int32_t __cdecl MaskPixelSolid32(uint32_t x, uint32_t y, const void *mask);
+
 /* 0x004232C0. One bit of the 1bpp bitmap the mask above is encoded FROM --
  * both call sites are in the encoder at 0x00423300, which walks a row
  * counting runs and caps each at 255, producing exactly the [skip][run]

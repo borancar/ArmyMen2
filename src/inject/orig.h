@@ -1866,6 +1866,7 @@
 #define ADDR_RING_PUSH_32    0x00402E50u  /* void(void *, uint32_t) */
 
 #define ADDR_MASK_PIXEL_SOLID  0x0041CF20u  /* int32_t(x, y, const void *mask) */
+#define ADDR_MASK_PIXEL_SOLID32 0x0041CEC0u  /* same, dword row table */
 #define ADDR_XOR_CHECKSUM      0x00402700u  /* uint32_t(const void *record) */
 #define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */
 #define ADDR_LIST_PUSH_FRONT   0x00429F20u  /* void(void *node, void **head) */
