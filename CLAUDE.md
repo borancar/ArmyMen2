@@ -1097,7 +1097,31 @@ is edits that appear to do nothing.
 mapped DLL** — a plain `cp` corrupts a running instance.
 
 When killing the game, bracket the pattern: `pkill -f 'ArmyMen2[.]exe'`. Without
-the brackets the pattern matches the killing shell itself. A surviving game also
+the brackets the pattern matches the killing shell itself.
+
+**`drive.sh stop` once took the whole login session down with it, and the
+mechanism is a shell idiom rather than anything about this game.** The
+process-tree walk built its next generation with
+
+```
+kids="$kids $(pgrep -P $(echo "$kids" | tr ' ' ',') ...)"
+```
+
+and `tr '\n' ' '` leaves a TRAILING SPACE, which becomes a TRAILING COMMA in
+the PPID list. `pgrep` reads an empty list element as PPID **0**, so
+`pgrep -P "1234,"` answers **1 and 2**. The first pass put init into the list,
+the second asked for every child of init, and the `kill -KILL` that followed
+reached `user@1000.service` -- `Main process exited, code=killed, status=9/KILL`
+in the journal, and every terminal, browser and editor on the desktop with it.
+
+It only fired when a `desktop=amii*` process was still alive at `stop` time,
+which is why it was intermittent rather than constant.
+
+Two defences now, because neither is obviously sufficient alone: the walk
+carries a `frontier` that is never empty and never has stray whitespace, and
+the kill list refuses pid 1 and 2 whatever the walk produced. Anything that
+expands a PID list and then signals it wants the second check -- the cost of
+being wrong is not a failed test, it is the user's session. A surviving game also
 keeps holding `ArmyMenMutex`, which silently makes the next run in that prefix
 exit; `tools/drive.sh stop` walks the process tree for this reason.
 

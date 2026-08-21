@@ -102,12 +102,38 @@ stop)
     # then walk down to the launcher and the game beneath it. Killing the
     # explorer alone leaves them running, and a surviving game keeps holding
     # ArmyMenMutex, which silently makes the next run in that prefix exit.
+    # THIS LOOP ONCE KILLED THE WHOLE LOGIN SESSION, and the mechanism is worth
+    # keeping written down. It used to append pgrep's output straight onto
+    # `kids` and pass the lot back to `pgrep -P`:
+    #
+    #     kids="$kids $(pgrep -P $(echo "$kids" | tr ' ' ',') ...)"
+    #
+    # `tr '\n' ' '` leaves a TRAILING SPACE, which becomes a TRAILING COMMA in
+    # the PPID list, and pgrep reads an empty list element as PPID 0 -- so
+    # `pgrep -P "1234,"` answers 1 and 2. One pass injected init into the list,
+    # the next asked for every child of init, and the kill then took down
+    # user@1000.service and most of the system with it.
+    #
+    # Two defences, because either alone would have been enough and neither is
+    # obviously sufficient on its own: build the list from a frontier that is
+    # never empty and never has stray whitespace, and refuse to signal pid 1 or
+    # 2 whatever the walk produces.
     for top in $(pgrep -f "desktop=$DESKNAME" 2>/dev/null); do
         kids="$top"
+        frontier="$top"
         for _ in 1 2 3; do
-            kids="$kids $(pgrep -P $(echo "$kids" | tr ' ' ',') 2>/dev/null | tr '\n' ' ')"
+            [ -z "$frontier" ] && break
+            # Unquoted, so the shell collapses whitespace before tr sees it.
+            list="$(echo $frontier | tr ' ' ',')"
+            [ -z "$list" ] && break
+            frontier="$(pgrep -P "$list" 2>/dev/null | tr '\n' ' ')"
+            kids="$kids $frontier"
         done
-        kill -KILL $kids 2>/dev/null
+        safe=""
+        for p in $kids; do
+            [ "$p" -gt 2 ] 2>/dev/null && safe="$safe $p"
+        done
+        [ -n "$safe" ] && kill -KILL $safe 2>/dev/null
     done
     # A dedicated prefix has its own wineserver, so it is safe to take down
     # wholesale. The shared one is not -- another run may be using it.
