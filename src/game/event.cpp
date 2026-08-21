@@ -599,6 +599,31 @@ int32_t __cdecl SaveScriptConditions(am2_FILE *fp)
     return 1;
 }
 
+#define kEventBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_EVENT_BLOCK))
+
+int32_t __cdecl SaveEventBlock(am2_FILE *fp)
+{
+    WriteSaveTag(fp, AM2_SAVETAG_EVENT_BLOCK);
+    WriteSaveTag(fp, AM2_EVENT_BLOCK_SIZE);
+    orig_fwrite(kEventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
+    return 1;
+}
+
+int32_t __cdecl LoadEventBlock(am2_FILE *fp)
+{
+    if (!CheckSaveTag(fp, AM2_SAVETAG_EVENT_BLOCK,
+                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0xD9))
+        return 0;
+
+    /* The size, through the same helper, one source line later. */
+    if (!CheckSaveTag(fp, AM2_EVENT_BLOCK_SIZE,
+                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0xDB))
+        return 0;
+
+    orig_fread(kEventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
+    return 1;
+}
+
 void __cdecl EvtMarkSet(int32_t row, int32_t col)
 {
     g_evtMarks[col + row * 4] = 1;
@@ -637,6 +662,10 @@ int event_install(void)
                         "LoadScriptConditions", 1);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_CONDS, (const void *)SaveScriptConditions,
                         "SaveScriptConditions", 1);
+    rc |= patch_replace(ADDR_SAVE_EVENT_BLOCK, (const void *)SaveEventBlock,
+                        "SaveEventBlock", 1);
+    rc |= patch_replace(ADDR_LOAD_EVENT_BLOCK, (const void *)LoadEventBlock,
+                        "LoadEventBlock", 1);
     rc |= patch_replace(ADDR_LOAD_EVENT_SECTION, (const void *)LoadEventSection,
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_LOAD_SCRIPT_COND, (const void *)LoadScriptCond,

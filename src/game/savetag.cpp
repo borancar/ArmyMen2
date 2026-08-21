@@ -14,7 +14,14 @@
  *   0x06660002 script   0x06660007 item      0x06660666 gameproc
  *   0x06660003 event    0x06660008 objscript 0x06660668 unit
  *   0x06660004 event    0x06660009 map       0x01326413 audio
- *   0x06660005 pad      0x06660010 air       0x00003E88 event
+ *   0x06660005 pad      0x06660010 air
+ *
+ * 0x00003E88 is in docs/savetags.tsv and used to be listed here as a twelfth
+ * tag. It is not a tag: it is the LENGTH of the 16008-byte block at
+ * 0x0050C368, which SaveEventBlock writes with WriteSaveTag and LoadEventBlock
+ * checks with this function. The two helpers are general enough that a length
+ * travels exactly as a tag does, so from the loader's side the two are
+ * indistinguishable -- only reading the saver settles it.
  */
 
 #include "savetag.h"

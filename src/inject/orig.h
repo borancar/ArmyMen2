@@ -1093,6 +1093,17 @@
 #define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
 /* map.cpp's savegame section: one fixed 236-byte block and nothing else, which
  * is why the pair is 48 and 64 bytes. The block is at 0x00514D90. */
+/* event.cpp's OTHER section: a tag, then the block's own length as a second
+ * tag, then 16008 bytes straight out of 0x0050C368. The length goes out
+ * through WriteSaveTag and comes back through CheckSaveTag, which is why
+ * 0x00003E88 sits in docs/savetags.tsv looking like a twelfth section tag.
+ * It is not one. */
+#define ADDR_SAVE_EVENT_BLOCK    0x0041E9E0u  /* int32_t(FILE *) */
+#define ADDR_LOAD_EVENT_BLOCK    0x0041EA20u  /* int32_t(FILE *) */
+#define ADDR_EVENT_BLOCK         0x0050C368u
+#define AM2_EVENT_BLOCK_SIZE     0x3E88u      /* 16008 bytes, and its own tag */
+#define AM2_SAVETAG_EVENT_BLOCK  0x06660006u
+
 #define ADDR_SAVE_MAP_SECTION    0x0042DB40u  /* int32_t(FILE *) */
 #define ADDR_LOAD_MAP_SECTION    0x0042DB70u  /* int32_t(FILE *) */
 #define ADDR_MAP_SAVE_BLOCK      0x00514D90u

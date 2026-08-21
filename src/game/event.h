@@ -248,6 +248,23 @@ int32_t __cdecl LoadScriptConditions(am2_FILE *fp);
  * from the loader's side; this is the half that makes it true. */
 int32_t __cdecl SaveScriptConditions(am2_FILE *fp);
 
+/* 0x0041E9E0 and 0x0041EA20. event.cpp's other savegame section, and the whole
+ * of it: one tag, the block's length written as a second tag, and 16008 bytes
+ * out of 0x0050C368.
+ *
+ * The length check is the part worth knowing. WriteSaveTag and CheckSaveTag
+ * are general enough that a length travels through them exactly as a tag does,
+ * so the loader verifies the size it is about to read without any code that
+ * knows it is a size. That is why 0x00003E88 was recorded among the section
+ * tags: from the loader's side it is indistinguishable from one.
+ *
+ * The saver checks nothing and always answers 1. The loader answers 0 if
+ * either check fails and reads NOTHING -- so a truncated or foreign save
+ * leaves the block as it was, which is the opposite of LoadItems, which
+ * empties the item list before its tag check. */
+int32_t __cdecl SaveEventBlock(am2_FILE *fp);
+int32_t __cdecl LoadEventBlock(am2_FILE *fp);
+
 int event_install(void);
 
 #ifdef __cplusplus
