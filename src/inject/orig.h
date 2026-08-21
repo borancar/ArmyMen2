@@ -1175,6 +1175,15 @@
 #define ADDR_AT_POINT_A          0x0041F820u  /* void(uid, point, relative) */
 #define ADDR_AT_POINT_B          0x0041F8B0u  /* void(int32, uid, point, rel) */
 #define ADDR_AT_POINT_C          0x0041F780u  /* void(uid, point, relative) */
+/* The "On" wrapper for AT_POINT_C, exactly the shape of EvtAtObjPosA. */
+#define ADDR_EVT_AT_OBJ_POS_C    0x0041F7F0u  /* void(uid, uid, int32) */
+/* Two 32-byte shims that pass the ADDRESS of their first argument to a
+ * function above the nominal CRT line -- game code, per tools/crt.py, not
+ * library. Neither callee names itself. */
+#define ADDR_EVT_BY_REF_A        0x0041FD10u  /* void(int32_t, int32_t) */
+#define ADDR_EVT_BY_REF_B        0x0041FD30u  /* void(int32_t, int32_t) */
+#define ADDR_BY_REF_ACTION_A     0x00462000u  /* void(int32_t *, int32, int32) */
+#define ADDR_BY_REF_ACTION_B     0x00462080u  /* void(int32_t *,0,0,0,int32) */
 #define ADDR_POINT_ACTION_A      0x004582F0u  /* void(obj, point) */
 #define ADDR_POINT_ACTION_C      0x00428F80u  /* void(obj, point) */
 #define OBJ_OFF_X                0x12u

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 386 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 386 | 379 of them below the CRT line |
+| `patch_replace` sites | 389 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 389 | 382 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 90,464 / 372,816 B (**24.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 90,576 / 372,816 B (**24.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -153,6 +153,13 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`0x0041F8B0` is not another shim and should not be taken as one.** It is
+  the third "At" address, so it looked like a peer of `EvtAtPointA` and
+  `EvtAtPointC` -- but it resolves an ARMY through `CommSlotForArmy`, indexes a
+  per-slot list at `0x004F9ECC`, and walks every object in it. 192 bytes of
+  iteration rather than a guard and a call. Worth reading before assuming the
+  pattern holds, which is the same trap the "At" halves already sprang once.
+
 - **`AM2_ScriptAction.relative` is honoured two levels below the parser, and
   finding that corrected a naming guess.** The "At" halves were described last
   commit as plain point-takers, on the strength of the "On" wrappers that call
@@ -183,7 +190,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **28 functions are left in the event.cpp band, and most are tiny.** Four
+- **25 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap

@@ -138,6 +138,16 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b);
 void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative);
 void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative);
 
+/* 0x0041F7F0. The "On" wrapper for EvtAtPointC: `target` is acted on, `at`
+ * only supplies a position. */
+void __cdecl EvtAtObjPosC(uint32_t target, uint32_t at, int32_t relative);
+
+/* 0x0041FD10 and 0x0041FD30. Hand the ADDRESS of the first argument to a
+ * function further up the image; the zero arguments differ, so they are not
+ * one function called twice. */
+void __cdecl EvtByRefA(int32_t a, int32_t b);
+void __cdecl EvtByRefB(int32_t a, int32_t b);
+
 void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c);
 void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d);
 

@@ -826,6 +826,11 @@ typedef void (__cdecl *AM2_AtPointBFn)(int32_t a, int32_t b, uint32_t point,
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
 #define orig_point_action_a (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_A))
 #define orig_point_action_c (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_C))
+typedef void (__cdecl *AM2_ByRefAFn)(int32_t *slot, int32_t b, int32_t c);
+typedef void (__cdecl *AM2_ByRefBFn)(int32_t *slot, int32_t b, int32_t c,
+                                     int32_t d, int32_t e);
+#define orig_by_ref_a (*(AM2_ByRefAFn)AM2_IMAGE(ADDR_BY_REF_ACTION_A))
+#define orig_by_ref_b (*(AM2_ByRefBFn)AM2_IMAGE(ADDR_BY_REF_ACTION_B))
 #define orig_at_point_b     (*(AM2_AtPointBFn)AM2_IMAGE(ADDR_AT_POINT_B))
 
 /* 0x0041FE70. Deploy the object a uid names.
@@ -999,6 +1004,44 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
         return;
 
     orig_point_action_c(obj, point);
+}
+
+/* 0x0041F7F0. The "On" wrapper for EvtAtPointC, and the third of that shape:
+ * `target` is acted on, `at` only supplies a position. */
+void __cdecl EvtAtObjPosC(uint32_t target, uint32_t at, int32_t relative)
+{
+    const uint8_t *obj;
+
+    if (at < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = (const uint8_t *)LookupByUID(at);
+
+    if (obj == (const uint8_t *)0)
+        return;
+
+    EvtAtPointC(target, *(const uint32_t *)(obj + OBJ_OFF_POS), relative);
+}
+
+/* 0x0041FD10 and 0x0041FD30. Two shims that hand the ADDRESS of their first
+ * argument to a function further up the image.
+ *
+ * Passing a parameter slot by reference is the whole of what they do, so the
+ * callee writes back into a copy that dies on return -- unless it only reads.
+ * Which it is is not established here; both callees are above the nominal CRT
+ * line at 0x0045C000 and are game code rather than library, per tools/crt.py,
+ * and neither names itself.
+ *
+ * The zero arguments differ in number and position between the two, so they
+ * are not one function called twice. */
+void __cdecl EvtByRefA(int32_t a, int32_t b)
+{
+    orig_by_ref_a(&a, 0, b);
+}
+
+void __cdecl EvtByRefB(int32_t a, int32_t b)
+{
+    orig_by_ref_b(&a, 0, 0, 0, b);
 }
 
 /* 0x0041F710. The most guarded member of the family: four tests before it acts.
@@ -1448,6 +1491,12 @@ int event_install(void)
                         "EvtAtPointA", 2);
     rc |= patch_replace(ADDR_AT_POINT_C, (const void *)EvtAtPointC,
                         "EvtAtPointC", 3);
+    rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_C, (const void *)EvtAtObjPosC,
+                        "EvtAtObjPosC", 1);
+    rc |= patch_replace(ADDR_EVT_BY_REF_A, (const void *)EvtByRefA,
+                        "EvtByRefA", 1);
+    rc |= patch_replace(ADDR_EVT_BY_REF_B, (const void *)EvtByRefB,
+                        "EvtByRefB", 1);
     rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_A, (const void *)EvtAtObjPosA,
                         "EvtAtObjPosA", 1);
     rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_B, (const void *)EvtAtObjPosB,
