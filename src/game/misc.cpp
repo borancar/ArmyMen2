@@ -340,6 +340,42 @@ int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
     }
 }
 
+/* The other end of the same format: the encoder at 0x00423300 reads its source
+ * through this and MaskPixelSolid reads the result. Rows run bottom-up, so the
+ * height is needed to find row y at all.
+ *
+ * `x % 8` is C's signed remainder, which is what the original's
+ * `and 0x80000007` / `dec` / `or 0xFFFFFFF8` / `inc` computes; for a negative
+ * x that makes the shift count exceed 7. Nothing shows a negative x ever
+ * arrives -- this reproduces the arithmetic rather than arguing for it. */
+int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
+                             int32_t height, int32_t stride)
+{
+    const uint8_t *bytes = (const uint8_t *)base;
+    int32_t        bit   = 1 << (7 - (x % 8));
+    const uint8_t *row   = bytes + (height - y - 1) * stride;
+
+    return bit & row[x >> 3];
+}
+
+/* Index at +0x39C, 32 dwords at +0x3A0. Post-increment, wrap at 32, no report
+ * that the oldest entry went. */
+#define AM2_RING32_INDEX  0x39C
+#define AM2_RING32_ENTRY  0x3A0
+#define AM2_RING32_COUNT  32
+
+void __cdecl RingPush32(void *obj, uint32_t value)
+{
+    uint8_t  *base  = (uint8_t *)obj;
+    int32_t  *index = (int32_t *)(base + AM2_RING32_INDEX);
+    uint32_t *ring  = (uint32_t *)(base + AM2_RING32_ENTRY);
+
+    ring[*index] = value;
+    *index += 1;
+    if (*index >= AM2_RING32_COUNT)
+        *index = 0;
+}
+
 uint32_t __cdecl XorChecksum(const void *record)
 {
     const uint32_t *d = (const uint32_t *)record;
@@ -602,5 +638,8 @@ int misc_install(void)
                   "CommSlotForArmy", 20);
     patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
                   "CommSlotHasPlayer", 5);
+    patch_replace(ADDR_BITMAP_BIT_SET, (const void *)BitmapBitSet,
+                  "BitmapBitSet", 5);
+    patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
     return 0;
 }

@@ -99,6 +99,37 @@ def addr_names():
 # it an integer. Rather than build dataflow analysis for one case, say so here.
 ARG_KIND_OVERRIDE = {
     0x004231A0: {0: "ptr", 1: "ptr"},   # ReverseBlocks(dst, src, total, count)
+    # BitmapBitSet(base, x, y, height, stride). The address it reads is built
+    # from TWO arguments -- `base + (height - y - 1) * stride` indexed by
+    # `x >> 3` -- and the classifier picked the one that is finally used as the
+    # index, so the base was left a scalar and every vector faulted.
+    0x004232C0: {0: "ptr", 1: "scalar"},
+}
+
+# Per-argument value sets, for functions whose scalars are a geometry rather
+# than a number.
+#
+# `hints` above is a POOL: one set of interesting values offered to every
+# scalar argument. That is right for a switch code and useless for a width and
+# a stride, where the arguments are not interchangeable and the interesting
+# thing about them is that they are SMALL. BitmapBitSet multiplies three of
+# them together into an offset, so a random 32-bit stride puts the read
+# megabytes outside the scratch page and the vector is discarded as a fault --
+# 0 vectors, and a reconstruction that could not be checked at all.
+#
+# Keep every combination inside +/-PTR_STRIDE of the argument's pointer, since
+# that is what the scratch page can absorb. The negative x values are not
+# decoration: the sign-correcting `dec` / `or` / `inc` after `and 0x80000007`
+# is 6 instructions that nothing else reaches.
+#
+# {function: {arg index: [values]}}
+ARG_VALUES = {
+    0x004232C0: {
+        1: [0, 1, 2, 3, 7, 8, 15, 63, -1, -8, -9],   # x
+        2: [0, 1, 2, 3, 7],                          # y
+        3: [1, 2, 4, 8, 16],                         # height
+        4: [1, 2, 4, 8],                             # stride
+    },
 }
 
 # What a record has to contain before a function can be run at all. The
@@ -528,6 +559,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
     """[(args, eax, scratch-writes)]. Interesting values first, then random."""
     rnd = random.Random(seed)
     EDGE = [0, 1, -1, 2, -2, 7, 255, 256, 0x7FFFFFFF, -0x80000000, 100, -100]
+    argvals = ARG_VALUES.get(addr, {})
     out = []
 
     for args, pre in extra:                 # path-covering, from angr
@@ -552,6 +584,9 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                 # forget.
                 args.append(0 if k % 7 == 3
                             else SCRATCH + PTR_STRIDE * (i + 1))
+            elif i in argvals:
+                vals = argvals[i]
+                args.append(vals[(k + i) % len(vals)])
             elif hints and k % 4 != 3:
                 # Not `k % 2 == 0`: that is disjoint from the correlation cases
                 # below, which fire on odd k, so a correlated vector could never
@@ -816,7 +851,8 @@ def main():
                 "ADDR_OBJ_KIND538_10_17", "ADDR_FILTER_MATCHES",
                 "ADDR_CONSUME_PENDING", "ADDR_FACING_DELTA_08",
                 "ADDR_FACING_DELTA_14", "ADDR_MAP_CODE_18_28",
-                "ADDR_MEETS_ALL_THREE"]
+                "ADDR_MEETS_ALL_THREE",
+                "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -916,6 +952,8 @@ def main():
         "ADDR_FACING_DELTA_14": "FacingFromDelta14",
         "ADDR_MAP_CODE_18_28": "MapCode18To28",
         "ADDR_MEETS_ALL_THREE": "MeetsAllThree",
+        "ADDR_BITMAP_BIT_SET": "BitmapBitSet",
+        "ADDR_RING_PUSH_32": "RingPush32",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -927,7 +965,12 @@ def main():
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
             "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet",
             "TitleCaseName", "ResetPairMask", "SetFacing14", "SetFacing08",
-            "ListPushFront", "ConsumePendingByte"}
+            "ListPushFront", "ConsumePendingByte",
+            # RingPush32 loads the object into eax at entry and never writes
+            # eax again, so the pointer is still there at `ret`. Both call
+            # sites -- 0x0040168B and 0x00401C53 -- overwrite eax with their
+            # next load immediately after the call, so nothing reads it.
+            "RingPush32"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

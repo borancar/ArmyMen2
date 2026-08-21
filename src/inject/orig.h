@@ -1858,6 +1858,13 @@
 #define ADDR_CLASSIFY_CODE74   0x0040D7E0u  /* int32_t(const void *obj) */
 #define ADDR_KIND_IN_SET_A     0x0045EE20u  /* int32_t(int32_t kind) */
 #define ADDR_KIND_IN_SET_B     0x00433520u  /* int32_t(int32_t kind) */
+/* The 1bpp source bitmap the RLE mask is encoded FROM, and the encoder's own
+ * bit test. Rows run bottom-up, as a DIB's do. */
+#define ADDR_BITMAP_BIT_SET  0x004232C0u  /* int32(base, x, y, height, stride) */
+
+/* Index at +0x39C, 32 dwords at +0x3A0. */
+#define ADDR_RING_PUSH_32    0x00402E50u  /* void(void *, uint32_t) */
+
 #define ADDR_MASK_PIXEL_SOLID  0x0041CF20u  /* int32_t(x, y, const void *mask) */
 #define ADDR_XOR_CHECKSUM      0x00402700u  /* uint32_t(const void *record) */
 #define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */

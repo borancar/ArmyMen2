@@ -184,6 +184,36 @@ int32_t __cdecl KindInSetB(int32_t kind);   /* range 1..29 */
  * which is why there is no signed check anywhere. */
 int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask);
 
+/* 0x004232C0. One bit of the 1bpp bitmap the mask above is encoded FROM --
+ * both call sites are in the encoder at 0x00423300, which walks a row
+ * counting runs and caps each at 255, producing exactly the [skip][run]
+ * stream MaskPixelSolid decodes.
+ *
+ * Rows are addressed `(height - y - 1) * stride`, which is bottom-up: row 0
+ * of the image is the LAST row in memory. That is the DIB convention, and it
+ * is the only reason this function needs the height at all.
+ *
+ * The x modulo is signed -- the original uses the MSVC `and 0x80000007` /
+ * `dec` / `or` / `inc` sequence, which is C's `%` and keeps the sign of the
+ * dividend -- so a negative x shifts by more than 7 and the result is the
+ * original's, whatever that is worth. Nothing establishes that a negative x
+ * ever arrives; it is reproduced rather than defended.
+ *
+ * Returns the masked BIT, not a boolean: 0 or 1 << (7 - x % 8). The one
+ * caller tests it against zero. */
+int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
+                             int32_t height, int32_t stride);
+
+/* 0x00402E50. Push one dword into a 32-entry ring inside the caller's object:
+ * the write index is the dword at +0x39C and the entries are the 32 dwords at
+ * +0x3A0. The index is post-incremented and wrapped to 0 on reaching 32, so
+ * the ring overwrites its oldest entry and nothing reports that it did.
+ *
+ * The wrap test is signed and reads the index back out of memory after
+ * storing it rather than using the register it just wrote -- reproduced,
+ * since both are what the original does and neither changes the result. */
+void __cdecl RingPush32(void *obj, uint32_t value);
+
 /* 0x00402700. XOR of the record's own dwords, its length taken from inside it:
  * the dword at +4 is a BYTE count, shifted right by two for a dword count. The
  * sum starts at +0, so the length field is folded into its own checksum.

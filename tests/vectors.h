@@ -2517,6 +2517,170 @@ static const uint32_t i_MeetsAllThree_74[] = {2380,16,2381,0,2048,1,2049,0,2050,
 static const uint32_t f_MeetsAllThree_74[] = {2196,2304};
 static const uint32_t i_MeetsAllThree_75[] = {2380,30,2381,0,2048,3,2049,0,2050,0,2051,0,2056,2,2057,0,2058,0,2059,0,2304,26,2305,0,2306,0,2307,0};
 static const uint32_t f_MeetsAllThree_75[] = {2196,2304};
+static const uint32_t w_RingPush32_0[] = {2972,29,3088,1,3089,0,3090,0,3091,0};
+static const uint32_t i_RingPush32_0[] = {2380,251,2381,255,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_1[] = {2972,25,3072,255,3073,255,3074,255,3075,255};
+static const uint32_t i_RingPush32_1[] = {2380,2,2381,0,2972,24,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_2[] = {2972,29,3088,2,3089,0,3090,0,3091,0};
+static const uint32_t i_RingPush32_2[] = {2380,9,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_3[] = {2972,29,3088,7,3089,0,3090,0,3091,0};
+static const uint32_t i_RingPush32_3[] = {2380,23,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_4[] = {2972,29,3088,255,3089,0,3090,0,3091,0};
+static const uint32_t i_RingPush32_4[] = {2380,30,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_5[] = {2972,29,3088,0,3089,1,3090,0,3091,0};
+static const uint32_t i_RingPush32_5[] = {2380,37,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_6[] = {2972,31,3096,255,3097,255,3098,255,3099,127};
+static const uint32_t i_RingPush32_6[] = {2380,44,2381,0,2972,30,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_7[] = {2972,29,3088,0,3089,0,3090,0,3091,128};
+static const uint32_t i_RingPush32_7[] = {2380,51,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_8[] = {2972,0,3104,100,3105,0,3106,0,3107,0};
+static const uint32_t i_RingPush32_8[] = {2380,58,2381,0,2972,32,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_9[] = {2972,24,3068,0,3069,0,3070,0,3071,0};
+static const uint32_t i_RingPush32_9[] = {2380,72,2381,0,2972,23,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_10[] = {2972,29,3088,61,3089,13,3090,3,3091,0};
+static const uint32_t i_RingPush32_10[] = {2380,79,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_11[] = {2972,26,3076,158,3077,222,3078,253,3079,255};
+static const uint32_t i_RingPush32_11[] = {2380,252,2381,255,2972,25,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_12[] = {2972,29,3088,175,3089,30,3090,252,3091,255};
+static const uint32_t i_RingPush32_12[] = {2380,3,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_13[] = {2972,28,3084,70,3085,115,3086,253,3087,255};
+static const uint32_t i_RingPush32_13[] = {2380,10,2381,0,2972,27,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_14[] = {2972,29,3088,14,3089,143,3090,252,3091,255};
+static const uint32_t i_RingPush32_14[] = {2380,17,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_15[] = {2972,29,3088,34,3089,147,3090,253,3091,255};
+static const uint32_t i_RingPush32_15[] = {2380,31,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_16[] = {2972,0,3100,150,3101,172,3102,1,3103,0};
+static const uint32_t i_RingPush32_16[] = {2380,38,2381,0,2972,31,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_17[] = {2972,29,3088,249,3089,201,3090,255,3091,255};
+static const uint32_t i_RingPush32_17[] = {2380,45,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_18[] = {2972,0,3108,98,3109,71,3110,252,3111,255};
+static const uint32_t i_RingPush32_18[] = {2380,52,2381,0,2972,33,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_19[] = {2972,29,3088,54,3089,126,3090,252,3091,255};
+static const uint32_t i_RingPush32_19[] = {2380,59,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_20[] = {2972,25,3072,225,3073,64,3074,252,3075,255};
+static const uint32_t i_RingPush32_20[] = {2380,66,2381,0,2972,24,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_21[] = {2972,27,3080,120,3081,191,3082,3,3083,0};
+static const uint32_t i_RingPush32_21[] = {2380,80,2381,0,2972,26,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_22[] = {2972,29,3088,177,3089,106,3090,3,3091,0};
+static const uint32_t i_RingPush32_22[] = {2380,253,2381,255,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_23[] = {2972,29,3088,122,3089,96,3090,254,3091,255};
+static const uint32_t i_RingPush32_23[] = {2380,4,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_24[] = {2972,29,3088,233,3089,117,3090,253,3091,255};
+static const uint32_t i_RingPush32_24[] = {2380,11,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_25[] = {2972,31,3096,240,3097,237,3098,254,3099,255};
+static const uint32_t i_RingPush32_25[] = {2380,18,2381,0,2972,30,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_26[] = {2972,29,3088,162,3089,212,3090,253,3091,255};
+static const uint32_t i_RingPush32_26[] = {2380,25,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_27[] = {2972,29,3088,187,3089,201,3090,3,3091,0};
+static const uint32_t i_RingPush32_27[] = {2380,39,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_28[] = {2972,24,3068,75,3069,255,3071,255};
+static const uint32_t i_RingPush32_28[] = {2380,46,2381,0,2972,23,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_29[] = {2972,29,3088,114,3089,8,3090,253,3091,255};
+static const uint32_t i_RingPush32_29[] = {2380,53,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_30[] = {2972,26,3076,82,3077,116,3078,3,3079,0};
+static const uint32_t i_RingPush32_30[] = {2380,60,2381,0,2972,25,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_31[] = {2972,29,3088,220,3089,24,3090,253,3091,255};
+static const uint32_t i_RingPush32_31[] = {2380,67,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_32[] = {2972,28,3084,64,3085,108,3086,253,3087,255};
+static const uint32_t i_RingPush32_32[] = {2380,74,2381,0,2972,27,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_33[] = {2972,30,3092,56,3093,80,3094,0,3095,0};
+static const uint32_t i_RingPush32_33[] = {2380,254,2381,255,2972,29,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_34[] = {2972,29,3088,93,3089,2,3090,253,3091,255};
+static const uint32_t i_RingPush32_34[] = {2380,5,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_35[] = {2972,0,3100,191,3101,214,3102,0,3103,0};
+static const uint32_t i_RingPush32_35[] = {2380,12,2381,0,2972,31,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_36[] = {2972,29,3088,83,3089,178,3090,3,3091,0};
+static const uint32_t i_RingPush32_36[] = {2380,19,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_37[] = {2972,0,3108,15,3109,175,3110,1,3111,0};
+static const uint32_t i_RingPush32_37[] = {2380,26,2381,0,2972,33,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_38[] = {2972,29,3088,101,3089,67,3090,0,3091,0};
+static const uint32_t i_RingPush32_38[] = {2380,33,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_39[] = {2972,29,3088,84,3089,51,3090,255,3091,255};
+static const uint32_t i_RingPush32_39[] = {2380,47,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_40[] = {2972,27,3080,19,3081,65,3082,3,3083,0};
+static const uint32_t i_RingPush32_40[] = {2380,54,2381,0,2972,26,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_41[] = {2972,29,3088,13,3089,79,3090,252,3091,255};
+static const uint32_t i_RingPush32_41[] = {2380,61,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_42[] = {2972,29,3088,33,3089,33,3090,253,3091,255};
+static const uint32_t i_RingPush32_42[] = {2380,68,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_43[] = {2972,29,3088,173,3089,23,3090,252,3091,255};
+static const uint32_t i_RingPush32_43[] = {2380,75,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_44[] = {2972,31,3096,14,3097,86,3098,1,3099,0};
+static const uint32_t i_RingPush32_44[] = {2380,82,2381,0,2972,30,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_45[] = {2972,0,3104,178,3105,144,3106,3,3107,0};
+static const uint32_t i_RingPush32_45[] = {2380,6,2381,0,2972,32,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_46[] = {2972,29,3088,157,3089,9,3090,2,3091,0};
+static const uint32_t i_RingPush32_46[] = {2380,13,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_47[] = {2972,24,3068,126,3069,172,3070,254,3071,255};
+static const uint32_t i_RingPush32_47[] = {2380,20,2381,0,2972,23,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_48[] = {2972,29,3088,230,3089,221,3090,252,3091,255};
+static const uint32_t i_RingPush32_48[] = {2380,27,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_49[] = {2972,26,3076,65,3077,56,3078,253,3079,255};
+static const uint32_t i_RingPush32_49[] = {2380,34,2381,0,2972,25,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_50[] = {2972,29,3088,255,3089,241,3090,3,3091,0};
+static const uint32_t i_RingPush32_50[] = {2380,41,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_51[] = {2972,29,3088,132,3089,52,3090,253,3091,255};
+static const uint32_t i_RingPush32_51[] = {2380,55,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_52[] = {2972,30,3092,6,3093,113,3094,255,3095,255};
+static const uint32_t i_RingPush32_52[] = {2380,62,2381,0,2972,29,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_53[] = {2972,29,3088,212,3089,78,3090,254,3091,255};
+static const uint32_t i_RingPush32_53[] = {2380,69,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_54[] = {2972,0,3100,30,3101,111,3102,252,3103,255};
+static const uint32_t i_RingPush32_54[] = {2380,76,2381,0,2972,31,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_55[] = {2972,29,3088,41,3089,138,3090,1,3091,0};
+static const uint32_t i_RingPush32_55[] = {2380,83,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_56[] = {2972,0,3108,51,3109,198,3110,253,3111,255};
+static const uint32_t i_RingPush32_56[] = {2380,0,2381,0,2972,33,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_57[] = {2972,25,3072,227,3073,226,3074,0,3075,0};
+static const uint32_t i_RingPush32_57[] = {2380,14,2381,0,2972,24,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_58[] = {2972,29,3088,42,3089,68,3090,3,3091,0};
+static const uint32_t i_RingPush32_58[] = {2380,21,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_59[] = {2972,27,3080,40,3081,162,3082,252,3083,255};
+static const uint32_t i_RingPush32_59[] = {2380,28,2381,0,2972,26,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_60[] = {2972,29,3088,246,3089,168,3090,2,3091,0};
+static const uint32_t i_RingPush32_60[] = {2380,35,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_61[] = {2972,29,3088,180,3089,109,3090,0,3091,0};
+static const uint32_t i_RingPush32_61[] = {2380,42,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_62[] = {2972,29,3088,173,3089,164,3090,252,3091,255};
+static const uint32_t i_RingPush32_62[] = {2380,49,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_63[] = {2972,29,3088,195,3089,88,3090,0,3091,0};
+static const uint32_t i_RingPush32_63[] = {2380,63,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_64[] = {2972,0,3104,30,3105,121,3106,254,3107,255};
+static const uint32_t i_RingPush32_64[] = {2380,70,2381,0,2972,32,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_65[] = {2972,29,3088,234,3089,205,3090,0,3091,0};
+static const uint32_t i_RingPush32_65[] = {2380,77,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_66[] = {2972,24,3068,10,3069,121,3070,254,3071,255};
+static const uint32_t i_RingPush32_66[] = {2380,84,2381,0,2972,23,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_67[] = {2972,29,3088,153,3089,110,3090,3,3091,0};
+static const uint32_t i_RingPush32_67[] = {2380,1,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_68[] = {2972,26,3076,49,3077,168,3078,252,3079,255};
+static const uint32_t i_RingPush32_68[] = {2380,8,2381,0,2972,25,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_69[] = {2972,28,3084,238,3085,151,3086,1,3087,0};
+static const uint32_t i_RingPush32_69[] = {2380,22,2381,0,2972,27,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_70[] = {2972,29,3088,7,3089,239,3090,3,3091,0};
+static const uint32_t i_RingPush32_70[] = {2380,29,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_71[] = {2972,30,3092,162,3093,119,3094,1,3095,0};
+static const uint32_t i_RingPush32_71[] = {2380,36,2381,0,2972,29,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_72[] = {2972,29,3088,106,3089,125,3090,3,3091,0};
+static const uint32_t i_RingPush32_72[] = {2380,43,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_73[] = {2972,0,3100,109,3101,157,3102,3,3103,0};
+static const uint32_t i_RingPush32_73[] = {2380,50,2381,0,2972,31,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_74[] = {2972,29,3088,171,3089,185,3090,252,3091,255};
+static const uint32_t i_RingPush32_74[] = {2380,57,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_75[] = {2972,29,3088,51,3089,184,3090,254,3091,255};
+static const uint32_t i_RingPush32_75[] = {2380,71,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_76[] = {2972,25,3072,150,3073,8,3074,3,3075,0};
+static const uint32_t i_RingPush32_76[] = {2380,78,2381,0,2972,24,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_77[] = {2972,29,3088,134,3089,1,3090,3,3091,0};
+static const uint32_t i_RingPush32_77[] = {2380,251,2381,255,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_78[] = {2972,27,3080,25,3081,187,3082,0,3083,0};
+static const uint32_t i_RingPush32_78[] = {2380,2,2381,0,2972,26,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_79[] = {2972,29,3088,145,3089,102,3090,0,3091,0};
+static const uint32_t i_RingPush32_79[] = {2380,9,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_80[] = {2972,29,3088,102,3089,251,3090,253,3091,255};
+static const uint32_t i_RingPush32_80[] = {2380,16,2381,0,2972,28,2973,0,2974,0,2975,0};
+static const uint32_t w_RingPush32_81[] = {2972,31,3096,68,3097,169,3098,2,3099,0};
+static const uint32_t i_RingPush32_81[] = {2380,30,2381,0,2972,30,2973,0,2974,0,2975,0};
 
 static const AM2_Vector kVectors[] = {
     {"Clamp", (void *)Clamp, 3, {0,0,0,0,0,0}, {0x00000000u,0x00000001u,0xffffffffu,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -8981,4 +9145,168 @@ static const AM2_Vector kVectors[] = {
     {"MeetsAllThree", (void *)MeetsAllThree, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 14, i_MeetsAllThree_73, 1, f_MeetsAllThree_73, 0, 0},
     {"MeetsAllThree", (void *)MeetsAllThree, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 14, i_MeetsAllThree_74, 1, f_MeetsAllThree_74, 0, 0},
     {"MeetsAllThree", (void *)MeetsAllThree, 1, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 14, i_MeetsAllThree_75, 1, f_MeetsAllThree_75, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000002u,0x00000008u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000003u,0x00000002u,0x00000003u,0x00000000u}, 0x00000020u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000007u,0x00000001u,0xffffffffu,0x00000000u}, 0x00000010u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000001u,0x00000004u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000002u,0x0000000fu,0x00000002u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000003u,0x00000010u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000007u,0x00000001u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000000u,0x00000002u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000001u,0xfffffff7u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000003u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000007u,0x00000001u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000000u,0x00000003u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000001u,0x00000004u,0xffffffffu,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000002u,0x00000008u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000003u,0x00000010u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000000u,0x00000002u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000001u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000002u,0x00000008u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000003u,0x00000000u,0x00000003u,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000007u,0x00000001u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000000u,0x00000002u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000002u,0x00000007u,0x00000002u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000003u,0x00000010u,0xffffffffu,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000007u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000000u,0x00000002u,0x00000001u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000001u,0xffffffffu,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000002u,0x00000008u,0xffffffffu,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000007u,0x00000001u,0x00000001u,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000000u,0x00000001u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000001u,0x00000004u,0xffffffffu,0x00000000u}, 0x00000020u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000002u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000003u,0x00000010u,0x00000001u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000007u,0x00000008u,0x00000007u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000001u,0x00000004u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000002u,0x00000008u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000003u,0xfffffff8u,0x00000003u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000007u,0x00000001u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000001u,0x00000004u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000003u,0x00000010u,0xffffffffu,0x00000000u}, 0x00000010u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000007u,0x00000001u,0x00000008u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000000u,0x00000002u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000001u,0x0000000fu,0x00000001u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000002u,0x00000008u,0xffffffffu,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000003u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000000u,0xfffffff7u,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000001u,0x00000004u,0xffffffffu,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000002u,0x00000008u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000003u,0x00000010u,0x00000001u,0x00000000u}, 0x00000020u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000007u,0x00000003u,0x00000007u,0x00000000u}, 0x00000010u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000000u,0x00000002u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000002u,0x00000008u,0x00000001u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000003u,0x0000003fu,0x00000003u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000007u,0x00000001u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000000u,0x00000002u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000001u,0x00000004u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000002u,0x00000000u,0x00000002u,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000007u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000000u,0x00000002u,0x00000001u,0x00000000u}, 0x00000010u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000001u,0x00000007u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000002u,0x00000008u,0xffffffffu,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000003u,0x00000010u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000007u,0x00000001u,0x00000001u,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000001u,0x00000004u,0xffffffffu,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000002u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000003u,0x00000010u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000007u,0x00000001u,0x00000007u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000000u,0x00000002u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000001u,0x00000004u,0x00000008u,0x00000000u}, 0x00000010u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000003u,0x00000008u,0x00000003u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000007u,0x00000001u,0xffffffffu,0x00000000u}, 0x00000001u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000003fu,0x00000000u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000001u,0x00000004u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff8u,0x00000002u,0xfffffff8u,0x00000002u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xfffffff7u,0x00000003u,0x00000010u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000000u,0x00000002u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000001u,0x00000002u,0x00000001u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000003u,0x00000002u,0x00000008u,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000003u,0xffffffffu,0xffffffffu,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x00000008u,0x00000007u,0x00000001u,0x00000001u,0x00000000u}, 0x00000080u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0x0000000fu,0x00000000u,0x0000000fu,0x00000000u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"BitmapBitSet", (void *)BitmapBitSet, 5, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000002u,0x00000008u,0x00000008u,0x00000000u}, 0x00000000u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00000001u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_0, 6, i_RingPush32_0, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xffffffffu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_1, 6, i_RingPush32_1, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00000002u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_2, 6, i_RingPush32_2, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00000007u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_3, 6, i_RingPush32_3, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x000000ffu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_4, 6, i_RingPush32_4, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00000100u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_5, 6, i_RingPush32_5, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x7fffffffu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_6, 6, i_RingPush32_6, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x80000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_7, 6, i_RingPush32_7, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00000064u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_8, 6, i_RingPush32_8, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_9, 6, i_RingPush32_9, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00030d3du,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_10, 6, i_RingPush32_10, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffdde9eu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_11, 6, i_RingPush32_11, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc1eafu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_12, 6, i_RingPush32_12, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd7346u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_13, 6, i_RingPush32_13, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc8f0eu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_14, 6, i_RingPush32_14, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd9322u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_15, 6, i_RingPush32_15, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0001ac96u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_16, 6, i_RingPush32_16, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xffffc9f9u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_17, 6, i_RingPush32_17, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc4762u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_18, 6, i_RingPush32_18, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc7e36u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_19, 6, i_RingPush32_19, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc40e1u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_20, 6, i_RingPush32_20, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0003bf78u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_21, 6, i_RingPush32_21, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00036ab1u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_22, 6, i_RingPush32_22, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffe607au,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_23, 6, i_RingPush32_23, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd75e9u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_24, 6, i_RingPush32_24, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffeedf0u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_25, 6, i_RingPush32_25, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffdd4a2u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_26, 6, i_RingPush32_26, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0003c9bbu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_27, 6, i_RingPush32_27, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xffffff4bu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 4, w_RingPush32_28, 6, i_RingPush32_28, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd0872u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_29, 6, i_RingPush32_29, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00037452u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_30, 6, i_RingPush32_30, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd18dcu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_31, 6, i_RingPush32_31, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd6c40u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_32, 6, i_RingPush32_32, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00005038u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_33, 6, i_RingPush32_33, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd025du,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_34, 6, i_RingPush32_34, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0000d6bfu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_35, 6, i_RingPush32_35, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0003b253u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_36, 6, i_RingPush32_36, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0001af0fu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_37, 6, i_RingPush32_37, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00004365u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_38, 6, i_RingPush32_38, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xffff3354u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_39, 6, i_RingPush32_39, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00034113u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_40, 6, i_RingPush32_40, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc4f0du,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_41, 6, i_RingPush32_41, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd2121u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_42, 6, i_RingPush32_42, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc17adu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_43, 6, i_RingPush32_43, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0001560eu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_44, 6, i_RingPush32_44, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x000390b2u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_45, 6, i_RingPush32_45, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0002099du,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_46, 6, i_RingPush32_46, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffeac7eu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_47, 6, i_RingPush32_47, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffcdde6u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_48, 6, i_RingPush32_48, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd3841u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_49, 6, i_RingPush32_49, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0003f1ffu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_50, 6, i_RingPush32_50, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffd3484u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_51, 6, i_RingPush32_51, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xffff7106u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_52, 6, i_RingPush32_52, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffe4ed4u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_53, 6, i_RingPush32_53, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffc6f1eu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_54, 6, i_RingPush32_54, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00018a29u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_55, 6, i_RingPush32_55, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffdc633u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_56, 6, i_RingPush32_56, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0000e2e3u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_57, 6, i_RingPush32_57, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0003442au,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_58, 6, i_RingPush32_58, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffca228u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_59, 6, i_RingPush32_59, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0002a8f6u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_60, 6, i_RingPush32_60, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00006db4u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_61, 6, i_RingPush32_61, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffca4adu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_62, 6, i_RingPush32_62, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x000058c3u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_63, 6, i_RingPush32_63, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffe791eu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_64, 6, i_RingPush32_64, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0000cdeau,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_65, 6, i_RingPush32_65, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffe790au,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_66, 6, i_RingPush32_66, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00036e99u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_67, 6, i_RingPush32_67, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffca831u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_68, 6, i_RingPush32_68, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x000197eeu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_69, 6, i_RingPush32_69, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0003ef07u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_70, 6, i_RingPush32_70, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x000177a2u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_71, 6, i_RingPush32_71, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00037d6au,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_72, 6, i_RingPush32_72, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00039d6du,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_73, 6, i_RingPush32_73, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffcb9abu,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_74, 6, i_RingPush32_74, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffeb833u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_75, 6, i_RingPush32_75, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00030896u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_76, 6, i_RingPush32_76, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00030186u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_77, 6, i_RingPush32_77, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0000bb19u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_78, 6, i_RingPush32_78, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x00006691u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_79, 6, i_RingPush32_79, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0xfffdfb66u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_80, 6, i_RingPush32_80, 0, 0, 0, 0},
+    {"RingPush32", (void *)RingPush32, 2, {1,0,0,0,0,0}, {0x00000800u,0x0002a944u,0x00000000u,0x00000000u,0x00000000u,0x00000000u}, 0x00000800u, 1, 1, 5, w_RingPush32_81, 6, i_RingPush32_81, 0, 0, 0, 0},
 };
