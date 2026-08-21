@@ -83,7 +83,7 @@ division is visible, use it.
 
 `src/game/win32/` holds every module that talks to Win32 or DirectX -- **15**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
-API at all, and there are **21**; the split is the answer to "what still talks
+API at all, and there are **23**; the split is the answer to "what still talks
 to the outside world" in directory form.
 
 **The flat half is the one that grows, and this file's count of it went stale
@@ -92,9 +92,10 @@ without anything noticing.** It said eight, naming `blit`, `dist`, `objtable`,
 rectangle and distance maths, the object tables, key packing and save tags:
 pure computation over memory the caller supplies. Those eight are still there
 and still flat, so the sentence was not wrong about them. What it could not
-survive was thirteen more landing beside them -- the script interpreter, the
-event table, the object accessors, the save serialisation, and map.cpp and
-pad.cpp, which the image names in the strings it hands CheckSaveTag -- while
+survive was fifteen more landing beside them -- the script interpreter, the
+event table, the object accessors, the save serialisation, and map.cpp,
+pad.cpp, air.cpp and gameproc.cpp, which the image names in the strings it
+hands CheckSaveTag -- while
 the prose went on counting the original set and calling everything else the
 boundary.
 

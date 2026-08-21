@@ -1106,6 +1106,31 @@
  * The section exists in this shape because AM2_ScriptName begins with a
  * POINTER: the struct cannot go out whole, so the name travels as a length and
  * then the bytes, and only the 12 fields after the pointer are written raw. */
+/* air.cpp's savegame section: a tag and one 584-byte block, the same shape as
+ * map.cpp's. The section map puts air at 588 bytes, which is 4 + 0x248. */
+/* gameproc.cpp's savegame section: no tag of its own -- SaveGame writes
+ * 0x06660666 before calling -- just the block LENGTH and then 1080 bytes from
+ * 0x00511A68.
+ *
+ * The loader is the interesting half. Five things inside that block survive a
+ * load: two strings, and the three audio volumes, which are already named
+ * ADDR_VOLUME_AT_ZERO, ADDR_STREAM_VOLUME and ADDR_VOLUME_VOICE. They are
+ * stashed on the stack, overwritten by the read, and put back -- so loading a
+ * save does not reset what the player set. */
+#define ADDR_SAVE_GAMEPROC       0x00426850u  /* int32_t(FILE *) */
+#define ADDR_LOAD_GAMEPROC       0x00426880u  /* int32_t(FILE *) */
+#define ADDR_GAMEPROC_BLOCK      0x00511A68u  /* also a string; see below */
+#define AM2_GAMEPROC_SAVE_SIZE   0x438u       /* 1080 bytes, and its own tag */
+#define ADDR_GAMEPROC_STR_B      0x00511B88u  /* a second string inside it */
+#define ADDR_STR_GAMEPROC_CPP    0x004851ECu  /* "C:\\ArmyMen2\\source\\gameproc.cpp" */
+
+#define ADDR_SAVE_AIR_SECTION    0x00409840u  /* int32_t(FILE *) */
+#define ADDR_LOAD_AIR_SECTION    0x00409870u  /* int32_t(FILE *) */
+#define ADDR_AIR_SAVE_BLOCK      0x004F945Cu
+#define AM2_AIR_SAVE_SIZE        0x248u       /* 584 bytes */
+#define AM2_SAVETAG_AIR          0x06660010u
+#define ADDR_STR_AIR_CPP         0x004740B0u  /* "C:\\ArmyMen2\\source\\air.cpp" */
+
 #define ADDR_FREE_SCRIPT_NAMES   0x0043F030u  /* void(void), 3 callers */
 #define ADDR_SAVE_SCRIPT_SECTION 0x0043F0A0u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_SECTION 0x0043F150u  /* int32_t(FILE *) */

@@ -45,6 +45,8 @@
 #include "../game/savetag.h"
 #include "../game/map.h"
 #include "../game/pad.h"
+#include "../game/air.h"
+#include "../game/gameproc.h"
 #include "../game/win32/sprite.h"
 #include "../game/win32/surface.h"
 #include "../game/text.h"
@@ -426,6 +428,8 @@ static void install(void)
     savetag_install();
     map_install();
     pad_install();
+    air_install();
+    gameproc_install();
     rect_install();
     dist_install();
     item_install();
