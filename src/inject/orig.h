@@ -1135,6 +1135,15 @@
  * save does not reset what the player set. */
 #define ADDR_SAVE_GAMEPROC       0x00426850u  /* int32_t(FILE *) */
 #define ADDR_LOAD_GAMEPROC       0x00426880u  /* int32_t(FILE *) */
+/* The two ends of the savegame format. SaveGame writes each section's tag and
+ * calls its saver; LoadGame checks the outer tag, resets the token context and
+ * runs the eleven loaders in the same order, closing the file on both exits. */
+/* The section's own tag, written by SaveGame rather than by the saver. Three
+ * readers check it: LoadGame, and 0x00425950 when it validates a save before
+ * the mission starts. */
+#define AM2_SAVETAG_GAMEPROC     0x06660666u
+#define ADDR_LOAD_GAME           0x00425A10u  /* int32_t(FILE *) */
+#define ADDR_SAVE_GAME           0x00425790u  /* int32_t(const char *) */
 #define ADDR_GAMEPROC_BLOCK      0x00511A68u  /* also a string; see below */
 #define AM2_GAMEPROC_SAVE_SIZE   0x438u       /* 1080 bytes, and its own tag */
 #define ADDR_GAMEPROC_STR_B      0x00511B88u  /* a second string inside it */

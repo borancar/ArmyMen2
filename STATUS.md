@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 340 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 340 | 333 of them below the CRT line |
+| `patch_replace` sites | 341 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 341 | 334 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 82,144 / 372,816 B (**22.0%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 82,368 / 372,816 B (**22.1%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -113,43 +113,32 @@ counts probe before reading one as coverage -- that is what turned the
    into a clean result with a sharp pass criterion. `tools/actdiff.py` already
    renumbers pointers by first-seen index; the savefile deserves the same, and
    then `tools/ab.sh` could carry it as a standing check.
-4. **Drive a LOAD -- the arm fires and the flag is then lost, measured not
-   guessed.** This is the most valuable single thing left in this area: eleven
-   loaders are written and only `LoadGameProcSection` has ever executed.
+4. **Drive a LOAD -- narrowed to a genuine puzzle, with the ruled-out
+   branches named.** `LoadGame` (`0x00425A10`) is now reconstructed, patched
+   and traced, and it still never runs. What a temporary `hooklog` probe plus
+   the trace log establish, all measured:
 
-   The chain, all of it read from the image: `LoadGame` (`0x00425A10`) has one
-   caller, `0x004255EE`, inside mission start (`0x00425300`), behind
-   `if ([0x00511DD8] == 0) LoadLevelScript(); else LoadGame(fp)`. The GAME
-   SELECT PANEL's LOAD button is `0x00452060`: it takes the selected entry's
-   name from the panel object at `0x0065A058` plus `0x68`, refuses an empty
-   one, `strcpy`s it to `0x00511B88`, sets `0x00511DD8 = 1` and requests a
-   state change. Mission start then clears the flag if the player name at
-   `0x00511A68` is empty, or if `0x00425950` returns 0 -- and that helper
-   chdirs to `save\<player>`, fopens the save, checks the `0x06660666` tag and
-   runs `LoadGameProcSection` before rewinding, so those two calls are its own.
+   - The GAME SELECT PANEL's LOAD arm (`0x00452060`) fires: `0x00511B88`
+     holds `"map1_mission1.sav"`, `0x00511A68` holds `"sarge"`.
+   - Mission start (`0x00425300`) takes the LOAD branch, so `0x00511DD8` was
+     set when it read it at `0x00425360`.
+   - `0x00425950` **succeeds**. The log shows its three steps in order --
+     `SetGameDir("save\sarge")`, `CheckSaveTag(fp, 0x06660666, gameproc.cpp,
+     0x528)`, `LoadGameProcSection` returning 1. So the flag is NOT cleared at
+     `0x00425373`, which was one of the two candidates.
+   - `LoadGame` is patched (`patch: LoadGame 00425a10` in the log) and never
+     traced. `LoadLevelScript` is, so `0x004255CB` read the flag as 0.
+   - There is **no write** to `0x00511DD8` between `0x00425385` and
+     `0x004255CB`. The two map-loader references at `0x0042D078` and
+     `0x0042D0D2` are `mov eax,`/`mov ecx,` -- reads, where the loader decides
+     whether the map should place objects a save will supply.
 
-   What a `dump` probe over the control socket says, live:
-
-   | global | reads | meaning |
-   |---|---|---|
-   | `0x00511A68` | `"sarge"` | player name is set |
-   | `0x00511B88` | `"map1_mission1.sav"` after the click | the LOAD arm DID run |
-   | `0x00511DD8` | **0** ~4 s after the click, and in mission | the flag is lost |
-
-   So the button works and something clears the flag before `0x004255CB`
-   reads it. Two candidates, and one probe would separate them: `0x00425373`,
-   reached when `0x00425950` returns 0, or `0x00425F8B` in `0x00425EE0` -- the
-   menu-request consumer -- which clears `0x00511DD8` alongside `0x00511DCC`
-   and `0x00511DC0`. `CheckSaveTag=1` and `LoadGameProcSection=1` fit either
-   reading, since the panel reads a header to label the row too.
-
-   Note two of the five remaining references to `0x00511DD8` are NOT
-   instructions -- `xor eax, 0x511dd8` at `0x00425F1B` and `add eax, 0x511dd8`
-   at `0x00426996` are unaligned operand hits, exactly the false positive
-   CLAUDE.md warns about. There is one real write outside mission start.
-
-   The control socket already has `dump <hex addr> [len]`; no probe was needed
-   to get this far, and none should be needed to finish it.
+   So the flag is set, survives the open, and is 0 by the test ~250 log lines
+   later with nothing in range writing it. The most likely remaining reading
+   is that mission start is ENTERED TWICE and the second entry clears at
+   `0x00425358` or `0x00425373` before reaching the test -- which a probe on
+   those two writes would settle in one run. That is the next step, and it is
+   cheap now that the surrounding code is ours.
 
 5. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
    median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,

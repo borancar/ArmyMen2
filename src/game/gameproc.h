@@ -43,4 +43,9 @@ void gameproc_install(void);
 }
 #endif
 
+/* 0x00425A10. Read a whole savegame: check the outer tag, reset the token
+ * context, then run the eleven loaders in the order SaveGame wrote them.
+ * Closes `fp` on both exits. Returns 1 on success, 0 if any loader failed. */
+int32_t __cdecl LoadGame(am2_FILE *fp);
+
 #endif /* AM2_GAMEPROC_H */
