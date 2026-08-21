@@ -37,6 +37,11 @@ void __cdecl DeclareRuleVars(void);
 void __cdecl EventRegister(int32_t bucket, int32_t key0, int32_t key1,
                            const void *fn, void *arg, int32_t owns);
 
+/* 0x00420060. Point a named object at a different sprite frame. The name must
+ * be type 2 and its uid must resolve to a valid object; every failure logs and
+ * returns, leaving the object alone. */
+void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame);
+
 /* The 40-byte message the event system puts on the wire. Derived from BOTH
  * sides -- EventMessageSend writes these offsets and EventMessageReceive reads
  * the same ones back -- so the layout is confirmed rather than inferred from

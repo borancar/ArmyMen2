@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 346 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 346 | 339 of them below the CRT line |
+| `patch_replace` sites | 347 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 347 | 340 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 83,488 / 372,816 B (**22.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 83,632 / 372,816 B (**22.4%**) | patched entries' sizes over the total |
 | modules | 24 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A function can be live code, correctly wired, and still unreachable from
+  anything the game ships.** `ScriptSetObjBitmap` is one arm of the 4096-byte
+  action executor at `0x00420410`, so it is reached the way every other action
+  handler is -- but no `.txt` under the prefix names a keyword that gets there,
+  and the 185-entry token table has `showbitmap` and `showbitmapnopause` and
+  nothing else bitmap-shaped. Its counter reads 0 and always will on shipped
+  content. CLAUDE.md already records that 48 of the 59 action keywords appear
+  in scripts; this is what one of the other eleven looks like from the inside.
+
+- **`DefLinkParse` is a merged entry, and the tool that would say so is
+  silent.** `docs/functions.tsv` files it at `0x00436080` with 512 bytes, but
+  that address is a 52-byte table-search wrapper and the function with the
+  three "DefLinkParse:" strings starts at `0x004360C0`. `tools/merges.py`
+  does not split it -- the same lower-bound caveat its docstring carries.
+  Worth knowing before ranking it: it parses `LINK <parent> <n> <child> <m>`
+  with seven numbered failure exits, and it is the obvious place to look for
+  the unexplained `object.aai` complaint about `link 33-1..4`.
 
 - **A counter of 12 can mean the first line ran twelve times.**
   `ArmyMessageSend` reads 12 on a campaign mission -- matching

@@ -2241,6 +2241,13 @@ typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
  * the game allocated must be freed here and vice versa. */
 #define orig_malloc  (*(am2_malloc_fn)ADDR_GAME_MALLOC)
 #define orig_free    (*(am2_free_fn)ADDR_GAME_FREE)
+/* ChangeObjectFrame, 0x004351C0, still original and now wanted from two
+ * modules -- objscript.cpp's runner and event.cpp's ScriptSetObjBitmap -- so
+ * the seam lives here rather than being declared twice. */
+typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
+                                                      int32_t flag);
+#define orig_change_object_frame \
+    (*(am2_change_object_frame_fn)ADDR_CHANGE_OBJECT_FRAME)
 #define orig_blit_bitmap_in (*(am2_blit_bitmap_in_fn)ADDR_BLIT_BITMAP_IN)
 /* The object table was allocated by the game's CRT, so it must be grown by the
  * game's CRT -- our msvcrt has a different heap entirely. */

@@ -674,6 +674,48 @@ void __cdecl EvtMarkClear(int32_t row, int32_t col)
     g_evtMarks[col + row * 4] = 0;
 }
 
+/* ----------------------------------------------- script bitmaps ---- */
+
+/* 0x00420060. Point a named object at a different sprite frame.
+ *
+ * Its own three error strings name it and describe every exit, which is most
+ * of why it is legible at all: the name must be type 2, the uid behind it must
+ * resolve to a valid object, and ChangeObjectFrame must accept the index.
+ *
+ * Worth a note on that type test. orig.h documents type 2 as
+ * AM2_NAME_TYPE_REF, "a name used before declaring", while this function's
+ * message for anything else is "which is not an item". Both readings survive
+ * together -- a script naming a map object it did not declare gets a forward
+ * reference, and those are exactly the names that carry an object uid -- but
+ * the two descriptions are not obviously the same thing, and only one of them
+ * came from a body. Recorded rather than reconciled.
+ *
+ * All three failures log and return; none is fatal, and the object is simply
+ * left alone. */
+void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
+{
+    const AM2_ScriptName *e = am2_script_name(nameidx);
+    void                 *obj;
+
+    if (e->type != AM2_NAME_TYPE_REF) {
+        orig_log("ERROR: ScriptSetObjBitmap was called with %s which is not "
+                 "an item\n", e->name);
+        return;
+    }
+
+    obj = LookupByUID((uint32_t)e->value);
+
+    if (!ObjIsItem((const AM2_Object *)obj)) {
+        orig_log("ERROR: ScriptSetObjBitmap was called with %s which is not "
+                 "a valid object\n", e->name);
+        return;
+    }
+
+    if (!orig_change_object_frame(obj, frame, 1))
+        orig_log("Error: ChangeObjectFrame returned false when passed %s "
+                 "with index %d\n", e->name, frame);
+}
+
 /* ------------------------------------------------ event messages ---- */
 
 /* The event logging switch, a field of the comm object. The logger it gates is
@@ -851,6 +893,9 @@ int event_install(void)
     rc |= patch_replace(ADDR_EVENT_TRIGGER_DELAYED,
                         (const void *)EventTriggerDelayed,
                         "EventTriggerDelayed", 1);
+    rc |= patch_replace(ADDR_SCRIPT_SET_OBJ_BITMAP,
+                        (const void *)ScriptSetObjBitmap,
+                        "ScriptSetObjBitmap", 1);
     rc |= patch_replace(ADDR_EVENT_MESSAGE_SEND,
                         (const void *)EventMessageSend, "EventMessageSend", 1);
     rc |= patch_replace(ADDR_EVENT_MESSAGE_RECV,

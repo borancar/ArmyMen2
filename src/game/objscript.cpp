@@ -312,13 +312,9 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 /* 0x004351C0 and 0x00420410 stay original and are reached by address. The
  * first is ChangeObjectFrame, named by the error string below; the second is
  * unidentified beyond its role, so it keeps a role name. */
-typedef int32_t (__cdecl *AM2_ChangeObjectFrameFn)(void *obj, int32_t frame,
-                                                   int32_t flag);
 typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
                                               void *owner);
 
-#define orig_change_object_frame \
-    (*(AM2_ChangeObjectFrameFn)AM2_IMAGE(ADDR_CHANGE_OBJECT_FRAME))
 #define orig_run_script_action \
     (*(AM2_RunScriptActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
 
