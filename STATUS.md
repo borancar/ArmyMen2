@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `d8540fe`. Working tree clean.
+Last updated: **2026-08-21**, at `323ff49`. Working tree clean.
 
 ## In flight
 
@@ -68,8 +68,8 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 319 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 319 | 312 of them below the CRT line |
+| `patch_replace` sites | 320 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 320 | 313 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
@@ -98,27 +98,44 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Next
 
-1. **Drive a LOAD.** The save half of the serialiser is already exercised --
+1. **Give the savegame oracle a pointer-aware comparison.** Driving the
+   campaign twice and `cmp`-ing the two `.sav` files verifies the save half
+   against the original's own bytes -- section offsets, lengths and record
+   counts all matched exactly. What it cannot do yet is ignore the stored HEAP
+   POINTERS, which shift because `am2hook.dll` moves the heap: 23 of 25
+   differing bytes were low bytes of `0x01A1xxxx` dwords, 19 of them +32.
+   `tools/actdiff.py` already solves this by renumbering pointers by first-seen
+   index; the same treatment folded into `tools/ab.sh` would make the savefile
+   a standing check rather than a one-off. Offset 929 is separately volatile --
+   two runs of the SAME build differ there.
+2. **Drive a LOAD.** The save half of the serialiser is already exercised --
    the game autosaves at mission start and `save/sarge/map1_mission1.sav` is
    written on every campaign run -- but nothing loads one. `LoadGame` is called
    only from mission start (`0x00425300`), so starting the same mission with a
    save present should do it, with no menu navigation at all. That would cover
    `CheckSaveTag`, `LoadScriptCond`, `LoadEventSection`, `LoadScriptConditions`
    and `LoadItems` in one run.
-2. **Nine save/load section pairs, in the same order, each saver immediately
+3. **Nine save/load section pairs, in the same order, each saver immediately
    before its loader in the image** -- read out of `SaveGame` and `LoadGame`
    separately and they agree. That names four unreconstructed targets by
    structure: `0x0041EC20` (80 B, mirrors the reconstructed
    `LoadScriptConditions`), `0x00422470` (368 B, mirrors `LoadEventSection`),
    `0x0041E9E0` (64 B) and `0x0043F0A0` (176 B). Reconstructing a saver whose
    loader is already ours makes the round trip check both halves at once.
-3. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
+4. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
    median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
    928 B, 14 callers) is the hub two of them already reach by address.
-4. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
+5. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
 
+- **A savegame is an exact oracle the log-and-pixel A/B cannot be.** A
+  mis-serialised save shows in neither the log nor the screen. Comparing the
+  `.sav` two runs produce catches what `ab.sh` structurally cannot -- and it
+  took two wrong readings to interpret the first result: "written by original
+  code, so noise" (the control disproved it: two ORIGINAL runs differ by one
+  byte) and then "a real divergence in object state" (the bytes are heap
+  pointers). Run the control, then look at what the differing bytes ARE.
 - **The savegame SAVE half is verified by execution; the LOAD half is not.**
   `SaveItems=1` and `SaveScriptCond=91` on the campaign path -- the game
   autosaves at mission start. Every loader reads 0 and none is blind.
