@@ -204,7 +204,17 @@ static void SetFacing(int32_t facing, const void *src, void *out,
         *(int32_t *)(o + off_mode) = wide;
         o[0] = base;
         break;
+    /* 1 is NOT grouped with 3, and it was. The jump table sends facing 1 to an
+     * arm that loads `out` and jumps straight into the common tail, while
+     * facing 3 writes off_flag first and then falls into the same tail -- so 1
+     * mirrors 7 and 3 mirrors 5, and folding 1 in with 3 broke that symmetry.
+     * The defect was invisible for as long as the vectors only checked that
+     * the expected writes happened; it writes one dword the original never
+     * writes, and every value it was expected to produce it still produced. */
     case 1:
+        *(int32_t *)(o + off_mode) = wide;
+        o[0] = (uint8_t)(base + 0x20);
+        break;
     case 3:
         *(int32_t *)(o + off_flag) = 1;
         *(int32_t *)(o + off_mode) = wide;
@@ -409,6 +419,26 @@ void __cdecl ListPushFront(void *node, void **head)
     if (old)
         *(void **)((uint8_t *)old + 4) = node;
     *head = node;
+}
+
+/* The inverse. Both arms end by clearing the node's own links, and only the
+ * head arm writes through `head`. */
+void __cdecl ListUnlink(void *node, void **head)
+{
+    uint8_t *n    = (uint8_t *)node;
+    void    *prev = *(void **)(n + 4);
+    void    *next = *(void **)(n + 8);
+
+    if (!prev)
+        *head = next;
+    else
+        *(void **)((uint8_t *)prev + 8) = next;
+
+    if (next)
+        *(void **)((uint8_t *)next + 4) = prev;
+
+    *(void **)(n + 8) = 0;
+    *(void **)(n + 4) = 0;
 }
 
 int32_t __cdecl SetFieldInAll(void *record, void *value)
@@ -641,5 +671,6 @@ int misc_install(void)
     patch_replace(ADDR_BITMAP_BIT_SET, (const void *)BitmapBitSet,
                   "BitmapBitSet", 5);
     patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
+    patch_replace(ADDR_LIST_UNLINK, (const void *)ListUnlink, "ListUnlink", 6);
     return 0;
 }

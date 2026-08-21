@@ -33,6 +33,15 @@
 
 static uint8_t g_scratch[AM2_SCRATCH_LEN];
 
+/* The scratch as it stood when the reconstruction was called, and which bytes
+ * the ORIGINAL changed. Recording only the changed offsets, and comparing only
+ * those, cannot see a write the original never made -- so a reconstruction
+ * that scribbles somewhere extra passed silently. Found by mutation:
+ * ListUnlink writes through `head` only when the node is first, and making it
+ * write unconditionally left all 6708 vectors green. */
+static uint8_t g_before[AM2_SCRATCH_CMP];
+static uint8_t g_touched[AM2_SCRATCH_CMP];
+
 /* Every one of these is cdecl, so a single six-argument invoker serves them
  * all: the caller cleans up, so passing more arguments than the callee reads
  * is harmless. */
@@ -74,6 +83,9 @@ int main(void)
             a[i] = t->isptr[i] ? (uint32_t)(uintptr_t)(g_scratch + t->arg[i])
                                : t->arg[i];
 
+        for (uint32_t o = 0; o < AM2_SCRATCH_CMP; o++)
+            g_before[o] = g_scratch[o];
+
         uint32_t got = ((am2_any_fn)t->fn)(a[0], a[1], a[2], a[3], a[4], a[5]);
 
         uint32_t want_eax = t->eax_is_ptr
@@ -93,6 +105,40 @@ int main(void)
             if (*(uint32_t *)(g_scratch + at)
                 != (uint32_t)(uintptr_t)(g_scratch + target))
                 bad = 1;
+        }
+
+        /* And every byte the original did NOT touch must be untouched here.
+         * Without this the harness only ever asked whether the expected writes
+         * happened, never whether anything else did. */
+        if (!bad) {
+            for (uint32_t o = 0; o < AM2_SCRATCH_CMP; o++)
+                g_touched[o] = 0;
+            for (int32_t w = 0; w < t->nwrites; w++) {
+                uint32_t off = t->writes[w * 2];
+                if (off < AM2_SCRATCH_CMP)
+                    g_touched[off] = 1;
+            }
+            for (int32_t w = 0; w < t->nwptr; w++) {
+                uint32_t at = t->wptr[w * 2];
+                for (uint32_t b = 0; b < 4; b++)
+                    if (at + b < AM2_SCRATCH_CMP)
+                        g_touched[at + b] = 1;
+            }
+            /* A slot that HELD a pointer before the call is not comparable
+             * byte for byte in either direction. The emulator's pointers are
+             * SCRATCH-based and the replay's are host addresses, so clearing
+             * one is a change here and was not a change there -- the write is
+             * correct and simply never got recorded. That is what a fixup
+             * offset is, so exclude those four bytes. */
+            for (int32_t w = 0; w < t->nfixups; w++) {
+                uint32_t at = t->fixups[w * 2];
+                for (uint32_t b = 0; b < 4; b++)
+                    if (at + b < AM2_SCRATCH_CMP)
+                        g_touched[at + b] = 1;
+            }
+            for (uint32_t o = 0; o < AM2_SCRATCH_CMP && !bad; o++)
+                if (!g_touched[o] && g_scratch[o] != g_before[o])
+                    bad = 1;
         }
 
         if (bad) {

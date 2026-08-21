@@ -1869,6 +1869,7 @@
 #define ADDR_XOR_CHECKSUM      0x00402700u  /* uint32_t(const void *record) */
 #define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */
 #define ADDR_LIST_PUSH_FRONT   0x00429F20u  /* void(void *node, void **head) */
+#define ADDR_LIST_UNLINK       0x0041DAD0u  /* void(void *node, void **head) */
 #define ADDR_SET_FIELD_IN_ALL  0x00434E90u  /* int32_t(void *record, void *v) */
 #define ADDR_FIELD51_MEETS_MIN 0x0040A490u  /* int32_t(const void *p) */
 #define ADDR_OBJ_KIND538_10_17 0x0040D860u  /* int32_t(const void *obj) */

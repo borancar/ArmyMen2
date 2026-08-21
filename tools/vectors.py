@@ -852,7 +852,8 @@ def main():
                 "ADDR_CONSUME_PENDING", "ADDR_FACING_DELTA_08",
                 "ADDR_FACING_DELTA_14", "ADDR_MAP_CODE_18_28",
                 "ADDR_MEETS_ALL_THREE",
-                "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32"]
+                "ADDR_BITMAP_BIT_SET", "ADDR_RING_PUSH_32",
+                "ADDR_LIST_UNLINK"]
 
     want = sys.argv[1:] or ["--validate"]
     emit = "--emit" in want
@@ -954,6 +955,7 @@ def main():
         "ADDR_MEETS_ALL_THREE": "MeetsAllThree",
         "ADDR_BITMAP_BIT_SET": "BitmapBitSet",
         "ADDR_RING_PUSH_32": "RingPush32",
+        "ADDR_LIST_UNLINK": "ListUnlink",
     }
     # Functions whose C prototype is void. The original still leaves something
     # in eax -- ObjSetFieldA's last instruction is `mov [eax+8],ecx`, so the
@@ -970,7 +972,9 @@ def main():
             # eax again, so the pointer is still there at `ret`. Both call
             # sites -- 0x0040168B and 0x00401C53 -- overwrite eax with their
             # next load immediately after the call, so nothing reads it.
-            "RingPush32"}
+            "RingPush32",
+            # ListUnlink keeps the node in eax from entry to `ret` too.
+            "ListUnlink"}
     out = []
 
     print("  %-24s %-12s %4s %-14s %5s %5s %6s"

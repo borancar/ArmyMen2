@@ -230,6 +230,17 @@ uint32_t __cdecl ChainField14(const void *p);
  * +4, next at +8, and `head` is the address of the head pointer. */
 void __cdecl ListPushFront(void *node, void **head);
 
+/* 0x0041DAD0. The other half of the same list: take `node` out and leave it
+ * with both links cleared. Same node layout as ListPushFront -- prev at +4,
+ * next at +8 -- and the same (node, head) signature, and six callers around
+ * 0x00429E4B..0x0042A0E4, which is where ListPushFront lives.
+ *
+ * `head` is written ONLY when the node is the first one, because that is the
+ * only case where the head has to move. An unlink from the middle never
+ * touches it, so the pointer is allowed to be wrong there and nothing would
+ * notice -- reproduced, not defended. */
+void __cdecl ListUnlink(void *node, void **head);
+
 /* 0x00434E90. Writes `value` into the dword at +0x2C of every element of an
  * array the record describes -- base at +8, count at +4, elements 0x60 apart.
  * Returns the number written, which is 0 when the count is not positive.
