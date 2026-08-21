@@ -1151,6 +1151,24 @@
  * returned straight on. 0x00428370 has eight callers and no name. */
 #define ADDR_EVT_OBJ_SET         0x0041F6E0u  /* void(uint32_t, int32_t) */
 #define ADDR_OBJ_SET             0x00428370u  /* void(obj, int32_t, int32_t) */
+/* 0x0041F710. The most guarded member of the family: uid threshold, pointer,
+ * a flag bit CLEAR at +8, and a positive int16 at +0x62, all before it acts.
+ * Its callee has nineteen callers and no name. */
+#define ADDR_EVT_GUARDED_ACTION  0x0041F710u  /* void(uint32_t, int32, int32) */
+#define ADDR_GUARDED_ACTION      0x00428140u  /* void(obj,int32,int32,0,0,0) */
+#define OBJ_OFF_FLAGS8           8u    /* bit 2 blocks the action above */
+#define OBJ_FLAG8_BLOCKED        4u
+#define OBJ_OFF_COUNT62          0x62u /* int16; must be > 0 */
+
+/* Two more of the "On" shape: take a uid, substitute the object's own position
+ * for a point, and call the twin that takes the point directly. event.h
+ * already records the pattern for EvtPlaySoundAt/EvtPlaySoundOn -- these are
+ * two more pairs, and the "At" halves are themselves small and unreconstructed
+ * (0x0041F820, 0x0041F8B0, and 0x0041F780 for a third pair). */
+#define ADDR_EVT_AT_OBJ_POS_A    0x0041F880u  /* void(int32, uint32, int32) */
+#define ADDR_EVT_AT_OBJ_POS_B    0x0041F970u  /* void(int32,int32,uint32,int32) */
+#define ADDR_AT_POINT_A          0x0041F820u  /* void(int32, uint32, int32) */
+#define ADDR_AT_POINT_B          0x0041F8B0u  /* void(int32,int32,uint32,int32) */
 #define ADDR_OBJ_ACTION          0x00428DA0u  /* void(void *obj) */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is

@@ -122,6 +122,17 @@ void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg);
  * on -- the unsafe member of the family. Reproduced as written. */
 void __cdecl EvtObjSet(uint32_t uid, int32_t value);
 
+/* 0x0041F710. Four tests before it acts: uid threshold, pointer, a flag bit at
+ * +8 that must be clear, and a positive int16 at +0x62. */
+void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b);
+
+/* 0x0041F880 and 0x0041F970. Two more of the "On" shape -- take a uid where
+ * the twin takes a point, and pass the object's own position instead. Note the
+ * uid is the SECOND and THIRD argument respectively, because it sits where the
+ * point sits in each twin's signature. */
+void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c);
+void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d);
+
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER
  * against the timer's id with `owns` set, so the teardown frees the record.

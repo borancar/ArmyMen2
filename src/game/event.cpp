@@ -817,6 +817,14 @@ typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
 #define orig_type2_action_c \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
 #define orig_obj_set        (*(AM2_ObjSetFn)AM2_IMAGE(ADDR_OBJ_SET))
+typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
+                                            int32_t c, int32_t d, int32_t e);
+typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
+typedef void (__cdecl *AM2_AtPointBFn)(int32_t a, int32_t b, uint32_t point,
+                                       int32_t d);
+#define orig_guarded_action (*(AM2_GuardedActionFn)AM2_IMAGE(ADDR_GUARDED_ACTION))
+#define orig_at_point_a     (*(AM2_AtPointAFn)AM2_IMAGE(ADDR_AT_POINT_A))
+#define orig_at_point_b     (*(AM2_AtPointBFn)AM2_IMAGE(ADDR_AT_POINT_B))
 
 /* 0x0041FE70. Deploy the object a uid names.
  *
@@ -915,6 +923,75 @@ void __cdecl EvtObjSet(uint32_t uid, int32_t value)
         return;
 
     orig_obj_set(LookupByUID(uid), value, 0);
+}
+
+/* 0x0041F710. The most guarded member of the family: four tests before it acts.
+ *
+ * The uid threshold, then the pointer, then a flag bit at +8 that must be
+ * CLEAR, then an int16 at +0x62 that must be positive. The last two are read
+ * off the object rather than the event, so this is the shim that declines when
+ * the object itself is not in a fit state -- whatever that state is. Three
+ * trailing zero arguments go to a callee with nineteen callers. */
+void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
+{
+    uint8_t *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = (uint8_t *)LookupByUID(uid);
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BLOCKED)
+        return;
+
+    if (*(const int16_t *)(obj + OBJ_OFF_COUNT62) <= 0)
+        return;
+
+    orig_guarded_action(obj, a, b, 0, 0, 0);
+}
+
+/* 0x0041F880 and 0x0041F970. Two more of the "On" shape.
+ *
+ * Each takes a uid where its twin takes a point, looks the object up, and
+ * passes the object's own position at +0x12 through instead. event.h records
+ * the same pattern for EvtPlaySoundOn against EvtPlaySoundAt; these are two
+ * further pairs, and their "At" halves are still original -- small, and worth
+ * taking next so each pair is whole.
+ *
+ * Note which argument carries the uid: the FIRST for most of this family, but
+ * the second here and the third in the other, because the uid sits where the
+ * point sits in the twin's signature. */
+void __cdecl EvtAtObjPosA(int32_t a, uint32_t uid, int32_t c)
+{
+    const uint8_t *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = (const uint8_t *)LookupByUID(uid);
+
+    if (obj == (const uint8_t *)0)
+        return;
+
+    orig_at_point_a(a, *(const uint32_t *)(obj + OBJ_OFF_POS), c);
+}
+
+void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
+{
+    const uint8_t *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = (const uint8_t *)LookupByUID(uid);
+
+    if (obj == (const uint8_t *)0)
+        return;
+
+    orig_at_point_b(a, b, *(const uint32_t *)(obj + OBJ_OFF_POS), d);
 }
 
 /* ------------------------------------------------------- reset ---- */
@@ -1289,6 +1366,12 @@ int event_install(void)
                         (const void *)EvtType2ActionC, "EvtType2ActionC", 1);
     rc |= patch_replace(ADDR_EVT_OBJ_SET, (const void *)EvtObjSet,
                         "EvtObjSet", 1);
+    rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
+                        (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_A, (const void *)EvtAtObjPosA,
+                        "EvtAtObjPosA", 1);
+    rc |= patch_replace(ADDR_EVT_AT_OBJ_POS_B, (const void *)EvtAtObjPosB,
+                        "EvtAtObjPosB", 1);
     rc |= patch_replace(ADDR_EVT_SET_FIELD_540, (const void *)EvtSetField540,
                         "EvtSetField540", 2);
     rc |= patch_replace(ADDR_EVT_SET_MODE_F0, (const void *)EvtSetModeF0,
