@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 341 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 341 | 334 of them below the CRT line |
+| `patch_replace` sites | 342 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 342 | 335 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 82,368 / 372,816 B (**22.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 82,624 / 372,816 B (**22.2%**) | patched entries' sizes over the total |
 | modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -140,12 +140,36 @@ counts probe before reading one as coverage -- that is what turned the
    those two writes would settle in one run. That is the next step, and it is
    cheap now that the surrounding code is ours.
 
-5. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
-   median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
-   928 B, 14 callers) is the hub two of them already reach by address.
+5. Keep taking self-naming functions -- **29 are left**, recomputed from
+   `docs/logs.tsv` against the current patch list rather than quoted from an
+   old sweep. Smallest first: `AddMsg` (`0x00401050`, 96 B, 12 callers),
+   `RemHead` (`0x004010C0`, 144 B, 10), `RemMsg` (`0x00401410`, 176 B, 3) --
+   the air.cpp message list, which CLAUDE.md warns is mutex-guarded and
+   multi-threaded, so a mistake there is a race. Cleaner: `EventMessageSend`
+   (`0x0041F150`, 176 B), `EventMessageReceive` (`0x0041F320`, 240 B),
+   `EventTriggerDelayed` (`0x0041F410`, 144 B), `DefLinkParse` (`0x00436080`,
+   512 B) and `DefObjParse` (`0x00435B60`, 768 B).
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`0x00511E04` is not a clock, and the reading that said so lasted one
+  probe.** `UpdateObjectScript` skips an object while `obj[0xBC] >= this` and
+  on advancing sets `obj[0xBC] = frame->a + this`. That is a deadline against a
+  rising tick in every particular, and it is what went into `orig.h` first.
+  Then `dump 511E04` three times over twelve seconds of Boot Camp: 500, 500,
+  500, while `ComposeFrame` climbed and `UpdateObjectScript` ran 177,370 times.
+  It does not tick. `orig.h` still calls it `ADDR_INPUT_CONTEXT` and still says
+  the meaning is unestablished -- now with one candidate positively excluded,
+  which is worth more than the plausible name would have been.
+
+- **A clean pixel figure can hide what the log catches.** Passing an object
+  frame's `a` where the original passes `b` leaves `campaign` at exactly 2,571
+  differing pixels -- the usual number, inside budget -- while the log grows
+  `ChangeObjectFrame failed in UpdateObjectScript` lines that are not in the
+  original. The mutation is caught, but only by the half of `ab.sh` that
+  compares text. Worth remembering when judging a reconstruction whose effect
+  is a sprite choice.
 
 - **The audio section is the last in the file, which turns its LENGTH into a
   check.** 68 bytes -- a tag and sixteen zero lengths -- ending exactly at EOF.

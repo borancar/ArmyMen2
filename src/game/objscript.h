@@ -100,4 +100,10 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp);
  * `text` is NOT freed -- the token list owns it. Three callers. */
 void __cdecl FreeObjScripts(void);
 
+/* 0x004371A0. Step one object along its object script when its deadline has
+ * passed: pick the next frame, change the sprite, push the deadline out and
+ * run the frame's actions. Returns 0 for "no script" and for a bad state
+ * index, 1 otherwise. Two callers. */
+int32_t __cdecl UpdateObjectScript(void *obj);
+
 #endif /* AM2_OBJSCRIPT_H */

@@ -301,6 +301,91 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
     }
     return 1;
 }
+/* ------------------------------------------------- script runner ---- */
+
+/* The global this function measures object-script timing against. orig.h
+ * calls it ADDR_INPUT_CONTEXT and says the meaning is unestablished. It is NOT
+ * a clock -- probed at 500 for twelve seconds of play -- so the local name
+ * says only that timing is read from it, and claims nothing wider. */
+#define kScriptTiming (*(const uint32_t *)AM2_IMAGE(ADDR_INPUT_CONTEXT))
+
+/* 0x004351C0 and 0x00420410 stay original and are reached by address. The
+ * first is ChangeObjectFrame, named by the error string below; the second is
+ * unidentified beyond its role, so it keeps a role name. */
+typedef int32_t (__cdecl *AM2_ChangeObjectFrameFn)(void *obj, int32_t frame,
+                                                   int32_t flag);
+typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
+                                              void *owner);
+
+#define orig_change_object_frame \
+    (*(AM2_ChangeObjectFrameFn)AM2_IMAGE(ADDR_CHANGE_OBJECT_FRAME))
+#define orig_run_script_action \
+    (*(AM2_RunScriptActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
+
+/* 0x004371A0. Step one object along its object script.
+ *
+ * The object carries four fields: which script it runs, which state it is in,
+ * which frame it reached, and a timing value at +0xBC. Nothing happens while
+ * that value is at or above the global; otherwise the next frame is selected,
+ * the sprite is changed to that frame's second number, +0xBC is reset to the
+ * frame's first number plus the global, and every action the frame owns is run
+ * against the object's owner.
+ *
+ * Two bounds are worth reading twice, because neither is what a careful
+ * version would write and both are reproduced. The state index is rejected
+ * only when it is `> statecount`, so the value EQUAL to the count is accepted
+ * and indexes one past the array. And the frame bound is `>=`, which is
+ * correct -- so the two disagree with each other in the same function.
+ *
+ * The `scr == NULL` test is likewise the original's: it can only fire when the
+ * table pointer is null and the id is 1, since the address is computed before
+ * it is checked. */
+int32_t __cdecl UpdateObjectScript(void *obj)
+{
+    uint8_t *o  = (uint8_t *)obj;
+    int32_t  id = *(const int32_t *)(o + OBJ_OFF_SCRIPT_ID);
+
+    if (id <= 0)
+        return 0;
+
+    AM2_ObjScript *scr = &kObjScripts[id - 1];
+
+    if (scr == (AM2_ObjScript *)0)
+        return 1;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) >= kScriptTiming)
+        return 1;
+
+    int32_t st = *(const int32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+
+    if (st > scr->statecount || st < 0) {
+        orig_log("UpdateObjectScript: bad state index\n");
+        return 0;
+    }
+
+    AM2_ObjState *state = &scr->states[st];
+    int32_t       fr    = *(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1;
+
+    if (fr >= state->framecount)
+        return 1;
+
+    *(int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) = fr;
+
+    AM2_ObjFrame *frame = &state->frames[fr];
+
+    if (!orig_change_object_frame(obj, frame->b, 1))
+        orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
+
+    *(int32_t *)(o + OBJ_OFF_SCRIPT_NEXT) = frame->a + (int32_t)kScriptTiming;
+
+    void *owner = *(void **)(o + OBJ_OFF_OWNER);
+
+    for (int32_t i = 0; i < frame->actioncount; i++)
+        orig_run_script_action(&frame->actions[i], owner);
+
+    return 1;
+}
+
 /* ------------------------------------------------------ save ---- */
 
 /* 0x00436280. Four nested levels -- script, state, frame, action -- each
@@ -542,6 +627,9 @@ int objscript_install(void)
                         "LoadObjScriptSection", 1);
     rc |= patch_replace(ADDR_FREE_OBJ_SCRIPTS,
                         (const void *)FreeObjScripts, "FreeObjScripts", 1);
+    rc |= patch_replace(ADDR_UPDATE_OBJECT_SCRIPT,
+                        (const void *)UpdateObjectScript,
+                        "UpdateObjectScript", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);

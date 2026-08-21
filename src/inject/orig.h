@@ -1253,7 +1253,26 @@
  * they are, rather than being guessed at from a call site again. */
 #define ADDR_SCRIPT_RESURRECT_ITEM 0x0041FEC0u
 #define ADDR_SCRIPT_SET_OBJ_BITMAP 0x00420060u
-#define ADDR_UPDATE_OBJECT_SCRIPT  0x004371A0u  /* also ChangeObjectFrame */
+/* 0x004371A0. Advance one object along its object script by one frame, if its
+ * deadline has passed. Two of its own log strings name it and its callee:
+ * "UpdateObjectScript: bad state index" and "ChangeObjectFrame failed in
+ * UpdateObjectScript". The comment here used to read "also ChangeObjectFrame",
+ * which put two names on one address -- they are separate functions and the
+ * second is 0x004351C0, reached from nine places. */
+#define ADDR_UPDATE_OBJECT_SCRIPT  0x004371A0u  /* int32_t(void *obj) */
+#define ADDR_CHANGE_OBJECT_FRAME   0x004351C0u  /* int32_t(obj, frame, int32) */
+/* Runs one parsed action against an owner. 4096 bytes in event.cpp with three
+ * callers, and it names itself nowhere -- so this is a ROLE, not a recovered
+ * source name, and it stays that way until the body says otherwise. */
+#define ADDR_RUN_SCRIPT_ACTION     0x00420410u  /* void(action *, void *owner) */
+
+/* The four object fields the object-script runner uses, all read out of
+ * UpdateObjectScript's body rather than guessed at a call site. */
+#define OBJ_OFF_SCRIPT_ID        0xB0u   /* 1-based index into the table; 0 = none */
+#define OBJ_OFF_SCRIPT_STATE     0xB4u
+#define OBJ_OFF_SCRIPT_FRAME     0xB8u
+#define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
+#define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */
 #define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
 #define ADDR_DEF_GAME_PARSE        0x00424590u
@@ -1826,7 +1845,18 @@
                                                * nothing here reads it */
 /* Read from 157 places and written from three, all of them in the state
  * machine -- ADDR_TAKE_MENU_REQUEST is one. What it MEANS is not established;
- * this records only that the mouse stamps it whenever there is input. */
+ * this records only that the mouse stamps it whenever there is input.
+ *
+ * UpdateObjectScript adds a datum and rules a reading OUT. It skips an object
+ * while `obj[0xBC] >= this` and on advancing sets `obj[0xBC] = frame->a +
+ * this`, which reads exactly like a deadline against a rising clock -- so that
+ * is what went in here first. A live probe says no: it holds 0x1F4 (500) for
+ * twelve seconds of Boot Camp play while ComposeFrame climbs and
+ * UpdateObjectScript runs 177,370 times. It does not tick.
+ *
+ * So it is a state-scoped VALUE the object-script timing is measured against,
+ * consistent with "written from three places in the state machine". Still not
+ * established, and now with one fewer candidate. */
 #define ADDR_INPUT_CONTEXT       0x00511E04u
 #define ADDR_MOUSE_EVENT         0x00426F40u  /* void(void), after every event */
 /* PollInput is `call PollMouse; jmp PollKeyboard` and nothing else. */
