@@ -1187,6 +1187,11 @@
 #define AM2_MAP_SAVE_SIZE        0xECu        /* 236 bytes */
 #define AM2_SAVETAG_MAP          0x06660009u
 #define ADDR_STR_MAP_CPP         0x00486410u  /* "C:\\ArmyMen2\\source\\map.cpp" */
+/* 0x0042DBB0, "Checksum of %s " and "is %x " -- its own name. Seven callers,
+ * and it sits immediately after the two map save/load functions, which is the
+ * evidence for filing it in map.cpp: the band alone only says
+ * map.cpp..objscript.cpp. */
+#define ADDR_CHECKSUM              0x0042DBB0u  /* uint32_t(const char *) */
 
 #define ADDR_SAVE_SCRIPT_CONDS   0x0041EC20u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_CONDS   0x0041EDD0u  /* int32_t(FILE *) */

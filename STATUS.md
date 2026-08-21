@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 365 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 365 | 358 of them below the CRT line |
+| `patch_replace` sites | 366 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 366 | 359 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 88,224 / 372,816 B (**23.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 88,352 / 372,816 B (**23.7%**) | patched entries' sizes over the total |
 | modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,16 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The `.aai` files are checksummed for peer agreement, which is why none of
+  it runs here.** `Checksum` (`0x0042DBB0`) XORs a file's dwords; the wrapper
+  at `0x004303B0` chdirs into `aai` and XORs the checksums of `game.aai`,
+  `object.aai`, `troop.aai`, `vehicle.aai` and `weapon.aai` into one number.
+  That is a data-integrity handshake, so it needs a second player and reads 0
+  in every configuration this project can drive -- despite seven call sites.
+  Those are the same files defparse.cpp and definfo.cpp parse, so the whole
+  `.aai` subsystem now has both halves: what the files MEAN and how two
+  machines agree they are the same files.
 
 - **Fifty-three callers, fifteen executions, and the drive still cannot see
   what it returns.** `ResolveUid` is the one place a script name becomes a uid.

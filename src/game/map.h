@@ -41,4 +41,9 @@ void map_install(void);
 }
 #endif
 
+/* 0x0042DBB0. XOR every whole dword of a file together; a trailing partial
+ * dword is dropped. Announces itself in the log either way, and reports 0 for
+ * a file it cannot open. Seven callers. */
+uint32_t __cdecl Checksum(const char *path);
+
 #endif /* AM2_MAP_H */
