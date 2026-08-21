@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `a7d74f0`. Working tree clean.
+Last updated: **2026-08-21**, at `1b6d541`. Working tree clean.
 
 ## In flight
 
@@ -23,6 +23,13 @@ Nothing uncommitted.
 - **The pure-leaf pool is nearly empty**: 14 pure unreconstructed leaves left,
   from the 161 this project started that count at. Three of the 14 are false
   positives -- see Leads.
+- **The vectors now check for writes the original did NOT make.** They only
+  ever asked whether the expected writes happened, so a reconstruction that
+  scribbled elsewhere passed. Found by a `ListUnlink` mutation that should have
+  failed and did not. Closing it immediately found a real defect:
+  `SetFacing14` and `SetFacing08` set a dword on facing 1 that the original
+  sets only on facing 3, and had done since they were written. Fixed at
+  `1b6d541`.
 
 ## Where the work is
 
@@ -42,12 +49,12 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 299 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 299 | 292 of them below the CRT line |
+| `patch_replace` sites | 300 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 300 | 293 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
-| pure unreconstructed leaves | 14 | `tools/vectors.py --all` |
+| pure unreconstructed leaves | 13 | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
@@ -61,7 +68,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **6,626** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **6,708** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, twice: log identical at 14 messages, 2,571/786,432 pixels both times |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
@@ -72,9 +79,11 @@ counts probe before reading one as coverage -- that is what turned the
 ## Next
 
 1. Finish `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
-2. Keep taking pure leaves: 11 real ones left, each verifiable offline by
-   vectors with no game at all. `0x0041dad0`, `0x00449ef0`, `0x0041bb60` and
-   `0x0041cec0` are the next smallest.
+2. Keep taking pure leaves: 10 real ones left, each verifiable offline by
+   vectors with no game at all. `0x0041bb60` (a byte remap, or a memcpy when
+   the table is null) and `0x0041cec0` (an RLE decoder like `MaskPixelSolid`
+   but with a dword row table) are read and ready. `0x00449ef0` needs a SEED
+   chain -- it dereferences `obj->[0xC0]->[0]`.
 3. The action executor at `0x00420410` (4,096 B) is the layer above the setter
    family, and `0x0041FD10`, `0x0041FD30`, `0x0041FEA0` are three more of its
    helpers, all still original.
@@ -97,3 +106,9 @@ and not promoted to fact without evidence.
   set from `patch_replace` calls in `src/game` only and cannot see a harness
   patch. Worth fixing in `merges.reconstructed()`, which is where the same
   lesson is already written down.
+- **Coverage percentages in `--validate` are not being read.** `SetFacing14`
+  and `SetFacing08` have sat at **39.3%** for as long as they have existed and
+  the line printing it went past every time. The defect found at `1b6d541` was
+  in an arm those vectors do reach, so coverage was not the thing that hid it
+  -- but a third of two functions is still unvisited and nothing is tracking
+  which functions are short.
