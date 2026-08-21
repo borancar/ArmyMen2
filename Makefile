@@ -50,6 +50,7 @@ HOOK_C   := src/inject/dllmain.c \
 
 HOOK_CXX := src/game/savetag.cpp \
             src/game/map.cpp \
+            src/game/pad.cpp \
             src/game/item.cpp \
             src/game/msgslot.cpp \
             src/game/objflag.cpp \

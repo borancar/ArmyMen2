@@ -1098,6 +1098,18 @@
  * through WriteSaveTag and comes back through CheckSaveTag, which is why
  * 0x00003E88 sits in docs/savetags.tsv looking like a twelfth section tag.
  * It is not one. */
+/* pad.cpp's savegame section, and the reset the loader opens with. The two
+ * blocks are ADDR_PAD_NUMBERS and ADDR_PADS, already named; the sizes here are
+ * confirmed three ways -- the fwrite lengths, the fread lengths, and the reset's
+ * `rep stosd` counts of 0x1300 and 0x2400 dwords. */
+#define ADDR_SAVE_PAD_SECTION    0x00437A90u  /* int32_t(FILE *) */
+#define ADDR_LOAD_PAD_SECTION    0x00437AE0u  /* int32_t(FILE *) */
+#define ADDR_RESET_PADS          0x004373C0u  /* void(void), 2 callers */
+#define ADDR_STR_PAD_CPP         0x004877F8u  /* "C:\\ArmyMen2\\source\\pad.cpp" */
+#define AM2_SAVETAG_PAD          0x06660005u
+#define AM2_PAD_NUMBERS_BYTES    0x4C00u      /* 256 entries of 76 */
+#define AM2_PADS_BYTES           0x9000u      /* 512 entries of 72 */
+
 #define ADDR_SAVE_EVENT_BLOCK    0x0041E9E0u  /* int32_t(FILE *) */
 #define ADDR_LOAD_EVENT_BLOCK    0x0041EA20u  /* int32_t(FILE *) */
 #define ADDR_EVENT_BLOCK         0x0050C368u
