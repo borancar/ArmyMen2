@@ -7,6 +7,7 @@
 #include "crt.h"
 #include "event.h"
 #include "image.h"
+#include "misc.h"      /* FilterMatches */
 #include "objtable.h"
 #include "item.h"   /* UidOnWire */
 #include "objtype.h"
@@ -731,26 +732,24 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
  * game's transport -- 20 callers -- and EventTriggerImmediate is the local
  * raise that Receive feeds. */
 typedef void (__cdecl *AM2_ArmyMessageSendFn)(const void *msg);
-typedef void (__cdecl *AM2_EventTriggerImmedFn)(int32_t type, int32_t num1,
-                                                uint32_t uid1, int32_t aux1,
-                                                int32_t num2, uint32_t uid2,
-                                                int32_t aux2,
-                                                int32_t removeevent,
-                                                int32_t remote);
 #define orig_army_message_send \
     (*(AM2_ArmyMessageSendFn)AM2_IMAGE(ADDR_ARMY_MESSAGE_SEND))
-#define orig_event_trigger_immediate \
-    (*(AM2_EventTriggerImmedFn)AM2_IMAGE(ADDR_EVENT_TRIGGER_IMMED))
+/* What a registered handler is called as: the seven event fields the trigger
+ * received, then the handler's OWN argument from its registration. */
+typedef void (__cdecl *AM2_EventHandlerFn)(int32_t type, int32_t num1,
+                                           uint32_t uid1, int32_t maskA,
+                                           int32_t num2, uint32_t uid2,
+                                           int32_t maskB, void *arg);
 
 /* 0x0041F150. Pack an event into a 40-byte message and send it.
  *
  * The uids go through UidOnWire, which is the identity on this target and a
- * byte-order hook on any other. Note the log prints five of the eight
- * arguments and skips aux1 and aux2 entirely -- which is most of why those two
- * have no better name than their position. */
+ * byte-order hook on any other. The log prints five of the eight arguments and
+ * skips the two masks entirely, which is why they carried positional names
+ * until EventTriggerImmediate handed them to FilterMatches. */
 void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
-                              int32_t aux1, int32_t num2, uint32_t uid2,
-                              int32_t aux2, int32_t removeevent)
+                              int32_t maskA, int32_t num2, uint32_t uid2,
+                              int32_t maskB, int32_t removeevent)
 {
     AM2_EventMsg msg;
 
@@ -764,10 +763,10 @@ void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
     msg.type        = (uint8_t)type;
     msg.num1        = num1;
     msg.uid1        = UidOnWire(uid1);
-    msg.aux1        = aux1;
+    msg.maskA       = maskA;
     msg.num2        = num2;
     msg.uid2        = UidOnWire(uid2);
-    msg.aux2        = aux2;
+    msg.maskB       = maskB;
     msg.removeevent = removeevent;
 
     orig_army_message_send(&msg);
@@ -797,10 +796,107 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                      msg->removeevent);
     }
 
-    orig_event_trigger_immediate((int32_t)(int8_t)msg->type, msg->num1,
-                                 UidOnWire(msg->uid1), msg->aux1,
+    EventTriggerImmediate((int32_t)(int8_t)msg->type, msg->num1,
+                                 UidOnWire(msg->uid1), msg->maskA,
                                  msg->num2, UidOnWire(msg->uid2),
-                                 msg->aux2, msg->removeevent, 1);
+                                 msg->maskB, msg->removeevent, 1);
+}
+
+/* --------------------------------------------- immediate trigger ---- */
+
+/* Free one entry's handler chain and then the entry. `owns` decides whether
+ * the handler's argument goes with it -- the same flag EventRegister stores
+ * and the table teardown reads. */
+static void FreeEventEntry(AM2_EventEntry *e)
+{
+    AM2_EventHandler *h = e->handlers;
+
+    while (h != (AM2_EventHandler *)0) {
+        AM2_EventHandler *next = h->next;
+
+        if (h->owns)
+            am2_free(h->arg);
+        am2_free(h);
+        h = next;
+    }
+
+    am2_free(e);
+}
+
+/* 0x0041EF80. Raise an event now: walk the bucket for `type`, and for every
+ * entry whose key matches, call each handler in turn.
+ *
+ * `type` is the BUCKET INDEX -- the original indexes kEventTable directly with
+ * it, so the nine buckets are nine event types rather than a hash.
+ *
+ * Two things this settles about the event model. A locally raised event is
+ * broadcast to peers exactly once, through EventMessageSend, and only when
+ * `remote` is 0 -- so an event arriving from the wire does not echo. And the
+ * broadcast happens on the FIRST matching entry, before its handlers run, not
+ * once per entry.
+ *
+ * `removeevent` unlinks the entry after its handlers have run and frees it.
+ * The head case restarts from the new head; the other case keeps a `prev` it
+ * only searches for once. Note that `prev` is NOT reset when the head is
+ * removed, so a bucket that removes its head and later removes a middle entry
+ * uses a stale `prev`. That is the original's, and it is reproduced. */
+void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
+                                   int32_t maskA, int32_t num2, uint32_t uid2,
+                                   int32_t maskB, int32_t removeevent,
+                                   int32_t remote)
+{
+    AM2_EventEntry *e;
+    AM2_EventEntry *prev = (AM2_EventEntry *)0;
+    int32_t         sent = 0;
+
+    if (kEventDebug)
+        orig_log("EventTriggerImmediate: type %d, num: %d, uid: %x, "
+                 "removeevent: %d, remote: %d\n",
+                 type, num1, uid1, removeevent, remote);
+
+    e = kEventTable[type];
+
+    while (e != (AM2_EventEntry *)0) {
+        /* The entry's key pair is the CRITERIA, the event's numbers the
+         * candidate values, and its two mask fields the sets it belongs to.
+         * Neither uid takes part in matching. */
+        int32_t matched = FilterMatches(e->key0, e->key1, num1, num2,
+                                        maskA, maskB);
+
+        if (matched) {
+            if (!remote && !sent) {
+                EventMessageSend(type, num1, uid1, maskA, num2, uid2, maskB,
+                                 removeevent);
+                sent = 1;
+            }
+
+            for (AM2_EventHandler *h = e->handlers;
+                 h != (AM2_EventHandler *)0; h = h->next)
+                ((AM2_EventHandlerFn)h->fn)(type, num1, uid1, maskA,
+                                            num2, uid2, maskB, h->arg);
+        }
+
+        if (!matched || !removeevent) {
+            prev = e;
+            e    = e->next;
+            continue;
+        }
+
+        if (kEventTable[type] == e) {
+            kEventTable[type] = e->next;
+            FreeEventEntry(e);
+            e = kEventTable[type];
+        } else {
+            if (prev == (AM2_EventEntry *)0) {
+                prev = kEventTable[type];
+                while (prev->next != e)
+                    prev = prev->next;
+            }
+            prev->next = e->next;
+            FreeEventEntry(e);
+            e = prev->next;
+        }
+    }
 }
 
 /* ----------------------------------------------- delayed trigger ---- */
@@ -890,6 +986,9 @@ int event_install(void)
                         "LoadEventSection", 1);
     rc |= patch_replace(ADDR_SAVE_EVENT_SECTION, (const void *)SaveEventSection,
                         "SaveEventSection", 1);
+    rc |= patch_replace(ADDR_EVENT_TRIGGER_IMMED,
+                        (const void *)EventTriggerImmediate,
+                        "EventTriggerImmediate", 1);
     rc |= patch_replace(ADDR_EVENT_TRIGGER_DELAYED,
                         (const void *)EventTriggerDelayed,
                         "EventTriggerDelayed", 1);

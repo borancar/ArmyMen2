@@ -47,10 +47,11 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame);
  * the same ones back -- so the layout is confirmed rather than inferred from
  * one direction.
  *
- * `aux1` and `aux2` are passed straight through in both directions and are not
- * logged by either function, so what they mean is not established here. They
- * sit next to (num1, uid1) and (num2, uid2) respectively, which is suggestive
- * and no more.
+ * `maskA` and `maskB` went in as aux1/aux2, positional names, because neither
+ * of these functions logs them or looks at them. EventTriggerImmediate settles
+ * it: they are the maskA/maskB arguments of FilterMatches -- the SETS the
+ * event belongs to, against which an entry's negative key is a subset test.
+ * Neither uid takes part in matching at all.
  *
  * The three padding bytes after `type` are never written. The original leaves
  * them as whatever the stack held, and so does this -- the struct is a local
@@ -63,22 +64,30 @@ typedef struct {
     uint8_t  type;         /* +0x08, the event type, narrowed to a byte */
     int32_t  num1;         /* +0x0C */
     uint32_t uid1;         /* +0x10, through UidOnWire */
-    int32_t  aux1;         /* +0x14 */
+    int32_t  maskA;        /* +0x14, a set membership; see above */
     int32_t  num2;         /* +0x18 */
     uint32_t uid2;         /* +0x1C, through UidOnWire */
-    int32_t  aux2;         /* +0x20 */
+    int32_t  maskB;        /* +0x20 */
     int32_t  removeevent;  /* +0x24 */
 } AM2_EventMsg;
 
 /* 0x0041F150. Pack those eight values into a message and hand it to
  * ArmyMessageSend. */
 void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
-                              int32_t aux1, int32_t num2, uint32_t uid2,
-                              int32_t aux2, int32_t removeevent);
+                              int32_t maskA, int32_t num2, uint32_t uid2,
+                              int32_t maskB, int32_t removeevent);
 
 /* 0x0041F320. The other end: unpack one and raise it locally through
  * EventTriggerImmediate with `remote` set. */
 void __cdecl EventMessageReceive(const AM2_EventMsg *msg);
+
+/* 0x0041EF80. Raise an event now: walk the bucket `type` indexes and run every
+ * matching entry's handlers. Broadcasts to peers once, unless `remote`.
+ * `removeevent` unlinks and frees the entry afterwards. */
+void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
+                                   int32_t maskA, int32_t num2, uint32_t uid2,
+                                   int32_t maskB, int32_t removeevent,
+                                   int32_t remote);
 
 /* 0x0041F410. Raise an event after `delay`: allocate the 16-byte record the
  * handler will be given, start a timer, and register ADDR_EVT_RECORD_HANDLER

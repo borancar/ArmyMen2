@@ -1209,6 +1209,10 @@
 #define ADDR_EVENT_MESSAGE_SEND    0x0041F150u
 #define ADDR_EVENT_MESSAGE_RECV    0x0041F320u
 #define ADDR_EVENT_TRIGGER_IMMED   0x0041EF80u  /* 464 B, 3 callers */
+/* The predicate it walks a bucket with is FilterMatches, 0x0041EF20, which
+ * this port already owns -- so no new name here. That is what gives the two
+ * pass-through fields of an event a meaning: they are the maskA/maskB
+ * arguments, the sets the event belongs to. */
 /* 0x004105F0, "ArmyMessageSend" from its own three error strings -- 304 bytes
  * and 20 callers, so it is the transport the whole game sends through. */
 #define ADDR_ARMY_MESSAGE_SEND     0x004105F0u

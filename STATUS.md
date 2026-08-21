@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 362 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 362 | 355 of them below the CRT line |
+| `patch_replace` sites | 363 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 363 | 356 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 87,328 / 372,816 B (**23.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 87,792 / 372,816 B (**23.5%**) | patched entries' sizes over the total |
 | modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,29 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The event message's two pass-through fields are FilterMatches' masks.**
+  They went into `AM2_EventMsg` as `aux1`/`aux2` two weeks of commits ago,
+  positional names, because neither EventMessageSend nor EventMessageReceive
+  logs or inspects them. `EventTriggerImmediate` hands them straight to
+  `FilterMatches` as `maskA`/`maskB` -- the sets the event belongs to, against
+  which an entry's NEGATIVE key is a subset test rather than an equality. They
+  are renamed throughout. Neither uid takes part in matching at all.
+
+- **A mutation script that fails to parse produces a clean A/B, and it looks
+  exactly like a pass.** A quoting error in the python that was meant to gut
+  EventTriggerImmediate's handler loop left the source untouched; the build
+  succeeded, the drive ran, and the result read "A/B clean". CLAUDE.md already
+  says a test that cannot fail has not passed -- the practical form of that is
+  to `grep -c` for the mutation marker between editing and building, which the
+  re-run did.
+
+- **The event propagation model, from three functions agreeing.** A locally
+  raised event broadcasts once through EventMessageSend and only when `remote`
+  is 0, so an event arriving from the wire does not echo; the broadcast happens
+  on the first MATCHING entry, before its handlers run. `type` is the bucket
+  index straight into the nine-entry table, so the buckets are event types
+  rather than a hash.
 
 - **Twelve .aai game constants are parsed and thrown away.** `DefGameParse`'s
   jump table has twenty arms and twelve of them share one target that is
