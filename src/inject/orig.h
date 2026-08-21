@@ -1084,7 +1084,11 @@
 /* The uids the four army keywords and `me` stand for. Not in keyword order,
  * and the first arm of the resolver's jump table serves id 15 -- which no
  * entry in the keyword table produces, so it cannot be reached. */
-#define ADDR_SVAR_ID15            0x00656474u  /* unreachable */
+/* "unreachable" was true of the RESOLVER's jump table -- no keyword produces
+ * id 15 -- and false of the global itself. Two functions, 0x0041F570 and
+ * 0x0041F5C0, compare a name index against it directly and take a special
+ * path when it matches. So the id is unreachable and the NAME is not. */
+#define ADDR_SVAR_ID15            0x00656474u  /* not reachable via the table */
 #define ADDR_SVAR_GREEN           0x00656484u
 #define ADDR_SVAR_TAN             0x00656498u
 #define ADDR_SVAR_BLUE            0x00656454u
@@ -1444,6 +1448,21 @@
 #define OBJ_OFF_SUBRECORD         0x6Cu
 #define SUBREC_OFF_TABLE_KIND2    0x4C0u
 #define SUBREC_OFF_TABLE_KIND3    0x4C8u
+/* 0x0041FC40. A fourth of the "look it up and act if the type fits" twins, and
+ * the only one that admits types 2, 3 AND 8 rather than type 2 alone. */
+#define ADDR_EVT_TYPE238_ACTION   0x0041FC40u  /* void(uint32_t, int32_t) */
+#define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
+
+/* 0x0041FFD0. Pushes a one-deep "current object" context: three globals are
+ * copied into three companions before being overwritten. Nothing here says
+ * what the context is FOR, so all six keep positional names. */
+#define ADDR_EVT_PUSH_OBJ_CTX     0x0041FFD0u  /* void(uint32_t uid) */
+#define ADDR_OBJ_CTX_OBJ          0x005122CCu
+#define ADDR_OBJ_CTX_OBJ_PREV     0x005122D0u
+#define ADDR_OBJ_CTX_VAL          0x00511E28u
+#define ADDR_OBJ_CTX_VAL_PREV     0x00511E2Cu
+#define ADDR_OBJ_CTX_SET          0x00511E3Cu
+#define ADDR_OBJ_CTX_SET_PREV     0x00511E40u
 /* 0x00421C40. Routes the end of a mission: in single player straight to
  * ADDR_SCRIPT_FIND_FILE, which builds "%s%d.txt" and loads the next script,
  * and in a multiplayer session to 0x00421800 instead -- which takes an extra

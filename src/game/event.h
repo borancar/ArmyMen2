@@ -141,6 +141,14 @@ void __cdecl EvtType2ActionA(uint32_t uid);
 void __cdecl EvtType2ActionB(uint32_t uid);
 void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg);
 
+/* 0x0041FC40. The fourth twin, and the only one admitting types 2, 3 and 8. */
+void __cdecl EvtType238Action(uint32_t uid, int32_t arg);
+
+/* 0x0041FFD0. Push a one-deep "current object" context -- three globals saved
+ * into three companions, then overwritten. A second call before the restore
+ * loses the first saved value. */
+void __cdecl EvtPushObjCtx(uint32_t uid);
+
 /* 0x0041F6E0. Checks only the uid threshold and passes a possibly-null object
  * on -- the unsafe member of the family. Reproduced as written. */
 void __cdecl EvtObjSet(uint32_t uid, int32_t value);

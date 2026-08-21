@@ -815,6 +815,8 @@ typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
 typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
 #define orig_type2_action_c \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
+#define orig_type238_action \
+    (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
 #define orig_obj_set        (*(AM2_ObjSetFn)AM2_IMAGE(ADDR_OBJ_SET))
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
@@ -1501,6 +1503,53 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
     }
 }
 
+/* 0x0041FC40. The fourth of the "look it up and act if the type fits" twins,
+ * and the only one that admits types 2, 3 AND 8 rather than type 2 alone.
+ * Same order as the others: threshold, lookup, type test. */
+void __cdecl EvtType238Action(uint32_t uid, int32_t arg)
+{
+    void *obj;
+
+    if (uid < AM2_UID_COUNTER_MIN)
+        return;
+
+    obj = LookupByUID(uid);
+
+    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+        return;
+
+    orig_type238_action(obj, arg);
+}
+
+/* 0x0041FFD0. Push a one-deep "current object" context.
+ *
+ * Three globals are copied into three companions and then overwritten, which
+ * is a save/restore pair with a depth of exactly one -- so a second call
+ * before the matching restore loses the first saved value. Nothing here says
+ * what the context is FOR, so all six keep positional names.
+ *
+ * The order matters and is preserved: every save happens before any install,
+ * and the third pair's new value is a constant 1 rather than anything derived
+ * from the object. */
+void __cdecl EvtPushObjCtx(uint32_t uid)
+{
+    uint8_t *obj = (uint8_t *)LookupByUID(uid);
+
+    if (obj == (uint8_t *)0)
+        return;
+
+    *(void **)AM2_IMAGE(ADDR_OBJ_CTX_OBJ_PREV) =
+        *(void **)AM2_IMAGE(ADDR_OBJ_CTX_OBJ);
+    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_VAL_PREV) =
+        *(const int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_VAL);
+    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET_PREV) =
+        *(const int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET);
+
+    *(void **)AM2_IMAGE(ADDR_OBJ_CTX_OBJ)  = obj;
+    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_VAL) = *(const int32_t *)(obj + 4);
+    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET) = 1;
+}
+
 /* ------------------------------------------- object table record ---- */
 
 /* 0x0041FF60. Point an object at one of the 256-byte records at
@@ -1785,6 +1834,10 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_TYPE238_ACTION,
+                        (const void *)EvtType238Action, "EvtType238Action", 1);
+    rc |= patch_replace(ADDR_EVT_PUSH_OBJ_CTX, (const void *)EvtPushObjCtx,
+                        "EvtPushObjCtx", 1);
     rc |= patch_replace(ADDR_SCRIPT_SET_OBJ_TABLE,
                         (const void *)ScriptSetObjTable,
                         "ScriptSetObjTable", 1);

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 396 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 396 | 389 of them below the CRT line |
+| `patch_replace` sites | 398 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 398 | 391 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 91,440 / 372,816 B (**24.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 91,584 / 372,816 B (**24.6%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,14 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **"Unreachable" was true of the id and false of the name.** `ADDR_SVAR_ID15`
+  carried the comment "unreachable", which is correct about the RESOLVER's jump
+  table -- no keyword produces id 15. Two functions, `0x0041F570` and
+  `0x0041F5C0`, compare a name index against that global directly and take a
+  special path when it matches, so the global is live. The comment is corrected
+  rather than removed: both halves are worth knowing, and a bare "unreachable"
+  invites skipping the functions that use it.
 
 - **A redefinition warning caught a name that was a guess AND a clash.**
   `AM2_OBJ_STATE_REC_SIZE` already meant `AM2_ObjState`'s sixteen bytes; I
@@ -267,7 +275,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **18 functions are left in the event.cpp band, and most are tiny.** Four
+- **16 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap
