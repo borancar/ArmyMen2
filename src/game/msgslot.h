@@ -96,6 +96,26 @@ void __cdecl CommRemoveKeyed(void *comm, uint32_t key);
 uint32_t __cdecl GetPlayerMask(uint32_t id);
 uint32_t __cdecl GetReSendMask(uint32_t id);
 
+/* 0x004119C0 and 0x00411AC0. Broadcast this player's colour, or its team, to
+ * everyone else. Named by their own messages, and one shape twice:
+ *
+ *   store the value into a static message record, at +8
+ *   if the comm object's +0x3E4 is clear, stop -- nothing is connected
+ *   hand the record to SendGameMsg
+ *   RE-READ the comm object
+ *   if its +0x418 is clear, stop -- that gate is the log, not the send
+ *   log, with +0x3CC as the sender
+ *
+ * The re-read is the part worth keeping. The original loads the comm object
+ * again after the send rather than reusing the register, so a send that
+ * replaced the object would be followed correctly; nothing here establishes
+ * that one can, and it is reproduced rather than folded away.
+ *
+ * The value is written BEFORE the connected check, so it lands in the record
+ * even when nothing is sent. */
+void __cdecl SendColorMsg(int32_t colour);
+void __cdecl SendTeamMsg(int32_t team);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

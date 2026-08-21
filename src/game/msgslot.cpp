@@ -4,6 +4,7 @@
 #include "msgslot.h"
 #include "../inject/orig.h"
 #include "crt.h"        /* am2_log */
+#include "image.h"      /* AM2_IMAGE */
 #include "../inject/patch.h"
 
 /* The null check comes first in every one of the six, before the division, so
@@ -136,6 +137,50 @@ uint32_t __cdecl GetReSendMask(uint32_t id)
     return *(uint32_t *)((uint8_t *)q + AM2_FLOW_RESEND_MASK);
 }
 
+/* Fields of the comm object these two read. Named for position: what +0x3E4
+ * and +0x418 actually hold is not established, only which one gates the send
+ * and which the log. */
+#define AM2_COMM_CONNECTED   0x3E4
+#define AM2_COMM_LOG_ENABLED 0x418
+#define AM2_COMM_SELF_ID     0x3CC
+#define AM2_MSG_VALUE        8
+
+typedef int32_t (__cdecl *am2_send_game_msg_fn)(void *msg, int32_t a, int32_t b);
+#define orig_send_game_msg (*(am2_send_game_msg_fn)ADDR_SEND_GAME_MSG)
+
+#define kCommObj (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+
+static void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
+{
+    const uint8_t *comm = kCommObj;
+
+    *(int32_t *)(record + AM2_MSG_VALUE) = value;
+
+    if (!*(const int32_t *)(comm + AM2_COMM_CONNECTED))
+        return;
+
+    orig_send_game_msg((void *)record, 0, 1);
+
+    /* Re-read: the original does not reuse the register it had. */
+    comm = kCommObj;
+    if (!*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        return;
+
+    am2_log(fmt, *(const int32_t *)(comm + AM2_COMM_SELF_ID), value);
+}
+
+void __cdecl SendColorMsg(int32_t colour)
+{
+    SendValueMsg((uintptr_t)ADDR_MSG_COLOR, colour,
+                 "SendColorMsg from %x , Color =%d \n");
+}
+
+void __cdecl SendTeamMsg(int32_t team)
+{
+    SendValueMsg((uintptr_t)ADDR_MSG_TEAM, team,
+                 "SendTeamMsg from %x , Team =%d \n");
+}
+
 int msgslot_install(void)
 {
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
@@ -153,5 +198,9 @@ int msgslot_install(void)
                   "GetPlayerMask", 4);
     patch_replace(ADDR_GET_RESEND_MASK, (const void *)GetReSendMask,
                   "GetReSendMask", 1);
+    patch_replace(ADDR_SEND_COLOR_MSG, (const void *)SendColorMsg,
+                  "SendColorMsg", 1);
+    patch_replace(ADDR_SEND_TEAM_MSG, (const void *)SendTeamMsg,
+                  "SendTeamMsg", 1);
     return 0;
 }

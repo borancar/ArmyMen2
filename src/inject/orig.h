@@ -1541,6 +1541,23 @@
 /* Two masks out of that record, each named by its own error message. */
 #define ADDR_GET_PLAYER_MASK     0x00402BD0u  /* uint32_t(uint32_t id) -- +0x14 */
 #define ADDR_GET_RESEND_MASK     0x00402C00u  /* uint32_t(uint32_t id) -- +0x18 */
+
+/* The comm layer's outgoing message hub, named by its own
+ * "SendGameMsg, first message to %x, hehas set to %d". 928 bytes and 14
+ * callers, so it is a hub rather than a helper; two of those callers are
+ * reconstructed below and reach it through here. Among its other messages is
+ * "Error Send can't find Flow for Player %x", which is the same player/FlowQ
+ * synonym ADDR_FIND_PLAYER_BY_ID records. */
+#define ADDR_SEND_GAME_MSG       0x004022D0u  /* int32_t(void *msg, int32, int32) */
+
+/* Two static message records in .bss -- zero at load, filled in at 0x0040FE04
+ * and 0x0040FE14 -- each with the value the sender writes at +8. */
+#define ADDR_MSG_COLOR           0x004FC898u
+#define ADDR_MSG_TEAM            0x004FC8A8u
+
+/* The two senders themselves. */
+#define ADDR_SEND_COLOR_MSG      0x004119C0u  /* void(int32_t colour) */
+#define ADDR_SEND_TEAM_MSG       0x00411AC0u  /* void(int32_t team) */
 #define ADDR_GET_PAUSE_FLAGS     0x00426840u  /* uint32(void) */
 #define ADDR_STR_SEND_BADPLAYER  0x004754ACu
 #define ADDR_STR_SEND_BADPARAM   0x00475478u
