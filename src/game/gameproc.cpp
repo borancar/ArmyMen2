@@ -4,6 +4,7 @@
 
 #include "gameproc.h"
 #include "savetag.h"
+#include "definfo.h"   /* DefParseNumber, and the .aai vocabulary */
 #include "map.h"
 #include "pad.h"
 #include "air.h"
@@ -110,9 +111,54 @@ fail:
     return 0;
 }
 
+/* ------------------------------------------------ game constants ---- */
+
+typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
+#define orig_strtok (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
+#define kSep        ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
+#define kGameConst  ((int32_t *)AM2_IMAGE(ADDR_GAME_CONSTANTS))
+
+/* 0x00424780. The .aai handler for twenty game-constant keywords.
+ *
+ * It lives here rather than in definfo.cpp because the band says so: this is
+ * event.cpp..gameproc.cpp, the same range our other gameproc functions sit in,
+ * while definfo.cpp's are audio.cpp..event.cpp. The image names no source file
+ * for either, so the band is the only evidence there is.
+ *
+ * The number is parsed BEFORE the keyword is examined, so an unknown keyword
+ * still consumes its argument -- and a bad number is rejected (2) ahead of a
+ * bad keyword (3) even when both are wrong.
+ *
+ * Twelve of the twenty keywords are accepted and then thrown away. In the
+ * original they share one arm that does nothing but return 0, so
+ * vehicle_danger through scroll_speed parse, validate, and have no effect in
+ * this build. Reproduced: the `default` of the inner switch below is that
+ * arm, not an error. Only the eight roach_* constants reach a global, and
+ * they land in consecutive dwords, which is why they are one array here. */
+int32_t __cdecl DefGameParse(int32_t cmd, char *line)
+{
+    int32_t value;
+
+    if (!DefParseNumber(&value, orig_strtok(line, kSep)))
+        return 2;
+
+    if (cmd < AM2_DEF_CMD_GAME_FIRST || cmd > AM2_DEF_CMD_GAME_LAST) {
+        orig_log("DefGameParse: Bad Game Constant Type\n");
+        return 3;
+    }
+
+    if (cmd >= AM2_DEF_CMD_ROACH_FIRST)
+        kGameConst[cmd - AM2_DEF_CMD_ROACH_FIRST] = value;
+
+    /* else: one of the twelve the original drops on the floor */
+    return 0;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
+    patch_replace(ADDR_DEF_GAME_PARSE, (const void *)DefGameParse,
+                  "DefGameParse", 1);
     patch_replace(ADDR_SAVE_GAMEPROC, (const void *)SaveGameProcSection,
                   "SaveGameProcSection", 1);
     patch_replace(ADDR_LOAD_GAMEPROC, (const void *)LoadGameProcSection,

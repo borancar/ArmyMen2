@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 361 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 361 | 354 of them below the CRT line |
+| `patch_replace` sites | 362 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 362 | 355 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 86,544 / 372,816 B (**23.2%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 87,328 / 372,816 B (**23.4%**) | patched entries' sizes over the total |
 | modules | 26 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,27 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Twelve .aai game constants are parsed and thrown away.** `DefGameParse`'s
+  jump table has twenty arms and twelve of them share one target that is
+  literally `xor eax,eax; ret` -- vehicle_danger, vehicle_standoff,
+  trooper_turn_rate, trooper_pose_rate, trooper_slide_rate, defense_radius,
+  attack_radius, attack_hunt, follow_radius, follow_engaged_radius, gravity
+  and scroll_speed. Only the eight `roach_*` values reach a global. The
+  keywords still parse, so the shipped files remain valid; the values simply do
+  nothing in this build. Read the table, not the arm layout -- twelve arms
+  pointing at one address is not visible any other way.
+
+- **Not filtering `redefined` caught the same mistake a second time, before it
+  shipped.** `ADDR_DEF_GAME_PARSE` already existed pointing at `0x00424590`,
+  the merged entry, exactly as `ADDR_DEF_LINK_PARSE` had. Two commits ago that
+  cost a wasted run and a wrong patch; this time GCC said so and the build was
+  fixed before it was ever driven. The stale name is now `ADDR_DEF_GAME_ENTRY`.
+
+- **`0x00511E04` is static during play but not a constant.** It read 500 across
+  every earlier sample and 501 on this run. So "it does not tick" still holds
+  -- it did not move across twelve seconds -- but it is not fixed either, and
+  the name remains unestablished.
 
 - **CORRECTION to the previous commit: the handler is passed the entry's
   VALUE, not its index.** The dispatcher reads `[eax + 0x476FE4]`, the `+4`

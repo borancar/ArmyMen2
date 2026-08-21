@@ -1312,7 +1312,10 @@
 #define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */
 #define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
-#define ADDR_DEF_GAME_PARSE        0x00424590u
+/* NOT DefGameParse -- 0x00424590 is docs/functions.tsv's merged 784-byte
+ * entry, and the handler with the "DefGameParse:" string starts at 0x00424780.
+ * Same mistake, same cause, as ADDR_DEF_LINK_PARSE two commits ago. */
+#define ADDR_DEF_GAME_ENTRY        0x00424590u
 #define ADDR_DEF_OBJ_PARSE         0x00435B60u
 /* docs/functions.tsv merges THREE things into the 768-byte entry here:
  * DefObjParse itself (0x00435B60, a jump table over sixteen tokens), the table
@@ -1362,12 +1365,28 @@
 /* 0x0041A5F0 is DefParseInfoFile, by its own string; 0x0041A6B0 is the line
  * dispatcher it drives, and that one names itself nowhere. Both still
  * original. */
-#define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u  /* int32_t(const char *) */
 #define ADDR_DEF_DISPATCH_LINE     0x0041A6B0u  /* int32_t(FILE *) */
 #define ADDR_CRT_FGETS             0x004655B8u
 #define ADDR_CRT_STRLWR           0x0046D7D6u  /* the plain ASCII _strlwr */
 #define ADDR_STR_DEF_FILE_MODE     0x004779F4u  /* "rt" */
 #define AM2_DEF_LINE_MAX           0x140        /* both line buffers */
+
+/* DefGameParse, by its own "DefGameParse: Bad Game Constant Type". It is the
+ * handler for twenty .aai keywords, and docs/functions.tsv merges it into the
+ * 784-byte entry at 0x00424590 -- the fourth merged entry found in this work.
+ *
+ * Twelve of the twenty arms share ONE target, `xor eax,eax; ret`:
+ * vehicle_danger, vehicle_standoff, trooper_turn_rate, trooper_pose_rate,
+ * trooper_slide_rate, defense_radius, attack_radius, attack_hunt,
+ * follow_radius, follow_engaged_radius, gravity and scroll_speed are parsed
+ * and then DISCARDED. Only the eight roach_* constants are stored, into the
+ * eight consecutive dwords at 0x00487BA8. The keywords still parse, so the
+ * files are still valid; the values simply do nothing in this build. */
+#define ADDR_DEF_GAME_PARSE        0x00424780u  /* int32_t(int32_t, char *) */
+#define ADDR_GAME_CONSTANTS        0x00487BA8u  /* the eight roach_* dwords */
+#define AM2_DEF_CMD_GAME_FIRST     0x3B
+#define AM2_DEF_CMD_ROACH_FIRST    0x47
+#define AM2_DEF_CMD_GAME_LAST      0x4E
 /* strtol into *out, 0 on failure. Its one string is "Bad or missing number",
  * which names the condition and not the function -- 48 callers. */
 #define ADDR_DEF_PARSE_NUMBER      0x0041A250u  /* int32_t(int32_t *, const char *) */
