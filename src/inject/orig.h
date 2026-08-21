@@ -1252,6 +1252,17 @@
 #define ADDR_OBJ_SCRIPT_CAP       0x00516190u
 #define AM2_OBJ_SCRIPT_REC_SIZE   20u
 
+/* The object-script save section. The saver walks four levels -- script,
+ * state, frame, action -- writing each record whole, and the sizes it uses
+ * (0x14, 0x10, 0x14, 0x48) confirm objscript.h's struct layout independently
+ * of how those structs were derived. The count doubles as a data value: it
+ * goes out through WriteSaveTag, like every other length in this format. */
+#define ADDR_SAVE_OBJSCRIPT_SECTION 0x00436280u  /* int32_t(FILE *) */
+#define ADDR_LOAD_OBJSCRIPT_SECTION 0x004364A0u  /* int32_t(FILE *) */
+#define AM2_SAVETAG_OBJSCRIPT       0x06660008u
+#define AM2_OBJ_STATE_REC_SIZE      16u
+#define AM2_OBJ_FRAME_REC_SIZE      20u
+
 /* 0x00440700. Resolve a name token to its index in the name table, declaring
  * it if need be -- it reaches both ScriptFindName and AddNameTableName.
  * int32_t(ctx *, int32_t *at, int32_t *out, int32_t). */

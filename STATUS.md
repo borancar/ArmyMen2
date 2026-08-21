@@ -58,21 +58,22 @@ COM vtables, runtime resolution, delay imports. The three `MessageBoxA` sites
 left are a decision, not an omission: all three sit behind CD checks this build
 has patched to jump past them.
 
-The front has moved into **game logic**. `event.cpp` is the current module --
-the registration table, the script conditions, and now savegame serialisation
-(`SaveScriptCond` / `LoadScriptCond` / `LoadEventSection` / `LoadScriptConditions`).
-The save and load halves mirror each other, which is what is confirming the
-condition struct's layout from both ends.
+The front has moved into **game logic**, and the current front is savegame
+serialisation. `SaveGame` writes eleven sections and **ten of those savers are
+ours**, as are nine of the eleven loaders; the two halves mirror each other,
+which is what keeps confirming each struct's layout from both ends. The newest is `SaveObjScriptSection`, the deepest of them -- four
+nested levels, with each action's string length-prefixed in place of the
+pointer field it occupies in memory.
 
 ## Measured
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 328 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 328 | 321 of them below the CRT line |
+| `patch_replace` sites | 336 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 336 | 329 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
-| modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 80,288 / 372,816 B (**21.5%**) | patched entries' sizes over the total |
+| modules | 23 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
@@ -90,6 +91,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
 | `make selftest` | current | **7,186** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
+| savegame oracle, objscript section | current | **0 differing bytes of 11,632**, pointers included; whole file 18, all outside it |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
 A clean A/B is not evidence about a function the run never calls. Check with a
@@ -98,43 +100,52 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Next
 
-1. **Give the savegame oracle a pointer-aware comparison.** Driving the
-   campaign twice and `cmp`-ing the two `.sav` files verifies the save half
-   against the original's own bytes -- section offsets, lengths and record
-   counts all matched exactly. What it cannot do yet is ignore the stored HEAP
-   POINTERS, which shift because `am2hook.dll` moves the heap: 23 of 25
-   differing bytes were low bytes of `0x01A1xxxx` dwords, 19 of them +32.
-   `tools/actdiff.py` already solves this by renumbering pointers by first-seen
-   index; the same treatment folded into `tools/ab.sh` would make the savefile
-   a standing check rather than a one-off. Offset 929 is separately volatile --
-   two runs of the SAME build differ there.
-2. **Drive a LOAD.** The save half of the serialiser is already exercised --
-   the game autosaves at mission start and `save/sarge/map1_mission1.sav` is
-   written on every campaign run -- but nothing loads one. `LoadGame` is called
-   only from mission start (`0x00425300`), so starting the same mission with a
-   save present should do it, with no menu navigation at all. That would cover
-   `CheckSaveTag`, `LoadScriptCond`, `LoadEventSection`, `LoadScriptConditions`
-   and `LoadItems` in one run.
-3. **The savegame subsystem is most of the way done.** Ours now: WriteSaveTag,
-   SaveItems/LoadItems, SaveScriptConditions, SaveMapSection/LoadMapSection,
-   SaveEventBlock/LoadEventBlock, ResetPads/SavePadSection/LoadPadSection and
-   SaveEventSection -- eleven functions across five modules, two of them
-   (`map.cpp`, `pad.cpp`) new and named by the image. Next is the script trio,
-   fully read and needing no new infrastructure: `0x0043F030` FreeScriptNames,
-   `0x0043F0A0` the saver, `0x0043F150` the loader.
-4. **Nine save/load section pairs, in the same order, each saver immediately
-   before its loader in the image** -- read out of `SaveGame` and `LoadGame`
-   separately and they agree. That names four unreconstructed targets by
-   structure: `0x0041EC20` (80 B, mirrors the reconstructed
-   `LoadScriptConditions`), `0x00422470` (368 B, mirrors `LoadEventSection`),
-   `0x0041E9E0` (64 B) and `0x0043F0A0` (176 B). Reconstructing a saver whose
-   loader is already ours makes the round trip check both halves at once.
+1. **The objscript loader is the last unreconstructed half of a pair.**
+   `0x004364A0`, 1072 B, and it is the first function of the objscript.cpp
+   band. Its saver is now ours and verified byte for byte, so the round trip
+   would check both halves at once. It has to rebuild three pointer levels
+   from the raw dwords the saver stored -- states, frames, actions -- and turn
+   each action's stored LENGTH back into a `malloc`'d string.
+2. **The audio section is the last one untouched in either direction**:
+   `0x0040BDF0` saver (272 B) and `0x0040BF00` loader (240 B). It is also the
+   only section whose tag is not in the `0x0666xxxx` family -- `0x01326413`.
+   With it and the objscript loader, the whole serialiser is ours.
+3. **Fold the pointer-aware comparison into a tool.** It was done by hand for
+   objscript here -- walk the section, collect the offsets that hold heap
+   pointers, and compare everything else -- and it turned "188 differing bytes"
+   into a clean result with a sharp pass criterion. `tools/actdiff.py` already
+   renumbers pointers by first-seen index; the savefile deserves the same, and
+   then `tools/ab.sh` could carry it as a standing check.
+4. **Drive a LOAD.** The save half is exercised on every campaign run -- the
+   game autosaves at mission start -- but nothing loads one. `LoadGame` is
+   called only from mission start (`0x00425300`), so starting the same mission
+   with a save present should do it, with no menu navigation at all. That
+   covers `CheckSaveTag` and every `Load*` in one run. `LoadGame` itself
+   (`0x00425A10`, 224 B) is fully mapped and not yet written.
 5. Keep taking self-naming functions. 109 were found below the CRT line, 51 KB,
    median 288 B, 34 under 200 B; ten are done. `SendGameMsg` (`0x004022D0`,
    928 B, 14 callers) is the hub two of them already reach by address.
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **A structural parse that lands exactly on the next tag proves every record
+  boundary, and the objscript section is the strongest case of it yet.** Four
+  nested levels -- 11 scripts, 73 states, 137 frames, 104 actions, one embedded
+  string -- walked from the count alone, ending precisely on `0x06660002`. Get
+  any record size or any count field wrong and the walk lands somewhere else.
+  The sizes the original pushes (0x14, 0x10, 0x14, 0x48) are a second
+  derivation of the layouts in `objscript.h` and `script.h`, neither of which
+  was written from this function.
+
+- **Do not read "0 differing bytes" in a pointer-bearing section as a stronger
+  result than it is.** The objscript section stores three levels of raw heap
+  pointer -- 221 dwords -- and this run pair matched on all of them, where an
+  earlier pair of the same section differed on 188 bytes, every one inside a
+  pointer field. What changed is heap layout between the two runs, not the
+  serialiser. So the honest pass criterion is the one applied here: walk the
+  section, set the pointer offsets aside, and require everything else to match.
+  A future run differing in those 221 dwords means nothing on its own.
 
 - **The savegame oracle needs a control, and the campaign drive is not
   deterministic to the uid.** Two runs of one tree gave 766 differing bytes and

@@ -7,10 +7,12 @@
  */
 #include <stdint.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "crt.h"
 #include "image.h"
 #include "objscript.h"
+#include "savetag.h"
 #include "script.h"
 #include "scriptint.h"
 #include "../inject/orig.h"
@@ -299,12 +301,71 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
     }
     return 1;
 }
+/* ------------------------------------------------------ save ---- */
+
+/* 0x00436280. Four nested levels -- script, state, frame, action -- each
+ * record written whole. The sizes the original pushes are 0x14, 0x10, 0x14
+ * and 0x48, which is a second derivation of the layout in objscript.h and
+ * script.h: nothing here was taken from the allocators that build them.
+ *
+ * An action is NOT written from the table. It is copied aside first so that
+ * `text`, a pointer, can be replaced by the string's LENGTH in the copy; the
+ * bytes follow the record, with no terminator. Every other pointer in the
+ * section -- states, frames, actions -- goes out raw, so those dwords are
+ * whatever the heap gave this process and the loader has to overwrite them.
+ * That is the same reason the item section cannot be compared byte for byte
+ * across two builds.
+ *
+ * The count goes out through WriteSaveTag, which is how every length in this
+ * format travels; see savetag.cpp. */
+int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
+{
+    WriteSaveTag(fp, AM2_SAVETAG_OBJSCRIPT);
+    WriteSaveTag(fp, (uint32_t)kObjScriptCount);   /* a count, not a tag */
+
+    for (int32_t i = 0; i < kObjScriptCount; i++) {
+        AM2_ObjScript *o = &kObjScripts[i];
+
+        orig_fwrite(o, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
+
+        for (int32_t j = 0; j < o->statecount; j++) {
+            AM2_ObjState *st = &o->states[j];
+
+            orig_fwrite(st, AM2_OBJ_STATE_REC_SIZE, 1, fp);
+
+            for (int32_t k = 0; k < st->framecount; k++) {
+                AM2_ObjFrame *fr = &st->frames[k];
+
+                orig_fwrite(fr, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
+
+                for (int32_t m = 0; m < fr->actioncount; m++) {
+                    const AM2_ScriptAction *a = &fr->actions[m];
+                    uint8_t copy[sizeof(AM2_ScriptAction)];
+                    int32_t len = a->text ? (int32_t)strlen(a->text) : 0;
+
+                    memcpy(copy, a, sizeof copy);
+                    *(int32_t *)(copy + offsetof(AM2_ScriptAction, text)) = len;
+                    orig_fwrite(copy, sizeof copy, 1, fp);
+
+                    if (len > 0)
+                        orig_fwrite(a->text, (size_t)len, 1, fp);
+                }
+            }
+        }
+    }
+
+    return 1;
+}
+
 int objscript_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_SCRIPT_COMPARE,
                         (const void *)ScriptCompare, "ScriptCompare", 1);
+    rc |= patch_replace(ADDR_SAVE_OBJSCRIPT_SECTION,
+                        (const void *)SaveObjScriptSection,
+                        "SaveObjScriptSection", 1);
     rc |= patch_replace(ADDR_OBJ_FRAME_NEW_ACTION,
                         (const void *)ObjFrameNewAction,
                         "ObjFrameNewAction", 1);

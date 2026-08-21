@@ -14,6 +14,8 @@
 
 #include <stdint.h>
 
+#include "../inject/orig.h"   /* am2_FILE */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -83,5 +85,10 @@ int objscript_install(void);
 #ifdef __cplusplus
 }
 #endif
+
+/* 0x00436280. Write the object-script section: tag, count, then four nested
+ * levels of record. Action strings are length-prefixed in place of the
+ * pointer field; see the body. Always returns 1. */
+int32_t __cdecl SaveObjScriptSection(am2_FILE *fp);
 
 #endif /* AM2_OBJSCRIPT_H */
