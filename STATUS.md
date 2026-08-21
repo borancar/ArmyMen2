@@ -5,23 +5,24 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `56e30cf`. Working tree clean.
+Last updated: **2026-08-21**, at `a7d74f0`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`EvtSetField540`** (`0x0041FAB0`, 48 B, one caller at `0x00420FBE`) --
-  committed at `2697730`, and **not verified against the running game**. Sixth
-  member of the uid-setter family; gated on `ObjIsType2` alone rather than the
-  2/3/8 set, writes `+0x540`. Static checks and the offline selftest pass; the
-  A/B has not been run. It is the third commit in a row in that position --
-  `e249071` and `6a6b94e` are the other two -- so `tools/ab.sh campaign` is
-  owed on all three, not just the last.
-- **Stale module counts in `CLAUDE.md`** -- fixed at `56e30cf`. The
-  source-layout section said eight flat modules and fourteen boundary; it is 19
-  and 15. `tools/checkclaims.py` derives both from `am2.game_sources()` now and
-  was tested in both failing directions. Five checked claims became seven.
+- **A whole setter family is reconstructed and never runs.** A counts probe on
+  the campaign reads `EvtSetField540=0`, `EvtSetByte530=0` and
+  `LookupType3ByUID=0`; of the family only `EvtSetByte40` fires, 4 times. They
+  are arms of the action executor at `0x00420410`, so which ones run is decided
+  by which actions the shipped scripts use, and `kitchen1.txt` uses almost none
+  of them. **The clean campaign A/B says nothing about any of them** -- it
+  establishes only that nothing else broke. Verified by reading.
+  `blindspots.py` confirms these counters can move, so the zeroes are real
+  rather than the usual blind spot.
+- **The pure-leaf pool is nearly empty**: 14 pure unreconstructed leaves left,
+  from the 161 this project started that count at. Three of the 14 are false
+  positives -- see Leads.
 
 ## Where the work is
 
@@ -41,11 +42,12 @@ condition struct's layout from both ends.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 295 | `grep -rc patch_replace src/game` |
-| distinct addresses reconstructed | 295 | 289 of them below the CRT line |
+| `patch_replace` sites | 299 | `grep -rc patch_replace src/game` |
+| distinct addresses reconstructed | 299 | 292 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 70,000 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 70,160 / 372,816 B (**18.8%**) | patched entries' sizes over the total |
 | modules | 19 flat + 15 `win32/` | `tools/checkclaims.py` |
+| pure unreconstructed leaves | 14 | `tools/vectors.py --all` |
 | boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
@@ -57,14 +59,41 @@ way, and `tools/blindspots.py` says which counters can move at all.
 
 | check | when | result |
 |---|---|---|
-| `make` | this session | builds clean |
-| `make check` (16 static checks) | this session | all pass, generated files regenerate identically |
-| `make selftest` | this session | 6,462 vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
-| `tools/ab.sh all` | **not this session** | the other half of verification; needs the game |
+| `make` | current | builds clean |
+| `make check` (16 static checks) | current | all pass, generated files regenerate identically |
+| `make selftest` | current | **6,626** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `tools/ab.sh campaign` | current | clean, twice: log identical at 14 messages, 2,571/786,432 pixels both times |
+| `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
+
+A clean A/B is not evidence about a function the run never calls. Check with a
+counts probe before reading one as coverage -- that is what turned the
+`EvtSetByte530` result from "verified" into "verified by reading", above.
 
 ## Next
 
-1. `tools/ab.sh campaign` for `EvtSetField540`, then commit it.
-2. Continue the save/load family in `event.cpp`.
-3. Standing: `docs/scriptactions.md`'s oracle, the Lock/Unlock rasteriser
-   batch (4 of 29 done), and object types 2, 3 and 8 still unidentified.
+1. Finish `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
+2. Keep taking pure leaves: 11 real ones left, each verifiable offline by
+   vectors with no game at all. `0x0041dad0`, `0x00449ef0`, `0x0041bb60` and
+   `0x0041cec0` are the next smallest.
+3. The action executor at `0x00420410` (4,096 B) is the layer above the setter
+   family, and `0x0041FD10`, `0x0041FD30`, `0x0041FEA0` are three more of its
+   helpers, all still original.
+
+## Leads
+
+Things believed but not established. Written down so they are not re-derived,
+and not promoted to fact without evidence.
+
+- **Type 3 may be vehicles.** `0x0045A9C0`, the type-3 arm of the per-type
+  teardown at `0x00428DA0`, sits inside a band that is entirely vehicle code --
+  `vehicle mask direction`, `ExitAllFromVehicle`, `Vehicle aai entry not found`.
+  That is adjacency, not proof, and the check that would settle it came back
+  empty: none of `ObjIsType3`'s 25 caller functions carries a log string at all.
+  Types 2, 3 and 8 stay unidentified.
+- **Three of `vectors.py`'s 14 pure leaves are not targets.** `0x00427974` is
+  the jump table `0x004278E0` dispatches through, not a function -- the split
+  list is a lower bound and says so. `0x0045CAA0` is the stubbed logger, which
+  IS reconstructed, by `src/inject/gamelog.c`; the scan reads the reconstructed
+  set from `patch_replace` calls in `src/game` only and cannot see a harness
+  patch. Worth fixing in `merges.reconstructed()`, which is where the same
+  lesson is already written down.
