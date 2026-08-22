@@ -41,8 +41,13 @@ typedef struct AM2_Widget {
                                      * WidgetTakeFocus: it stores `this` and
                                      * `firstChild` into it and dispatches a
                                      * vtable slot on what it reads back. */
-    int32_t  unknown38;             /* 0x0038 */
-    int32_t  flag3C;                /* 0x003C  constructed as 1 */
+    struct AM2_Sprite *sprite;      /* 0x0038  the widget's own backdrop, or
+                                     * null. WidgetPaint draws it and reads
+                                     * its bounds; WidgetRepaint walks up for
+                                     * the nearest ancestor that has one. */
+    int32_t  flag3C;                /* 0x003C  constructed as 1. Set centres the
+                                     * sprite in the widget; clear puts it at
+                                     * the top left. */
     int32_t  unknown40;             /* 0x0040  NOT written by the constructor */
     int32_t  flag44;                /* 0x0044  constructed as 0 */
     int32_t  unknown48;             /* 0x0048 */
@@ -225,6 +230,33 @@ AM2_Widget *__attribute__((thiscall)) LabelConstruct(AM2_Widget *w,
 /* Slot 3's signature. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
                                                             int32_t announce);
+
+/* Original: 0x00453C40, thiscall. The base painter, and what 18 of the 33
+ * vtables reach through two levels of forwarding thunk.
+ *
+ * If the widget has a sprite: place it, work out where the sprite goes,
+ * intersect the widget's rectangle with the caller's clip and then with the
+ * 640x480 screen, clip the sprite against that, and draw. Any of the three
+ * failing drops the sprite -- but NOT the children, which are painted either
+ * way, and are painted with the CALLER's clip rather than the intersected one.
+ *
+ * A widget with no sprite does not even place itself; the whole first half is
+ * skipped and it goes straight to its children.
+ *
+ * The centring halves each side before subtracting -- `(w >> 1) - (sw >> 1)`,
+ * not `(w - sw) >> 1` -- which differs by a pixel whenever exactly one of the
+ * two is odd. Kept as written. */
+void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip);
+
+/* Original: 0x00453D50, thiscall. Append a child to the end of this widget's
+ * child list and point it back at this widget as its parent.
+ *
+ * The first child is linked with its `prevSibling` left ALONE -- only the
+ * append path writes one -- so this depends on the constructor having zeroed
+ * it. It never writes the new child's `nextSibling` either. Both are what the
+ * original does and both are safe only because WidgetConstruct clears them. */
+void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *w,
+                                              AM2_Widget *child);
 
 /* Original: 0x00453D90, thiscall. Follow the sibling chain from this widget to
  * its end and answer the last one -- which is `this` when there is no next.

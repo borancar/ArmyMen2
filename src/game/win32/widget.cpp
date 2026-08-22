@@ -7,6 +7,7 @@
 #include "widget.h"
 #include "surface.h"
 #include "../rect.h"
+#include "sprite.h"
 #include "frame.h"
 #include "audio.h"
 #include "../image.h"
@@ -95,6 +96,70 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 #define AM2_DIK_SPACE  0x39
 #define AM2_DIK_UP     0xC8
 #define AM2_DIK_DOWN   0xD0
+
+/* The 640x480 screen rectangle, spelled exactly as sprite.cpp and text.cpp
+ * spell it so it stays one definition rather than a drift. */
+#define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
+
+void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
+{
+    AM2_Widget *child;
+
+    if (w->sprite) {
+        AM2_Sprite *spr = w->sprite;
+        int32_t     x;
+        int32_t     y;
+        RECT        visible;
+        AM2_Rect    part;
+
+        WidgetScreenRect(w);
+
+        if (w->flag3C) {
+            /* Each side is halved BEFORE the subtraction, which is not the
+             * same as halving the difference when exactly one is odd. */
+            x = w->rect.left + ((w->w >> 1) - (spr->bounds.right >> 1));
+            y = w->rect.top  + ((w->h >> 1) - (spr->bounds.bottom >> 1));
+        } else {
+            x = w->rect.left;
+            y = w->rect.top;
+        }
+
+        /* RECT and AM2_Rect are the same four int32_t; the casts are the price
+         * of the flat half not being allowed to name RECT. */
+        if (IntersectRect(&visible, &w->rect, &clip)
+            && IntersectRect(&visible, (const RECT *)&g_screenClip, &visible)
+            && ClipRect(&spr->bounds, (const AM2_Rect *)&visible, &x, &y,
+                        &part))
+            DrawSpriteClipped(spr, x, y, &part, 0);
+    }
+
+    /* Children are painted whether or not the sprite was, and against the
+     * CALLER's clip rather than the intersection worked out above. */
+    for (child = w->firstChild; child; child = child->nextSibling)
+        ((AM2_WidgetPaintFn *)child->vtable)[WIDGET_VSLOT_PAINT](child, clip);
+}
+
+void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *w, AM2_Widget *child)
+{
+    AM2_Widget *last;
+
+    if (!child)
+        return;
+
+    child->parent = w;
+
+    last = w->firstChild;
+    if (!last) {
+        /* No prevSibling written here, and no nextSibling on the new child
+         * either -- see the header. */
+        w->firstChild = child;
+        return;
+    }
+    while (last->nextSibling)
+        last = last->nextSibling;
+    last->nextSibling  = child;
+    child->prevSibling = last;
+}
 
 AM2_Widget *__attribute__((thiscall)) WidgetLastSibling(AM2_Widget *w)
 {
@@ -291,8 +356,10 @@ void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w)
     if (w->unknown48) {
         AM2_Widget *up = w->parent;
 
+        /* The nearest ancestor with a sprite -- something with a backdrop
+         * to repaint over. */
         while (up) {
-            if (up->unknown38) {
+            if (up->sprite) {
                 target = up;
                 break;
             }
@@ -334,7 +401,7 @@ AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
     w->prevSibling = (AM2_Widget *)0;
     w->nextSibling = (AM2_Widget *)0;
     w->focusedChild = (AM2_Widget *)0;
-    w->unknown38   = 0;
+    w->sprite      = 0;
     w->flag3C      = 1;
     /* 0x0040 is deliberately not written -- the original leaves it, and
      * whatever it is arrives from the allocator. */
@@ -424,6 +491,10 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_PAINT, (const void *)WidgetPaint,
+                        "WidgetPaint", 6);
+    rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
+                        "WidgetAddChild", 1);
     rc |= patch_replace(ADDR_WIDGET_LAST_SIBLING,
                         (const void *)WidgetLastSibling,
                         "WidgetLastSibling", 3);

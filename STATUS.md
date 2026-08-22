@@ -70,14 +70,14 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 423 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 423 | 416 of them below the CRT line |
+| `patch_replace` sites | 425 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 425 | 418 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 93,952 / 372,816 B (**25.2%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 94,288 / 372,816 B (**25.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 59, 164 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 60, 165 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how
@@ -152,6 +152,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Field `0x0038` is the widget's SPRITE, and that improves an older
+  comment.** `WidgetPaint` draws it and reads its bounds to centre it, so it
+  is an `AM2_Sprite *`. `WidgetRepaint`'s walk up the parent chain -- written
+  a few commits ago as "the first ancestor with `0x0038` set" -- is really
+  "the nearest ancestor that has a backdrop to repaint over", which is a
+  reason rather than a field test.
+
+- **`flag3C` centres the sprite**, and that is why mutating it in
+  `WidgetConstruct` showed nothing: the base constructor's 1 is not what the
+  buttons on screen are using. Whether a subclass overwrites it is not yet
+  established -- worth a probe rather than another guess.
+
+- **The widget layer's remaining pieces.** The two forwarding thunks onto
+  `WidgetPaint` (`0x00454A90` and `0x00454BA0`, 48 bytes each, and the second
+  is what 18 vtables actually carry); the per-class constructors, which is
+  where the subclass tails get their meaning; and the edit box at
+  `0x00454C10`, which owns `g_charHandler`.
 
 - **The two focus walkers disagree about what "eligible" means.** Forwards
   (`0x00453DB0`) requires `0x0050` set AND `0x004C` clear. Backwards

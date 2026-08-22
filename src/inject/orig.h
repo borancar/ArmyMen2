@@ -68,6 +68,12 @@
  * focus to the next / previous eligible sibling, wrapping through the parent's
  * child list, skipping anything whose 0x0050 is clear or whose 0x004C is set,
  * and finishing by dispatching slot 3 on whatever they land on. */
+/* 0x00453C40, thiscall: the base widget's painter -- draw my own sprite if I
+ * have one, then paint every child. 0x00454A90 and 0x00454BA0 are two levels
+ * of forwarding thunk onto it, and 0x00454BA0 is what 18 vtables carry. */
+#define ADDR_WIDGET_PAINT       0x00453C40u /* void(AM2_Widget *, RECT) */
+/* 0x00453D50, thiscall: append a child to a widget's child list. */
+#define ADDR_WIDGET_ADD_CHILD   0x00453D50u /* void(AM2_Widget *, AM2_Widget *) */
 #define ADDR_WIDGET_LAST_SIBLING 0x00453D90u /* AM2_Widget *(AM2_Widget *) */
 #define ADDR_WIDGET_FOCUS_NEXT  0x00453DB0u /* void(AM2_Widget *, int32_t) */
 #define ADDR_WIDGET_FOCUS_PREV  0x00453E20u /* void(AM2_Widget *, int32_t) */
