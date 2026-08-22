@@ -153,18 +153,24 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
-- **`controls` compares the log and ONE frame, and that is its ceiling.**
-  Three mutations have now passed it that are genuinely wrong code:
-  `WidgetRepaint` never deferring to an ancestor, and `WidgetTakeFocus`
-  focusing the obvious widget instead of the parent's first child, and the two
-  constructed flags. None of them changes the frame that is still on screen
-  when the screenshot is taken.
+- **`controls` samples two frames now, and it did NOT fix what it was built
+  to fix.** `ab.sh` takes a shot between the two clicks as well as after them,
+  and the comparer checks every frame a configuration leaves behind. The mid
+  frame is genuinely discriminating -- a width-from-height slip in
+  `WidgetScreenRect` is 93,347 pixels there, independently of the 305,939 on
+  the final frame -- so a defect that only touched the OPTIONS menu would now
+  be caught where before it could not be.
 
-  So the layer needs a configuration that samples DURING the interaction, not
-  after it. The cheapest version is a second screenshot between the two clicks
-  -- the OPTIONS menu with one entry highlighted is exactly the transient
-  state these mutations disturb. Worth doing before reconstructing the click
-  slot (`0x00454BD0`, 17 classes), because that one is all transient.
+  But it does not catch the three mutations that motivated it. Focusing the
+  obvious widget instead of the parent's first child still passes both frames.
+  So the reason those pass is NOT that the sample was too late; the focus and
+  flag state simply does not change what either screen looks like. They stay
+  verified by reading, and the next idea has to be a different one -- a probe
+  that reads the widget tree over the control socket would settle it directly,
+  where more screenshots will not.
+
+  **Extending a test is not the same as extending its reach**, and the second
+  frame had to be mutation-checked on its own before it counted for anything.
 
 - **`WidgetTakeFocus` teaches the type of field 0x0034.** It stores `this` and
   `firstChild` there and dispatches a vtable slot on what it reads back, so it

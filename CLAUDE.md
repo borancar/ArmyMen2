@@ -1220,6 +1220,25 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   It fails when it should: clearing the label background with the ink colour
   rather than the paper colour puts it 17,110 pixels over.
 
+  **It takes TWO shots, and any configuration may.** `ab.sh` compares every
+  frame a run leaves behind, not only the last one — `controls` grabs the
+  OPTIONS menu between its two clicks, and the comparer checks both against
+  the same budget. That was added because a menu is mostly transients and a
+  settled final frame cannot show one.
+
+  **It did not do what it was added for, and that is worth knowing.** Three
+  mutations that are genuinely wrong code passed the single-frame version —
+  `WidgetTakeFocus` focusing the obvious widget instead of the parent's first
+  child, `WidgetRepaint` never deferring to an ancestor, and both flags
+  `WidgetConstruct` writes as 1 — and all three still pass with the second
+  frame in. So the sample was not too late; that state simply does not reach
+  the screen on either of these two. The second frame is still worth having,
+  because it is discriminating on its own (93,347 pixels for a
+  `WidgetScreenRect` error, independently of the final frame's 305,939), and
+  it covers a screen nothing else did. **Mutation-check an extension of a test
+  before crediting it with anything** — extending a test is not the same as
+  extending its reach.
+
   The sizes quoted for the next candidates were off as well (`0x00413610` is
   128 B, not 256; `0x00433350` is `0x00433360` at 288 B), which is what
   `tools/merges.py` was written to fix.

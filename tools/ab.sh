@@ -210,6 +210,15 @@ play() {
         # cursor is drawn on both screens, so point.py is the right tool here.
         "$REPO/tools/point.py" 306 262 --click >/dev/null 2>&1
         sleep 5
+        # A shot DURING the sequence, not only after it. The OPTIONS menu with
+        # one entry lit is a transient the final frame cannot show, and three
+        # mutations that are genuinely wrong code passed this configuration for
+        # exactly that reason -- WidgetRepaint never deferring to an ancestor,
+        # WidgetTakeFocus focusing the wrong child, and both flags the base
+        # constructor writes as 1. Widget focus and highlight state IS the
+        # transient, so a menu layer verified only on a settled frame is barely
+        # verified at all.
+        drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
         "$REPO/tools/point.py" 306 212 --click >/dev/null 2>&1
         sleep 6
     fi
@@ -375,25 +384,42 @@ import sys, os, glob
 from PIL import Image
 import numpy as np
 shots, cfg, budget = sys.argv[1], sys.argv[2], int(sys.argv[3])
-def find(side):
-    hits = glob.glob(os.path.join(shots, "*", "ab-%s-%s.png" % (cfg, side)))
+
+def find(side, tag):
+    stem = "ab-%s-%s" % (cfg, side) if not tag \
+        else "ab-%s-%s-%s" % (cfg, tag, side)
+    hits = glob.glob(os.path.join(shots, "*", stem + ".png"))
     return max(hits, key=os.path.getmtime) if hits else None
-o, r = find("orig"), find("recon")
-if not o or not r:
-    print("  pixels  no screenshots to compare"); sys.exit(0)
-a = np.asarray(Image.open(o).convert("RGB")).astype(int)
-b = np.asarray(Image.open(r).convert("RGB")).astype(int)
-if a.shape != b.shape:
-    print("  pixels  DIFFERENT SIZES %s vs %s" % (a.shape, b.shape)); sys.exit(1)
-n = (np.abs(a - b).sum(axis=2) > 0).sum()
-over = budget >= 0 and n > budget
-print("  pixels  %d of %d differ (%.4f%%)%s"
-      % (n, a[..., 0].size, 100.0 * n / a[..., 0].size,
-         "  -- OVER the budget of %d" % budget if over
-         else "" if n == 0 else "  -- expected on a moving scene"))
-if over:
-    print("  pixels  the frame is wrong, not merely unsynchronised")
-    sys.exit(1)
+
+# A configuration may take extra shots DURING its sequence, not only at the
+# end. Every one found is compared against the same budget; a settled final
+# frame cannot show a transient, and a menu is mostly transients.
+bad = 0
+compared = 0
+for tag in ("", "mid"):
+    o, r = find("orig", tag), find("recon", tag)
+    if not o or not r:
+        continue
+    label = "pixels" if not tag else tag[:6].rjust(6)
+    a = np.asarray(Image.open(o).convert("RGB")).astype(int)
+    b = np.asarray(Image.open(r).convert("RGB")).astype(int)
+    if a.shape != b.shape:
+        print("  %s  DIFFERENT SIZES %s vs %s" % (label, a.shape, b.shape))
+        bad = 1
+        continue
+    compared += 1
+    n = (np.abs(a - b).sum(axis=2) > 0).sum()
+    over = budget >= 0 and n > budget
+    print("  %s  %d of %d differ (%.4f%%)%s"
+          % (label, n, a[..., 0].size, 100.0 * n / a[..., 0].size,
+             "  -- OVER the budget of %d" % budget if over
+             else "" if n == 0 else "  -- expected on a moving scene"))
+    if over:
+        print("  %s  the frame is wrong, not merely unsynchronised" % label)
+        bad = 1
+if not compared and not bad:
+    print("  pixels  no screenshots to compare")
+sys.exit(bad)
 PY
     return $rc
 }
