@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 466 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 466 | 459 of them below the CRT line |
+| `patch_replace` sites | 467 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 467 | 460 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 103,264 / 372,816 B (**27.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 103,520 / 372,816 B (**27.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,20 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The original disagrees with itself about a null check.**
+  `SendGameReadyToLoadMsg` and `ReceiveGameReadyToLoadMsg` end with the SAME
+  two-call lobby repaint, and the receive half tests the dialog pointer while
+  the send half does not. One of the two is wrong. Both are reproduced as
+  written -- a crash on a null dialog is the original's behaviour, and adding
+  the guard to the send half would hide a real difference between the two
+  paths.
+
+  Worth noting for the port: if the native build ever wants that guard, it is a
+  deliberate divergence and should be marked as one, not slipped in.
+
+- **Four of the six handshake functions are done.** `SendGameReadyMsg` (352 B)
+  and `SendGameStartMsg` (256 B) remain.
 
 - **The member-name sweep found exactly three**, and they were worth having:
   `m_ArmyReady` (`0x0274`), `m_ArmyReadyToLoad` (`0x0270`) and `m_pLobby`.

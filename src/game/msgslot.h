@@ -176,6 +176,23 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid);
  * than hoisted. Reproduced. */
 void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid);
 
+/* Original: 0x00410D90, "SendGameReadyToLoadMsg". The CLIENT half of the pair
+ * whose host half is ReceiveGameReadyToLoadMsg: it returns at once if this
+ * machine IS the host, which is the exact mirror of the other returning unless
+ * it is.
+ *
+ * It sets its OWN m_ArmyReadyToLoad -- finding its slot from the comm object's
+ * self id rather than from an argument -- then sends the record and repaints
+ * the lobby.
+ *
+ * The repaint here has NO null check on the current dialog, while the host
+ * side's identical repaint does. One of the two is wrong and the original
+ * disagrees with itself; both are reproduced as written, because a crash on a
+ * null dialog is the original's behaviour and inventing a guard would hide it.
+ *
+ * The slot lookup runs twice when logging is on, as in the host half. */
+void __cdecl SendGameReadyToLoadMsg(int32_t ready);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

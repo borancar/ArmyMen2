@@ -273,6 +273,42 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
 #define orig_comm_send_players \
     (*(AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
 
+void __cdecl SendGameReadyToLoadMsg(int32_t ready)
+{
+    uint8_t *comm = (uint8_t *)kCommObj;
+    int32_t  slot;
+    void    *dlg;
+
+    /* Clients only -- the exact mirror of the host-only receive. */
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("SendGameReadyToLoadMsg\n %s", ready ? "TRUE" : "FALSE");
+
+    slot = orig_comm_slot_of_id(comm,
+                                *(const int32_t *)(comm + AM2_COMM_SELF_ID));
+    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY_TO_LOAD) = ready;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
+                orig_comm_slot_of_id(comm,
+                                     *(const int32_t *)(comm + AM2_COMM_SELF_ID)),
+                ready ? "TRUE" : "FALSE");
+
+    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_READY_TO_LOAD + AM2_MSG_VALUE)
+        = ready;
+    orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_READY_TO_LOAD, 0, 1);
+
+    /* No null test on the dialog, unlike the host half. The original's. */
+    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
+        dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+}
+
 void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 {
     uint8_t *comm = (uint8_t *)kCommObj;
@@ -412,6 +448,9 @@ void __cdecl ExitGamePostClose(void)
 
 int msgslot_install(void)
 {
+    patch_replace(ADDR_SEND_READY_TO_LOAD,
+                  (const void *)SendGameReadyToLoadMsg,
+                  "SendGameReadyToLoadMsg", 1);
     patch_replace(ADDR_RECV_GAME_READY,
                   (const void *)ReceiveGameReadyMsg, "ReceiveGameReadyMsg", 1);
     patch_replace(ADDR_RECV_READY_TO_LOAD,

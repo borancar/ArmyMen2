@@ -2000,6 +2000,10 @@
  * 0x004FC3A8 is the record it sends. */
 #define ADDR_RECV_GAME_READY       0x00410BB0u /* void(msg *, int32_t dpid) */
 #define ADDR_MSG_END_SETUP         0x004FC3A8u
+/* 0x00410D90, "SendGameReadyToLoadMsg". The client half of the pair whose host
+ * half is 0x00410E90. 0x004FAA18 is the record it sends, value at +8. */
+#define ADDR_SEND_READY_TO_LOAD    0x00410D90u /* void(int32_t) */
+#define ADDR_MSG_READY_TO_LOAD     0x004FAA18u
 #define COMM_ARMY_OFF_READY        0x274u   /* m_ArmyReady, its own name */
 #define COMM_ARMY_RECORD_SIZE      112u
 #define COMM_ARMY_OFF_READY_TO_LOAD 0x270u
