@@ -45,6 +45,7 @@
 #include "mapdraw.h"
 #include "../rect.h"
 #include "../msgslot.h"  /* CommEndSetup, shared with both ready handlers */
+#include "../army.h"     /* ForEachArmyObject, and the callback is not a sprite */
 
 #include <stdint.h>
 #include <string.h>
@@ -168,7 +169,6 @@ typedef void (__cdecl *am2_str_int_fn)(const char *text, int32_t arg);
 typedef void (__cdecl *am2_str_int2_fn)(const char *text, int32_t a, int32_t b);
 typedef void (__cdecl *am2_int_fn2)(int32_t arg);
 typedef void (__cdecl *am2_void_fn2)(void);
-typedef void (__cdecl *am2_drop_fn)(int32_t slot, const void *what);
 typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
                                      int32_t x, int32_t y, int32_t slot,
                                      int32_t pri, int32_t owner);
@@ -191,7 +191,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_hud_message    (*(am2_str_int_fn)ADDR_HUD_MESSAGE)
 #define orig_menu_message   (*(am2_str_int2_fn)ADDR_MENU_MESSAGE)
 #define orig_chat_append    (*(am2_str_int_fn)ADDR_CHAT_APPEND)
-#define orig_sprite_drop    (*(am2_drop_fn)ADDR_SPRITE_DROP_NAMED)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -283,7 +282,10 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
     orig_remove_player(id);
 
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        orig_sprite_drop(slot, (const void *)(uintptr_t)ADDR_MP_LEAVE_SPRITE);
+        /* Not a sprite: hand the departed player's units to the AI. The
+         * callback is still original; the walk is ours. See army.h. */
+        ForEachArmyObject(slot,
+                          (void (__cdecl *)(void *))(uintptr_t)ADDR_OBJ_TO_AI);
 
     orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_LEFT_AI,
                  PlayerName(comm, slot));

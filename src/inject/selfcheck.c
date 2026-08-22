@@ -45,6 +45,7 @@
 #include "../game/item.h"
 #include "../game/objflag.h"
 #include "../game/msgslot.h"
+#include "../game/army.h"
 
 /* Big enough for the worst reach any function under test has. MaskPixelSolid
  * takes a row offset from the buffer itself, so it can address up to 0xFFFF
@@ -95,6 +96,22 @@ static const struct check kChecks[] = {
     { "UidOnWire",      ADDR_UID_ON_WIRE,    (void *)UidOnWire,      1, {0,0,0,0} },
     { "ObjIsItem",      ADDR_OBJ_IS_ITEM,    (void *)ObjIsItem,      1, {1,0,0,0} },
     { "ObjIsType2",     ADDR_OBJ_IS_TYPE2,   (void *)ObjIsType2,     1, {1,0,0,0} },
+    /* The one army helper that can survive a random argument: ObjIsFriendly
+     * reads its object out to +0x544, which the scratch covers.
+     *
+     * The other four in army.h are deliberately absent, and the reasons differ.
+     * AllyFlag indexes a 4x4 matrix with no bounds check at all, so `pick`'s
+     * large values would read unmapped memory; ArmiesAllied tail-calls it; and
+     * ForEachArmyObject would CALL its second argument, which here is a random
+     * integer.
+     *
+     * LookupOwnerObj is the interesting one, and it was added and taken out
+     * again: it range-checks the army perfectly well, and then indexes
+     * 0x004F9ECC, which is still NULL this early. This runs before install(),
+     * which is before the game has loaded anything -- so "survives a random
+     * argument" is not the only question. It has to survive the empty world
+     * this runs in. */
+    { "ObjIsFriendly",  ADDR_OBJ_IS_FRIENDLY, (void *)ObjIsFriendly,  1, {1,0,0,0} },
     { "ObjIsType3",     ADDR_OBJ_IS_TYPE3,   (void *)ObjIsType3,     1, {1,0,0,0} },
     { "ObjIsType4",     ADDR_OBJ_IS_TYPE4,   (void *)ObjIsType4,     1, {1,0,0,0} },
     { "ObjIsType8",     ADDR_OBJ_IS_TYPE8,   (void *)ObjIsType8,     1, {1,0,0,0} },

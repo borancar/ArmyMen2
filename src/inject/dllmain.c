@@ -53,6 +53,7 @@
 #include "../game/pad.h"
 #include "../game/air.h"
 #include "../game/anim.h"
+#include "../game/army.h"
 #include "../game/gameproc.h"
 #include "../game/win32/sprite.h"
 #include "../game/win32/surface.h"
@@ -437,6 +438,7 @@ static void install(void)
     pad_install();
     air_install();
     anim_install();
+    army_install();
     gameproc_install();
     rect_install();
     dist_install();

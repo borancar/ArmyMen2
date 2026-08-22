@@ -81,12 +81,12 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 561 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 560 | 550 of them below the CRT line |
+| `patch_replace` sites | 566 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 565 | 555 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 104,176 / 372,816 B (**27.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 129,488 / 372,816 B (34.7%) | what every earlier session quoted, and an over-count |
-| modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 104,592 / 372,816 B (**28.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 129,904 / 372,816 B (34.8%) | what every earlier session quoted, and an over-count |
+| modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 68, 179 import sites | `docs/boundary.md` |
@@ -105,6 +105,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make selftest` | current | **7,282** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
+| `AM2_SELFCHECK=1` | current | 5,888 calls across 46 functions, 0 disagree |
 | `tools/maskdump.py` | current | roach 32 records/237 points, vehicle 192/3,081, 36,768 bytes, sha256 `532e52a0...` -- byte-identical to `AM2_NOPATCH=1` |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
@@ -195,6 +196,36 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **Two names in `orig.h` were wrong about what they named, and both were
+  named from a single call site.** `ADDR_SPRITE_DROP_NAMED` (`0x00457820`)
+  walks every object an army owns and CALLS its second argument -- `call ebp`
+  -- so nothing about it is a sprite; the one call site passes `0x0045A030`,
+  which is a function that hands a unit to the AI, matching the "left, AI takes
+  over" message beside it. And `EvtMarkSet`/`EvtMarkClear` write into the 4x4
+  ALLIANCE matrix: `0x00424E80` fills that table with the identity and then
+  allies any two comm players on the same team. They are `ForEachArmyObject`,
+  `ADDR_OBJ_TO_AI`, `EvtSetAllied` and `EvtClearAllied` now.
+
+- **And the alias ratchet caught the author again**, one commit after the
+  lesson was last written down. Five addresses went into `orig.h` and two
+  already had names; the group was grepped for its globals and not for its
+  functions. Grep EVERY address, not the ones that feel new.
+
+- **A function can be safe for `AM2_SELFCHECK=1` and still not survive it.**
+  `LookupOwnerObj` range-checks its army perfectly and then indexes
+  `0x004F9ECC`, which is NULL that early -- the selfcheck runs before
+  `install()`, which is before the game has loaded anything. It took the
+  process down with 47 functions announced and no summary, the same symptom
+  `XorChecksum` produced. The question is not only "does it survive a random
+  argument" but "does it survive the empty world this runs in".
+
+- **`ObjIsFriendly` passes the selfcheck and one mutation of it also passes.**
+  Inverting the matrix lookup fails all 128 calls, so that half is genuinely
+  compared. Changing the `owner == 4` shortcut to `owner == 5` changes
+  nothing: the scratch byte at that offset is fixed, so the argument never
+  varies. The shortcut and the multiplayer block -- `g_mpSession` is 0 before
+  anything loads -- stay verified by reading.
 
 - **The `.ani` subsystem is closed: five loaders, six frees, one table
   reader, three lookups, two mask builders.** Nothing between a `.ani` file on

@@ -914,7 +914,11 @@
 #define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */
 #define ADDR_MENU_MESSAGE        0x00431C30u  /* void(const char *, int32, int32) */
 #define ADDR_CHAT_APPEND         0x00411E90u  /* void(const char *, int32), 128 bytes */
-#define ADDR_SPRITE_DROP_NAMED   0x00457820u  /* void(int32, const void *), 128 bytes */
+/* NOT a sprite anything. 0x00457820 walks every object an army owns and calls
+ * the SECOND argument on each -- `call ebp`, where ebp is that argument. It
+ * went in as ADDR_SPRITE_DROP_NAMED from the one call site, which passes
+ * 0x0045A030; that is a function too, not a sprite. See src/game/army.h. */
+#define ADDR_FOR_EACH_ARMY_OBJECT 0x00457820u /* void(army, void(*)(void*)) */
 
 #define ADDR_AI_CONTROLLED       0x00476FB0u  /* int32_t, set by ADDR_SET_AI_CONTROL */
 #define ADDR_PAUSE_FLAGS         0x005122FCu  /* uint32_t, one bit per reason */
@@ -925,7 +929,11 @@
 #define ADDR_NET_GAME            0x00511DD4u  /* int32_t */
 #define ADDR_GAME_OVER_FLAGS     0x00515FD8u  /* uint32_t, bit 18 selects the AI mode */
 #define ADDR_HUD_MESSAGE_COLOUR  0x00507234u  /* uint8_t, colour for ADDR_HUD_MESSAGE */
-#define ADDR_MP_LEAVE_SPRITE     0x0045A030u  /* const void *, passed to 0x00457820 */
+/* The callback the line above hands to it when a player leaves: for a type 2
+ * object, clear +0x57C if it still has health and put +0xE4 -- the AI mode --
+ * to 6, which orig.h already records as `attack`. So the departed player's
+ * units are handed to the AI, which is what the message beside it says. */
+#define ADDR_OBJ_TO_AI           0x0045A030u  /* void(void *obj) */
 #define ADDR_STR_ALLRIGHT_WAV    0x00474194u  /* "AllRight.wav" */
 #define ADDR_STR_HOST_NOW        0x00474178u  /* "Player %s is now the host." */
 #define ADDR_STR_LEFT_AI         0x004741ECu  /* "Player %s has left the game - now AI" */
@@ -1035,6 +1043,8 @@
 #define SOUND_REC_OFF_LOOPING    0x1Cu
 #define SOUND_VOICE_SLOT_HI      0x10    /* slot 16, like slot 0, is a voice */
 #define ADDR_POINTS_EQUAL        0x0042E140u /* int32(const AM2_Point*, const AM2_Point*) */
+/* 0x00457750, 21 callers. Reconstructed in src/game/army.cpp -- the name was
+ * already here and is kept, being the more careful of the two readings. */
 #define ADDR_LOOKUP_OWNER_OBJ    0x00457750u /* void *(uint32 owner) */
 #define SOUND_DYN_OFF_BUFFER     0x00u
 #define SOUND_DYN_OFF_DATA       0x04u
@@ -1785,9 +1795,19 @@
 #define ADDR_EVT_PLAY_SOUND_ON   0x0041F6B0u  /* void(name, owner, slot, pri, loop) */
 #define ADDR_EVT_SET_WORD60      0x0041F750u  /* void(uid, int32), clamped */
 #define ADDR_EVT_SET_AI_MODE     0x0041F9B0u  /* void(uid, mode), +0xE4/+0xE8 */
-#define ADDR_EVT_MARK_SET        0x0041FF20u  /* void(row, col) -> 1 */
-#define ADDR_EVT_MARK_CLEAR      0x0041FF40u  /* void(row, col) -> 0 */
-#define ADDR_EVT_MARKS           0x00511E60u  /* int32_t[][4] */
+#define ADDR_EVT_SET_ALLIED      0x0041FF20u  /* void(a, b) -> matrix 1 */
+#define ADDR_EVT_CLEAR_ALLIED    0x0041FF40u  /* void(a, b) -> matrix 0 */
+/* The 4x4 alliance matrix, not "marks": 0x00424E80 fills it with the identity
+ * and then allies any two comm players on the same team, and AllyFlag reads it
+ * to answer whether two armies are on the same side. The two writers above
+ * were named from their shape alone. See src/game/army.h. */
+#define ADDR_ALLY_MATRIX         0x00511E60u  /* int32_t[4][4] */
+#define ADDR_ALLY_FLAG           0x0040F230u  /* stdcall int32_t(a, b) */
+#define ADDR_ARMIES_ALLIED       0x00457720u  /* int32_t(a, b), 4 means all */
+#define ADDR_OBJ_IS_FRIENDLY     0x004577C0u  /* int32_t(const void *obj) */
+/* The uid of OUR army's leader; 0x00424E80 clears it and three others set it.
+ * The name is ours, from ArmyLeader's one use of it. */
+#define ADDR_OUR_LEADER_UID      0x00511E4Cu  /* uint32_t */
 #define ADDR_EVENT_NOTIFY        0x0041F4A0u  /* see EVENT_RAISE note */
 /* 0x004203A0, fourteen callers. Works out the point an action refers to,
  * which it can express three ways: a pair of VARIABLES, a literal, or -- when

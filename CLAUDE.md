@@ -85,7 +85,7 @@ division is visible, use it.
 
 `src/game/win32/` holds every module that talks to Win32 or DirectX -- **16**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
-API at all, and there are **29**; the split is the answer to "what still talks
+API at all, and there are **30**; the split is the answer to "what still talks
 to the outside world" in directory form.
 
 **The flat half is the one that grows, and this file's count of it went stale
@@ -561,6 +561,25 @@ the log is the list of installs.**
 about to be a second reconstruction of `AllocUid`, which `script.cpp` had
 already patched at the same address -- the `ScriptCompare` mistake exactly.
 `tools/checkpatches.py` failed the build before it could be committed.
+
+**Two `orig.h` names were wrong about what they named, and both came from a
+single call site.** `ADDR_SPRITE_DROP_NAMED` (`0x00457820`) walks every object
+an army owns and CALLS its second argument — `call ebp` — so nothing about it
+is a sprite; the one call site passes `0x0045A030`, which is itself a function
+that hands a unit to the AI, matching the "left, AI takes over" message beside
+it. And `EvtMarkSet`/`EvtMarkClear` write into the 4x4 ALLIANCE matrix:
+`0x00424E80` fills that table with the identity and then allies any two comm
+players on the same team, which is what settles it. Fourth and fifth instances
+of the same failure, and the fix is the same — read the callee.
+
+**A function can be safe for `AM2_SELFCHECK=1` and still not survive it.**
+`LookupOwnerObj` range-checks its army perfectly well and then indexes
+`0x004F9ECC`, which is still NULL that early: the selfcheck runs before
+`install()`, which is before the game has loaded anything. It took the process
+down with 47 functions announced and no summary — the same symptom
+`XorChecksum` produced, for a different reason. The question is not only
+whether a function survives a random argument but whether it survives the
+empty world this runs in.
 
 **And the alias ratchet caught its author.** Naming `0x004267C0`
 `ADDR_PAUSE_GAME` collided with the `ADDR_SET_EVENT_FLAGS` already on it: the

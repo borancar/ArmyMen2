@@ -205,7 +205,7 @@ void __cdecl DeclareRuleVars(void)
 /* LookupByUID and ObjIsTypeIn238 are both reconstructed, so these call them
  * directly rather than through the image. Reaching for an orig_ macro here was
  * caught by tools/checkseams.py, which exists for exactly that. */
-#define g_evtMarks ((int32_t *)(uintptr_t)ADDR_EVT_MARKS)
+#define g_allyMatrix ((int32_t *)(uintptr_t)ADDR_ALLY_MATRIX)
 
 void __cdecl EvtSetField540(uint32_t uid, int32_t value)
 {
@@ -668,14 +668,14 @@ int32_t __cdecl LoadEventBlock(am2_FILE *fp)
     return 1;
 }
 
-void __cdecl EvtMarkSet(int32_t row, int32_t col)
+void __cdecl EvtSetAllied(int32_t a, int32_t b)
 {
-    g_evtMarks[col + row * 4] = 1;
+    g_allyMatrix[b + a * 4] = 1;
 }
 
-void __cdecl EvtMarkClear(int32_t row, int32_t col)
+void __cdecl EvtClearAllied(int32_t a, int32_t b)
 {
-    g_evtMarks[col + row * 4] = 0;
+    g_allyMatrix[b + a * 4] = 0;
 }
 
 /* ----------------------------------------------- script bitmaps ---- */
@@ -2199,9 +2199,9 @@ int event_install(void)
                         "EvtSetWord60", 2);
     rc |= patch_replace(ADDR_EVT_SET_AI_MODE, (const void *)EvtSetAiMode,
                         "EvtSetAiMode", 2);
-    rc |= patch_replace(ADDR_EVT_MARK_SET, (const void *)EvtMarkSet,
-                        "EvtMarkSet", 2);
-    rc |= patch_replace(ADDR_EVT_MARK_CLEAR, (const void *)EvtMarkClear,
-                        "EvtMarkClear", 2);
+    rc |= patch_replace(ADDR_EVT_SET_ALLIED, (const void *)EvtSetAllied,
+                        "EvtSetAllied", 2);
+    rc |= patch_replace(ADDR_EVT_CLEAR_ALLIED, (const void *)EvtClearAllied,
+                        "EvtClearAllied", 2);
     return rc;
 }

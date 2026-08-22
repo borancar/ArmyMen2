@@ -16,6 +16,7 @@
 
 #include "../rect.h"
 #include "../objtable.h"
+#include "../army.h"   /* LookupOwnerObj -- where the ear is */
 #include "audio.h"
 #include "../dist.h"
 #include "../../inject/hooklog.h"
@@ -1096,8 +1097,6 @@ static_assert(DSBVOLUME_MIN == -10000, "DSBVOLUME_MIN");
 
 typedef int32_t (__cdecl *am2_points_equal_fn)(const AM2_Point *a,
                                                const AM2_Point *b);
-typedef void *(__cdecl *am2_lookup_owner_fn)(uint32_t owner);
-#define orig_lookup_owner (*(am2_lookup_owner_fn)ADDR_LOOKUP_OWNER_OBJ)
 /* g_defaultOwner comes from ../objtable.h, which this file already
  * includes. It used to be redefined here as a const uint32_t, which GCC
  * warned about on every build. */
@@ -1141,7 +1140,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
 
     if (where.x != 0) {
         int32_t  dist = ApproxDist(&g_listenerPos, &where);
-        void    *owner = orig_lookup_owner(g_defaultOwner);
+        void    *owner = LookupOwnerObj(g_defaultOwner);
 
         /* An owner that can see gets a say, and only ever a shortening one. */
         if (owner && *(const int16_t *)((uint8_t *)owner + 0x62) > 0) {

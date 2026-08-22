@@ -304,11 +304,15 @@ void __cdecl EvtSetByte40(uint32_t uid, int8_t value);
  * establish on their own. */
 void __cdecl EvtSetByte530(uint32_t uid, int8_t value);
 
-/* 0x0041FF20 and 0x0041FF40, over a table of rows of four dwords at
- * 0x00511E60. The index arithmetic is `(col + row * 4) * 4`, so `row` selects
- * a group of four and `col` an entry in it. */
-void __cdecl EvtMarkSet(int32_t row, int32_t col);
-void __cdecl EvtMarkClear(int32_t row, int32_t col);
+/* 0x0041FF20 and 0x0041FF40: the script's `ally` and its opposite. They write
+ * 1 and 0 into the 4x4 alliance matrix at 0x00511E60, and they went in as
+ * EvtMarkSet/EvtMarkClear "over a table of rows of four dwords" -- named from
+ * the shape because nothing here says what the table is. 0x00424E80 does: it
+ * fills the same table with the IDENTITY and then allies any two comm players
+ * on the same team, and AllyFlag reads it to answer whether two armies are on
+ * the same side. See src/game/army.h. */
+void __cdecl EvtSetAllied(int32_t a, int32_t b);
+void __cdecl EvtClearAllied(int32_t a, int32_t b);
 
 /* 0x0041F750. Clamps to 0x7FFF and stores 16 bits at +0x60. The clamp happens
  * before the lookup, so a value above 32767 is capped even for a uid that
