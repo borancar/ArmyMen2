@@ -432,6 +432,12 @@ void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
 
 /* The game's own fwrite: the FILE was opened by the game's CRT, so it must be
  * the same CRT that writes to it -- the reason crt.h exists. */
+/* Forward-declared rather than including win32/sprite.h: that header names
+ * LPDIRECTDRAWSURFACE and this module is on the flat side. FreeBitmap's own
+ * signature does not, which is what makes the declaration legal here -- the
+ * same reason script.cpp forward-declares PreloadSprite. */
+extern "C" void __cdecl FreeBitmap(void **pp);
+
 #define orig_fwrite (*(am2_fwrite_fn)ADDR_FWRITE)
 
 void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
@@ -1698,7 +1704,6 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 
 typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
 typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
-#define orig_free_bitmap (*(AM2_FreeBitmapFn)AM2_IMAGE(ADDR_FREE_BITMAP))
 #define orig_load_bitmap (*(AM2_LoadBitmapFn)AM2_IMAGE(ADDR_LOAD_BITMAP))
 
 /* 0x0041F600 and 0x0041F650. Put a full-screen bitmap up, pausing or not.
@@ -1729,7 +1734,7 @@ void __cdecl EvtShowBitmap(const char *name)
 
     SendGamePause(1, AM2_EVENT_FLAG_8);
 
-    orig_free_bitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
+    FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
     *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = orig_load_bitmap(name, 0);
 }
 
@@ -1737,7 +1742,7 @@ void __cdecl EvtShowBitmapNoPause(const char *name)
 {
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
 
-    orig_free_bitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
+    FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
     *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = orig_load_bitmap(name, 0);
 }
 

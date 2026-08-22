@@ -163,6 +163,16 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
 
 /* FreeMenuSprites -- original 0x00412F80. Release all 190 menu sprites, the
  * slot past them, and the surface they were drawn from. */
+/* 0x00446410, 14 callers. Release a sprite through a POINTER TO the pointer:
+ * clear it, free the block at +0x3C if there is one, free the sprite, and null
+ * the caller's variable. The pointer is re-read after ClearSprite, which is
+ * what the original does.
+ *
+ * `void **` rather than `AM2_Sprite **` so event.cpp can forward-declare it:
+ * that module is on the flat side of the split and must not name a DirectDraw
+ * type, and this signature does not. */
+void __cdecl FreeBitmap(void **pp);
+
 void __cdecl FreeMenuSprites(void);
 
 /* 0x0045A450. The same for one vehicle kind, and the function that names the

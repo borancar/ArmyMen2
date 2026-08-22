@@ -596,6 +596,16 @@ int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);
  * capacity. The grow is still original. */
 void __attribute__((thiscall)) PtrListPush(void *rec, void *item);
 
+/* 0x0042A750, 33 callers -- the same record's remove. Drop the entry at
+ * `index`, shift what follows down with the CRT's memmove, and hand the
+ * capacity back through 0x0042A710 once twenty entries are spare. An index at
+ * or past the count does nothing.
+ *
+ * MSVC wrote the byte count as `((index << 30) - index + count) << 2`, which
+ * is `(count - index) * 4` because the shifted term leaves the register
+ * entirely. Written as the multiply it is. */
+void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index);
+
 /* 0x00434C80, one caller. Free a pointer unless it is null, and nothing else.
  * The CRT's own free makes the same test, so this exists to save a call rather
  * than to be necessary. */

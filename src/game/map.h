@@ -35,6 +35,15 @@ extern "C" {
 int32_t __cdecl SaveMapSection(am2_FILE *fp);
 int32_t __cdecl LoadMapSection(am2_FILE *fp);
 
+/* 0x0042B290, 45 callers. A packed point to a tile index, sixteen pixels to
+ * the tile, or 0 for anything off the map -- which is also tile 0's answer,
+ * so a caller cannot tell the two apart.
+ *
+ * Both coordinates are tested SIGNED as int16 and then again against the map's
+ * pixel extents, and the failure path clears only AX, so the result is
+ * sixteen bits; every caller stores it as one. */
+int32_t __cdecl TileOfPoint(uint32_t packed);
+
 void map_install(void);
 
 #ifdef __cplusplus

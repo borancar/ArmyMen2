@@ -60,8 +60,25 @@ uint32_t __cdecl Checksum(const char *path)
     return sum;
 }
 
+int32_t __cdecl TileOfPoint(uint32_t packed)
+{
+    int32_t x = (int16_t)(packed & 0xFFFFu);
+    int32_t y = (int16_t)(packed >> 16);
+
+    if (x < 0 || y < 0)
+        return 0;
+    if (x >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)
+        return 0;
+    if (y >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+        return 0;
+    return (y >> AM2_TILE_SHIFT) * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+           + (x >> AM2_TILE_SHIFT);
+}
+
 void map_install(void)
 {
+    patch_replace(ADDR_TILE_OF_POINT, (const void *)TileOfPoint,
+                  "TileOfPoint", 1);
     patch_replace(ADDR_CHECKSUM, (const void *)Checksum, "Checksum", 1);
     patch_replace(ADDR_SAVE_MAP_SECTION, (const void *)SaveMapSection,
                   "SaveMapSection", 1);

@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 616 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 615 | 605 of them below the CRT line |
+| `patch_replace` sites | 620 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 619 | 609 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 106,304 / 372,816 B (**28.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 131,616 / 372,816 B (35.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 106,576 / 372,816 B (**28.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 131,888 / 372,816 B (35.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,26 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The Boot Camp map is 256 x 256 tiles and 4096 x 4096 pixels**, read out of
+  the running game -- `0x00514DD0`/`0x00514DD4` are 4096 and
+  `0x00514DDC`/`0x00514DE0` are 256, which also fixes the tile at 16 pixels
+  and matches `TileOfPoint`'s shift of four exactly.
+
+  **That is why the map-dimension contradiction has survived: the two globals
+  are EQUAL.** CLAUDE.md records `0x00514DDC` as both `ADDR_MAP_TILES_W` and
+  `ADDR_MAP_HEIGHT` and says both pairs cannot be right. `TileOfPoint` uses
+  `0x00514DDC` as its row stride and `ScriptPad` uses `0x00514DE0` as its row
+  stride, which is two pieces of CODE disagreeing rather than two names -- and
+  swapping `TileOfPoint`'s stride to the other global leaves `bootcamp`
+  identical at 22 pixels, because on a square map they are interchangeable.
+
+  To settle it, read both globals on a NON-SQUARE map. The campaign drive is
+  the obvious place and it died twice under the hand-driven sequence; `ab.sh
+  campaign` is the reliable route and would need a dump added to it.
+
+- **`TileOfPoint` runs 24,884 times a mission**, which is the most of anything
+  taken this session apart from the keyboard pair.
 
 - **The trace table had been silently full, and a full table reads exactly
   like a missing patch.** 104 functions could not be wrapped -- everything

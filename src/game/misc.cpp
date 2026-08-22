@@ -1051,6 +1051,28 @@ void __attribute__((thiscall)) PtrListPush(void *rec, void *item)
     r[1] = r[1] + 1;
 }
 
+typedef void (__attribute__((thiscall)) *AM2_PtrListShrinkFn)(void *rec);
+#define orig_ptr_list_shrink \
+    (*(AM2_PtrListShrinkFn)AM2_IMAGE(ADDR_PTR_LIST_SHRINK))
+
+#define AM2_PTR_LIST_SLACK 20
+
+void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
+{
+    int32_t *r = (int32_t *)rec;
+    int32_t  count;
+
+    if (index >= r[1])
+        return;
+    count = r[1] - 1;
+    r[1] = count;
+    if (index < count)
+        memmove((void **)r[2] + index, (void **)r[2] + index + 1,
+                (size_t)(count - index) * 4);
+    if (count + AM2_PTR_LIST_SLACK < r[0])
+        orig_ptr_list_shrink(rec);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1152,6 +1174,8 @@ int misc_install(void)
                   "CommArmyOfSlot", 20);
     patch_replace(ADDR_PTR_LIST_PUSH, (const void *)PtrListPush,
                   "PtrListPush", 2);
+    patch_replace(ADDR_LIST_REMOVE_AT, (const void *)ListRemoveAt,
+                  "ListRemoveAt", 2);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
     patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,
                   "InitPtrList", 1);

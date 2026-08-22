@@ -186,6 +186,14 @@ int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
  * the same object either way, and reproduced as written. */
 int32_t __attribute__((thiscall)) CommDropSession(void *comm);
 
+/* 0x0040F160, 15 callers -- what CommPlayerSlot forwards to. The slot holding
+ * this DirectPlay id, or 0.
+ *
+ * THISCALL by its `ret 4`, and it ignores `this` entirely: it loads the comm
+ * object from the global instead, which is the same shape CommDropSession has.
+ * Not found and slot 0 share an answer, as they do in CommSlotForArmy. */
+int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

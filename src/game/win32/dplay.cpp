@@ -582,7 +582,6 @@ static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 
 typedef int32_t (__attribute__((thiscall)) *am2_slot_of_id_fn)(void *, DPID);
 typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
-#define orig_slot_of_id     (*(am2_slot_of_id_fn)ADDR_COMM_SLOT_OF_ID)
 #define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_POOL)
 #define g_joinContext  (*(int32_t *)(uintptr_t)ADDR_JOIN_CONTEXT)
 
@@ -1121,7 +1120,7 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
         at = 0;
     comm_u32(self, COMM_OFF_RX_INDEX) = at;
 
-    slot = orig_slot_of_id(comm, *from);
+    slot = CommSlotOfId(comm, *from);
 
     /* Type 0x0B is the acknowledgement: it wipes the outstanding count. */
     if (*(uint32_t *)data == COMM_MSG_TYPE_ACK)
@@ -1516,6 +1515,21 @@ int32_t __attribute__((thiscall)) CommDropSession(void *comm)
     return CommDropDirectPlay(comm);
 }
 
+#define COMM_OFF_PLAYER_COUNT 0x3D0u
+
+int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id)
+{
+    const uint8_t *p = g_commObject + AM2_PLAYER_ID;
+    int32_t        n = *(const int32_t *)(g_commObject + COMM_OFF_PLAYER_COUNT);
+    int32_t        i;
+
+    (void)comm;   /* the original ignores `this` and uses the global */
+    for (i = 0; i < n; i++, p += AM2_PLAYER_STRIDE)
+        if (*(const uint32_t *)p == id)
+            return i;
+    return 0;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1566,6 +1580,8 @@ int dplay_install(void)
                         "CommReceive", 5);
     rc |= patch_replace(ADDR_COMM_CREATE_PLAYER, (const void *)CommCreatePlayer,
                         "CommCreatePlayer", 4);
+    rc |= patch_replace(ADDR_COMM_SLOT_OF_ID, (const void *)CommSlotOfId,
+                        "CommSlotOfId", 2);
     rc |= patch_replace(ADDR_COMM_PLAYER_SLOT, (const void *)CommPlayerSlot,
                         "CommPlayerSlot", 2);
     rc |= patch_replace(ADDR_COMM_DROP_SESSION, (const void *)CommDropSession,

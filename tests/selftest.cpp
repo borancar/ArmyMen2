@@ -453,6 +453,19 @@ extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
     return 0;
 }
 
+/* event.cpp's two bitmap triggers reach FreeBitmap, which is in win32/sprite.cpp
+ * with the rest of the sprite code. Same reasoning as PreloadSprite above.
+ *
+ * This one arrived by CLOSING a seam rather than by adding a function:
+ * event.cpp called it through ADDR_FREE_BITMAP until 0x00446410 was
+ * reconstructed, at which point checkseams asked for the direct call and the
+ * direct call asked for the module. A stub is the third option, and the right
+ * one -- moving EvtShowBitmap out of event.cpp to satisfy a linker would be
+ * the tail wagging the dog. */
+extern "C" void __cdecl FreeBitmap(void **)
+{
+}
+
 /* event.cpp's two sound triggers reach PlayDynamicSound, which is in the win32
  * half with the rest of the sound code. Same reasoning as PreloadSprite above:
  * nothing here plays anything, and pulling win32/audio.cpp in would bring

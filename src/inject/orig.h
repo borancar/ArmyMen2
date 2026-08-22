@@ -667,6 +667,24 @@
 /* The map's size in tiles; the camera is clamped to one less than each. */
 #define ADDR_MAP_TILES_W         0x00514DDCu  /* int32_t */
 #define ADDR_MAP_TILES_H         0x00514DE0u  /* int32_t */
+/* The map's extent in PIXELS, which TileOfPoint bounds a point against before
+ * shifting it down by four. ADDR_OBJECTS_IN_RECT's comment already named them
+ * in prose. */
+#define ADDR_MAP_EXTENT_X        0x00514DD0u  /* int32_t */
+#define ADDR_MAP_EXTENT_Y        0x00514DD4u  /* int32_t */
+/* 0x0042B290, 45 callers: a point to a tile index, or 0 for anything off the
+ * map. Sixteen pixels to the tile, and the row stride is ADDR_MAP_TILES_W.
+ *
+ * This SHARPENS the disagreement CLAUDE.md records about that pair rather than
+ * settling it. The two names on 0x00514DDC are ADDR_MAP_TILES_W and
+ * ADDR_MAP_HEIGHT, and the argument for the first used to be a name; it is now
+ * a row stride in code. But ScriptPad divides its index by 0x00514DE0 to
+ * recover x, which makes THAT one a row stride too, and the two grids cannot
+ * both be indexed the way their own code indexes them unless they are
+ * different shapes. Two functions disagreeing is a better lead than two names
+ * disagreeing; neither name is changed on it. */
+#define ADDR_TILE_OF_POINT       0x0042B290u  /* int32_t(AM2_Point) */
+#define AM2_TILE_SHIFT           4
 #define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
 /* The rectangle the view is clipped against before anything is compared --
  * the map's extent on screen. */
@@ -3593,6 +3611,7 @@
  * into [+8] at index [+4]. */
 #define ADDR_PTR_LIST_PUSH         0x0042A6E0u  /* thiscall void(void *, void *) */
 #define ADDR_PTR_LIST_GROW         0x0042A6B0u  /* thiscall void(void *) */
+#define ADDR_PTR_LIST_SHRINK       0x0042A710u  /* thiscall void(void *) */
 #define ADDR_CLEAR_PTR_LIST_ALIAS  0x0042A670u  /* thiscall void(void *) */
 /* 0x00434C80, one caller: free a pointer unless it is null, and nothing else.
  * The CRT's own free does the same test; this one is the game's. */
