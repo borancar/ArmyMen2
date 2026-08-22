@@ -302,6 +302,54 @@ void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip)
     DrawSpriteClipped(spr, x, y, &part, 0);
 }
 
+void __attribute__((thiscall)) BlinkerUpdate(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    uint32_t last;
+    uint32_t elapsed;
+
+    if (!*(const int32_t *)(self + BLINK_OFF_ACTIVE))
+        return;
+
+    last    = *(const uint32_t *)(self + BLINK_OFF_LAST);
+    elapsed = orig_get_tick_count() - last;
+
+    /* Written before the period test, so it is readable on the frames that do
+     * nothing -- a readout rather than a working value. */
+    *(uint32_t *)(self + BLINK_OFF_ELAPSED) = elapsed;
+    if (elapsed < *(const uint32_t *)(self + BLINK_OFF_PERIOD))
+        return;
+
+    *(uint32_t *)(self + BLINK_OFF_LAST) = elapsed + last;
+    *(int32_t *)(self + TOGGLE_OFF_STATE) =
+        (*(const int32_t *)(self + TOGGLE_OFF_STATE) == 0);
+    *(uint32_t *)(self + BLINK_OFF_ELAPSED) = 0;
+
+    if (--*(int32_t *)(self + BLINK_OFF_REMAINING) == 0) {
+        /* A blink always ends in the OFF sprite, whatever the count was. */
+        *(int32_t *)(self + BLINK_OFF_ACTIVE)  = 0;
+        *(int32_t *)(self + TOGGLE_OFF_STATE)  = 0;
+    }
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
+void __attribute__((thiscall)) BlinkerStart(AM2_Widget *w, uint32_t periodMs,
+                                            int32_t flips)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    *(int32_t *)(self + TOGGLE_OFF_STATE)     = 1;
+    *(int32_t *)(self + BLINK_OFF_ACTIVE)     = 1;
+    *(uint32_t *)(self + BLINK_OFF_PERIOD)    = periodMs;
+    *(uint32_t *)(self + BLINK_OFF_LAST)      = orig_get_tick_count();
+    *(int32_t *)(self + BLINK_OFF_REMAINING)  = flips;
+    *(uint32_t *)(self + BLINK_OFF_ELAPSED)   = 0;
+
+    /* Repaint at once, so the first flash does not wait a whole period. */
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
 void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
 {
     uint8_t *self = (uint8_t *)w;
@@ -960,6 +1008,10 @@ int widget_install(void)
                         "FindPressedKey", 1);
     rc |= patch_replace(ADDR_KEYROW_UPDATE, (const void *)KeyRowUpdate,
                         "KeyRowUpdate", 1);
+    rc |= patch_replace(ADDR_BLINKER_UPDATE, (const void *)BlinkerUpdate,
+                        "BlinkerUpdate", 1);
+    rc |= patch_replace(ADDR_BLINKER_START, (const void *)BlinkerStart,
+                        "BlinkerStart", 1);
     rc |= patch_replace(ADDR_MULTI_SPRITE_PAINT,
                         (const void *)MultiSpritePaint,
                         "MultiSpritePaint", 1);

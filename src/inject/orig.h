@@ -106,6 +106,11 @@
 /* 0x00455C80, thiscall, slot 1: picks a sprite out of a small array by an
  * index, centres it in the widget, and draws it clipped. */
 #define ADDR_MULTI_SPRITE_PAINT 0x00455C80u /* void(AM2_Widget *, RECT) */
+/* 0x00456D40 and 0x00456DC0: the two-state indicator is a BLINKER. The first
+ * is its slot 2 -- flip on a timer, count the flashes down, stop. The second
+ * starts one, taking the period and the number of flashes. */
+#define ADDR_BLINKER_UPDATE     0x00456D40u /* void(AM2_Widget *) */
+#define ADDR_BLINKER_START      0x00456DC0u /* void(AM2_Widget *, uint32_t, int32_t) */
 /* 0x00456D00, thiscall, slot 1 of a two-state indicator: one flag chooses
  * between two sprites, then the base painter draws it. */
 #define ADDR_TOGGLE_PAINT       0x00456D00u /* void(AM2_Widget *, RECT) */

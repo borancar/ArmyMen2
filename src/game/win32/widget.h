@@ -453,6 +453,35 @@ void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w);
  * -- is verified by reading. A clean A/B here says less than it looks. */
 void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip);
 
+/* The two-state indicator is a BLINKER, and its update says so: it flips
+ * 0x006C on a timer, counts flashes down, and stops. On the multiplayer dialog
+ * these are the small "send" dots beside the two name fields.
+ *
+ * 0x006C is the same field TogglePaint reads to choose its sprite, so the
+ * blink IS the sprite swap. */
+#define BLINK_OFF_ACTIVE     0x68   /* int32_t, non-zero while flashing */
+#define BLINK_OFF_PERIOD     0x70   /* uint32_t, ms between flips */
+#define BLINK_OFF_REMAINING  0x74   /* int32_t, flips left before it stops */
+#define BLINK_OFF_ELAPSED    0x78   /* uint32_t, scratch: ms since the last flip */
+#define BLINK_OFF_LAST       0x7C   /* uint32_t, GetTickCount at the last flip */
+
+/* Original: 0x00456D40, thiscall, slot 2. Does nothing at all unless 0x0068
+ * is set. Otherwise: measure the time since the last flip into 0x0078, give up
+ * if the period has not passed, then flip 0x006C, zero 0x0078, and count
+ * 0x0074 down. Reaching zero clears BOTH the active flag and the state, so a
+ * blink always ENDS in the off sprite however many flips were asked for.
+ * Finally repaint through slot 1.
+ *
+ * 0x0078 is written before the period test, so it holds the elapsed time even
+ * on the frames that do nothing -- it is a readout, not a working value. */
+void __attribute__((thiscall)) BlinkerUpdate(AM2_Widget *w);
+
+/* Original: 0x00456DC0, thiscall. Start a blink: on, active, remember the
+ * period and the number of flips, stamp the clock, and repaint immediately so
+ * the first flash appears without waiting a period. */
+void __attribute__((thiscall)) BlinkerStart(AM2_Widget *w, uint32_t periodMs,
+                                            int32_t flips);
+
 /* A two-state indicator: one flag and two sprites. The flag being at 0x006C
  * and the sprites at 0x0060 and 0x0064 is measured; calling it a TOGGLE is the
  * obvious reading of "one bit picks one of two pictures" and nothing here

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 448 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 448 | 441 of them below the CRT line |
+| `patch_replace` sites | 450 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 450 | 443 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,768 / 372,816 B (**27.0%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 100,864 / 372,816 B (**27.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,26 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The two-state indicator is a BLINKER, and it is the toggle's other half.**
+  `0x00456D40` flips `0x006C` on a timer, counts flashes down and stops -- and
+  `0x006C` is the same field `TogglePaint` reads to choose its sprite, so the
+  blink IS the sprite swap. A blink always ends in the OFF sprite whatever
+  count it was given, because reaching zero clears the state as well as the
+  active flag. On the multiplayer dialog these are the "send" dots.
+
+  Suppressing the flip is **106 pixels** -- under `multi`'s budget of 500, so
+  the pixels pass it -- and the WIDGET TREE catches it. Second time the oracle
+  has caught something the budget could not.
+
+- **Both drivable dialogs are now nearly all ours.** Crossing the classes each
+  screen instantiates against the patch list leaves, on CONTROLS: two SEH
+  destructors. On the multiplayer dialog: three SEH destructors and
+  `0x0042FF40`. Everything else on both screens is reconstructed.
+
+  So the next real work is elsewhere -- either the SEH destructors, which need
+  a decision about reproducing MSVC exception frames, or screens neither
+  configuration reaches.
 
 - **`ctl widgets` prints the vtable ADDRESS now, and it turned target selection
   into a lookup.** The CONTROLS dialog uses exactly three of the thirty-three
