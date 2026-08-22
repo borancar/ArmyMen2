@@ -7,6 +7,7 @@
 #include "widget.h"
 #include "surface.h"
 #include "../rect.h"
+#include "../misc.h"   /* IsKeyDown, KeyChanged */
 #include "sprite.h"
 #include "frame.h"
 #include "audio.h"
@@ -86,8 +87,6 @@ AM2_Widget *__attribute__((thiscall)) LabelDelete(AM2_Widget *w, int32_t flags)
 typedef int32_t (__cdecl *AM2_KeyQueryFn)(int32_t dik);
 typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
 typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
-#define orig_is_key_down  ((AM2_KeyQueryFn)(uintptr_t)ADDR_IS_KEY_DOWN)
-#define orig_key_changed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_CHANGED)
 #define orig_consume_key  ((AM2_ConsumeKeyFn)(uintptr_t)ADDR_CONSUME_KEY)
 #define orig_key_pressed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_PRESSED_FN)
 
@@ -208,7 +207,7 @@ int32_t __cdecl FindPressedKey(void)
          * mask to 8 bits themselves -- and the original loads it as a byte. */
         int32_t dik = (int32_t)(uint8_t)e->dik;
 
-        if (orig_key_changed(dik) && orig_is_key_down(dik))
+        if (KeyChanged(dik) && IsKeyDown(dik))
             return idx;
     }
     return -1;
@@ -658,7 +657,7 @@ void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip)
 
             if (w->unknown40 && (g_mouseButton[0] || g_mouseChanged[0]))
                 pressed = 1;
-            else if (orig_is_key_down(AM2_DIK_RETURN))
+            else if (IsKeyDown(AM2_DIK_RETURN))
                 pressed = 1;
 
             w->sprite = pressed
@@ -1156,19 +1155,19 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
     /* Either activation key CHANGING repaints the focused child, which is how
      * a button shows itself going down and coming back up. No consume here --
      * the release blocks below want to see the same edge. */
-    if (orig_key_changed(AM2_DIK_SPACE) || orig_key_changed(AM2_DIK_RETURN)) {
+    if (KeyChanged(AM2_DIK_SPACE) || KeyChanged(AM2_DIK_RETURN)) {
         focus = w->focusedChild;
         ((AM2_WidgetPaintFn *)focus->vtable)[WIDGET_VSLOT_PAINT](focus,
                                                                  focus->rect);
     }
 
-    if (!orig_is_key_down(AM2_DIK_SPACE) && orig_key_changed(AM2_DIK_SPACE)) {
+    if (!IsKeyDown(AM2_DIK_SPACE) && KeyChanged(AM2_DIK_SPACE)) {
         orig_consume_key(AM2_DIK_SPACE);
         focus = w->focusedChild;
         if (focus->activate)
             focus->activate(focus);
     }
-    if (!orig_is_key_down(AM2_DIK_RETURN) && orig_key_changed(AM2_DIK_RETURN)) {
+    if (!IsKeyDown(AM2_DIK_RETURN) && KeyChanged(AM2_DIK_RETURN)) {
         orig_consume_key(AM2_DIK_RETURN);
         focus = w->focusedChild;
         if (focus->activate)
@@ -1188,8 +1187,8 @@ void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
         *(AM2_CancelFn *)((uint8_t *)w + WIDGET_OFF_CANCEL);
 
     if (cancel
-        && !orig_is_key_down(AM2_DIK_ESCAPE)
-        && orig_key_changed(AM2_DIK_ESCAPE)) {
+        && !IsKeyDown(AM2_DIK_ESCAPE)
+        && KeyChanged(AM2_DIK_ESCAPE)) {
         orig_consume_key(AM2_DIK_ESCAPE);
         cancel(w);
         return;

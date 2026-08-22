@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 576 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 575 | 565 of them below the CRT line |
+| `patch_replace` sites | 583 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 582 | 572 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 104,928 / 372,816 B (**28.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 130,240 / 372,816 B (34.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 105,152 / 372,816 B (**28.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 130,464 / 372,816 B (35.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,37 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **`orig_` was one spelling of the seam and not the only one.**
+  `frame.cpp` reached the movie step as `call0(ADDR_MOVIE_FRAME_STEP)`, which
+  was fine until `0x00445630` was reconstructed and then went through the
+  detour into our own code -- exactly what `checkseams.py` exists to stop,
+  written differently. It checks `callN(ADDR_X)` at a call site now as well as
+  `#define orig_x ... ADDR_X`, and is tested in the failing direction by
+  putting the call back.
+
+- **And that made `blindspots.py` wrong in the other direction.** It reported
+  `MovieStepCurrent` blind because both its callers are reconstructed, while
+  the counter read **746,792** -- because those callers were reaching it by
+  ADDRESS. Closing the seam took the counter to 0 with no behaviour change at
+  all: `MoviePoll` still reads 712,509 on the same run. A counter falling to
+  zero for that reason is the blind spot happening on purpose, and it is worth
+  having seen it once.
+
+- **`IsKeyDown` and `KeyChanged` are the two most-called reconstructions in
+  the tree**: 2,669,477 and 2,667,117 in one Boot Camp mission. Both mask the
+  scancode themselves and read through `ADDR_KEYS_NOW_PTR`, because
+  `PollKeyboard` swaps the two buffers each poll. `IsKeyDown` returns 0x80
+  rather than 1 -- an `and eax, 0x80` with no normalisation -- so every caller
+  is testing it against zero.
+
+  Neither can go in `AM2_SELFCHECK=1`, and for the reason `LookupOwnerObj`
+  taught last commit: the buffer pointers are NULL before `install()` runs.
+
+- **`Cos8` and `Sin8` return a FLOAT**, in st(0), which puts them outside both
+  differential harnesses -- the vectors and the selfcheck each compare eax.
+  What checks them is one layer down: they are the only readers of the two
+  forward trig tables, and `tools/trigdump.py` compares those byte for byte.
 
 - **The nine smallest functions left were worth more than their bytes.** 192
   bytes across five modules, and eight of the nine already had a name in

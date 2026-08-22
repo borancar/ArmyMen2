@@ -45,6 +45,7 @@
 #include "mapdraw.h"
 #include "../rect.h"
 #include "../msgslot.h"  /* CommEndSetup, shared with both ready handlers */
+#include "../gameproc.h" /* GameOverState indexes the dispatch table */
 #include "../army.h"     /* ForEachArmyObject, and the callback is not a sprite */
 
 #include <stdint.h>
@@ -119,7 +120,6 @@ typedef int32_t (__cdecl *am2_int_fn)(void);
 typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 
 #define orig_on_app_activated  (*(am2_void_fn)ADDR_ON_APP_ACTIVATED)
-#define orig_current_state     (*(am2_int_fn)ADDR_CURRENT_STATE)
 #define orig_state_leave       (*(am2_void_fn)ADDR_STATE_LEAVE)
 #define orig_request_state       (*(am2_int_arg_fn)ADDR_REQUEST_STATE)
 
@@ -451,7 +451,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case AM2_WM_STATE_ADVANCE:
     case AM2_WM_STATE_ABORT:
         if (g_gameState == 0)
-            g_stateDispatch[orig_current_state()].fn();
+            g_stateDispatch[GameOverState()].fn();
         else {
             orig_state_leave();
             orig_request_state(g_stateArg);

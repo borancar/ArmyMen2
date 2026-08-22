@@ -547,6 +547,21 @@ int32_t __cdecl GetMenuRow(void);
 void __attribute__((thiscall)) InitPtrList(void *rec);
 void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 
+/* 0x00427450 and 0x00427470, 33 and 21 callers -- the two keyboard predicates
+ * everything in the game tests a key with. Both mask the scancode to 8 bits
+ * themselves, so a caller never has to.
+ *
+ * IsKeyDown answers the top bit of the CURRENT buffer, and returns 0x80 rather
+ * than 1 -- an `and eax, 0x80` with no normalisation, so callers must be
+ * testing it against zero. KeyChanged xors the two buffers and shifts the top
+ * bit down, so it answers 0 or 1.
+ *
+ * Which buffer is current alternates: PollKeyboard SWAPS the two pointers each
+ * poll, which is why these read through ADDR_KEYS_NOW_PTR rather than a fixed
+ * array. */
+int32_t __cdecl IsKeyDown(int32_t dik);
+int32_t __cdecl KeyChanged(int32_t dik);
+
 int misc_install(void);
 
 #ifdef __cplusplus

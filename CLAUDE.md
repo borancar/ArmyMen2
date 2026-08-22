@@ -534,6 +534,20 @@ that is not for want of coverage: `from` arrives as 0, 9, 10, 60 and 100 over
 for everything Boot Camp remaps. Covered, and still not discriminating; the
 guard stays verified by reading.
 
+**`orig_` is one spelling of the seam and not the only one.** `frame.cpp`
+reached the movie step as `call0(ADDR_MOVIE_FRAME_STEP)` — fine until
+`0x00445630` was reconstructed, at which point the call went through the detour
+into our own code. `tools/checkseams.py` checks `callN(ADDR_X)` at a call site
+now as well as `#define orig_x ... ADDR_X`, and is tested by putting the call
+back.
+
+That seam also made `tools/blindspots.py` wrong in the other direction: it
+reported `MovieStepCurrent` blind because both callers are reconstructed, while
+the counter read 746,792 — because those callers reached it by ADDRESS. Closing
+the seam took the counter to 0 with no behaviour change; `MoviePoll` still
+reads 712,509 on the same run. **"All callers reconstructed" only implies blind
+if they call by NAME.**
+
 **Four reconstructions had never been installed, and every tool said they
 were done.** `dist_install` opened with
 `return patch_replace(ADDR_APPROX_DIST, ...)` and had three more calls under

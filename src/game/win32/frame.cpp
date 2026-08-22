@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "movie.h"   /* MovieStepCurrent, states 0 and 3 */
 #include "frame.h"
 #include "device.h"
 #include "mapdraw.h"
@@ -123,7 +124,7 @@ void __cdecl State0Frame(void)
         *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK = GetTickCount();
     }
 
-    call0(ADDR_MOVIE_FRAME_STEP);
+    MovieStepCurrent();
     call0(ADDR_STATE_FRAME_COMMON);
 }
 
@@ -273,7 +274,7 @@ void __cdecl State3Frame(void)
         return;
     }
 
-    call0(ADDR_MOVIE_FRAME_STEP);
+    MovieStepCurrent();
     call0(ADDR_STATE_FRAME_COMMON);
 }
 

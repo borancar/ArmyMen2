@@ -40,6 +40,7 @@
  */
 
 #include "winmain.h"
+#include "../gameproc.h"  /* SetGameOver */
 #include "../air.h"    /* FreeSpriteList -- what the alias jumps to */
 /* Compiled for the check, not called: see the header. The retail copy
  * protection is recorded there because this binary has it patched out. */
@@ -119,7 +120,6 @@ typedef void (__cdecl *am2_i32_fn)(int32_t);
 #define orig_sprite_set_load  (*(am2_str_fn)ADDR_SPRITE_SET_LOAD)
 #define orig_sprite_set_free  (*(am2_ptr_fn)ADDR_SPRITE_SET_FREE)
 #define orig_request_state    (*(am2_i32_fn)ADDR_REQUEST_STATE)
-#define orig_set_game_over    (*(am2_i32_fn)ADDR_SET_GAME_OVER)
 #define orig_strncpy          (*(char *(__cdecl *)(char *, const char *, \
                                                    uint32_t))ADDR_CRT_STRNCPY)
 
@@ -323,7 +323,7 @@ void __cdecl StartIntro(void)
     }
 
     orig_request_state(0);
-    orig_set_game_over(0);
+    SetGameOver(0);
 }
 
 /* 0x0040B000. One frame.

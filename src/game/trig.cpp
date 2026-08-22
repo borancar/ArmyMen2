@@ -96,8 +96,26 @@ void __cdecl BuildTrigTables(void)
     }
 }
 
+#define g_trigCos ((const float *)(uintptr_t)ADDR_TRIG_COS)
+#define g_trigSin ((const float *)(uintptr_t)ADDR_TRIG_SIN)
+
+float __cdecl Cos8(int32_t heading)
+{
+    return g_trigCos[heading & 0xFF];
+}
+
+float __cdecl Sin8(int32_t heading)
+{
+    return g_trigSin[heading & 0xFF];
+}
+
 int trig_install(void)
 {
-    return patch_replace(ADDR_BUILD_TRIG_TABLES, (const void *)BuildTrigTables,
-                         "BuildTrigTables", 1);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_COS8, (const void *)Cos8, "Cos8", 1);
+    rc |= patch_replace(ADDR_SIN8, (const void *)Sin8, "Sin8", 1);
+    rc |= patch_replace(ADDR_BUILD_TRIG_TABLES, (const void *)BuildTrigTables,
+                        "BuildTrigTables", 1);
+    return rc;
 }

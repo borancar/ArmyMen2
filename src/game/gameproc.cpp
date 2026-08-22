@@ -154,6 +154,37 @@ int32_t __cdecl DefGameParse(int32_t cmd, char *line)
     return 0;
 }
 
+#define g_endState       (*(int32_t *)(uintptr_t)ADDR_GAME_OVER_STATE)
+#define g_gameOverSaved  ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SAVED)
+#define g_gameOverSource ((const int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)
+
+typedef void (__cdecl *AM2_StateLeaveFn)(void);
+#define orig_state_leave (*(AM2_StateLeaveFn)AM2_IMAGE(ADDR_STATE_LEAVE))
+
+void __cdecl SetGameOver(int32_t state)
+{
+    /* All three read before any is written, which is what the original's three
+     * loads then three stores do; nothing here can alias, but reproduce it. */
+    int32_t a = g_gameOverSource[0];
+    int32_t b = g_gameOverSource[1];
+    int32_t c = g_gameOverSource[2];
+
+    g_gameOverSaved[0] = a;
+    g_gameOverSaved[1] = b;
+    g_gameOverSaved[2] = c;
+    g_endState = state;
+}
+
+int32_t __cdecl GameOverState(void)
+{
+    return g_endState;
+}
+
+void __cdecl StateLeaveAlias(void)
+{
+    orig_state_leave();
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
@@ -163,4 +194,10 @@ void gameproc_install(void)
                   "SaveGameProcSection", 1);
     patch_replace(ADDR_LOAD_GAMEPROC, (const void *)LoadGameProcSection,
                   "LoadGameProcSection", 1);
+    patch_replace(ADDR_SET_GAME_OVER, (const void *)SetGameOver,
+                  "SetGameOver", 1);
+    patch_replace(ADDR_CURRENT_STATE, (const void *)GameOverState,
+                  "GameOverState", 0);
+    patch_replace(ADDR_STATE_LEAVE_ALIAS, (const void *)StateLeaveAlias,
+                  "StateLeaveAlias", 0);
 }

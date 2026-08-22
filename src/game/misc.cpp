@@ -950,6 +950,25 @@ void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
     orig_clear_ptr_list(rec);
 }
 
+/* The same spelling device.cpp uses -- PollKeyboard owns these and swaps them
+ * each poll, and two names on one address is what checkglobals exists to
+ * stop. */
+#define g_curKeys  (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)
+#define g_prevKeys (*(uint8_t **)(uintptr_t)ADDR_KEYS_PREV_PTR)
+
+int32_t __cdecl IsKeyDown(int32_t dik)
+{
+    /* 0x80, not 1: the original masks and returns, and never normalises. */
+    return g_curKeys[(uint32_t)dik & 0xFFu] & 0x80;
+}
+
+int32_t __cdecl KeyChanged(int32_t dik)
+{
+    uint32_t k = (uint32_t)dik & 0xFFu;
+
+    return (int32_t)((uint32_t)(g_prevKeys[k] ^ g_curKeys[k]) >> 7);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1035,6 +1054,8 @@ int misc_install(void)
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     patch_replace(ADDR_GET_MENU_ROW, (const void *)GetMenuRow, "GetMenuRow", 0);
+    patch_replace(ADDR_IS_KEY_DOWN, (const void *)IsKeyDown, "IsKeyDown", 1);
+    patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
     patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,
                   "InitPtrList", 1);
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,

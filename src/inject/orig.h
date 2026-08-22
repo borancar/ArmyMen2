@@ -1208,6 +1208,19 @@
 #define ADDR_GAME_STATE_ARG      0x00511DB4u  /* int32_t */
 #define ADDR_STATE_DISPATCH      0x00486550u  /* 12-byte records; +0 is a function */
 #define ADDR_ON_APP_ACTIVATED    0x004269B0u  /* void(void) */
+/* Three of the four functions in the 96-byte run around ADDR_GAME_OVER_STATE
+ * were already named -- ADDR_CLEAR_GAME_OVER at 0x0042E580, reconstructed as
+ * ClearGameOver in winmain.cpp, and ADDR_SET_GAME_OVER at 0x0042E5A0. So the
+ * getter here is GameOverState and not, as it nearly went in, CurrentEndState.
+ *
+ * The one thing not settled is what the index MEANS: winproc.cpp uses this
+ * answer to select an entry of ADDR_STATE_DISPATCH, while the family calls it
+ * game over. An end-of-mission outcome that picks an end screen would be both;
+ * nothing here decides it, and the names describe the record rather than what
+ * it is for. */
+#define ADDR_STATE_LEAVE_ALIAS   0x0042E590u  /* void(void), one jmp */
+#define ADDR_GAME_OVER_SAVED     0x00515F8Cu  /* int32_t[3], beside the state */
+#define ADDR_GAME_OVER_SOURCE    0x00511E14u  /* int32_t[3], where they come from */
 #define ADDR_CURRENT_STATE       0x0042E5D0u  /* int32_t(void), indexes the above */
 #define ADDR_STATE_LEAVE         0x0042E720u  /* void(void) */
 /* The game is a five-state machine driven by RunFrame, and changing state is
@@ -3093,6 +3106,11 @@
 /* The trig tables and the constants that build them. The store index runs one
  * ahead of the loop counter in the original, so the cos table really starts at
  * 0x00515784 and not at the 0x00515780 the first fstp encodes. */
+/* 0x0042DD70 and 0x0042DDC0, 17 callers each: one masked index into the table
+ * below and an `fld`, so they return a FLOAT in st(0). The names are ours; the
+ * tables were named long before, by trig.cpp, which builds them. */
+#define ADDR_COS8                0x0042DD70u  /* float(int32_t heading) */
+#define ADDR_SIN8                0x0042DDC0u  /* float(int32_t heading) */
 #define ADDR_TRIG_COS            0x00515784u  /* float[256] */
 #define ADDR_TRIG_SIN            0x00514F80u  /* float[256], scaled by -0.85 */
 /* These two are the CENTRES, not the starts: the original indexes them with a

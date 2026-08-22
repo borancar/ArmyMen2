@@ -26,6 +26,18 @@ extern "C" {
 
 void __cdecl BuildTrigTables(void);
 
+/* 0x0042DD70 and 0x0042DDC0, 17 callers each and four instructions apiece: an
+ * 8-bit heading masked to 0..255, one `fld` from the table this file builds,
+ * and a `ret`. They return a FLOAT, in st(0) -- which is why neither can go in
+ * the vector harness or AM2_SELFCHECK, both of which compare eax.
+ *
+ * What DOES check them is tools/trigdump.py, one layer down: these two are the
+ * only readers of the two forward tables, and the tables are compared byte for
+ * byte against the original. A wrong index here would still be a wrong index
+ * into a table known to be right. */
+float __cdecl Cos8(int32_t heading);
+float __cdecl Sin8(int32_t heading);
+
 int trig_install(void);
 
 #ifdef __cplusplus

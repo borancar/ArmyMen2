@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find `orig_` macros that point at an address we have already reconstructed.
+"""Find calls into our own code that go through the image.
 
 An `orig_` name means "this stays in the original image". When the address it
 resolves to is in the patch list, the call goes through the detour and lands in
@@ -15,6 +15,19 @@ in three modules; the pause pair in dplay.cpp; CreateOffscreenSurface and
 ClearSurface in device.cpp. Each time the comment beside it had gone stale too,
 which is the real cost: `orig_create_offscreen` sat under "on the list to
 reconstruct next" for however long after it was done.
+
+`orig_` is one spelling of that mistake and not the only one. frame.cpp reaches
+a dozen still-original functions as `call0(ADDR_X)`, which is fine until X is
+reconstructed -- and `call0(ADDR_MOVIE_FRAME_STEP)` sat there for exactly as
+long as it took to reconstruct 0x00445630. It works, because the address is
+patched and the call lands in our code; what it costs is the same thing the
+orig_ case costs. It also makes tools/blindspots.py wrong in the other
+direction: it reported MovieStepCurrent blind because both callers are
+reconstructed, while the counter read 746,792, because those callers were
+reaching it by address.
+
+So both spellings are checked: a `#define orig_x ... ADDR_Y`, and a
+`callN(ADDR_Y)` written out at a call site.
 
 Deliberate ones are listed in ALLOWED, with the reason.
 """
@@ -58,24 +71,32 @@ def main():
     bad = []
     for f in sorted(glob.glob(os.path.join(ROOT, "src/**/*.c*"), recursive=True)
                     + glob.glob(os.path.join(ROOT, "src/**/*.h"), recursive=True)):
-        for line in open(f):
+        rel = os.path.relpath(f, ROOT)
+        for n, line in enumerate(open(f), 1):
             m = re.match(r"\s*#define\s+(orig_\w+)\s+.*?(ADDR_[A-Z0-9_]+)", line)
-            if not m:
+            if m:
+                name, sym = m.group(1), m.group(2)
+                if name not in ALLOWED and sym in addr and addr[sym] in patched:
+                    bad.append((rel, name, sym, addr[sym]))
                 continue
-            name, sym = m.group(1), m.group(2)
-            if name in ALLOWED or sym not in addr:
+            # The other spelling: a call site that names the address itself.
+            # Only in a call, not in a patch_replace or a #define of the macro.
+            if "patch_replace" in line or line.lstrip().startswith("#define"):
                 continue
-            if addr[sym] in patched:
-                bad.append((os.path.relpath(f, ROOT), name, sym, addr[sym]))
+            for m in re.finditer(r"\bcall\d\(\s*(ADDR_[A-Z0-9_]+)", line):
+                sym = m.group(1)
+                if sym in addr and addr[sym] in patched:
+                    bad.append(("%s:%d" % (rel, n), "call site", sym,
+                                addr[sym]))
 
     for f, name, sym, a in bad:
         print("  %s: %s -> %s (0x%08X) is reconstructed; call it directly"
               % (f, name, sym, a))
     if bad:
-        print("  %d orig_ macro(s) name our own code. Add to ALLOWED only with"
-              " a reason." % len(bad))
+        print("  %d site(s) reach our own code through the image. Add to"
+              " ALLOWED only with a reason." % len(bad))
         return 1
-    print("no orig_ macro points at a reconstructed address")
+    print("nothing reaches a reconstructed address through the image")
     return 0
 
 

@@ -37,6 +37,26 @@ extern "C" {
 int32_t __cdecl SaveGameProcSection(am2_FILE *fp);
 int32_t __cdecl LoadGameProcSection(am2_FILE *fp);
 
+/* Three more of the 96-byte run around ADDR_GAME_OVER_STATE. The fourth,
+ * 0x0042E580, is ClearGameOver and has been in winmain.cpp since the WinMain
+ * chain went in -- which is what named these: they nearly went in as
+ * SetEndState and CurrentEndState until the address was grepped.
+ *
+ * SetGameOver copies three dwords from 0x00511E14 in beside the state before
+ * storing it, so the record is four wide: an index and three numbers that were
+ * true when it was set.
+ *
+ * What the index MEANS is not settled. winproc.cpp uses GameOverState's answer
+ * to select an entry of ADDR_STATE_DISPATCH, while the rest of the family
+ * calls it game over; an end-of-mission outcome that picks an end screen would
+ * be both. The names describe the record, not what it is for.
+ *
+ * StateLeaveAlias is one `jmp` to 0x0042E720 and lives among them by accident
+ * of layout; it is the third function of that shape in the tree. */
+void __cdecl SetGameOver(int32_t state);
+int32_t __cdecl GameOverState(void);
+void __cdecl StateLeaveAlias(void);
+
 void gameproc_install(void);
 
 #ifdef __cplusplus
