@@ -1217,6 +1217,13 @@ meant a cursor into a buffer, which sitting next to `ADDR_CURSOR_X` is a trap.
 They are `ADDR_KEYS_NOW_PTR` and `ADDR_KEYS_PREV_PTR`. Renamed, not aliased:
 the count in `checkpatches.py` stayed at 39.
 
+**Anything gated on `g_mouseMoved` needs `mouse move`, and `cursor` will
+silently skip it.** The widget layer's hover paths all test that global before
+they look at the pointer, so poking the cursor across three list rows with
+`cursor` moved `BlinkerStart` not at all, while eight relative movements over
+the same rows took it from 2 to 10. The counter reading 0 looked exactly like
+"this code never runs" and meant "this input never arrived".
+
 **`mouse move DX DY` is still the honest way in when the input path is what is
 under test.** `cursor` writes the globals and reads nothing from the device, so
 it exercises neither `PollMouse` nor `UpdateMouseState`. `ab.sh mission` scrolls

@@ -167,6 +167,20 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`BlinkerStart` runs, and finding out how confirmed the unwritten function's
+  reading.** It had read 0 on every run and was verified by reading only.
+  Driving the DIFFICULTY dialog and moving the pointer across the list rows
+  takes it 0 -> 2 -> **10**: two from clicking a row, eight more from moving
+  over them. So the analysis of `0x00455340` below is right about the part
+  that matters -- a change of hovered row starts a blink -- established by its
+  effect rather than by more reading.
+
+  **It needs `mouse move`, not `cursor`.** `cursor` writes the position
+  globals and nothing else, so `g_mouseMoved` stays clear and every
+  hover-gated path is skipped; the first attempt poked the cursor across all
+  three rows and moved the counter not at all. Anything gated on movement has
+  to go through the relative path.
+
 - **`0x00455340`, the list box's update, is READ but not written -- 2 KB and
   branchy, and the reading is the hard part.** What it establishes:
 
