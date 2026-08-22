@@ -1,6 +1,7 @@
 /* misc.cpp -- see misc.h. */
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "misc.h"
 #include "crt.h"
@@ -987,6 +988,19 @@ void __cdecl Announce(const char *text)
     orig_chat_append(text, 1);
 }
 
+#define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)
+
+int32_t __cdecl KeyPressed(int32_t dik)
+{
+    return g_keyPressed[(uint32_t)dik & 0xFFu];
+}
+
+void __cdecl LatchKeyState(void)
+{
+    /* 0x40 dwords in the original, which is the whole 256-byte buffer. */
+    memcpy(g_prevKeys, g_curKeys, 256);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1076,6 +1090,9 @@ int misc_install(void)
     patch_replace(ADDR_FREE_IF_NOT_NULL, (const void *)FreeIfNotNull,
                   "FreeIfNotNull", 1);
     patch_replace(ADDR_IS_KEY_DOWN, (const void *)IsKeyDown, "IsKeyDown", 1);
+    patch_replace(ADDR_KEY_PRESSED_FN, (const void *)KeyPressed, "KeyPressed", 1);
+    patch_replace(ADDR_LATCH_KEY_STATE, (const void *)LatchKeyState,
+                  "LatchKeyState", 0);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
     patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,
                   "InitPtrList", 1);

@@ -64,6 +64,13 @@ int32_t __cdecl BuildFont(int32_t font);
 /* 0x00446830, four callers. A cdecl wrapper for BuildFont and nothing else. */
 int32_t __cdecl BuildFontAlias(int32_t fontIndex);
 
+/* 0x00446840 and 0x00446880. Give one font's glyph bytes back and clear both
+ * its table entries, and do that for all three. The second is entry 7 of
+ * ShutdownSubsystems' ordered teardown -- another of those that is no longer a
+ * guess. Neither touches the offsets table, only the size and the base. */
+void __cdecl FreeFont(int32_t fontIndex);
+void __cdecl FreeAllFonts(void);
+
 int font_install(void);
 
 #ifdef __cplusplus

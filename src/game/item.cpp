@@ -408,6 +408,11 @@ int32_t __cdecl ObjTileAttr(const void *obj)
     return *(const int8_t *)(g_tileAttrs + tile);
 }
 
+int32_t __cdecl TileAttrAt(uint32_t tile)
+{
+    return *(const int8_t *)(g_tileAttrs + (tile & 0xFFFFu));
+}
+
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 {
     orig_item_pre_destroy(obj, arg);
@@ -441,6 +446,7 @@ void item_install(void)
     patch_replace(ADDR_LOAD_ITEMS, (const void *)LoadItems, "LoadItems", 1);
     patch_replace(ADDR_OBJ_TILE_ATTR, (const void *)ObjTileAttr,
                   "ObjTileAttr", 1);
+    patch_replace(ADDR_TILE_ATTR_AT, (const void *)TileAttrAt, "TileAttrAt", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
 }

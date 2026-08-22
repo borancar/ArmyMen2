@@ -102,6 +102,11 @@ int32_t __cdecl LoadItems(am2_FILE *fp);
  * either. */
 int32_t __cdecl ObjTileAttr(const void *obj);
 
+/* 0x00429540, three callers. The same byte taken by tile INDEX rather than by
+ * object -- masked to 16 bits here where its neighbour reads a word, which is
+ * the same value arrived at differently. */
+int32_t __cdecl TileAttrAt(uint32_t tile);
+
 /* 0x00429CE0, seven callers. A plain cdecl forwarder for 0x0042A0A0, which is
  * still original -- both arguments go straight through. */
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);

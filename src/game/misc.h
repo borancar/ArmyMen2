@@ -562,6 +562,19 @@ void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 int32_t __cdecl IsKeyDown(int32_t dik);
 int32_t __cdecl KeyChanged(int32_t dik);
 
+/* 0x00427430 and 0x004274D0, the other two of the keyboard four.
+ *
+ * KeyPressed reads the edge-and-auto-repeat array at 0x00512BD0 rather than
+ * either poll buffer, which is what most of the game actually tests.
+ *
+ * LatchKeyState copies the whole 256-byte current buffer over the previous
+ * one, so every edge test that follows sees no change -- called where the game
+ * wants the keystroke that got it here not to be seen again. Note it COPIES
+ * where PollKeyboard SWAPS; the two are different operations on the same
+ * pair. */
+int32_t __cdecl KeyPressed(int32_t dik);
+void __cdecl LatchKeyState(void);
+
 /* 0x00434C80, one caller. Free a pointer unless it is null, and nothing else.
  * The CRT's own free makes the same test, so this exists to save a call rather
  * than to be necessary. */

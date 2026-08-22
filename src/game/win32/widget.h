@@ -873,6 +873,12 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
  * 0x00453910 the SESSION constructor and 0x00453930 the list box's ROW ARRAY
  * cleanup, both names taken from callers. One shape, two callers, two words.
  * Named here for what they do to the record. */
+/* 0x00450BF0, two callers. The INDEX of the CONTROLS dialog's key record whose
+ * scancode has this low byte, or -1. Only the low byte is compared, which is
+ * all a DirectInput scancode is; the records are 8 bytes and the table's end
+ * is a literal address in the original, not a count. */
+int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
+
 void __attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
 void __attribute__((thiscall)) RecordResetAlias(void *rec);
 

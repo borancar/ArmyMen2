@@ -177,6 +177,15 @@ void __attribute__((thiscall)) CommSessionOver(void *comm);
  * the object in ecx. A pass-through under a second name. */
 int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
 
+/* 0x0040F140, three callers -- CommMarkLobbied's counterpart. Clear the same
+ * field and tail-jump to CommDropDirectPlay.
+ *
+ * THISCALL, which is not obvious from a body that names no `this`: all three
+ * call sites load ecx with the comm object first, and the tail jump hands it
+ * on. The store still goes through the GLOBAL rather than through `this` --
+ * the same object either way, and reproduced as written. */
+int32_t __attribute__((thiscall)) CommDropSession(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

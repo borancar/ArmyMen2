@@ -88,7 +88,6 @@ typedef int32_t (__cdecl *AM2_KeyQueryFn)(int32_t dik);
 typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
 typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 #define orig_consume_key  ((AM2_ConsumeKeyFn)(uintptr_t)ADDR_CONSUME_KEY)
-#define orig_key_pressed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_PRESSED_FN)
 
 /* DirectInput scancodes, which is what every query here is indexed by. */
 #define AM2_DIK_TAB    0x0F
@@ -1130,17 +1129,17 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
 
     /* KeyPressed rather than IsKeyDown: that array auto-repeats, so holding a
      * movement key keeps moving. */
-    if (orig_key_pressed(AM2_DIK_UP)) {
+    if (KeyPressed(AM2_DIK_UP)) {
         if (w->focusedChild)
             WidgetFocusPrev(w->focusedChild, 1);
         orig_consume_key(AM2_DIK_UP);
     }
-    if (orig_key_pressed(AM2_DIK_DOWN)) {
+    if (KeyPressed(AM2_DIK_DOWN)) {
         if (w->focusedChild)
             WidgetFocusNext(w->focusedChild, 1);
         orig_consume_key(AM2_DIK_DOWN);
     }
-    if (orig_key_pressed(AM2_DIK_TAB)) {
+    if (KeyPressed(AM2_DIK_TAB)) {
         if (w->focusedChild)
             WidgetFocusNext(w->focusedChild, 1);
         orig_consume_key(AM2_DIK_TAB);
@@ -1193,7 +1192,6 @@ void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
 /* 0x004274D0. Still original: it is two globals and a rep movsd, and the
  * buffers are the input layer's rather than this module's. */
 typedef void (__cdecl *AM2_LatchKeysFn)(void);
-#define orig_latch_key_state ((AM2_LatchKeysFn)(uintptr_t)ADDR_LATCH_KEY_STATE)
 
 void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce)
 {
@@ -1217,7 +1215,7 @@ void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce)
     w->flag44 = 1;
 
     PollInput();
-    orig_latch_key_state();
+    LatchKeyState();
 
     if (announce) {
         PlaySoundAt(1, 0, 0, 0, 0);
@@ -1387,6 +1385,18 @@ void __attribute__((thiscall)) RecordResetAlias(void *rec)
     orig_record_reset(rec);
 }
 
+int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
+{
+    const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_KEY_NAME_TABLE;
+    int32_t        i   = 0;
+
+    for (; rec < (const uint8_t *)(uintptr_t)ADDR_KEY_NAME_TABLE_END;
+         rec += 8, i++)
+        if (*rec == scancode)
+            return i;
+    return -1;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1464,6 +1474,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
                         (const void *)FocusLabelTakeFocus,
                         "FocusLabelTakeFocus", 1);
+    rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
+                        "KeyNameIndexOf", 1);
     rc |= patch_replace(ADDR_SESSION_CTOR, (const void *)RecordCtor,
                         "RecordCtor", 2);
     rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, (const void *)RecordResetAlias,

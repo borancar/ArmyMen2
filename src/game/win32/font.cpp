@@ -14,6 +14,7 @@
  * than that is emitted as several pairs with zero-length partners between them.
  */
 
+#include "../crt.h"
 #include "font.h"
 #include "../../inject/patch.h"
 #include "surface.h"
@@ -294,6 +295,26 @@ int32_t __cdecl BuildFontAlias(int32_t fontIndex)
     return BuildFont(fontIndex);
 }
 
+void __cdecl FreeFont(int32_t fontIndex)
+{
+    uint32_t off = (uint32_t)fontIndex * ADDR_FONT_STRIDE;
+    uint8_t **base = (uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
+
+    if (!*base)
+        return;
+    am2_free(*base);
+    *base = 0;
+    *(uint32_t *)((uintptr_t)ADDR_GLYPH_SIZE + off) = 0;
+}
+
+void __cdecl FreeAllFonts(void)
+{
+    int32_t i;
+
+    for (i = 0; i < AM2_FONT_COUNT; i++)
+        FreeFont(i);
+}
+
 int font_install(void)
 {
     int rc = 0;
@@ -303,6 +324,9 @@ int font_install(void)
     rc |= patch_replace(ADDR_CREATE_GAME_FONT, (const void *)CreateGameFont,
                         "CreateGameFont", 3);
     rc |= patch_replace(ADDR_BUILD_FONT, (const void *)BuildFont, "BuildFont", 1);
+    rc |= patch_replace(ADDR_FREE_FONT, (const void *)FreeFont, "FreeFont", 1);
+    rc |= patch_replace(ADDR_FREE_ALL_FONTS, (const void *)FreeAllFonts,
+                        "FreeAllFonts", 0);
     rc |= patch_replace(ADDR_BUILD_FONT_ALIAS, (const void *)BuildFontAlias,
                         "BuildFontAlias", 1);
     return rc;

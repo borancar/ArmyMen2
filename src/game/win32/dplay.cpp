@@ -1510,6 +1510,12 @@ int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id)
     return orig_comm_slot_of_id(comm, id);
 }
 
+int32_t __attribute__((thiscall)) CommDropSession(void *comm)
+{
+    *(int32_t *)(g_commObject + COMM_OFF_MSGS_ENABLED) = 0;
+    return CommDropDirectPlay(comm);
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1562,6 +1568,8 @@ int dplay_install(void)
                         "CommCreatePlayer", 4);
     rc |= patch_replace(ADDR_COMM_PLAYER_SLOT, (const void *)CommPlayerSlot,
                         "CommPlayerSlot", 2);
+    rc |= patch_replace(ADDR_COMM_DROP_SESSION, (const void *)CommDropSession,
+                        "CommDropSession", 1);
     rc |= patch_replace(ADDR_COMM_MARK_LOBBIED, (const void *)CommMarkLobbied,
                         "CommMarkLobbied", 0);
     rc |= patch_replace(ADDR_COMM_SESSION_OVER, (const void *)CommSessionOver,

@@ -3,6 +3,7 @@
 
 #include "army.h"
 #include "objtable.h"
+#include "objtype.h"   /* ObjType2Field548 */
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -162,10 +163,42 @@ void __cdecl SetMaxHealth(void *obj, int32_t amount)
     *max = (int16_t)(scaled > floor ? scaled : floor);
 }
 
+typedef void (__cdecl *AM2_Type238ActionFn)(void *obj, int32_t arg);
+#define orig_type238_action \
+    (*(AM2_Type238ActionFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
+
+void __cdecl SetLeadsAndAct(void *obj)
+{
+    *(int32_t *)((uint8_t *)obj + OBJ_OFF_LEADS) = 1;
+    orig_type238_action(obj, AM2_LEADS_ACTION_ARG);
+}
+
+void *__cdecl ListFirstObj(const void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (!obj)
+        return 0;
+    if (*(const int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) < 1)
+        return 0;
+    return LookupByUID(**(const uint32_t **)(o + VEHICLE_OFF_PTR_LIST + 8));
+}
+
+uint32_t __cdecl ListFirstField548(const void *obj)
+{
+    return ObjType2Field548((const AM2_Object *)ListFirstObj(obj));
+}
+
 int army_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_SET_LEADS_AND_ACT, (const void *)SetLeadsAndAct,
+                        "SetLeadsAndAct", 1);
+    rc |= patch_replace(ADDR_LIST_FIRST_OBJ, (const void *)ListFirstObj,
+                        "ListFirstObj", 1);
+    rc |= patch_replace(ADDR_LIST_FIRST_FIELD548, (const void *)ListFirstField548,
+                        "ListFirstField548", 1);
     rc |= patch_replace(ADDR_ALLY_FLAG, (const void *)AllyFlag, "AllyFlag", 2);
     rc |= patch_replace(ADDR_ARMIES_ALLIED, (const void *)ArmiesAllied,
                         "ArmiesAllied", 2);

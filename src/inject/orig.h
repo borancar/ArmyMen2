@@ -95,6 +95,10 @@
  * -- record 1 is 8 for '7' -- and the names are what the dialog shows. */
 #define ADDR_KEY_NAME_TABLE     0x0048AF28u
 #define ADDR_KEY_NAME_TABLE_END 0x0048B220u
+/* 0x00450BF0, two callers: the INDEX of the record whose scancode has this low
+ * byte, or -1. Only the low byte is compared, which is all a DirectInput
+ * scancode is. */
+#define ADDR_KEY_NAME_INDEX_OF  0x00450BF0u  /* int32_t(uint8_t scancode) */
 /* The string a key row shows when it is bound to nothing. There is a second
  * copy of "None" at 0x0048A134 inside the table itself; this is the one the
  * duplicate-clearing loop stores. */
@@ -314,6 +318,13 @@
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t *, the encoded glyphs */
 #define ADDR_FONT_DESCS     0x004897E8u  /* {const char *face; int32 h; uint16 style}[] */
 #define ADDR_BUILD_FONT     0x004466E0u  /* int32_t(int32_t fontIndex) */
+/* 0x00446840 and 0x00446880: give one font's glyph bytes back and clear its
+ * two table entries, and do that for all three. The second is entry 7 of
+ * ShutdownSubsystems' ordered teardown, so naming it takes another of those
+ * out of the "a name per entry would be a guess per entry" bucket. */
+#define ADDR_FREE_FONT      0x00446840u  /* void(int32_t fontIndex) */
+#define ADDR_FREE_ALL_FONTS 0x00446880u  /* void(void), three of them */
+#define AM2_FONT_COUNT      3
 /* 0x00446830, four callers. A cdecl wrapper for the line above and nothing
  * else -- both take one argument and it is passed straight through. */
 #define ADDR_BUILD_FONT_ALIAS 0x00446830u  /* int32_t(int32_t fontIndex) */
@@ -420,6 +431,10 @@
  * extended. 0x00429CE0 next door is a plain cdecl forwarder for
  * ADDR_ITEM_PRE_DESTROY. Both names are ours. */
 #define ADDR_OBJ_TILE_ATTR     0x00429570u /* int32_t(const void *obj) */
+/* 0x00429540, three callers: the same byte, taken by tile INDEX rather than by
+ * object. The index is masked to 16 bits here where its neighbour reads a word
+ * -- the same value, arrived at differently. */
+#define ADDR_TILE_ATTR_AT      0x00429540u /* int32_t(uint32_t tile) */
 #define ADDR_ITEM_PRE_DESTROY_ALIAS 0x00429CE0u /* void(obj, int32_t) */
 #define ADDR_MAP_ROW_SHIFT     0x00514DE4u /* int32, log2 of the map's width */
 /* The camera doubles as the top-left of the visible-tile rectangle: the four
@@ -731,6 +746,11 @@
 #define COMM_OFF_JOINED          0x3DCu
 #define COMM_SLOT_OFF_TAKEN      0x050u   /* the field StartSelectedGame sets */
 #define ADDR_COMM_MARK_LOBBIED   0x0040F130u  /* void(void); sets comm+0x404 */
+/* 0x0040F140, three callers, the counterpart: clear the same field and tail-
+ * jump to CommDropDirectPlay. THISCALL -- every caller loads ecx with the comm
+ * object first -- and the store still goes through the global rather than
+ * through `this`, which is reproduced. */
+#define ADDR_COMM_DROP_SESSION   0x0040F140u  /* thiscall int32(this) */
 #define ADDR_ON_LOBBY_SLAVE      0x00410F70u  /* void(void), stays original */
 #define COMM_OFF_LOBBY_BUF       0x3F0u   /* DPLCONNECTION, 0x800 bytes */
 #define COMM_OFF_IS_HOST         0x3D8u   /* from DPCAPS_ISHOST */
@@ -1898,6 +1918,15 @@
  * the only one that admits types 2, 3 AND 8 rather than type 2 alone. */
 #define ADDR_EVT_TYPE238_ACTION   0x0041FC40u  /* void(uint32_t, int32_t) */
 #define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
+/* 0x0044BBD0, two callers: put 1 in the dword at +0x548 and then run the line
+ * above with 0x2710. Both names are ours. */
+#define ADDR_SET_LEADS_AND_ACT    0x0044BBD0u  /* void(void *obj) */
+#define AM2_LEADS_ACTION_ARG      0x2710
+/* 0x0045AFB0 and 0x0045AFE0: the first entry of the list at VEHICLE_OFF_PTR_LIST
+ * resolved to an object, and the same run through ObjType2Field548. Null when
+ * there is no object or the list is empty. */
+#define ADDR_LIST_FIRST_OBJ       0x0045AFB0u  /* void *(const void *obj) */
+#define ADDR_LIST_FIRST_FIELD548  0x0045AFE0u  /* uint32_t(const void *obj) */
 
 /* 0x0041F570 and 0x0041F5C0. A pair over one object flag bit and one global,
  * and they are CROSSED rather than symmetric:

@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 596 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 595 | 585 of them below the CRT line |
+| `patch_replace` sites | 606 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 605 | 595 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 105,520 / 372,816 B (**28.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 130,832 / 372,816 B (35.1%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 105,888 / 372,816 B (**28.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 131,200 / 372,816 B (35.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,22 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The keyboard four are all ours now**: `IsKeyDown` and `KeyChanged` off the
+  two poll buffers, `KeyPressed` off the edge-and-auto-repeat array at
+  0x00512BD0, and `LatchKeyState`, which COPIES the current buffer over the
+  previous one so every edge test that follows sees no change. Note it copies
+  where `PollKeyboard` swaps -- two different operations on the same pair.
+
+- **`FreeAllFonts` is teardown entry 7**, so six of the thirteen are named now.
+  It reads 1 on the quit path and `FreeFont` reads 0, which is the ordinary
+  blind spot: the sweep calls it directly.
+
+- **`ListFirstField548` runs 348 times a mission** and `SetLeadsAndAct` once.
+  Between them they are the only writer and one of the readers of the dword at
+  +0x548, whose meaning is still not established -- `LookupOwnerObj` picks an
+  army's object by it and this puts 1 in it. Worth knowing that the whole set
+  of things that touch it is now small and reconstructed.
 
 - **The packed key has a TABLE, and it is what the region pass consults.**
   `0x00434290` binary-searches a sorted {key, value} array at `0x00516150` and

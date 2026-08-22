@@ -98,6 +98,22 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj));
  * show up as one health point somewhere. */
 void __cdecl SetMaxHealth(void *obj, int32_t amount);
 
+/* 0x0044BBD0, two callers. Put 1 in the dword at +0x548 -- the same field
+ * LookupOwnerObj looks for -- and then run the type-2/3/8 action at
+ * 0x00457CD0 with 0x2710. Whatever +0x548 means, this is what SETS it, and
+ * nothing else in the tree does. The name is ours. */
+void __cdecl SetLeadsAndAct(void *obj);
+
+/* 0x0045AFB0 and 0x0045AFE0, four and four callers. The first entry of the
+ * three-field list at +0x538, resolved to an object; and the same run through
+ * ObjType2Field548.
+ *
+ * Null for a null argument or an empty list, and the empty case answers 0
+ * rather than falling through -- the count at +0x53C is tested against 1
+ * before the pointer at +0x540 is touched. */
+void *__cdecl ListFirstObj(const void *obj);
+uint32_t __cdecl ListFirstField548(const void *obj);
+
 int army_install(void);
 
 #ifdef __cplusplus
