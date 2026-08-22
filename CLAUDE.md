@@ -965,9 +965,13 @@ kill the suite and restart it.
 `0x0045CAA0` is the example.** One widget class's slot 2 is that address, which
 holds a bare `ret` — so it reads exactly like a class whose per-frame update
 does nothing. It is `ADDR_LOG`: the retail build stubs the game's own logger to
-`ret`, and `src/inject/gamelog.c` patches it to capture output. The linker
-folded the two, because an empty virtual and a stubbed varargs logger are both
-one `c3`, and identical-COMDAT folding gives them one address.
+`ret`, and `src/inject/gamelog.c` patches it to capture output.
+
+What is measured is that vtable `0x0046FD10` slot 2 holds `0x0045CAA0`, that
+the address is `ADDR_LOG`, and that patching it silences the game. WHY one
+address serves both is inferred rather than established: an empty virtual and a
+stubbed varargs logger are both a single `c3`, and identical-COMDAT folding is
+what merges such functions. Plausible, and not checked.
 
 Reconstructing it as an empty update replaced the logger with a no-op. **The
 game then ran perfectly and logged nothing**, which blinds precisely the half of

@@ -272,8 +272,10 @@ void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip);
  * A THIRD one is deliberately absent. One vtable's slot 2 is 0x0045CAA0, a
  * bare `ret`, which reads like a class whose update does nothing -- and that
  * address is ADDR_LOG, stubbed to `ret` in this build and patched by the
- * harness to capture the game's output. The linker folded an empty virtual
- * and a stubbed varargs logger together because both are one `c3`. Reconstruct
+ * harness to capture the game's output -- vtable 0x0046FD10 slot 2, measured.
+ * Why one address serves both is inferred and not checked: an empty virtual
+ * and a stubbed varargs logger are both a single `c3`, which is what
+ * identical-COMDAT folding merges. Reconstruct
  * it and the game runs perfectly with its log silenced, which blinds exactly
  * the half of the A/B that would have told you. */
 void __attribute__((thiscall)) WidgetUpdateThunk(AM2_Widget *w);
