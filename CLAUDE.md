@@ -1055,6 +1055,18 @@ would skip it and the base destructor would not run: a leak, not a crash, and
 not a wrong answer. That is the cost, and it is accepted knowingly rather than
 by not noticing the prologue was there.
 
+**A log message beginning `ERROR:` is not a function naming itself.** The
+self-naming sweep matches `Name:` at the start of a message, which works for
+`AddMsg:` and `CreateTimer:` and fails for `ERROR:`, `Error:`, `Warning:` and
+`List:` — six of twenty candidates. One is worse than useless: `0x004372A0`
+prints "ERROR: SetObjScriptState was called with %s", which names a DIFFERENT
+function, so a name taken from it lands on the wrong address entirely.
+
+`0x00423200` was listed as "ERROR" and is a DIB loader — it opens a file, reads
+a chunk and flips it. The message merely starts "ERROR: %s has listed size of
+0". **Read the body before taking the name**, which is the same rule as naming
+from a call site, one level further out.
+
 **Say what state the game was in when a global was sampled.** `0x00511E04`
 went in as a clock, because `UpdateObjectScript` skips an object while
 `obj[0xBC] >= this` and then sets `obj[0xBC] = frame->a + this` — a deadline

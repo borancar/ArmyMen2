@@ -214,13 +214,24 @@ counts probe before reading one as coverage -- that is what turned the
   empty ordinary queue is simply idle. That is the kind of thing a generic
   linked-list reconstruction would smooth away.
 
-- **21 self-naming functions are still original**, recomputed against the
-  current patch list. Smallest first: `List` (`0x004013B0`, 96 B),
-  `itemDeployMessageReceive` (`0x0042AF30`, 112 B), `RemMsg` (`0x00401410`,
-  176 B), `itemDeployMessageSend` (`0x0042AA50`, 144 B), then `CreateTimer`
-  (`0x0041E820`, 304 B) and `UseInventoryItem` (`0x00449760`, 256 B). The
-  air.cpp ones are the message list and share its verification problem; the
-  item and unit ones run during a mission and can be A/B'd.
+- **14 self-naming functions are still original, not 21** -- six of the
+  entries were never names at all. A message beginning `ERROR:`, `Error:`,
+  `Warning:` or `List:` says nothing about which function printed it, and one
+  is actively misleading: `0x004372A0` prints "ERROR: SetObjScriptState was
+  called with %s", which names a DIFFERENT function. Taking a name from that
+  table without reading the body is how `0x00423200` nearly became "ERROR"
+  instead of a DIB loader.
+
+  The real fourteen, and the item and unit ones run during a mission so they
+  can be A/B'd:
+
+  `RemMsg` (`0x00401410`), `Resend` (`0x004014C0`), `DestroyFlow`
+  (`0x004029B0`), `ArmyMessageFlush` (`0x00410420`), `DefGameParse`
+  (`0x00424590`), `itemDeployMessageSend` (`0x0042AA50`),
+  `itemDeployMessageReceive` (`0x0042AF30`), `DamageTrooper` (`0x00447A40`),
+  `DeployTrooper` (`0x00449250`), `UseInventoryItem` (`0x00449760`),
+  `UpdateTrooperAction` (`0x0044AFB0`), `troopMessageReceive` (`0x0044C590`),
+  `ExitAllFromVehicle` (`0x0045AE30`), `CreateWeapon` (`0x0045F0C0`).
 
 - **Two ownership conventions sit side by side in one hierarchy.** The list
   box's destructor tests BOTH an ownership flag at `0x0064` and the pointer
