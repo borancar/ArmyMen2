@@ -1984,6 +1984,17 @@
  * and this is WeaponByUid. Answers null, having complained, for any other
  * kind. */
 #define ADDR_WEAPON_BY_UID        0x0045EE80u  /* obj *(int32_t uid) */
+/* 0x00447990, "RemoveInventoryItem": take one slot out of a unit's six-entry
+ * weapon inventory. 0x00449860 selects a slot -- it writes the index to
+ * 0x0568 and looks the weapon up -- and is otherwise unread. */
+#define ADDR_REMOVE_INVENTORY_ITEM 0x00447990u /* void(AM2_Object *, int32_t) */
+#define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
+/* A unit's weapon inventory: six uids, the one in hand, and a spare field the
+ * removal always clears. */
+#define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */
+#define UNIT_OFF_INVENTORY_LAST   0x560u  /* the sixth entry */
+#define UNIT_OFF_INVENTORY_SEL    0x568u  /* int32_t, which slot is in hand */
+#define AM2_INVENTORY_SLOTS       6
 #define AM2_OBJ_KIND_WEAPON       4
 #define ADDR_FIRST_SCRIPT_OBJ     0x00427850u
 #define ADDR_NEXT_SCRIPT_OBJ      0x00427880u

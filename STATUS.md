@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 462 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 462 | 455 of them below the CRT line |
+| `patch_replace` sites | 463 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 463 | 456 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,496 / 372,816 B (**27.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 102,672 / 372,816 B (**27.5%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The self-naming sweep missed SEVEN more, because it required a colon.**
+  `RemoveInventoryItem` logs exactly `"RemoveInventoryItem\n"` -- no colon, no
+  arguments -- and the regex wanted `Name:`. Widening it to "the whole message
+  is an identifier" finds six comm handshake functions as well:
+  `SendGameReadyMsg` (`0x00410A10`), `ReceiveEndSetupMsg` (`0x00410B70`),
+  `ReceiveGameReadyMsg` (`0x00410BB0`), `SendGameReadyToLoadMsg`
+  (`0x00410D90`), `ReceiveGameReadyToLoadMsg` (`0x00410E90`),
+  `SendGameStartMsg` (`0x00411000`).
+
+  So the list is 14 + 7 = 21, and the six comm ones are the handshake CLAUDE.md
+  says is verified by reading because it needs a second player.
+
+- **A unit's inventory is six weapon uids at `0x054C`**, with the one in hand
+  at `0x0568`. `RemoveInventoryItem` shifts, clears the sixth, and fixes the
+  selection -- and the three selection cases are not symmetric: equal resets to
+  0 and re-selects, above slides down, below is untouched. Its counter reads 0
+  on Boot Camp; nothing there loses a weapon.
 
 - **`UseInventoryItem` (`0x00449760`, 256 B) is READ; four callees need names
   first.** The body is plain enough:

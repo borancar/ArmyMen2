@@ -15,6 +15,23 @@
 extern "C" {
 #endif
 
+/* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one
+ * slot out of a unit's six-entry weapon inventory: shift the entries above it
+ * down, clear the sixth, and fix up which slot is in hand.
+ *
+ * The shift is `memmove` of `0x14 - slot * 4` bytes, so it moves only the
+ * entries that exist above `slot` and is skipped entirely for slot 5. The
+ * sixth entry is cleared either way, which is what stops the shift leaving a
+ * duplicate at the top.
+ *
+ * The selected slot is fixed in three cases and they are not symmetric. If the
+ * removed slot WAS in hand the selection resets to 0 and the unit re-selects,
+ * but only when ObjType2Field548 agrees. If the selection was ABOVE the removed
+ * slot it slides down by one. If it was below it is left alone -- and the
+ * `jle` that decides this makes "equal" go the first way, which is why the
+ * equal case is tested first and cannot fall through to the decrement. */
+void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
+
 /* A uid carries its owner in the top three bits, over a 29-bit per-owner
  * counter -- the layout objtable.h already describes and AddToItemList already
  * builds. UidArmy is the original's accessor for the owner half. */

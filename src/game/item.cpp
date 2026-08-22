@@ -10,6 +10,7 @@
 
 #include "item.h"
 #include "objtable.h"
+#include "objtype.h"   /* ObjType2Field548 */
 #include "savetag.h"
 #include "image.h"
 #include "crt.h"
@@ -237,8 +238,59 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
     }
 }
 
+/* 0x00449860: put a slot in hand. It writes the index to UNIT_OFF_INVENTORY_SEL
+ * and looks the weapon up; the rest of it is unread, so it stays original and
+ * keeps a role name rather than a claim. */
+typedef void (__cdecl *AM2_SelectSlotFn)(void *unit, int32_t slot);
+#define orig_select_inventory_slot \
+    (*(AM2_SelectSlotFn)AM2_IMAGE(ADDR_SELECT_INVENTORY_SLOT))
+
+void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
+{
+    uint8_t *u = (uint8_t *)unit;
+    int32_t  sel;
+
+    /* The same comm field msgslot.cpp calls AM2_COMM_LOG_ENABLED, reached the
+     * same way. Logged BEFORE the null check, as the original does. */
+    if (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT)
+                           + 0x418))
+        orig_log("RemoveInventoryItem\n");
+
+    if (!unit)
+        return;
+    if (slot < 0 || slot >= AM2_INVENTORY_SLOTS)
+        return;
+
+    /* Only the entries ABOVE `slot` move, so the last slot shifts nothing. */
+    if (slot < AM2_INVENTORY_SLOTS - 1)
+        orig_memmove(u + UNIT_OFF_INVENTORY + slot * 4,
+                     u + UNIT_OFF_INVENTORY + (slot + 1) * 4,
+                     (size_t)(0x14 - slot * 4));
+
+    /* Cleared whether or not anything shifted, which is what stops the shift
+     * leaving a duplicate at the top. */
+    *(int32_t *)(u + UNIT_OFF_INVENTORY_LAST) = 0;
+
+    sel = *(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL);
+    if (sel == slot) {
+        /* What was in hand has gone: reset and re-select, if the object
+         * agrees it should. */
+        *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = 0;
+        if (ObjType2Field548((const AM2_Object *)unit))
+            orig_select_inventory_slot(unit, 0);
+        return;
+    }
+    /* Above the hole slides down; below is left alone. Equal was handled
+     * above and cannot reach here. */
+    if (sel > slot)
+        *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = sel - 1;
+}
+
 void item_install(void)
 {
+    patch_replace(ADDR_REMOVE_INVENTORY_ITEM,
+                  (const void *)RemoveInventoryItem,
+                  "RemoveInventoryItem", 4);
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
