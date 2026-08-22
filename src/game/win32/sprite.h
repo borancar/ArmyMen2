@@ -138,6 +138,23 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr);
 void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
                            uint32_t flags);
 
+/* Original: 0x00409F50, six callers, and the name is ours. Open a sprite file
+ * in "rb", read its 256-entry palette, turn that into a 256-byte remap table
+ * by asking NearestPalIndex for the closest ACTIVE palette entry to each, load
+ * the set through it, hand the still-open file to 0x00409BE0, and close.
+ *
+ * The `from` argument goes to both NearestPalIndex and LoadSpriteSet, so the
+ * reserved block below it is respected in the same place twice: the table is
+ * never built to point below it, and the walker never rewrites an index below
+ * it either.
+ *
+ * The failure path writes no return value of its own and does not need to:
+ * `eax` still holds the null fopen returned, so it answers 0 while the success
+ * path answers 1. I read that as "returns whatever was in the register" first
+ * and it is worth saying it is not -- the value is null by construction. */
+int32_t __cdecl LoadSpriteFile(const char *path, int32_t a, int32_t b,
+                               int32_t from, uint32_t flags);
+
 /* FreeMenuSprites -- original 0x00412F80. Release all 190 menu sprites, the
  * slot past them, and the surface they were drawn from. */
 void __cdecl FreeMenuSprites(void);

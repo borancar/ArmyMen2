@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `bc049d6`. Working tree clean.
+Last updated: **2026-08-22**, at `36f776d`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 540 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 540 | 532 of them below the CRT line |
+| `patch_replace` sites | 541 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 541 | 533 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,768 / 372,816 B (**27.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 126,080 / 372,816 B (33.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 100,960 / 372,816 B (**27.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 126,272 / 372,816 B (33.9%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`| head` in a build command hides the exit status, and an A/B ran against a
+  stale binary because of it.** `make -s 2>&1 | head -6 && make check && ab.sh`
+  continues past a failed compile, because the pipeline's status is `head`'s.
+  The compile had failed on a missing include; `make check` then passed on the
+  PREVIOUS object files and the A/B measured a binary without the change in it.
+
+  Caught by reading the task output rather than the summary line. Put the build
+  in its own command, or check `${PIPESTATUS[0]}` -- never `&&` after a pipe.
+
+- **`ab.sh mission`'s frame guard fired for real**, reporting 0/0 markers and
+  refusing to compare "the two ways of not getting there". The re-run gave
+  7807/6713 and was clean. That guard was added after a run compared 24,914
+  lines against 21,741; this is the first time it has caught a drive that
+  reached nothing at all.
+
+- **`LoadSpriteFile` runs 21 times in Boot Camp**, once per `LoadSpriteSet`, so
+  both halves of the sprite loader are measured rather than assumed.
 
 - **`pad28` was not padding.** `sprite.h` had eight bytes at 0x0028 named as
   filler; `LoadSpriteSet` reads two int16 straight out of the file into 0x0028

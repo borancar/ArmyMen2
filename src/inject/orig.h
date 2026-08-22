@@ -3231,6 +3231,13 @@
  * Two fields land in what sprite.h calls pad28, so 0x0028 and 0x002A are a
  * pair of int16 read straight out of the file, not padding. */
 #define ADDR_LOAD_SPRITE_SET     0x004099F0u  /* void(FILE *, table, int32, uint32) */
+/* 0x00409F50, six callers. Open a sprite file, build a 256-entry remap table
+ * from its palette, load the set through it and hand the file to 0x00409BE0
+ * for whatever follows. Returns 1, or nothing at all when the open fails --
+ * see the note in sprite.h. */
+#define ADDR_LOAD_SPRITE_FILE    0x00409F50u  /* int32_t(path, a, b, from, flags) */
+#define ADDR_SPRITE_FILE_TAIL    0x00409BE0u  /* void(FILE *, a, int32, b) */
+#define AM2_SPRITE_PALETTE_SIZE  256
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */

@@ -22,6 +22,7 @@
 #include "../blit.h"
 #include "../rect.h"
 #include "../air.h"        /* RemapSpriteRuns, GrowSpriteList */
+#include "palette.h"       /* NearestPalIndex -- reconstructed */
 #include "../crt.h"        /* am2_malloc */
 #include "../../inject/patch.h"
 
@@ -474,6 +475,44 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
     }
 }
 
+/* orig_fopen and orig_fclose come from orig.h, like orig_fread. */
+typedef void (__cdecl *AM2_SpriteTailFn)(am2_FILE *fp, int32_t a, int32_t n,
+                                         int32_t b);
+#define orig_sprite_tail  ((AM2_SpriteTailFn)(uintptr_t)ADDR_SPRITE_FILE_TAIL)
+#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+
+int32_t __cdecl LoadSpriteFile(const char *path, int32_t a, int32_t b,
+                               int32_t from, uint32_t flags)
+{
+    am2_FILE *fp;
+    uint32_t  palette[AM2_SPRITE_PALETTE_SIZE];
+    uint8_t   table[AM2_SPRITE_PALETTE_SIZE];
+    int32_t   i;
+    int32_t   before;
+
+    fp = orig_fopen(path, "rb");
+    if (!fp)
+        return 0;   /* eax still holds the null, which is what it returns. */
+
+    orig_fread(palette, 4, AM2_SPRITE_PALETTE_SIZE, fp);
+
+    /* Each of the file's colours becomes the closest ACTIVE palette index at
+     * or above `from` -- the same threshold LoadSpriteSet then refuses to
+     * rewrite below, so the reserved block is respected twice over. */
+    for (i = 0; i < AM2_SPRITE_PALETTE_SIZE; i++)
+        table[i] = NearestPalIndex(g_activePalette, palette[i],
+                                   (uint32_t)from);
+
+    /* Taken before the load, so the tail gets the index the new sprites start
+     * at rather than the count after them. */
+    before = g_spriteListN;
+
+    LoadSpriteSet(fp, table, from, flags);
+    orig_sprite_tail(fp, a, before, b);
+    orig_fclose(fp);
+    return 1;
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -485,6 +524,8 @@ int sprite_install(void)
                         "RestoreSpriteSurface", 1);
     rc |= patch_replace(ADDR_CLEAR_SPRITE, (const void *)ClearSprite,
                         "ClearSprite", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_FILE, (const void *)LoadSpriteFile,
+                        "LoadSpriteFile", 6);
     rc |= patch_replace(ADDR_LOAD_SPRITE_SET, (const void *)LoadSpriteSet,
                         "LoadSpriteSet", 1);
     rc |= patch_replace(ADDR_RELEASE_SPRITE, (const void *)ReleaseSprite,
