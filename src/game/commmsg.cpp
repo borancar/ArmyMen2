@@ -530,8 +530,6 @@ typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
 #define orig_recv_packet   ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PACKET)
 #define orig_recv_player_msg \
     ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PLAYER_MSG)
-#define orig_check_player_timeout \
-    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_CHECK_PLAYER_TIMEOUT)
 #define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
 #define orig_menu_message  ((AM2_MenuMessageFn)(uintptr_t)ADDR_MENU_MESSAGE)
 
@@ -688,6 +686,32 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid)
             dpid, slot, pause, GetPauseFlags(), mask, flags);
 }
 
+void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
+{
+    const uint8_t *m    = (const uint8_t *)msg;
+    uint8_t       *comm = (uint8_t *)kCommObj;
+    uint8_t       *q;
+
+    (void)dpid;   /* given, and never read -- alone in this family. */
+
+    /* The host is the one that sends this. */
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    *(int32_t *)(comm + COMM_OFF_SEND_FLAGS) =
+        *(const int32_t *)(m + AM2_MSG_VALUE);
+
+    /* OUR record, not the sender's. */
+    comm = (uint8_t *)kCommObj;
+    q = (uint8_t *)orig_find_player_by_id(
+            *(const uint32_t *)(comm + AM2_COMM_SELF_ID));
+    if (!q)
+        return;
+
+    *(int32_t *)(q + FLOWQ_OFF_A) = *(const int32_t *)(m + 0x0C);
+    *(int32_t *)(q + FLOWQ_OFF_B) = *(const int32_t *)(m + 0x10);
+}
+
 void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 {
     const uint8_t *comm = kCommObj;
@@ -757,7 +781,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
         return;
 
     case 14:
-        orig_check_player_timeout(m, dpid);
+        ReceiveFlowControlMsg(m, dpid);
         return;
 
     case 15:
@@ -785,6 +809,9 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_RECV_FLOW_CONTROL,
+                  (const void *)ReceiveFlowControlMsg,
+                  "ReceiveFlowControlMsg", 1);
     patch_replace(ADDR_RECV_GAME_PAUSE, (const void *)RemoteGamePause,
                   "RemoteGamePause", 1);
     patch_replace(ADDR_RECV_START_GAME_MSG,

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `1b0b82f`. Working tree clean.
+Last updated: **2026-08-22**, at `009da5e`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 517 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 517 | 510 of them below the CRT line |
+| `patch_replace` sites | 518 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 518 | 511 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 97,024 / 372,816 B (**26.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 121,712 / 372,816 B (32.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 97,104 / 372,816 B (**26.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 122,416 / 372,816 B (32.8%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,28 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The self-naming sweep credited a string to the wrong function, and this is
+  the first time that has been caught.** It listed `0x00411BD0` as carrying
+  "TIMING OUT PLAYER %d %s". That string belongs to `0x00411C20`; the two share
+  one `functions.tsv` entry, and the sweep attributes by ENTRY. So the sweep's
+  output is "a name somewhere in this entry", not "this function's name" --
+  read the body before believing the pairing, exactly as with `merges.py` and
+  the COM ranking.
+
+  `0x00411BD0` carries no string at all. From its body it is the host telling
+  us how to send: the value becomes the comm object's SEND FLAGS -- the third
+  argument `ArmyMessageFlush` hands `SendGameMsg` for every outgoing packet --
+  and two more fields go into our own flow record.
+
+- **It is the one message in the family that ignores its dpid**, looking up the
+  flow record by OUR id instead. And if we have no flow record yet the two
+  fields are dropped while the send flags are kept anyway.
+
+- **This commit is a clean demonstration of the two coverage figures.** The
+  honest one moved 80 bytes; the entry-crediting one moved 704, because
+  `0x00411BD0` and `0x00411C20` share an entry and patching one credits both.
+  That is the whole argument for `tools/reconstructed.py` in a single step.
 
 - **The pause mask is one bit per player per REASON, and `RemoteGamePause` is
   where a peer's bit moves.** Two independent blocks, not a switch: bit 0x0008

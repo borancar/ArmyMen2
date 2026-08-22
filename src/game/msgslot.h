@@ -265,6 +265,18 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid);
  * as on the comm object's verbosity. */
 void __cdecl RemoteGamePause(void *msg, int32_t dpid);
 
+/* Original: 0x00411BD0, and the name is ours -- it carries no string of its
+ * own. The host telling us how to send: the value becomes the comm object's
+ * SEND FLAGS, which is the third argument ArmyMessageFlush hands SendGameMsg
+ * for every outgoing packet, and two further fields go into our own flow
+ * record.
+ *
+ * Client only, and the flow record is looked up by OUR id rather than the
+ * sender's -- the one message in this family that does not use the dpid it is
+ * given at all. If we have no flow record yet, the two fields are dropped and
+ * the send flags are kept anyway. */
+void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid);
+
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.
  *

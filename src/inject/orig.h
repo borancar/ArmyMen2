@@ -2610,7 +2610,19 @@
 #define MSG_PAUSE_FLAG_B         0x10000u    /* picks the 0x20000 block */
 #define PAUSE_BIT_A_SLOT0        0x10u
 #define PAUSE_BIT_B_SLOT0        0x20000u
-#define ADDR_CHECK_PLAYER_TIMEOUT 0x00411BD0u /* "TIMING OUT PLAYER %d %s" */
+/* 0x00411BD0. The self-naming sweep credited it with "TIMING OUT PLAYER",
+ * which belongs to 0x00411C20 -- the two share a functions.tsv entry. This one
+ * carries no string at all, so the name is ours, from the body: the host
+ * dictating how we send. It stores the message's value as the comm object's
+ * SEND FLAGS -- the third argument ArmyMessageFlush hands SendGameMsg -- and
+ * two more fields into our own flow record. Client only. */
+#define ADDR_RECV_FLOW_CONTROL   0x00411BD0u /* void(msg *, int32_t dpid) */
+#define COMM_OFF_SEND_FLAGS      0x414u
+#define FLOWQ_OFF_A              0xB0u
+#define FLOWQ_OFF_B              0xB4u
+/* 0x00411C20, "TIMING OUT PLAYER %d %s" -- a different function, still
+ * original, and one of the AM2_WM_PLAYER_GONE senders. */
+#define ADDR_CHECK_PLAYER_TIMEOUT 0x00411C20u
 /* 0x0469, and NOTHING handles it. ReceiveStartGameMsg is the only sender in
  * the image and WndProc has no case for it, so DefWindowProc eats it. Named
  * from what posts it, as the other six are. */
