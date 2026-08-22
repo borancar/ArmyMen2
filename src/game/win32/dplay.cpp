@@ -27,6 +27,7 @@
 #include "frame.h"
 #include "cdcheck.h"
 #include "../msgslot.h"
+#include "../objtable.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -585,7 +586,6 @@ typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
 #define orig_slot_of_id     (*(am2_slot_of_id_fn)ADDR_COMM_SLOT_OF_ID)
 #define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_POOL)
 #define g_joinContext  (*(int32_t *)(uintptr_t)ADDR_JOIN_CONTEXT)
-#define g_defaultOwner (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 
 #define AM2_MAX_PLAYERS 4
 
@@ -725,7 +725,6 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
  * Returns 0 always, which every caller ignores. */
 typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
 #define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
-#define g_defaultOwnerSlot     (*(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_commUnknown4F48E0    (*(int32_t *)(uintptr_t)ADDR_COMM_UNKNOWN_4F48E0)
 
 int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
@@ -791,7 +790,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
     }
 
     UnPauseGame(COMM_DROP_EVENT_MASK);
-    g_defaultOwnerSlot  = 0;
+    g_defaultOwner      = 0;
     g_commUnknown4F48E0 = 0;
     return 0;
 }

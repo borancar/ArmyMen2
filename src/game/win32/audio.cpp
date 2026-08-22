@@ -1098,7 +1098,9 @@ typedef int32_t (__cdecl *am2_points_equal_fn)(const AM2_Point *a,
                                                const AM2_Point *b);
 typedef void *(__cdecl *am2_lookup_owner_fn)(uint32_t owner);
 #define orig_lookup_owner (*(am2_lookup_owner_fn)ADDR_LOOKUP_OWNER_OBJ)
-#define g_defaultOwner    (*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+/* g_defaultOwner comes from ../objtable.h, which this file already
+ * includes. It used to be redefined here as a const uint32_t, which GCC
+ * warned about on every build. */
 
 /* 22 bytes to the millisecond: the waves are 22 kHz, eight bit, mono. */
 #define SOUND_BYTES_PER_MS   22

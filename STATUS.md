@@ -165,13 +165,19 @@ counts probe before reading one as coverage -- that is what turned the
   either field is READ. `0x0044` is read by `0x00453E80` and written by
   `0x00454070`, so that one at least has a known consumer.
 
-- **`g_defaultOwner` is defined four times over three types.** `objtable.h`
-  has it as `uint32_t`, `audio.cpp` redefines it as `const uint32_t`,
-  `dplay.cpp` as `int32_t` -- and then again as `g_defaultOwnerSlot`, a second
-  name for the same address. GCC warns on three of the four and the build has
-  been printing it. Same hazard as the local typedef that hid `PlaySoundAt`'s
-  two-pointer compare, and an alias of exactly the kind the `ADDR_` ratchet
-  exists to stop, one level down where nothing is watching.
+- **`g_defaultOwner` was defined four times over three types; it is one now.**
+  `objtable.h` had it as `uint32_t`, `audio.cpp` redefined it as
+  `const uint32_t`, `dplay.cpp` as `int32_t` -- and again as
+  `g_defaultOwnerSlot`, a second name for the same address. Same hazard as the
+  local typedef that hid `PlaySoundAt`'s two-pointer compare, and an alias of
+  exactly the kind the `ADDR_` ratchet stops one level up, where something is
+  watching. The build now compiles with no warnings at all.
+
+  Nothing checks this. `checkpatches.py` ratchets `ADDR_` aliases and
+  `checkseams.py` ratchets `orig_` lies, but a `g_` macro can be redefined in
+  as many modules and as many types as anyone likes, and only GCC objects --
+  and only when two of them meet in one translation unit. `g_defaultOwnerSlot`
+  never did meet the others, so nothing said a word about it.
 
 - **`WidgetScreenRect` is the busiest thing in the tree: 1,510,864 calls.**
   Eighty bytes, thirty-three callers, and the shared base helper the whole
