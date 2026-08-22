@@ -1987,6 +1987,10 @@
 /* 0x00447990, "RemoveInventoryItem": take one slot out of a unit's six-entry
  * weapon inventory. 0x00449860 selects a slot -- it writes the index to
  * 0x0568 and looks the weapon up -- and is otherwise unread. */
+/* 0x00410B70, "ReceiveEndSetupMsg": log, then post AM2_WM_SETUP_DONE to the
+ * window. Sixty-four bytes and no state of its own -- the handshake's whole
+ * receive side is telling the message pump something arrived. */
+#define ADDR_RECEIVE_END_SETUP_MSG 0x00410B70u /* void(void) */
 #define ADDR_REMOVE_INVENTORY_ITEM 0x00447990u /* void(AM2_Object *, int32_t) */
 #define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
@@ -2235,6 +2239,20 @@
 #define IAT_RELEASE_MUTEX          0x0046F060u
 #define IAT_POST_MESSAGE_A         0x0046F1CCu
 #define AM2_WM_CLOSE               0x10
+/* The six private window messages, named for what POSTS them rather than for
+ * the case labels they used to share. They live here and not in winproc.cpp
+ * because the comm side posts them and the window side handles them, and one
+ * constant in two files is one constant too many. See the sender list in
+ * winproc.cpp.
+ *
+ * 0x0500 is NOT comm traffic: AudioTimerProc posts it, and it shared a case
+ * label with the rest only because WndProc forwarded all six together. */
+#define AM2_WM_PACKETS_READY       0x0464u
+#define AM2_WM_NO_BUFFERS          0x046Bu
+#define AM2_WM_PLAYER_GONE         0x046Cu
+#define AM2_WM_HOST_CHANGED        0x046Du
+#define AM2_WM_SETUP_DONE          0x046Eu
+#define AM2_WM_STREAM_DONE         0x0500u
 
 /* 0x00402720. Posts WM_CLOSE to the game window and says so. Sets a flag
  * first, and the ORDER matters: the flag is raised before the log line, so a

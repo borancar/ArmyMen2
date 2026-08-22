@@ -253,6 +253,16 @@ void __cdecl MsgListAdd(void *list, void *node)
  *
  * The message goes through the game's own PostMessageA slot, so it lands in
  * the same queue WndProc reads. */
+void __cdecl ReceiveEndSetupMsg(void)
+{
+    const uint8_t *comm = kCommObj;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("ReceiveEndSetupMsg\n");
+
+    orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
+}
+
 void *__cdecl MsgListRemHead(void *list)
 {
     uint8_t *l = (uint8_t *)list;
@@ -297,6 +307,8 @@ void __cdecl ExitGamePostClose(void)
 
 int msgslot_install(void)
 {
+    patch_replace(ADDR_RECEIVE_END_SETUP_MSG,
+                  (const void *)ReceiveEndSetupMsg, "ReceiveEndSetupMsg", 1);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
                   "MsgListRemHead", 10);
     patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,

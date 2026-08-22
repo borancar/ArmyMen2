@@ -70,14 +70,14 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 463 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 463 | 456 of them below the CRT line |
+| `patch_replace` sites | 464 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 464 | 457 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,672 / 372,816 B (**27.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 102,736 / 372,816 B (**27.6%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 62, 171 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 68, 179 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how
@@ -166,6 +166,19 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The six private window messages live in `orig.h` now.** They were defined
+  in `winproc.cpp`, which HANDLES them, and the comm side POSTS them -- so the
+  first comm function to need one would have duplicated the constant. One
+  constant in two files is one too many, and this session has spent several
+  commits undoing exactly that for `g_` macros and `ADDR_` names.
+
+- **`ReceiveEndSetupMsg` is done; five handshake functions remain.**
+  `SendGameReadyMsg` (352 B), `ReceiveGameReadyMsg` (304 B),
+  `SendGameReadyToLoadMsg` (256 B), `ReceiveGameReadyToLoadMsg` (224 B),
+  `SendGameStartMsg` (256 B). All self-naming, all in the same band, and none
+  exercisable without a second player -- so the whole group is read-verified
+  and the A/B can only confirm it does not break single player.
 
 - **The self-naming sweep missed SEVEN more, because it required a colon.**
   `RemoveInventoryItem` logs exactly `"RemoveInventoryItem\n"` -- no colon, no

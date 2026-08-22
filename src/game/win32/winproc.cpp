@@ -73,12 +73,8 @@
  *   0x0500  AudioTimerProc, twice -- NOT comm traffic at all. It shared a case
  *           label with the others only because WndProc forwarded all six.
  */
-#define AM2_WM_PACKETS_READY 0x0464u
-#define AM2_WM_NO_BUFFERS    0x046Bu
-#define AM2_WM_PLAYER_GONE   0x046Cu
-#define AM2_WM_HOST_CHANGED  0x046Du
-#define AM2_WM_SETUP_DONE    0x046Eu
-#define AM2_WM_STREAM_DONE   0x0500u
+/* The six now live in orig.h, because the comm side POSTS them and defining
+ * them twice is how two copies of one constant come to disagree. */
 
 static_assert(SC_SCREENSAVE == 0xF140 && SC_MONITORPOWER == 0xF170, "SC_*");
 static_assert((RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN |

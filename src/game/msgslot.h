@@ -130,6 +130,16 @@ void __cdecl SendTeamMsg(int32_t team);
  * links are left alone, so a caller can still read its `next`. */
 void *__cdecl MsgListRemHead(void *list);
 
+/* Original: 0x00410B70, and it names itself -- "ReceiveEndSetupMsg". Log if
+ * the comm object's verbosity field is set, then post AM2_WM_SETUP_DONE to the
+ * game window. That is all of it: the receive side of this handshake holds no
+ * state, it just tells the message pump something arrived, and WndProc's
+ * 0x046E case does the work.
+ *
+ * It cannot be exercised here -- the handshake needs a second player -- so it
+ * is verified by reading, like the rest of that group. */
+void __cdecl ReceiveEndSetupMsg(void);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus
