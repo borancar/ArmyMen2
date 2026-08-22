@@ -579,7 +579,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
 static_assert(DPOPEN_CREATE == 2, "DPOPEN_CREATE");
 static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 
-#define g_hostSlot     (*(int32_t *)(uintptr_t)ADDR_HOST_SLOT)
+#define g_ourSlot     (*(int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 
 typedef int32_t (__attribute__((thiscall)) *am2_slot_of_id_fn)(void *, DPID);
 typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
@@ -607,9 +607,11 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
         desc.dwFlags       = DPSESSION_MIGRATEHOST;
         desc.dwMaxPlayers  = AM2_MAX_PLAYERS;
         desc.lpszSessionNameA = (LPSTR)name;
-        /* The hosting slot's index field, carried across as user data. */
+        /* Our own slot's index field, carried across as user data. Only the
+         * host reaches this branch, so "ours" and "the host's" are the same
+         * slot here -- which is how the global came to be misnamed. */
         desc.dwUser1 = comm_u32((uint8_t *)self,
-                                COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE + 4);
+                                COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE + 4);
 
         app = *(const GUID **)(comm + COMM_OFF_APP_GUID);
         if (app)
@@ -621,7 +623,7 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
 
     g_joinContext  = 0;
     g_defaultOwner = 0;
-    g_hostSlot     = 0;
+    g_ourSlot     = 0;
     return 1;
 }
 
@@ -982,7 +984,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
     } else {
         /* The host records its own name in the slot it occupies. */
         char *slotName = (char *)(g_commObject + COMM_SLOT_BASE
-                                  + g_hostSlot * COMM_SLOT_STRIDE
+                                  + g_ourSlot * COMM_SLOT_STRIDE
                                   + COMM_SLOT_OFF_NAME);
         strcpy(slotName, playerName);
     }
@@ -1028,9 +1030,9 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
 
     /* Offline: nobody to tell, so just claim the slot. */
     if (comm_u32(shared, COMM_OFF_LOCAL)) {
-        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
                          + COMM_SLOT_OFF_TAKEN) = 1;
-        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
                          + COMM_SLOT_OFF_ID) = 1;
         comm_u32(self, COMM_OFF_PLAYER_MADE) = 1;
         return 1;
@@ -1060,10 +1062,10 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
     }
 
     if (comm_u32(self, COMM_OFF_IS_HOST)) {
-        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
                          + COMM_SLOT_OFF_ID) =
             comm_u32(self, COMM_OFF_OUR_PLAYER_ID);
-        comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
                          + COMM_SLOT_OFF_TAKEN) = 1;
     }
 
@@ -1209,7 +1211,7 @@ int32_t __attribute__((thiscall)) CommJoinSession(void *comm, const GUID *instan
             *(LPDPSESSIONDESC2 *)(shared + COMM_OFF_SESSION_DESC);
 
         if (sd->dwUser1 == 0)
-            comm_u32(shared, COMM_SLOT_BASE + g_hostSlot * COMM_SLOT_STRIDE + 4)
+            comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE + 4)
                 = sd->dwCurrentPlayers;
     }
     return 1;

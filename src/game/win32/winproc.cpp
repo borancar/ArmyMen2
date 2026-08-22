@@ -148,7 +148,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define g_netGame  (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
 #define g_gameOverFlags (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)
-#define g_hostSlot     (*(const int32_t *)(uintptr_t)ADDR_HOST_SLOT)
+#define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 #define g_overlayDirty (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 #define g_reqTaken     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_TAKEN)
 
@@ -304,7 +304,7 @@ static LRESULT OnHostMigrated(void)
         ReopenSession(comm);
 
     orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_HOST_NOW,
-                 PlayerName(comm, g_hostSlot));
+                 PlayerName(comm, g_ourSlot));
     if (g_gameState == 2)
         orig_hud_message(text, g_hudColour);
     else

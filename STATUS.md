@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `50d338f`. Working tree clean.
+Last updated: **2026-08-22**, at `33cff49`. Working tree clean.
 
 ## In flight
 
@@ -167,6 +167,30 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`ADDR_HOST_SLOT` was our slot, not the host's**, and the way it went wrong
+  is one this file has recorded three times for FUNCTIONS and not once for a
+  global: it was named from a call site. `CommOpenSession` reads it, and the
+  machine opening a session IS the host, so the wrong reading and the right one
+  agree there and nothing looked amiss.
+
+  `0x0040E117` settles it. The player-created handler writes it only when the
+  new player's id equals the comm object's own id -- that is us, whoever is
+  hosting. `CommRemovePlayer` confirms it by decrementing this and
+  `ADDR_DEFAULT_OWNER` together when a lower slot leaves.
+
+  The host-migration message is the one that looks like counter-evidence and is
+  not: it fills "Player %s is now the host" from this slot, naming US, which is
+  right because that handler runs on the machine that has just taken over.
+
+  Renamed to `ADDR_OUR_SLOT`, and the two modules reading it renamed with it.
+  **Before trusting a global's name, find the site that WRITES it**; a reader
+  can agree with a wrong name for a reason peculiar to that reader.
+
+- **The two globals track the same value and can still diverge.**
+  `ADDR_DEFAULT_OWNER` is read about 130 times across items, units and weapons
+  and is written in one place `ADDR_OUR_SLOT` is not (`0x0040EB57`). They are
+  not aliases, and neither is redundant.
 
 - **A three-valued query that only sometimes answers the question it is named
   for.** `CommSlotRemote` reads the 0x020C flag only for an OCCUPIED slot; an

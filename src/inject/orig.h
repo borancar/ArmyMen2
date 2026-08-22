@@ -2527,7 +2527,17 @@
 #define ADDR_COMM_ENUM_CONNECTIONS 0x0040E530u /* thiscall int32(this, void *) */
 #define ADDR_ENUM_CONNECTIONS_CB 0x0040E460u  /* LPDPENUMCONNECTIONSCALLBACK */
 #define ADDR_CONNECTION_LIST     0x004FA900u  /* void *, what that callback fills */
-#define ADDR_HOST_SLOT           0x004FA904u  /* int32_t, which player slot hosts */
+/* int32_t, which player slot is OURS. It was ADDR_HOST_SLOT, named from
+ * CommOpenSession -- where the machine opening the session IS the host, so the
+ * two readings agree and the wrong one looked right.
+ *
+ * 0x0040E117 settles it: the player-created handler writes this only when the
+ * new player's id equals the comm object's OWN id. CommRemovePlayer confirms
+ * it, decrementing this and ADDR_DEFAULT_OWNER together when a lower slot
+ * leaves. And the host-migration message reads it to fill "Player %s is now
+ * the host", which names US -- correct, because that handler runs on the
+ * machine that has just taken over. */
+#define ADDR_OUR_SLOT            0x004FA904u
 #define ADDR_JOIN_CONTEXT        0x004751B4u  /* int32_t, cleared once a session exists */
 /* Creates the DirectPlay session -- slot 24 is Open, with DPOPEN_CREATE. */
 #define ADDR_COMM_OPEN_SESSION   0x0040DFC0u  /* thiscall int32(this, const char *) */
