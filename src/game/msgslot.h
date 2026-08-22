@@ -122,4 +122,13 @@ int msgslot_install(void);
 }
 #endif
 
+/* 0x00401050. Append a node to the tail of a mutex-guarded list. Twelve
+ * callers and multi-threaded; the size complaint above 400 or below zero does
+ * not stop the append and is issued while the mutex is still held. */
+void __cdecl MsgListAdd(void *list, void *node);
+
+/* 0x00402720. Raise the exit flag, log, and post WM_CLOSE to the game window
+ * -- in that order. */
+void __cdecl ExitGamePostClose(void);
+
 #endif /* AM2_MSGSLOT_H */

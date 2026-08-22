@@ -70,14 +70,14 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 406 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 406 | 399 of them below the CRT line |
+| `patch_replace` sites | 408 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 408 | 401 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 92,272 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 92,416 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 56, 160 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 58, 163 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how
@@ -152,6 +152,21 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **400 appends and the linkage is still unobserved.** `MsgListAdd` runs 400
+  times on a campaign drive, which by call count is the busiest thing taken in
+  a while -- and breaking the list's forward link entirely leaves `campaign`
+  clean. Single player appends to the comm message list and never WALKS it, so
+  the structure the function maintains is never read. Another case where a high
+  call count says nothing about coverage.
+
+- **Three more import sites are ours, reached through the game's own IAT.**
+  `WaitForSingleObject`, `ReleaseMutex` and `PostMessageA` are called through
+  their slots rather than by importing the symbols into `am2hook.dll`, which
+  keeps `msgslot.cpp` on the flat side of the split -- the handle is an opaque
+  pointer and no Win32 type is named. `docs/boundary.md` moves 56 -> 58
+  functions and 160 -> 163 sites; "still boundary" stays at 3 and 6, the
+  unreachable CD dialogs.
 
 - **The .aai files contain no floating-point numbers either.**
   `DefParseNumber` runs 553 times and `DefParseFloat` -- its strtod twin, with

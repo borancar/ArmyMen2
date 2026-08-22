@@ -181,8 +181,93 @@ void __cdecl SendTeamMsg(int32_t team)
                  "SendTeamMsg from %x , Team =%d \n");
 }
 
+/* ------------------------------------------------ message list ---- */
+
+/* Reached through the GAME's import table rather than by importing the symbols
+ * into am2hook.dll. Two reasons: this module is on the flat side of the split
+ * and must name no Win32 type, and going through the game's own slot is what
+ * device.cpp already does for the DirectX thunks. The handle is an opaque
+ * pointer here, which is all these three need it to be. */
+typedef uint32_t (__attribute__((stdcall)) *AM2_WaitFn)(void *h, uint32_t ms);
+typedef int32_t (__attribute__((stdcall)) *AM2_ReleaseMutexFn)(void *h);
+typedef int32_t (__attribute__((stdcall)) *AM2_PostMessageFn)(void *hwnd,
+                                                              uint32_t msg,
+                                                              uint32_t wp,
+                                                              int32_t lp);
+#define orig_wait_for_object \
+    (**(AM2_WaitFn *)(uintptr_t)IAT_WAIT_FOR_SINGLE_OBJECT)
+#define orig_release_mutex \
+    (**(AM2_ReleaseMutexFn *)(uintptr_t)IAT_RELEASE_MUTEX)
+#define orig_post_message \
+    (**(AM2_PostMessageFn *)(uintptr_t)IAT_POST_MESSAGE_A)
+
+/* 0x00401050. Append a node to the tail of a mutex-guarded list.
+ *
+ * The list is {mutex, head, tail, count} and a node is {prev, next}. Twelve
+ * callers and multi-threaded, which is why every field write here sits between
+ * the wait and the release exactly as the original places them -- CLAUDE.md
+ * warns that a mistake in this cluster is a race rather than a crash, and a
+ * race is precisely what no A/B in this project could see.
+ *
+ * The size complaint fires above 400 OR below zero -- the original tests the
+ * sign separately, so a count that has wrapped negative is caught -- and it
+ * does NOT stop the append. It is a diagnostic, and with the logger stubbed to
+ * `ret` in this build it is not even that. Reproduced.
+ *
+ * Note the complaint is issued while the mutex is still held. */
+void __cdecl MsgListAdd(void *list, void *node)
+{
+    uint8_t *l = (uint8_t *)list;
+    uint8_t *n = (uint8_t *)node;
+    uint8_t *tail;
+    int32_t  count;
+
+    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+
+    *(void **)(n + MSGNODE_OFF_NEXT) = (void *)0;
+
+    tail = *(uint8_t **)(l + MSGLIST_OFF_TAIL);
+    *(void **)(n + MSGNODE_OFF_PREV) = tail;
+
+    if (tail == (uint8_t *)0)
+        *(void **)(l + MSGLIST_OFF_HEAD) = n;
+    else
+        *(void **)(tail + MSGNODE_OFF_NEXT) = n;
+
+    *(void **)(l + MSGLIST_OFF_TAIL) = n;
+
+    count = *(const int32_t *)(l + MSGLIST_OFF_COUNT) + 1;
+    *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
+
+    if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
+        orig_log("AddMsg: Impossible List Size %d \n", count);
+
+    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+}
+
+/* 0x00402720. Ask the window to close, and say so.
+ *
+ * The flag is raised BEFORE the log line, so a log that shows the message also
+ * shows the flag was already set -- the ordering is reproduced for that
+ * reason rather than because anything reads it in between.
+ *
+ * The message goes through the game's own PostMessageA slot, so it lands in
+ * the same queue WndProc reads. */
+void __cdecl ExitGamePostClose(void)
+{
+    *(int32_t *)AM2_IMAGE(ADDR_EXIT_GAME_FLAG) = 1;
+
+    orig_log("Exit Game Posting WM_CLOSE from 3DONetwork\n");
+
+    orig_post_message(*(void **)AM2_IMAGE(ADDR_HWND), AM2_WM_CLOSE, 0, 0);
+}
+
 int msgslot_install(void)
 {
+    patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,
+                  "MsgListAdd", 12);
+    patch_replace(ADDR_EXIT_GAME_POST_CLOSE, (const void *)ExitGamePostClose,
+                  "ExitGamePostClose", 1);
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
     patch_replace(ADDR_MSGSLOT_A1, (const void *)MsgSlotA1, "MsgSlotA1", 2);
     patch_replace(ADDR_MSGSLOT_A2, (const void *)MsgSlotA2, "MsgSlotA2", 2);

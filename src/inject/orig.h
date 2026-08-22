@@ -523,6 +523,9 @@
 #define ADDR_OBJ_FLAG_BIT0       0x0040A030u  /* uint32_t(const void *obj) */
 #define ADDR_OBJ_FLAG_BIT1       0x0040A040u
 #define ADDR_MSG_LIST_INIT       0x00401000u  /* int32_t(void *list) */
+/* Its own log string calls it AddMsg. The role name here says the same thing
+ * and is already used by dplay.cpp, so it stays -- see the AddMsg note further
+ * down for the list layout. */
 #define ADDR_MSG_LIST_ADD        0x00401050u  /* void(void *list, void *node) */
 #define ADDR_EVENT_CLOSE         0x00402170u  /* void(void *holder) */
 /* The four lists, in the order they are created. */
@@ -2008,6 +2011,37 @@
  * it, and it means "this machine is fast enough". WinMain clears it first. */
 #define ADDR_FAST_MACHINE        0x00512584u  /* int32_t */
 #define ADDR_HWND                0x0051245Cu  /* HWND, the one game window */
+/* IAT slots, reached through the game's own import table rather than by
+ * importing the symbols into am2hook.dll -- which keeps the flat modules free
+ * of Win32 types and matches what device.cpp does for the DirectX thunks.
+ *
+ * All three are "incidental" by the rule in CLAUDE.md: waiting on a handle,
+ * releasing a mutex and posting a message operate on things somebody else
+ * created, so a module using them is not boundary code. */
+#define IAT_WAIT_FOR_SINGLE_OBJECT 0x0046F080u
+#define IAT_RELEASE_MUTEX          0x0046F060u
+#define IAT_POST_MESSAGE_A         0x0046F1CCu
+#define AM2_WM_CLOSE               0x10
+
+/* 0x00402720. Posts WM_CLOSE to the game window and says so. Sets a flag
+ * first, and the ORDER matters: the flag is raised before the log line, so a
+ * reader of the log knows it was already set. */
+#define ADDR_EXIT_GAME_POST_CLOSE  0x00402720u  /* void(void) */
+#define ADDR_EXIT_GAME_FLAG        0x004F8778u
+
+/* ADDR_MSG_LIST_ADD, "AddMsg: Impossible List Size %d". Appends a node to the
+ * tail of
+ * a mutex-guarded doubly-linked list. The list is {mutex, head, tail, count}
+ * and a node is {prev, next}; the complaint fires above 400 or below zero and
+ * does NOT stop the append. Twelve callers, and multi-threaded -- CLAUDE.md
+ * warns that a mistake here is a race rather than a crash. */
+#define MSGLIST_OFF_MUTEX          0x00u
+#define MSGLIST_OFF_HEAD           0x04u
+#define MSGLIST_OFF_TAIL           0x08u
+#define MSGLIST_OFF_COUNT          0x0Cu
+#define MSGNODE_OFF_PREV           0x00u
+#define MSGNODE_OFF_NEXT           0x04u
+#define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
 /* Both DirectPlay enumerations pass this same handle as their lpContext, and
  * CommSend posts to it -- so an "lpContext" in this game is the window. */
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE "ArmyMenMutex" */
