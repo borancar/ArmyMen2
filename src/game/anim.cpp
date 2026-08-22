@@ -19,6 +19,7 @@
 #define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
 
 #define g_explosionAnims ((AM2_AnimTable *)(uintptr_t)ADDR_EXPLOSION_ANIMS)
+#define g_missileAnims   ((AM2_AnimTable *)(uintptr_t)ADDR_MISSILE_ANIMS)
 #define g_roachAnims     ((AM2_AnimTable *)(uintptr_t)ADDR_ROACH_ANIMS)
 #define g_soldierAnims   ((AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)
 #define g_turretAnims    ((AM2_AnimTable *)(uintptr_t)ADDR_TURRET_ANIMS)
@@ -188,6 +189,11 @@ void __cdecl FreeExplosionAnims(void)
     FreeAnimTable(g_explosionAnims);
 }
 
+void __cdecl FreeMissileAnims(void)
+{
+    FreeAnimTable(g_missileAnims);
+}
+
 void __cdecl FreeRoachAnims(void)
 {
     FreeAnimTable(g_roachAnims);
@@ -225,6 +231,8 @@ int anim_install(void)
     rc |= patch_replace(ADDR_FREE_EXPLOSION_ANIMS,
                         (const void *)FreeExplosionAnims,
                         "FreeExplosionAnims", 0);
+    rc |= patch_replace(ADDR_FREE_MISSILE_ANIMS, (const void *)FreeMissileAnims,
+                        "FreeMissileAnims", 0);
     rc |= patch_replace(ADDR_FREE_ROACH_ANIMS, (const void *)FreeRoachAnims,
                         "FreeRoachAnims", 0);
     rc |= patch_replace(ADDR_FREE_SOLDIER_ANIMS,

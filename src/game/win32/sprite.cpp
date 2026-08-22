@@ -21,6 +21,7 @@
 #include "sprite.h"
 #include "../anim.h"
 #include "../dist.h"   /* RoundTo8 */
+#include "../misc.h"   /* MaskPixelSolid */
 #include "../blit.h"
 #include "../rect.h"
 #include "../air.h"        /* RemapSpriteRuns, GrowSpriteList */
@@ -513,6 +514,33 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
     return 1;
 }
 
+/* 0x00446290, two callers -- the roach and vehicle footprint builders. Is this
+ * sprite opaque at this point? The name is ours.
+ *
+ * A sprite with no image is never solid. Otherwise the answer comes from
+ * `format`, the same field sprite.h's teardown reads: 1 is the 32-bit row
+ * table and 2 or 3 the 16-bit one, so those three ask the run-length mask
+ * itself; anything else -- which means 0, an image that is a DirectDraw
+ * surface -- falls back to the bounding box.
+ *
+ * The original reads the packed point twice at overlapping offsets, `[esp+8]`
+ * whole and `[esp+0xA]` for the upper half, so both mask arguments arrive with
+ * junk above their sixteen bits. Both testers cast to uint16_t on the way in,
+ * so passing the two halves is the same function.
+ */
+int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
+{
+    if (!spr->image.rle16)
+        return 0;
+    if (spr->format == 1)
+        return MaskPixelSolid32((uint32_t)at.x, (uint32_t)at.y,
+                                spr->image.rle32);
+    if (spr->format == 2 || spr->format == 3)
+        return MaskPixelSolid((uint32_t)at.x, (uint32_t)at.y,
+                              spr->image.rle16);
+    return PointInRect(&spr->bounds, &at);
+}
+
 /* The three animation lookups -- 0x0044BB30, 0x0045D9B0 and 0x0045DA20, and
  * all three names are ours. Each finds the entry with a fixed id in its kind's
  * table, turns an 8-bit heading into one of the animation's facings, and
@@ -589,10 +617,102 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading)
     return AnimSpriteAt(t->entries[i].anim, heading);
 }
 
+/* 0x0043C730, and the roach loader at 0x0043CCF0 tail-jumps to it. The name is
+ * ours. Build the roach's collision footprint -- one record per facing of the
+ * animation with id 0x51, which is the only animation any vehicle or turret
+ * file is ever asked for.
+ *
+ * The method is a 16-pixel grid over the sprite. Each block is sampled every
+ * two pixels, 8 by 8 = 64 samples, and kept when at least 16 of them are
+ * opaque; a kept block contributes one point, its far corner less the hot spot
+ * and less 8, which puts it at the block's CENTRE relative to where the sprite
+ * is drawn.
+ *
+ * The record is {count, up to 40 points} and 0xA4 bytes apart, so the local
+ * scratch holds exactly as many as the record does -- 160 bytes, the top of a
+ * 192-byte frame. Nothing bounds the count against either, so a sprite with 41
+ * qualifying blocks would run off both; the grid step and the sprite sizes
+ * make that unreachable and the original does not check.
+ *
+ * The lookup at the top is SoldierAnimSprite's, written out again with the
+ * roach's table and no fallback difference -- except that this one leaves the
+ * index at 0 when nothing matches, like the soldier and vehicle versions.
+ */
+#define g_roachAnims        ((AM2_AnimTable *)(uintptr_t)ADDR_ROACH_ANIMS)
+#define g_roachFacings      (*(int32_t *)(uintptr_t)ADDR_ROACH_FOOTPRINT_FACINGS)
+#define g_roachFootprints   ((uint8_t *)(uintptr_t)ADDR_ROACH_FOOTPRINTS)
+
+void __cdecl BuildRoachFootprints(void)
+{
+    const AM2_AnimTable *t = g_roachAnims;
+    AM2_Anim            *a;
+    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+    int32_t              facing;
+    uint8_t             *out;
+
+    if (i >= t->count)
+        i = 0;
+    a = t->entries[i].anim;
+
+    g_roachFacings = a->facings;
+    if (a->facings <= 0)
+        return;
+
+    out = g_roachFootprints;
+    for (facing = 0; facing < a->facings; facing++) {
+        AM2_Sprite *spr = g_spriteList[a->cells[(int32_t)a->frames * facing]
+                                        .sprite];
+        AM2_Point   found[AM2_FOOTPRINT_POINTS];
+        int32_t     count = 0;
+        int32_t     x, y;
+
+        for (y = AM2_FOOTPRINT_STEP; y < spr->bounds.bottom;
+             y += AM2_FOOTPRINT_STEP)
+            for (x = AM2_FOOTPRINT_STEP; x < spr->bounds.right;
+                 x += AM2_FOOTPRINT_STEP) {
+                int32_t solid = 0;
+                int32_t sx, sy;
+
+                for (sy = y - AM2_FOOTPRINT_STEP; sy < y;
+                     sy += AM2_FOOTPRINT_SAMPLE)
+                    for (sx = x - AM2_FOOTPRINT_STEP; sx < x;
+                         sx += AM2_FOOTPRINT_SAMPLE) {
+                        AM2_Point p;
+
+                        p.x = (int16_t)sx;
+                        p.y = (int16_t)sy;
+                        if (SpriteSolidAt(spr, p))
+                            solid++;
+                    }
+
+                if (solid < AM2_FOOTPRINT_MIN_SOLID)
+                    continue;
+                found[count].x = (int16_t)(x - spr->hotX - 8);
+                found[count].y = (int16_t)(y - spr->hotY - 8);
+                count++;
+            }
+
+        /* The count sits one dword BELOW the points, exactly as the original
+         * writes it through `[ebp-4]`. Getting this wrong by one dword put the
+         * whole table over the global at 0x00654CA4 with every point still
+         * correct, and `bootcamp` and `mission` were both clean on it -- the
+         * mis-centred trig table again. tools/footprints.py is what caught
+         * it. */
+        *(int32_t *)(out - 4) = count;
+        memcpy(out, found, (size_t)count * 4);
+        out += AM2_FOOTPRINT_STRIDE;
+    }
+}
+
 int sprite_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_BUILD_ROACH_FOOTPRINTS,
+                        (const void *)BuildRoachFootprints,
+                        "BuildRoachFootprints", 0);
+    rc |= patch_replace(ADDR_SPRITE_SOLID_AT, (const void *)SpriteSolidAt,
+                        "SpriteSolidAt", 2);
     rc |= patch_replace(ADDR_SOLDIER_ANIM_SPRITE, (const void *)SoldierAnimSprite,
                         "SoldierAnimSprite", 2);
     rc |= patch_replace(ADDR_VEHICLE_ANIM_SPRITE, (const void *)VehicleAnimSprite,

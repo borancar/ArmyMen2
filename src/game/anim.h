@@ -115,6 +115,7 @@ void __cdecl FreeAnimTable(AM2_AnimTable *table);
  * per entry" bucket: each one is a `push <table>; call FreeAnimTable` and the
  * table says which file it holds. */
 void __cdecl FreeExplosionAnims(void);   /* 0x00422850 */
+void __cdecl FreeMissileAnims(void);     /* 0x0043C720 */
 void __cdecl FreeRoachAnims(void);       /* 0x0043CD30 */
 void __cdecl FreeSoldierAnims(void);     /* 0x004470D0, all nine */
 void __cdecl FreeVehicleAnims(void);     /* 0x0045A990, six vehicles and six

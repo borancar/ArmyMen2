@@ -3260,6 +3260,7 @@
  * the whole reason LoadAnimTable records the flag. */
 #define ADDR_FREE_ANIM_TABLE     0x00409EE0u  /* void(AM2_AnimTable *) */
 #define ADDR_FREE_EXPLOSION_ANIMS 0x00422850u /* void(void) */
+#define ADDR_FREE_MISSILE_ANIMS  0x0043C720u  /* void(void) */
 #define ADDR_FREE_ROACH_ANIMS    0x0043CD30u  /* void(void) */
 #define ADDR_FREE_SOLDIER_ANIMS  0x004470D0u  /* void(void), all nine */
 #define ADDR_FREE_VEHICLE_ANIMS  0x0045A990u  /* void(void), both arrays */
@@ -3268,6 +3269,28 @@
  * The id is 1 for soldiers and 0x51 for vehicles and turrets, which the
  * shipped `.ani` files bear out -- rifleman.ani has id 1 and every vehicle and
  * turret file has 81. */
+/* 0x0043C730, tail-jumped from the roach loader at 0x0043CCF0. The roach's
+ * collision footprint, one record per facing: a 16-pixel grid over the
+ * sprite, a block kept when 16 of its 64 two-pixel samples are opaque.
+ *
+ * The record is {int32_t count; AM2_Point pts[40]} -- 0xA4 bytes, and the
+ * stride is what says 40. The builder's own pointer starts at the POINTS and
+ * writes the count through `[ebp-4]`, so the array really begins at
+ * 0x00654CA8; taking 0x00654CAC as the base put the whole table one dword
+ * early, over the global at 0x00654CA4, and no A/B could see it. */
+#define ADDR_BUILD_ROACH_FOOTPRINTS 0x0043C730u  /* void(void) */
+#define ADDR_ROACH_FOOTPRINT_FACINGS 0x00654CA0u /* int32_t */
+#define ADDR_ROACH_FOOTPRINTS       0x00654CACu  /* the first record's POINTS;
+                                                  * its count is the dword
+                                                  * below, at 0x00654CA8 */
+#define AM2_FOOTPRINT_STRIDE        0xA4
+#define AM2_FOOTPRINT_POINTS        40
+#define AM2_FOOTPRINT_STEP          16   /* the grid */
+#define AM2_FOOTPRINT_SAMPLE        2    /* within a block */
+#define AM2_FOOTPRINT_MIN_SOLID     16   /* of the 64 samples */
+/* 0x00446290, two callers. Is this sprite opaque at this point: the run-length
+ * mask for a software format, the bounding box for anything else. */
+#define ADDR_SPRITE_SOLID_AT     0x00446290u  /* int32_t(AM2_Sprite *, AM2_Point) */
 #define ADDR_SOLDIER_ANIM_SPRITE 0x0044BB30u  /* AM2_Sprite *(kind, heading) */
 #define ADDR_VEHICLE_ANIM_SPRITE 0x0045D9B0u
 #define ADDR_TURRET_ANIM_SPRITE  0x0045DA20u

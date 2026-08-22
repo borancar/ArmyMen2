@@ -165,6 +165,14 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
  * slot past them, and the surface they were drawn from. */
 void __cdecl FreeMenuSprites(void);
 
+/* 0x0043C730. Build the roach's collision footprint, one record per facing.
+ * See the note in sprite.cpp for the grid and the record layout. */
+void __cdecl BuildRoachFootprints(void);
+
+/* 0x00446290. Is this sprite opaque at this point -- the run-length mask for a
+ * software format, the bounding box for anything else. */
+int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at);
+
 /* 0x0044BB30, 0x0045D9B0 and 0x0045DA20. The sprite to draw for a unit of this
  * kind facing this way: the animation with a fixed id (1 for soldiers, 0x51
  * for vehicles and turrets), the heading rounded to one of its facings, frame

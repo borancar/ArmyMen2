@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 552 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 551 | 541 of them below the CRT line |
+| `patch_replace` sites | 555 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 554 | 544 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,432 / 372,816 B (**27.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 127,744 / 372,816 B (34.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 102,960 / 372,816 B (**27.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 128,272 / 372,816 B (34.4%) | what every earlier session quoted, and an over-count |
 | modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -105,6 +105,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make selftest` | current | **7,282** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
+| `tools/footprints.py` | current | 32 records, 237 points, 5,256 bytes, sha256 `52a1d32c...` -- byte-identical to `AM2_NOPATCH=1` |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
@@ -194,6 +195,24 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The mis-centred trig table happened again, and only a table dump caught
+  it.** `BuildRoachFootprints` writes each record's count through `[ebp-4]`
+  with `ebp` starting at the POINTS, so the array begins at `0x00654CA8`.
+  Taking `0x00654CAC` as the base put the whole table one dword early, over the
+  global at `0x00654CA4` -- every point correct and every one in the wrong
+  place. `tools/footprints.py` found it on its first run by hashing the raw
+  region rather than the decoded records.
+
+- **And that A/B cannot fail on this at all.** With the sample step doubled
+  from 2 to 4, all 32 records change and the point total drops from 237 to 25;
+  `ab.sh bootcamp` is still clean at the usual 22 pixels with an identical log.
+  So the table is verified by `footprints.py` or by nothing.
+
+- **`0x0043C720` was 12 bytes, not 432.** It is `FreeMissileAnims`, the fifth
+  anim sweep, and `docs/functions.tsv` had run it together with the roach
+  footprint builder next door. The teardown table's comment said it "does more
+  than free" on that basis; a merged entry, exactly as `merges.py` warns.
 
 - **The three animation lookups are what prove anim.h's field names.**
   `0x0044BB30`, `0x0045D9B0` and `0x0045DA20` each find the entry with a fixed
