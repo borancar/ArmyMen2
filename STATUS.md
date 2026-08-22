@@ -183,11 +183,19 @@ counts probe before reading one as coverage -- that is what turned the
     is "droping item:%x".
   - `item[8] |= 2` happens on BOTH exits of that last branch, taken or not.
 
-  What is missing is honest names for `0x0040F560`, `0x0045EE80`, `0x00447990`
-  and `0x0044C150`. `0x0040F560` is thiscall on the comm object with the same
-  `army == 4` shortcut `CommSlotForArmy` has, so it is a sibling of it -- but
-  "a sibling of" is not a name, and inventing four from one call site is the
-  trap this file has just spent three commits documenting. Read them first.
+  **One of the four is now named, and it changes what the function means.**
+  `0x0045EE80` looks a uid up through `ADDR_OBJ_BY_UID` and requires kind 4,
+  complaining **"uid wasn't a weapon!"** when it is not. So it is
+  `WeaponByUid`, kind 4 is a WEAPON, and the "inventory" at `unit[0x54C]` is a
+  weapon inventory -- which makes `item[0xCC]` an AMMO count rather than a
+  generic use count, and the drop at zero the gun being thrown away when it is
+  empty. Named from its own message, not from this call site.
+
+  Three still need reading: `0x0040F560`, `0x00447990` and `0x0044C150`.
+  `0x0040F560` and `0x0040F5A0` are a thiscall pair on the comm object -- the
+  second indexes **112-byte per-army records** at `comm + army*112` and tests
+  fields at `0x020C`, `0x0214` and `0x025C` against `comm[0x3D8]`. That record
+  size is worth having on its own; the pair's meaning is not established.
 
 - **`LoadDibFlipped` cannot run in this installation, and that is measurable
   rather than inferred.** Its only caller globs

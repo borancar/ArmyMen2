@@ -1979,6 +1979,12 @@
  * whatever the record at ADDR_SCRIPT_OBJ_TARGET selects, which the objclass
  * branch has just filled in. */
 #define ADDR_OBJ_BY_UID           0x00427820u  /* obj *(int32_t uid) */
+/* 0x0045EE80: the same lookup, but insisting the object is kind 4. It names
+ * what that means itself -- "uid wasn't a weapon!" -- so kind 4 is a WEAPON
+ * and this is WeaponByUid. Answers null, having complained, for any other
+ * kind. */
+#define ADDR_WEAPON_BY_UID        0x0045EE80u  /* obj *(int32_t uid) */
+#define AM2_OBJ_KIND_WEAPON       4
 #define ADDR_FIRST_SCRIPT_OBJ     0x00427850u
 #define ADDR_NEXT_SCRIPT_OBJ      0x00427880u
 #define ADDR_OBJ_TAKES_SCRIPT     0x00433860u  /* int32_t(obj *) */
