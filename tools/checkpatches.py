@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
-"""Every address must be patched by exactly one reconstruction.
+"""Every address must be patched by exactly one reconstruction, and reached.
+
+It also checks that no `patch_replace` sits after a `return` in the install
+function holding it, which is the same defect from the other side: the call is
+there, every tool that reads the sources counts it, and it never executes.
+
+That was not hypothetical. `dist_install` opened with
+`return patch_replace(ADDR_APPROX_DIST, ...)` and had three more calls under
+it; `savetag_install` had one. So `ApproxDistXY`, `AngleDelta`, `RoundTo8` and
+`WriteSaveTag` had never been installed in the game at all, while
+`docs/boundary.md`, `tools/coverage.py` and this file's own count all reported
+them done -- and every A/B that "covered" them was running the original. The
+game log is what settles it: one `patch:` line where there should have been
+four. GCC does not warn; -Wunreachable-code has been a no-op for years.
 
 Two `patch_replace` calls on the same address is a real defect and a quiet one:
 the second writes its jump over the first, so whichever install runs last wins
@@ -86,9 +99,56 @@ def main():
             print("  0x%08X patched %d times: %s" % (v, len(where), ", ".join(where)))
             rc = 1
 
+    # A patch after a `return` in the same install function. Only a return
+    # at the function's own brace depth kills what follows; one inside an `if`
+    # is ordinary.
+    dead = 0
+    for root, _dirs, files in os.walk(os.path.join(ROOT, "src")):
+        for f in sorted(files):
+            if not f.endswith((".c", ".cpp")):
+                continue
+            path = os.path.join(root, f)
+            lines = open(path).readlines()
+            i = 0
+            while i < len(lines):
+                if not re.match(r"(int|void)\s+\w+_install\(void\)", lines[i]):
+                    i += 1
+                    continue
+                depth = 0
+                ret = 0
+                i += 1
+                while i < len(lines):
+                    line = lines[i]
+                    if depth == 1:
+                        if "patch_replace" in line and ret:
+                            print("  %s:%d patch_replace is unreachable -- a "
+                                  "`return` on line %d"
+                                  % (os.path.relpath(path, ROOT), i + 1, ret))
+                            dead += 1
+                            ret = 0
+                        elif re.match(r"\s*return\b", line):
+                            # Not a return that is the unbraced body of an
+                            # `if` -- winmain_install's AM2_PROBE_NOWIN is one
+                            # of those and is perfectly ordinary.
+                            prev = ""
+                            j = i - 1
+                            while j >= 0 and not lines[j].strip():
+                                j -= 1
+                            if j >= 0:
+                                prev = lines[j].strip()
+                            if not re.match(r"(if|else|for|while)\b", prev):
+                                ret = i + 1
+                    depth += line.count("{") - line.count("}")
+                    i += 1
+                    if depth <= 0:
+                        break
+    if dead:
+        rc = 1
+
     if rc == 0:
-        print("%d addresses patched, each exactly once; %d ADDR_ aliases "
-              "(AM2_SHOW_ALIASES=1 to list)" % (len(sites), len(aliases)))
+        print("%d addresses patched, each exactly once, none after a return; "
+              "%d ADDR_ aliases (AM2_SHOW_ALIASES=1 to list)"
+              % (len(sites), len(aliases)))
     return rc
 
 

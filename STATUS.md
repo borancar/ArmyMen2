@@ -11,6 +11,17 @@ Last updated: **2026-08-22**, at `8d0fcfa`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **Four reconstructions had never been installed.** `dist_install` opened
+  with `return patch_replace(...)` and had three calls under it;
+  `savetag_install` had one. Every tool that reads the sources counted them
+  done; the game's own log printed one `patch:` line where there should have
+  been four. So `ApproxDistXY`, `AngleDelta`, `RoundTo8` and `WriteSaveTag`
+  had never run once, and every A/B that "covered" them compared the original
+  against itself. Fixed, and `tools/checkpatches.py` now fails on the shape.
+  The three arithmetic ones went live immediately: `ApproxDistXY` 58,
+  `AngleDelta` 1,252, `RoundTo8` 4,876 in one Boot Camp mission, `bootcamp`
+  clean. `WriteSaveTag` still reads 0 because nothing saves in that run.
+
 - **A whole setter family is reconstructed and never runs.** A counts probe on
   the campaign reads `EvtSetField540=0`, `EvtSetByte530=0` and
   `LookupType3ByUID=0`; of the family only `EvtSetByte40` fires, 4 times. They

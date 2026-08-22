@@ -517,6 +517,29 @@ that is not for want of coverage: `from` arrives as 0, 9, 10, 60 and 100 over
 for everything Boot Camp remaps. Covered, and still not discriminating; the
 guard stays verified by reading.
 
+**Four reconstructions had never been installed, and every tool said they
+were done.** `dist_install` opened with
+`return patch_replace(ADDR_APPROX_DIST, ...)` and had three more calls under
+it; `savetag_install` had one. The calls are there, so `tools/coverage.py`,
+`docs/boundary.md` and `tools/checkpatches.py`'s own count all read them as
+reconstructed — and `ApproxDistXY`, `AngleDelta`, `RoundTo8` and `WriteSaveTag`
+had never run in the game once. Every A/B that "covered" them was comparing the
+original against itself.
+
+GCC does not warn: `-Wunreachable-code` has been a no-op for years. What
+settles it is the game's own log, which prints one `patch:` line per install —
+one where there should have been four.
+
+`tools/checkpatches.py` fails on a `patch_replace` after a `return` at an
+install function's own brace depth now, and tested in the failing direction by
+putting the `return` back. A return that is the unbraced body of an `if` is
+ordinary and is allowed — `winmain_install`'s `AM2_PROBE_NOWIN` is one.
+
+Fixing it put three functions into live play for the first time:
+`ApproxDistXY` 58, `AngleDelta` 1,252 and `RoundTo8` 4,876 in one Boot Camp
+mission, with `bootcamp` still clean. **A patch list is a list of intentions;
+the log is the list of installs.**
+
 **The duplicate-patch check earned its keep a second time.** `TakeUid` was
 about to be a second reconstruction of `AllocUid`, which `script.cpp` had
 already patched at the same address -- the `ScriptCompare` mistake exactly.

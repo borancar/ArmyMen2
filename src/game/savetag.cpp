@@ -54,7 +54,11 @@ void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag)
 
 int savetag_install(void)
 {
-    return patch_replace(ADDR_CHECK_SAVE_TAG, (const void *)CheckSaveTag, "CheckSaveTag", 4);
-    patch_replace(ADDR_WRITE_SAVE_TAG, (const void *)WriteSaveTag,
-                  "WriteSaveTag", 2);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_CHECK_SAVE_TAG, (const void *)CheckSaveTag,
+                        "CheckSaveTag", 4);
+    rc |= patch_replace(ADDR_WRITE_SAVE_TAG, (const void *)WriteSaveTag,
+                        "WriteSaveTag", 2);
+    return rc;
 }

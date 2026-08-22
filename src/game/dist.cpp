@@ -86,8 +86,16 @@ int32_t __cdecl RoundTo8(int32_t value, uint32_t bits)
 
 int dist_install(void)
 {
-    return patch_replace(ADDR_APPROX_DIST, (const void *)ApproxDist, "ApproxDist", 2);
-    patch_replace(ADDR_APPROX_DIST_XY, (const void *)ApproxDistXY, "ApproxDistXY", 2);
-    patch_replace(ADDR_ANGLE_DELTA, (const void *)AngleDelta, "AngleDelta", 2);
-    patch_replace(ADDR_ROUND_TO_8, (const void *)RoundTo8, "RoundTo8", 2);
+    int rc = 0;
+
+    /* Accumulated, not returned from the first: a `return` on line one made
+     * the three below dead code, and they were never installed at all. */
+    rc |= patch_replace(ADDR_APPROX_DIST, (const void *)ApproxDist,
+                        "ApproxDist", 2);
+    rc |= patch_replace(ADDR_APPROX_DIST_XY, (const void *)ApproxDistXY,
+                        "ApproxDistXY", 2);
+    rc |= patch_replace(ADDR_ANGLE_DELTA, (const void *)AngleDelta,
+                        "AngleDelta", 2);
+    rc |= patch_replace(ADDR_ROUND_TO_8, (const void *)RoundTo8, "RoundTo8", 2);
+    return rc;
 }
