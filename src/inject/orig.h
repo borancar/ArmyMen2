@@ -112,6 +112,7 @@
 #define ADDR_EDIT_TAKE_FOCUS    0x00454CE0u /* void(AM2_Widget *, int32_t) */
 #define ADDR_EDIT_REPAINT       0x00454D00u /* void(AM2_Widget *) */
 #define ADDR_EDIT_UPDATE        0x00454E20u /* void(AM2_Widget *) */
+#define ADDR_EDIT_DRAW          0x00454D20u /* void(AM2_Widget *, RECT) */
 /* The label subclass that highlights when focused -- vtable 0x0046FB80, and
  * the class the CONTROLS panel builds its captions from. */
 #define ADDR_FOCUSLABEL_DELETE    0x00450CC0u /* AM2_Widget *(AM2_Widget *, int32_t) */

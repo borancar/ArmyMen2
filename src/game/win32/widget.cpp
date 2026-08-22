@@ -16,6 +16,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 /* The layout claims above are compiler-checked rather than commented. */
 static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
@@ -335,6 +336,43 @@ void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip)
         }
     }
     WidgetPaint(w, clip);
+}
+
+void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    char           buf[EDIT_DRAW_BUFFER];
+    RECT           paint;
+    int32_t        ink;
+
+    WidgetScreenRect(w);
+
+    if (!IntersectRect(&paint, &w->rect, &clip))
+        return;
+
+    ClearRegion(&paint, *(const uint8_t *)(self + EDIT_OFF_PAPER));
+
+    /* The field's own buffer is never written -- the caret lives only in this
+     * copy, and therefore only in the painted image. */
+    strcpy(buf, *(const char *const *)(self + EDIT_OFF_TEXT));
+    if (w->flag44) {
+        size_t len = strlen(buf);
+
+        buf[len]     = '_';
+        buf[len + 1] = '\0';
+        ink = *(const uint8_t *)(self + EDIT_OFF_INK_FOCUS);
+    } else {
+        ink = *(const uint8_t *)(self + EDIT_OFF_INK);
+    }
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    orig_draw_text_clipped(w->rect.left, w->rect.top, buf,
+                           *(const int32_t *)(self + EDIT_OFF_FONT),
+                           paint, ink);
+
+    UnlockSurface();
 }
 
 void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce)
@@ -818,6 +856,8 @@ int widget_install(void)
                         "ButtonUpdate", 4);
     rc |= patch_replace(ADDR_BUTTON_PAINT, (const void *)ButtonPaint,
                         "ButtonPaint", 2);
+    rc |= patch_replace(ADDR_EDIT_DRAW, (const void *)EditDraw,
+                        "EditDraw", 1);
     rc |= patch_replace(ADDR_EDIT_TAKE_FOCUS, (const void *)EditTakeFocus,
                         "EditTakeFocus", 1);
     rc |= patch_replace(ADDR_EDIT_REPAINT, (const void *)EditRepaint,

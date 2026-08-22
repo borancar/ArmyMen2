@@ -484,6 +484,36 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
  * A button with no parent picks nothing and keeps whatever sprite it had. */
 void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip);
 
+/* The edit box's own fields. Note the two ink bytes are the OPPOSITE way round
+ * from the focus label's: here 0x0064 is the focused colour and 0x0065 the
+ * unfocused one, and in FocusLabel it is 0x0065 focused and 0x0064 not.
+ * Different classes, so there is no contradiction -- but it is the sharpest
+ * illustration yet of why these tails must not be merged. */
+#define EDIT_OFF_TEXT       0x58   /* char *, the current contents */
+#define EDIT_OFF_FONT       0x60   /* int32_t */
+#define EDIT_OFF_INK_FOCUS  0x64   /* uint8_t, ink while focused */
+#define EDIT_OFF_INK        0x65   /* uint8_t, ink while not focused */
+#define EDIT_OFF_PAPER      0x66   /* uint8_t, background */
+
+/* The original builds its string in 68 bytes of stack. Kept at that size
+ * rather than rounded, because the caret is appended into it and the size is
+ * the only thing standing between a long field and the return address. */
+#define EDIT_DRAW_BUFFER    68
+
+/* Original: 0x00454D20, thiscall, slot 1 of the edit box. Place, clip, clear
+ * the background, COPY the text into a stack buffer, and -- if this field has
+ * the focus -- append a literal `'_'` as the caret before drawing.
+ *
+ * The caret is why the text is copied at all: the field's own buffer is not
+ * written, so the caret exists only in the painted image. And because 0x0044
+ * is set by WidgetTakeFocus and cleared by WidgetRepaint, it toggles, which is
+ * what makes the caret blink -- the same blinking CLAUDE.md recorded from the
+ * other end when the multiplayer A/B came out 90 to 100 pixels apart.
+ *
+ * Reached through LockSurface like every other rasteriser here; a failed lock
+ * leaves the cleared background with no text over it, as in LabelDraw. */
+void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip);
+
 /* The edit box -- vtable 0x0046FC98, and the class CLAUDE.md names when it says
  * porting g_charHandler means porting the text-field system.
  *

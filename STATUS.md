@@ -70,14 +70,14 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 444 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 444 | 437 of them below the CRT line |
+| `patch_replace` sites | 445 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 445 | 438 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 100,368 / 372,816 B (**26.9%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 61, 170 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 62, 171 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how
@@ -196,6 +196,7 @@ counts probe before reading one as coverage -- that is what turned the
   | focus highlight never shown (`ButtonPaint`) | 249 | yes, by 43 |
   | toggle always ON (`TogglePaint`) | **212** | **no** -- `multi` budget 500 |
   | handler never installed (`EditTakeFocus`) | **72** | **no** |
+  | wrong caret glyph (`EditDraw`) | **34** | **no** -- and not in the tree either |
   | row strip not repainted (`ListTakeFocus`) | **0** | **no** -- unobservable |
   | two constructed flags, focus quirk, repaint deferral | 0 | no |
 
