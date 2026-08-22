@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 413 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 413 | 406 of them below the CRT line |
+| `patch_replace` sites | 414 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 414 | 407 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 93,456 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 93,584 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,26 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`controls` compares the log and ONE frame, and that is its ceiling.**
+  Three mutations have now passed it that are genuinely wrong code:
+  `WidgetRepaint` never deferring to an ancestor, and `WidgetTakeFocus`
+  focusing the obvious widget instead of the parent's first child, and the two
+  constructed flags. None of them changes the frame that is still on screen
+  when the screenshot is taken.
+
+  So the layer needs a configuration that samples DURING the interaction, not
+  after it. The cheapest version is a second screenshot between the two clicks
+  -- the OPTIONS menu with one entry highlighted is exactly the transient
+  state these mutations disturb. Worth doing before reconstructing the click
+  slot (`0x00454BD0`, 17 classes), because that one is all transient.
+
+- **`WidgetTakeFocus` teaches the type of field 0x0034.** It stores `this` and
+  `firstChild` there and dispatches a vtable slot on what it reads back, so it
+  is a widget pointer -- `focusedChild` -- and not the `int32_t` the struct
+  had. Reconstructing a function is how the struct gets learned; the fields
+  were named from the constructor, which only ever writes zeroes and cannot
+  say what a zero is.
 
 - **The widget vtable has five slots and they are all named now.** Reading all
   33 vtables at once is what did it -- slot 3 is the same function in 30 of

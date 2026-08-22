@@ -41,6 +41,13 @@
  * use. Same leading arguments, then the clip rectangle BY VALUE and the
  * colour. `^` in the string is an escape that rewrites the colour argument. */
 #define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,str,font,RECT,colour) */
+/* 0x004274D0: copy the 256-byte current key buffer over the previous one, so
+ * every edge test that follows sees no change. Called where the game wants the
+ * keystroke that got it here not to be seen again. */
+#define ADDR_LATCH_KEY_STATE    0x004274D0u /* void(void) */
+/* 0x00454070, thiscall, vtable slot 3 of 30 of the 33 widget classes. Move
+ * focus to this widget within its parent. */
+#define ADDR_WIDGET_TAKE_FOCUS  0x00454070u /* void(AM2_Widget *, int32_t) */
 /* 0x00453FF0, thiscall, vtable slot 4 of 29 of the 33 widget classes. Repaint:
  * clear the dirty flag, pick what to draw, and dispatch through slot 1. */
 #define ADDR_WIDGET_REPAINT     0x00453FF0u /* void(AM2_Widget *) */

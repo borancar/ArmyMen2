@@ -35,7 +35,11 @@ typedef struct AM2_Widget {
     struct AM2_Widget *parent;      /* 0x0028  null for a top-level widget */
     int32_t  unknown2C;             /* 0x002C */
     struct AM2_Widget *nextSibling; /* 0x0030  next child of the same parent */
-    int32_t  unknown34;             /* 0x0034 */
+    struct AM2_Widget *focusedChild;/* 0x0034  which child has the focus.
+                                     * A pointer, established by
+                                     * WidgetTakeFocus: it stores `this` and
+                                     * `firstChild` into it and dispatches a
+                                     * vtable slot on what it reads back. */
     int32_t  unknown38;             /* 0x0038 */
     int32_t  flag3C;                /* 0x003C  constructed as 1 */
     int32_t  unknown40;             /* 0x0040  NOT written by the constructor */
@@ -81,6 +85,30 @@ typedef struct AM2_Widget {
 /* Slot 1's signature: the clip rectangle by value, thiscall. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetPaintFn)(AM2_Widget *w,
                                                             RECT clip);
+
+/* Slot 4's signature. */
+typedef void (__attribute__((thiscall)) *AM2_WidgetRepaintFn)(AM2_Widget *w);
+
+/* Original: 0x00454070, thiscall, slot 3 of 30 classes. Move the focus within
+ * this widget's parent to this widget, and answer nothing.
+ *
+ * The `announce` argument gates the visible half: without it the focus moves
+ * silently, with it the menu click sound plays and this widget repaints
+ * itself. Either way the previously focused sibling is repainted, because
+ * that is what takes its highlight off.
+ *
+ * One branch is odd and is reproduced rather than tidied. When the parent had
+ * NO focused child, the original sets the parent's focus to its FIRST CHILD
+ * rather than to the widget that is taking focus -- so the very first call on
+ * a fresh parent focuses whichever child was added first, not the caller.
+ * That may well be deliberate, since a fresh dialog wants its first control
+ * highlighted, but it is not what the function's name would lead you to
+ * expect and nothing here should smooth it over.
+ *
+ * The input pair after it is PollInput followed by latching the key buffer,
+ * which together mean "and do not let the keystroke that got us here be seen
+ * again". */
+void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce);
 
 /* Original: 0x00453FF0, thiscall, slot 4 of 29 classes. Repaint this widget.
  *

@@ -7,6 +7,8 @@
 #include "widget.h"
 #include "surface.h"
 #include "../rect.h"
+#include "frame.h"
+#include "audio.h"
 #include "../image.h"
 #include "../../inject/patch.h"
 
@@ -32,6 +34,41 @@ typedef void (__cdecl *AM2_DrawTextClippedFn)(int32_t x, int32_t y,
                                               RECT clip, int32_t colour);
 #define orig_draw_text_clipped \
     ((AM2_DrawTextClippedFn)(uintptr_t)ADDR_DRAW_TEXT_CLIPPED)
+
+/* 0x004274D0. Still original: it is two globals and a rep movsd, and the
+ * buffers are the input layer's rather than this module's. */
+typedef void (__cdecl *AM2_LatchKeysFn)(void);
+#define orig_latch_key_state ((AM2_LatchKeysFn)(uintptr_t)ADDR_LATCH_KEY_STATE)
+
+void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce)
+{
+    AM2_Widget *parent = w->parent;
+    AM2_Widget *had;
+
+    if (!parent)
+        return;
+
+    had = parent->focusedChild;
+    if (!had) {
+        /* The parent's first child, NOT w -- see the header. */
+        parent->focusedChild = parent->firstChild;
+    } else {
+        if (had == w)
+            return;
+        parent->focusedChild = w;
+        ((AM2_WidgetRepaintFn *)had->vtable)[WIDGET_VSLOT_REPAINT](had);
+    }
+
+    w->flag44 = 1;
+
+    PollInput();
+    orig_latch_key_state();
+
+    if (announce) {
+        PlaySoundAt(1, 0, 0, 0, 0);
+        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    }
+}
 
 void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w)
 {
@@ -88,7 +125,7 @@ AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
     w->parent      = (AM2_Widget *)0;
     w->unknown2C   = 0;
     w->nextSibling = (AM2_Widget *)0;
-    w->unknown34   = 0;
+    w->focusedChild = (AM2_Widget *)0;
     w->unknown38   = 0;
     w->flag3C      = 1;
     /* 0x0040 is deliberately not written -- the original leaves it, and
@@ -179,6 +216,8 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_TAKE_FOCUS, (const void *)WidgetTakeFocus,
+                        "WidgetTakeFocus", 30);
     rc |= patch_replace(ADDR_WIDGET_REPAINT, (const void *)WidgetRepaint,
                         "WidgetRepaint", 29);
     rc |= patch_replace(ADDR_WIDGET_CONSTRUCT, (const void *)WidgetConstruct,
