@@ -2,6 +2,9 @@
 #include <stdint.h>
 
 #include "air.h"
+#include "rect.h"     /* AM2_Rect */
+#include "item.h"     /* UidArmy -- reconstructed */
+#include "objtable.h" /* AM2_Object */
 #include "savetag.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -46,6 +49,42 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 #define g_airExtra   ((int32_t *)kAirField(AIR_OFF_EXTRA))
 #define g_airFlagA   (*(int32_t *)kAirField(AIR_OFF_FLAG_A))
 #define g_airFlagB   (*(int32_t *)kAirField(AIR_OFF_FLAG_B))
+
+typedef void *(__cdecl *AM2_ObjectsInRectFn)(const AM2_Rect *r, void *table,
+                                             const void *pred);
+#define orig_objects_in_rect \
+    ((AM2_ObjectsInRectFn)(uintptr_t)ADDR_OBJECTS_IN_RECT)
+
+uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
+{
+    int32_t   x = (int32_t)(int16_t)(where & 0xFFFF);
+    int32_t   y = (int32_t)(int16_t)(where >> 16);
+    AM2_Rect  box;
+    uint8_t  *o;
+
+    box.left   = x - AM2_AIR_ENEMY_RADIUS;
+    box.top    = y - AM2_AIR_ENEMY_RADIUS;
+    box.right  = x + AM2_AIR_ENEMY_RADIUS;
+    box.bottom = y + AM2_AIR_ENEMY_RADIUS;
+
+    o = (uint8_t *)orig_objects_in_rect(&box,
+                                        (void *)(uintptr_t)ADDR_OBJ_TABLE_ARG,
+                                        (const void *)(uintptr_t)
+                                            ADDR_MEETS_ALL_THREE);
+
+    /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
+     * OBJ_OFF_OWNER is NOT -- that constant is 0x0004 and belongs to a
+     * different structure entirely. Two right names, one collision. */
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        const AM2_Object *obj = (const AM2_Object *)o;
+
+        /* Once per candidate, not once before the loop. */
+        if ((int32_t)obj->owner != (int32_t)UidArmy(from)
+            && *(const int16_t *)(o + OBJ_OFF_HEALTH) > 0)
+            return obj->uid;
+    }
+    return 0;
+}
 
 void __cdecl AirSupportBegin(void)
 {
@@ -99,6 +138,8 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_FIND_ENEMY_NEAR, (const void *)FindEnemyNear,
+                  "FindEnemyNear", 1);
     patch_replace(ADDR_AIR_BEGIN, (const void *)AirSupportBegin,
                   "AirSupportBegin", 2);
     patch_replace(ADDR_AIR_CLEAR, (const void *)AirSupportClear,

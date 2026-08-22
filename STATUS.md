@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `a9b4166`. Working tree clean.
+Last updated: **2026-08-22**, at `9b10491`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 533 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 533 | 525 of them below the CRT line |
+| `patch_replace` sites | 534 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 534 | 526 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,520 / 372,816 B (**26.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,832 / 372,816 B (33.5%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,664 / 372,816 B (**26.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,976 / 372,816 B (33.5%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,31 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **CORRECTION: `obj + 0x0010` is the OWNER, not a kind byte.** Two commits ago
+  I wrote that `TrooperDropItem` "sets its kind byte to 4, so a dropped item
+  becomes a weapon object on the ground". It does not. `objtable.h` has had
+  that field named `owner` since long before today, and army 4 is the neutral
+  one -- so what dropping an item does is give it to NOBODY, which is what a
+  thing lying on the ground should belong to.
+
+  Two independent uses settle it: `TrooperDropItem` passes that byte to
+  `CommMustBroadcast`, which takes an army, and `FindEnemyNear` compares it
+  against `UidArmy`. I guessed a field the repo had already named -- the same
+  failure as naming a function from a call site, one level down.
+
+- **And `OBJ_OFF_OWNER` in `orig.h` is a DIFFERENT structure's field**, at
+  0x0004. The object's owner is at 0x0010 and lives in `objtable.h`'s
+  `AM2_Object`. Two right names, one collision, and the wrong one is the one
+  that greps first.
+
+- **`FindEnemyNear` calls `UidArmy` once per CANDIDATE**, not once before the
+  loop, so a query returning forty objects calls it forty times. Reproduced.
+
+- **`0x0042A240` is "every object in a rectangle"**: clip to the map extents,
+  shift down by eight into tile coordinates, walk the cells, keep what the
+  predicate accepts, and thread the result through 0x0068 of each object.
+  Named from the body; three callers.
 
 - **"EndMission" is a log PREFIX, not a function name**, and the self-naming
   sweep would pair it with whichever function it reached first. 0x00408FF0

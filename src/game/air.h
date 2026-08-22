@@ -44,6 +44,19 @@ void __cdecl AirSupportBegin(void);
 void __cdecl AirSupportClear(void);
 void __cdecl AirSupportPop(void);
 
+/* Original: 0x00409680, and the name is ours. Answer the uid of an enemy
+ * within five hundred units of `where`, or zero.
+ *
+ * "Enemy" is two tests: the object's OWNER differs from the asking uid's army,
+ * and its health is above zero. Both have to hold, and the owner is the byte
+ * objtable.h already calls `owner` -- read here with a signed load, as it is
+ * everywhere else.
+ *
+ * UidArmy is called once per CANDIDATE rather than once before the loop, so a
+ * query returning forty objects calls it forty times. Reproduced; hoisting it
+ * would be a different program. */
+uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from);
+
 /* 0x00409840 and 0x00409870. A tag and one fixed 584-byte block at
  * 0x004F945C, written and read straight -- the simplest section in the file
  * and the same shape map.cpp's is.

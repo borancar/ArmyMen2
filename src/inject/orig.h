@@ -3179,6 +3179,20 @@
 #define ADDR_MAP_CODE_18_28    0x00406A40u  /* int32_t(int32_t code) */
 #define ADDR_OBJ_CODE_UNMAPPED 0x00449EF0u  /* int32_t(const void *obj) */
 #define ADDR_MEETS_ALL_THREE   0x00409650u  /* int32_t(const void *p) */
+/* 0x0042A240, 400 bytes and three callers. Every object in a rectangle: clip
+ * the rectangle to the map (0x00514DD0 and 0x00514DD4 are its extents), turn
+ * it into tile coordinates with an arithmetic shift of eight, walk the cells
+ * and keep whatever the predicate accepts. The name is ours, from the body.
+ *
+ * The result is a list threaded through 0x0068 of each object. */
+#define ADDR_OBJECTS_IN_RECT   0x0042A240u  /* obj *(const AM2_Rect *, void *, pred) */
+/* 0x00409680. Is there an enemy within five hundred units of a point? Used by
+ * DoAirSupport to decide whether paratroopers are dropping into a fight, which
+ * is the difference between its kind 2 and its kind 3. */
+#define ADDR_FIND_ENEMY_NEAR   0x00409680u  /* uint32_t(uint32_t where, uint32_t from) */
+#define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
+#define OBJ_OFF_HEALTH         0x62u        /* int16_t */
+#define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u
