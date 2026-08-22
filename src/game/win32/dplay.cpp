@@ -24,6 +24,7 @@
  */
 
 #include "../gameproc.h"
+#include "widget.h"   /* ListAdd */
 #include "dplay.h"
 #include "../armymsg.h"   /* SendGamePause */
 #include "frame.h"
@@ -417,7 +418,6 @@ int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
 typedef void (__attribute__((thiscall)) *am2_list_add_fn)(void *list,
                                                           const char *name,
                                                           void *data);
-#define orig_list_add     (*(am2_list_add_fn)ADDR_LIST_ADD)
 #define g_connectionList  (*(void **)(uintptr_t)ADDR_CONNECTION_LIST)
 
 int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
@@ -442,7 +442,7 @@ int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
 
     /* Read back through the global rather than the argument, as the original
      * does -- they are the same object, but only because nothing reassigned it. */
-    orig_list_add(g_connectionList,
+    ListAdd(g_connectionList,
                   (const char *)(uintptr_t)ADDR_STR_COMPUTER_ONLY, NULL);
     return 1;
 }

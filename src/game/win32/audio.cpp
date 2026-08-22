@@ -1648,10 +1648,32 @@ int32_t __cdecl LoadAudioSection(am2_FILE *fp)
     return 1;
 }
 
+typedef int32_t (__cdecl *AM2_RandFn)(void);
+#define orig_rand (*(AM2_RandFn)(uintptr_t)ADDR_GAME_RAND)
+
+void __cdecl SpeakLine(int32_t group, int32_t owner)
+{
+    const uint8_t     *rec;
+    int32_t            count;
+    const char *const *names;
+
+    if ((int32_t)g_defaultOwner != owner)
+        return;
+
+    rec = (const uint8_t *)(uintptr_t)ADDR_VOICE_GROUPS
+          + (uint32_t)group * AM2_VOICE_GROUP_STRIDE;
+    count = *(const int32_t *)rec;
+    names = (const char *const *)(rec + 4);
+
+    PlayDynamicSound(names[orig_rand() % count], 0, 0, 0, 0, AM2_VOICE_SLOT,
+                     1, 0);
+}
+
 int audio_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_SPEAK_LINE, (const void *)SpeakLine, "SpeakLine", 2);
     rc |= patch_replace(ADDR_STOP_AUDIO_STREAM, (const void *)StopAudioStream,
                         "StopAudioStream", 0);
     rc |= patch_replace(ADDR_SAVE_AUDIO_SECTION, (const void *)SaveAudioSection,

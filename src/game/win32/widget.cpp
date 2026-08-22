@@ -1396,6 +1396,23 @@ int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
     return -1;
 }
 
+void __attribute__((thiscall)) ListAdd(void *list, const char *name,
+                                       void *value)
+{
+    int32_t  *count = (int32_t *)list;
+    uint8_t **base  = (uint8_t **)((uint8_t *)list + 4);
+    uint8_t  *row;
+
+    *base = (uint8_t *)am2_realloc(*base,
+                                   (size_t)(*count + 1) * AM2_LIST_ROW_STRIDE);
+    /* The count is re-read after the realloc, as the original does, and the
+     * destination is computed from the NEW base. */
+    row = *base + (size_t)*count * AM2_LIST_ROW_STRIDE;
+    strcpy((char *)row, name);
+    *(void **)(row + AM2_LIST_ROW_VALUE) = value;
+    *count = *count + 1;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1473,6 +1490,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
                         (const void *)FocusLabelTakeFocus,
                         "FocusLabelTakeFocus", 1);
+    rc |= patch_replace(ADDR_LIST_ADD, (const void *)ListAdd, "ListAdd", 3);
     rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
                         "KeyNameIndexOf", 1);
     rc |= patch_replace(ADDR_SESSION_CTOR, (const void *)RecordCtor,

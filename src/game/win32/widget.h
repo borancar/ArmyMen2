@@ -879,6 +879,18 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
  * is a literal address in the original, not a count. */
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
+/* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
+ * {int32 count; row *base}, where a row is 0x104 bytes -- a name of up to
+ * 0x100 and a dword beside it.
+ *
+ * Every append reallocs to exactly count+1 rows, so filling a list of n costs
+ * n reallocs and n copies of everything before it; nothing rounds up. And the
+ * name is copied with no bound at all, so a name of 0x100 or more runs into
+ * the value and past the row. Both are the original's, and the shipped lists
+ * are short. */
+void __attribute__((thiscall)) ListAdd(void *list, const char *name,
+                                       void *value);
+
 void __attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
 void __attribute__((thiscall)) RecordResetAlias(void *rec);
 

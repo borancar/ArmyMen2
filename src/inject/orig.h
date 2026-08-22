@@ -67,6 +67,10 @@
  * a control rather than about a key. The names are ours. */
 #define ADDR_KEY_BINDINGS       0x004854BCu /* uint8_t[][2], scancode pairs */
 #define ADDR_ACTION_KEY_DOWN    0x004274F0u /* int32_t(int32_t action) */
+/* 0x00427530, 19 callers: the same two keys, but "just pressed" rather than
+ * "down" -- a key counts only if it is down AND its bit differs between the
+ * two poll buffers. */
+#define ADDR_ACTION_KEY_PRESSED 0x00427530u /* int32_t(int32_t action) */
 /* 0x00453E80, thiscall, 21 callers: the base widget's per-frame update. Places
  * itself through WidgetScreenRect and walks its children calling THEIR slot 2,
  * which is what makes WidgetScreenRect the busiest function in the tree.
@@ -1146,6 +1150,15 @@
 #define SOUND_FIXED_SLOTS        0x38    /* 56 */
 #define ADDR_PLAY_SOUND_AT       0x0040C040u /* void(idx,flags,?,x,y) */
 #define ADDR_PLAY_DYNAMIC_SOUND  0x0040B8F0u /* void(name,loop,?,x,y,slot,pri,owner) */
+/* 0x0040BFF0, 35 callers. One of a group's voice lines, at random, and only
+ * when the owner is ours. The groups are 20-byte records at 0x00474444 -- a
+ * count and up to four wave names -- and the names say what they are:
+ * Aerosol.wav, AirStrike.wav, AutoRifle.wav, Bazooka.wav, Disguise.wav. It
+ * goes out on slot 0x10, which orig.h already records as a voice slot. */
+#define ADDR_SPEAK_LINE          0x0040BFF0u /* void(int32 group, int32 owner) */
+#define ADDR_VOICE_GROUPS        0x00474440u /* {int32 count; const char *[4]} */
+#define AM2_VOICE_GROUP_STRIDE   20
+#define AM2_VOICE_SLOT           0x10
 #define ADDR_VOS_DIR             0x00474D70u /* "audio\\vos" */
 #define ADDR_VOLUME_VOICE        0x00512320u /* used for slots 0 and 16 */
 #define SOUND_REC_OFF_OWNER_DS   0x08u   /* the IDirectSound it was made from */
@@ -2778,8 +2791,15 @@
 #define ADDR_JOIN_CONTEXT        0x004751B4u  /* int32_t, cleared once a session exists */
 /* Creates the DirectPlay session -- slot 24 is Open, with DPOPEN_CREATE. */
 #define ADDR_COMM_OPEN_SESSION   0x0040DFC0u  /* thiscall int32(this, const char *) */
-/* Appends one named entry to a list object. 16 callers. */
+/* Appends one named entry to a list object. 16 callers.
+ *
+ * The object is {int32 count; record *base} and a record is 0x104 bytes: a
+ * name of up to 0x100 and a dword beside it. Every append reallocs to exactly
+ * count+1 records, so adding n entries is n reallocs; nothing here rounds up.
+ * The name is copied with no bound at all. */
 #define ADDR_LIST_ADD            0x00453A30u  /* thiscall void(this, const char *, void *) */
+#define AM2_LIST_ROW_STRIDE      0x104u
+#define AM2_LIST_ROW_VALUE       0x100u
 #define ADDR_STR_COMPUTER_ONLY   0x00475300u  /* "Play Against Computer Only" */
 
 /* The packet transmit and the three helpers its watchdog uses. */

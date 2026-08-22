@@ -593,6 +593,12 @@ void __cdecl LatchKeyState(void);
 void __cdecl ConsumeKey(int32_t dik);
 int32_t __cdecl ActionKeyDown(int32_t action);
 
+/* 0x00427530, 19 callers -- the same two keys, but "just pressed": a key
+ * counts only if it is down AND its bit differs between the two poll buffers.
+ * The alternate is tested the same way, so an action with no alternate tests
+ * scancode 0 and gets nothing. */
+int32_t __cdecl ActionKeyPressed(int32_t action);
+
 /* 0x0040F190, 47 callers -- CommSlotForArmy's inverse. Slot 4 answers 4
  * without touching the object, the same convention army 4 has everywhere. */
 int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);

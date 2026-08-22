@@ -1082,6 +1082,21 @@ void __attribute__((thiscall)) ClearPtrList(void *rec)
     r[2] = 0;
 }
 
+int32_t __cdecl ActionKeyPressed(int32_t action)
+{
+    int32_t i;
+
+    for (i = 0; i < 2; i++) {
+        uint32_t k = g_keyBindings[action * 2 + i];
+
+        if (!(g_curKeys[k] & 0x80))
+            continue;
+        if ((g_prevKeys[k] ^ g_curKeys[k]) & 0x80)
+            return 1;
+    }
+    return 0;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1179,6 +1194,8 @@ int misc_install(void)
     patch_replace(ADDR_CONSUME_KEY, (const void *)ConsumeKey, "ConsumeKey", 1);
     patch_replace(ADDR_ACTION_KEY_DOWN, (const void *)ActionKeyDown,
                   "ActionKeyDown", 1);
+    patch_replace(ADDR_ACTION_KEY_PRESSED, (const void *)ActionKeyPressed,
+                  "ActionKeyPressed", 1);
     patch_replace(ADDR_COMM_ARMY_OF_SLOT, (const void *)CommArmyOfSlot,
                   "CommArmyOfSlot", 20);
     patch_replace(ADDR_PTR_LIST_PUSH, (const void *)PtrListPush,

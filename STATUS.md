@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 627 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 626 | 616 of them below the CRT line |
+| `patch_replace` sites | 630 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 629 | 619 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 107,024 / 372,816 B (**28.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 132,336 / 372,816 B (35.5%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 107,360 / 372,816 B (**28.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 132,672 / 372,816 B (35.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,24 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The voice lines are a table with the answers in it.** `SpeakLine`
+  (0x0040BFF0, 35 callers) picks one of a group's wave names at random and
+  only when the owner is ours; the groups are 20-byte records at 0x00474444 --
+  a count and up to four names -- and the names say what they are:
+  Aerosol.wav, AirStrike.wav, AutoRifle.wav, Bazooka.wav, Disguise.wav,
+  Explosives.wav. It goes out on slot 0x10, which orig.h already records as a
+  voice slot.
+
+  **It reads 0, and so does PlayDynamicSound underneath it**, even with the
+  ALSA null device attached and both Boot Camp dialogs cleared. So the whole
+  dynamic-sound path is unreached by any configuration here -- which is a
+  pre-existing gap for PlayDynamicSound, now measured rather than assumed.
+
+- **`ListAdd` reallocs per entry.** Every append grows the array to exactly
+  count+1 rows of 0x104, so filling a list of n costs n reallocs and n copies
+  of everything before it, and the name is copied with no bound at all -- a
+  name of 0x100 runs into the value beside it. Both are the original's.
 
 - **`AM2_SELFCHECK=1` was comparing every pointer-argument function against
   ONE input, and the two pointers at the same bytes.** Two defects in one

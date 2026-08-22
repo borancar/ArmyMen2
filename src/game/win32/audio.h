@@ -148,6 +148,19 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
                               int32_t x, int32_t y, int32_t slot,
                               int32_t priority, uint32_t owner);
 
+/* 0x0040BFF0, 35 callers. Say one of a group's lines, chosen at random, and
+ * only when the owner is OURS -- everyone else's units are silent to us.
+ *
+ * The groups are 20-byte records: a count and up to four wave names, and the
+ * names are what they are for -- Aerosol.wav, AirStrike.wav, AutoRifle.wav,
+ * Bazooka.wav, Disguise.wav, Explosives.wav. The line goes out on slot 0x10,
+ * which is a voice slot, at priority 1 and with no position, so it is not
+ * placed in the world.
+ *
+ * Neither the group index nor `rand() % count` is bounded; a count of zero
+ * would divide by zero, and every shipped group has one. */
+void __cdecl SpeakLine(int32_t group, int32_t owner);
+
 int audio_install(void);
 
 #ifdef __cplusplus
