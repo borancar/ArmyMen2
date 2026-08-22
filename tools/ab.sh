@@ -236,6 +236,11 @@ play() {
         # EditTakeFocus installed g_charHandler.
         drive ctl "type Zulu" >/dev/null 2>&1
         sleep 3
+        # The tree here holds the toggles -- the "send" indicators beside the
+        # two fields -- and their chosen sprite. A wrong toggle sprite is 212
+        # pixels, which no budget catches; it is one changed line here.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
     fi
 
     if [ "$cfg" = controls ]; then

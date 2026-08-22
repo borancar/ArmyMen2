@@ -73,18 +73,42 @@ static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
                         const uint8_t *w, int depth)
 {
     const int32_t *r;
+    const uint8_t *spr_ptr;
+    int32_t        sid;
     int            self;
     int            vt;
     int            spr;
     int            foc;
 
-    if (!w || depth > 8 || at + 200 >= cap)
+    if (!w || depth > 8 || at + 240 >= cap)
         return at;
+
+    /* Read AFTER the null guard. Initialising it at the declaration
+     * dereferenced w before the guard ran, so every null child faulted and the
+     * control socket closed mid-reply. */
+    spr_ptr = *(const uint8_t *const *)(w + WD_OFF_SPRITE);
 
     /* Indices are taken into locals first, in a defined order. Passing three
      * wd_index() calls as arguments numbered them BACKWARDS, because an i386
      * cdecl call evaluates its arguments right to left -- the dump was
      * self-consistent and read #3 for the first node. */
+    /* The sprite's own id, not just its pointer index. First-seen indices are
+     * what make this dump reproducible across runs, but they also hide a
+     * SUBSTITUTION: swap which of two sprites a widget uses and the new one is
+     * simply first-seen at the same position, taking the same index. Forcing
+     * TogglePaint to the wrong sprite moved 212 pixels and left the tree
+     * identical until this line existed. The id is real data and differs.
+     *
+     * Range-checked before dereferencing: the FIRST version read it
+     * unconditionally and took the game down, closing the control socket. A
+     * debug dump that can fault is worse than no dump -- it fails the run it
+     * was meant to explain. */
+    sid = -1;
+    if ((uintptr_t)spr_ptr >= 0x00400000u
+        && (uintptr_t)spr_ptr < 0x80000000u
+        && ((uintptr_t)spr_ptr & 3u) == 0u)
+        sid = (int32_t)*(const uint32_t *)spr_ptr;
+
     self = wd_index(w);
     vt   = wd_index(*(void *const *)w);
     spr  = wd_index(*(void *const *)(w + WD_OFF_SPRITE));
@@ -95,10 +119,10 @@ static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
      * a multi-line reply is silently truncated to its first line. */
     at += (uint32_t)_snprintf(out + at, cap - at,
                               "%s[%d] d%d v%d r=%d,%d,%d,%d spr=%d "
-                              "foc=%d dirty=%d nofoc=%d canfoc=%d c3c=%d",
+                              "sid=%d foc=%d dirty=%d nofoc=%d canfoc=%d c3c=%d",
                               at ? " | " : "",
                               self, depth, vt,
-                              r[0], r[1], r[2], r[3], spr, foc,
+                              r[0], r[1], r[2], r[3], spr, sid, foc,
                               *(const int32_t *)(w + WD_OFF_DIRTY),
                               *(const int32_t *)(w + WD_OFF_NOFOCUS),
                               *(const int32_t *)(w + WD_OFF_CANFOCUS),

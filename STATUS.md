@@ -167,6 +167,21 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **A first-seen pointer index cannot see a SUBSTITUTION, and that nearly cost
+  the oracle its point.** The widget dump renumbers pointers so it survives the
+  heap moving -- the same trick `tools/actdiff.py` uses. But forcing
+  `TogglePaint` to the wrong sprite left the tree **identical**: the substituted
+  sprite is simply first-seen at the same position and takes the same index.
+  `spr=10` on both sides, 212 pixels apart on screen.
+
+  Printing the sprite's own `id` alongside fixes it -- `sid=1576448` against
+  `sid=1576449` on exactly the two "send" indicators. **Renumbering makes a
+  dump reproducible and blind in the same stroke; carry one real datum beside
+  every renumbered pointer.**
+
+- **`ab.sh multi` captures the tree too**, 8 nodes, and it is what moved the
+  toggle row of the table from "not caught" to "caught".
+
 - **`drive.sh ctl widgets` is an EXACT oracle for the menu layer, and it is in
   `ab.sh controls`.** The CONTROLS dialog is 25 nodes and they come back byte
   for byte identical from the original and from the reconstruction, so the
@@ -194,7 +209,7 @@ counts probe before reading one as coverage -- that is what turned the
   | width from height (`WidgetScreenRect`) | 305,939 | yes |
   | label cleared with ink (`LabelDraw`) | 17,110 | yes |
   | focus highlight never shown (`ButtonPaint`) | 249 | yes, by 43 |
-  | toggle always ON (`TogglePaint`) | **212** | **no** -- `multi` budget 500 |
+  | toggle always ON (`TogglePaint`) | 212 | **yes**, by the widget tree |
   | handler never installed (`EditTakeFocus`) | **72** | **no** |
   | wrong caret glyph (`EditDraw`) | **34** | **no** -- and not in the tree either |
   | row strip not repainted (`ListTakeFocus`) | **0** | **no** -- unobservable |

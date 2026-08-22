@@ -1295,6 +1295,23 @@ byte identical** from the original and from the reconstruction, so `ab.sh`
 compares them with `diff` and no budget at all. Setting the base constructor's
 `0x0050` to 0 — invisible to all three pixel frames — changes all 25 lines.
 
+**A first-seen index cannot see a SUBSTITUTION.** Pointers are renumbered so
+the dump survives the heap moving, which is the same trick `tools/actdiff.py`
+uses — and it made the oracle blind in exactly the way it was built to fix.
+Forcing `TogglePaint` to the wrong sprite left the tree identical, because the
+substituted sprite is first-seen at the same position and takes the same index:
+`spr=10` on both sides, 212 pixels apart on screen. The sprite's own `id` is
+printed beside the index now, and reads 1576448 against 1576449. **Renumbering
+buys reproducibility and blindness in the same stroke — carry one real datum
+beside every renumbered pointer.**
+
+**Two ways a debug dump can take the game down, both hit here.** Reading the
+sprite id without a range check faulted; and the pointer was read in the
+declaration's initialiser, which runs BEFORE the `if (!w)` guard below it, so
+every null child faulted. Both closed the control socket mid-reply, which fails
+the run the dump was meant to explain. A diagnostic that can crash is worse
+than no diagnostic.
+
 **Field `0x0040` is deliberately NOT in the dump.** It is the one the
 constructor never writes, because `ButtonUpdate` computes it before anything
 reads it, so for every widget whose update has not run it holds whatever the
