@@ -70,8 +70,8 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 456 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 456 | 449 of them below the CRT line |
+| `patch_replace` sites | 457 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 457 | 450 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 101,600 / 372,816 B (**27.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
@@ -203,6 +203,11 @@ counts probe before reading one as coverage -- that is what turned the
   its painter (`0x00455180`) and its update (`0x00455340`) are checkable there
   or nowhere. Found by dumping the tree and crossing the vtables against the
   patch list, which is now the standard way to pick a target.
+
+- **`ListDraw` is done, and it is one of the few things in this layer with a
+  real defect signal.** Dropping the highlight fill on the selected row -- the
+  green bar in SELECT DIFFICULTY -- is **3,299 pixels**, well over budget. Most
+  of this layer sits between 0 and 249; a filled row is big enough to see.
 
 - **The list's row records are 260 bytes.** `0x00455180` computes the offset as
   `((idx << 6) + idx) << 2`, which is `idx * 65 * 4`, into an array at `0x0060`

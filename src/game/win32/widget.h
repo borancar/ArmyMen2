@@ -517,7 +517,14 @@ void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip);
 /* The list box's own fields, all read by its painter. The row array at 0x0060
  * is {int32_t count; const char *strings;} followed by nothing this function
  * touches -- the strings are indexed by a 260-byte stride from `strings`. */
-#define LIST_OFF_ROWS        0x60   /* struct { int32_t count; char *text; } * */
+/* The row array: a count, then the base of the row records. A row's text is
+ * `text + index * 260`. */
+typedef struct AM2_ListRows {
+    int32_t  count;
+    char    *text;
+} AM2_ListRows;
+
+#define LIST_OFF_ROWS        0x60   /* AM2_ListRows * */
 #define LIST_OFF_HOT         0x5C   /* int32_t, the row under the pointer */
 #define LIST_OFF_VISIBLE     0x78   /* int32_t, how many rows fit */
 #define LIST_OFF_INK         0x80   /* uint8_t, an ordinary row */

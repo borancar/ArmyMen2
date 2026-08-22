@@ -103,6 +103,8 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 #define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define orig_mouse_moved (*(const int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
 /* Spelled as device.cpp spells them, so they stay one definition. */
+#define g_backgroundColour (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
+#define g_hiliteColour     (*(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR)
 #define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
 #define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
 
@@ -360,6 +362,79 @@ void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
         w->sprite = *(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_OFF);
 
     WidgetPaint(w, clip);
+}
+
+void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip)
+{
+    uint8_t            *self = (uint8_t *)w;
+    const AM2_ListRows *rows =
+        *(const AM2_ListRows *const *)(self + LIST_OFF_ROWS);
+    RECT     paint;
+    RECT     rowRect;
+    int32_t  idx;
+    int32_t  offset;
+
+    if (!rows)
+        return;
+
+    WidgetScreenRect(w);
+    if (!IntersectRect(&paint, &w->rect, &clip))
+        return;
+
+    /* The row strip spans the widget's full width; only top and bottom move. */
+    rowRect.left  = w->rect.left;
+    rowRect.right = w->rect.right;
+
+    ClearRegion(&paint, g_backgroundColour);
+
+    idx = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+    if (idx >= rows->count)
+        return;
+
+    offset = idx * LIST_ROW_STRIDE;
+    do {
+        int32_t top = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+        int32_t sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+        int32_t y;
+        uint8_t ink;
+        int32_t selectedHere;
+
+        if (idx >= top + *(const int32_t *)(self + LIST_OFF_VISIBLE))
+            return;
+
+        selectedHere = (idx == sel)
+                       && *(const int32_t *)(self + 0x44) != 0
+                       && *(const int32_t *)(self + 0x4C) == 0;
+
+        ink = *(const uint8_t *)(self + LIST_OFF_INK);
+        if (idx == sel && w->flag44)
+            ink = g_mouseButton[0]
+                  ? *(const uint8_t *)(self + LIST_OFF_INK_SEL_DOWN)
+                  : *(const uint8_t *)(self + LIST_OFF_INK_SEL);
+        if (idx == *(const int32_t *)(self + LIST_OFF_HOT))
+            ink = selectedHere ? *(const uint8_t *)(self + LIST_OFF_INK_HOT_SEL)
+                               : g_hiliteColour;
+
+        y = w->rect.top + (idx - top) * LIST_ROW_HEIGHT + LIST_ROW_TOP_MARGIN;
+        rowRect.top    = y;
+        rowRect.bottom = y + LIST_ROW_HEIGHT;
+
+        /* A failed intersect skips only the FILL -- `paint` keeps whatever the
+         * previous row left in it and the text below is drawn against that.
+         * The original's defect, and the same shape as LockSurface's Restore
+         * path; kept deliberately. */
+        if (IntersectRect(&paint, &clip, &rowRect) && selectedHere)
+            ClearRegion(&paint, g_hiliteColour);
+
+        if (!LockSurface(g_drawTarget))
+            return;
+        orig_draw_text_clipped(rowRect.left + LIST_TEXT_INDENT, rowRect.top,
+                               rows->text + offset, 1, paint, ink);
+        UnlockSurface();
+
+        idx++;
+        offset += LIST_ROW_STRIDE;
+    } while (idx < rows->count);
 }
 
 void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce)
@@ -1086,6 +1161,8 @@ int widget_install(void)
                         "MultiSpritePaint", 1);
     rc |= patch_replace(ADDR_TOGGLE_PAINT, (const void *)TogglePaint,
                         "TogglePaint", 1);
+    rc |= patch_replace(ADDR_LIST_DRAW, (const void *)ListDraw,
+                        "ListDraw", 1);
     rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,
                         "ListTakeFocus", 1);
     rc |= patch_replace(ADDR_ICON_DESTRUCT, (const void *)IconDestruct,
