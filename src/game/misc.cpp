@@ -976,6 +976,17 @@ void __cdecl FreeIfNotNull(void *p)
         am2_free(p);
 }
 
+typedef void (__cdecl *AM2_MenuMessageFn)(const char *s, int32_t a, int32_t b);
+typedef void (__cdecl *AM2_ChatAppendFn)(const char *s, int32_t a);
+#define orig_menu_message (*(AM2_MenuMessageFn)AM2_IMAGE(ADDR_MENU_MESSAGE))
+#define orig_chat_append  (*(AM2_ChatAppendFn)AM2_IMAGE(ADDR_CHAT_APPEND))
+
+void __cdecl Announce(const char *text)
+{
+    orig_menu_message(text, 4, 0);
+    orig_chat_append(text, 1);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1061,6 +1072,7 @@ int misc_install(void)
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     patch_replace(ADDR_GET_MENU_ROW, (const void *)GetMenuRow, "GetMenuRow", 0);
+    patch_replace(ADDR_ANNOUNCE, (const void *)Announce, "Announce", 1);
     patch_replace(ADDR_FREE_IF_NOT_NULL, (const void *)FreeIfNotNull,
                   "FreeIfNotNull", 1);
     patch_replace(ADDR_IS_KEY_DOWN, (const void *)IsKeyDown, "IsKeyDown", 1);

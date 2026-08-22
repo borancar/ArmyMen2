@@ -112,14 +112,13 @@ void __cdecl CommRemoveKeyed(void *comm, uint32_t key)
  * not reconstructed. See ADDR_FIND_PLAYER_BY_ID for why it keeps that name
  * when these two messages call the record a Flowq. */
 typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
-#define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
 
 #define AM2_FLOW_PLAYER_MASK  0x14
 #define AM2_FLOW_RESEND_MASK  0x18
 
 uint32_t __cdecl GetPlayerMask(uint32_t id)
 {
-    void *q = orig_find_player(id);
+    void *q = FindPlayerById(id);
 
     if (!q) {
         am2_log("ERROR: GetPlayerMask: No Flowq for %X\n", id);
@@ -130,7 +129,7 @@ uint32_t __cdecl GetPlayerMask(uint32_t id)
 
 uint32_t __cdecl GetReSendMask(uint32_t id)
 {
-    void *q = orig_find_player(id);
+    void *q = FindPlayerById(id);
 
     if (!q) {
         am2_log("ERROR: GetReSendMask: No Flowq for %X\n", id);
@@ -188,8 +187,28 @@ int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army)
     return CommSlotRemote(comm, army) == 0;
 }
 
+/* NOT AM2_PLAYER_STRIDE -- orig.h already has that name on 0x70, the comm
+ * object's own player slots. These are the flow records, a different array. */
+#define AM2_FLOW_RECORDS 6
+#define AM2_FLOW_STRIDE  0x7E0u
+
+void *__cdecl FindPlayerById(uint32_t id)
+{
+    uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS;
+    void    *found = 0;
+    int32_t  i;
+
+    /* No break: every record is looked at and the last match is the answer. */
+    for (i = 0; i < AM2_FLOW_RECORDS; i++, rec += AM2_FLOW_STRIDE)
+        if (*(const uint32_t *)rec == id)
+            found = rec;
+    return found;
+}
+
 int msgslot_install(void)
 {
+    patch_replace(ADDR_FIND_PLAYER_BY_ID, (const void *)FindPlayerById,
+                  "FindPlayerById", 1);
     patch_replace(ADDR_COMM_SET_REMOTE, (const void *)CommSetSlotRemote,
                   "CommSetSlotRemote", 4);
     patch_replace(ADDR_COMM_CLEAR_REMOTE, (const void *)CommClearSlotRemote,

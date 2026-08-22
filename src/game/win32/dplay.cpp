@@ -474,7 +474,6 @@ static_assert((uint32_t)E_INVALIDARG == 0x80070057u, "E_INVALIDARG");
 typedef void *(__cdecl *am2_find_player_fn)(uint32_t id);
 typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
-#define orig_find_player (*(am2_find_player_fn)ADDR_FIND_PLAYER_BY_ID)
 #define g_hwnd           (*(HWND *)(uintptr_t)ADDR_HWND)
 
 /* 0x046C -- WndProc forwards this one to the original. */
@@ -549,7 +548,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
                              + COMM_SLOT_OFF_ID);
         if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
             continue;
-        if (!orig_find_player(id))
+        if (!FindPlayerById(id))
             continue;
 
         bit = 0x800u << i;
@@ -1501,6 +1500,16 @@ void __attribute__((thiscall)) CommSessionOver(void *comm)
     CommSendLobbyProperty(comm, 1);
 }
 
+typedef int32_t (__attribute__((thiscall)) *AM2_CommSlotOfIdFn)(void *comm,
+                                                                uint32_t id);
+#define orig_comm_slot_of_id \
+    ((AM2_CommSlotOfIdFn)(uintptr_t)ADDR_COMM_SLOT_OF_ID)
+
+int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id)
+{
+    return orig_comm_slot_of_id(comm, id);
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1551,6 +1560,8 @@ int dplay_install(void)
                         "CommReceive", 5);
     rc |= patch_replace(ADDR_COMM_CREATE_PLAYER, (const void *)CommCreatePlayer,
                         "CommCreatePlayer", 4);
+    rc |= patch_replace(ADDR_COMM_PLAYER_SLOT, (const void *)CommPlayerSlot,
+                        "CommPlayerSlot", 2);
     rc |= patch_replace(ADDR_COMM_MARK_LOBBIED, (const void *)CommMarkLobbied,
                         "CommMarkLobbied", 0);
     rc |= patch_replace(ADDR_COMM_SESSION_OVER, (const void *)CommSessionOver,

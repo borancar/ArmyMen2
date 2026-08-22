@@ -37,10 +37,43 @@ uint32_t __cdecl KeyFieldC(uint32_t key)
     return key & 0x7F;
 }
 
+typedef struct { uint32_t key; int32_t value; } AM2_KeyEntry;
+
+#define g_keyTableN (*(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
+#define g_keyTable  (*(const AM2_KeyEntry **)(uintptr_t)ADDR_KEY_TABLE)
+
+int32_t __cdecl KeyLookup(uint32_t key)
+{
+    int32_t lo = 0;
+    int32_t hi = g_keyTableN;
+
+    while (hi > lo) {
+        int32_t mid = lo + ((hi - lo) >> 1);
+
+        if (g_keyTable[mid].key == key)
+            return g_keyTable[mid].value;
+        if (g_keyTable[mid].key > key)
+            hi = mid;
+        else
+            lo = mid + 1;
+    }
+    return -1;
+}
+
+int32_t __cdecl KeyLookupTriple(uint32_t a, uint32_t b, uint32_t c)
+{
+    /* The original computes this inline rather than calling PackKey; the
+     * arithmetic is identical, overflow included. */
+    return KeyLookup(PackKey(a, b, c));
+}
+
 int packkey_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_KEY_LOOKUP, (const void *)KeyLookup, "KeyLookup", 1);
+    rc |= patch_replace(ADDR_KEY_LOOKUP_TRIPLE, (const void *)KeyLookupTriple,
+                  "KeyLookupTriple", 3);
     rc |= patch_replace(ADDR_PACK_KEY, (const void *)PackKey, "PackKey", 3);
     rc |= patch_replace(ADDR_KEY_FIELD_A, (const void *)KeyFieldA, "KeyFieldA", 1);
     rc |= patch_replace(ADDR_KEY_FIELD_B, (const void *)KeyFieldB, "KeyFieldB", 1);

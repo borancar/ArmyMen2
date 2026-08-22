@@ -172,6 +172,11 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm);
 void __cdecl CommMarkLobbied(void);
 void __attribute__((thiscall)) CommSessionOver(void *comm);
 
+/* 0x0040F320, six callers, sixteen bytes: a thiscall that pushes its one
+ * argument and tail-calls 0x0040F160, which is thiscall too and so already has
+ * the object in ecx. A pass-through under a second name. */
+int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

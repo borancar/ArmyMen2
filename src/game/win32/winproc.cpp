@@ -177,7 +177,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 #define orig_drain_msgs     (*(am2_void_fn2)ADDR_COMM_DRAIN_MSGS)
 #define orig_no_buffers     (*(am2_void_fn2)ADDR_COMM_NO_BUFFERS)
-#define orig_player_slot    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_SLOT)
 #define orig_find_player    (*(am2_comm_id_fn)ADDR_COMM_FIND_PLAYER)
 #define orig_remove_player_rec (*(am2_comm_id_fn)ADDR_COMM_REMOVE_PLAYER)
 #define orig_player_left    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_LEFT)
@@ -232,13 +231,13 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
         return 1;
 
     /* Each player owns three bits; drop them all. */
-    g_eventFlags &= ~(0x20810u << orig_player_slot(comm, id));
+    g_eventFlags &= ~(0x20810u << CommPlayerSlot(comm, id));
 
     if (g_gameState == 1 || (g_gameState == 2 && g_reqTaken == 0x22)) {
         /* Lobby: copy the name out before the record is recycled. */
         char name[128];
 
-        slot = orig_player_slot(comm, id);
+        slot = CommPlayerSlot(comm, id);
         strcpy(name, PlayerName(comm, slot));
         ((char *)PlayerName(comm, slot))[0] = '\0';
 
@@ -274,7 +273,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
         return 1;
     }
 
-    slot = orig_player_slot(comm, id);
+    slot = CommPlayerSlot(comm, id);
     if (orig_player_left(comm, id) && g_gameState == 2 && g_netGame
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
         CommEndSetup();

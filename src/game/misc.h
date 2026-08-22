@@ -567,6 +567,11 @@ int32_t __cdecl KeyChanged(int32_t dik);
  * than to be necessary. */
 void __cdecl FreeIfNotNull(void *p);
 
+/* 0x00430120, 12 callers. Put a line on the menu and append it to the chat
+ * log, in that order, and nothing else. Both callees are still original. The
+ * name is ours; what the two calls do is what it is for. */
+void __cdecl Announce(const char *text);
+
 int misc_install(void);
 
 #ifdef __cplusplus

@@ -430,6 +430,16 @@ int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot);
  * global, so it cannot have vectors. */
 int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army);
 
+/* 0x00402990, 27 callers -- the record for a DirectPlay id, or null.
+ *
+ * Six records of 0x7E0 bytes from 0x004F1980, walked to the end whatever
+ * happens: the loop does NOT break at a match, it overwrites the answer, so
+ * the LAST match wins. orig.h has said so since long before this was written.
+ *
+ * Kept as PLAYER rather than FLOWQ for the reason orig.h gives: both words are
+ * the program's own, from different error messages about the same record. */
+void *__cdecl FindPlayerById(uint32_t id);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 591 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 590 | 580 of them below the CRT line |
+| `patch_replace` sites | 596 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 595 | 585 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 105,328 / 372,816 B (**28.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 130,640 / 372,816 B (35.0%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 105,520 / 372,816 B (**28.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 130,832 / 372,816 B (35.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,18 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The packed key has a TABLE, and it is what the region pass consults.**
+  `0x00434290` binary-searches a sorted {key, value} array at `0x00516150` and
+  `0x004346E0` packs its three arguments with exactly `PackKey`'s arithmetic
+  before handing them over -- which is what ties `packkey.cpp`'s field
+  accessors to something that uses them.
+
+  Checked by mutation rather than by a clean run: `KeyLookup` runs 1,588 times
+  in a Boot Camp mission, and making the search never match puts the frame
+  293,671 pixels wrong -- 37% of it -- and drops the game's own "calculating
+  region data..." line. That log line is also the only evidence so far of what
+  the table is FOR.
 
 - **`ab.sh controls`' pixel figure is NOT deterministic, and this file said it
   was.** Four runs of one build gave 0/0/0, 45/45/45, 54/45/50 and 0/0/0 --

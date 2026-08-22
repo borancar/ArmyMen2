@@ -2680,6 +2680,7 @@
  * It scans six 0x7E0-byte records at 0x004F1980 and does NOT stop at the first
  * match -- eax is overwritten each time -- so the LAST match wins. */
 #define ADDR_FIND_PLAYER_BY_ID   0x00402990u  /* void *(uint32 id); NULL when unknown */
+#define ADDR_PLAYER_RECORDS      0x004F1980u  /* six of them, 0x7E0 apart */
 
 /* Two masks out of that record, each named by its own error message. */
 #define ADDR_GET_PLAYER_MASK     0x00402BD0u  /* uint32_t(uint32_t id) -- +0x14 */
@@ -3195,6 +3196,18 @@
 #define ADDR_FREE_MEM_TRACKER    0x0041E710u
 
 /* Packed map key: A(7) | gap(2) | B(10) | C(7). */
+/* 0x00434290 and 0x004346E0. A sorted array of {key, value} dwords, searched
+ * by halving: the count is at 0x00516148 and the array at 0x00516150. The
+ * three-argument one packs its key with exactly PackKey's arithmetic and hands
+ * it straight over, which is what ties the two families together. Both names
+ * are ours; -1 means no such key. */
+#define ADDR_KEY_LOOKUP          0x00434290u  /* int32_t(uint32_t key) */
+#define ADDR_KEY_LOOKUP_TRIPLE   0x004346E0u  /* int32_t(a, b, c) */
+#define ADDR_KEY_TABLE_COUNT     0x00516148u  /* int32_t */
+#define ADDR_KEY_TABLE           0x00516150u  /* {uint32 key, int32 value}[] */
+/* 0x00430120, 12 callers: put a line on the menu and append it to the chat
+ * log, in that order. The name is ours. */
+#define ADDR_ANNOUNCE            0x00430120u  /* void(const char *) */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u
 #define ADDR_KEY_FIELD_B    0x00433840u

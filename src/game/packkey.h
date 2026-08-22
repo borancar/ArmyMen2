@@ -38,6 +38,25 @@ uint32_t __cdecl KeyFieldA(uint32_t key);
 uint32_t __cdecl KeyFieldB(uint32_t key);
 uint32_t __cdecl KeyFieldC(uint32_t key);
 
+/* 0x00434290 and 0x004346E0, two and sixteen callers. The table those keys are
+ * FOR: a sorted array of {key, value} dwords at 0x00516150, searched by
+ * halving, with -1 for a key that is not there. Both names are ours.
+ *
+ * KeyLookupTriple is what ties the two families together -- it packs its three
+ * arguments with exactly PackKey's arithmetic, written out inline rather than
+ * called, and hands the result over.
+ *
+ * The comparison is UNSIGNED where the loop bound is signed: `jae` picks the
+ * half, `jg` decides whether to go round again. Reproduced as it stands.
+ *
+ * Thoroughly checked, and measured rather than assumed: KeyLookup runs 1,588
+ * times in a Boot Camp mission, and making the search never match puts the
+ * frame 293,671 pixels wrong -- 37% of it -- and drops the game's own
+ * "calculating region data..." line. So this table is what the region pass
+ * consults, which is the one thing known about what it is FOR. */
+int32_t __cdecl KeyLookup(uint32_t key);
+int32_t __cdecl KeyLookupTriple(uint32_t a, uint32_t b, uint32_t c);
+
 int packkey_install(void);
 
 #ifdef __cplusplus
