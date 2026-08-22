@@ -3255,6 +3255,16 @@
 #define ADDR_SOLDIER_ANIMS       0x00659F00u  /* AM2_AnimTable[9], rifleman first */
 #define ADDR_TURRET_ANIMS        0x0065A2A8u  /* AM2_AnimTable[6] */
 #define ADDR_VEHICLE_ANIMS       0x00661DF0u  /* AM2_AnimTable[6] */
+/* The five `.ani` loaders, one per group and every one `void(void)`. Each
+ * chdirs into `data\\ani` and loads what its group needs, skipping any table
+ * that already has a count. See src/game/anim.h. */
+#define ADDR_LOAD_EXPLOSION_ANIMS 0x00422820u
+#define ADDR_LOAD_MISSILE_ANIMS   0x0043C6F0u
+#define ADDR_LOAD_ROACH_ANIMS     0x0043CCF0u
+#define ADDR_LOAD_SOLDIER_ANIMS   0x00446F50u
+#define ADDR_LOAD_VEHICLE_ANIMS   0x0045A8C0u
+#define AM2_ANIM_ID_LINK_BREAK    0x46  /* whose `next` the soldier loader
+                                         * rewrites to -1 after loading */
 /* 0x00409EE0, 14 callers. Free one table: every animation it owns, then the
  * entry array, then zero both fields. A borrowed entry is left alone, which is
  * the whole reason LoadAnimTable records the flag. */

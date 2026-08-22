@@ -13,10 +13,22 @@
 #include "anim.h"
 #include "crt.h"
 #include "dist.h"   /* Log2Mask */
+#include "gamedir.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
 #define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
+
+/* Forward-declared rather than including win32/sprite.h, the same reason
+ * script.cpp forward-declares PreloadSprite: that header names
+ * LPDIRECTDRAWSURFACE and this module must not. None of these three
+ * signatures does, so the declaration costs nothing. */
+extern "C" int32_t __cdecl LoadSpriteFile(const char *path,
+                                          AM2_AnimTable *anims,
+                                          const AM2_AnimTable *fallback,
+                                          int32_t from, uint32_t flags);
+extern "C" void __cdecl BuildRoachMask(void);
+extern "C" void __cdecl BuildVehicleMask(int32_t kind);
 
 #define g_explosionAnims ((AM2_AnimTable *)(uintptr_t)ADDR_EXPLOSION_ANIMS)
 #define g_missileAnims   ((AM2_AnimTable *)(uintptr_t)ADDR_MISSILE_ANIMS)
@@ -162,6 +174,112 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
         DumpAnimTable(table);
 }
 
+/* The `.ani` directory, and the flags each group is loaded with. `from` is
+ * NearestPalIndex's reserved-block threshold and `flags` decides the sprite
+ * format; both are the caller's decision, not the file's. */
+#define AM2_ANI_DIR       "data\\ani"
+#define AM2_ANI_FLAGS_FX  8
+#define AM2_ANI_FLAGS_MEN 0x10
+
+void __cdecl LoadExplosionAnims(void)
+{
+    /* The chdir happens BEFORE the already-loaded test here and in
+     * LoadMissileAnims, and AFTER it in LoadRoachAnims. Reproduced rather
+     * than tidied: a chdir is a side effect, so which side of the test it
+     * falls on is behaviour. */
+    SetGameDir(AM2_ANI_DIR);
+    if (g_explosionAnims->count <= 0)
+        LoadSpriteFile("explosions.ani", g_explosionAnims, 0, 0,
+                       AM2_ANI_FLAGS_FX);
+}
+
+void __cdecl LoadMissileAnims(void)
+{
+    SetGameDir(AM2_ANI_DIR);
+    if (g_missileAnims->count <= 0)
+        LoadSpriteFile("missile.ani", g_missileAnims, 0, 0, AM2_ANI_FLAGS_FX);
+}
+
+void __cdecl LoadRoachAnims(void)
+{
+    if (g_roachAnims->count > 0)
+        return;
+    SetGameDir(AM2_ANI_DIR);
+    LoadSpriteFile("roach.ani", g_roachAnims, 0, 0, AM2_ANI_FLAGS_FX);
+    /* A tail jump in the original, so the mask is built only on the load
+     * path -- a second call does nothing at all. */
+    BuildRoachMask();
+}
+
+void __cdecl LoadSoldierAnims(void)
+{
+    /* rifleman first and with no fallback, because it IS the fallback for the
+     * other eight -- see LoadAnimTable. The zombie and the scientists reserve
+     * 0x3C palette entries where everyone else reserves 10. */
+    static const struct {
+        const char *path;
+        int32_t     from;
+    } kMen[] = {
+        { "rifleman.ani",   0x0A }, { "bazookaman.ani", 0x0A },
+        { "grenadier.ani",  0x0A }, { "flamer.ani",     0x0A },
+        { "mortarman.ani",  0x0A }, { "sweeper.ani",    0x0A },
+        { "m80.ani",        0x0A }, { "zombie.ani",     0x3C },
+        { "scientists.ani", 0x3C },
+    };
+    int32_t i;
+
+    SetGameDir(AM2_ANI_DIR);
+    for (i = 0; i < AM2_SOLDIER_ANIM_TABLES; i++)
+        if (g_soldierAnims[i].count <= 0)
+            LoadSpriteFile(kMen[i].path, &g_soldierAnims[i],
+                           i ? &g_soldierAnims[0] : 0, kMen[i].from,
+                           AM2_ANI_FLAGS_MEN);
+
+    /* Then one link is cut: the animation with id 0x46 in the rifleman's own
+     * table gets `next` = -1, where LoadAnimTable would have left whatever the
+     * file said. Nothing is done if the table has no such entry, or none at
+     * all. */
+    for (i = 0; i < g_soldierAnims[0].count; i++)
+        if (g_soldierAnims[0].entries[i].id == AM2_ANIM_ID_LINK_BREAK) {
+            g_soldierAnims[0].entries[i].next = -1;
+            return;
+        }
+}
+
+void __cdecl LoadVehicleAnims(void)
+{
+    /* Six pairs, laid out interleaved in the original's frame as {vehicle,
+     * turret}. Two of the twelve slots point at the image's shared empty
+     * string at 0x004F96B8 -- 67 sites use it and nothing writes it -- and an
+     * empty path is skipped before the count is even looked at.
+     *
+     * So kind 4 has no vehicle and no turret, which is why its direction count
+     * stays 0 and BuildVehicleMask runs five times rather than six. And the
+     * boat is given the JEEP's turret, which reads like a mistake and is
+     * reproduced as it stands. */
+    static const char *const kPaths[AM2_VEHICLE_ANIM_TABLES][2] = {
+        { "jeep.ani",      "jeepturret.ani" },
+        { "tank.ani",      "tankturret.ani" },
+        { "halftrack.ani", "halfturret.ani" },
+        { "truck.ani",     ""               },
+        { "",              ""               },
+        { "boat.ani",      "jeepturret.ani" },
+    };
+    int32_t i;
+
+    SetGameDir(AM2_ANI_DIR);
+    for (i = 0; i < AM2_VEHICLE_ANIM_TABLES; i++) {
+        if (kPaths[i][0][0] && g_vehicleAnims[i].count <= 0) {
+            LoadSpriteFile(kPaths[i][0], &g_vehicleAnims[i], 0, 0x0A,
+                           AM2_ANI_FLAGS_MEN);
+            BuildVehicleMask(i);
+        }
+        if (kPaths[i][1][0] && g_turretAnims[i].count <= 0)
+            LoadSpriteFile(kPaths[i][1], &g_turretAnims[i], 0, 0x0A,
+                           AM2_ANI_FLAGS_MEN);
+    }
+}
+
 void __cdecl FreeAnimTable(AM2_AnimTable *table)
 {
     int32_t i;
@@ -226,6 +344,17 @@ int anim_install(void)
 
     rc |= patch_replace(ADDR_LOAD_ANIM_TABLE, (const void *)LoadAnimTable,
                         "LoadAnimTable", 1);
+    rc |= patch_replace(ADDR_LOAD_EXPLOSION_ANIMS,
+                        (const void *)LoadExplosionAnims,
+                        "LoadExplosionAnims", 0);
+    rc |= patch_replace(ADDR_LOAD_MISSILE_ANIMS,
+                        (const void *)LoadMissileAnims, "LoadMissileAnims", 0);
+    rc |= patch_replace(ADDR_LOAD_ROACH_ANIMS, (const void *)LoadRoachAnims,
+                        "LoadRoachAnims", 0);
+    rc |= patch_replace(ADDR_LOAD_SOLDIER_ANIMS,
+                        (const void *)LoadSoldierAnims, "LoadSoldierAnims", 0);
+    rc |= patch_replace(ADDR_LOAD_VEHICLE_ANIMS,
+                        (const void *)LoadVehicleAnims, "LoadVehicleAnims", 0);
     rc |= patch_replace(ADDR_FREE_ANIM_TABLE, (const void *)FreeAnimTable,
                         "FreeAnimTable", 1);
     rc |= patch_replace(ADDR_FREE_EXPLOSION_ANIMS,

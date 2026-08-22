@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 556 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 555 | 545 of them below the CRT line |
+| `patch_replace` sites | 561 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 560 | 550 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 103,424 / 372,816 B (**27.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 128,736 / 372,816 B (34.5%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 104,176 / 372,816 B (**27.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 129,488 / 372,816 B (34.7%) | what every earlier session quoted, and an over-count |
 | modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -195,6 +195,27 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The `.ani` subsystem is closed: five loaders, six frees, one table
+  reader, three lookups, two mask builders.** Nothing between a `.ani` file on
+  disk and a sprite index is original any more.
+
+- **A `chdir` is a side effect, so which side of a test it falls on is
+  behaviour.** `LoadExplosionAnims` and `LoadMissileAnims` chdir into
+  `data\ani` and THEN test whether the table is already loaded;
+  `LoadRoachAnims` tests first and returns without chdiring. Reproduced rather
+  than tidied.
+
+- **Neither oracle sees the soldier loader's last line**, which rewrites the
+  `next` of rifleman's animation 0x46 to -1. `anicheck.py` reads the table
+  inside LoadAnimTable, before the fixup, and `maskdump.py` never looks at the
+  soldier tables. Checked by reading the entry over the control socket in both
+  builds instead: id 70, `next` -1, on ours and under `AM2_NOPATCH=1`.
+
+- **The boat is given the jeep's turret** and vehicle kind 4 has no paths at
+  all -- two of the twelve slots in `LoadVehicleAnims`' table point at the
+  image's shared empty string at `0x004F96B8`, which 67 sites use and nothing
+  writes. Both reproduced as they stand.
 
 - **The game calls these masks, and it said so itself.** `BuildVehicleMask`
   logs `"vehicle mask direction: %d"` under `-traceVEH`, which named the whole

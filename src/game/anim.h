@@ -99,6 +99,20 @@ typedef struct AM2_AnimTable {
 void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
                            const AM2_AnimTable *fallback);
 
+/* The five loaders, one per group and all `void(void)`. Each chdirs into
+ * `data\\ani` and loads what its group needs, skipping any table that already
+ * has a count -- so calling one twice is free. The names are ours.
+ *
+ * They are not interchangeable and the differences are the interesting part:
+ * LoadRoachAnims tests the count BEFORE the chdir where the other two singles
+ * test it after, LoadSoldierAnims cuts one animation's `next` link when it is
+ * done, and LoadVehicleAnims skips a pair whose path is empty. */
+void __cdecl LoadExplosionAnims(void);   /* 0x00422820 */
+void __cdecl LoadMissileAnims(void);     /* 0x0043C6F0 */
+void __cdecl LoadRoachAnims(void);       /* 0x0043CCF0, then the roach mask */
+void __cdecl LoadSoldierAnims(void);     /* 0x00446F50, all nine */
+void __cdecl LoadVehicleAnims(void);     /* 0x0045A8C0, six pairs */
+
 /* Original: 0x00409EE0, 14 callers, and the name is ours. Free everything one
  * table owns and leave it empty: for each entry that holds an animation of its
  * OWN, the cell array and then the animation; then the entry array; then both
