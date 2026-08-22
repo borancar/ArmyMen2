@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 464 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 464 | 457 of them below the CRT line |
+| `patch_replace` sites | 465 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 465 | 458 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,736 / 372,816 B (**27.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 102,960 / 372,816 B (**27.6%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,29 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **A log string handed over an original MEMBER NAME.** "Setting
+  m_ArmyReadyToLoad[%d] to %s" places that array at `0x0270` of the 112-byte
+  per-army record -- the same stride `0x0040F5A0` indexes -- and it is the
+  original's own identifier, `m_` prefix and all, not a name of ours. Worth
+  sweeping the log corpus for others: a format string that prints a field
+  usually names it.
+
+- **The comm side drives the MENU, which nothing had shown before.**
+  `ReceiveGameReadyToLoadMsg` repaints the lobby through the current dialog's
+  slot 2 then slot 1 -- the same update-then-paint pair the widget layer uses
+  everywhere. So the handshake and the widget work meet here, and the widget
+  slots being reconstructed is what made this function legible at a glance.
+
+- **`0x0065A058` had two names and one is mine.** `control.c`'s `WD_ROOT` was a
+  duplicate of `ADDR_PAINT_OBJECT`, introduced when the widget dump was
+  written. Fixed by reuse. The `ctl widgets` root and WndProc's repaint target
+  are the same object, which is worth knowing: the thing WndProc repaints IS
+  the current dialog.
+
+- **`0x3D8` still has two names**, `COMM_OFF_IS_HOST` and `COMM_OFF_READY`.
+  The first is evidenced -- "from DPCAPS_ISHOST" -- and this function's
+  host-only gate agrees with it. Not collapsed yet.
 
 - **The six private window messages live in `orig.h` now.** They were defined
   in `winproc.cpp`, which HANDLES them, and the comm side POSTS them -- so the

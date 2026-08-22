@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "msgslot.h"
+#include "rect.h"   /* AM2_Rect, for the dialog paint slot */
 #include "../inject/orig.h"
 #include "crt.h"        /* am2_log */
 #include "image.h"      /* AM2_IMAGE */
@@ -253,6 +254,64 @@ void __cdecl MsgListAdd(void *list, void *node)
  *
  * The message goes through the game's own PostMessageA slot, so it lands in
  * the same queue WndProc reads. */
+/* The two widget slots this reaches. Declared locally rather than by including
+ * win32/widget.h, which would pull a COM header into a flat module -- see
+ * tools/checksplit.py. The slot numbers are widget.h's. */
+typedef void (__attribute__((thiscall)) *AM2_DlgUpdateFn)(void *w);
+typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn)(void *w, AM2_Rect r);
+#define AM2_DLG_SLOT_PAINT  1
+#define AM2_DLG_SLOT_UPDATE 2
+#define AM2_DLG_OFF_RECT    0x14
+
+/* 0x0040F160, thiscall on the comm object: which slot holds this DirectPlay
+ * id. Still original. */
+typedef int32_t (__attribute__((thiscall)) *AM2_SlotOfIdFn)(void *comm,
+                                                            int32_t dpid);
+#define orig_comm_slot_of_id \
+    ((AM2_SlotOfIdFn)(uintptr_t)ADDR_COMM_SLOT_OF_ID)
+typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
+#define orig_comm_send_players \
+    (*(AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
+
+void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
+{
+    uint8_t *comm = (uint8_t *)kCommObj;
+    int32_t  value;
+    int32_t  slot;
+    void    *dlg;
+
+    /* Host only. */
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("ReceiveGameReadyToLoadMsg\n");
+
+    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
+    slot  = orig_comm_slot_of_id(comm, dpid);
+    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY_TO_LOAD) = value;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+        /* The lookup runs a SECOND time here; the original does not reuse the
+         * slot it just computed. */
+        am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
+                orig_comm_slot_of_id(comm, dpid),
+                value ? "TRUE" : "FALSE");
+    }
+
+    /* Repaint the lobby through the widget layer's update-then-paint pair. */
+    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    if (dlg) {
+        ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+        dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+        ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
+            dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+    }
+
+    orig_comm_send_players(0);
+}
+
 void __cdecl ReceiveEndSetupMsg(void)
 {
     const uint8_t *comm = kCommObj;
@@ -307,6 +366,9 @@ void __cdecl ExitGamePostClose(void)
 
 int msgslot_install(void)
 {
+    patch_replace(ADDR_RECV_READY_TO_LOAD,
+                  (const void *)ReceiveGameReadyToLoadMsg,
+                  "ReceiveGameReadyToLoadMsg", 1);
     patch_replace(ADDR_RECEIVE_END_SETUP_MSG,
                   (const void *)ReceiveEndSetupMsg, "ReceiveEndSetupMsg", 1);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,

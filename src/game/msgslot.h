@@ -140,6 +140,24 @@ void *__cdecl MsgListRemHead(void *list);
  * is verified by reading, like the rest of that group. */
 void __cdecl ReceiveEndSetupMsg(void);
 
+/* Original: 0x00410E90, "ReceiveGameReadyToLoadMsg". HOST ONLY -- it returns
+ * at once unless COMM_OFF_IS_HOST is set, so a client that somehow received
+ * this does nothing with it.
+ *
+ * It records the sender's flag in `m_ArmyReadyToLoad[slot]`, a name the log
+ * line hands over verbatim: "Setting m_ArmyReadyToLoad[%d] to %s". That places
+ * the field at 0x0270 of the 112-byte per-army record, which is the same
+ * record stride 0x0040F5A0 indexes.
+ *
+ * Then it repaints the lobby: the current dialog's slot 2 and slot 1, the same
+ * update-then-paint pair the widget layer uses everywhere. This is the only
+ * place found so far where the comm side drives the menu directly.
+ *
+ * The slot lookup is called TWICE when logging is on -- once to store and once
+ * to print -- which is the original's, not a tidy-up opportunity: the second
+ * call is inside the `if`. */
+void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

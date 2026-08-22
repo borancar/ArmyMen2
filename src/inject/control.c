@@ -31,7 +31,9 @@ static volatile LONG g_stop;
  * is looking and is deliberately NOT printed -- the same offset means three
  * different things in three classes, so a generic dump of it would be noise
  * that differs for reasons no defect caused. */
-#define WD_ROOT        0x0065A058u
+/* Already named: ADDR_PAINT_OBJECT. WndProc repaints whatever is there and the
+ * dialog openers store the current dialog in it, which are the same object. */
+#define WD_ROOT        ADDR_PAINT_OBJECT
 #define WD_OFF_RECT    0x14
 #define WD_OFF_CHILD   0x24
 #define WD_OFF_SIBLING 0x30

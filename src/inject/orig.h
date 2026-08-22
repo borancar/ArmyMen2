@@ -1991,6 +1991,12 @@
  * window. Sixty-four bytes and no state of its own -- the handshake's whole
  * receive side is telling the message pump something arrived. */
 #define ADDR_RECEIVE_END_SETUP_MSG 0x00410B70u /* void(void) */
+/* 0x00410E90, "ReceiveGameReadyToLoadMsg". Host-only. The field it sets names
+ * itself in the log: "Setting m_ArmyReadyToLoad[%d] to %s", so 0x0270 of the
+ * 112-byte per-army record is m_ArmyReadyToLoad. */
+#define ADDR_RECV_READY_TO_LOAD    0x00410E90u /* void(msg *, int32_t dpid) */
+#define COMM_ARMY_RECORD_SIZE      112u
+#define COMM_ARMY_OFF_READY_TO_LOAD 0x270u
 #define ADDR_REMOVE_INVENTORY_ITEM 0x00447990u /* void(AM2_Object *, int32_t) */
 #define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
