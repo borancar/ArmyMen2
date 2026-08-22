@@ -208,6 +208,14 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
                                     int32_t unused, int32_t x, int32_t y);
 
+/* The pause trio is reconstructed, in win32/frame.cpp. Declared here rather
+ * than by including that header for the same reason PlaySoundAt is: this
+ * module is flat and frame.h names Win32 types. Spelled exactly as frame.h
+ * spells them so the two cannot drift. */
+extern "C" uint32_t __cdecl GetPauseFlags(void);
+extern "C" void     __cdecl PauseGame(uint32_t bits);
+extern "C" void     __cdecl UnPauseGame(uint32_t bits);
+
 typedef int32_t (__attribute__((thiscall)) *AM2_SetColourFn)(void *comm,
                                                              int32_t slot,
                                                              int32_t colour);
@@ -522,8 +530,6 @@ typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
 #define orig_recv_packet   ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PACKET)
 #define orig_recv_player_msg \
     ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PLAYER_MSG)
-#define orig_recv_game_pause \
-    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_GAME_PAUSE)
 #define orig_check_player_timeout \
     ((AM2_MsgHandlerFn)(uintptr_t)ADDR_CHECK_PLAYER_TIMEOUT)
 #define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
@@ -629,6 +635,59 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
         *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
 }
 
+typedef int32_t (__attribute__((thiscall)) *AM2_PlayerSlotFn)(void *comm,
+                                                              int32_t dpid);
+#define orig_comm_player_slot \
+    ((AM2_PlayerSlotFn)(uintptr_t)ADDR_COMM_PLAYER_SLOT)
+
+#define AM2_MSG_PAUSE  8        /* non-zero: pause. zero: resume. */
+#define AM2_MSG_FLAGS  0x0C
+
+/* One block of RemoteGamePause. Four explicit compares on the slot, exactly as
+ * the original writes them -- a slot above 3 falls out with no call made and
+ * the mask left alone, which is why the caller keeps it across both blocks. */
+static uint32_t ApplyPauseBlock(int32_t slot, int32_t pause, uint32_t base)
+{
+    uint32_t bit;
+
+    if (slot == 0)      bit = base;
+    else if (slot == 1) bit = base << 1;
+    else if (slot == 2) bit = base << 2;
+    else if (slot == 3) bit = base << 3;
+    else                return 0;
+
+    if (pause)
+        PauseGame(bit);
+    else
+        UnPauseGame(bit);
+    return bit;
+}
+
+void __cdecl RemoteGamePause(void *msg, int32_t dpid)
+{
+    const uint8_t *m    = (const uint8_t *)msg;
+    const uint8_t *comm = kCommObj;
+    int32_t        slot = orig_comm_player_slot((void *)comm, dpid);
+    int32_t        pause = *(const int32_t *)(m + AM2_MSG_PAUSE);
+    uint32_t       flags = *(const uint32_t *)(m + AM2_MSG_FLAGS);
+    uint32_t       mask  = 0;
+
+    /* Both blocks run if the message asks for both, and the second overwrites
+     * the mask the log will print. */
+    if (flags & MSG_PAUSE_FLAG_A)
+        mask = ApplyPauseBlock(slot, pause, PAUSE_BIT_A_SLOT0);
+    if (flags & MSG_PAUSE_FLAG_B)
+        mask = ApplyPauseBlock(slot, pause, PAUSE_BIT_B_SLOT0);
+
+    comm = kCommObj;
+    if (!*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED) || !mask)
+        return;
+
+    am2_log("RemoteGamePause from %x; playerIndex== %d paused = %d "
+            "pauseflags = %x (%x) (msg Pause=%x)\n",
+            dpid, slot, pause, GetPauseFlags(), mask, flags);
+}
+
 void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 {
     const uint8_t *comm = kCommObj;
@@ -662,7 +721,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
         return;
 
     case 6:
-        orig_recv_game_pause(m, dpid);
+        RemoteGamePause(m, dpid);
         return;
 
     case 7:
@@ -726,6 +785,8 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_RECV_GAME_PAUSE, (const void *)RemoteGamePause,
+                  "RemoteGamePause", 1);
     patch_replace(ADDR_RECV_START_GAME_MSG,
                   (const void *)ReceiveStartGameMsg,
                   "ReceiveStartGameMsg", 1);

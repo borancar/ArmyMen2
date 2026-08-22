@@ -250,6 +250,21 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused);
  * It posts 0x0469, which nothing in the image handles. */
 void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid);
 
+/* Original: 0x00410890, "RemoteGamePause from %x; playerIndex== %d paused = %d
+ * pauseflags = %x (%x) (msg Pause=%x)". The pause mask has one bit per player
+ * per reason, and this is where a peer's bit is set or cleared.
+ *
+ * Two independent blocks, not a switch: bit 0x0008 of the message's flags
+ * selects the 0x10<<slot family and bit 0x10000 selects 0x20000<<slot, and a
+ * message carrying both runs both. Each block is four explicit compares on the
+ * slot rather than a shift, so a slot above 3 does nothing at all -- it is not
+ * clamped, it is simply not handled.
+ *
+ * The mask the log prints is whichever block ran LAST, and the log fires only
+ * when a block actually ran: it is guarded on the mask being non-zero as well
+ * as on the comm object's verbosity. */
+void __cdecl RemoteGamePause(void *msg, int32_t dpid);
+
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.
  *

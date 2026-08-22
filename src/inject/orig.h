@@ -2601,7 +2601,15 @@
 #define ADDR_RECV_PACKET         0x00410720u  /* "Receive Checksum Error from %x seq %d" */
 #define ADDR_RECV_START_GAME_MSG 0x00411100u  /* "ReceiveStartGameMsg for %d Players.  Seed is %d " */
 #define ADDR_RECV_PLAYER_MSG     0x004114E0u  /* "ReceivePlayerMsg for %d Players..." */
-#define ADDR_RECV_GAME_PAUSE     0x00410890u  /* "RemoteGamePause from %x; ..." */
+/* 0x00410890, "RemoteGamePause from %x; playerIndex== %d paused = %d
+ * pauseflags = %x (%x) (msg Pause=%x)". One pause bit per player per reason,
+ * and the two reasons have their own blocks: 0x0008 in the message's flags
+ * selects 0x10<<slot and 0x10000 selects 0x20000<<slot. */
+#define ADDR_RECV_GAME_PAUSE     0x00410890u  /* void(msg *, int32_t dpid) */
+#define MSG_PAUSE_FLAG_A         0x8u        /* picks the 0x10 block */
+#define MSG_PAUSE_FLAG_B         0x10000u    /* picks the 0x20000 block */
+#define PAUSE_BIT_A_SLOT0        0x10u
+#define PAUSE_BIT_B_SLOT0        0x20000u
 #define ADDR_CHECK_PLAYER_TIMEOUT 0x00411BD0u /* "TIMING OUT PLAYER %d %s" */
 /* 0x0469, and NOTHING handles it. ReceiveStartGameMsg is the only sender in
  * the image and WndProc has no case for it, so DefWindowProc eats it. Named

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `9f8c88e`. Working tree clean.
+Last updated: **2026-08-22**, at `1b0b82f`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 516 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 516 | 509 of them below the CRT line |
+| `patch_replace` sites | 517 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 517 | 510 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 96,640 / 372,816 B (**25.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 121,328 / 372,816 B (32.5%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 97,024 / 372,816 B (**26.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 121,712 / 372,816 B (32.6%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The pause mask is one bit per player per REASON, and `RemoteGamePause` is
+  where a peer's bit moves.** Two independent blocks, not a switch: bit 0x0008
+  of the message's flags drives the `0x10 << slot` family and bit 0x10000 the
+  `0x20000 << slot` family, and a message carrying both runs both. That is what
+  the 767,153 `GetPauseFlags` reads in a Boot Camp run are testing against.
+
+- **A slot above 3 is not clamped, it is not handled.** Each block is four
+  explicit compares rather than a shift, so a fifth player would fall out with
+  no call made and the mask left at zero -- which then suppresses the log,
+  since it is guarded on the mask as well as on verbosity. Reproduced.
+
+- **`GetPauseFlags()` takes no arguments and the call site pushes two.** They
+  are the last two varargs of the log line that follows, pushed first because
+  cdecl evaluates right to left; the call simply steps over them. Reading that
+  as a two-argument function -- which is what it looks like -- would have
+  invented a signature. `frame.h` already had it right.
 
 - **`SendMapMsg` was wrong in two ways and its own caller is what said so.**
   Reconstructing `ReceiveStartGameMsg` a commit later showed the call site
