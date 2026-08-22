@@ -19,6 +19,7 @@
  */
 
 #include "sprite.h"
+#include "../anim.h"
 #include "../blit.h"
 #include "../rect.h"
 #include "../air.h"        /* RemapSpriteRuns, GrowSpriteList */
@@ -476,12 +477,10 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
 }
 
 /* orig_fopen and orig_fclose come from orig.h, like orig_fread. */
-typedef void (__cdecl *AM2_SpriteTailFn)(am2_FILE *fp, int32_t a, int32_t n,
-                                         int32_t b);
-#define orig_sprite_tail  ((AM2_SpriteTailFn)(uintptr_t)ADDR_SPRITE_FILE_TAIL)
 #define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
-int32_t __cdecl LoadSpriteFile(const char *path, int32_t a, int32_t b,
+int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
+                               const AM2_AnimTable *fallback,
                                int32_t from, uint32_t flags)
 {
     am2_FILE *fp;
@@ -508,7 +507,7 @@ int32_t __cdecl LoadSpriteFile(const char *path, int32_t a, int32_t b,
     before = g_spriteListN;
 
     LoadSpriteSet(fp, table, from, flags);
-    orig_sprite_tail(fp, a, before, b);
+    LoadAnimTable(fp, anims, before, fallback);
     orig_fclose(fp);
     return 1;
 }

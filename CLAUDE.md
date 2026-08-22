@@ -85,7 +85,7 @@ division is visible, use it.
 
 `src/game/win32/` holds every module that talks to Win32 or DirectX -- **16**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
-API at all, and there are **28**; the split is the answer to "what still talks
+API at all, and there are **29**; the split is the answer to "what still talks
 to the outside world" in directory form.
 
 **The flat half is the one that grows, and this file's count of it went stale
@@ -765,6 +765,29 @@ the lock/unlock bracket. The title screen alone touches almost none of the
 engine, so it proves very little. From the briefing screen, **`RETURN` starts
 the mission** — the cursor is hidden there, so `tools/point.py` cannot find it
 and clicking is not an option.
+
+**`tools/anicheck.py` reads inside a structure no A/B can see.**
+`LoadAnimTable` is the tail of a `.ani` load — the list of animations over the
+sprites `LoadSpriteSet` has just read — and nothing about it reaches the log.
+A wrong field draws the wrong sprite, but `bootcamp` screenshots the briefing,
+where no soldier is on screen, and `mission`'s pixel check is off by
+construction. So `AM2_DUMP_ANIMS=1` prints what the game built and the tool
+parses the twenty shipped `.ani` files itself and compares entry by entry.
+
+**A file format that consumes its input exactly is its own proof.** Parsing all
+twenty with the layout taken off the disassembly ends each one on its last
+byte — 349 animation entries, 1,103,262 of 1,103,262 for `rifleman.ani`. A
+mis-sized field could not do that, which is better evidence than reading the
+loader twice.
+
+Say what it does not reach, as always. All 121 borrowed entries in a Boot Camp
+run resolve to the predicted pointer, which covers the fallback search and the
+final fixup — `explosions.ani` passes no fallback at all, so its three can only
+come from the fixup. But no borrowed id is missing from `rifleman.ani`, so the
+`entries[0]` last resort never fires, and rifleman's 52 ids are all distinct,
+so "the last match wins" and "the first match wins" cannot be told apart. Both
+stay verified by reading. Tested in the failing direction: dropping the
+`next == 0 → -2` rewrite fails 6 of the 21 tables and names the field.
 
 **`tools/ab.sh quit` covers the teardown, and it found a real bug the first
 time it ran.** Until it existed, `ShutdownDirectDraw`, `ShutdownInput`,

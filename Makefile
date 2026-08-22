@@ -52,6 +52,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/map.cpp \
             src/game/pad.cpp \
             src/game/air.cpp \
+            src/game/anim.cpp \
             src/game/gameproc.cpp \
             src/game/item.cpp \
             src/game/msgslot.cpp \

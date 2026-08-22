@@ -6,6 +6,7 @@
 #include "../../inject/win32.h"
 #include "../blit.h"
 #include "../rect.h"
+#include "../anim.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -141,7 +142,11 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
 /* Original: 0x00409F50, six callers, and the name is ours. Open a sprite file
  * in "rb", read its 256-entry palette, turn that into a 256-byte remap table
  * by asking NearestPalIndex for the closest ACTIVE palette entry to each, load
- * the set through it, hand the still-open file to 0x00409BE0, and close.
+ * the set through it, hand the still-open file to LoadAnimTable, and close.
+
+ * `anims` is the caller's own animation table and `fallback` another already
+ * loaded -- every soldier file in the group passes rifleman's. Both were
+ * `int32_t` here when the tail was original and nothing said what they were.
  *
  * The `from` argument goes to both NearestPalIndex and LoadSpriteSet, so the
  * reserved block below it is respected in the same place twice: the table is
@@ -152,7 +157,8 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
  * `eax` still holds the null fopen returned, so it answers 0 while the success
  * path answers 1. I read that as "returns whatever was in the register" first
  * and it is worth saying it is not -- the value is null by construction. */
-int32_t __cdecl LoadSpriteFile(const char *path, int32_t a, int32_t b,
+int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
+                               const AM2_AnimTable *fallback,
                                int32_t from, uint32_t flags);
 
 /* FreeMenuSprites -- original 0x00412F80. Release all 190 menu sprites, the

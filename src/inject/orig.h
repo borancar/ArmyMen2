@@ -3232,11 +3232,18 @@
  * pair of int16 read straight out of the file, not padding. */
 #define ADDR_LOAD_SPRITE_SET     0x004099F0u  /* void(FILE *, table, int32, uint32) */
 /* 0x00409F50, six callers. Open a sprite file, build a 256-entry remap table
- * from its palette, load the set through it and hand the file to 0x00409BE0
- * for whatever follows. Returns 1, or nothing at all when the open fails --
+ * from its palette, load the set through it and hand the file to
+ * LoadAnimTable. Returns 1, or nothing at all when the open fails --
  * see the note in sprite.h. */
 #define ADDR_LOAD_SPRITE_FILE    0x00409F50u  /* int32_t(path, a, b, from, flags) */
-#define ADDR_SPRITE_FILE_TAIL    0x00409BE0u  /* void(FILE *, a, int32, b) */
+/* 0x00409BE0, 768 bytes, LoadSpriteFile's tail and its only caller. The
+ * animation table that follows the sprites in a `.ani` file -- see
+ * src/game/anim.h. The name is ours: the function's one string is "Error!
+ * %d\n", which names nothing. */
+#define ADDR_LOAD_ANIM_TABLE     0x00409BE0u  /* void(FILE*, table, base, fb) */
+/* 0x0042DFE0, five callers. The bit index of a power of two in 1..0x8000; 0
+ * for anything else. A jump table for 1..0x80 and a compare chain above it. */
+#define ADDR_LOG2_MASK           0x0042DFE0u  /* uint8_t(int32_t mask) */
 #define AM2_SPRITE_PALETTE_SIZE  256
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */

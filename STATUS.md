@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `36f776d`. Working tree clean.
+Last updated: **2026-08-22**, at `8d0fcfa`+1. Working tree clean.
 
 ## In flight
 
@@ -70,12 +70,12 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 541 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 541 | 533 of them below the CRT line |
+| `patch_replace` sites | 543 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 542 | 534 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,960 / 372,816 B (**27.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 126,272 / 372,816 B (33.9%) | what every earlier session quoted, and an over-count |
-| modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 101,728 / 372,816 B (**27.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 127,040 / 372,816 B (34.1%) | what every earlier session quoted, and an over-count |
+| modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 68, 179 import sites | `docs/boundary.md` |
@@ -94,6 +94,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make selftest` | current | **7,186** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
+| `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
 A clean A/B is not evidence about a function the run never calls. Check with a
@@ -183,8 +184,46 @@ counts probe before reading one as coverage -- that is what turned the
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
 
+- **The `.ani` format is confirmed by arithmetic.** `LoadAnimTable` --
+  `LoadSpriteFile`'s tail, and the last unread part of a sprite file -- reads a
+  count and that many 16-byte entries, each either an animation of its own or a
+  borrow. Parsing all twenty shipped files with that layout ends every one on
+  its last byte, 349 entries in all; `rifleman.ani` is 1,103,262 of 1,103,262.
+  A mis-sized field could not do that.
+
+  `tools/anicheck.py` then compares what the game built against that parse.
+  Sprite indices are compared as deltas, because the absolute value depends on
+  how many sprites earlier files put in the list.
+
+- **Everyone borrows from the rifleman.** Eight soldier files pass rifleman's
+  table as their fallback, and an entry with no animation of its own takes the
+  one with the same id out of it -- `grenadier.ani` gets 43 of its 49 that way.
+  `explosions.ani` passes no fallback at all, so its three borrowers fall to
+  the loader's final fixup and take its own entry 0. All 121 resolve to the
+  predicted pointer.
+
+  Two paths the shipped data cannot reach: no borrowed id is missing from
+  rifleman, so the `entries[0]` last resort never fires, and rifleman's 52 ids
+  are distinct, so first-match and last-match are indistinguishable.
+
+- **`facings` is always a power of two, which is what fixed the field names.**
+  The loader hands it to `0x0042DFE0`, a jump table that turns a single-bit
+  value in 1..0x8000 into its bit index, and stores the answer in a byte. The
+  shipped files use 1, 2, 8, 16 and 32 and nothing else. So the pair
+  multiplying to the cell count is frames x facings and not two anonymous
+  dimensions; the cell data settles the order, stepping consecutively within a
+  facing and jumping between them.
+
 - **`LoadSpriteFile` runs 21 times in Boot Camp**, once per `LoadSpriteSet`, so
   both halves of the sprite loader are measured rather than assumed.
+
+- **`0x0042DFE0` is the next thing to take and it is 100 bytes.** A pure leaf
+  with five callers -- the power-of-two-to-bit-index table above -- and
+  `LoadAnimTable` already calls it by address. It is NOT on the pure-leaf list
+  and the reason is worth checking rather than assuming: its jump table sits in
+  `.text` at `0x0042E068`, and the purity test matches data addresses by range,
+  so a `.text` table read may be reading as a global. If it is, the test is
+  more conservative than it needs to be for this shape.
 
 - **`pad28` was not padding.** `sprite.h` had eight bytes at 0x0028 named as
   filler; `LoadSpriteSet` reads two int16 straight out of the file into 0x0028
