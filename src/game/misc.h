@@ -575,6 +575,27 @@ int32_t __cdecl KeyChanged(int32_t dik);
 int32_t __cdecl KeyPressed(int32_t dik);
 void __cdecl LatchKeyState(void);
 
+/* 0x004274A0 and 0x004274F0, the last two of the keyboard family.
+ *
+ * ConsumeKey copies one key's current state over its previous one and clears
+ * its entry in the pressed array, so the edge is not seen twice.
+ *
+ * ActionKeyDown is the one the game actually asks 26 times over: an ACTION
+ * index, not a scancode. Two scancodes are bound to each -- a primary and an
+ * alternate -- and either being down is enough. Where there is no alternate
+ * the table holds 0, and that is tested too rather than skipped. */
+void __cdecl ConsumeKey(int32_t dik);
+int32_t __cdecl ActionKeyDown(int32_t action);
+
+/* 0x0040F190, 47 callers -- CommSlotForArmy's inverse. Slot 4 answers 4
+ * without touching the object, the same convention army 4 has everywhere. */
+int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);
+
+/* 0x0042A6E0, 13 callers. Append to the {capacity, count, items} record
+ * InitPtrList clears, growing it first when the count has caught the
+ * capacity. The grow is still original. */
+void __attribute__((thiscall)) PtrListPush(void *rec, void *item);
+
 /* 0x00434C80, one caller. Free a pointer unless it is null, and nothing else.
  * The CRT's own free makes the same test, so this exists to save a call rather
  * than to be necessary. */

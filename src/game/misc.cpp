@@ -1007,6 +1007,50 @@ uint32_t __cdecl UnitTypeCost(int32_t type)
                                + (uint32_t)type * AM2_UNIT_TYPE_STRIDE);
 }
 
+#define g_keyBindings ((const uint8_t *)(uintptr_t)ADDR_KEY_BINDINGS)
+
+typedef void (__attribute__((thiscall)) *AM2_PtrListGrowFn)(void *rec);
+#define orig_ptr_list_grow \
+    (*(AM2_PtrListGrowFn)AM2_IMAGE(ADDR_PTR_LIST_GROW))
+
+void __cdecl ConsumeKey(int32_t dik)
+{
+    uint32_t k = (uint32_t)dik & 0xFFu;
+
+    g_prevKeys[k] = g_curKeys[k];
+    g_keyPressed[k] = 0;
+}
+
+int32_t __cdecl ActionKeyDown(int32_t action)
+{
+    /* No mask on `action` and no bound: the table is indexed raw. */
+    if (g_curKeys[g_keyBindings[action * 2]] & 0x80)
+        return 1;
+    if (g_curKeys[g_keyBindings[action * 2 + 1]] & 0x80)
+        return 1;
+    return 0;
+}
+
+int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot)
+{
+    if (slot == 4)
+        return 4;
+    return *(const int32_t *)((const uint8_t *)comm
+                              + (uint32_t)slot * AM2_PLAYER_STRIDE
+                              + AM2_PLAYER_ARMY);
+}
+
+void __attribute__((thiscall)) PtrListPush(void *rec, void *item)
+{
+    int32_t *r = (int32_t *)rec;
+
+    if (r[1] >= r[0])
+        orig_ptr_list_grow(rec);
+    /* Re-read the count after the grow, as the original does. */
+    ((void **)r[2])[r[1]] = item;
+    r[1] = r[1] + 1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1101,6 +1145,13 @@ int misc_install(void)
     patch_replace(ADDR_KEY_PRESSED_FN, (const void *)KeyPressed, "KeyPressed", 1);
     patch_replace(ADDR_LATCH_KEY_STATE, (const void *)LatchKeyState,
                   "LatchKeyState", 0);
+    patch_replace(ADDR_CONSUME_KEY, (const void *)ConsumeKey, "ConsumeKey", 1);
+    patch_replace(ADDR_ACTION_KEY_DOWN, (const void *)ActionKeyDown,
+                  "ActionKeyDown", 1);
+    patch_replace(ADDR_COMM_ARMY_OF_SLOT, (const void *)CommArmyOfSlot,
+                  "CommArmyOfSlot", 20);
+    patch_replace(ADDR_PTR_LIST_PUSH, (const void *)PtrListPush,
+                  "PtrListPush", 2);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
     patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,
                   "InitPtrList", 1);

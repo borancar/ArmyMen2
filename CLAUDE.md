@@ -1173,6 +1173,21 @@ make a bare `-w`, which it takes as `--print-directory`:
 AM2_DISPLAY=:99 tools/drive.sh start 25 "ARGS=-nointro -dbg -w"
 ```
 
+**A full trace table reads exactly like a missing patch, and it had been full
+for some time.** `MAX_TRACED` was 512 with 610 patches installed, so 104
+functions — everything patched late in `install()`: palette, sprite, surface,
+device, winmain — could not be wrapped, and `counts <name>` answered
+"(nothing traced)" for every one of them. Nothing was wrong: `trace_wrap` falls
+back to the unwrapped function and the patch goes in either way, and it only
+happens under `TRACE=1`. Only the measurement was gone.
+
+Third overflow of that table. It is 2,048 now, with the arena sized from it
+rather than separately — the arena holds `ARENA_BYTES/STUB_BYTES` stubs, so
+raising one alone just moves which limit bites — and the overflow is COUNTED,
+with `counts` appending `[N function(s) NOT WRAPPED: trace table full]`. The
+quiet version of this cannot recur. **Before reading a counter as evidence,
+make sure the counter exists.**
+
 **`tools/blindspots.py` says which counters can move, so the question below
 does not have to be re-derived every time.** Of 138 traced functions, 44 have
 every caller reconstructed and their counters are 0 by construction; 4 more are

@@ -413,6 +413,17 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
     return *(const int8_t *)(g_tileAttrs + (tile & 0xFFFFu));
 }
 
+int32_t __cdecl ObjHeight(const void *obj)
+{
+    const uint8_t *o   = (const uint8_t *)obj;
+    int32_t        adj = *(const int8_t *)(o + OBJ_OFF_HEIGHT_ADJ);
+    uint8_t        set = *(o + OBJ_OFF_HEIGHT_SET);
+
+    if (set)
+        return adj + (int32_t)(int8_t)set;
+    return TileAttrAt(*(const uint16_t *)(o + OBJ_OFF_TILE)) + adj;
+}
+
 void __cdecl ObjMarkIfOverdue(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -458,6 +469,7 @@ void item_install(void)
     patch_replace(ADDR_TILE_ATTR_AT, (const void *)TileAttrAt, "TileAttrAt", 1);
     patch_replace(ADDR_OBJ_MARK_IF_OVERDUE, (const void *)ObjMarkIfOverdue,
                   "ObjMarkIfOverdue", 1);
+    patch_replace(ADDR_OBJ_HEIGHT, (const void *)ObjHeight, "ObjHeight", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
 }

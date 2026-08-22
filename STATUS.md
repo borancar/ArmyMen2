@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 610 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 609 | 599 of them below the CRT line |
+| `patch_replace` sites | 616 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 615 | 605 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 106,000 / 372,816 B (**28.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 131,312 / 372,816 B (35.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 106,304 / 372,816 B (**28.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 131,616 / 372,816 B (35.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,21 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The trace table had been silently full, and a full table reads exactly
+  like a missing patch.** 104 functions could not be wrapped -- everything
+  patched late in `install()`, so the palette, sprite, surface, device and
+  winmain modules -- and `counts NearestPal` answered "(nothing traced)",
+  which is indistinguishable from never installed. Nothing was WRONG:
+  `trace_wrap` falls back to the unwrapped function and the patch goes in
+  either way. Only the measurement was gone, and only under `TRACE=1`.
+
+  Third overflow, and `trace.c`'s own comment had already said what to do
+  ("the limits want raising, not the message suppressing"). Raised to 2,048
+  with the arena sized from it, and the overflow is COUNTED now: `counts`
+  appends `[N function(s) NOT WRAPPED: trace table full]`, so the quiet
+  version of this failure cannot happen again. `NearestPalIndex` reads 3,072
+  and `NearestPalIndexRGB` 50 -- both invisible an hour ago.
 
 - **The unit types name themselves, and the table is 12 records of 40 bytes.**
   `0x004878B8` holds {value, bit, isTrooper, isVehicle, index, char name[20]}

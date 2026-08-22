@@ -251,12 +251,12 @@ typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_palette_loaded (*(am2_void_fn)ADDR_PALETTE_LOADED)
 
-/* 0x0041B820: pack three channels and ask the matcher, which is what the
- * original calls 23 times over. */
+/* Was a private helper here with the reserved-block threshold hardcoded at 9.
+ * 0x0041B820 is that function and takes the threshold as a fifth argument; the
+ * 23 call sites in this file all pass 9. */
 static uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
 {
-    return NearestPalIndex((const uint32_t *)pal,
-                              r | (g << 8) | (b << 16), 9);
+    return NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9);
 }
 
 /* Every colour the engine looks up by name, in the original's order. */
@@ -387,10 +387,19 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
     return hit;
 }
 
+uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
+                                   uint32_t b, uint32_t from)
+{
+    return NearestPalIndex(pal, (r & 0xFFu) | ((g & 0xFFu) << 8)
+                                | ((b & 0xFFu) << 16), from);
+}
+
 int palette_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_NEAREST_PAL_RGB, (const void *)NearestPalIndexRGB,
+                        "NearestPalIndexRGB", 5);
     rc |= patch_replace(ADDR_NEAREST_PAL_INDEX, (const void *)NearestPalIndex,
                         "NearestPalIndex", 11);
 

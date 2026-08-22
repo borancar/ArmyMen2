@@ -87,7 +87,6 @@ AM2_Widget *__attribute__((thiscall)) LabelDelete(AM2_Widget *w, int32_t flags)
 typedef int32_t (__cdecl *AM2_KeyQueryFn)(int32_t dik);
 typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
 typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
-#define orig_consume_key  ((AM2_ConsumeKeyFn)(uintptr_t)ADDR_CONSUME_KEY)
 
 /* DirectInput scancodes, which is what every query here is indexed by. */
 #define AM2_DIK_TAB    0x0F
@@ -1132,17 +1131,17 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
     if (KeyPressed(AM2_DIK_UP)) {
         if (w->focusedChild)
             WidgetFocusPrev(w->focusedChild, 1);
-        orig_consume_key(AM2_DIK_UP);
+        ConsumeKey(AM2_DIK_UP);
     }
     if (KeyPressed(AM2_DIK_DOWN)) {
         if (w->focusedChild)
             WidgetFocusNext(w->focusedChild, 1);
-        orig_consume_key(AM2_DIK_DOWN);
+        ConsumeKey(AM2_DIK_DOWN);
     }
     if (KeyPressed(AM2_DIK_TAB)) {
         if (w->focusedChild)
             WidgetFocusNext(w->focusedChild, 1);
-        orig_consume_key(AM2_DIK_TAB);
+        ConsumeKey(AM2_DIK_TAB);
     }
 
     /* Either activation key CHANGING repaints the focused child, which is how
@@ -1155,13 +1154,13 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
     }
 
     if (!IsKeyDown(AM2_DIK_SPACE) && KeyChanged(AM2_DIK_SPACE)) {
-        orig_consume_key(AM2_DIK_SPACE);
+        ConsumeKey(AM2_DIK_SPACE);
         focus = w->focusedChild;
         if (focus->activate)
             focus->activate(focus);
     }
     if (!IsKeyDown(AM2_DIK_RETURN) && KeyChanged(AM2_DIK_RETURN)) {
-        orig_consume_key(AM2_DIK_RETURN);
+        ConsumeKey(AM2_DIK_RETURN);
         focus = w->focusedChild;
         if (focus->activate)
             focus->activate(focus);
@@ -1182,7 +1181,7 @@ void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
     if (cancel
         && !IsKeyDown(AM2_DIK_ESCAPE)
         && KeyChanged(AM2_DIK_ESCAPE)) {
-        orig_consume_key(AM2_DIK_ESCAPE);
+        ConsumeKey(AM2_DIK_ESCAPE);
         cancel(w);
         return;
     }

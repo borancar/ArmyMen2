@@ -59,6 +59,14 @@
 #define ADDR_IS_KEY_DOWN        0x00427450u /* int32_t(int32_t dik) */
 #define ADDR_KEY_CHANGED        0x00427470u /* int32_t(int32_t dik) */
 #define ADDR_CONSUME_KEY        0x004274A0u /* void(int32_t dik) */
+/* The key BINDINGS: two DirectInput scancodes per action, a primary and an
+ * alternate, and 0x004274F0 answers "is either of this action's keys down".
+ * The first four actions bind a letter and an arrow -- W/UP, S/DOWN, A/LEFT,
+ * D/RIGHT -- and the rest bind one key with a zero beside it, which reads as
+ * no key and is tested anyway. 26 callers, so this is how the game asks about
+ * a control rather than about a key. The names are ours. */
+#define ADDR_KEY_BINDINGS       0x004854BCu /* uint8_t[][2], scancode pairs */
+#define ADDR_ACTION_KEY_DOWN    0x004274F0u /* int32_t(int32_t action) */
 /* 0x00453E80, thiscall, 21 callers: the base widget's per-frame update. Places
  * itself through WidgetScreenRect and walks its children calling THEIR slot 2,
  * which is what makes WidgetScreenRect the busiest function in the tree.
@@ -430,6 +438,13 @@
 /* 0x00429570, six callers: that byte for the tile an object stands on, sign
  * extended. 0x00429CE0 next door is a plain cdecl forwarder for
  * ADDR_ITEM_PRE_DESTROY. Both names are ours. */
+/* 0x00429590, 24 callers. How high an object stands: the byte at +0x65 is an
+ * absolute floor when it is non-zero, and otherwise the tile's own attribute
+ * byte is used; either way the signed byte at +0x64 is added. So +0x64 is an
+ * offset and +0x65 an override, and neither name is the program's. */
+#define ADDR_OBJ_HEIGHT        0x00429590u /* int32_t(const void *obj) */
+#define OBJ_OFF_HEIGHT_ADJ     0x64u       /* int8_t, always added */
+#define OBJ_OFF_HEIGHT_SET     0x65u       /* uint8_t, replaces the tile's */
 #define ADDR_OBJ_TILE_ATTR     0x00429570u /* int32_t(const void *obj) */
 /* 0x00429540, three callers: the same byte, taken by tile INDEX rather than by
  * object. The index is masked to 16 bits here where its neighbour reads a word
@@ -677,6 +692,11 @@
 /* Scan the palette from `from` for the entry closest to a colour, by the
  * metric at ADDR_COLOUR_DISTANCE. Went in twice, as ADDR_NEAREST_PAL_INDEX too. */
 #define ADDR_NEAREST_PAL_INDEX   0x0041B7C0u  /* uint8_t(const uint32_t*,uint32_t,uint32_t) */
+/* 0x0041B820, 25 callers: the same thing with the three channels apart. It
+ * packs them into its own FIRST ARGUMENT SLOT and passes the dword, so the top
+ * byte is whatever the red argument's byte 3 was -- stale, and it does not
+ * matter, since the matcher masks. */
+#define ADDR_NEAREST_PAL_RGB     0x0041B820u  /* uint8_t(pal, r, g, b, from) */
 #define ADDR_COLOUR_DISTANCE     0x0041B760u  /* int32_t(const uint32_t *a,
                                                * const uint32_t *b) */
 #define AM2_COLOUR_DIST_MAX      0x2FFFD      /* the sentinel it starts from */
@@ -2377,6 +2397,10 @@
 #define AM2_PLAYER_STRIDE        0x70u
 #define AM2_PLAYERS_MAX          4
 #define AM2_PLAYER_ARMY          0x210u
+/* 0x0040F190, 47 callers -- CommSlotForArmy's inverse, and the same special
+ * case: slot 4 answers 4 without touching the object. Everything else reads
+ * AM2_PLAYER_ARMY out of that slot's record. */
+#define ADDR_COMM_ARMY_OF_SLOT   0x0040F190u /* thiscall int32(this, slot) */
 #define AM2_PLAYER_ID            0x214u   /* the DirectPlay id; 0 or -1 is none */
 #define AM2_PLAYER_ACTIVE        0x25Cu
 #define AM2_COMM_VERBOSE         0x418u   /* gates the per-script logging */
@@ -3563,6 +3587,12 @@
  * 0x0042A670 is one `jmp` to the teardown above -- an alias, the same shape as
  * FreeSpriteListAlias. */
 #define ADDR_INIT_PTR_LIST         0x0042A660u  /* thiscall void(void *) */
+/* 0x0042A6E0, 13 callers: append to that record, growing it through 0x0042A6B0
+ * when the count has caught the capacity. {capacity, count, items} is the
+ * layout this fixes -- the grow test is [+4] against [+0] and the store is
+ * into [+8] at index [+4]. */
+#define ADDR_PTR_LIST_PUSH         0x0042A6E0u  /* thiscall void(void *, void *) */
+#define ADDR_PTR_LIST_GROW         0x0042A6B0u  /* thiscall void(void *) */
 #define ADDR_CLEAR_PTR_LIST_ALIAS  0x0042A670u  /* thiscall void(void *) */
 /* 0x00434C80, one caller: free a pointer unless it is null, and nothing else.
  * The CRT's own free does the same test; this one is the game's. */

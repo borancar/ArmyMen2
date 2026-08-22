@@ -112,6 +112,13 @@ int32_t __cdecl TileAttrAt(uint32_t tile);
  * compare, and nothing clears the bit here. Both names are ours. */
 void __cdecl ObjMarkIfOverdue(void *obj);
 
+/* 0x00429590, 24 callers. How high an object stands: the byte at +0x65 is an
+ * absolute floor when it is non-zero and otherwise the tile's own attribute
+ * byte is used; either way the SIGNED byte at +0x64 is added. So +0x64 is an
+ * offset and +0x65 an override -- neither name is the program's, and the
+ * override is read unsigned where the offset is read signed. */
+int32_t __cdecl ObjHeight(const void *obj);
+
 /* 0x00429CE0, seven callers. A plain cdecl forwarder for 0x0042A0A0, which is
  * still original -- both arguments go straight through. */
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);

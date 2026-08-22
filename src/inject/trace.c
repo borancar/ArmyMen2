@@ -17,14 +17,23 @@
  * counters at once, and the only sign was "table full, cannot wrap ..." in a
  * log nobody reads until they are already suspicious.
  *
- * Sized well clear of the reconstruction now rather than just above it. If it
- * ever fills again the message is real and the limits want raising, not the
- * message suppressing. */
-#define MAX_TRACED   512
+ * Then a third time, at 512, and the same way: 104 functions lost their
+ * counters and `counts <name>` answered "(nothing traced)" for every one --
+ * which is indistinguishable from never having been installed, and is exactly
+ * the confusion src/inject/control.c's own comment warns about. Nothing was
+ * WRONG: trace_wrap falls back to the unwrapped function and the patch goes in
+ * either way. Only the measurement was gone.
+ *
+ * Sized four times the reconstruction now, and the arena with it -- the arena
+ * holds ARENA_BYTES/STUB_BYTES stubs, so raising one without the other just
+ * moves which limit bites. And the overflow is no longer only a log line: it
+ * is counted and `counts` says so, because a quiet "(nothing traced)" is the
+ * whole failure. */
+#define MAX_TRACED   2048
 #define MAX_ARGS     8
 #define LOG_FIRST_N  12
 #define STUB_BYTES   27
-#define ARENA_BYTES  16384
+#define ARENA_BYTES  (MAX_TRACED * STUB_BYTES + 1024)
 
 struct entry {
     const char *name;
@@ -34,6 +43,7 @@ struct entry {
 
 static struct entry g_entries[MAX_TRACED];
 static int32_t      g_count;
+static int32_t      g_overflow;   /* wraps refused for want of room */
 static uint8_t     *g_arena;
 static size_t       g_arena_used;
 static int          g_enabled = -1;
@@ -165,7 +175,14 @@ void trace_describe(char *out, uint32_t cap, const char *want)
      * bad thing to have to guess about -- the whole point of the counts is to
      * tell "not called" apart from "not installed". */
     if (i < g_count)
-        _snprintf(out + at, cap - at, " (+%d truncated)", g_count - i);
+        at += (uint32_t)_snprintf(out + at, cap - at, " (+%d truncated)",
+                                  g_count - i);
+    /* A name that is missing because the table filled reads exactly like a
+     * name that was never installed. Say which. */
+    if (g_overflow)
+        _snprintf(out + at, cap - at,
+                  " [%d function(s) NOT WRAPPED: trace table full]",
+                  g_overflow);
     out[cap - 1] = '\0';
 }
 
@@ -222,6 +239,7 @@ const void *trace_make_stub(const void *fn, const char *name, int32_t nargs)
     int32_t  id;
 
     if (g_count >= MAX_TRACED) {
+        g_overflow++;
         hooklog("trace: table full, cannot wrap %s", name);
         return NULL;
     }
@@ -232,6 +250,7 @@ const void *trace_make_stub(const void *fn, const char *name, int32_t nargs)
 
     s = arena_alloc(STUB_BYTES);
     if (!s) {
+        g_overflow++;
         hooklog("trace: out of stub space for %s", name);
         return NULL;
     }

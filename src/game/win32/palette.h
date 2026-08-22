@@ -71,6 +71,13 @@ void __cdecl SetGamePalette(uint8_t *palette);
 uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
                                 uint32_t from);
 
+/* 0x0041B820, 25 callers. NearestPalIndex with the three channels apart. The
+ * original packs them into its own first argument slot and passes the dword,
+ * so the top byte is whatever the red argument's byte 3 was -- stale, and
+ * harmless, because the matcher masks. */
+uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
+                                   uint32_t b, uint32_t from);
+
 int palette_install(void);
 
 #ifdef __cplusplus
