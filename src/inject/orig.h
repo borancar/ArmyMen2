@@ -853,6 +853,17 @@
  * from 0x025C instead, and a slot that is neither answers -1. It also takes
  * its slot as a SIGNED WORD, alone in this family. */
 #define ADDR_COMM_SLOT_REMOTE    0x0040F5A0u /* thiscall int32(this, int16 slot) */
+/* 0x0040F560, thiscall. "Must I tell the other players what this army just
+ * did?" -- the question every action with a network side asks first, and the
+ * name is ours from the three answers it gives.
+ *
+ * No multiplayer session at all answers NO, which is the reading that settles
+ * it: under "is this army mine" a single-player game would have to answer yes.
+ * Army 4 -- the neutral one -- answers "am I the host". Everything else
+ * answers "is that slot NOT remote", which is CommSlotRemote inverted, so it
+ * inherits that function's three-valued oddity: a slot answering -1 is
+ * truthy, and this turns it into a 0. */
+#define ADDR_COMM_MUST_BROADCAST 0x0040F560u /* thiscall int32(this, int16 army) */
 #define ADDR_COMM_SET_REMOTE     0x0040F600u /* thiscall void(this, int32 slot) */
 #define ADDR_COMM_CLEAR_REMOTE   0x0040F620u /* thiscall void(this, int32 slot) */
 #define COMM_ARMY_OFF_REMOTE     0x20Cu

@@ -142,9 +142,13 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 #define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
 #define g_aiControlled (*(int32_t *)(uintptr_t)ADDR_AI_CONTROLLED)
-/* Becoming the host is written into the same global that says whether
- * this is a multiplayer session at all -- see ADDR_MP_SESSION. */
-#define g_hostChanged  (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+/* The multiplayer-session flag, and it is spelled that way here because that
+ * is what it IS -- OnHostChanged writing 1 into it is not a second meaning,
+ * it is a machine that has just become the host asserting there is a session.
+ * It was g_hostChanged, which read as a different global; commmsg.cpp's
+ * CommMustBroadcast needed the same address under the honest name and
+ * checkglobals refused to let both exist. */
+#define g_mpSession    (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_netGame  (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
 #define g_gameOverFlags (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)
@@ -294,7 +298,7 @@ static LRESULT OnHostMigrated(void)
     char     text[128];
 
     *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
-    g_hostChanged = 1;
+    g_mpSession = 1;
     if (g_gameState == 1) {
         g_reqTaken     = 7;
         g_overlayDirty = 1;

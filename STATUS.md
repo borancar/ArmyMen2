@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `1cf896a`. Working tree clean.
+Last updated: **2026-08-22**, at `0e8bf42`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 529 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 529 | 521 of them below the CRT line |
+| `patch_replace` sites | 530 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 530 | 522 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,216 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,528 / 372,816 B (33.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,280 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,592 / 372,816 B (33.4%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,31 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **"Must I tell the other players?" is one function, and nine callers ask it.**
+  `0x0040F560` answers NO when there is no multiplayer session at all -- which
+  is what settles the name, because under "is this army mine" a single-player
+  game would have to answer yes to everything. Army 4 answers "am I the host".
+  Everything else answers "is that slot NOT remote", inheriting
+  `CommSlotRemote`'s three-valued oddity: a slot answering -1 is truthy there
+  and becomes 0 here.
+
+- **`g_hostChanged` was the multiplayer-session flag under a name from one
+  writer.** `OnHostChanged` puts 1 in it, and that is not a second meaning --
+  it is a machine that has just become the host asserting there is a session.
+  The `orig.h` macro said `ADDR_MP_SESSION` all along and a comment beside the
+  local name explained the discrepancy rather than fixing it. `checkglobals`
+  refused to let the honest name exist alongside it, which is the ratchet
+  working exactly as intended: it does not care which name is right, only that
+  there is one.
+
+- **`TrooperDropItem` is read and NOT written**, because it needs five more
+  names first: 0x0042B290, 0x00439F40 (352 B), 0x0044C150 (256 B, the send
+  side of a trooper message) and 0x00427F60. Reading it did establish that a
+  trooper's inventory is six uids at 0x054C and that slot 0 is the wielded
+  weapon -- the same field `DestroyTrooper` reads as `TROOPER_OFF_WEAPON_UID`.
+  It also sets the dropped item's kind byte to 4, so a dropped item becomes a
+  weapon object on the ground.
 
 - **`FreeItem`'s whole switch is closed** -- all five arms, eight kinds, no
   `orig_` left in it. The bare arm serves kinds 1, 5, 6 and 8 and is exactly

@@ -412,6 +412,24 @@ void __attribute__((thiscall)) CommClearSlotRemote(void *comm, int32_t slot);
  * accessor takes a full int32_t. A negative would index backwards. */
 int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot);
 
+/* Original: 0x0040F560, thiscall, and the name is ours. "Must I tell the other
+ * players what this army just did?" -- TrooperDropItem and its relatives ask
+ * this before sending anything.
+ *
+ * Three answers. No multiplayer session at all is NO, which is what settles
+ * the name: under "is this army mine" a single-player game would answer yes to
+ * everything. Army 4, the neutral one, answers "am I the host". Anything else
+ * answers "is that slot NOT remote".
+ *
+ * That last one is CommSlotRemote inverted, so it inherits the three-valued
+ * oddity: a slot that answers -1 is truthy there and becomes 0 here. The
+ * original spells the inversion `neg; sbb; inc`, which is `== 0` and not a
+ * logical not -- for -1 the two agree, and it is written as the compare.
+ *
+ * NOT pure, unlike the three accessors above: it reads the multiplayer-session
+ * global, so it cannot have vectors. */
+int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

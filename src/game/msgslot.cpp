@@ -171,12 +171,31 @@ int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot)
     return -1;
 }
 
+#define g_mpSession (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+
+int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army)
+{
+    /* Nobody to tell. */
+    if (!g_mpSession)
+        return 0;
+
+    /* The neutral army is the host's to speak for. */
+    if (army == 4)
+        return *(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)
+               != 0;
+
+    /* `== 0`, as the original's neg/sbb/inc spells it -- not a logical not. */
+    return CommSlotRemote(comm, army) == 0;
+}
+
 int msgslot_install(void)
 {
     patch_replace(ADDR_COMM_SET_REMOTE, (const void *)CommSetSlotRemote,
                   "CommSetSlotRemote", 4);
     patch_replace(ADDR_COMM_CLEAR_REMOTE, (const void *)CommClearSlotRemote,
                   "CommClearSlotRemote", 2);
+    patch_replace(ADDR_COMM_MUST_BROADCAST, (const void *)CommMustBroadcast,
+                  "CommMustBroadcast", 9);
     patch_replace(ADDR_COMM_SLOT_REMOTE, (const void *)CommSlotRemote,
                   "CommSlotRemote", 1);
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
