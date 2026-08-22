@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `9ba85e2`. Working tree clean.
+Last updated: **2026-08-22**, at `4039e33`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 535 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 535 | 527 of them below the CRT line |
+| `patch_replace` sites | 536 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 536 | 528 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,856 / 372,816 B (**26.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 125,168 / 372,816 B (33.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,968 / 372,816 B (**26.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 125,280 / 372,816 B (33.6%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,27 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **Three ratchets fired on one 112-byte function, and all three were right.**
+  `checkseams` caught a fresh `orig_` on 0x00457420, which `objtype.cpp` has
+  had as `ObjIsTypeIn238` for a long time; `checkglobals` caught the game clock
+  spelled `(const int32_t *)(uintptr_t)` where `event.cpp` spells it
+  `(const uint32_t *)AM2_IMAGE(...)`; and the COMPILER caught `OBJ_OFF_FLAGS`,
+  which I put in `orig.h` while `item.cpp` had a local copy of the same offset.
+
+  The third is the one with no tool behind it -- a duplicate `#define` is only
+  a warning, and only because both were in scope at once. The offset now lives
+  in `orig.h` alone.
+
+- **The "radius" is ApproxDist's, so it is a diamond and not a circle.**
+  `TakeNearbyOffMap` measures with `ApproxDist`, which is the game's cheap
+  approximation, and that is what decides who gets caught by an air strike.
+  Reproduced rather than tidied into a true distance.
+
+- **Three tests in the original's order, all three needed.** Type 2, 3 or 8;
+  not ALREADY off the map, which is the 0x0800 flag the taking-off sets; and
+  within the radius. The second is what stops a second strike re-scheduling
+  something already gone.
 
 - **The air-support family is complete** -- request, enemy check, queue head,
   start and reset. Five functions, and every one of them is inside or beside

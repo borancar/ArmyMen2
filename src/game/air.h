@@ -16,6 +16,7 @@
 #define AM2_AIR_H
 
 #include <stdint.h>
+#include "rect.h"   /* AM2_Point */
 #include "../inject/orig.h"   /* am2_FILE */
 
 #ifdef __cplusplus
@@ -77,6 +78,23 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from);
  * The `where` field is written here as one dword and copied by AirSupportPop
  * as two words. Same field, two access widths, and both are reproduced. */
 int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from);
+
+/* Original: 0x004097D0, and the name is ours. Walk every registered object and
+ * take the ones near `where` off the map, each scheduled to return at the game
+ * clock plus `delayMs`.
+ *
+ * Three tests, in the original's order and all three needed: the object is a
+ * type 2, 3 or 8; it is not ALREADY off the map, which is the 0x0800 flag the
+ * taking-off sets; and ApproxDist from `where` is no more than `radius`.
+ *
+ * The distance is ApproxDist, not a true one -- so the "radius" is that
+ * function's diamond-ish approximation and not a circle. Reproduced, since it
+ * is what decides who is caught.
+ *
+ * The point arrives BY VALUE and its address is taken to pass to ApproxDist,
+ * which is why the parameter cannot become a pointer. */
+void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius,
+                              int32_t delayMs);
 
 /* 0x00409840 and 0x00409870. A tag and one fixed 584-byte block at
  * 0x004F945C, written and read straight -- the simplest section in the file

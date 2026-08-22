@@ -4,7 +4,9 @@
 #include "air.h"
 #include "rect.h"     /* AM2_Rect */
 #include "item.h"     /* UidArmy -- reconstructed */
-#include "objtable.h" /* AM2_Object */
+#include "objtable.h" /* AM2_Object, FirstItem, NextItem */
+#include "dist.h"     /* ApproxDist -- reconstructed */
+#include "objtype.h"  /* ObjIsTypeIn238 -- reconstructed */
 #include "savetag.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -84,6 +86,33 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
             return obj->uid;
     }
     return 0;
+}
+
+typedef void (__cdecl *AM2_TakeOffMapFn)(void *obj);
+#define orig_take_off_map   ((AM2_TakeOffMapFn)(uintptr_t)ADDR_OBJ_TAKE_OFF_MAP)
+/* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
+ * stay one definition. */
+#define g_gameClockMs (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+
+void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius, int32_t delayMs)
+{
+    uint8_t *o;
+
+    for (o = (uint8_t *)FirstItem(); o; o = (uint8_t *)NextItem()) {
+        /* Types 2, 3 and 8 only; not one that is already off the map; and
+         * ApproxDist -- a diamond, not a circle -- within the radius. */
+        if (!ObjIsTypeIn238((const AM2_Object *)o))
+            continue;
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_OFF_MAP)
+            continue;
+        if (ApproxDist(&where, (const AM2_Point *)(o + OBJ_OFF_POS))
+                > radius)
+            continue;
+
+        orig_take_off_map(o);
+        *(int32_t *)(o + OBJ_OFF_RETURN_AT) =
+            (int32_t)g_gameClockMs + delayMs;
+    }
 }
 
 int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from)
@@ -173,6 +202,9 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_TAKE_NEARBY_OFF_MAP,
+                  (const void *)TakeNearbyOffMap,
+                  "TakeNearbyOffMap", 2);
     patch_replace(ADDR_DO_AIR_SUPPORT, (const void *)DoAirSupport,
                   "DoAirSupport", 3);
     patch_replace(ADDR_FIND_ENEMY_NEAR, (const void *)FindEnemyNear,

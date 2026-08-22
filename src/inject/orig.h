@@ -3193,6 +3193,17 @@
 /* 0x00409710, "DoAirSupport paratroopers where: %d, from %d, army %d,
  * count: %d" -- its own name, on its own line. Three callers. */
 #define ADDR_DO_AIR_SUPPORT    0x00409710u  /* int32_t(int32, uint32, uint32) */
+/* 0x004296E0, 96 bytes, eight callers. Take one object off the map: raise
+ * 0x0800 in its flags, and if 0x0200 was up, lower it and unregister every row
+ * of the object's sub-list from the map descriptor. The name is ours; 0x0800
+ * is what callers test to know it has already been done. */
+#define ADDR_OBJ_TAKE_OFF_MAP  0x004296E0u  /* void(obj *) */
+#define OBJ_FLAG_OFF_MAP       0x0800u
+#define OBJ_OFF_FLAGS          0x08u
+#define OBJ_OFF_RETURN_AT      0x5Cu   /* game-clock ms, set by the below */
+/* 0x004097D0, 112 bytes, two callers. Everything of type 2, 3 or 8 within a
+ * radius of a point goes off the map and comes back later. */
+#define ADDR_TAKE_NEARBY_OFF_MAP 0x004097D0u /* void(AM2_Point, int32, int32) */
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */

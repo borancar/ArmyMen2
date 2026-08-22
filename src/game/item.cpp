@@ -56,7 +56,8 @@ uint32_t __cdecl UidOnWire(uint32_t uid)
  */
 #define OBJ_FIELDA_SHIFT 18
 #define OBJ_FIELDA_MASK  7u
-#define OBJ_OFF_FLAGS    8u
+/* OBJ_OFF_FLAGS moved to orig.h, where air.cpp needs it too -- a local
+ * copy of a shared offset is how two definitions of one field start. */
 
 uint32_t __cdecl ObjFieldA(const void *obj)
 {
