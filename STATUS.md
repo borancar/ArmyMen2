@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 440 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 440 | 433 of them below the CRT line |
+| `patch_replace` sites | 441 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 441 | 434 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 98,960 / 372,816 B (**26.5%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 99,232 / 372,816 B (**26.6%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -154,6 +154,17 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`controls`' budget of 200 is only just tight enough.** Making `ButtonPaint`
+  always show the unfocused sprite -- so no button ever lights -- moves **249,
+  249 and 243** pixels on the three frames. It is caught, by 43 pixels. A
+  button's focus highlight is simply not many pixels, and the same is true of
+  most menu state.
+
+  Together with the edit box's 72, that is the shape of this whole layer:
+  correct-looking output and small defect signals. The budgets are near the
+  limit of what a whole-frame comparison can do here, and the sharper checks
+  are the ones that DRIVE -- press the key, look at where the game went.
 
 - **The edit box types, and that is end-to-end evidence.** `EditTakeFocus` is
   what installs `g_charHandler`, so a field can only receive a character if our

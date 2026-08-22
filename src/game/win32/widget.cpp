@@ -101,6 +101,9 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
  * spell it so it stays one definition rather than a drift. */
 #define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define orig_mouse_moved (*(const int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
+/* Spelled as device.cpp spells them, so they stay one definition. */
+#define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+#define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
 
 void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
 {
@@ -160,6 +163,29 @@ static void EditReleaseFocus(AM2_Widget *w)
         g_focusedEdit = (AM2_Widget *)0;
         g_charHandler = (am2_char_fn)0;
     }
+}
+
+void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    if (w->parent) {
+        if (w->parent->focusedChild != w) {
+            w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
+        } else {
+            int32_t pressed = 0;
+
+            if (w->unknown40 && (g_mouseButton[0] || g_mouseChanged[0]))
+                pressed = 1;
+            else if (orig_is_key_down(AM2_DIK_RETURN))
+                pressed = 1;
+
+            w->sprite = pressed
+                ? *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED)
+                : *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS);
+        }
+    }
+    WidgetPaint(w, clip);
 }
 
 void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce)
@@ -635,6 +661,8 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_BUTTON_PAINT, (const void *)ButtonPaint,
+                        "ButtonPaint", 2);
     rc |= patch_replace(ADDR_EDIT_TAKE_FOCUS, (const void *)EditTakeFocus,
                         "EditTakeFocus", 1);
     rc |= patch_replace(ADDR_EDIT_REPAINT, (const void *)EditRepaint,

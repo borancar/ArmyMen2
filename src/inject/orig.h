@@ -87,6 +87,9 @@
  * thunk onto the base destructor. Slot 0 in three vtables. */
 #define ADDR_WIDGET_DELETE_ALT  0x00456970u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_WIDGET_DESTRUCT_THUNK 0x00456990u /* void(AM2_Widget *) */
+/* 0x00454270, thiscall, slot 1 in two vtables: a button that picks one of
+ * three sprites -- normal, focused, pressed -- and then paints normally. */
+#define ADDR_BUTTON_PAINT       0x00454270u /* void(AM2_Widget *, RECT) */
 /* The edit box -- vtable 0x0046FC98, the class CLAUDE.md names as the owner of
  * g_charHandler. 0x0065A05C holds whichever one currently has the focus, and
  * 0x0044D520 is the WM_CHAR consumer it installs while it does. */

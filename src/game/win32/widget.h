@@ -391,6 +391,28 @@ void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
 
+/* A three-state button's sprites. The dialog builders load them in triples --
+ * `03_007_00_ok.bmp`, `03_007_01_ok.bmp`, `03_007_02_ok.bmp` -- which is the
+ * independent confirmation that these three offsets are normal, focused and
+ * pressed in that order. */
+#define BUTTON_OFF_SPRITE_NORMAL  0x68   /* AM2_Sprite *, not focused */
+#define BUTTON_OFF_SPRITE_FOCUS   0x6C   /* AM2_Sprite *, focused, not pressed */
+#define BUTTON_OFF_SPRITE_PRESSED 0x70   /* AM2_Sprite *, being pressed */
+
+/* Original: 0x00454270, thiscall, slot 1 in two vtables. Choose which of the
+ * three sprites this button shows, store it in the widget's own sprite field,
+ * and then paint exactly as the base does.
+ *
+ * A button that is not its parent's focused child is always the normal
+ * sprite. The focused one is PRESSED if the cursor is inside it and the left
+ * button is either down or has just changed, or -- whether or not the cursor
+ * is anywhere near it -- if RETURN is held. That second route is what makes a
+ * keyboard-selected button look pressed while the key is down, and it is
+ * checked on both paths rather than only the no-hover one.
+ *
+ * A button with no parent picks nothing and keeps whatever sprite it had. */
+void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip);
+
 /* The edit box -- vtable 0x0046FC98, and the class CLAUDE.md names when it says
  * porting g_charHandler means porting the text-field system.
  *
