@@ -86,6 +86,33 @@ typedef struct AM2_Widget {
 typedef void (__attribute__((thiscall)) *AM2_WidgetPaintFn)(AM2_Widget *w,
                                                             RECT clip);
 
+/* Slot 0's signature: the MSVC scalar deleting destructor. Bit 0 of the flag
+ * says "and free the storage"; the object is returned, as i386 MSVC does. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_WidgetDeleteFn)(
+    AM2_Widget *w, int32_t flags);
+
+/* Original: 0x00453BC0, thiscall. The base destructor: restore the base
+ * vtable, then destroy every child through ITS slot 0 with the free bit set,
+ * walking the sibling chain. The next pointer is read before the child is
+ * destroyed, which is what makes deleting from inside the walk safe.
+ *
+ * Children are freed; the widget itself is not. That is the deleting
+ * destructor's job and it is the caller who decides. */
+void __attribute__((thiscall)) WidgetDestruct(AM2_Widget *w);
+
+/* Original: 0x00453BA0, thiscall, slot 0 of the base class. */
+AM2_Widget *__attribute__((thiscall)) WidgetDelete(AM2_Widget *w,
+                                                   int32_t flags);
+
+/* Original: 0x00454EF0, thiscall. The label's destructor. It owns nothing --
+ * the text it points at is not its to free -- so it is the vtable store and a
+ * tail call to the base. */
+void __attribute__((thiscall)) LabelDestruct(AM2_Widget *w);
+
+/* Original: 0x00454ED0, thiscall, slot 0 of the label. */
+AM2_Widget *__attribute__((thiscall)) LabelDelete(AM2_Widget *w,
+                                                  int32_t flags);
+
 /* Slot 4's signature. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetRepaintFn)(AM2_Widget *w);
 

@@ -10,6 +10,7 @@
 #include "frame.h"
 #include "audio.h"
 #include "../image.h"
+#include "../crt.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -34,6 +35,49 @@ typedef void (__cdecl *AM2_DrawTextClippedFn)(int32_t x, int32_t y,
                                               RECT clip, int32_t colour);
 #define orig_draw_text_clipped \
     ((AM2_DrawTextClippedFn)(uintptr_t)ADDR_DRAW_TEXT_CLIPPED)
+
+void __attribute__((thiscall)) WidgetDestruct(AM2_Widget *w)
+{
+    AM2_Widget *child;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_WIDGET_BASE);
+
+    child = w->firstChild;
+    while (child) {
+        /* Read the sibling BEFORE destroying the child, which is what makes
+         * freeing from inside the walk safe. The original also tests the
+         * child for null a second time here, on a value it has just branched
+         * on and re-enters the loop with; that test can never fire and is not
+         * reproduced. */
+        AM2_Widget *next = child->nextSibling;
+
+        ((AM2_WidgetDeleteFn *)child->vtable)[WIDGET_VSLOT_DTOR](child, 1);
+        child = next;
+    }
+}
+
+AM2_Widget *__attribute__((thiscall)) WidgetDelete(AM2_Widget *w,
+                                                   int32_t flags)
+{
+    WidgetDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) LabelDestruct(AM2_Widget *w)
+{
+    w->vtable = (void *)AM2_IMAGE(VTABLE_LABEL);
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) LabelDelete(AM2_Widget *w, int32_t flags)
+{
+    LabelDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
 
 /* 0x004274D0. Still original: it is two globals and a rep movsd, and the
  * buffers are the input layer's rather than this module's. */
@@ -216,6 +260,14 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_DESTRUCT, (const void *)WidgetDestruct,
+                        "WidgetDestruct", 2);
+    rc |= patch_replace(ADDR_WIDGET_DELETE, (const void *)WidgetDelete,
+                        "WidgetDelete", 1);
+    rc |= patch_replace(ADDR_LABEL_DESTRUCT, (const void *)LabelDestruct,
+                        "LabelDestruct", 1);
+    rc |= patch_replace(ADDR_LABEL_DELETE, (const void *)LabelDelete,
+                        "LabelDelete", 1);
     rc |= patch_replace(ADDR_WIDGET_TAKE_FOCUS, (const void *)WidgetTakeFocus,
                         "WidgetTakeFocus", 30);
     rc |= patch_replace(ADDR_WIDGET_REPAINT, (const void *)WidgetRepaint,

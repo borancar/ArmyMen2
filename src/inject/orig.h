@@ -41,6 +41,13 @@
  * use. Same leading arguments, then the clip rectangle BY VALUE and the
  * colour. `^` in the string is an escape that rewrites the colour argument. */
 #define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,str,font,RECT,colour) */
+/* 0x00453BC0 / 0x00453BA0, thiscall: the base widget's destructor and the
+ * MSVC scalar deleting destructor around it, which is vtable slot 0.
+ * 0x00454EF0 / 0x00454ED0 are the label's pair. */
+#define ADDR_WIDGET_DESTRUCT    0x00453BC0u /* void(AM2_Widget *) */
+#define ADDR_WIDGET_DELETE      0x00453BA0u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_LABEL_DESTRUCT     0x00454EF0u /* void(AM2_Widget *) */
+#define ADDR_LABEL_DELETE       0x00454ED0u /* AM2_Widget *(AM2_Widget *, int32_t) */
 /* 0x004274D0: copy the 256-byte current key buffer over the previous one, so
  * every edge test that follows sees no change. Called where the game wants the
  * keystroke that got it here not to be seen again. */

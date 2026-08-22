@@ -221,6 +221,12 @@ play() {
         drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
         "$REPO/tools/point.py" 306 212 --click >/dev/null 2>&1
         sleep 6
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        # CANCEL, which is the only thing here that DESTROYS widgets: the
+        # dialog and all twenty-odd of its children come down through slot 0.
+        # Without this the destructors are reconstructed and never run.
+        "$REPO/tools/point.py" 575 290 --click >/dev/null 2>&1
+        sleep 5
     fi
 
     if [ "$cfg" = mission ]; then
@@ -396,7 +402,7 @@ def find(side, tag):
 # frame cannot show a transient, and a menu is mostly transients.
 bad = 0
 compared = 0
-for tag in ("", "mid"):
+for tag in ("", "mid", "dlg"):
     o, r = find("orig", tag), find("recon", tag)
     if not o or not r:
         continue

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 414 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 414 | 407 of them below the CRT line |
+| `patch_replace` sites | 418 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 418 | 411 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 93,584 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 93,648 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,29 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`LabelConstruct` 21, `LabelDestruct` 21, and that is an invariant.** Every
+  label the CONTROLS dialog builds is destroyed when CANCEL closes it, exactly.
+  It is the registry invariant's shape -- two counters that must agree or
+  something leaked -- and it is the first one this project has in the menu
+  layer.
+
+- **The labels are MEMBERS, not heap children, and the counters say so.**
+  `LabelDelete` and `WidgetDelete` -- the two MSVC scalar deleting destructors,
+  vtable slot 0 -- read **0** while `LabelDestruct` reads 21. A heap child
+  destroyed through `WidgetDestruct`'s walk would go through slot 0 and move
+  both. Twenty-one calls arriving at the destructor ADDRESS while the deleting
+  wrapper is never entered means original code is calling the destructor
+  directly with no free, which is what MSVC emits for a member object whose
+  container is going away.
+
+  So the child-walk in `WidgetDestruct` is not what takes these down, and
+  slot 0 stays verified by reading.
+
+- **`tools/ab.sh controls` closes the dialog now** and compares three frames:
+  the OPTIONS menu mid-sequence, the open dialog, and the screen after CANCEL.
+  The dialog frame is exact. Closing it is the only thing in the suite that
+  destroys a widget at all.
 
 - **`controls` samples two frames now, and it did NOT fix what it was built
   to fix.** `ab.sh` takes a shot between the two clicks as well as after them,
