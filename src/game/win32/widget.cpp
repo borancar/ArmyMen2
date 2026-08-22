@@ -885,6 +885,90 @@ void __attribute__((thiscall)) ArrowDestruct(AM2_Widget *w)
     ButtonDestruct(w);
 }
 
+/* The palette index the matcher filled with white. */
+#define g_whiteInk (*(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE)
+
+/* One line of the typewriter's text, drawn at the given y. Shared by the two
+ * places the original emits the same six-argument call -- on reaching a `|`
+ * and once more for whatever is left after the last one. Returns 0 if the
+ * surface would not lock, which is the original's early return. */
+static int32_t TyperDrawLine(AM2_Widget *w, const char *line, int32_t y,
+                             RECT clip, uint8_t ink)
+{
+    if (!LockSurface(g_drawTarget))
+        return 0;
+
+    orig_draw_text_clipped(w->rect.left, y, line, 1, clip, ink);
+    UnlockSurface();
+    return 1;
+}
+
+void __attribute__((thiscall)) TyperPaint(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    const char    *text = (const char *)(self + TYPER_OFF_TEXT);
+    int32_t        shown;
+    uint8_t        ink;
+    RECT           visible;
+    char           line[0x3F0];
+    int32_t        count = 0;
+    int32_t        yoff  = 0;
+    int32_t        i;
+
+    WidgetScreenRect(w);
+
+    /* Computed, tested, and then not used -- the drawer gets `clip`. */
+    if (!IntersectRect(&visible, &clip, &w->rect))
+        return;
+
+    shown = *(const int32_t *)(self + TYPER_OFF_SHOWN);
+    ink   = g_whiteInk;
+    if (shown <= 0)
+        return;
+
+    for (i = 0; i < shown; i++) {
+        if (text[i] == '|') {
+            line[count] = 0;
+            if (!TyperDrawLine(w, line, w->rect.top + yoff, clip, ink))
+                return;
+            count = 0;
+            yoff += TYPER_LINE_HEIGHT;
+        } else {
+            line[count++] = text[i];
+        }
+    }
+
+    if (count > 0) {
+        line[count] = 0;
+        TyperDrawLine(w, line, w->rect.top + yoff, clip, ink);
+    }
+}
+
+void __attribute__((thiscall)) TyperUpdate(AM2_Widget *w)
+{
+    uint8_t    *self = (uint8_t *)w;
+    const char *text = (const char *)(self + TYPER_OFF_TEXT);
+    uint32_t    now;
+
+    WidgetScreenRect(w);
+    now = orig_get_tick_count();
+
+    if (*(const int32_t *)(self + TYPER_OFF_SHOWN) < (int32_t)strlen(text)
+        && now - *(const uint32_t *)(self + TYPER_OFF_LAST) > TYPER_REVEAL_MS) {
+        AM2_Widget *blink = *(AM2_Widget **)(self + TYPER_OFF_BLINKER);
+
+        *(uint32_t *)(self + TYPER_OFF_LAST) = now;
+        if (blink)
+            BlinkerStart(blink, TYPER_BLINK_MS, 1);
+        /* Sound 0, the typing click. Every argument but the index is zero. */
+        PlaySoundAt(0, 0, 0, 0, 0);
+        *(int32_t *)(self + TYPER_OFF_SHOWN) += 1;
+    }
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetUpdate(w);
+}
+
 AM2_Widget *__attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags)
 {
     ArrowDestruct(w);
@@ -1463,6 +1547,10 @@ int widget_install(void)
     rc |= patch_replace(ADDR_DLG_GAMEMENU_DELETE,
                         (const void *)DlgGameMenuDelete,
                         "DlgGameMenuDelete", 1);
+    rc |= patch_replace(ADDR_TYPER_PAINT, (const void *)TyperPaint,
+                        "TyperPaint", 1);
+    rc |= patch_replace(ADDR_TYPER_UPDATE, (const void *)TyperUpdate,
+                        "TyperUpdate", 1);
     rc |= patch_replace(ADDR_ARROW_DESTRUCT, (const void *)ArrowDestruct,
                         "ArrowDestruct", 1);
     rc |= patch_replace(ADDR_ARROW_DELETE, (const void *)ArrowDelete,

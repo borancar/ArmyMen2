@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `3862ed7`. Working tree clean.
+Last updated: **2026-08-22**, at `390e06e`. Working tree clean.
 
 ## In flight
 
@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 508 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 508 | 501 of them below the CRT line |
+| `patch_replace` sites | 510 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 510 | 503 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 94,576 / 372,816 B (**25.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 95,120 / 372,816 B (**25.5%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 119,808 / 372,816 B (32.1%) | what every earlier session quoted, and an over-count |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
@@ -167,6 +167,35 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`ab.sh quit` compared the title screen and nothing else.** The only frame
+  it took was before the QUIT click, so CONFIRM GAME EXIT -- the dialog the
+  configuration exists to reach, and the one that runs the typewriter label and
+  the QUIT GAME destructor -- was never in the pixels at all. It takes a `dlg`
+  frame now.
+
+  The wait before it is the part that needed measuring. That dialog's body
+  reveals one character every 100 ms, so a shot taken too early catches the two
+  sides at different characters and is unsynchronised by construction. "Are you
+  sure you want to quit?" settles in about three seconds; shots at 4 s and 14 s
+  are identical, so six is the margin.
+
+- **The default pixel budget of 500 is too loose for a MENU configuration, and
+  that has now been found twice in one session.** Dropping the trailing line
+  from `TyperPaint` deletes the whole message and moves **361** pixels; the
+  default passed it, exactly as it passed the 336 of the scroll-bar mutation.
+  A line of menu text is about 360 pixels, so a budget that cannot see 361
+  cannot see a missing line. `quit` is 200 now, with `controls`, `difficulty`
+  and `audiovol`.
+
+  The gameplay configurations are a different case and 500 is right there: the
+  scene moves between runs and that is the noise floor. The number was never
+  wrong, it was being applied to screens it was not measured on.
+
+- **Both typewriter counters are blind**, so the frame is the only evidence.
+  `blindspots.py` lists `TyperPaint` and `TyperUpdate` as unable to move --
+  every caller is ours, through the vtable. That is why the shot mattered more
+  than usual here.
 
 - **The percentage in the table above was an over-count, and had been for the
   whole project.** It asked "does a patched address fall inside this

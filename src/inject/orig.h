@@ -214,6 +214,18 @@
  * never its own. Read, not tidied. */
 #define ADDR_ARROW_DELETE       0x00455B50u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_ARROW_DESTRUCT     0x00455B70u /* void(AM2_Widget *) */
+/* The TYPEWRITER message label, vtable 0x0046FD24. Its constructor word-wraps
+ * the text it is given into a `|`-separated buffer at 0x0058; its update
+ * reveals one more character every 100 ms, ticking the blinker and playing a
+ * click as it goes; its painter draws the revealed prefix line by line. Six
+ * confirm dialogs build it -- QUIT GAME, REPLAY, DELETE GAME, the overwrite
+ * confirm, DELETE PLAYER and the plain message box -- so CONFIRM GAME EXIT is
+ * one, and `tools/ab.sh quit` reaches it. */
+#define ADDR_TYPER_PAINT        0x004569A0u /* void(AM2_Widget *, RECT) */
+#define ADDR_TYPER_UPDATE       0x00456B20u /* void(AM2_Widget *) */
+/* The palette index the matcher fills with white; palette.cpp already carries
+ * the address in its named-colour table, and this is the name for it. */
+#define ADDR_COLOUR_WHITE       0x004FD768u /* uint8_t */
 /* The DIALOG base class, vtable 0x0046FC84 -- one level under the icon, whose
  * destructor it jumps straight to. Every full-screen dialog in the game
  * derives from it. Slots 1 and 2 are 0x00454BA0 and 0x00454BD0, the two

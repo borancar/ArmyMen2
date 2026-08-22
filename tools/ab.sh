@@ -362,7 +362,19 @@ play() {
         # own; the counters reach the log because trace_report() runs on
         # DLL_PROCESS_DETACH, which is the only way to see a teardown count.
         "$REPO/tools/point.py" 306 383 --click >/dev/null 2>&1
-        sleep 4
+        # A shot of CONFIRM GAME EXIT while it is up, and this configuration
+        # went a long time without one -- the only frame it compared was the
+        # title screen before the click, so the dialog it exists to reach was
+        # never in the pixels at all.
+        #
+        # The wait is what makes the frame comparable. That dialog's body is a
+        # TYPEWRITER label: it reveals one character every 100 ms, so a shot
+        # taken too early catches the two sides at different characters and is
+        # unsynchronised by construction. "Are you sure you want to quit?" is
+        # thirty characters and settles in about three seconds; six is the
+        # margin. Measured -- shots at 4 s and 14 s are identical.
+        sleep 6
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
         "$REPO/tools/point.py" 475 224 --click >/dev/null 2>&1
         local waited=0
         while pgrep -f 'ArmyMen2[.]exe' >/dev/null 2>&1 && [ $waited -lt 40 ]; do
@@ -509,6 +521,17 @@ compare() {
         # the cursor, which `controls` measured at 45 on the fourth run of
         # three that had all been 0.
         audiovol)   budget=200 ;;
+        # 200, for the same reason and found the same way. The dlg frame is
+        # CONFIRM GAME EXIT with its message settled; clean it is 54 -- the
+        # cursor -- and dropping the trailing line from TyperPaint, which
+        # deletes the whole message, is 361. The DEFAULT of 500 passed that.
+        #
+        # Twice in one session, so it is worth saying plainly: 500 is too loose
+        # for any MENU configuration. A whole line of menu text is about 360
+        # pixels, so a budget that cannot see 361 cannot see a missing line.
+        # The gameplay configurations are different -- there the scene moves
+        # and 500 is the noise floor, which is where that number came from.
+        quit)       budget=200 ;;
         # Measured at 0, three runs -- but left at the default, and the
         # reason is worth knowing before trusting this number. A REAL defect
         # here is small: making EditTakeFocus skip installing g_charHandler,

@@ -82,6 +82,15 @@ typedef struct AM2_Widget {
  * with a destructor that is the same two instructions, and each stamps its own
  * vtable from this list on the way past. */
 #define VTABLE_DIALOG       0x0046FC84u
+/* The typewriter message label. Six confirm dialogs build one. */
+#define VTABLE_TYPER        0x0046FD24u
+#define TYPER_OFF_TEXT      0x58    /* char[0x400], lines separated by `|` */
+#define TYPER_OFF_LAST      0x458   /* uint32_t, GetTickCount at the last reveal */
+#define TYPER_OFF_SHOWN     0x45C   /* int32_t, characters revealed so far */
+#define TYPER_OFF_BLINKER   0x460   /* AM2_Widget *, ticked on every reveal */
+#define TYPER_LINE_HEIGHT   12
+#define TYPER_REVEAL_MS     100
+#define TYPER_BLINK_MS      0x46    /* 70 ms, the same period the list box uses */
 #define VTABLE_DLG_SELECTMAP             0x0046FAB8u
 #define VTABLE_DLG_DIFFICULTY            0x0046FAE0u
 #define VTABLE_DLG_QUITGAME              0x0046FAF4u
@@ -601,6 +610,33 @@ AM2_DECLARE_DIALOG_DTOR(DlgNameEntry);
 AM2_DECLARE_DIALOG_DTOR(DlgLoadGame);
 AM2_DECLARE_DIALOG_DTOR(DlgMessage);
 AM2_DECLARE_DIALOG_DTOR(DlgGameMenu);
+
+/* Original: 0x004569A0, slot 1 of the typewriter label. Draw the revealed
+ * prefix of the wrapped text, one call per `|`-separated line, each twelve
+ * pixels below the last.
+ *
+ * The intersection with the caller's clip is computed and then only TESTED --
+ * what is handed to the text drawer is the caller's rectangle unchanged, where
+ * `ListDraw` passes the intersection. The two disagree and both are kept.
+ *
+ * The line buffer is a kilobyte of stack with no bound check on the count, so
+ * a wrapped line longer than 1008 characters would run off it. Nothing the
+ * game ships comes close; reproduced rather than guarded, because a guard
+ * would be ours and would hide the original's shape.
+ *
+ * Note it walks exactly `shown` characters and never looks for the
+ * terminator: the update is what keeps that count inside the string. */
+void __attribute__((thiscall)) TyperPaint(AM2_Widget *w, RECT clip);
+
+/* Original: 0x00456B20, slot 2. Reveal one more character every 100 ms until
+ * the whole string is out, ticking the blinker and playing sound 0 on each --
+ * which is the typing click. Then repaint through slot 1 and chain to the base
+ * update.
+ *
+ * The elapsed test is `> 100`, not `>=`, and the reveal is one character per
+ * tick however long the frame took -- so the effect runs slower on a machine
+ * that cannot keep 10 fps rather than skipping ahead. The original's. */
+void __attribute__((thiscall)) TyperUpdate(AM2_Widget *w);
 
 /* The list box. Its rows are 14 pixels tall and start 4 below the widget's
  * top, which is read off the arithmetic in ListTakeFocus rather than assumed:
