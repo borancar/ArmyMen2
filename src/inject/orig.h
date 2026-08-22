@@ -2004,6 +2004,16 @@
  * half is 0x00410E90. 0x004FAA18 is the record it sends, value at +8. */
 #define ADDR_SEND_READY_TO_LOAD    0x00410D90u /* void(int32_t) */
 #define ADDR_MSG_READY_TO_LOAD     0x004FAA18u
+/* 0x00411000, "SendGameStartMsg". Host only, and the one place the shared
+ * random seed is chosen: the host reads the clock, keeps the value and sends
+ * it, so every machine's RNG starts from the same number. */
+#define ADDR_SEND_GAME_START       0x00411000u /* void(void) */
+#define ADDR_MSG_GAME_START        0x004FC5F0u /* record: +4 len, +8 players, +0xC id */
+#define ADDR_GAME_SEED             0x00512314u /* int32_t, the shared seed */
+#define ADDR_GAME_SEED_SENT        0x004FC780u /* int32_t, the copy that goes out */
+#define ADDR_CRT_TIME              0x00465052u /* int32_t(int32_t *) -- GetLocalTime */
+#define COMM_OFF_STARTED           0x400u      /* non-zero once the game is running */
+#define AM2_SESSION_FLAGS_START    0x21u       /* or'd into the description */
 #define COMM_ARMY_OFF_READY        0x274u   /* m_ArmyReady, its own name */
 #define COMM_ARMY_RECORD_SIZE      112u
 #define COMM_ARMY_OFF_READY_TO_LOAD 0x270u

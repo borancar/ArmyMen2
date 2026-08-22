@@ -3,6 +3,7 @@
 
 #include "msgslot.h"
 #include "rect.h"   /* AM2_Rect, for the dialog paint slot */
+#include "armymsg.h" /* SendGamePause */
 #include "../inject/orig.h"
 #include "crt.h"        /* am2_log */
 #include "image.h"      /* AM2_IMAGE */

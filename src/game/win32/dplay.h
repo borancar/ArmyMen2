@@ -57,6 +57,31 @@ int32_t __cdecl CommClose(void);
 int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
                                                            void *connection);
 
+/* It lives HERE and not in msgslot.cpp because it calls three comm methods
+ * that do -- and msgslot.cpp is in the selftest link, which does not pull in
+ * DirectX. Closing those seams turned calls-by-address into link
+ * dependencies, which is exactly what checkseams warns about.
+ *
+ * Original: 0x00411000, "SendGameStartMsg". The host announcing that play
+ * begins, and the one place the SHARED RANDOM SEED is chosen: it reads the
+ * clock, keeps the value in ADDR_GAME_SEED and sends a copy, so every machine
+ * starts its RNG from the same number.
+ *
+ * Three exits, and they are not a simple chain. If the game has already
+ * started it skips straight to the tail. If this machine is not the host it
+ * returns outright, doing nothing. Only the host reaches the middle, which
+ * fills the record, marks the session description with 0x21, publishes it and
+ * sends.
+ *
+ * The tail runs for the host AND for the already-started case: unpause with
+ * mask 0x10000, request state 2, and set the two flags.
+ *
+ * Two of the original's own oddities are kept. The opening log is NOT gated on
+ * the comm verbosity field, unlike every other function in this group. And the
+ * second log says "Seed is %d" while a literal 0 is pushed for it, so the seed
+ * it reports is always zero -- the value it actually used is never printed. */
+void __cdecl SendGameStartMsg(void);
+
 /* Original: 0x0040E630. Set the session description. */
 int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
                                                      uint32_t flags);

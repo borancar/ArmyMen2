@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 467 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 467 | 460 of them below the CRT line |
+| `patch_replace` sites | 468 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 468 | 461 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 103,520 / 372,816 B (**27.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 103,776 / 372,816 B (**27.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,30 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **Closing a seam can move a function to another FILE, and this one did.**
+  `SendGameStartMsg` was written in `msgslot.cpp`, and its three comm callees
+  turned out to be reconstructed -- so `checkseams` demanded direct calls, and
+  direct calls turned reaches-by-address into LINK dependencies on
+  `win32/dplay.cpp`. `msgslot.cpp` is in the selftest link, which deliberately
+  does not pull in DirectX, so `selftest.exe` stopped linking.
+
+  The fix was not a stub or an exclusion: the function belongs in `dplay.cpp`,
+  beside the three methods it drives. `selftest-link` is the check that caught
+  it, and its own message predicted the cause exactly.
+
+- **The host picks the shared RANDOM SEED here**, reads it from the clock, keeps
+  it in `0x00512314` and sends a copy -- so every machine's RNG starts from the
+  same number. That is the only place found that sets it.
+
+- **Two of the original's oddities in one function.** The opening log is NOT
+  gated on the comm verbosity field, unlike every other function in this group.
+  And the second log says "Seed is %d" while a literal 0 is pushed for it, so
+  the seed it reports is always zero and the value actually used is never
+  printed. Both kept.
+
+- **Five of the six handshake functions are done.** Only `SendGameReadyMsg`
+  (352 B) remains.
 
 - **The original disagrees with itself about a null check.**
   `SendGameReadyToLoadMsg` and `ReceiveGameReadyToLoadMsg` end with the SAME

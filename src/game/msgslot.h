@@ -193,6 +193,7 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid);
  * The slot lookup runs twice when logging is on, as in the host half. */
 void __cdecl SendGameReadyToLoadMsg(int32_t ready);
 
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

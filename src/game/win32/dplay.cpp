@@ -24,6 +24,7 @@
  */
 
 #include "dplay.h"
+#include "../armymsg.h"   /* SendGamePause */
 #include "frame.h"
 #include "cdcheck.h"
 #include "../msgslot.h"
@@ -478,7 +479,6 @@ typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
 /* 0x046C -- WndProc forwards this one to the original. */
 #define AM2_WM_COMM_SEND_FAILED 0x046Cu
-
 int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
                                            uint32_t flags, void *data,
                                            uint32_t size)
@@ -1421,6 +1421,68 @@ int32_t __cdecl StartPacketThread(void)
     }
     return SetThreadPriority(g_packetThread, THREAD_PRIORITY_HIGHEST) != 0;
 }
+/* The CRT clock and the state request this reaches, both still original. */
+typedef int32_t (__cdecl *AM2_CrtTimeFn)(int32_t *out);
+#define orig_crt_time      (*(AM2_CrtTimeFn)(uintptr_t)ADDR_CRT_TIME)
+typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
+#define orig_request_state (*(AM2_RequestStateFn)(uintptr_t)ADDR_REQUEST_STATE)
+
+/* The two widget slots the lobby repaint reaches, and the comm fields this
+ * shares with msgslot.cpp. */
+typedef void (__attribute__((thiscall)) *AM2_DlgUpdateFn2)(void *w);
+#define AM2_START_COMM_LOG   0x418
+#define AM2_START_SELF_ID    0x3CC
+
+void __cdecl SendGameStartMsg(void)
+{
+    uint8_t *comm;
+    uint8_t *msg = (uint8_t *)(uintptr_t)ADDR_MSG_GAME_START;
+
+    /* NOT gated on the verbosity field, unlike the rest of this group. */
+    orig_log("SendGameStartMsg\n");
+
+    comm = (uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT);
+
+    if (!*(const int32_t *)(comm + COMM_OFF_STARTED)) {
+        int32_t seed;
+        void   *desc;
+
+        /* Host only; a client does nothing at all, not even the tail. */
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            return;
+
+        *(int32_t *)(msg + 8) = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+        *(int32_t *)(msg + 12) = *(const int32_t *)(comm + AM2_START_SELF_ID);
+
+        /* The shared seed: read once here and sent, so every machine agrees. */
+        seed = orig_crt_time((int32_t *)0);
+        *(int32_t *)(uintptr_t)ADDR_GAME_SEED      = seed;
+        *(int32_t *)(uintptr_t)ADDR_GAME_SEED_SENT = seed;
+
+        if (*(const int32_t *)(comm + AM2_START_COMM_LOG))
+            /* "Seed is %d" with a literal 0 -- the original never prints the
+             * seed it just chose. Kept. */
+            orig_log("SendGameStartMsg for %d  Players: Seed is %d \n",
+                    *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT), 0);
+
+        CommGetSessionDesc(comm);
+
+        desc = *(void **)(comm + COMM_OFF_SESSION_BUF);
+        *(uint32_t *)((uint8_t *)desc + 4) |= AM2_SESSION_FLAGS_START;
+        CommSetSessionDesc(comm, desc, 0);
+
+        CommSend(comm, 0, 1, msg, (uint32_t)*(const int32_t *)(msg + 4));
+    }
+
+    /* Reached by the host AND by the already-started case. */
+    SendGamePause(1, 0x10000);
+    orig_request_state(2);
+    *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
+    *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
+}
+
+
+
 
 int dplay_install(void)
 {
@@ -1455,6 +1517,8 @@ int dplay_install(void)
                         "CommEnumSessions", 1);
     rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, (const void *)CommEnumConnections,
                         "CommEnumConnections", 1);
+    rc |= patch_replace(ADDR_SEND_GAME_START, (const void *)SendGameStartMsg,
+                        "SendGameStartMsg", 3);
     rc |= patch_replace(ADDR_COMM_SEND, (const void *)CommSend, "CommSend", 4);
     rc |= patch_replace(ADDR_COMM_OPEN_SESSION, (const void *)CommOpenSession,
                         "CommOpenSession", 1);
