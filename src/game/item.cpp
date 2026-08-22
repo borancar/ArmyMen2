@@ -150,6 +150,45 @@ typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
  *
  * Note the log prints the object's uid at +4 and is gated on the comm object's
  * debug field, the same one the event functions read. */
+typedef void *(__cdecl *AM2_WeaponByUidFn)(int32_t uid);
+typedef void (__cdecl *AM2_FreeRowsFn)(void *subrecord);
+#define orig_weapon_by_uid ((AM2_WeaponByUidFn)(uintptr_t)ADDR_WEAPON_BY_UID)
+#define orig_free_subrecord_rows \
+    ((AM2_FreeRowsFn)(uintptr_t)ADDR_FREE_SUBRECORD_ROWS)
+
+void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
+{
+    uint8_t *t = (uint8_t *)trooper;
+    int32_t  weaponUid;
+    uint8_t *weapon;
+    void    *alloc;
+
+    if (!trooper)
+        return;
+
+    weaponUid = *(const int32_t *)(t + TROOPER_OFF_WEAPON_UID);
+    if (weaponUid) {
+        /* Answers null, having complained, for anything that is not kind 4. */
+        weapon = (uint8_t *)orig_weapon_by_uid(weaponUid);
+        if (weapon) {
+            if (kCommDbg)
+                orig_log("DestroyTrooper %x\n",
+                         *(const int32_t *)(weapon + 4));
+            /* An 8-bit OR on a 32-bit load, stored back as 32 bits. */
+            *(int32_t *)(weapon + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
+        }
+    }
+
+    alloc = *(void **)(t + TROOPER_OFF_ALLOC);
+    if (alloc)
+        am2_free(alloc);
+
+    orig_free_subrecord_rows(t + OBJ_OFF_SUBRECORD);
+    DestroyItemObject(trooper, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
+                      unlink);
+    am2_free(trooper);
+}
+
 void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -173,7 +212,6 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
  * dispatch: the kind says whose object this is. */
 typedef void (__cdecl *AM2_FreeKindFn)(void *item, int32_t unlink);
 #define orig_free_common (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_COMMON))
-#define orig_free_kind2  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND2))
 #define orig_free_kind3  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND3))
 #define orig_free_kind4  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND4))
 #define orig_free_kind7  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND7))
@@ -216,7 +254,7 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
         return 1;
 
     case 2:
-        orig_free_kind2(item, unlink);
+        DestroyTrooper(item, unlink);
         return 1;
 
     case 3:
@@ -293,6 +331,8 @@ void item_install(void)
                   "RemoveInventoryItem", 4);
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
+    patch_replace(ADDR_FREE_ITEM_KIND2, (const void *)DestroyTrooper,
+                  "DestroyTrooper", 1);
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);

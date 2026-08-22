@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `68d95d0`. Working tree clean.
+Last updated: **2026-08-22**, at `f265bf5`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 524 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 524 | 517 of them below the CRT line |
+| `patch_replace` sites | 525 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 525 | 518 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 98,848 / 372,816 B (**26.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,160 / 372,816 B (33.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 98,992 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,304 / 372,816 B (33.3%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,32 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **"Grep the address first" failed again, and this time BOTH ratchets caught
+  it.** `0x004478C0` names itself "DestroyTrooper", and I added
+  `ADDR_DESTROY_TROOPER` for it -- while `orig.h` already called it
+  `ADDR_FREE_ITEM_KIND2` and `item.cpp` already reached it through
+  `orig_free_kind2`. `checkpatches` reported the 32nd alias and `checkseams`
+  reported the seam in the same run.
+
+  The old name was not wrong either: it is the kind-2 arm of `FreeItem`'s
+  switch, and kind 2 is the trooper -- `ReceiveArmyMsg`'s switch says so
+  independently. So the address keeps the family name that `FreeItem` reads by,
+  and the C++ function takes the name the function gives itself. When two names
+  are both right, keep the one the surrounding code is organised around.
+
+- **This landed as a SEAM CLOSURE, not a new frontier.** `FreeItem` was already
+  ours and was calling into the image for kind 2; now it calls a function.
+  Three of the five arms are still original -- common, kind 3 and kind 4 -- and
+  each is a self-contained target of the same shape.
+
+- **A trooper is freed twice over, in an order that matters.**
+  `DestroyItemObject` frees the 0x0090 allocation and clears the live byte, and
+  only then is the object itself freed. Reproduced in that order.
+
+- **The weapon step is skipped in silence for anything that is not a weapon.**
+  `WeaponByUid` complains and answers null for any kind but 4, and a zero uid
+  never asks -- both land on the same path, and the trooper still comes down.
 
 - **BOTH dispatchers are ours now.** `CommDispatchMessage` handles the
   packet-level messages and `ReceiveArmyMsg` handles one message out of a

@@ -109,4 +109,25 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink);
  * BEFORE the free. Five callers. */
 void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify);
 
+/* Original: 0x004478C0, "DestroyTrooper %x" -- and it is the KIND 2 arm of
+ * FreeItem's switch, which is why orig.h calls the address
+ * ADDR_FREE_ITEM_KIND2. Kind 2 is the trooper, so the two names agree.
+ *
+ * Take one trooper down: mark its
+ * weapon dead, free the allocation at 0x00AC, free the subrecord's rows, hand
+ * the object itself to DestroyItemObject, and free it.
+ *
+ * The weapon is reached by uid through WeaponByUid, which complains and
+ * answers null for anything that is not kind 4 -- so a trooper holding
+ * something that is not a weapon leaves that step undone and carries on. Both
+ * the uid being zero and the lookup failing land on the same path.
+ *
+ * The flag is set with an 8-bit OR on a 32-bit load and stored back as 32
+ * bits, which for bit 1 is the same thing.
+ *
+ * Note the object is freed here AND handed to DestroyItemObject, which frees
+ * its 0x0090 allocation and clears the live byte -- so the order matters and
+ * is reproduced: DestroyItemObject first, then the object. */
+void __cdecl DestroyTrooper(void *trooper, int32_t unlink);
+
 #endif

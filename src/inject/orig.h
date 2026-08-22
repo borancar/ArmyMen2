@@ -3201,10 +3201,25 @@
  * allocation at +0x90 and clears the live byte at +0x8C; does nothing at all
  * if that byte is already clear, which makes it idempotent. */
 #define ADDR_DESTROY_ITEM_OBJECT   0x00429C80u  /* void(obj, int32, int32) */
+/* Four bytes past ADDR_OBJ_TABLE, and passed BY ADDRESS to a great many
+ * functions -- DestroyItemObject's second parameter among them, where it is
+ * simply forwarded to ADDR_ITEM_PRE_DESTROY. What it holds is not established;
+ * what is, is that it is one of the two things every object call carries.
+ * Named for position, as AM2_COMM_CONNECTED is. */
+#define ADDR_OBJ_TABLE_ARG         0x00514F10u
+/* 0x00434EC0. Free a subrecord's row array: unregister each 0x60-byte row from
+ * the map descriptor, then give the array back. The name is ours. */
+#define ADDR_FREE_SUBRECORD_ROWS   0x00434EC0u  /* void(void *subrecord) */
+#define TROOPER_OFF_WEAPON_UID     0x54Cu
+#define TROOPER_OFF_ALLOC          0xACu
+#define WEAPON_OFF_FLAGS           0x08u
+#define WEAPON_FLAG_DEAD           0x02u
 #define ADDR_ITEM_PRE_DESTROY      0x0042A0A0u  /* void(obj, int32_t) */
 #define OBJ_OFF_ALLOC_LIVE         0x8Cu   /* uint8_t */
 #define OBJ_OFF_ALLOC_PTR          0x90u
 #define ADDR_FREE_ITEM_COMMON      0x0043BBB0u  /* kinds 1, 5, 6, 8 */
+/* Kind 2 is the TROOPER, and this arm names itself: "DestroyTrooper %x". The
+ * family name is kept because it is what FreeItem's switch reads by. */
 #define ADDR_FREE_ITEM_KIND2       0x004478C0u
 #define ADDR_FREE_ITEM_KIND3       0x0045B470u
 #define ADDR_FREE_ITEM_KIND4       0x0045F290u  /* the one that logs */
