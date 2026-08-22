@@ -139,6 +139,56 @@ void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
         ((AM2_WidgetPaintFn *)child->vtable)[WIDGET_VSLOT_PAINT](child, clip);
 }
 
+void __attribute__((thiscall)) WidgetDestructThunk(AM2_Widget *w)
+{
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) WidgetDeleteAlt(AM2_Widget *w,
+                                                      int32_t flags)
+{
+    WidgetDestructThunk(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) FocusLabelDestruct(AM2_Widget *w)
+{
+    LabelDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) FocusLabelDelete(AM2_Widget *w,
+                                                       int32_t flags)
+{
+    FocusLabelDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    if (w->flag44) {
+        self[LABEL_OFF_INK]   = self[FOCUSLABEL_OFF_INK_FOCUS];
+        self[LABEL_OFF_PAPER] = self[FOCUSLABEL_OFF_PAPER_FOCUS];
+    } else {
+        /* Paper first here and ink first above -- the original's order, and
+         * nothing can tell the difference. */
+        self[LABEL_OFF_PAPER] = self[FOCUSLABEL_OFF_PAPER];
+        self[LABEL_OFF_INK]   = self[FOCUSLABEL_OFF_INK];
+    }
+    LabelDraw(w, clip);
+}
+
+void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
+                                                   int32_t announce)
+{
+    WidgetTakeFocus(w, announce);
+}
+
 void __attribute__((thiscall)) WidgetPaintFwd1(AM2_Widget *w, RECT clip)
 {
     WidgetPaint(w, clip);
@@ -519,6 +569,22 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_WIDGET_DESTRUCT_THUNK,
+                        (const void *)WidgetDestructThunk,
+                        "WidgetDestructThunk", 1);
+    rc |= patch_replace(ADDR_WIDGET_DELETE_ALT, (const void *)WidgetDeleteAlt,
+                        "WidgetDeleteAlt", 3);
+    rc |= patch_replace(ADDR_FOCUSLABEL_DESTRUCT,
+                        (const void *)FocusLabelDestruct,
+                        "FocusLabelDestruct", 1);
+    rc |= patch_replace(ADDR_FOCUSLABEL_DELETE,
+                        (const void *)FocusLabelDelete,
+                        "FocusLabelDelete", 1);
+    rc |= patch_replace(ADDR_FOCUSLABEL_DRAW, (const void *)FocusLabelDraw,
+                        "FocusLabelDraw", 1);
+    rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
+                        (const void *)FocusLabelTakeFocus,
+                        "FocusLabelTakeFocus", 1);
     rc |= patch_replace(ADDR_WIDGET_UPDATE_THUNK,
                         (const void *)WidgetUpdateThunk,
                         "WidgetUpdateThunk", 1);

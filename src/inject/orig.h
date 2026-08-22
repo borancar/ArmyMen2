@@ -83,6 +83,16 @@
 /* 0x00455100: the same one-instruction shape onto WidgetRepaint, slot 4 in
  * two vtables. */
 #define ADDR_WIDGET_REPAINT_THUNK 0x00455100u /* void(AM2_Widget *) */
+/* 0x00456970 and 0x00456990: a second scalar deleting destructor over a `jmp`
+ * thunk onto the base destructor. Slot 0 in three vtables. */
+#define ADDR_WIDGET_DELETE_ALT  0x00456970u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_WIDGET_DESTRUCT_THUNK 0x00456990u /* void(AM2_Widget *) */
+/* The label subclass that highlights when focused -- vtable 0x0046FB80, and
+ * the class the CONTROLS panel builds its captions from. */
+#define ADDR_FOCUSLABEL_DELETE    0x00450CC0u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_FOCUSLABEL_DESTRUCT  0x00450CE0u /* void(AM2_Widget *) */
+#define ADDR_FOCUSLABEL_DRAW      0x00450CF0u /* void(AM2_Widget *, RECT) */
+#define ADDR_FOCUSLABEL_TAKE_FOCUS 0x00450D40u /* void(AM2_Widget *, int32_t) */
 /* There is NO third one. A widget vtable slot points at 0x0045CAA0, which is
  * a bare `ret`, and that reads like a class whose update does nothing -- but
  * 0x0045CAA0 is ADDR_LOG, thirty lines above, stubbed to `ret` in the retail

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 429 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 429 | 422 of them below the CRT line |
+| `patch_replace` sites | 435 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 435 | 428 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 96,672 / 372,816 B (**25.9%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 98,352 / 372,816 B (**26.4%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -154,6 +154,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The `dlg` frame earned its keep, and it is the only one that did.** Making
+  `FocusLabelDraw` always use the focused colour pair leaves the final frame at
+  **0** and the mid frame at **0**, and puts the DIALOG frame **635 pixels**
+  over its budget. So the extra shots are not redundant: each covers a screen
+  the others do not, and this defect is invisible on two of the three.
+
+  That also answers the note from earlier today about the mid frame "not doing
+  what it was added for". The principle was right and the first test of it was
+  simply the wrong mutation.
+
+- **A whole subclass in six small functions.** The focus-highlighting label --
+  vtable `0x0046FB80`, what the CONTROLS panel builds its captions from -- adds
+  nothing to the plain label but a second colour pair, picked on `0x0044` and
+  copied into the label's own ink and paper before delegating. That is why
+  those two bytes are rewritten every frame instead of being set once by a
+  constructor. `FocusLabelDraw` runs 132,192 times opening the dialog.
 
 - **A silenced log looks exactly like a clean run, and that cost five
   configurations.** Patching `0x0045CAA0` -- which is `ADDR_LOG`, folded with an

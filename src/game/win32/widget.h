@@ -77,6 +77,14 @@ typedef struct AM2_Widget {
 #define LABEL_OFF_INK    0x60       /* uint8_t, palette index the text is drawn in */
 #define LABEL_OFF_PAPER  0x61       /* uint8_t, palette index the background is cleared to */
 
+/* The focus-highlighting label's own fields. It keeps TWO colour pairs and
+ * copies the applicable one into the plain label's ink and paper above before
+ * delegating, which is why those two are rewritten every frame. */
+#define FOCUSLABEL_OFF_INK         0x64   /* uint8_t, ink while not focused */
+#define FOCUSLABEL_OFF_INK_FOCUS   0x65   /* uint8_t, ink while focused */
+#define FOCUSLABEL_OFF_PAPER       0x66   /* uint8_t, paper while not focused */
+#define FOCUSLABEL_OFF_PAPER_FOCUS 0x67   /* uint8_t, paper while focused */
+
 /* The five virtuals, in slot order. Reading the whole array at once is what
  * makes them nameable: slot 3 is 0x00454070 in 30 of the 33 classes and slot 4
  * is 0x00453FF0 in 29, so those two are the base's and the handful of others
@@ -351,6 +359,35 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w);
  * that safe and is the clearest evidence the subclasses lay their own tails
  * out independently. */
 void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w);
+
+/* Original: 0x00456970 over 0x00456990 -- a second scalar deleting destructor
+ * and the `jmp` thunk it calls, which lands on the base destructor. Slot 0 in
+ * three vtables. Identical in shape to WidgetDelete over WidgetDestruct; the
+ * original has two because two different classes declared one. */
+AM2_Widget *__attribute__((thiscall)) WidgetDeleteAlt(AM2_Widget *w,
+                                                      int32_t flags);
+void __attribute__((thiscall)) WidgetDestructThunk(AM2_Widget *w);
+
+/* The label subclass that highlights when it holds the focus -- vtable
+ * 0x0046FB80, and what the CONTROLS panel builds its captions from.
+ *
+ * It adds nothing but a second colour pair. Its painter picks between them on
+ * 0x0044, copies the winner into the plain label's ink and paper, and
+ * delegates to LabelDraw -- which is why those two bytes are rewritten on
+ * every frame rather than set once by the constructor.
+ *
+ * The two branches write the pair in opposite orders, ink-then-paper when
+ * focused and paper-then-ink when not. Nothing can observe that; it is kept
+ * because it is what the original does and tidying it would be inventing.
+ *
+ * Its destructor tail-calls the label's, which is what establishes the
+ * inheritance, and its slot 3 is a plain forward to WidgetTakeFocus. */
+AM2_Widget *__attribute__((thiscall)) FocusLabelDelete(AM2_Widget *w,
+                                                       int32_t flags);
+void __attribute__((thiscall)) FocusLabelDestruct(AM2_Widget *w);
+void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
+void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
+                                                   int32_t announce);
 
 int widget_install(void);
 
