@@ -149,6 +149,16 @@ void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip)
     WidgetPaintFwd1(w, clip);
 }
 
+void __attribute__((thiscall)) WidgetUpdateThunk(AM2_Widget *w)
+{
+    WidgetUpdate(w);
+}
+
+void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w)
+{
+    WidgetRepaint(w);
+}
+
 void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *w, AM2_Widget *child)
 {
     AM2_Widget *last;
@@ -509,6 +519,12 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_WIDGET_UPDATE_THUNK,
+                        (const void *)WidgetUpdateThunk,
+                        "WidgetUpdateThunk", 1);
+    rc |= patch_replace(ADDR_WIDGET_REPAINT_THUNK,
+                        (const void *)WidgetRepaintThunk,
+                        "WidgetRepaintThunk", 2);
     rc |= patch_replace(ADDR_WIDGET_LAST_SIBLING,
                         (const void *)WidgetLastSibling,
                         "WidgetLastSibling", 3);

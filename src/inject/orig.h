@@ -79,7 +79,17 @@
 #define ADDR_WIDGET_LAST_SIBLING 0x00453D90u /* AM2_Widget *(AM2_Widget *) */
 #define ADDR_WIDGET_FOCUS_NEXT  0x00453DB0u /* void(AM2_Widget *, int32_t) */
 #define ADDR_WIDGET_FOCUS_PREV  0x00453E20u /* void(AM2_Widget *, int32_t) */
-#define ADDR_WIDGET_UPDATE_THUNK 0x00454AC0u
+#define ADDR_WIDGET_UPDATE_THUNK 0x00454AC0u /* void(AM2_Widget *) */
+/* 0x00455100: the same one-instruction shape onto WidgetRepaint, slot 4 in
+ * two vtables. */
+#define ADDR_WIDGET_REPAINT_THUNK 0x00455100u /* void(AM2_Widget *) */
+/* There is NO third one. A widget vtable slot points at 0x0045CAA0, which is
+ * a bare `ret`, and that reads like a class whose update does nothing -- but
+ * 0x0045CAA0 is ADDR_LOG, thirty lines above, stubbed to `ret` in the retail
+ * build and patched by src/inject/gamelog.c to capture the game's output. The
+ * linker folded the two: an empty virtual and a stubbed varargs logger are the
+ * same single byte, and identical-COMDAT folding gives them one address.
+ * Patching it silenced every game message while the game ran perfectly. */
 /* 0x00454BD0, thiscall, slot 2 of 17 classes: the base update with a cancel
  * key in front of it. */
 #define ADDR_WIDGET_UPDATE_CANCEL 0x00454BD0u /* void(AM2_Widget *) */

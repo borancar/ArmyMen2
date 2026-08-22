@@ -262,6 +262,23 @@ void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) WidgetPaintFwd1(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip);
 
+/* Original: 0x00454AC0 and 0x00455100 -- two more shared virtuals, one
+ * instruction each.
+ *
+ * Both are `jmp` tail calls, onto the base update and the base repaint, which
+ * is what an override that only calls its base compiles to when the signature
+ * has nothing to copy.
+ *
+ * A THIRD one is deliberately absent. One vtable's slot 2 is 0x0045CAA0, a
+ * bare `ret`, which reads like a class whose update does nothing -- and that
+ * address is ADDR_LOG, stubbed to `ret` in this build and patched by the
+ * harness to capture the game's output. The linker folded an empty virtual
+ * and a stubbed varargs logger together because both are one `c3`. Reconstruct
+ * it and the game runs perfectly with its log silenced, which blinds exactly
+ * the half of the A/B that would have told you. */
+void __attribute__((thiscall)) WidgetUpdateThunk(AM2_Widget *w);
+void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w);
+
 /* Original: 0x00453D50, thiscall. Append a child to the end of this widget's
  * child list and point it back at this widget as its parent.
  *

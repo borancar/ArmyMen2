@@ -961,6 +961,28 @@ Found by editing three functions during an `ab.sh all` on the belief that only
 — luck, not care. If a source file has to change while a suite is running,
 kill the suite and restart it.
 
+**A vtable slot can point at a stubbed function the harness has claimed, and
+`0x0045CAA0` is the example.** One widget class's slot 2 is that address, which
+holds a bare `ret` — so it reads exactly like a class whose per-frame update
+does nothing. It is `ADDR_LOG`: the retail build stubs the game's own logger to
+`ret`, and `src/inject/gamelog.c` patches it to capture output. The linker
+folded the two, because an empty virtual and a stubbed varargs logger are both
+one `c3`, and identical-COMDAT folding gives them one address.
+
+Reconstructing it as an empty update replaced the logger with a no-op. **The
+game then ran perfectly and logged nothing**, which blinds precisely the half of
+`tools/ab.sh` that would have reported it — the pixels stayed at their usual 22
+and the log went from thirteen game messages to zero on the reconstructed side
+only. Five configurations of an `ab.sh all` were spent that way.
+
+`tools/checkpatches.py` catches it in both directions — as a 32nd `ADDR_` alias
+and as "0x0045CAA0 patched 2 times: widget.cpp, src/inject/gamelog.c". It was
+not run. The three functions were staged deliberately WITHOUT building, to
+avoid disturbing a suite that was running; but `ab.sh` rebuilds on every launch,
+so the code went live and only the check was deferred. **Deferring the build
+does not defer the code — it defers the checking.** If a source edit cannot be
+checked now, do not make it now.
+
 **Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
 `setsid make -s run ... &` issued from a script or an agent shell starts the
 game, gets as far as `system speed:` in the log, then fails inside `InitInput`
