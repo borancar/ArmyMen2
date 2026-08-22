@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `af52240`. Working tree clean.
+Last updated: **2026-08-22**, at `bc049d6`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 539 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 539 | 531 of them below the CRT line |
+| `patch_replace` sites | 540 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 540 | 532 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,272 / 372,816 B (**26.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 125,584 / 372,816 B (33.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 100,768 / 372,816 B (**27.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 126,080 / 372,816 B (33.8%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,29 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`pad28` was not padding.** `sprite.h` had eight bytes at 0x0028 named as
+  filler; `LoadSpriteSet` reads two int16 straight out of the file into 0x0028
+  and 0x002A, beside hotX and hotY and in exactly the same shape. They are
+  `fileA` and `fileB` now -- what they MEAN is still unknown, but "padding" was
+  a claim and it was wrong.
+
+  A field is only padding when something has looked for a writer. Nothing had.
+
+- **A sprite's format comes from the CALLER, not the file.** `LoadSpriteSet`
+  sets it to 3 for flag bit 0x10, 2 for bit 0x08, and otherwise leaves the zero
+  the memset put there -- which `sprite.h` reads as "image is a DirectDraw
+  surface". A set loaded with neither bit would claim to hold surfaces while
+  holding file bytes. No caller does it; the zero is left alone.
+
+- **`LoadSpriteSet` runs 21 times in a Boot Camp mission** and feeds the 5,798
+  `RemapSpriteRuns` calls, so this A/B is real evidence rather than "nothing
+  else broke". Probed rather than assumed, which is the habit the last commit
+  argued for.
+
+- **`RemapSpriteRuns`' unused second argument is the image byte count.** The
+  caller has it and passes it; the RLE walker does not need it, because the
+  header already says how far to go.
 
 - **A counts probe on today's work, and it splits three ways.** Every commit
   since the comm family said "bootcamp and mission clean". One probe says what

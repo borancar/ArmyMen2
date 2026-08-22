@@ -44,7 +44,13 @@ typedef struct AM2_Sprite {
     AM2_Rect bounds;             /* +0x14 .. +0x23 */
     int16_t  hotX;               /* +0x24, subtracted from the draw position */
     int16_t  hotY;               /* +0x26 */
-    uint8_t  pad28[8];           /* +0x28 */
+    int16_t  fileA;              /* +0x28  read straight out of the sprite
+                                  *        file by LoadSpriteSet, beside hotX
+                                  *        and hotY and in the same shape --
+                                  *        what they mean is not established,
+                                  *        but they are not padding */
+    int16_t  fileB;              /* +0x2A */
+    uint8_t  pad2C[4];           /* +0x2C */
     AM2_Rle16 *overlay;          /* +0x30  second layer, drawn after the first */
     uint8_t *lut;                /* +0x34  256-entry remap table, may be NULL */
     void    *palette;            /* +0x38  overlay palette; NULL means default */
@@ -109,6 +115,28 @@ void __cdecl ClearSprite(AM2_Sprite *spr);
 AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
                                   int32_t flags, int32_t addref);
 void __cdecl ReleaseSprite(AM2_Sprite *spr);
+
+/* Original: 0x004099F0, and the name is ours. Read a sprite set from an open
+ * file into the sprite list: a count, then that many sprites.
+ *
+ * Each sprite is six uint16 fields -- bounds.right, bounds.bottom, hotX, hotY
+ * and the pair at 0x0028 -- then a dword size and that many bytes of image,
+ * then a dword size and that many bytes of overlay, the overlay only if its
+ * size is positive. bounds.left and bounds.top are zeroed rather than read, so
+ * a sprite's box always starts at the origin.
+ *
+ * The FORMAT is decided last and from the caller, not the file: bit 0x10 of
+ * `flags` makes it 3, otherwise bit 0x08 makes it 2, otherwise it stays 0 --
+ * which sprite.h's comment above records as meaning `image` is a DirectDraw
+ * surface. So a set loaded with neither bit claims to hold surfaces while
+ * holding file bytes; no caller does that, and the zero is left as it is.
+ *
+ * The first uint16 is read into the FILE POINTER'S OWN ARGUMENT SLOT, which
+ * MSVC reuses because `fp` is live in a register by then. A local here.
+ *
+ * Nothing checks a malloc or a read. */
+void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
+                           uint32_t flags);
 
 /* FreeMenuSprites -- original 0x00412F80. Release all 190 menu sprites, the
  * slot past them, and the surface they were drawn from. */

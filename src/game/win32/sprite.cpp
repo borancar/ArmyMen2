@@ -21,6 +21,8 @@
 #include "sprite.h"
 #include "../blit.h"
 #include "../rect.h"
+#include "../air.h"        /* RemapSpriteRuns, GrowSpriteList */
+#include "../crt.h"        /* am2_malloc */
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -388,6 +390,90 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
     return spr;
 }
 
+/* orig_fread comes from orig.h, where map.cpp and air.cpp already reach it --
+ * a second definition here is how one name becomes two. */
+
+#define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)
+#define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
+#define g_spriteListCap (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_CAP)
+
+void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
+                           uint32_t flags)
+{
+    int32_t count;
+    int32_t i;
+
+    if (orig_fread(&count, 4, 1, fp), count <= 0)
+        return;
+
+    for (i = 0; i < count; i++) {
+        AM2_Sprite *spr;
+        int16_t     w;
+        int32_t     size;
+
+        if (g_spriteListN >= g_spriteListCap)
+            GrowSpriteList();
+
+        spr = (AM2_Sprite *)am2_malloc(0x40);
+        g_spriteList[g_spriteListN] = spr;
+        /* Re-read from the list rather than reusing the pointer, as the
+         * original does -- twice, once for each of the next two uses. */
+        spr = g_spriteList[g_spriteListN];
+        memset(spr, 0, 0x40);
+
+        /* The original reads this one into the FILE pointer's own argument
+         * slot, `fp` being live in a register by then. */
+        orig_fread(&w, 2, 1, fp);
+        spr->id          = 0xFFFFFFFFu;
+        spr->bounds.top  = 0;
+        spr->bounds.left = 0;
+        spr->bounds.right = w;
+        orig_fread(&w, 2, 1, fp);
+        spr->bounds.bottom = w;
+
+        orig_fread(&w, 2, 1, fp);
+        spr->hotX = w;
+        orig_fread(&w, 2, 1, fp);
+        spr->hotY = w;
+
+        orig_fread(&w, 2, 1, fp);
+        spr->fileA = w;
+        orig_fread(&w, 2, 1, fp);
+        spr->fileB = w;
+
+        /* The image, then the overlay -- each a size and that many bytes, and
+         * the overlay only if its size is positive. Neither malloc nor either
+         * read is checked. */
+        orig_fread(&size, 4, 1, fp);
+        spr->image.rle16 = (AM2_Rle16 *)am2_malloc((size_t)size);
+        orig_fread(spr->image.rle16, (size_t)size, 1, fp);
+
+        {
+            int32_t overlaySize;
+
+            orig_fread(&overlaySize, 4, 1, fp);
+            if (overlaySize > 0) {
+                spr->overlay = (AM2_Rle16 *)am2_malloc((size_t)overlaySize);
+                orig_fread(spr->overlay, (size_t)overlaySize, 1, fp);
+            }
+        }
+
+        /* The image's byte count goes to the remapper, which does not read it
+         * -- the RLE header already says how far to walk. */
+        RemapSpriteRuns(spr->image.rle16, size, table, from);
+
+        spr->flags = flags;
+        /* Decided from the CALLER's flags, not from the file. Neither bit
+         * leaves it at zero, which sprite.h reads as "image is a surface". */
+        if (flags & 0x10)
+            spr->format = 3;
+        else if (flags & 8)
+            spr->format = 2;
+
+        g_spriteListN += 1;
+    }
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -399,6 +485,8 @@ int sprite_install(void)
                         "RestoreSpriteSurface", 1);
     rc |= patch_replace(ADDR_CLEAR_SPRITE, (const void *)ClearSprite,
                         "ClearSprite", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_SET, (const void *)LoadSpriteSet,
+                        "LoadSpriteSet", 1);
     rc |= patch_replace(ADDR_RELEASE_SPRITE, (const void *)ReleaseSprite,
                         "ReleaseSprite", 1);
     rc |= patch_replace(ADDR_FREE_MENU_SPRITES, (const void *)FreeMenuSprites,

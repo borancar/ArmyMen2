@@ -3224,6 +3224,13 @@
  * Only indices at or above the threshold are remapped, which is the same
  * reserved-block convention NearestPalIndex's `from` argument follows. */
 #define ADDR_REMAP_SPRITE_RUNS   0x00409960u  /* void(img, int32, table, int32) */
+/* 0x004099F0. Read a whole sprite set from an open file into the sprite list:
+ * a count, then that many sprites, each six uint16 fields and two sized
+ * blocks. Its one caller is 0x00409FD9.
+ *
+ * Two fields land in what sprite.h calls pad28, so 0x0028 and 0x002A are a
+ * pair of int16 read straight out of the file, not padding. */
+#define ADDR_LOAD_SPRITE_SET     0x004099F0u  /* void(FILE *, table, int32, uint32) */
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */
