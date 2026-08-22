@@ -315,6 +315,33 @@ void __cdecl FreeAllFonts(void)
         FreeFont(i);
 }
 
+void __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
+{
+    uint32_t        off   = (uint32_t)font * ADDR_FONT_STRIDE;
+    const uint8_t  *base  = *(const uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
+    const uint16_t *table = (const uint16_t *)((uintptr_t)ADDR_GLYPH_OFFSETS + off);
+    int32_t         width = 0;
+    const uint8_t  *p;
+
+    for (p = (const uint8_t *)text; *p; p++) {
+        if (*p == '^')          /* an escape; the character after it counts */
+            continue;
+        if ((int8_t)*p < 0x1F)  /* a control, and SIGNED -- so 0x80 and up
+                                 * are skipped too */
+            continue;
+        width += *(const uint16_t *)(base + table[*p]);
+    }
+
+    if (!out)
+        return;
+    out[0] = width;
+    /* The line height is the space glyph's, whatever the string was. */
+    out[1] = *(const uint16_t *)(base
+                                 + *(const uint16_t *)
+                                       ((uintptr_t)ADDR_GLYPH_OFFSET_SPACE + off)
+                                 + 2);
+}
+
 int font_install(void)
 {
     int rc = 0;
@@ -324,6 +351,8 @@ int font_install(void)
     rc |= patch_replace(ADDR_CREATE_GAME_FONT, (const void *)CreateGameFont,
                         "CreateGameFont", 3);
     rc |= patch_replace(ADDR_BUILD_FONT, (const void *)BuildFont, "BuildFont", 1);
+    rc |= patch_replace(ADDR_TEXT_EXTENT, (const void *)TextExtent,
+                        "TextExtent", 3);
     rc |= patch_replace(ADDR_FREE_FONT, (const void *)FreeFont, "FreeFont", 1);
     rc |= patch_replace(ADDR_FREE_ALL_FONTS, (const void *)FreeAllFonts,
                         "FreeAllFonts", 0);

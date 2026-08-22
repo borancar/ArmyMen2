@@ -327,6 +327,14 @@
 #define ADDR_FONT_STRIDE    524u
 #define ADDR_GLYPH_SIZE     0x006598D0u  /* uint32_t, total encoded bytes */
 #define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[256] */
+/* The entry for ' ' inside that table -- 0x006598D4 + 0x20 * 2 -- which is
+ * what TextExtent reads to get a line height without measuring anything. */
+#define ADDR_GLYPH_OFFSET_SPACE 0x00659914u
+/* 0x004468A0, nine callers: how wide a string is in a font, and how tall a
+ * line is. The width is the sum of each glyph's own width; '^' is skipped as
+ * an escape and anything below 0x1F is skipped as a control. The height does
+ * not depend on the string at all -- it is the height of the SPACE glyph. */
+#define ADDR_TEXT_EXTENT    0x004468A0u  /* void(const char *, int32, int32[2]) */
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t *, the encoded glyphs */
 #define ADDR_FONT_DESCS     0x004897E8u  /* {const char *face; int32 h; uint16 style}[] */
 #define ADDR_BUILD_FONT     0x004466E0u  /* int32_t(int32_t fontIndex) */
@@ -3086,6 +3094,15 @@
 #define ADDR_CREATE_OFFSCREEN    0x0041B850u  /* surface *(w, h, caps, int32 key) */
 #define ADDR_CLEAR_SURFACE       0x0041AD30u  /* int32_t(surface *, uint32_t colour) */
 #define ADDR_CLEAR_REGION        0x0041CE20u  /* void(const RECT *, uint8_t) */
+/* 0x00425000, nine callers. The loading bar: a rectangle from x=0xB0 to
+ * 0xB0 + percent * 288 / 100, y 0x197 to 0x19F, filled on the PRIMARY surface
+ * in ADDR_VIEW_RECT_COLOUR. The divide by 100 is MSVC's reciprocal multiply by
+ * 0x51EB851F with a shift of 5. The name is ours. */
+#define ADDR_PROGRESS_BAR        0x00425000u  /* void(int32_t percent) */
+#define AM2_PROGRESS_X0          0xB0
+#define AM2_PROGRESS_Y0          0x197
+#define AM2_PROGRESS_Y1          0x19F
+#define AM2_PROGRESS_WIDTH       288
 
 /* DirectInput. The GUIDs and data formats are the game's own copies in .rdata,
  * so nothing here needs dxguid. */

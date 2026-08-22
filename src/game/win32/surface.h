@@ -195,6 +195,15 @@ void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest)
  * orig.h with no reason beside it, which turned out to mean "not yet". */
 void __cdecl RefreshGate(int32_t enabled);
 
+/* 0x00425000, nine callers. The loading bar: a rectangle from x = 0xB0 to
+ * 0xB0 + percent * 288 / 100, y 0x197 to 0x19F, filled straight onto the
+ * PRIMARY surface in ADDR_VIEW_RECT_COLOUR. The name is ours.
+ *
+ * The divide is MSVC's reciprocal multiply -- 0x51EB851F, shift 5 -- which is
+ * C's truncating division, so 99% is one pixel short of full rather than
+ * rounded up. Nothing bounds `percent`. */
+void __cdecl ProgressBar(int32_t percent);
+
 int surface_install(void);
 
 #ifdef __cplusplus

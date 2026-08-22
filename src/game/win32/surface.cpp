@@ -1181,10 +1181,25 @@ void __cdecl RefreshGate(int32_t enabled)
     *(int32_t *)(uintptr_t)ADDR_MENU_ENABLED = enabled;
 }
 
+void __cdecl ProgressBar(int32_t percent)
+{
+    RECT bar;
+
+    bar.left   = AM2_PROGRESS_X0;
+    bar.top    = AM2_PROGRESS_Y0;
+    bar.right  = AM2_PROGRESS_X0 + percent * AM2_PROGRESS_WIDTH / 100;
+    bar.bottom = AM2_PROGRESS_Y1;
+
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+    ClearRegion(&bar, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+}
+
 int surface_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_PROGRESS_BAR, (const void *)ProgressBar,
+                        "ProgressBar", 1);
     rc |= patch_replace(ADDR_REFRESH_GATE, (const void *)RefreshGate,
                         "RefreshGate", 1);
     rc |= patch_replace(ADDR_DRAW_MENU_CURSOR, (const void *)DrawMenuCursor,

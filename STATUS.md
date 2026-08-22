@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 633 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 632 | 622 of them below the CRT line |
+| `patch_replace` sites | 635 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 634 | 624 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 107,632 / 372,816 B (**28.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 132,944 / 372,816 B (35.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 107,872 / 372,816 B (**28.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 133,184 / 372,816 B (35.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,25 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **A function that does not appear in `counts` at ALL has no patch**, and
+  that is a usable check only since the trace table stopped overflowing.
+  `ProgressBar` was written, compiled, and never installed -- an edit that
+  targeted `    patch_replace(...` where the file says `    rc |= patch_replace(...`
+  simply did not apply, and nothing static could know a patch had been
+  intended. `counts ProgressBar` answering "(nothing traced)" is what caught
+  it, three commits after "(nothing traced)" stopped being ambiguous.
+
+- **And the 76 was noise.** That same run put `bootcamp` at 76 differing
+  pixels where it has read 22 all session, which looked like the new drawing
+  code. Two re-runs on the fixed build: 22 and 22. `ab.sh` has said to re-run a
+  difference before believing it since long before this session.
+
+- **`TextExtent`'s height does not depend on the string.** It is the second
+  uint16 of the SPACE glyph, read through a fixed entry of the font's offset
+  table, so an empty string still answers a line height. The width skips '^' as
+  an escape and anything below 0x1F as a control -- and the test is SIGNED, so
+  0x80 and up are skipped too.
 
 - **The heading arithmetic exists three times in the image**, which is how it
   was recognised: `AngleBetween` from two points, `AngleOfDelta` from the

@@ -71,6 +71,20 @@ int32_t __cdecl BuildFontAlias(int32_t fontIndex);
 void __cdecl FreeFont(int32_t fontIndex);
 void __cdecl FreeAllFonts(void);
 
+/* 0x004468A0, nine callers. How wide a string is in a font, and how tall a
+ * line is, both written through `out`.
+ *
+ * The width is the sum of each glyph's own first uint16 -- the same
+ * AM2_Rle16 header BlitGlyph reads -- reached through the font's offset table.
+ * '^' is skipped as an escape and anything below 0x1F as a control, so neither
+ * contributes; nothing else is special.
+ *
+ * The HEIGHT does not depend on the string at all: it is the second uint16 of
+ * the SPACE glyph, read through a fixed entry of the offset table. So an empty
+ * string still answers a line height, and `out` is left untouched only when it
+ * is null. */
+void __cdecl TextExtent(const char *text, int32_t font, int32_t out[2]);
+
 int font_install(void);
 
 #ifdef __cplusplus
