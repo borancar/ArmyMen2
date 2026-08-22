@@ -51,9 +51,16 @@ int32_t __cdecl LoadPadSection(am2_FILE *fp)
     return 1;
 }
 
+void __cdecl ResetPadsAlias(void)
+{
+    ResetPads();
+}
+
 void pad_install(void)
 {
     patch_replace(ADDR_RESET_PADS, (const void *)ResetPads, "ResetPads", 0);
+    patch_replace(ADDR_RESET_PADS_ALIAS, (const void *)ResetPadsAlias,
+                  "ResetPadsAlias", 0);
     patch_replace(ADDR_SAVE_PAD_SECTION, (const void *)SavePadSection,
                   "SavePadSection", 1);
     patch_replace(ADDR_LOAD_PAD_SECTION, (const void *)LoadPadSection,

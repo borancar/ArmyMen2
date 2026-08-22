@@ -395,6 +395,24 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
         *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = sel - 1;
 }
 
+#define g_tileAttrs (*(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS)
+
+typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
+#define orig_item_pre_destroy \
+    (*(AM2_ItemPreDestroyFn)AM2_IMAGE(ADDR_ITEM_PRE_DESTROY))
+
+int32_t __cdecl ObjTileAttr(const void *obj)
+{
+    uint32_t tile = *(const uint16_t *)((const uint8_t *)obj + OBJ_OFF_TILE);
+
+    return *(const int8_t *)(g_tileAttrs + tile);
+}
+
+void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
+{
+    orig_item_pre_destroy(obj, arg);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_REMOVE_INVENTORY_ITEM,
@@ -421,4 +439,8 @@ void item_install(void)
     patch_replace(ADDR_OBJ_FIELD_B, (const void *)ObjFieldB, "ObjFieldB", 1);
     patch_replace(ADDR_SAVE_ITEMS, (const void *)SaveItems, "SaveItems", 1);
     patch_replace(ADDR_LOAD_ITEMS, (const void *)LoadItems, "LoadItems", 1);
+    patch_replace(ADDR_OBJ_TILE_ATTR, (const void *)ObjTileAttr,
+                  "ObjTileAttr", 1);
+    patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
+                  "ItemPreDestroyAlias", 2);
 }

@@ -165,6 +165,13 @@ void __cdecl EventClose(void *holder);
  * anything, with the comm object already in ecx from the field it just read. */
 int32_t __attribute__((thiscall)) CommLobbyStart(void *comm);
 
+/* 0x0040F130 and 0x0040FB70, one caller each and both named in orig.h before
+ * they were written. The first sets the lobby flag at comm+0x404; the second
+ * is a thiscall that tail-calls CommSendLobbyProperty with 1, which is the
+ * value that says the session is over. */
+void __cdecl CommMarkLobbied(void);
+void __attribute__((thiscall)) CommSessionOver(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus

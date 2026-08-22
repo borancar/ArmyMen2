@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "misc.h"
+#include "crt.h"
 #include "image.h"
 #include "../inject/orig.h"
 
@@ -969,6 +970,12 @@ int32_t __cdecl KeyChanged(int32_t dik)
     return (int32_t)((uint32_t)(g_prevKeys[k] ^ g_curKeys[k]) >> 7);
 }
 
+void __cdecl FreeIfNotNull(void *p)
+{
+    if (p)
+        am2_free(p);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1054,6 +1061,8 @@ int misc_install(void)
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     patch_replace(ADDR_GET_MENU_ROW, (const void *)GetMenuRow, "GetMenuRow", 0);
+    patch_replace(ADDR_FREE_IF_NOT_NULL, (const void *)FreeIfNotNull,
+                  "FreeIfNotNull", 1);
     patch_replace(ADDR_IS_KEY_DOWN, (const void *)IsKeyDown, "IsKeyDown", 1);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
     patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,

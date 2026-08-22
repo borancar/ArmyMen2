@@ -23,6 +23,7 @@
  * reason having nothing to do with whether the reconstruction is right.
  */
 
+#include "widget.h"   /* RecordCtor, the three-field record */
 #include "audio.h"
 #include "startgame.h"
 #include "cdcheck.h"
@@ -164,7 +165,6 @@ typedef void (__attribute__((thiscall)) *am2_session_ctor_fn)(void *, int32_t);
 typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *);
 
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
-#define orig_session_ctor  (*(am2_session_ctor_fn)ADDR_SESSION_CTOR)
 #define orig_drop_obj      (*(am2_void_fn)ADDR_DROP_OBJ_51612C)
 
 #define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
@@ -205,7 +205,7 @@ void __cdecl StartMultiplayerGame(void)
     if (!g_sessionObject) {
         void *obj = orig_operator_new(SESSION_OBJECT_SIZE);
         if (obj)
-            orig_session_ctor(obj, 1);
+            RecordCtor(obj, 1);
         g_sessionObject = obj;
     }
 

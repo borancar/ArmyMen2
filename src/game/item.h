@@ -93,6 +93,19 @@ int32_t __cdecl ObjFieldB(const void *obj);
 int32_t __cdecl SaveItems(am2_FILE *fp);
 int32_t __cdecl LoadItems(am2_FILE *fp);
 
+/* 0x00429570, six callers. The attribute byte for the tile an object is
+ * standing on: the tile index at +0x1A picks an entry of the table at
+ * 0x00514EBC, and the byte comes back SIGN EXTENDED. The name is ours.
+ *
+ * The index is read as a word and used unsigned, so an object with 0xFFFF
+ * there reads 64K into the table. Nothing bounds it; the original does not
+ * either. */
+int32_t __cdecl ObjTileAttr(const void *obj);
+
+/* 0x00429CE0, seven callers. A plain cdecl forwarder for 0x0042A0A0, which is
+ * still original -- both arguments go straight through. */
+void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);
+
 void item_install(void);
 
 #ifdef __cplusplus

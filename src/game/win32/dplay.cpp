@@ -839,7 +839,6 @@ static_assert(sizeof(DPLCONNECTION) <= LOBBY_CONN_BUF_SIZE, "the 0x800 buffer");
 typedef void (__cdecl *am2_lobby_void_fn)(void);
 /* CommCreatePlayer is reconstructed; called directly below. */
 #define orig_read_mp_maps    (*(am2_lobby_void_fn)ADDR_READ_MP_MAPS)
-#define orig_mark_lobbied    (*(am2_lobby_void_fn)ADDR_COMM_MARK_LOBBIED)
 #define orig_on_lobby_slave  (*(am2_lobby_void_fn)ADDR_ON_LOBBY_SLAVE)
 #define orig_apply_settings  (*(am2_lobby_void_fn)ADDR_APPLY_GAME_SETTINGS)
 
@@ -977,7 +976,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
              comm_u32(g_commObject, COMM_OFF_OUR_PLAYER_ID));
 
     comm_u32(g_commObject, COMM_OFF_LOBBIED) = 1;
-    orig_mark_lobbied();
+    CommMarkLobbied();
 
     if (!comm_u32(g_commObject, COMM_OFF_IS_HOST)) {
         orig_on_lobby_slave();
@@ -1486,6 +1485,22 @@ void __cdecl SendGameStartMsg(void)
 
 
 
+/* The two names on this disagree and neither is settled from the body, which
+ * is one store. orig.h calls the function ADDR_COMM_MARK_LOBBIED, from its one
+ * caller; it calls +0x404 COMM_OFF_MSGS_ENABLED, from somewhere else. The
+ * offset's name is the one already used elsewhere in the tree, so it is the
+ * one used here -- adding a third would be the mistake checkglobals exists to
+ * stop. */
+void __cdecl CommMarkLobbied(void)
+{
+    *(int32_t *)(g_commObject + COMM_OFF_MSGS_ENABLED) = 1;
+}
+
+void __attribute__((thiscall)) CommSessionOver(void *comm)
+{
+    CommSendLobbyProperty(comm, 1);
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1536,6 +1551,10 @@ int dplay_install(void)
                         "CommReceive", 5);
     rc |= patch_replace(ADDR_COMM_CREATE_PLAYER, (const void *)CommCreatePlayer,
                         "CommCreatePlayer", 4);
+    rc |= patch_replace(ADDR_COMM_MARK_LOBBIED, (const void *)CommMarkLobbied,
+                        "CommMarkLobbied", 0);
+    rc |= patch_replace(ADDR_COMM_SESSION_OVER, (const void *)CommSessionOver,
+                        "CommSessionOver", 1);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;

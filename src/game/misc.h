@@ -562,6 +562,11 @@ void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 int32_t __cdecl IsKeyDown(int32_t dik);
 int32_t __cdecl KeyChanged(int32_t dik);
 
+/* 0x00434C80, one caller. Free a pointer unless it is null, and nothing else.
+ * The CRT's own free makes the same test, so this exists to save a call rather
+ * than to be necessary. */
+void __cdecl FreeIfNotNull(void *p);
+
 int misc_install(void);
 
 #ifdef __cplusplus

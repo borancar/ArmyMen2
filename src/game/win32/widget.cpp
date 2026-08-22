@@ -363,12 +363,6 @@ void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
     WidgetPaint(w, clip);
 }
 
-/* 0x00453930, thiscall: the row array's own cleanup, run before its storage is
- * released. Still original -- it is the array's business, not the widget's. */
-typedef void (__attribute__((thiscall)) *AM2_ListCleanupFn)(void *rows);
-#define orig_list_rows_cleanup \
-    ((AM2_ListCleanupFn)(uintptr_t)ADDR_LIST_ROWS_CLEANUP)
-
 void __attribute__((thiscall)) ListDestruct(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
@@ -379,7 +373,7 @@ void __attribute__((thiscall)) ListDestruct(AM2_Widget *w)
         void *rows = *(void **)(self + LIST_OFF_ROWS);
 
         if (rows) {
-            orig_list_rows_cleanup(rows);
+            RecordResetAlias(rows);
             am2_free(rows);
         }
     }
@@ -1375,6 +1369,24 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip)
     UnlockSurface();
 }
 
+typedef void (__attribute__((thiscall)) *AM2_RecordResetFn)(void *rec);
+#define orig_record_reset \
+    ((AM2_RecordResetFn)(uintptr_t)ADDR_SESSION_RESET)
+
+void __attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
+{
+    int32_t *r = (int32_t *)rec;
+
+    r[0] = 0;
+    r[1] = 0;
+    r[2] = value;
+}
+
+void __attribute__((thiscall)) RecordResetAlias(void *rec)
+{
+    orig_record_reset(rec);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1452,6 +1464,10 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
                         (const void *)FocusLabelTakeFocus,
                         "FocusLabelTakeFocus", 1);
+    rc |= patch_replace(ADDR_SESSION_CTOR, (const void *)RecordCtor,
+                        "RecordCtor", 2);
+    rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, (const void *)RecordResetAlias,
+                        "RecordResetAlias", 1);
     rc |= patch_replace(ADDR_DIALOG_DESTRUCT, (const void *)DialogDestruct,
                         "DialogDestruct", 1);
     rc |= patch_replace(ADDR_DIALOG_DELETE, (const void *)DialogDelete,

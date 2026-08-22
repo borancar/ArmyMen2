@@ -111,7 +111,11 @@
  * is the array's own cleanup, called before the storage goes back. */
 #define ADDR_LIST_DESTRUCT      0x00455090u /* void(AM2_Widget *) */
 #define ADDR_LIST_DELETE        0x00455070u /* AM2_Widget *(AM2_Widget *, int32_t) */
-#define ADDR_LIST_ROWS_CLEANUP  0x00453930u /* void(AM2_ListRows *) -- thiscall */
+/* One `jmp` to ADDR_SESSION_RESET, which is the same three-field record under
+ * a different vocabulary -- 0x00453910 is its constructor and 0x00453940 its
+ * reset, and the list box's row array is one of the things it holds. Two names
+ * for one shape, both the program's callers' rather than the program's. */
+#define ADDR_LIST_ROWS_CLEANUP  0x00453930u /* thiscall void(void *), one jmp */
 /* 0x00455180, thiscall, slot 1 of the list box: clear, then draw every visible
  * row with an ink chosen from the row's state. */
 #define ADDR_LIST_DRAW          0x00455180u /* void(AM2_Widget *, RECT) */
@@ -408,6 +412,15 @@
 #define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
 #define ADDR_PAINT_MAP_TILES   0x0042D580u /* void(const AM2_Rect *tiles) */
 #define ADDR_MAP_TILES         0x00514EB8u /* uint16 *, one index per tile */
+/* The byte beside it, indexed by a TILE INDEX rather than by a map square: 27
+ * sites read it and nothing here writes it. The name is ours. */
+#define ADDR_TILE_ATTRS        0x00514EBCu /* uint8_t *, one per tile index */
+#define OBJ_OFF_TILE           0x1Au       /* uint16_t, indexes the above */
+/* 0x00429570, six callers: that byte for the tile an object stands on, sign
+ * extended. 0x00429CE0 next door is a plain cdecl forwarder for
+ * ADDR_ITEM_PRE_DESTROY. Both names are ours. */
+#define ADDR_OBJ_TILE_ATTR     0x00429570u /* int32_t(const void *obj) */
+#define ADDR_ITEM_PRE_DESTROY_ALIAS 0x00429CE0u /* void(obj, int32_t) */
 #define ADDR_MAP_ROW_SHIFT     0x00514DE4u /* int32, log2 of the map's width */
 /* The camera doubles as the top-left of the visible-tile rectangle: the four
  * dwords from ADDR_CAMERA_X are used as a RECT to clip against. */
@@ -1666,6 +1679,7 @@
 #define ADDR_SAVE_PAD_SECTION    0x00437A90u  /* int32_t(FILE *) */
 #define ADDR_LOAD_PAD_SECTION    0x00437AE0u  /* int32_t(FILE *) */
 #define ADDR_RESET_PADS          0x004373C0u  /* void(void), 2 callers */
+#define ADDR_RESET_PADS_ALIAS    0x004373F0u  /* void(void), one jmp to it */
 #define ADDR_STR_PAD_CPP         0x004877F8u  /* "C:\\ArmyMen2\\source\\pad.cpp" */
 #define AM2_SAVETAG_PAD          0x06660005u
 #define AM2_PAD_NUMBERS_BYTES    0x4C00u      /* 256 entries of 76 */
@@ -3484,6 +3498,9 @@
  * FreeSpriteListAlias. */
 #define ADDR_INIT_PTR_LIST         0x0042A660u  /* thiscall void(void *) */
 #define ADDR_CLEAR_PTR_LIST_ALIAS  0x0042A670u  /* thiscall void(void *) */
+/* 0x00434C80, one caller: free a pointer unless it is null, and nothing else.
+ * The CRT's own free does the same test; this one is the game's. */
+#define ADDR_FREE_IF_NOT_NULL      0x00434C80u  /* void(void *) */
 #define TROOPER_OFF_ALLOC          0xACu
 #define WEAPON_OFF_FLAGS           0x08u
 #define WEAPON_FLAG_DEAD           0x02u

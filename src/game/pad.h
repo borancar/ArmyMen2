@@ -26,6 +26,10 @@ extern "C" {
  * which are exactly the 0x4C00 and 0x9000 the section writes. */
 void __cdecl ResetPads(void);
 
+/* 0x004373F0, one `jmp` to the line above and nothing else. Reconstructed as
+ * the alias it is, the same shape as FreeSpriteListAlias. */
+void __cdecl ResetPadsAlias(void);
+
 /* 0x00437A90 and 0x00437AE0. The pad section: a tag, the pad COUNT, and then
  * the two tables whole. 56 KB, a third of the entire savegame.
  *

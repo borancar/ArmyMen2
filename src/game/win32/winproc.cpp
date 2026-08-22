@@ -182,7 +182,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_remove_player_rec (*(am2_comm_id_fn)ADDR_COMM_REMOVE_PLAYER)
 #define orig_player_left    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_LEFT)
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
-#define orig_session_over   (*(am2_comm_void_fn)ADDR_COMM_SESSION_OVER)
 #define orig_comm_reset     (*(am2_comm_void_fn)ADDR_COMM_RESET_STATE)
 #define orig_remove_player  (*(am2_int_fn2)ADDR_REMOVE_PLAYER)
 #define orig_show_mp_result (*(am2_int_fn2)ADDR_SHOW_MP_RESULT)
@@ -330,7 +329,7 @@ static LRESULT OnSetupDone(void)
                       0, 0, 0, 0, 0, 3, 0);
     orig_lobby_reset();
     orig_comm_reset(comm);
-    orig_session_over(comm);
+    CommSessionOver(comm);
     return 1;
 }
 

@@ -865,6 +865,17 @@ void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce);
 void __attribute__((thiscall)) EditRepaint(AM2_Widget *w);
 void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
 
+/* 0x00453910 and 0x00453930, both thiscall over the same three-field record.
+ * The first is its constructor -- two zeros and the argument -- and the second
+ * is one `jmp` to its reset at 0x00453940, which stays original.
+ *
+ * The vocabulary is split and neither half is ours to settle: orig.h calls
+ * 0x00453910 the SESSION constructor and 0x00453930 the list box's ROW ARRAY
+ * cleanup, both names taken from callers. One shape, two callers, two words.
+ * Named here for what they do to the record. */
+void __attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
+void __attribute__((thiscall)) RecordResetAlias(void *rec);
+
 int widget_install(void);
 
 #ifdef __cplusplus
