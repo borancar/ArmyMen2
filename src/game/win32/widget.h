@@ -391,6 +391,19 @@ void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
 
+/* A two-state indicator: one flag and two sprites. The flag being at 0x006C
+ * and the sprites at 0x0060 and 0x0064 is measured; calling it a TOGGLE is the
+ * obvious reading of "one bit picks one of two pictures" and nothing here
+ * evidences what it toggles. */
+#define TOGGLE_OFF_STATE        0x6C   /* int32_t, non-zero picks the ON sprite */
+#define TOGGLE_OFF_SPRITE_OFF   0x60   /* AM2_Sprite * */
+#define TOGGLE_OFF_SPRITE_ON    0x64   /* AM2_Sprite * */
+
+/* Original: 0x00456D00, thiscall. Choose the sprite from the flag, store it in
+ * the widget's own sprite field, and paint exactly as the base does -- the
+ * same shape as ButtonPaint, with one bit instead of three states. */
+void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip);
+
 /* The list box. Its rows are 14 pixels tall and start 4 below the widget's
  * top, which is read off the arithmetic in ListTakeFocus rather than assumed:
  * `top + 14 * (0x58 - 0x74) + 4`, with the row 14 tall.

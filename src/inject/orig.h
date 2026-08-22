@@ -90,6 +90,9 @@
 /* The game's own import slot for GetTickCount, called through rather than
  * imported, so a flat-ish module needs no Win32 declaration for it. */
 #define IAT_GET_TICK_COUNT      0x0046F084u
+/* 0x00456D00, thiscall, slot 1 of a two-state indicator: one flag chooses
+ * between two sprites, then the base painter draws it. */
+#define ADDR_TOGGLE_PAINT       0x00456D00u /* void(AM2_Widget *, RECT) */
 /* 0x00455110, thiscall, slot 3 of the list box: repaint the current row, then
  * take focus normally. */
 #define ADDR_LIST_TAKE_FOCUS    0x00455110u /* void(AM2_Widget *, int32_t) */

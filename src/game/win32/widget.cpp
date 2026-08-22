@@ -193,6 +193,18 @@ static void ButtonRepaintSelf(AM2_Widget *w)
 
 #define BUTTON_DEADLINE(w) (*(uint32_t *)((uint8_t *)(w) + BUTTON_OFF_DEADLINE))
 
+void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    if (*(const int32_t *)(self + TOGGLE_OFF_STATE))
+        w->sprite = *(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_ON);
+    else
+        w->sprite = *(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_OFF);
+
+    WidgetPaint(w, clip);
+}
+
 void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -798,6 +810,8 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_TOGGLE_PAINT, (const void *)TogglePaint,
+                        "TogglePaint", 1);
     rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,
                         "ListTakeFocus", 1);
     rc |= patch_replace(ADDR_BUTTON_UPDATE, (const void *)ButtonUpdate,

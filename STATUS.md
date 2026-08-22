@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 443 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 443 | 436 of them below the CRT line |
+| `patch_replace` sites | 444 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 444 | 437 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,080 / 372,816 B (**26.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 100,368 / 372,816 B (**26.9%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,25 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The defect-signal table, kept current, because it is the honest measure of
+  what a clean run here is worth:**
+
+  | defect | pixels | caught? |
+  |---|---:|---|
+  | button never fires (`ButtonUpdate`) | 306,126 | yes |
+  | width from height (`WidgetScreenRect`) | 305,939 | yes |
+  | label cleared with ink (`LabelDraw`) | 17,110 | yes |
+  | focus highlight never shown (`ButtonPaint`) | 249 | yes, by 43 |
+  | toggle always ON (`TogglePaint`) | **212** | **no** -- `multi` budget 500 |
+  | handler never installed (`EditTakeFocus`) | **72** | **no** |
+  | row strip not repainted (`ListTakeFocus`) | **0** | **no** -- unobservable |
+  | two constructed flags, focus quirk, repaint deferral | 0 | no |
+
+  `multi` has now measured 0 four times running, so a budget of 150 would catch
+  the toggle. It has NOT been tightened: four samples is the same evidence that
+  said `controls` was exact before a fifth run gave 45, and repeating that
+  mistake the same day would be worse than missing a 212-pixel defect.
 
 - **The list box's rows are 14 pixels tall, and the arithmetic says so.**
   `ListTakeFocus` computes `top + 14 * (0x58 - 0x74) + 4` and clips a strip 14
