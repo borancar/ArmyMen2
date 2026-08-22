@@ -167,6 +167,28 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`UseInventoryItem` (`0x00449760`, 256 B) is READ; four callees need names
+  first.** The body is plain enough:
+
+  - In a multiplayer session (`ADDR_MP_SESSION`) it returns immediately unless
+    `0x0040F560` approves the unit's army; in single player that test is
+    skipped entirely.
+  - `comm[0x418]` gates two log lines, so it is a verbosity flag.
+  - The item is `unit[0x54C + slot*4]` -- an inventory of uids -- looked up
+    through `0x0045EE80`, with `0x0045EE20` (`KindInSetA`, already ours)
+    vetting its kind.
+  - `item[0xCC]` is a USE COUNT. It is decremented, and only when it reaches
+    zero does the item leave: `0x00447990(unit, slot)` clears the slot and
+    `0x0044C150(unit, item, slot, 0, unit[0x12])` is the drop, whose log line
+    is "droping item:%x".
+  - `item[8] |= 2` happens on BOTH exits of that last branch, taken or not.
+
+  What is missing is honest names for `0x0040F560`, `0x0045EE80`, `0x00447990`
+  and `0x0044C150`. `0x0040F560` is thiscall on the comm object with the same
+  `army == 4` shortcut `CommSlotForArmy` has, so it is a sibling of it -- but
+  "a sibling of" is not a name, and inventing four from one call site is the
+  trap this file has just spent three commits documenting. Read them first.
+
 - **`LoadDibFlipped` cannot run in this installation, and that is measurable
   rather than inferred.** Its only caller globs
   `%02d_%03d_%02d_*.msk` out of a `masks` directory, and the GOG build ships
