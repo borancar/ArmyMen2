@@ -155,4 +155,21 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink);
  * Both go to ADDR_LOG, which this build stubs to a single `ret`. */
 void __cdecl DestroyWeapon(void *weapon, int32_t unlink);
 
+/* Original: 0x0043BBB0, the arm kinds 1, 5, 6 and 8 share -- and the BARE
+ * version of the family: free the subrecord's rows, hand the object to
+ * DestroyItemObject, free the object. Every other arm is this plus something.
+ *
+ * Forty-eight bytes, and four kinds reach it, which is why the family's shared
+ * tail is visible at all. */
+void __cdecl DestroyItemCommon(void *item, int32_t unlink);
+
+/* Original: 0x004355F0, the KIND 7 arm: the bare one plus a population
+ * decrement, clamped at zero.
+ *
+ * The clamp is not defensive tidying -- 0x00435550 refuses to create a
+ * thirty-third kind-7 object, so the counter is bounded at both ends by
+ * design. The name is ours; what a kind-7 object is has not been established,
+ * beyond its being 0x94 bytes and limited to 32 live. */
+void __cdecl DestroyKind7(void *item, int32_t unlink);
+
 #endif

@@ -3222,7 +3222,9 @@
 #define ADDR_ITEM_PRE_DESTROY      0x0042A0A0u  /* void(obj, int32_t) */
 #define OBJ_OFF_ALLOC_LIVE         0x8Cu   /* uint8_t */
 #define OBJ_OFF_ALLOC_PTR          0x90u
-#define ADDR_FREE_ITEM_COMMON      0x0043BBB0u  /* kinds 1, 5, 6, 8 */
+/* Kinds 1, 5, 6 and 8 share one arm, and it is the BARE version of the family:
+ * the tail all five have and nothing else. 48 bytes. */
+#define ADDR_FREE_ITEM_COMMON      0x0043BBB0u
 /* Kind 2 is the TROOPER, and this arm names itself: "DestroyTrooper %x". The
  * family name is kept because it is what FreeItem's switch reads by. */
 #define ADDR_FREE_ITEM_KIND2       0x004478C0u
@@ -3235,7 +3237,13 @@
  * verbosity, where the trooper's is -- both reach ADDR_LOG, which this build
  * stubs to a single `ret`, so neither prints. */
 #define ADDR_FREE_ITEM_KIND4       0x0045F290u
+/* Kind 7's arm is the bare one plus a population decrement. 0x0051616C counts
+ * live kind-7 objects: 0x00435550 refuses to make a thirty-third and this
+ * clamps the count at zero on the way down, so the pair is bounded at both
+ * ends. What a kind-7 object IS is not established; it is 0x94 bytes and there
+ * are at most 32 of them. */
 #define ADDR_FREE_ITEM_KIND7       0x004355F0u
+#define ADDR_KIND7_COUNT           0x0051616Cu  /* int32_t, at most 32 */
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */
 

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `7a7ca2b`. Working tree clean.
+Last updated: **2026-08-22**, at `1cf896a`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 527 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 527 | 519 of them below the CRT line |
+| `patch_replace` sites | 529 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 529 | 521 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,088 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,400 / 372,816 B (33.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,216 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,528 / 372,816 B (33.4%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,22 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`FreeItem`'s whole switch is closed** -- all five arms, eight kinds, no
+  `orig_` left in it. The bare arm serves kinds 1, 5, 6 and 8 and is exactly
+  the tail the other four share; every other arm is that plus something.
+
+- **The kind-7 counter is bounded at BOTH ends, which is why the clamp is not
+  tidying.** 0x00435550 refuses to make a thirty-third kind-7 object and the
+  free clamps the count at zero coming down. Reproducing only one half would
+  have looked like a defensive check worth dropping.
+
+- **A comment beside a seam goes stale exactly when the seam closes.**
+  `item.cpp` carried "the five per-kind destructors stay original and are
+  reached by address" while they stopped being original one arm at a time over
+  three commits. Nothing checks prose; `checkseams` only sees `orig_` macros,
+  and the last of those went in this commit, taking the sentence's last
+  reader with it. Corrected, and the correction says what happened.
 
 - **`FreeItem`'s arms are one function written four times, and the differences
   are the interesting part.** Three are now ours -- trooper, vehicle, weapon --

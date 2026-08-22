@@ -218,6 +218,33 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
     am2_free(vehicle);
 }
 
+void __cdecl DestroyItemCommon(void *item, int32_t unlink)
+{
+    if (!item)
+        return;
+
+    orig_free_subrecord_rows((uint8_t *)item + OBJ_OFF_SUBRECORD);
+    DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
+    am2_free(item);
+}
+
+void __cdecl DestroyKind7(void *item, int32_t unlink)
+{
+    int32_t *live = (int32_t *)(uintptr_t)ADDR_KIND7_COUNT;
+
+    if (!item)
+        return;
+
+    /* Clamped at zero going down, and refused above 32 going up. */
+    *live -= 1;
+    if (*live < 0)
+        *live = 0;
+
+    orig_free_subrecord_rows((uint8_t *)item + OBJ_OFF_SUBRECORD);
+    DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
+    am2_free(item);
+}
+
 void __cdecl DestroyWeapon(void *weapon, int32_t unlink)
 {
     uint8_t *w = (uint8_t *)weapon;
@@ -251,12 +278,13 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
     *(uint8_t *)(o + OBJ_OFF_ALLOC_LIVE) = 0;
 }
 
-/* The five per-kind destructors stay original and are reached by address. Each
- * lives in a different translation unit, which is the real content of the
- * dispatch: the kind says whose object this is. */
-typedef void (__cdecl *AM2_FreeKindFn)(void *item, int32_t unlink);
-#define orig_free_common (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_COMMON))
-#define orig_free_kind7  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND7))
+/* All five per-kind destructors are ours now, and the switch below calls them
+ * directly. Each lived in a different translation unit in the original, which
+ * is the real content of the dispatch: the kind says whose object this is.
+ *
+ * The comment that used to sit here said they "stay original and are reached
+ * by address", which stopped being true one arm at a time over five commits.
+ * A sentence beside a seam goes stale exactly when the seam closes. */
 
 #define kCommDebug \
     (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
@@ -292,7 +320,7 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
     case 5:
     case 6:
     case 8:
-        orig_free_common(item, unlink);
+        DestroyItemCommon(item, unlink);
         return 1;
 
     case 2:
@@ -310,7 +338,7 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
         return 1;
 
     case 7:
-        orig_free_kind7(item, unlink);
+        DestroyKind7(item, unlink);
         return 1;
 
     default:
@@ -379,6 +407,10 @@ void item_install(void)
                   "DestroyVehicle", 1);
     patch_replace(ADDR_FREE_ITEM_KIND4, (const void *)DestroyWeapon,
                   "DestroyWeapon", 1);
+    patch_replace(ADDR_FREE_ITEM_COMMON, (const void *)DestroyItemCommon,
+                  "DestroyItemCommon", 4);
+    patch_replace(ADDR_FREE_ITEM_KIND7, (const void *)DestroyKind7,
+                  "DestroyKind7", 1);
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
