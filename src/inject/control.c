@@ -166,7 +166,7 @@ static void handle_line(SOCKET s, char *line)
     }
     if (!strcmp(argv[0], "counts")) {
         char buf[MAX_LINE - 8];
-        trace_describe(buf, sizeof buf);
+        trace_describe(buf, sizeof buf, (argc >= 2) ? argv[1] : NULL);
         reply(s, "ok %s", buf[0] ? buf : "(nothing traced)");
         return;
     }

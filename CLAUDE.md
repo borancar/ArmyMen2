@@ -81,7 +81,7 @@ split the same way rather than along a line of our choosing, with
 `scriptint.h` as the private surface between them. Where the original's own
 division is visible, use it.
 
-`src/game/win32/` holds every module that talks to Win32 or DirectX -- **15**
+`src/game/win32/` holds every module that talks to Win32 or DirectX -- **16**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
 API at all, and there are **27**; the split is the answer to "what still talks
 to the outside world" in directory form.
@@ -112,6 +112,20 @@ on a locked pointer somebody else obtained.
 Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
+
+**`am2.Image.refs_to` cannot see a call, and reading it as though it could is
+how three separate things in this file were nearly recorded as dead code.** It
+scans a section for the target as a little-endian dword, which finds vtable
+slots and `push imm32` operands and nothing else — `call rel32` and `jmp rel32`
+encode a displacement, so the address is not in the byte stream at all. Asked
+about `LockSurface`, which has 38 call sites, it answers **0**.
+
+The failure is quiet and it is convincing: a survey of all 33 menu widget
+classes came back "not one is ever instantiated", which is nonsense the moment
+you look at a menu. `am2.Image.xrefs` decodes instead and is the method to
+reach for; `refs_to` answers the narrower question and now says so in its
+docstring. The check that either is working is to point it at a function whose
+call count is already known.
 
 **`tools/checksplit.py` keeps the split honest, in both directions.** It fails
 if a flat module names a Win32 or COM type — or reaches a Win32 header
@@ -1132,9 +1146,27 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **7** are reconstructed
+  all. Measured: **29 functions** call the bracket and **8** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates.
+
+  `0x00454F00` came off the shortlist as `LabelDraw`, and it opened a subsystem
+  rather than closing a rasteriser: it is vtable slot 1 of a menu widget class,
+  one of **thirty-three five-slot vtables** laid out consecutively from
+  `0x0046FAB8` to `0x0046FD38`, each referenced by exactly one constructor and
+  one destructor. So the menus are a class tree with five virtuals apiece, the
+  edit box (`0x00454C10`, whose focus method installs `g_charHandler`) is the
+  class one entry earlier, and `src/game/win32/widget.cpp` is where the rest of
+  it goes. A vtable array is worth walking the moment one of its slots is
+  reconstructed — it says how big the subsystem is before any of it is read.
+
+  **OPTIONS → CONTROLS is a menu A/B, and it is a good one.** That dialog is
+  78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
+  VEHICLE" — and driving the same two clicks under `AM2_NOPATCH=1` puts the
+  frames **54 pixels apart of 786,432**, all 54 inside a 10x13 box at the
+  cursor. The dialog itself is identical. Two clicks from the title screen,
+  no typing, no mission: the cheapest gameplay-free A/B in the project, and
+  the only one that compares the menu widget layer at all.
 
   The sizes quoted for the next candidates were off as well (`0x00413610` is
   128 B, not 256; `0x00433350` is `0x00433360` at 288 B), which is what

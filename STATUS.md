@@ -70,14 +70,14 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 408 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 408 | 401 of them below the CRT line |
+| `patch_replace` sites | 409 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 409 | 402 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 92,416 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 92,560 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 58, 163 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 59, 164 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how
@@ -152,6 +152,29 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The menu widget layer is 33 classes and one of them is now ours.** The
+  image lays out thirty-three FIVE-slot vtables end to end from `0x0046FAB8`
+  to `0x0046FD38`, each with exactly one constructor and one destructor storing
+  it. `LabelDraw` (`0x00454F00`) is slot 1 of the twenty-sixth. That is a whole
+  subsystem sized before any of it was read, and `src/game/win32/widget.cpp` is
+  where it goes -- the four other virtuals per class, the containers, and the
+  edit box at `0x00454C10` that owns `g_charHandler`.
+
+- **OPTIONS -> CONTROLS is the cheapest A/B in the project.** Two clicks from
+  the title screen, no typing and no mission, and it is 78,174 `LabelDraw`
+  calls -- every caption on the dialog. Against `AM2_NOPATCH=1` the frames are
+  **54 pixels apart of 786,432**, all inside a 10x13 box at the cursor. Worth
+  adding to `tools/ab.sh` as its own configuration: nothing else in the suite
+  compares the menu widget layer at all.
+
+- **`am2.Image.refs_to` cannot see a call.** It scans for the address as a
+  dword, which finds vtable slots and `push imm32` and nothing else; `call
+  rel32` stores a displacement. It answers **0** for `LockSurface`, which has
+  38 call sites. Believing it produced a survey saying not one of the 33 menu
+  widget classes is ever instantiated -- nonsense that is one screenshot away
+  from being disproved, and it was two minutes from being committed as a
+  "dead code" finding. `am2.Image.xrefs` decodes and is the one to use.
 
 - **The 400 appends were one loop, and the counter proves it.** Converting
   `dplay.cpp`'s `orig_msg_add` seam to a direct call -- which `checkseams.py`

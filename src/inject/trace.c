@@ -141,18 +141,25 @@ static void __cdecl trace_enter(uint32_t id, uint32_t *args)
     hooklog_raw(buf);
 }
 
-void trace_describe(char *out, uint32_t cap)
+void trace_describe(char *out, uint32_t cap, const char *want)
 {
     uint32_t at = 0;
     int32_t  i;
+    int32_t  shown = 0;
 
     if (!out || cap < 8)
         return;
+    if (want && !want[0])
+        want = NULL;
     out[0] = '\0';
-    for (i = 0; i < g_count && at < cap - 32; i++)
+    for (i = 0; i < g_count && at < cap - 32; i++) {
+        if (want && !strstr(g_entries[i].name, want))
+            continue;
         at += (uint32_t)_snprintf(out + at, cap - at, "%s%s=%u",
-                                  i ? " " : "", g_entries[i].name,
+                                  shown ? " " : "", g_entries[i].name,
                                   g_entries[i].calls);
+        shown++;
+    }
     /* Say so rather than just stopping. A list that ends early is
      * indistinguishable from a function that was never patched, and that is a
      * bad thing to have to guess about -- the whole point of the counts is to

@@ -37,6 +37,17 @@
 
 /* Text rendering. */
 #define ADDR_DRAW_TEXT      0x00446930u  /* void(x,y,str,font,?,colour) */
+/* 0x00446AB0: the clipped sibling of the above, and the one the menu widgets
+ * use. Same leading arguments, then the clip rectangle BY VALUE and the
+ * colour. `^` in the string is an escape that rewrites the colour argument. */
+#define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,str,font,RECT,colour) */
+/* 0x00453BF0, thiscall, 33 callers. Absolute rectangle of a menu widget from
+ * its offset within its parent; no parent means the offset is absolute. */
+#define ADDR_WIDGET_SCREEN_RECT 0x00453BF0u /* void(AM2_Widget *) */
+/* 0x00454F00, thiscall, vtable slot 1 of the vtable at 0x0046FCAC. The static
+ * label's painter -- reached BOTH through that slot and by one direct call
+ * from the panel that owns the label. */
+#define ADDR_LABEL_DRAW        0x00454F00u /* void(AM2_Widget *, RECT) */
 /* Runtime font generation: GDI-render a character, then RLE it. */
 #define ADDR_ENCODE_GLYPH   0x004464C0u  /* uint32_t(uint8_t*,int32,int32,int32) */
 #define ADDR_RENDER_GLYPH   0x004465E0u  /* uint32_t(int32,char,HFONT,AM2_Rle16*,int32) */

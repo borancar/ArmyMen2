@@ -45,6 +45,34 @@ class Image:
     def valid(self, va):
         return any(start <= va < end for _n, start, end, _d in self.sections)
 
+    def xrefs(self, va):
+        """Every reference to `va`: calls, jumps, and stored addresses.
+
+        Decodes the text section rather than scanning it for bytes, so a
+        `call rel32` is resolved to its target. This is the question
+        "what reaches this function"; `refs_to` answers a narrower one, and
+        this repo has three times now mistaken the second for the first.
+        """
+        out = []
+        for ins in self.disasm():
+            if ins.op_str.startswith("0x"):
+                try:
+                    target = int(ins.op_str, 16)
+                except ValueError:
+                    continue
+                if target == va and ins.mnemonic in ("call", "jmp", "push"):
+                    out.append(ins.address)
+        needle = va.to_bytes(4, "little")
+        for _name, start, _end, data in self.sections:
+            at = 0
+            while True:
+                at = data.find(needle, at)
+                if at < 0:
+                    break
+                out.append(start + at)
+                at += 1
+        return sorted(set(out))
+
     def cstring(self, va, limit=512):
         """NUL-terminated ASCII string at a VA, or None if it does not look like one."""
         raw = self.read(va, limit)
@@ -78,7 +106,17 @@ class Image:
         return out
 
     def refs_to(self, va, section=".text"):
-        """Offsets in a section holding `va` as a little-endian dword."""
+        """Offsets in a section holding `va` as a little-endian dword.
+
+        This finds ABSOLUTE references only -- vtable slots, dispatch tables,
+        the operand of a `push imm32`. It does NOT find calls: `call rel32`
+        and `jmp rel32` encode a displacement, so the target address is
+        nowhere in the instruction stream. Asking this about a function and
+        reading zero means "nothing stores its address", never "nothing calls
+        it" -- LockSurface has 38 call sites and answers 0 here.
+
+        Use `xrefs` for the question that is usually meant.
+        """
         _name, start, _end, data = self.section(section)
         needle = va.to_bytes(4, "little")
         out, at = [], 0

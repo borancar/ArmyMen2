@@ -81,6 +81,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/win32/surface.cpp \
             src/game/win32/font.cpp \
             src/game/win32/mapdraw.cpp \
+            src/game/win32/widget.cpp \
             src/game/win32/palette.cpp \
             src/game/win32/winmain.cpp \
             src/game/win32/winproc.cpp \

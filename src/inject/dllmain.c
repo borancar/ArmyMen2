@@ -25,6 +25,7 @@
 #include "../game/dist.h"
 #include "../game/win32/font.h"
 #include "../game/win32/mapdraw.h"
+#include "../game/win32/widget.h"
 #include "../game/item.h"
 #include "../game/msgslot.h"
 #include "../game/armymsg.h"
@@ -456,6 +457,7 @@ static void install(void)
     text_install();
     font_install();
     mapdraw_install();
+    widget_install();
     report_install();
     wavefile_install();
     dplay_install();

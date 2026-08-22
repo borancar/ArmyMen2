@@ -38,7 +38,12 @@ const void *trace_make_stub(const void *fn, const char *name, int32_t nargs);
  * Only the first few calls of each are logged in full -- a function called
  * tens of thousands of times per second would otherwise bury the log and slow
  * the game to a crawl -- so the counts are the real survey result. */
-void trace_describe(char *out, uint32_t cap);
+/* Name every traced function and its call count into `out`. `want`, if it is
+ * non-NULL and non-empty, keeps only the entries whose name contains it as a
+ * substring -- the list outgrew one reply buffer twice, and raising the buffer
+ * only postpones the third time. Filtering is the fix that scales; the
+ * truncation notice stays for the unfiltered case. */
+void trace_describe(char *out, uint32_t cap, const char *want);
 
 /* Write the same totals to the log. Called on detach. */
 void trace_report(void);
