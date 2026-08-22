@@ -1001,6 +1001,12 @@ void __cdecl LatchKeyState(void)
     memcpy(g_prevKeys, g_curKeys, 256);
 }
 
+uint32_t __cdecl UnitTypeCost(int32_t type)
+{
+    return *(const uint32_t *)((uintptr_t)ADDR_UNIT_TYPES
+                               + (uint32_t)type * AM2_UNIT_TYPE_STRIDE);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1087,6 +1093,8 @@ int misc_install(void)
                   "ObjCodeUnmapped", 1);
     patch_replace(ADDR_GET_MENU_ROW, (const void *)GetMenuRow, "GetMenuRow", 0);
     patch_replace(ADDR_ANNOUNCE, (const void *)Announce, "Announce", 1);
+    patch_replace(ADDR_UNIT_TYPE_COST, (const void *)UnitTypeCost,
+                  "UnitTypeCost", 1);
     patch_replace(ADDR_FREE_IF_NOT_NULL, (const void *)FreeIfNotNull,
                   "FreeIfNotNull", 1);
     patch_replace(ADDR_IS_KEY_DOWN, (const void *)IsKeyDown, "IsKeyDown", 1);

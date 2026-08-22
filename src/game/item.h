@@ -107,6 +107,11 @@ int32_t __cdecl ObjTileAttr(const void *obj);
  * the same value arrived at differently. */
 int32_t __cdecl TileAttrAt(uint32_t tile);
 
+/* 0x004355D0, one caller. A second deadline on the mission clock, at +0x58:
+ * once the clock is PAST it, bit 1 of the object's flags goes on. Unsigned
+ * compare, and nothing clears the bit here. Both names are ours. */
+void __cdecl ObjMarkIfOverdue(void *obj);
+
 /* 0x00429CE0, seven callers. A plain cdecl forwarder for 0x0042A0A0, which is
  * still original -- both arguments go straight through. */
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);

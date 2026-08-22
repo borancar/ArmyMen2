@@ -516,6 +516,12 @@ int32_t __cdecl SaveScriptConditions(am2_FILE *fp);
 int32_t __cdecl SaveEventBlock(am2_FILE *fp);
 int32_t __cdecl LoadEventBlock(am2_FILE *fp);
 
+/* 0x0041E800, one caller. Empty the timer table by putting every slot's id
+ * back to zero -- a slot is free when its id is -- and clearing the count and
+ * the dword before it. It walks the id FIELDS, sixteen bytes apart, rather
+ * than the records; the name is ours. */
+void __cdecl ResetTimers(void);
+
 int event_install(void);
 
 #ifdef __cplusplus

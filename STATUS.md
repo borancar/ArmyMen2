@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 606 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 605 | 595 of them below the CRT line |
+| `patch_replace` sites | 610 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 609 | 599 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 105,888 / 372,816 B (**28.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 131,200 / 372,816 B (35.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 106,000 / 372,816 B (**28.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 131,312 / 372,816 B (35.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,22 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The unit types name themselves, and the table is 12 records of 40 bytes.**
+  `0x004878B8` holds {value, bit, isTrooper, isVehicle, index, char name[20]}
+  and the names are IN it: bazookaman, mortarman, grenadier, flamerman, tank,
+  jeep, halftrack, truck, ptboat, riflepill, bazookapill, mgpill. That identity
+  is certain.
+
+  What the first field means is NOT. It runs 100 to 500, `0x0043A5E0` is its
+  only reader, and the three callers are the mission-start screens -- which is
+  what suggests a cost and is not proof of one. Named `UnitTypeCost` with that
+  said in the header rather than left to look established.
+
+- **`ResetDrawCounts` is blind by construction and stays verified by reading.**
+  Its only caller is `ComposeFrame`, which is ours, so closing the seam took
+  its counter to 0. It is three stores of zero; the proportionate check is
+  reading them, and that is what it has.
 
 - **The keyboard four are all ours now**: `IsKeyDown` and `KeyChanged` off the
   two poll buffers, `KeyPressed` off the edge-and-auto-repeat array at

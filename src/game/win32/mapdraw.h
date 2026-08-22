@@ -67,6 +67,11 @@ void __cdecl ScrollView(void);
  * strips that exposed. */
 void __cdecl ScrollMapCache(void);
 
+/* 0x0041DCE0, one caller -- ComposeFrame, at the top of every frame. Three
+ * uint16 counters beside the dirty list, cleared as a set. What each counts is
+ * not established; that they are 16 bits and reset together is. */
+void __cdecl ResetDrawCounts(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

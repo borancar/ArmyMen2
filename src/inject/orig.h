@@ -660,6 +660,12 @@
  * meeting the given region. Its only import is IntersectRect, so it is game
  * logic by the coverage rules and stays original. */
 #define ADDR_REPAINT_DIRTY_LIST  0x0041D000u  /* void(const AM2_Rect *) */
+/* Three uint16 counters beside the dirty list at 0x00508AC4, all cleared
+ * together at the top of a frame. The names are ours; what each counts is not
+ * established, only that they are 16-bit and reset as a set. */
+#define ADDR_DRAW_COUNT_A        0x00508AC0u  /* uint16_t */
+#define ADDR_DRAW_COUNT_B        0x00508AD4u  /* uint16_t */
+#define ADDR_DRAW_COUNT_C        0x00508AD6u  /* uint16_t */
 #define ADDR_RESET_DRAW_COUNTS   0x0041DCE0u  /* void(void) */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
@@ -1770,6 +1776,10 @@
 #define AM2_TIMER_SLOW_PERIOD      0x3A98      /* 15000 ms */
 #define AM2_TIMER_REFUSED          (-101)
 #define AM2_TIMER_NO_ROOM          (-100)
+/* 0x0041E800, one caller: put every timer slot's id back to zero and clear the
+ * count and the dword before it, which empties the table without walking the
+ * records. The name is ours. */
+#define ADDR_RESET_TIMERS          0x0041E800u  /* void(void) */
 #define ADDR_CREATE_TIMER          0x0041E820u  /* "CreateTimer", 304 B */
 /* The network half of the event system, and the two sides confirm each other:
  * EventMessageSend packs a 40-byte message and EventMessageReceive unpacks the
@@ -2048,6 +2058,11 @@
 #define OBJ_OFF_SCRIPT_STATE     0xB4u
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
+/* A second deadline on the same clock, at +0x58, and 0x004355D0 is the only
+ * thing that reads it: past it, bit 1 of the flags goes on. Both names ours. */
+#define OBJ_OFF_DEADLINE_58      0x58u
+#define OBJ_FLAG_OVERDUE         0x02u
+#define ADDR_OBJ_MARK_IF_OVERDUE 0x004355D0u /* void(void *obj) */
 #define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */
 #define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
@@ -3237,6 +3252,15 @@
 /* 0x00430120, 12 callers: put a line on the menu and append it to the chat
  * log, in that order. The name is ours. */
 #define ADDR_ANNOUNCE            0x00430120u  /* void(const char *) */
+/* The unit-type table: 12 records of 40 bytes, {value, bit, isTrooper,
+ * isVehicle, index, char name[20]}, and the names are IN it -- bazookaman,
+ * mortarman, grenadier, flamerman, tank, jeep, halftrack, truck, ptboat,
+ * riflepill, bazookapill, mgpill. That identity is certain; what the first
+ * field means is not. It runs 100 to 500 and 0x0043A5E0 is the only reader,
+ * from the two mission-start screens, which is what suggests a cost. */
+#define ADDR_UNIT_TYPES     0x004878B8u  /* 12 records */
+#define AM2_UNIT_TYPE_STRIDE 40
+#define ADDR_UNIT_TYPE_COST 0x0043A5E0u  /* uint32_t(int32_t type) */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u
 #define ADDR_KEY_FIELD_B    0x00433840u

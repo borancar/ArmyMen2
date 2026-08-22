@@ -402,7 +402,6 @@ bad:
 
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_scroll_decay      (*(am2_void_fn)ADDR_SCROLL_DECAY)
-#define orig_reset_draw_counts (*(am2_void_fn)ADDR_RESET_DRAW_COUNTS)
 
 /* Save `n` dwords from `src` to `dst`. The original writes the nine stores out
  * one at a time, interleaved; they are independent, so a loop is the same
@@ -426,7 +425,7 @@ void __cdecl ComposeFrame(void)
     else
         ScrollView();
 
-    orig_reset_draw_counts();
+    ResetDrawCounts();
 
     RectSet(&src, g_blitRect->left, g_blitRect->top,
             g_blitRect->right, g_blitRect->bottom);
@@ -857,8 +856,17 @@ static void __cdecl DrawViewRect(void)
     UnlockSurface();
 }
 
+void __cdecl ResetDrawCounts(void)
+{
+    *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_C = 0;
+    *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_B = 0;
+    *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_A = 0;
+}
+
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_RESET_DRAW_COUNTS, (const void *)ResetDrawCounts,
+                  "ResetDrawCounts", 0);
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
     patch_replace(ADDR_DRAW_HLINE, (const void *)DrawHLine, "DrawHLine", 2);
     patch_replace(ADDR_DRAW_RECT, (const void *)DrawRect, "DrawRect", 2);

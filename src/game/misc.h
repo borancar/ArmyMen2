@@ -585,6 +585,16 @@ void __cdecl FreeIfNotNull(void *p);
  * name is ours; what the two calls do is what it is for. */
 void __cdecl Announce(const char *text);
 
+/* 0x0043A5E0, three callers. One dword out of the unit-type table at
+ * 0x004878B8 -- 12 records of 40 bytes whose names are IN them: bazookaman,
+ * mortarman, grenadier, flamerman, tank, jeep, halftrack, truck, ptboat,
+ * riflepill, bazookapill, mgpill.
+ *
+ * That identity is certain. What the field means is not: it runs 100 to 500,
+ * this is its only reader, and the callers are the two mission-start screens,
+ * which is what suggests a cost and is not proof of one. No bounds check. */
+uint32_t __cdecl UnitTypeCost(int32_t type);
+
 int misc_install(void);
 
 #ifdef __cplusplus

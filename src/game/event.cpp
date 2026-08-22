@@ -2062,10 +2062,26 @@ int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
     return id;
 }
 
+void __cdecl ResetTimers(void)
+{
+    uint32_t *id;
+
+    *(int32_t *)(uintptr_t)ADDR_EVENT_BLOCK = 0;
+    *(int32_t *)(uintptr_t)ADDR_TIMER_COUNT = 0;
+    /* From the first record's id field to one past the last, sixteen bytes at
+     * a time -- the records themselves are left alone. */
+    for (id = (uint32_t *)(uintptr_t)(ADDR_TIMER_TABLE + 0xC);
+         id < (uint32_t *)(uintptr_t)ADDR_TIMER_TABLE_ID_END;
+         id = (uint32_t *)((uint8_t *)id + 0x10))
+        *id = 0;
+}
+
 int event_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_RESET_TIMERS, (const void *)ResetTimers,
+                        "ResetTimers", 0);
     rc |= patch_replace(ADDR_CREATE_TIMER, (const void *)CreateTimer,
                         "CreateTimer", 20);
     rc |= patch_replace(ADDR_DECLARE_RULE_VARS, (const void *)DeclareRuleVars,

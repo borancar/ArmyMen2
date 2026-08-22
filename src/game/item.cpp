@@ -413,6 +413,15 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
     return *(const int8_t *)(g_tileAttrs + (tile & 0xFFFFu));
 }
 
+void __cdecl ObjMarkIfOverdue(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        > *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+}
+
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 {
     orig_item_pre_destroy(obj, arg);
@@ -447,6 +456,8 @@ void item_install(void)
     patch_replace(ADDR_OBJ_TILE_ATTR, (const void *)ObjTileAttr,
                   "ObjTileAttr", 1);
     patch_replace(ADDR_TILE_ATTR_AT, (const void *)TileAttrAt, "TileAttrAt", 1);
+    patch_replace(ADDR_OBJ_MARK_IF_OVERDUE, (const void *)ObjMarkIfOverdue,
+                  "ObjMarkIfOverdue", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
 }
