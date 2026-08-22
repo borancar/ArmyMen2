@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `317f2fe`. Working tree clean.
+Last updated: **2026-08-22**, at `3862ed7`. Working tree clean.
 
 ## In flight
 
@@ -70,10 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 476 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 476 | 469 of them below the CRT line |
+| `patch_replace` sites | 508 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 508 | 501 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 105,648 / 372,816 B (**28.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 94,576 / 372,816 B (**25.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 119,808 / 372,816 B (32.1%) | what every earlier session quoted, and an over-count |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +167,58 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The percentage in the table above was an over-count, and had been for the
+  whole project.** It asked "does a patched address fall inside this
+  `functions.tsv` entry", which credits the WHOLE entry to whichever function
+  in it was patched -- the same defect `tools/coverage.py` was fixed for, where
+  reconstructing `AudioTimerProc` marked `OpenAudioStream`'s COM calls covered
+  a commit before they were.
+
+  It bites hardest exactly where the work is easiest. The fifteen dialog
+  destructors are two instructions each, about 400 bytes all told, and they
+  moved the naive figure 3.8 points -- because each one sits inside an entry
+  holding a whole dialog's implementation. A jump like that is the tell.
+
+  `tools/reconstructed.py` now prints both, splitting merged entries at their
+  referenced starts the way `merges.py` already does for the boundary count.
+  The honest figure is **25.4%**, the old one 32.1%. It is a tool rather than a
+  line of shell because it had been recomputed by an ad-hoc script every
+  session, which is how it drifted in the first place.
+
+- **The dialog hierarchy is three deep and the middle level had no name.**
+  0x0046FC84 sits under the ICON, whose destructor it jumps to, and fifteen
+  full-screen dialogs sit under it -- SELECT MAP, DIFFICULTY, QUIT GAME,
+  REPLAY, AUDIO, OPTIONS, DELETE GAME, the overwrite confirm, DELETE PLAYER,
+  CONTROLS, SELECT PLAYER, the recruit name box, LOAD GAME, the plain message
+  box and the in-game ESCAPE menu. Each is named from the bitmap its
+  constructor loads, which is the only thing that tells them apart.
+
+- **Fifteen identical destructors are still fifteen functions in the image.**
+  Unlike CommEndSetup, there is nothing here for the linker to fold: each
+  stamps a DIFFERENT vtable constant. So the macro in widget.cpp is a way of
+  writing them, not a claim that the original had one function -- and the
+  reason for it is that fifteen chances to mistype a vtable address are not
+  fifteen pieces of evidence.
+
+- **`ab.sh quit` is the check for a destructor, and it is a real one.**
+  `ReportLeaks` prints "Unreleased memory (%d) blocks:" on DLL_PROCESS_DETACH
+  and that line is inside the compared log, reading (0) on both sides. A
+  destructor that forgot a free would move a number that is in the diff.
+
+- **The dialog dispatcher's jump table is another case of layout order lying.**
+  0x00426400 has 21 arms selected by 0x00511DBC, and reading the call sites
+  top to bottom numbers them wrong: arm 7 is the tenth call laid out. Take the
+  order from the table at 0x00426518. AUDIO is id 19.
+
+- **Next in this layer, both read and not yet written.** The class at
+  0x0046FD24 is a TYPEWRITER message label: its constructor word-wraps the
+  text into a `|`-separated buffer at 0x0058, its update reveals one more
+  character every 100 ms and plays a click, and its painter draws the revealed
+  prefix line by line. Six confirm dialogs build it, including CONFIRM GAME
+  EXIT -- so `ab.sh quit` reaches it. And 0x0046FC5C is a four-sprite checkbox
+  with four ink bytes chosen on (focused, checked) and a caption drawn after
+  the sprite.
 
 - **The AUDIO CONTROLS dialog is the only screen with a scroll bar**, and
   `tools/ab.sh audiovol` is new for it: OPTIONS -> AUDIO reaches three of them

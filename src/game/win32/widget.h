@@ -78,6 +78,25 @@ typedef struct AM2_Widget {
 /* The horizontal scroll bar. Its constructor loads 03_020_00_hscrollbar.bmp
  * and builds an ltarrow and an rtarrow child, so the class names itself. */
 #define VTABLE_SCROLLBAR    0x0046FCFCu
+/* The dialog base, one level under the icon. Fifteen classes derive from it
+ * with a destructor that is the same two instructions, and each stamps its own
+ * vtable from this list on the way past. */
+#define VTABLE_DIALOG       0x0046FC84u
+#define VTABLE_DLG_SELECTMAP             0x0046FAB8u
+#define VTABLE_DLG_DIFFICULTY            0x0046FAE0u
+#define VTABLE_DLG_QUITGAME              0x0046FAF4u
+#define VTABLE_DLG_REPLAY                0x0046FB08u
+#define VTABLE_DLG_AUDIO                 0x0046FB1Cu
+#define VTABLE_DLG_OPTIONS               0x0046FB30u
+#define VTABLE_DLG_DELGAME               0x0046FB44u
+#define VTABLE_DLG_OVERWRITE             0x0046FB58u
+#define VTABLE_DLG_DELPLAYER             0x0046FB6Cu
+#define VTABLE_DLG_CONTROLS              0x0046FB94u
+#define VTABLE_DLG_SELECTPLAYER          0x0046FBA8u
+#define VTABLE_DLG_NAMEENTRY             0x0046FBBCu
+#define VTABLE_DLG_LOADGAME              0x0046FBD0u
+#define VTABLE_DLG_MESSAGE               0x0046FBE4u
+#define VTABLE_DLG_GAMEMENU              0x0046FBF8u
 #define SCROLLBAR_OFF_BAR   0x64   /* AM2_Sprite *, the bar the paint draws */
 #define SCROLLBAR_OFF_SHIFT 0x6C   /* int32_t, added to the centred x */
 #define SCROLLBAR_OFF_SPAN  0x70   /* int32_t, taken off the width first */
@@ -545,6 +564,43 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w,
  * changes nothing, and is reproduced rather than corrected. */
 void __attribute__((thiscall)) ArrowDestruct(AM2_Widget *w);
 AM2_Widget *__attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags);
+
+/* Original: 0x00454B90 and 0x00454B70, the DIALOG base class -- one level
+ * under the icon, whose destructor it jumps straight to. Every full-screen
+ * dialog derives from it, so this pair runs whenever any of them closes. */
+void __attribute__((thiscall)) DialogDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) DialogDelete(AM2_Widget *w,
+                                                   int32_t flags);
+
+/* The fifteen dialog subclasses whose destructor is the same two instructions:
+ * stamp my own vtable, then jump to DialogDestruct. The image really does hold
+ * fifteen separate copies -- MSVC emits one ~Dialog() per class and there is
+ * nothing here for the linker to fold, since each stamps a different constant.
+ *
+ * They are written as a macro rather than fifteen transcriptions for the
+ * reason CommEndSetup is written once: fifteen chances to mistype a vtable
+ * address is not fifteen pieces of evidence. The names come from the bitmap
+ * each constructor loads, which is the only thing that distinguishes them. */
+#define AM2_DECLARE_DIALOG_DTOR(name)                                        \
+    void __attribute__((thiscall)) name##Destruct(AM2_Widget *w);            \
+    AM2_Widget *__attribute__((thiscall)) name##Delete(AM2_Widget *w,        \
+                                                       int32_t flags)
+
+AM2_DECLARE_DIALOG_DTOR(DlgSelectMap);
+AM2_DECLARE_DIALOG_DTOR(DlgDifficulty);
+AM2_DECLARE_DIALOG_DTOR(DlgQuitGame);
+AM2_DECLARE_DIALOG_DTOR(DlgReplay);
+AM2_DECLARE_DIALOG_DTOR(DlgAudio);
+AM2_DECLARE_DIALOG_DTOR(DlgOptions);
+AM2_DECLARE_DIALOG_DTOR(DlgDelGame);
+AM2_DECLARE_DIALOG_DTOR(DlgOverwrite);
+AM2_DECLARE_DIALOG_DTOR(DlgDelPlayer);
+AM2_DECLARE_DIALOG_DTOR(DlgControls);
+AM2_DECLARE_DIALOG_DTOR(DlgSelectPlayer);
+AM2_DECLARE_DIALOG_DTOR(DlgNameEntry);
+AM2_DECLARE_DIALOG_DTOR(DlgLoadGame);
+AM2_DECLARE_DIALOG_DTOR(DlgMessage);
+AM2_DECLARE_DIALOG_DTOR(DlgGameMenu);
 
 /* The list box. Its rows are 14 pixels tall and start 4 below the widget's
  * top, which is read off the arithmetic in ListTakeFocus rather than assumed:

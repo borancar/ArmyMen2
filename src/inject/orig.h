@@ -214,6 +214,64 @@
  * never its own. Read, not tidied. */
 #define ADDR_ARROW_DELETE       0x00455B50u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_ARROW_DESTRUCT     0x00455B70u /* void(AM2_Widget *) */
+/* The DIALOG base class, vtable 0x0046FC84 -- one level under the icon, whose
+ * destructor it jumps straight to. Every full-screen dialog in the game
+ * derives from it. Slots 1 and 2 are 0x00454BA0 and 0x00454BD0, the two
+ * forwarding thunks already reconstructed. */
+#define ADDR_DIALOG_DELETE      0x00454B70u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_DIALOG_DESTRUCT    0x00454B90u /* void(AM2_Widget *) */
+
+/* The fifteen dialog subclasses whose destructor is the SAME two instructions
+ * -- stamp my own vtable, jump to the dialog base's. Each is named from the
+ * bitmap its constructor loads; the id is the value 0x00511DBC holds while it
+ * is up, which the dispatcher at 0x00426400 turns into a call. Three more
+ * dialogs are NOT in this list because their destructors carry an SEH frame
+ * and do real work: 0x0044E510 (the film archive), 0x00453830 and 0x00455BA0. */
+/* SelectMap -- 02_004_00_selectmap.bmp */
+#define ADDR_DLG_SELECTMAP_DELETE         0x0044DE70u
+#define ADDR_DLG_SELECTMAP_DESTRUCT       0x0044DE90u
+/* Difficulty -- 02_014_00_difficulty.bmp */
+#define ADDR_DLG_DIFFICULTY_DELETE        0x0044EA50u
+#define ADDR_DLG_DIFFICULTY_DESTRUCT      0x0044EA70u
+/* QuitGame -- 02_009_00_quitgame */
+#define ADDR_DLG_QUITGAME_DELETE          0x0044EE00u
+#define ADDR_DLG_QUITGAME_DESTRUCT        0x0044EE20u
+/* Replay -- 02_015_00_replay */
+#define ADDR_DLG_REPLAY_DELETE            0x0044F180u
+#define ADDR_DLG_REPLAY_DESTRUCT          0x0044F1A0u
+/* Audio -- 02_013_00_audio.bmp */
+#define ADDR_DLG_AUDIO_DELETE             0x0044F830u
+#define ADDR_DLG_AUDIO_DESTRUCT           0x0044F850u
+/* Options -- 03_120/121/126 audio, controls, difficulty and back */
+#define ADDR_DLG_OPTIONS_DELETE           0x0044FD10u
+#define ADDR_DLG_OPTIONS_DESTRUCT         0x0044FD30u
+/* DelGame -- 02_011_00_delgame.bmp */
+#define ADDR_DLG_DELGAME_DELETE           0x00450150u
+#define ADDR_DLG_DELGAME_DESTRUCT         0x00450170u
+/* Overwrite -- "Are you sure you want to overwrite savefile '%s'?" */
+#define ADDR_DLG_OVERWRITE_DELETE         0x004505B0u
+#define ADDR_DLG_OVERWRITE_DESTRUCT       0x004505D0u
+/* DelPlayer -- 02_010_00_delplayer */
+#define ADDR_DLG_DELPLAYER_DELETE         0x004509E0u
+#define ADDR_DLG_DELPLAYER_DESTRUCT       0x00450A00u
+/* Controls -- 03_002 default, beside OK and CANCEL */
+#define ADDR_DLG_CONTROLS_DELETE          0x004510D0u
+#define ADDR_DLG_CONTROLS_DESTRUCT        0x004510F0u
+/* SelectPlayer -- 02_005_00_selectplayer.bmp */
+#define ADDR_DLG_SELECTPLAYER_DELETE      0x004518E0u
+#define ADDR_DLG_SELECTPLAYER_DESTRUCT    0x00451900u
+/* NameEntry -- 02_006_00_name.bmp */
+#define ADDR_DLG_NAMEENTRY_DELETE         0x00451DE0u
+#define ADDR_DLG_NAMEENTRY_DESTRUCT       0x00451E00u
+/* LoadGame -- 02_007_00_loadgame.bmp */
+#define ADDR_DLG_LOADGAME_DELETE          0x00452650u
+#define ADDR_DLG_LOADGAME_DESTRUCT        0x00452670u
+/* Message -- 03_029 red, and an OK -- a plain message box */
+#define ADDR_DLG_MESSAGE_DELETE           0x00452960u
+#define ADDR_DLG_MESSAGE_DESTRUCT         0x00452980u
+/* GameMenu -- 03_123/124/125 load, return, save and abort */
+#define ADDR_DLG_GAMEMENU_DELETE          0x00452E20u
+#define ADDR_DLG_GAMEMENU_DESTRUCT        0x00452E40u
 /* 0x00454F00, thiscall, vtable slot 1 of the vtable at 0x0046FCAC. The static
  * label's painter -- reached BOTH through that slot and by one direct call
  * from the panel that owns the label. */

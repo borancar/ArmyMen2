@@ -893,6 +893,52 @@ AM2_Widget *__attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags)
     return w;
 }
 
+void __attribute__((thiscall)) DialogDestruct(AM2_Widget *w)
+{
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DIALOG);
+    IconDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) DialogDelete(AM2_Widget *w, int32_t flags)
+{
+    DialogDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* One per dialog class. See widget.h for why this is a macro. */
+#define AM2_DIALOG_DTOR(name, vt)                                        \
+    void __attribute__((thiscall)) name##Destruct(AM2_Widget *w)             \
+    {                                                                        \
+        w->vtable = (void *)AM2_IMAGE(vt);                                   \
+        DialogDestruct(w);                                                   \
+    }                                                                        \
+    AM2_Widget *__attribute__((thiscall)) name##Delete(AM2_Widget *w,        \
+                                                       int32_t flags)        \
+    {                                                                        \
+        name##Destruct(w);                                                   \
+        if (flags & 1)                                                       \
+            am2_free(w);                                                     \
+        return w;                                                            \
+    }
+
+AM2_DIALOG_DTOR(DlgSelectMap, VTABLE_DLG_SELECTMAP)
+AM2_DIALOG_DTOR(DlgDifficulty, VTABLE_DLG_DIFFICULTY)
+AM2_DIALOG_DTOR(DlgQuitGame, VTABLE_DLG_QUITGAME)
+AM2_DIALOG_DTOR(DlgReplay, VTABLE_DLG_REPLAY)
+AM2_DIALOG_DTOR(DlgAudio, VTABLE_DLG_AUDIO)
+AM2_DIALOG_DTOR(DlgOptions, VTABLE_DLG_OPTIONS)
+AM2_DIALOG_DTOR(DlgDelGame, VTABLE_DLG_DELGAME)
+AM2_DIALOG_DTOR(DlgOverwrite, VTABLE_DLG_OVERWRITE)
+AM2_DIALOG_DTOR(DlgDelPlayer, VTABLE_DLG_DELPLAYER)
+AM2_DIALOG_DTOR(DlgControls, VTABLE_DLG_CONTROLS)
+AM2_DIALOG_DTOR(DlgSelectPlayer, VTABLE_DLG_SELECTPLAYER)
+AM2_DIALOG_DTOR(DlgNameEntry, VTABLE_DLG_NAMEENTRY)
+AM2_DIALOG_DTOR(DlgLoadGame, VTABLE_DLG_LOADGAME)
+AM2_DIALOG_DTOR(DlgMessage, VTABLE_DLG_MESSAGE)
+AM2_DIALOG_DTOR(DlgGameMenu, VTABLE_DLG_GAMEMENU)
+
 void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w)
 {
     WidgetRepaint(w);
@@ -1323,6 +1369,100 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
                         (const void *)FocusLabelTakeFocus,
                         "FocusLabelTakeFocus", 1);
+    rc |= patch_replace(ADDR_DIALOG_DESTRUCT, (const void *)DialogDestruct,
+                        "DialogDestruct", 1);
+    rc |= patch_replace(ADDR_DIALOG_DELETE, (const void *)DialogDelete,
+                        "DialogDelete", 1);
+    rc |= patch_replace(ADDR_DLG_SELECTMAP_DESTRUCT,
+                        (const void *)DlgSelectMapDestruct,
+                        "DlgSelectMapDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_SELECTMAP_DELETE,
+                        (const void *)DlgSelectMapDelete,
+                        "DlgSelectMapDelete", 1);
+    rc |= patch_replace(ADDR_DLG_DIFFICULTY_DESTRUCT,
+                        (const void *)DlgDifficultyDestruct,
+                        "DlgDifficultyDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_DIFFICULTY_DELETE,
+                        (const void *)DlgDifficultyDelete,
+                        "DlgDifficultyDelete", 1);
+    rc |= patch_replace(ADDR_DLG_QUITGAME_DESTRUCT,
+                        (const void *)DlgQuitGameDestruct,
+                        "DlgQuitGameDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_QUITGAME_DELETE,
+                        (const void *)DlgQuitGameDelete,
+                        "DlgQuitGameDelete", 1);
+    rc |= patch_replace(ADDR_DLG_REPLAY_DESTRUCT,
+                        (const void *)DlgReplayDestruct,
+                        "DlgReplayDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_REPLAY_DELETE,
+                        (const void *)DlgReplayDelete,
+                        "DlgReplayDelete", 1);
+    rc |= patch_replace(ADDR_DLG_AUDIO_DESTRUCT,
+                        (const void *)DlgAudioDestruct,
+                        "DlgAudioDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_AUDIO_DELETE,
+                        (const void *)DlgAudioDelete,
+                        "DlgAudioDelete", 1);
+    rc |= patch_replace(ADDR_DLG_OPTIONS_DESTRUCT,
+                        (const void *)DlgOptionsDestruct,
+                        "DlgOptionsDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_OPTIONS_DELETE,
+                        (const void *)DlgOptionsDelete,
+                        "DlgOptionsDelete", 1);
+    rc |= patch_replace(ADDR_DLG_DELGAME_DESTRUCT,
+                        (const void *)DlgDelGameDestruct,
+                        "DlgDelGameDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_DELGAME_DELETE,
+                        (const void *)DlgDelGameDelete,
+                        "DlgDelGameDelete", 1);
+    rc |= patch_replace(ADDR_DLG_OVERWRITE_DESTRUCT,
+                        (const void *)DlgOverwriteDestruct,
+                        "DlgOverwriteDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_OVERWRITE_DELETE,
+                        (const void *)DlgOverwriteDelete,
+                        "DlgOverwriteDelete", 1);
+    rc |= patch_replace(ADDR_DLG_DELPLAYER_DESTRUCT,
+                        (const void *)DlgDelPlayerDestruct,
+                        "DlgDelPlayerDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_DELPLAYER_DELETE,
+                        (const void *)DlgDelPlayerDelete,
+                        "DlgDelPlayerDelete", 1);
+    rc |= patch_replace(ADDR_DLG_CONTROLS_DESTRUCT,
+                        (const void *)DlgControlsDestruct,
+                        "DlgControlsDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_CONTROLS_DELETE,
+                        (const void *)DlgControlsDelete,
+                        "DlgControlsDelete", 1);
+    rc |= patch_replace(ADDR_DLG_SELECTPLAYER_DESTRUCT,
+                        (const void *)DlgSelectPlayerDestruct,
+                        "DlgSelectPlayerDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_SELECTPLAYER_DELETE,
+                        (const void *)DlgSelectPlayerDelete,
+                        "DlgSelectPlayerDelete", 1);
+    rc |= patch_replace(ADDR_DLG_NAMEENTRY_DESTRUCT,
+                        (const void *)DlgNameEntryDestruct,
+                        "DlgNameEntryDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_NAMEENTRY_DELETE,
+                        (const void *)DlgNameEntryDelete,
+                        "DlgNameEntryDelete", 1);
+    rc |= patch_replace(ADDR_DLG_LOADGAME_DESTRUCT,
+                        (const void *)DlgLoadGameDestruct,
+                        "DlgLoadGameDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_LOADGAME_DELETE,
+                        (const void *)DlgLoadGameDelete,
+                        "DlgLoadGameDelete", 1);
+    rc |= patch_replace(ADDR_DLG_MESSAGE_DESTRUCT,
+                        (const void *)DlgMessageDestruct,
+                        "DlgMessageDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_MESSAGE_DELETE,
+                        (const void *)DlgMessageDelete,
+                        "DlgMessageDelete", 1);
+    rc |= patch_replace(ADDR_DLG_GAMEMENU_DESTRUCT,
+                        (const void *)DlgGameMenuDestruct,
+                        "DlgGameMenuDestruct", 1);
+    rc |= patch_replace(ADDR_DLG_GAMEMENU_DELETE,
+                        (const void *)DlgGameMenuDelete,
+                        "DlgGameMenuDelete", 1);
     rc |= patch_replace(ADDR_ARROW_DESTRUCT, (const void *)ArrowDestruct,
                         "ArrowDestruct", 1);
     rc |= patch_replace(ADDR_ARROW_DELETE, (const void *)ArrowDelete,
