@@ -2638,6 +2638,26 @@
  * different dispatcher from CommDispatchMessage and takes the slot rather than
  * the id. Its only caller is the packet walker above. */
 #define ADDR_RECV_ARMY_MSG       0x0040FBB0u  /* void(msg *, int32_t slot, int32_t seq) */
+/* 0x0040F920, thiscall. Is the army that owns this uid still in play? Army 4
+ * -- the one every colour lookup treats as neutral -- always answers yes;
+ * anything else answers with 0x025C of its record, which is the field
+ * CommSlotRemote falls back to for an empty slot. */
+#define ADDR_ARMY_IN_PLAY        0x0040F920u  /* thiscall int32(this, uint32 uid) */
+/* 0x0042A7C0. The object kind behind a uid, which is what the army-message
+ * dispatcher switches on: 2 is a trooper, 3 a vehicle, 4 the game itself. */
+#define ADDR_UID_OBJ_KIND        0x0042A7C0u  /* int32_t(uint32_t uid) */
+/* 0x0042ACE0. Answers non-zero to SWALLOW a message before it is dispatched. */
+#define ADDR_ARMY_MSG_FILTER     0x0042ACE0u  /* int32_t(msg *, int32_t army) */
+/* Both self-named. "troopMessageReceive: got eTROOPER_DROP_ITEM_MESSAGE" and
+ * "Unknown Vehicle Message of type %d Received". */
+#define ADDR_TROOP_MESSAGE_RECV  0x0044C590u  /* void(msg *, int32_t army) */
+#define ADDR_VEHICLE_MSG_RECV    0x0045E590u  /* void(msg *, int32_t army) */
+/* Who won, written only by the two game-over arms of the army dispatcher. */
+#define ADDR_GAME_WINNER         0x00512300u  /* int32_t */
+/* Gates the WON arm: with this clear, a win is recorded exactly as a loss.
+ * 0x0044D110 is the only writer, and it sets and clears it in three places. */
+#define ADDR_WIN_ENABLED         0x00512304u  /* int32_t */
+#define AM2_MENU_REQUEST_GAME_OVER 0x22u
 #define ADDR_RECV_START_GAME_MSG 0x00411100u  /* "ReceiveStartGameMsg for %d Players.  Seed is %d " */
 /* 0x004114E0, "ReceivePlayerMsg for %d Players. I reckoned there were %d
  * Players ". The host's whole view of the lobby, arriving at a client. */

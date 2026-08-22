@@ -322,6 +322,31 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid);
  * that disagrees with the host announces itself. */
 void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid);
 
+/* Original: 0x0040FBB0, "Unknown Army Msg Item Type %d, msgtype:%d, item uid:
+ * %x; msgsize: %d". The SECOND dispatcher -- one message out of a packet,
+ * where CommDispatchMessage handles the packet-level ones. ReceivePacket is
+ * its only caller.
+ *
+ * It switches on the object KIND behind the message's uid, not on a message
+ * type: 2 goes to troopMessageReceive, 3 to the vehicle equivalent, 4 and
+ * anything unrecognised fall through to the game-wide messages, and 1 and 5
+ * are accepted and ignored in silence.
+ *
+ * The army it passes on is the uid's owner, EXCEPT for uid 0, where it is the
+ * packet's sender slot instead -- so a message about nothing is attributed to
+ * whoever sent it.
+ *
+ * Two of its calls are to ADDR_LOG, which this build has stubbed to a single
+ * `ret`. One of them passes the MESSAGE BUFFER as the format string. Both are
+ * reproduced, and neither does anything.
+ *
+ * GAME_WON is recorded as GAME_LOST unless ADDR_WIN_ENABLED is set, and when
+ * it is enabled the winner is written as 1 if it was us and as the army
+ * otherwise. Both arms then request menu 0x22 and raise the state-pending flag
+ * DIRECTLY, without going through RequestState -- which is the same pair
+ * CLAUDE.md records as the route to the level teardown. */
+void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq);
+
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.
  *

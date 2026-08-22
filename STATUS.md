@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `54a633f`. Working tree clean.
+Last updated: **2026-08-22**, at `68d95d0`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 523 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 523 | 516 of them below the CRT line |
+| `patch_replace` sites | 524 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 524 | 517 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 98,448 / 372,816 B (**26.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 123,760 / 372,816 B (33.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 98,848 / 372,816 B (**26.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,160 / 372,816 B (33.3%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,33 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **BOTH dispatchers are ours now.** `CommDispatchMessage` handles the
+  packet-level messages and `ReceiveArmyMsg` handles one message out of a
+  packet, and the two switch on different things: the first on a message type,
+  the second on the object KIND behind the message's uid. 2 is a trooper, 3 a
+  vehicle, 4 the game itself, and 1 and 5 are accepted and ignored in silence.
+
+- **A message about uid 0 is attributed to whoever sent it.** Every other
+  message is attributed to the uid's owning army; uid 0 belongs to nobody, so
+  the packet's sender slot is used instead.
+
+- **Two calls in it are to ADDR_LOG, which this build has stubbed to a single
+  `ret`, and one passes the MESSAGE BUFFER where a format string goes.**
+  Reproduced through a typed pointer so the compiler has no opinion, because
+  what the image does is call a function that ignores everything.
+
+- **GAME_WON is recorded as GAME_LOST unless 0x00512304 is set.** With winning
+  enabled the winner is 1 if it was us and the army otherwise; with it clear,
+  the win takes the loss arm exactly. Both arms then write the menu request and
+  the state-pending flag BY HAND, without going through `RequestState` -- the
+  same pair CLAUDE.md records as the route to the level teardown, reached here
+  from a network message rather than from ESCAPE.
+
+- **`0x025C` is "this army is in play".** `ArmyIsInPlay` answers yes for army 4
+  unconditionally -- the one every colour lookup treats as neutral -- and reads
+  that field for anything else. It is the same field `CommSlotRemote` falls
+  back to for an empty slot, which now makes sense of that fallback.
 
 - **The comm receive path is complete.** `CommDispatchMessage` and every
   handler it names are reconstructed; what is left below it is

@@ -23,6 +23,8 @@
 #include <string.h>
 
 #include "commmsg.h"
+#include "item.h"      /* UidOnWire, UidArmy -- reconstructed */
+#include "event.h"     /* EventMessageReceive -- reconstructed */
 #include "misc.h"      /* XorChecksum, reconstructed */
 #include "rect.h"       /* AM2_Rect, for the dialog paint slot */
 #include "armymsg.h"    /* SendGamePause */
@@ -684,8 +686,114 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid)
             dpid, slot, pause, GetPauseFlags(), mask, flags);
 }
 
-typedef void (__cdecl *AM2_ArmyMsgFn)(void *msg, int32_t slot, int32_t seq);
-#define orig_recv_army_msg ((AM2_ArmyMsgFn)(uintptr_t)ADDR_RECV_ARMY_MSG)
+typedef int32_t (__attribute__((thiscall)) *AM2_ArmyInPlayFn)(void *comm,
+                                                              uint32_t uid);
+typedef int32_t (__cdecl *AM2_KindFn)(uint32_t wire);
+typedef int32_t (__cdecl *AM2_FilterFn)(void *msg, int32_t army);
+typedef void (__cdecl *AM2_KindMsgFn)(void *msg, int32_t army);
+/* The stubbed logger, reached as a plain three-argument function so the
+ * message buffer can be passed where a format string goes without the
+ * compiler having an opinion. It is one `ret` in this build. */
+typedef void (__cdecl *AM2_RawLogFn)(const void *a, int32_t b, int32_t c);
+
+#define orig_army_in_play  ((AM2_ArmyInPlayFn)(uintptr_t)ADDR_ARMY_IN_PLAY)
+#define orig_uid_obj_kind  ((AM2_KindFn)(uintptr_t)ADDR_UID_OBJ_KIND)
+#define orig_army_msg_filter ((AM2_FilterFn)(uintptr_t)ADDR_ARMY_MSG_FILTER)
+#define orig_troop_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_TROOP_MESSAGE_RECV)
+#define orig_vehicle_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_VEHICLE_MSG_RECV)
+#define orig_raw_log       ((AM2_RawLogFn)(uintptr_t)ADDR_LOG)
+
+/* Spelled exactly as objtable.h spells it -- uint32_t, not int32_t -- so the
+ * two stay one definition. checkglobals refused the first attempt. */
+#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+
+#define AM2_ARMYMSG_SIZE 0x00   /* uint16_t */
+#define AM2_ARMYMSG_TYPE 0x02   /* uint16_t */
+#define AM2_ARMYMSG_UID  0x04
+
+/* The tail both game-over arms share: record who won, ask for menu 0x22 and
+ * raise the pending flag by hand rather than through RequestState. */
+static void RecordGameOver(int32_t winner)
+{
+    *(int32_t *)(uintptr_t)ADDR_GAME_WINNER   = winner;
+    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST  = AM2_MENU_REQUEST_GAME_OVER;
+    *(int32_t *)(uintptr_t)ADDR_STATE_PENDING = 1;
+}
+
+void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
+{
+    uint8_t  *m    = (uint8_t *)msg;
+    uint8_t  *comm = (uint8_t *)kCommObj;
+    uint32_t  uid;
+    int32_t   army;
+    int32_t   kind;
+
+    (void)seq;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
+        return;
+
+    uid = *(const uint32_t *)(m + AM2_ARMYMSG_UID);
+    if (!orig_army_in_play(comm, uid)) {
+        am2_log("ignoring message from defunct army\n");
+        return;
+    }
+
+    /* uid 0 is nobody's, so the message is attributed to whoever sent it. */
+    army = uid ? (int32_t)UidArmy(UidOnWire(uid)) : slot;
+
+    /* ADDR_LOG, which is a single `ret` here -- and it is handed the MESSAGE
+     * where a format string goes. Kept because it is what the image does. */
+    orig_raw_log(m, 0, army);
+
+    if (orig_army_msg_filter(m, army))
+        return;
+
+    kind = orig_uid_obj_kind(UidOnWire(uid));
+    switch (kind) {
+    case 1:
+    case 5:
+        /* Accepted and ignored, in silence. */
+        return;
+    case 2:
+        orig_troop_msg_recv(m, army);
+        return;
+    case 3:
+        orig_vehicle_msg_recv(m, army);
+        return;
+    default:
+        break;   /* 4, and anything the table does not cover */
+    }
+
+    switch (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE)) {
+    case 4:
+        am2_log("Received GAME_LOST_MESSAGE\n");
+        RecordGameOver(army);
+        return;
+
+    case 5:
+        am2_log("Received GAME_WON_MESSAGE\n");
+        /* With winning disabled, a win is recorded exactly as a loss. */
+        if (!*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
+            RecordGameOver(army);
+            return;
+        }
+        RecordGameOver((int32_t)g_defaultOwner == army ? 1 : army);
+        return;
+
+    case 0x20:
+        EventMessageReceive((const AM2_EventMsg *)m);
+        return;
+
+    default:
+        am2_log("Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; "
+                "msgsize: %d\n",
+                kind, *(const uint16_t *)(m + AM2_ARMYMSG_TYPE),
+                UidOnWire(uid),
+                *(const uint16_t *)(m + AM2_ARMYMSG_SIZE));
+        return;
+    }
+}
 
 void __cdecl ReceivePacket(void *packet, int32_t dpid)
 {
@@ -733,7 +841,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
             return;
         }
 
-        orig_recv_army_msg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
+        ReceiveArmyMsg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
 
         /* Re-read, after the handler has had the bytes. */
         part = *(const uint16_t *)p;
@@ -750,9 +858,6 @@ typedef int32_t (__cdecl *AM2_SprintfFn)(char *out, const char *fmt, ...);
 #define orig_sprintf ((AM2_SprintfFn)(uintptr_t)ADDR_GAME_SPRINTF)
 
 #define g_ourSlot      (*(int32_t *)(uintptr_t)ADDR_OUR_SLOT)
-/* Spelled exactly as objtable.h spells it -- uint32_t, not int32_t -- so the
- * two stay one definition. checkglobals refused the first attempt. */
-#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 
 /* Update the current dialog and repaint it, with no player list sent after --
  * which is what separates this from RepaintDialogAndSendPlayers. */
@@ -1034,6 +1139,8 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_RECV_ARMY_MSG, (const void *)ReceiveArmyMsg,
+                  "ReceiveArmyMsg", 1);
     patch_replace(ADDR_RECV_PLAYER_MSG, (const void *)ReceivePlayerMsg,
                   "ReceivePlayerMsg", 1);
     patch_replace(ADDR_RECV_PACKET, (const void *)ReceivePacket,
