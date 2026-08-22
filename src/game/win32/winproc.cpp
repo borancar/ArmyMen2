@@ -44,6 +44,7 @@
 #include "winmain.h"
 #include "mapdraw.h"
 #include "../rect.h"
+#include "../msgslot.h"  /* CommEndSetup, shared with both ready handlers */
 
 #include <stdint.h>
 #include <string.h>
@@ -176,7 +177,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_find_player    (*(am2_comm_id_fn)ADDR_COMM_FIND_PLAYER)
 #define orig_remove_player_rec (*(am2_comm_id_fn)ADDR_COMM_REMOVE_PLAYER)
 #define orig_player_left    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_LEFT)
-#define orig_end_setup      (*(am2_void_fn2)ADDR_COMM_END_SETUP)
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
 #define orig_session_over   (*(am2_comm_void_fn)ADDR_COMM_SESSION_OVER)
 #define orig_comm_reset     (*(am2_comm_void_fn)ADDR_COMM_RESET_STATE)
@@ -275,7 +275,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
     slot = orig_player_slot(comm, id);
     if (orig_player_left(comm, id) && g_gameState == 2 && g_netGame
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        orig_end_setup();
+        CommEndSetup();
     orig_remove_player(id);
 
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))

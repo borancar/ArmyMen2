@@ -756,7 +756,11 @@
 #define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
                                                * "Remove Player numPlayers now = %d" */
 #define ADDR_COMM_PLAYER_LEFT    0x0040F790u  /* thiscall int32(this,id), 272 bytes */
-#define ADDR_COMM_END_SETUP      0x00410CE0u  /* void(void) -- "Sending EndSetupMessage" */
+/* void(void) -- "Sending EndSetupMessage". The end-of-setup scan, and the same
+ * block is INLINED at the end of both ready handlers, so the image holds three
+ * identical copies of it. That is what an inline member function looks like
+ * once MSVC has declined to inline it at one site out of three. */
+#define ADDR_COMM_END_SETUP      0x00410CE0u
 #define ADDR_COMM_SEND_PLAYERS   0x00411270u  /* void(int32) -- "SendPlayerMsg for %d" */
 #define ADDR_COMM_SESSION_OVER   0x0040FB70u  /* thiscall void(this), tail-calls 0x40FAA0 */
 #define ADDR_SHOW_MP_RESULT      0x00426A90u  /* void(int32) -- loads bitmaps/mpwon.bmp */
@@ -2004,6 +2008,12 @@
  * half is 0x00410E90. 0x004FAA18 is the record it sends, value at +8. */
 #define ADDR_SEND_READY_TO_LOAD    0x00410D90u /* void(int32_t) */
 #define ADDR_MSG_READY_TO_LOAD     0x004FAA18u
+/* 0x00410A10, "SendGameReadyMsg\n %s". The local half of 0x00410BB0: it marks
+ * OUR OWN slot ready -- the id comes from the comm object, not from a message
+ * -- sends the record at 0x004FAA28 and then runs the same end-of-setup scan.
+ * Its one caller is 0x00418FA1. */
+#define ADDR_SEND_GAME_READY       0x00410A10u /* void(int32_t) */
+#define ADDR_MSG_GAME_READY        0x004FAA28u /* value at +8 */
 /* 0x00411000, "SendGameStartMsg". Host only, and the one place the shared
  * random seed is chosen: the host reads the clock, keeps the value and sends
  * it, so every machine's RNG starts from the same number. */

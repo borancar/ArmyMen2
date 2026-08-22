@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `a0043fd`. Working tree clean.
+Last updated: **2026-08-22**, at `3ca2a7d`. Working tree clean.
 
 ## In flight
 
@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 468 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 468 | 461 of them below the CRT line |
+| `patch_replace` sites | 470 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 470 | 463 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 103,776 / 372,816 B (**27.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 104,304 / 372,816 B (**28.0%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,34 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **Three identical copies of a block is an INLINE FUNCTION, not three
+  transcriptions.** The end-of-setup scan appears at the tail of
+  `SendGameReadyMsg`, at the tail of `ReceiveGameReadyMsg`, and once on its own
+  at `0x00410CE0` with a caller of its own -- instruction for instruction the
+  same, modulo register allocation. That is what MSVC does with an inline
+  member function it declines at one site out of three. Written ONCE here and
+  called from all three, which is both less to be wrong about and closer to
+  what the original source said.
+
+- **And the standalone copy was already named.** `ADDR_COMM_END_SETUP` had been
+  in `orig.h` since the comm survey; I added `ADDR_SEND_END_SETUP_IF_READY`
+  beside it without grepping the address first -- the exact mistake CLAUDE.md
+  warns about, within one function of writing a comment about it.
+  `checkseams` is what caught it, not `checkpatches`: the alias ratchet counts
+  the surplus, and one more alias sat under its baseline. **A ratchet with a
+  baseline cannot fail on the first offence.**
+
+- **The handshake pair is not symmetric, and that is the original's design.**
+  The ready-to-load pair splits host and client with an early return each. The
+  READY pair does not: `SendGameReadyMsg` runs the host scan for whoever calls
+  it, because a host marking ITSELF ready may be the last one the scan was
+  waiting on.
+
+- **All six handshake functions are done.** The next thing on that path is
+  `0x00418F90` -- 24 bytes, a widget activate handler registered by
+  `push 0x418f90` at `0x004192C1`: play sound 0, then `SendGameReadyMsg(1)`.
+  That is the READY button itself.
 
 - **Closing a seam can move a function to another FILE, and this one did.**
   `SendGameStartMsg` was written in `msgslot.cpp`, and its three comm callees

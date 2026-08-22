@@ -310,25 +310,10 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
         dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
-void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
+void __cdecl CommEndSetup(void)
 {
     uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  value;
-    int32_t  slot;
     int32_t  i;
-
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
-        am2_log("ReceiveGameReadyMsg\n");
-
-    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
-    slot  = orig_comm_slot_of_id(comm, dpid);
-    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY) = value;
-
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
-        am2_log("Setting m_ArmyReady[%d] to %s\n",
-                orig_comm_slot_of_id(comm, dpid),
-                value ? "TRUE" : "FALSE");
 
     /* Only the host decides that setup is over. */
     if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
@@ -354,6 +339,63 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 
     orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_END_SETUP, 0, 1);
     orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
+}
+
+void __cdecl SendGameReadyMsg(int32_t ready)
+{
+    uint8_t *comm = (uint8_t *)kCommObj;
+    int32_t  slot;
+
+    /* Gated on the verbosity field like the rest of the group -- unlike
+     * SendGameStartMsg, whose opening line is not. */
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("SendGameReadyMsg\n %s", ready ? "TRUE" : "FALSE");
+
+    /* Our own slot: the id comes from the comm object, where the receive half
+     * takes it from the message. */
+    slot = orig_comm_slot_of_id(comm,
+                                *(const int32_t *)(comm + AM2_COMM_SELF_ID));
+    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY) = ready;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+        /* The lookup runs a second time inside the `if`, as in both
+         * ready-to-load halves. */
+        am2_log("Setting m_ArmyReady[%d] to %s\n",
+                orig_comm_slot_of_id(comm,
+                                     *(const int32_t *)(comm + AM2_COMM_SELF_ID)),
+                ready ? "TRUE" : "FALSE");
+    }
+
+    /* The value is stored into the record BEFORE the arguments are complete --
+     * the original writes it between the last push and the call. */
+    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_GAME_READY + AM2_MSG_VALUE)
+        = ready;
+    orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_GAME_READY, 0, 1);
+
+    CommEndSetup();
+}
+
+void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
+{
+    uint8_t *comm = (uint8_t *)kCommObj;
+    int32_t  value;
+    int32_t  slot;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("ReceiveGameReadyMsg\n");
+
+    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
+    slot  = orig_comm_slot_of_id(comm, dpid);
+    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY) = value;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("Setting m_ArmyReady[%d] to %s\n",
+                orig_comm_slot_of_id(comm, dpid),
+                value ? "TRUE" : "FALSE");
+
+    CommEndSetup();
 }
 
 void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
@@ -454,6 +496,11 @@ int msgslot_install(void)
                   "SendGameReadyToLoadMsg", 1);
     patch_replace(ADDR_RECV_GAME_READY,
                   (const void *)ReceiveGameReadyMsg, "ReceiveGameReadyMsg", 1);
+    patch_replace(ADDR_SEND_GAME_READY, (const void *)SendGameReadyMsg,
+                  "SendGameReadyMsg", 1);
+    patch_replace(ADDR_COMM_END_SETUP,
+                  (const void *)CommEndSetup,
+                  "CommEndSetup", 1);
     patch_replace(ADDR_RECV_READY_TO_LOAD,
                   (const void *)ReceiveGameReadyToLoadMsg,
                   "ReceiveGameReadyToLoadMsg", 1);

@@ -193,6 +193,28 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid);
  * The slot lookup runs twice when logging is on, as in the host half. */
 void __cdecl SendGameReadyToLoadMsg(int32_t ready);
 
+/* Original: 0x00410CE0, and no string of its own -- the name is ours, from the
+ * body: on the host, if every occupied slot is ready, send the end-of-setup
+ * record and post AM2_WM_SETUP_DONE.
+ *
+ * The same block is INLINED at the end of both SendGameReadyMsg and
+ * ReceiveGameReadyMsg, so the image holds three identical copies. That is what
+ * an inline member function looks like after MSVC has declined to inline it at
+ * one site out of three, and it is why this is written once here and called
+ * from the other two rather than transcribed three times. */
+void __cdecl CommEndSetup(void);
+
+/* Original: 0x00410A10, "SendGameReadyMsg\n %s". The LOCAL half of
+ * ReceiveGameReadyMsg: same field, same scan, but the slot comes from the comm
+ * object's own player id rather than from a message's sender, and the record
+ * at 0x004FAA28 goes out afterwards.
+ *
+ * Note the pairing is not symmetric the way the ready-to-load pair is. That
+ * one splits host and client with an early return each; this one runs the host
+ * scan for whoever calls it, because a host that marks itself ready may be the
+ * last one the scan was waiting on. */
+void __cdecl SendGameReadyMsg(int32_t ready);
+
 
 int msgslot_install(void);
 
