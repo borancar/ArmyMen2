@@ -130,4 +130,29 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify);
  * is reproduced: DestroyItemObject first, then the object. */
 void __cdecl DestroyTrooper(void *trooper, int32_t unlink);
 
+/* Original: 0x0045B470, the KIND 3 arm, and a near-twin of DestroyTrooper.
+ * Three differences and all three are the original's:
+ *
+ *  - the weapon uid is at 0x0550, not the trooper's 0x054C;
+ *  - there is no log at all, where the trooper has one behind the verbosity
+ *    flag and the weapon has one in front of it;
+ *  - and it empties a pointer list at 0x0538 first, which the other two arms
+ *    have nothing corresponding to.
+ *
+ * The weapon flag is set with a 32-bit OR here and with an 8-bit OR on a
+ * 32-bit load in the trooper. For bit 1 the two are the same thing; the
+ * difference is the compiler's, from the same source written twice.
+ *
+ * The name is ours: this arm carries no string, and kind 3 is the vehicle
+ * because ReceiveArmyMsg's switch sends kind 3 to the vehicle handler. */
+void __cdecl DestroyVehicle(void *vehicle, int32_t unlink);
+
+/* Original: 0x0045F290, the KIND 4 arm, "DestroyWeapon, %x" -- its own name.
+ * The shortest of the three: no weapon of its own to mark, no list to empty,
+ * just the subrecord rows, DestroyItemObject and the free.
+ *
+ * Its log is NOT gated on the comm object's verbosity where the trooper's is.
+ * Both go to ADDR_LOG, which this build stubs to a single `ret`. */
+void __cdecl DestroyWeapon(void *weapon, int32_t unlink);
+
 #endif

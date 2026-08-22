@@ -3211,6 +3211,11 @@
  * the map descriptor, then give the array back. The name is ours. */
 #define ADDR_FREE_SUBRECORD_ROWS   0x00434EC0u  /* void(void *subrecord) */
 #define TROOPER_OFF_WEAPON_UID     0x54Cu
+#define VEHICLE_OFF_WEAPON_UID     0x550u
+#define VEHICLE_OFF_PTR_LIST       0x538u
+/* 0x0042A680, thiscall. Empty a three-field {a, b, ptr} record: clear the two
+ * fields, free the pointer if there is one, clear that too. */
+#define ADDR_CLEAR_PTR_LIST        0x0042A680u  /* thiscall void(void *) */
 #define TROOPER_OFF_ALLOC          0xACu
 #define WEAPON_OFF_FLAGS           0x08u
 #define WEAPON_FLAG_DEAD           0x02u
@@ -3221,8 +3226,15 @@
 /* Kind 2 is the TROOPER, and this arm names itself: "DestroyTrooper %x". The
  * family name is kept because it is what FreeItem's switch reads by. */
 #define ADDR_FREE_ITEM_KIND2       0x004478C0u
+/* Kind 3 is the VEHICLE -- ReceiveArmyMsg's switch sends kind 3 to the vehicle
+ * message handler -- and this arm carries no string of its own, so the C++
+ * name is ours by that mapping rather than from the image. */
 #define ADDR_FREE_ITEM_KIND3       0x0045B470u
-#define ADDR_FREE_ITEM_KIND4       0x0045F290u  /* the one that logs */
+/* Kind 4 is the WEAPON, and this one names itself: "DestroyWeapon, %x". It is
+ * "the one that logs" because its log is NOT gated on the comm object's
+ * verbosity, where the trooper's is -- both reach ADDR_LOG, which this build
+ * stubs to a single `ret`, so neither prints. */
+#define ADDR_FREE_ITEM_KIND4       0x0045F290u
 #define ADDR_FREE_ITEM_KIND7       0x004355F0u
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */

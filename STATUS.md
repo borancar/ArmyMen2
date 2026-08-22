@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `f265bf5`. Working tree clean.
+Last updated: **2026-08-22**, at `7a7ca2b`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 525 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 525 | 518 of them below the CRT line |
+| `patch_replace` sites | 527 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 527 | 519 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 98,992 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,304 / 372,816 B (33.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,088 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,400 / 372,816 B (33.4%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,27 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`FreeItem`'s arms are one function written four times, and the differences
+  are the interesting part.** Three are now ours -- trooper, vehicle, weapon --
+  and every one ends the same way: free the subrecord rows, hand the object to
+  `DestroyItemObject`, free the object.
+
+  What differs: the vehicle keeps its weapon uid at 0x0550 and the trooper at
+  0x054C; the vehicle also empties a pointer list at 0x0538 that neither other
+  arm has; the trooper's log is behind the verbosity flag, the weapon's is in
+  front of it, and the vehicle has none at all. And the same weapon flag is set
+  with an 8-bit OR in one arm and a 32-bit OR in another -- the compiler's
+  difference, from one piece of source written twice.
+
+- **The COMMON arm at 0x0043BBB0 is the bare version**, 48 bytes, serving kinds
+  1, 5, 6 and 8: the shared tail and nothing else. Read, and the obvious next
+  step -- with `ADDR_FREE_ITEM_KIND7` after it, that closes the whole switch.
+
+- **Both of these landed as seam closures.** `FreeItem` was already ours and
+  was calling into the image for kinds 3 and 4; it now calls functions. That is
+  a different kind of progress from a new frontier and the percentage barely
+  moves for it -- 96 bytes -- while three `orig_` seams disappear.
 
 - **"Grep the address first" failed again, and this time BOTH ratchets caught
   it.** `0x004478C0` names itself "DestroyTrooper", and I added

@@ -189,6 +189,50 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
     am2_free(trooper);
 }
 
+typedef void (__attribute__((thiscall)) *AM2_ClearListFn)(void *rec);
+#define orig_clear_ptr_list ((AM2_ClearListFn)(uintptr_t)ADDR_CLEAR_PTR_LIST)
+
+void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
+{
+    uint8_t *v = (uint8_t *)vehicle;
+    int32_t  weaponUid;
+    uint8_t *weapon;
+
+    if (!vehicle)
+        return;
+
+    weaponUid = *(const int32_t *)(v + VEHICLE_OFF_WEAPON_UID);
+    if (weaponUid) {
+        weapon = (uint8_t *)orig_weapon_by_uid(weaponUid);
+        /* A 32-bit OR here, an 8-bit one in DestroyTrooper. Same bit. */
+        if (weapon)
+            *(int32_t *)(weapon + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
+    }
+
+    /* The one step neither of the other two arms has. */
+    orig_clear_ptr_list(v + VEHICLE_OFF_PTR_LIST);
+
+    orig_free_subrecord_rows(v + OBJ_OFF_SUBRECORD);
+    DestroyItemObject(vehicle, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
+                      unlink);
+    am2_free(vehicle);
+}
+
+void __cdecl DestroyWeapon(void *weapon, int32_t unlink)
+{
+    uint8_t *w = (uint8_t *)weapon;
+
+    if (!weapon)
+        return;
+
+    /* Not gated on the verbosity flag, unlike DestroyTrooper's. */
+    orig_log("DestroyWeapon, %x\n", *(const int32_t *)(w + 4));
+
+    orig_free_subrecord_rows(w + OBJ_OFF_SUBRECORD);
+    DestroyItemObject(weapon, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
+    am2_free(weapon);
+}
+
 void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -212,8 +256,6 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
  * dispatch: the kind says whose object this is. */
 typedef void (__cdecl *AM2_FreeKindFn)(void *item, int32_t unlink);
 #define orig_free_common (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_COMMON))
-#define orig_free_kind3  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND3))
-#define orig_free_kind4  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND4))
 #define orig_free_kind7  (*(AM2_FreeKindFn)AM2_IMAGE(ADDR_FREE_ITEM_KIND7))
 
 #define kCommDebug \
@@ -258,13 +300,13 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
         return 1;
 
     case 3:
-        orig_free_kind3(item, unlink);
+        DestroyVehicle(item, unlink);
         return 1;
 
     case 4:
         if (kCommDebug)
             orig_log("FreeItem %0x\n", ((const int32_t *)item)[1]);
-        orig_free_kind4(item, unlink);
+        DestroyWeapon(item, unlink);
         return 1;
 
     case 7:
@@ -333,6 +375,10 @@ void item_install(void)
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
     patch_replace(ADDR_FREE_ITEM_KIND2, (const void *)DestroyTrooper,
                   "DestroyTrooper", 1);
+    patch_replace(ADDR_FREE_ITEM_KIND3, (const void *)DestroyVehicle,
+                  "DestroyVehicle", 1);
+    patch_replace(ADDR_FREE_ITEM_KIND4, (const void *)DestroyWeapon,
+                  "DestroyWeapon", 1);
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
