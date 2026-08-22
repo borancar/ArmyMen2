@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 457 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 457 | 450 of them below the CRT line |
+| `patch_replace` sites | 459 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 459 | 452 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 101,600 / 372,816 B (**27.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 101,856 / 372,816 B (**27.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **Two ownership conventions sit side by side in one hierarchy.** The list
+  box's destructor tests BOTH an ownership flag at `0x0064` and the pointer
+  itself before freeing its row array; the icon's and the blinker's release
+  their sprites with no null test at all. Neither is wrong -- `ReleaseSprite`
+  copes with a null and `free` would too -- but a reader who generalises from
+  one to the other will write a guard the original does not have, or drop one
+  it does.
+
+- **The vtable survey says the widget layer is done for every menu screen that
+  can be driven.** Five screens checked -- CONTROLS, the multiplayer battle
+  dialog, DIFFICULTY, the film archive and SINGLE PLAYER -- and what is left on
+  any of them is per-dialog DESTRUCTORS in the menu band (`0x0044E4F0`,
+  `0x004510D0`, `0x004518E0`, `0x0042FF40`, `0x00455B80`) plus two list-box
+  updates. The shared bases cover everything else those screens instantiate.
+
+  So the widget layer proper is finished, and what remains under these dialogs
+  is dialog logic rather than widget logic.
 
 - **`BlinkerStart` runs, and finding out how confirmed the unwritten function's
   reading.** It had read 0 on every run and was verified by reading only.

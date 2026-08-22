@@ -106,6 +106,12 @@
 /* 0x00455C80, thiscall, slot 1: picks a sprite out of a small array by an
  * index, centres it in the widget, and draws it clipped. */
 #define ADDR_MULTI_SPRITE_PAINT 0x00455C80u /* void(AM2_Widget *, RECT) */
+/* 0x00455090 / 0x00455070: the list box's destructor and its deleting wrapper.
+ * The row array is freed only when 0x0064 says the list owns it, and 0x00453930
+ * is the array's own cleanup, called before the storage goes back. */
+#define ADDR_LIST_DESTRUCT      0x00455090u /* void(AM2_Widget *) */
+#define ADDR_LIST_DELETE        0x00455070u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_LIST_ROWS_CLEANUP  0x00453930u /* void(AM2_ListRows *) -- thiscall */
 /* 0x00455180, thiscall, slot 1 of the list box: clear, then draw every visible
  * row with an ink chosen from the row's state. */
 #define ADDR_LIST_DRAW          0x00455180u /* void(AM2_Widget *, RECT) */

@@ -364,6 +364,37 @@ void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
     WidgetPaint(w, clip);
 }
 
+/* 0x00453930, thiscall: the row array's own cleanup, run before its storage is
+ * released. Still original -- it is the array's business, not the widget's. */
+typedef void (__attribute__((thiscall)) *AM2_ListCleanupFn)(void *rows);
+#define orig_list_rows_cleanup \
+    ((AM2_ListCleanupFn)(uintptr_t)ADDR_LIST_ROWS_CLEANUP)
+
+void __attribute__((thiscall)) ListDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_LIST);
+
+    if (*(const int32_t *)(self + LIST_OFF_OWNS_ROWS)) {
+        void *rows = *(void **)(self + LIST_OFF_ROWS);
+
+        if (rows) {
+            orig_list_rows_cleanup(rows);
+            am2_free(rows);
+        }
+    }
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags)
+{
+    ListDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip)
 {
     uint8_t            *self = (uint8_t *)w;
@@ -1161,6 +1192,10 @@ int widget_install(void)
                         "MultiSpritePaint", 1);
     rc |= patch_replace(ADDR_TOGGLE_PAINT, (const void *)TogglePaint,
                         "TogglePaint", 1);
+    rc |= patch_replace(ADDR_LIST_DESTRUCT, (const void *)ListDestruct,
+                        "ListDestruct", 1);
+    rc |= patch_replace(ADDR_LIST_DELETE, (const void *)ListDelete,
+                        "ListDelete", 1);
     rc |= patch_replace(ADDR_LIST_DRAW, (const void *)ListDraw,
                         "ListDraw", 1);
     rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,

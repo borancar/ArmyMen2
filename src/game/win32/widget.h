@@ -74,6 +74,7 @@ typedef struct AM2_Widget {
 /* The one-sprite icon, and the blinker that derives from it. */
 #define VTABLE_ICON         0x0046FC70u
 #define VTABLE_BLINKER      0x0046FD38u
+#define VTABLE_LIST         0x0046FCC0u
 #define ICON_OFF_SPRITE     0x58
 
 /* The label's own fields, offsets from the widget base. The paper colour is
@@ -526,6 +527,7 @@ typedef struct AM2_ListRows {
 
 #define LIST_OFF_ROWS        0x60   /* AM2_ListRows * */
 #define LIST_OFF_HOT         0x5C   /* int32_t, the row under the pointer */
+#define LIST_OFF_OWNS_ROWS   0x64   /* int32_t; the array is freed only if set */
 #define LIST_OFF_VISIBLE     0x78   /* int32_t, how many rows fit */
 #define LIST_OFF_INK         0x80   /* uint8_t, an ordinary row */
 #define LIST_OFF_INK_SEL     0x84   /* uint8_t, the selected row */
@@ -541,6 +543,20 @@ typedef struct AM2_ListRows {
  * compiler's magic-number sequence, which is a second independent route to the
  * row height -- and a BlinkerStart(0x0094's widget, 70ms, 1) whenever that row
  * changes, which is the first use found for the blinker at all. */
+
+/* Original: 0x00455090 / 0x00455070, thiscall -- the list box's destructor and
+ * its deleting wrapper. Restore the vtable, and if 0x0064 says this list owns
+ * its row array AND the array is there, run the array's own cleanup and give
+ * the storage back. Then chain to the base.
+ *
+ * Both conditions are tested, so a list handed a shared array leaves it alone
+ * and a list that owns a null one does nothing -- unlike the icon and blinker
+ * destructors, which release their sprites with no null test at all. The two
+ * conventions sit side by side in the same hierarchy.
+ *
+ * The SEH prologue is not reproduced; see CLAUDE.md. */
+void __attribute__((thiscall)) ListDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
 
 /* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list
  * to 0x00502AD9, then walk the visible rows drawing each one's text.
