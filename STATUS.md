@@ -153,6 +153,29 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`tools/checkglobals.py` is in, and the backlog is 38 + 17.** Nothing had
+  ever checked the `g_` macros. The first run found 38 surplus names for
+  addresses that already had one and 17 names carrying more than one spelling.
+  It is a ratchet at those figures -- lower them, never raise them.
+
+  Worth working off in order of how much a name is claiming:
+
+  1. `ADDR_FONT_SURFACE` through **five** names -- `g_back`, `g_backBuffer`,
+     `g_backBuffer2`, `g_backBufferSurf`, `g_fontSurface`. "The font surface"
+     and "the back buffer" are different claims about what it is FOR, and one
+     of them is wrong. Read the uses, then rename.
+  2. `ADDR_LOCKED_SURFACE` through four -- `g_drawTarget`, `g_lockTarget`,
+     `g_lockedSurface`, `g_target`. `orig.h` calls it "currently locked" while
+     `SetDrawTarget` writes it long before any lock, so the comment is the
+     doubtful part here, not only the names.
+  3. `ADDR_PRIMARY_SURFACE` through four, `ADDR_HWND` through three -- one of
+     which is `g_enumContext` in `dplay.cpp`, a name that says something quite
+     different from "the window".
+  4. The drifts are mostly const-vs-non-const and are cosmetic, with two
+     exceptions worth looking at: `g_lockedSurface` is `LPDIRECTDRAWSURFACE`
+     in `surface.cpp` and `int32_t` in `text.cpp`, and `g_screenClip` is the
+     ADDRESS in one module and the OBJECT in another.
+
 - **Two of the base widget's constructed flags are not observed at all.**
   `WidgetConstruct` writes 1 into `0x003C` and 1 into `0x0050`; setting EITHER
   to 0 leaves `controls` at 0 pixels. So the exact A/B that catches a

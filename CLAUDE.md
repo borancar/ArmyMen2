@@ -41,11 +41,13 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** Eight analysis
+**`make check` runs everything that does not need the game.** Fifteen analysis
 tools plus a drift check that fails if any generated file under `docs/` no
-longer matches what the tools produce.
+longer matches what the tools produce. The list is in the `check` recipe; it
+said "eight" here for a long time after it stopped being eight, which is what
+a hand-maintained number in prose always comes to.
 
-One of the eight is `tools/checkclaims.py`, which reads the numeric claims out
+One of the fifteen is `tools/checkclaims.py`, which reads the numeric claims out
 of *this file* and recomputes them. It exists because three separate figures
 here were found stale by measuring rather than reading, each from the same
 cause: a tool changed, some prose was updated, the rest kept asserting the old
@@ -112,6 +114,33 @@ on a locked pointer somebody else obtained.
 Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
+
+**`tools/checkglobals.py` ratchets the `g_` macros, and there is a large
+backlog behind it.** `src/game` reaches the original's globals through macros
+like `#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)`, and
+nothing was checking them at all — so one global ended up with four definitions
+across three types, one of them a second name. The `ADDR_` ratchet in
+`checkpatches.py` would never have seen it: the `ADDR_` name underneath is the
+same in every case, so grepping the address finds them all and they look
+consistent.
+
+Two rules, both already applied one level up. An **alias** is one address
+reached through two `g_` names. A **drift** is one `g_` name defined with two
+different expansions.
+
+It found **38 surplus names and 17 surplus spellings** on its first run, so it
+is a baseline that may only go down, not a clean bill of health. Some of the
+backlog is harmless const-vs-non-const; some is not, and the sharpest is
+`ADDR_FONT_SURFACE`, reached through **five** names including `g_backBuffer`
+and `g_fontSurface`. Those cannot both be right, and settling it means reading
+what the surface is for rather than renaming the loser — the same job as
+`ADDR_CD_PATH` and `ADDR_GAME_DIR_ALT`.
+
+**Count the surplus, not the addresses that have any.** The first version
+counted addresses with more than one name, and a fifth name landing on an
+address that already had four did not move it — which is exactly where a new
+alias is most likely to appear, and it passed when tried. Counting
+`len(names) - 1` fails in both directions, tested both ways.
 
 **`am2.Image.refs_to` cannot see a call, and reading it as though it could is
 how three separate things in this file were nearly recorded as dead code.** It
