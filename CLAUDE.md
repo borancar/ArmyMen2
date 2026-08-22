@@ -1302,9 +1302,15 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **10** are reconstructed
+  all. Measured: **29 functions** call the bracket and **11** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
-  the last of which the old list predates.
+  the last of which the old list predates, and the menu-widget painters that
+  have landed since.
+
+  Do not hand-edit that pair. `tools/checkclaims.py` recomputes it, and it is
+  the reason this sentence is right: the count moved from 10 to 11 the moment
+  `TyperPaint` was written, and the check failed the build rather than letting
+  the prose go quietly stale — which is the whole argument for the tool.
 
   `0x00454F00` came off the shortlist as `LabelDraw`, and it opened a subsystem
   rather than closing a rasteriser: it is vtable slot 1 of a menu widget class,

@@ -168,6 +168,14 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`make -s check` was committed against while FAILING, and the reason is
+  worth knowing.** Its last line reads "all static checks pass" only on
+  success, but `tail -1` of a failing run shows whatever the last tool printed
+  -- here "generated ok" -- which reads exactly like a pass. The exit code was
+  1. `checkclaims` had caught the Lock/Unlock bracket count going from 10 to 11
+  the moment `TyperPaint` was written, which is precisely what that tool is
+  for. Read the exit status, not the last line.
+
 - **`ab.sh quit` compared the title screen and nothing else.** The only frame
   it took was before the QUIT click, so CONFIRM GAME EXIT -- the dialog the
   configuration exists to reach, and the one that runs the typewriter label and
