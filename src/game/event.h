@@ -160,6 +160,10 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me);
  * type 2. */
 void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB);
 
+/* 0x0041FA10. EvtArmyAtPoint's sibling: same list walk and gates plus a type
+ * test, and a one-deep field save (0xE4 -> 0xE8) instead of a point action. */
+void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value);
+
 void __cdecl EvtShowBitmap(const char *name);
 void __cdecl EvtShowBitmapNoPause(const char *name);
 

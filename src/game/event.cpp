@@ -1608,6 +1608,59 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
         *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
 }
 
+/* 0x0041FA10. Set a field on every object of an army that passes the gates.
+ *
+ * EvtArmyAtPoint's sibling, and the shared parts are worth naming as shared:
+ * the same CommSlotForArmy lookup into the per-slot list, the same +8 flag
+ * gate, the same ObjFieldA filter that -1 disables, and the same prune-a-dead-
+ * uid-without-advancing. Two differences: this one also requires
+ * ObjIsTypeIn238, and its action is a field write rather than a point action.
+ *
+ * That write is a one-deep save -- 0xE4 goes to 0xE8 before the new value goes
+ * to 0xE4 -- which is the same shape EvtPushObjCtx uses on globals. So a second
+ * call before anything restores loses the first saved value, here as there.
+ *
+ * Unlike EvtArmyAtPoint this one carries nothing that accumulates, so the
+ * defect recorded there does not apply. */
+void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
+{
+    void    *comm = *(void **)AM2_IMAGE(ADDR_COMM_OBJECT);
+    int32_t  slot = CommSlotForArmy(comm, army);
+    uint8_t *list = ((uint8_t **)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+    int32_t  i    = 0;
+
+    while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
+        const uint32_t *uids = *(const uint32_t **)(list + LIST_OFF_UIDS);
+        uint8_t        *obj  = (uint8_t *)LookupByUID(uids[i]);
+
+        if (obj == (uint8_t *)0) {
+            orig_list_remove_at(list, i);
+            continue;
+        }
+
+        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BLOCKED) {
+            i++;
+            continue;
+        }
+
+        if (!ObjIsTypeIn238((const AM2_Object *)obj)) {
+            i++;
+            continue;
+        }
+
+        if (filter != -1 && (int32_t)ObjFieldA(obj) != filter) {
+            i++;
+            continue;
+        }
+
+        *(int32_t *)(obj + OBJ_OFF_FIELD_E8) =
+            *(const int32_t *)(obj + OBJ_OFF_FIELD_E4);
+        *(int32_t *)(obj + OBJ_OFF_FIELD_E4) = value;
+
+        i++;
+    }
+}
+
 /* 0x0041FD50. Give one object something to do with another.
  *
  * Both uids must clear the threshold and both must resolve -- and note the
@@ -1972,6 +2025,8 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_ARMY_SET_FIELD,
+                        (const void *)EvtArmySetField, "EvtArmySetField", 3);
     rc |= patch_replace(ADDR_EVT_OBJ_PAIR, (const void *)EvtObjPair,
                         "EvtObjPair", 1);
     rc |= patch_replace(ADDR_EVT_SHOW_BITMAP, (const void *)EvtShowBitmap,

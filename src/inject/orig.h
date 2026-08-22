@@ -1220,6 +1220,14 @@
  * the object something new to do. */
 #define ADDR_EVT_OBJ_PAIR        0x0041FD50u  /* void(uint32_t, uint32_t) */
 #define ADDR_OBJ_PAIR_ACTION     0x00458070u  /* void(void *a, void *b) */
+/* 0x0041FA10. EvtArmyAtPoint's sibling: the same CommSlotForArmy -> list walk,
+ * the same +8 flag gate and ObjFieldA filter, the same prune-and-do-not-
+ * advance for a dead uid -- plus a type test the other one does not have, and
+ * a different action. It pushes field 0xE4 into 0xE8 before overwriting it,
+ * which is the one-deep save EvtPushObjCtx does with globals. */
+#define ADDR_EVT_ARMY_SET_FIELD  0x0041FA10u  /* void(army, filter, value) */
+#define OBJ_OFF_FIELD_E4         0xE4u
+#define OBJ_OFF_FIELD_E8         0xE8u  /* the previous value of 0xE4 */
 #define ADDR_EVT_SET_MODE_F0     0x0041FAE0u  /* void(uid, int32), +0xF0, type 2/3/8 */
 #define ADDR_EVT_SET_MODE_94     0x0041FB10u  /* void(uid, int32), +0x94, type 2/3/8 */
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */

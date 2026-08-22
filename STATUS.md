@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 403 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 403 | 396 of them below the CRT line |
+| `patch_replace` sites | 404 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 404 | 397 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 91,952 / 372,816 B (**24.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 92,112 / 372,816 B (**24.7%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,15 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **What is left in event.cpp is the dense half, and the shim run is over.**
+  Ten functions remain: the 4096-byte action executor at `0x00420410`, a
+  448-byte helper at `0x00421590`, and eight in the 160..192 byte range that
+  are NOT more shims -- `0x00420260` and `0x00420300` each open with a
+  two-step lookup through `0x00459FB0`/`0x00459FE0`, build a struct on the
+  stack, and reach five or six unnamed callees apiece. Read one before
+  budgeting for it; the pattern that made the last dozen quick does not hold
+  here.
 
 - **"Clear field 0x540 first, but only for type 2" is a recurring step.** Three
   sightings now: `EvtAtPointA`, `EvtObjPair`, and `EvtSetField540` which exists
@@ -304,7 +313,7 @@ counts probe before reading one as coverage -- that is what turned the
   (`EvtObjSet`, the unsafe one). Writing them all the same way would lose a
   real distinction, so they are written as found.
 
-- **11 functions are left in the event.cpp band, and most are tiny.** Four
+- **10 functions are left in the event.cpp band, and most are tiny.** Four
   are 32 bytes, eight are 48, and nearly all have a single caller -- they are
   the `Evt*` shim family this module already holds ten of: check a uid or a
   pointer, look the object up, poke one field or call one thing. They are cheap
