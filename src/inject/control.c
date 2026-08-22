@@ -22,6 +22,108 @@ static SOCKET g_listen = INVALID_SOCKET;
 static HANDLE g_thread;
 static volatile LONG g_stop;
 
+/* The widget tree, described for comparison rather than for reading.
+ *
+ * Offsets are the base layout established in src/game/win32/widget.h: the
+ * absolute rectangle at 0x14, the child list at 0x24, the parent at 0x28, the
+ * sibling links at 0x2C and 0x30, the focused child at 0x34, the sprite at
+ * 0x38 and the four flags. Everything past 0x54 belongs to whichever subclass
+ * is looking and is deliberately NOT printed -- the same offset means three
+ * different things in three classes, so a generic dump of it would be noise
+ * that differs for reasons no defect caused. */
+#define WD_ROOT        0x0065A058u
+#define WD_OFF_RECT    0x14
+#define WD_OFF_CHILD   0x24
+#define WD_OFF_SIBLING 0x30
+#define WD_OFF_FOCUSED 0x34
+#define WD_OFF_SPRITE  0x38
+#define WD_OFF_FLAG3C  0x3C
+/* 0x40 is NOT printed. It is the one field WidgetConstruct deliberately never
+ * writes -- ButtonUpdate computes it before anything reads it -- so for every
+ * widget whose update has not run it holds whatever the allocator left, and it
+ * came back as 25, 1 and 27346604 on runs that were otherwise identical. An
+ * oracle has to be exact to be worth anything, and an uninitialised field
+ * cannot be. Two runs compared by hand happened to agree, which is how it got
+ * into the first version. */
+#define WD_OFF_HOVER   0x40
+#define WD_OFF_DIRTY   0x44
+#define WD_OFF_NOFOCUS 0x4C
+#define WD_OFF_CANFOCUS 0x50
+#define WD_MAX_PTRS    64
+
+static const void *wd_seen[WD_MAX_PTRS];
+static int         wd_nseen;
+
+/* First-seen index for a pointer, so the dump survives the heap moving. */
+static int wd_index(const void *p)
+{
+    int i;
+
+    if (!p)
+        return -1;
+    for (i = 0; i < wd_nseen; i++)
+        if (wd_seen[i] == p)
+            return i;
+    if (wd_nseen < WD_MAX_PTRS)
+        wd_seen[wd_nseen++] = p;
+    return wd_nseen - 1;
+}
+
+static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
+                        const uint8_t *w, int depth)
+{
+    const int32_t *r;
+    int            self;
+    int            vt;
+    int            spr;
+    int            foc;
+
+    if (!w || depth > 8 || at + 200 >= cap)
+        return at;
+
+    /* Indices are taken into locals first, in a defined order. Passing three
+     * wd_index() calls as arguments numbered them BACKWARDS, because an i386
+     * cdecl call evaluates its arguments right to left -- the dump was
+     * self-consistent and read #3 for the first node. */
+    self = wd_index(w);
+    vt   = wd_index(*(void *const *)w);
+    spr  = wd_index(*(void *const *)(w + WD_OFF_SPRITE));
+    foc  = wd_index(*(void *const *)(w + WD_OFF_FOCUSED));
+
+    r = (const int32_t *)(w + WD_OFF_RECT);
+    /* One line, separated by `|`: the control protocol frames on a newline, so
+     * a multi-line reply is silently truncated to its first line. */
+    at += (uint32_t)_snprintf(out + at, cap - at,
+                              "%s[%d] d%d v%d r=%d,%d,%d,%d spr=%d "
+                              "foc=%d dirty=%d nofoc=%d canfoc=%d c3c=%d",
+                              at ? " | " : "",
+                              self, depth, vt,
+                              r[0], r[1], r[2], r[3], spr, foc,
+                              *(const int32_t *)(w + WD_OFF_DIRTY),
+                              *(const int32_t *)(w + WD_OFF_NOFOCUS),
+                              *(const int32_t *)(w + WD_OFF_CANFOCUS),
+                              *(const int32_t *)(w + WD_OFF_FLAG3C));
+
+    at = wd_node(out, at, cap, *(const uint8_t *const *)(w + WD_OFF_CHILD),
+                 depth + 1);
+    return wd_node(out, at, cap,
+                   *(const uint8_t *const *)(w + WD_OFF_SIBLING), depth);
+}
+
+static void widget_describe(char *out, uint32_t cap)
+{
+    const uint8_t *root = *(const uint8_t *const *)(uintptr_t)WD_ROOT;
+
+    wd_nseen = 0;
+    out[0] = '\0';
+    if (!root) {
+        _snprintf(out, cap, "(no dialog open)");
+        return;
+    }
+    wd_node(out, 0, cap, root, 0);
+    out[cap - 1] = '\0';
+}
+
 static int reply(SOCKET s, const char *fmt, ...)
 {
     char    buf[MAX_LINE];
@@ -162,6 +264,29 @@ static void handle_line(SOCKET s, char *line)
             at += (uint32_t)_snprintf(out + at, sizeof out - at, "%02x", p[i]);
         out[at] = '\0';
         reply(s, "ok %p %s", (void *)p, out);
+        return;
+    }
+    /* `widgets` -- walk the current dialog's widget tree and describe every
+     * node. This exists because the menu layer's defects are TOO SMALL for a
+     * whole-frame comparison: STATUS.md's table has a wrong toggle sprite at
+     * 212 pixels, a missing WM_CHAR handler at 72, and an unrepainted list row
+     * at 0, all under any budget that survives a blinking caret. The state
+     * those defects live in is right here in the tree, exactly, and comparing
+     * it is not a matter of budgets at all.
+     *
+     * Pointers are printed as an index in first-seen order rather than as
+     * addresses, for the reason tools/actdiff.py renumbers them: a heap
+     * address moves between runs and a raw one would differ every time. The
+     * sequence restarts on every call.
+     *
+     * The root is 0x0065A058, which is where the dialog opener at 0x00451210
+     * stores whatever dialog is up; there is no tree at all when no dialog is
+     * open, and the reply says so rather than inventing one. */
+    if (!strcmp(argv[0], "widgets")) {
+        char out[MAX_LINE];
+
+        widget_describe(out, sizeof out);
+        reply(s, "ok %s", out);
         return;
     }
     if (!strcmp(argv[0], "counts")) {

@@ -167,6 +167,24 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`drive.sh ctl widgets` is an EXACT oracle for the menu layer, and it is in
+  `ab.sh controls`.** The CONTROLS dialog is 25 nodes and they come back byte
+  for byte identical from the original and from the reconstruction, so the
+  comparison is a `diff` and not a budget. Setting the base constructor's
+  `0x0050` to 0 -- which every pixel frame reads as 0 -- changes all 25 lines.
+
+  That converts most of the "not caught" column of the table above into
+  something catchable. The remaining pixel-only defects are the ones that live
+  outside the tree: `g_charHandler` (a global, 72 pixels) and the list row
+  strip (a transient, 0 pixels).
+
+- **Field `0x0040` had to come OUT of the dump.** It is the one the constructor
+  never writes, so for any widget whose update has not run it is allocator
+  junk -- 25, 1 and 27,346,604 across runs that were otherwise identical. Two
+  hand-compared runs happened to agree, which is how it got into the first
+  version and why `ab.sh` failed on its first real run. An uninitialised field
+  cannot be part of an exact oracle.
+
 - **The defect-signal table, kept current, because it is the honest measure of
   what a clean run here is worth:**
 

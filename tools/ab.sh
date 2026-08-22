@@ -255,6 +255,15 @@ play() {
         "$REPO/tools/point.py" 306 212 --click >/dev/null 2>&1
         sleep 6
         drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        # The widget tree, while the dialog is up. This is the sharp check for
+        # this layer and the pixels are the blunt one: STATUS.md's table has
+        # three reconstructions whose defects are 212, 72 and 0 pixels, all
+        # under any budget that survives a blinking caret, and every one of
+        # them lives in state that is printed here exactly. Setting the base
+        # constructor's 0x0050 to 0 -- invisible to all three frames -- changes
+        # all 25 lines of this.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
         # CANCEL, which is the only thing here that DESTROYS widgets: the
         # dialog and all twenty-odd of its children come down through slot 0.
         # Without this the destructors are reconstructed and never run.
@@ -349,6 +358,22 @@ compare() {
     vr=$(cat "$WORK/$cfg-recon.volatile" 2>/dev/null || echo 0)
     if [ "$vo" -gt 0 ] || [ "$vr" -gt 0 ]; then
         echo "  frames  $vo/$vr per-frame markers dropped as volatile"
+    fi
+
+    # The widget tree, where a configuration captured one. Compared as an exact
+    # diff rather than against a budget, because it is exact: the same 25 lines
+    # come back from the original and from the reconstruction.
+    if [ -s "$WORK/$cfg-orig.widgets" ] && [ -s "$WORK/$cfg-recon.widgets" ]; then
+        if diff -q "$WORK/$cfg-orig.widgets" "$WORK/$cfg-recon.widgets" \
+             >/dev/null 2>&1; then
+            echo "  widgets identical ($(wc -l < "$WORK/$cfg-orig.widgets" \
+                 | tr -d ' ') nodes)"
+        else
+            echo "  widgets DIFFER:"
+            diff "$WORK/$cfg-orig.widgets" "$WORK/$cfg-recon.widgets" \
+                | head -20 | sed 's/^/          /'
+            rc=1
+        fi
     fi
 
     local eo er

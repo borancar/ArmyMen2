@@ -1279,7 +1279,31 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   wrong scancode constant — which an A/B never can, because both sides are
   driven with the same key and would agree about ignoring it.
 
-  **`tools/ab.sh controls` is the menu A/B.** That dialog is
+**`drive.sh ctl widgets` dumps the widget tree, and it is an EXACT oracle
+where the pixels are a blunt one.** The menu layer's defects are too small for
+a whole-frame comparison — measured, not guessed: a wrong toggle sprite is 212
+pixels, a WM_CHAR handler that is never installed is 72, an unrepainted list
+row is 0, and two flags the base constructor writes are 0. Every budget that
+survives a blinking caret is above all of those.
+
+The state those defects live in is in the tree. `widgets` walks it from
+`0x0065A058` — where the dialog opener at `0x00451210` stores whatever dialog
+is up — and prints each node's rectangle, vtable, sprite, focused child and
+flags, with pointers renumbered in first-seen order the way `tools/actdiff.py`
+renumbers them. The CONTROLS dialog is 25 nodes and they come back **byte for
+byte identical** from the original and from the reconstruction, so `ab.sh`
+compares them with `diff` and no budget at all. Setting the base constructor's
+`0x0050` to 0 — invisible to all three pixel frames — changes all 25 lines.
+
+**Field `0x0040` is deliberately NOT in the dump.** It is the one the
+constructor never writes, because `ButtonUpdate` computes it before anything
+reads it, so for every widget whose update has not run it holds whatever the
+allocator left: it came back as 25, 1 and 27,346,604 on runs that were
+otherwise identical. Two runs compared by hand happened to agree, which is how
+it got into the first version. **An uninitialised field cannot be part of an
+exact oracle**, however meaningful it is when it is set.
+
+    **`tools/ab.sh controls` is the menu A/B.** That dialog is
   78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
   VEHICLE" — and the dialog itself comes out **0 of 786,432**. Its budget is
   200, for the cursor and nothing else; see below.
