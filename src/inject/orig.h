@@ -106,6 +106,11 @@
 /* 0x00455C80, thiscall, slot 1: picks a sprite out of a small array by an
  * index, centres it in the widget, and draws it clipped. */
 #define ADDR_MULTI_SPRITE_PAINT 0x00455C80u /* void(AM2_Widget *, RECT) */
+/* 0x004541E0 and 0x004541C0: the three-state button's destructor and the
+ * deleting wrapper over it. The destructor carries an MSVC SEH prologue which
+ * is deliberately not reproduced -- see CLAUDE.md. */
+#define ADDR_BUTTON_DESTRUCT    0x004541E0u /* void(AM2_Widget *) */
+#define ADDR_BUTTON_DELETE      0x004541C0u /* AM2_Widget *(AM2_Widget *, int32_t) */
 /* 0x00456D40 and 0x00456DC0: the two-state indicator is a BLINKER. The first
  * is its slot 2 -- flip on a timer, count the flashes down, stop. The second
  * starts one, taking the period and the number of flashes. */

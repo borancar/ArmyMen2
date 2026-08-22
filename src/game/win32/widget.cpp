@@ -384,6 +384,36 @@ void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce)
     WidgetTakeFocus(w, announce);
 }
 
+void __attribute__((thiscall)) ButtonDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON);
+
+    if (*(const uint8_t *)(self + BUTTON_OFF_OWNS_SPRITES)) {
+        AM2_Sprite *s;
+
+        s = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
+        if (s)
+            ReleaseSprite(s);
+        s = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS);
+        if (s)
+            ReleaseSprite(s);
+        s = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED);
+        if (s)
+            ReleaseSprite(s);
+    }
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w, int32_t flags)
+{
+    ButtonDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
@@ -1019,6 +1049,10 @@ int widget_install(void)
                         "TogglePaint", 1);
     rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,
                         "ListTakeFocus", 1);
+    rc |= patch_replace(ADDR_BUTTON_DESTRUCT, (const void *)ButtonDestruct,
+                        "ButtonDestruct", 1);
+    rc |= patch_replace(ADDR_BUTTON_DELETE, (const void *)ButtonDelete,
+                        "ButtonDelete", 1);
     rc |= patch_replace(ADDR_BUTTON_UPDATE, (const void *)ButtonUpdate,
                         "ButtonUpdate", 4);
     rc |= patch_replace(ADDR_BUTTON_PAINT, (const void *)ButtonPaint,

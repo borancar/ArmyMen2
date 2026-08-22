@@ -1037,6 +1037,24 @@ commit claiming the intro no longer plays the movie, when `MovieDrawFrame` runs
 200 frames at a time. A rule that is written down and forgotten should be
 turned into a tool.
 
+**The MSVC SEH frame on a destructor is NOT reproduced, and that is a
+decision.** Several widget destructors open with the VC6 exception prologue —
+`push -1; push <handler table>; push fs:[0]; mov fs:[0], esp` — and write an
+unwind state index into their frame as they go. None of that is reproduced;
+the reconstruction is the destructor's body and nothing else.
+
+What makes it safe is that nothing in this program throws. VC6's `operator new`
+answers NULL rather than throwing, and the game tests it — `0x00451251` is
+`test eax,eax; je` on the result — so the one plausible source of an exception
+is not one here. With no throw, the registered frame is never consulted, the
+state index is never read, and the whole prologue is overhead.
+
+State the failure mode rather than only the reasoning. If something DID unwind
+through one of these, our frame is not on the `fs:[0]` chain, so the unwinder
+would skip it and the base destructor would not run: a leak, not a crash, and
+not a wrong answer. That is the cost, and it is accepted knowingly rather than
+by not noticing the prologue was there.
+
 **A mutation that DROPS a term proves nothing when the term is zero.**
 `MultiSpritePaint` runs 9,081 times on the multiplayer path, and removing the
 vertical bias it applies changed no pixels — which reads as "the bias is zero

@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 450 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 450 | 443 of them below the CRT line |
+| `patch_replace` sites | 452 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 452 | 445 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,864 / 372,816 B (**27.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 101,104 / 372,816 B (**27.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,23 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The MSVC SEH prologue on a destructor is not reproduced, deliberately.**
+  Nothing in this program throws -- VC6's `operator new` answers NULL and the
+  game tests it at `0x00451251` -- so the registered frame is never consulted.
+  The cost if that were ever wrong is a skipped base destructor during an
+  unwind: a leak, not a crash. CLAUDE.md carries the reasoning and the failure
+  mode. That unblocks six destructors across the two drivable dialogs.
+
+- **A leaked sprite has no signature in any test here.** `ButtonDestruct`
+  releases its three sprites when `0x0075` says it owns them, and suppressing
+  that entirely leaves `controls`, `multi` AND `quit` clean -- the last was
+  worth trying, because its log carries an "Unreleased memory (N) blocks" line,
+  but sprites do not reach that counter. So the release is verified by reading.
+
+  `ButtonDelete` reads 13 on a run that opens and cancels the CONTROLS dialog,
+  so the path itself is thoroughly exercised; it is only the RELEASE that
+  nothing can see.
 
 - **The two-state indicator is a BLINKER, and it is the toggle's other half.**
   `0x00456D40` flips `0x006C` on a timer, counts flashes down and stops -- and

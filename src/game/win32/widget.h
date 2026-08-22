@@ -69,6 +69,8 @@ typedef struct AM2_Widget {
 #define VTABLE_LABEL        0x0046FCACu
 /* The edit box, twenty-fifth of the thirty-three. */
 #define VTABLE_EDIT         0x0046FC98u
+/* The three-state button, and what its destructor restores. */
+#define VTABLE_BUTTON       0x0046FC34u
 
 /* The label's own fields, offsets from the widget base. The paper colour is
  * NOT at the same offset in the edit box, which clears with the byte at 0x0066
@@ -560,6 +562,11 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
 #define BUTTON_OFF_SPRITE_NORMAL  0x68   /* AM2_Sprite *, not focused */
 #define BUTTON_OFF_SPRITE_FOCUS   0x6C   /* AM2_Sprite *, focused, not pressed */
 #define BUTTON_OFF_SPRITE_PRESSED 0x70   /* AM2_Sprite *, being pressed */
+/* Whether this button OWNS its three sprites and must release them. A button
+ * handed shared sprites leaves them alone. Evidenced by the destructor, which
+ * is also the independent confirmation that 0x0068, 0x006C and 0x0070 are the
+ * three sprites and nothing else -- it releases exactly those. */
+#define BUTTON_OFF_OWNS_SPRITES   0x75   /* uint8_t */
 
 /* Original: 0x00454270, thiscall, slot 1 in two vtables. Choose which of the
  * three sprites this button shows, store it in the widget's own sprite field,
@@ -574,6 +581,17 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
  *
  * A button with no parent picks nothing and keeps whatever sprite it had. */
 void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip);
+
+/* Original: 0x004541E0 and 0x004541C0, thiscall -- the three-state button's
+ * destructor and the MSVC deleting wrapper over it. Restore the vtable,
+ * release the three sprites if 0x0075 says this button owns them, and chain to
+ * the base destructor.
+ *
+ * The original's SEH prologue is not reproduced; see CLAUDE.md for why that is
+ * safe here and what it would cost if it were not. */
+void __attribute__((thiscall)) ButtonDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w,
+                                                   int32_t flags);
 
 /* The edit box's own fields. Note the two ink bytes are the OPPOSITE way round
  * from the focus label's: here 0x0064 is the focused colour and 0x0065 the
