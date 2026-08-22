@@ -106,6 +106,14 @@
 /* 0x00455C80, thiscall, slot 1: picks a sprite out of a small array by an
  * index, centres it in the widget, and draws it clipped. */
 #define ADDR_MULTI_SPRITE_PAINT 0x00455C80u /* void(AM2_Widget *, RECT) */
+/* 0x00454A30 / 0x00454A10: the one-sprite icon's destructor and its deleting
+ * wrapper -- vtable 0x0046FC70. The sprite is at 0x0058, which is the TEXT
+ * pointer in a label; the tails disagree as usual. */
+#define ADDR_ICON_DESTRUCT      0x00454A30u /* void(AM2_Widget *) */
+#define ADDR_ICON_DELETE        0x00454A10u /* AM2_Widget *(AM2_Widget *, int32_t) */
+/* 0x00456CA0 / 0x00456C80: the blinker's, which chains to the icon's. */
+#define ADDR_BLINKER_DESTRUCT   0x00456CA0u /* void(AM2_Widget *) */
+#define ADDR_BLINKER_DELETE     0x00456C80u /* AM2_Widget *(AM2_Widget *, int32_t) */
 /* 0x004541E0 and 0x004541C0: the three-state button's destructor and the
  * deleting wrapper over it. The destructor carries an MSVC SEH prologue which
  * is deliberately not reproduced -- see CLAUDE.md. */

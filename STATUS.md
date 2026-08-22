@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 452 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 452 | 445 of them below the CRT line |
+| `patch_replace` sites | 456 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 456 | 449 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 101,104 / 372,816 B (**27.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 101,600 / 372,816 B (**27.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,20 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The blinker derives from a one-sprite ICON**, established by its
+  destructor chaining to that class's rather than to the base. So the
+  multiplayer dialog's "send" dot is an icon that can flash: one sprite from
+  the parent at `0x0058`, two more of its own at `0x0060` and `0x0064`, and the
+  blink swaps between the latter pair.
+
+  Both destructors release their sprites with NO null test. Worth knowing
+  before adding a guard the original does not have -- `ReleaseSprite` is
+  trusted to cope, and it does.
+
+- **What is left on the two drivable dialogs is now two functions.**
+  `0x004510D0` on CONTROLS (2,063 B) and `0x0042FF40` on the multiplayer one.
+  Everything else either screen instantiates is reconstructed.
 
 - **The MSVC SEH prologue on a destructor is not reproduced, deliberately.**
   Nothing in this program throws -- VC6's `operator new` answers NULL and the

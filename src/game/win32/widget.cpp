@@ -384,6 +384,45 @@ void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce)
     WidgetTakeFocus(w, announce);
 }
 
+void __attribute__((thiscall)) IconDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_ICON);
+    /* No null test, as in the original. */
+    ReleaseSprite(*(AM2_Sprite **)(self + ICON_OFF_SPRITE));
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) IconDelete(AM2_Widget *w, int32_t flags)
+{
+    IconDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) BlinkerDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_BLINKER);
+    /* Settle the live sprite on the OFF one before letting the ON one go.
+     * Nothing reads it after this; kept because the original does it. */
+    w->sprite = *(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_OFF);
+    ReleaseSprite(*(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_ON));
+    IconDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) BlinkerDelete(AM2_Widget *w,
+                                                    int32_t flags)
+{
+    BlinkerDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 void __attribute__((thiscall)) ButtonDestruct(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
@@ -1049,6 +1088,14 @@ int widget_install(void)
                         "TogglePaint", 1);
     rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,
                         "ListTakeFocus", 1);
+    rc |= patch_replace(ADDR_ICON_DESTRUCT, (const void *)IconDestruct,
+                        "IconDestruct", 1);
+    rc |= patch_replace(ADDR_ICON_DELETE, (const void *)IconDelete,
+                        "IconDelete", 1);
+    rc |= patch_replace(ADDR_BLINKER_DESTRUCT, (const void *)BlinkerDestruct,
+                        "BlinkerDestruct", 1);
+    rc |= patch_replace(ADDR_BLINKER_DELETE, (const void *)BlinkerDelete,
+                        "BlinkerDelete", 1);
     rc |= patch_replace(ADDR_BUTTON_DESTRUCT, (const void *)ButtonDestruct,
                         "ButtonDestruct", 1);
     rc |= patch_replace(ADDR_BUTTON_DELETE, (const void *)ButtonDelete,

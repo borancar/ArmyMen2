@@ -71,6 +71,10 @@ typedef struct AM2_Widget {
 #define VTABLE_EDIT         0x0046FC98u
 /* The three-state button, and what its destructor restores. */
 #define VTABLE_BUTTON       0x0046FC34u
+/* The one-sprite icon, and the blinker that derives from it. */
+#define VTABLE_ICON         0x0046FC70u
+#define VTABLE_BLINKER      0x0046FD38u
+#define ICON_OFF_SPRITE     0x58
 
 /* The label's own fields, offsets from the widget base. The paper colour is
  * NOT at the same offset in the edit box, which clears with the byte at 0x0066
@@ -581,6 +585,25 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
  *
  * A button with no parent picks nothing and keeps whatever sprite it had. */
 void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip);
+
+/* Original: 0x00454A30 / 0x00454A10, thiscall -- the one-sprite icon's
+ * destructor and its deleting wrapper. Restore the vtable, release the sprite
+ * at 0x0058, chain to the base. The release is UNCONDITIONAL: no null test,
+ * so ReleaseSprite is trusted to cope, which is worth knowing before writing a
+ * guard the original does not have.
+ *
+ * Original: 0x00456CA0 / 0x00456C80 -- the blinker's pair, which chains to the
+ * icon's rather than straight to the base, so the blinker derives from the
+ * icon. It sets the widget's live sprite to the OFF one before releasing the
+ * ON one; nothing here reads it afterwards, and it is reproduced because it is
+ * what the original does. Its release is unconditional too.
+ *
+ * Neither SEH prologue is reproduced; see CLAUDE.md. */
+void __attribute__((thiscall)) IconDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) IconDelete(AM2_Widget *w, int32_t flags);
+void __attribute__((thiscall)) BlinkerDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) BlinkerDelete(AM2_Widget *w,
+                                                    int32_t flags);
 
 /* Original: 0x004541E0 and 0x004541C0, thiscall -- the three-state button's
  * destructor and the MSVC deleting wrapper over it. Restore the vtable,
