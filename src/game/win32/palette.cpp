@@ -240,7 +240,6 @@ static_assert(DDPCAPS_ALLOW256 == 0x40, "DDPCAPS_ALLOW256");
 #define DARK_SCALE        0.7
 
 #define g_ddraw        (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
-#define g_primarySurf  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_windowedMode (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
 typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
 #define g_remapIdent   (*(uint8_t **)(uintptr_t)ADDR_REMAP_IDENTITY)
@@ -298,7 +297,7 @@ void __cdecl SetGamePalette(uint8_t *pal)
         IDirectDraw_CreatePalette(g_ddraw, DDPCAPS_8BIT | DDPCAPS_ALLOW256,
                                   (LPPALETTEENTRY)pal, held, NULL);
 
-    IDirectDrawSurface_SetPalette(g_primarySurf, *held);
+    IDirectDrawSurface_SetPalette(g_primarySurface, *held);
 
     memcpy((void *)(uintptr_t)ADDR_PALETTE_COPY, pal, 0x201 * 4);
 

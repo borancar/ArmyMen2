@@ -41,7 +41,7 @@
 /* Writable views of the globals LockSurface publishes. blit.c takes the same
  * two read-only, which is why it declares its own const versions. */
 #define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_lockedSurface  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_drawTarget  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 #define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_frameBuf       (*(void **)(uintptr_t)ADDR_FRAMEBUFFER)
 #define g_pitch          (*(int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
@@ -58,7 +58,7 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
     /* Locks do not nest. Re-locking the surface already held is a no-op that
      * succeeds; asking for a different one while holding this is refused. */
     if (g_surfaceLocked) {
-        if (surf == g_lockedSurface)
+        if (surf == g_drawTarget)
             return 1;
         orig_log("another surface already locked!\n");
         return 0;
@@ -81,7 +81,7 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
          * mode change), which is presumably why it was never noticed. */
     }
 
-    g_lockedSurface = surf;
+    g_drawTarget = surf;
     g_surfaceLocked = 1;
     g_frameBuf      = desc.lpSurface;
     g_pitch         = desc.lPitch;
@@ -91,7 +91,7 @@ int32_t __cdecl LockSurface(LPDIRECTDRAWSURFACE surf)
 int32_t __cdecl UnlockSurface(void)
 {
     if (g_surfaceLocked) {
-        LPDIRECTDRAWSURFACE surf = g_lockedSurface;
+        LPDIRECTDRAWSURFACE surf = g_drawTarget;
 
         /* Unlock takes back the same pointer Lock handed out. */
         IDirectDrawSurface_Unlock(surf, g_frameBuf);
@@ -544,7 +544,7 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
     if (!IntersectRect(&dest, r, g_screenClip))
         return;
 
-    if (g_lockedSurface == g_primarySurface) {
+    if (g_drawTarget == g_primarySurface) {
         /* Game coordinates are relative to the client area; the primary is the
          * whole desktop. Shift, or the fill lands somewhere else entirely. */
         dest.left   += g_screenRect.left;
@@ -555,7 +555,7 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
 
     fx.dwSize      = sizeof fx;
     fx.dwFillColor = colour;
-    IDirectDrawSurface_Blt(g_lockedSurface, &dest, NULL, NULL,
+    IDirectDrawSurface_Blt(g_drawTarget, &dest, NULL, NULL,
                            DDBLT_COLORFILL | DDBLT_WAIT, &fx);
 }
 
@@ -1005,8 +1005,6 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 #define g_cursorPrev    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV)
 #define g_menuSurface2  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
 #define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_target        (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
-#define g_primary2      (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_clipRect      ((const RECT *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define g_curX          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
 #define g_curY          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
@@ -1088,7 +1086,7 @@ void __cdecl DrawMenuCursor(void)
     TickMenuAnimation(row);
 
     if (g_paintObj && !g_presenting) {
-        LPDIRECTDRAWSURFACE target = g_target;
+        LPDIRECTDRAWSURFACE target = g_drawTarget;
         AM2_Rect            cur, clipped, shifted;
         uint8_t            *spr;
 
@@ -1096,7 +1094,7 @@ void __cdecl DrawMenuCursor(void)
 
         /* Put back whatever the cursor covered last tick. */
         if (g_savedValid)
-            IDirectDrawSurface_Blt(g_target, (LPRECT)g_savedRect,
+            IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)g_savedRect,
                                    g_menuSurface2, g_saveSlot,
                                    DDBLT_WAIT, NULL);
 
@@ -1127,7 +1125,7 @@ void __cdecl DrawMenuCursor(void)
         if (IntersectRect((LPRECT)&cur, (const RECT *)g_cursorRect,
                           g_clipRect)) {
             shifted = cur;
-            if (g_target == g_primary2) {
+            if (g_drawTarget == g_primarySurface) {
                 /* The primary is the whole desktop when windowed, so only the
                  * DESTINATION moves; the back buffer it reads from does not. */
                 shifted.left   += g_screenRect.left;
@@ -1135,14 +1133,14 @@ void __cdecl DrawMenuCursor(void)
                 shifted.top    += g_screenRect.top;
                 shifted.bottom += g_screenRect.top;
             }
-            IDirectDrawSurface_Blt(g_target, (LPRECT)&shifted, g_backBuffer,
+            IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)&shifted, g_backBuffer,
                                    (LPRECT)&cur, DDBLT_WAIT, NULL);
         }
     } else {
         g_savedValid = 0;
 
         if (row >= MENU_ROW_DIRECT) {
-            if (!LockSurface(g_target))
+            if (!LockSurface(g_drawTarget))
                 return;
             if (g_cursorSprite) {
                 uint8_t *spr = g_cursorSprite;

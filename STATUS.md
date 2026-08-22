@@ -168,28 +168,33 @@ counts probe before reading one as coverage -- that is what turned the
   `checkglobals` alias backlog went 38 to 34 and `checkpatches`'s `ADDR_`
   count stayed at 31, which is what renaming rather than aliasing looks like.
 
-- **`tools/checkglobals.py` is in, and the backlog is 38 + 17.** Nothing had
+- **The `checkglobals` backlog is 28 + 15, down from 38 + 17.** Three of the
+  four worst entries are done: the back buffer (five names), the draw target
+  (four) and the primary surface (four) are one name each. What is left is
+  smaller and mostly const-vs-non-const. `ADDR_HWND` through three is the next
+  one with an actual claim in it -- one of the three is `g_enumContext` in
+  `dplay.cpp`, which says something quite different from "the window".
+
+- **`tools/checkglobals.py` is in, and the backlog started at 38 + 17.** Nothing had
   ever checked the `g_` macros. The first run found 38 surplus names for
   addresses that already had one and 17 names carrying more than one spelling.
   It is a ratchet at those figures -- lower them, never raise them.
 
   Worth working off in order of how much a name is claiming:
 
-  1. `ADDR_FONT_SURFACE` through **five** names -- `g_back`, `g_backBuffer`,
-     `g_backBuffer2`, `g_backBufferSurf`, `g_fontSurface`. "The font surface"
-     and "the back buffer" are different claims about what it is FOR, and one
-     of them is wrong. Read the uses, then rename.
-  2. `ADDR_LOCKED_SURFACE` through four -- `g_drawTarget`, `g_lockTarget`,
-     `g_lockedSurface`, `g_target`. `orig.h` calls it "currently locked" while
-     `SetDrawTarget` writes it long before any lock, so the comment is the
-     doubtful part here, not only the names.
-  3. `ADDR_PRIMARY_SURFACE` through four, `ADDR_HWND` through three -- one of
-     which is `g_enumContext` in `dplay.cpp`, a name that says something quite
-     different from "the window".
-  4. The drifts are mostly const-vs-non-const and are cosmetic, with two
-     exceptions worth looking at: `g_lockedSurface` is `LPDIRECTDRAWSURFACE`
-     in `surface.cpp` and `int32_t` in `text.cpp`, and `g_screenClip` is the
-     ADDRESS in one module and the OBJECT in another.
+  1. ~~`ADDR_FONT_SURFACE` through five~~ -- done, and the name was wrong too.
+  2. ~~`ADDR_LOCKED_SURFACE` through four~~ -- done. Both `SetDrawTarget` and
+     `LockSurface` write it, so "currently locked" was half a name; it is
+     `ADDR_DRAW_TARGET`.
+  3. `ADDR_HWND` through three, one of which is `g_enumContext` in
+     `dplay.cpp` -- a name that says something quite different from "the
+     window". ~~`ADDR_PRIMARY_SURFACE` through four~~ is done.
+  4. The remaining drifts are mostly const-vs-non-const and cosmetic. One is
+     not: `g_screenClip` is the ADDRESS in one module and the OBJECT in
+     another. A single spelling across the split is impossible for a COM
+     pointer -- a flat module may not name `LPDIRECTDRAWSURFACE` -- so a
+     couple of these drifts are structural rather than sloppy, and the ratchet
+     should not be expected to reach zero.
 
 - **Two of the base widget's constructed flags are not observed at all.**
   `WidgetConstruct` writes 1 into `0x003C` and 1 into `0x0050`; setting EITHER

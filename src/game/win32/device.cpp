@@ -57,10 +57,10 @@ static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperatio
 
 #define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 #define g_ddraw2      (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
-#define g_primary     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_primarySurface     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_backBuffer  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 #define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
-#define g_lockTarget  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_drawTarget  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 #define g_surfaceLocked (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
 #define g_pixelFormatByte (*(const uint8_t *)(uintptr_t)ADDR_PIXEL_FORMAT_BYTE)
 
@@ -179,7 +179,7 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
             DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX;
         ddsd.dwBackBufferCount = 1;
     }
-    hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &g_primary, NULL);
+    hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &g_primarySurface, NULL);
     if (hr)
         return hr;
 
@@ -188,7 +188,7 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
                                              DDSCAPS_OFFSCREENPLAIN, -1);
     } else {
         caps.dwCaps = DDSCAPS_BACKBUFFER;
-        hr = IDirectDrawSurface_GetAttachedSurface(g_primary, &caps,
+        hr = IDirectDrawSurface_GetAttachedSurface(g_primarySurface, &caps,
                                                    &g_backBuffer);
         if (hr)
             return hr;
@@ -196,11 +196,11 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
 
     g_offscreen  = CreateOffscreenSurface(g_screenW, g_screenH,
                                          DDSCAPS_OFFSCREENPLAIN, -1);
-    ClearSurface(g_primary, g_pixelFormatByte);
+    ClearSurface(g_primarySurface, g_pixelFormatByte);
     ClearSurface(g_backBuffer, g_pixelFormatByte);
 
     /* Drawing starts aimed at the back buffer, with no lock held. */
-    g_lockTarget    = g_backBuffer;
+    g_drawTarget    = g_backBuffer;
     g_surfaceLocked = 0;
     return 0;
 }

@@ -258,7 +258,14 @@
 #define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
 #define ADDR_UNLOCK_SURFACE 0x0041BA40u  /* int32_t(void) */
 #define ADDR_SURFACE_LOCKED 0x004FDF80u  /* int32_t; non-zero while a lock is held */
-#define ADDR_LOCKED_SURFACE 0x00507128u  /* IDirectDrawSurface *, currently locked */
+/* The surface drawing is aimed at. TWO functions write it, which is why the
+ * old name -- ADDR_LOCKED_SURFACE, "currently locked" -- was only half right:
+ * SetDrawTarget designates it, long before and quite independently of any
+ * lock, and LockSurface also stores whatever it has just locked. UnlockSurface
+ * reads it to know what to release, and LockSurface reads it to answer "is the
+ * surface already held the one you are asking for", which is the check behind
+ * "another surface already locked!". */
+#define ADDR_DRAW_TARGET    0x00507128u  /* IDirectDrawSurface *, the draw target */
 #define ADDR_PRIMARY_SURFACE 0x00502AD4u /* IDirectDrawSurface *, Restore target */
 #define ADDR_SCREEN_PITCH   0x00502AD0u  /* int32_t, DDSURFACEDESC.lPitch */
 #define ADDR_FRAMEBUFFER    0x004FE1A8u  /* uint8_t *, DDSURFACEDESC.lpSurface */

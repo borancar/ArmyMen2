@@ -19,7 +19,7 @@ static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
 
 /* The surface subsequent drawing targets -- the same global mapdraw.cpp calls
  * g_drawTarget, under the same name, because it is the same global. */
-#define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 
 /* 0x00446AB0, cdecl, 11 direct callers: the clipped sibling of DrawText at
  * 0x00446930. Measures the string with `repne scasb`, then walks it a

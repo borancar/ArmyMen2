@@ -28,7 +28,7 @@
 
 #define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_lockedSurface  (*(void *const *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_drawTarget  (*(void *const *)(uintptr_t)ADDR_DRAW_TARGET)
 #define g_primarySurface (*(void *const *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_frameBuf       (*(void *const *)(uintptr_t)ADDR_FRAMEBUFFER)
 #define g_originDX       (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
@@ -71,7 +71,7 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
 
     /* Drawing into the primary surface is offset; into anything else it is not.
      * Same test DrawText makes. */
-    if (g_lockedSurface == g_primarySurface) {
+    if (g_drawTarget == g_primarySurface) {
         x += g_originDX;
         y += g_originDY;
     }
@@ -138,11 +138,11 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
         HRESULT             hr;
 
         if (g_surfaceLocked) {
-            IDirectDrawSurface_Unlock((LPDIRECTDRAWSURFACE)g_lockedSurface,
+            IDirectDrawSurface_Unlock((LPDIRECTDRAWSURFACE)g_drawTarget,
                                       g_frameBuf);
             g_surfaceLocked = 0;
         }
-        dest = (LPDIRECTDRAWSURFACE)g_lockedSurface;
+        dest = (LPDIRECTDRAWSURFACE)g_drawTarget;
 
         trans = (spr->flags & 1) ? DDBLTFAST_WAIT
                                  : (DDBLTFAST_WAIT | DDBLTFAST_SRCCOLORKEY);

@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
 
-#define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
+#define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 /* The OFFSCREEN surface, not the back buffer. This file used to call it
  * g_backBuffer, which made one identifier mean two different surfaces in two
  * files. The address was always right; the name was the trap, and both ADDR_
