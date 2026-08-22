@@ -277,6 +277,26 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid);
  * the send flags are kept anyway. */
 void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid);
 
+/* Original: 0x00410720. One arriving packet: log it if the sequence number is
+ * below five, verify the checksum, then walk the messages inside it.
+ *
+ * The checksum failing does NOT stop the walk. It logs, bumps that player's
+ * error count, and carries on into a packet it has just been told is corrupt.
+ * The original's, and it is the sort of thing only a live session could show.
+ *
+ * The walk decrements the packet's own length field as it goes, so the packet
+ * is consumed in place. But the bogus-length test compares each part against
+ * the length SAVED on entry, not against what is left -- so a part longer than
+ * the whole packet is caught while a part longer than the remainder is not,
+ * and that drives the length field negative. The loop bound is UNSIGNED, so a
+ * negative length is enormous and the walk carries on off the end of the
+ * packet instead of stopping. Reproduced: a signed compare would quietly
+ * repair it, and repairing the original is not what this port is for.
+ *
+ * And it re-reads the part's length AFTER handing the message on, so a handler
+ * that rewrote those two bytes would move the cursor somewhere else. */
+void __cdecl ReceivePacket(void *packet, int32_t dpid);
+
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.
  *

@@ -527,7 +527,6 @@ typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
 
 #define orig_find_player_by_id \
     ((AM2_FindPlayerFn)(uintptr_t)ADDR_FIND_PLAYER_BY_ID)
-#define orig_recv_packet   ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PACKET)
 #define orig_recv_player_msg \
     ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PLAYER_MSG)
 #define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
@@ -686,6 +685,64 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid)
             dpid, slot, pause, GetPauseFlags(), mask, flags);
 }
 
+typedef void (__cdecl *AM2_ArmyMsgFn)(void *msg, int32_t slot, int32_t seq);
+#define orig_recv_army_msg ((AM2_ArmyMsgFn)(uintptr_t)ADDR_RECV_ARMY_MSG)
+
+void __cdecl ReceivePacket(void *packet, int32_t dpid)
+{
+    uint8_t  *pkt   = (uint8_t *)packet;
+    uint8_t  *comm  = (uint8_t *)kCommObj;
+    int32_t   slot  = orig_comm_slot_of_id(comm, dpid);
+    /* The length as it arrived. The loop below decrements the field itself,
+     * and the bogus-length test is against THIS, not against the remainder. */
+    int32_t   total = *(const int32_t *)(pkt + PACKET_OFF_LEN);
+    uint8_t  *p     = pkt + PACKET_HEADER_SIZE;
+
+    /* Only the first five packets of a session are logged. */
+    if (*(const uint32_t *)(pkt + PACKET_OFF_SEQ) < 5
+        && *(const int32_t *)(kCommObj + AM2_COMM_LOG_ENABLED))
+        am2_log("Get Packed  %x bytes seq %d Chksum %x \n",
+                *(const int32_t *)(pkt + PACKET_OFF_LEN),
+                *(const int32_t *)(pkt + PACKET_OFF_SEQ),
+                *(const int32_t *)(pkt + PACKET_OFF_CHECKSUM));
+
+    /* A bad checksum is counted and complained about, and then the packet is
+     * walked anyway. */
+    if (XorChecksum(pkt)) {
+        am2_log("Receive Checksum Error from %x seq %d\n",
+                dpid, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
+        comm = (uint8_t *)kCommObj;
+        *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                     + COMM_ARMY_OFF_CHKSUM_ERRS) += 1;
+    }
+
+    /* UNSIGNED, as the original's `jbe` is. It matters: the bogus-length test
+     * below compares against the length on ENTRY, so a part longer than what
+     * REMAINS is accepted and drives this field negative -- and a negative
+     * length read unsigned is enormous, so the walk carries on off the end of
+     * the packet rather than stopping. Signed here would quietly fix that, and
+     * fixing it is not this port's job. */
+    while (*(const uint32_t *)(pkt + PACKET_OFF_LEN) > PACKET_HEADER_SIZE) {
+        int32_t part = *(const uint16_t *)p;
+
+        if (!part) {
+            am2_log("Received zero Length Message\n");
+            return;
+        }
+        if (part >= total) {
+            am2_log("Received Bogus Length Message, part greater than sum\n");
+            return;
+        }
+
+        orig_recv_army_msg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
+
+        /* Re-read, after the handler has had the bytes. */
+        part = *(const uint16_t *)p;
+        *(int32_t *)(pkt + PACKET_OFF_LEN) -= part;
+        p += part;
+    }
+}
+
 void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
@@ -773,7 +830,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
         return;
 
     case 11:
-        orig_recv_packet(m, dpid);
+        ReceivePacket(m, dpid);
         /* The slot writer's first argument is a PLAYER record here, not the
          * comm object msgslot.h describes -- FindPlayerById returns one. */
         MsgSlotB0(orig_find_player_by_id((uint32_t)dpid),
@@ -809,6 +866,8 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_RECV_PACKET, (const void *)ReceivePacket,
+                  "ReceivePacket", 1);
     patch_replace(ADDR_RECV_FLOW_CONTROL,
                   (const void *)ReceiveFlowControlMsg,
                   "ReceiveFlowControlMsg", 1);

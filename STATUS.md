@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `009da5e`. Working tree clean.
+Last updated: **2026-08-22**, at `134584c`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 518 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 518 | 511 of them below the CRT line |
+| `patch_replace` sites | 519 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 519 | 512 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 97,104 / 372,816 B (**26.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 122,416 / 372,816 B (32.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 97,360 / 372,816 B (**26.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 122,672 / 372,816 B (32.9%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,28 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`ReceivePacket`'s loop bound is UNSIGNED and that is not a detail.** The
+  bogus-length test compares each part against the length the packet arrived
+  with, not against what is LEFT, so a part longer than the remainder is
+  accepted and drives the length field negative -- and read unsigned, a
+  negative length is enormous, so the walk carries on off the end of the packet
+  instead of stopping. A signed compare here quietly repairs that, which is not
+  what this port is for. Written the first time with `int32_t` and corrected
+  before it was committed.
+
+- **A bad checksum does not stop the walk.** It logs, bumps that player's error
+  count, and then parses a packet it has just been told is corrupt.
+
+- **And the part length is re-read AFTER the handler has had the bytes**, so a
+  handler that rewrote those two bytes would move the cursor somewhere else.
+  Three original behaviours in one 256-byte function, none of which any A/B in
+  this project can reach.
+
+- **`0x0040FBB0` is a SECOND dispatcher**, for one message out of a packet --
+  "Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; msgsize: %d" -- and
+  it takes the slot where `CommDispatchMessage` takes the id. Two layers of
+  dispatch, and the names had to distinguish them.
 
 - **The self-naming sweep credited a string to the wrong function, and this is
   the first time that has been caught.** It listed `0x00411BD0` as carrying

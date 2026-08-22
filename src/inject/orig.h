@@ -2598,7 +2598,22 @@
  * -- so 256-byte records, of which it reads only the first. */
 #define ADDR_CHAT_COLOUR_TABLE   0x004F9AD0u
 /* The dispatcher's remaining callees, each named from its own strings. */
-#define ADDR_RECV_PACKET         0x00410720u  /* "Receive Checksum Error from %x seq %d" */
+/* 0x00410720, "Get Packed  %x bytes seq %d Chksum %x " and "Receive Checksum
+ * Error from %x seq %d". One arriving packet: check it, then walk the messages
+ * inside it. The header is twenty bytes -- the same 0x14 ArmyMessageFlush
+ * resets the outgoing packet's length to -- and each part opens with a
+ * uint16_t length. */
+#define ADDR_RECV_PACKET         0x00410720u  /* void(packet *, int32_t dpid) */
+#define PACKET_OFF_LEN           4u
+#define PACKET_OFF_SEQ           8u
+#define PACKET_OFF_CHECKSUM      0x0Cu
+#define PACKET_HEADER_SIZE       0x14u
+#define COMM_ARMY_OFF_CHKSUM_ERRS 0x260u  /* int32_t, one per player */
+/* 0x0040FBB0, "Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x;
+ * msgsize: %d" -- the handler for ONE message out of a packet, which is a
+ * different dispatcher from CommDispatchMessage and takes the slot rather than
+ * the id. Its only caller is the packet walker above. */
+#define ADDR_RECV_ARMY_MSG       0x0040FBB0u  /* void(msg *, int32_t slot, int32_t seq) */
 #define ADDR_RECV_START_GAME_MSG 0x00411100u  /* "ReceiveStartGameMsg for %d Players.  Seed is %d " */
 #define ADDR_RECV_PLAYER_MSG     0x004114E0u  /* "ReceivePlayerMsg for %d Players..." */
 /* 0x00410890, "RemoteGamePause from %x; playerIndex== %d paused = %d
