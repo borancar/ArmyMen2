@@ -1205,6 +1205,21 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   `WidgetScreenRect` runs a million and a half times. **Name a virtual from
   its callees, not from the shape of its body.**
 
+  **Drive the input and see where the game ends up.** The menu layer turned
+  out to be checkable far more sharply than by comparing frames.
+  `WidgetUpdate` is a dialog's whole keyboard interface — UP and DOWN and TAB
+  move focus, SPACE and RETURN repaint the focused child and then fire its
+  handler on RELEASE — and four of its five branches were confirmed in one run
+  by pressing the keys: DOWN walks the OPTIONS highlight AUDIO → CONTROLS →
+  DIFFICULTY, TAB does the same to the pixel, SPACE opens CONTROLS, RETURN
+  opens SELECT DIFFICULTY. ESCAPE closes a dialog through `WidgetUpdateCancel`
+  the same way.
+
+  This beats the A/B on its own ground for anything that causes a state
+  transition. It needs no second run and no budget, and it discriminates a
+  wrong scancode constant — which an A/B never can, because both sides are
+  driven with the same key and would agree about ignoring it.
+
   **`tools/ab.sh controls` is the menu A/B.** That dialog is
   78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
   VEHICLE" — and the dialog itself comes out **0 of 786,432**. Its budget is

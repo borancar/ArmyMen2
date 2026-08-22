@@ -55,6 +55,7 @@
  * over the previous one and clearing that key's entry in ADDR_KEY_PRESSED, so
  * the edge is not seen twice. The idiom `!IsKeyDown(k) && KeyChanged(k)` is
  * the key being RELEASED, which is what the menus act on. */
+#define ADDR_KEY_PRESSED_FN     0x00427430u /* int32_t(int32_t dik) */
 #define ADDR_IS_KEY_DOWN        0x00427450u /* int32_t(int32_t dik) */
 #define ADDR_KEY_CHANGED        0x00427470u /* int32_t(int32_t dik) */
 #define ADDR_CONSUME_KEY        0x004274A0u /* void(int32_t dik) */
@@ -63,6 +64,12 @@
  * which is what makes WidgetScreenRect the busiest function in the tree.
  * 0x00454AC0 is a one-instruction `jmp` thunk onto it. */
 #define ADDR_WIDGET_UPDATE      0x00453E80u /* void(AM2_Widget *) */
+/* 0x00453DB0 and 0x00453E20, thiscall taking an `announce` flag: move the
+ * focus to the next / previous eligible sibling, wrapping through the parent's
+ * child list, skipping anything whose 0x0050 is clear or whose 0x004C is set,
+ * and finishing by dispatching slot 3 on whatever they land on. */
+#define ADDR_WIDGET_FOCUS_NEXT  0x00453DB0u /* void(AM2_Widget *, int32_t) */
+#define ADDR_WIDGET_FOCUS_PREV  0x00453E20u /* void(AM2_Widget *, int32_t) */
 #define ADDR_WIDGET_UPDATE_THUNK 0x00454AC0u
 /* 0x00454BD0, thiscall, slot 2 of 17 classes: the base update with a cancel
  * key in front of it. */

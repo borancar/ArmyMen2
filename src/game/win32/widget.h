@@ -33,7 +33,8 @@ typedef struct AM2_Widget {
     RECT     rect;                  /* 0x0014  absolute; WidgetScreenRect's output */
     struct AM2_Widget *firstChild;  /* 0x0024  head of the child list */
     struct AM2_Widget *parent;      /* 0x0028  null for a top-level widget */
-    int32_t  unknown2C;             /* 0x002C */
+    struct AM2_Widget *prevSibling; /* 0x002C  the sibling walk runs both ways;
+                                     * 0x00453E20 follows this one backwards */
     struct AM2_Widget *nextSibling; /* 0x0030  next child of the same parent */
     struct AM2_Widget *focusedChild;/* 0x0034  which child has the focus.
                                      * A pointer, established by
@@ -45,9 +46,15 @@ typedef struct AM2_Widget {
     int32_t  unknown40;             /* 0x0040  NOT written by the constructor */
     int32_t  flag44;                /* 0x0044  constructed as 0 */
     int32_t  unknown48;             /* 0x0048 */
-    int32_t  unknown4C;             /* 0x004C */
-    int32_t  flag50;                /* 0x0050  constructed as 1 */
-    int32_t  unknown54;             /* 0x0054 */
+    int32_t  unknown4C;             /* 0x004C  set disqualifies from focus */
+    int32_t  flag50;                /* 0x0050  constructed as 1; CLEAR
+                                     * disqualifies from focus, so it reads as
+                                     * "can be focused" -- but that is from the
+                                     * two focus walkers only, and nothing has
+                                     * been seen to clear it yet */
+    void   (__cdecl *activate)(struct AM2_Widget *w);
+                                    /* 0x0054  fired by SPACE or RETURN on the
+                                     * focused child. Constructed null. */
 } AM2_Widget;
 
 /* The base class's vtable, stored by its constructor and restored by its
@@ -214,6 +221,29 @@ AM2_Widget *__attribute__((thiscall)) LabelConstruct(AM2_Widget *w,
                                                      int32_t font,
                                                      int32_t ink,
                                                      int32_t paper);
+
+/* Original: 0x00453E80, thiscall, 21 direct callers -- the base per-frame
+ * update and the whole keyboard interface of a dialog.
+ *
+ * Place myself, then update every child through THEIR slot 2, which is the
+ * recursion that makes WidgetScreenRect the busiest function in the tree.
+ * Then, only if this widget is the one holding keyboard focus and it has a
+ * focused child:
+ *
+ *   UP                move focus to the previous eligible sibling
+ *   DOWN, TAB         move it to the next
+ *   SPACE or RETURN   changing at all repaints the focused child, so the
+ *                     button shows itself pressed and released
+ *   SPACE, RETURN     on RELEASE, fire the focused child's activate handler
+ *
+ * The three movement keys use KeyPressed, which is the auto-repeating array,
+ * so holding UP scrolls. The two activation keys use `!IsKeyDown && KeyChanged`
+ * -- release -- and consume, so a press cannot fire twice.
+ *
+ * The focused child is re-read before each block because the movement keys can
+ * change it. It is NOT re-checked for null in the last three, and the original
+ * dereferences it there unguarded; reproduced. */
+void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w);
 
 /* Original: 0x00454BD0, thiscall, slot 2 of 17 classes. The per-frame update
  * for a widget that has a cancel handler: if ESCAPE has just been RELEASED,

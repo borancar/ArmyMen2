@@ -87,7 +87,80 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 #define orig_is_key_down  ((AM2_KeyQueryFn)(uintptr_t)ADDR_IS_KEY_DOWN)
 #define orig_key_changed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_CHANGED)
 #define orig_consume_key  ((AM2_ConsumeKeyFn)(uintptr_t)ADDR_CONSUME_KEY)
-#define orig_widget_update ((AM2_WidgetUpdateFn)(uintptr_t)ADDR_WIDGET_UPDATE)
+#define orig_key_pressed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_PRESSED_FN)
+
+/* The two focus walkers, 0x00453DB0 and 0x00453E20. Still original: each is a
+ * loop over the sibling list with a wrap through the parent and two
+ * eligibility tests, and neither is needed to read this one. */
+typedef void (__attribute__((thiscall)) *AM2_FocusMoveFn)(AM2_Widget *w,
+                                                          int32_t announce);
+#define orig_focus_next ((AM2_FocusMoveFn)(uintptr_t)ADDR_WIDGET_FOCUS_NEXT)
+#define orig_focus_prev ((AM2_FocusMoveFn)(uintptr_t)ADDR_WIDGET_FOCUS_PREV)
+
+/* DirectInput scancodes, which is what every query here is indexed by. */
+#define AM2_DIK_TAB    0x0F
+#define AM2_DIK_RETURN 0x1C
+#define AM2_DIK_SPACE  0x39
+#define AM2_DIK_UP     0xC8
+#define AM2_DIK_DOWN   0xD0
+
+void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
+{
+    AM2_Widget *child;
+    AM2_Widget *focus;
+
+    WidgetScreenRect(w);
+
+    for (child = w->firstChild; child; child = child->nextSibling)
+        ((AM2_WidgetUpdateFn *)child->vtable)[WIDGET_VSLOT_UPDATE](child);
+
+    /* Only the widget that holds keyboard focus reads the keyboard, and only
+     * when it has something focused to act on. */
+    if (!w->flag44)
+        return;
+    if (!w->focusedChild)
+        return;
+
+    /* KeyPressed rather than IsKeyDown: that array auto-repeats, so holding a
+     * movement key keeps moving. */
+    if (orig_key_pressed(AM2_DIK_UP)) {
+        if (w->focusedChild)
+            orig_focus_prev(w->focusedChild, 1);
+        orig_consume_key(AM2_DIK_UP);
+    }
+    if (orig_key_pressed(AM2_DIK_DOWN)) {
+        if (w->focusedChild)
+            orig_focus_next(w->focusedChild, 1);
+        orig_consume_key(AM2_DIK_DOWN);
+    }
+    if (orig_key_pressed(AM2_DIK_TAB)) {
+        if (w->focusedChild)
+            orig_focus_next(w->focusedChild, 1);
+        orig_consume_key(AM2_DIK_TAB);
+    }
+
+    /* Either activation key CHANGING repaints the focused child, which is how
+     * a button shows itself going down and coming back up. No consume here --
+     * the release blocks below want to see the same edge. */
+    if (orig_key_changed(AM2_DIK_SPACE) || orig_key_changed(AM2_DIK_RETURN)) {
+        focus = w->focusedChild;
+        ((AM2_WidgetPaintFn *)focus->vtable)[WIDGET_VSLOT_PAINT](focus,
+                                                                 focus->rect);
+    }
+
+    if (!orig_is_key_down(AM2_DIK_SPACE) && orig_key_changed(AM2_DIK_SPACE)) {
+        orig_consume_key(AM2_DIK_SPACE);
+        focus = w->focusedChild;
+        if (focus->activate)
+            focus->activate(focus);
+    }
+    if (!orig_is_key_down(AM2_DIK_RETURN) && orig_key_changed(AM2_DIK_RETURN)) {
+        orig_consume_key(AM2_DIK_RETURN);
+        focus = w->focusedChild;
+        if (focus->activate)
+            focus->activate(focus);
+    }
+}
 
 /* The cancel handler at 0x0060: cdecl, takes the widget. */
 typedef void (__cdecl *AM2_CancelFn)(AM2_Widget *w);
@@ -107,7 +180,7 @@ void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
         cancel(w);
         return;
     }
-    orig_widget_update(w);
+    WidgetUpdate(w);
 }
 
 /* 0x004274D0. Still original: it is two globals and a rep movsd, and the
@@ -198,7 +271,7 @@ AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
 
     w->firstChild  = (AM2_Widget *)0;
     w->parent      = (AM2_Widget *)0;
-    w->unknown2C   = 0;
+    w->prevSibling = (AM2_Widget *)0;
     w->nextSibling = (AM2_Widget *)0;
     w->focusedChild = (AM2_Widget *)0;
     w->unknown38   = 0;
@@ -209,7 +282,7 @@ AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
     w->unknown48   = 0;
     w->unknown4C   = 0;
     w->flag50      = 1;
-    w->unknown54   = 0;
+    w->activate    = 0;
     return w;
 }
 
@@ -291,6 +364,8 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_UPDATE, (const void *)WidgetUpdate,
+                        "WidgetUpdate", 21);
     rc |= patch_replace(ADDR_WIDGET_UPDATE_CANCEL,
                         (const void *)WidgetUpdateCancel,
                         "WidgetUpdateCancel", 17);

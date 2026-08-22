@@ -70,8 +70,8 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 419 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 419 | 412 of them below the CRT line |
+| `patch_replace` sites | 420 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 420 | 413 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 93,712 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
@@ -152,6 +152,27 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Four of `WidgetUpdate`'s five key branches are confirmed by DRIVING, not
+  by pixels.** With the OPTIONS menu up and 408,272 calls on the clock:
+  DOWN moves the highlight AUDIO -> CONTROLS -> DIFFICULTY (721 pixels, twice,
+  the same signature each time), TAB moves it identically (721 pixels, same
+  bounding box), SPACE opens the CONTROLS dialog (305,916 pixels), and RETURN
+  on DIFFICULTY opens SELECT DIFFICULTY. UP is the only one not driven, and it
+  is the only branch with a callee the others do not share.
+
+  This is the strongest evidence available in this project and it costs one
+  run. A reconstruction that CAUSES a transition is checked by driving the
+  input and seeing where the game ends up -- no second run, no budget, and it
+  discriminates a wrong scancode constant, which no pixel comparison against
+  an identically-driven original ever could.
+
+- **Three more fields fell out of the two focus walkers.** `0x002C` is the
+  PREVIOUS sibling, so the child list is doubly linked; `0x0050` clear and
+  `0x004C` set each disqualify a widget from taking focus; and `0x0054` is a
+  cdecl activate handler fired by SPACE or RETURN on release. `0x0050` is the
+  flag whose mutation `controls` could not see -- it is read by the focus
+  walkers, which that configuration never reaches.
 
 - **ESCAPE closes the CONTROLS dialog, through our code, and that is the best
   evidence in this layer so far.** `WidgetUpdateCancel` runs 73,393 times with
