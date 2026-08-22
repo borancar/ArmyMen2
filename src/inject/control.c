@@ -110,7 +110,11 @@ static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
         sid = (int32_t)*(const uint32_t *)spr_ptr;
 
     self = wd_index(w);
-    vt   = wd_index(*(void *const *)w);
+    /* The vtable is an IMAGE address, not a heap one -- fixed for the life of
+     * the build -- so it is printed raw. That costs nothing in reproducibility
+     * and says which of the 33 classes each node is, which is what decides
+     * where the next reconstruction is worth doing. */
+    vt   = (int)(uintptr_t)*(void *const *)w;
     spr  = wd_index(*(void *const *)(w + WD_OFF_SPRITE));
     foc  = wd_index(*(void *const *)(w + WD_OFF_FOCUSED));
 
@@ -118,7 +122,7 @@ static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
     /* One line, separated by `|`: the control protocol frames on a newline, so
      * a multi-line reply is silently truncated to its first line. */
     at += (uint32_t)_snprintf(out + at, cap - at,
-                              "%s[%d] d%d v%d r=%d,%d,%d,%d spr=%d "
+                              "%s[%d] d%d vt=%06x r=%d,%d,%d,%d spr=%d "
                               "sid=%d foc=%d dirty=%d nofoc=%d canfoc=%d c3c=%d",
                               at ? " | " : "",
                               self, depth, vt,

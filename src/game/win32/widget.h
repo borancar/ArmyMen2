@@ -391,6 +391,37 @@ void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
 
+/* One entry of the CONTROLS dialog's key table. */
+typedef struct AM2_KeyName {
+    uint32_t    dik;    /* DirectInput scancode */
+    const char *name;   /* what the dialog shows for it */
+} AM2_KeyName;
+
+/* The key-capture row -- the class the CONTROLS dialog has 21 of, and a
+ * subclass of the focus-highlighting label, so its text is the label's at
+ * 0x0058. Its own field is the bound key's INDEX into the key table. */
+#define KEYROW_OFF_KEY       0x68   /* int32_t, index into the key table */
+/* The parent holds its rows in an array at 0x0064. Twenty-one of them, which
+ * is exactly what `ctl widgets` counts on that dialog. */
+#define KEYROW_PARENT_ROWS   0x64
+#define KEYROW_ROW_COUNT     21
+
+/* Original: 0x00450C10. The index of the key that has just gone DOWN -- a
+ * changed-and-now-down edge, walked over the whole 95-entry table -- or -1.
+ * The first match wins, so a table order is a priority order. */
+int32_t __cdecl FindPressedKey(void);
+
+/* Original: 0x00450D50, thiscall, slot 2 of the key-capture row. Hover to
+ * focus like the edit box, and then, ONLY while this row holds the focus,
+ * capture whatever key is pressed: remember its index, put its name in the
+ * label's own text pointer, and repaint.
+ *
+ * Then the part that makes it a key BINDING and not just a display: it walks
+ * all twenty-one of the parent's rows and clears the same key off any OTHER
+ * row that had it, setting that row back to "None". A key can be bound in one
+ * place only, and this is where that is enforced. */
+void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w);
+
 /* An indexed sprite widget: an array of sprites at 0x0064 chosen by a state at
  * 0x006C, with two vertical tweaks.
  *

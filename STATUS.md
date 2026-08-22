@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 445 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 445 | 438 of them below the CRT line |
+| `patch_replace` sites | 448 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 448 | 441 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,368 / 372,816 B (**26.9%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 100,768 / 372,816 B (**27.0%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,28 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`ctl widgets` prints the vtable ADDRESS now, and it turned target selection
+  into a lookup.** The CONTROLS dialog uses exactly three of the thirty-three
+  classes -- `0x0046FB80` x21, `0x0046FB94` x1, `0x0046FC34` x3 -- so crossing
+  those against the patch list said, in one command, that only three functions
+  on that whole screen were still original. Two are SEH destructors; the third
+  was `0x00450D50`, and it was the key-capture row.
+
+  **Ask which classes are on the screen before choosing what to reconstruct.**
+  Ranking by size picks functions that may never run -- `MultiSpritePaint` is
+  9,081 calls that never draw. Ranking by what the drivable screens actually
+  instantiate picks functions that can be checked.
+
+- **The key rebinding is the best-verified thing in this session.** Click
+  CUSTOMIZE CONTROLS, click FORWARD, `key 0x24 tap`: the row reads **`j`**.
+  Click BACKWARD and press it again: BACKWARD reads `j` and FORWARD reads
+  **`None`**. That is the 95-entry key table, the index, the name pointer, the
+  repaint AND the twenty-one-row duplicate-clearing loop, all confirmed by
+  looking at the screen. No budget, no second run.
+
+  The 21 rows are the same 21 the widget tree counts on that dialog, which is
+  two independent routes to the same number.
 
 - **`MultiSpritePaint` runs 9,081 times and never draws.** Its sprite is null
   on every call on the multiplayer path. Shifting the drawn position five

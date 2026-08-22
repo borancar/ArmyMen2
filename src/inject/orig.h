@@ -90,6 +90,19 @@
 /* The game's own import slot for GetTickCount, called through rather than
  * imported, so a flat-ish module needs no Win32 declaration for it. */
 #define IAT_GET_TICK_COUNT      0x0046F084u
+/* The CONTROLS dialog's key table: 95 records of {uint32_t scancode, const
+ * char *name} from 0x0048AF28 to 0x0048B220. The scancodes are DirectInput's
+ * -- record 1 is 8 for '7' -- and the names are what the dialog shows. */
+#define ADDR_KEY_NAME_TABLE     0x0048AF28u
+#define ADDR_KEY_NAME_TABLE_END 0x0048B220u
+/* The string a key row shows when it is bound to nothing. There is a second
+ * copy of "None" at 0x0048A134 inside the table itself; this is the one the
+ * duplicate-clearing loop stores. */
+#define ADDR_STR_NONE           0x0048AF1Cu
+/* 0x00450C10: index of the key that has just gone down, or -1. */
+#define ADDR_FIND_PRESSED_KEY   0x00450C10u /* int32_t(void) */
+/* 0x00450D50, thiscall, slot 2 of the key-capture row. */
+#define ADDR_KEYROW_UPDATE      0x00450D50u /* void(AM2_Widget *) */
 /* 0x00455C80, thiscall, slot 1: picks a sprite out of a small array by an
  * index, centres it in the widget, and draws it clipped. */
 #define ADDR_MULTI_SPRITE_PAINT 0x00455C80u /* void(AM2_Widget *, RECT) */

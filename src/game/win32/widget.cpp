@@ -194,6 +194,76 @@ static void ButtonRepaintSelf(AM2_Widget *w)
 
 #define BUTTON_DEADLINE(w) (*(uint32_t *)((uint8_t *)(w) + BUTTON_OFF_DEADLINE))
 
+int32_t __cdecl FindPressedKey(void)
+{
+    const AM2_KeyName *e   = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    const AM2_KeyName *end = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE_END);
+    int32_t            idx = 0;
+
+    for (; e < end; e++, idx++) {
+        /* Changed AND now down: the pressing edge. Only the low byte of the
+         * record is the scancode as far as the queries are concerned -- they
+         * mask to 8 bits themselves -- and the original loads it as a byte. */
+        int32_t dik = (int32_t)(uint8_t)e->dik;
+
+        if (orig_key_changed(dik) && orig_is_key_down(dik))
+            return idx;
+    }
+    return -1;
+}
+
+void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  key;
+
+    WidgetScreenRect(w);
+
+    if (w->parent && orig_mouse_moved && !w->unknown4C) {
+        w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
+                                   (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+        if (w->unknown40)
+            ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+    }
+
+    /* Only the focused row captures. */
+    if (!w->flag44)
+        return;
+
+    key = FindPressedKey();
+    if (key < 0)
+        return;
+
+    {
+        const AM2_KeyName *table =
+            (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+
+        *(int32_t *)(self + KEYROW_OFF_KEY)      = key;
+        *(const char **)(self + LABEL_OFF_TEXT)  = table[key].name;
+    }
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+
+    /* A key can be bound in one place only: take it off every other row. */
+    {
+        AM2_Widget **rows =
+            (AM2_Widget **)((uint8_t *)w->parent + KEYROW_PARENT_ROWS);
+        const char  *none = (const char *)AM2_IMAGE(ADDR_STR_NONE);
+        int32_t      i;
+
+        for (i = 0; i < KEYROW_ROW_COUNT; i++) {
+            AM2_Widget *other = rows[i];
+
+            if (other == w)
+                continue;
+            if (*(const int32_t *)((uint8_t *)other + KEYROW_OFF_KEY) != key)
+                continue;
+            *(int32_t *)((uint8_t *)other + KEYROW_OFF_KEY)     = 0;
+            *(const char **)((uint8_t *)other + LABEL_OFF_TEXT) = none;
+        }
+    }
+}
+
 void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -886,6 +956,10 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_FIND_PRESSED_KEY, (const void *)FindPressedKey,
+                        "FindPressedKey", 1);
+    rc |= patch_replace(ADDR_KEYROW_UPDATE, (const void *)KeyRowUpdate,
+                        "KeyRowUpdate", 1);
     rc |= patch_replace(ADDR_MULTI_SPRITE_PAINT,
                         (const void *)MultiSpritePaint,
                         "MultiSpritePaint", 1);
