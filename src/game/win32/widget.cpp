@@ -193,6 +193,28 @@ static void ButtonRepaintSelf(AM2_Widget *w)
 
 #define BUTTON_DEADLINE(w) (*(uint32_t *)((uint8_t *)(w) + BUTTON_OFF_DEADLINE))
 
+void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    int32_t        sel  = *(const int32_t *)(self + LIST_OFF_SELECTED);
+
+    WidgetScreenRect(w);
+
+    if (sel >= 0 && announce) {
+        int32_t row = sel - *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+        RECT    strip;
+
+        strip.left   = w->rect.left;
+        strip.top    = w->rect.top + row * LIST_ROW_HEIGHT
+                       + LIST_ROW_TOP_MARGIN;
+        strip.right  = w->rect.right;
+        strip.bottom = strip.top + LIST_ROW_HEIGHT;
+
+        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, strip);
+    }
+    WidgetTakeFocus(w, announce);
+}
+
 void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
@@ -776,6 +798,8 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,
+                        "ListTakeFocus", 1);
     rc |= patch_replace(ADDR_BUTTON_UPDATE, (const void *)ButtonUpdate,
                         "ButtonUpdate", 4);
     rc |= patch_replace(ADDR_BUTTON_PAINT, (const void *)ButtonPaint,

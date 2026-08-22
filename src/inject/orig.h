@@ -90,6 +90,9 @@
 /* The game's own import slot for GetTickCount, called through rather than
  * imported, so a flat-ish module needs no Win32 declaration for it. */
 #define IAT_GET_TICK_COUNT      0x0046F084u
+/* 0x00455110, thiscall, slot 3 of the list box: repaint the current row, then
+ * take focus normally. */
+#define ADDR_LIST_TAKE_FOCUS    0x00455110u /* void(AM2_Widget *, int32_t) */
 /* 0x00454310, thiscall, slot 2 in four vtables: a button's mouse handling,
  * with optional auto-repeat while a button is held. */
 #define ADDR_BUTTON_UPDATE      0x00454310u /* void(AM2_Widget *) */

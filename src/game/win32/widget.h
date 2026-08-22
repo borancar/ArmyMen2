@@ -391,6 +391,27 @@ void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
 
+/* The list box. Its rows are 14 pixels tall and start 4 below the widget's
+ * top, which is read off the arithmetic in ListTakeFocus rather than assumed:
+ * `top + 14 * (0x58 - 0x74) + 4`, with the row 14 tall.
+ *
+ * What that arithmetic establishes is that 0x0058 is the row being singled out
+ * and 0x0074 is the first row on screen. Calling them the SELECTED row and the
+ * SCROLL ORIGIN is the obvious reading and is not otherwise evidenced here.
+ * 0x0058 is the text pointer in a label -- the tails differ, as ever. */
+#define LIST_OFF_SELECTED    0x58   /* int32_t, negative means none */
+#define LIST_OFF_TOP_ROW     0x74   /* int32_t, first row drawn */
+#define LIST_ROW_HEIGHT      14
+#define LIST_ROW_TOP_MARGIN  4
+
+/* Original: 0x00455110, thiscall, slot 3 of the list box. Place, and if a row
+ * is selected AND the caller asked for the change to be announced, repaint
+ * just that ONE ROW -- clipped to its own strip rather than the whole list --
+ * before taking focus the ordinary way.
+ *
+ * With no row selected, or with announce clear, it is exactly the base. */
+void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce);
+
 /* A button's handlers and its auto-repeat state. 0x005C and 0x0060 are the
  * font and the ink in a LABEL -- the subclass tails do not agree and must not
  * be merged into one struct. */

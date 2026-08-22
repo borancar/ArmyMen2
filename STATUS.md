@@ -70,8 +70,8 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 442 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 442 | 435 of them below the CRT line |
+| `patch_replace` sites | 443 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 443 | 436 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 100,080 / 372,816 B (**26.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
@@ -166,6 +166,19 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The list box's rows are 14 pixels tall, and the arithmetic says so.**
+  `ListTakeFocus` computes `top + 14 * (0x58 - 0x74) + 4` and clips a strip 14
+  tall, which is what establishes the row height, the top margin, and that
+  `0x0058` is the row being singled out while `0x0074` is the first row on
+  screen. Calling those two the selected row and the scroll origin is the
+  obvious reading and nothing here evidences it further.
+
+- **Its distinctive half is unobserved.** Skipping the row repaint entirely
+  leaves `multi` at 0 pixels. It is an optimisation -- repaint one strip now
+  rather than wait for the next full repaint -- and a settled frame cannot show
+  the difference. `ListTakeFocus` runs once on that path, when the TCP/IP row
+  is clicked, so what IS checked is the base take-focus underneath it.
 
 - **`ButtonUpdate` is the widget layer's sharpest A/B, by a wide margin.**
   Suppressing the left handler on release -- so no menu button does anything --
