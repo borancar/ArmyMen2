@@ -157,6 +157,49 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **The subclass tails are laid out INDEPENDENTLY, and three classes now prove
+  it at the same offsets.** `0x005C` is the font in a label, and in the class
+  at `0x00454310` it is the auto-repeat enable. `0x0060` is the label's ink
+  colour, the cancel handler in `WidgetUpdateCancel`'s class, and the
+  auto-repeat DEADLINE in `0x00454310`'s. So `AM2_Widget` must stop at the base
+  -- anything past `0x0054` belongs to whichever subclass is looking, and a
+  single struct covering the tail would be wrong three ways at once.
+
+- **`0x00454310` is the mouse update, and it is a button with auto-repeat.**
+  Slot 2 for 4 classes, about 800 bytes, and fully mapped now:
+
+  - place, then bail to the base update if there is no parent or `0x004C` is
+    set;
+  - `0x0040 = PointInRect(rect, g_cursorPoint)` -- the hover flag, and the one
+    field `WidgetConstruct` deliberately never writes, because this computes
+    it before anything reads it;
+  - if the mouse moved, take focus through slot 3;
+  - `0x0054` is the LEFT/activate handler and `0x0064` the right one. `0x0054`
+    is the same field `WidgetUpdate` fires on SPACE and RETURN, which is a
+    clean cross-check between the keyboard and mouse paths;
+  - and when `0x005C` is set, holding a button repeats: `GetTickCount` through
+    the IAT at `0x0046F084`, **250 ms** before the first repeat and **150 ms**
+    between them, with the deadline in `0x0060`.
+
+  Every arm ends the same way -- repaint self with its own rectangle through
+  slot 1, then call the base update -- which is what makes 800 bytes out of a
+  small amount of logic.
+
+- **The edit box filters what can be typed.** `0x0068` holds a pointer to an
+  allowed-character string and the constructor defaults it to `0x004853A8`,
+  which is nearly all printable ASCII plus tab. The other one in the image,
+  `0x00485360`, is ` a-zA-Z0-9!'&+-_` -- no path-hostile characters, so it is
+  the player-name and battle-name filter. Relevant to CLAUDE.md's note about
+  typing names: what a field accepts is data, not code.
+
+- **The caret is an underscore, and `flag44` is what shows it.** The edit box
+  painter copies its text into a stack buffer and, when `0x0044` is set,
+  appends `'_'` and re-terminates before drawing; it also picks ink `0x0064`
+  rather than `0x0065`. `0x0044` is set by `WidgetTakeFocus` and cleared by
+  `WidgetRepaint`, so it toggles -- which is independently what CLAUDE.md
+  recorded as "the blinking caret" in the multiplayer A/B, arrived at from the
+  other end.
+
 - **Field `0x0038` is the widget's SPRITE, and that improves an older
   comment.** `WidgetPaint` draws it and reads its bounds to centre it, so it
   is an `AM2_Sprite *`. `WidgetRepaint`'s walk up the parent chain -- written
