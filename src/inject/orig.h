@@ -2572,6 +2572,28 @@
 #define COMM_ARMY_OFF_COLOUR     0x210u   /* int32_t, swapped by the above */
 #define COMM_ARMY_OFF_TEAM       0x258u   /* int32_t, what ReceivedTeamMsg sets */
 #define COMM_ARMY_OFF_MAP_OK     0x278u   /* int32_t, what ReceivedMapMsg sets */
+/* 0x0040FEA0, "Unknown message type %d". The receive side's dispatcher: an
+ * eighteen-arm jump table on the message's first dword, reached from
+ * 0x004026D5. The name is ours -- it has no string that names itself, only the
+ * one that names its default arm.
+ *
+ * Gated on 0x0404 of the comm object, which is NOT the 0x0400 that
+ * COMM_OFF_STARTED and COMM_OFF_LOCAL both already name. */
+#define ADDR_COMM_DISPATCH_MSG   0x0040FEA0u  /* void(msg *, int32_t dpid) */
+#define COMM_OFF_MSGS_ENABLED    0x404u
+/* Where type 1 leaves what it received: the value, and the checksum of the
+ * whole record. */
+#define ADDR_LAST_MSG_VALUE      0x004F48F0u  /* int32_t */
+#define ADDR_LAST_MSG_CHECKSUM   0x004F48F4u  /* uint32_t */
+/* The chat arm's colour table, indexed by the sender byte shifted left eight
+ * -- so 256-byte records, of which it reads only the first. */
+#define ADDR_CHAT_COLOUR_TABLE   0x004F9AD0u
+/* The dispatcher's remaining callees, each named from its own strings. */
+#define ADDR_RECV_PACKET         0x00410720u  /* "Receive Checksum Error from %x seq %d" */
+#define ADDR_RECV_START_GAME_MSG 0x00411100u  /* "ReceiveStartGameMsg for %d Players.  Seed is %d " */
+#define ADDR_RECV_PLAYER_MSG     0x004114E0u  /* "ReceivePlayerMsg for %d Players..." */
+#define ADDR_RECV_GAME_PAUSE     0x00410890u  /* "RemoteGamePause from %x; ..." */
+#define ADDR_CHECK_PLAYER_TIMEOUT 0x00411BD0u /* "TIMING OUT PLAYER %d %s" */
 #define ADDR_GET_PAUSE_FLAGS     0x00426840u  /* uint32(void) */
 #define ADDR_STR_SEND_BADPLAYER  0x004754ACu
 #define ADDR_STR_SEND_BADPARAM   0x00475478u

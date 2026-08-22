@@ -247,6 +247,24 @@ void __cdecl ReceivedMapMsg(void *msg, int32_t dpid);
 void __cdecl ReceivedColorMsg(void *msg, int32_t dpid);
 void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
 
+/* Original: 0x0040FEA0, and the name is ours -- it has no string that names
+ * itself, only "Unknown message type %d" for its default arm. The receive
+ * side's dispatcher, an eighteen-arm jump table on the message's first dword,
+ * and the whole of it is gated on 0x0404 of the comm object.
+ *
+ * The arm order comes from the table at 0x00410044 and is nothing like the
+ * layout: type 11 is the first arm emitted, type 3 the tenth. Types 4, 12, 13
+ * and 16 land on the same arm as anything above 18 and are LOGGED as unknown,
+ * while type 2 returns in silence -- so the original distinguishes a message
+ * it knows and ignores from one it does not know.
+ *
+ * Three kinds of host test sit side by side here, and the differences are the
+ * original's. Types 9, 17 and 18 return unless this machine is the host, on
+ * top of the same test inside the handler they would have called. Type 8 tests
+ * the host only to LOG that it should not have received the message, and then
+ * calls the handler either way. Everything else does not test at all. */
+void __cdecl CommDispatchMessage(void *msg, int32_t dpid);
+
 
 int msgslot_install(void);
 

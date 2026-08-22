@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `30f7845`. Working tree clean.
+Last updated: **2026-08-22**, at `a65e21c`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 514 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 514 | 507 of them below the CRT line |
+| `patch_replace` sites | 515 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 515 | 508 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 95,776 / 372,816 B (**25.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 120,464 / 372,816 B (32.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 96,272 / 372,816 B (**25.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 120,960 / 372,816 B (32.4%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,37 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The receive side has a dispatcher and it is ours now.** `0x0040FEA0`, an
+  eighteen-arm jump table on the message's first dword, reached from
+  `0x004026D5` and gated on `0x0404` of the comm object -- which is NOT the
+  `0x0400` that `COMM_OFF_STARTED` and `COMM_OFF_LOCAL` both already name.
+
+- **Type 2 returns in silence; types 4, 12, 13 and 16 are LOGGED as unknown.**
+  So the original distinguishes a message it knows and ignores from one it does
+  not know, and a reconstruction that folded them together would lose a log
+  line that only a live session could show.
+
+- **Three different host tests sit side by side in one function.** Types 9, 17
+  and 18 return unless this machine is the host -- on top of the identical test
+  inside the handler each would have called. Type 8 tests the host only to LOG
+  that it should not have received the message, and calls the handler either
+  way. Everything else does not test at all.
+
+- **Type 10 pushes two arguments at a handler that takes none.** cdecl, so the
+  arguments are simply dropped; `ReceiveEndSetupMsg` really is `void(void)` and
+  the call site really does push the message and the sender.
+
+- **`MsgSlotB0`'s first argument is a PLAYER record, not the comm object.** The
+  type 11 arm passes what `FindPlayerById` returned. `msgslot.h` describes that
+  family as fields of the comm object, which is where the six writers were
+  first read; one call site says otherwise and both may be true if the player
+  records live inside it, but the header should not be trusted on that point
+  until it is checked.
+
+- **`COMM_OFF_STARTED` and `COMM_OFF_LOCAL` are two names for `0x400`**, and
+  `checkglobals` cannot see it -- that ratchet tracks `ADDR_` macros, not
+  `COMM_OFF_` ones. There is a second family of names with no ratchet on it.
 
 - **The selftest link drew a module boundary, and it drew the right one.**
   `msgslot.cpp` is in `SELFTEST_SRC` because its slot writers, its latency ring

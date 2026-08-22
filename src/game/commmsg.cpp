@@ -22,6 +22,7 @@
 #include <stdint.h>
 
 #include "commmsg.h"
+#include "misc.h"      /* XorChecksum, reconstructed */
 #include "rect.h"       /* AM2_Rect, for the dialog paint slot */
 #include "armymsg.h"    /* SendGamePause */
 #include "../inject/orig.h"
@@ -509,8 +510,153 @@ void __cdecl ExitGamePostClose(void)
     orig_post_message(*(void **)AM2_IMAGE(ADDR_HWND), AM2_WM_CLOSE, 0, 0);
 }
 
+typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);
+typedef void (__cdecl *AM2_MsgHandlerFn)(void *msg, int32_t dpid);
+typedef void (__cdecl *AM2_HudMessageFn)(const char *text, int32_t colour);
+typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
+                                          int32_t b);
+
+#define orig_find_player_by_id \
+    ((AM2_FindPlayerFn)(uintptr_t)ADDR_FIND_PLAYER_BY_ID)
+#define orig_recv_packet   ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PACKET)
+#define orig_recv_start_game \
+    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_START_GAME_MSG)
+#define orig_recv_player_msg \
+    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PLAYER_MSG)
+#define orig_recv_game_pause \
+    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_GAME_PAUSE)
+#define orig_check_player_timeout \
+    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_CHECK_PLAYER_TIMEOUT)
+#define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
+#define orig_menu_message  ((AM2_MenuMessageFn)(uintptr_t)ADDR_MENU_MESSAGE)
+
+#define AM2_MSG_TYPE   0        /* the first dword: what the arm is chosen on */
+#define AM2_MSG_SENDER 8        /* the chat arm reads this as a SIGNED byte */
+#define AM2_MSG_TEXT   9
+
+/* The chat arm. Which of the two message sinks it uses depends on the screen
+ * that is up: the three menu screens get the menu one, everything else the
+ * in-game HUD. */
+static void DispatchChat(const uint8_t *msg)
+{
+    int32_t screen = *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_TAKEN;
+    int32_t sender = (int32_t)*(const int8_t *)(msg + AM2_MSG_SENDER);
+
+    if (screen == 7 || screen == 9 || screen == 8) {
+        /* The original loads only DL here and pushes the whole of EDX, so the
+         * top three bytes of that argument are whatever was in the register.
+         * The callee reads a byte; passing the byte is the same call. */
+        orig_menu_message((const char *)(msg + AM2_MSG_TEXT), sender, 1);
+        return;
+    }
+
+    /* SIGNED, and then shifted left eight -- a negative sender would index
+     * backwards out of the table. The original's, and the table is 256-byte
+     * records of which only the first byte is read. */
+    orig_hud_message((const char *)(msg + AM2_MSG_TEXT),
+                     *(const uint8_t *)((uintptr_t)ADDR_CHAT_COLOUR_TABLE
+                                        + (uintptr_t)(sender << 8)));
+}
+
+void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
+{
+    const uint8_t *comm = kCommObj;
+    uint8_t       *m    = (uint8_t *)msg;
+    int32_t        type;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
+        return;
+
+    type = *(const int32_t *)(m + AM2_MSG_TYPE);
+
+    /* From the table at 0x00410044, in TYPE order. The arms are laid out in a
+     * different order entirely. */
+    switch (type) {
+    case 1:
+        *(int32_t *)(uintptr_t)ADDR_LAST_MSG_VALUE =
+            *(const int32_t *)(m + AM2_MSG_VALUE);
+        *(uint32_t *)(uintptr_t)ADDR_LAST_MSG_CHECKSUM = XorChecksum(m);
+        return;
+
+    case 2:
+        /* Known and ignored, in silence -- unlike the unknown arm below. */
+        return;
+
+    case 3:
+        DispatchChat(m);
+        return;
+
+    case 5:
+        orig_recv_start_game(m, dpid);
+        return;
+
+    case 6:
+        orig_recv_game_pause(m, dpid);
+        return;
+
+    case 7:
+        ReceiveGameReadyMsg(m, dpid);
+        return;
+
+    case 8:
+        /* Tested only to complain; the handler runs either way. */
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            am2_log("Message Error:  Host should not receive PLAYERMSG\n");
+        orig_recv_player_msg(m, dpid);
+        return;
+
+    case 9:
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            return;
+        ReceivedColorMsg(m, dpid);
+        return;
+
+    case 10:
+        /* The original pushes the message and the id at this call site even
+         * though the handler takes neither. cdecl, so it is harmless; the
+         * arguments are simply dropped. */
+        ReceiveEndSetupMsg();
+        return;
+
+    case 11:
+        orig_recv_packet(m, dpid);
+        /* The slot writer's first argument is a PLAYER record here, not the
+         * comm object msgslot.h describes -- FindPlayerById returns one. */
+        MsgSlotB0(orig_find_player_by_id((uint32_t)dpid),
+                  *(const uint32_t *)(m + AM2_MSG_VALUE));
+        return;
+
+    case 14:
+        orig_check_player_timeout(m, dpid);
+        return;
+
+    case 15:
+        ReceivedMapMsg(m, dpid);
+        return;
+
+    case 17:
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            return;
+        ReceivedTeamMsg(m, dpid);
+        return;
+
+    case 18:
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            return;
+        ReceiveGameReadyToLoadMsg(m, dpid);
+        return;
+
+    default:
+        /* 4, 12, 13, 16 and anything above 18. */
+        am2_log("Unknown message type %d\n", type);
+        return;
+    }
+}
+
 int commmsg_install(void)
 {
+    patch_replace(ADDR_COMM_DISPATCH_MSG, (const void *)CommDispatchMessage,
+                  "CommDispatchMessage", 1);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
                   "MsgListRemHead", 10);
     patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,
