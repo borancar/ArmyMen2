@@ -31,9 +31,26 @@ typedef struct AM2_Widget {
     int32_t  w;                     /* 0x000C */
     int32_t  h;                     /* 0x0010 */
     RECT     rect;                  /* 0x0014  absolute; WidgetScreenRect's output */
-    int32_t  unknown24;             /* 0x0024 */
+    struct AM2_Widget *firstChild;  /* 0x0024  head of the child list */
     struct AM2_Widget *parent;      /* 0x0028  null for a top-level widget */
+    int32_t  unknown2C;             /* 0x002C */
+    struct AM2_Widget *nextSibling; /* 0x0030  next child of the same parent */
+    int32_t  unknown34;             /* 0x0034 */
+    int32_t  unknown38;             /* 0x0038 */
+    int32_t  flag3C;                /* 0x003C  constructed as 1 */
+    int32_t  unknown40;             /* 0x0040  NOT written by the constructor */
+    int32_t  flag44;                /* 0x0044  constructed as 0 */
+    int32_t  unknown48;             /* 0x0048 */
+    int32_t  unknown4C;             /* 0x004C */
+    int32_t  flag50;                /* 0x0050  constructed as 1 */
+    int32_t  unknown54;             /* 0x0054 */
 } AM2_Widget;
+
+/* The base class's vtable, stored by its constructor and restored by its
+ * destructor. It is the twentieth of the thirty-three. */
+#define VTABLE_WIDGET_BASE  0x0046FC20u
+/* The label's vtable, twenty-sixth of the thirty-three. */
+#define VTABLE_LABEL        0x0046FCACu
 
 /* The label's own fields, offsets from the widget base. The paper colour is
  * NOT at the same offset in the edit box, which clears with the byte at 0x0066
@@ -79,6 +96,26 @@ void __attribute__((thiscall)) WidgetScreenRect(AM2_Widget *w);
  * CONTROLS dialog is 78,174 calls of it, and every caption on that screen,
  * from "SARGE CONTROLS" to "EXIT VEHICLE", comes out of this function. */
 void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
+
+/* Original: 0x00453B00, thiscall, the base constructor every one of the
+ * thirty-three classes chains to. Zeroes both rectangles through RectSet and
+ * clears the tree links, then leaves 0x0040 alone -- the one field in the
+ * range it touches that it does not write. Returns `this`, as an i386 MSVC
+ * constructor does. */
+AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w);
+
+/* Original: 0x00454E70, thiscall. The label's constructor: base first, then
+ * its own four fields and the four rectangle components, then place itself.
+ * The argument order is the original's and is not the field order --
+ * (text, x, y, w, h, font, ink, paper). */
+AM2_Widget *__attribute__((thiscall)) LabelConstruct(AM2_Widget *w,
+                                                     const char *text,
+                                                     int32_t x, int32_t y,
+                                                     int32_t width,
+                                                     int32_t height,
+                                                     int32_t font,
+                                                     int32_t ink,
+                                                     int32_t paper);
 
 int widget_install(void);
 

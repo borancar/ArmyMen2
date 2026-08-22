@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 410 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 410 | 403 of them below the CRT line |
+| `patch_replace` sites | 412 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 412 | 405 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 92,640 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 92,960 / 372,816 B (**24.9%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,26 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **Two of the base widget's constructed flags are not observed at all.**
+  `WidgetConstruct` writes 1 into `0x003C` and 1 into `0x0050`; setting EITHER
+  to 0 leaves `controls` at 0 pixels. So the exact A/B that catches a
+  one-colour error in `LabelDraw` and a width-from-height error in
+  `WidgetScreenRect` says nothing whatever about those two fields, and they
+  stay verified by reading. Executing is not covering, on a screen where
+  almost everything else is.
+
+  Worth chasing later with a probe rather than more mutations: find where
+  either field is READ. `0x0044` is read by `0x00453E80` and written by
+  `0x00454070`, so that one at least has a known consumer.
+
+- **`g_defaultOwner` is defined four times over three types.** `objtable.h`
+  has it as `uint32_t`, `audio.cpp` redefines it as `const uint32_t`,
+  `dplay.cpp` as `int32_t` -- and then again as `g_defaultOwnerSlot`, a second
+  name for the same address. GCC warns on three of the four and the build has
+  been printing it. Same hazard as the local typedef that hid `PlaySoundAt`'s
+  two-pointer compare, and an alias of exactly the kind the `ADDR_` ratchet
+  exists to stop, one level down where nothing is watching.
 
 - **`WidgetScreenRect` is the busiest thing in the tree: 1,510,864 calls.**
   Eighty bytes, thirty-three callers, and the shared base helper the whole

@@ -41,6 +41,12 @@
  * use. Same leading arguments, then the clip rectangle BY VALUE and the
  * colour. `^` in the string is an escape that rewrites the colour argument. */
 #define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,str,font,RECT,colour) */
+/* 0x00453B00, thiscall. The base constructor of the menu widget hierarchy;
+ * every one of the thirty-three class constructors chains to it. */
+#define ADDR_WIDGET_CONSTRUCT   0x00453B00u /* AM2_Widget *(AM2_Widget *) */
+/* 0x00454E70, thiscall. The static label's constructor, taking
+ * (text, x, y, w, h, font, ink, paper) -- eight stack dwords, `ret 0x20`. */
+#define ADDR_LABEL_CONSTRUCT    0x00454E70u
 /* 0x00453BF0, thiscall, 33 callers. Absolute rectangle of a menu widget from
  * its offset within its parent; no parent means the offset is absolute. */
 #define ADDR_WIDGET_SCREEN_RECT 0x00453BF0u /* void(AM2_Widget *) */
