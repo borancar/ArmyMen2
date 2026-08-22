@@ -3244,6 +3244,35 @@
 /* 0x0042DFE0, five callers. The bit index of a power of two in 1..0x8000; 0
  * for anything else. A jump table for 1..0x80 and a compare chain above it. */
 #define ADDR_LOG2_MASK           0x0042DFE0u  /* uint8_t(int32_t mask) */
+/* The animation tables, all of them {int32_t count, AM2_AnimEntry *entries}.
+ * Every name here is ours; what fixes each one is the `.ani` path its loader
+ * passes. The arrays are indexed by unit kind, and their lengths come from the
+ * teardown loops rather than from a guess -- 0x0045A990 walks 0..0x30 by 8, so
+ * six each. */
+#define ADDR_EXPLOSION_ANIMS     0x00510228u  /* AM2_AnimTable  -- explosions.ani */
+#define ADDR_MISSILE_ANIMS       0x00654C90u  /* AM2_AnimTable  -- missile.ani */
+#define ADDR_ROACH_ANIMS         0x00654C98u  /* AM2_AnimTable  -- roach.ani */
+#define ADDR_SOLDIER_ANIMS       0x00659F00u  /* AM2_AnimTable[9], rifleman first */
+#define ADDR_TURRET_ANIMS        0x0065A2A8u  /* AM2_AnimTable[6] */
+#define ADDR_VEHICLE_ANIMS       0x00661DF0u  /* AM2_AnimTable[6] */
+/* 0x00409EE0, 14 callers. Free one table: every animation it owns, then the
+ * entry array, then zero both fields. A borrowed entry is left alone, which is
+ * the whole reason LoadAnimTable records the flag. */
+#define ADDR_FREE_ANIM_TABLE     0x00409EE0u  /* void(AM2_AnimTable *) */
+#define ADDR_FREE_EXPLOSION_ANIMS 0x00422850u /* void(void) */
+#define ADDR_FREE_ROACH_ANIMS    0x0043CD30u  /* void(void) */
+#define ADDR_FREE_SOLDIER_ANIMS  0x004470D0u  /* void(void), all nine */
+#define ADDR_FREE_VEHICLE_ANIMS  0x0045A990u  /* void(void), both arrays */
+/* The three lookups: find the animation with a fixed id, turn an 8-bit heading
+ * into one of its facings with RoundTo8, and return the sprite for frame 0.
+ * The id is 1 for soldiers and 0x51 for vehicles and turrets, which the
+ * shipped `.ani` files bear out -- rifleman.ani has id 1 and every vehicle and
+ * turret file has 81. */
+#define ADDR_SOLDIER_ANIM_SPRITE 0x0044BB30u  /* AM2_Sprite *(kind, heading) */
+#define ADDR_VEHICLE_ANIM_SPRITE 0x0045D9B0u
+#define ADDR_TURRET_ANIM_SPRITE  0x0045DA20u
+#define AM2_ANIM_ID_STAND        1
+#define AM2_ANIM_ID_VEHICLE      0x51
 #define AM2_SPRITE_PALETTE_SIZE  256
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */

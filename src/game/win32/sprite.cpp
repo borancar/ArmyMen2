@@ -20,6 +20,7 @@
 
 #include "sprite.h"
 #include "../anim.h"
+#include "../dist.h"   /* RoundTo8 */
 #include "../blit.h"
 #include "../rect.h"
 #include "../air.h"        /* RemapSpriteRuns, GrowSpriteList */
@@ -512,10 +513,92 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
     return 1;
 }
 
+/* The three animation lookups -- 0x0044BB30, 0x0045D9B0 and 0x0045DA20, and
+ * all three names are ours. Each finds the entry with a fixed id in its kind's
+ * table, turns an 8-bit heading into one of the animation's facings, and
+ * returns the sprite for frame 0 of that facing.
+ *
+ * They are the proof that anim.h's field names are right rather than plausible.
+ * `facingBits` goes to RoundTo8 as its bit count, so it really is the log of
+ * the facing count; the cell index is `frames * facing`, so `frames` really is
+ * the inner stride and the grid really is facing-major. Nothing in the loader
+ * could have settled either.
+ *
+ * On this side of the split rather than in anim.cpp because the return is an
+ * AM2_Sprite, which carries an LPDIRECTDRAWSURFACE.
+ */
+#define g_soldierAnims ((AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)
+#define g_turretAnims  ((AM2_AnimTable *)(uintptr_t)ADDR_TURRET_ANIMS)
+#define g_vehicleAnims ((AM2_AnimTable *)(uintptr_t)ADDR_VEHICLE_ANIMS)
+
+/* Written once and used three times, where the original writes it out three
+ * times. The index it returns is the caller's business: two of them fall back
+ * to entry 0 and one does not. */
+static int32_t AnimIndexOfId(const AM2_AnimTable *t, int32_t id)
+{
+    int32_t i = 0;
+
+    if (t->count > 0)
+        for (i = 0; i < t->count; i++)
+            if (t->entries[i].id == id)
+                break;
+    return i;
+}
+
+static AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
+{
+    int32_t facing = RoundTo8((int32_t)(heading & 0xFFu), a->facingBits) & 0xFF;
+
+    return g_spriteList[a->cells[(int32_t)a->frames * facing].sprite];
+}
+
+AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint32_t heading)
+{
+    const AM2_AnimTable *t = &g_soldierAnims[kind];
+    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_STAND);
+
+    if (i >= t->count)
+        i = 0;
+    return AnimSpriteAt(t->entries[i].anim, heading);
+}
+
+AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint32_t heading)
+{
+    const AM2_AnimTable *t = &g_vehicleAnims[kind];
+    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+
+    if (i >= t->count)
+        i = 0;
+    return AnimSpriteAt(t->entries[i].anim, heading);
+}
+
+/* The odd one out, in two ways. It RETURNS NULL when nothing carries the id,
+ * where the other two fall back to entry 0 -- not tidied, since a turret with
+ * no animation is a different thing from a turret drawn as its first one.
+ *
+ * And it opens with `lea esi, [eax*8 + 0x65A2A8]; test esi, esi; jne` -- a
+ * null test on the address of a global plus an index, which cannot be zero.
+ * Not reproduced; the same shape as UpdateMouseState's unreachable `je`. */
+AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading)
+{
+    const AM2_AnimTable *t = &g_turretAnims[kind];
+    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+
+    if (i >= t->count)
+        return 0;
+    return AnimSpriteAt(t->entries[i].anim, heading);
+}
+
 int sprite_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_SOLDIER_ANIM_SPRITE, (const void *)SoldierAnimSprite,
+                        "SoldierAnimSprite", 2);
+    rc |= patch_replace(ADDR_VEHICLE_ANIM_SPRITE, (const void *)VehicleAnimSprite,
+                        "VehicleAnimSprite", 2);
+    rc |= patch_replace(ADDR_TURRET_ANIM_SPRITE, (const void *)TurretAnimSprite,
+                        "TurretAnimSprite", 2);
     rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
                         "DrawSpriteClipped", 5);

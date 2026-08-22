@@ -18,6 +18,17 @@
 
 #define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
 
+#define g_explosionAnims ((AM2_AnimTable *)(uintptr_t)ADDR_EXPLOSION_ANIMS)
+#define g_roachAnims     ((AM2_AnimTable *)(uintptr_t)ADDR_ROACH_ANIMS)
+#define g_soldierAnims   ((AM2_AnimTable *)(uintptr_t)ADDR_SOLDIER_ANIMS)
+#define g_turretAnims    ((AM2_AnimTable *)(uintptr_t)ADDR_TURRET_ANIMS)
+#define g_vehicleAnims   ((AM2_AnimTable *)(uintptr_t)ADDR_VEHICLE_ANIMS)
+
+/* Both from the teardown loops, not from a guess: 0x004470D0 writes out nine
+ * calls and 0x0045A990 walks 0..0x30 in steps of 8. */
+#define AM2_SOLDIER_ANIM_TABLES  9
+#define AM2_VEHICLE_ANIM_TABLES  6
+
 /* AM2_DUMP_ANIMS=1 prints every table this parses, which tools/anicheck.py
  * compares against its own reading of the `.ani` files. Latched once: the
  * function runs 21 times per Boot Camp mission and getenv is not free. */
@@ -150,8 +161,75 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
         DumpAnimTable(table);
 }
 
+void __cdecl FreeAnimTable(AM2_AnimTable *table)
+{
+    int32_t i;
+
+    for (i = 0; i < table->count; i++) {
+        AM2_AnimEntry *e = &table->entries[i];
+
+        if (!e->anim || e->borrowed)
+            continue;
+        if (e->anim->cells)
+            am2_free(e->anim->cells);
+        /* Re-read through the table rather than reusing `e->anim`, as the
+         * original does -- it reloads entries and the pointer for this one. */
+        am2_free(table->entries[i].anim);
+    }
+
+    /* Outside the loop, so a table with no entries is still emptied. */
+    am2_free(table->entries);
+    table->entries = 0;
+    table->count = 0;
+}
+
+void __cdecl FreeExplosionAnims(void)
+{
+    FreeAnimTable(g_explosionAnims);
+}
+
+void __cdecl FreeRoachAnims(void)
+{
+    FreeAnimTable(g_roachAnims);
+}
+
+void __cdecl FreeSoldierAnims(void)
+{
+    int32_t i;
+
+    /* Nine calls written out in the original, one per table. rifleman is
+     * first, so it is freed BEFORE the eight that borrow from it -- which is
+     * safe only because a borrowed entry is skipped. */
+    for (i = 0; i < AM2_SOLDIER_ANIM_TABLES; i++)
+        FreeAnimTable(&g_soldierAnims[i]);
+}
+
+void __cdecl FreeVehicleAnims(void)
+{
+    int32_t i;
+
+    for (i = 0; i < AM2_VEHICLE_ANIM_TABLES; i++) {
+        FreeAnimTable(&g_vehicleAnims[i]);
+        FreeAnimTable(&g_turretAnims[i]);
+    }
+}
+
 int anim_install(void)
 {
-    return patch_replace(ADDR_LOAD_ANIM_TABLE, (const void *)LoadAnimTable,
-                         "LoadAnimTable", 1);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_LOAD_ANIM_TABLE, (const void *)LoadAnimTable,
+                        "LoadAnimTable", 1);
+    rc |= patch_replace(ADDR_FREE_ANIM_TABLE, (const void *)FreeAnimTable,
+                        "FreeAnimTable", 1);
+    rc |= patch_replace(ADDR_FREE_EXPLOSION_ANIMS,
+                        (const void *)FreeExplosionAnims,
+                        "FreeExplosionAnims", 0);
+    rc |= patch_replace(ADDR_FREE_ROACH_ANIMS, (const void *)FreeRoachAnims,
+                        "FreeRoachAnims", 0);
+    rc |= patch_replace(ADDR_FREE_SOLDIER_ANIMS,
+                        (const void *)FreeSoldierAnims, "FreeSoldierAnims", 0);
+    rc |= patch_replace(ADDR_FREE_VEHICLE_ANIMS,
+                        (const void *)FreeVehicleAnims, "FreeVehicleAnims", 0);
+    return rc;
 }

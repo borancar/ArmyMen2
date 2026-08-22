@@ -605,6 +605,20 @@ here, unlike `orig_parse_action`, where the same mistake silently re-recorded
 the oracle. Worth grepping for after any batch: an `orig_` whose address is in
 the patch list is either a deliberate probe or a lie.
 
+**Four of those thirteen are no longer guesses, and what identified them was
+the loader below them.** Entries 1, 3, 4 and 5 are the `.ani` sweeps --
+explosions, roach, vehicles-and-turrets, soldiers -- each a `push <table>;
+call FreeAnimTable`, and the table says which file it holds. Naming
+`FreeAnimTable` named four of its callers for free. The other nine stay
+literals, including `0x0043C720`, which is 432 bytes and does more than free.
+
+**`counts` truncates its reply, and the filter argument is the answer.** Three
+newly patched functions were simply absent from an unfiltered `counts`, which
+reads exactly like "never installed" -- the failure `src/inject/control.c`'s
+own comment predicts and was raised to 4,096 bytes for once already.
+`drive.sh ctl "counts Anim"` lists only the matching names. Reach for it
+whenever a name you expect is missing rather than concluding anything.
+
 **`ShutdownSubsystems` was `ReleaseAppMutex`, which is its last line.** The
 thirteen calls before it are the subsystems coming down in order and only three
 are identified, so they are an ordered table in the source rather than thirteen

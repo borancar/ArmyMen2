@@ -95,6 +95,31 @@ typedef struct AM2_AnimTable {
 void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
                            const AM2_AnimTable *fallback);
 
+/* Original: 0x00409EE0, 14 callers, and the name is ours. Free everything one
+ * table owns and leave it empty: for each entry that holds an animation of its
+ * OWN, the cell array and then the animation; then the entry array; then both
+ * fields zeroed.
+ *
+ * A borrowed entry is skipped, which is what the flag is for -- grenadier.ani
+ * borrows 43 of its 49 animations from rifleman.ani, and freeing them here
+ * would free the rifleman's while it is still using them. The soldier sweep
+ * frees all nine tables in load order, so rifleman's own goes last.
+ *
+ * The entry array is freed and the fields zeroed whatever the count is, so a
+ * table with none is still emptied. */
+void __cdecl FreeAnimTable(AM2_AnimTable *table);
+
+/* The four sweeps, all of them `void(void)` and all in ShutdownSubsystems'
+ * ordered teardown -- entries 1, 3, 4 and 5 of the thirteen. Naming them takes
+ * four of that table's entries out of the "a name per entry would be a guess
+ * per entry" bucket: each one is a `push <table>; call FreeAnimTable` and the
+ * table says which file it holds. */
+void __cdecl FreeExplosionAnims(void);   /* 0x00422850 */
+void __cdecl FreeRoachAnims(void);       /* 0x0043CD30 */
+void __cdecl FreeSoldierAnims(void);     /* 0x004470D0, all nine */
+void __cdecl FreeVehicleAnims(void);     /* 0x0045A990, six vehicles and six
+                                          * turrets, interleaved */
+
 int anim_install(void);
 
 #ifdef __cplusplus

@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 544 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 543 | 535 of them below the CRT line |
+| `patch_replace` sites | 552 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 551 | 541 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,032 / 372,816 B (**27.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 127,344 / 372,816 B (34.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 102,432 / 372,816 B (**27.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 127,744 / 372,816 B (34.3%) | what every earlier session quoted, and an over-count |
 | modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -194,6 +194,39 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The three animation lookups are what prove anim.h's field names.**
+  `0x0044BB30`, `0x0045D9B0` and `0x0045DA20` each find the entry with a fixed
+  id -- 1 for soldiers, 0x51 for vehicles and turrets, and the shipped files
+  bear both out -- then hand `facingBits` to `RoundTo8` as its BIT COUNT and
+  index the cell grid at `frames * facing`. So `facingBits` really is the log
+  of the facing count and `frames` really is the inner stride. Nothing in the
+  loader could have settled either; only a reader could.
+
+  All three are installed and read 0 in every configuration. The gate is
+  `0x004FCF84`, four frames up the chain at `0x00413BC0`, which also rotates a
+  ghost with keys 2 and 3 and places it at the cursor -- a developer placement
+  overlay, not gameplay. Verified by reading plus the structural agreement.
+  Finding the switch that sets `0x004FCF84` would make all three drivable.
+
+- **The turret lookup returns NULL where the other two fall back to entry 0**,
+  and it opens with a null test on `lea esi, [eax*8 + 0x65A2A8]` -- the address
+  of a global plus an index, which cannot be zero. Not reproduced, same as
+  `UpdateMouseState`'s unreachable `je`; the NULL return IS reproduced, since a
+  turret with no animation is a different thing from one drawn as its first.
+
+- **Four of ShutdownSubsystems' thirteen teardown entries are no longer
+  guesses.** They are the anim sweeps -- explosions, roach, vehicles+turrets,
+  soldiers -- each a `push <table>; call FreeAnimTable`, and the table names
+  the `.ani`. Measured at shutdown: all four run once and `FreeAnimTable`
+  itself reads 1, called with `00654C90`, the missile table, from the one
+  caller still original. `ab.sh quit` clean at 8 messages and 0 pixels.
+
+- **`counts` truncates, and the filter argument is the answer.** The three new
+  lookups were absent from an unfiltered `counts` reply, which reads exactly
+  like "never installed" -- the failure `control.c`'s own comment predicts.
+  `drive.sh ctl "counts Anim"` lists them. Use the filter whenever a name you
+  expect is missing.
 
 - **The `.ani` format is confirmed by arithmetic.** `LoadAnimTable` --
   `LoadSpriteFile`'s tail, and the last unread part of a sprite file -- reads a
