@@ -843,6 +843,20 @@
 #define ADDR_COMM_DRAIN_MSGS     0x00402690u  /* void(void), walks the msg list */
 #define ADDR_COMM_NO_BUFFERS     0x00403280u  /* void(void), "COMM ERROR: NO BUFFERS" */
 #define ADDR_COMM_PLAYER_SLOT    0x0040F320u  /* thiscall int32(this,id), 16 bytes */
+/* Three tiny thiscall accessors for one per-player field, 0x020C. The names
+ * are ours, from who sets what: ReceivePlayerMsg writes 1 into every record
+ * that is NOT ours and 0 into the one that is, and CommPlayerLeft clears it.
+ * So the field says a remote player is in that slot.
+ *
+ * The query is three-valued and only its first branch reads that field: an
+ * OCCUPIED slot answers with it, an empty slot answers "am I not the host"
+ * from 0x025C instead, and a slot that is neither answers -1. It also takes
+ * its slot as a SIGNED WORD, alone in this family. */
+#define ADDR_COMM_SLOT_REMOTE    0x0040F5A0u /* thiscall int32(this, int16 slot) */
+#define ADDR_COMM_SET_REMOTE     0x0040F600u /* thiscall void(this, int32 slot) */
+#define ADDR_COMM_CLEAR_REMOTE   0x0040F620u /* thiscall void(this, int32 slot) */
+#define COMM_ARMY_OFF_REMOTE     0x20Cu
+#define COMM_ARMY_OFF_WAS_HERE   0x25Cu   /* what the query falls back to */
 #define ADDR_COMM_FIND_PLAYER    0x0040F330u  /* thiscall int32(this,id), -1 if absent */
 #define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
                                                * "Remove Player numPlayers now = %d" */

@@ -338,6 +338,30 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
 void __cdecl CommDispatchMessage(void *msg, int32_t dpid);
 
 
+/* Original: 0x0040F600 and 0x0040F620, thiscall. Set and clear 0x020C of one
+ * player record. ReceivePlayerMsg writes 1 into every record that is not ours
+ * and 0 into the one that is, and CommPlayerLeft clears it -- so the field
+ * says a remote player is in that slot, and the names are ours from that.
+ *
+ * Twenty-seven bytes each, and the only difference is the constant. Written as
+ * two functions rather than one with a flag because that is what the image
+ * holds: two entry points, four callers between them. */
+void __attribute__((thiscall)) CommSetSlotRemote(void *comm, int32_t slot);
+void __attribute__((thiscall)) CommClearSlotRemote(void *comm, int32_t slot);
+
+/* Original: 0x0040F5A0, thiscall. Three-valued, and only the first branch
+ * reads the field the two above write.
+ *
+ * An OCCUPIED slot -- id neither 0 nor -1 -- answers with 0x020C normalised to
+ * 0 or 1. An empty slot with 0x025C set answers "am I NOT the host" instead,
+ * which is a different question entirely and returns 1 on a client. Anything
+ * else answers -1. So a caller that treats the result as a boolean gets a
+ * truthy answer from the -1 as well.
+ *
+ * The slot arrives as a SIGNED WORD, alone in this family; every other
+ * accessor takes a full int32_t. A negative would index backwards. */
+int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

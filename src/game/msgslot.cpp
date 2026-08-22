@@ -139,8 +139,46 @@ uint32_t __cdecl GetReSendMask(uint32_t id)
     return *(uint32_t *)((uint8_t *)q + AM2_FLOW_RESEND_MASK);
 }
 
+#define AM2_ARMY_STRIDE 112u
+
+void __attribute__((thiscall)) CommSetSlotRemote(void *comm, int32_t slot)
+{
+    *(int32_t *)((uint8_t *)comm + (uint32_t)slot * AM2_ARMY_STRIDE
+                 + COMM_ARMY_OFF_REMOTE) = 1;
+}
+
+void __attribute__((thiscall)) CommClearSlotRemote(void *comm, int32_t slot)
+{
+    *(int32_t *)((uint8_t *)comm + (uint32_t)slot * AM2_ARMY_STRIDE
+                 + COMM_ARMY_OFF_REMOTE) = 0;
+}
+
+int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot)
+{
+    const uint8_t *rec = (const uint8_t *)comm
+                         + (uint32_t)(int32_t)slot * AM2_ARMY_STRIDE;
+    int32_t        id  = *(const int32_t *)(rec + AM2_PLAYER_ID);
+
+    /* 0 and -1 are both "nobody", which is the convention CLAUDE.md records
+     * for this field and which ReceiveGameReadyMsg's loop disagrees with. */
+    if (id != 0 && id != -1)
+        return *(const int32_t *)(rec + COMM_ARMY_OFF_REMOTE) != 0;
+
+    /* An empty slot that once held someone answers a different question. */
+    if (*(const int32_t *)(rec + COMM_ARMY_OFF_WAS_HERE))
+        return *(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST) == 0;
+
+    return -1;
+}
+
 int msgslot_install(void)
 {
+    patch_replace(ADDR_COMM_SET_REMOTE, (const void *)CommSetSlotRemote,
+                  "CommSetSlotRemote", 4);
+    patch_replace(ADDR_COMM_CLEAR_REMOTE, (const void *)CommClearSlotRemote,
+                  "CommClearSlotRemote", 2);
+    patch_replace(ADDR_COMM_SLOT_REMOTE, (const void *)CommSlotRemote,
+                  "CommSlotRemote", 1);
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
     patch_replace(ADDR_MSGSLOT_A1, (const void *)MsgSlotA1, "MsgSlotA1", 2);
     patch_replace(ADDR_MSGSLOT_A2, (const void *)MsgSlotA2, "MsgSlotA2", 2);

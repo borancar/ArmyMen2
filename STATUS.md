@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `134584c`. Working tree clean.
+Last updated: **2026-08-22**, at `50d338f`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 519 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 519 | 512 of them below the CRT line |
+| `patch_replace` sites | 522 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 522 | 515 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 97,360 / 372,816 B (**26.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 122,672 / 372,816 B (32.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 97,520 / 372,816 B (**26.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 122,832 / 372,816 B (32.9%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,35 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **A three-valued query that only sometimes answers the question it is named
+  for.** `CommSlotRemote` reads the 0x020C flag only for an OCCUPIED slot; an
+  empty slot that once held someone answers "am I NOT the host" from 0x025C
+  instead, and anything else answers -1. A caller treating the result as a
+  boolean gets a truthy answer from that -1 as well. Three different questions
+  behind one return value.
+
+- **It takes its slot as a SIGNED WORD**, alone in the family -- every other
+  per-slot accessor takes a full `int32_t`. A negative would index backwards.
+
+- **These three are PURE and could have vectors.** They reach the comm object
+  only through `this`, never through the global, so `tools/vectors.py` could
+  record them. That is why they went into `msgslot.cpp` rather than
+  `commmsg.cpp`: the module split made a fortnight of an hour ago is exactly
+  the line "can this be checked offline", and these fall on the offline side.
+
+- **Next up is `ReceivePlayerMsg` (0x004114E0, 928 B), read but not written**,
+  and it is worth knowing what it will cost. Its loop bound is taken from the
+  ADDRESS OF THE NEXT GLOBAL -- it walks a table at 0x00515FE0 and stops on
+  reaching `ADDR_SCORE_LIMIT` at 0x00515FF0, so there are exactly four entries.
+  That is the same shape as the registration table walking up to
+  `ADDR_SCRIPT_CONDITIONS`.
+
+  It also puts pressure on two existing names. `ADDR_HOST_SLOT` (0x004FA904)
+  is set here to the slot whose id is OURS, which is not what "host slot"
+  means, and `ADDR_DEFAULT_OWNER` (0x004F9FDC) is set to the same value in the
+  same breath. One of the three readings is wrong. Check both before writing
+  that function.
 
 - **`ReceivePacket`'s loop bound is UNSIGNED and that is not a detail.** The
   bogus-length test compares each part against the length the packet arrived
