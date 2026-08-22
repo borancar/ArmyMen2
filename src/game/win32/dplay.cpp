@@ -23,6 +23,7 @@
  * rest on the stack, callee cleans. `ret 4` and one stack argument agree.
  */
 
+#include "../gameproc.h"
 #include "dplay.h"
 #include "../armymsg.h"   /* SendGamePause */
 #include "frame.h"
@@ -1424,7 +1425,6 @@ int32_t __cdecl StartPacketThread(void)
 typedef int32_t (__cdecl *AM2_CrtTimeFn)(int32_t *out);
 #define orig_crt_time      (*(AM2_CrtTimeFn)(uintptr_t)ADDR_CRT_TIME)
 typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
-#define orig_request_state (*(AM2_RequestStateFn)(uintptr_t)ADDR_REQUEST_STATE)
 
 /* The two widget slots the lobby repaint reaches, and the comm fields this
  * shares with msgslot.cpp. */
@@ -1475,7 +1475,7 @@ void __cdecl SendGameStartMsg(void)
 
     /* Reached by the host AND by the already-started case. */
     SendGamePause(1, 0x10000);
-    orig_request_state(2);
+    RequestState(2);
     *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
     *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
 }

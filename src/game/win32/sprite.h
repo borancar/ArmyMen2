@@ -171,6 +171,13 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
  * `void **` rather than `AM2_Sprite **` so event.cpp can forward-declare it:
  * that module is on the flat side of the split and must not name a DirectDraw
  * type, and this signature does not. */
+/* 0x00445AD0, 15 callers. PreloadSprite addressed by a PACKED KEY: the key is
+ * split into PackKey's three fields and they become the first three
+ * arguments. This is what ties packkey.cpp's field layout to something that
+ * uses it -- the shifts and masks here are KeyFieldA, KeyFieldB and KeyFieldC
+ * written out, and they agree exactly. */
+AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a, int32_t b);
+
 void __cdecl FreeBitmap(void **pp);
 
 void __cdecl FreeMenuSprites(void);

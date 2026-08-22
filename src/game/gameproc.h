@@ -53,6 +53,18 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp);
  *
  * StateLeaveAlias is one `jmp` to 0x0042E720 and lives among them by accident
  * of layout; it is the third function of that shape in the tree. */
+/* 0x00424AD0 and 0x00424AF0, 29 callers and one. The two halves of a state
+ * change, and CLAUDE.md's account of the state machine is written in terms of
+ * them: RequestState raises the pending flag and records what is wanted;
+ * CommitState takes it, puts the wanted value back to -1, moves it into
+ * ADDR_GAME_STATE, drops the pending flag and raises "entered".
+ *
+ * Nothing validates the state, and CommitState runs whether anything was
+ * pending or not -- called with nothing wanted it would put -1 into the game
+ * state. Its one caller checks first. */
+void __cdecl RequestState(int32_t state);
+void __cdecl CommitState(void);
+
 void __cdecl SetGameOver(int32_t state);
 int32_t __cdecl GameOverState(void);
 void __cdecl StateLeaveAlias(void);

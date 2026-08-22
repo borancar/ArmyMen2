@@ -91,7 +91,7 @@ static_assert(sizeof(PAINTSTRUCT) == 64, "the 0x40 bytes of frame it reserves");
 #define g_windowed    (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
 #define g_lastMessage (*(const uint32_t *)(uintptr_t)ADDR_LAST_MESSAGE)
 #define g_appActive   (*(int32_t *)(uintptr_t)ADDR_APP_ACTIVE)
-#define g_gameState   (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE)
+#define g_gameState   (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
 #define g_stateArg    (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG)
 
 /* 0x0065A058. Reached as object -> table -> slot, which is the exact shape of a
@@ -121,7 +121,6 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 
 #define orig_on_app_activated  (*(am2_void_fn)ADDR_ON_APP_ACTIVATED)
 #define orig_state_leave       (*(am2_void_fn)ADDR_STATE_LEAVE)
-#define orig_request_state       (*(am2_int_arg_fn)ADDR_REQUEST_STATE)
 
 /* ---- comm traffic -------------------------------------------------------
  *
@@ -452,7 +451,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             g_stateDispatch[GameOverState()].fn();
         else {
             orig_state_leave();
-            orig_request_state(g_stateArg);
+            RequestState(g_stateArg);
         }
         break;
 

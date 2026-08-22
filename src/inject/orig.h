@@ -504,6 +504,10 @@
  * restoring and as its destination when saving. */
 #define ADDR_MENU_SAVE_SLOT      0x00476198u  /* RECT */
 #define MENU_ROW_DIRECT          0x13         /* at or above, lock and draw directly */
+/* 0x00426CD0, 15 callers. Milliseconds since InitTimer, from the performance
+ * counter when there is one and from GetTickCount when there is not. The two
+ * answers are not the same clock and nothing reconciles them; which one a run
+ * gets is decided once, at startup. */
 #define ADDR_TICKS               0x00426CD0u  /* uint32_t(void) */
 /* Sprite fields the cursor code reads: two int16 hotspot pairs and the
  * width/height, plus the mode slot DrawSprite consults. */
@@ -1489,6 +1493,10 @@
  * callee at 0x004457E0 builds -- "%02d_%03d_%02d_*.bmp" and the matching
  * ".sha" -- so the statement's three integers are a sprite identity triple. */
 #define ADDR_PRELOAD_SPRITE       0x00445B00u
+/* 0x00445AD0, 15 callers: the same thing addressed by a PACKED KEY. It splits
+ * the key into PackKey's three fields and passes them as the first three
+ * arguments, which is what ties the key format to the sprite lookup. */
+#define ADDR_PRELOAD_SPRITE_KEY   0x00445AD0u  /* sprite *(key, int32, int32) */
 /* What PreloadSprite calls once it has decided the sprite is not loaded. The
  * first builds the two filenames above, chdirs with ADDR_SET_DATA_DIR, and
  * fills the record; the second grows the registry and puts the record in it.

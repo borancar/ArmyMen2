@@ -119,7 +119,6 @@ typedef void (__cdecl *am2_i32_fn)(int32_t);
 
 #define orig_sprite_set_load  (*(am2_str_fn)ADDR_SPRITE_SET_LOAD)
 #define orig_sprite_set_free  (*(am2_ptr_fn)ADDR_SPRITE_SET_FREE)
-#define orig_request_state    (*(am2_i32_fn)ADDR_REQUEST_STATE)
 #define orig_strncpy          (*(char *(__cdecl *)(char *, const char *, \
                                                    uint32_t))ADDR_CRT_STRNCPY)
 
@@ -314,15 +313,15 @@ void __cdecl StartIntro(void)
     }
 
     if (*(const int32_t *)(comm + ADDR_COMM_OFF_SKIP_INTRO)) {
-        orig_request_state(1);
+        RequestState(1);
         return;
     }
     if (*(const int32_t *)(uintptr_t)ADDR_OPT_NO_INTRO) {
-        orig_request_state(1);
+        RequestState(1);
         return;
     }
 
-    orig_request_state(0);
+    RequestState(0);
     SetGameOver(0);
 }
 
@@ -780,6 +779,22 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     return (int32_t)msg.wParam;
 }
 
+uint32_t __cdecl Ticks(void)
+{
+    const int64_t *freq = (const int64_t *)(uintptr_t)ADDR_PERF_FREQ;
+    LARGE_INTEGER  now;
+    int64_t        delta;
+
+    if (*freq <= 0)
+        return GetTickCount();
+
+    QueryPerformanceCounter(&now);
+    delta = now.QuadPart - *(const int64_t *)(uintptr_t)ADDR_PERF_START;
+    return (uint32_t)(int64_t)((long double)delta
+                               * (long double)*(const double *)
+                                     (uintptr_t)ADDR_PERF_PERIOD);
+}
+
 int winmain_install(void)
 {
     int rc = 0;
@@ -795,6 +810,7 @@ int winmain_install(void)
     if (getenv("AM2_PROBE_NOWIN"))
         return 0;
 
+    rc |= patch_replace(ADDR_TICKS, (const void *)Ticks, "Ticks", 0);
     rc |= patch_replace(ADDR_POSITION_WINDOW, (const void *)PositionWindow,
                         "PositionWindow", 0);
     rc |= patch_replace(ADDR_PUMP_MESSAGE, (const void *)PumpMessage,

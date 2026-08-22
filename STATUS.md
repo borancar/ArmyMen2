@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 620 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 619 | 609 of them below the CRT line |
+| `patch_replace` sites | 624 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 623 | 613 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 106,576 / 372,816 B (**28.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 131,888 / 372,816 B (35.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 106,800 / 372,816 B (**28.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 132,112 / 372,816 B (35.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,19 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The packed key addresses SPRITES.** `PreloadSpriteByKey` (0x00445AD0)
+  splits a key into PackKey's three fields and passes them as PreloadSprite's
+  first three arguments -- the shifts and masks are `KeyFieldA`, `KeyFieldB`
+  and `KeyFieldC` written out, and they agree exactly. Together with
+  `KeyLookup`'s table two commits ago, `packkey.cpp` is no longer a set of
+  accessors with nothing that uses them. It runs 3,073 times a mission.
+
+- **The state machine's two halves are ours**: `RequestState` raises the
+  pending flag and records what is wanted, `CommitState` takes it and moves it
+  into `ADDR_GAME_STATE`. CommitState runs whether anything was pending or
+  not -- called with nothing wanted it would put -1 into the game state, and
+  its one caller checks first.
 
 - **The Boot Camp map is 256 x 256 tiles and 4096 x 4096 pixels**, read out of
   the running game -- `0x00514DD0`/`0x00514DD4` are 4096 and

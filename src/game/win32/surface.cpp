@@ -1015,7 +1015,6 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 #define g_overlayBFld   (*(const int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_FLD)
 
 typedef uint32_t (__cdecl *am2_ticks_fn)(void);
-#define orig_ticks (*(am2_ticks_fn)ADDR_TICKS)
 
 /* The paint object's first virtual, which takes its rectangle BY VALUE. It is
  * a C++ virtual and not COM -- `this` stays in ecx and is never pushed. */
@@ -1033,7 +1032,7 @@ static void TickMenuAnimation(int32_t row)
 
     if (g_animFrame < 0)
         return;
-    now = orig_ticks();
+    now = Ticks();
     if (now <= g_animNext)
         return;
 

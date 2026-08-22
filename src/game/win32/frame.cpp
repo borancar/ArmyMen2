@@ -24,7 +24,7 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 #define call0(a)  (((am2_void_fn)(uintptr_t)(a))())
 
 #define g_comm         (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
-#define g_statePending (*(const int32_t *)(uintptr_t)ADDR_STATE_PENDING)
+#define g_statePending (*(int32_t *)(uintptr_t)ADDR_STATE_PENDING)
 #define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
 #define g_subState     (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)

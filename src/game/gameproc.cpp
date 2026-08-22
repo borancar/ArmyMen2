@@ -185,6 +185,27 @@ void __cdecl StateLeaveAlias(void)
     orig_state_leave();
 }
 
+#define g_statePending (*(int32_t *)(uintptr_t)ADDR_STATE_PENDING)
+#define g_stateWanted  (*(int32_t *)(uintptr_t)ADDR_STATE_WANTED)
+#define g_gameState    (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
+#define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
+
+void __cdecl RequestState(int32_t state)
+{
+    g_statePending = 1;
+    g_stateWanted = state;
+}
+
+void __cdecl CommitState(void)
+{
+    int32_t wanted = g_stateWanted;
+
+    g_stateWanted = -1;
+    g_gameState = wanted;
+    g_statePending = 0;
+    g_stateEntered = 1;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
@@ -194,6 +215,10 @@ void gameproc_install(void)
                   "SaveGameProcSection", 1);
     patch_replace(ADDR_LOAD_GAMEPROC, (const void *)LoadGameProcSection,
                   "LoadGameProcSection", 1);
+    patch_replace(ADDR_REQUEST_STATE, (const void *)RequestState,
+                  "RequestState", 1);
+    patch_replace(ADDR_COMMIT_STATE, (const void *)CommitState,
+                  "CommitState", 0);
     patch_replace(ADDR_SET_GAME_OVER, (const void *)SetGameOver,
                   "SetGameOver", 1);
     patch_replace(ADDR_CURRENT_STATE, (const void *)GameOverState,

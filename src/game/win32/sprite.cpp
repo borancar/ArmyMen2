@@ -21,6 +21,7 @@
 #include "sprite.h"
 #include "../anim.h"
 #include "../dist.h"   /* RoundTo8 */
+#include "../packkey.h"  /* the three key fields */
 #include "../misc.h"   /* MaskPixelSolid */
 #include "../blit.h"
 #include "../rect.h"
@@ -800,6 +801,12 @@ void __cdecl FreeBitmap(void **pp)
     *pp = 0;
 }
 
+AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a, int32_t b)
+{
+    return PreloadSprite((int32_t)KeyFieldA(key), (int32_t)KeyFieldB(key),
+                         (int32_t)KeyFieldC(key), a, b);
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -807,6 +814,8 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_BUILD_VEHICLE_MASK,
                         (const void *)BuildVehicleMask,
                         "BuildVehicleMask", 1);
+    rc |= patch_replace(ADDR_PRELOAD_SPRITE_KEY, (const void *)PreloadSpriteByKey,
+                        "PreloadSpriteByKey", 3);
     rc |= patch_replace(ADDR_FREE_BITMAP, (const void *)FreeBitmap,
                         "FreeBitmap", 1);
     rc |= patch_replace(ADDR_BUILD_ROACH_MASK,
