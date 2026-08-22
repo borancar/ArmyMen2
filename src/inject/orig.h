@@ -430,7 +430,10 @@
 #define ADDR_BLIT_BITMAP_IN  0x0041BA90u
 #define ADDR_CREATE_BITMAP   0x00423D90u  /* surface *(FILE*, ...) */
 #define ADDR_RELOAD_BITMAP   0x00424280u  /* int32(surface*, FILE*, ...) */
-#define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32), stays original */
+/* Two stores: clear ADDR_MENU_SAVED_VALID and put the argument in
+ * ADDR_MENU_ENABLED. It said "stays original" with no reason beside it, which
+ * turned out to mean "not yet" rather than a decision. */
+#define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32) */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
 #define ADDR_PAINT_MAP_TILES   0x0042D580u /* void(const AM2_Rect *tiles) */
@@ -716,6 +719,12 @@
  * 0x80 -- which is itself the argument that nothing may read above AL. */
 #define ADDR_ANGLE_BETWEEN       0x0042DEB0u  /* uint8_t(const AM2_Point *,
                                                *         const AM2_Point *) */
+/* Two more copies of the same arithmetic, which is how it was identified.
+ * 0x0042DE50 takes the deltas already subtracted, and 0x0042DF20 answers the
+ * distance AND the heading through two out-pointers -- the distance is
+ * ApproxDist's formula exactly, so the original inlines both of them there. */
+#define ADDR_ANGLE_OF_DELTA      0x0042DE50u  /* uint8_t(int32 dx, int32 dy) */
+#define ADDR_DIST_AND_ANGLE      0x0042DF20u  /* void(a, b, int32 *, uint8 *) */
 #define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
 /* The rectangle the view is clipped against before anything is compared --
  * the map's extent on screen. */

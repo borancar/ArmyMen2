@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 630 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 629 | 619 of them below the CRT line |
+| `patch_replace` sites | 633 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 632 | 622 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 107,360 / 372,816 B (**28.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 132,672 / 372,816 B (35.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 107,632 / 372,816 B (**28.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 132,944 / 372,816 B (35.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -106,7 +106,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
 | `tools/objdump.py --leader` | current | max health 140, current 140 -- identical to `AM2_NOPATCH=1` |
-| `AM2_SELFCHECK=1` | current | 6,016 calls across 47 functions, 0 disagree -- and the pointer arguments finally differ from one another |
+| `AM2_SELFCHECK=1` | current | 6,144 calls across 48 functions, 0 disagree -- and the pointer arguments finally differ from one another |
 | `tools/maskdump.py` | current | roach 32 records/237 points, vehicle 192/3,081, 36,768 bytes, sha256 `532e52a0...` -- byte-identical to `AM2_NOPATCH=1` |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
@@ -197,6 +197,24 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The heading arithmetic exists three times in the image**, which is how it
+  was recognised: `AngleBetween` from two points, `AngleOfDelta` from the
+  deltas already subtracted, and `DistAndAngle`, which answers the distance and
+  the heading together through two out-pointers -- and whose distance half is
+  `ApproxDist`'s formula to the instruction. One copy here, called three times.
+
+  `AngleOfDelta` reads **58** in a Boot Camp mission where `AngleBetween` reads
+  0, so the shared body IS exercised, just not through the entry that looked
+  like the main one. It is also the one of the three the selfcheck can drive
+  directly: its arguments are scalars, so `pick` varies them without going
+  through the scratch at all.
+
+- **`ADDR_REFRESH_GATE`'s "stays original" meant "not yet".** No reason was
+  written beside it and the body is two stores to globals that were already
+  named. Reconstructed, and surface.cpp's seam closed with it. A decline with
+  no reason recorded is not a decision -- that is what the note beside it is
+  for.
 
 - **The voice lines are a table with the answers in it.** `SpeakLine`
   (0x0040BFF0, 35 callers) picks one of a group's wave names at random and

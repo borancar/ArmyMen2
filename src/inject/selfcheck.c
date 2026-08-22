@@ -157,6 +157,12 @@ static const struct check kChecks[] = {
      * image, none of them reconstructed, and the counter reads 0 through a
      * live Boot Camp mission with both dialogs cleared and the view scrolled. */
     { "AngleBetween",   ADDR_ANGLE_BETWEEN, (void *)AngleBetween,     2, {1,1,0,0}, 1 },
+    /* Its two siblings. AngleOfDelta takes the deltas as scalars, so `pick`
+     * varies them directly and it needs no pointer at all; DistAndAngle writes
+     * through two out-pointers, which this harness does not compare -- only
+     * its return is checked, and it has none, so it is here for the fault
+     * coverage and nothing more. Said plainly rather than counted as a check. */
+    { "AngleOfDelta",   ADDR_ANGLE_OF_DELTA, (void *)AngleOfDelta,    2, {0,0,0,0}, 1 },
     { "ObjIsType3",     ADDR_OBJ_IS_TYPE3,   (void *)ObjIsType3,     1, {1,0,0,0}, 0 },
     { "ObjIsType4",     ADDR_OBJ_IS_TYPE4,   (void *)ObjIsType4,     1, {1,0,0,0}, 0 },
     { "ObjIsType8",     ADDR_OBJ_IS_TYPE8,   (void *)ObjIsType8,     1, {1,0,0,0}, 0 },

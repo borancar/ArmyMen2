@@ -338,7 +338,6 @@ void __cdecl RestoreLostSurfaces(void)
 }
 
 typedef void (__cdecl *am2_gate_fn)(int32_t);
-#define orig_refresh_gate (*(am2_gate_fn)ADDR_REFRESH_GATE)
 #define orig_refresh_draw (*(am2_void_fn)ADDR_REFRESH_DRAW)
 #define g_presentEnabledRW (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
 
@@ -347,7 +346,7 @@ void __cdecl RefreshScreen(void)
     /* Saved rather than assumed: presenting may already have been off. */
     const int32_t wasEnabled = g_presentEnabledRW;
 
-    orig_refresh_gate(0);
+    RefreshGate(0);
     g_presentEnabledRW = 0;
 
     /* Twice, because the scene is double buffered and one pass would leave the
@@ -360,7 +359,7 @@ void __cdecl RefreshScreen(void)
                                (DWORD)g_screenRect.top,
                                g_backBuffer, g_screenClip, DDBLTFAST_WAIT);
 
-    orig_refresh_gate(1);
+    RefreshGate(1);
     g_presentEnabledRW = wasEnabled;
 }
 
@@ -1176,10 +1175,18 @@ void __cdecl DrawMenuCursor(void)
     }
 }
 
+void __cdecl RefreshGate(int32_t enabled)
+{
+    *(int32_t *)(uintptr_t)ADDR_MENU_SAVED_VALID = 0;
+    *(int32_t *)(uintptr_t)ADDR_MENU_ENABLED = enabled;
+}
+
 int surface_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_REFRESH_GATE, (const void *)RefreshGate,
+                        "RefreshGate", 1);
     rc |= patch_replace(ADDR_DRAW_MENU_CURSOR, (const void *)DrawMenuCursor,
                         "DrawMenuCursor", 0);
 

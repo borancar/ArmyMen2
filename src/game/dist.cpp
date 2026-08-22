@@ -127,10 +127,8 @@ uint8_t __cdecl Log2Mask(int32_t value)
 #define g_atanSin ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_SIN)
 #define g_atanCos ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_COS)
 
-uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
+uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy)
 {
-    int32_t dx  = (int32_t)to->x - (int32_t)from->x;
-    int32_t dy  = (int32_t)to->y - (int32_t)from->y;
     int32_t adx = dx < 0 ? -dx : dx;
     int32_t ady = dy < 0 ? -dy : dy;
     uint8_t h;
@@ -149,6 +147,22 @@ uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
     return h;
 }
 
+uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
+{
+    /* Inlined in the original; one copy here. */
+    return AngleOfDelta((int32_t)to->x - (int32_t)from->x,
+                        (int32_t)to->y - (int32_t)from->y);
+}
+
+void __cdecl DistAndAngle(const AM2_Point *a, const AM2_Point *b,
+                          int32_t *dist, uint8_t *angle)
+{
+    /* Both inlined in the original, and both to the instruction. The distance
+     * goes out first. */
+    *dist  = ApproxDist(a, b);
+    *angle = AngleBetween(a, b);
+}
+
 int dist_install(void)
 {
     int rc = 0;
@@ -157,6 +171,10 @@ int dist_install(void)
      * the three below dead code, and they were never installed at all. */
     rc |= patch_replace(ADDR_ANGLE_BETWEEN, (const void *)AngleBetween,
                         "AngleBetween", 2);
+    rc |= patch_replace(ADDR_ANGLE_OF_DELTA, (const void *)AngleOfDelta,
+                        "AngleOfDelta", 2);
+    rc |= patch_replace(ADDR_DIST_AND_ANGLE, (const void *)DistAndAngle,
+                        "DistAndAngle", 4);
     rc |= patch_replace(ADDR_APPROX_DIST, (const void *)ApproxDist,
                         "ApproxDist", 2);
     rc |= patch_replace(ADDR_APPROX_DIST_XY, (const void *)ApproxDistXY,

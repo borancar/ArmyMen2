@@ -65,6 +65,19 @@ uint8_t __cdecl Log2Mask(int32_t value);
  * compares them byte for byte against the original. */
 uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to);
 
+/* 0x0042DE50, eight callers: the same answer from deltas already subtracted.
+ * The original holds three copies of this arithmetic -- here, inside
+ * AngleBetween, and inside DistAndAngle -- which is how it was recognised;
+ * here it is written once and called three times. */
+uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy);
+
+/* 0x0042DF20, eight callers. Distance AND heading in one pass, through two
+ * out-pointers. The distance is ApproxDist's formula to the instruction, so
+ * the original has that inlined here too. The distance is stored FIRST, which
+ * matters only if a caller aliases the two. */
+void __cdecl DistAndAngle(const AM2_Point *a, const AM2_Point *b,
+                          int32_t *dist, uint8_t *angle);
+
 int dist_install(void);
 
 #ifdef __cplusplus

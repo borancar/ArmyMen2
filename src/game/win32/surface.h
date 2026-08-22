@@ -190,6 +190,11 @@ void __cdecl DrawMenuOverlay(void);
  * movie player's way of showing a frame. */
 void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest);
 
+/* 0x00412DE0, eight callers. Two stores: clear the menu's saved-overlay flag
+ * and set whether the menu draws at all. It carried "stays original" in
+ * orig.h with no reason beside it, which turned out to mean "not yet". */
+void __cdecl RefreshGate(int32_t enabled);
+
 int surface_install(void);
 
 #ifdef __cplusplus
