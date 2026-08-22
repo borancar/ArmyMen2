@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 460 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 460 | 453 of them below the CRT line |
+| `patch_replace` sites | 461 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 461 | 454 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,000 / 372,816 B (**27.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 102,304 / 372,816 B (**27.4%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`CreateTimer` is in, and it is what settled the clock.** 1,000 records of
+  `{start, period, count, id}` at `0x0050C370`, a slot free when its id is
+  zero, and a live count at `0x0050C36C`. Two refusals with DIFFERENT
+  thresholds: a low-priority request is dropped past 900 live timers, a request
+  with a period over fifteen seconds past 950. So a slow timer outranks a
+  low-priority one and both outrank nothing -- an ordinary request is refused
+  only when the table is genuinely full.
+
+  A schedule that has already begun is CAUGHT UP rather than fired late: the
+  elapsed repeats are counted off `count` and added to `start`.
+
+- **Its one caller passes a period of ZERO**, and that is safe only by
+  ordering. With `count == 1` the already-elapsed test answers before the
+  catch-up divides by the period. Two fires at period zero would divide by
+  zero and nothing in the function stops it. Reproduced with the reasoning
+  beside it, because a reader tidying that branch could easily "fix" it into a
+  crash.
 
 - **`MsgListRemHead` is in and reads 0**, which is exactly what the earlier
   mutation predicted: single player FILLS the message-buffer pool at startup

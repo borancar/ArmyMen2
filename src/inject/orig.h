@@ -1534,6 +1534,18 @@
  * calls "the notify". That one is kept: it describes the same body just as
  * well, and renaming an established name for a synonym is churn. */
 #define AM2_SUBSTATE_ESCAPE        0x22
+/* The timer table: 1,000 records of {start, period, count, id} at 0x0050C370,
+ * with the live count at 0x0050C36C. A slot is FREE when its id is zero, which
+ * is why the scan walks the id field at 0x0050C37C rather than the record. */
+#define ADDR_TIMER_COUNT           0x0050C36Cu /* int32_t */
+#define ADDR_TIMER_TABLE           0x0050C370u /* AM2_Timer[1000] */
+#define ADDR_TIMER_TABLE_ID_END    0x005101FCu /* one past the last id field */
+#define AM2_TIMER_MAX              1000
+#define AM2_TIMER_LOWPRI_LIMIT     0x384       /* 900 */
+#define AM2_TIMER_SLOW_LIMIT       0x3B6       /* 950 */
+#define AM2_TIMER_SLOW_PERIOD      0x3A98      /* 15000 ms */
+#define AM2_TIMER_REFUSED          (-101)
+#define AM2_TIMER_NO_ROOM          (-100)
 #define ADDR_CREATE_TIMER          0x0041E820u  /* "CreateTimer", 304 B */
 /* The network half of the event system, and the two sides confirm each other:
  * EventMessageSend packs a 40-byte message and EventMessageReceive unpacks the

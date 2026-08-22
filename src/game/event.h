@@ -24,6 +24,34 @@
 extern "C" {
 #endif
 
+/* One scheduled timer. A slot is free when `id` is zero. */
+typedef struct AM2_Timer {
+    uint32_t start;    /* mission ms of the next fire */
+    uint32_t period;   /* ms between fires */
+    int32_t  count;    /* fires remaining */
+    int32_t  id;       /* zero means the slot is free */
+} AM2_Timer;
+
+/* Original: 0x0041E820, "CreateTimer". Schedule `count` fires of `id`, `period`
+ * milliseconds apart, starting at `start` -- which is relative to now unless
+ * `absolute` says otherwise. Answers the id, or a negative code.
+ *
+ * It refuses work when the table is busy, and the two refusals differ. A
+ * LOW-PRIORITY request is dropped once 900 timers are live; a request whose
+ * period is over fifteen seconds is dropped once 950 are. So a slow timer is
+ * worth more than a low-priority one and both are worth less than an ordinary
+ * one, which is only refused when the table is actually full.
+ *
+ * A schedule that has already started is caught up rather than fired late:
+ * the elapsed repeats are counted, taken off `count`, and added to `start`. If
+ * nothing is left, or the catch-up still lands in the past, it answers -100
+ * without taking a slot.
+ *
+ * An `id` of -2 means "allocate one", through the same counter the scripts
+ * use. */
+int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
+                            int32_t count, int32_t id, int32_t lowPriority);
+
 /* 0x00421C70, the last thing LoadLevelScript does.
  *
  * Three groups: the eight fixed win conditions, three rule events that take a

@@ -1950,13 +1950,6 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
 
 /* ----------------------------------------------- delayed trigger ---- */
 
-/* CreateTimer stays original and is reached by address. 304 bytes, one caller
- * -- this function -- and it names itself in its own log string. */
-typedef int32_t (__cdecl *AM2_CreateTimerFn)(int32_t delay, int32_t a,
-                                             int32_t b, int32_t c, int32_t d,
-                                             int32_t e);
-#define orig_create_timer (*(AM2_CreateTimerFn)AM2_IMAGE(ADDR_CREATE_TIMER))
-
 /* 0x0041F410. Arrange for an event to be raised after a delay.
  *
  * Sixteen bytes are allocated and filled with what the event will need when it
@@ -1990,7 +1983,12 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
     rec[2] = uid;
     rec[3] = removeevent;
 
-    id = orig_create_timer(delay, 0, 0, 1, -2, arg);
+    /* One fire, relative, with a PERIOD OF ZERO -- which is only safe because
+     * a single fire can never reach the division: with count == 1 the
+     * "already elapsed" test is `start <= now`, and it answers before the
+     * catch-up divides by the period. A caller asking for two fires at period
+     * zero would divide by zero, and nothing here stops it. */
+    id = CreateTimer((uint32_t)delay, 0, 0, 1, -2, arg);
 
     if (id == -100 || id == -101)
         return;
@@ -1999,10 +1997,77 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
                   rec, 1);
 }
 
+/* The mission clock and the timer table, all in the image. */
+#define g_gameClockMs  (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_timerCount   (*(int32_t *)AM2_IMAGE(ADDR_TIMER_COUNT))
+#define g_timers       ((AM2_Timer *)AM2_IMAGE(ADDR_TIMER_TABLE))
+
+int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
+                            int32_t count, int32_t id, int32_t lowPriority)
+{
+    uint32_t now;
+    int32_t  i;
+
+    /* Two different thresholds, and the order matters: a low-priority request
+     * is refused first and at a lower mark than a slow one. */
+    if (lowPriority && g_timerCount > AM2_TIMER_LOWPRI_LIMIT) {
+        orig_log("CreateTimer: lowpriority event ignored, count is %d\n",
+                 g_timerCount);
+        return AM2_TIMER_REFUSED;
+    }
+    if (period > AM2_TIMER_SLOW_PERIOD
+        && g_timerCount > AM2_TIMER_SLOW_LIMIT) {
+        orig_log("CreateTimer: long delayed event ignored, count is %d\n",
+                 g_timerCount);
+        return AM2_TIMER_REFUSED;
+    }
+
+    now = g_gameClockMs;
+    if (!absolute)
+        start += now;
+
+    if (start <= now) {
+        uint32_t skip;
+
+        /* Already begun. If even the LAST fire is in the past there is
+         * nothing to schedule. */
+        if (start + (uint32_t)(count - 1) * period <= now)
+            return AM2_TIMER_NO_ROOM;
+
+        /* Catch up rather than fire late: drop the elapsed repeats. */
+        skip   = (now - start) / period + 1;
+        count -= (int32_t)skip;
+        start += skip * period;
+        if (count < 1)
+            return AM2_TIMER_NO_ROOM;
+        if (start <= now)
+            return AM2_TIMER_NO_ROOM;
+    }
+
+    if (id == -2)
+        id = AllocUid();
+
+    /* A slot is free when its id is zero. */
+    for (i = 0; i < AM2_TIMER_MAX; i++)
+        if (g_timers[i].id == 0)
+            break;
+    if (i >= AM2_TIMER_MAX)
+        return AM2_TIMER_NO_ROOM;
+
+    g_timers[i].start  = start;
+    g_timers[i].period = period;
+    g_timers[i].count  = count;
+    g_timers[i].id     = id;
+    g_timerCount++;
+    return id;
+}
+
 int event_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_CREATE_TIMER, (const void *)CreateTimer,
+                        "CreateTimer", 20);
     rc |= patch_replace(ADDR_DECLARE_RULE_VARS, (const void *)DeclareRuleVars,
                         "DeclareRuleVars", 3);
     rc |= patch_replace(ADDR_EVENT_REGISTER, (const void *)EventRegister,
