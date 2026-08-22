@@ -22,6 +22,28 @@
 extern "C" {
 #endif
 
+/* Original: 0x00408F80, 0x00408FD0 and 0x00408FF0 -- the air-support queue's
+ * head, and all three names are ours.
+ *
+ * The log line that looks like a name is not one. 0x00408FF0 prints
+ * "EndMission  AirSupport.count decreasing to: %d" and DoAirSupport prints
+ * "EndMission  AirSupport.count increasing to: %d" from a different function
+ * entirely, so "EndMission" is a prefix these two share -- a section label in
+ * the original's source, most likely. DoAirSupport names ITSELF on the line
+ * above its own. A self-naming sweep would pair the prefix with whichever
+ * function it found first.
+ *
+ * AirSupportBegin looks at the head entry's `extra` field: zero means play
+ * sound 0x2E and raise the active flag with both others clear, non-zero means
+ * raise both others and leave the active flag alone. AirSupportClear is the
+ * three-line reset. AirSupportPop shifts all four arrays down one, decrements
+ * the count, and tail-calls Begin if anything is left or Clear if not -- the
+ * original really does tail-JUMP to both, which is why they are separate
+ * functions rather than arms. */
+void __cdecl AirSupportBegin(void);
+void __cdecl AirSupportClear(void);
+void __cdecl AirSupportPop(void);
+
 /* 0x00409840 and 0x00409870. A tag and one fixed 584-byte block at
  * 0x004F945C, written and read straight -- the simplest section in the file
  * and the same shape map.cpp's is.

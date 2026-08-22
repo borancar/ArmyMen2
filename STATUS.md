@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `0e8bf42`. Working tree clean.
+Last updated: **2026-08-22**, at `a9b4166`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 530 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 530 | 522 of them below the CRT line |
+| `patch_replace` sites | 533 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 533 | 525 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,280 / 372,816 B (**26.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,592 / 372,816 B (33.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,520 / 372,816 B (**26.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 124,832 / 372,816 B (33.5%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,31 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **"EndMission" is a log PREFIX, not a function name**, and the self-naming
+  sweep would pair it with whichever function it reached first. 0x00408FF0
+  prints "EndMission  AirSupport.count decreasing to: %d" and DoAirSupport
+  prints "EndMission  AirSupport.count increasing to: %d" from a different
+  function entirely -- and DoAirSupport names ITSELF on the line above its own.
+  Second time the sweep has been shown to attribute a string wrongly, after
+  "TIMING OUT PLAYER"; the first was a merged entry, this one is a shared
+  prefix. Read the body.
+
+- **The air-support queue IS the block `air.cpp` saves.** All nine fields are
+  offsets into ADDR_AIR_SAVE_BLOCK rather than addresses of their own, and the
+  layout closes it exactly: the last flag sits at 0x0244 of 584 bytes. That is
+  independent confirmation of both the field map and the block size, from two
+  facts that were established years apart in this project.
+
+  It also settled a naming collision the honest way -- `checkpatches` refused a
+  second name on 0x004F945C, which is the block's start AND the active flag,
+  and expressing the fields as offsets removes the question rather than
+  answering it.
+
+- **Two of the three tail into each other.** `AirSupportPop` really does
+  `jmp` to Begin or Clear rather than calling them, which is why they are three
+  functions and not one with arms. And Begin's two shapes disagree about the
+  active flag: only the sound-playing one raises it.
 
 - **"Must I tell the other players?" is one function, and nine callers ask it.**
   `0x0040F560` answers NO when there is no multiplayer session at all -- which

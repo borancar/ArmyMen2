@@ -864,6 +864,35 @@
  * inherits that function's three-valued oddity: a slot answering -1 is
  * truthy, and this turns it into a 0. */
 #define ADDR_COMM_MUST_BROADCAST 0x0040F560u /* thiscall int32(this, int16 army) */
+
+/* The air-support queue IS the block air.cpp saves, so these are offsets into
+ * ADDR_AIR_SAVE_BLOCK rather than addresses of their own -- naming the first
+ * dword separately would have put a second name on that address, which is
+ * what checkpatches refused.
+ *
+ * Four parallel arrays of thirty, filled by DoAirSupport (0x00409710, which
+ * refuses at thirty) and drained from the head. The layout closes the block
+ * exactly: 0x0244 is the last dword of 584. */
+#define AIR_OFF_ACTIVE           0x000u  /* int32_t, 1 while one is running */
+#define AIR_OFF_PENDING          0x004u  /* int32_t, cleared as one retires */
+#define AIR_OFF_COUNT            0x008u  /* int32_t, at most 30 */
+#define AIR_OFF_WHERE            0x00Cu  /* packed point[30] */
+#define AIR_OFF_KIND             0x084u  /* int32_t[30], 2 or 3 */
+#define AIR_OFF_FROM             0x0FCu  /* uint32_t[30], the uid asking */
+#define AIR_OFF_EXTRA            0x174u  /* int32_t[30], what 0x00409680 found */
+#define AIR_OFF_FLAG_A           0x240u  /* int32_t, set and cleared together */
+#define AIR_OFF_FLAG_B           0x244u  /* int32_t, with the above */
+#define AM2_AIR_MAX              30
+#define AM2_AIR_SOUND            0x2Eu
+/* 0x00408FF0. Retire the head of the queue and start whatever is behind it.
+ *
+ * Its log says "EndMission  AirSupport.count decreasing to: %d" -- and
+ * "EndMission" is a PREFIX that DoAirSupport's own count line shares, not this
+ * function's name. DoAirSupport names itself separately in the line above it.
+ * So the name here is ours, from the body. */
+#define ADDR_AIR_POP             0x00408FF0u  /* void(void) */
+#define ADDR_AIR_BEGIN           0x00408F80u  /* void(void) */
+#define ADDR_AIR_CLEAR           0x00408FD0u  /* void(void) */
 #define ADDR_COMM_SET_REMOTE     0x0040F600u /* thiscall void(this, int32 slot) */
 #define ADDR_COMM_CLEAR_REMOTE   0x0040F620u /* thiscall void(this, int32 slot) */
 #define COMM_ARMY_OFF_REMOTE     0x20Cu
