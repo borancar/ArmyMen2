@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 427 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 427 | 420 of them below the CRT line |
+| `patch_replace` sites | 429 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 429 | 422 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 94,384 / 372,816 B (**25.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 96,672 / 372,816 B (**25.9%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -156,6 +156,24 @@ counts probe before reading one as coverage -- that is what turned the
    have not been run since the widget work began.
 
 ## Leads
+
+- **A silenced log looks exactly like a clean run, and that cost five
+  configurations.** Patching `0x0045CAA0` -- which is `ADDR_LOG`, folded with an
+  empty virtual because both are a single `c3` -- replaced the game's logger
+  with a no-op. Boot Camp still loaded, the HUD still drew, the pixel figure
+  stayed at its usual 22. Only the LOG changed, from thirteen game messages to
+  zero, and the log is the half of the A/B that reports it.
+
+  Two wrong diagnoses on the way, both worth remembering. "The recon side is
+  crashing" -- it was not, it rendered a perfect mission. And "my manual run
+  works, so it must be ab.sh" -- it did not; I was comparing an unfiltered
+  703-line log against ab.sh's FILTERED count, and filtered, my run gave the
+  same single line. **Compare like with like before concluding the harness is
+  at fault.**
+
+- **`ab.sh all` needs re-running after any blinded run.** The first sweep this
+  session produced valid results for `bootcamp`, `windowed` and `intro` only;
+  everything from `audio` onward ran against a silenced log.
 
 - **The subclass tails are laid out INDEPENDENTLY, and three classes now prove
   it at the same offsets.** `0x005C` is the font in a label, and in the class
