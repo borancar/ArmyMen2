@@ -158,6 +158,24 @@ void __cdecl ReceiveEndSetupMsg(void);
  * call is inside the `if`. */
 void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid);
 
+/* Original: 0x00410BB0, "ReceiveGameReadyMsg". Record the sender's flag in
+ * `m_ArmyReady[slot]` -- 0x0274 of the per-army record, next door to
+ * `m_ArmyReadyToLoad` -- and then, ON THE HOST ONLY, decide whether setup is
+ * finished.
+ *
+ * Finished means every OCCUPIED slot is ready, and "occupied" is `player id
+ * != -1`. Note that is the only value skipped: AM2_PLAYER_ID's own note says
+ * "0 or -1 is none", so a slot holding 0 would still have to be ready. Left
+ * as the original has it.
+ *
+ * When they all are, it sends the end-of-setup record and posts
+ * AM2_WM_SETUP_DONE -- so the host both announces it and tells its own window,
+ * which is why ReceiveEndSetupMsg exists on the other side.
+ *
+ * The player count is re-read from the comm object on every iteration rather
+ * than hoisted. Reproduced. */
+void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus

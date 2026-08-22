@@ -1995,6 +1995,12 @@
  * itself in the log: "Setting m_ArmyReadyToLoad[%d] to %s", so 0x0270 of the
  * 112-byte per-army record is m_ArmyReadyToLoad. */
 #define ADDR_RECV_READY_TO_LOAD    0x00410E90u /* void(msg *, int32_t dpid) */
+/* 0x00410BB0, "ReceiveGameReadyMsg". Records m_ArmyReady and, on the host,
+ * sends the end-of-setup message once every occupied slot is ready.
+ * 0x004FC3A8 is the record it sends. */
+#define ADDR_RECV_GAME_READY       0x00410BB0u /* void(msg *, int32_t dpid) */
+#define ADDR_MSG_END_SETUP         0x004FC3A8u
+#define COMM_ARMY_OFF_READY        0x274u   /* m_ArmyReady, its own name */
 #define COMM_ARMY_RECORD_SIZE      112u
 #define COMM_ARMY_OFF_READY_TO_LOAD 0x270u
 #define ADDR_REMOVE_INVENTORY_ITEM 0x00447990u /* void(AM2_Object *, int32_t) */

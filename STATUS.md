@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 465 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 465 | 458 of them below the CRT line |
+| `patch_replace` sites | 466 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 466 | 459 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,960 / 372,816 B (**27.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 103,264 / 372,816 B (**27.7%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,25 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The member-name sweep found exactly three**, and they were worth having:
+  `m_ArmyReady` (`0x0274`), `m_ArmyReadyToLoad` (`0x0270`) and `m_pLobby`.
+  Two of them are adjacent fields of the 112-byte per-army record, and having
+  the name before reading the function made `ReceiveGameReadyMsg` legible on
+  the first pass rather than the second.
+
+  Three is a small return, but they are the game's OWN identifiers. Worth
+  re-running whenever the log corpus grows.
+
+- **"Occupied" means `player id != -1` only.** `ReceiveGameReadyMsg` decides
+  setup is over when every occupied slot is ready, and skips only `-1` --
+  while `AM2_PLAYER_ID`'s own note says "0 or -1 is none". So a slot holding 0
+  must be ready for the game to start. Left as the original has it, and
+  flagged rather than smoothed.
+
+- **Three of the six handshake functions are done.** `SendGameReadyMsg`
+  (352 B), `SendGameReadyToLoadMsg` (256 B) and `SendGameStartMsg` (256 B)
+  remain -- all send-side, all read-verified only.
 
 - **A log string handed over an original MEMBER NAME.** "Setting
   m_ArmyReadyToLoad[%d] to %s" places that array at `0x0270` of the 112-byte

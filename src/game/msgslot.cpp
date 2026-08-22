@@ -273,6 +273,52 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
 #define orig_comm_send_players \
     (*(AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
 
+void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
+{
+    uint8_t *comm = (uint8_t *)kCommObj;
+    int32_t  value;
+    int32_t  slot;
+    int32_t  i;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("ReceiveGameReadyMsg\n");
+
+    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
+    slot  = orig_comm_slot_of_id(comm, dpid);
+    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY) = value;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("Setting m_ArmyReady[%d] to %s\n",
+                orig_comm_slot_of_id(comm, dpid),
+                value ? "TRUE" : "FALSE");
+
+    /* Only the host decides that setup is over. */
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    /* The count is re-read each time round rather than hoisted. */
+    for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++) {
+        const uint8_t *rec = comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE;
+
+        if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+            am2_log("m_ArmyReady[%d] = %d \n", i,
+                    *(const int32_t *)(rec + COMM_ARMY_OFF_READY));
+
+        /* -1 is the only id treated as empty, though 0 is documented as one
+         * too -- so a slot holding 0 must be ready. The original's test. */
+        if (*(const int32_t *)(rec + AM2_PLAYER_ID) != -1
+            && !*(const int32_t *)(rec + COMM_ARMY_OFF_READY))
+            return;
+    }
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+        am2_log("Sending EndSetupMessage\n");
+
+    orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_END_SETUP, 0, 1);
+    orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
+}
+
 void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
 {
     uint8_t *comm = (uint8_t *)kCommObj;
@@ -366,6 +412,8 @@ void __cdecl ExitGamePostClose(void)
 
 int msgslot_install(void)
 {
+    patch_replace(ADDR_RECV_GAME_READY,
+                  (const void *)ReceiveGameReadyMsg, "ReceiveGameReadyMsg", 1);
     patch_replace(ADDR_RECV_READY_TO_LOAD,
                   (const void *)ReceiveGameReadyToLoadMsg,
                   "ReceiveGameReadyToLoadMsg", 1);
