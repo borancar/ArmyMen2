@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `6103d25`. Working tree clean.
+Last updated: **2026-08-22**, at `af52240`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 538 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 538 | 530 of them below the CRT line |
+| `patch_replace` sites | 539 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 539 | 531 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 100,128 / 372,816 B (**26.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 125,440 / 372,816 B (33.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 100,272 / 372,816 B (**26.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 125,584 / 372,816 B (33.7%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,26 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **A counts probe on today's work, and it splits three ways.** Every commit
+  since the comm family said "bootcamp and mission clean". One probe says what
+  that was worth:
+
+  | | calls | what the zero means |
+  |---|---:|---|
+  | `RemapSpriteRuns` | **5,798** | genuinely exercised; the A/B is real evidence |
+  | `GrowSpriteList` | **58** | the same |
+  | `DoAirSupport`, `AirSupportPop` | 0 | REAL zeros -- `blindspots.py` says these counters can move, so the air-support path simply never runs in Boot Camp. Verified by reading |
+  | the five `FreeItem` arms, `AirSupportBegin`, `AirSupportClear` | 0 | BLIND -- every caller is ours, so the zero says nothing either way |
+
+  So of eleven functions landed since the comm work, two are exercised, two are
+  known not to run, and seven are unmeasurable from the outside. The A/Bs were
+  still worth having -- they establish that nothing else broke, which is not
+  nothing -- but "clean" was doing more work in those messages than it earned.
+
+- **The `quit` configuration is the one that reaches the free family**, through
+  `ReportLeaks`' "Unreleased memory (0) blocks:", and that is why it is worth
+  running for anything that frees.
 
 - **The duplicate-PATCH check earned its keep a third time.** I wrote a thunk
   for 0x00409920 that `winmain.cpp` had already reconstructed as

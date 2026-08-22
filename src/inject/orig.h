@@ -3216,6 +3216,14 @@
 #define ADDR_SPRITE_LIST         0x004F96C8u  /* AM2_Sprite ** */
 #define AM2_SPRITE_LIST_GROW     100
 #define ADDR_GROW_SPRITE_LIST    0x00409930u  /* void(void) */
+/* 0x00409960. Remap a run-length-encoded sprite image in place. The header is
+ * {uint16 width, uint16 height} followed by one uint16 per row, so the pixel
+ * data starts at 4 + height*2. Each row is pairs of {skip, run} bytes, and the
+ * row ends when skip+run has covered the width.
+ *
+ * Only indices at or above the threshold are remapped, which is the same
+ * reserved-block convention NearestPalIndex's `from` argument follows. */
+#define ADDR_REMAP_SPRITE_RUNS   0x00409960u  /* void(img, int32, table, int32) */
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */

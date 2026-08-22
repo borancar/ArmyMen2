@@ -114,6 +114,28 @@ void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius,
 void __cdecl FreeSpriteList(void);
 void __cdecl GrowSpriteList(void);
 
+/* Original: 0x00409960, and the name is ours. Remap a run-length-encoded
+ * sprite image in place: every pixel index at or above `from` is replaced by
+ * `table[index]`, and everything below it is left alone -- the same
+ * reserved-block convention NearestPalIndex's `from` argument follows.
+ *
+ * The image is {uint16 width, uint16 height} then one uint16 per row, so the
+ * pixel data starts at 4 + height*2. A row is pairs of {skip, run} bytes and
+ * ends when skip and run together have covered the width; only the run bytes
+ * are pixels.
+ *
+ * The SECOND parameter is never read. Four are pushed and three are used;
+ * whatever it was for, this function does not want it.
+ *
+ * A null table returns at once. A height of zero returns too -- the test is on
+ * the height, not the width, so a zero-width image with rows would walk them.
+ * Reproduced.
+ *
+ * It sits in this module by position, like the rest of the `<=air.cpp` band;
+ * a sprite remapper may well belong to an earlier translation unit. */
+void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
+                             int32_t from);
+
 /* 0x00409840 and 0x00409870. A tag and one fixed 584-byte block at
  * 0x004F945C, written and read straight -- the simplest section in the file
  * and the same shape map.cpp's is.
