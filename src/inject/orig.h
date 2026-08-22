@@ -2563,8 +2563,17 @@
 #define ADDR_RECV_TEAM_MSG       0x00411B20u  /* void(msg *, int32_t dpid) */
 /* 0x00411880, "SendMapMsg from %x   Error = %d". Returns the send result, and
  * returns 1 without sending at all if this machine is the host -- the host has
- * no one to tell. 0x004FB770 is the record, value at +8. */
-#define ADDR_SEND_MAP_MSG        0x00411880u  /* int32_t(int32_t) */
+ * no one to tell. 0x004FB770 is the record, value at +8.
+ *
+ * TWO parameters, and the body reads only the first: all three call sites push
+ * two and 0x0041116E cleans exactly eight. What the second holds differs by
+ * site -- twice it is the comm object's 0x03E4, which the body reads out of the
+ * global anyway, and once it is the player id.
+ *
+ * And the value is a RESULT CODE, not a map index. ReceiveStartGameMsg sends 7
+ * and 0x00411830 sends 5, while ReceivedMapMsg switches on 0..8 and calls 4
+ * nominal. The name says Map; what travels is how the map check went. */
+#define ADDR_SEND_MAP_MSG        0x00411880u  /* int32_t(int32_t, int32_t) */
 #define ADDR_MSG_MAP             0x004FB770u
 /* 0x0040F280, thiscall: give a slot an army colour, swapping with whoever
  * already had it. Returns the slot, or -1 if the colour is negative. */
@@ -2594,6 +2603,13 @@
 #define ADDR_RECV_PLAYER_MSG     0x004114E0u  /* "ReceivePlayerMsg for %d Players..." */
 #define ADDR_RECV_GAME_PAUSE     0x00410890u  /* "RemoteGamePause from %x; ..." */
 #define ADDR_CHECK_PLAYER_TIMEOUT 0x00411BD0u /* "TIMING OUT PLAYER %d %s" */
+/* 0x0469, and NOTHING handles it. ReceiveStartGameMsg is the only sender in
+ * the image and WndProc has no case for it, so DefWindowProc eats it. Named
+ * from what posts it, as the other six are. */
+#define AM2_WM_START_GAME          0x0469u
+/* The seed the host chose, as it arrives: 0x0190 into the start-game record.
+ * SendGameStartMsg is where it was picked. */
+#define MSG_START_OFF_SEED         0x190u
 #define ADDR_GET_PAUSE_FLAGS     0x00426840u  /* uint32(void) */
 #define ADDR_STR_SEND_BADPLAYER  0x004754ACu
 #define ADDR_STR_SEND_BADPARAM   0x00475478u

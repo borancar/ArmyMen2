@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `a65e21c`. Working tree clean.
+Last updated: **2026-08-22**, at `9f8c88e`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 515 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 515 | 508 of them below the CRT line |
+| `patch_replace` sites | 516 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 516 | 509 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 96,272 / 372,816 B (**25.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 120,960 / 372,816 B (32.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 96,640 / 372,816 B (**25.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 121,328 / 372,816 B (32.5%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,34 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`SendMapMsg` was wrong in two ways and its own caller is what said so.**
+  Reconstructing `ReceiveStartGameMsg` a commit later showed the call site
+  pushing TWO arguments and cleaning eight, where the body reads one -- and all
+  three call sites do. So it has two parameters and reads only the first.
+  Behaviourally identical under cdecl, but a signature that is wrong in the
+  header is the thing CLAUDE.md already warns about under private typedefs.
+
+  Worse, my comment said it tells the other players "which map is chosen". It
+  does not: the value is a RESULT CODE. This function sends 7, 0x00411830 sends
+  5, and `ReceivedMapMsg` switches on 0..8 calling 4 nominal. I named the
+  argument from the function's name instead of from a caller. Both corrected.
+
+- **The seed arrives at 0x0190 of the start record**, straight into the global
+  `SendGameStartMsg` chose it in -- so both halves of that story are now
+  reconstructed. And "Seed is %d" prints a literal 0 in the RECEIVE half too,
+  so the seed is never in the log at either end.
+
+- **One failing player stops the game for everyone.** The failure flag is
+  checked once, after the whole loop, so a single `DPLAY ERROR SENDING TO` or
+  `FlowQ creation Failure` reaches "Error in start" and nothing starts. A zero
+  player count skips both the loop and the check.
+
+- **0x0469 is a seventh window message and nothing handles it.**
+  `ReceiveStartGameMsg` is its only sender in the image and `WndProc` has no
+  case for it, so `DefWindowProc` eats it. The six in `winproc.cpp`'s table
+  were found by decoding forward from each `push` to its `PostMessageA`; this
+  one was missed, so that sweep was not complete.
 
 - **The receive side has a dispatcher and it is ours now.** `0x0040FEA0`, an
   eighteen-arm jump table on the message's first dword, reached from

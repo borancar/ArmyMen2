@@ -215,15 +215,40 @@ void __cdecl CommEndSetup(void);
  * last one the scan was waiting on. */
 void __cdecl SendGameReadyMsg(int32_t ready);
 
-/* Original: 0x00411880, "SendMapMsg from %x   Error = %d". Tell the other
- * players which map is chosen -- and return 1 WITHOUT sending if this machine
- * is the host, which is the first thing it does. The host has nobody to tell.
+/* Original: 0x00411880, "SendMapMsg from %x   Error = %d". Report how the map
+ * check went -- and return 1 WITHOUT sending if this machine is the host,
+ * which is the first thing it does. The host has nobody to tell.
+ *
+ * The value is a RESULT CODE and not a map index, which the name does not say:
+ * ReceiveStartGameMsg sends 7, 0x00411830 sends 5, and ReceivedMapMsg switches
+ * on 0..8 calling 4 nominal.
+ *
+ * Two parameters, and the body reads only the first. All three call sites push
+ * two, and 0x0041116E cleans exactly eight; what the second holds differs by
+ * site. It is named `unused` here because that is what it is to this function.
  *
  * The log is mislabelled in the original: it prints the ARGUMENT under "Error"
  * while the send result it just took sits in a register and is never printed.
- * The same author's "Seed is %d" in SendGameStartMsg pushes a literal 0. Both
- * kept. */
-int32_t __cdecl SendMapMsg(int32_t map);
+ * The same author's "Seed is %d" in SendGameStartMsg pushes a literal 0 -- and
+ * so does the RECEIVE half. Both kept. */
+int32_t __cdecl SendMapMsg(int32_t result, int32_t unused);
+
+/* Original: 0x00411100, "ReceiveStartGameMsg for %d Players.  Seed is %d ".
+ * The client's half of SendGameStartMsg, and the place the shared seed lands:
+ * 0x0190 into the record, straight into the global the host chose it in.
+ *
+ * It returns at once if this machine IS the host. Then, for every player that
+ * is not us, it reports the map result and makes sure a flow queue exists --
+ * and if either fails for any player it calls the session getter, logs "Error
+ * in start" and does NOT start. Note the failure flag is checked only after
+ * the loop, so one bad player stops the game for all of them.
+ *
+ * Zero players skips the loop AND the check, landing straight on the success
+ * path. And "Seed is %d" prints a literal 0 here exactly as it does in the
+ * send half, so the seed is never in the log at either end.
+ *
+ * It posts 0x0469, which nothing in the image handles. */
+void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid);
 
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.

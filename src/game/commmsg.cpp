@@ -214,12 +214,13 @@ typedef int32_t (__attribute__((thiscall)) *AM2_SetColourFn)(void *comm,
 #define orig_comm_set_army_colour \
     ((AM2_SetColourFn)(uintptr_t)ADDR_COMM_SET_ARMY_COLOUR)
 
-int32_t __cdecl SendMapMsg(int32_t map)
+int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 {
     const uint8_t *comm = kCommObj;
     int32_t        rc   = 0;
 
-    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_MAP + AM2_MSG_VALUE) = map;
+    (void)unused;   /* pushed by every call site, read by none. */
+    *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_MAP + AM2_MSG_VALUE) = result;
 
     /* The host has nobody to tell, and says so with a 1 rather than a 0. */
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
@@ -234,7 +235,7 @@ int32_t __cdecl SendMapMsg(int32_t map)
         /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is not
          * printed at all. The original's. */
         am2_log("SendMapMsg from %x   Error = %d \n",
-                *(const int32_t *)(comm + AM2_COMM_SELF_ID), map);
+                *(const int32_t *)(comm + AM2_COMM_SELF_ID), result);
     }
     return rc;
 }
@@ -519,8 +520,6 @@ typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
 #define orig_find_player_by_id \
     ((AM2_FindPlayerFn)(uintptr_t)ADDR_FIND_PLAYER_BY_ID)
 #define orig_recv_packet   ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PACKET)
-#define orig_recv_start_game \
-    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_START_GAME_MSG)
 #define orig_recv_player_msg \
     ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PLAYER_MSG)
 #define orig_recv_game_pause \
@@ -558,6 +557,78 @@ static void DispatchChat(const uint8_t *msg)
                                         + (uintptr_t)(sender << 8)));
 }
 
+typedef int32_t (__attribute__((thiscall)) *AM2_GetSessionFn)(void *comm);
+typedef int32_t (__cdecl *AM2_RegisterSelfFn)(uint32_t dpid);
+typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
+
+#define orig_comm_get_session \
+    ((AM2_GetSessionFn)(uintptr_t)ADDR_COMM_GET_SESSION)
+#define orig_comm_register_self \
+    ((AM2_RegisterSelfFn)(uintptr_t)ADDR_COMM_REGISTER_SELF)
+#define orig_request_state \
+    ((AM2_RequestStateFn)(uintptr_t)ADDR_REQUEST_STATE)
+
+void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
+{
+    uint8_t *comm = (uint8_t *)kCommObj;
+    int32_t  ok   = 1;
+    int32_t  i;
+
+    (void)dpid;   /* the dispatcher passes it; this one never reads it. */
+
+    /* The host sent this; it does not receive it. */
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+        /* "Seed is %d" pushes a literal 0 here as well as in the send half, so
+         * the seed this function is about is never in either log. */
+        am2_log("ReceiveStartGameMsg for %d Players.  Seed is %d \n",
+                *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE), 0);
+    }
+
+    /* The count is re-read every iteration, as everywhere else in this file. */
+    for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++) {
+        uint32_t id = *(const uint32_t *)(comm
+                                          + (uint32_t)i * COMM_ARMY_RECORD_SIZE
+                                          + AM2_PLAYER_ID);
+
+        if ((int32_t)id == *(const int32_t *)(comm + AM2_COMM_SELF_ID))
+            continue;
+
+        /* 7 is a result code, not a map. The second argument is the id, which
+         * SendMapMsg does not read. */
+        if (!SendMapMsg(7, (int32_t)id)) {
+            ok = 0;
+            am2_log("DPLAY ERROR SENDING TO %x\n", id);
+        }
+
+        /* Only if this player has no queue yet. Both tests re-read the id from
+         * the record rather than reusing the one above. */
+        if (!orig_find_player_by_id(id) && !orig_comm_register_self(id)) {
+            ok = 0;
+            am2_log("FlowQ creation Failure %x\n", id);
+        }
+    }
+
+    /* Checked once, after every player -- so one failure stops the game for
+     * all of them. A zero player count skips this test entirely. */
+    if (!ok) {
+        orig_comm_get_session(comm);
+        am2_log("Error in start\n");
+        return;
+    }
+
+    /* Nothing in the image handles 0x0469. */
+    orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_START_GAME, 0, 0);
+    SendGamePause(1, 0x10000);
+    orig_request_state(2);
+    *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
+    *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
+    *(int32_t *)(uintptr_t)ADDR_GAME_SEED =
+        *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
+}
+
 void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 {
     const uint8_t *comm = kCommObj;
@@ -587,7 +658,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
         return;
 
     case 5:
-        orig_recv_start_game(m, dpid);
+        ReceiveStartGameMsg(m, dpid);
         return;
 
     case 6:
@@ -655,6 +726,9 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_RECV_START_GAME_MSG,
+                  (const void *)ReceiveStartGameMsg,
+                  "ReceiveStartGameMsg", 1);
     patch_replace(ADDR_COMM_DISPATCH_MSG, (const void *)CommDispatchMessage,
                   "CommDispatchMessage", 1);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
