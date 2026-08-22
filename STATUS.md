@@ -153,6 +153,21 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`ADDR_FONT_SURFACE` and `ADDR_BACK_SURFACE` are gone, and they were both
+  wrong.** `0x004FE08C` is the back buffer -- `InitDirectDraw` takes it off the
+  primary with `DDSCAPS_BACKBUFFER`, the lock target starts pointing at it and
+  `PresentFrame` blits it to the primary -- and it was named for the one thing
+  font.cpp does with it. `0x00503100` is the offscreen map surface and was
+  called BACK_SURFACE. Both comments in `orig.h` already said the name was
+  wrong and that it had been kept anyway because it was spread about.
+
+  **A comment saying a name is wrong is not a correction; it is a note that
+  the correction was declined.** Renaming both cost one `sed` and took the
+  five `g_` names on the back buffer -- `g_back`, `g_backBuffer`,
+  `g_backBuffer2`, `g_backBufferSurf`, `g_fontSurface` -- down to one. The
+  `checkglobals` alias backlog went 38 to 34 and `checkpatches`'s `ADDR_`
+  count stayed at 31, which is what renaming rather than aliasing looks like.
+
 - **`tools/checkglobals.py` is in, and the backlog is 38 + 17.** Nothing had
   ever checked the `g_` macros. The first run found 38 surplus names for
   addresses that already had one and 17 names carrying more than one spelling.
@@ -228,12 +243,13 @@ counts probe before reading one as coverage -- that is what turned the
   where it goes -- the four other virtuals per class, the containers, and the
   edit box at `0x00454C10` that owns `g_charHandler`.
 
-- **`tools/ab.sh controls` is in, and it is EXACT.** Two clicks from the title
-  screen, no typing and no mission, 78,174 `LabelDraw` calls -- and **0 pixels
-  of 786,432**, three runs running. The manual version of the same comparison
-  differed by 54 in a 10x13 box at the cursor; driven identically both sides
-  click the same place at the same time and there is nothing left to differ.
-  Only `windowed` is also exact, and that one is a black client area.
+- **`tools/ab.sh controls` is in; its budget is 200 and was briefly 0.** Two
+  clicks from the title screen, no typing and no mission, 78,174 `LabelDraw`
+  calls. The dialog is exact. The CURSOR is not: about one run in five it
+  differs by ~45 pixels inside a 10x13 box wherever the last click left the
+  pointer, and three consecutive runs at 0 were enough to convince me it was
+  deterministic and not enough to be true. 200 covers the box; the errors this
+  screen exists to catch are thousands of pixels.
 
   It discriminates: clearing the label background with the ink colour instead
   of the paper colour puts it **17,110 pixels** over. Nothing else in the suite

@@ -58,12 +58,14 @@
 #define ADDR_ENCODE_GLYPH   0x004464C0u  /* uint32_t(uint8_t*,int32,int32,int32) */
 #define ADDR_RENDER_GLYPH   0x004465E0u  /* uint32_t(int32,char,HFONT,AM2_Rle16*,int32) */
 #define ADDR_CREATE_GAME_FONT 0x00446450u /* HFONT(const char *face, int32 h, uint16 style) */
-/* Named for the use font.cpp makes of it -- it GDI-renders glyphs onto it --
- * but InitDirectDraw shows it is the back buffer proper: the surface taken off
- * the primary with DDSCAPS_BACKBUFFER when fullscreen, and a plain offscreen
- * surface of the same size when windowed, where there is no flipping chain to
- * take one from. It is also what the lock target starts out pointing at. */
-#define ADDR_FONT_SURFACE   0x004FE08Cu  /* IDirectDrawSurface *, the back buffer */
+/* This was ADDR_FONT_SURFACE, named for the use font.cpp makes of it -- it
+ * GDI-renders glyphs onto it -- and the comment here already said the name was
+ * wrong. InitDirectDraw settles it: the surface taken off the primary with
+ * DDSCAPS_BACKBUFFER when fullscreen, and a plain offscreen surface of the
+ * same size when windowed, where there is no flipping chain to take one from.
+ * It is what the lock target starts out pointing at, and PresentFrame is what
+ * blits it to the primary. It is the back buffer, and it is named that now. */
+#define ADDR_BACK_BUFFER   0x004FE08Cu  /* IDirectDrawSurface *, the back buffer */
 /* One record per font, 524 bytes apart -- BuildFont computes the stride as
  * ((f<<6)+f)*2+f then <<2, which is 131 dwords and not the 133 this said
  * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
@@ -312,10 +314,13 @@
 #define ADDR_REDRAW_MAP_REGION   0x0041CF90u  /* void(const AM2_Rect*) */
 #define ADDR_BLIT_MAP_BACKDROP   0x0042D9B0u  /* void(AM2_Rect by value) */
 #define ADDR_DRAW_MAP_TILES      0x0041E440u  /* void(const AM2_Rect*,void*,int32) */
-/* A second offscreen surface, the same size again, and NOT the back buffer
- * despite the name -- that is ADDR_FONT_SURFACE. Kept as-is because the name is
- * already spread across mapdraw.cpp; the comment is the correction. */
-#define ADDR_BACK_SURFACE        0x00503100u  /* IDirectDrawSurface *, offscreen */
+/* A second offscreen surface, the same size again, and NOT the back buffer --
+ * that is ADDR_BACK_BUFFER. This was ADDR_BACK_SURFACE for a long time, with a
+ * comment here saying the name was wrong and had been kept anyway because it
+ * was already spread across mapdraw.cpp. A comment saying a name is wrong is
+ * not a correction, it is a note that the correction was declined; it is
+ * renamed now. RedrawMapRegion locks [0x00503100], which is what settles it. */
+#define ADDR_OFFSCREEN_SURFACE   0x00503100u  /* IDirectDrawSurface *, offscreen */
 #define ADDR_MAP_DESC            0x00514F20u  /* map descriptor; +4 is a row count */
 /* The left and top of the visible-area rectangle -- these are its first two
  * fields, not two loose globals: RedrawMapRegion is called with 0x00514E14

@@ -30,14 +30,12 @@
 #include <stdio.h>   /* SEEK_CUR only */
 
 #define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
-/* ADDR_BACK_SURFACE is misnamed in orig.h and its comment there says so: this
- * is the OFFSCREEN surface, and the real back buffer is ADDR_FONT_SURFACE.
- * This file used to call it g_backBuffer, which made the same identifier mean
- * two different surfaces in two files -- device.cpp's g_backBuffer is the other
- * one. The address was always right; only the name was a trap, and it is the
- * kind that costs an afternoon the first time somebody writes code touching
- * both. Verified against the original: RedrawMapRegion locks [0x00503100]. */
-#define g_offscreen (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
+/* The OFFSCREEN surface, not the back buffer. This file used to call it
+ * g_backBuffer, which made one identifier mean two different surfaces in two
+ * files. The address was always right; the name was the trap, and both ADDR_
+ * names involved have since been renamed to what they are. Verified against
+ * the original: RedrawMapRegion locks [0x00503100]. */
+#define g_offscreen (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
 #define g_mapDesc    ((void *)(uintptr_t)ADDR_MAP_DESC)
 
 /* 0x0041E440: the recursive tile walker. Shifts the rectangle's edges right by
@@ -400,7 +398,7 @@ bad:
 #define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
 #define g_viewRect   ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
 #define g_fullRedraw (*(int32_t *)(uintptr_t)ADDR_FULL_REDRAW)
-#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_scroll_decay      (*(am2_void_fn)ADDR_SCROLL_DECAY)

@@ -198,7 +198,7 @@ static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");
 static_assert(PM_NOREMOVE == 0, "PM_NOREMOVE");
 
 #define g_presentEnabled (*(const int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
-#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 #define g_screenClip     ((LPRECT)(uintptr_t)ADDR_SCREEN_CLIP)
 #define g_hWnd           (*(HWND *)(uintptr_t)ADDR_HWND)
 #define g_windowed       (*(const int32_t *)(uintptr_t)ADDR_OPT_WINDOWED)
@@ -244,8 +244,7 @@ void __cdecl PresentFrame(void)
 
 #define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 #define g_clipper     (*(LPDIRECTDRAWCLIPPER *)(uintptr_t)ADDR_DD_CLIPPER)
-#define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_SURFACE)
-#define g_backBuffer2 (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
 #define g_palHolder   (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
 #define MOVIE_PALETTE_OFF 0x800u
 
@@ -283,7 +282,7 @@ void __cdecl ShutdownDirectDraw(void)
         /* Cleared rather than released: fullscreen it was attached to the
          * primary and never separately owned, and windowed it is the offscreen
          * surface already let go above. */
-        g_backBuffer2 = NULL;
+        g_backBuffer = NULL;
     }
 
     IDirectDraw_RestoreDisplayMode(g_ddraw);
@@ -581,7 +580,6 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
 static_assert(sizeof(DDBLTFX) == 0x64, "DDBLTFX");
 static_assert((DDBLT_COLORFILL | DDBLT_WAIT) == 0x01000400, "colour fill");
 
-#define g_backBufferSurf (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
 #define g_seqBarBg       (*(const uint8_t *)(uintptr_t)ADDR_SEQ_BAR_BG)
 
 #define SEQ_BAR_WIDTH  3
@@ -605,7 +603,7 @@ static void SeqBarFill(int32_t left, int32_t top, int32_t right, int32_t bottom,
     fx.dwSize      = sizeof fx;
     fx.dwFillColor = colour;
 
-    if (IDirectDrawSurface_Blt(g_backBufferSurf, &dest, NULL, NULL,
+    if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
                                DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
         orig_log((const char *)(uintptr_t)ADDR_STR_SEQ_BLT_FAIL);
 }
@@ -1008,7 +1006,6 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 #define g_menuSurface2  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
 #define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
 #define g_target        (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
-#define g_back          (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
 #define g_primary2      (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define g_clipRect      ((const RECT *)(uintptr_t)ADDR_SCREEN_CLIP)
 #define g_curX          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
@@ -1095,7 +1092,7 @@ void __cdecl DrawMenuCursor(void)
         AM2_Rect            cur, clipped, shifted;
         uint8_t            *spr;
 
-        SetDrawTarget(g_back);
+        SetDrawTarget(g_backBuffer);
 
         /* Put back whatever the cursor covered last tick. */
         if (g_savedValid)
@@ -1116,7 +1113,7 @@ void __cdecl DrawMenuCursor(void)
 
         /* Save what is about to be covered. */
         if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, g_clipRect)) {
-            IDirectDrawSurface_Blt(g_menuSurface2, g_saveSlot, g_back,
+            IDirectDrawSurface_Blt(g_menuSurface2, g_saveSlot, g_backBuffer,
                                    (LPRECT)&clipped, DDBLT_WAIT, NULL);
             *g_savedRect = clipped;
             g_savedValid = 1;
@@ -1138,7 +1135,7 @@ void __cdecl DrawMenuCursor(void)
                 shifted.top    += g_screenRect.top;
                 shifted.bottom += g_screenRect.top;
             }
-            IDirectDrawSurface_Blt(g_target, (LPRECT)&shifted, g_back,
+            IDirectDrawSurface_Blt(g_target, (LPRECT)&shifted, g_backBuffer,
                                    (LPRECT)&cur, DDBLT_WAIT, NULL);
         }
     } else {

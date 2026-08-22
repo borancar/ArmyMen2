@@ -1189,20 +1189,33 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   it goes. A vtable array is worth walking the moment one of its slots is
   reconstructed — it says how big the subsystem is before any of it is read.
 
-  **`tools/ab.sh controls` is the menu A/B, and it is exact.** That dialog is
+  **`tools/ab.sh controls` is the menu A/B.** That dialog is
   78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
-  VEHICLE" — and it comes out **0 of 786,432**, so its budget is 0 like
-  `windowed`'s. Two clicks from the title screen, no typing and no mission:
+  VEHICLE" — and the dialog itself comes out **0 of 786,432**. Its budget is
+  200, for the cursor and nothing else; see below.
+  Two clicks from the title screen, no typing and no mission:
   the cheapest gameplay-free configuration in the suite, and the only one that
   compares the menu widget layer at all, since `bootcamp` and `campaign` merely
   pass through the menus and the game composes no frames while a dialog is up.
 
-  Driving it by hand first gave 54 pixels in a 10x13 box at the cursor, which
-  is worth knowing for what it is: not noise in the dialog but two clicks
-  landing at different moments. Inside `ab.sh` both sides get the same clicks
-  and it is zero. **A pixel figure can be an artefact of how the run was
-  driven rather than of what was drawn** — and the fix is to drive both sides
-  identically, not to widen the budget.
+  **Three runs agreeing is not determinism, and this budget was 0 for exactly
+  as long as it took a fourth run to disagree.** Driving it by hand first gave
+  54 pixels in a 10x13 box at the cursor. That looked like an artefact of two
+  clicks landing at different moments, and three `ab.sh` runs at 0 seemed to
+  confirm it — so the budget was tightened to 0 with a comment saying it had
+  been measured rather than reasoned. It had been measured; three times is
+  simply not enough for something that happens about one run in five. The
+  fifth run came out at 45, in the same 10x13 box.
+
+  So the pointer is not reproducible frame for frame even when both sides are
+  driven identically, and 200 covers the box. **When a figure is going to
+  become a budget, ask how rare a disagreement would have to be to hide from
+  the sample you took** — three clean runs cannot distinguish "never" from
+  "one in five" with any confidence at all.
+
+  What survives is the useful half: the DIALOG is exact, and the difference
+  when there is one is entirely the cursor. That is worth knowing, because it
+  means a handful of pixels here is never a caption.
 
   It fails when it should: clearing the label background with the ink colour
   rather than the paper colour puts it 17,110 pixels over.

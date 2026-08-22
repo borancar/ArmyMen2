@@ -21,7 +21,7 @@
 
 #include <stdint.h>
 
-#define g_fontSurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
+#define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 #define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
 #define g_frameBuf (*(uint8_t *const *)(uintptr_t)ADDR_FRAMEBUFFER)
 
@@ -127,7 +127,7 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
 uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
                              AM2_Rle16 *out, int32_t space)
 {
-    LPDIRECTDRAWSURFACE surf = g_fontSurface;
+    LPDIRECTDRAWSURFACE surf = g_backBuffer;
     HDC                 hdc;
     SIZE                size;
     char                buf[2];
@@ -226,7 +226,6 @@ HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style)
 typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDesc;
 
 #define g_fontDescs   ((const AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)
-#define g_backBuffer  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_FONT_SURFACE)
 #define g_fillColour  (*(const uint8_t *)(uintptr_t)ADDR_PIXEL_FORMAT_BYTE)
 
 /* Per-font record fields, `f` records apart. */

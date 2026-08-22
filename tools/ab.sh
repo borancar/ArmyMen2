@@ -356,13 +356,15 @@ compare() {
         # The process is gone by the time the shot is taken, so there is no
         # frame to compare. The log is the evidence.
         quit)     budget=-1 ;;
-        # Exact, like windowed, and measured twice rather than reasoned: the
-        # dialog is static and both sides receive the same two clicks, so the
-        # cursor lands in the same place on each. A manual A/B of the same
-        # screen differed by 54 pixels in a 10x13 box at the cursor, which is
-        # what an unsynchronised click looks like -- driven identically it is
-        # zero. Any pixel here is a wrong caption, so the budget says so.
-        controls) budget=0 ;;
+        # The dialog itself is exact -- three runs at 0 -- but the CURSOR is
+        # not, and this budget was 0 for exactly as long as it took a fourth
+        # run to disagree. It differs about one run in five, always inside the
+        # same 10x13 box at wherever the last click left the pointer, which is
+        # at most 130 pixels. 200 covers that and nothing else: the errors this
+        # screen is here to catch are thousands of pixels, not tens -- a
+        # one-colour slip in LabelDraw is 17,110 and a width-from-height slip
+        # in WidgetScreenRect is 305,939.
+        controls) budget=200 ;;
         *)        budget=500 ;;
     esac
     # Overridable, mainly so the check itself can be tested.
