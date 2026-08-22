@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-21**, at `412efb8`. Working tree clean.
+Last updated: **2026-08-22**, at `73cca02`. Working tree clean.
 
 ## In flight
 
@@ -101,55 +101,59 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Next
 
-1. **The savegame serialiser is complete** -- eleven savers and eleven
-   loaders. What it still lacks is EXECUTION of the load half; see 4 below,
-   which is now the most valuable single thing left in this area. `LoadGame`
-   itself (`0x00425A10`, 224 B) is fully mapped and still unwritten, and
-   `FreeObjScripts` (`0x004368D0`) is done and, unlike the loaders, actually
-   executes -- its counter reads 1 on a campaign run.
-3. **Fold the pointer-aware comparison into a tool.** It was done by hand for
-   objscript here -- walk the section, collect the offsets that hold heap
-   pointers, and compare everything else -- and it turned "188 differing bytes"
-   into a clean result with a sharp pass criterion. `tools/actdiff.py` already
-   renumbers pointers by first-seen index; the savefile deserves the same, and
-   then `tools/ab.sh` could carry it as a standing check.
-4. **Drive a LOAD -- narrowed to a genuine puzzle, with the ruled-out
-   branches named.** `LoadGame` (`0x00425A10`) is now reconstructed, patched
-   and traced, and it still never runs. What a temporary `hooklog` probe plus
-   the trace log establish, all measured:
+1. **The menu widget layer is the current front, and it is the best-verified
+   thing in the tree.** All five vtable slots have a reconstructed base, plus
+   the placement helper, both constructors, the four destructors, the focus
+   walkers and the shared painter. `tools/ab.sh controls` compares three
+   frames against the original and the dialog frame is exact.
+
+   What is left is per-class: the 33 constructors, the painters that are not
+   the shared one, and the edit box at `0x00454C10` -- the one with a text
+   buffer to get wrong, and the owner of `g_charHandler`.
+
+2. **Drive a LOAD -- a genuine puzzle, with the ruled-out branches named.**
+   `LoadGame` (`0x00425A10`) is reconstructed, patched and traced, and it still
+   never runs. Measured, from a temporary `hooklog` probe plus the trace log:
 
    - The GAME SELECT PANEL's LOAD arm (`0x00452060`) fires: `0x00511B88`
      holds `"map1_mission1.sav"`, `0x00511A68` holds `"sarge"`.
    - Mission start (`0x00425300`) takes the LOAD branch, so `0x00511DD8` was
      set when it read it at `0x00425360`.
-   - `0x00425950` **succeeds**. The log shows its three steps in order --
-     `SetGameDir("save\sarge")`, `CheckSaveTag(fp, 0x06660666, gameproc.cpp,
-     0x528)`, `LoadGameProcSection` returning 1. So the flag is NOT cleared at
+   - `0x00425950` **succeeds** -- `SetGameDir("save\sarge")`,
+     `CheckSaveTag(fp, 0x06660666, gameproc.cpp, 0x528)`,
+     `LoadGameProcSection` returning 1. So the flag is NOT cleared at
      `0x00425373`, which was one of the two candidates.
-   - `LoadGame` is patched (`patch: LoadGame 00425a10` in the log) and never
-     traced. `LoadLevelScript` is, so `0x004255CB` read the flag as 0.
+   - `LoadGame` is patched and never traced; `LoadLevelScript` is, so
+     `0x004255CB` read the flag as 0.
    - There is **no write** to `0x00511DD8` between `0x00425385` and
-     `0x004255CB`. The two map-loader references at `0x0042D078` and
-     `0x0042D0D2` are `mov eax,`/`mov ecx,` -- reads, where the loader decides
-     whether the map should place objects a save will supply.
+     `0x004255CB`.
 
-   So the flag is set, survives the open, and is 0 by the test ~250 log lines
-   later with nothing in range writing it. The most likely remaining reading
-   is that mission start is ENTERED TWICE and the second entry clears at
-   `0x00425358` or `0x00425373` before reaching the test -- which a probe on
-   those two writes would settle in one run. That is the next step, and it is
-   cheap now that the surrounding code is ours.
+   The most likely remaining reading is that mission start is ENTERED TWICE
+   and the second entry clears the flag before reaching the test, which a
+   probe on the two writes would settle in one run.
 
-5. Keep taking self-naming functions -- **29 are left**, recomputed from
-   `docs/logs.tsv` against the current patch list rather than quoted from an
-   old sweep. Smallest first: `AddMsg` (`0x00401050`, 96 B, 12 callers),
-   `RemHead` (`0x004010C0`, 144 B, 10), `RemMsg` (`0x00401410`, 176 B, 3) --
-   the air.cpp message list, which CLAUDE.md warns is mutex-guarded and
-   multi-threaded, so a mistake there is a race. Cleaner: `EventMessageSend`
-   (`0x0041F150`, 176 B), `EventMessageReceive` (`0x0041F320`, 240 B),
-   `EventTriggerDelayed` (`0x0041F410`, 144 B), `DefLinkParse` (`0x00436080`,
-   512 B) and `DefObjParse` (`0x00435B60`, 768 B).
-6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
+3. **Fold the pointer-aware savefile comparison into a tool.** Done by hand
+   for objscript -- walk the section, collect the offsets holding heap
+   pointers, compare everything else -- and it turned "188 differing bytes"
+   into a clean result with a sharp pass criterion. `tools/actdiff.py` already
+   renumbers pointers by first-seen index; the savefile deserves the same, and
+   then `tools/ab.sh` could carry it as a standing check.
+
+4. **Work off the `checkglobals` backlog**, currently 28 surplus names and 15
+   surplus spellings. The three worst were the back buffer, the draw target
+   and the primary surface, and all three are done. `ADDR_HWND` through three
+   names is next, one of which is `g_enumContext`.
+
+5. Keep taking self-naming functions from `docs/logs.tsv`, recomputed against
+   the current patch list rather than quoted from an old sweep. The air.cpp
+   message list is the notable remainder -- `RemHead` (`0x004010C0`, 144 B,
+   10 callers) and `RemMsg` (`0x00401410`, 176 B, 3) -- and CLAUDE.md warns
+   it is mutex-guarded and multi-threaded, so a mistake there is a race
+   rather than a crash.
+
+6. `tools/ab.sh all` -- `controls`, `bootcamp` and `campaign` have been run
+   against recent HEADs; `intro`, `audio`, `windowed`, `mission` and `quit`
+   have not been run since the widget work began.
 
 ## Leads
 
