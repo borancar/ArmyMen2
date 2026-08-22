@@ -193,6 +193,27 @@
 /* 0x00453BF0, thiscall, 33 callers. Absolute rectangle of a menu widget from
  * its offset within its parent; no parent means the offset is absolute. */
 #define ADDR_WIDGET_SCREEN_RECT 0x00453BF0u /* void(AM2_Widget *) */
+/* 0x00455D50, thiscall: one instruction, `jmp 0x00453BF0`. It is slot 2 --
+ * update -- of the multi-sprite class at 0x0046FCE8, so that class's whole
+ * per-frame update is "recompute my absolute rectangle". The same shape as
+ * ADDR_WIDGET_UPDATE_THUNK and ADDR_WIDGET_REPAINT_THUNK. */
+#define ADDR_MULTI_UPDATE_THUNK 0x00455D50u /* void(AM2_Widget *) */
+/* The horizontal scroll bar -- vtable 0x0046FCFC, and it names itself in the
+ * three bitmaps its constructor loads: 03_020_00_hscrollbar.bmp for the bar
+ * itself and 03_021/03_022 ltarrow and rtarrow for the two arrow children it
+ * builds. 0x7C bytes. Slot 2 is the base update and slots 3 and 4 are the
+ * base's, so only these two are its own. */
+#define ADDR_SCROLLBAR_DELETE   0x004561C0u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_SCROLLBAR_DESTRUCT 0x004561E0u /* void(AM2_Widget *) */
+#define ADDR_SCROLLBAR_PAINT    0x00456240u /* void(AM2_Widget *, RECT) */
+/* The scroll bar's two arrow children, vtable 0x0046FCD4. Slots 1 and 2 are
+ * the button's own paint and update, and the scroll bar's constructor builds
+ * each arrow by calling the BUTTON constructor and then stamping this vtable
+ * over it -- so the arrow has no constructor of its own. Its destructor is one
+ * instruction, `jmp` to the button's, which means it stamps VTABLE_BUTTON and
+ * never its own. Read, not tidied. */
+#define ADDR_ARROW_DELETE       0x00455B50u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_ARROW_DESTRUCT     0x00455B70u /* void(AM2_Widget *) */
 /* 0x00454F00, thiscall, vtable slot 1 of the vtable at 0x0046FCAC. The static
  * label's painter -- reached BOTH through that slot and by one direct call
  * from the panel that owns the label. */

@@ -75,6 +75,12 @@ typedef struct AM2_Widget {
 #define VTABLE_ICON         0x0046FC70u
 #define VTABLE_BLINKER      0x0046FD38u
 #define VTABLE_LIST         0x0046FCC0u
+/* The horizontal scroll bar. Its constructor loads 03_020_00_hscrollbar.bmp
+ * and builds an ltarrow and an rtarrow child, so the class names itself. */
+#define VTABLE_SCROLLBAR    0x0046FCFCu
+#define SCROLLBAR_OFF_BAR   0x64   /* AM2_Sprite *, the bar the paint draws */
+#define SCROLLBAR_OFF_SHIFT 0x6C   /* int32_t, added to the centred x */
+#define SCROLLBAR_OFF_SPAN  0x70   /* int32_t, taken off the width first */
 #define ICON_OFF_SPRITE     0x58
 
 /* The label's own fields, offsets from the widget base. The paper colour is
@@ -501,6 +507,44 @@ void __attribute__((thiscall)) BlinkerStart(AM2_Widget *w, uint32_t periodMs,
  * the widget's own sprite field, and paint exactly as the base does -- the
  * same shape as ButtonPaint, with one bit instead of three states. */
 void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip);
+
+/* Original: 0x00455D50 -- one instruction, `jmp WidgetScreenRect`. Slot 2 of
+ * the multi-sprite class, whose whole per-frame update is therefore
+ * "recompute my absolute rectangle". */
+void __attribute__((thiscall)) MultiUpdateThunk(AM2_Widget *w);
+
+/* Original: 0x00456240, slot 1 of the scroll bar. Draw the bar sprite, and
+ * only the bar -- it paints no children, where the base painter would.
+ *
+ * The two axes are NOT symmetric and the asymmetry is the original's. The x is
+ * centred on the widget's width less SCROLLBAR_OFF_SPAN and then shifted by
+ * SCROLLBAR_OFF_SHIFT, which is what moves the bar along its track; the y is
+ * centred on the SPRITE's own height with nothing added. So only one axis can
+ * scroll, which for a horizontal bar is the point.
+ *
+ * Both halves shift right by one AFTER the subtraction, where WidgetPaint's
+ * centring halves each side BEFORE it -- a different rounding on odd values,
+ * kept as each has it. */
+void __attribute__((thiscall)) ScrollBarPaint(AM2_Widget *w, RECT clip);
+
+/* Original: 0x004561E0 and 0x004561C0. The bar sprite IS null-tested before
+ * being released, where the icon's otherwise identical destructor does not
+ * test at all -- the two disagree and both are kept as written. The two arrow
+ * children are not released here: they are children, so the base destructor
+ * takes them with the rest of the list. */
+void __attribute__((thiscall)) ScrollBarDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w,
+                                                      int32_t flags);
+
+/* Original: 0x00455B70 and 0x00455B50, the scroll bar's arrow children.
+ *
+ * The arrow has no constructor: the scroll bar builds each one by calling the
+ * BUTTON constructor and then stamping vtable 0x0046FCD4 over the button's.
+ * Its destructor is a single `jmp` to the button's, so it re-stamps
+ * VTABLE_BUTTON rather than its own -- which for a widget about to be freed
+ * changes nothing, and is reproduced rather than corrected. */
+void __attribute__((thiscall)) ArrowDestruct(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags);
 
 /* The list box. Its rows are 14 pixels tall and start 4 below the widget's
  * top, which is read off the arithmetic in ListTakeFocus rather than assumed:

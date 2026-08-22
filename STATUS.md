@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `3ca2a7d`. Working tree clean.
+Last updated: **2026-08-22**, at `317f2fe`. Working tree clean.
 
 ## In flight
 
@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 470 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 470 | 463 of them below the CRT line |
+| `patch_replace` sites | 476 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 476 | 469 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 104,304 / 372,816 B (**28.0%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 105,648 / 372,816 B (**28.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,45 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The AUDIO CONTROLS dialog is the only screen with a scroll bar**, and
+  `tools/ab.sh audiovol` is new for it: OPTIONS -> AUDIO reaches three of them
+  -- the SOUND EFFECTS, MUSIC and VOICE sliders -- each with an ltarrow and an
+  rtarrow child. `ctl widgets` says class 0x0046FCFC appears nowhere else.
+
+- **And the widget oracle CANNOT see what that configuration is for.** A scroll
+  bar's own sprite lives at 0x0064, not at the base's 0x0038, so every bar
+  prints `spr=-1` and a wrong bar would dump identically. The pixels are the
+  evidence here, which is the reverse of `controls`, where the pixels are blunt
+  and the tree is sharp. Ask which of the two can see a given field before
+  claiming a screen is covered.
+
+- **The first version of `audiovol` could not fail, and the mutation is what
+  said so.** Dropping the thumb offset from `ScrollBarPaint` moved 336 pixels
+  against the DEFAULT budget of 500, and the run reported A/B clean. Worse, the
+  four arrow clicks it makes to move a thumb were photographed by nothing: the
+  `dlg` frame is taken before them and the final frame after CANCEL has closed
+  the dialog. Both fixed -- a `mid` frame after the clicks, and a budget of 200
+  measured in both directions (clean 45/45/50, mutation 336).
+
+- **The scroll bar's two axes are not symmetric.** x is centred on the widget's
+  width less a span field and then shifted by an offset field, which is what
+  moves the thumb; y is centred on the SPRITE's height with nothing added. Only
+  one axis can scroll, which for a horizontal bar is the point. And both halves
+  halve AFTER the subtraction where `WidgetPaint` halves each side BEFORE it --
+  a different rounding on odd values, kept as each has it.
+
+- **The arrow children have no constructor.** The scroll bar builds each one by
+  calling the BUTTON constructor and stamping vtable 0x0046FCD4 over it, and
+  the arrow's destructor is a single `jmp` to the button's -- so it stamps
+  VTABLE_BUTTON and never its own.
+
+- **Fifteen dialog destructors are the same two instructions**: stamp my own
+  vtable, jump to the dialog base at 0x00454B90. The base is one level under
+  the ICON, whose destructor it jumps to in turn. That is the next batch, and
+  `ab.sh quit` is its check -- `ReportLeaks` prints "Unreleased memory (0)
+  blocks:" into the compared log, so a destructor that forgets a free moves a
+  number that is in the diff.
 
 - **Three identical copies of a block is an INLINE FUNCTION, not three
   transcriptions.** The end-of-setup scan appears at the tail of

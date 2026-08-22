@@ -185,6 +185,17 @@ play() {
         # place the class at 0x0046FCC0 is instantiated, so its painter and its
         # update are checkable here or nowhere.
         difficulty) args="-nointro -dbg" ; wait=25 ;;
+        # OPTIONS -> AUDIO, the AUDIO CONTROLS dialog. It is the only screen
+        # in the game with a SCROLL BAR: three of them, the SOUND EFFECTS,
+        # MUSIC and VOICE sliders, each with an ltarrow and an rtarrow child.
+        # `ctl widgets` says class 0x0046FCFC appears nowhere else, so its
+        # painter and its destructor are checkable here or nowhere.
+        #
+        # And the widget dump CANNOT see the thing this configuration is for.
+        # A scroll bar's own sprite lives at 0x0064, not at the base's 0x0038,
+        # so every bar prints spr=-1 and a wrong bar would look identical. The
+        # pixels are the evidence here, which is the reverse of `controls`.
+        audiovol) args="-nointro -dbg"   ; wait=25 ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
@@ -246,6 +257,37 @@ play() {
         # pixels, which no budget catches; it is one changed line here.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
+    fi
+
+    if [ "$cfg" = audiovol ]; then
+        "$REPO/tools/point.py" 306 262 --click >/dev/null 2>&1   # OPTIONS
+        sleep 5
+        "$REPO/tools/point.py" 306 172 --click >/dev/null 2>&1   # AUDIO
+        sleep 6
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        # Nudge the SOUND EFFECTS bar right. A still dialog never moves a
+        # thumb, and the thumb's x is the ONE thing ScrollBarPaint computes --
+        # without this the configuration compares three bars that could have
+        # been drawn by any arithmetic at all.
+        local i=0
+        while [ $i -lt 4 ]; do
+            "$REPO/tools/point.py" 355 186 --click >/dev/null 2>&1
+            sleep 1
+            i=$((i + 1))
+        done
+        sleep 3
+        # A shot AFTER the clicks, and the first version of this configuration
+        # did not take one -- so the four clicks it makes to move a thumb
+        # contributed nothing to any comparison. The dlg frame is taken before
+        # them and the final frame after the dialog has gone.
+        drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
+        # CANCEL rather than OK: OK writes the volume to the registry, so a run
+        # would leave the next one starting somewhere else. It is also the
+        # click that DESTROYS the dialog, its three bars and their six arrows.
+        "$REPO/tools/point.py" 449 276 --click >/dev/null 2>&1
+        sleep 5
     fi
 
     if [ "$cfg" = difficulty ]; then
@@ -459,6 +501,14 @@ compare() {
         controls) budget=200 ;;
         # A static dialog like controls, and the cursor moves the same way.
         difficulty) budget=200 ;;
+        # 200, and measured in both directions rather than assumed. Two clean
+        # runs give 0 on every frame; dropping the thumb offset from
+        # ScrollBarPaint gives 336 on the dlg frame, which the DEFAULT budget
+        # of 500 passed. That is the mutation this configuration exists to
+        # catch, so the first version of it could not fail. 200 leaves room for
+        # the cursor, which `controls` measured at 45 on the fourth run of
+        # three that had all been 0.
+        audiovol)   budget=200 ;;
         # Measured at 0, three runs -- but left at the default, and the
         # reason is worth knowing before trusting this number. A REAL defect
         # here is small: making EditTakeFocus skip installing g_charHandler,
@@ -520,7 +570,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty multi quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol multi quit"
 
 fail=0
 for cfg in $cfgs; do

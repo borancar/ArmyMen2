@@ -814,6 +814,85 @@ void __attribute__((thiscall)) WidgetUpdateThunk(AM2_Widget *w)
     WidgetUpdate(w);
 }
 
+void __attribute__((thiscall)) MultiUpdateThunk(AM2_Widget *w)
+{
+    WidgetScreenRect(w);
+}
+
+void __attribute__((thiscall)) ScrollBarPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Sprite *bar;
+    int32_t     x;
+    int32_t     y;
+    RECT        visible;
+    RECT        box;
+    AM2_Rect    part;
+
+    WidgetScreenRect(w);
+
+    bar = *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR);
+    if (!bar)
+        return;
+
+    /* The subtraction happens first and the halving after, which rounds the
+     * other way from WidgetPaint's centring on an odd difference. */
+    x = w->rect.left
+        + ((w->rect.right - *(const int32_t *)(self + SCROLLBAR_OFF_SPAN)
+            - w->rect.left) >> 1)
+        + *(const int32_t *)(self + SCROLLBAR_OFF_SHIFT);
+    y = w->rect.top
+        + ((w->rect.bottom - bar->bounds.bottom - w->rect.top) >> 1);
+
+    /* The box is the sprite placed at (x, y), and it is what the clip is taken
+     * against -- not the widget's own rectangle, which is what WidgetPaint
+     * uses. A bar shifted past its track is clipped by its own extent. */
+    box.left   = x;
+    box.top    = y;
+    box.right  = bar->bounds.right + x;
+    box.bottom = bar->bounds.bottom + y;
+
+    /* One IntersectRect, where WidgetPaint does two -- this one never meets
+     * the screen rectangle. */
+    if (IntersectRect(&visible, &box, &clip)
+        && ClipRect(&bar->bounds, (const AM2_Rect *)&visible, &x, &y, &part))
+        DrawSpriteClipped(bar, x, y, &part, 0);
+}
+
+void __attribute__((thiscall)) ScrollBarDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    AM2_Sprite *bar = *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR);
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_SCROLLBAR);
+    /* Tested here, where the icon's identical release is not. */
+    if (bar)
+        ReleaseSprite(bar);
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w,
+                                                      int32_t flags)
+{
+    ScrollBarDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) ArrowDestruct(AM2_Widget *w)
+{
+    ButtonDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags)
+{
+    ArrowDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w)
 {
     WidgetRepaint(w);
@@ -1244,6 +1323,20 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
                         (const void *)FocusLabelTakeFocus,
                         "FocusLabelTakeFocus", 1);
+    rc |= patch_replace(ADDR_ARROW_DESTRUCT, (const void *)ArrowDestruct,
+                        "ArrowDestruct", 1);
+    rc |= patch_replace(ADDR_ARROW_DELETE, (const void *)ArrowDelete,
+                        "ArrowDelete", 1);
+    rc |= patch_replace(ADDR_MULTI_UPDATE_THUNK,
+                        (const void *)MultiUpdateThunk,
+                        "MultiUpdateThunk", 1);
+    rc |= patch_replace(ADDR_SCROLLBAR_PAINT, (const void *)ScrollBarPaint,
+                        "ScrollBarPaint", 1);
+    rc |= patch_replace(ADDR_SCROLLBAR_DESTRUCT,
+                        (const void *)ScrollBarDestruct,
+                        "ScrollBarDestruct", 1);
+    rc |= patch_replace(ADDR_SCROLLBAR_DELETE, (const void *)ScrollBarDelete,
+                        "ScrollBarDelete", 1);
     rc |= patch_replace(ADDR_WIDGET_UPDATE_THUNK,
                         (const void *)WidgetUpdateThunk,
                         "WidgetUpdateThunk", 1);
