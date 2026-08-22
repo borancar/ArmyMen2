@@ -103,6 +103,7 @@ typedef void (__attribute__((thiscall)) *am2_movie_arg_fn)(void *movie, void *ar
 
 /* Non-zero once the movie subsystem has handed Smacker a DirectSound object. */
 #define g_movieSoundReady (*(const int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
+#define g_movieCurrent (*(void **)(uintptr_t)ADDR_MOVIE_CURRENT)
 
 /* Smacker names its audio tracks by bit, starting here and shifting up. */
 #define SMACK_TRACK_FIRST 0x2000u
@@ -204,7 +205,7 @@ int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
      * same shape as the paint object in winproc.cpp. Two dereferences: the
      * global holds the object, the object begins with its table. */
     {
-        void              *current = *(void **)(uintptr_t)ADDR_MOVIE_CURRENT;
+        void              *current = g_movieCurrent;
         am2_movie_slot_fn *vtbl    = *(am2_movie_slot_fn **)current;
 
         vtbl[0]();
@@ -222,13 +223,13 @@ int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
 
     /* No timer, so no movie. Tear it down and let the game carry on. */
     {
-        void *current = *(void **)(uintptr_t)ADDR_MOVIE_CURRENT;
+        void *current = g_movieCurrent;
 
         if (current) {
             MovieStop(current);
             orig_delete(current);
         }
-        *(void **)(uintptr_t)ADDR_MOVIE_CURRENT = NULL;
+        g_movieCurrent = NULL;
     }
     PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
     return 0;
@@ -418,6 +419,53 @@ int32_t __attribute__((thiscall)) MoviePoll(void *movie)
     return 1;
 }
 
+/* Only the two fields these four touch are named, as everywhere else in this
+ * file: the object is deliberately opaque. */
+#define MOVIE_OFF_FLAG_0C   0x0Cu
+#define MOVIE_OFF_FLAG_14   0x14u
+
+void __cdecl MovieSetCurrent(void *movie)
+{
+    g_movieCurrent = movie;
+}
+
+void __cdecl MovieStepCurrent(void)
+{
+    void *movie = g_movieCurrent;
+    void **vtable;
+
+    if (!movie)
+        return;
+    /* Object, then table, then slot -- three levels, and the middle one is
+     * easy to lose. Slot 0 is MoviePoll. */
+    vtable = *(void ***)movie;
+    (*(int32_t (__attribute__((thiscall)) *)(void *))vtable[0])(movie);
+    /* Re-read the global, as the original does: the call above could have
+     * cleared it. */
+    if (g_movieCurrent)
+        *(int32_t *)((uint8_t *)g_movieCurrent + MOVIE_OFF_FLAG_14) = 0;
+}
+
+void __cdecl MovieEndCurrent(void)
+{
+    void *movie = g_movieCurrent;
+
+    if (!movie)
+        return;
+    *(int32_t *)((uint8_t *)movie + MOVIE_OFF_FLAG_0C) = 0;
+    MovieFinished();
+    g_movieCurrent = 0;
+}
+
+void __cdecl MovieForget(void)
+{
+    /* The test cannot change the outcome -- both arms leave the global at
+     * zero -- and is reproduced rather than removed. */
+    if (!g_movieCurrent)
+        return;
+    g_movieCurrent = 0;
+}
+
 int movie_install(void)
 {
     int rc = 0;
@@ -427,6 +475,14 @@ int movie_install(void)
                         "MovieSetVolume", 1);
     rc |= patch_replace(ADDR_MOVIE_DRAW_FRAME, (const void *)MovieDrawFrame,
                         "MovieDrawFrame", 1);
+    rc |= patch_replace(ADDR_MOVIE_SET_CURRENT, (const void *)MovieSetCurrent,
+                        "MovieSetCurrent", 1);
+    rc |= patch_replace(ADDR_MOVIE_FRAME_STEP, (const void *)MovieStepCurrent,
+                        "MovieStepCurrent", 0);
+    rc |= patch_replace(ADDR_MOVIE_END_CURRENT, (const void *)MovieEndCurrent,
+                        "MovieEndCurrent", 0);
+    rc |= patch_replace(ADDR_MOVIE_FORGET, (const void *)MovieForget,
+                        "MovieForget", 0);
     rc |= patch_replace(ADDR_MOVIE_FINISHED, (const void *)MovieFinished,
                         "MovieFinished", 0);
     rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);

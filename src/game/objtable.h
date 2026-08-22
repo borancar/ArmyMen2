@@ -58,6 +58,11 @@ int32_t __cdecl FindSlot(uint32_t uid, int32_t *insert_at);
 /* Original: 0x00427820. Returns the registered object for `uid`, or NULL. */
 void *__cdecl LookupByUID(uint32_t uid);
 
+/* 0x0044BA60, 14 callers. A cdecl wrapper for the line above and nothing else,
+ * passing its one argument straight through. Reconstructed as the wrapper it
+ * is: the callers reach it, not the thing it forwards to. */
+void *__cdecl ObjByUidAlias(uint32_t uid);
+
 /* Original: 0x00429740. Registers `obj`, allocating a UID when `uid` is 0.
  * Returns the UID it registered under. */
 uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid);

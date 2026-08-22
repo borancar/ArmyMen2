@@ -310,6 +310,9 @@
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t *, the encoded glyphs */
 #define ADDR_FONT_DESCS     0x004897E8u  /* {const char *face; int32 h; uint16 style}[] */
 #define ADDR_BUILD_FONT     0x004466E0u  /* int32_t(int32_t fontIndex) */
+/* 0x00446830, four callers. A cdecl wrapper for the line above and nothing
+ * else -- both take one argument and it is passed straight through. */
+#define ADDR_BUILD_FONT_ALIAS 0x00446830u  /* int32_t(int32_t fontIndex) */
 #define ADDR_GAME_MALLOC    0x004647F8u  /* the game's own CRT malloc */
 #define ADDR_GAME_FREE      0x004646A9u  /* the game's own CRT free */
 #define ADDR_SCREEN_CLIP    0x00485310u  /* AM2_Rect -- text and sprites share it */
@@ -427,6 +430,9 @@
 #define ADDR_CURSOR_X            0x00485464u  /* int32_t */
 #define ADDR_CURSOR_Y            0x00485468u  /* int32_t */
 #define ADDR_MENU_ROW            0x004FCAA8u  /* int32_t, row into the sprite grid */
+/* 0x00412DD0, 21 callers and five bytes of body: `mov eax, [ADDR_MENU_ROW]`.
+ * A getter, which is why so many things use it rather than the global. */
+#define ADDR_GET_MENU_ROW        0x00412DD0u  /* int32_t(void) */
 #define ADDR_MENU_ANIM_FRAME     0x004FCDECu  /* int32_t 0..9, -1 stops the cycle */
 #define ADDR_MENU_ANIM_NEXT      0x004FCDE8u  /* uint32_t, tick the next frame is due */
 #define MENU_ANIM_PERIOD         0xC8u        /* 200 ms */
@@ -1127,6 +1133,12 @@
 #define ADDR_IAT_SMACK_WAIT      0x0046F2BCu
 #define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall void(this, surface) */
 #define ADDR_MOVIE_CURRENT       0x006568A0u  /* the movie being played, or null */
+/* The four one-liners around ADDR_MOVIE_CURRENT. Between them they are the
+ * whole of how the rest of the game touches a playing film: one sets it, one
+ * steps it every frame in states 0 and 3, and two put it down. */
+#define ADDR_MOVIE_SET_CURRENT   0x00445620u  /* void(void *movie) */
+#define ADDR_MOVIE_END_CURRENT   0x00445650u  /* void(void) */
+#define ADDR_MOVIE_FORGET        0x00445670u  /* void(void) */
 #define ADDR_MOVIE_TIMER_PROC    0x004455E0u  /* the timer callback, stays original */
 #define ADDR_GAME_DELETE         0x004648F5u  /* the game's own operator delete */
 /* Posted to the window to advance the game state machine: 0x400 when a movie
@@ -2168,6 +2180,9 @@
  * whatever the record at ADDR_SCRIPT_OBJ_TARGET selects, which the objclass
  * branch has just filled in. */
 #define ADDR_OBJ_BY_UID           0x00427820u  /* obj *(int32_t uid) */
+/* 0x0044BA60, 14 callers. A cdecl wrapper for the line above, passing its one
+ * argument straight through -- the same shape as ADDR_BUILD_FONT_ALIAS. */
+#define ADDR_OBJ_BY_UID_ALIAS     0x0044BA60u  /* obj *(uint32_t uid) */
 /* 0x0045EE80: the same lookup, but insisting the object is kind 4. It names
  * what that means itself -- "uid wasn't a weapon!" -- so kind 4 is a WEAPON
  * and this is WeaponByUid. Answers null, having complained, for any other
@@ -3445,6 +3460,12 @@
 /* 0x0042A680, thiscall. Empty a three-field {a, b, ptr} record: clear the two
  * fields, free the pointer if there is one, clear that too. */
 #define ADDR_CLEAR_PTR_LIST        0x0042A680u  /* thiscall void(void *) */
+/* 0x0042A660, thiscall, the other end of the same record: zero all three
+ * fields without freeing anything, which is what a constructor does. And
+ * 0x0042A670 is one `jmp` to the teardown above -- an alias, the same shape as
+ * FreeSpriteListAlias. */
+#define ADDR_INIT_PTR_LIST         0x0042A660u  /* thiscall void(void *) */
+#define ADDR_CLEAR_PTR_LIST_ALIAS  0x0042A670u  /* thiscall void(void *) */
 #define TROOPER_OFF_ALLOC          0xACu
 #define WEAPON_OFF_FLAGS           0x08u
 #define WEAPON_FLAG_DEAD           0x02u

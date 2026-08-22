@@ -289,6 +289,11 @@ int32_t __cdecl BuildFont(int32_t font)
     return 1;
 }
 
+int32_t __cdecl BuildFontAlias(int32_t fontIndex)
+{
+    return BuildFont(fontIndex);
+}
+
 int font_install(void)
 {
     int rc = 0;
@@ -298,5 +303,7 @@ int font_install(void)
     rc |= patch_replace(ADDR_CREATE_GAME_FONT, (const void *)CreateGameFont,
                         "CreateGameFont", 3);
     rc |= patch_replace(ADDR_BUILD_FONT, (const void *)BuildFont, "BuildFont", 1);
+    rc |= patch_replace(ADDR_BUILD_FONT_ALIAS, (const void *)BuildFontAlias,
+                        "BuildFontAlias", 1);
     return rc;
 }

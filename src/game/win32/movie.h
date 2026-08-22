@@ -62,6 +62,24 @@ void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
  * SmackWait is what stops them drawing the same frame twice. */
 int32_t __attribute__((thiscall)) MoviePoll(void *movie);
 
+/* The four one-liners around the "current movie" global at 0x006568A0.
+ * Between them they are the whole of how the rest of the game touches a
+ * playing film, and all four names are ours.
+ *
+ * MovieStepCurrent goes through the object's VTABLE rather than calling
+ * MoviePoll -- slot 0 is 0x00445390, which is MoviePoll, but the dispatch is
+ * what the original does and is reproduced. Two dereferences, not one: the
+ * object, then its table. See CLAUDE.md, where writing that as one cost an
+ * iteration.
+ *
+ * MovieForget tests the pointer and then stores zero either way, so the test
+ * cannot change anything. Reproduced; it is one instruction and removing it
+ * would be tidying rather than porting. */
+void __cdecl MovieSetCurrent(void *movie);   /* 0x00445620 */
+void __cdecl MovieStepCurrent(void);         /* 0x00445630, states 0 and 3 */
+void __cdecl MovieEndCurrent(void);          /* 0x00445650 */
+void __cdecl MovieForget(void);              /* 0x00445670 */
+
 int movie_install(void);
 
 #ifdef __cplusplus

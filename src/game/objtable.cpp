@@ -254,6 +254,11 @@ void *__cdecl NextItem(void)
     return g_objTable[g_iterCursor].obj;
 }
 
+void *__cdecl ObjByUidAlias(uint32_t uid)
+{
+    return LookupByUID(uid);
+}
+
 int objtable_install(void)
 {
     int rc = 0;
@@ -265,5 +270,7 @@ int objtable_install(void)
                         "RemoveFromItemList", 1);
     rc |= patch_replace(ADDR_FIRST_ITEM, (const void *)FirstItem, "FirstItem", 0);
     rc |= patch_replace(ADDR_NEXT_ITEM, (const void *)NextItem, "NextItem", 0);
+    rc |= patch_replace(ADDR_OBJ_BY_UID_ALIAS, (const void *)ObjByUidAlias,
+                        "ObjByUidAlias", 1);
     return rc;
 }

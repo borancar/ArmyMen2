@@ -534,6 +534,19 @@ int32_t __cdecl MeetsAllThree(const void *p);
 int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
 int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot);
 
+/* 0x00412DD0, 21 callers and five bytes of body: one load of the menu row and
+ * a `ret`. A getter over a global, which is why so much of the menu code goes
+ * through it rather than reading the global. */
+int32_t __cdecl GetMenuRow(void);
+
+/* 0x0042A660 and 0x0042A670, both thiscall over the three-field {a, b, ptr}
+ * record. The first zeroes all three and frees nothing, which is a
+ * constructor; the second is one `jmp` to the teardown at 0x0042A680, which is
+ * still original -- the same shape as FreeSpriteListAlias, and reconstructed
+ * as the alias it is rather than left as a jump to somewhere else. */
+void __attribute__((thiscall)) InitPtrList(void *rec);
+void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
+
 int misc_install(void);
 
 #ifdef __cplusplus

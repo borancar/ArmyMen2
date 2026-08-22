@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 567 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 566 | 556 of them below the CRT line |
+| `patch_replace` sites | 576 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 575 | 565 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 104,736 / 372,816 B (**28.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 130,048 / 372,816 B (34.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 104,928 / 372,816 B (**28.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 130,240 / 372,816 B (34.9%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,23 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The nine smallest functions left were worth more than their bytes.** 192
+  bytes across five modules, and eight of the nine already had a name in
+  `orig.h` waiting for them -- `ADDR_MENU_ROW`, `ADDR_CLEAR_PTR_LIST`,
+  `ADDR_BUILD_FONT`, `ADDR_OBJ_BY_UID`, `ADDR_MOVIE_CURRENT` and the movie
+  block. Grepping the address first turned what would have been nine guesses
+  into one: `0x00412DD0` is `GetMenuRow`, `0x0044BA60` and `0x00446830` are
+  plain cdecl wrappers, `0x0042A660` is the constructor for the record
+  `ADDR_CLEAR_PTR_LIST` empties, and `0x0042A670` is a one-instruction alias
+  for that teardown.
+
+- **The movie vtable dispatch works, and its counter proves the chain.**
+  `MovieStepCurrent` reaches `MoviePoll` through `object -> table -> slot 0`,
+  and on the intro path `MovieStepCurrent` reads 746,792 while `MoviePoll`
+  reads 746,794 -- so the two dereferences are right. Writing that as one
+  dereference calls the vtable pointer as a function and the game exits
+  instantly; CLAUDE.md says it cost an iteration once.
 
 - **`ab.sh` can SEE a defect and still report clean, and here is a measured
   case.** Forcing `SetMaxHealth`'s difficulty index to 0 doubles the player's

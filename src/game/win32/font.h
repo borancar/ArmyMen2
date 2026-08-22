@@ -61,6 +61,9 @@ HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style);
  * both allocations use the game's CRT, not ours. */
 int32_t __cdecl BuildFont(int32_t font);
 
+/* 0x00446830, four callers. A cdecl wrapper for BuildFont and nothing else. */
+int32_t __cdecl BuildFontAlias(int32_t fontIndex);
+
 int font_install(void);
 
 #ifdef __cplusplus
