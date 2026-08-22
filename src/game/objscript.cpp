@@ -303,11 +303,12 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 }
 /* ------------------------------------------------- script runner ---- */
 
-/* The global this function measures object-script timing against. orig.h
- * calls it ADDR_INPUT_CONTEXT and says the meaning is unestablished. It is NOT
- * a clock -- probed at 500 for twelve seconds of play -- so the local name
- * says only that timing is read from it, and claims nothing wider. */
-#define kScriptTiming (*(const uint32_t *)AM2_IMAGE(ADDR_INPUT_CONTEXT))
+/* The mission clock in milliseconds, so `obj[0xBC] >= now` really is a
+ * deadline test and `obj[0xBC] = frame->a + now` really is scheduling the next
+ * frame. This comment used to say the opposite -- "It is NOT a clock, probed
+ * at 500 for twelve seconds of play" -- on a probe taken with a dialog up,
+ * which pauses it. See ADDR_GAME_CLOCK_MS in orig.h. */
+#define kScriptTiming (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
 
 /* 0x004351C0 and 0x00420410 stay original and are reached by address. The
  * first is ChangeObjectFrame, named by the error string below; the second is

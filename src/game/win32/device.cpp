@@ -400,7 +400,7 @@ void __cdecl UpdateMouseState(void)
 
     if (g_mouseDX || g_mouseDY || g_mouseMoved)
         *(int32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY =
-            *(const int32_t *)(uintptr_t)ADDR_INPUT_CONTEXT;
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 }
 
 /* One button event. `changed` is against the previous state rather than a

@@ -1055,6 +1055,23 @@ would skip it and the base destructor would not run: a leak, not a crash, and
 not a wrong answer. That is the cost, and it is accepted knowingly rather than
 by not noticing the prologue was there.
 
+**Say what state the game was in when a global was sampled.** `0x00511E04`
+went in as a clock, because `UpdateObjectScript` skips an object while
+`obj[0xBC] >= this` and then sets `obj[0xBC] = frame->a + this` — a deadline
+against a rising counter. A live probe then read 0x1F4, unchanging, for twelve
+seconds of Boot Camp while `ComposeFrame` climbed, and the name was changed to
+`ADDR_INPUT_CONTEXT` with "It does not tick" recorded as a fact.
+
+It ticks. The probe was taken with a DIALOG up, and a dialog pauses the game.
+Sampled in play with both Boot Camp dialogs cleared it reads 6344, 9427, 12509,
+15595 three seconds apart — about 1,027 a second, which is milliseconds. Two
+other users agree: `CreateTimer` treats it as `now`, and `ADDR_MOUSE_ACTIVITY`
+is stamped from it, which is a timestamp. It is `ADDR_GAME_CLOCK_MS`.
+
+The name was wrong for months on a measurement that was correct and
+incomplete. A value sampled only while the game is paused cannot be shown to
+tick, and the probe said nothing about which state it was in.
+
 **A mutation that DROPS a term proves nothing when the term is zero.**
 `MultiSpritePaint` runs 9,081 times on the multiplayer path, and removing the
 vertical bias it applies changed no pixels — which reads as "the bias is zero

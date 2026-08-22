@@ -2512,7 +2512,7 @@
 /* Three {point, tick} pairs, one per button, stamped when that button goes
  * down. The point is the packed dword above, not a pair of ints. */
 #define ADDR_MOUSE_PRESS         0x00485498u
-#define ADDR_MOUSE_ACTIVITY      0x004854B0u  /* set from ADDR_INPUT_CONTEXT on
+#define ADDR_MOUSE_ACTIVITY      0x004854B0u  /* set from ADDR_GAME_CLOCK_MS on
                                                * any movement or button change */
 #define ADDR_MOUSE_B0_EXTRA      0x004854B4u  /* zeroed when button 0 goes down;
                                                * nothing here reads it */
@@ -2520,17 +2520,31 @@
  * machine -- ADDR_TAKE_MENU_REQUEST is one. What it MEANS is not established;
  * this records only that the mouse stamps it whenever there is input.
  *
- * UpdateObjectScript adds a datum and rules a reading OUT. It skips an object
- * while `obj[0xBC] >= this` and on advancing sets `obj[0xBC] = frame->a +
- * this`, which reads exactly like a deadline against a rising clock -- so that
- * is what went in here first. A live probe says no: it holds 0x1F4 (500) for
- * twelve seconds of Boot Camp play while ComposeFrame climbs and
- * UpdateObjectScript runs 177,370 times. It does not tick.
+ * It IS a clock, in milliseconds, and it took three goes to establish that.
  *
- * So it is a state-scoped VALUE the object-script timing is measured against,
- * consistent with "written from three places in the state machine". Still not
- * established, and now with one fewer candidate. */
-#define ADDR_INPUT_CONTEXT       0x00511E04u
+ * UpdateObjectScript skips an object while `obj[0xBC] >= this` and on
+ * advancing sets `obj[0xBC] = frame->a + this`, which reads exactly like a
+ * deadline against a rising clock -- so "clock" went in first. A live probe
+ * then said no: 0x1F4 (500), unchanging, for twelve seconds of Boot Camp while
+ * ComposeFrame climbed. That looked decisive and the name was changed to
+ * ADDR_INPUT_CONTEXT.
+ *
+ * The probe was taken with a DIALOG up. Measured again in play with both Boot
+ * Camp dialogs cleared, it reads 6344, 9427, 12509, 15595 on samples three
+ * seconds apart -- about 1,027 units a second, which is milliseconds. It is 0
+ * on the title screen and holds still while the game is paused, which is why a
+ * dialog makes it look frozen.
+ *
+ * Two other users agree. CreateTimer treats it as `now`: a relative start is
+ * added to it and an already-elapsed schedule is compared against it. And
+ * ADDR_MOUSE_ACTIVITY is stamped FROM it whenever there is input, which is a
+ * timestamp and needs a clock to be one.
+ *
+ * The lesson is about the probe, not the name. A value sampled only while the
+ * game is paused cannot be shown to tick, and "it does not tick" was recorded
+ * as a fact for months on exactly that evidence. Say what state the game was
+ * in when a global was sampled. */
+#define ADDR_GAME_CLOCK_MS       0x00511E04u  /* uint32_t, mission ms */
 #define ADDR_MOUSE_EVENT         0x00426F40u  /* void(void), after every event */
 /* PollInput is `call PollMouse; jmp PollKeyboard` and nothing else. */
 #define ADDR_POLL_INPUT          0x00427420u  /* void(void) */
