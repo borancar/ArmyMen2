@@ -84,6 +84,46 @@ int32_t __cdecl RoundTo8(int32_t value, uint32_t bits)
     return rounded >> (8 - b);
 }
 
+/* 0x0042DFE0, five callers, and the name is ours -- the function carries no
+ * string. A power of two in 1..0x8000 becomes its bit index; everything else,
+ * including 0 and anything with more than one bit set, becomes 0, which is the
+ * same answer as for 1.
+ *
+ * MSVC compiled it as a 128-byte index table at 0x0042E08C over `value - 1`
+ * feeding a nine-entry jump table at 0x0042E068 -- eight arms and a default --
+ * and a compare chain for 0x100 upwards. The index table is 0, 1, 8, 2, 8, 8,
+ * 8, 3, ... : non-default only at 0, 1, 3, 7, 15, 31, 63 and 127, so the low
+ * half really is powers of two and nothing else.
+ *
+ * It writes `al` and leaves the rest of `eax` holding `value` or `value - 1`,
+ * which is why the vectors compare a byte here. Its callers all store the
+ * result into a byte field -- LoadAnimTable's is AM2_Anim::facingBits, where
+ * the argument is the number of facings and the answer is the shift from an
+ * 8-bit heading to one of them.
+ */
+uint8_t __cdecl Log2Mask(int32_t value)
+{
+    switch (value) {
+    case 0x0001: return 0;
+    case 0x0002: return 1;
+    case 0x0004: return 2;
+    case 0x0008: return 3;
+    case 0x0010: return 4;
+    case 0x0020: return 5;
+    case 0x0040: return 6;
+    case 0x0080: return 7;
+    case 0x0100: return 8;
+    case 0x0200: return 9;
+    case 0x0400: return 10;
+    case 0x0800: return 11;
+    case 0x1000: return 12;
+    case 0x2000: return 13;
+    case 0x4000: return 14;
+    case 0x8000: return 15;
+    default:     return 0;
+    }
+}
+
 int dist_install(void)
 {
     int rc = 0;
@@ -97,5 +137,6 @@ int dist_install(void)
     rc |= patch_replace(ADDR_ANGLE_DELTA, (const void *)AngleDelta,
                         "AngleDelta", 2);
     rc |= patch_replace(ADDR_ROUND_TO_8, (const void *)RoundTo8, "RoundTo8", 2);
+    rc |= patch_replace(ADDR_LOG2_MASK, (const void *)Log2Mask, "Log2Mask", 1);
     return rc;
 }

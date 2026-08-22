@@ -12,6 +12,7 @@
 
 #include "anim.h"
 #include "crt.h"
+#include "dist.h"   /* Log2Mask */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -53,13 +54,6 @@ static void DumpAnimTable(const AM2_AnimTable *t)
     }
 }
 
-/* 0x0042DFE0, five callers. A power of two in 1..0x8000 becomes its bit index
- * and everything else -- zero, a negative, a value with more than one bit --
- * becomes 0, which is the same answer as for 1. Left original for now; it is a
- * pure leaf and belongs with the other arithmetic. */
-typedef uint8_t (__cdecl *AM2_Log2MaskFn)(int32_t mask);
-#define orig_log2_mask  ((AM2_Log2MaskFn)(uintptr_t)ADDR_LOG2_MASK)
-
 void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
                            const AM2_AnimTable *fallback)
 {
@@ -100,7 +94,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             a->frames = w;
             orig_fread(&w, 2, 1, fp);
             a->facings = w;
-            a->facingBits = orig_log2_mask(a->facings);
+            a->facingBits = Log2Mask(a->facings);
             orig_fread(&w, 2, 1, fp);
             a->field4 = w;
             a->zero9 = 0;

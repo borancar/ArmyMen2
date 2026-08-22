@@ -326,6 +326,23 @@ word and `ParseNumber` re-runs `strlen` per character, so a 213-character line
 of prose reached it and was discarded as a fault. It is a parameter now. Raise
 it before concluding a function faulted.
 
+**A byte-returning prototype needed the harness to learn one more thing.**
+`Log2Mask` writes `al` and leaves the rest of `eax` holding its own argument --
+the recorded answer for `Log2Mask(0)` is `0xFFFFFF00`, which is `dec eax` on
+zero followed by `xor al, al`. Comparing all 32 bits tests the register
+allocator rather than the function, so the vectors carry a `byte_ret` flag and
+mask both ends. Measured rather than reasoned: with the flag off, 90-odd
+vectors fail and the low byte agrees on every one of them. `VOID` was already
+the same problem one step further on, for functions whose prototype returns
+nothing at all.
+
+**A 16-way switch is exactly the case for an explicit argument set.** 96 random
+32-bit arguments reached 50.8% of `Log2Mask`, because a random integer is
+almost never an exact power of two. Twenty-five values in `ARG_VALUES` -- every
+power, both ends of the compare chain above 0x100, and near-misses so the
+default arm and the unsigned `dec`/`cmp 0x7F` guard are reached -- put it at
+100%.
+
 **Coverage is measured, not claimed.** A Unicorn code hook records every
 instruction a vector set reaches, and `tools/vectors.py` prints the percentage
 per function; trailing `nop`/`int3` padding is excluded, since the linker's

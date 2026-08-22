@@ -169,6 +169,15 @@ VECTOR_CAP = {
 }
 
 ARG_VALUES = {
+    # Log2Mask is a 16-way switch on exact powers of two, and random 32-bit
+    # arguments almost never produce one -- 96 random vectors reached 50.8% of
+    # it. Every power, both ends of the compare chain above 0x100, and some
+    # near-misses so the default arm and the unsigned `dec`/`cmp 0x7f` guard
+    # are reached too. SEVENTEEN values against 96 vectors, which is co-prime
+    # with nothing that matters here because there is only one argument.
+    0x0042DFE0: {0: [1, 2, 4, 8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400,
+                     0x800, 0x1000, 0x2000, 0x4000, 0x8000,
+                     0, 3, 5, 0x81, 0xFF, 0x180, 0x10000, -1, -0x8000]},
     # RemapRleRuns' `wide`: 1 selects the dword row table and everything else
     # the word one, so both arms and a couple of non-1 values.
     0x00423EE0: {2: [1, 3, 0, 2, 1]},
@@ -1056,7 +1065,7 @@ def main():
                 "ADDR_UID_ARMY", "ADDR_UID_ON_WIRE",
                 "ADDR_OBJ_FIELD_A", "ADDR_OBJ_SET_FIELD_A", "ADDR_OBJ_FIELD_B",
                 "ADDR_APPROX_DIST_XY", "ADDR_ANGLE_DELTA", "ADDR_ROUND_TO_8",
-                "ADDR_MAKE_POINT",
+                "ADDR_MAKE_POINT", "ADDR_LOG2_MASK",
                 "ADDR_MSGSLOT_A0", "ADDR_MSGSLOT_A1", "ADDR_MSGSLOT_A2",
                 "ADDR_MSGSLOT_B0", "ADDR_MSGSLOT_B1", "ADDR_MSGSLOT_B2",
                 "ADDR_MSG_FIELD_12", "ADDR_COMM_MEAN_32",
@@ -1149,6 +1158,7 @@ def main():
         "ADDR_OBJ_FIELD_B": "ObjFieldB",
         "ADDR_APPROX_DIST_XY": "ApproxDistXY", "ADDR_ANGLE_DELTA": "AngleDelta",
         "ADDR_ROUND_TO_8": "RoundTo8", "ADDR_MAKE_POINT": "MakePoint",
+        "ADDR_LOG2_MASK": "Log2Mask",
         "ADDR_MSGSLOT_A0": "MsgSlotA0", "ADDR_MSGSLOT_A1": "MsgSlotA1",
         "ADDR_MSGSLOT_A2": "MsgSlotA2", "ADDR_MSGSLOT_B0": "MsgSlotB0",
         "ADDR_MSGSLOT_B1": "MsgSlotB1", "ADDR_MSGSLOT_B2": "MsgSlotB2",
@@ -1208,6 +1218,13 @@ def main():
     # Comparing that would test the calling convention rather than the
     # function. The one caller ignores eax, so void is the right prototype and
     # the harness has to be told, since it cannot see a C declaration.
+    # Functions whose C prototype returns a byte. The i386 ABI says only `al`
+    # carries the value, and Log2Mask really does leave the rest of eax holding
+    # its argument -- so comparing 32 bits would test what the original happens
+    # to leave in a register nobody may read. Compared masked to 8 bits at both
+    # ends. VOID above is the same problem one step further on.
+    BYTE = {"Log2Mask"}
+
     VOID = {"ObjSetFieldA", "MsgSlotA0", "MsgSlotA1", "MsgSlotA2",
             "MsgSlotB0", "MsgSlotB1", "MsgSlotB2",
             "ObjFlagSet0", "ObjFlagClear0", "CopyByteIfSet",
@@ -1311,6 +1328,7 @@ def main():
                      "    uint32_t    eax;\n"
                      "    uint8_t     eax_is_ptr;  /* eax is scratch+eax, not a literal */\n"
                      "    uint8_t     void_ret;     /* prototype is void: do not compare eax */\n"
+                     "    uint8_t     byte_ret;     /* prototype returns a byte: compare al */\n"
                      "    int32_t     nwrites;\n"
                      "    const uint32_t *writes;   /* offset, byte pairs */\n"
                      "    int32_t     ninputs;\n"
@@ -1365,12 +1383,13 @@ def main():
                     eaxp = 1 if (has_ptr and SCRATCH <= eax < SCRATCH + SCRATCH_SZ) else 0
                     eaxv = (eax - SCRATCH) if eaxp else eax
                     fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, '
-                             '%d, %d, %d, %s, %d, %s, %d, %s, %d, %s},\n'
+                             '%d, %d, %d, %d, %s, %d, %s, %d, %s, %d, %s},\n'
                              % (cname, cname, nargs,
                                 ",".join(str(x) for x in p),
                                 ",".join("0x%08xu" % (x & 0xFFFFFFFF) for x in a),
                                 eaxv & 0xFFFFFFFF, eaxp,
-                                1 if cname in VOID else 0, len(writes),
+                                1 if cname in VOID else 0,
+                                1 if cname in BYTE else 0, len(writes),
                                 ("w_%s_%d" % (cname, k)) if writes else "0",
                                 len(pre),
                                 ("i_%s_%d" % (cname, k)) if pre else "0",

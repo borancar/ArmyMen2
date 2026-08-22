@@ -94,6 +94,14 @@ int main(void)
         uint32_t want_eax = t->eax_is_ptr
                           ? (uint32_t)(uintptr_t)(g_scratch + t->eax)
                           : t->eax;
+        /* A byte-returning prototype carries its value in `al` only, and the
+         * original leaves the rest of eax holding whatever it last had --
+         * Log2Mask leaves its own argument there. Comparing 32 bits would test
+         * the register allocator rather than the function. */
+        if (t->byte_ret) {
+            got &= 0xFFu;
+            want_eax &= 0xFFu;
+        }
         int bad = t->void_ret ? 0 : (got != want_eax);
         for (int32_t w = 0; w < t->nwrites && !bad; w++) {
             uint32_t off = t->writes[w * 2], want = t->writes[w * 2 + 1];

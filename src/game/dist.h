@@ -42,6 +42,11 @@ int32_t __cdecl AngleDelta(uint32_t from, uint32_t to);
  * carrying past 255 wraps rather than saturating. */
 int32_t __cdecl RoundTo8(int32_t value, uint32_t bits);
 
+/* 0x0042DFE0. The bit index of a power of two in 1..0x8000, and 0 for
+ * anything else -- see the note in dist.cpp for how MSVC laid it out and why
+ * the return is a byte. */
+uint8_t __cdecl Log2Mask(int32_t value);
+
 int dist_install(void);
 
 #ifdef __cplusplus

@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 543 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 542 | 534 of them below the CRT line |
+| `patch_replace` sites | 544 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 543 | 535 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 101,728 / 372,816 B (**27.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 127,040 / 372,816 B (34.1%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 102,032 / 372,816 B (**27.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 127,344 / 372,816 B (34.2%) | what every earlier session quoted, and an over-count |
 | modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -102,7 +102,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **7,186** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **7,282** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
@@ -228,13 +228,20 @@ counts probe before reading one as coverage -- that is what turned the
 - **`LoadSpriteFile` runs 21 times in Boot Camp**, once per `LoadSpriteSet`, so
   both halves of the sprite loader are measured rather than assumed.
 
-- **`0x0042DFE0` is the next thing to take and it is 100 bytes.** A pure leaf
-  with five callers -- the power-of-two-to-bit-index table above -- and
-  `LoadAnimTable` already calls it by address. It is NOT on the pure-leaf list
-  and the reason is worth checking rather than assuming: its jump table sits in
-  `.text` at `0x0042E068`, and the purity test matches data addresses by range,
-  so a `.text` table read may be reading as a global. If it is, the test is
-  more conservative than it needs to be for this shape.
+- **A byte-returning function needed the vector harness to learn a new
+  thing.** `Log2Mask` (`0x0042DFE0`) writes `al` and leaves the rest of `eax`
+  holding its own argument -- the recorded answer for `Log2Mask(0)` is
+  `0xFFFFFF00`, which is `dec eax` on 0 followed by `xor al, al`. The harness
+  compared all 32 bits, so 90-odd vectors failed on register contents the i386
+  ABI says nobody may read. Measured, not assumed: turning the new `byte_ret`
+  flag off reproduces exactly those failures with the low byte agreeing every
+  time. `VOID` was already the same problem one step further on.
+
+- **A 16-way switch is the case for an explicit argument set.** 96 random
+  32-bit arguments reached 50.8% of `Log2Mask`, because a random integer is
+  almost never an exact power of two. Twenty-five values -- every power, the
+  ends of the compare chain, and near-misses for the default arm -- put it at
+  100%. Mutating one arm fails 3 vectors and prints the argument.
 
 - **`pad28` was not padding.** `sprite.h` had eight bytes at 0x0028 named as
   filler; `LoadSpriteSet` reads two int16 straight out of the file into 0x0028
