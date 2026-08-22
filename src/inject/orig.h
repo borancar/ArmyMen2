@@ -41,6 +41,9 @@
  * use. Same leading arguments, then the clip rectangle BY VALUE and the
  * colour. `^` in the string is an escape that rewrites the colour argument. */
 #define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,str,font,RECT,colour) */
+/* 0x00453FF0, thiscall, vtable slot 4 of 29 of the 33 widget classes. Repaint:
+ * clear the dirty flag, pick what to draw, and dispatch through slot 1. */
+#define ADDR_WIDGET_REPAINT     0x00453FF0u /* void(AM2_Widget *) */
 /* 0x00453B00, thiscall. The base constructor of the menu widget hierarchy;
  * every one of the thirty-three class constructors chains to it. */
 #define ADDR_WIDGET_CONSTRUCT   0x00453B00u /* AM2_Widget *(AM2_Widget *) */

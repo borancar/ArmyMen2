@@ -33,6 +33,35 @@ typedef void (__cdecl *AM2_DrawTextClippedFn)(int32_t x, int32_t y,
 #define orig_draw_text_clipped \
     ((AM2_DrawTextClippedFn)(uintptr_t)ADDR_DRAW_TEXT_CLIPPED)
 
+void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w)
+{
+    AM2_Widget *target = w;
+
+    /* First and unconditionally, before anything is decided -- which is where
+     * the original puts it. Nothing the walk below reads is this field, so the
+     * order is unobservable; matching it costs nothing and saves having to
+     * have established that. */
+    w->flag44 = 0;
+
+    if (w->unknown48) {
+        AM2_Widget *up = w->parent;
+
+        while (up) {
+            if (up->unknown38) {
+                target = up;
+                break;
+            }
+            up = up->parent;
+        }
+    }
+
+    /* One dereference, not two: the struct field IS the table address, so
+     * indexing it gives the slot. Writing this as a nested cast off the
+     * object is how the movie object's dispatch was got wrong -- see the
+     * `obj -> table -> slot` note in CLAUDE.md. */
+    ((AM2_WidgetPaintFn *)target->vtable)[WIDGET_VSLOT_PAINT](target, w->rect);
+}
+
 AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
 {
     AM2_Rect zero;
@@ -150,6 +179,8 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_REPAINT, (const void *)WidgetRepaint,
+                        "WidgetRepaint", 29);
     rc |= patch_replace(ADDR_WIDGET_CONSTRUCT, (const void *)WidgetConstruct,
                         "WidgetConstruct", 33);
     rc |= patch_replace(ADDR_LABEL_CONSTRUCT, (const void *)LabelConstruct,

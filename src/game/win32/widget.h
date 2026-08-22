@@ -61,6 +61,40 @@ typedef struct AM2_Widget {
 #define LABEL_OFF_INK    0x60       /* uint8_t, palette index the text is drawn in */
 #define LABEL_OFF_PAPER  0x61       /* uint8_t, palette index the background is cleared to */
 
+/* The five virtuals, in slot order. Reading the whole array at once is what
+ * makes them nameable: slot 3 is 0x00454070 in 30 of the 33 classes and slot 4
+ * is 0x00453FF0 in 29, so those two are the base's and the handful of others
+ * are overrides.
+ *
+ *   0  destructor -- every class has its own; none is shared
+ *   1  paint      -- 0x00454BA0 in 18, LabelDraw is one of the overrides
+ *   2  click      -- 0x00454BD0 in 17
+ *   3  focus      -- 0x00454070 in 30
+ *   4  repaint    -- 0x00453FF0 in 29
+ */
+#define WIDGET_VSLOT_DTOR    0
+#define WIDGET_VSLOT_PAINT   1
+#define WIDGET_VSLOT_CLICK   2
+#define WIDGET_VSLOT_FOCUS   3
+#define WIDGET_VSLOT_REPAINT 4
+
+/* Slot 1's signature: the clip rectangle by value, thiscall. */
+typedef void (__attribute__((thiscall)) *AM2_WidgetPaintFn)(AM2_Widget *w,
+                                                            RECT clip);
+
+/* Original: 0x00453FF0, thiscall, slot 4 of 29 classes. Repaint this widget.
+ *
+ * Three things it does, in the original's order. The dirty flag at 0x0044 is
+ * cleared FIRST and unconditionally, before anything is decided. Then, if
+ * 0x0048 is set, it walks UP the parent chain for the first ancestor with
+ * 0x0038 set and paints that one instead. And whichever object it ends up
+ * painting, the clip rectangle is always THIS widget's -- so deferring to an
+ * ancestor means "redraw the container, but only over me".
+ *
+ * The walk stops at the first match and falls through to painting self if it
+ * reaches the top without one. */
+void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w);
+
 /* Original: 0x00453BF0, thiscall, 33 direct callers -- the shared base helper
  * of the whole hierarchy, and the reason the layout above is known rather than
  * guessed. Turns the widget's offset within its parent into the absolute

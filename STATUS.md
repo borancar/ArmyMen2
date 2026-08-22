@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 412 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 412 | 405 of them below the CRT line |
+| `patch_replace` sites | 413 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 413 | 406 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 92,960 / 372,816 B (**24.9%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 93,456 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,30 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The widget vtable has five slots and they are all named now.** Reading all
+  33 vtables at once is what did it -- slot 3 is the same function in 30 of
+  them and slot 4 in 29, so those are the base's and the rest are overrides.
+  0 destructor (all distinct), 1 paint (`0x00454BA0` in 18), 2 click
+  (`0x00454BD0` in 17), 3 focus (`0x00454070` in 30), 4 repaint
+  (`0x00453FF0` in 29).
+
+  Slot 2's identification is the nicest: it tests three input queries and then
+  calls a function pointer at `0x0060` with `this`. For the LABEL, `0x0060` is
+  the ink colour byte -- and the label's vtable has a different function in
+  slot 2, which is what says the subclasses lay their own tails out
+  independently rather than sharing a field map.
+
+- **`WidgetRepaint` runs 3 times on the CONTROLS dialog and its interesting
+  branch runs 0 times.** Making it never defer to an ancestor leaves
+  `controls` at 0 pixels, so the walk up the parent chain is not taken on this
+  path at all; it stays verified by reading. Clicking CUSTOMIZE CONTROLS
+  lights the button and leaves the counter at 3, so whatever repaints a
+  hovered button is not slot 4.
+
+  That is the next thing to find, and it matters for the whole layer: 1.5
+  million `WidgetScreenRect` calls and 78,174 paints are reaching the screen
+  through a route that is not the repaint virtual.
 
 - **`ADDR_FONT_SURFACE` and `ADDR_BACK_SURFACE` are gone, and they were both
   wrong.** `0x004FE08C` is the back buffer -- `InitDirectDraw` takes it off the
