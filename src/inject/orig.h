@@ -3694,6 +3694,24 @@
 #define TROOPER_OFF_WEAPON_UID     0x54Cu
 #define VEHICLE_OFF_WEAPON_UID     0x550u
 #define VEHICLE_OFF_PTR_LIST       0x538u
+/* 0x0045AE30, one caller, and it names itself twice over: "ExitAllFromVehicle:
+ * I was killed in a vehicle, damage owner is me" and "... not me". Empty a
+ * vehicle from the last seat down.
+ *
+ * Its three still-original callees are named FROM THIS ONE CALL SITE, which is
+ * the naming this file warns about; read their bodies before relying on the
+ * names. What is evidenced is only what ExitAllFromVehicle does with them:
+ * the first decides whether a seat is emptied at all, the second is run on an
+ * occupant that WAS taken out, and the third goes out only on the path whose
+ * message says the damage was not ours. */
+#define ADDR_EXIT_ALL_FROM_VEHICLE 0x0045AE30u  /* void(vehicle, uint32 uid) */
+#define ADDR_VEHICLE_SEAT_BLOCKED  0x0045AC90u  /* int32(int32 seat, vehicle) */
+#define ADDR_VEHICLE_DROP_OCCUPANT 0x0045E3C0u  /* void(vehicle, occupant) */
+#define ADDR_DAMAGE_BROADCAST      0x0042A880u  /* void(obj,uid,int,int,pt,int) */
+#define VEHICLE_OFF_KIND           0x52Cu  /* 2 and 3 skip the damage entirely */
+#define OBJ_OFF_RIDING             0x570u  /* cleared as an occupant gets out */
+#define AM2_VEHICLE_DEATH_DAMAGE   0x2710
+#define AM2_VEHICLE_DEATH_KIND     4
 /* 0x0042A680, thiscall. Empty a three-field {a, b, ptr} record: clear the two
  * fields, free the pointer if there is one, clear that too. */
 #define ADDR_CLEAR_PTR_LIST        0x0042A680u  /* thiscall void(void *) */

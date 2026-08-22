@@ -3,7 +3,10 @@
 
 #include "army.h"
 #include "objtable.h"
+#include "misc.h"      /* ListRemoveAt */
+#include "msgslot.h"   /* CommMustBroadcast */
 #include "objtype.h"   /* ObjType2Field548 */
+#include "crt.h"
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -189,10 +192,90 @@ uint32_t __cdecl ListFirstField548(const void *obj)
     return ObjType2Field548((const AM2_Object *)ListFirstObj(obj));
 }
 
+typedef int32_t (__cdecl *AM2_SeatBlockedFn)(int32_t seat, void *vehicle);
+typedef void (__cdecl *AM2_DropOccupantFn)(void *vehicle, void *occupant);
+typedef void (__cdecl *AM2_DamageBroadcastFn)(void *obj, uint32_t uid,
+                                              int32_t amount, int32_t kind,
+                                              const void *at, int32_t flag);
+typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
+                                             int32_t kind, uint32_t uid,
+                                             int32_t a, int32_t b);
+#define orig_seat_blocked \
+    (*(AM2_SeatBlockedFn)AM2_IMAGE(ADDR_VEHICLE_SEAT_BLOCKED))
+#define orig_drop_occupant \
+    (*(AM2_DropOccupantFn)AM2_IMAGE(ADDR_VEHICLE_DROP_OCCUPANT))
+#define orig_damage_broadcast \
+    (*(AM2_DamageBroadcastFn)AM2_IMAGE(ADDR_DAMAGE_BROADCAST))
+#define orig_guarded_action \
+    (*(AM2_GuardedActionFn2)AM2_IMAGE(ADDR_GUARDED_ACTION))
+
+void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
+{
+    uint8_t *v = (uint8_t *)vehicle;
+    int32_t  seat;
+
+    for (seat = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4) - 1;
+         seat >= 0; seat--) {
+        const uint32_t *uids =
+            *(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8);
+        void    *rider = LookupByUID(uids[seat]);
+        int32_t  kind;
+
+        if (!orig_seat_blocked(seat, vehicle)
+            && (!g_mpSession
+                || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                     (int16_t)((const AM2_Object *)v)->owner))) {
+            /* Looked up a SECOND time, from a freshly re-read list pointer,
+             * before the slot is removed. The original does not reuse the
+             * pointer it already has. */
+            uint8_t *out = (uint8_t *)LookupByUID(
+                (*(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[seat]);
+
+            ListRemoveAt(v + VEHICLE_OFF_PTR_LIST, seat);
+            if (out) {
+                *(int32_t *)(out + OBJ_OFF_RIDING) = 0;
+                if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                      (int16_t)((const AM2_Object *)v)->owner))
+                    orig_drop_occupant(vehicle, out);
+            }
+        }
+
+        kind = *(const int32_t *)(v + VEHICLE_OFF_KIND);
+        if (kind == 3 || kind == 2 || !rider)
+            continue;
+
+        {
+            AM2_Object *dmg   = (AM2_Object *)LookupByUID(damageOwner);
+            int32_t     army  = dmg ? (int32_t)dmg->owner : AM2_ARMY_ALL;
+
+            if (g_mpSession
+                && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                      (int16_t)army)) {
+                am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
+                        "damage owner not me\n");
+                orig_damage_broadcast(rider, damageOwner,
+                                      AM2_VEHICLE_DEATH_DAMAGE,
+                                      AM2_VEHICLE_DEATH_KIND,
+                                      (const uint8_t *)rider + OBJ_OFF_POS, 0);
+                orig_guarded_action(rider, AM2_VEHICLE_DEATH_DAMAGE,
+                                    AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 1);
+            } else {
+                am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
+                        "damage owner is me\n");
+                orig_guarded_action(rider, AM2_VEHICLE_DEATH_DAMAGE,
+                                    AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 0);
+            }
+        }
+    }
+}
+
 int army_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_EXIT_ALL_FROM_VEHICLE,
+                        (const void *)ExitAllFromVehicle,
+                        "ExitAllFromVehicle", 2);
     rc |= patch_replace(ADDR_SET_LEADS_AND_ACT, (const void *)SetLeadsAndAct,
                         "SetLeadsAndAct", 1);
     rc |= patch_replace(ADDR_LIST_FIRST_OBJ, (const void *)ListFirstObj,

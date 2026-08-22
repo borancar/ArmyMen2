@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 636 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 635 | 625 of them below the CRT line |
+| `patch_replace` sites | 637 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 636 | 626 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 108,160 / 372,816 B (**29.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 133,472 / 372,816 B (35.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 108,528 / 372,816 B (**29.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 133,840 / 372,816 B (35.9%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,17 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **Six self-naming functions are left in the whole image**, and the sweep now
+  covers any size: `ExitAllFromVehicle` (368 B, taken), "Options changed by
+  host." (544), `UpdateTrooperAction` (2,080), "Player %s has left the game -
+  now AI controlled." (2,256), "Avoid the agony..." (2,304) and "Starting Slave
+  Session" (3,040). After that, naming has to come from somewhere else again.
+
+- **Three of `ExitAllFromVehicle`'s callees are named from that one call
+  site**, which is the naming this project keeps getting bitten by. Said so in
+  `orig.h` beside them: what is evidenced is only what the caller does with
+  each answer, and the bodies want reading before the names are trusted.
 
 - **The self-naming pool is nearly dry below 320 bytes.** A sweep for
   unpatched sub-CRT functions that push a string looking like their own name

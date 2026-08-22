@@ -114,6 +114,25 @@ void __cdecl SetLeadsAndAct(void *obj);
 void *__cdecl ListFirstObj(const void *obj);
 uint32_t __cdecl ListFirstField548(const void *obj);
 
+/* 0x0045AE30, one caller, and it names itself twice: "ExitAllFromVehicle: I
+ * was killed in a vehicle, damage owner is me" and "... not me".
+ *
+ * Empty a vehicle from the LAST seat down, and hurt whoever was in it. Each
+ * seat is asked first whether it is emptied at all; a seat that is gets its
+ * occupant taken off the list, its riding field cleared, and -- when we must
+ * broadcast for the vehicle's own army -- one more call on it.
+ *
+ * The damage is separate and runs even for a seat that was NOT emptied, unless
+ * the vehicle's kind is 2 or 3. Which of the two messages comes out is decided
+ * by CommMustBroadcast on the DAMAGE owner's army, with no multiplayer session
+ * answering "is me" -- and the "not me" path sends one extra call before the
+ * same damage.
+ *
+ * The loop index lives in the argument slot the vehicle came in on, MSVC
+ * having kept the vehicle in a register; it is restored from there after the
+ * ejection, because that half clobbers the register. */
+void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner);
+
 int army_install(void);
 
 #ifdef __cplusplus
