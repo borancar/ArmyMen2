@@ -26,6 +26,7 @@
 #include "dplay.h"
 #include "frame.h"
 #include "cdcheck.h"
+#include "../msgslot.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -1336,12 +1337,10 @@ static_assert(sizeof(HANDLE) == 4, "a 32-bit handle");
 #define g_packetThread  (*(HANDLE *)(uintptr_t)ADDR_PACKET_THREAD)
 #define g_packetState   (*(int32_t *)(uintptr_t)ADDR_PACKET_STATE)
 
-typedef void (__cdecl *am2_msg_add_fn)(void *list, void *node);
 typedef void (__cdecl *am2_slot_reset_fn)(int32_t slot);
 typedef void (__cdecl *am2_srand_fn)(uint32_t seed);
 typedef int32_t (__cdecl *am2_rand_fn)(void);
 
-#define orig_msg_add    (*(am2_msg_add_fn)ADDR_MSG_LIST_ADD)
 #define orig_slot_reset (*(am2_slot_reset_fn)ADDR_PACKET_SLOT_RESET)
 #define orig_srand      (*(am2_srand_fn)ADDR_GAME_SRAND)
 #define orig_rand       (*(am2_rand_fn)ADDR_GAME_RAND)
@@ -1396,7 +1395,7 @@ int32_t __cdecl StartPacketThread(void)
         for (i = 0; i < (int32_t)(PACKET_BUFFER_BYTES / 4); i++)
             *w++ = (uint32_t)orig_rand();
 
-        orig_msg_add((void *)(uintptr_t)ADDR_MSG_LIST_POOL, rec);
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, rec);
         rec  += PACKET_RECORD_STRIDE;
         data  = (uint8_t *)w;
     }

@@ -153,6 +153,14 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **The 400 appends were one loop, and the counter proves it.** Converting
+  `dplay.cpp`'s `orig_msg_add` seam to a direct call -- which `checkseams.py`
+  demanded the moment `0x00401050` was patched -- took `MsgListAdd` from 400 to
+  **0** in one step, with the code behaving identically either way. So the whole
+  400 was the pool fill in `CommCreateDirectPlay`, not traffic. This is the
+  count-of-0 blind spot manufactured on purpose rather than stumbled into, and
+  it is the cheapest way there is to find out which caller a count belongs to.
+
 - **400 appends and the linkage is still unobserved.** `MsgListAdd` runs 400
   times on a campaign drive, which by call count is the busiest thing taken in
   a while -- and breaking the list's forward link entirely leaves `campaign`
