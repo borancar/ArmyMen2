@@ -40,6 +40,7 @@
  */
 
 #include "winmain.h"
+#include "../air.h"    /* FreeSpriteList -- what the alias jumps to */
 /* Compiled for the check, not called: see the header. The retail copy
  * protection is recorded there because this binary has it patched out. */
 #include "cdcheck.h"
@@ -115,7 +116,6 @@ typedef void (__cdecl *am2_str_fn)(const char *);
 typedef void (__cdecl *am2_ptr_fn)(void *);
 typedef void (__cdecl *am2_i32_fn)(int32_t);
 
-#define orig_free_sprite_list (*(am2_void_fn)ADDR_FREE_SPRITE_LIST)
 #define orig_sprite_set_load  (*(am2_str_fn)ADDR_SPRITE_SET_LOAD)
 #define orig_sprite_set_free  (*(am2_ptr_fn)ADDR_SPRITE_SET_FREE)
 #define orig_request_state    (*(am2_i32_fn)ADDR_REQUEST_STATE)
@@ -216,7 +216,7 @@ void __cdecl ShutdownSubsystems(void)
  * three globals in a known state rather than to free anything. */
 void __cdecl FreeSpriteListAlias(void)
 {
-    orig_free_sprite_list();
+    FreeSpriteList();
 }
 
 /* 0x0040C9B0. Bring audio up, and say so in a global rather than a return

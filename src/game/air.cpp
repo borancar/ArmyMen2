@@ -7,6 +7,7 @@
 #include "objtable.h" /* AM2_Object, FirstItem, NextItem */
 #include "dist.h"     /* ApproxDist -- reconstructed */
 #include "objtype.h"  /* ObjIsTypeIn238 -- reconstructed */
+#include "crt.h"      /* am2_free, am2_realloc -- the game's own */
 #include "savetag.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -115,6 +116,47 @@ void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius, int32_t delayMs)
     }
 }
 
+/* ReleaseSprite is reconstructed, in win32/sprite.cpp. Declared here rather
+ * than by including that header because this module is flat and AM2_Sprite has
+ * an LPDIRECTDRAWSURFACE in it -- the same reason script.cpp declares
+ * PreloadSprite. An incomplete type is all this needs. */
+struct AM2_Sprite;
+extern "C" void __cdecl ReleaseSprite(AM2_Sprite *spr);
+
+#define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)
+#define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
+#define g_spriteListCap (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_CAP)
+
+void __cdecl FreeSpriteList(void)
+{
+    int32_t i;
+
+    /* No array: the count and the capacity are cleared anyway. */
+    if (!g_spriteList) {
+        g_spriteListN   = 0;
+        g_spriteListCap = 0;
+        return;
+    }
+
+    /* The count is re-read every iteration, not held. */
+    for (i = 0; i < g_spriteListN; i++)
+        ReleaseSprite(g_spriteList[i]);
+
+    am2_free(g_spriteList);
+    g_spriteList    = (AM2_Sprite **)0;
+    g_spriteListN   = 0;
+    g_spriteListCap = 0;
+}
+
+void __cdecl GrowSpriteList(void)
+{
+    /* A hundred more, and the COUNT is not consulted -- this is "make room",
+     * not "grow if full". The realloc is not checked. */
+    g_spriteListCap += AM2_SPRITE_LIST_GROW;
+    g_spriteList = (AM2_Sprite **)am2_realloc(g_spriteList,
+                                              (size_t)g_spriteListCap * 4u);
+}
+
 int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from)
 {
     int32_t extra = 0;
@@ -202,6 +244,10 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_FREE_SPRITE_LIST, (const void *)FreeSpriteList,
+                  "FreeSpriteList", 3);
+    patch_replace(ADDR_GROW_SPRITE_LIST, (const void *)GrowSpriteList,
+                  "GrowSpriteList", 1);
     patch_replace(ADDR_TAKE_NEARBY_OFF_MAP,
                   (const void *)TakeNearbyOffMap,
                   "TakeNearbyOffMap", 2);

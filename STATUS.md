@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `4039e33`. Working tree clean.
+Last updated: **2026-08-22**, at `6103d25`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 536 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 536 | 528 of them below the CRT line |
+| `patch_replace` sites | 538 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 538 | 530 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,968 / 372,816 B (**26.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 125,280 / 372,816 B (33.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 100,128 / 372,816 B (**26.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 125,440 / 372,816 B (33.6%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,32 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The duplicate-PATCH check earned its keep a third time.** I wrote a thunk
+  for 0x00409920 that `winmain.cpp` had already reconstructed as
+  `FreeSpriteListAlias` -- one of the twelve WinMain-chain functions CLAUDE.md
+  names -- and `checkpatches` refused the build. The two before it were
+  `TakeUid`/`AllocUid` and `ScriptCompare`.
+
+  What the alias JUMPS to had a name too, `ADDR_FREE_SPRITE_LIST`, reached
+  through an `orig_` seam. So this was never new frontier: it was the seam
+  under a function that was already ours, and closing it is what the commit
+  actually did.
+
+  The lesson is narrower than "grep the address". I DID grep -- for
+  0x004098B0, and found nothing, because the constant is spelled
+  `0x004098B0u` in one place and the thunk is a different address entirely.
+  Grep the address of every function in the group, not just the one you
+  started from.
+
+- **Naming follows the code that is already there.** The globals became
+  `ADDR_SPRITE_LIST*` rather than my `SPRITE_POOL*` because `orig.h` had
+  already committed to "sprite list" in the two function names. A new name
+  beside an established vocabulary is a second vocabulary.
+
+- **`GrowSpriteList` does not look at the count.** It adds a hundred to the
+  capacity and reallocs, so it is "make room", called by whoever is about to
+  need it, rather than "grow if full". And nothing checks the realloc.
 
 - **Three ratchets fired on one 112-byte function, and all three were right.**
   `checkseams` caught a fresh `orig_` on 0x00457420, which `objtype.cpp` has

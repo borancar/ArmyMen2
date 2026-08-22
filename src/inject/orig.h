@@ -3204,6 +3204,18 @@
 /* 0x004097D0, 112 bytes, two callers. Everything of type 2, 3 or 8 within a
  * radius of a point goes off the map and comes back later. */
 #define ADDR_TAKE_NEARBY_OFF_MAP 0x004097D0u /* void(AM2_Point, int32, int32) */
+/* The sprite LIST -- the array ADDR_FREE_SPRITE_LIST releases and frees, and
+ * ADDR_FREE_SPRITE_LIST_ALIAS jumps to. It sits just past the air save block
+ * and is not part of it. Capacity grows a HUNDRED entries at a time, the same
+ * shape as the script tokeniser's ten.
+ *
+ * The three global names are ours; the two function names were already here,
+ * from the WinMain teardown that calls the alias. */
+#define ADDR_SPRITE_LIST_CAP     0x004F96C0u  /* int32_t */
+#define ADDR_SPRITE_LIST_COUNT   0x004F96C4u  /* int32_t */
+#define ADDR_SPRITE_LIST         0x004F96C8u  /* AM2_Sprite ** */
+#define AM2_SPRITE_LIST_GROW     100
+#define ADDR_GROW_SPRITE_LIST    0x00409930u  /* void(void) */
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */

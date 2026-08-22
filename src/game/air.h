@@ -96,6 +96,24 @@ int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from);
 void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius,
                               int32_t delayMs);
 
+/* Originals: 0x004098B0 and 0x00409930, the sprite list's teardown and its
+ * growth. The list itself is 0x004F96C0..0x004F96C8 -- capacity, count, array.
+ *
+ * FreeSpriteList is what winmain.cpp's FreeSpriteListAlias has been jumping to
+ * since it was written; the alias at 0x00409920 was already reconstructed, and
+ * this closes the seam under it rather than adding anything beside it.
+ *
+ * It releases every sprite, frees the array and clears all three globals. Its
+ * EMPTY path clears the count and the capacity anyway, so a null array with a
+ * stale count is tidied rather than trusted -- and the count is re-read from
+ * memory on every iteration of the release loop rather than held.
+ *
+ * GrowSpriteList adds a HUNDRED to the capacity and reallocs to that without
+ * looking at the count, so it is "make room", called by whoever is about to
+ * need it, not "grow if full". Nothing checks the realloc. */
+void __cdecl FreeSpriteList(void);
+void __cdecl GrowSpriteList(void);
+
 /* 0x00409840 and 0x00409870. A tag and one fixed 584-byte block at
  * 0x004F945C, written and read straight -- the simplest section in the file
  * and the same shape map.cpp's is.
