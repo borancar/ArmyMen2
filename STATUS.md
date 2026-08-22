@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `73cca02`. Working tree clean.
+Last updated: **2026-08-22**, at `74701d8`. Working tree clean.
 
 ## In flight
 
@@ -151,9 +151,7 @@ counts probe before reading one as coverage -- that is what turned the
    it is mutex-guarded and multi-threaded, so a mistake there is a race
    rather than a crash.
 
-6. `tools/ab.sh all` -- `controls`, `bootcamp` and `campaign` have been run
-   against recent HEADs; `intro`, `audio`, `windowed`, `mission` and `quit`
-   have not been run since the widget work began.
+6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
 
@@ -171,9 +169,26 @@ counts probe before reading one as coverage -- that is what turned the
   same single line. **Compare like with like before concluding the harness is
   at fault.**
 
-- **`ab.sh all` needs re-running after any blinded run.** The first sweep this
-  session produced valid results for `bootcamp`, `windowed` and `intro` only;
-  everything from `audio` onward ran against a silenced log.
+- **`tools/ab.sh all` is CLEAN, all eight configurations**, at `74701d8` --
+  the first full-suite pass of this session and the first since the widget
+  layer began.
+
+  | config | log | pixels |
+  |---|---|---|
+  | `bootcamp` | 13 identical | 22 |
+  | `windowed` | 5 identical | **0** |
+  | `intro` | 4 identical | **0** |
+  | `audio` | 13 identical | 22 |
+  | `mission` | 13 identical | 172,775 -- live scroll, budget disabled |
+  | `campaign` | 14 identical | 2,571 -- budget disabled |
+  | `controls` | 5 identical | **0 / 0 / 0** on all three frames |
+  | `quit` | 8 identical | **0** |
+
+  `audio`, `mission`, `campaign`, `controls` and `quit` are the five that ran
+  blind against a silenced log before the `ADDR_LOG` fix; all five match now.
+  `mission` and `campaign` have their pixel checks disabled by design -- two
+  unsynchronised runs of live play -- so their evidence is the log, and both
+  logs agree exactly.
 
 - **The subclass tails are laid out INDEPENDENTLY, and three classes now prove
   it at the same offsets.** `0x005C` is the font in a label, and in the class
