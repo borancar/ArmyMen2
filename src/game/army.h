@@ -70,6 +70,34 @@ void *__cdecl LookupOwnerObj(uint32_t owner);
  * is a sweep as well as a walk. */
 void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj));
 
+/* 0x00457B30, seven callers, every one of them creating a unit. Put the type's
+ * health figure into the object's MAX health at +0x60, scaled by who owns it
+ * and how the game is set up. Every caller then computes the current health at
+ * +0x62 from what this left behind, which is what fixes the two fields as max
+ * and current.
+ *
+ * Four exits, and only one of them is the interesting one:
+ *
+ *   - a max health already above 400 is left exactly as it is;
+ *   - in a multiplayer session the amount is stored unscaled;
+ *   - for OUR OWN army it is multiplied by 4, 2 or 1.5 as the difficulty is
+ *     easy, normal or hard;
+ *   - for anyone else on hard, nothing happens at all -- and on easy or normal
+ *     the enemy keeps the LARGER of a third of the amount and the amount less
+ *     five for every retry of this level, divided by 2*difficulty + 2.
+ *
+ * That last term is a rubber band: 0x00512330 is the retry counter the level
+ * loader logs as "Attempt# %d", so an enemy gets weaker the more times the
+ * player has restarted, and faster on easy than on normal.
+ *
+ * The arithmetic is `long double` on purpose. The original is x87 throughout
+ * -- `fild` an int, `fmul` a float or a double, then MSVC's truncating _ftol
+ * -- so every product is rounded to 80 bits and not to 64. On both i386 and
+ * x86-64 `long double` IS the x87 type, so this is the same function; plain
+ * `double` would differ in the last place for some amounts and would only ever
+ * show up as one health point somewhere. */
+void __cdecl SetMaxHealth(void *obj, int32_t amount);
+
 int army_install(void);
 
 #ifdef __cplusplus

@@ -1802,6 +1802,26 @@
  * to answer whether two armies are on the same side. The two writers above
  * were named from their shape alone. See src/game/army.h. */
 #define ADDR_ALLY_MATRIX         0x00511E60u  /* int32_t[4][4] */
+/* 0x00457B30, seven callers, every one of them creating a unit. Set an
+ * object's MAX health (+0x60) from its type's value, scaled by the difficulty
+ * -- and every caller then sets the current health at +0x62 from what this
+ * left there, which is what fixes the two fields.
+ *
+ * The two globals it reads name themselves. 0x00512324 is written through
+ * `Options.cfg` and indexes a three-float table, and the function returns
+ * without doing anything when it is above 1 -- so it is the difficulty, 0 to
+ * 2. 0x00512330 is logged as "Attempt# %d": the level loader increments it on
+ * each retry and 0x00421890 clears it when the campaign moves on. Every
+ * retry takes five health off each enemy, divided by 2*difficulty + 2. */
+#define ADDR_SET_MAX_HEALTH      0x00457B30u  /* void(void *obj, int32_t) */
+#define ADDR_DIFFICULTY          0x00512324u  /* int32_t, 0..2 */
+#define ADDR_LEVEL_ATTEMPT       0x00512330u  /* int32_t -- "Attempt# %d" */
+#define ADDR_DIFFICULTY_SCALE    0x00489870u  /* float[3] = 4.0, 2.0, 1.5 */
+#define ADDR_ENEMY_HEALTH_SHARE  0x0046FD50u  /* double 0.33 */
+#define ADDR_FTOL                0x00464490u  /* MSVC _ftol, truncating */
+#define OBJ_OFF_MAX_HEALTH       0x60u        /* int16_t, beside +0x62 */
+#define AM2_MAX_HEALTH_CAP       0x190        /* 400: above this, leave alone */
+#define AM2_HEALTH_PER_ATTEMPT   5
 #define ADDR_ALLY_FLAG           0x0040F230u  /* stdcall int32_t(a, b) */
 #define ADDR_ARMIES_ALLIED       0x00457720u  /* int32_t(a, b), 4 means all */
 #define ADDR_OBJ_IS_FRIENDLY     0x004577C0u  /* int32_t(const void *obj) */

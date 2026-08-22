@@ -662,6 +662,22 @@ renamed with them, because that message's counter runs over exactly that field.
 One string settled the vocabulary for a struct, two functions, six globals and
 a tool.
 
+**A pixel budget can hide a real difference, and that is measured rather than
+feared.** Forcing `SetMaxHealth`'s difficulty index to 0 doubles the player's
+health; `ab.sh bootcamp` goes from 22 differing pixels to 96 and reports A/B
+clean, because 96 is well inside the budget of 500. The budget is what lets the
+check survive a moving scene, and it is also what lets a small real difference
+through. Read the number, not the verdict — the same lesson the 33,137-pixel
+tile painter taught, one rung further in.
+
+**`tools/objdump.py` reads a registered object's fields out of the running
+game**, by uid, binary-searching the sorted table `src/game/objtable.c`
+describes. Run it against a reconstruction and again under `AM2_NOPATCH=1`: the
+leader's max health is 140 on a correct build and 280 on that mutation, which
+is 4.0 against 2.0 exactly. It is the check for functions that write an object
+field and return nothing — a class neither `tools/vectors.py` (it cannot map
+the game's globals) nor `AM2_SELFCHECK=1` (it compares `eax`) can reach.
+
 **A table's BASE is the part an A/B cannot check, and this file's own warning
 came true a second time.** `BuildRoachFootprints` writes each record's count
 through `[ebp-4]` with `ebp` starting at the points, so the array begins at

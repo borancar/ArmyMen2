@@ -122,6 +122,46 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
     }
 }
 
+#define g_difficulty     (*(const int32_t *)(uintptr_t)ADDR_DIFFICULTY)
+#define g_levelAttempt   (*(const int32_t *)(uintptr_t)ADDR_LEVEL_ATTEMPT)
+/* Both constants come out of the image rather than being written here: same
+ * bits, and nothing to mistype. The table is FLOATS and the share is a
+ * DOUBLE, which is what `fmul dword` and `fmul qword` say. */
+#define g_difficultyScale ((const float *)AM2_IMAGE(ADDR_DIFFICULTY_SCALE))
+#define g_enemyHealthShare (*(const double *)AM2_IMAGE(ADDR_ENEMY_HEALTH_SHARE))
+
+void __cdecl SetMaxHealth(void *obj, int32_t amount)
+{
+    AM2_Object *o   = (AM2_Object *)obj;
+    int16_t    *max = (int16_t *)((uint8_t *)o + OBJ_OFF_MAX_HEALTH);
+    int32_t     scaled;
+    int32_t     floor;
+
+    if (*max > AM2_MAX_HEALTH_CAP)
+        return;
+
+    if (g_mpSession) {
+        *max = (int16_t)amount;
+        return;
+    }
+
+    if (o->owner == (int32_t)g_defaultOwner) {
+        *max = (int16_t)(int32_t)((long double)amount
+                                  * (long double)g_difficultyScale[g_difficulty]);
+        return;
+    }
+
+    /* Hard leaves an enemy's health exactly as the caller passed it -- which
+     * is to say, untouched: this writes nothing at all. */
+    if (g_difficulty > 1)
+        return;
+
+    scaled = (int32_t)((long double)amount * (long double)g_enemyHealthShare);
+    floor  = amount - AM2_HEALTH_PER_ATTEMPT
+                      * (g_levelAttempt / (g_difficulty * 2 + 2));
+    *max = (int16_t)(scaled > floor ? scaled : floor);
+}
+
 int army_install(void)
 {
     int rc = 0;
@@ -133,6 +173,8 @@ int army_install(void)
                         "ObjIsFriendly", 1);
     rc |= patch_replace(ADDR_LOOKUP_OWNER_OBJ, (const void *)LookupOwnerObj,
                         "LookupOwnerObj", 1);
+    rc |= patch_replace(ADDR_SET_MAX_HEALTH, (const void *)SetMaxHealth,
+                        "SetMaxHealth", 2);
     rc |= patch_replace(ADDR_FOR_EACH_ARMY_OBJECT,
                         (const void *)ForEachArmyObject, "ForEachArmyObject", 2);
     return rc;

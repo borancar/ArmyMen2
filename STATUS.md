@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 566 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 565 | 555 of them below the CRT line |
+| `patch_replace` sites | 567 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 566 | 556 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 104,592 / 372,816 B (**28.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 129,904 / 372,816 B (34.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 104,736 / 372,816 B (**28.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 130,048 / 372,816 B (34.9%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -105,6 +105,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make selftest` | current | **7,282** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
+| `tools/objdump.py --leader` | current | max health 140, current 140 -- identical to `AM2_NOPATCH=1` |
 | `AM2_SELFCHECK=1` | current | 5,888 calls across 46 functions, 0 disagree |
 | `tools/maskdump.py` | current | roach 32 records/237 points, vehicle 192/3,081, 36,768 bytes, sha256 `532e52a0...` -- byte-identical to `AM2_NOPATCH=1` |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
@@ -196,6 +197,33 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **`ab.sh` can SEE a defect and still report clean, and here is a measured
+  case.** Forcing `SetMaxHealth`'s difficulty index to 0 doubles the player's
+  health, and `bootcamp` goes from its usual 22 differing pixels to 96 -- and
+  passes, because 96 is well inside the budget of 500. The budget is what
+  makes the check survive a moving scene; it is also what makes a small real
+  difference invisible. Read the number, not the verdict.
+
+  `tools/objdump.py` is the answer for this class: it reads a registered
+  object's fields out of the running game by uid, binary-searching the sorted
+  table. The leader's max health is 140 on a correct build and 280 on the
+  mutated one -- 4.0 against 2.0, exactly. That turns "verified by reading"
+  into a comparison for every function that writes an object field and returns
+  nothing, which neither the vector harness nor `AM2_SELFCHECK=1` can check.
+
+- **The game gives up on you gently.** `SetMaxHealth` takes five health off
+  every enemy for each retry of the level, divided by 2*difficulty + 2 --
+  faster on easy than on normal, and not at all on hard, where the whole enemy
+  branch returns without writing. `0x00512330` is the retry counter, and it
+  says so: the level loader logs `"Attempt# %d"` and `0x00421890` clears it
+  when the campaign moves on.
+
+- **And that rubber band is unobserved in every run here.** Boot Camp reads
+  difficulty 1 and attempt 0, so the enemy arm computes
+  `max(amount * 0.33, amount - 0)`, which is `amount`. The 0.33 constant, the
+  division and the floor are all verified by reading; only the player's x2 and
+  the 400 cap are actually exercised.
 
 - **Two names in `orig.h` were wrong about what they named, and both were
   named from a single call site.** `ADDR_SPRITE_DROP_NAMED` (`0x00457820`)
