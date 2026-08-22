@@ -100,6 +100,7 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 /* The 640x480 screen rectangle, spelled exactly as sprite.cpp and text.cpp
  * spell it so it stays one definition rather than a drift. */
 #define g_screenClip  (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
+#define orig_mouse_moved (*(const int32_t *)(uintptr_t)ADDR_MOUSE_MOVED)
 
 void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
 {
@@ -137,6 +138,71 @@ void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
      * CALLER's clip rather than the intersection worked out above. */
     for (child = w->firstChild; child; child = child->nextSibling)
         ((AM2_WidgetPaintFn *)child->vtable)[WIDGET_VSLOT_PAINT](child, clip);
+}
+
+/* Which edit box has the focus, and the WM_CHAR consumer WndProc dispatches
+ * through. The handler itself is still original -- it is the field's typing
+ * behaviour, not its lifecycle. */
+#define g_focusedEdit (*(AM2_Widget **)(uintptr_t)ADDR_FOCUSED_EDIT)
+/* Spelled exactly as winproc.cpp spells it, type and all, so the two stay one
+ * definition rather than a drift -- checkglobals refused the first attempt,
+ * which had it as a bare void *. */
+typedef void (__cdecl *am2_char_fn)(uint32_t ch, uint32_t lo, uint32_t hi);
+#define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
+
+/* Clear the focus record and the installed handler, but only if this widget is
+ * the one that owns them. Both callers need the test: a field can be repainted
+ * or destroyed while a DIFFERENT field holds the focus, and wiping a newer
+ * field's handler would leave typing dead with nothing to say why. */
+static void EditReleaseFocus(AM2_Widget *w)
+{
+    if (g_focusedEdit == w) {
+        g_focusedEdit = (AM2_Widget *)0;
+        g_charHandler = (am2_char_fn)0;
+    }
+}
+
+void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce)
+{
+    g_focusedEdit = w;
+    g_charHandler = (am2_char_fn)AM2_IMAGE(ADDR_EDIT_CHAR_HANDLER);
+    WidgetTakeFocus(w, announce);
+}
+
+void __attribute__((thiscall)) EditRepaint(AM2_Widget *w)
+{
+    EditReleaseFocus(w);
+    WidgetRepaint(w);
+}
+
+void __attribute__((thiscall)) EditDestruct(AM2_Widget *w)
+{
+    w->vtable = (void *)AM2_IMAGE(VTABLE_EDIT);
+    EditReleaseFocus(w);
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) EditDelete(AM2_Widget *w, int32_t flags)
+{
+    EditDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) EditUpdate(AM2_Widget *w)
+{
+    WidgetScreenRect(w);
+
+    /* Hover to focus, and nothing else -- which is how clicking a text field
+     * gives it the caret and the keyboard. */
+    if (w->parent && orig_mouse_moved && !w->unknown4C) {
+        w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
+                                   (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+        if (w->unknown40)
+            ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+    }
+    WidgetUpdate(w);
 }
 
 void __attribute__((thiscall)) WidgetDestructThunk(AM2_Widget *w)
@@ -569,6 +635,16 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_EDIT_TAKE_FOCUS, (const void *)EditTakeFocus,
+                        "EditTakeFocus", 1);
+    rc |= patch_replace(ADDR_EDIT_REPAINT, (const void *)EditRepaint,
+                        "EditRepaint", 1);
+    rc |= patch_replace(ADDR_EDIT_DESTRUCT, (const void *)EditDestruct,
+                        "EditDestruct", 1);
+    rc |= patch_replace(ADDR_EDIT_DELETE, (const void *)EditDelete,
+                        "EditDelete", 1);
+    rc |= patch_replace(ADDR_EDIT_UPDATE, (const void *)EditUpdate,
+                        "EditUpdate", 1);
     rc |= patch_replace(ADDR_WIDGET_DESTRUCT_THUNK,
                         (const void *)WidgetDestructThunk,
                         "WidgetDestructThunk", 1);

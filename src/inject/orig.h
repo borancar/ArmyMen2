@@ -87,6 +87,16 @@
  * thunk onto the base destructor. Slot 0 in three vtables. */
 #define ADDR_WIDGET_DELETE_ALT  0x00456970u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_WIDGET_DESTRUCT_THUNK 0x00456990u /* void(AM2_Widget *) */
+/* The edit box -- vtable 0x0046FC98, the class CLAUDE.md names as the owner of
+ * g_charHandler. 0x0065A05C holds whichever one currently has the focus, and
+ * 0x0044D520 is the WM_CHAR consumer it installs while it does. */
+#define ADDR_FOCUSED_EDIT       0x0065A05Cu /* AM2_Widget *, or null */
+#define ADDR_EDIT_CHAR_HANDLER  0x0044D520u /* void(wparam, lo, hi) */
+#define ADDR_EDIT_DELETE        0x00454CA0u /* AM2_Widget *(AM2_Widget *, int32_t) */
+#define ADDR_EDIT_DESTRUCT      0x00454CC0u /* void(AM2_Widget *) */
+#define ADDR_EDIT_TAKE_FOCUS    0x00454CE0u /* void(AM2_Widget *, int32_t) */
+#define ADDR_EDIT_REPAINT       0x00454D00u /* void(AM2_Widget *) */
+#define ADDR_EDIT_UPDATE        0x00454E20u /* void(AM2_Widget *) */
 /* The label subclass that highlights when focused -- vtable 0x0046FB80, and
  * the class the CONTROLS panel builds its captions from. */
 #define ADDR_FOCUSLABEL_DELETE    0x00450CC0u /* AM2_Widget *(AM2_Widget *, int32_t) */

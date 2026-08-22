@@ -67,6 +67,8 @@ typedef struct AM2_Widget {
 #define VTABLE_WIDGET_BASE  0x0046FC20u
 /* The label's vtable, twenty-sixth of the thirty-three. */
 #define VTABLE_LABEL        0x0046FCACu
+/* The edit box, twenty-fifth of the thirty-three. */
+#define VTABLE_EDIT         0x0046FC98u
 
 /* The label's own fields, offsets from the widget base. The paper colour is
  * NOT at the same offset in the edit box, which clears with the byte at 0x0066
@@ -388,6 +390,27 @@ void __attribute__((thiscall)) FocusLabelDestruct(AM2_Widget *w);
 void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
+
+/* The edit box -- vtable 0x0046FC98, and the class CLAUDE.md names when it says
+ * porting g_charHandler means porting the text-field system.
+ *
+ * Its whole extra behaviour is one piece of global state. Taking focus records
+ * itself in 0x0065A05C and installs 0x0044D520 as the WM_CHAR consumer that
+ * WndProc calls; losing focus, or being destroyed, clears BOTH -- but only if
+ * it is still the one recorded, which is what stops a stale field wiping a
+ * newer field's handler.
+ *
+ * That check appears twice, in the repaint and in the destructor, and both are
+ * needed: a field can be repainted while another has focus, and can be
+ * destroyed while another has focus.
+ *
+ * Its update is hover-to-focus and nothing else, which is how clicking a text
+ * field gives it the caret and the keyboard. */
+AM2_Widget *__attribute__((thiscall)) EditDelete(AM2_Widget *w, int32_t flags);
+void __attribute__((thiscall)) EditDestruct(AM2_Widget *w);
+void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce);
+void __attribute__((thiscall)) EditRepaint(AM2_Widget *w);
+void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
 
 int widget_install(void);
 

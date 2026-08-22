@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 435 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 435 | 428 of them below the CRT line |
+| `patch_replace` sites | 440 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 440 | 433 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 98,352 / 372,816 B (**26.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 98,960 / 372,816 B (**26.5%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -154,6 +154,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The edit box types, and that is end-to-end evidence.** `EditTakeFocus` is
+  what installs `g_charHandler`, so a field can only receive a character if our
+  reconstruction ran. Driving `AM2_MULTIPLAYER=1` to ENTER BATTLE NAME gives
+  `EditUpdate` 12,552 and `EditTakeFocus` 1, and `ctl "type Zulu"` puts
+  **`Zulu_`** in the field -- text and caret both.
+
+  The caret was predicted from reading the painter, which appends a literal
+  `'_'` when `0x0044` is set, and then seen. Prediction first, observation
+  second, which is worth more than either alone.
+
+- **`controls` does NOT reach the edit box.** Its key-capture boxes look like
+  text fields and are a different class: all five `Edit*` counters read 0 on
+  that configuration. The classes that use it are ENTER BATTLE NAME behind
+  `AM2_MULTIPLAYER=1` and the campaign's RECRUIT dialog, which CLAUDE.md warns
+  against driving. So the edit box is verified on the multiplayer path or not
+  at all -- worth an `ab.sh` configuration of its own, since the whole path is
+  drivable and CLAUDE.md already records the coordinates.
 
 - **The `dlg` frame earned its keep, and it is the only one that did.** Making
   `FocusLabelDraw` always use the focused colour pair leaves the final frame at
