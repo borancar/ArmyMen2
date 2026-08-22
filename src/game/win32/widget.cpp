@@ -19,13 +19,6 @@ static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
  * g_drawTarget, under the same name, because it is the same global. */
 #define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_LOCKED_SURFACE)
 
-/* 0x00453BF0, thiscall, 33 direct callers: the shared base helper that turns a
- * widget's offset-within-its-parent into an absolute rectangle. A widget with
- * no parent is placed at its offset directly. Still original. */
-typedef void (__attribute__((thiscall)) *AM2_WidgetRectFn)(AM2_Widget *w);
-#define orig_widget_screen_rect \
-    ((AM2_WidgetRectFn)(uintptr_t)ADDR_WIDGET_SCREEN_RECT)
-
 /* 0x00446AB0, cdecl, 11 direct callers: the clipped sibling of DrawText at
  * 0x00446930. Measures the string with `repne scasb`, then walks it a
  * character at a time; `^` followed by any character is an escape that
@@ -38,12 +31,31 @@ typedef void (__cdecl *AM2_DrawTextClippedFn)(int32_t x, int32_t y,
 #define orig_draw_text_clipped \
     ((AM2_DrawTextClippedFn)(uintptr_t)ADDR_DRAW_TEXT_CLIPPED)
 
+void __attribute__((thiscall)) WidgetScreenRect(AM2_Widget *w)
+{
+    const AM2_Widget *parent = w->parent;
+    int32_t           left;
+    int32_t           top;
+
+    if (parent) {
+        left = parent->rect.left + w->x;
+        top  = parent->rect.top  + w->y;
+    } else {
+        left = w->x;
+        top  = w->y;
+    }
+    w->rect.left   = left;
+    w->rect.right  = left + w->w;
+    w->rect.top    = top;
+    w->rect.bottom = top  + w->h;
+}
+
 void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
     RECT           paint;
 
-    orig_widget_screen_rect(w);
+    WidgetScreenRect(w);
 
     /* IntersectRect answers zero for an empty result, which is the whole
      * off-screen test: a label scrolled out of its container paints nothing
@@ -69,6 +81,8 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_SCREEN_RECT, (const void *)WidgetScreenRect,
+                        "WidgetScreenRect", 33);
     rc |= patch_replace(ADDR_LABEL_DRAW, (const void *)LabelDraw,
                         "LabelDraw", 2);
     return rc;

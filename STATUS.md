@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 409 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 409 | 402 of them below the CRT line |
+| `patch_replace` sites | 410 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 410 | 403 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 92,560 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 92,640 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **`WidgetScreenRect` is the busiest thing in the tree: 1,510,864 calls.**
+  Eighty bytes, thirty-three callers, and the shared base helper the whole
+  menu hierarchy places itself with. It is also thoroughly CHECKED and not
+  merely run -- taking the width from the height field puts `controls` at
+  **305,939 pixels** of 786,432, 39% of the frame.
+
+  Ratio worth keeping: 1,510,864 against `LabelDraw`'s 135,490, so roughly
+  eleven placements per label draw. The menu repaints far more widgets than it
+  paints text on.
+
+- **The rest of the label class is the obvious next unit**, and all of it is
+  covered by `controls`: the constructor at `0x00454E70`, the destructor at
+  `0x00454EF0` and the scalar deleting destructor at `0x00454ED0`. After that
+  the shared base virtuals, which pay for themselves across many classes at
+  once -- `0x00454BA0` is slot 1 for about fifteen of them and is a 48-byte
+  forwarder, `0x00454070` is 128 bytes, and `0x00453E80` is 496 with 21
+  callers and two vtable dispatches in it.
 
 - **The menu widget layer is 33 classes and one of them is now ours.** The
   image lays out thirty-three FIVE-slot vtables end to end from `0x0046FAB8`

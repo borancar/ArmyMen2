@@ -44,6 +44,20 @@ typedef struct AM2_Widget {
 #define LABEL_OFF_INK    0x60       /* uint8_t, palette index the text is drawn in */
 #define LABEL_OFF_PAPER  0x61       /* uint8_t, palette index the background is cleared to */
 
+/* Original: 0x00453BF0, thiscall, 33 direct callers -- the shared base helper
+ * of the whole hierarchy, and the reason the layout above is known rather than
+ * guessed. Turns the widget's offset within its parent into the absolute
+ * rectangle everything else clips and draws against.
+ *
+ * A widget with no parent is placed at its offset directly, which is the same
+ * arithmetic against an origin of (0,0) and is written out separately in the
+ * original rather than folded. Reproduced as two branches for that reason.
+ *
+ * Note what it does NOT do: it never walks further than one level up. The
+ * parent's own rectangle is read as already correct, so a container has to
+ * have been placed before its children are, and nothing here enforces that. */
+void __attribute__((thiscall)) WidgetScreenRect(AM2_Widget *w);
+
 /* Original: 0x00454F00, vtable slot 1 of the class constructed at 0x00454E70.
  * Paints a static text label: clip against the caller's rectangle, clear the
  * background, then draw the string.
