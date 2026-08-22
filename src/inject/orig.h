@@ -106,6 +106,11 @@
 /* 0x00455C80, thiscall, slot 1: picks a sprite out of a small array by an
  * index, centres it in the widget, and draws it clipped. */
 #define ADDR_MULTI_SPRITE_PAINT 0x00455C80u /* void(AM2_Widget *, RECT) */
+/* 0x00455180, thiscall, slot 1 of the list box: clear, then draw every visible
+ * row with an ink chosen from the row's state. */
+#define ADDR_LIST_DRAW          0x00455180u /* void(AM2_Widget *, RECT) */
+/* The two palette bytes it reads are both already named: the background is
+ * ADDR_BACKGROUND_COLOUR and the highlight is ADDR_VIEW_RECT_COLOUR. */
 /* 0x00454A30 / 0x00454A10: the one-sprite icon's destructor and its deleting
  * wrapper -- vtable 0x0046FC70. The sprite is at 0x0058, which is the TEXT
  * pointer in a label; the tails disagree as usual. */
@@ -429,7 +434,13 @@
 #define BLIT_SRC_OFF_SURFACE     0x04u   /* the source, inside `this` */
 #define BLIT_SRC_OFF_DESC        0x1Cu   /* -> {?, width, height} */
 #define ADDR_DRAW_SEQ_BAR        0x004624A0u  /* void(x,y,colour,value,base) */
-#define ADDR_SEQ_BAR_BG          0x00502AD9u  /* uint8_t, the unfilled colour */
+/* One byte, three uses and formerly two names: the sequence bar's unfilled
+ * colour, the fill AttachPalette is handed, and the list box's background. All
+ * three were local descriptions of the same thing -- the palette index this
+ * game fills with -- so ADDR_SEQ_BAR_BG and ADDR_PIXEL_FORMAT_BYTE are one
+ * name now. "Pixel format byte" was the actively misleading one; it is not a
+ * pixel format. */
+#define ADDR_BACKGROUND_COLOUR   0x00502AD9u  /* uint8_t */
 #define ADDR_STR_SEQ_BLT_FAIL    0x0048CBE8u  /* "Couldn't Blt Seq Pixels\n" */
 #define ADDR_RELEASE_SPRITE      0x00445D80u  /* void(AM2_Sprite *) */
 #define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
@@ -2429,7 +2440,6 @@
  * on v1 and five on v2. */
 #define ADDR_DIRECTDRAW2         0x004FE098u  /* IDirectDraw2 * */
 #define ADDR_IID_DIRECTDRAW2     0x0046F338u  /* the game's own copy of the IID */
-#define ADDR_PIXEL_FORMAT_BYTE   0x00502AD9u  /* uint8_t, passed to AttachPalette */
 /* Both reconstructed in src/game/win32/surface.cpp.
  *
  * ClearSurface was called ADDR_ATTACH_PALETTE for one commit, guessed from its

@@ -514,6 +514,37 @@ void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip);
 #define LIST_ROW_HEIGHT      14
 #define LIST_ROW_TOP_MARGIN  4
 
+/* The list box's own fields, all read by its painter. The row array at 0x0060
+ * is {int32_t count; const char *strings;} followed by nothing this function
+ * touches -- the strings are indexed by a 260-byte stride from `strings`. */
+#define LIST_OFF_ROWS        0x60   /* struct { int32_t count; char *text; } * */
+#define LIST_OFF_HOT         0x5C   /* int32_t, the row under the pointer */
+#define LIST_OFF_VISIBLE     0x78   /* int32_t, how many rows fit */
+#define LIST_OFF_INK         0x80   /* uint8_t, an ordinary row */
+#define LIST_OFF_INK_SEL     0x84   /* uint8_t, the selected row */
+#define LIST_OFF_INK_SEL_DOWN 0x88  /* uint8_t, selected with the button down */
+#define LIST_OFF_INK_HOT_SEL 0x8C   /* uint8_t, hot AND selected AND eligible */
+#define LIST_ROW_STRIDE      0x104  /* 260 bytes per row record */
+#define LIST_TEXT_INDENT     4
+
+/* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list
+ * to 0x00502AD9, then walk the visible rows drawing each one's text.
+ *
+ * The ink is chosen in three layers, and the later ones overwrite the earlier:
+ * an ordinary row uses 0x0080; the SELECTED row, while the list has focus,
+ * uses 0x0088 if the left button is down and 0x0084 if not; and the HOT row --
+ * the one under the pointer -- uses 0x008C when it is also the selected,
+ * focused, eligible row and the highlight colour otherwise. The hot row is
+ * also filled with the highlight colour before its text goes down, which is
+ * what makes the green bar in SELECT DIFFICULTY.
+ *
+ * One defect reproduced. The per-row rectangle is intersected against the clip
+ * and the result reused, but a FAILED intersect only skips the fill -- the
+ * text is still drawn, with whatever that rectangle held from the row before.
+ * Same shape as the Restore defect in LockSurface, and kept for the same
+ * reason. */
+void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip);
+
 /* Original: 0x00455110, thiscall, slot 3 of the list box. Place, and if a row
  * is selected AND the caller asked for the change to be announced, repaint
  * just that ONE ROW -- clipped to its own strip rather than the whole list --

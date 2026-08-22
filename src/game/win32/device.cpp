@@ -62,7 +62,7 @@ static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperatio
 #define g_offscreen   (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_OFFSCREEN_SURFACE)
 #define g_drawTarget  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 #define g_surfaceLocked (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
-#define g_pixelFormatByte (*(const uint8_t *)(uintptr_t)ADDR_PIXEL_FORMAT_BYTE)
+#define g_backgroundColour (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
 
 #define g_dinput      (*(LPDIRECTINPUTA *)(uintptr_t)ADDR_DINPUT)
 #define g_diMouse     (*(LPDIRECTINPUTDEVICEA *)(uintptr_t)ADDR_DI_MOUSE)
@@ -196,8 +196,8 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
 
     g_offscreen  = CreateOffscreenSurface(g_screenW, g_screenH,
                                          DDSCAPS_OFFSCREENPLAIN, -1);
-    ClearSurface(g_primarySurface, g_pixelFormatByte);
-    ClearSurface(g_backBuffer, g_pixelFormatByte);
+    ClearSurface(g_primarySurface, g_backgroundColour);
+    ClearSurface(g_backBuffer, g_backgroundColour);
 
     /* Drawing starts aimed at the back buffer, with no lock held. */
     g_drawTarget    = g_backBuffer;

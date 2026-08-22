@@ -580,7 +580,7 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour)
 static_assert(sizeof(DDBLTFX) == 0x64, "DDBLTFX");
 static_assert((DDBLT_COLORFILL | DDBLT_WAIT) == 0x01000400, "colour fill");
 
-#define g_seqBarBg       (*(const uint8_t *)(uintptr_t)ADDR_SEQ_BAR_BG)
+#define g_backgroundColour       (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
 
 #define SEQ_BAR_WIDTH  3
 #define SEQ_BAR_HEIGHT 16
@@ -619,7 +619,7 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
 
     /* The empty bar. */
     SeqBarFill(x, bottom - (SEQ_BAR_HEIGHT - 1), x + SEQ_BAR_WIDTH, bottom + 1,
-               g_seqBarBg);
+               g_backgroundColour);
     /* However much of it is full. */
     SeqBarFill(x, bottom - filled, x + SEQ_BAR_WIDTH, bottom + 1,
                colour & 0xFF);
@@ -627,7 +627,7 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
     /* And the marker, which disappears into the fill once the fill reaches it. */
     mark = base % SEQ_BAR_HEIGHT;
     SeqBarFill(x, bottom - mark, x + SEQ_BAR_WIDTH, bottom - mark + 1,
-               (mark > filled) ? (colour & 0xFF) : g_seqBarBg);
+               (mark > filled) ? (colour & 0xFF) : g_backgroundColour);
 }
 
 /* Let the map go -- 0x0042D390.

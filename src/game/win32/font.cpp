@@ -226,7 +226,7 @@ HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style)
 typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDesc;
 
 #define g_fontDescs   ((const AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)
-#define g_fillColour  (*(const uint8_t *)(uintptr_t)ADDR_PIXEL_FORMAT_BYTE)
+#define g_backgroundColour  (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)
 
 /* Per-font record fields, `f` records apart. */
 #define font_size(f)    (*(uint32_t *)(uintptr_t)(ADDR_GLYPH_SIZE + (f) * ADDR_FONT_STRIDE))
@@ -245,7 +245,7 @@ int32_t __cdecl BuildFont(int32_t font)
     if (font_base(font))
         return 1;                       /* already built */
 
-    ClearSurface(g_backBuffer, g_fillColour);
+    ClearSurface(g_backBuffer, g_backgroundColour);
 
     scratch = (uint8_t *)orig_malloc(GLYPH_SCRATCH);
     out     = scratch;

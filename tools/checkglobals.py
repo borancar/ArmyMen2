@@ -28,6 +28,13 @@ Repeating a definition VERBATIM in two modules is allowed and is not the
 interesting case: it cannot drift silently, because changing one and not the
 other turns it into DRIFT and this reports it.
 
+The ALIAS key is the ADDRESS, not the ADDR_ macro name, and that correction
+raised the count from 28 to 39 the moment it went in. Keying on the name made
+this blind to precisely the case it exists for: two g_ names sitting on two
+ADDR_ aliases of ONE byte looked like two unrelated globals. It only surfaced
+when those ADDR_ aliases were collapsed and the surplus went UP instead of
+down. A number that rises after a tooling fix is the tool getting more honest.
+
 This is a RATCHET, not a clean bill of health. The first run found 38 surplus names
 and 17 surplus spellings already in the tree, which is far too many to fix in the commit
 that adds the tool and several of which are naming questions rather than
@@ -51,7 +58,7 @@ import am2
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # What was in the tree when this check was written. Lower them, never raise.
-ALIAS_BASELINE = 28
+ALIAS_BASELINE = 37
 DRIFT_BASELINE = 15
 
 DEFINE = re.compile(r"^\s*#\s*define\s+(g_[A-Za-z0-9_]*)\s+(.+?)\s*$")
@@ -68,7 +75,19 @@ def sources():
     return sorted(set(out))
 
 
+def addr_values():
+    """ADDR_ macro -> address, so g_ names can be keyed on the byte itself."""
+    text = io.open(os.path.join(REPO, "src/inject/orig.h"),
+                   encoding="utf-8").read()
+    out = {}
+    for m in re.finditer(r"#define\s+(ADDR_[A-Z0-9_]+)\s+0x([0-9A-Fa-f]+)u",
+                         text):
+        out[m.group(1)] = int(m.group(2), 16)
+    return out
+
+
 def main():
+    addrs = addr_values()
     # name -> {expansion -> [where]},  addr macro -> {name -> [where]}
     by_name = collections.defaultdict(lambda: collections.defaultdict(list))
     by_addr = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -85,14 +104,21 @@ def main():
             by_name[name][body].append(where)
             found = ADDR.search(body)
             if found:
-                by_addr[found.group(0)][name].append(where)
+                # Key on the ADDRESS, not the ADDR_ name. Keying on the name
+                # made this blind to exactly the case it exists for: two g_
+                # names on two ADDR_ aliases of ONE byte looked like two
+                # separate globals. It only showed up when the ADDR_ aliases
+                # were collapsed and the count went UP.
+                by_addr[addrs.get(found.group(0), found.group(0))][name] \
+                    .append(where)
 
     bad = 0
-    for addr, names in sorted(by_addr.items()):
+    for addr, names in sorted(by_addr.items(), key=lambda kv: str(kv[0])):
         if len(names) > 1:
             bad += 1
+            label = ("0x%08X" % addr) if isinstance(addr, int) else addr
             print("  ALIAS  %s is reached through %d names:" %
-                  (addr, len(names)))
+                  (label, len(names)))
             for name, wheres in sorted(names.items()):
                 print("           %-24s %s" % (name, ", ".join(wheres)))
 

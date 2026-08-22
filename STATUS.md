@@ -167,6 +167,26 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`checkglobals` was keyed on the ADDR_ NAME, which made it blind to the
+  case it exists for.** Two `g_` names sitting on two `ADDR_` aliases of one
+  byte looked like two unrelated globals. It surfaced only because collapsing
+  those `ADDR_` aliases made the surplus go UP: `ADDR_SEQ_BAR_BG` and
+  `ADDR_PIXEL_FORMAT_BYTE` became one name, and three `g_` names suddenly
+  landed on one key.
+
+  Keyed on the ADDRESS it reports **39** where it reported 28. A number that
+  rises after a tooling fix is the tool getting more honest, and this is the
+  second time this project has seen that -- `merges.py` did the same thing to
+  the boundary count.
+
+- **`0x00502AD9` is the palette index this game fills with**, and it had two
+  names and three uses: the sequence bar's unfilled colour, the fill
+  `AttachPalette` is handed, and now the list box's background. All three were
+  local descriptions of one thing. `ADDR_BACKGROUND_COLOUR` replaces both, and
+  the three `g_` names with them -- `ADDR_` aliases 31 -> 30, `g_` surplus
+  39 -> 37. "Pixel format byte" was the actively misleading one; it is not a
+  pixel format.
+
 - **The blinker derives from a one-sprite ICON**, established by its
   destructor chaining to that class's rather than to the base. So the
   multiplayer dialog's "send" dot is an icon that can flash: one sprite from
