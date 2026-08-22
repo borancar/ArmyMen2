@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 425 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 425 | 418 of them below the CRT line |
+| `patch_replace` sites | 427 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 427 | 420 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 94,288 / 372,816 B (**25.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 94,384 / 372,816 B (**25.3%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -165,11 +165,13 @@ counts probe before reading one as coverage -- that is what turned the
   buttons on screen are using. Whether a subclass overwrites it is not yet
   established -- worth a probe rather than another guess.
 
-- **The widget layer's remaining pieces.** The two forwarding thunks onto
-  `WidgetPaint` (`0x00454A90` and `0x00454BA0`, 48 bytes each, and the second
-  is what 18 vtables actually carry); the per-class constructors, which is
-  where the subclass tails get their meaning; and the edit box at
-  `0x00454C10`, which owns `g_charHandler`.
+- **The widget layer's remaining pieces.** All five vtable slots have a
+  reconstructed base now, and the two forwarding thunks with them, so every
+  class in the array reaches OUR code through every slot it does not override.
+  What is left is per-class: the 33 constructors, which is where the subclass
+  tails get their meaning, the per-class painters that are not the shared one,
+  and the edit box at `0x00454C10`, which owns `g_charHandler` and is the one
+  with a text buffer to get wrong.
 
 - **The two focus walkers disagree about what "eligible" means.** Forwards
   (`0x00453DB0`) requires `0x0050` set AND `0x004C` clear. Backwards

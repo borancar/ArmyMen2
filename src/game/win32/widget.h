@@ -248,6 +248,20 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
  * two is odd. Kept as written. */
 void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip);
 
+/* Original: 0x00454A90 and 0x00454BA0, thiscall, 48 bytes each. Two levels of
+ * forwarding onto WidgetPaint, and 0x00454BA0 is the one 18 of the 33 vtables
+ * carry in slot 1 -- so most of the menu reaches the base painter through
+ * both of these.
+ *
+ * Each does nothing but copy its sixteen-byte clip rectangle onto the stack
+ * again and tail-call the next, which is what an override that only calls its
+ * base compiles to. The names describe position in the chain and nothing more:
+ * the two classes that declared them are not recoverable from the image, and
+ * inventing class names for them would be a guess where the addresses are a
+ * fact. */
+void __attribute__((thiscall)) WidgetPaintFwd1(AM2_Widget *w, RECT clip);
+void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip);
+
 /* Original: 0x00453D50, thiscall. Append a child to the end of this widget's
  * child list and point it back at this widget as its parent.
  *

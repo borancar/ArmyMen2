@@ -139,6 +139,16 @@ void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
         ((AM2_WidgetPaintFn *)child->vtable)[WIDGET_VSLOT_PAINT](child, clip);
 }
 
+void __attribute__((thiscall)) WidgetPaintFwd1(AM2_Widget *w, RECT clip)
+{
+    WidgetPaint(w, clip);
+}
+
+void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip)
+{
+    WidgetPaintFwd1(w, clip);
+}
+
 void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *w, AM2_Widget *child)
 {
     AM2_Widget *last;
@@ -493,6 +503,10 @@ int widget_install(void)
 
     rc |= patch_replace(ADDR_WIDGET_PAINT, (const void *)WidgetPaint,
                         "WidgetPaint", 6);
+    rc |= patch_replace(ADDR_WIDGET_PAINT_FWD1,
+                        (const void *)WidgetPaintFwd1, "WidgetPaintFwd1", 1);
+    rc |= patch_replace(ADDR_WIDGET_PAINT_FWD2,
+                        (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
     rc |= patch_replace(ADDR_WIDGET_LAST_SIBLING,
