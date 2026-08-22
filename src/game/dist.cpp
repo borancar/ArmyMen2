@@ -124,12 +124,39 @@ uint8_t __cdecl Log2Mask(int32_t value)
     }
 }
 
+#define g_atanSin ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_SIN)
+#define g_atanCos ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_COS)
+
+uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
+{
+    int32_t dx  = (int32_t)to->x - (int32_t)from->x;
+    int32_t dy  = (int32_t)to->y - (int32_t)from->y;
+    int32_t adx = dx < 0 ? -dx : dx;
+    int32_t ady = dy < 0 ? -dy : dy;
+    uint8_t h;
+
+    if (adx > ady) {
+        h = (uint8_t)g_atanCos[(dy << 9) / dx];
+    } else {
+        if (dx == 0)
+            /* Straight up or straight down, and nothing to divide by. */
+            return dy < 0 ? 0u : 0x80u;
+        h = (uint8_t)g_atanSin[(dx << 9) / dy];
+    }
+    /* Eight-bit add, so it wraps inside the byte. */
+    if (dx > 0)
+        h = (uint8_t)(h + 0x80u);
+    return h;
+}
+
 int dist_install(void)
 {
     int rc = 0;
 
     /* Accumulated, not returned from the first: a `return` on line one made
      * the three below dead code, and they were never installed at all. */
+    rc |= patch_replace(ADDR_ANGLE_BETWEEN, (const void *)AngleBetween,
+                        "AngleBetween", 2);
     rc |= patch_replace(ADDR_APPROX_DIST, (const void *)ApproxDist,
                         "ApproxDist", 2);
     rc |= patch_replace(ADDR_APPROX_DIST_XY, (const void *)ApproxDistXY,

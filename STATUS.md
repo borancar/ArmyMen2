@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 624 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 623 | 613 of them below the CRT line |
+| `patch_replace` sites | 627 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 626 | 616 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 106,800 / 372,816 B (**28.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 132,112 / 372,816 B (35.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 107,024 / 372,816 B (**28.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 132,336 / 372,816 B (35.5%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -106,7 +106,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
 | `tools/objdump.py --leader` | current | max health 140, current 140 -- identical to `AM2_NOPATCH=1` |
-| `AM2_SELFCHECK=1` | current | 5,888 calls across 46 functions, 0 disagree |
+| `AM2_SELFCHECK=1` | current | 6,016 calls across 47 functions, 0 disagree -- and the pointer arguments finally differ from one another |
 | `tools/maskdump.py` | current | roach 32 records/237 points, vehicle 192/3,081, 36,768 bytes, sha256 `532e52a0...` -- byte-identical to `AM2_NOPATCH=1` |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
@@ -197,6 +197,39 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **`AM2_SELFCHECK=1` was comparing every pointer-argument function against
+  ONE input, and the two pointers at the same bytes.** Two defects in one
+  line. `fill_scratch` did not vary with the iteration, so all 128 calls saw
+  the same memory; and `(i * 7 + 13) & 0xFF` has period 256 while the pointer
+  arguments are 0x100 apart, so every pointer pointed at IDENTICAL bytes.
+  ApproxDist, PointInRect, PointsEqual and every Obj* predicate were being
+  handed two copies of one value, 128 times.
+
+  It is the offline harness's own bug, which `vectors.py` hit with a stride of
+  0x800 and fixed with a salt; the in-process one had it with 0x100 and nobody
+  had looked. Found by mutating `AngleBetween`'s table index by one and
+  watching the run pass -- twice, because the first fix (vary with `k`) was not
+  enough.
+
+  Fixed and re-run: **0 disagree**, so nothing was relying on the accident. The
+  same mutation now fails 127 of 128 with the arguments printed.
+
+- **`AngleBetween` needed the trig tables seeded to be checkable at all.** It
+  reads the two reverse tables, which are .bss zeros when the selfcheck runs --
+  every index would answer 0 and the indexing, which is the whole function,
+  would go unchecked. `fill_atan_tables()` puts a position-dependent byte in
+  each of the 2,050 entries first; the game overwrites both at startup.
+
+  Worth the trouble because nothing else reaches it: twenty callers in the
+  image, none reconstructed, and the counter reads 0 through a live Boot Camp
+  mission with both dialogs cleared and the view scrolled.
+
+- **The selfcheck learned `byte_ret` too**, for the same reason the vectors
+  did: `AngleBetween` returns in AL and the two sides leave different rubbish
+  above it -- the division's quotient in the original, a sign-extended table
+  byte in ours. `-> ffffff91, original 00000091` was the first thing the fixed
+  harness said.
 
 - **The packed key addresses SPRITES.** `PreloadSpriteByKey` (0x00445AD0)
   splits a key into PackKey's three fields and passes them as PreloadSprite's

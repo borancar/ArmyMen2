@@ -2376,8 +2376,13 @@ static void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
     /* One dword store covering both words -- the default before the scan. */
     *(int32_t *)&pn->cx = *(const int32_t *)AM2_IMAGE(ADDR_PAD_DEFAULT_POS);
 
-    int32_t w = *(const int32_t *)AM2_IMAGE(ADDR_MAP_WIDTH);
-    int32_t total = w * *(const int32_t *)AM2_IMAGE(ADDR_MAP_HEIGHT);
+    /* The original divides by 0x00514DE0 to recover x, which is the map's
+     * HEIGHT in tiles -- TileOfPoint, PointOfTile and ADDR_MAP_ROW_SHIFT all
+     * make 0x00514DDC the width. Reproduced exactly: on a square map, and
+     * every shipped one seen so far is, the two are the same number and the
+     * scan is right by accident. */
+    int32_t w = *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_H);
+    int32_t total = w * *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W);
     if (total <= 0)
         return;
 

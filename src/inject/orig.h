@@ -679,16 +679,39 @@
 /* 0x0042B290, 45 callers: a point to a tile index, or 0 for anything off the
  * map. Sixteen pixels to the tile, and the row stride is ADDR_MAP_TILES_W.
  *
- * This SHARPENS the disagreement CLAUDE.md records about that pair rather than
- * settling it. The two names on 0x00514DDC are ADDR_MAP_TILES_W and
- * ADDR_MAP_HEIGHT, and the argument for the first used to be a name; it is now
- * a row stride in code. But ScriptPad divides its index by 0x00514DE0 to
- * recover x, which makes THAT one a row stride too, and the two grids cannot
- * both be indexed the way their own code indexes them unless they are
- * different shapes. Two functions disagreeing is a better lead than two names
- * disagreeing; neither name is changed on it. */
+ * This is one of the three readings that settle what 0x00514DDC is. It had two
+ * names, ADDR_MAP_TILES_W and ADDR_MAP_HEIGHT, and CLAUDE.md recorded that
+ * both pairs could not be right. Width wins, on three counts:
+ *
+ *   - TileOfPoint multiplies the ROW by it, so it is the column count;
+ *   - PointOfTile masks the column with it and takes the row with
+ *     ADDR_MAP_ROW_SHIFT, which only lines up if it is the width;
+ *   - ADDR_MAP_ROW_SHIFT's own established name is log2 of the WIDTH.
+ *
+ * Against that, ScriptPad divides its index by 0x00514DE0 to recover x, which
+ * would make THAT the width. It is one reading against three, and it is a
+ * reading that cannot be caught: every shipped map seen so far is square --
+ * Boot Camp's is 256 x 256 tiles, read out of the running game -- so dividing
+ * by the height gives the right answer anyway. ADDR_MAP_HEIGHT and
+ * ADDR_MAP_WIDTH are gone; the TILES_W/TILES_H pair is what is left. */
 #define ADDR_TILE_OF_POINT       0x0042B290u  /* int32_t(AM2_Point) */
 #define AM2_TILE_SHIFT           4
+/* 0x0042B250, six callers: the inverse, and it CENTRES -- the point it returns
+ * is the middle of the tile, eight pixels in on each axis. The column comes
+ * out with an AND against ADDR_MAP_TILES_W * 16 - 16, which is a modulo only
+ * because the width is a power of two, and the row with a shift by
+ * ADDR_MAP_ROW_SHIFT. */
+#define ADDR_POINT_OF_TILE       0x0042B250u  /* uint32_t(int32_t tile) */
+/* 0x0042DEB0, 30 callers. The 8-bit heading from one point to another, out of
+ * the two reverse trig tables: the ratio of the smaller delta to the larger,
+ * scaled by 512, indexes whichever table matches which delta was larger. 0 is
+ * straight up and 0x80 straight down.
+ *
+ * Only AL carries the answer. The two table paths leave the division's
+ * quotient in the upper 24 bits, and the dx == 0 path leaves a clean 0 or
+ * 0x80 -- which is itself the argument that nothing may read above AL. */
+#define ADDR_ANGLE_BETWEEN       0x0042DEB0u  /* uint8_t(const AM2_Point *,
+                                               *         const AM2_Point *) */
 #define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
 /* The rectangle the view is clipped against before anything is compared --
  * the map's extent on screen. */
@@ -1520,8 +1543,6 @@
 #define ADDR_MAP_PAD_LAYER        0x00514EC8u
 #define ADDR_MAP_PADBIT_LAYER     0x00514EC4u
 #define ADDR_PAD_BIT_TABLE        0x00486444u  /* int32_t[8], 1<<n */
-#define ADDR_MAP_WIDTH            0x00514DE0u
-#define ADDR_MAP_HEIGHT           0x00514DDCu
 #define ADDR_PAD_DEFAULT_POS      0x005125A0u  /* both centroid words at once */
 #define ADDR_SCRIPT_VARIABLE      0x00443F70u  /* keyword 133 */
 #define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */

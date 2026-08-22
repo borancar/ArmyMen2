@@ -212,6 +212,30 @@ opportunity.
 5,504 calls across 43 functions, and swapping `min` for `max` in `ApproxDistXY`
 makes 124 of them disagree with the argument printed.
 
+**And it was comparing every pointer-argument function against ONE input, with
+both pointers at the same bytes.** Two defects in one line of `fill_scratch`:
+it did not vary with the iteration, so all 128 calls saw the same memory; and
+`(i * 7 + 13) & 0xFF` has period 256 while the pointer arguments are 0x100
+apart, so every pointer pointed at IDENTICAL bytes. `ApproxDist`,
+`PointInRect`, `PointsEqual` and every `Obj*` predicate were being handed two
+copies of one value.
+
+This is the offline harness's own bug — `tools/vectors.py` hit it with a stride
+of 0x800 and fixed it with a salt — and the in-process one had it with 0x100
+and nobody had looked. Both harnesses are worth checking against each other's
+scars.
+
+Found by mutating a function and watching the run pass, which is the only way
+these ever surface. Re-run after the fix: 0 disagree, so nothing had been
+relying on the accident.
+
+**A function whose answer depends on a table the game has not built yet needs
+the table SEEDED.** `AngleBetween` reads the two reverse trig tables, which are
+`.bss` zeros when the selfcheck runs — so every index answers 0 and the
+indexing, which is the whole function, goes unchecked. `fill_atan_tables()`
+writes a position-dependent byte into each of the 2,050 entries first; the game
+overwrites both at startup, so the scribble cannot outlive the check.
+
 **It cannot pass NULL, and that is the one thing the offline harness does
 better.** A null argument that faults simply drops a vector under Unicorn; here
 it takes the game down, and `ApproxDist` — which dereferences unconditionally —

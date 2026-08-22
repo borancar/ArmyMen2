@@ -46,6 +46,7 @@
 #include "../game/objflag.h"
 #include "../game/msgslot.h"
 #include "../game/army.h"
+#include "../game/dist.h"
 
 /* Big enough for the worst reach any function under test has. MaskPixelSolid
  * takes a row offset from the buffer itself, so it can address up to 0xFFFF
@@ -55,13 +56,35 @@
 
 static uint8_t g_scratch[SCRATCH_BYTES];
 
-/* Same shape as the offline harness so a failure reads the same either way. */
-static void fill_scratch(void)
+/* Same shape as the offline harness so a failure reads the same either way --
+ * except that it varies with the ITERATION, which the offline one does not
+ * need to and this one very much did.
+ *
+ * Two things were wrong with the fixed `(i * 7 + 13) & 0xFF` it used to be,
+ * and both were found by mutating AngleBetween's table index by one and
+ * watching the run pass.
+ *
+ * It did not vary with the ITERATION, so a function whose only arguments are
+ * pointers was compared against exactly one input a hundred and twenty-eight
+ * times -- ApproxDist, PointInRect, every Obj* predicate, ObjIsFriendly.
+ *
+ * Worse, `i * 7 + 13` has period 256 in `i` and the pointer arguments are
+ * 0x100 apart, so EVERY pointer argument pointed at identical bytes. Two
+ * points handed to AngleBetween had dx == dy == 0 and it took its early
+ * return every time; PointsEqual was always comparing a value with itself.
+ * The offline harness had exactly this defect once, with 0x800 for the stride,
+ * and was fixed with the same trick: a salt that changes faster than the
+ * stride.
+ *
+ * Both sides are filled from the same `k` before each call, so what the two
+ * halves see is still identical, which is the only thing the comparison
+ * needs. */
+static void fill_scratch(uint32_t k)
 {
     uint32_t i;
 
     for (i = 0; i < SCRATCH_BYTES; i++)
-        g_scratch[i] = (uint8_t)((i * 7 + 13) & 0xFF);
+        g_scratch[i] = (uint8_t)(((i * 7 + 13) ^ (i >> 8)) + k * 31);
 }
 
 /* Every reconstruction under test here is cdecl, so one invoker serves them
@@ -76,26 +99,32 @@ struct check {
     void       *ours;
     int32_t     nargs;
     uint8_t     isptr[4];
+    /* The prototype returns a BYTE, so only AL carries the answer and the
+     * upper 24 bits are whatever each side happened to leave there. Compare
+     * masked, exactly as tests/vectors.h's byte_ret does -- AngleBetween's
+     * table path leaves the division's quotient up there in the original and
+     * a sign-extended table byte in ours, and the low bytes agree. */
+    uint8_t     byte_ret;
 };
 
 static const struct check kChecks[] = {
-    { "Clamp",          ADDR_CLAMP,          (void *)Clamp,          3, {0,0,0,0} },
-    { "ApproxDist",     ADDR_APPROX_DIST,    (void *)ApproxDist,     2, {1,1,0,0} },
-    { "ApproxDistXY",   ADDR_APPROX_DIST_XY, (void *)ApproxDistXY,   2, {0,0,0,0} },
-    { "AngleDelta",     ADDR_ANGLE_DELTA,    (void *)AngleDelta,     2, {0,0,0,0} },
-    { "RoundTo8",       ADDR_ROUND_TO_8,     (void *)RoundTo8,       2, {0,0,0,0} },
-    { "MakePoint",      ADDR_MAKE_POINT,     (void *)MakePoint,      2, {0,0,0,0} },
-    { "PointsEqual",    ADDR_POINTS_EQUAL,   (void *)PointsEqual,    2, {0,0,0,0} },
-    { "PointsDiffer",   ADDR_POINTS_DIFFER,  (void *)PointsDiffer,   2, {0,0,0,0} },
-    { "PointInRect",    ADDR_POINT_IN_RECT,  (void *)PointInRect,    2, {1,1,0,0} },
-    { "PackKey",        ADDR_PACK_KEY,       (void *)PackKey,        3, {0,0,0,0} },
-    { "KeyFieldA",      ADDR_KEY_FIELD_A,    (void *)KeyFieldA,      1, {0,0,0,0} },
-    { "KeyFieldB",      ADDR_KEY_FIELD_B,    (void *)KeyFieldB,      1, {0,0,0,0} },
-    { "KeyFieldC",      ADDR_KEY_FIELD_C,    (void *)KeyFieldC,      1, {0,0,0,0} },
-    { "UidArmy",        ADDR_UID_ARMY,       (void *)UidArmy,        1, {0,0,0,0} },
-    { "UidOnWire",      ADDR_UID_ON_WIRE,    (void *)UidOnWire,      1, {0,0,0,0} },
-    { "ObjIsItem",      ADDR_OBJ_IS_ITEM,    (void *)ObjIsItem,      1, {1,0,0,0} },
-    { "ObjIsType2",     ADDR_OBJ_IS_TYPE2,   (void *)ObjIsType2,     1, {1,0,0,0} },
+    { "Clamp",          ADDR_CLAMP,          (void *)Clamp,          3, {0,0,0,0}, 0 },
+    { "ApproxDist",     ADDR_APPROX_DIST,    (void *)ApproxDist,     2, {1,1,0,0}, 0 },
+    { "ApproxDistXY",   ADDR_APPROX_DIST_XY, (void *)ApproxDistXY,   2, {0,0,0,0}, 0 },
+    { "AngleDelta",     ADDR_ANGLE_DELTA,    (void *)AngleDelta,     2, {0,0,0,0}, 0 },
+    { "RoundTo8",       ADDR_ROUND_TO_8,     (void *)RoundTo8,       2, {0,0,0,0}, 0 },
+    { "MakePoint",      ADDR_MAKE_POINT,     (void *)MakePoint,      2, {0,0,0,0}, 0 },
+    { "PointsEqual",    ADDR_POINTS_EQUAL,   (void *)PointsEqual,    2, {0,0,0,0}, 0 },
+    { "PointsDiffer",   ADDR_POINTS_DIFFER,  (void *)PointsDiffer,   2, {0,0,0,0}, 0 },
+    { "PointInRect",    ADDR_POINT_IN_RECT,  (void *)PointInRect,    2, {1,1,0,0}, 0 },
+    { "PackKey",        ADDR_PACK_KEY,       (void *)PackKey,        3, {0,0,0,0}, 0 },
+    { "KeyFieldA",      ADDR_KEY_FIELD_A,    (void *)KeyFieldA,      1, {0,0,0,0}, 0 },
+    { "KeyFieldB",      ADDR_KEY_FIELD_B,    (void *)KeyFieldB,      1, {0,0,0,0}, 0 },
+    { "KeyFieldC",      ADDR_KEY_FIELD_C,    (void *)KeyFieldC,      1, {0,0,0,0}, 0 },
+    { "UidArmy",        ADDR_UID_ARMY,       (void *)UidArmy,        1, {0,0,0,0}, 0 },
+    { "UidOnWire",      ADDR_UID_ON_WIRE,    (void *)UidOnWire,      1, {0,0,0,0}, 0 },
+    { "ObjIsItem",      ADDR_OBJ_IS_ITEM,    (void *)ObjIsItem,      1, {1,0,0,0}, 0 },
+    { "ObjIsType2",     ADDR_OBJ_IS_TYPE2,   (void *)ObjIsType2,     1, {1,0,0,0}, 0 },
     /* The one army helper that can survive a random argument: ObjIsFriendly
      * reads its object out to +0x544, which the scratch covers.
      *
@@ -111,36 +140,52 @@ static const struct check kChecks[] = {
      * which is before the game has loaded anything -- so "survives a random
      * argument" is not the only question. It has to survive the empty world
      * this runs in. */
-    { "ObjIsFriendly",  ADDR_OBJ_IS_FRIENDLY, (void *)ObjIsFriendly,  1, {1,0,0,0} },
-    { "ObjIsType3",     ADDR_OBJ_IS_TYPE3,   (void *)ObjIsType3,     1, {1,0,0,0} },
-    { "ObjIsType4",     ADDR_OBJ_IS_TYPE4,   (void *)ObjIsType4,     1, {1,0,0,0} },
-    { "ObjIsType8",     ADDR_OBJ_IS_TYPE8,   (void *)ObjIsType8,     1, {1,0,0,0} },
-    { "ObjIsTypeIn238", ADDR_OBJ_IS_TYPE238, (void *)ObjIsTypeIn238, 1, {1,0,0,0} },
-    { "ObjFieldA",      ADDR_OBJ_FIELD_A,    (void *)ObjFieldA,      1, {1,0,0,0} },
-    { "ObjFieldB",      ADDR_OBJ_FIELD_B,    (void *)ObjFieldB,      1, {1,0,0,0} },
-    { "ObjFlagBit0",    ADDR_OBJ_FLAG_BIT0,  (void *)ObjFlagBit0,    1, {1,0,0,0} },
-    { "ObjFlagBit1",    ADDR_OBJ_FLAG_BIT1,  (void *)ObjFlagBit1,    1, {1,0,0,0} },
-    { "IsBlank",        ADDR_IS_BLANK,       (void *)IsBlank,        1, {0,0,0,0} },
-    { "IsScriptDelim",  ADDR_IS_SCRIPT_DELIM,(void *)IsScriptDelim,  1, {0,0,0,0} },
-    { "IsKind10To17",   ADDR_IS_KIND_10_17,  (void *)IsKind10To17,   1, {0,0,0,0} },
-    { "IsKind14Or22",   ADDR_IS_KIND_14_22,  (void *)IsKind14Or22,   1, {0,0,0,0} },
-    { "IsKind7",        ADDR_IS_KIND_7,      (void *)IsKind7,        1, {1,0,0,0} },
-    { "KindInSetA",     ADDR_KIND_IN_SET_A,  (void *)KindInSetA,     1, {0,0,0,0} },
-    { "KindInSetB",     ADDR_KIND_IN_SET_B,  (void *)KindInSetB,     1, {0,0,0,0} },
-    { "MapCode",        ADDR_MAP_CODE,       (void *)MapCode,        1, {0,0,0,0} },
-    { "ScaleBy32Blocks",ADDR_SCALE_32_BLOCKS,(void *)ScaleBy32Blocks,1, {0,0,0,0} },
-    { "AddByteSat",     ADDR_ADD_BYTE_SAT,   (void *)AddByteSat,     2, {0,0,0,0} },
-    { "SwapColourBytes",ADDR_SWAP_COLOUR_BYTES,(void *)SwapColourBytes,2,{0,0,0,0} },
-    { "ScriptCompare",  ADDR_SCRIPT_COMPARE, (void *)ScriptCompare,  3, {0,0,0,0} },
-    { "TypesCompatible",ADDR_TYPES_COMPATIBLE,(void *)TypesCompatible,2,{0,0,0,0} },
-    { "ComparePair",    ADDR_COMPARE_PAIR,   (void *)ComparePair,    2, {1,1,0,0} },
-    { "CompareTriple",  ADDR_COMPARE_TRIPLE, (void *)CompareTriple,  2, {1,1,0,0} },
-    { "CompareDword",   ADDR_COMPARE_DWORD,  (void *)CompareDword,   2, {1,1,0,0} },
-    { "Field53C",       ADDR_FIELD_53C,      (void *)Field53C,       1, {1,0,0,0} },
-    { "MaskPixelSolid", ADDR_MASK_PIXEL_SOLID,(void *)MaskPixelSolid,3, {0,0,1,0} },
+    { "ObjIsFriendly",  ADDR_OBJ_IS_FRIENDLY, (void *)ObjIsFriendly,  1, {1,0,0,0}, 0 },
+    /* AngleBetween reads the two reverse trig tables, which the game has not
+     * built yet -- this runs before install(), let alone before
+     * BuildTrigTables. Both sides would read the same zeros and every index
+     * would give the same answer, so the comparison would prove nothing about
+     * the indexing, which is the part worth checking.
+     *
+     * fill_atan_tables() below puts a position-dependent byte in each entry
+     * first. The game overwrites both tables at startup, so the scribble
+     * cannot outlive the check. It cannot fault either: the branch that
+     * divides by dx has already established |dx| > |dy| >= 0, and the branch
+     * that divides by dy has established dx != 0 and |dx| <= |dy|.
+     *
+     * Worth the trouble because nothing else reaches it. Twenty callers in the
+     * image, none of them reconstructed, and the counter reads 0 through a
+     * live Boot Camp mission with both dialogs cleared and the view scrolled. */
+    { "AngleBetween",   ADDR_ANGLE_BETWEEN, (void *)AngleBetween,     2, {1,1,0,0}, 1 },
+    { "ObjIsType3",     ADDR_OBJ_IS_TYPE3,   (void *)ObjIsType3,     1, {1,0,0,0}, 0 },
+    { "ObjIsType4",     ADDR_OBJ_IS_TYPE4,   (void *)ObjIsType4,     1, {1,0,0,0}, 0 },
+    { "ObjIsType8",     ADDR_OBJ_IS_TYPE8,   (void *)ObjIsType8,     1, {1,0,0,0}, 0 },
+    { "ObjIsTypeIn238", ADDR_OBJ_IS_TYPE238, (void *)ObjIsTypeIn238, 1, {1,0,0,0}, 0 },
+    { "ObjFieldA",      ADDR_OBJ_FIELD_A,    (void *)ObjFieldA,      1, {1,0,0,0}, 0 },
+    { "ObjFieldB",      ADDR_OBJ_FIELD_B,    (void *)ObjFieldB,      1, {1,0,0,0}, 0 },
+    { "ObjFlagBit0",    ADDR_OBJ_FLAG_BIT0,  (void *)ObjFlagBit0,    1, {1,0,0,0}, 0 },
+    { "ObjFlagBit1",    ADDR_OBJ_FLAG_BIT1,  (void *)ObjFlagBit1,    1, {1,0,0,0}, 0 },
+    { "IsBlank",        ADDR_IS_BLANK,       (void *)IsBlank,        1, {0,0,0,0}, 0 },
+    { "IsScriptDelim",  ADDR_IS_SCRIPT_DELIM,(void *)IsScriptDelim,  1, {0,0,0,0}, 0 },
+    { "IsKind10To17",   ADDR_IS_KIND_10_17,  (void *)IsKind10To17,   1, {0,0,0,0}, 0 },
+    { "IsKind14Or22",   ADDR_IS_KIND_14_22,  (void *)IsKind14Or22,   1, {0,0,0,0}, 0 },
+    { "IsKind7",        ADDR_IS_KIND_7,      (void *)IsKind7,        1, {1,0,0,0}, 0 },
+    { "KindInSetA",     ADDR_KIND_IN_SET_A,  (void *)KindInSetA,     1, {0,0,0,0}, 0 },
+    { "KindInSetB",     ADDR_KIND_IN_SET_B,  (void *)KindInSetB,     1, {0,0,0,0}, 0 },
+    { "MapCode",        ADDR_MAP_CODE,       (void *)MapCode,        1, {0,0,0,0}, 0 },
+    { "ScaleBy32Blocks",ADDR_SCALE_32_BLOCKS,(void *)ScaleBy32Blocks,1, {0,0,0,0}, 0 },
+    { "AddByteSat",     ADDR_ADD_BYTE_SAT,   (void *)AddByteSat,     2, {0,0,0,0}, 0 },
+    { "SwapColourBytes",ADDR_SWAP_COLOUR_BYTES,(void *)SwapColourBytes,2,{0,0,0,0}, 0 },
+    { "ScriptCompare",  ADDR_SCRIPT_COMPARE, (void *)ScriptCompare,  3, {0,0,0,0}, 0 },
+    { "TypesCompatible",ADDR_TYPES_COMPATIBLE,(void *)TypesCompatible,2,{0,0,0,0}, 0 },
+    { "ComparePair",    ADDR_COMPARE_PAIR,   (void *)ComparePair,    2, {1,1,0,0}, 0 },
+    { "CompareTriple",  ADDR_COMPARE_TRIPLE, (void *)CompareTriple,  2, {1,1,0,0}, 0 },
+    { "CompareDword",   ADDR_COMPARE_DWORD,  (void *)CompareDword,   2, {1,1,0,0}, 0 },
+    { "Field53C",       ADDR_FIELD_53C,      (void *)Field53C,       1, {1,0,0,0}, 0 },
+    { "MaskPixelSolid", ADDR_MASK_PIXEL_SOLID,(void *)MaskPixelSolid,3, {0,0,1,0}, 0 },
     { "ObjKind538In10To17", ADDR_OBJ_KIND538_10_17,
-                            (void *)ObjKind538In10To17, 1, {1,0,0,0} },
-    { "FilterMatches",  ADDR_FILTER_MATCHES, (void *)FilterMatches,  6, {0,0,0,0} },
+                            (void *)ObjKind538In10To17, 1, {1,0,0,0}, 0 },
+    { "FilterMatches",  ADDR_FILTER_MATCHES, (void *)FilterMatches,  6, {0,0,0,0}, 0 },
 };
 
 /* A cheap deterministic generator: the interesting values first, then a
@@ -158,6 +203,19 @@ static uint32_t pick(uint32_t k, uint32_t slot)
     return (k * 2654435761u) ^ (slot * 40503u);
 }
 
+/* The two 1,025-byte reverse trig tables, centred on the addresses the code
+ * carries. Filled with something that varies per entry so an off-by-one in the
+ * index is visible; see the note beside AngleBetween above. */
+static void fill_atan_tables(void)
+{
+    int32_t i;
+
+    for (i = -512; i <= 512; i++) {
+        *(int8_t *)((uintptr_t)ADDR_TRIG_ATAN_SIN + i) = (int8_t)(i * 7 + 3);
+        *(int8_t *)((uintptr_t)ADDR_TRIG_ATAN_COS + i) = (int8_t)(i * 11 + 5);
+    }
+}
+
 int selfcheck_run(void)
 {
     const char *opt = getenv("AM2_SELFCHECK");
@@ -166,6 +224,8 @@ int selfcheck_run(void)
 
     if (!opt || *opt != '1')
         return 0;
+
+    fill_atan_tables();
 
     hooklog("selfcheck: starting, %d functions",
             (int32_t)(sizeof kChecks / sizeof kChecks[0]));
@@ -179,7 +239,7 @@ int selfcheck_run(void)
             uint32_t got, want;
             int32_t  j;
 
-            fill_scratch();
+            fill_scratch(k);
             for (j = 0; j < 6; j++) {
                 if (j < c->nargs && c->isptr[j])
                     /* Never NULL. Offline a null argument that faults simply
@@ -193,10 +253,14 @@ int selfcheck_run(void)
             }
 
             got = ((am2_any_fn)c->ours)(a[0], a[1], a[2], a[3], a[4], a[5]);
-            fill_scratch();
+            fill_scratch(k);
             want = ((am2_any_fn)(uintptr_t)c->original)(a[0], a[1], a[2],
                                                         a[3], a[4], a[5]);
             checked++;
+            if (c->byte_ret) {
+                got &= 0xFFu;
+                want &= 0xFFu;
+            }
             if (got != want) {
                 if (!bad)
                     hooklog("selfcheck: %s(%08x,%08x,%08x,%08x,%08x,%08x)"

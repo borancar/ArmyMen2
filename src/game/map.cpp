@@ -75,8 +75,24 @@ int32_t __cdecl TileOfPoint(uint32_t packed)
            + (x >> AM2_TILE_SHIFT);
 }
 
+uint32_t __cdecl PointOfTile(int32_t tile)
+{
+    int32_t w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t shift = *(const int16_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    uint16_t x, y;
+
+    x = (uint16_t)((((uint32_t)tile << AM2_TILE_SHIFT)
+                    & (uint32_t)((w << AM2_TILE_SHIFT) - 16)) + 8);
+    /* A 16-BIT shift of the tile index, then scaled -- the original does
+     * `shr ax, cl` and not `shr eax, cl`. */
+    y = (uint16_t)(((uint32_t)((uint16_t)tile >> shift) << AM2_TILE_SHIFT) + 8);
+    return (uint32_t)x | ((uint32_t)y << 16);
+}
+
 void map_install(void)
 {
+    patch_replace(ADDR_POINT_OF_TILE, (const void *)PointOfTile,
+                  "PointOfTile", 1);
     patch_replace(ADDR_TILE_OF_POINT, (const void *)TileOfPoint,
                   "TileOfPoint", 1);
     patch_replace(ADDR_CHECKSUM, (const void *)Checksum, "Checksum", 1);

@@ -929,9 +929,6 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
 
 #define g_menuRow (*(const int32_t *)(uintptr_t)ADDR_MENU_ROW)
 
-typedef void (__attribute__((thiscall)) *AM2_ClearPtrListFn)(void *rec);
-#define orig_clear_ptr_list \
-    (*(AM2_ClearPtrListFn)AM2_IMAGE(ADDR_CLEAR_PTR_LIST))
 
 int32_t __cdecl GetMenuRow(void)
 {
@@ -949,7 +946,7 @@ void __attribute__((thiscall)) InitPtrList(void *rec)
 
 void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
 {
-    orig_clear_ptr_list(rec);
+    ClearPtrList(rec);
 }
 
 /* The same spelling device.cpp uses -- PollKeyboard owns these and swaps them
@@ -1073,6 +1070,18 @@ void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
         orig_ptr_list_shrink(rec);
 }
 
+void __attribute__((thiscall)) ClearPtrList(void *rec)
+{
+    int32_t *r     = (int32_t *)rec;
+    void    *items = (void *)(uintptr_t)r[2];
+
+    r[0] = 0;
+    r[1] = 0;
+    if (items)
+        am2_free(items);
+    r[2] = 0;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
@@ -1176,6 +1185,8 @@ int misc_install(void)
                   "PtrListPush", 2);
     patch_replace(ADDR_LIST_REMOVE_AT, (const void *)ListRemoveAt,
                   "ListRemoveAt", 2);
+    patch_replace(ADDR_CLEAR_PTR_LIST, (const void *)ClearPtrList,
+                  "ClearPtrList", 1);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
     patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,
                   "InitPtrList", 1);

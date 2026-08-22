@@ -547,6 +547,12 @@ int32_t __cdecl GetMenuRow(void);
 void __attribute__((thiscall)) InitPtrList(void *rec);
 void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 
+/* 0x0042A680, six callers -- what that alias jumps to, and the last of the
+ * record's five. Zero the capacity and the count, free the items if there are
+ * any, zero that too. The two fields are cleared BEFORE the free, which is
+ * what the original does and what makes it safe to call twice. */
+void __attribute__((thiscall)) ClearPtrList(void *rec);
+
 /* 0x00427450 and 0x00427470, 33 and 21 callers -- the two keyboard predicates
  * everything in the game tests a key with. Both mask the scancode to 8 bits
  * themselves, so a caller never has to.

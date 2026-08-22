@@ -44,6 +44,16 @@ int32_t __cdecl LoadMapSection(am2_FILE *fp);
  * sixteen bits; every caller stores it as one. */
 int32_t __cdecl TileOfPoint(uint32_t packed);
 
+/* 0x0042B250, six callers -- the inverse, and it CENTRES: the point it returns
+ * is the middle of the tile, eight pixels in on each axis.
+ *
+ * The column comes out with an AND against `width * 16 - 16`, which is a
+ * modulo only because the width is a power of two, and the row with a shift by
+ * ADDR_MAP_ROW_SHIFT. Both halves read the map's width, from two globals that
+ * have to agree; that is one of the three readings that settle what
+ * 0x00514DDC is. */
+uint32_t __cdecl PointOfTile(int32_t tile);
+
 void map_install(void);
 
 #ifdef __cplusplus

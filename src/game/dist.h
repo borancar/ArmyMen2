@@ -47,6 +47,24 @@ int32_t __cdecl RoundTo8(int32_t value, uint32_t bits);
  * the return is a byte. */
 uint8_t __cdecl Log2Mask(int32_t value);
 
+/* 0x0042DEB0, 30 callers. The 8-bit heading from `from` to `to`.
+ *
+ * The ratio of the smaller delta to the larger, scaled by 512, indexes
+ * whichever reverse table matches which delta was larger -- so the tables are
+ * arctangents and the two halves of the circle are picked apart by comparing
+ * |dx| and |dy| first. Straight up is 0 and straight down is 0x80.
+ *
+ * Returns a BYTE. The two table paths leave the division's quotient in the
+ * upper 24 bits of eax and only AL is written; the dx == 0 path leaves a clean
+ * 0 or 0x80, which is the argument that nothing may read above AL. Same
+ * reasoning as Log2Mask, and the same consequence: neither differential
+ * harness can take it, since both compare eax.
+ *
+ * What DOES check it is one layer down. The two tables are 1,025 signed bytes
+ * each, centred on the addresses the code carries, and tools/trigdump.py
+ * compares them byte for byte against the original. */
+uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to);
+
 int dist_install(void);
 
 #ifdef __cplusplus

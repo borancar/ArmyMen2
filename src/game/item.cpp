@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "item.h"
+#include "misc.h"      /* ClearPtrList */
 #include "objtable.h"
 #include "objtype.h"   /* ObjType2Field548 */
 #include "savetag.h"
@@ -191,7 +192,6 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
 }
 
 typedef void (__attribute__((thiscall)) *AM2_ClearListFn)(void *rec);
-#define orig_clear_ptr_list ((AM2_ClearListFn)(uintptr_t)ADDR_CLEAR_PTR_LIST)
 
 void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
 {
@@ -211,7 +211,7 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
     }
 
     /* The one step neither of the other two arms has. */
-    orig_clear_ptr_list(v + VEHICLE_OFF_PTR_LIST);
+    ClearPtrList(v + VEHICLE_OFF_PTR_LIST);
 
     orig_free_subrecord_rows(v + OBJ_OFF_SUBRECORD);
     DestroyItemObject(vehicle, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
