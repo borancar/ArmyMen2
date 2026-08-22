@@ -297,6 +297,31 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid);
  * that rewrote those two bytes would move the cursor somewhere else. */
 void __cdecl ReceivePacket(void *packet, int32_t dpid);
 
+/* Original: 0x004114E0, "ReceivePlayerMsg for %d Players. I reckoned there
+ * were %d Players ". The host's whole view of the lobby, arriving at a client:
+ * the player count, every slot's id, colour, team and name, the map and level
+ * names, and the version pair.
+ *
+ * Its loop bound is the ADDRESS OF THE NEXT GLOBAL. It fills ADDR_ARMY_SETTING
+ * and stops when the cursor reaches ADDR_SCORE_LIMIT, which sits immediately
+ * after it -- so there are exactly four slots, whatever the message says the
+ * count is. The same shape as the registration table walking up to
+ * ADDR_SCRIPT_CONDITIONS.
+ *
+ * Three things are done twice and one is done early:
+ *
+ *  - the opening log is NOT gated on the comm object's verbosity, unlike every
+ *    other log in the function and like SendGameStartMsg's;
+ *  - a record that is not ours has CommSetSlotRemote called on it twice, once
+ *    before the bound check and once after;
+ *  - and the bound check sits BETWEEN those two, so the fifth and later
+ *    records still get their remote flag set before the loop gives up.
+ *
+ * The version-mismatch message names OUR player, not the sender's: "%s has a
+ * different version of the game" is filled from ADDR_DEFAULT_OWNER. A client
+ * that disagrees with the host announces itself. */
+void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid);
+
 /* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
  * Host only. Its one caller is the message dispatcher.
  *

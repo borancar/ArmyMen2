@@ -20,6 +20,7 @@
  * and m_ArmyReadyToLoad are the original's own spellings.
  */
 #include <stdint.h>
+#include <string.h>
 
 #include "commmsg.h"
 #include "misc.h"      /* XorChecksum, reconstructed */
@@ -527,8 +528,6 @@ typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
 
 #define orig_find_player_by_id \
     ((AM2_FindPlayerFn)(uintptr_t)ADDR_FIND_PLAYER_BY_ID)
-#define orig_recv_player_msg \
-    ((AM2_MsgHandlerFn)(uintptr_t)ADDR_RECV_PLAYER_MSG)
 #define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
 #define orig_menu_message  ((AM2_MenuMessageFn)(uintptr_t)ADDR_MENU_MESSAGE)
 
@@ -743,6 +742,175 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
     }
 }
 
+typedef int32_t (__cdecl *AM2_MapRulesFn)(int32_t a, int32_t b, int32_t c);
+typedef void (__cdecl *AM2_ChatAppendFn)(const char *text, int32_t flag);
+#define orig_check_map_rules ((AM2_MapRulesFn)(uintptr_t)ADDR_CHECK_MAP_RULES)
+#define orig_chat_append     ((AM2_ChatAppendFn)(uintptr_t)ADDR_CHAT_APPEND)
+typedef int32_t (__cdecl *AM2_SprintfFn)(char *out, const char *fmt, ...);
+#define orig_sprintf ((AM2_SprintfFn)(uintptr_t)ADDR_GAME_SPRINTF)
+
+#define g_ourSlot      (*(int32_t *)(uintptr_t)ADDR_OUR_SLOT)
+/* Spelled exactly as objtable.h spells it -- uint32_t, not int32_t -- so the
+ * two stay one definition. checkglobals refused the first attempt. */
+#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+
+/* Update the current dialog and repaint it, with no player list sent after --
+ * which is what separates this from RepaintDialogAndSendPlayers. */
+static void RepaintDialog(void)
+{
+    void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+
+    if (!dlg)
+        return;
+    ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
+        dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+}
+
+void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
+{
+    const uint8_t *m    = (const uint8_t *)msg;
+    uint8_t       *comm = (uint8_t *)kCommObj;
+    int32_t       *slotSetting = (int32_t *)(uintptr_t)ADDR_ARMY_SETTING;
+    const int32_t *settingEnd  = (const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT;
+    const uint8_t *rec;
+    uint8_t       *ours;
+    int32_t        i;
+
+    (void)dpid;
+
+    /* The host sends it. */
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    /* Not gated on verbosity, alone among this function's logs. */
+    am2_log("ReceivePlayerMsg for %d Players. I reckoned there were %d "
+            "Players \n",
+            *(const int32_t *)(m + MSG_PLAYER_COUNT),
+            *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
+
+    *(int32_t *)(comm + AM2_COMM_CONNECTED) =
+        *(const int32_t *)(m + MSG_PLAYER_CONNECTED);
+
+    if (*(const int32_t *)(kCommObj + AM2_COMM_LOG_ENABLED))
+        am2_log("      map: %s, mapSum=%X, ruleSum=%X\n",
+                (const char *)(m + MSG_PLAYER_MAP_NAME),
+                *(const int32_t *)(m + MSG_PLAYER_MAP_SUM),
+                *(const int32_t *)(m + MSG_PLAYER_RULE_SUM));
+
+    comm = (uint8_t *)kCommObj;
+    *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
+        *(const int32_t *)(m + MSG_PLAYER_COUNT);
+    *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
+        *(const int32_t *)(m + MSG_PLAYER_SCORE_LIMIT);
+    *(int32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS =
+        *(const int32_t *)(m + MSG_PLAYER_OVER_FLAGS);
+    *(int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C =
+        *(const int32_t *)(m + MSG_PLAYER_SETTING_22C);
+
+    rec = m + MSG_PLAYER_RECORDS;
+    for (i = 0; ; i++, rec += MSG_PLAYER_STRIDE, slotSetting++) {
+        uint8_t *slotRec;
+        int32_t  id = *(const int32_t *)(rec + REC_PLAYER_ID);
+
+        comm = (uint8_t *)kCommObj;
+        if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+            am2_log("                 player: %s %x %d\n",
+                    (const char *)(rec + REC_PLAYER_NAME), id,
+                    *(const int32_t *)(rec + REC_PLAYER_COLOUR));
+
+        /* Done BEFORE the bound check, so a fifth record still lands here. */
+        if (id == *(const int32_t *)(comm + AM2_COMM_SELF_ID)) {
+            g_ourSlot      = i;
+            g_defaultOwner = (uint32_t)i;
+            CommClearSlotRemote(comm, i);
+        } else {
+            CommSetSlotRemote(comm, i);
+        }
+
+        /* Four entries, and the end is the address of the next global. This
+         * BREAKS to the tail below -- it does not return, so everything after
+         * the loop still runs on the fifth record. */
+        if (slotSetting >= settingEnd)
+            break;
+
+        comm    = (uint8_t *)kCommObj;
+        slotRec = comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE;
+        *(int32_t *)(slotRec + AM2_PLAYER_ID)         = id;
+        *(int32_t *)(slotRec + COMM_ARMY_OFF_COLOUR)  =
+            *(const int32_t *)(rec + REC_PLAYER_COLOUR);
+        *(int32_t *)(slotRec + COMM_ARMY_OFF_TEAM)    =
+            *(const int32_t *)(rec + REC_PLAYER_TEAM);
+        *(int32_t *)(slotRec + COMM_ARMY_OFF_WAS_HERE) =
+            *(const int32_t *)(rec + REC_PLAYER_WAS_HERE);
+        *(int32_t *)(slotRec + COMM_ARMY_OFF_READY_TO_LOAD) =
+            *(const int32_t *)(rec + REC_PLAYER_F270);
+        *slotSetting = *(const int32_t *)(rec + REC_PLAYER_SETTING);
+
+        if (id != *(const int32_t *)(comm + AM2_COMM_SELF_ID)) {
+            /* The SECOND time for this record, and this one is bounded by the
+             * count where the first is not. */
+            if (i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
+                CommSetSlotRemote(comm, i);
+            comm = (uint8_t *)kCommObj;
+            if (!orig_find_player_by_id(
+                    *(const uint32_t *)(slotRec + AM2_PLAYER_ID))) {
+                am2_log("PlayerMsg received before DPSYS_CREATEPLAYERORGROUP. "
+                        "Unusual but should work. No flowq yet",
+                        *(const int32_t *)(slotRec + AM2_PLAYER_ID));
+                comm = (uint8_t *)kCommObj;
+            }
+        }
+
+        strcpy((char *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
+                        + COMM_OFF_PLAYERS),
+               (const char *)(rec + REC_PLAYER_NAME));
+    }
+
+    /* Our own slot may have arrived empty; fill in the id we already know. */
+    comm = (uint8_t *)kCommObj;
+    ours = comm + (uint32_t)g_ourSlot * COMM_ARMY_RECORD_SIZE;
+    if (*(const int32_t *)(ours + AM2_PLAYER_ID) == 0
+        || *(const int32_t *)(ours + AM2_PLAYER_ID) == -1)
+        *(int32_t *)(ours + AM2_PLAYER_ID) =
+            *(const int32_t *)(comm + AM2_COMM_SELF_ID);
+
+    if (*(const int32_t *)(m + MSG_PLAYER_HAS_MAP)) {
+        int32_t rules;
+
+        strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
+               (const char *)(m + MSG_PLAYER_MAP_NAME));
+        strcpy((char *)(uintptr_t)ADDR_TILESET_NAME,
+               (const char *)(m + MSG_PLAYER_LEVEL_NAME));
+        rules = orig_check_map_rules(
+                    *(const int32_t *)(m + MSG_PLAYER_RULE_ARG),
+                    *(const int32_t *)(m + MSG_PLAYER_RULE_SUM),
+                    *(const int32_t *)(m + MSG_PLAYER_MAP_SUM));
+        SendMapMsg(rules, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
+    }
+
+    if (*(const int32_t *)(m + MSG_PLAYER_VERSION)
+            != *(const int32_t *)(uintptr_t)ADDR_GAME_VERSION
+        || *(const int32_t *)(m + MSG_PLAYER_CHECKSUM)
+            != *(const int32_t *)(uintptr_t)ADDR_DATA_CHECKSUM) {
+        char buf[0x30];
+
+        /* OUR name, from ADDR_DEFAULT_OWNER -- the disagreeing client
+         * announces itself rather than naming the host. */
+        orig_sprintf(buf, "%s has a different version of the game.",
+                     (const char *)(kCommObj
+                                    + g_defaultOwner
+                                      * COMM_ARMY_RECORD_SIZE
+                                    + COMM_OFF_PLAYERS));
+        orig_menu_message(buf, 4, 0);
+        orig_chat_append(buf, 1);
+        SendMapMsg(5, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
+    }
+
+    RepaintDialog();
+}
+
 void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
@@ -813,7 +981,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
         /* Tested only to complain; the handler runs either way. */
         if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
             am2_log("Message Error:  Host should not receive PLAYERMSG\n");
-        orig_recv_player_msg(m, dpid);
+        ReceivePlayerMsg(m, dpid);
         return;
 
     case 9:
@@ -866,6 +1034,8 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_RECV_PLAYER_MSG, (const void *)ReceivePlayerMsg,
+                  "ReceivePlayerMsg", 1);
     patch_replace(ADDR_RECV_PACKET, (const void *)ReceivePacket,
                   "ReceivePacket", 1);
     patch_replace(ADDR_RECV_FLOW_CONTROL,

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `33cff49`. Working tree clean.
+Last updated: **2026-08-22**, at `54a633f`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 522 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 522 | 515 of them below the CRT line |
+| `patch_replace` sites | 523 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 523 | 516 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 97,520 / 372,816 B (**26.2%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 122,832 / 372,816 B (32.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 98,448 / 372,816 B (**26.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 123,760 / 372,816 B (33.2%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,34 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The comm receive path is complete.** `CommDispatchMessage` and every
+  handler it names are reconstructed; what is left below it is
+  `0x0040FBB0`, the SECOND dispatcher, which handles one message out of a
+  packet and is 736 bytes of item and unit traffic.
+
+- **`ReceivePlayerMsg`'s loop bound is the address of the next global.** It
+  fills `ADDR_ARMY_SETTING` at 0x00515FE0 and stops when the cursor reaches
+  `ADDR_SCORE_LIMIT` at 0x00515FF0 -- exactly four slots, whatever count the
+  message carries. Second instance of that shape in this image.
+
+- **And the bound check sits in the MIDDLE of the loop body.** A fifth record
+  still gets its remote flag set and can still overwrite `ADDR_OUR_SLOT` before
+  the loop gives up, because both happen before the check. A reconstruction
+  that hoisted the test to the top would be tidier and wrong.
+
+- **A record that is not ours has its remote flag set TWICE**, once before the
+  bound check and once after -- and only the second is guarded by the player
+  count. Both reproduced.
+
+- **The version-mismatch message names OUR player, not the sender's.** "%s has
+  a different version of the game" is filled from `ADDR_DEFAULT_OWNER`, so a
+  client that disagrees with the host announces itself.
+
+- **`checkglobals` caught a spelling, which is what it is for.**
+  `g_defaultOwner` is `uint32_t` in `objtable.h` and I wrote `int32_t`; that is
+  one definition of one address becoming two, and the ratchet refused it before
+  it could become a habit.
 
 - **`ADDR_HOST_SLOT` was our slot, not the host's**, and the way it went wrong
   is one this file has recorded three times for FUNCTIONS and not once for a

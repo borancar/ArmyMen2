@@ -2639,7 +2639,52 @@
  * the id. Its only caller is the packet walker above. */
 #define ADDR_RECV_ARMY_MSG       0x0040FBB0u  /* void(msg *, int32_t slot, int32_t seq) */
 #define ADDR_RECV_START_GAME_MSG 0x00411100u  /* "ReceiveStartGameMsg for %d Players.  Seed is %d " */
-#define ADDR_RECV_PLAYER_MSG     0x004114E0u  /* "ReceivePlayerMsg for %d Players..." */
+/* 0x004114E0, "ReceivePlayerMsg for %d Players. I reckoned there were %d
+ * Players ". The host's whole view of the lobby, arriving at a client. */
+#define ADDR_RECV_PLAYER_MSG     0x004114E0u  /* void(msg *, int32_t dpid) */
+/* Four int32_t, one per slot, and the loop that fills them stops on reaching
+ * ADDR_SCORE_LIMIT -- the NEXT global -- rather than on a count. The same
+ * shape as the registration table walking up to ADDR_SCRIPT_CONDITIONS.
+ *
+ * What the value MEANS is not established. What is: 0x00431E10 sets it from a
+ * lobby field's text through atoi, ReceivePlayerMsg carries it across for
+ * every player, and 0x00413480 reads our own entry through ADDR_OUR_SLOT. */
+#define ADDR_ARMY_SETTING        0x00515FE0u  /* int32_t[4] */
+#define ADDR_GAME_SETTING_22C    0x00515FDCu  /* int32_t, beside ADDR_GAME_OVER_FLAGS */
+/* The pair a client checks before agreeing to play: a constant in .rdata and a
+ * value computed at run time. SendPlayerMsg puts both in the record and this
+ * compares them; a mismatch says "has a different version of the game". They
+ * are read in those two places and nowhere else. */
+#define ADDR_GAME_VERSION        0x00475894u  /* int32_t, 1 in this build */
+#define ADDR_DATA_CHECKSUM       0x004FC8B4u  /* int32_t */
+/* 0x00431E10, "%s does not have rules." and "%s.txt" -- loads a map's rules
+ * and answers with the code SendMapMsg reports. */
+#define ADDR_CHECK_MAP_RULES     0x00431E10u  /* int32_t(int32, int32, int32) */
+/* Offsets into the player message. The per-player records start at 0x00A8 and
+ * are 0x60 apart; the original addresses them from 0x00AC, so the id reads as
+ * rec[-4]. */
+#define MSG_PLAYER_COUNT         0x08u
+#define MSG_PLAYER_CONNECTED     0x0Cu
+#define MSG_PLAYER_HAS_MAP       0x14u
+#define MSG_PLAYER_SCORE_LIMIT   0x18u
+#define MSG_PLAYER_MAP_NAME      0x1Cu
+#define MSG_PLAYER_LEVEL_NAME    0x5Cu
+#define MSG_PLAYER_MAP_SUM       0x9Cu
+#define MSG_PLAYER_RULE_SUM      0xA0u
+#define MSG_PLAYER_RULE_ARG      0xA4u
+#define MSG_PLAYER_RECORDS       0xA8u
+#define MSG_PLAYER_STRIDE        0x60u
+#define MSG_PLAYER_OVER_FLAGS    0x228u
+#define MSG_PLAYER_SETTING_22C   0x22Cu
+#define MSG_PLAYER_VERSION       0x230u
+#define MSG_PLAYER_CHECKSUM      0x234u
+#define REC_PLAYER_ID            0x00u
+#define REC_PLAYER_COLOUR        0x04u
+#define REC_PLAYER_SETTING       0x10u
+#define REC_PLAYER_NAME          0x14u
+#define REC_PLAYER_TEAM          0x54u
+#define REC_PLAYER_F270          0x58u
+#define REC_PLAYER_WAS_HERE      0x5Cu
 /* 0x00410890, "RemoteGamePause from %x; playerIndex== %d paused = %d
  * pauseflags = %x (%x) (msg Pause=%x)". One pause bit per player per reason,
  * and the two reasons have their own blocks: 0x0008 in the message's flags
