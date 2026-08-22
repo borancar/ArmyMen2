@@ -165,6 +165,121 @@ static void EditReleaseFocus(AM2_Widget *w)
     }
 }
 
+/* GetTickCount through the game's own IAT slot, so this module names no Win32
+ * type for it. */
+typedef uint32_t (__attribute__((stdcall)) *AM2_TickFn)(void);
+#define orig_get_tick_count (**(AM2_TickFn *)(uintptr_t)IAT_GET_TICK_COUNT)
+
+/* 250 ms before a held button starts repeating, 150 ms between repeats. */
+#define BUTTON_REPEAT_DELAY  250u
+#define BUTTON_REPEAT_PERIOD 150u
+
+typedef void (__cdecl *AM2_ButtonFn)(AM2_Widget *w);
+
+static void ButtonFire(AM2_Widget *w, int32_t off)
+{
+    AM2_ButtonFn fn = *(AM2_ButtonFn *)((uint8_t *)w + off);
+
+    if (fn)
+        fn(w);
+}
+
+/* Repaint self through slot 1 with its own rectangle -- the tail every arm of
+ * ButtonUpdate shares. */
+static void ButtonRepaintSelf(AM2_Widget *w)
+{
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
+#define BUTTON_DEADLINE(w) (*(uint32_t *)((uint8_t *)(w) + BUTTON_OFF_DEADLINE))
+
+void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  repeats;
+
+    WidgetScreenRect(w);
+
+    if (!w->parent || w->unknown4C) {
+        WidgetUpdate(w);
+        return;
+    }
+
+    w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
+                               (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+    if (!w->unknown40) {
+        BUTTON_DEADLINE(w) = 0;
+        WidgetUpdate(w);
+        return;
+    }
+
+    if (orig_mouse_moved)
+        ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+
+    repeats = *(const int32_t *)(self + BUTTON_OFF_REPEATS);
+
+    if (!repeats) {
+        /* Plain button: both handlers fire on RELEASE, a press only repaints. */
+        if (!orig_mouse_moved) {
+            WidgetUpdate(w);
+            return;
+        }
+        if (g_mouseChanged[0]) {
+            if (!g_mouseButton[0]) {
+                ButtonFire(w, BUTTON_OFF_ON_LEFT);
+                w->unknown40 = 0;
+            }
+            ButtonRepaintSelf(w);
+        } else if (g_mouseChanged[1]) {
+            if (!g_mouseButton[1]) {
+                ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+                w->unknown40 = 0;
+            }
+            ButtonRepaintSelf(w);
+        }
+        WidgetUpdate(w);
+        return;
+    }
+
+    /* Auto-repeat. The left and right buttons do NOT behave the same: left
+     * arms the deadline on first press without firing, right fires. Kept. */
+    if (g_mouseButton[0]) {
+        if (g_mouseChanged[0]) {
+            BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
+        } else {
+            if (orig_get_tick_count() <= BUTTON_DEADLINE(w)) {
+                WidgetUpdate(w);
+                return;
+            }
+            BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_PERIOD;
+            ButtonFire(w, BUTTON_OFF_ON_LEFT);
+        }
+    } else if (g_mouseChanged[0]) {
+        BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
+        ButtonFire(w, BUTTON_OFF_ON_LEFT);
+    } else if (g_mouseButton[1]) {
+        if (g_mouseChanged[1]) {
+            BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
+            ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+        } else {
+            if (orig_get_tick_count() <= BUTTON_DEADLINE(w)) {
+                WidgetUpdate(w);
+                return;
+            }
+            BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_PERIOD;
+            ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+        }
+    } else {
+        /* Neither button down: forget the deadline and the hover. */
+        BUTTON_DEADLINE(w) = 0;
+        w->unknown40 = 0;
+        WidgetUpdate(w);
+        return;
+    }
+    ButtonRepaintSelf(w);
+    WidgetUpdate(w);
+}
+
 void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip)
 {
     uint8_t *self = (uint8_t *)w;
@@ -661,6 +776,8 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_BUTTON_UPDATE, (const void *)ButtonUpdate,
+                        "ButtonUpdate", 4);
     rc |= patch_replace(ADDR_BUTTON_PAINT, (const void *)ButtonPaint,
                         "ButtonPaint", 2);
     rc |= patch_replace(ADDR_EDIT_TAKE_FOCUS, (const void *)EditTakeFocus,

@@ -391,6 +391,43 @@ void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
 
+/* A button's handlers and its auto-repeat state. 0x005C and 0x0060 are the
+ * font and the ink in a LABEL -- the subclass tails do not agree and must not
+ * be merged into one struct. */
+#define BUTTON_OFF_ON_LEFT   0x54   /* void(__cdecl *)(AM2_Widget *) */
+#define BUTTON_OFF_REPEATS   0x5C   /* int32_t, non-zero enables auto-repeat */
+#define BUTTON_OFF_DEADLINE  0x60   /* uint32_t, GetTickCount of the next repeat */
+#define BUTTON_OFF_ON_RIGHT  0x64   /* void(__cdecl *)(AM2_Widget *) */
+
+/* Original: 0x00454310, thiscall, slot 2 in four vtables -- a button's mouse
+ * handling, and the only widget update that reads the pointer.
+ *
+ * Common to both modes: place, give up if there is no parent or 0x004C is set,
+ * then compute `the cursor is inside me` into 0x0040. That field is the one
+ * WidgetConstruct deliberately never writes, because this computes it before
+ * anything reads it. Outside, the repeat deadline is cleared and nothing else
+ * happens. Inside, and if the mouse moved at all, the button takes focus.
+ *
+ * Then the two modes, which do NOT agree with each other and are reproduced
+ * as they are:
+ *
+ *   0x005C clear -- a plain button. The left handler fires on RELEASE and the
+ *   right handler on RELEASE, and a press only repaints.
+ *
+ *   0x005C set -- auto-repeat. The LEFT handler does NOT fire on first press,
+ *   only the deadline is armed; it fires on release, and again every time the
+ *   clock passes the deadline while the button is held. The RIGHT handler DOES
+ *   fire on first press. That asymmetry is the original's.
+ *
+ * The delays are 250 ms to the first repeat and 150 ms between, read through
+ * GetTickCount. With neither button down, the deadline and the hover flag are
+ * both cleared.
+ *
+ * Every arm ends the same way -- repaint self through slot 1 with its own
+ * rectangle, then run the base update -- which is what makes a kilobyte out of
+ * this much logic. */
+void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
+
 /* A three-state button's sprites. The dialog builders load them in triples --
  * `03_007_00_ok.bmp`, `03_007_01_ok.bmp`, `03_007_02_ok.bmp` -- which is the
  * independent confirmation that these three offsets are normal, focused and

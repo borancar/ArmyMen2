@@ -70,14 +70,14 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 441 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 441 | 434 of them below the CRT line |
+| `patch_replace` sites | 442 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 442 | 435 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,232 / 372,816 B (**26.6%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 100,080 / 372,816 B (**26.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 60, 165 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 61, 170 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how
@@ -154,6 +154,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`ButtonUpdate` is the widget layer's sharpest A/B, by a wide margin.**
+  Suppressing the left handler on release -- so no menu button does anything --
+  is **30,096 / 29,964 / 306,126** pixels on the three `controls` frames. Two
+  orders of magnitude above the focus-highlight and caret defects in the same
+  layer, because a button that does not fire means the next screen never
+  appears at all.
+
+  Ranked by defect signal, this layer now reads: button not firing 306,126;
+  wrong widget geometry 305,939; label colour 17,110; button focus highlight
+  249; typed text 72. The budgets only reach the top three.
+
+- **The four classes that use `0x00454310` are the auto-repeat buttons**, and
+  the left/right asymmetry in it is reproduced rather than reconciled: with
+  repeat enabled the LEFT handler does not fire on first press, only arming the
+  250 ms deadline, while the RIGHT handler does. Both then repeat every 150 ms.
+  Nothing driven so far reaches the repeat path -- it needs a button held down
+  past 250 ms -- so that half stays verified by reading.
 
 - **`controls`' budget of 200 is only just tight enough.** Making `ButtonPaint`
   always show the unfocused sprite -- so no button ever lights -- moves **249,

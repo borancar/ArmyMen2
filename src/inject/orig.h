@@ -87,6 +87,12 @@
  * thunk onto the base destructor. Slot 0 in three vtables. */
 #define ADDR_WIDGET_DELETE_ALT  0x00456970u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_WIDGET_DESTRUCT_THUNK 0x00456990u /* void(AM2_Widget *) */
+/* The game's own import slot for GetTickCount, called through rather than
+ * imported, so a flat-ish module needs no Win32 declaration for it. */
+#define IAT_GET_TICK_COUNT      0x0046F084u
+/* 0x00454310, thiscall, slot 2 in four vtables: a button's mouse handling,
+ * with optional auto-repeat while a button is held. */
+#define ADDR_BUTTON_UPDATE      0x00454310u /* void(AM2_Widget *) */
 /* 0x00454270, thiscall, slot 1 in two vtables: a button that picks one of
  * three sprites -- normal, focused, pressed -- and then paints normally. */
 #define ADDR_BUTTON_PAINT       0x00454270u /* void(AM2_Widget *, RECT) */
