@@ -393,6 +393,12 @@
  * bitmap header MakeBitmap also reads -- ten dwords then a 256-entry palette --
  * and returns the pixels in a buffer the caller frees. */
 #define ADDR_READ_DIB_CHUNK  0x00422FF0u
+/* 0x00423200: open a file, read one DIB chunk from it, and flip the result
+ * top-down into a fresh buffer. The two header fields it needs are the row
+ * count and the total byte size. */
+#define ADDR_LOAD_DIB_FLIPPED 0x00423200u /* void *(const char *, void *, uint16_t *) */
+#define DIB_OFF_BLOCKS        0x08u   /* int32_t, ReverseBlocks' block count */
+#define DIB_OFF_SIZE          0x14u   /* int32_t, total bytes -- the listed size */
 #define ADDR_MSG_TILESET_OPEN 0x00486310u /* "Unable to open tileset" */
 #define ADDR_MSG_TILESET_LOCK 0x004862ECu /* "Error on Lock in RestoreTileSet()" */
 #define ADDR_MSG_TILESET_LOAD 0x004862D4u /* "Error in loadtileset()" */

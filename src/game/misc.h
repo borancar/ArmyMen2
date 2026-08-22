@@ -80,6 +80,25 @@ int32_t  __cdecl   ReturnOne(void);           /* 0x004354F0 */
  * taking the SOURCE blocks in reverse order while the destination advances --
  * a block reverse, which over rows of a bitmap is a vertical flip. Returns 1,
  * including when count <= 0 and it copies nothing. */
+/* 0x00423200. Open `path`, read one DIB chunk into the 0x428-byte header
+ * `hdr`, and answer the pixels flipped top-down in a buffer the caller owns.
+ * `*size` is the LISTED SIZE from the header -- the same field the allocation
+ * and the "size of 0" complaint use -- and is zeroed on every failure after
+ * the file opens. The block count is a different field, 0x08, and only
+ * ReverseBlocks sees it.
+ *
+ * The flip is ReverseBlocks over the rows, which is what a bottom-up DIB
+ * needs. The chunk reader hands back a buffer this frees.
+ *
+ * It leaks that buffer if the destination allocation fails -- the only exit
+ * that does not free it. Reproduced; it is one `malloc` failure away from
+ * mattering and nothing here is in a position to decide otherwise.
+ *
+ * Its only caller loads `%02d_%03d_%02d_*.msk` out of a `masks` directory, so
+ * the masks are DIBs. The function itself knows nothing about masks and is not
+ * named for them. */
+void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size);
+
 int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
                               int32_t count);
 

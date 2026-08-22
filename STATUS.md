@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 461 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 461 | 454 of them below the CRT line |
+| `patch_replace` sites | 462 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 462 | 455 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,304 / 372,816 B (**27.4%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 102,496 / 372,816 B (**27.5%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,24 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`LoadDibFlipped` cannot run in this installation, and that is measurable
+  rather than inferred.** Its only caller globs
+  `%02d_%03d_%02d_*.msk` out of a `masks` directory, and the GOG build ships
+  **no `masks` directory and zero `.msk` files anywhere in the prefix**. So the
+  counter's 0 is neither a blind spot -- `blindspots.py` agrees the caller is
+  original -- nor a path not driven. The content simply is not there.
+
+  Worth doing anyway: it is 192 bytes, it is on the self-naming list, and the
+  reading corrected a swap before it shipped. But it is verified by reading and
+  no amount of driving will change that.
+
+- **Two header fields nearly went in swapped.** `hdr[0x14]` is the LISTED SIZE
+  -- checked for zero, passed to `malloc`, and returned through the out
+  parameter -- while `hdr[0x08]` is the block count only `ReverseBlocks` sees.
+  The first draft had them the other way round, which would have allocated the
+  block count and reported it as the size. The compiler caught it only because
+  an unrelated type error forced a re-read of the same lines.
 
 - **`CreateTimer` is in, and it is what settled the clock.** 1,000 records of
   `{start, period, count, id}` at `0x0050C370`, a slot free when its id is
