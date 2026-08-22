@@ -177,6 +177,21 @@ counts probe before reading one as coverage -- that is what turned the
   before adding a guard the original does not have -- `ReleaseSprite` is
   trusted to cope, and it does.
 
+- **`tools/ab.sh difficulty` is a third menu configuration**, OPTIONS ->
+  DIFFICULTY, six nodes, identical trees and 0 pixels. It exists because that
+  dialog is the ONLY place the list box at `0x0046FCC0` is instantiated, so
+  its painter (`0x00455180`) and its update (`0x00455340`) are checkable there
+  or nowhere. Found by dumping the tree and crossing the vtables against the
+  patch list, which is now the standard way to pick a target.
+
+- **The list's row records are 260 bytes.** `0x00455180` computes the offset as
+  `((idx << 6) + idx) << 2`, which is `idx * 65 * 4`, into an array at `0x0060`
+  whose first dword is the row count. It draws rows `0x0074` through
+  `0x0074 + 0x0078` and picks an ink from four different fields -- `0x0080`
+  normally, `0x0084` and `0x0088` for the selected row depending on whether the
+  left mouse button is down, and `0x008C` for another case still. Not yet
+  reconstructed; the colour selection needs the rest of the body read.
+
 - **What is left on the two drivable dialogs is now two functions.**
   `0x004510D0` on CONTROLS (2,063 B) and `0x0042FF40` on the multiplayer one.
   Everything else either screen instantiates is reconstructed.

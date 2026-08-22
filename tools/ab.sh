@@ -180,6 +180,11 @@ play() {
         # whole DirectPlay subsystem is otherwise unreachable. Both sides get
         # it, so the comparison is still like for like.
         multi)    args="-nointro -dbg"    ; wait=25 ;;
+        # OPTIONS -> DIFFICULTY, which is the only screen with a LIST BOX --
+        # the Easy/Medium/Hard rows. `ctl widgets` says that dialog is the only
+        # place the class at 0x0046FCC0 is instantiated, so its painter and its
+        # update are checkable here or nowhere.
+        difficulty) args="-nointro -dbg" ; wait=25 ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
@@ -239,6 +244,15 @@ play() {
         # The tree here holds the toggles -- the "send" indicators beside the
         # two fields -- and their chosen sprite. A wrong toggle sprite is 212
         # pixels, which no budget catches; it is one changed line here.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
+    fi
+
+    if [ "$cfg" = difficulty ]; then
+        "$REPO/tools/point.py" 306 262 --click >/dev/null 2>&1   # OPTIONS
+        sleep 5
+        "$REPO/tools/point.py" 306 252 --click >/dev/null 2>&1   # DIFFICULTY
+        sleep 6
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
     fi
@@ -443,6 +457,8 @@ compare() {
         # one-colour slip in LabelDraw is 17,110 and a width-from-height slip
         # in WidgetScreenRect is 305,939.
         controls) budget=200 ;;
+        # A static dialog like controls, and the cursor moves the same way.
+        difficulty) budget=200 ;;
         # Measured at 0, three runs -- but left at the default, and the
         # reason is worth knowing before trusting this number. A REAL defect
         # here is small: making EditTakeFocus skip installing g_charHandler,
@@ -504,7 +520,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls multi quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty multi quit"
 
 fail=0
 for cfg in $cfgs; do
