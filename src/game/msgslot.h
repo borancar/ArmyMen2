@@ -215,6 +215,38 @@ void __cdecl CommEndSetup(void);
  * last one the scan was waiting on. */
 void __cdecl SendGameReadyMsg(int32_t ready);
 
+/* Original: 0x00411880, "SendMapMsg from %x   Error = %d". Tell the other
+ * players which map is chosen -- and return 1 WITHOUT sending if this machine
+ * is the host, which is the first thing it does. The host has nobody to tell.
+ *
+ * The log is mislabelled in the original: it prints the ARGUMENT under "Error"
+ * while the send result it just took sits in a register and is never printed.
+ * The same author's "Seed is %d" in SendGameStartMsg pushes a literal 0. Both
+ * kept. */
+int32_t __cdecl SendMapMsg(int32_t map);
+
+/* Original: 0x004118F0, "ReceivedMapMsg from %x  Result = %d (4 is nominal)".
+ * Host only. Its one caller is the message dispatcher.
+ *
+ * A nine-arm jump table on the value, and the arms do NOT line up with the log
+ * text: 0 sets the slot's flag; 1, 2, 3, 4, 6 and 8 clear it and play sound 3;
+ * 5 and 7 do nothing at all, as does anything above 8. So the value the
+ * message calls nominal takes the same arm as the failures. Transcribed from
+ * the table at 0x00411998, not from the layout -- as always in this image, the
+ * two differ. */
+void __cdecl ReceivedMapMsg(void *msg, int32_t dpid);
+
+/* Original: 0x00411A20 and 0x00411B20, the receive halves of SendColorMsg and
+ * SendTeamMsg. Host only, and both end the same way: repaint the current
+ * dialog through the update-then-paint pair, then send the player list.
+ *
+ * They differ in the middle. The colour one goes through
+ * CommSetArmyColour, which SWAPS the colour with whoever already had it, and
+ * gives up if that returns -1; the team one writes the field directly with no
+ * check of any kind. */
+void __cdecl ReceivedColorMsg(void *msg, int32_t dpid);
+void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
+
 
 int msgslot_install(void);
 

@@ -2555,6 +2555,23 @@
 /* The two senders themselves. */
 #define ADDR_SEND_COLOR_MSG      0x004119C0u  /* void(int32_t colour) */
 #define ADDR_SEND_TEAM_MSG       0x00411AC0u  /* void(int32_t team) */
+/* The receive halves of the same three, all host-only, all taking
+ * (msg, dpid) as ReceiveGameReadyMsg does. Their one caller each is the
+ * message dispatcher at 0x0040FF00. */
+#define ADDR_RECV_MAP_MSG        0x004118F0u  /* void(msg *, int32_t dpid) */
+#define ADDR_RECV_COLOR_MSG      0x00411A20u  /* void(msg *, int32_t dpid) */
+#define ADDR_RECV_TEAM_MSG       0x00411B20u  /* void(msg *, int32_t dpid) */
+/* 0x00411880, "SendMapMsg from %x   Error = %d". Returns the send result, and
+ * returns 1 without sending at all if this machine is the host -- the host has
+ * no one to tell. 0x004FB770 is the record, value at +8. */
+#define ADDR_SEND_MAP_MSG        0x00411880u  /* int32_t(int32_t) */
+#define ADDR_MSG_MAP             0x004FB770u
+/* 0x0040F280, thiscall: give a slot an army colour, swapping with whoever
+ * already had it. Returns the slot, or -1 if the colour is negative. */
+#define ADDR_COMM_SET_ARMY_COLOUR 0x0040F280u /* int32_t(this, slot, colour) */
+#define COMM_ARMY_OFF_COLOUR     0x210u   /* int32_t, swapped by the above */
+#define COMM_ARMY_OFF_TEAM       0x258u   /* int32_t, what ReceivedTeamMsg sets */
+#define COMM_ARMY_OFF_MAP_OK     0x278u   /* int32_t, what ReceivedMapMsg sets */
 #define ADDR_GET_PAUSE_FLAGS     0x00426840u  /* uint32(void) */
 #define ADDR_STR_SEND_BADPLAYER  0x004754ACu
 #define ADDR_STR_SEND_BADPARAM   0x00475478u

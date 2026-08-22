@@ -55,6 +55,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/gameproc.cpp \
             src/game/item.cpp \
             src/game/msgslot.cpp \
+            src/game/commmsg.cpp \
             src/game/armymsg.cpp \
             src/game/defparse.cpp \
             src/game/definfo.cpp \

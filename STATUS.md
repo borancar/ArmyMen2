@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `390e06e`. Working tree clean.
+Last updated: **2026-08-22**, at `30f7845`. Working tree clean.
 
 ## In flight
 
@@ -70,12 +70,12 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 510 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 510 | 503 of them below the CRT line |
+| `patch_replace` sites | 514 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 514 | 507 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 95,120 / 372,816 B (**25.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 119,808 / 372,816 B (32.1%) | what every earlier session quoted, and an over-count |
-| modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
+| sub-CRT code reconstructed | 95,776 / 372,816 B (**25.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 120,464 / 372,816 B (32.3%) | what every earlier session quoted, and an over-count |
+| modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 68, 179 import sites | `docs/boundary.md` |
@@ -167,6 +167,41 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The selftest link drew a module boundary, and it drew the right one.**
+  `msgslot.cpp` is in `SELFTEST_SRC` because its slot writers, its latency ring
+  and `CommRemoveKeyed` are pure functions with recorded vectors. The comm
+  MESSAGE family had been growing in the same file, and it can never have a
+  vector -- every one of those functions reads the comm object, logs, repaints
+  a dialog or plays a sound. The moment `ReceivedMapMsg` needed `PlaySoundAt`,
+  which lives in `win32/audio.cpp` where the selftest deliberately does not
+  reach, `selftest.exe` stopped linking.
+
+  This is the second time `selftest-link` has caught a real structural
+  question, and the answer was different from last time: `SendGameStartMsg`
+  moved to the module of the functions it drives, while here the module itself
+  had to split. `src/game/commmsg.cpp` is the message half; `msgslot.cpp` keeps
+  what can be checked offline. The header stays whole, because it documents a
+  field and both functions that touch it, and that is not what the linker was
+  asking about.
+
+- **The three lobby settings and their receive halves are done.** `SendMapMsg`
+  returns 1 WITHOUT sending when this machine is the host -- the host has
+  nobody to tell -- and its log is mislabelled: it prints the ARGUMENT under
+  "Error = %d" while the send result it just took is never printed at all. The
+  same author's "Seed is %d" in `SendGameStartMsg` pushes a literal 0.
+
+- **`ReceivedMapMsg`'s arms do not line up with its own log text.** The message
+  says "Result = %d (4 is nominal)", and 4 takes the same arm as the failures:
+  clear the slot's flag and play sound 3. Only 0 sets it. 5 and 7 do nothing,
+  as does anything above 8. Taken from the table at 0x00411998, which as always
+  in this image is not the order the arms are laid out in.
+
+- **The colour and team receivers differ in the middle and nowhere else.** The
+  colour one goes through `CommSetArmyColour`, which SWAPS the colour with
+  whoever already had it and can refuse with -1; the team one writes the field
+  with no check of any kind. Both then repaint the current dialog and send the
+  player list.
 
 - **`make -s check` was committed against while FAILING, and the reason is
   worth knowing.** Its last line reads "all static checks pass" only on

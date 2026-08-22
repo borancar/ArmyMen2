@@ -28,6 +28,7 @@
 #include "../game/win32/widget.h"
 #include "../game/item.h"
 #include "../game/msgslot.h"
+#include "../game/commmsg.h"
 #include "../game/armymsg.h"
 #include "../game/defparse.h"
 #include "../game/definfo.h"
@@ -439,6 +440,7 @@ static void install(void)
     dist_install();
     item_install();
     msgslot_install();
+    commmsg_install();
     armymsg_install();
     defparse_install();
     definfo_install();
