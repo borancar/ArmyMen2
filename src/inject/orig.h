@@ -1908,6 +1908,28 @@
 /* 0x004105F0, "ArmyMessageSend" from its own three error strings -- 304 bytes
  * and 20 callers, so it is the transport the whole game sends through. */
 #define ADDR_ARMY_MESSAGE_SEND     0x004105F0u
+/* 0x0044C250, one caller, and it names itself: "Trooper Fire Send, trooper:
+ * %d,  face:%d, pos (%d,%d,%d), loctarg %x, globTarg %x, weap %d, seq:%d".
+ * A 28-byte army message of kind 0x17 -- the trooper, its target, where it is
+ * and which way it faces -- and it clears two of the trooper's fields on the
+ * way out. */
+#define ADDR_TROOPER_FIRE_SEND     0x0044C250u  /* void(trooper, target) */
+#define AM2_MSG_TROOPER_FIRE       0x17
+#define AM2_MSG_TROOPER_FIRE_LEN   0x1C
+#define FLOW_OFF_SEQUENCE          0x94u   /* read, never bumped here */
+/* The trooper fields this touches. Only the two positions and the facing are
+ * evidenced by the log line beside them; the rest are named for what the
+ * message does with them. */
+#define TROOPER_OFF_FACING         0x40u   /* uint8_t, logged as `face` */
+#define TROOPER_OFF_POS_X          0x590u  /* int16_t, logged as pos.x */
+#define TROOPER_OFF_POS_Y          0x592u
+#define TROOPER_OFF_POS_Z          0x594u
+#define TROOPER_OFF_LOCAL_TARGET   0x598u  /* logged as `loctarg` */
+#define TROOPER_OFF_WEAPON         0x568u  /* logged as `weap` */
+#define TROOPER_OFF_FIRE_FLAG      0x529u
+#define TROOPER_OFF_CLEAR_A        0x57Cu  /* both zeroed as the shot goes */
+#define TROOPER_OFF_CLEAR_B        0x588u
+#define TROOPER_OFF_LAST_SEQ       0x5CCu  /* where the sequence is kept */
 /* 0x00410820, "SendGamePause from %x  Pause =%s  Flags=%x". Eight callers.
  * It fills two fields of a message that lives in .bss at 0x004FAA50 and hands
  * it to SendGameMsg -- the header is set up elsewhere, since nothing in the

@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 635 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 634 | 624 of them below the CRT line |
+| `patch_replace` sites | 636 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 635 | 625 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 107,872 / 372,816 B (**28.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 133,184 / 372,816 B (35.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 108,160 / 372,816 B (**29.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 133,472 / 372,816 B (35.8%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -197,6 +197,21 @@ counts probe before reading one as coverage -- that is what turned the
   7807/6713 and was clean. That guard was added after a run compared 24,914
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
+
+- **The self-naming pool is nearly dry below 320 bytes.** A sweep for
+  unpatched sub-CRT functions that push a string looking like their own name
+  turns up exactly ONE: `0x0044C250`, which logs "Trooper Fire Send, trooper:
+  %d,  face:%d, pos (%d,%d,%d), loctarg %x, globTarg %x, weap %d, seq:%d". That
+  one line named the function and nine of its fields.
+
+  It is a 28-byte army message of kind 0x17 and it cannot run here: no
+  DirectPlay session, so it returns at its first test. Verified by reading, and
+  the counter exists -- so that 0 is real rather than a missing patch, which is
+  a distinction this tree could not draw two days ago.
+
+- **The sequence number is READ and not bumped.** `TrooperFireSend` takes it
+  off the flow record at +0x94 and stores it on the trooper at +0x5CC; whatever
+  advances it is somewhere else.
 
 - **A function that does not appear in `counts` at ALL has no patch**, and
   that is a usable check only since the trace table stopped overflowing.

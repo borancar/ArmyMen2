@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "commmsg.h"
+#include "msgslot.h"   /* FindPlayerById */
 #include "item.h"      /* UidOnWire, UidArmy -- reconstructed */
 #include "event.h"     /* EventMessageReceive -- reconstructed */
 #include "misc.h"      /* XorChecksum, reconstructed */
@@ -1137,8 +1138,64 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
     }
 }
 
+/* +0x00 len, +0x02 kind, +0x04 uid -- AM2_ArmyMsgHdr -- then the rest. */
+typedef struct {
+    AM2_ArmyMsgHdr hdr;
+    uint32_t       target;     /* +0x08, the trooper's local target on the wire */
+    int16_t        x;          /* +0x0C */
+    int16_t        y;          /* +0x0E */
+    int16_t        z;          /* +0x10 */
+    uint16_t       pad12;      /* +0x12, never written */
+    uint32_t       shotAt;     /* +0x14, the target argument's uid on the wire */
+    uint8_t        flag;       /* +0x18, the byte at +0x529 */
+    uint8_t        pad19[3];
+} AM2_TrooperFireMsg;
+
+void __cdecl TrooperFireSend(void *trooper, void *target)
+{
+    uint8_t           *t = (uint8_t *)trooper;
+    AM2_TrooperFireMsg msg;
+    const uint8_t     *flow;
+    int32_t            seq;
+
+    if (*(const int32_t *)(kCommObj + COMM_OFF_DPLAY) == 0)
+        return;
+
+    flow = (const uint8_t *)FindPlayerById(
+               (uint32_t)*(const int32_t *)(kCommObj + COMM_OFF_OUR_PLAYER_ID));
+    seq = *(const int32_t *)(flow + FLOW_OFF_SEQUENCE);
+
+    msg.hdr.len  = AM2_MSG_TROOPER_FIRE_LEN;
+    msg.hdr.kind = AM2_MSG_TROOPER_FIRE;
+    msg.hdr.uid  = UidOnWire(*(const uint32_t *)(t + 4));
+    msg.target   = UidOnWire(*(const uint32_t *)(t + TROOPER_OFF_LOCAL_TARGET));
+    msg.shotAt   = UidOnWire(*(const uint32_t *)((const uint8_t *)target + 4));
+    msg.x        = *(const int16_t *)(t + TROOPER_OFF_POS_X);
+    msg.y        = *(const int16_t *)(t + TROOPER_OFF_POS_Y);
+    msg.z        = *(const int16_t *)(t + TROOPER_OFF_POS_Z);
+    msg.flag     = *(t + TROOPER_OFF_FIRE_FLAG);
+
+    /* Cleared before the send, not after. */
+    *(int32_t *)(t + TROOPER_OFF_CLEAR_A) = 0;
+    *(int32_t *)(t + TROOPER_OFF_CLEAR_B) = 0;
+
+    ArmyMessageSend(&msg);
+
+    if (*(const int32_t *)(kCommObj + AM2_COMM_VERBOSE))
+        am2_log("Trooper Fire Send, trooper: %d,  face:%d, pos (%d,%d,%d), "
+                "loctarg %x, globTarg %x, weap %d, seq:%d\n",
+                *(const uint32_t *)(t + 4), *(t + TROOPER_OFF_FACING),
+                (int32_t)msg.x, (int32_t)msg.y, (int32_t)msg.z,
+                *(const uint32_t *)(t + TROOPER_OFF_LOCAL_TARGET), msg.target,
+                *(const int32_t *)(t + TROOPER_OFF_WEAPON), seq);
+
+    *(int32_t *)(t + TROOPER_OFF_LAST_SEQ) = seq;
+}
+
 int commmsg_install(void)
 {
+    patch_replace(ADDR_TROOPER_FIRE_SEND, (const void *)TrooperFireSend,
+                  "TrooperFireSend", 2);
     patch_replace(ADDR_RECV_ARMY_MSG, (const void *)ReceiveArmyMsg,
                   "ReceiveArmyMsg", 1);
     patch_replace(ADDR_RECV_PLAYER_MSG, (const void *)ReceivePlayerMsg,

@@ -16,6 +16,18 @@
 extern "C" {
 #endif
 
+/* 0x0044C250, one caller, and it names itself -- "Trooper Fire Send,
+ * trooper: %d,  face:%d, pos (%d,%d,%d), loctarg %x, globTarg %x, weap %d,
+ * seq:%d", which is where every field name below comes from.
+ *
+ * A 28-byte army message of kind 0x17: the trooper's uid and its local target
+ * on the wire, where it is, and the byte at +0x529. Two of the trooper's own
+ * fields are zeroed as it goes and the flow record's sequence number is
+ * recorded on it -- READ, not bumped, so something else owns that counter.
+ *
+ * Does nothing at all without a DirectPlay session. */
+void __cdecl TrooperFireSend(void *trooper, void *target);
+
 int commmsg_install(void);
 
 #ifdef __cplusplus
