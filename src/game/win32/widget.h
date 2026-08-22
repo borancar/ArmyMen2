@@ -222,6 +222,33 @@ AM2_Widget *__attribute__((thiscall)) LabelConstruct(AM2_Widget *w,
                                                      int32_t ink,
                                                      int32_t paper);
 
+/* Slot 3's signature. */
+typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
+                                                            int32_t announce);
+
+/* Original: 0x00453D90, thiscall. Follow the sibling chain from this widget to
+ * its end and answer the last one -- which is `this` when there is no next.
+ * It is the wrap for moving backwards: a widget with no previous sibling is
+ * the first child, so the last of its own chain is the last child. */
+AM2_Widget *__attribute__((thiscall)) WidgetLastSibling(AM2_Widget *w);
+
+/* Original: 0x00453DB0 and 0x00453E20, thiscall. Move the focus to the next or
+ * the previous ELIGIBLE sibling and dispatch slot 3 on it. Both wrap: forwards
+ * runs off the end into the parent's first child, backwards runs off the front
+ * into the last of the chain. Both stop if they come all the way round to the
+ * widget they started from, and both then re-test the candidate before
+ * dispatching -- redundantly for the eligible case, which is the original's
+ * shape and is kept.
+ *
+ * They do NOT agree on what eligible means, and that is reproduced rather than
+ * tidied. Forwards requires 0x0050 set AND 0x004C clear; backwards looks only
+ * at 0x0050 and never reads 0x004C at all. So a widget with 0x004C set is
+ * skipped going down and landed on going up. Nothing in the menus shipped here
+ * has been seen to set 0x004C, so which of the two is the bug is not
+ * established -- only that they differ. */
+void __attribute__((thiscall)) WidgetFocusNext(AM2_Widget *w, int32_t announce);
+void __attribute__((thiscall)) WidgetFocusPrev(AM2_Widget *w, int32_t announce);
+
 /* Original: 0x00453E80, thiscall, 21 direct callers -- the base per-frame
  * update and the whole keyboard interface of a dialog.
  *

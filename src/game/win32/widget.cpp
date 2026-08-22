@@ -89,20 +89,80 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 #define orig_consume_key  ((AM2_ConsumeKeyFn)(uintptr_t)ADDR_CONSUME_KEY)
 #define orig_key_pressed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_PRESSED_FN)
 
-/* The two focus walkers, 0x00453DB0 and 0x00453E20. Still original: each is a
- * loop over the sibling list with a wrap through the parent and two
- * eligibility tests, and neither is needed to read this one. */
-typedef void (__attribute__((thiscall)) *AM2_FocusMoveFn)(AM2_Widget *w,
-                                                          int32_t announce);
-#define orig_focus_next ((AM2_FocusMoveFn)(uintptr_t)ADDR_WIDGET_FOCUS_NEXT)
-#define orig_focus_prev ((AM2_FocusMoveFn)(uintptr_t)ADDR_WIDGET_FOCUS_PREV)
-
 /* DirectInput scancodes, which is what every query here is indexed by. */
 #define AM2_DIK_TAB    0x0F
 #define AM2_DIK_RETURN 0x1C
 #define AM2_DIK_SPACE  0x39
 #define AM2_DIK_UP     0xC8
 #define AM2_DIK_DOWN   0xD0
+
+AM2_Widget *__attribute__((thiscall)) WidgetLastSibling(AM2_Widget *w)
+{
+    while (w->nextSibling)
+        w = w->nextSibling;
+    return w;
+}
+
+void __attribute__((thiscall)) WidgetFocusNext(AM2_Widget *w, int32_t announce)
+{
+    AM2_Widget *cand = w->nextSibling;
+
+    if (!cand) {
+        AM2_Widget *parent = w->parent;
+
+        if (parent)
+            cand = parent->firstChild;
+    }
+
+    while (cand) {
+        if (cand == w)
+            break;                      /* all the way round; give up */
+        if (cand->flag50 && !cand->unknown4C)
+            break;                      /* eligible */
+        if (cand->nextSibling) {
+            cand = cand->nextSibling;
+        } else {
+            AM2_Widget *parent = cand->parent;
+
+            if (!parent)
+                return;
+            cand = parent->firstChild;
+        }
+    }
+
+    if (!cand || cand == w)
+        return;
+    if (!cand->flag50 || cand->unknown4C)
+        return;
+    ((AM2_WidgetFocusFn *)cand->vtable)[WIDGET_VSLOT_FOCUS](cand, announce);
+}
+
+void __attribute__((thiscall)) WidgetFocusPrev(AM2_Widget *w, int32_t announce)
+{
+    AM2_Widget *cand = w->prevSibling;
+
+    if (!cand)
+        cand = WidgetLastSibling(w);
+
+    while (cand) {
+        if (cand == w)
+            break;
+        /* 0x004C is NOT consulted here and IS going forwards -- see the
+         * header. Reproduced, not reconciled. */
+        if (cand->flag50)
+            break;
+        if (cand->prevSibling)
+            cand = cand->prevSibling;
+        else
+            cand = WidgetLastSibling(cand);
+    }
+
+    if (!cand || cand == w)
+        return;
+    if (!cand->flag50)
+        return;
+    ((AM2_WidgetFocusFn *)cand->vtable)[WIDGET_VSLOT_FOCUS](cand, announce);
+}
 
 void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
 {
@@ -125,17 +185,17 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
      * movement key keeps moving. */
     if (orig_key_pressed(AM2_DIK_UP)) {
         if (w->focusedChild)
-            orig_focus_prev(w->focusedChild, 1);
+            WidgetFocusPrev(w->focusedChild, 1);
         orig_consume_key(AM2_DIK_UP);
     }
     if (orig_key_pressed(AM2_DIK_DOWN)) {
         if (w->focusedChild)
-            orig_focus_next(w->focusedChild, 1);
+            WidgetFocusNext(w->focusedChild, 1);
         orig_consume_key(AM2_DIK_DOWN);
     }
     if (orig_key_pressed(AM2_DIK_TAB)) {
         if (w->focusedChild)
-            orig_focus_next(w->focusedChild, 1);
+            WidgetFocusNext(w->focusedChild, 1);
         orig_consume_key(AM2_DIK_TAB);
     }
 
@@ -364,6 +424,13 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_LAST_SIBLING,
+                        (const void *)WidgetLastSibling,
+                        "WidgetLastSibling", 3);
+    rc |= patch_replace(ADDR_WIDGET_FOCUS_NEXT, (const void *)WidgetFocusNext,
+                        "WidgetFocusNext", 4);
+    rc |= patch_replace(ADDR_WIDGET_FOCUS_PREV, (const void *)WidgetFocusPrev,
+                        "WidgetFocusPrev", 2);
     rc |= patch_replace(ADDR_WIDGET_UPDATE, (const void *)WidgetUpdate,
                         "WidgetUpdate", 21);
     rc |= patch_replace(ADDR_WIDGET_UPDATE_CANCEL,

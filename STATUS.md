@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 420 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 420 | 413 of them below the CRT line |
+| `patch_replace` sites | 423 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 423 | 416 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 93,712 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 93,952 / 372,816 B (**25.2%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,21 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The two focus walkers disagree about what "eligible" means.** Forwards
+  (`0x00453DB0`) requires `0x0050` set AND `0x004C` clear. Backwards
+  (`0x00453E20`) looks only at `0x0050` and never reads `0x004C` at all. So a
+  widget with `0x004C` set is skipped going down and landed on going up.
+  Reproduced rather than reconciled: nothing in the shipped menus has been seen
+  to set `0x004C`, so which of the two is the bug is not established -- only
+  that they differ. Worth a probe that reads `0x004C` across a live dialog.
+
+- **UP is now driven too, so all five of `WidgetUpdate`'s branches are.**
+  DOWN, DOWN, UP on the OPTIONS menu leaves the highlight on CONTROLS -- net
+  one down from AUDIO -- and `WidgetTakeFocus` climbs to 5, which is the
+  cross-check that the walkers actually dispatched slot 3 rather than merely
+  running. The walkers' own counters read 0, because `WidgetUpdate` is ours and
+  calls them directly.
 
 - **Four of `WidgetUpdate`'s five key branches are confirmed by DRIVING, not
   by pixels.** With the OPTIONS menu up and 408,272 calls on the clock:
