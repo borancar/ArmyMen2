@@ -861,6 +861,21 @@ A BATTLE with an empty session list. It exercises `CommCreateDirectPlay`,
 `StartMultiplayerGame` and `CommEnumSessions` — the last polled repeatedly
 while the browser is open, so its count climbs on its own.
 
+**`tools/ab.sh multi` drives that path now**, through to ENTER BATTLE NAME,
+and types into the field. 7 identical messages and 0 pixels, three runs. It is
+the only configuration that reaches the EDIT BOX at all — the CONTROLS
+dialog's key-capture boxes look like text fields and are a different class,
+where all five `Edit*` counters read 0.
+
+**Its pixel check does not discriminate, and that is measured.** Making
+`EditTakeFocus` skip installing `g_charHandler`, so nothing typed ever
+appears, moves **72** pixels — "Zulu" in a menu font is small — which is under
+any budget that survives a blinking caret. So it covers the path and gross
+errors, and the handler is checked by driving and looking at the field.
+**Measure the defect signal, not just the noise floor**: three clean runs said
+the noise was 0, which was true and useless. What decides whether a budget is
+worth anything is how big a real error is.
+
 **The multiplayer path can be A/B'd, so "verified by reading" is weaker than
 it needs to be.** START A WAR reaches ENTER BATTLE NAME, which has two text
 fields and an OK, so the whole sequence is drivable with `point.py` and

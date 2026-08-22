@@ -168,13 +168,28 @@ play() {
         # menus on their way somewhere and stop composing frames the moment a
         # dialog is up.
         controls) args="-nointro -dbg"    ; wait=25 ;;
+        # The only configuration that reaches the EDIT BOX. The CONTROLS
+        # dialog's key-capture boxes look like text fields and are a different
+        # class; all five Edit* counters read 0 there. This one drives
+        # MULTI-PLAYER -> TCP/IP -> SELECT -> START A WAR to ENTER BATTLE NAME,
+        # which has two real text fields, and types into one -- so it compares
+        # the handler install as well as the painting.
+        #
+        # It needs AM2_MULTIPLAYER=1, because the title screen's MULTI-PLAYER
+        # entry is patched out of this build (docs/binarypatches.md) and the
+        # whole DirectPlay subsystem is otherwise unreachable. Both sides get
+        # it, so the comparison is still like for like.
+        multi)    args="-nointro -dbg"    ; wait=25 ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
     esac
 
     [ "$side" = orig ] && export AM2_NOPATCH=1 || unset AM2_NOPATCH
-    AM2_MAKEVARS="TRACE=1" drive start "$wait" "ARGS=$args" >/dev/null 2>&1
+    local extra=""
+    [ "$cfg" = multi ] && extra="AM2_MULTIPLAYER=1"
+    AM2_MAKEVARS="TRACE=1" drive start "$wait" "ARGS=$args" $extra \
+        >/dev/null 2>&1
 
     # Boot Camp needs driving; the other two show what they show.
     if [ "$cfg" = bootcamp ] || [ "$cfg" = audio ] || [ "$cfg" = mission ]; then
@@ -203,6 +218,24 @@ play() {
         sleep 25
         drive ctl "mouse left tap" >/dev/null 2>&1
         sleep 8
+    fi
+
+    if [ "$cfg" = multi ]; then
+        # Coordinates from CLAUDE.md. point.py needs the exact button centre
+        # here: two pixels above MULTI-PLAYER lands between buttons, does
+        # nothing, and reads exactly like a dead code path.
+        "$REPO/tools/point.py" 306 222 --click >/dev/null 2>&1   # MULTI-PLAYER
+        sleep 4
+        "$REPO/tools/point.py" 200 176 --click >/dev/null 2>&1   # the TCP/IP row
+        sleep 3
+        "$REPO/tools/point.py" 515 221 --click >/dev/null 2>&1   # SELECT
+        sleep 4
+        "$REPO/tools/point.py" 321 222 --click >/dev/null 2>&1   # START A WAR
+        sleep 5
+        # Typing is the point: a character only reaches the field if
+        # EditTakeFocus installed g_charHandler.
+        drive ctl "type Zulu" >/dev/null 2>&1
+        sleep 3
     fi
 
     if [ "$cfg" = controls ]; then
@@ -380,6 +413,16 @@ compare() {
         # one-colour slip in LabelDraw is 17,110 and a width-from-height slip
         # in WidgetScreenRect is 305,939.
         controls) budget=200 ;;
+        # Measured at 0, three runs -- but left at the default, and the
+        # reason is worth knowing before trusting this number. A REAL defect
+        # here is small: making EditTakeFocus skip installing g_charHandler,
+        # so nothing typed ever appears, moves only **72** pixels, because
+        # "Zulu" in a menu font is not many pixels. No budget can sit below
+        # that and still survive a blinking caret, so this configuration does
+        # NOT discriminate the handler install. What it covers is the path --
+        # 12,552 EditUpdate calls and the whole dialog -- and gross errors.
+        # The handler itself is checked by driving and looking at the field.
+        multi)    budget=500 ;;
         *)        budget=500 ;;
     esac
     # Overridable, mainly so the check itself can be tested.
@@ -431,7 +474,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls multi quit"
 
 fail=0
 for cfg in $cfgs; do

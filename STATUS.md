@@ -165,6 +165,22 @@ counts probe before reading one as coverage -- that is what turned the
   `'_'` when `0x0044` is set, and then seen. Prediction first, observation
   second, which is worth more than either alone.
 
+- **`tools/ab.sh multi` is in, and its pixel check is weak on purpose.** It
+  drives MULTI-PLAYER -> TCP/IP -> SELECT -> START A WAR to ENTER BATTLE NAME
+  under `AM2_MULTIPLAYER=1` and types into the field: 7 identical messages and
+  **0 pixels**, three runs.
+
+  It does NOT catch the defect it was built for. Making `EditTakeFocus` skip
+  installing `g_charHandler`, so nothing typed ever appears, moves only **72**
+  pixels -- "Zulu" in a menu font is small -- and no budget can sit below that
+  and still survive a blinking caret. So the configuration covers the PATH,
+  12,552 `EditUpdate` calls and a dialog nothing else reaches, and the handler
+  itself stays checked by driving and looking.
+
+  **Measure the defect signal, not just the noise floor.** Three clean runs
+  said the noise was 0 and that was true and useless; what settles whether a
+  budget is worth anything is how big a real error is.
+
 - **`controls` does NOT reach the edit box.** Its key-capture boxes look like
   text fields and are a different class: all five `Edit*` counters read 0 on
   that configuration. The classes that use it are ENTER BATTLE NAME behind
