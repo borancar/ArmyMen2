@@ -72,13 +72,22 @@ typedef struct AM2_Widget {
  *
  *   0  destructor -- every class has its own; none is shared
  *   1  paint      -- 0x00454BA0 in 18, LabelDraw is one of the overrides
- *   2  click      -- 0x00454BD0 in 17
+ *   2  update     -- 0x00454BD0 in 17, over a base of 0x00453E80
  *   3  focus      -- 0x00454070 in 30
  *   4  repaint    -- 0x00453FF0 in 29
+ *
+ * Slot 2 was called "click" here for one commit, from a glance at 0x00454BD0
+ * that saw a function pointer being called and stopped. Reading its callees
+ * says otherwise: the three queries around it are IsKeyDown, KeyChanged and a
+ * consume, the scancode is 1 -- ESCAPE -- and `!down && changed` is the key
+ * being RELEASED. It is the per-frame update, and 0x00454BD0 is the override
+ * that gives a dialog its cancel key before doing the ordinary thing. The
+ * base at 0x00453E80 places the widget and recurses into its children, which
+ * is why WidgetScreenRect runs a million and a half times.
  */
 #define WIDGET_VSLOT_DTOR    0
 #define WIDGET_VSLOT_PAINT   1
-#define WIDGET_VSLOT_CLICK   2
+#define WIDGET_VSLOT_UPDATE  2
 #define WIDGET_VSLOT_FOCUS   3
 #define WIDGET_VSLOT_REPAINT 4
 
@@ -205,6 +214,21 @@ AM2_Widget *__attribute__((thiscall)) LabelConstruct(AM2_Widget *w,
                                                      int32_t font,
                                                      int32_t ink,
                                                      int32_t paper);
+
+/* Original: 0x00454BD0, thiscall, slot 2 of 17 classes. The per-frame update
+ * for a widget that has a cancel handler: if ESCAPE has just been RELEASED,
+ * consume it and call the handler at 0x0060 with `this`; otherwise fall
+ * through to the base update.
+ *
+ * The three conditions are checked in the original's order and each one short-
+ * circuits to the fall-through, so a widget with no handler never queries the
+ * keyboard at all. The consume is what stops one press firing on two frames.
+ *
+ * Note 0x0060 is the handler HERE and the ink colour in a label -- the label's
+ * vtable has the base update in slot 2 rather than this, which is what makes
+ * that safe and is the clearest evidence the subclasses lay their own tails
+ * out independently. */
+void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w);
 
 int widget_install(void);
 

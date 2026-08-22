@@ -48,6 +48,25 @@
 #define ADDR_WIDGET_DELETE      0x00453BA0u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_LABEL_DESTRUCT     0x00454EF0u /* void(AM2_Widget *) */
 #define ADDR_LABEL_DELETE       0x00454ED0u /* AM2_Widget *(AM2_Widget *, int32_t) */
+/* The three per-key input queries, all indexed by DirectInput scancode and all
+ * masked to 8 bits by the callee. 0x00427450 answers "is it down now" from the
+ * top bit of the current buffer; 0x00427470 answers "did it change" by xoring
+ * current against previous; 0x004274A0 CONSUMES one, copying the current byte
+ * over the previous one and clearing that key's entry in ADDR_KEY_PRESSED, so
+ * the edge is not seen twice. The idiom `!IsKeyDown(k) && KeyChanged(k)` is
+ * the key being RELEASED, which is what the menus act on. */
+#define ADDR_IS_KEY_DOWN        0x00427450u /* int32_t(int32_t dik) */
+#define ADDR_KEY_CHANGED        0x00427470u /* int32_t(int32_t dik) */
+#define ADDR_CONSUME_KEY        0x004274A0u /* void(int32_t dik) */
+/* 0x00453E80, thiscall, 21 callers: the base widget's per-frame update. Places
+ * itself through WidgetScreenRect and walks its children calling THEIR slot 2,
+ * which is what makes WidgetScreenRect the busiest function in the tree.
+ * 0x00454AC0 is a one-instruction `jmp` thunk onto it. */
+#define ADDR_WIDGET_UPDATE      0x00453E80u /* void(AM2_Widget *) */
+#define ADDR_WIDGET_UPDATE_THUNK 0x00454AC0u
+/* 0x00454BD0, thiscall, slot 2 of 17 classes: the base update with a cancel
+ * key in front of it. */
+#define ADDR_WIDGET_UPDATE_CANCEL 0x00454BD0u /* void(AM2_Widget *) */
 /* 0x004274D0: copy the 256-byte current key buffer over the previous one, so
  * every edge test that follows sees no change. Called where the game wants the
  * keystroke that got it here not to be seen again. */

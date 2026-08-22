@@ -79,6 +79,37 @@ AM2_Widget *__attribute__((thiscall)) LabelDelete(AM2_Widget *w, int32_t flags)
     return w;
 }
 
+/* The input trio and the base update, all still original. The queries are two
+ * globals and a mask each and belong to the input layer rather than here. */
+typedef int32_t (__cdecl *AM2_KeyQueryFn)(int32_t dik);
+typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
+typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
+#define orig_is_key_down  ((AM2_KeyQueryFn)(uintptr_t)ADDR_IS_KEY_DOWN)
+#define orig_key_changed  ((AM2_KeyQueryFn)(uintptr_t)ADDR_KEY_CHANGED)
+#define orig_consume_key  ((AM2_ConsumeKeyFn)(uintptr_t)ADDR_CONSUME_KEY)
+#define orig_widget_update ((AM2_WidgetUpdateFn)(uintptr_t)ADDR_WIDGET_UPDATE)
+
+/* The cancel handler at 0x0060: cdecl, takes the widget. */
+typedef void (__cdecl *AM2_CancelFn)(AM2_Widget *w);
+#define WIDGET_OFF_CANCEL 0x60
+
+#define AM2_DIK_ESCAPE 1
+
+void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
+{
+    AM2_CancelFn cancel =
+        *(AM2_CancelFn *)((uint8_t *)w + WIDGET_OFF_CANCEL);
+
+    if (cancel
+        && !orig_is_key_down(AM2_DIK_ESCAPE)
+        && orig_key_changed(AM2_DIK_ESCAPE)) {
+        orig_consume_key(AM2_DIK_ESCAPE);
+        cancel(w);
+        return;
+    }
+    orig_widget_update(w);
+}
+
 /* 0x004274D0. Still original: it is two globals and a rep movsd, and the
  * buffers are the input layer's rather than this module's. */
 typedef void (__cdecl *AM2_LatchKeysFn)(void);
@@ -260,6 +291,9 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_WIDGET_UPDATE_CANCEL,
+                        (const void *)WidgetUpdateCancel,
+                        "WidgetUpdateCancel", 17);
     rc |= patch_replace(ADDR_WIDGET_DESTRUCT, (const void *)WidgetDestruct,
                         "WidgetDestruct", 2);
     rc |= patch_replace(ADDR_WIDGET_DELETE, (const void *)WidgetDelete,

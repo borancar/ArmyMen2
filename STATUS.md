@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 418 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 418 | 411 of them below the CRT line |
+| `patch_replace` sites | 419 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 419 | 412 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 93,648 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 93,712 / 372,816 B (**25.1%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -153,6 +153,22 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **ESCAPE closes the CONTROLS dialog, through our code, and that is the best
+  evidence in this layer so far.** `WidgetUpdateCancel` runs 73,393 times with
+  the dialog up -- once per widget per frame -- and tapping ESCAPE takes it to
+  77,370 and returns the screen to the OPTIONS menu. So the branch that was
+  reconstructed from reading `!IsKeyDown(1) && KeyChanged(1)` as "the key was
+  RELEASED" is the branch that produced a visible state change. Not a pixel
+  comparison and not a counter: the game did the thing.
+
+  Worth remembering as a technique. A reconstruction that CAUSES a state
+  transition can be checked by driving the input and looking at where the game
+  ends up, which is stronger than any budget and needs no second run.
+
+- **`tools/ab.sh controls` still closes with the CANCEL button, not ESCAPE.**
+  Both reach the same handler; the click also exercises the button widget's
+  own path, so it is the better of the two to automate. ESCAPE is the probe.
+
 - **`LabelConstruct` 21, `LabelDestruct` 21, and that is an invariant.** Every
   label the CONTROLS dialog builds is destroyed when CANCEL closes it, exactly.
   It is the registry invariant's shape -- two counters that must agree or
@@ -209,11 +225,14 @@ counts probe before reading one as coverage -- that is what turned the
   (`0x00454BD0` in 17), 3 focus (`0x00454070` in 30), 4 repaint
   (`0x00453FF0` in 29).
 
-  Slot 2's identification is the nicest: it tests three input queries and then
-  calls a function pointer at `0x0060` with `this`. For the LABEL, `0x0060` is
-  the ink colour byte -- and the label's vtable has a different function in
-  slot 2, which is what says the subclasses lay their own tails out
-  independently rather than sharing a field map.
+  Slot 2 was recorded as "click" for one commit and is the per-frame UPDATE.
+  Its three input queries are `IsKeyDown`, `KeyChanged` and a consume, the
+  scancode is 1 -- ESCAPE -- and `!down && changed` is a RELEASE, so
+  `0x00454BD0` is the base update with a cancel key in front of it. For the
+  LABEL, `0x0060` is the ink colour byte rather than the handler, and the
+  label's vtable has the base update in slot 2 rather than this one, which is
+  what makes that safe and is the clearest evidence the subclasses lay their
+  own tails out independently.
 
 - **`WidgetRepaint` runs 3 times on the CONTROLS dialog and its interesting
   branch runs 0 times.** Making it never defer to an ancestor leaves

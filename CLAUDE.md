@@ -1189,6 +1189,22 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   it goes. A vtable array is worth walking the moment one of its slots is
   reconstructed — it says how big the subsystem is before any of it is read.
 
+  **The five slots are 0 destructor, 1 paint, 2 update, 3 focus, 4 repaint**,
+  and naming them needed the whole array rather than any one vtable: slot 3 is
+  the same function in 30 of the 33 and slot 4 in 29, so those are the base's
+  and everything else is an override.
+
+  **Slot 2 went in as "click" and that was wrong**, from a glance at
+  `0x00454BD0` that saw a function pointer being called and stopped there. Its
+  callees settle it: the three queries around the call are `IsKeyDown`,
+  `KeyChanged` and a consume, the scancode is 1 — ESCAPE — and
+  `!down && changed` is the key being RELEASED, the same idiom as the
+  in-mission ESCAPE handler. It is the per-frame update, `0x00454BD0` is the
+  override that gives a dialog its cancel key first, and the base at
+  `0x00453E80` places the widget and recurses into its children — which is why
+  `WidgetScreenRect` runs a million and a half times. **Name a virtual from
+  its callees, not from the shape of its body.**
+
   **`tools/ab.sh controls` is the menu A/B.** That dialog is
   78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
   VEHICLE" — and the dialog itself comes out **0 of 786,432**. Its budget is
