@@ -165,17 +165,22 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
  * slot past them, and the surface they were drawn from. */
 void __cdecl FreeMenuSprites(void);
 
-/* 0x0043C730. Build the roach's collision footprint, one record per facing.
+/* 0x0045A450. The same for one vehicle kind, and the function that names the
+ * family: it logs "vehicle mask direction: %d" under -traceVEH. It keeps a
+ * block on twelve of the 64 samples where the roach wants sixteen. */
+void __cdecl BuildVehicleMask(int32_t kind);
+
+/* 0x0043C730. Build the roach's collision mask, one record per direction.
  * See the note in sprite.cpp for the grid and the record layout. */
-void __cdecl BuildRoachFootprints(void);
+void __cdecl BuildRoachMask(void);
 
 /* 0x00446290. Is this sprite opaque at this point -- the run-length mask for a
  * software format, the bounding box for anything else. */
 int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at);
 
 /* 0x0044BB30, 0x0045D9B0 and 0x0045DA20. The sprite to draw for a unit of this
- * kind facing this way: the animation with a fixed id (1 for soldiers, 0x51
- * for vehicles and turrets), the heading rounded to one of its facings, frame
+ * kind pointed this way: the animation with a fixed id (1 for soldiers, 0x51
+ * for vehicles and turrets), the heading rounded to one of its directions, frame
  * 0. See the note in sprite.cpp for what they settle about anim.h, and for the
  * one way the turret version differs. */
 AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint32_t heading);

@@ -514,7 +514,7 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
     return 1;
 }
 
-/* 0x00446290, two callers -- the roach and vehicle footprint builders. Is this
+/* 0x00446290, two callers -- the roach and vehicle mask builders. Is this
  * sprite opaque at this point? The name is ours.
  *
  * A sprite with no image is never solid. Otherwise the answer comes from
@@ -543,11 +543,11 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
 
 /* The three animation lookups -- 0x0044BB30, 0x0045D9B0 and 0x0045DA20, and
  * all three names are ours. Each finds the entry with a fixed id in its kind's
- * table, turns an 8-bit heading into one of the animation's facings, and
+ * table, turns an 8-bit heading into one of the animation's directions, and
  * returns the sprite for frame 0 of that facing.
  *
  * They are the proof that anim.h's field names are right rather than plausible.
- * `facingBits` goes to RoundTo8 as its bit count, so it really is the log of
+ * `directionBits` goes to RoundTo8 as its bit count, so it really is the log of
  * the facing count; the cell index is `frames * facing`, so `frames` really is
  * the inner stride and the grid really is facing-major. Nothing in the loader
  * could have settled either.
@@ -575,7 +575,7 @@ static int32_t AnimIndexOfId(const AM2_AnimTable *t, int32_t id)
 
 static AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
 {
-    int32_t facing = RoundTo8((int32_t)(heading & 0xFFu), a->facingBits) & 0xFF;
+    int32_t facing = RoundTo8((int32_t)(heading & 0xFFu), a->directionBits) & 0xFF;
 
     return g_spriteList[a->cells[(int32_t)a->frames * facing].sprite];
 }
@@ -618,7 +618,7 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading)
 }
 
 /* 0x0043C730, and the roach loader at 0x0043CCF0 tail-jumps to it. The name is
- * ours. Build the roach's collision footprint -- one record per facing of the
+ * ours. Build the roach's collision mask -- one record per direction of the
  * animation with id 0x51, which is the only animation any vehicle or turret
  * file is ever asked for.
  *
@@ -639,10 +639,10 @@ AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading)
  * index at 0 when nothing matches, like the soldier and vehicle versions.
  */
 #define g_roachAnims        ((AM2_AnimTable *)(uintptr_t)ADDR_ROACH_ANIMS)
-#define g_roachFacings      (*(int32_t *)(uintptr_t)ADDR_ROACH_FOOTPRINT_FACINGS)
-#define g_roachFootprints   ((uint8_t *)(uintptr_t)ADDR_ROACH_FOOTPRINTS)
+#define g_roachMaskDirs      (*(int32_t *)(uintptr_t)ADDR_ROACH_MASK_DIRECTIONS)
+#define g_roachMask   ((uint8_t *)(uintptr_t)ADDR_ROACH_MASK)
 
-void __cdecl BuildRoachFootprints(void)
+void __cdecl BuildRoachMask(void)
 {
     const AM2_AnimTable *t = g_roachAnims;
     AM2_Anim            *a;
@@ -654,29 +654,29 @@ void __cdecl BuildRoachFootprints(void)
         i = 0;
     a = t->entries[i].anim;
 
-    g_roachFacings = a->facings;
-    if (a->facings <= 0)
+    g_roachMaskDirs = a->directions;
+    if (a->directions <= 0)
         return;
 
-    out = g_roachFootprints;
-    for (facing = 0; facing < a->facings; facing++) {
+    out = g_roachMask;
+    for (facing = 0; facing < a->directions; facing++) {
         AM2_Sprite *spr = g_spriteList[a->cells[(int32_t)a->frames * facing]
                                         .sprite];
-        AM2_Point   found[AM2_FOOTPRINT_POINTS];
+        AM2_Point   found[AM2_MASK_POINTS];
         int32_t     count = 0;
         int32_t     x, y;
 
-        for (y = AM2_FOOTPRINT_STEP; y < spr->bounds.bottom;
-             y += AM2_FOOTPRINT_STEP)
-            for (x = AM2_FOOTPRINT_STEP; x < spr->bounds.right;
-                 x += AM2_FOOTPRINT_STEP) {
+        for (y = AM2_MASK_STEP; y < spr->bounds.bottom;
+             y += AM2_MASK_STEP)
+            for (x = AM2_MASK_STEP; x < spr->bounds.right;
+                 x += AM2_MASK_STEP) {
                 int32_t solid = 0;
                 int32_t sx, sy;
 
-                for (sy = y - AM2_FOOTPRINT_STEP; sy < y;
-                     sy += AM2_FOOTPRINT_SAMPLE)
-                    for (sx = x - AM2_FOOTPRINT_STEP; sx < x;
-                         sx += AM2_FOOTPRINT_SAMPLE) {
+                for (sy = y - AM2_MASK_STEP; sy < y;
+                     sy += AM2_MASK_SAMPLE)
+                    for (sx = x - AM2_MASK_STEP; sx < x;
+                         sx += AM2_MASK_SAMPLE) {
                         AM2_Point p;
 
                         p.x = (int16_t)sx;
@@ -685,7 +685,7 @@ void __cdecl BuildRoachFootprints(void)
                             solid++;
                     }
 
-                if (solid < AM2_FOOTPRINT_MIN_SOLID)
+                if (solid < AM2_ROACH_MASK_MIN_SOLID)
                     continue;
                 found[count].x = (int16_t)(x - spr->hotX - 8);
                 found[count].y = (int16_t)(y - spr->hotY - 8);
@@ -696,11 +696,86 @@ void __cdecl BuildRoachFootprints(void)
          * writes it through `[ebp-4]`. Getting this wrong by one dword put the
          * whole table over the global at 0x00654CA4 with every point still
          * correct, and `bootcamp` and `mission` were both clean on it -- the
-         * mis-centred trig table again. tools/footprints.py is what caught
+         * mis-centred trig table again. tools/maskdump.py is what caught
          * it. */
         *(int32_t *)(out - 4) = count;
         memcpy(out, found, (size_t)count * 4);
-        out += AM2_FOOTPRINT_STRIDE;
+        out += AM2_MASK_STRIDE;
+    }
+}
+
+/* 0x0045A450, one caller -- the vehicle loader at 0x0045A8C0, once per kind.
+ * The roach builder again, and this one names the family: it logs
+ * "vehicle mask direction: %d" under -traceVEH.
+ *
+ * Three differences from the roach, all reproduced. It takes the kind and
+ * indexes everything by it. It keeps a block on TWELVE of the 64 samples
+ * rather than sixteen. And its record index is `kind * 32 + dir`, so every
+ * kind gets 32 slots whether its animation has that many directions or not.
+ *
+ * The bases are confirmed by tiling rather than by reading: the six turret
+ * tables end exactly where the six direction counts begin, and those end
+ * exactly where the records begin, and 6 * 32 records of 0xA4 end exactly at
+ * ADDR_VEHICLE_ANIMS. If a layout does not tile, one of the bases is wrong --
+ * which is how the roach table's was found to be.
+ */
+#define g_vehicleMaskDirs ((int32_t *)(uintptr_t)ADDR_VEHICLE_MASK_DIRECTIONS)
+#define g_vehicleMask     ((uint8_t *)(uintptr_t)ADDR_VEHICLE_MASK)
+#define g_traceVeh        (*(const int32_t *)(uintptr_t)ADDR_OPT_TRACE_VEH)
+
+void __cdecl BuildVehicleMask(int32_t kind)
+{
+    const AM2_AnimTable *t = &g_vehicleAnims[kind];
+    AM2_Anim            *a;
+    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+    int32_t              dir;
+
+    if (i >= t->count)
+        i = 0;
+    a = t->entries[i].anim;
+
+    g_vehicleMaskDirs[kind] = a->directions;
+    if (a->directions <= 0)
+        return;
+
+    for (dir = 0; dir < a->directions; dir++) {
+        AM2_Sprite *spr;
+        AM2_Point   found[AM2_MASK_POINTS];
+        int32_t     count = 0;
+        int32_t     x, y;
+        uint8_t    *out;
+
+        if (g_traceVeh)
+            am2_log("vehicle mask direction: %d\n", dir);
+
+        spr = g_spriteList[a->cells[(int32_t)a->frames * dir].sprite];
+
+        for (y = AM2_MASK_STEP; y < spr->bounds.bottom; y += AM2_MASK_STEP)
+            for (x = AM2_MASK_STEP; x < spr->bounds.right; x += AM2_MASK_STEP) {
+                int32_t solid = 0;
+                int32_t sx, sy;
+
+                for (sy = y - AM2_MASK_STEP; sy < y; sy += AM2_MASK_SAMPLE)
+                    for (sx = x - AM2_MASK_STEP; sx < x; sx += AM2_MASK_SAMPLE) {
+                        AM2_Point p;
+
+                        p.x = (int16_t)sx;
+                        p.y = (int16_t)sy;
+                        if (SpriteSolidAt(spr, p))
+                            solid++;
+                    }
+
+                if (solid < AM2_VEHICLE_MASK_MIN_SOLID)
+                    continue;
+                found[count].x = (int16_t)(x - spr->hotX - 8);
+                found[count].y = (int16_t)(y - spr->hotY - 8);
+                count++;
+            }
+
+        out = g_vehicleMask
+              + (size_t)(kind * AM2_VEHICLE_MASK_DIRS + dir) * AM2_MASK_STRIDE;
+        *(int32_t *)(out - 4) = count;
+        memcpy(out, found, (size_t)count * 4);
     }
 }
 
@@ -708,9 +783,12 @@ int sprite_install(void)
 {
     int rc = 0;
 
-    rc |= patch_replace(ADDR_BUILD_ROACH_FOOTPRINTS,
-                        (const void *)BuildRoachFootprints,
-                        "BuildRoachFootprints", 0);
+    rc |= patch_replace(ADDR_BUILD_VEHICLE_MASK,
+                        (const void *)BuildVehicleMask,
+                        "BuildVehicleMask", 1);
+    rc |= patch_replace(ADDR_BUILD_ROACH_MASK,
+                        (const void *)BuildRoachMask,
+                        "BuildRoachMask", 0);
     rc |= patch_replace(ADDR_SPRITE_SOLID_AT, (const void *)SpriteSolidAt,
                         "SpriteSolidAt", 2);
     rc |= patch_replace(ADDR_SOLDIER_ANIM_SPRITE, (const void *)SoldierAnimSprite,

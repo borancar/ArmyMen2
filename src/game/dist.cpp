@@ -98,8 +98,8 @@ int32_t __cdecl RoundTo8(int32_t value, uint32_t bits)
  * It writes `al` and leaves the rest of `eax` holding `value` or `value - 1`,
  * which is why the vectors compare a byte here. Its callers all store the
  * result into a byte field -- LoadAnimTable's is AM2_Anim::facingBits, where
- * the argument is the number of facings and the answer is the shift from an
- * 8-bit heading to one of them.
+ * the argument is the number of directions and the answer is the shift from
+ * an 8-bit heading to one of them.
  */
 uint8_t __cdecl Log2Mask(int32_t value)
 {

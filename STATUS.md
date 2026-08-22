@@ -81,11 +81,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 555 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 554 | 544 of them below the CRT line |
+| `patch_replace` sites | 556 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 555 | 545 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 102,960 / 372,816 B (**27.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 128,272 / 372,816 B (34.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 103,424 / 372,816 B (**27.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 128,736 / 372,816 B (34.5%) | what every earlier session quoted, and an over-count |
 | modules | 29 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -105,7 +105,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | `make selftest` | current | **7,282** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
-| `tools/footprints.py` | current | 32 records, 237 points, 5,256 bytes, sha256 `52a1d32c...` -- byte-identical to `AM2_NOPATCH=1` |
+| `tools/maskdump.py` | current | roach 32 records/237 points, vehicle 192/3,081, 36,768 bytes, sha256 `532e52a0...` -- byte-identical to `AM2_NOPATCH=1` |
 | `tools/anicheck.py` | current | 20 `.ani` files parsed to their last byte, 21 tables in the game, 0 mismatched, 121 borrowed entries all resolved right |
 | `tools/ab.sh bootcamp\|windowed\|intro\|audio\|mission\|quit` | not since this run began | the rest of `ab.sh all` is still owed |
 
@@ -196,12 +196,34 @@ counts probe before reading one as coverage -- that is what turned the
   lines against 21,741; this is the first time it has caught a drive that
   reached nothing at all.
 
+- **The game calls these masks, and it said so itself.** `BuildVehicleMask`
+  logs `"vehicle mask direction: %d"` under `-traceVEH`, which named the whole
+  family: the tables are MASKS and their index is a DIRECTION. What went in as
+  `footprints`/`facings` is renamed throughout -- `AM2_Anim::directions` and
+  `directionBits` with it, since that message's counter runs over exactly that
+  field. `tools/footprints.py` is `tools/maskdump.py`.
+
+- **The vehicle bases are confirmed by tiling, which is the check that matters
+  after the roach's was wrong.** Six turret animation tables end exactly at
+  `0x0065A2D8`, six direction counts end exactly at `0x0065A2F0`, and
+  6 x 32 records of 0xA4 end exactly at `0x00661DF0`, which is
+  `ADDR_VEHICLE_ANIMS`. Nothing left over anywhere.
+
+- **The roach wants 16 of its 64 samples solid and the vehicle 12.** Same
+  builder otherwise; not unified, because the two constants are the only thing
+  separating them and a shared helper would hide that.
+
+- **`BuildVehicleMask=5`, not 6.** The loader skips a kind whose path is empty,
+  so its direction count stays 0 -- `dirs 32,32,32,32,0,32` -- and the mask
+  builder is never called for it. The `directions <= 0` early return is
+  therefore NOT what that zero comes from; nothing reaches it.
+
 - **The mis-centred trig table happened again, and only a table dump caught
   it.** `BuildRoachFootprints` writes each record's count through `[ebp-4]`
   with `ebp` starting at the POINTS, so the array begins at `0x00654CA8`.
   Taking `0x00654CAC` as the base put the whole table one dword early, over the
   global at `0x00654CA4` -- every point correct and every one in the wrong
-  place. `tools/footprints.py` found it on its first run by hashing the raw
+  place. `tools/maskdump.py` found it on its first run by hashing the raw
   region rather than the decoded records.
 
 - **And that A/B cannot fail on this at all.** With the sample step doubled

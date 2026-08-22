@@ -199,7 +199,7 @@ static const uint32_t kTeardown[] = {
      * says which `.ani` it holds. The fifth read as 432 bytes and "does more
      * than free" until docs/functions.tsv was checked against the disassembly:
      * 0x0043C720 is twelve bytes and the rest of that entry is the roach
-     * footprint builder next door. A merged entry, exactly as merges.py says. */
+     * mask builder next door. A merged entry, exactly as merges.py says. */
     ADDR_FREE_EXPLOSION_ANIMS, ADDR_FREE_MISSILE_ANIMS, ADDR_FREE_ROACH_ANIMS,
     ADDR_FREE_VEHICLE_ANIMS, ADDR_FREE_SOLDIER_ANIMS,
     ADDR_FREE_SPRITE_LIST, 0x00445F40u, 0x00446880u, 0x0042E590u,

@@ -30,25 +30,29 @@ typedef struct AM2_AnimCell {
     int16_t sprite;
 } AM2_AnimCell;
 
-/* An animation: `frames * facings` cells, laid out facing-major -- the shipped
- * data steps consecutively within a facing and jumps between them, which is
- * what fixes the order. `facings` is a power of two in every shipped file
- * (1, 2, 8, 16 or 32) and `facingBits` is its log, so a consumer can get from
- * an 8-bit heading to a facing with a shift instead of a divide.
+/* An animation: `frames * directions` cells, laid out direction-major -- the
+ * shipped data steps consecutively within a direction and jumps between them,
+ * which is what fixes the order. `directions` is a power of two in every
+ * shipped file (1, 2, 8, 16 or 32) and `directionBits` is its log, so a
+ * consumer can get from an 8-bit heading to one of them with a shift instead
+ * of a divide.
+ *
+ * "Direction" is the game's word rather than ours: the vehicle mask builder
+ * logs "vehicle mask direction: %d" with a counter over exactly this field.
  *
  * field4 and field6 are copied and not used here; across the shipped files
  * field4 takes sixteen values from 0 to 99 and field6 only 0, 1, 2 and 4.
  *
- * The record is malloc'd and NOT cleared, so when `frames * facings` is not
+ * The record is malloc'd and NOT cleared, so when `frames * directions` is not
  * positive `cells` is left holding whatever the heap had. The original leaves
  * it that way and nothing reads it, since the same test guards the loop. */
 typedef struct AM2_Anim {
-    int16_t       frames;      /* +0x00 */
-    int16_t       facings;     /* +0x02 */
-    int16_t       field4;      /* +0x04 */
-    int16_t       field6;      /* +0x06 */
-    uint8_t       facingBits;  /* +0x08 -- Log2Mask(facings) */
-    uint8_t       zero9;       /* +0x09 -- written 0, never read here */
+    int16_t       frames;         /* +0x00 */
+    int16_t       directions;     /* +0x02 */
+    int16_t       field4;         /* +0x04 */
+    int16_t       field6;         /* +0x06 */
+    uint8_t       directionBits;  /* +0x08 -- Log2Mask(directions) */
+    uint8_t       zero9;          /* +0x09 -- written 0, never read here */
     uint8_t       pad0A[2];
     AM2_AnimCell *cells;       /* +0x0C */
 } AM2_Anim;

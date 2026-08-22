@@ -52,10 +52,10 @@ static void DumpAnimTable(const AM2_AnimTable *t)
                     e->id, e->next, e->borrowed, (const void *)e->anim);
         if (e->anim && !e->borrowed) {
             const AM2_Anim *a = e->anim;
-            int32_t cells = (int16_t)(a->facings * a->frames);
+            int32_t cells = (int16_t)(a->directions * a->frames);
 
             n += sprintf(buf + n, " f=%d fa=%d bits=%d w4=%d w6=%d cells=%d",
-                         a->frames, a->facings, a->facingBits, a->field4,
+                         a->frames, a->directions, a->directionBits, a->field4,
                          a->field6, cells);
             for (j = 0; j < cells && j < 6; j++)
                 n += sprintf(buf + n, " (%d,%d)", a->cells[j].field0,
@@ -105,8 +105,8 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             orig_fread(&w, 2, 1, fp);
             a->frames = w;
             orig_fread(&w, 2, 1, fp);
-            a->facings = w;
-            a->facingBits = Log2Mask(a->facings);
+            a->directions = w;
+            a->directionBits = Log2Mask(a->directions);
             orig_fread(&w, 2, 1, fp);
             a->field4 = w;
             a->zero9 = 0;
@@ -116,7 +116,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             /* Computed 16-bit and sign-extended afterwards, exactly as the
              * original does -- so a grid big enough to overflow an int16 would
              * come out negative and skip both the allocation and the loop. */
-            cells = (int16_t)(a->facings * a->frames);
+            cells = (int16_t)(a->directions * a->frames);
             if (cells > 0)
                 a->cells = (AM2_AnimCell *)am2_malloc((size_t)cells * 4);
 

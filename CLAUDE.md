@@ -635,12 +635,20 @@ exactly where atanS `0x00515380` begins, which ends exactly where cos
 `0x00515784` begins, which ends exactly where atanC `0x00515B84` begins. If a
 layout does not tile, one of the bases is wrong.
 
+**Let the function name the family, not just itself.** The roach and vehicle
+mask builders went in as "footprints" over "facings" until the vehicle one was
+read: it logs `"vehicle mask direction: %d"` under `-traceVEH`. So the tables
+are masks and their index is a direction, and `AM2_Anim::directions` was
+renamed with them, because that message's counter runs over exactly that field.
+One string settled the vocabulary for a struct, two functions, six globals and
+a tool.
+
 **A table's BASE is the part an A/B cannot check, and this file's own warning
 came true a second time.** `BuildRoachFootprints` writes each record's count
 through `[ebp-4]` with `ebp` starting at the points, so the array begins at
 `0x00654CA8`; taking `0x00654CAC` as the base put the whole table one dword
 early, over the global next to it, with every point still correct.
-`tools/footprints.py` caught it on its first run by hashing the raw region
+`tools/maskdump.py` caught it on its first run by hashing the raw region
 rather than the decoded records — decode the records and a uniform shift looks
 like a table that is simply somewhere else.
 
@@ -648,7 +656,7 @@ like a table that is simply somewhere else.
 With the footprint sample step doubled from 2 to 4, all 32 records change and
 the point total drops from 237 to 25; `ab.sh bootcamp` is still clean at the
 usual 22 pixels with an identical log. So that table is verified by
-`footprints.py` or by nothing at all — the same standing as the trig tables
+`maskdump.py` or by nothing at all — the same standing as the trig tables
 below.
 
 **`tools/trigdump.py` compares the tables byte for byte, and no A/B could.**

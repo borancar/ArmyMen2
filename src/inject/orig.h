@@ -3265,12 +3265,12 @@
 #define ADDR_FREE_SOLDIER_ANIMS  0x004470D0u  /* void(void), all nine */
 #define ADDR_FREE_VEHICLE_ANIMS  0x0045A990u  /* void(void), both arrays */
 /* The three lookups: find the animation with a fixed id, turn an 8-bit heading
- * into one of its facings with RoundTo8, and return the sprite for frame 0.
+ * into one of its directions with RoundTo8, and return the sprite for frame 0.
  * The id is 1 for soldiers and 0x51 for vehicles and turrets, which the
  * shipped `.ani` files bear out -- rifleman.ani has id 1 and every vehicle and
  * turret file has 81. */
 /* 0x0043C730, tail-jumped from the roach loader at 0x0043CCF0. The roach's
- * collision footprint, one record per facing: a 16-pixel grid over the
+ * collision mask, one record per direction: a 16-pixel grid over the
  * sprite, a block kept when 16 of its 64 two-pixel samples are opaque.
  *
  * The record is {int32_t count; AM2_Point pts[40]} -- 0xA4 bytes, and the
@@ -3278,16 +3278,34 @@
  * writes the count through `[ebp-4]`, so the array really begins at
  * 0x00654CA8; taking 0x00654CAC as the base put the whole table one dword
  * early, over the global at 0x00654CA4, and no A/B could see it. */
-#define ADDR_BUILD_ROACH_FOOTPRINTS 0x0043C730u  /* void(void) */
-#define ADDR_ROACH_FOOTPRINT_FACINGS 0x00654CA0u /* int32_t */
-#define ADDR_ROACH_FOOTPRINTS       0x00654CACu  /* the first record's POINTS;
+#define ADDR_BUILD_ROACH_MASK 0x0043C730u  /* void(void) */
+#define ADDR_ROACH_MASK_DIRECTIONS 0x00654CA0u /* int32_t */
+#define ADDR_ROACH_MASK       0x00654CACu  /* the first record's POINTS;
                                                   * its count is the dword
                                                   * below, at 0x00654CA8 */
-#define AM2_FOOTPRINT_STRIDE        0xA4
-#define AM2_FOOTPRINT_POINTS        40
-#define AM2_FOOTPRINT_STEP          16   /* the grid */
-#define AM2_FOOTPRINT_SAMPLE        2    /* within a block */
-#define AM2_FOOTPRINT_MIN_SOLID     16   /* of the 64 samples */
+#define AM2_MASK_STRIDE        0xA4
+#define AM2_MASK_POINTS        40
+#define AM2_MASK_STEP          16   /* the grid */
+#define AM2_MASK_SAMPLE        2    /* within a block */
+#define AM2_ROACH_MASK_MIN_SOLID   16   /* of the 64 samples */
+/* 0x0045A450, called from the vehicle loader at 0x0045A8C0 once per kind. The
+ * same builder for vehicles, with three differences: it takes the kind, it
+ * keeps a block on 12 of the 64 samples rather than 16, and it logs
+ * "vehicle mask direction: %d" under -traceVEH, which is where this whole
+ * family's vocabulary comes from.
+ *
+ * Its three tables tile exactly, which is the check that the bases are right:
+ * ADDR_TURRET_ANIMS is six 8-byte tables ending at 0x0065A2D8, the direction
+ * counts are six dwords ending at 0x0065A2F0, and 6 * 32 records of 0xA4 from
+ * there end at 0x00661DF0, which is ADDR_VEHICLE_ANIMS. */
+#define ADDR_BUILD_VEHICLE_MASK    0x0045A450u  /* void(int32_t kind) */
+#define ADDR_VEHICLE_MASK_DIRECTIONS 0x0065A2D8u /* int32_t[6] */
+#define ADDR_VEHICLE_MASK          0x0065A2F4u  /* record [kind*32 + dir]'s
+                                                 * POINTS; its count is the
+                                                 * dword below */
+#define AM2_VEHICLE_MASK_KINDS     6
+#define AM2_VEHICLE_MASK_DIRS      32  /* the stride of the kind index */
+#define AM2_VEHICLE_MASK_MIN_SOLID 12  /* of the 64 samples -- NOT the roach's 16 */
 /* 0x00446290, two callers. Is this sprite opaque at this point: the run-length
  * mask for a software format, the bounding box for anything else. */
 #define ADDR_SPRITE_SOLID_AT     0x00446290u  /* int32_t(AM2_Sprite *, AM2_Point) */
