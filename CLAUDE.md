@@ -943,6 +943,24 @@ nothing, or fail on noise, is worse than not running one. Note the counts are em
 the trace stubs, installed by `patch_replace` — so the evidence is the log and
 the pixels, not the counters.
 
+**`tools/ab.sh` REBUILDS, twice per configuration, so do not edit `src/`
+while it runs.** Every `play` calls `drive.sh start`, which calls `make -s run`,
+which rebuilds and reinstalls `am2hook.dll`. Editing a source file mid-suite is
+therefore not "safe as long as I do not build" — it is a build, on the very
+next launch.
+
+The hazard is not that the edit goes live. It is that a rebuild landing
+*between* a configuration's two halves gives that one configuration two
+DIFFERENT DLLs, and the comparison then reports a difference, or hides one,
+for a reason that has nothing to do with the reconstruction. Nothing in the
+output would say so.
+
+Found by editing three functions during an `ab.sh all` on the belief that only
+`make` builds. It happened to land between `intro-recon` finishing and
+`audio-orig` starting, so no configuration straddled it and every result stood
+— luck, not care. If a source file has to change while a suite is running,
+kill the suite and restart it.
+
 **Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
 `setsid make -s run ... &` issued from a script or an agent shell starts the
 game, gets as far as `system speed:` in the log, then fails inside `InitInput`
