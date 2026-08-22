@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `9b10491`. Working tree clean.
+Last updated: **2026-08-22**, at `9ba85e2`. Working tree clean.
 
 ## In flight
 
@@ -70,11 +70,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 534 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 534 | 526 of them below the CRT line |
+| `patch_replace` sites | 535 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 535 | 527 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 99,664 / 372,816 B (**26.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 124,976 / 372,816 B (33.5%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 99,856 / 372,816 B (**26.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 125,168 / 372,816 B (33.6%) | what every earlier session quoted, and an over-count |
 | modules | 28 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -167,6 +167,25 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **The air-support family is complete** -- request, enemy check, queue head,
+  start and reset. Five functions, and every one of them is inside or beside
+  the 584-byte block `air.cpp` was already saving, so the savegame section and
+  the live subsystem turned out to be the same thing.
+
+- **The caller's `kind` is a floor, not a decision.** `DoAirSupport` takes kind
+  2 as given, but anything else asks `FindEnemyNear` and becomes kind 3 if
+  there is one. So a caller cannot ask for the quiet drop when the drop zone is
+  contested -- except by asking for kind 2, which skips the check entirely.
+
+- **It calls `AirSupportBegin` with the entry written and the count still
+  zero**, so Begin reads a slot the count says is not there. Harmless, because
+  Begin only ever looks at slot 0, and it is the original's order.
+
+- **The same field is written as a dword and copied as two words.**
+  `DoAirSupport` stores `where` with one 32-bit move; `AirSupportPop` moves its
+  two halves separately. Both reproduced, because the packing is only visible
+  in the second.
 
 - **CORRECTION: `obj + 0x0010` is the OWNER, not a kind byte.** Two commits ago
   I wrote that `TrooperDropItem` "sets its kind byte to 4, so a dropped item

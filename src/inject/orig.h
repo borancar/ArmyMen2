@@ -3190,6 +3190,9 @@
  * DoAirSupport to decide whether paratroopers are dropping into a fight, which
  * is the difference between its kind 2 and its kind 3. */
 #define ADDR_FIND_ENEMY_NEAR   0x00409680u  /* uint32_t(uint32_t where, uint32_t from) */
+/* 0x00409710, "DoAirSupport paratroopers where: %d, from %d, army %d,
+ * count: %d" -- its own name, on its own line. Three callers. */
+#define ADDR_DO_AIR_SUPPORT    0x00409710u  /* int32_t(int32, uint32, uint32) */
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */

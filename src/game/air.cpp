@@ -86,6 +86,41 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     return 0;
 }
 
+int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from)
+{
+    int32_t extra = 0;
+
+    /* Kind 2 is taken as given; anything else is promoted to 3 by an enemy. */
+    if (kind != 2) {
+        extra = (int32_t)FindEnemyNear(where, from);
+        if (extra)
+            kind = 3;
+    }
+
+    if (g_airCount >= AM2_AIR_MAX)
+        return 0;
+
+    orig_log("DoAirSupport paratroopers where: %d, from %d, army %d, "
+             "count: %d\n",
+             where, from, UidArmy(from), g_airCount);
+
+    /* One dword, where AirSupportPop moves the same field as two words. */
+    ((uint32_t *)g_airWhere)[g_airCount] = where;
+    g_airKind[g_airCount]  = kind;
+    g_airFrom[g_airCount]  = from;
+    g_airExtra[g_airCount] = extra;
+
+    /* Called with the entry written and the count still zero, so Begin reads a
+     * slot the count says is empty. Harmless -- Begin only looks at slot 0 --
+     * and it is the original's order. */
+    if (!g_airCount)
+        AirSupportBegin();
+
+    g_airCount += 1;
+    orig_log("EndMission  AirSupport.count increasing to: %d\n", g_airCount);
+    return 1;
+}
+
 void __cdecl AirSupportBegin(void)
 {
     /* The head entry's `extra` decides which of the two shapes runs, and the
@@ -138,6 +173,8 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_DO_AIR_SUPPORT, (const void *)DoAirSupport,
+                  "DoAirSupport", 3);
     patch_replace(ADDR_FIND_ENEMY_NEAR, (const void *)FindEnemyNear,
                   "FindEnemyNear", 1);
     patch_replace(ADDR_AIR_BEGIN, (const void *)AirSupportBegin,

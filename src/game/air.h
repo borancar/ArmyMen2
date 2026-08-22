@@ -57,6 +57,27 @@ void __cdecl AirSupportPop(void);
  * would be a different program. */
 uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from);
 
+/* Original: 0x00409710, "DoAirSupport paratroopers where: %d, from %d, army
+ * %d, count: %d" -- this one really does name itself, on its own line, which
+ * is what makes the "EndMission" prefix on the line below it a prefix.
+ *
+ * Queue one air-support request. Kind 2 is taken as given; anything else asks
+ * FindEnemyNear first and becomes kind 3 if there is one -- so the caller's
+ * kind is a floor, not a decision.
+ *
+ * It refuses at thirty and answers 0. Otherwise it fills the four arrays,
+ * starts the queue if this is the first entry, and answers 1.
+ *
+ * Two details of the order are the original's. AirSupportBegin is called with
+ * the entry WRITTEN but the count still zero, so Begin reads an entry the
+ * count says is not there -- harmless, because Begin only looks at slot 0. And
+ * the count is re-read from memory before each of the four stores rather than
+ * held in a register.
+ *
+ * The `where` field is written here as one dword and copied by AirSupportPop
+ * as two words. Same field, two access widths, and both are reproduced. */
+int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from);
+
 /* 0x00409840 and 0x00409870. A tag and one fixed 584-byte block at
  * 0x004F945C, written and read straight -- the simplest section in the file
  * and the same shape map.cpp's is.
