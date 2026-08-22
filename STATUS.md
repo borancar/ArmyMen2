@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `74701d8`. Working tree clean.
+Last updated: **2026-08-22**, at `a0043fd`. Working tree clean.
 
 ## In flight
 
@@ -101,15 +101,27 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Next
 
-1. **The menu widget layer is the current front, and it is the best-verified
-   thing in the tree.** All five vtable slots have a reconstructed base, plus
-   the placement helper, both constructors, the four destructors, the focus
-   walkers and the shared painter. `tools/ab.sh controls` compares three
-   frames against the original and the dialog frame is exact.
+1. **The menu widget layer is the current front and the best-verified part of
+   the tree.** All five vtable slots have a reconstructed base, plus the
+   placement helper, the constructors, the destructors, the focus walkers, the
+   shared painter and the forwarding thunks. Three whole subclasses are done:
+   the plain label, the focus-highlighting label, and the button (paint and
+   mouse update). The edit box's lifecycle is done -- it is the owner of
+   `g_charHandler`, and typing into it is checked end to end.
 
-   What is left is per-class: the 33 constructors, the painters that are not
-   the shared one, and the edit box at `0x00454C10` -- the one with a text
-   buffer to get wrong, and the owner of `g_charHandler`.
+   Two configurations cover it: `tools/ab.sh controls` compares three frames,
+   and `tools/ab.sh multi` is the only one that reaches the edit box.
+
+   What is left, smallest first from the ranking in the Leads: `0x00454B70`
+   (~43 B), `0x00456D00` (~61), `0x00455110` (~99), `0x00454A10` (~118),
+   `0x004561C0` (~122), `0x00456C80` (~124), `0x00455070` (~138). Then the 33
+   per-class constructors, which is where the subclass tails get their
+   meaning, and the edit box's own painter at `0x00454D20` (242 B, the one
+   with the text buffer and the caret).
+
+   **Before claiming any of them, run the address past `orig.h` AND the
+   harness patch list.** `0x0045CAA0` looked like an empty virtual and was the
+   game's logger; see CLAUDE.md.
 
 2. **Drive a LOAD -- a genuine puzzle, with the ruled-out branches named.**
    `LoadGame` (`0x00425A10`) is reconstructed, patched and traced, and it still
