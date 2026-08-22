@@ -167,6 +167,26 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`0x00455340`, the list box's update, is READ but not written -- 2 KB and
+  branchy, and the reading is the hard part.** What it establishes:
+
+  - It opens with an optional per-frame callback at `0x006C`, called with the
+    widget, before anything else.
+  - Hover to focus like the edit box, then it computes the row under the
+    POINTER from the cursor's y: `(cursorY - rect.top - 4) / 14 + topRow`,
+    clamped to `count - 1`. The division is the compiler's magic-number
+    sequence -- `imul 0x92492493; sar edx, 3` with the sign add-back -- which
+    is division by **14**, independently confirming the row height that
+    `ListTakeFocus`'s arithmetic gave.
+  - When the row under the pointer CHANGES and `0x0094` holds a widget, it
+    calls `BlinkerStart(that, 0x46, 1)` -- so moving over a list flashes the
+    associated indicator once for 70 ms. That is what the blinker is FOR, and
+    it is the first thing found that starts one.
+  - The rest, about 1.5 KB, is the mouse-button and keyboard handling.
+
+  Two independent routes to the 14-pixel row height, and a use for the blinker,
+  are worth having even before the function is written.
+
 - **`checkglobals` was keyed on the ADDR_ NAME, which made it blind to the
   case it exists for.** Two `g_` names sitting on two `ADDR_` aliases of one
   byte looked like two unrelated globals. It surfaced only because collapsing

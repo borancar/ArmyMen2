@@ -534,6 +534,14 @@ typedef struct AM2_ListRows {
 #define LIST_ROW_STRIDE      0x104  /* 260 bytes per row record */
 #define LIST_TEXT_INDENT     4
 
+/* Slot 2 of the list box, 0x00455340, is NOT reconstructed. It is 2 KB and
+ * branchy, and what has been read of it is in STATUS.md: a per-frame callback
+ * at 0x006C, the row under the pointer computed as
+ * `(cursorY - rect.top - 4) / 14 + topRow` -- the division by 14 is the
+ * compiler's magic-number sequence, which is a second independent route to the
+ * row height -- and a BlinkerStart(0x0094's widget, 70ms, 1) whenever that row
+ * changes, which is the first use found for the blinker at all. */
+
 /* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list
  * to 0x00502AD9, then walk the visible rows drawing each one's text.
  *
