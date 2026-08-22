@@ -1209,6 +1209,17 @@
  * them are exactly which of those guards each one has, so they are worth
  * keeping separate rather than folding into one helper. */
 #define ADDR_EVT_SET_FIELD_540   0x0041FAB0u  /* void(uid, int32), type 2 only */
+#define OBJ_OFF_FIELD_540        0x540u
+/* 0x0041FD50. Takes TWO uids, requires both above the threshold and both to
+ * resolve, clears field 0x540 on the first if it is type 2, and hands the pair
+ * to 0x00458070 -- 640 bytes with twenty callers, unnamed.
+ *
+ * That "clear 0x540 first, but only for type 2" step is the third sighting:
+ * EvtAtPointA does it, ADDR_EVT_SET_FIELD_540 exists to write it, and this is
+ * a third. Whatever the field holds, several actions reset it before giving
+ * the object something new to do. */
+#define ADDR_EVT_OBJ_PAIR        0x0041FD50u  /* void(uint32_t, uint32_t) */
+#define ADDR_OBJ_PAIR_ACTION     0x00458070u  /* void(void *a, void *b) */
 #define ADDR_EVT_SET_MODE_F0     0x0041FAE0u  /* void(uid, int32), +0xF0, type 2/3/8 */
 #define ADDR_EVT_SET_MODE_94     0x0041FB10u  /* void(uid, int32), +0x94, type 2/3/8 */
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */

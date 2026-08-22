@@ -155,6 +155,11 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me);
  * SendGamePause(1, AM2_EVENT_FLAG_8) -- so pause reason 8 is "a bitmap is up".
  * The pause is announced BEFORE the load, so a failed load still leaves the
  * game paused. */
+/* 0x0041FD50. Give one object something to do with another. Both uids are
+ * checked BEFORE either lookup; field 0x540 is cleared on the first if it is
+ * type 2. */
+void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB);
+
 void __cdecl EvtShowBitmap(const char *name);
 void __cdecl EvtShowBitmapNoPause(const char *name);
 

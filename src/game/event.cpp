@@ -819,6 +819,9 @@ typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
 #define orig_type238_action \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
+typedef void (__cdecl *AM2_ObjPairFn)(void *a, void *b);
+#define orig_obj_pair_action \
+    (*(AM2_ObjPairFn)AM2_IMAGE(ADDR_OBJ_PAIR_ACTION))
 #define orig_obj_set        (*(AM2_ObjSetFn)AM2_IMAGE(ADDR_OBJ_SET))
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
@@ -1067,7 +1070,7 @@ void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative)
     }
 
     if (ObjIsType2((const AM2_Object *)obj))
-        *(int32_t *)(obj + 0x540) = 0;
+        *(int32_t *)(obj + OBJ_OFF_FIELD_540) = 0;
 
     orig_point_action_a(obj, point);
 }
@@ -1605,6 +1608,39 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
         *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
 }
 
+/* 0x0041FD50. Give one object something to do with another.
+ *
+ * Both uids must clear the threshold and both must resolve -- and note the
+ * order: BOTH thresholds are tested before either lookup, so a bad second uid
+ * costs no lookup at all. That is the opposite of the hoisting mistake made
+ * earlier in this module, and reproducing it exactly is the point.
+ *
+ * Field 0x540 is cleared on the first object when it is type 2, before the
+ * pair is handed on. Third sighting of that step -- EvtAtPointA does it and
+ * EvtSetField540 exists to write the field -- so several actions reset it
+ * before giving an object something new to do, whatever it holds. */
+void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
+{
+    uint8_t *a;
+    uint8_t *b;
+
+    if (uidA < AM2_UID_COUNTER_MIN || uidB < AM2_UID_COUNTER_MIN)
+        return;
+
+    a = (uint8_t *)LookupByUID(uidA);
+    if (a == (uint8_t *)0)
+        return;
+
+    b = (uint8_t *)LookupByUID(uidB);
+    if (b == (uint8_t *)0)
+        return;
+
+    if (ObjIsType2((const AM2_Object *)a))
+        *(int32_t *)(a + OBJ_OFF_FIELD_540) = 0;
+
+    orig_obj_pair_action(a, b);
+}
+
 /* --------------------------------------------------- bitmaps ---- */
 
 typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
@@ -1936,6 +1972,8 @@ int event_install(void)
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
                         (const void *)EvtGuardedAction, "EvtGuardedAction", 1);
+    rc |= patch_replace(ADDR_EVT_OBJ_PAIR, (const void *)EvtObjPair,
+                        "EvtObjPair", 1);
     rc |= patch_replace(ADDR_EVT_SHOW_BITMAP, (const void *)EvtShowBitmap,
                         "EvtShowBitmap", 1);
     rc |= patch_replace(ADDR_EVT_SHOW_BITMAP_NP,
