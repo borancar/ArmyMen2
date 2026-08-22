@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 459 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 459 | 452 of them below the CRT line |
+| `patch_replace` sites | 460 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 460 | 453 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 101,856 / 372,816 B (**27.3%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 102,000 / 372,816 B (**27.4%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -166,6 +166,25 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` is clean on all eight configurations; see Leads.
 
 ## Leads
+
+- **`MsgListRemHead` is in and reads 0**, which is exactly what the earlier
+  mutation predicted: single player FILLS the message-buffer pool at startup
+  and never draws from it. `MsgListAdd`'s 400 appends were that fill, and
+  breaking the list's forward link was invisible for the same reason. The pair
+  is now reconstructed and both halves are verified by reading.
+
+- **"Empty List!" is gated on one specific list**, `ADDR_MSG_LIST_POOL`,
+  because an empty POOL means the game has run out of message buffers while an
+  empty ordinary queue is simply idle. That is the kind of thing a generic
+  linked-list reconstruction would smooth away.
+
+- **21 self-naming functions are still original**, recomputed against the
+  current patch list. Smallest first: `List` (`0x004013B0`, 96 B),
+  `itemDeployMessageReceive` (`0x0042AF30`, 112 B), `RemMsg` (`0x00401410`,
+  176 B), `itemDeployMessageSend` (`0x0042AA50`, 144 B), then `CreateTimer`
+  (`0x0041E820`, 304 B) and `UseInventoryItem` (`0x00449760`, 256 B). The
+  air.cpp ones are the message list and share its verification problem; the
+  item and unit ones run during a mission and can be A/B'd.
 
 - **Two ownership conventions sit side by side in one hierarchy.** The list
   box's destructor tests BOTH an ownership flag at `0x0064` and the pointer

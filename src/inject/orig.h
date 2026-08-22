@@ -2220,6 +2220,12 @@
 #define MSGNODE_OFF_PREV           0x00u
 #define MSGNODE_OFF_NEXT           0x04u
 #define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
+/* 0x004010C0, "RemHead: Impossible List Size %d". Unlinks and answers the head
+ * node, or null. The same sanity complaint as the append, and a second one --
+ * "Empty List!" -- that fires ONLY for ADDR_MSG_LIST_POOL, because an empty
+ * pool means the game has run out of message buffers and an empty ordinary
+ * queue is unremarkable. */
+#define ADDR_MSG_LIST_REM_HEAD     0x004010C0u /* void *(void *list) */
 /* Both DirectPlay enumerations pass this same handle as their lpContext, and
  * CommSend posts to it -- so an "lpContext" in this game is the window. */
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE "ArmyMenMutex" */

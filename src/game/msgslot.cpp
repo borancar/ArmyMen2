@@ -253,6 +253,39 @@ void __cdecl MsgListAdd(void *list, void *node)
  *
  * The message goes through the game's own PostMessageA slot, so it lands in
  * the same queue WndProc reads. */
+void *__cdecl MsgListRemHead(void *list)
+{
+    uint8_t *l = (uint8_t *)list;
+    uint8_t *node;
+
+    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+
+    node = *(uint8_t **)(l + MSGLIST_OFF_HEAD);
+    if (node) {
+        uint8_t *next = *(uint8_t **)(node + MSGNODE_OFF_NEXT);
+        int32_t  count;
+
+        *(void **)(l + MSGLIST_OFF_HEAD) = next;
+        if (!next)
+            *(void **)(l + MSGLIST_OFF_TAIL) = next;   /* null */
+        else
+            *(void **)(next + MSGNODE_OFF_PREV) = (void *)0;
+
+        count = *(const int32_t *)(l + MSGLIST_OFF_COUNT) - 1;
+        *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
+        if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
+            orig_log("RemHead: Impossible List Size %d \n", count);
+    } else if (l == (uint8_t *)(uintptr_t)ADDR_MSG_LIST_POOL) {
+        /* Only the POOL is worth complaining about: no message buffers left.
+         * An empty ordinary queue is simply an idle one. */
+        orig_log("Empty List! l->first = %d listsize = %d \n", node,
+                 *(const int32_t *)(l + MSGLIST_OFF_COUNT));
+    }
+
+    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+    return node;
+}
+
 void __cdecl ExitGamePostClose(void)
 {
     *(int32_t *)AM2_IMAGE(ADDR_EXIT_GAME_FLAG) = 1;
@@ -264,6 +297,8 @@ void __cdecl ExitGamePostClose(void)
 
 int msgslot_install(void)
 {
+    patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
+                  "MsgListRemHead", 10);
     patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,
                   "MsgListAdd", 12);
     patch_replace(ADDR_EXIT_GAME_POST_CLOSE, (const void *)ExitGamePostClose,

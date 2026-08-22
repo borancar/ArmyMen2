@@ -116,6 +116,20 @@ uint32_t __cdecl GetReSendMask(uint32_t id);
 void __cdecl SendColorMsg(int32_t colour);
 void __cdecl SendTeamMsg(int32_t team);
 
+/* Original: 0x004010C0, cdecl, the mirror of MsgListAdd. Unlink the head node
+ * under the mutex and answer it, or answer null when the list is empty.
+ *
+ * Two complaints, and they are not the same. The size check is the append's,
+ * fires above 400 or below zero, and does not stop anything. The other --
+ * "Empty List!" -- is gated on the list being ADDR_MSG_LIST_POOL specifically,
+ * because an empty POOL means the game has run out of message buffers, while
+ * an empty ordinary queue is the normal state of an idle one. Both complaints
+ * are made while the mutex is still held, as in the append.
+ *
+ * The node's `prev` is cleared on the NEW head but the unlinked node's own
+ * links are left alone, so a caller can still read its `next`. */
+void *__cdecl MsgListRemHead(void *list);
+
 int msgslot_install(void);
 
 #ifdef __cplusplus
