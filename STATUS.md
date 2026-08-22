@@ -167,6 +167,23 @@ counts probe before reading one as coverage -- that is what turned the
 
 ## Leads
 
+- **`MultiSpritePaint` runs 9,081 times and never draws.** Its sprite is null
+  on every call on the multiplayer path. Shifting the drawn position five
+  pixels changes nothing; returning outright before the blit changes nothing.
+  So the placement and the array index are covered and the centring, the two
+  intersects and the blit are verified by reading only.
+
+  The probe that settled it is worth reusing: a mutation that DROPS a term
+  proves nothing when the term is zero, but one that ADDS a constant
+  distinguishes "the field is zero" from "this code never runs". The first
+  attempt dropped the y bias, got 0 pixels, and would have been recorded as
+  "the bias is zero here" -- which was the wrong conclusion about a function
+  that was not drawing at all.
+
+- **Where the second sprite of that class comes from is unknown.** The array at
+  `0x0064` holds at most two, because `0x0064 + index * 4` reaches the index
+  field itself at 2. Nothing driven so far populates either.
+
 - **A first-seen pointer index cannot see a SUBSTITUTION, and that nearly cost
   the oracle its point.** The widget dump renumbers pointers so it survives the
   heap moving -- the same trick `tools/actdiff.py` uses. But forcing

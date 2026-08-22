@@ -1037,6 +1037,20 @@ commit claiming the intro no longer plays the movie, when `MovieDrawFrame` runs
 200 frames at a time. A rule that is written down and forgotten should be
 turned into a tool.
 
+**A mutation that DROPS a term proves nothing when the term is zero.**
+`MultiSpritePaint` runs 9,081 times on the multiplayer path, and removing the
+vertical bias it applies changed no pixels — which reads as "the bias is zero
+on this path" and is a reasonable thing to write down. It was wrong. Adding a
+constant five pixels to the drawn position ALSO changed nothing, and so did
+returning outright before the blit: the sprite is null on every call and the
+function never draws at all.
+
+The two mutations answer different questions. Dropping a term asks "does this
+term matter", and a zero term makes the answer no for an uninteresting reason.
+Adding a constant asks "does this code run", which is the question you actually
+need answered first. **Ask whether the code runs before asking whether the term
+matters.**
+
 **A count of 0 does not mean "broken" and does not mean "never called".** When a
 reconstructed function's callers are *also* reconstructed, the direct call
 bypasses the patched entry point and the counter never moves. The two cases are

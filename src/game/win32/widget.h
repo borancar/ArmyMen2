@@ -391,6 +391,37 @@ void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
 void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
                                                    int32_t announce);
 
+/* An indexed sprite widget: an array of sprites at 0x0064 chosen by a state at
+ * 0x006C, with two vertical tweaks.
+ *
+ * The array cannot hold more than TWO. `0x0064 + index * 4` reaches 0x006C at
+ * index 2, which is the index field itself -- so a third entry would read the
+ * state as a sprite pointer. That is a fact about the layout, not a guess:
+ * whatever this class is, it has at most two pictures. */
+#define MULTISPR_OFF_SPRITES  0x64   /* AM2_Sprite *[2] */
+#define MULTISPR_OFF_INDEX    0x6C   /* int32_t, which one */
+#define MULTISPR_OFF_Y_BIAS   0x70   /* int32_t, added to the centred y */
+#define MULTISPR_OFF_Y_INSET  0x74   /* int32_t, taken off the height first */
+
+/* Original: 0x00455C80, thiscall. Place, choose the sprite, centre it in the
+ * widget, intersect that against the caller's clip, clip the sprite to what is
+ * left and draw.
+ *
+ * The centring is `left + (right - left - spriteWidth) / 2` horizontally and
+ * the same vertically with 0x0074 removed from the height and 0x0075's
+ * neighbour 0x0070 added back afterwards -- so the two fields bias the sprite
+ * up or down within its box. Both halves shift right by one AFTER the
+ * subtraction here, unlike WidgetPaint which halves each side first; the two
+ * classes round differently and both are reproduced as written.
+ *
+ * VERIFIED ONLY AS FAR AS THE NULL CHECK. It runs 9,081 times on the
+ * multiplayer path and its sprite is null every time: shifting the drawn
+ * position by five pixels changes nothing, and so does returning outright
+ * before the draw. So the placement and the array index are exercised and
+ * everything past `if (!spr)` -- the centring, the two intersects and the blit
+ * -- is verified by reading. A clean A/B here says less than it looks. */
+void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip);
+
 /* A two-state indicator: one flag and two sprites. The flag being at 0x006C
  * and the sprites at 0x0060 and 0x0064 is measured; calling it a TOGGLE is the
  * obvious reading of "one bit picks one of two pictures" and nothing here

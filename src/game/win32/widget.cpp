@@ -194,6 +194,44 @@ static void ButtonRepaintSelf(AM2_Widget *w)
 
 #define BUTTON_DEADLINE(w) (*(uint32_t *)((uint8_t *)(w) + BUTTON_OFF_DEADLINE))
 
+void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    int32_t        idx  = *(const int32_t *)(self + MULTISPR_OFF_INDEX);
+    AM2_Sprite    *spr;
+    RECT           dest;
+    RECT           vis;
+    AM2_Rect       part;
+    int32_t        x;
+    int32_t        y;
+
+    WidgetScreenRect(w);
+
+    spr = *(AM2_Sprite *const *)(self + MULTISPR_OFF_SPRITES + idx * 4);
+    if (!spr)
+        return;
+
+    /* Halved AFTER the subtraction, which is not how WidgetPaint rounds. */
+    x = w->rect.left
+        + ((w->rect.right - spr->bounds.right - w->rect.left) >> 1);
+    y = w->rect.top
+        + ((w->rect.bottom - *(const int32_t *)(self + MULTISPR_OFF_Y_INSET)
+            - w->rect.top) >> 1)
+        + *(const int32_t *)(self + MULTISPR_OFF_Y_BIAS);
+
+    dest.left   = x;
+    dest.top    = y;
+    dest.right  = x + spr->bounds.right;
+    dest.bottom = y + spr->bounds.bottom;
+
+    if (!IntersectRect(&vis, &dest, &clip))
+        return;
+    if (!ClipRect(&spr->bounds, (const AM2_Rect *)&vis, &x, &y, &part))
+        return;
+
+    DrawSpriteClipped(spr, x, y, &part, 0);
+}
+
 void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
 {
     uint8_t *self = (uint8_t *)w;
@@ -848,6 +886,9 @@ int widget_install(void)
                         (const void *)WidgetPaintFwd2, "WidgetPaintFwd2", 18);
     rc |= patch_replace(ADDR_WIDGET_ADD_CHILD, (const void *)WidgetAddChild,
                         "WidgetAddChild", 1);
+    rc |= patch_replace(ADDR_MULTI_SPRITE_PAINT,
+                        (const void *)MultiSpritePaint,
+                        "MultiSpritePaint", 1);
     rc |= patch_replace(ADDR_TOGGLE_PAINT, (const void *)TogglePaint,
                         "TogglePaint", 1);
     rc |= patch_replace(ADDR_LIST_TAKE_FOCUS, (const void *)ListTakeFocus,

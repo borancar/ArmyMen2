@@ -69,9 +69,9 @@ outside it.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 62 | 171 |
+| reconstructed | 63 | 172 |
 | still boundary | 3 | 6 |
-| game logic, incidental calls only | 66 | 99 |
+| game logic, incidental calls only | 65 | 98 |
 | **total** | **131** | **276** |
 
 ## By library
@@ -82,7 +82,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 81 | 130 |  |
+| USER32 | 82 | 130 |  |
 | KERNEL32 | 43 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
