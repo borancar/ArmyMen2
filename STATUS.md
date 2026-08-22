@@ -161,12 +161,18 @@ counts probe before reading one as coverage -- that is what turned the
   where it goes -- the four other virtuals per class, the containers, and the
   edit box at `0x00454C10` that owns `g_charHandler`.
 
-- **OPTIONS -> CONTROLS is the cheapest A/B in the project.** Two clicks from
-  the title screen, no typing and no mission, and it is 78,174 `LabelDraw`
-  calls -- every caption on the dialog. Against `AM2_NOPATCH=1` the frames are
-  **54 pixels apart of 786,432**, all inside a 10x13 box at the cursor. Worth
-  adding to `tools/ab.sh` as its own configuration: nothing else in the suite
-  compares the menu widget layer at all.
+- **`tools/ab.sh controls` is in, and it is EXACT.** Two clicks from the title
+  screen, no typing and no mission, 78,174 `LabelDraw` calls -- and **0 pixels
+  of 786,432**, three runs running. The manual version of the same comparison
+  differed by 54 in a 10x13 box at the cursor; driven identically both sides
+  click the same place at the same time and there is nothing left to differ.
+  Only `windowed` is also exact, and that one is a black client area.
+
+  It discriminates: clearing the label background with the ink colour instead
+  of the paper colour puts it **17,110 pixels** over. Nothing else in the suite
+  compares the menu widget layer at all -- `bootcamp` and `campaign` pass
+  through the menus on their way somewhere, and the game composes no frames
+  while a dialog is up.
 
 - **`am2.Image.refs_to` cannot see a call.** It scans for the address as a
   dword, which finds vtable slots and `push imm32` and nothing else; `call

@@ -1160,13 +1160,23 @@ exit; `tools/drive.sh stop` walks the process tree for this reason.
   it goes. A vtable array is worth walking the moment one of its slots is
   reconstructed — it says how big the subsystem is before any of it is read.
 
-  **OPTIONS → CONTROLS is a menu A/B, and it is a good one.** That dialog is
+  **`tools/ab.sh controls` is the menu A/B, and it is exact.** That dialog is
   78,174 `LabelDraw` calls — every caption from "SARGE CONTROLS" to "EXIT
-  VEHICLE" — and driving the same two clicks under `AM2_NOPATCH=1` puts the
-  frames **54 pixels apart of 786,432**, all 54 inside a 10x13 box at the
-  cursor. The dialog itself is identical. Two clicks from the title screen,
-  no typing, no mission: the cheapest gameplay-free A/B in the project, and
-  the only one that compares the menu widget layer at all.
+  VEHICLE" — and it comes out **0 of 786,432**, so its budget is 0 like
+  `windowed`'s. Two clicks from the title screen, no typing and no mission:
+  the cheapest gameplay-free configuration in the suite, and the only one that
+  compares the menu widget layer at all, since `bootcamp` and `campaign` merely
+  pass through the menus and the game composes no frames while a dialog is up.
+
+  Driving it by hand first gave 54 pixels in a 10x13 box at the cursor, which
+  is worth knowing for what it is: not noise in the dialog but two clicks
+  landing at different moments. Inside `ab.sh` both sides get the same clicks
+  and it is zero. **A pixel figure can be an artefact of how the run was
+  driven rather than of what was drawn** — and the fix is to drive both sides
+  identically, not to widen the budget.
+
+  It fails when it should: clearing the label background with the ink colour
+  rather than the paper colour puts it 17,110 pixels over.
 
   The sizes quoted for the next candidates were off as well (`0x00413610` is
   128 B, not 256; `0x00433350` is `0x00433360` at 288 B), which is what

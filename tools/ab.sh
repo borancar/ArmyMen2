@@ -160,6 +160,14 @@ play() {
         # and no Boot Camp script declares any. So ScriptVariable and the whole
         # name-table layer are compared here or nowhere.
         campaign) args="-nointro -dbg"    ; wait=25 ;;
+        # OPTIONS -> CONTROLS, which is the only configuration that compares
+        # the menu widget layer. That dialog is 78,174 LabelDraw calls -- every
+        # caption on it, from "SARGE CONTROLS" to "EXIT VEHICLE" -- and it
+        # costs two clicks, no typing and no mission. Nothing else in this
+        # suite draws a widget at all: bootcamp and campaign pass through the
+        # menus on their way somewhere and stop composing frames the moment a
+        # dialog is up.
+        controls) args="-nointro -dbg"    ; wait=25 ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
@@ -195,6 +203,15 @@ play() {
         sleep 25
         drive ctl "mouse left tap" >/dev/null 2>&1
         sleep 8
+    fi
+
+    if [ "$cfg" = controls ]; then
+        # OPTIONS, then CONTROLS. Both are plain title-screen buttons and the
+        # cursor is drawn on both screens, so point.py is the right tool here.
+        "$REPO/tools/point.py" 306 262 --click >/dev/null 2>&1
+        sleep 5
+        "$REPO/tools/point.py" 306 212 --click >/dev/null 2>&1
+        sleep 6
     fi
 
     if [ "$cfg" = mission ]; then
@@ -339,6 +356,13 @@ compare() {
         # The process is gone by the time the shot is taken, so there is no
         # frame to compare. The log is the evidence.
         quit)     budget=-1 ;;
+        # Exact, like windowed, and measured twice rather than reasoned: the
+        # dialog is static and both sides receive the same two clicks, so the
+        # cursor lands in the same place on each. A manual A/B of the same
+        # screen differed by 54 pixels in a 10x13 box at the cursor, which is
+        # what an unsynchronised click looks like -- driven identically it is
+        # zero. Any pixel here is a wrong caption, so the budget says so.
+        controls) budget=0 ;;
         *)        budget=500 ;;
     esac
     # Overridable, mainly so the check itself can be tested.
@@ -373,7 +397,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls quit"
 
 fail=0
 for cfg in $cfgs; do
