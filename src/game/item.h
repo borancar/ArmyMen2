@@ -87,4 +87,9 @@ void item_install(void);
  * unknown kind returns 1 having done nothing. Two callers. */
 int32_t __cdecl FreeItem(void *item, int32_t unlink);
 
+/* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
+ * +0x8C is both the guard and the record. `notify` gates a call that runs
+ * BEFORE the free. Five callers. */
+void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify);
+
 #endif

@@ -128,6 +128,45 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     return 1;
 }
 
+typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
+#define orig_item_pre_destroy \
+    (*(AM2_ItemPreDestroyFn)AM2_IMAGE(ADDR_ITEM_PRE_DESTROY))
+
+#define kCommDbg \
+    (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
+                        + COMM_OFF_EVENT_DEBUG))
+
+/* 0x00429C80. Release an item object's allocation, by its own log line.
+ *
+ * The byte at +0x8C is the guard and the record: nothing happens if it is
+ * already clear, and it is cleared at the end, so calling this twice is safe
+ * and the second call is silent. That makes it idempotent by construction
+ * rather than by a caller's discipline.
+ *
+ * The third argument gates a call to 0x0042A0A0 -- four callers, unnamed --
+ * which runs BEFORE the free, so it is a chance to look at the allocation
+ * rather than a notification that it is gone.
+ *
+ * Note the log prints the object's uid at +4 and is gated on the comm object's
+ * debug field, the same one the event functions read. */
+void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const uint8_t *)(o + OBJ_OFF_ALLOC_LIVE) == 0)
+        return;
+
+    if (kCommDbg)
+        orig_log("DestroyItemObject, %x\n", *(const int32_t *)(o + 4));
+
+    if (notify)
+        orig_item_pre_destroy(obj, arg);
+
+    am2_free(*(void **)(o + OBJ_OFF_ALLOC_PTR));
+
+    *(uint8_t *)(o + OBJ_OFF_ALLOC_LIVE) = 0;
+}
+
 /* The five per-kind destructors stay original and are reached by address. Each
  * lives in a different translation unit, which is the real content of the
  * dispatch: the kind says whose object this is. */
@@ -202,6 +241,8 @@ void item_install(void)
 {
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
+    patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
+                  "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
     patch_replace(ADDR_OBJ_FIELD_A, (const void *)ObjFieldA, "ObjFieldA", 1);
     patch_replace(ADDR_OBJ_SET_FIELD_A, (const void *)ObjSetFieldA,

@@ -11,7 +11,9 @@
  * depends on shared state -- this is for consistency with the rest of the def
  * parsing, which must use the game's tokeniser. */
 typedef int32_t (__cdecl *AM2_StrtolFn)(const char *s, char **end, int32_t base);
+typedef double (__cdecl *AM2_StrtodFn)(const char *s, char **end);
 #define orig_strtol (*(AM2_StrtolFn)AM2_IMAGE(ADDR_CRT_STRTOL))
+#define orig_strtod (*(AM2_StrtodFn)AM2_IMAGE(ADDR_CRT_STRTOD))
 
 #define kDefKeywords ((const AM2_DefKeyword *)AM2_IMAGE(ADDR_DEF_NAME_TABLE))
 
@@ -44,6 +46,34 @@ int32_t __cdecl DefParseNumber(int32_t *out, const char *tok)
         return 0;
 
     *out = orig_strtol(tok, &end, 0);
+
+    if (end == tok) {
+        orig_log("Bad or missing number\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+/* 0x0041A290. DefParseNumber's float twin, sixty-four bytes further along.
+ *
+ * The same three-part shape: a null token returns 0 in silence, a token that
+ * is not a number complains first, and success means strtod consumed
+ * SOMETHING rather than everything.
+ *
+ * Two differences from the integer form, both reproduced. There is no base
+ * argument, so 0x and 0 prefixes mean nothing here. And the value is stored
+ * before the check either way -- the original's `fstp` writes *out and only
+ * then compares the end pointer -- so a failed parse still leaves 0.0 behind
+ * rather than the caller's previous value. */
+int32_t __cdecl DefParseFloat(float *out, const char *tok)
+{
+    char *end;
+
+    if (tok == (const char *)0)
+        return 0;
+
+    *out = (float)orig_strtod(tok, &end);
 
     if (end == tok) {
         orig_log("Bad or missing number\n");
@@ -182,6 +212,8 @@ int definfo_install(void)
 
     rc |= patch_replace(ADDR_DEF_PARSE_NUMBER, (const void *)DefParseNumber,
                         "DefParseNumber", 2);
+    rc |= patch_replace(ADDR_DEF_PARSE_FLOAT, (const void *)DefParseFloat,
+                        "DefParseFloat", 1);
     rc |= patch_replace(ADDR_DEF_NAME_INDEX, (const void *)DefFindKeyword,
                         "DefFindKeyword", 1);
     rc |= patch_replace(ADDR_DEF_DISPATCH_LINE, (const void *)DefDispatchFile,

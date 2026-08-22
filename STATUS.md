@@ -70,10 +70,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 404 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 404 | 397 of them below the CRT line |
+| `patch_replace` sites | 406 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 406 | 399 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 92,112 / 372,816 B (**24.7%**) | patched entries' sizes over the total |
+| sub-CRT code reconstructed | 92,272 / 372,816 B (**24.8%**) | patched entries' sizes over the total |
 | modules | 27 flat + 15 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -152,6 +152,13 @@ counts probe before reading one as coverage -- that is what turned the
 6. `tools/ab.sh all` -- only `campaign` has been run against current HEAD.
 
 ## Leads
+
+- **The .aai files contain no floating-point numbers either.**
+  `DefParseNumber` runs 553 times and `DefParseFloat` -- its strtod twin, with
+  the identical shape and complaint -- runs 0. Taken with the earlier finding
+  that forcing strtol to base 10 changes nothing, the shipped `.aai` corpus
+  uses plain decimal integers throughout and exercises neither the alternate
+  bases nor the float path.
 
 - **What is left in event.cpp is the dense half, and the shim run is over.**
   Ten functions remain: the 4096-byte action executor at `0x00420410`, a

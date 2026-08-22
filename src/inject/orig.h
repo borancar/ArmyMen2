@@ -1645,6 +1645,11 @@
  * with an empty name ends the table. */
 #define AM2_DEF_KEYWORD_STRIDE     12
 #define ADDR_CRT_STRTOL            0x00465198u
+#define ADDR_CRT_STRTOD            0x004653B7u
+/* 0x0041A290. DefParseNumber's FLOAT twin, sixty-four bytes further on: same
+ * null check, same "consumed something" test, same complaint -- strtod and a
+ * float store instead of strtol and an int32. */
+#define ADDR_DEF_PARSE_FLOAT       0x0041A290u  /* int32_t(float *, const char *) */
 /* 0x0041A5F0 is DefParseInfoFile, by its own string; 0x0041A6B0 is the line
  * dispatcher it drives, and that one names itself nowhere. Both still
  * original. */
@@ -2602,6 +2607,13 @@
  * 3 and 8 as unidentified -- this narrows where to look rather than answering
  * it. */
 #define ADDR_FREE_ITEM             0x004285F0u  /* int32_t(void *, int32_t) */
+/* 0x00429C80, "DestroyItemObject, %x" -- its own name. Five callers. Frees the
+ * allocation at +0x90 and clears the live byte at +0x8C; does nothing at all
+ * if that byte is already clear, which makes it idempotent. */
+#define ADDR_DESTROY_ITEM_OBJECT   0x00429C80u  /* void(obj, int32, int32) */
+#define ADDR_ITEM_PRE_DESTROY      0x0042A0A0u  /* void(obj, int32_t) */
+#define OBJ_OFF_ALLOC_LIVE         0x8Cu   /* uint8_t */
+#define OBJ_OFF_ALLOC_PTR          0x90u
 #define ADDR_FREE_ITEM_COMMON      0x0043BBB0u  /* kinds 1, 5, 6, 8 */
 #define ADDR_FREE_ITEM_KIND2       0x004478C0u
 #define ADDR_FREE_ITEM_KIND3       0x0045B470u

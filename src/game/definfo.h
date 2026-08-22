@@ -36,6 +36,10 @@ int32_t __cdecl DefParseNumber(int32_t *out, const char *tok);
 
 /* 0x0041A640. The index of `name` in the vocabulary table, or -1. That index
  * is the command id the handlers are given. */
+/* 0x0041A290. The float twin: strtod rather than strtol, no base argument,
+ * and the value stored before the check either way. */
+int32_t __cdecl DefParseFloat(float *out, const char *tok);
+
 int32_t __cdecl DefFindKeyword(const char *name);
 
 /* 0x0041A6B0. Read an open .aai file, dispatching each line through the
