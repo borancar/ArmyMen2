@@ -65,6 +65,9 @@
 #define kOnLoadGameDelete   OnLoadGameDelete
 #define kOnDelGameCancel    OnDelGameCancel
 #define kOnLoadGameNew      OnLoadGameNew
+#define kOnMovieNextPage    OnMovieNextPage
+#define kOnMoviePlay        OnMoviePlay
+#define kOnLoadGameLoad     OnLoadGameLoad
 #define kOnAudioButton      OnAudioButton
 #define kOnControlsButton   OnControlsButton
 #define kOnDifficultyButton OnDifficultyButton
@@ -1481,7 +1484,7 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
 #define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
 #define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_levelCount      (*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)
-#define g_moviePage       (*(const int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)
+#define g_moviePage       (*(int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)
 #define g_movieCount      (*(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
 #define g_menuMode        (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
@@ -4518,7 +4521,7 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
  * is the page button: with fewer than three there is nothing to page to. */
 static AM2_Widget *MakeMovieButton(AM2_Widget *w, AM2_Widget *panel,
                                    int32_t left, int32_t top, int32_t slot,
-                                   uint32_t handler)
+                                   void (__cdecl *handler)(AM2_Widget *))
 {
     AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
     AM2_Sprite *const *pair;
@@ -4532,7 +4535,7 @@ static AM2_Widget *MakeMovieButton(AM2_Widget *w, AM2_Widget *panel,
                               (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                               (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                               (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
-                              1, box, kImageHandler(handler),
+                              1, box, handler,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
 
@@ -4582,7 +4585,7 @@ AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
         spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B + i, 1, 1, 1);
     }
 
-    slots[0] = MakeMovieButton(w, panel, 0x21, 0x35, 0, ADDR_ON_MOVIE_PLAY);
+    slots[0] = MakeMovieButton(w, panel, 0x21, 0x35, 0, kOnMoviePlay);
     panel->focusedChild = slots[0];
     slots[1] = (AM2_Widget *)0;
     slots[2] = (AM2_Widget *)0;
@@ -4590,13 +4593,13 @@ AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
 
     if (g_movieCount > 0)
         slots[1] = MakeMovieButton(w, panel, 0xD5, 0x35, 1,
-                                   ADDR_ON_MOVIE_PLAY);
+                                   kOnMoviePlay);
     if (g_movieCount > 1)
         slots[2] = MakeMovieButton(w, panel, 0x21, 0xE9, 2,
-                                   ADDR_ON_MOVIE_PLAY);
+                                   kOnMoviePlay);
     if (g_movieCount > 2)
         slots[3] = MakeMovieButton(w, panel, 0xD5, 0xE9, 3,
-                                   ADDR_ON_MOVIE_PLAY);
+                                   kOnMoviePlay);
 
     WidgetAddChild(panel, MakeButton(0x197, 0xE8, AM2_BMP_BACK19_0,
                                      AM2_BMP_BACK19_1, AM2_BMP_BACK19_2,
@@ -4604,7 +4607,7 @@ AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
     if (g_movieCount > 2)
         WidgetAddChild(panel, MakeButton(0x197, 0xB6, AM2_BMP_EGG0,
                                          AM2_BMP_EGG1, AM2_BMP_EGG2,
-                                         kImageHandler(ADDR_ON_MOVIE_NEXT_PAGE)));
+                                         kOnMovieNextPage));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
     return w;
@@ -4725,7 +4728,7 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
                                       kOnLoadGameNew));
     WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x6B, AM2_BMP_LOAD0,
                                       AM2_BMP_LOAD1, AM2_BMP_LOAD2,
-                                      kImageHandler(ADDR_ON_LOADGAME_LOAD)));
+                                      kOnLoadGameLoad));
     WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x92,
                                       AM2_BMP_DELETE12_0, AM2_BMP_DELETE12_1,
                                       AM2_BMP_DELETE12_2,
@@ -4916,6 +4919,102 @@ void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
     PlaySoundAt(2, 0, 0, 0, 0);
 }
 
+/* 0x0044E580. MOVIES' page button: bump the page, wrap past 2, and RETARGET
+ * the four buttons that already exist rather than rebuilding them. Each takes
+ * a new slot index and the two sprites for it, in the same NORMAL=b,
+ * FOCUS=a, PRESSED=a pattern the constructor uses.
+ *
+ * It does not repaint. The buttons are marked by nothing and simply come out
+ * differently the next time the screen is drawn, which is what makes this
+ * cheap enough to do on a click. */
+void __cdecl OnMovieNextPage(AM2_Widget *w)
+{
+    AM2_Widget  *panel;
+    AM2_Widget  *screen;
+    AM2_Widget **slots;
+    int32_t      page;
+    int32_t      i;
+
+    if (!w)
+        return;
+    panel = w->parent;
+    if (!panel)
+        return;
+    screen = panel->parent;
+    if (!screen)
+        return;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    page = g_moviePage + 1;
+    g_moviePage = page;
+    if (page > 2) {
+        page = 0;
+        g_moviePage = 0;
+    }
+
+    slots = (AM2_Widget **)((uint8_t *)screen + MOVIES_OFF_BUTTONS);
+    for (i = 0; i < AM2_MOVIE_PAGE_SIZE; i++) {
+        AM2_Widget *btn = slots[i];
+        int32_t     idx = i + page * AM2_MOVIE_PAGE_SIZE;
+        AM2_Sprite *const *pair;
+        uint8_t    *self;
+
+        if (!btn)
+            continue;
+        pair = (AM2_Sprite *const *)((const uint8_t *)screen
+                                     + MOVIES_OFF_SPRITES
+                                     + (uint32_t)idx * 8);
+        self = (uint8_t *)btn;
+        *(int32_t *)(self + MOVIE_BUTTON_OFF_INDEX)        = idx;
+        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL)  = pair[1];
+        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS)   = pair[0];
+        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED) = pair[0];
+    }
+}
+
+/* 0x0044E610. A thumbnail's click: name the film from the button's own slot
+ * and go to state 3, which is the movie player. It sets the overlay mode
+ * afterwards, so state 3 arrives with the film already chosen. */
+void __cdecl OnMoviePlay(AM2_Widget *w)
+{
+    const char *const *names = (const char *const *)
+        AM2_IMAGE(ADDR_MOVIE_NAMES);
+    int32_t idx;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    idx = *(const int32_t *)((const uint8_t *)w + MOVIE_BUTTON_OFF_INDEX);
+    strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY, names[idx]);
+    RequestState(3);
+    *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
+    g_menuMode = AM2_MENU_MODE_MOVIE;
+}
+
+/* 0x00452060. LOAD GAME's LOAD -- and this is the arm STATUS's open item 2
+ * names as the one that fires: it copies the chosen save into
+ * ADDR_GAMEPROC_STR_B, raises ADDR_LOAD_PENDING and asks for state 2, which
+ * is the whole of the load request. What happens after that is the puzzle,
+ * not this.
+ *
+ * The name is the SCREEN's copy, seeded by the constructor, so LOAD works
+ * without a row ever being clicked; an empty one is refused with wave 3. */
+void __cdecl OnLoadGameLoad(AM2_Widget *w)
+{
+    const char *name;
+
+    (void)w;
+    if (!g_paintObject)
+        return;
+    name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
+    if (!strlen(name)) {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        return;
+    }
+    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, name);
+    g_loadPending = 1;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    RequestState(2);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -5021,6 +5120,14 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_MOVIE_NEXT_PAGE,
+                        (const void *)OnMovieNextPage,
+                        "OnMovieNextPage", 0);
+    rc |= patch_replace(ADDR_ON_MOVIE_PLAY, (const void *)OnMoviePlay,
+                        "OnMoviePlay", 0);
+    rc |= patch_replace(ADDR_ON_LOADGAME_LOAD, (const void *)OnLoadGameLoad,
+                        "OnLoadGameLoad", 0);
+
     rc |= patch_replace(ADDR_REPAINT_ANCESTOR, (const void *)RepaintAncestor,
                         "RepaintAncestor", 1);
     rc |= patch_replace(ADDR_SELECT_MAP_ROW, (const void *)SelectMapRow,

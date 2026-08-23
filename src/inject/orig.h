@@ -2009,6 +2009,13 @@
 #define ADDR_MOVIE_COUNT         0x00512328u /* int32_t */
 #define ADDR_ON_MOVIE_PLAY       0x0044E610u
 #define ADDR_ON_MOVIE_NEXT_PAGE  0x0044E580u
+/* The twelve movie filenames, indexed by the button's own slot. */
+#define ADDR_MOVIE_NAMES         0x0048AE98u /* const char *[] */
+#define ADDR_MOVIE_TO_PLAY       0x00511B08u /* char[], the chosen filename */
+/* The in-mission overlay mode the movie player runs under. Equal to
+ * AM2_MENU_REQUEST_MOVIES by coincidence and NOT the same constant: one
+ * indexes the 21-arm menu table and the other the 13-arm sub-state table. */
+#define AM2_MENU_MODE_MOVIE      0x0Du
 #define AM2_BMP_BACK19_0         0x0048B6BCu /* 03_019_0N_back.bmp */
 #define AM2_BMP_BACK19_1         0x0048B6D0u
 #define AM2_BMP_BACK19_2         0x0048B6E4u

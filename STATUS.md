@@ -11,6 +11,36 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **MOVIES' page button retargets its buttons instead of rebuilding them, and
+  does not repaint.** `0x0044E580` bumps the page, wraps past 2, and gives the
+  four buttons that already exist a new slot index and the two sprites for it
+  -- same NORMAL=b, FOCUS=a, PRESSED=a pattern the constructor uses. Nothing
+  is marked dirty; they simply come out differently the next time the screen
+  is drawn, which is what makes this cheap enough to do on a click.
+
+- **`0x00452060` is the LOAD arm STATUS's open item 2 names.** It copies the
+  chosen save into `ADDR_GAMEPROC_STR_B`, raises `ADDR_LOAD_PENDING` and asks
+  for state 2 -- the whole of the load request, and now ours. What happens
+  after that is still the puzzle: the flag is set, read as SET at
+  `0x00425360`, and read as 0 again by `0x004255CB`. Reconstructing the
+  requester does not move that, and saying so is the point.
+
+  The name it sends is the SCREEN's copy, seeded by the constructor, so LOAD
+  works without a row ever being clicked; an empty one is refused with wave 3.
+
+- **Equal constants are not the same constant.** `ADDR_MENU_MODE` takes `0x0D`
+  for the movie player and `AM2_MENU_REQUEST_MOVIES` is also `0x0D` -- but one
+  indexes the 21-arm menu table and the other the 13-arm sub-state table, so
+  reusing the name would have been the reverse of yesterday's mistake: one
+  name on two different things rather than two names on one. `AM2_MENU_MODE_MOVIE`
+  is a second macro on purpose, with the coincidence written down.
+
+- **ENTER NAME's OK is left original, with the other two.** `0x00451990`
+  globs the save directory to refuse a duplicate name and then creates it --
+  CRT file I/O, which this port replaces wholesale rather than function by
+  function. It joins DELETE PLAYER's OK and DELETE GAME's OK on that list;
+  all three are the file layer rather than the menu.
+
 - **`RepaintAncestor` is not `WidgetRepaint`, and the difference is the CLIP.**
   `0x00455C10` walks up to the nearest ancestor owning a sprite and paints
   THAT widget clipped to **this** widget's rectangle -- so only the area this
@@ -1488,10 +1518,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 735 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 734 | 724 of them below the CRT line |
+| `patch_replace` sites | 738 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 737 | 727 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 134,944 / 372,816 B (**36.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 135,328 / 372,816 B (**36.3%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 149,600 / 372,816 B (40.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
@@ -1550,7 +1580,7 @@ counts probe before reading one as coverage -- that is what turned the
    `LoadGame` (`0x00425A10`) is reconstructed, patched and traced, and it still
    never runs. Measured, from a temporary `hooklog` probe plus the trace log:
 
-   - The GAME SELECT PANEL's LOAD arm (`0x00452060`) fires: `0x00511B88`
+   - The GAME SELECT PANEL's LOAD arm (`0x00452060`, reconstructed) fires: `0x00511B88`
      holds `"map1_mission1.sav"`, `0x00511A68` holds `"sarge"`.
    - Mission start (`0x00425300`) takes the LOAD branch, so `0x00511DD8` was
      set when it read it at `0x00425360`. That global is `ADDR_LOAD_PENDING`.

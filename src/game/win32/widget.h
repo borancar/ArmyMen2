@@ -1333,6 +1333,12 @@ void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
 void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
                          int32_t selected);
 
+/* MOVIES' two handlers and LOAD GAME's LOAD: 0x0044E580, 0x0044E610 and
+ * 0x00452060. */
+void __cdecl OnMovieNextPage(AM2_Widget *w);
+void __cdecl OnMoviePlay(AM2_Widget *w);
+void __cdecl OnLoadGameLoad(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
