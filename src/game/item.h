@@ -134,6 +134,15 @@ void item_install(void);
  * unknown kind returns 1 having done nothing. Two callers. */
 int32_t __cdecl FreeItem(void *item, int32_t unlink);
 
+/* 0x00429450. The object registry's teardown -- FreeItem every entry with
+ * `unlink` ZERO, which is what keeps the forward walk safe, then free the
+ * array and clear the record. */
+void __cdecl ItemsReset(void);
+
+/* 0x0045EE80. A weapon by uid. Null for a zero uid or one that resolves to
+ * nothing, and null WITH a log line for one that resolves to a non-weapon. */
+void *__cdecl WeaponByUid(uint32_t uid);
+
 /* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
  * +0x8C is both the guard and the record. `notify` gates a call that runs
  * BEFORE the free. Five callers. */

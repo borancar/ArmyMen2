@@ -1007,10 +1007,6 @@ uint32_t __cdecl UnitTypeCost(int32_t type)
 
 #define g_keyBindings ((const uint8_t *)(uintptr_t)ADDR_KEY_BINDINGS)
 
-typedef void (__attribute__((thiscall)) *AM2_PtrListGrowFn)(void *rec);
-#define orig_ptr_list_grow \
-    (*(AM2_PtrListGrowFn)AM2_IMAGE(ADDR_PTR_LIST_GROW))
-
 void __cdecl ConsumeKey(int32_t dik)
 {
     uint32_t k = (uint32_t)dik & 0xFFu;
@@ -1038,23 +1034,54 @@ int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot)
                               + AM2_PLAYER_ARMY);
 }
 
+/* 0x0042A6B0 and 0x0042A710, thiscall. The {capacity, count, items} record's
+ * two capacity moves, and the pair are not symmetric.
+ *
+ * The grow adds twenty and reallocs. The shrink takes twenty off and, if that
+ * leaves nothing, FREES the array and nulls the pointer rather than reallocing
+ * to zero -- so an emptied list gives its storage back entirely and the next
+ * push starts from a null pointer, which realloc treats as a fresh malloc.
+ *
+ * Neither touches the count. PtrListPush and ListRemoveAt own that, which is
+ * why the grow can be called before the item is stored and the shrink after
+ * the count has already come down. */
+#define AM2_PTR_LIST_SLACK 20
+
+void __attribute__((thiscall)) PtrListGrow(void *rec)
+{
+    int32_t *r = (int32_t *)rec;
+
+    r[0] = r[0] + AM2_PTR_LIST_SLACK;
+    r[2] = (int32_t)(uintptr_t)am2_realloc((void *)(uintptr_t)r[2],
+                                           (size_t)r[0] * 4);
+}
+
+void __attribute__((thiscall)) PtrListShrink(void *rec)
+{
+    int32_t *r = (int32_t *)rec;
+
+    r[0] = r[0] - AM2_PTR_LIST_SLACK;
+    if (r[0] <= 0) {
+        am2_free((void *)(uintptr_t)r[2]);
+        r[2] = 0;
+        return;
+    }
+    r[2] = (int32_t)(uintptr_t)am2_realloc((void *)(uintptr_t)r[2],
+                                           (size_t)r[0] * 4);
+}
+
 void __attribute__((thiscall)) PtrListPush(void *rec, void *item)
 {
     int32_t *r = (int32_t *)rec;
 
     if (r[1] >= r[0])
-        orig_ptr_list_grow(rec);
+        PtrListGrow(rec);
     /* Re-read the count after the grow, as the original does. */
     ((void **)r[2])[r[1]] = item;
     r[1] = r[1] + 1;
 }
 
-typedef void (__attribute__((thiscall)) *AM2_PtrListShrinkFn)(void *rec);
-#define orig_ptr_list_shrink \
-    (*(AM2_PtrListShrinkFn)AM2_IMAGE(ADDR_PTR_LIST_SHRINK))
-
 #define AM2_PTR_LIST_SLACK 20
-
 void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
 {
     int32_t *r = (int32_t *)rec;
@@ -1068,7 +1095,7 @@ void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
         memmove((void **)r[2] + index, (void **)r[2] + index + 1,
                 (size_t)(count - index) * 4);
     if (count + AM2_PTR_LIST_SLACK < r[0])
-        orig_ptr_list_shrink(rec);
+        PtrListShrink(rec);
 }
 
 void __attribute__((thiscall)) ClearPtrList(void *rec)
@@ -1100,6 +1127,10 @@ int32_t __cdecl ActionKeyPressed(int32_t action)
 
 int misc_install(void)
 {
+    patch_replace(ADDR_PTR_LIST_GROW, (const void *)PtrListGrow,
+                  "PtrListGrow", 1);
+    patch_replace(ADDR_PTR_LIST_SHRINK, (const void *)PtrListShrink,
+                  "PtrListShrink", 1);
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
     patch_replace(ADDR_ADD_BYTE_SAT, (const void *)AddByteSat, "AddByteSat", 2);
     patch_replace(ADDR_COMPARE_DWORD, (const void *)CompareDword, "CompareDword", 2);

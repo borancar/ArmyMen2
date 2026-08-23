@@ -2950,6 +2950,8 @@
  * and this is WeaponByUid. Answers null, having complained, for any other
  * kind. */
 #define ADDR_WEAPON_BY_UID        0x0045EE80u  /* obj *(int32_t uid) */
+#define ADDR_STR_NOT_A_WEAPON     0x0048C6E0u  /* "uid wasn't a weapon!\n" */
+#define AM2_OBJ_TYPE_WEAPON       4
 /* 0x00447990, "RemoveInventoryItem": take one slot out of a unit's six-entry
  * weapon inventory. 0x00449860 selects a slot -- it writes the index to
  * 0x0568 and looks the weapon up -- and is otherwise unread. */

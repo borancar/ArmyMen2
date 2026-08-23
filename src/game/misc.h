@@ -612,6 +612,13 @@ int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);
  * capacity. The grow is still original. */
 void __attribute__((thiscall)) PtrListPush(void *rec, void *item);
 
+/* 0x0042A6B0 and 0x0042A710. The same record's two capacity moves, and they
+ * are not symmetric: the grow adds twenty and reallocs, while the shrink
+ * takes twenty off and FREES the array outright when that leaves nothing,
+ * rather than reallocing to zero. Neither touches the count. */
+void __attribute__((thiscall)) PtrListGrow(void *rec);
+void __attribute__((thiscall)) PtrListShrink(void *rec);
+
 /* 0x0042A750, 33 callers -- the same record's remove. Drop the entry at
  * `index`, shift what follows down with the CRT's memmove, and hand the
  * capacity back through 0x0042A710 once twenty entries are spare. An index at

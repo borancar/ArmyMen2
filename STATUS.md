@@ -11,6 +11,37 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **Four small functions off the FRONTIER, chosen by asking what our own code
+  still reaches by address.** Listing every `orig_` macro in `src/game` with
+  its target's size is a two-minute question and a better ranking than
+  anything static: it names exactly the functions one call away from
+  reconstructed code. 130 of them, and the four smallest useful ones went in.
+
+  `PtrListGrow` and `PtrListShrink` (`0x0042A6B0`, `0x0042A710`) are the
+  {capacity, count, items} record's two capacity moves and they are **not
+  symmetric**: the grow adds twenty and reallocs, while the shrink takes
+  twenty off and FREES the array outright when that leaves nothing, rather
+  than reallocing to zero. So an emptied list gives its storage back and the
+  next push starts from a null pointer, which `realloc` treats as a fresh
+  `malloc`. Neither touches the count.
+
+  `ItemsReset` (`0x00429450`) tears the object registry down, and passes 0 for
+  `FreeItem`'s `unlink` -- which is the whole reason it can walk forward
+  without the table moving under it, since unlinking is what memmoves the
+  tail. It re-reads the count every iteration anyway.
+
+  `WeaponByUid` (`0x0045EE80`) COMPLAINS rather than just refusing: three ways
+  to fail and only one is worth a line. A zero uid and one that resolves to
+  nothing return null in silence; one that resolves to a non-weapon logs "uid
+  wasn't a weapon!".
+
+- **The multiplayer host/join panel was looked at and declined for now.**
+  `0x00430530` is 4,497 bytes, 115 calls, four player rows each with a colour
+  multi-sprite, a name, a scroll bar and dots -- and it builds them through
+  two widget constructors (`0x004329A0`, `0x00432E20`) that are not
+  reconstructed either. It is the last screen and it is worth doing; it is not
+  worth starting between two other things. Recorded rather than half-done.
+
 - **MOVIES' page button retargets its buttons instead of rebuilding them, and
   does not repaint.** `0x0044E580` bumps the page, wraps past 2, and gives the
   four buttons that already exist a new slot index and the two sprites for it
@@ -1518,11 +1549,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 738 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 737 | 727 of them below the CRT line |
+| `patch_replace` sites | 742 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 741 | 730 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 135,328 / 372,816 B (**36.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 149,600 / 372,816 B (40.1%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 135,552 / 372,816 B (**36.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 149,824 / 372,816 B (40.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

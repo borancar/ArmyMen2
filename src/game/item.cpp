@@ -89,7 +89,46 @@ typedef void (__cdecl *am2_void_fn)(void);
 
 #define orig_save_one_item (*(am2_save_one_fn)ADDR_SAVE_ONE_ITEM)
 #define orig_load_one_item (*(am2_load_one_fn)ADDR_LOAD_ONE_ITEM)
-#define orig_items_reset   (*(am2_void_fn)ADDR_ITEMS_RESET)
+
+/* 0x00429450. The object registry's teardown: FreeItem every entry, free the
+ * array, and clear all three fields of the {capacity, count, table} record.
+ *
+ * It passes 0 for FreeItem's `unlink`, which is the whole reason it can walk
+ * forward without the table moving under it -- unlinking is what memmoves the
+ * tail. It re-reads the count every iteration anyway. */
+void __cdecl ItemsReset(void)
+{
+    int32_t i;
+
+    for (i = 0; i < g_objCount; i++)
+        FreeItem(g_objTable[i].obj, 0);
+
+    if (g_objTable)
+        am2_free(g_objTable);
+    g_objCap   = 0;
+    g_objCount = 0;
+    g_objTable = (AM2_ObjEntry *)0;
+}
+
+/* 0x0045EE80. A weapon by uid, and it COMPLAINS rather than just refusing: a
+ * uid that resolves to something whose type is not 4 logs "uid wasn't a
+ * weapon!" and returns null, while a uid of zero or one that resolves to
+ * nothing returns null in silence. Three ways to fail and only one of them is
+ * worth a line. */
+void *__cdecl WeaponByUid(uint32_t uid)
+{
+    uint32_t *obj;
+
+    if (!uid)
+        return (void *)0;
+    obj = (uint32_t *)LookupByUID(uid);
+    if (!obj)
+        return (void *)0;
+    if (obj[0] == AM2_OBJ_TYPE_WEAPON)
+        return obj;
+    am2_log((const char *)AM2_IMAGE(ADDR_STR_NOT_A_WEAPON));
+    return (void *)0;
+}
 
 int32_t __cdecl SaveItems(am2_FILE *fp)
 {
@@ -114,7 +153,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     int32_t  count = 0;
 
     /* Before the tag check, and before `fp` is even read. */
-    orig_items_reset();
+    ItemsReset();
 
     if (!CheckSaveTag(fp, AM2_SAVE_TAG_ITEMS,
                       (const char *)AM2_IMAGE(ADDR_STR_ITEM_CPP), 0x4A8))
@@ -152,9 +191,7 @@ typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
  *
  * Note the log prints the object's uid at +4 and is gated on the comm object's
  * debug field, the same one the event functions read. */
-typedef void *(__cdecl *AM2_WeaponByUidFn)(int32_t uid);
 typedef void (__cdecl *AM2_FreeRowsFn)(void *subrecord);
-#define orig_weapon_by_uid ((AM2_WeaponByUidFn)(uintptr_t)ADDR_WEAPON_BY_UID)
 #define orig_free_subrecord_rows \
     ((AM2_FreeRowsFn)(uintptr_t)ADDR_FREE_SUBRECORD_ROWS)
 
@@ -171,7 +208,7 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
     weaponUid = *(const int32_t *)(t + TROOPER_OFF_WEAPON_UID);
     if (weaponUid) {
         /* Answers null, having complained, for anything that is not kind 4. */
-        weapon = (uint8_t *)orig_weapon_by_uid(weaponUid);
+        weapon = (uint8_t *)WeaponByUid(weaponUid);
         if (weapon) {
             if (kCommDbg)
                 orig_log("DestroyTrooper %x\n",
@@ -204,7 +241,7 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
 
     weaponUid = *(const int32_t *)(v + VEHICLE_OFF_WEAPON_UID);
     if (weaponUid) {
-        weapon = (uint8_t *)orig_weapon_by_uid(weaponUid);
+        weapon = (uint8_t *)WeaponByUid(weaponUid);
         /* A 32-bit OR here, an 8-bit one in DestroyTrooper. Same bit. */
         if (weapon)
             *(int32_t *)(weapon + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
@@ -440,6 +477,10 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 
 void item_install(void)
 {
+    patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
+                  "ItemsReset", 0);
+    patch_replace(ADDR_WEAPON_BY_UID, (const void *)WeaponByUid,
+                  "WeaponByUid", 1);
     patch_replace(ADDR_REMOVE_INVENTORY_ITEM,
                   (const void *)RemoveInventoryItem,
                   "RemoveInventoryItem", 4);
