@@ -214,9 +214,37 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
  * with `rep stosd` for 0x10 dwords. */
 static_assert(sizeof(AM2_Sprite) == 0x40, "AM2_Sprite is 64 bytes");
 
-typedef int32_t (__cdecl *am2_slot_of_fn)(uint32_t id);
-#define orig_sprite_slot_of (*(am2_slot_of_fn)ADDR_SPRITE_SLOT_OF)
 #define g_spriteTable       (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)
+#define g_spriteRegCount    (*(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT)
+#define g_spriteRegPairs    (*(const uint32_t *const *)(uintptr_t)ADDR_SPRITE_REG_PAIRS)
+
+/* 0x00445990. The sprite id to its SLOT in g_spriteTable, or -1.
+ *
+ * A binary search over a second table of {id, slot} pairs kept sorted by id
+ * -- so the registry is two arrays, not one, and this one exists purely to
+ * make the lookup logarithmic. The comparison is UNSIGNED (`jae`), which
+ * matters because an id is (((set << 12) + index) << 7) + frame and the top
+ * bit is reachable. */
+int32_t __cdecl SpriteSlotOf(uint32_t id)
+{
+    const uint32_t *tab = g_spriteRegPairs;
+    int32_t         lo  = 0;
+    int32_t         hi  = g_spriteRegCount;
+
+    if (hi <= 0)
+        return -1;
+    do {
+        int32_t mid = lo + ((hi - lo) >> 1);
+
+        if (tab[(uint32_t)mid * 2] == id)
+            return (int32_t)tab[(uint32_t)mid * 2 + 1];
+        if (tab[(uint32_t)mid * 2] > id)
+            hi = mid;
+        else
+            lo = mid + 1;
+    } while (hi > lo);
+    return -1;
+}
 
 /* What both teardowns do to the sprite's contents.
  *
@@ -261,7 +289,7 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
     /* 0xFFFFFFFF means it was never registered, so there is no count to keep
      * and nothing to unhook -- it just goes. */
     if (spr->id != 0xFFFFFFFFu) {
-        slot = orig_sprite_slot_of(spr->id);
+        slot = SpriteSlotOf(spr->id);
         if (slot < 0) {
             orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_MISSING);
         } else if (g_spriteTable[slot] != spr) {
@@ -358,7 +386,7 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
 {
     uint32_t id = (uint32_t)(((((uint32_t)set << 12) + (uint32_t)index) << 7)
                              + (uint32_t)frame);
-    int32_t slot = orig_sprite_slot_of(id);
+    int32_t slot = SpriteSlotOf(id);
 
     if (slot >= 0) {
         AM2_Sprite *spr = g_spriteTable[slot];
@@ -811,6 +839,8 @@ int sprite_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_SPRITE_SLOT_OF, (const void *)SpriteSlotOf,
+                        "SpriteSlotOf", 1);
     rc |= patch_replace(ADDR_BUILD_VEHICLE_MASK,
                         (const void *)BuildVehicleMask,
                         "BuildVehicleMask", 1);

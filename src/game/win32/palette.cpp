@@ -33,6 +33,7 @@
  */
 
 #include "palette.h"
+#include "../misc.h"   /* ColourDistance -- pure, so it lives in the flat half */
 #include "surface.h"
 #include "mapdraw.h"
 #include "../../inject/patch.h"
@@ -60,9 +61,6 @@
  * [esp+0x18] with four down is the second (its address goes to 0x0041B760),
  * [esp+0x14] with two down is the third (compared against 0x100), and it
  * returns `ret` with no immediate, so the caller cleans. */
-typedef int32_t (__cdecl *am2_colour_distance_fn)(const uint32_t *a,
-                                                  const uint32_t *b);
-#define orig_colour_distance (*(am2_colour_distance_fn)ADDR_COLOUR_DISTANCE)
 
 void __cdecl CalibratePalette(uint32_t *palette)
 {
@@ -377,7 +375,7 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
     uint8_t  hit  = 0;
 
     for (; i < 256; i++) {
-        int32_t d = orig_colour_distance(&palette[i], &colour);
+        int32_t d = ColourDistance(&palette[i], &colour);
 
         if (d < best) {
             best = d;

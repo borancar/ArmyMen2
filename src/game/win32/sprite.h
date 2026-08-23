@@ -117,6 +117,11 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
                                   int32_t flags, int32_t addref);
 void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
+/* Original: 0x00445990. A sprite id to its SLOT in the sprite table, or -1.
+ * A binary search over a SECOND table of {id, slot} pairs kept sorted by id,
+ * with an UNSIGNED comparison. */
+int32_t __cdecl SpriteSlotOf(uint32_t id);
+
 /* Original: 0x004099F0, and the name is ours. Read a sprite set from an open
  * file into the sprite list: a count, then that many sprites.
  *

@@ -600,8 +600,14 @@
 #define ADDR_DRAW_SPRITE_CLIPPED 0x00446070u  /* void(spr,x,y,const AM2_Rect*,mode) */
 #define ADDR_BLIT_OVERLAY        0x0041C480u  /* __fastcall(x,y,data,AM2_Rect) */
 #define ADDR_RESTORE_CHAIN       0x00445EB0u  /* void(AM2_Sprite*) */
-/* Sprite lifetime. The registry is a count at 0x006598C0 and a table of
- * AM2_Sprite* at 0x006598C4; the lookup walks it for a matching id. */
+/* Sprite lifetime, and this comment was wrong in three ways until the lookup
+ * was read rather than described. The registry is a count at 0x006598C0, a
+ * CAPACITY at 0x006598BC, an AM2_Sprite* table indexed by SLOT at 0x006598C4
+ * -- which is ADDR_SPRITE_TABLE below -- and a separate table of {id, slot}
+ * PAIRS at 0x006598C8. The lookup is a BINARY SEARCH over the pairs, not a
+ * walk over the sprites, and what it returns is the slot. */
+#define ADDR_SPRITE_REG_COUNT    0x006598C0u  /* int32_t */
+#define ADDR_SPRITE_REG_PAIRS    0x006598C8u  /* {uint32 id; int32 slot} * */
 #define ADDR_FILL_SOUND_BUFFER   0x0040C440u  /* int32(buf, const void *, uint32) */
 #define ADDR_STR_SND_LOCK_FAIL   0x00474E6Cu  /* "Unable to lock sound buffer\n" */
 #define ADDR_STR_SND_NO_ARGS     0x00474E44u  /* "Fill sound buffer missing arguments\n" */

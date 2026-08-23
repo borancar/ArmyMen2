@@ -14,6 +14,11 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* Original: 0x0042A7C0. The kind of whatever a uid names, or 0 -- and a
+ * missing slot, a null object and a kind of zero are indistinguishable in
+ * the answer. */
+int32_t __cdecl UidObjKind(uint32_t uid);
+
 #endif
 
 /* 0x0044C250, one caller, and it names itself -- "Trooper Fire Send,

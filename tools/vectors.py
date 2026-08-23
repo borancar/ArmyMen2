@@ -87,7 +87,19 @@ NVECTORS = 96
 # generated pointer graph but one faulted. One vector cannot distinguish a
 # reconstruction from a coincidence, so a function needs both.
 MIN_VECTORS = 8
-REG = r"e(?:ax|bx|cx|dx|si|di)"
+# EBP is in this list and was not, which cost a whole function's vectors.
+# Most functions use ebp as a frame pointer, so it never held an argument --
+# but one without a frame is free to keep a POINTER argument there, and
+# ColourDistance does. Its second argument came out `scalar`, every generated
+# call passed an integer where a pointer was wanted, and it produced 0 vectors
+# at 21% coverage rather than failing visibly.
+#
+# Safe to add: a slot is only recorded when a register is loaded FROM an
+# argument slot, and `mov ebp, esp` is not that -- the copy rule below drops
+# ebp instead, because esp is never a slot. So in a framed function ebp still
+# never appears in `slots` and `[ebp + 8]` still means an argument fetch
+# rather than a dereference.
+REG = r"e(?:ax|bx|cx|dx|si|di|bp)"
 
 
 def addr_names():
@@ -960,7 +972,30 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                             if kind == "ptr" and (k // (si + 1)) % 5 == 2
                             for i in range(4))
         out.append((args, eax, writes, pre_in, fx, tuple(wptr)))
-    return out
+
+    # DEDUPE, and the number this changes is the point of the number.
+    #
+    # A vector is (inputs -> output). Two with the same inputs are the same
+    # test, and the generator makes plenty of them: a function whose only
+    # variation is behind a POINTER gets the same scratch every time without
+    # angr, so 96 tries collapse to one or two distinct calls. Before this,
+    # 7,353 recorded vectors were 5,355 distinct and TWELVE functions had
+    # exactly ONE -- ObjFieldA, ObjFlagBit0, Field53C, CommMean32 and friends,
+    # each recorded 82 times.
+    #
+    # MIN_VECTORS exists because "one vector cannot distinguish a
+    # reconstruction from a coincidence", and it had been counting copies.
+    # Measured rather than reasoned: with ColourDistance at 71 vectors and
+    # 100% instruction coverage, replacing `d1 * d1` with `d1` passed.
+    seen = set()
+    uniq = []
+    for v in out:
+        key = (tuple(v[0]), tuple(v[3]), tuple(v[4]))
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(v)
+    return uniq
 
 
 def pure_leaves(img, md, sizes):
@@ -1076,7 +1111,8 @@ def main():
                 "ADDR_COPY_BYTE_IF_SET", "ADDR_SCALE_32_BLOCKS",
                 "ADDR_TITLE_CASE", "ADDR_RESET_PAIR_MASK", "ADDR_IS_KIND_7",
                 "ADDR_IS_BLANK", "ADDR_IS_SCRIPT_DELIM",
-                "ADDR_SWAP_COLOUR_BYTES", "ADDR_RETURN_ZERO", "ADDR_RETURN_ONE",
+                "ADDR_SWAP_COLOUR_BYTES", "ADDR_COLOUR_DISTANCE",
+                "ADDR_RETURN_ZERO", "ADDR_RETURN_ONE",
                 "ADDR_REVERSE_BLOCKS", "ADDR_SCRIPT_COMPARE",
                 "ADDR_OBJ_IS_TYPE8", "ADDR_OBJ_IS_TYPE4",
                 "ADDR_COMPARE_PAIR", "ADDR_MAP_CODE",
@@ -1175,6 +1211,7 @@ def main():
         "ADDR_RESET_PAIR_MASK": "ResetPairMask", "ADDR_IS_KIND_7": "IsKind7",
         "ADDR_IS_BLANK": "IsBlank", "ADDR_IS_SCRIPT_DELIM": "IsScriptDelim",
         "ADDR_SWAP_COLOUR_BYTES": "SwapColourBytes",
+        "ADDR_COLOUR_DISTANCE": "ColourDistance",
         "ADDR_RETURN_ZERO": "ReturnZero", "ADDR_RETURN_ONE": "ReturnOne",
         "ADDR_REVERSE_BLOCKS": "ReverseBlocks",
         "ADDR_SCRIPT_COMPARE": "ScriptCompare",

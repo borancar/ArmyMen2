@@ -26,6 +26,7 @@
 #include "msgslot.h"   /* FindPlayerById */
 #include "gameproc.h"  /* RequestState -- reconstructed */
 #include "item.h"      /* UidOnWire, UidArmy -- reconstructed */
+#include "objtable.h"  /* FindSlot, g_objTable -- reconstructed */
 #include "event.h"     /* EventMessageReceive -- reconstructed */
 #include "misc.h"      /* XorChecksum, reconstructed */
 #include "rect.h"       /* AM2_Rect, for the dialog paint slot */
@@ -709,8 +710,32 @@ typedef void (__cdecl *AM2_KindMsgFn)(void *msg, int32_t army);
  * compiler having an opinion. It is one `ret` in this build. */
 typedef void (__cdecl *AM2_RawLogFn)(const void *a, int32_t b, int32_t c);
 
+/* 0x0042A7C0. The KIND of whatever a uid names, or 0.
+ *
+ * FindSlot wants somewhere to put an insertion point even when it finds the
+ * entry, so the original hands it the address of its own first argument --
+ * the uid it has already read into a register. The slot it writes there is
+ * never looked at, and the uid is not used again. Reproduced with a local
+ * rather than by clobbering the parameter, which is the same thing without
+ * the trap.
+ *
+ * A missing slot, a null object and a kind of zero are all indistinguishable
+ * in the answer. */
+int32_t __cdecl UidObjKind(uint32_t uid)
+{
+    int32_t   insert;
+    int32_t   slot = FindSlot(uid, &insert);
+    uint32_t *obj;
+
+    if (slot < 0)
+        return 0;
+    obj = (uint32_t *)g_objTable[slot].obj;
+    if (!obj)
+        return 0;
+    return (int32_t)obj[0];
+}
+
 #define orig_army_in_play  ((AM2_ArmyInPlayFn)(uintptr_t)ADDR_ARMY_IN_PLAY)
-#define orig_uid_obj_kind  ((AM2_KindFn)(uintptr_t)ADDR_UID_OBJ_KIND)
 #define orig_army_msg_filter ((AM2_FilterFn)(uintptr_t)ADDR_ARMY_MSG_FILTER)
 #define orig_troop_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_TROOP_MESSAGE_RECV)
 #define orig_vehicle_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_VEHICLE_MSG_RECV)
@@ -762,7 +787,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
     if (orig_army_msg_filter(m, army))
         return;
 
-    kind = orig_uid_obj_kind(UidOnWire(uid));
+    kind = UidObjKind(UidOnWire(uid));
     switch (kind) {
     case 1:
     case 5:
@@ -1206,6 +1231,8 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_UID_OBJ_KIND, (const void *)UidObjKind,
+                  "UidObjKind", 1);
     patch_replace(ADDR_TROOPER_FIRE_SEND, (const void *)TrooperFireSend,
                   "TrooperFireSend", 2);
     patch_replace(ADDR_RECV_ARMY_MSG, (const void *)ReceiveArmyMsg,

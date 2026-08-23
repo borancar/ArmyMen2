@@ -271,6 +271,21 @@ It only works for functions that read no global data — one that reads a global
 needs that global mapped, and mapping it means starting the game. **161 of the
 433 unreconstructed leaves qualify**, and 99 of those already yield vectors.
 
+**A vector count that includes DUPLICATES is a claim about effort, not about
+inputs.** The generator tried 96 times per function and recorded every try;
+7,353 rows were 5,355 distinct, and twelve functions had exactly ONE input
+recorded 82 or 96 times -- `ObjFieldA`, `ObjFlagBit0`, `Field53C`,
+`CommMean32` and friends. The cause is the scratch: one deterministic pattern
+for every vector, so a function whose only variation is behind a POINTER gets
+the same call every time unless angr supplies the bytes.
+
+`MIN_VECTORS` exists because "one vector cannot distinguish a reconstruction
+from a coincidence" and it had been counting copies. Deduping before emit
+makes it fire: 5,149 vectors and 19 functions reported "too thin to check
+against" where none were before. Nothing got worse; what was already true
+became visible. Measured, not reasoned -- `ColourDistance` at "71 vectors" and
+100% instruction coverage passed with `d1 * d1` replaced by `d1`.
+
 Validated on the 17 pure functions that were already reconstructed: 533 vectors,
 all passing. Tested in the failing direction too, and the two results are the
 point of it — replacing `lo >> 1` with `lo / 2` in `ApproxDist` still passes,

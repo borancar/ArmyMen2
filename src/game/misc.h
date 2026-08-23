@@ -69,6 +69,18 @@ int32_t __cdecl IsKind7(const void *p);
  * parameter is read by nothing. */
 uint32_t __cdecl SwapColourBytes(uint32_t colour, uint32_t unused);
 
+/* 0x0041B760. Two colours' distance: the sum of the squares of the three
+ * per-channel differences, each an absolute value taken with the
+ * `cdq`/`xor`/`sub` idiom rather than a branch.
+ *
+ * It reads THREE bytes from each side, so a palette entry's fourth byte takes
+ * no part -- which is why the caller can pass a plain colour and a palette
+ * slot and have both mean the same thing.
+ *
+ * It lives HERE rather than beside its only caller in win32/palette.cpp
+ * because it is pure, and the flat half is what `make selftest` can link. */
+int32_t __cdecl ColourDistance(const void *a, const void *b);
+
 /* Four that do nothing but return. Reconstructed because they are functions in
  * the original and something calls them; there is nothing else to say. */
 void     __stdcall NullStub4(uint32_t arg);   /* 0x004170E0, `ret 4` */

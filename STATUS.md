@@ -11,6 +11,66 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **`ColourDistance`, `SpriteSlotOf` and `UidObjKind`, and a comment in
+  `orig.h` that was wrong in three ways.** It said the sprite registry is "a
+  count at 0x006598C0 and a table of AM2_Sprite* at 0x006598C4; the lookup
+  walks it for a matching id". Reading `0x00445990` instead: there is a
+  CAPACITY at `0x006598BC` as well, the `AM2_Sprite*` table is indexed by SLOT,
+  and a SEPARATE table of `{id, slot}` PAIRS at `0x006598C8` is what the lookup
+  reads -- by BINARY SEARCH, with an UNSIGNED comparison, returning the slot.
+  Two arrays, not one, and the second exists purely to make the lookup
+  logarithmic.
+
+  `UidObjKind` hands `FindSlot` the address of its own first argument as the
+  insertion-point out-parameter, because FindSlot wants somewhere to write even
+  when it finds the entry. The slot written there is never read and the uid is
+  not used again. Reproduced with a local rather than by clobbering the
+  parameter -- the same thing without the trap.
+
+- **`ColourDistance` moved to the FLAT half so `make selftest` can link it**,
+  which is the first time a function has been placed by where it can be
+  TESTED rather than by what it is about. It is pure -- three byte reads a
+  side, no globals, no calls -- and `misc.cpp` already holds `SwapColourBytes`,
+  so the precedent was there.
+
+- **`tools/vectors.py` could not see a pointer kept in EBP, and that cost a
+  whole function's vectors.** `REG` listed six registers and not `ebp`, because
+  a framed function uses it for the frame -- but one WITHOUT a frame is free to
+  keep a pointer argument there, and `ColourDistance` does. Its second argument
+  classified as `scalar`, every generated call passed an integer where a
+  pointer was wanted, and it produced **0 vectors at 21.4% coverage** rather
+  than failing visibly. With `ebp` added: `p,p`, 71 vectors, **100%**.
+
+  Safe because a slot is only recorded when a register is loaded FROM an
+  argument slot, and `mov ebp, esp` is not that. Checked by diffing every
+  classification in the validation set before and after: one other function
+  changed, `ClipRect`'s second argument from `s` to `p`, which is also right
+  and also a pointer.
+
+- **7,353 recorded vectors were 5,355 distinct, and twelve functions had
+  exactly ONE.** `MIN_VECTORS` exists because "one vector cannot distinguish a
+  reconstruction from a coincidence" -- and it had been counting COPIES.
+  `ObjFieldA`, `ObjFieldB`, `ObjFlagBit0`, `ObjFlagBit1`, `Field53C`,
+  `IsKind7`, `CommMean32`, `MsgField12`, `TitleCaseName`, `ReturnZero`,
+  `ReturnOne` and `ObjFlagClear0` were each recorded 82 or 96 times from a
+  single input.
+
+  The cause is the scratch: it is a deterministic pattern, identical for every
+  vector, so a function whose only variation is behind a POINTER gets the same
+  call every time unless angr supplies the bytes. 96 tries collapse to one.
+
+  **Measured rather than reasoned, and the measurement is the point.** With
+  `ColourDistance` at "71 vectors" and 100% instruction coverage, replacing
+  `d1 * d1` with `d1` PASSED. Replacing the whole body with `return 0` failed
+  on the first vector, so the function is called and the harness works -- it
+  simply had two distinct inputs and neither told those apart.
+
+  Deduping before emit makes the number mean what it says: 5,149 vectors, and
+  the existing "too thin to check against" warning now fires for **19**
+  functions instead of none. Nothing got worse; what was already true became
+  visible. **A count that includes duplicates is a coverage claim about
+  effort, not about inputs.**
+
 - **Four small functions off the FRONTIER, chosen by asking what our own code
   still reaches by address.** Listing every `orig_` macro in `src/game` with
   its target's size is a two-minute question and a better ranking than
@@ -1549,11 +1609,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 742 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 741 | 730 of them below the CRT line |
+| `patch_replace` sites | 745 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 744 | 733 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 135,552 / 372,816 B (**36.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 149,824 / 372,816 B (40.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 135,776 / 372,816 B (**36.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 150,048 / 372,816 B (40.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -1570,7 +1630,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **7,282** vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **5,149** DISTINCT vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
 | `tools/objdump.py --leader` | current | max health 140, current 140 -- identical to `AM2_NOPATCH=1` |

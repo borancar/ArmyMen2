@@ -1047,6 +1047,28 @@ int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot)
  * the count has already come down. */
 #define AM2_PTR_LIST_SLACK 20
 
+/* 0x0041B760. Two colours' distance: the sum of the squares of the three
+ * per-channel differences, each taken as an absolute value with the `cdq`
+ * / `xor` / `sub` idiom rather than a branch.
+ *
+ * It reads THREE BYTES from each argument, so the fourth byte of a palette
+ * entry -- whatever it holds -- takes no part. That is why the caller can
+ * hand it the address of a plain `uint32_t` colour and a palette slot and
+ * have both mean the same thing. */
+int32_t __cdecl ColourDistance(const void *a, const void *b)
+{
+    const uint8_t *p = (const uint8_t *)a;
+    const uint8_t *q = (const uint8_t *)b;
+    int32_t        d0 = (int32_t)p[0] - (int32_t)q[0];
+    int32_t        d1 = (int32_t)p[1] - (int32_t)q[1];
+    int32_t        d2 = (int32_t)p[2] - (int32_t)q[2];
+
+    if (d0 < 0) d0 = -d0;
+    if (d1 < 0) d1 = -d1;
+    if (d2 < 0) d2 = -d2;
+    return d0 * d0 + d1 * d1 + d2 * d2;
+}
+
 void __attribute__((thiscall)) PtrListGrow(void *rec)
 {
     int32_t *r = (int32_t *)rec;
@@ -1127,6 +1149,8 @@ int32_t __cdecl ActionKeyPressed(int32_t action)
 
 int misc_install(void)
 {
+    patch_replace(ADDR_COLOUR_DISTANCE, (const void *)ColourDistance,
+                  "ColourDistance", 2);
     patch_replace(ADDR_PTR_LIST_GROW, (const void *)PtrListGrow,
                   "PtrListGrow", 1);
     patch_replace(ADDR_PTR_LIST_SHRINK, (const void *)PtrListShrink,
