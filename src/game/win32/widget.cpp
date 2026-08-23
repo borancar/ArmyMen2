@@ -2589,11 +2589,7 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
  * The bar is the arrow-ended one -- `ret 0x24`, 36 bytes: rectangle, the list
  * it drives, two bitmaps, a maximum and a zero -- and the two point at each
  * other afterwards, the list at 0x007C and the bar at 0x0058. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ArrowBarCtorFn)(
-    AM2_Widget *w, AM2_Rect box, AM2_Widget *list, const char *b0,
-    const char *b1, int32_t max, int32_t zero);
 
-#define orig_arrowbar_ctor ((AM2_ArrowBarCtorFn)AM2_IMAGE(ADDR_ARROWBAR_CTOR))
 
 AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
                                                          const char *bmp)
@@ -2644,10 +2640,11 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
     if (bar) {
         RectSet(&box, 0x15E, 0x3C, 0x13, 0xBA);
-        bar = orig_arrowbar_ctor(bar, box, panel,
-                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
-                                 0x92, 0);
+        bar = ArrowBarConstruct(bar, box.left, box.top, box.right,
+                                box.bottom, panel,
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                0x92, 0);
     }
     WidgetAddChild(panel, bar);
     *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w
@@ -2762,10 +2759,11 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
     if (bar) {
         RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
-        bar = orig_arrowbar_ctor(bar, box, panel,
-                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
-                                 0x92, 0);
+        bar = ArrowBarConstruct(bar, box.left, box.top, box.right,
+                                box.bottom, panel,
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                0x92, 0);
     }
     WidgetAddChild(panel, bar);
     *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
@@ -3263,6 +3261,83 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00455970, thiscall, `ret 0x24` -- NINE stack arguments. The VERTICAL bar
+ * with arrows: the connection list's and the saved-player list's.
+ *
+ * The same shape as the horizontal scroll bar, transposed. Its arrows are
+ * 0x13 wide by 9 tall where that one's are 9 by 0x13, the second sits at
+ * top + height - 9 rather than left + width - 9, and both are again BUTTONs
+ * with a NULL first bitmap and VTABLE_ARROW stamped over.
+ *
+ * The argument slots were worked out by tracking esp through the function
+ * rather than by counting pushes. With nine arguments and five calls in the
+ * middle -- one of which pops 0x28 -- reading `[esp + 0x58]` off the page
+ * gets a different answer at every point, and three of these slots are read
+ * twice at different depths. A dozen lines of Python beat an hour of care. */
+static AM2_Widget *MakeVArrow(AM2_Widget *bar, AM2_Widget *parent,
+                              int32_t x, int32_t y, uint32_t b1, uint32_t b2,
+                              uint32_t handler, int32_t flag50)
+{
+    AM2_Widget *arrow = (AM2_Widget *)orig_operator_new(AM2_ARROW_SIZE);
+    AM2_Rect    box;
+
+    if (arrow) {
+        RectSet(&box, x, y, 0x13, 9);
+        ButtonConstruct(arrow, (const char *)0, (const char *)AM2_IMAGE(b1),
+                        (const char *)AM2_IMAGE(b2), 1, box,
+                        (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
+                        (void (__cdecl *)(AM2_Widget *))0);
+        arrow->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+        *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER) = bar;
+    }
+    WidgetAddChild(parent, arrow);
+    *(int32_t *)((uint8_t *)arrow + ARROWBAR_OFF_FLAG50) = flag50;
+    *(int32_t *)((uint8_t *)arrow + ARROW_OFF_FLAG5C)    = 1;
+    return arrow;
+}
+
+AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t width,
+                                                        int32_t height,
+                                                        AM2_Widget *parent,
+                                                        const char *b0,
+                                                        const char *b1,
+                                                        int32_t span,
+                                                        int32_t flag50)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    WidgetConstruct(w);
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_ARROWBAR);
+
+    *(AM2_Widget **)(self + ARROWBAR_OFF_UP) =
+        MakeVArrow(w, parent, w->x, w->y, AM2_BMP_UPARROW1, AM2_BMP_UPARROW2,
+                   ADDR_ON_ARROW_UP, flag50);
+    *(AM2_Widget **)(self + ARROWBAR_OFF_DOWN) =
+        MakeVArrow(w, parent, w->x, w->y + height - 9, AM2_BMP_DNARROW1,
+                   AM2_BMP_DNARROW2, ADDR_ON_ARROW_DOWN, flag50);
+    *(int32_t *)(self + ARROWBAR_OFF_FLAG50) = flag50;
+
+    *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0) =
+        orig_preload_by_name(b0, 1, 1);
+    *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE1) =
+        orig_preload_by_name(b1, 1, 1);
+    WidgetScreenRect(w);
+
+    *(int32_t *)(self + ARROWBAR_OFF_SPAN) = span;
+    *(int32_t *)(self + 0x58) = 0;
+    w->unknown48              = 0;
+    *(int32_t *)(self + 0x70) = 0;
+    *(int32_t *)(self + 0x6C) = 0;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3368,6 +3443,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ARROWBAR_CTOR, (const void *)ArrowBarConstruct,
+                        "ArrowBarConstruct", 9);
     rc |= patch_replace(ADDR_SCROLLBAR_CTOR,
                         (const void *)ScrollBarConstruct, "ScrollBarConstruct",
                         6);

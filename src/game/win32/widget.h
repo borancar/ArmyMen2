@@ -1188,6 +1188,21 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
                                                          AM2_Widget *parent,
                                                          int32_t span);
 
+/* Original: 0x00455970, thiscall, `ret 0x24` -- nine stack arguments. The
+ * VERTICAL bar with arrows: the connection list's and the player list's. The
+ * horizontal scroll bar transposed, with the same two-arrows-from-buttons
+ * trick. */
+AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t width,
+                                                        int32_t height,
+                                                        AM2_Widget *parent,
+                                                        const char *b0,
+                                                        const char *b1,
+                                                        int32_t span,
+                                                        int32_t flag50);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

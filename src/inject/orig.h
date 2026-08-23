@@ -1747,6 +1747,23 @@
 #define AM2_ARROW_SIZE           0x7Cu
 #define AM2_SCROLLBAR_RANGE      0x14u /* twenty steps, and what the AUDIO
                                         * dialog divides its position by */
+
+/* The VERTICAL bar with arrows, 0x00455970 -- the connection list's and the
+ * player list's. Nine stack arguments: rectangle, parent, two bitmaps, a span
+ * and a flag the arrows get too. */
+#define VTABLE_ARROWBAR          0x0046FCE8u
+#define ADDR_ON_ARROW_UP         0x004557F0u
+#define ADDR_ON_ARROW_DOWN       0x004558B0u
+#define AM2_BMP_UPARROW1         0x0048BCE0u
+#define AM2_BMP_UPARROW2         0x0048BCF8u
+#define AM2_BMP_DNARROW1         0x0048BCB0u
+#define AM2_BMP_DNARROW2         0x0048BCC8u
+#define ARROWBAR_OFF_UP          0x5Cu
+#define ARROWBAR_OFF_DOWN        0x60u
+#define ARROWBAR_OFF_FLAG50      0x50u /* the arrows get the same value */
+#define ARROWBAR_OFF_SPRITE0     0x64u
+#define ARROWBAR_OFF_SPRITE1     0x68u
+#define ARROWBAR_OFF_SPAN        0x74u
 /* Every checkbox's LEFT-click handler, written by the constructor and not by
  * the caller: the toggle. The caller's handler goes to 0x007C instead, which
  * is why clicking a plain box just ticks it and only a GROUP HEADER does

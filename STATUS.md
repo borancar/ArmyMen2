@@ -210,6 +210,33 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The ARROW BAR is reconstructed** (`0x00455970`, 480 B) -- the vertical bar
+  the connection list and the player list carry. It is the horizontal scroll
+  bar transposed: arrows 0x13 by 9 where that one's are 9 by 0x13, the second
+  at top + height - 9 rather than left + width - 9, and the same
+  two-arrows-built-from-buttons trick.
+
+  **Its nine argument slots were worked out by tracking `esp` in a script, not
+  by counting pushes.** With nine arguments and five calls in the middle --
+  one of which pops 0x28 -- the same `[esp + 0x58]` means a different argument
+  at every point, and three slots here are read twice at different depths. A
+  dozen lines of Python settled in a minute what an hour of care would have
+  got wrong somewhere. Worth reaching for whenever an argument list is long
+  enough that the offsets stop being obvious.
+
+- **And the byte figure did not move, which is worth knowing about the
+  figure.** `docs/functions.tsv` lists `0x00455970` as one 512-byte entry, and
+  `ArrowDelete` at `0x00455B50` sits inside it -- so patching that deleting
+  destructor months ago had already credited the whole span, arrow-bar
+  constructor included. Writing 480 bytes of real code moved the total by
+  zero.
+
+  That is the merged-entry over-count CLAUDE.md records against
+  `coverage.py`, still live in `reconstructed.py`: containment within a real
+  function is deliberate, but this entry is several functions and the rule
+  cannot tell. **The percentage is an upper bound, and by an unmeasured
+  amount.** It has been quoted all session as though it were exact.
+
 - **The SCROLL BAR constructor is reconstructed** (`0x00455FF0`, 453 B) and it
   confirms by running what `widget.h` had worked out by reading: **the arrows
   have no constructor.** Each one is a BUTTON with `VTABLE_ARROW` stamped over
@@ -772,8 +799,8 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 683 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 682 | 672 of them below the CRT line |
+| `patch_replace` sites | 684 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 683 | 673 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 123,696 / 372,816 B (**33.2%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
