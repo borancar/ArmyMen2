@@ -1829,6 +1829,106 @@ void __cdecl OpenLoadGame(void)
     }
 }
 
+/* 0x0044FAB0, thiscall. The OPTIONS menu: a backdrop and four buttons.
+ *
+ * The original unrolls the four blocks; they are written here as a table
+ * because they differ in exactly three things -- the row, the three bitmaps
+ * and the handler -- and four copies of eleven lines would hide that. Nothing
+ * about the emitted work changes.
+ *
+ * The rectangle is passed to the button constructor BY VALUE, in the middle of
+ * the argument list, and the original builds it in place: it pushes the four
+ * numbers as the placeholders, hands RectSet a pointer to them, and then
+ * overwrites the same four slots with what RectSet returns. `ret 0x28` is 40
+ * bytes -- three bitmaps, a flag, sixteen bytes of rectangle, a handler and a
+ * trailing zero -- which is what confirms the reading rather than the shape of
+ * the pushes.
+ *
+ * The four numbers are not a screen rectangle in the (left, top, right,
+ * bottom) sense the type says -- `right` would be 0x98 against a `left` of
+ * 0xE7. They are (left, top, WIDTH, HEIGHT), and the button constructor is
+ * what turns them into edges: `ctl widgets` puts the four buttons at
+ * 231,160,383,185 and three rows below it, which is 0xE7 and 0xE7 + 0x98,
+ * 0xA0 and 0xA0 + 0x19. Measured, not assumed -- RectSet stores what it is
+ * given and cannot tell the difference.
+ *
+ * It returns `this`, which its factory stores. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScreenBaseCtorFn)(
+    AM2_Widget *w, const char *bmp, int32_t flag);
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ButtonCtorFn)(
+    AM2_Widget *w, const char *b0, const char *b1, const char *b2,
+    int32_t flag, AM2_Rect box, void (__cdecl *handler)(AM2_Widget *),
+    int32_t last);
+
+#define orig_screen_base_ctor \
+    ((AM2_ScreenBaseCtorFn)AM2_IMAGE(ADDR_SCREEN_BASE_CTOR))
+#define orig_button_ctor ((AM2_ButtonCtorFn)AM2_IMAGE(ADDR_BUTTON_CTOR))
+
+typedef struct {
+    int32_t     top;
+    uint32_t    handler;
+    uint32_t    bmp[3];
+} AM2_MenuButton;
+
+/* Rows 0xA0, 0xC8, 0xF0, 0x118 -- 40 apart. */
+static const AM2_MenuButton kOptionsButtons[] = {
+    { 0x00A0, ADDR_ON_AUDIO_BUTTON,
+      { 0x0048B8B0, 0x0048B8C4, 0x0048B8D8 } },  /* 03_120_0N_audio */
+    { 0x00C8, ADDR_ON_CONTROLS_BUTTON,
+      { 0x0048B868, 0x0048B880, 0x0048B898 } },  /* 03_121_0N_controls */
+    { 0x00F0, ADDR_ON_DIFFICULTY_BUTTON,
+      { 0x0048B814, 0x0048B830, 0x0048B84C } },  /* 03_126_0N_difficulty */
+    { 0x0118, ADDR_ON_MENU_BACK,
+      { 0x0048B7D8, 0x0048B7EC, 0x0048B800 } },  /* 03_111_0N_back */
+};
+
+#define AM2_OPTIONS_BUTTON_LEFT   0xE7
+#define AM2_OPTIONS_BUTTON_WIDTH  0x98
+#define AM2_OPTIONS_BUTTON_HEIGHT 0x19
+#define AM2_BUTTON_SIZE           0x78
+
+AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
+                                                           const char *bmp)
+{
+    uint32_t i;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_OPTIONS_MENU);
+    w->flag44 = 1;
+
+    for (i = 0; i < sizeof kOptionsButtons / sizeof kOptionsButtons[0]; i++) {
+        const AM2_MenuButton *b = &kOptionsButtons[i];
+        AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+        AM2_Rect    box;
+
+        if (btn) {
+            RectSet(&box, AM2_OPTIONS_BUTTON_LEFT, b->top,
+                    AM2_OPTIONS_BUTTON_WIDTH, AM2_OPTIONS_BUTTON_HEIGHT);
+            btn = orig_button_ctor(btn,
+                                   (const char *)AM2_IMAGE(b->bmp[0]),
+                                   (const char *)AM2_IMAGE(b->bmp[1]),
+                                   (const char *)AM2_IMAGE(b->bmp[2]),
+                                   0, box,
+                                   (void (__cdecl *)(AM2_Widget *))
+                                   AM2_IMAGE(b->handler), 0);
+        }
+        WidgetAddChild(w, btn);
+
+        /* The FIRST button becomes the focused child, and only the first.
+         * That one instruction is the whole difference between AUDIO coming
+         * up highlighted and coming up plain -- 294 pixels, which no budget
+         * that survives a cursor could catch, and `ctl widgets` reported it
+         * as foc=2 against foc=-1. The generated loop dropped it because it
+         * is the one line of the four blocks that is not repeated. */
+        if (i == 0)
+            w->focusedChild = btn;
+    }
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)AM2_IMAGE(ADDR_ON_MENU_BACK);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1934,6 +2034,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_OPTIONS_MENU_CTOR,
+                        (const void *)OptionsMenuConstruct,
+                        "OptionsMenuConstruct", 1);
     rc |= patch_replace(ADDR_OPEN_COMM_PANEL, (const void *)OpenCommPanel,
                         "OpenCommPanel", 0);
     rc |= patch_replace(ADDR_OPEN_AUDIO_OPTIONS,

@@ -991,6 +991,13 @@ void __cdecl OpenDeleteGame(void);
  * where its two siblings put it before the allocation; see widget.cpp. */
 void __cdecl OpenLoadGame(void);
 
+/* Original: 0x0044FAB0, thiscall. The OPTIONS menu's constructor: a backdrop
+ * and four buttons, AUDIO / CONTROLS / DIFFICULTY / BACK. See widget.cpp for
+ * why the rectangle is passed by value in the middle of the argument list and
+ * how `ret 0x28` confirms the reading. Returns `this`. */
+AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
+                                                           const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

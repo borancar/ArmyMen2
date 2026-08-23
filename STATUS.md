@@ -192,6 +192,46 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
+- **The first SCREEN CONSTRUCTOR is reconstructed**, `OptionsMenuConstruct`
+  (`0x0044FAB0`): a backdrop and four buttons, AUDIO / CONTROLS / DIFFICULTY /
+  BACK. The factories were the easy half of this layer; the constructors are
+  where the widgets actually come from, and they run 580 to 1,400 bytes each.
+
+  **The rectangle goes to the button constructor BY VALUE, in the middle of
+  the argument list**, and the original builds it in place: it pushes the four
+  numbers as placeholders, hands RectSet a pointer to them, and overwrites the
+  same four slots with what RectSet returns. What settles the reading is not
+  the shape of the pushes but `ret 0x28` -- 40 bytes, being three bitmaps, a
+  flag, sixteen bytes of rectangle, a handler and a trailing zero.
+
+  And the four numbers are (left, top, WIDTH, HEIGHT), not the four edges the
+  type says. `ctl widgets` puts the buttons at 231,160,383,185 and three rows
+  below, which is 0xE7 and 0xE7 + 0x98, 0xA0 and 0xA0 + 0x19 -- so the button
+  constructor is what turns them into edges. Measured: RectSet stores what it
+  is given and cannot tell the difference.
+
+  Written as a table where the original unrolls four copies, because they
+  differ in exactly three things and four copies of eleven lines would hide
+  that -- **and that is exactly how the one real defect got in.** The FIRST
+  button is stored as the dialog's `focusedChild` and only the first, one
+  instruction sitting inside block one; a loop over what the four blocks have
+  in common drops precisely the line they do not share.
+
+  What NAMED it is `ctl widgets`: `foc=2` on the original against `foc=-1` on
+  ours, in the first line of the tree. The pixels said something was wrong --
+  294 on the menu itself, AUDIO coming up plain instead of highlighted, over
+  the budget of 200 but not by much -- and 305,895 on the dialog frame,
+  because with no focused child the click had nowhere to land and CONTROLS
+  never opened at all. Neither number says WHICH field; the tree does.
+
+  Compressing repetition is right. Check what the repetition is hiding first.
+
+- **The arm index IS the menu request, confirmed three times by the buttons
+  themselves.** The OPTIONS menu's handlers raise 15, 16 and 19 for CONTROLS,
+  DIFFICULTY and AUDIO -- which are those screens' arm numbers in
+  `docs/screens.md`. The table confirms its own indexing, and the poke that
+  reached the host panel with request 7 was not a lucky guess.
+
 - **Two ratchets fired on the commit that landed the last four, and both were
   right.** `checkseams.py`: `RefreshScreen` is already reconstructed, so
   reaching it through an `orig_` macro was a lie about where control goes --
@@ -374,10 +414,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 663 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 662 | 652 of them below the CRT line |
+| `patch_replace` sites | 664 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 663 | 653 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 112,368 / 372,816 B (**30.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 112,976 / 372,816 B (**30.3%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

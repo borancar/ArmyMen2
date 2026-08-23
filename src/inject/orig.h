@@ -1538,6 +1538,23 @@
 #define AM2_DELETE_GAME_SIZE     0x64u
 #define ADDR_STR_DELGAME_BMP     0x0048B918u  /* "02_011_00_delgame.bmp" */
 #define ADDR_OPEN_LOAD_GAME      0x00452680u  /* void(void) */
+/* The pieces a screen constructor is built from. */
+#define ADDR_SCREEN_BASE_CTOR    0x00454B00u /* thiscall w *(w, bmp, int32) */
+#define ADDR_BUTTON_CTOR         0x004540F0u /* thiscall w *(w, b0,b1,b2, f,
+                                              * AM2_Rect by value, handler,
+                                              * int32) -- ret 0x28 */
+#define VTABLE_OPTIONS_MENU      0x0046FB30u
+/* The OPTIONS menu's four button handlers. Each of the first three raises a
+ * menu request, and the number it raises is the ARM INDEX of the screen it
+ * opens -- 15 CONTROLS, 16 DIFFICULTY, 19 AUDIO. That is the table in
+ * docs/screens.md confirming its own indexing three times over. */
+#define ADDR_ON_CONTROLS_BUTTON   0x0044FD40u /* menu request 15 */
+#define ADDR_ON_DIFFICULTY_BUTTON 0x0044FD70u /* menu request 16 */
+#define ADDR_ON_AUDIO_BUTTON      0x0044FDA0u /* menu request 19 */
+/* The shared BACK handler: it computes its request rather than writing a
+ * constant, and a dialog also stores it at 0x0060 as its escape action. */
+#define ADDR_ON_MENU_BACK         0x0044E670u
+#define DLG_OFF_ESCAPE            0x60u
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */
