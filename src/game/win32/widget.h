@@ -479,6 +479,12 @@ void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w);
 #define MULTISPR_OFF_INDEX    0x6C   /* int32_t, which one */
 #define MULTISPR_OFF_Y_BIAS   0x70   /* int32_t, added to the centred y */
 #define MULTISPR_OFF_Y_INSET  0x74   /* int32_t, taken off the height first */
+/* And a slot in FRONT of the array, which the constructor fills with the
+ * first bitmap's sprite while putting the SECOND one in sprites[0]. The
+ * painter never reads it -- it indexes from MULTISPR_OFF_SPRITES -- so with
+ * an index of 0 the widget shows the second bitmap and with 1 it shows
+ * nothing, because sprites[1] is left null. That is the blink. */
+#define MULTISPR_OFF_SPRITE0  0x60   /* AM2_Sprite *, the first bitmap */
 
 /* Original: 0x00455C80, thiscall. Place, choose the sprite, centre it in the
  * widget, intersect that against the caller's clip, clip the sprite to what is
@@ -1121,6 +1127,15 @@ AM2_Widget *__attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf,
                                                     int32_t ink, int32_t paper,
                                                     void (__cdecl *onEnter)(AM2_Widget *),
                                                     int32_t a, int32_t b);
+
+/* Original: 0x00456BC0, thiscall, `ret 0x1C`. The two-sprite widget -- the
+ * flashing "send" and "receive" dots. A PANEL underneath, then the SECOND
+ * bitmap into sprites[0] and the first parked at MULTISPR_OFF_SPRITE0. */
+AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
+                                                           const char *b0,
+                                                           const char *b1,
+                                                           int32_t flag,
+                                                           AM2_Rect box);
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 

@@ -1946,12 +1946,8 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
     AM2_Widget *w, const char *bmp, int32_t flag, AM2_Rect box);
 typedef AM2_Widget *(__attribute__((thiscall)) *AM2_TyperCtorFn)(
     AM2_Widget *w, AM2_Rect box, const char *message);
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_MultiSpriteCtorFn)(
-    AM2_Widget *w, const char *b0, const char *b1, int32_t flag, AM2_Rect box);
 
 #define orig_typer_ctor  ((AM2_TyperCtorFn)AM2_IMAGE(ADDR_TYPER_CTOR))
-#define orig_multisprite_ctor \
-    ((AM2_MultiSpriteCtorFn)AM2_IMAGE(ADDR_MULTISPRITE_CTOR))
 
 /* The four bitmaps every one of the three uses, and the one string. */
 #define AM2_BMP_OK0    0x00487044u
@@ -2023,7 +2019,7 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, 0x23, 0x95, 0x11, 0x10);
-        dot = orig_multisprite_ctor(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
+        dot = MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
                                     (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
                                     box);
     }
@@ -2128,7 +2124,7 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, 0x23, 0x95, 0x11, 0x10);
-        dot = orig_multisprite_ctor(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
+        dot = MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
                                     (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
                                     box);
     }
@@ -2534,7 +2530,7 @@ static AM2_Widget *MakeNameField(AM2_Widget *panel, char *buf, int32_t top,
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, 0xB3, dotTop, 0x11, 0x10);
-        dot = orig_multisprite_ctor(dot,
+        dot = MultiSpriteConstruct(dot,
                                     (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
                                     (const char *)AM2_IMAGE(AM2_BMP_GREEN1),
                                     1, box);
@@ -3013,6 +3009,52 @@ AM2_Widget *__attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf,
     return w;
 }
 
+/* 0x00456BC0, thiscall, `ret 0x1C`. The two-sprite widget -- the flashing
+ * "send" and "receive" dots beside a comms field, and the red dot on every
+ * confirm dialog.
+ *
+ * A PANEL underneath, built from the FIRST bitmap, and then the SECOND
+ * bitmap's sprite into sprites[0] with sprites[1] left null and the index
+ * zeroed. The first bitmap's sprite is parked at 0x0060, which the painter
+ * never reads: it indexes from MULTISPR_OFF_SPRITES. So an index of 0 shows
+ * the second bitmap and an index of 1 shows nothing at all -- that null IS
+ * the off half of the blink, not an unfilled slot.
+ *
+ * This looked at first like a contradiction with widget.h's note, which puts
+ * the array at 0x0064 while the constructor writes 0x0060 and 0x0064. The
+ * PAINTER settles it, and the painter is A/B-verified: it reads
+ * `0x0064 + index * 4`. The note was right and the constructor simply has one
+ * slot in front of the array. Reading the consumer beats reasoning from the
+ * producer.
+ *
+ * The rectangle is written twice -- once by the panel and again here -- and
+ * WidgetScreenRect runs after both. Reproduced. */
+AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
+                                                           const char *b0,
+                                                           const char *b1,
+                                                           int32_t flag,
+                                                           AM2_Rect box)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    PanelConstruct(w, b0, flag, box);
+
+    *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES + 4) = (AM2_Sprite *)0;
+    *(int32_t *)(self + MULTISPR_OFF_INDEX) = 0;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_MULTISPRITE);
+    *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITE0) = w->sprite;
+    *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES) =
+        orig_preload_by_name(b1, flag, 1);
+
+    w->x = box.left;
+    w->y = box.top;
+    w->w = box.right;
+    w->h = box.bottom;
+    *(int32_t *)(self + 0x50) = 0;
+    WidgetScreenRect(w);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3118,6 +3160,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_MULTISPRITE_CTOR,
+                        (const void *)MultiSpriteConstruct,
+                        "MultiSpriteConstruct", 7);
     rc |= patch_replace(ADDR_EDIT_CTOR, (const void *)EditConstruct,
                         "EditConstruct", 13);
     rc |= patch_replace(ADDR_SCREEN_BASE_CTOR,
