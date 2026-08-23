@@ -32,6 +32,10 @@
  * handlers also ignore is harmless. The cast is here rather than in their
  * declarations so the signature stays the one the disassembly shows. */
 #define AM2_BUTTON_HANDLER(fn) ((void (__cdecl *)(AM2_Widget *))(fn))
+/* A handler that is still the ORIGINAL's, as a pointer. The address form is
+ * the general case -- the reconstruction owns a few dozen of these and the
+ * image owns the rest -- so the two spellings sit side by side on purpose. */
+#define kImageHandler(a)       AM2_BUTTON_HANDLER(AM2_IMAGE(a))
 #define kOnBootCamp     AM2_BUTTON_HANDLER(OnBootCamp)
 #define kOnSinglePlayer AM2_BUTTON_HANDLER(OnSinglePlayer)
 #define kOnMultiPlayer  AM2_BUTTON_HANDLER(OnMultiPlayer)
@@ -41,7 +45,24 @@
 #define kOnQuit         AM2_BUTTON_HANDLER(OnQuit)
 /* These already take the widget, so the cast only spells out the type the
  * table field wants. */
-#define kOnMenuBack     OnMenuBack
+#define kOnMenuBack       OnMenuBack
+#define kOnAudioOk        OnAudioOk
+#define kOnAudioCancel    OnAudioCancel
+#define kOnControlsCancel OnControlsCancel
+#define kOnControlsOk      OnControlsOk
+#define kOnControlsDefault OnControlsDefault
+#define kOnAudioButton      OnAudioButton
+#define kOnControlsButton   OnControlsButton
+#define kOnDifficultyButton OnDifficultyButton
+#define kOnQuitOk           OnQuitOk
+#define kOptionsSyncGroup   OptionsSyncGroup
+#define kOptionsApply       OptionsApply
+#define kOptionsDefaults    OptionsDefaults
+/* These two take no widget, like the title screen's seven. */
+#define kOptionsRequest     AM2_BUTTON_HANDLER(OptionsRequest)
+#define kHostBattle         AM2_BUTTON_HANDLER(HostBattle)
+#define kStartSelectedGame  AM2_BUTTON_HANDLER(StartSelectedGame)
+#define kOnDifficultyOk   OnDifficultyOk
 
 /* The layout claims above are compiler-checked rather than commented. */
 static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
@@ -1447,6 +1468,10 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
 #define g_gameSetting22C  (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
 #define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
 #define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define g_menuMode        (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
+#define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+typedef void (__cdecl *am2_void_fn)(void);
+#define orig_save_options (*(am2_void_fn)ADDR_SAVE_OPTIONS)
 /* The game's own rand, and it has to be: the LCG state at 0x0048CC1C is the
  * image's, so drawing from ours would leave it untouched. */
 typedef int32_t (__cdecl *am2_rand_fn)(void);
@@ -1884,19 +1909,19 @@ void __cdecl OpenLoadGame(void)
 
 typedef struct {
     int32_t     top;
-    uint32_t    handler;
+    void      (__cdecl *handler)(AM2_Widget *);
     uint32_t    bmp[3];
 } AM2_MenuButton;
 
 /* Rows 0xA0, 0xC8, 0xF0, 0x118 -- 40 apart. */
 static const AM2_MenuButton kOptionsButtons[] = {
-    { 0x00A0, ADDR_ON_AUDIO_BUTTON,
+    { 0x00A0, kOnAudioButton,
       { 0x0048B8B0, 0x0048B8C4, 0x0048B8D8 } },  /* 03_120_0N_audio */
-    { 0x00C8, ADDR_ON_CONTROLS_BUTTON,
+    { 0x00C8, kOnControlsButton,
       { 0x0048B868, 0x0048B880, 0x0048B898 } },  /* 03_121_0N_controls */
-    { 0x00F0, ADDR_ON_DIFFICULTY_BUTTON,
+    { 0x00F0, kOnDifficultyButton,
       { 0x0048B814, 0x0048B830, 0x0048B84C } },  /* 03_126_0N_difficulty */
-    { 0x0118, ADDR_ON_MENU_BACK,
+    { 0x0118, kOnMenuBack,
       { 0x0048B7D8, 0x0048B7EC, 0x0048B800 } },  /* 03_111_0N_back */
 };
 
@@ -2011,8 +2036,9 @@ static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
 
 static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
                                       uint32_t vtable, uint32_t panelBmp,
-                                      uint32_t okHandler, uint32_t message,
-                                      uint32_t cancelHandler)
+                                      void (__cdecl *okHandler)(AM2_Widget *),
+                                      uint32_t message,
+                                      void (__cdecl *cancelHandler)(AM2_Widget *))
 {
     AM2_Widget *panel;
     AM2_Widget *text;
@@ -2033,15 +2059,15 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     panel->flag44 = 1;
 
     {
-        AM2_Widget *ok = MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
-                                    AM2_BMP_OK2, okHandler);
+        AM2_Widget *ok = MakeButtonFn(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+                                      AM2_BMP_OK2, okHandler);
 
         WidgetAddChild(panel, ok);
         panel->focusedChild = ok;
     }
 
-    WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
-                                     AM2_BMP_CAN2, cancelHandler));
+    WidgetAddChild(panel, MakeButtonFn(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                       AM2_BMP_CAN2, cancelHandler));
 
     text = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
     if (text) {
@@ -2062,8 +2088,7 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     WidgetAddChild(panel, dot);
 
     *(AM2_Widget **)((uint8_t *)text + TYPER_OFF_BLINKER) = dot;
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)AM2_IMAGE(cancelHandler);
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)cancelHandler;
     return w;
 }
 
@@ -2071,23 +2096,23 @@ AM2_Widget *__attribute__((thiscall)) QuitDialogConstruct(AM2_Widget *w,
                                                           const char *bmp)
 {
     return ConfirmDialogBuild(w, bmp, VTABLE_QUIT_DIALOG, 0x0048B76C,
-                              ADDR_ON_QUIT_OK, 0x0048B74C, ADDR_ON_MENU_BACK);
+                              kOnQuitOk, 0x0048B74C, kOnMenuBack);
 }
 
 AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
                                                             const char *bmp)
 {
     return ConfirmDialogBuild(w, bmp, VTABLE_REPLAY_DIALOG, 0x0048B7B0,
-                              ADDR_ON_REPLAY_OK, 0x0048B780,
-                              ADDR_ON_MENU_BACK);
+                              kImageHandler(ADDR_ON_REPLAY_OK), 0x0048B780,
+                              kOnMenuBack);
 }
 
 AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
                                                                const char *bmp)
 {
     return ConfirmDialogBuild(w, bmp, VTABLE_DELPLAYER_DIALOG, 0x0048B9C4,
-                              ADDR_ON_DELPLAYER_OK, 0x0048B984,
-                              ADDR_ON_DELPLAYER_CANCEL);
+                              kImageHandler(ADDR_ON_DELPLAYER_OK), 0x0048B984,
+                              kImageHandler(ADDR_ON_DELPLAYER_CANCEL));
 }
 
 /* 0x0044E730, thiscall. The DIFFICULTY dialog -- the same panel-holds-
@@ -2107,7 +2132,7 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
  * again twice before the constructor ends -- and the blinking dot is stored
  * on the LIST at 0x0094, not on the panel that owns it. */
 
-#define g_difficulty      (*(const int32_t *)(uintptr_t)ADDR_DIFFICULTY)
+#define g_difficulty      (*(int32_t *)(uintptr_t)ADDR_DIFFICULTY)
 
 AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     AM2_Widget *w, const char *bmp)
@@ -2166,8 +2191,8 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST)
                      + LIST_OFF_BLINKER) = dot;
 
-    WidgetAddChild(panel, MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
-                                     AM2_BMP_OK2, ADDR_ON_DIFFICULTY_OK));
+    WidgetAddChild(panel, MakeButtonFn(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+                                       AM2_BMP_OK2, kOnDifficultyOk));
     WidgetAddChild(panel, MakeButtonFn(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                        AM2_BMP_CAN2, kOnOptionsMenu));
 
@@ -2244,19 +2269,18 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
      * buttons one palette step off and cost 547 pixels on a frame whose
      * widget tree was identical, which is the failure `ctl widgets` cannot
      * see and the pixels can. */
-    ok = MakeButton(0x218, 0xAD, AM2_BMP_OK0, AM2_BMP_OK1, AM2_BMP_OK2,
-                    ADDR_ON_CONTROLS_OK);
+    ok = MakeButtonFn(0x218, 0xAD, AM2_BMP_OK0, AM2_BMP_OK1, AM2_BMP_OK2,
+                      kOnControlsOk);
     WidgetAddChild(w, ok);
     ((AM2_WidgetFocusFn *)ok->vtable)[WIDGET_VSLOT_FOCUS](ok, 0);
 
-    WidgetAddChild(w, MakeButton(0x218, 0xDF, AM2_BMP_DEFAULT0,
-                                 AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
-                                 ADDR_ON_CONTROLS_DEFAULT));
-    WidgetAddChild(w, MakeButton(0x218, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
-                                 AM2_BMP_CAN2, ADDR_ON_CONTROLS_CANCEL));
+    WidgetAddChild(w, MakeButtonFn(0x218, 0xDF, AM2_BMP_DEFAULT0,
+                                   AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
+                                   kOnControlsDefault));
+    WidgetAddChild(w, MakeButtonFn(0x218, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                   AM2_BMP_CAN2, kOnControlsCancel));
 
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)AM2_IMAGE(ADDR_ON_CONTROLS_CANCEL);
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnControlsCancel;
     return w;
 }
 
@@ -2313,7 +2337,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
                                    record,
                                    *(const char *const *)(rec + 0x20),
                                    (void (__cdecl *)(AM2_Widget *))
-                                   AM2_IMAGE(ADDR_OPTIONS_SYNC_GROUP));
+                                   kOptionsSyncGroup);
         }
         boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)] = cb;
         cb->flag3C = 0;
@@ -2345,22 +2369,22 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
         }
 
         {
-            AM2_Widget *ok = MakeButton(0x219, 0xAE, AM2_BMP_OK0, AM2_BMP_OK1,
-                                        AM2_BMP_OK2, ADDR_OPTIONS_APPLY);
+            AM2_Widget *ok = MakeButtonFn(0x219, 0xAE, AM2_BMP_OK0, AM2_BMP_OK1,
+                                        AM2_BMP_OK2, kOptionsApply);
 
             WidgetAddChild(w, ok);
             w->focusedChild = ok;
             ok->flag44 = 1;
         }
-        WidgetAddChild(w, MakeButton(0x219, 0xE0, AM2_BMP_DEFAULT0,
+        WidgetAddChild(w, MakeButtonFn(0x219, 0xE0, AM2_BMP_DEFAULT0,
                                      AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
-                                     ADDR_OPTIONS_DEFAULTS));
-        WidgetAddChild(w, MakeButton(0x219, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
-                                     AM2_BMP_CAN2, ADDR_OPTIONS_REQUEST));
+                                     kOptionsDefaults));
+        WidgetAddChild(w, MakeButtonFn(0x219, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, kOptionsRequest));
     } else {
-        AM2_Widget *cancel = MakeButton(0x219, 0xAE, AM2_BMP_CAN0,
+        AM2_Widget *cancel = MakeButtonFn(0x219, 0xAE, AM2_BMP_CAN0,
                                         AM2_BMP_CAN1, AM2_BMP_CAN2,
-                                        ADDR_OPTIONS_REQUEST);
+                                        kOptionsRequest);
 
         WidgetAddChild(w, cancel);
         w->focusedChild = cancel;
@@ -2486,21 +2510,21 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
     saved[1] = g_streamVolume;
     saved[2] = g_voiceVolume;
 
-    WidgetAddChild(parent, MakeButton(offX + 0x110, offY + 0x5E, AM2_BMP_OK0,
-                                      AM2_BMP_OK1, AM2_BMP_OK2,
-                                      ADDR_ON_AUDIO_OK));
-    WidgetAddChild(parent, MakeButton(offX + 0x110, offY + 0x8B, AM2_BMP_CAN0,
-                                      AM2_BMP_CAN1, AM2_BMP_CAN2,
-                                      ADDR_ON_AUDIO_CANCEL));
+    WidgetAddChild(parent, MakeButtonFn(offX + 0x110, offY + 0x5E, AM2_BMP_OK0,
+                                        AM2_BMP_OK1, AM2_BMP_OK2,
+                                        kOnAudioOk));
+    WidgetAddChild(parent, MakeButtonFn(offX + 0x110, offY + 0x8B, AM2_BMP_CAN0,
+                                        AM2_BMP_CAN1, AM2_BMP_CAN2,
+                                        kOnAudioCancel));
 
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)AM2_IMAGE(ADDR_ON_AUDIO_CANCEL);
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnAudioCancel;
     return w;
 }
 
 /* This dialog's buttons are 0x4E wide where every other screen's are 0x51. */
 static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
-                                  uint32_t b1, uint32_t b2, uint32_t handler)
+                                  uint32_t b1, uint32_t b2,
+                                  void (__cdecl *handler)(AM2_Widget *))
 {
     AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
     AM2_Rect    box;
@@ -2510,9 +2534,7 @@ static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
     RectSet(&box, left, top, 0x4E, 0x20);
     return ButtonConstruct(btn, (const char *)AM2_IMAGE(b0),
                             (const char *)AM2_IMAGE(b1),
-                            (const char *)AM2_IMAGE(b2), 1, box,
-                            (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
-                            0);
+                            (const char *)AM2_IMAGE(b2), 1, box, handler, 0);
 }
 
 /* 0x0042FB00, thiscall. ENTER BATTLE NAME -- two edit boxes, a green dot
@@ -2526,7 +2548,7 @@ static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
  *
  * `ret 0x34` on the edit constructor is 52 bytes: the buffer, a maximum of
  * 0x18 characters, sixteen of rectangle, a flag, three colours, the handler
- * and two zeroes. The handler is ADDR_HOST_BATTLE -- the same function the OK
+ * and two zeroes. The handler is kHostBattle -- the same function the OK
  * button gets -- so RETURN in either field starts the battle.
  *
  * The dot is stored ON THE EDIT BOX at 0x0070 and added to the PANEL, and
@@ -2552,7 +2574,7 @@ static AM2_Widget *MakeNameField(AM2_Widget *panel, char *buf, int32_t top,
                              g_hiliteColour, g_colourBelowBg,
                              g_backgroundColour,
                              (void (__cdecl *)(AM2_Widget *))
-                             AM2_IMAGE(ADDR_HOST_BATTLE), 0, 0);
+                             kHostBattle, 0, 0);
     }
     WidgetAddChild(panel, edit);
     /* Only the FIRST field gets the focus slot -- the original calls it once,
@@ -2608,10 +2630,10 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
 
     WidgetAddChild(panel, MakeWideButton(0x14A, 0x44, AM2_BMP_OK0,
                                          AM2_BMP_OK1, AM2_BMP_OK2,
-                                         ADDR_HOST_BATTLE));
+                                         kHostBattle));
     WidgetAddChild(panel, MakeWideButton(0x14A, 0x6D, AM2_BMP_CAN0,
                                          AM2_BMP_CAN1, AM2_BMP_CAN2,
-                                         ADDR_ON_MENU_BACK));
+                                         kOnMenuBack));
     return w;
 }
 
@@ -2695,11 +2717,11 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) =
         *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
 
-    WidgetAddChild(panel, MakeButton(0x19C, 0x6B, AM2_BMP_SELECT0,
+    WidgetAddChild(panel, MakeButtonFn(0x19C, 0x6B, AM2_BMP_SELECT0,
                                      AM2_BMP_SELECT1, AM2_BMP_SELECT2,
-                                     ADDR_START_SELECTED_GAME));
-    WidgetAddChild(panel, MakeButton(0x19C, 0x94, AM2_BMP_CAN0, AM2_BMP_CAN1,
-                                     AM2_BMP_CAN2, ADDR_ON_MENU_BACK));
+                                     kStartSelectedGame));
+    WidgetAddChild(panel, MakeButtonFn(0x19C, 0x94, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, kOnMenuBack));
     return w;
 }
 
@@ -3625,7 +3647,7 @@ void __cdecl OnQuitOk(AM2_Widget *w)
  * DSBVOLUME_MIN -- silence is a special case, not the end of a ramp. The
  * original writes the -2000 out as a literal and compares against it, which
  * is why the test is on the computed value rather than on `pos == 0`. */
-static int32_t VolumeFromBar(const AM2_Widget *bar)
+static int32_t BarVolume(const AM2_Widget *bar)
 {
     int32_t pos = *(const int32_t *)((const uint8_t *)bar + SCROLLBAR_OFF_POS);
     int32_t vol = (pos - AM2_SCROLLBAR_RANGE) * 100;
@@ -3636,7 +3658,7 @@ static int32_t VolumeFromBar(const AM2_Widget *bar)
 /* 0x0044F2A0: sound effects, demonstrated by playing wave 0x27. */
 void __cdecl OnVolumeEffects(AM2_Widget *w)
 {
-    g_volumeAtZero = VolumeFromBar(w);
+    g_volumeAtZero = BarVolume(w);
     PlaySoundAt(0x27, 0, 0, 0, 0);
 }
 
@@ -3644,7 +3666,7 @@ void __cdecl OnVolumeEffects(AM2_Widget *w)
  * playing, and SetStreamVolume moves it. */
 void __cdecl OnVolumeMusic(AM2_Widget *w)
 {
-    g_streamVolume = VolumeFromBar(w);
+    g_streamVolume = BarVolume(w);
     SetStreamVolume(0, 0);
 }
 
@@ -3653,8 +3675,173 @@ void __cdecl OnVolumeMusic(AM2_Widget *w)
  * -- everywhere else it is a unit reacting to something. */
 void __cdecl OnVolumeVoice(AM2_Widget *w)
 {
-    g_voiceVolume = VolumeFromBar(w);
+    g_voiceVolume = BarVolume(w);
     SpeakLine(orig_rand() % 30, g_defaultOwner);
+}
+
+/* ------------------------------------------------------------------ *
+ * The OPTIONS dialogs' OK and CANCEL.
+ *
+ * Every dialog that can be opened from two places ends the same way, and it
+ * is not a menu request in both: in a mission the OPTIONS screen is an
+ * overlay, so the exit sets the in-game mode and marks the primary dirty
+ * instead. ADDR_GAME_STATE == 2 is the test, and all three of these carry a
+ * copy of it.
+ * ------------------------------------------------------------------ */
+
+static void ReturnToOptions(void)
+{
+    if (g_gameState == 2) {
+        g_menuMode     = MENU_MODE_OPTIONS;
+        g_overlayDirty = 1;
+    } else {
+        g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
+        g_menuRequestSet = 1;
+    }
+}
+
+/* 0x00451100. CONTROLS' CANCEL, and 0x00451150 calls it as its own last
+ * step -- so OK is "write the keys back, save, then cancel". */
+void __cdecl OnControlsCancel(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    ReturnToOptions();
+}
+
+/* 0x0044F8B0. AUDIO's CANCEL: put the three volumes back from the copy the
+ * screen took when it was built, then leave.
+ *
+ * It reaches the screen by walking `parent` to the top rather than by a fixed
+ * number of steps, which is what makes it work from both places -- and it
+ * still tests the result for null afterwards, which cannot happen, since the
+ * walk starts at the widget itself. Reproduced. */
+void __cdecl OnAudioCancel(AM2_Widget *w)
+{
+    AM2_Widget *screen = w;
+    const int32_t *saved;
+
+    while (screen->parent)
+        screen = screen->parent;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+
+    if (screen) {
+        saved = (const int32_t *)((const uint8_t *)screen + AUDIO_OFF_SAVED);
+        g_volumeAtZero = saved[0];
+        g_streamVolume = saved[1];
+        g_voiceVolume  = saved[2];
+    }
+    ReturnToOptions();
+}
+
+/* 0x0044F860. The three volumes together, each -2000 turned into silence the
+ * way a bar's own handler does it, and then Options.cfg is rewritten.
+ *
+ * The writer stays original: it is CRT file I/O, which this port replaces
+ * wholesale rather than function by function. */
+void __cdecl ApplyVolumes(int32_t effects, int32_t music, int32_t voice)
+{
+    if (effects == -2000)
+        effects = DSBVOLUME_MIN;
+    if (music == -2000)
+        music = DSBVOLUME_MIN;
+    if (voice == -2000)
+        voice = DSBVOLUME_MIN;
+    g_volumeAtZero = effects;
+    g_streamVolume = music;
+    g_voiceVolume  = voice;
+    orig_save_options();
+}
+
+/* 0x0044F930. AUDIO's OK: read the three bars, apply, save, leave.
+ *
+ * The screen is TWO parents up on the title screen and ONE in a mission --
+ * the overlay has a level less nesting -- and the original spells that out
+ * as a branch rather than walking to the top as CANCEL does. Two functions
+ * beside each other solving the same problem differently, and both kept. */
+void __cdecl OnAudioOk(AM2_Widget *w)
+{
+    AM2_Widget       *screen;
+    AM2_Widget *const *bars;
+
+    if (g_gameState == 2)
+        screen = w->parent;
+    else
+        screen = w->parent->parent;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+
+    bars = (AM2_Widget *const *)((const uint8_t *)screen + AUDIO_OFF_BARS);
+    ApplyVolumes(BarVolume(bars[0]), BarVolume(bars[1]), BarVolume(bars[2]));
+    SetStreamVolume(0, 0);
+    ReturnToOptions();
+}
+
+/* 0x0044EA80. DIFFICULTY's OK: the list's row, saved and asked for by the
+ * OPTIONS menu again. Unlike the AUDIO pair this one does NOT check the game
+ * state -- it always asks for menu request 14. */
+void __cdecl OnDifficultyOk(AM2_Widget *w)
+{
+    const uint8_t *list;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    list = *(const uint8_t *const *)((const uint8_t *)w->parent->parent
+                                     + DLG_OFF_LIST);
+    g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
+    g_difficulty     = *(const int32_t *)(list + LIST_OFF_HOT);
+    g_menuRequestSet = 1;
+    orig_save_options();
+}
+
+/* 0x00451150. CONTROLS' OK: write all twenty-one rows back into the key
+ * table, save, and then CANCEL -- the original literally calls 0x00451100 as
+ * its last step, so "OK" is "apply, then leave the way CANCEL does".
+ *
+ * The key table is pairs of bytes and only the FIRST of each pair is written
+ * here, which is what makes the stride 2 against an array of row pointers
+ * with stride 4. */
+void __cdecl OnControlsOk(AM2_Widget *w)
+{
+    uint8_t *binding = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+    AM2_Widget *const *rows =
+        (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
+    const AM2_KeyName *keys = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    int32_t i;
+
+    for (i = 0; i < KEYROW_ROW_COUNT; i++) {
+        int32_t k = *(const int32_t *)((const uint8_t *)rows[i] + KEYROW_OFF_KEY);
+        binding[i * 2] = (uint8_t)keys[k].dik;
+    }
+    orig_save_options();
+    PlaySoundAt(2, 0, 0, 0, 0);
+    OnControlsCancel(w);
+}
+
+/* 0x004511A0. CONTROLS' DEFAULT: put every row back to the built-in binding
+ * and repaint it. The defaults are one scancode per row at ADDR_KEY_DEFAULTS;
+ * each is turned into a table INDEX by KeyNameIndexOf, which is the form the
+ * row stores, and the row's label takes that entry's name.
+ *
+ * Note it does NOT save and does NOT leave: the table at ADDR_KEY_BINDINGS is
+ * untouched until OK is pressed. */
+void __cdecl OnControlsDefault(AM2_Widget *w)
+{
+    const uint8_t *defaults = (const uint8_t *)AM2_IMAGE(ADDR_KEY_DEFAULTS);
+    AM2_Widget *const *rows =
+        (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
+    const AM2_KeyName *keys = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    int32_t i;
+
+    for (i = 0; i < KEYROW_ROW_COUNT; i++) {
+        AM2_Widget *row = rows[i];
+        int32_t     k   = KeyNameIndexOf(defaults[i]);
+
+        *(int32_t *)((uint8_t *)row + KEYROW_OFF_KEY) = k;
+        *(const char **)((uint8_t *)row + LABEL_OFF_TEXT) = keys[k].name;
+        ((AM2_WidgetPaintFn *)row->vtable)[WIDGET_VSLOT_PAINT](row, row->rect);
+    }
+    PlaySoundAt(2, 0, 0, 0, 0);
 }
 
 int widget_install(void)
@@ -3762,6 +3949,21 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_CONTROLS_OK, (const void *)OnControlsOk,
+                        "OnControlsOk", 0);
+    rc |= patch_replace(ADDR_ON_CONTROLS_DEFAULT, (const void *)OnControlsDefault,
+                        "OnControlsDefault", 0);
+    rc |= patch_replace(ADDR_ON_CONTROLS_CANCEL, (const void *)OnControlsCancel,
+                        "OnControlsCancel", 0);
+    rc |= patch_replace(ADDR_ON_AUDIO_CANCEL, (const void *)OnAudioCancel,
+                        "OnAudioCancel", 0);
+    rc |= patch_replace(ADDR_APPLY_VOLUMES, (const void *)ApplyVolumes,
+                        "ApplyVolumes", 0);
+    rc |= patch_replace(ADDR_ON_AUDIO_OK, (const void *)OnAudioOk,
+                        "OnAudioOk", 0);
+    rc |= patch_replace(ADDR_ON_DIFFICULTY_OK, (const void *)OnDifficultyOk,
+                        "OnDifficultyOk", 0);
+
     rc |= patch_replace(ADDR_ON_MENU_BACK, (const void *)OnMenuBack,
                         "OnMenuBack", 0);
     rc |= patch_replace(ADDR_ON_CONTROLS_BUTTON, (const void *)OnControlsButton,

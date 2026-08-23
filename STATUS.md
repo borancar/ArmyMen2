@@ -11,6 +11,91 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **CONTROLS' OK and DEFAULT, and the key table has two columns but one is
+  never written.** `0x00451150` walks the dialog's twenty-one rows and stores
+  each row's key into `ADDR_KEY_BINDINGS`, which is pairs of bytes -- and only
+  the first of each pair, which is what makes the stride 2 against an array of
+  row pointers with stride 4. Then it saves, plays a sound, and calls CANCEL:
+  the original literally calls `0x00451100` as its last instruction, so OK is
+  "apply, then leave the way CANCEL does".
+
+  `0x004511A0` is DEFAULT: one scancode per row from `ADDR_KEY_DEFAULTS`, each
+  turned into a table INDEX by `KeyNameIndexOf` -- the form a row stores -- the
+  label taking that entry's name, and the row repainted through its own slot 1.
+  It does not save and does not leave; the key table is untouched until OK.
+
+  `ab.sh controls` clicks DEFAULT, shoots, then OK, where it used to click
+  CANCEL. Measured: the frame moves 760 pixels across the key rows when
+  DEFAULT lands, so the handler is being seen rather than merely called.
+
+- **`checkseams` has a fourth blind shape, and it is the one that let a
+  reconstructed handler be installed by address.** The first three spellings
+  it knows are `#define orig_x ... ADDR_Y`, `callN(ADDR_Y)` and a cast around
+  `AM2_IMAGE(ADDR_Y)`. The fourth is neither: `MakeButton(..., ADDR_ON_MENU_BACK)`
+  passes an address to a helper that applies `AM2_IMAGE` to the parameter, so
+  the call site names a reconstructed function and nothing on the line looks
+  like a call at all.
+
+  `tools/checkseams.py --by-address` reports every use of a reconstructed
+  address in `src/game`. It is REPORT ONLY and that is deliberate: it found 48
+  and not all of them are calls. Some are DATA and correct as data -- a list's
+  "no callback" field is written `AM2_IMAGE(ADDR_NULL_STUB)` and the game
+  compares pointers against that exact address, so pointing it at ours would
+  break the comparison. Sorting the calls from the sentinels is what would
+  turn it into a gate.
+
+  All nineteen in `widget.cpp` are closed -- `MakeButton`, `MakeWideButton`,
+  `MakeVolumeBar` and `ConfirmDialogBuild` take a pointer now, with the
+  address form kept beside it as `kImageHandler()` for the handlers that are
+  still the original's. 29 remain elsewhere: teardown tables, script
+  callbacks, and the sentinels.
+
+- **`windowed` fails about half the time and it is the machine, not the
+  code.** Wine hands this prefix a lockable primary on some runs and not
+  others, so one side's client area can be flat while the other's is painted,
+  which compares as 195,000 pixels of nothing. `ab.sh` now detects exactly
+  that -- one side's client area a single colour, the other's not -- prints
+  "one side's client area never painted" and does not compare. Both flat and
+  both painted still compare normally, at 0 and at 2 to 10.
+
+  It is scoped to `windowed` on purpose. A general "skip when the frames look
+  too different" rule is how a suite stops catching things.
+
+- **The OPTIONS dialogs' OK and CANCEL, and a saved file that made three of
+  them untestable.** Five more: CONTROLS' CANCEL (`0x00451100`), AUDIO's
+  CANCEL and OK (`0x0044F8B0`, `0x0044F930`), the three-volume apply beneath
+  the second (`0x0044F860`), and DIFFICULTY's OK (`0x0044EA80`).
+
+  **Every dialog that opens from two places ends in two ways.** In a mission
+  the OPTIONS screen is an overlay, so the exit writes `MENU_MODE_OPTIONS` and
+  marks the primary dirty; on the title screen it is menu request 14.
+  `ADDR_GAME_STATE == 2` is the test and three of these carry a copy of it.
+  DIFFICULTY's OK does NOT -- it always asks for 14 -- which is either a bug
+  in the original or a screen that cannot be opened from play. Reproduced
+  either way.
+
+  Two functions beside each other solve the same problem differently and both
+  are kept: AUDIO's CANCEL walks `parent` to the top to find the screen, and
+  AUDIO's OK branches on the game state to take one parent or two, because the
+  overlay has a level less nesting. CANCEL then tests the walk's result for
+  null, which cannot happen -- it starts at the widget itself.
+
+- **`ab.sh` saves and restores `Options.cfg` around every side, and that is
+  what makes an OK clickable at all.** `audiovol` deliberately clicked CANCEL,
+  with a comment saying OK writes the volume out and would leave the next run
+  starting somewhere else. True, and worse than it sounds: the sides run in
+  order, so orig would write the file and recon would then open the dialog on
+  what ORIG chose. One `cp` either side of the run removes the whole problem.
+
+  It buys three functions that were otherwise verified by reading, and it is
+  measured rather than assumed -- with the restore disabled, one drive of the
+  audio dialog changes bytes 5 and 6 of `Options.cfg`, so the OK really does
+  reach the writer. `difficulty` now picks the middle row and confirms it for
+  the same reason.
+
+  The writer itself (`0x0044CFA0`) stays original: it is CRT file I/O, which
+  this port replaces wholesale rather than function by function.
+
 - **The OPTIONS menu's buttons and the AUDIO dialog's three bars.** Eight more
   handlers: BACK, CONTROLS, DIFFICULTY and AUDIO (`0x0044E670`, `0x0044FD40`,
   `0x0044FD70`, `0x0044FDA0`), CONFIRM GAME EXIT's OK (`0x0044EE30`), and the
@@ -1000,11 +1085,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 701 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 700 | 690 of them below the CRT line |
+| `patch_replace` sites | 708 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 707 | 697 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 126,928 / 372,816 B (**34.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 146,416 / 372,816 B (39.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 127,664 / 372,816 B (**34.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 147,072 / 372,816 B (39.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

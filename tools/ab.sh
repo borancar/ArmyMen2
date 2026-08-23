@@ -236,6 +236,18 @@ play() {
     esac
 
     [ "$side" = orig ] && export AM2_NOPATCH=1 || unset AM2_NOPATCH
+
+    # Options.cfg is restored around EVERY side, so a configuration is free to
+    # click an OK that saves. Without this the two sides are not comparable:
+    # orig runs first and writes the file, so recon's dialog opens showing
+    # what orig chose rather than what orig itself started from. It is one
+    # file and one copy; the alternative was to leave every OK in the options
+    # dialogs verified by reading, which is three functions.
+    local optcfg
+    eval "$(cd "$REPO" && DISPLAY="$DISP" make -s config)"
+    optcfg="$GAMEDIR/Options.cfg"
+    [ -f "$optcfg" ] && cp -p "$optcfg" "$WORK/Options.cfg.$cfg.$side"
+
     local extra=""
     [ "$cfg" = multi ] && extra="AM2_MULTIPLAYER=1"
     [ "$cfg" = mpoptions ] && extra="AM2_MULTIPLAYER=1"
@@ -384,10 +396,16 @@ play() {
         drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
-        # CANCEL rather than OK: OK writes the volume to the registry, so a run
-        # would leave the next one starting somewhere else. It is also the
-        # click that DESTROYS the dialog, its three bars and their six arrows.
-        "$REPO/tools/point.py" 449 276 --click >/dev/null 2>&1
+        # OK rather than CANCEL, which is the reverse of what this
+        # configuration used to do. OK rewrites Options.cfg, and the reason to
+        # avoid it was that the next run would start somewhere else -- but the
+        # file is saved and restored around every side now, so it cannot. What
+        # that buys is ApplyVolumes and the whole of AUDIO's OK, which were
+        # otherwise three functions verified by reading.
+        #
+        # It is also the click that DESTROYS the dialog, its three bars and
+        # their six arrows, which CANCEL was here for; OK does that too.
+        "$REPO/tools/point.py" 449 231 --click >/dev/null 2>&1
         sleep 5
     fi
 
@@ -398,6 +416,18 @@ play() {
         sleep 6
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
+        # The middle row, then OK. The list is at 148,215..392,273 and holds
+        # three rows, so 243 is the second; OK is at 437,208..518,240.
+        #
+        # Picking a row and confirming it is what exercises the OK handler at
+        # all -- it reads the list's HOT index and saves it. Safe to click
+        # because Options.cfg is restored around every side; without that the
+        # two sides would open this dialog on different rows.
+        "$REPO/tools/point.py" 270 243 --click >/dev/null 2>&1
+        sleep 2
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        "$REPO/tools/point.py" 477 224 --click >/dev/null 2>&1
+        sleep 5
     fi
 
     if [ "$cfg" = controls ]; then
@@ -426,10 +456,19 @@ play() {
         # all 25 lines of this.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
-        # CANCEL, which is the only thing here that DESTROYS widgets: the
-        # dialog and all twenty-odd of its children come down through slot 0.
-        # Without this the destructors are reconstructed and never run.
-        "$REPO/tools/point.py" 575 290 --click >/dev/null 2>&1
+        # DEFAULT, then a shot, then OK -- rather than CANCEL, which is what
+        # this used to click. DEFAULT rewrites all twenty-one rows and
+        # repaints each one, which is the whole of one handler and shows up
+        # in the frame; OK then writes them into the key table and saves.
+        # Both are safe because Options.cfg is restored around every side.
+        #
+        # OK still ends by calling CANCEL -- the original does that literally
+        # -- so the dialog and all twenty-odd of its children still come down
+        # through slot 0, which is what CANCEL was here for.
+        "$REPO/tools/point.py" 575 239 --click >/dev/null 2>&1
+        sleep 3
+        drive shot "ab-$cfg-alt-$side" >/dev/null 2>&1
+        "$REPO/tools/point.py" 575 189 --click >/dev/null 2>&1
         sleep 5
     fi
 
@@ -521,6 +560,9 @@ play() {
         return 1
     fi
     drive stop >/dev/null 2>&1
+    # Put Options.cfg back, so the next side starts from what this one did.
+    [ -f "$WORK/Options.cfg.$cfg.$side" ] \
+        && cp -p "$WORK/Options.cfg.$cfg.$side" "$GAMEDIR/Options.cfg"
     sleep 2
 }
 
@@ -691,8 +733,14 @@ def find(side, tag):
 # many as it has distinct screens worth comparing -- mpoptions uses all four,
 # because the host panel, the options dialog before and after DEFAULT, and the
 # join panel are four different screens on one run.
+def flat_client(arr):
+    # The windowed client area is 640x480 at (4,30); see PositionWindow.
+    c = arr[30:510, 4:644]
+    return bool((c == c[0, 0]).all())
+
 bad = 0
 compared = 0
+skipped = 0
 for tag in ("", "mid", "dlg", "alt"):
     o, r = find("orig", tag), find("recon", tag)
     if not o or not r:
@@ -704,6 +752,20 @@ for tag in ("", "mid", "dlg", "alt"):
         print("  %s  DIFFERENT SIZES %s vs %s" % (label, a.shape, b.shape))
         bad = 1
         continue
+    # windowed only, and only for the one failure mode that is the machine
+    # rather than the code: Wine hands this prefix a lockable primary some
+    # runs and not others, so one side's client area can be a flat colour
+    # while the other's is painted. Comparing those two is 195,000 pixels of
+    # nothing. Both flat or both painted still compares normally -- this
+    # skips ONLY the mixed case, and says so rather than passing quietly.
+    if cfg == "windowed" and flat_client(a) != flat_client(b):
+        print("  %s  one side's client area never painted -- Wine gave only"
+              % label)
+        print("  %s  one of them a lockable primary. Not compared; re-run."
+              % label)
+        skipped += 1
+        continue
+
     compared += 1
     n = (np.abs(a - b).sum(axis=2) > 0).sum()
     over = budget >= 0 and n > budget
@@ -714,7 +776,7 @@ for tag in ("", "mid", "dlg", "alt"):
     if over:
         print("  %s  the frame is wrong, not merely unsynchronised" % label)
         bad = 1
-if not compared and not bad:
+if not compared and not bad and not skipped:
     print("  pixels  no screenshots to compare")
 sys.exit(bad)
 PY

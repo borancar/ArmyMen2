@@ -30,6 +30,17 @@ So both spellings are checked: a `#define orig_x ... ADDR_Y`, and a
 `callN(ADDR_Y)` written out at a call site.
 
 Deliberate ones are listed in ALLOWED, with the reason.
+
+There is a FOURTH spelling and it is not a gate. A menu handler is installed by
+ADDRESS -- `MakeButton(..., ADDR_ON_MENU_BACK)`, with the helper applying
+AM2_IMAGE to the parameter -- so the call site names a reconstructed function
+and nothing on the line looks like a cast or a call. `--by-address` reports
+every use of a reconstructed address in src/game and there are about two
+hundred, which is why it only reports: not all of them are calls. Some are
+DATA, and correct as data -- a list's "no callback" field is written as
+AM2_IMAGE(ADDR_NULL_STUB) and the game compares pointers against that exact
+address, so replacing it with ours would break the comparison. Sorting the
+calls from the sentinels is the work that would turn this into a gate.
 """
 import glob
 import os
@@ -55,6 +66,7 @@ def macros():
 
 
 def main():
+    by_address = "--by-address" in sys.argv
     addr = macros()
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import coverage
@@ -69,9 +81,11 @@ def main():
             patched.add(addr[n])
 
     bad = []
+    loose = []
     for f in sorted(glob.glob(os.path.join(ROOT, "src/**/*.c*"), recursive=True)
                     + glob.glob(os.path.join(ROOT, "src/**/*.h"), recursive=True)):
         rel = os.path.relpath(f, ROOT)
+        seen = set()
         for n, line in enumerate(open(f), 1):
             m = re.match(r"\s*#define\s+(orig_\w+)\s+.*?(ADDR_[A-Z0-9_]+)", line)
             if m:
@@ -100,6 +114,19 @@ def main():
                 if sym in addr and addr[sym] in patched:
                     bad.append(("%s:%d" % (rel, n), "cast through the image",
                                 sym, addr[sym]))
+            # The FOURTH spelling, and REPORT-ONLY -- see the note in the
+            # docstring for why it is not a gate yet.
+            if by_address and rel.startswith("src/game/"):
+                for m in re.finditer(r"\b(ADDR_[A-Z0-9_]+)\b", line):
+                    sym = m.group(1)
+                    if sym in addr and addr[sym] in patched:
+                        loose.append(("%s:%d" % (rel, n), sym, addr[sym]))
+
+    if by_address:
+        for f, sym, a in loose:
+            print("  %s: %s (0x%08X)" % (f, sym, a))
+        print("  %d site(s) in src/game name a reconstructed address."
+              " REPORT ONLY -- some are data, not calls." % len(loose))
 
     for f, name, sym, a in bad:
         print("  %s: %s -> %s (0x%08X) is reconstructed; call it directly"

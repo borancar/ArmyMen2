@@ -1233,6 +1233,18 @@ void __cdecl OnVolumeEffects(AM2_Widget *w);
 void __cdecl OnVolumeMusic(AM2_Widget *w);
 void __cdecl OnVolumeVoice(AM2_Widget *w);
 
+/* The OPTIONS dialogs' OK and CANCEL: 0x00451100, 0x0044F8B0, 0x0044F930
+ * and 0x0044EA80, with 0x0044F860 the three-volume apply underneath. */
+void __cdecl OnControlsCancel(AM2_Widget *w);
+void __cdecl OnAudioCancel(AM2_Widget *w);
+void __cdecl OnAudioOk(AM2_Widget *w);
+void __cdecl OnDifficultyOk(AM2_Widget *w);
+void __cdecl ApplyVolumes(int32_t effects, int32_t music, int32_t voice);
+
+/* CONTROLS' OK and DEFAULT: 0x00451150 and 0x004511A0. */
+void __cdecl OnControlsOk(AM2_Widget *w);
+void __cdecl OnControlsDefault(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

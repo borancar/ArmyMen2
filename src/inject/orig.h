@@ -66,6 +66,9 @@
  * no key and is tested anyway. 26 callers, so this is how the game asks about
  * a control rather than about a key. The names are ours. */
 #define ADDR_KEY_BINDINGS       0x004854BCu /* uint8_t[][2], scancode pairs */
+/* The built-in bindings, one scancode per row and no second column, which is
+ * why DEFAULT writes only the first byte of each pair -- as does OK. */
+#define ADDR_KEY_DEFAULTS       0x0048AE80u /* uint8_t[21] */
 #define ADDR_ACTION_KEY_DOWN    0x004274F0u /* int32_t(int32_t action) */
 /* 0x00427530, 19 callers: the same two keys, but "just pressed" rather than
  * "down" -- a key counts only if it is down AND its bit differs between the
@@ -1634,6 +1637,12 @@
 #define ADDR_ON_VOLUME_MUSIC     0x0044F2E0u
 #define ADDR_ON_VOLUME_VOICE     0x0044F320u
 #define ADDR_ON_AUDIO_OK         0x0044F930u
+/* 0x0044F860: store three volumes, each -2000 turned into DSBVOLUME_MIN,
+ * then tail-jump the Options.cfg writer. Only AUDIO's OK reaches it. */
+#define ADDR_APPLY_VOLUMES       0x0044F860u  /* void(fx, music, voice) */
+/* 0x0044CFA0: rewrite Options.cfg. Left original -- it is CRT file I/O, and
+ * this port replaces the CRT wholesale rather than function by function. */
+#define ADDR_SAVE_OPTIONS        0x0044CFA0u  /* void(void) */
 #define ADDR_ON_AUDIO_CANCEL     0x0044F8B0u
 /* Three bars at 0x0064..0x006C, and the volumes they started from at
  * 0x0070..0x0078 so CANCEL can put them back. */
@@ -2432,6 +2441,10 @@
  * each retry and 0x00421890 clears it when the campaign moves on. Every
  * retry takes five health off each enemy, divided by 2*difficulty + 2. */
 #define ADDR_SET_MAX_HEALTH      0x00457B30u  /* void(void *obj, int32_t) */
+/* The DIFFICULTY dialog is both ends of this: the constructor seeds the
+ * list's 0x58 and 0x5C from it and OK writes 0x5C back. 0x5C is the HOT row
+ * rather than the selected one, which is what the original reads; the list's
+ * click handler sets both. */
 #define ADDR_DIFFICULTY          0x00512324u  /* int32_t, 0..2 */
 #define ADDR_LEVEL_ATTEMPT       0x00512330u  /* int32_t -- "Attempt# %d" */
 #define ADDR_DIFFICULTY_SCALE    0x00489870u  /* float[3] = 4.0, 2.0, 1.5 */
@@ -3205,6 +3218,10 @@
 #define ADDR_DRAW_MENU_OVERLAY   0x00425AF0u  /* void(void) */
 #define ADDR_OVERLAY_PREPARE     0x00412D30u  /* void(int32, int32) */
 #define MENU_MODE_PLAYING        0x21
+/* The in-mission OPTIONS overlay. Every dialog that can be opened from
+ * either place -- CONTROLS, AUDIO -- ends by asking for this when
+ * ADDR_GAME_STATE is 2 and for menu request 14 when it is not. */
+#define MENU_MODE_OPTIONS        0x17
 /* The multiplayer session object and the two routines either side of it. */
 #define ADDR_SESSION_OBJECT      0x00516130u  /* void *, made on demand */
 #define ADDR_SESSION_CTOR        0x00453910u  /* thiscall void(this, int32) */

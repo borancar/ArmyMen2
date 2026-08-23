@@ -122,7 +122,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
     }
 }
 
-#define g_difficulty     (*(const int32_t *)(uintptr_t)ADDR_DIFFICULTY)
+#define g_difficulty     (*(int32_t *)(uintptr_t)ADDR_DIFFICULTY)
 #define g_levelAttempt   (*(const int32_t *)(uintptr_t)ADDR_LEVEL_ATTEMPT)
 /* Both constants come out of the image rather than being written here: same
  * bits, and nothing to mistype. The table is FLOATS and the share is a
