@@ -1745,7 +1745,14 @@
 
 /* The SCREEN BASE, 0x00454B00 -- every one of the twenty screens starts here.
  * It is a PANEL over the whole 640x480, then the dialog vtable on top. */
-#define ADDR_BUTTON_BASE_CTOR    0x004542F0u /* thiscall void(w), no args */
+/* 0x004542F0: the base BUTTON's constructor -- WidgetConstruct, its own
+ * vtable, and three fields cleared. Every three-state button and every
+ * checkbox derives from it, and it RETURNS `this`, as i386 MSVC does. */
+#define ADDR_BUTTON_BASE_CTOR    0x004542F0u /* thiscall void *(this) */
+#define VTABLE_BUTTON_BASE       0x0046FC48u
+#define BUTTON_BASE_OFF_A        0x5Cu
+#define BUTTON_BASE_OFF_B        0x60u
+#define BUTTON_BASE_OFF_C        0x64u
 #define VTABLE_EDIT              0x0046FC98u
 #define VTABLE_MULTISPRITE       0x0046FD38u
 #define VTABLE_LISTBOX           0x0046FCC0u

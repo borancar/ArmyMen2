@@ -1276,6 +1276,15 @@ void __cdecl SelectPlayerRow(AM2_Widget *list, AM2_ListRows *rows,
  * rather than on an argument. */
 void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi);
 
+/* Original: 0x004542F0, thiscall. The base button's constructor -- returns
+ * `this`, as every i386 MSVC constructor does. */
+AM2_Widget *__attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w);
+
+/* Original: 0x00454760. Every checkbox's left-click handler, installed by the
+ * constructor. Toggles the tick, repaints, then calls the caller's own
+ * handler at CHECK_OFF_ON_CHANGE if there is one. */
+void __cdecl CheckboxToggle(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

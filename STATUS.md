@@ -11,6 +11,25 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **The base BUTTON's constructor and the checkbox's toggle.** `0x004542F0` is
+  what every three-state button and every checkbox derives from -- the widget
+  base, its own vtable, three fields cleared -- and it returns `this`, which
+  `tools/checkthis.py` would now refuse to let go in as `void`. `0x00454760`
+  is the toggle: the tick flips with `sete` on the old value, so it is a
+  strict toggle and not a set, it plays wave 1 rather than the menus' wave 2,
+  and only then does it call the caller's own handler.
+
+  That last ordering is the point of the class. The toggle goes into
+  `BUTTON_OFF_ON_LEFT` unconditionally, written by the CONSTRUCTOR, and what
+  the caller asked for goes to `CHECK_OFF_ON_CHANGE` -- which is why clicking
+  a plain box only ticks it while a group header also disables its group.
+
+  Both were reached through the image by our own code until now: the checkbox
+  constructor wrote `AM2_IMAGE(ADDR_CHECKBOX_TOGGLE)` into the widget and
+  `ButtonConstruct` had an `orig_button_base_ctor` macro. `checkseams` caught
+  the first the moment the address became reconstructed, which is exactly what
+  it is for.
+
 - **`EditCharHandler` is the whole of a text field's typing behaviour, and
   CLAUDE.md said porting it meant porting the text-field system.** It did, and
   the text-field system is ours now, so `0x0044D520` went in as the last piece
@@ -1231,10 +1250,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 720 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 719 | 709 of them below the CRT line |
+| `patch_replace` sites | 722 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 721 | 711 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 128,976 / 372,816 B (**34.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 129,136 / 372,816 B (**34.6%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 148,000 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

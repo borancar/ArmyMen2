@@ -1422,10 +1422,6 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip)
     UnlockSurface();
 }
 
-typedef void (__attribute__((thiscall)) *AM2_RecordResetFn)(void *rec);
-#define orig_record_reset \
-    ((AM2_RecordResetFn)(uintptr_t)ADDR_RECORD_RESET)
-
 void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
 {
     int32_t *r = (int32_t *)rec;
@@ -1438,7 +1434,7 @@ void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
 
 void __attribute__((thiscall)) RecordResetAlias(void *rec)
 {
-    orig_record_reset(rec);
+    RecordReset(rec);
 }
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
@@ -2979,10 +2975,6 @@ AM2_Widget *__attribute__((thiscall)) ScreenBaseConstruct(AM2_Widget *w,
  *
  * 0x0075 goes in as 1 -- BUTTON_OFF_OWNS_SPRITES -- which is what makes
  * ButtonDestruct release all three. */
-typedef void (__attribute__((thiscall)) *AM2_ButtonBaseCtorFn)(AM2_Widget *w);
-#define orig_button_base_ctor \
-    ((AM2_ButtonBaseCtorFn)AM2_IMAGE(ADDR_BUTTON_BASE_CTOR))
-
 AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
                                                       const char *b0,
                                                       const char *b1,
@@ -2994,7 +2986,7 @@ AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
 {
     uint8_t *self = (uint8_t *)w;
 
-    orig_button_base_ctor(w);
+    ButtonBaseConstruct(w);
     w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON);
 
     if (b0) {
@@ -3212,7 +3204,7 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
 {
     uint8_t *self = (uint8_t *)w;
 
-    orig_button_base_ctor(w);
+    ButtonBaseConstruct(w);
     w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
 
     *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON)  =
@@ -3238,8 +3230,7 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
     self[CHECK_OFF_INK0 + 1] = 0xD4;
     self[CHECK_OFF_INK0 + 2] = 0xFB;
     self[CHECK_OFF_INK0 + 3] = 0xFB;
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) =
-        (uint32_t)AM2_IMAGE(ADDR_CHECKBOX_TOGGLE);
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)CheckboxToggle;
     *(void **)(self + CHECK_OFF_ON_CHANGE) = (void *)onChange;
     self[CHECK_OFF_FLAG8C] = 0;
     return w;
@@ -4228,6 +4219,45 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
         PlaySoundAt(3, 0, 0, 0, 0);
 }
 
+/* 0x004542F0, thiscall. The base BUTTON's constructor: the widget base, then
+ * its own vtable, then three fields cleared. Every three-state button and
+ * every checkbox derives from it, and it returns `this` the way an i386 MSVC
+ * constructor does -- which is the mistake that killed the multiplayer path
+ * for eleven commits, so tools/checkthis.py now refuses a `void` here. */
+AM2_Widget *__attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON_BASE);
+    *(int32_t *)(self + BUTTON_BASE_OFF_A) = 0;
+    *(int32_t *)(self + BUTTON_BASE_OFF_B) = 0;
+    *(int32_t *)(self + BUTTON_BASE_OFF_C) = 0;
+    return w;
+}
+
+/* 0x00454760. Every checkbox's LEFT-click handler, written by the CONSTRUCTOR
+ * and not by the caller -- which is why clicking a plain box just ticks it and
+ * only a group header does anything else: the caller's handler is at 0x7C and
+ * this is what calls it.
+ *
+ * The tick flips with `sete` on the old value, so it is a strict toggle and
+ * not a set. Wave 1, not the menus' wave 2. */
+void __cdecl CheckboxToggle(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    void   (__cdecl *onChange)(AM2_Widget *);
+
+    *(self + CHECK_OFF_TICKED) = (uint8_t)(*(self + CHECK_OFF_TICKED) == 0);
+    PlaySoundAt(1, 0, 0, 0, 0);
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+
+    onChange = *(void (__cdecl *const *)(AM2_Widget *))
+                   (self + CHECK_OFF_ON_CHANGE);
+    if (onChange)
+        onChange(w);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4333,6 +4363,12 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_BUTTON_BASE_CTOR,
+                        (const void *)ButtonBaseConstruct,
+                        "ButtonBaseConstruct", 1);
+    rc |= patch_replace(ADDR_CHECKBOX_TOGGLE, (const void *)CheckboxToggle,
+                        "CheckboxToggle", 0);
+
     rc |= patch_replace(ADDR_EDIT_CHAR_HANDLER, (const void *)EditCharHandler,
                         "EditCharHandler", 0);
 
