@@ -1770,6 +1770,26 @@
 #define ADDR_STR_LINE_BREAK      0x0048BD8Cu /* "|", not a newline */
 #define AM2_TYPER_MARGIN         12          /* taken off the usable width */
 #define AM2_TYPER_LINE_MAX       0x10Cu      /* the constructor's scratch */
+
+/* The TITLE SCREEN, 0x0044D730 -- arm 1 of the menu table, and the one arm
+ * that is not a factory: it builds the whole screen inline.
+ *
+ * It also holds the binary patch that removes MULTI-PLAYER. `0x0044D8FE` is
+ * an ordinary `je` on the allocation in the retail compile and an `EB` here,
+ * so the button is skipped unconditionally; docs/binarypatches.md has the
+ * byte. A reconstruction cannot honour a patch inside the function it
+ * replaces, so ours asks restore_multiplayer() instead. */
+#define ADDR_OPEN_TITLE_SCREEN   0x0044D730u  /* void(void) */
+#define ADDR_ON_BOOT_CAMP        0x0044D3F0u
+#define ADDR_ON_SINGLE_PLAYER    0x0044D2E0u
+#define ADDR_ON_MULTI_PLAYER     0x0044D380u
+#define ADDR_ON_MOVIES           0x0044D3C0u
+#define ADDR_ON_CREDITS          0x0044D4C0u
+#define ADDR_ON_QUIT             0x0044D4F0u
+#define AM2_TITLE_SCREEN_SIZE    0x64u
+#define AM2_TITLE_BUTTON_LEFT    0xE7
+#define AM2_TITLE_BUTTON_WIDTH   0x98
+#define AM2_TITLE_BUTTON_HEIGHT  0x19
 /* Every checkbox's LEFT-click handler, written by the constructor and not by
  * the caller: the toggle. The caller's handler goes to 0x007C instead, which
  * is why clicking a plain box just ticks it and only a GROUP HEADER does

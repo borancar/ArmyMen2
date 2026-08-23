@@ -46,6 +46,11 @@ static int enabled(const char *name)
     return opt && *opt == '1';
 }
 
+int restore_multiplayer(void)
+{
+    return enabled("AM2_MULTIPLAYER");
+}
+
 void restore_install(void)
 {
     if (!enabled("AM2_MULTIPLAYER"))

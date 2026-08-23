@@ -1213,6 +1213,12 @@ AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
                                                      int32_t height,
                                                      const char *message);
 
+/* Original: 0x0044D730. The TITLE SCREEN -- the one arm of the menu table
+ * that builds its screen inline rather than calling a constructor. It also
+ * holds the binary patch that removes MULTI-PLAYER, which a reconstruction
+ * cannot honour; see widget.cpp. */
+void __cdecl OpenTitleScreen(void);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

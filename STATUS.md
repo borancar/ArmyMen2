@@ -5,11 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-23**, at `edccf4b`+1. Working tree clean.
+Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **The TITLE SCREEN, and the binary patch that lives inside it.** `0x0044D730`
+  is arm 1 of the menu table and the one arm that is not a factory: it builds
+  its seven buttons inline rather than calling a constructor. Before any of
+  them it chdirs to `shared`, calls `CommClose` and `CommDropDirectPlay`, and
+  clears the session role and the two saved names -- so coming back to the
+  title is how a multiplayer session is torn down, and `quit`'s final frame is
+  this function's output compared at zero.
+
+  **It also holds the byte that removes MULTI-PLAYER.** `0x0044D8FE` is an
+  ordinary `je` on the allocation in the retail compile -- the same null check
+  the other six buttons have -- and an `EB` here, so that one row is skipped
+  unconditionally (`docs/binarypatches.md`). A reconstruction cannot honour a
+  patch inside the function it replaces, so the switch had to stop being only
+  a byte: `restore.c` still patches it, because the A/B's `orig` side runs the
+  original builder and needs it, and it now also exposes
+  `restore_multiplayer()`, which our version consults. Both read the same
+  variable, which is what keeps the two sides of a run agreeing.
+
+  **One line of the seven blocks is not shared, and dropping it moved the A/B
+  three screens.** After the FIRST button goes in -- and only then -- the
+  original reloads the screen from its global and writes the button into
+  `0x34`, the focused child. Written as a loop, that line disappears; the title
+  screen then opens with nothing focused, and `multi` ended on COMM CHANNEL
+  SELECT where the original was two screens further on at ENTER BATTLE NAME,
+  131,676 pixels apart, with `quit` losing its whole comm teardown.
+
+  This is the OPTIONS menu's defect exactly, in a function written four days
+  later: compressing seven near-identical blocks into a table again dropped
+  the one instruction only block zero carries. Knowing the failure did not
+  prevent it. What did catch it, again, was running the configuration that
+  covers what was touched -- and here the pixels named it before the tree
+  did, because the tree was dumped on a screen the two sides no longer
+  shared.
 
 - **An i386 MSVC constructor returns `this` in eax, and a reconstruction that
   drops it had been killing the multiplayer path for four days.** `RecordCtor`
@@ -696,7 +730,8 @@ Nothing uncommitted.
   **The twenty-first is not a factory.** `0x0044D730` is the TITLE SCREEN and
   it is 1,108 bytes: it chdirs to `shared`, tears the comm object down, clears
   three globals, and then builds every button on the screen. It belongs with
-  the dialog constructors, not with this family.
+  the dialog constructors, not with this family. **Done**, and with it every
+  arm of `docs/screens.md` reads `yes`: the whole menu screen table is ours.
 
 - **The thirteen plain factories went in as one batch**, generated from the same
   measurements `tools/screens.py` reports rather than transcribed: SELECT MAP,
@@ -847,11 +882,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 685 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 684 | 674 of them below the CRT line |
+| `patch_replace` sites | 686 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 685 | 675 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 124,336 / 372,816 B (**33.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 125,456 / 372,816 B (**33.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 144,544 / 372,816 B (38.8%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

@@ -17,6 +17,7 @@
 #include "../image.h"
 #include "../crt.h"
 #include "../../inject/patch.h"
+#include "../../inject/restore.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -3432,6 +3433,96 @@ AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x0044D730, cdecl. The TITLE SCREEN -- arm 1 of the menu table, and the one
+ * arm that is not a factory: no separate constructor, it builds the whole
+ * screen inline. Every configuration in the suite runs it, and `quit` ends on
+ * it, so its final frame is this function's output compared at zero.
+ *
+ * Before any widget: it chdirs back, closes the comm object and drops
+ * DirectPlay, and clears the session role and the two saved names. Coming to
+ * the title screen is how a multiplayer session is torn down.
+ *
+ * **It also holds the binary patch that removes MULTI-PLAYER.** `0x0044D8FE`
+ * is an ordinary `je` on the allocation in the retail compile and an `EB`
+ * here, so that one button is skipped unconditionally -- see
+ * docs/binarypatches.md. A reconstruction cannot honour a patch inside the
+ * function it replaces, so this asks `restore_multiplayer()` instead. Both
+ * routes read AM2_MULTIPLAYER, which is what keeps the two halves of an A/B
+ * agreeing: the `orig` side still gets its button from the byte. */
+typedef struct {
+    int32_t  top;
+    uint32_t handler;
+    uint32_t bmp[3];
+} AM2_TitleButton;
+
+static const AM2_TitleButton kTitleButtons[] = {
+    { 0x0082, ADDR_ON_BOOT_CAMP,
+      { 0x0048B620, 0x0048B638, 0x0048B650 } },  /* 03_102 bootcamp  */
+    { 0x00AA, ADDR_ON_SINGLE_PLAYER,
+      { 0x0048B5D8, 0x0048B5F0, 0x0048B608 } },  /* 03_100 oneplay   */
+    { 0x00D2, ADDR_ON_MULTI_PLAYER,
+      { 0x0048B590, 0x0048B5A8, 0x0048B5C0 } },  /* 03_101 multiplay */
+    { 0x00FA, ADDR_ON_DIALOG_CANCEL,
+      { 0x0048B548, 0x0048B560, 0x0048B578 } },  /* 03_103 options   */
+    { 0x0122, ADDR_ON_MOVIES,
+      { 0x0048B500, 0x0048B518, 0x0048B530 } },  /* 03_104 movies    */
+    { 0x014A, ADDR_ON_CREDITS,
+      { 0x0048B4B8, 0x0048B4D0, 0x0048B4E8 } },  /* 03_105 credits   */
+    { 0x0172, ADDR_ON_QUIT,
+      { 0x0048B47C, 0x0048B490, 0x0048B4A4 } },  /* 03_106 quit      */
+};
+#define AM2_TITLE_MULTIPLAYER_ROW 2
+
+void __cdecl OpenTitleScreen(void)
+{
+    AM2_Widget *screen;
+    uint32_t    i;
+
+    CloseCurrentScreen();
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    CommClose();
+    CommDropDirectPlay(g_commObject);
+    g_mpSession = 0;
+    *(char *)(uintptr_t)ADDR_GAMEPROC_BLOCK = '\0';
+    *(char *)(uintptr_t)ADDR_GAMEPROC_STR_B = '\0';
+
+    screen = (AM2_Widget *)orig_operator_new(AM2_TITLE_SCREEN_SIZE);
+    if (screen)
+        screen = ScreenBaseConstruct(screen, (const char *)
+                                     AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+    g_paintObject = (uint8_t *)screen;
+    screen->flag44 = 1;
+
+    for (i = 0; i < sizeof kTitleButtons / sizeof kTitleButtons[0]; i++) {
+        const AM2_TitleButton *b = &kTitleButtons[i];
+        AM2_Widget            *btn;
+
+        if (i == AM2_TITLE_MULTIPLAYER_ROW && !restore_multiplayer())
+            continue;
+        btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+        if (btn) {
+            AM2_Rect box;
+
+            RectSet(&box, AM2_TITLE_BUTTON_LEFT, b->top,
+                    AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT);
+            btn = ButtonConstruct(btn, (const char *)AM2_IMAGE(b->bmp[0]),
+                                  (const char *)AM2_IMAGE(b->bmp[1]),
+                                  (const char *)AM2_IMAGE(b->bmp[2]), 0, box,
+                                  (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(b->handler),
+                                  (void (__cdecl *)(AM2_Widget *))0);
+        }
+        WidgetAddChild(screen, btn);
+        /* Only the FIRST button, and only here: the original reloads the
+         * screen from its global and writes 0x34 once, after BOOT CAMP goes
+         * in. So the title screen opens with BOOT CAMP focused and every
+         * other row unfocused -- which is the one line the seven blocks do
+         * not share, and exactly the kind of line a loop swallows. */
+        if (i == 0)
+            screen->focusedChild = btn;
+    }
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3537,6 +3628,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_OPEN_TITLE_SCREEN,
+                        (const void *)OpenTitleScreen, "OpenTitleScreen", 0);
     rc |= patch_replace(ADDR_TYPER_CTOR, (const void *)TyperConstruct,
                         "TyperConstruct", 5);
     rc |= patch_replace(ADDR_ARROWBAR_CTOR, (const void *)ArrowBarConstruct,

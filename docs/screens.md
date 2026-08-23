@@ -17,7 +17,7 @@ rather than merely painting the wrong screen.
 
 | arm | stub | factory | size | ctor | args | screen | done |
 |---:|---|---|---|---|---:|---|---|
-| 1 | `0x00426435` | `0x0044D730` | 0x64 | `0x00454B00` | 2 | (shared backdrop) |  |
+| 1 | `0x00426435` | `0x0044D730` | 0x64 | `0x00454B00` | 2 | (shared backdrop) | yes |
 | 2 | `0x0042643F` | `0x0044DF20` | 0x68 | `0x0044DBB0` | 1 | 02_004_00_selectmap.bmp | yes |
 | 3 | `0x00426449` | `0x00451910` | 0x68 | `0x00451400` | 1 | 02_005_00_selectplayer.bmp | yes |
 | 4 | `0x00426450` | `0x00451E10` | 0x84 | `0x00451AF0` | 1 | 02_006_00_name.bmp | yes |
