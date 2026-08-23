@@ -998,6 +998,18 @@ void __cdecl OpenLoadGame(void);
 AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
                                                            const char *bmp);
 
+/* Originals: 0x0044EB50, 0x0044EED0, 0x00450730. The three CONFIRM dialogs --
+ * CONFIRM GAME EXIT, the replay prompt and DELETE PLAYER. One body three
+ * times, differing in the vtable, the panel bitmap, the OK handler, the
+ * message and (for DELETE PLAYER alone) the CANCEL handler. See widget.cpp
+ * for the shape and for the three stores the original leaves unguarded. */
+AM2_Widget *__attribute__((thiscall)) QuitDialogConstruct(AM2_Widget *w,
+                                                          const char *bmp);
+AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
+                                                            const char *bmp);
+AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
+                                                               const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

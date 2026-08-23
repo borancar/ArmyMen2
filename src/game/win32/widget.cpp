@@ -12,6 +12,7 @@
 #include "frame.h"
 #include "audio.h"
 #include "dplay.h"   /* CommCreateDirectPlay -- reconstructed */
+#include "../gamedir.h" /* SetGameDir -- reconstructed */
 #include "../image.h"
 #include "../crt.h"
 #include "../../inject/patch.h"
@@ -1929,6 +1930,145 @@ AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
     return w;
 }
 
+/* The three CONFIRM dialogs: CONFIRM GAME EXIT (0x0044EB50), the replay
+ * prompt (0x0044EED0) and DELETE PLAYER (0x00450730). One body three times
+ * over -- 685 bytes each, differing in the vtable, the panel bitmap, the OK
+ * handler, the message and, for DELETE PLAYER alone, the CANCEL handler.
+ *
+ * The shape: the dialog gets ONE child, a panel, and everything visible is a
+ * child of the PANEL -- the OK and CANCEL buttons, the typewriter message and
+ * the blinking red dot beside it. The panel is also what carries the focus.
+ *
+ * Every `ret N` here was checked rather than inferred from the pushes.
+ * 0x00454980 is `ret 0x18` -- bitmap, flag, sixteen bytes of rectangle;
+ * 0x004566F0 is `ret 0x14` -- rectangle then message; 0x00456BC0 is
+ * `ret 0x1C` -- two bitmaps, a flag and a rectangle. The rectangle is by
+ * value in all three, as it is for the button.
+ *
+ * THREE STORES ARE UNGUARDED IN THE ORIGINAL and are reproduced that way.
+ * `panel->flag44`, `panel->focusedChild` and the message's blinker field are
+ * written after the allocation was tested and found null on the failure path,
+ * so a genuine out-of-memory would fault here. VC6's `operator new` answers
+ * null rather than throwing and the game checks it everywhere else, which is
+ * what makes this an oversight rather than a convention -- but reproducing it
+ * costs nothing and diverging would be a silent behavioural change. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
+    AM2_Widget *w, const char *bmp, int32_t flag, AM2_Rect box);
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_TyperCtorFn)(
+    AM2_Widget *w, AM2_Rect box, const char *message);
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_MultiSpriteCtorFn)(
+    AM2_Widget *w, const char *b0, const char *b1, int32_t flag, AM2_Rect box);
+
+#define orig_panel_ctor  ((AM2_PanelCtorFn)AM2_IMAGE(ADDR_PANEL_CTOR))
+#define orig_typer_ctor  ((AM2_TyperCtorFn)AM2_IMAGE(ADDR_TYPER_CTOR))
+#define orig_multisprite_ctor \
+    ((AM2_MultiSpriteCtorFn)AM2_IMAGE(ADDR_MULTISPRITE_CTOR))
+
+/* The four bitmaps every one of the three uses, and the one string. */
+#define AM2_BMP_OK0    0x00487044u
+#define AM2_BMP_OK1    0x00487058u
+#define AM2_BMP_OK2    0x0048706Cu
+#define AM2_BMP_CAN0   0x00486DECu
+#define AM2_BMP_CAN1   0x00486E04u
+#define AM2_BMP_CAN2   0x00486E1Cu
+#define AM2_BMP_RED0   0x00487178u
+#define AM2_BMP_RED1   0x0048718Cu
+
+static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
+                              uint32_t b1, uint32_t b2, uint32_t handler)
+{
+    AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    AM2_Rect    box;
+
+    if (!btn)
+        return (AM2_Widget *)0;
+    RectSet(&box, left, top, 0x51, 0x20);
+    return orig_button_ctor(btn, (const char *)AM2_IMAGE(b0),
+                            (const char *)AM2_IMAGE(b1),
+                            (const char *)AM2_IMAGE(b2), 1, box,
+                            (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
+                            0);
+}
+
+static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
+                                      uint32_t vtable, uint32_t panelBmp,
+                                      uint32_t okHandler, uint32_t message,
+                                      uint32_t cancelHandler)
+{
+    AM2_Widget *panel;
+    AM2_Widget *text;
+    AM2_Widget *dot;
+    AM2_Rect    box;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(vtable);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_ALPINE));
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
+        panel = orig_panel_ctor(panel, (const char *)AM2_IMAGE(panelBmp), 0,
+                                box);
+    }
+    WidgetAddChild(w, panel);
+    panel->flag44 = 1;
+
+    {
+        AM2_Widget *ok = MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+                                    AM2_BMP_OK2, okHandler);
+
+        WidgetAddChild(panel, ok);
+        panel->focusedChild = ok;
+    }
+
+    WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, cancelHandler));
+
+    text = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
+    if (text) {
+        RectSet(&box, 0x28, 0x41, 0xF0, 0x34);
+        text = orig_typer_ctor(text, box, (const char *)AM2_IMAGE(message));
+    }
+    WidgetAddChild(panel, text);
+
+    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
+    if (dot) {
+        RectSet(&box, 0x23, 0x95, 0x11, 0x10);
+        dot = orig_multisprite_ctor(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
+                                    (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
+                                    box);
+    }
+    WidgetAddChild(panel, dot);
+
+    *(AM2_Widget **)((uint8_t *)text + TYPER_OFF_BLINKER) = dot;
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)AM2_IMAGE(cancelHandler);
+    return w;
+}
+
+AM2_Widget *__attribute__((thiscall)) QuitDialogConstruct(AM2_Widget *w,
+                                                          const char *bmp)
+{
+    return ConfirmDialogBuild(w, bmp, VTABLE_QUIT_DIALOG, 0x0048B76C,
+                              ADDR_ON_QUIT_OK, 0x0048B74C, ADDR_ON_MENU_BACK);
+}
+
+AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
+                                                            const char *bmp)
+{
+    return ConfirmDialogBuild(w, bmp, VTABLE_REPLAY_DIALOG, 0x0048B7B0,
+                              ADDR_ON_REPLAY_OK, 0x0048B780,
+                              ADDR_ON_MENU_BACK);
+}
+
+AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
+                                                               const char *bmp)
+{
+    return ConfirmDialogBuild(w, bmp, VTABLE_DELPLAYER_DIALOG, 0x0048B9C4,
+                              ADDR_ON_DELPLAYER_OK, 0x0048B984,
+                              ADDR_ON_DELPLAYER_CANCEL);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2034,6 +2174,15 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_QUIT_CONFIRM_CTOR,
+                        (const void *)QuitDialogConstruct,
+                        "QuitDialogConstruct", 1);
+    rc |= patch_replace(ADDR_REPLAY_PROMPT_CTOR,
+                        (const void *)ReplayDialogConstruct,
+                        "ReplayDialogConstruct", 1);
+    rc |= patch_replace(ADDR_DELETE_PLAYER_CTOR,
+                        (const void *)DelPlayerDialogConstruct,
+                        "DelPlayerDialogConstruct", 1);
     rc |= patch_replace(ADDR_OPTIONS_MENU_CTOR,
                         (const void *)OptionsMenuConstruct,
                         "OptionsMenuConstruct", 1);

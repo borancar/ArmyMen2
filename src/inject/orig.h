@@ -1555,6 +1555,34 @@
  * constant, and a dialog also stores it at 0x0060 as its escape action. */
 #define ADDR_ON_MENU_BACK         0x0044E670u
 #define DLG_OFF_ESCAPE            0x60u
+
+/* The three CONFIRM dialogs -- CONFIRM GAME EXIT, the replay prompt and
+ * DELETE PLAYER -- are one body three times over. They differ in five things
+ * and nothing else: the vtable, the panel's bitmap, the OK handler, the
+ * message, and (for DELETE PLAYER alone) the CANCEL handler.
+ *
+ * The shape is worth knowing before reading any of them: the panel is a child
+ * of the dialog, and everything else is a child of the PANEL. */
+#define ADDR_QUIT_CONFIRM_CTOR    0x0044EB50u /* thiscall w *(w, bmp) */
+#define VTABLE_QUIT_DIALOG       0x0046FAF4u
+#define VTABLE_REPLAY_DIALOG     0x0046FB08u
+#define VTABLE_DELPLAYER_DIALOG  0x0046FB6Cu
+#define ADDR_ON_QUIT_OK          0x0044EE30u
+#define ADDR_ON_REPLAY_OK        0x0044F1B0u
+#define ADDR_ON_DELPLAYER_OK     0x00450A60u
+#define ADDR_ON_DELPLAYER_CANCEL 0x00450A10u
+#define ADDR_STR_ALPINE          0x0048B710u /* "alpine", the data dir they chdir to */
+
+/* The other three widget constructors these need. Each takes its rectangle by
+ * value like the button's, and each `ret` confirms the argument list:
+ * 0x18 is bmp + flag + 16, 0x14 is 16 + message, 0x1C is two bitmaps + flag
+ * + 16. */
+#define ADDR_PANEL_CTOR          0x00454980u /* thiscall w *(w, bmp, f, rect) */
+#define AM2_PANEL_SIZE           0x60u
+#define ADDR_TYPER_CTOR          0x004566F0u /* thiscall w *(w, rect, msg) */
+#define AM2_TYPER_SIZE           0x464u
+#define ADDR_MULTISPRITE_CTOR    0x00456BC0u /* thiscall w *(w, b0, b1, f, rect) */
+#define AM2_MULTISPRITE_SIZE     0x80u
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */

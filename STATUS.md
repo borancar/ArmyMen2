@@ -192,6 +192,40 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
+- **The three CONFIRM dialogs are one body three times over** -- CONFIRM GAME
+  EXIT (`0x0044EB50`), the replay prompt (`0x0044EED0`) and DELETE PLAYER
+  (`0x00450730`), 685 bytes each. They differ in five things and nothing else:
+  the vtable, the panel's bitmap, the OK handler, the message, and -- for
+  DELETE PLAYER alone -- the CANCEL handler. Written once with those five as
+  arguments.
+
+  The shape is the thing to know before reading any of them: **the dialog gets
+  ONE child, a panel, and everything visible is a child of the PANEL** -- both
+  buttons, the typewriter message and the blinking red dot beside it. The
+  panel is also what carries the focus, not the dialog.
+
+  Three more widget constructors came with them, and every `ret N` was checked
+  rather than inferred from the pushes: the panel's `0x00454980` is `ret 0x18`
+  (bitmap, flag, sixteen bytes of rectangle), the typewriter's `0x004566F0` is
+  `ret 0x14` (rectangle then message), the two-sprite dot's `0x00456BC0` is
+  `ret 0x1C` (two bitmaps, a flag, a rectangle). The rectangle is by value in
+  all three, as it is for the button.
+
+  **Three stores are unguarded in the original and are reproduced that way.**
+  `panel->flag44`, `panel->focusedChild` and the message's blinker field are
+  all written after the allocation was tested and found null on the failure
+  path, so a genuine out-of-memory faults there. VC6's `operator new` answers
+  null rather than throwing and this game checks it everywhere else, which is
+  what makes these an oversight rather than a convention -- but reproducing
+  them costs nothing and diverging would be a silent behavioural change.
+
+- **The alias ratchet caught its author again.** All three constructors were
+  already named in `orig.h`, from the batch that reconstructed their
+  factories, and I gave them second names. I *did* grep the addresses first --
+  and grepped the four new callees and the vtables and the string, and left
+  the three constructor addresses out of the list. Checking a rule and
+  checking every case of it are not the same thing.
+
 - **The first SCREEN CONSTRUCTOR is reconstructed**, `OptionsMenuConstruct`
   (`0x0044FAB0`): a backdrop and four buttons, AUDIO / CONTROLS / DIFFICULTY /
   BACK. The factories were the easy half of this layer; the constructors are
@@ -414,10 +448,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 664 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 663 | 653 of them below the CRT line |
+| `patch_replace` sites | 667 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 666 | 656 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 112,976 / 372,816 B (**30.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 115,040 / 372,816 B (**30.9%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
