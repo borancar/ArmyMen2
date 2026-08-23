@@ -232,14 +232,21 @@ play() {
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
-        # SELECT MAP is arm 2 of the menu table and NOTHING in the game
-        # reaches it from the title screen: the campaign goes through SELECT
-        # PLAYER and the multiplayer host panel has its own picker. The two
-        # routes that do are the host panel and SINGLE PLAYER with the "Aye
-        # aye Captain!" cheat entered and a shift held. Poking the menu
-        # request is the third, and it is the one this suite already uses for
-        # the multiplayer options -- the same pair the game itself writes.
-        selectmap) args="-nointro -dbg"  ; wait=25 ;;
+        # The screens no OTHER configuration can reach, opened by poking the
+        # menu-request pair -- the same pair the game itself writes, and the
+        # technique mpoptions already uses for the multiplayer options.
+        #
+        # SELECT MAP is arm 2 and nothing reaches it from the title screen:
+        # the campaign goes through SELECT PLAYER and the host panel has its
+        # own picker, so the real routes are that panel and SINGLE PLAYER
+        # with the "Aye aye Captain!" cheat and a shift held. ENTER NAME is
+        # arm 4 and RECRUIT does reach it -- but driving the campaign through
+        # RECRUIT is what CLAUDE.md warns against, because a name that
+        # already exists is rejected in silence.
+        #
+        # It was called `selectmap` for one commit. Two screens in, that name
+        # was already wrong.
+        menuscreens) args="-nointro -dbg"  ; wait=25 ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
     esac
 
@@ -345,7 +352,7 @@ play() {
             > "$WORK/$cfg-$side.widgets" || true
     fi
 
-    if [ "$cfg" = selectmap ]; then
+    if [ "$cfg" = menuscreens ]; then
         # Straight to arm 2. The screen reparses campaign.txt itself and
         # builds its list from the level table, so it needs nothing set up.
         drive ctl "poke 511DC8 2" >/dev/null 2>&1
@@ -371,6 +378,21 @@ play() {
         # pixels to the right of it, and the run still passed, because a
         # click that lands nowhere looks exactly like one that lands.
         "$REPO/tools/point.py" 456 284 --click >/dev/null 2>&1
+        sleep 5
+
+        # ENTER NAME, arm 4. Typing is the point again: this screen's field
+        # writes into the SCREEN's own buffer rather than a dialog's, and the
+        # handler that reads it is still the original's.
+        drive ctl "poke 511DC8 4" >/dev/null 2>&1
+        drive ctl "poke 511DC4 1" >/dev/null 2>&1
+        sleep 6
+        drive ctl "type Sarge" >/dev/null 2>&1
+        sleep 2
+        drive shot "ab-$cfg-alt-$side" >/dev/null 2>&1
+        # CANCEL, not OK: OK would create a player directory and the next run
+        # would drive a screen with one more row in it. Measured rather than
+        # guessed -- the tree puts CANCEL at 438..519 by 246..278.
+        "$REPO/tools/point.py" 478 262 --click >/dev/null 2>&1
         sleep 5
     fi
 
@@ -781,8 +803,8 @@ compare() {
         # into the block Windows keeps. 918 -> 50 once fixed, and 50 is the
         # cursor. Nothing else in the suite reaches that screen, which is why
         # it had survived every green run. See STATUS.md.
-        # A static list screen; the cursor is the only thing that moves.
-        selectmap) budget=200 ;;
+        # Static screens; the cursor and the caret are what move.
+        menuscreens) budget=200 ;;
         mpoptions) budget=200 ;;
         *)        budget=500 ;;
     esac
@@ -864,7 +886,7 @@ PY
 # printed "A/B clean" -- which reads as both configurations passing and is the
 # same failure mode as the two missing files that once diffed as identical.
 cfgs="${*:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol selectmap multi mpoptions quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens multi mpoptions quit"
 
 fail=0
 for cfg in $cfgs; do

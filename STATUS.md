@@ -11,6 +11,31 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **ENTER NAME, and `selectmap` becomes `menuscreens`.** `0x00451AF0` is
+  RECRUIT's dialog and the simplest screen that owns an edit box: a panel, one
+  field writing into the SCREEN's own buffer at `0x64`, OK, CANCEL and a green
+  dot. It clears that buffer before building anything, so the field always
+  opens empty and the name that was there is not offered back. Its OK handler
+  doubles as the field's ON-ENTER -- one address in two slots, the shape ENTER
+  BATTLE NAME has too -- and the character set is installed AFTER the
+  constructor, over the default, exactly as that screen does it.
+
+  The configuration was called `selectmap` for one commit and two screens in
+  the name was already wrong. It is `menuscreens` now: the screens no other
+  configuration can reach, opened by poking the menu-request pair. ENTER NAME
+  is reachable through RECRUIT, but driving the campaign through RECRUIT is
+  what CLAUDE.md warns against -- a name that already exists is rejected in
+  silence -- so the poke is the safer route here too.
+
+  It types `Sarge` into the field and CANCELs rather than OKs, which would
+  create a player directory and leave the next run driving a screen with one
+  more row in it. The `alt` frame differs from the `mid` one by 107,140
+  pixels, so it really is a second screen, and both sides agree on it exactly.
+
+  **The CANCEL coordinate was measured, not computed.** Yesterday's miss cost
+  a silently passing run; this one came from dumping the tree with the screen
+  up: 438..519 by 246..278, so 478,262.
+
 - **SELECT MAP, and a configuration that had to be invented to reach it.**
   `0x0044DBB0` is the campaign's level picker and the one screen whose list
   comes out of a PARSED FILE rather than the filesystem or the comm object: it
@@ -27,7 +52,7 @@ Nothing uncommitted.
   **Nothing in the game reaches it from the title screen.** The campaign goes
   through SELECT PLAYER, and the multiplayer host panel has its own picker.
   The two real routes are that panel and SINGLE PLAYER with the "Aye aye
-  Captain!" cheat entered and a shift held. `ab.sh selectmap` takes the third:
+  Captain!" cheat entered and a shift held. `ab.sh menuscreens` takes the third:
   poke the menu-request pair, which is the same pair the game itself writes
   and the technique `mpoptions` already uses.
 
@@ -239,7 +264,7 @@ Nothing uncommitted.
   more rows than fit, and every list the suite reached -- COMM CHANNEL, SELECT
   PLAYER, DIFFICULTY -- showed all of its rows at once. That was a fact about
   the SUITE: SELECT MAP has more levels than its box shows, and `ab.sh
-  selectmap` now scrolls it. The guard is still what saves the short lists,
+  menuscreens` now scrolls it. The guard is still what saves the short lists,
   since `count - visible` would be a division by zero otherwise.
 
 - **`0x00455C10` is not `WidgetRepaint` and is a near-twin of it.** Both walk
@@ -1322,10 +1347,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 723 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 722 | 712 of them below the CRT line |
+| `patch_replace` sites | 724 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 723 | 713 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 129,840 / 372,816 B (**34.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 130,592 / 372,816 B (**35.0%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 148,000 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

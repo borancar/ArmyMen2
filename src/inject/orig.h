@@ -1924,6 +1924,15 @@
 #define ADDR_OPEN_ENTER_NAME     0x00451E10u  /* void(void) */
 #define ADDR_ENTER_NAME_CTOR     0x00451AF0u  /* thiscall obj *(obj, bmp) */
 #define AM2_ENTER_NAME_SIZE      0x84u
+#define VTABLE_ENTER_NAME        0x0046FBBCu
+#define ADDR_STR_NAME_BMP        0x0048BAA4u /* "02_006_00_name.bmp" */
+/* The screen's own name buffer -- the edit box writes straight into it, and
+ * the screen is 0x84 bytes so it has 0x20 to work with against a limit of
+ * 0x18. Still the original's two handlers either side of it. */
+#define ENTER_NAME_OFF_TEXT      0x64u
+#define AM2_ENTER_NAME_MAX       0x18
+#define ADDR_ON_ENTER_NAME_OK    0x00451990u
+#define ADDR_ON_ENTER_NAME_CANCEL 0x00451AC0u
 #define ADDR_OPEN_CD_PROMPT      0x0042F440u  /* void(void) */
 #define ADDR_CD_PROMPT_CTOR      0x0042EED0u  /* thiscall obj *(obj, bmp) */
 #define AM2_CD_PROMPT_SIZE       0x64u

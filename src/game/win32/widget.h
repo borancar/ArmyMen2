@@ -1290,6 +1290,11 @@ void __cdecl CheckboxToggle(AM2_Widget *w);
 AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
                                                          const char *bmp);
 
+/* Original: 0x00451AF0, thiscall. ENTER NAME -- RECRUIT's dialog, and the
+ * simplest screen that owns an edit box. */
+AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
+                                                         const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

@@ -1706,7 +1706,7 @@ void __cdecl OpenEnterName(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_ENTER_NAME_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_ENTER_NAME_CTOR),
+               (AM2_ScreenCtorFn)EnterNameConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -4346,6 +4346,76 @@ AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00451AF0, thiscall. ENTER NAME -- RECRUIT's dialog, and the simplest of
+ * the screens that own an edit box: a panel, one field writing into the
+ * screen's own buffer, OK, CANCEL and a green dot.
+ *
+ * It clears the buffer before building anything, so the field always opens
+ * empty; the name that was there is not offered back. Its OK handler doubles
+ * as the field's ON-ENTER, so RETURN in the field is the same as clicking OK
+ * -- one address in two slots, which is the shape ENTER BATTLE NAME has too.
+ *
+ * The character set is ADDR_EDIT_CHARSET_PTR rather than the constructor's
+ * default, installed AFTER the constructor exactly as ENTER BATTLE NAME
+ * installs its own. */
+AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
+                                                         const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Widget *edit;
+    AM2_Widget *dot;
+    AM2_Rect    box;
+    char       *text = (char *)w + ENTER_NAME_OFF_TEXT;
+
+    ScreenBaseConstruct(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_ENTER_NAME);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    text[0] = '\0';
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x6C, 0xAE, 0x1A7, 0x83);
+        panel = PanelConstruct(panel, (const char *)
+                                AM2_IMAGE(ADDR_STR_NAME_BMP), 0, box);
+    }
+    WidgetAddChild(w, panel);
+    w->focusedChild = panel;
+    panel->flag44 = 1;
+
+    edit = (AM2_Widget *)orig_operator_new(AM2_EDIT_SIZE);
+    if (edit) {
+        RectSet(&box, 0x24, 0x39, 0xF7, 0x12);
+        edit = EditConstruct(edit, text, AM2_ENTER_NAME_MAX, box.left,
+                             box.top, box.right, box.bottom, 1,
+                             g_hiliteColour, g_whiteInk, g_backgroundColour,
+                             kImageHandler(ADDR_ON_ENTER_NAME_OK), 0, 0);
+    }
+    WidgetAddChild(panel, edit);
+    ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
+    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+
+    WidgetAddChild(panel, MakeButton(0x14A, 0x1F, AM2_BMP_OK0, AM2_BMP_OK1,
+                                     AM2_BMP_OK2,
+                                     kImageHandler(ADDR_ON_ENTER_NAME_OK)));
+    WidgetAddChild(panel, MakeButton(0x14A, 0x48, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2,
+                                     kImageHandler(ADDR_ON_ENTER_NAME_CANCEL)));
+
+    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
+    if (dot) {
+        RectSet(&box, 0x23, 0x68, 0x11, 0x10);
+        dot = MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
+                                    (const char *)AM2_IMAGE(AM2_BMP_GREEN1), 1,
+                                    box);
+    }
+    WidgetAddChild(panel, dot);
+    *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)(uintptr_t)kImageHandler(ADDR_ON_ENTER_NAME_CANCEL);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4451,6 +4521,10 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ENTER_NAME_CTOR,
+                        (const void *)EnterNameConstruct,
+                        "EnterNameConstruct", 1);
+
     rc |= patch_replace(ADDR_MP_SELECT_MAP_CTOR,
                         (const void *)SelectMapConstruct,
                         "SelectMapConstruct", 1);
