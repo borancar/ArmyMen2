@@ -1746,10 +1746,7 @@ static void OpenScreen2(uint32_t size, AM2_ScreenCtor2Fn ctor,
     g_paintObject = obj ? (uint8_t *)ctor(obj, bmp, flag) : (uint8_t *)0;
 }
 
-#define g_gameState (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE)
-
-typedef void (__cdecl *AM2_RefreshFn)(void);
-#define orig_refresh_screen ((AM2_RefreshFn)AM2_IMAGE(ADDR_REFRESH_SCREEN))
+#define g_gameState (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
 
 /* Arm 6. The COMM CHANNEL SELECT screen, and the one factory that does
  * something before it allocates rather than around the branch: it asks the
@@ -1767,12 +1764,18 @@ void __cdecl OpenCommPanel(void)
 }
 
 /* Arm 19. AUDIO CONTROLS -- the three volume sliders. The repaint comes
- * BEFORE the allocation on this one. */
+ * BEFORE the allocation on this one.
+ *
+ * RefreshScreen is OURS and is called directly, so its counter cannot move
+ * from here -- the usual blind spot. It went in behind an `orig_` macro first
+ * and tools/checkseams.py caught it, which is what that ratchet is for: an
+ * `orig_` pointing at a reconstructed address is a lie about where control
+ * goes, and this one would have made the seam look open when it is closed. */
 void __cdecl OpenAudioOptions(void)
 {
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
-        orig_refresh_screen();
+        RefreshScreen();
         OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
                     (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_AUDIO_OPTIONS_CTOR),
                     (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP), 0);
@@ -1788,7 +1791,7 @@ void __cdecl OpenDeleteGame(void)
 {
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
-        orig_refresh_screen();
+        RefreshScreen();
         OpenScreen2(AM2_DELETE_GAME_SIZE,
                     (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_DELETE_GAME_CTOR),
                     (const char *)AM2_IMAGE(ADDR_STR_DELGAME_BMP), 0);
@@ -1817,7 +1820,7 @@ void __cdecl OpenLoadGame(void)
             screen = (uint8_t *)ctor(obj, (const char *)
                                      AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0);
         }
-        orig_refresh_screen();
+        RefreshScreen();
         g_paintObject = screen;
     } else {
         OpenScreen2(AM2_LOAD_GAME_SIZE,

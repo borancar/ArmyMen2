@@ -192,6 +192,17 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
+- **Two ratchets fired on the commit that landed the last four, and both were
+  right.** `checkseams.py`: `RefreshScreen` is already reconstructed, so
+  reaching it through an `orig_` macro was a lie about where control goes --
+  it would have made a closed seam read as open. `checkglobals.py`: a `const`
+  on `g_gameState` that `gameproc.cpp` and `winproc.cpp` do not have.
+
+  Both fixed in the commit after. Worth saying plainly: `make check` was run
+  before the change and after the build, but not between the last edit and
+  `git commit`, and that is the gap. The ratchets caught it within the minute;
+  the discipline they exist to enforce did not.
+
 - **Twenty of the twenty-one screen factories are reconstructed.** The last
   four were the two-argument ones: COMM CHANNEL SELECT (`0x0042EE40`), AUDIO
   CONTROLS (`0x0044F9E0`), DELETE GAME (`0x00450250`) and LOAD GAME
