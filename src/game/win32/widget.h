@@ -1253,6 +1253,15 @@ void __cdecl OnArrowDown(AM2_Widget *w);
 void __cdecl OnArrowLeft(AM2_Widget *w);
 void __cdecl OnArrowRight(AM2_Widget *w);
 
+/* SELECT PLAYER's three buttons (0x00451300, 0x00451330, 0x00451380),
+ * DELETE PLAYER's CANCEL (0x00450A10) and the REPLAY prompt's OK
+ * (0x0044F1B0). */
+void __cdecl OnRecruit(AM2_Widget *w);
+void __cdecl OnDeletePlayer(AM2_Widget *w);
+void __cdecl OnSelectPlayer(AM2_Widget *w);
+void __cdecl OnDelPlayerCancel(AM2_Widget *w);
+void __cdecl OnReplayOk(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

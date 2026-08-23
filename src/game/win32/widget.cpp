@@ -55,6 +55,11 @@
 #define kOnArrowDown        OnArrowDown
 #define kOnArrowLeft        OnArrowLeft
 #define kOnArrowRight       OnArrowRight
+#define kOnRecruit          OnRecruit
+#define kOnDeletePlayer     OnDeletePlayer
+#define kOnSelectPlayer     OnSelectPlayer
+#define kOnDelPlayerCancel  OnDelPlayerCancel
+#define kOnReplayOk         OnReplayOk
 #define kOnAudioButton      OnAudioButton
 #define kOnControlsButton   OnControlsButton
 #define kOnDifficultyButton OnDifficultyButton
@@ -2012,11 +2017,13 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
 #define AM2_BMP_RED1   0x0048718Cu
 
 
-/* The handler by POINTER. Most menu handlers are still the original's and
- * arrive as an address, which the overload below turns into one; the seven
- * that are ours must not, or they would reach our own code through the image
- * -- the seam tools/checkseams.py exists to catch. */
-static AM2_Widget *MakeButtonFn(int32_t left, int32_t top, uint32_t b0,
+/* The handler by POINTER, always. There used to be a second form taking the
+ * ADDRESS and applying AM2_IMAGE here, which is right for a handler still in
+ * the image and a lie for one that is ours -- and invisible, because nothing
+ * on the call line named an address. Every site passes a pointer now:
+ * `kImageHandler(ADDR_X)` where the handler is still the original's, the
+ * function itself where it is not. */
+static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
                                 uint32_t b1, uint32_t b2,
                                 void (__cdecl *handler)(AM2_Widget *))
 {
@@ -2031,12 +2038,6 @@ static AM2_Widget *MakeButtonFn(int32_t left, int32_t top, uint32_t b0,
                             (const char *)AM2_IMAGE(b2), 1, box, handler, 0);
 }
 
-static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
-                              uint32_t b1, uint32_t b2, uint32_t handler)
-{
-    return MakeButtonFn(left, top, b0, b1, b2,
-                        (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler));
-}
 
 static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
                                       uint32_t vtable, uint32_t panelBmp,
@@ -2063,14 +2064,14 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     panel->flag44 = 1;
 
     {
-        AM2_Widget *ok = MakeButtonFn(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+        AM2_Widget *ok = MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
                                       AM2_BMP_OK2, okHandler);
 
         WidgetAddChild(panel, ok);
         panel->focusedChild = ok;
     }
 
-    WidgetAddChild(panel, MakeButtonFn(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
+    WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                        AM2_BMP_CAN2, cancelHandler));
 
     text = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
@@ -2107,7 +2108,7 @@ AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
                                                             const char *bmp)
 {
     return ConfirmDialogBuild(w, bmp, VTABLE_REPLAY_DIALOG, 0x0048B7B0,
-                              kImageHandler(ADDR_ON_REPLAY_OK), 0x0048B780,
+                              kOnReplayOk, 0x0048B780,
                               kOnMenuBack);
 }
 
@@ -2116,7 +2117,7 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
 {
     return ConfirmDialogBuild(w, bmp, VTABLE_DELPLAYER_DIALOG, 0x0048B9C4,
                               kImageHandler(ADDR_ON_DELPLAYER_OK), 0x0048B984,
-                              kImageHandler(ADDR_ON_DELPLAYER_CANCEL));
+                              kOnDelPlayerCancel);
 }
 
 /* 0x0044E730, thiscall. The DIFFICULTY dialog -- the same panel-holds-
@@ -2195,9 +2196,9 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST)
                      + LIST_OFF_BLINKER) = dot;
 
-    WidgetAddChild(panel, MakeButtonFn(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+    WidgetAddChild(panel, MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
                                        AM2_BMP_OK2, kOnDifficultyOk));
-    WidgetAddChild(panel, MakeButtonFn(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
+    WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                        AM2_BMP_CAN2, kOnOptionsMenu));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnOptionsMenu;
@@ -2273,15 +2274,15 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
      * buttons one palette step off and cost 547 pixels on a frame whose
      * widget tree was identical, which is the failure `ctl widgets` cannot
      * see and the pixels can. */
-    ok = MakeButtonFn(0x218, 0xAD, AM2_BMP_OK0, AM2_BMP_OK1, AM2_BMP_OK2,
+    ok = MakeButton(0x218, 0xAD, AM2_BMP_OK0, AM2_BMP_OK1, AM2_BMP_OK2,
                       kOnControlsOk);
     WidgetAddChild(w, ok);
     ((AM2_WidgetFocusFn *)ok->vtable)[WIDGET_VSLOT_FOCUS](ok, 0);
 
-    WidgetAddChild(w, MakeButtonFn(0x218, 0xDF, AM2_BMP_DEFAULT0,
+    WidgetAddChild(w, MakeButton(0x218, 0xDF, AM2_BMP_DEFAULT0,
                                    AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
                                    kOnControlsDefault));
-    WidgetAddChild(w, MakeButtonFn(0x218, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
+    WidgetAddChild(w, MakeButton(0x218, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                    AM2_BMP_CAN2, kOnControlsCancel));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnControlsCancel;
@@ -2373,20 +2374,20 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
         }
 
         {
-            AM2_Widget *ok = MakeButtonFn(0x219, 0xAE, AM2_BMP_OK0, AM2_BMP_OK1,
+            AM2_Widget *ok = MakeButton(0x219, 0xAE, AM2_BMP_OK0, AM2_BMP_OK1,
                                         AM2_BMP_OK2, kOptionsApply);
 
             WidgetAddChild(w, ok);
             w->focusedChild = ok;
             ok->flag44 = 1;
         }
-        WidgetAddChild(w, MakeButtonFn(0x219, 0xE0, AM2_BMP_DEFAULT0,
+        WidgetAddChild(w, MakeButton(0x219, 0xE0, AM2_BMP_DEFAULT0,
                                      AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
                                      kOptionsDefaults));
-        WidgetAddChild(w, MakeButtonFn(0x219, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
+        WidgetAddChild(w, MakeButton(0x219, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                      AM2_BMP_CAN2, kOptionsRequest));
     } else {
-        AM2_Widget *cancel = MakeButtonFn(0x219, 0xAE, AM2_BMP_CAN0,
+        AM2_Widget *cancel = MakeButton(0x219, 0xAE, AM2_BMP_CAN0,
                                         AM2_BMP_CAN1, AM2_BMP_CAN2,
                                         kOptionsRequest);
 
@@ -2428,7 +2429,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
 #define g_voiceVolume   (*(int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
 
 
-/* onChange by POINTER, for the same reason MakeButtonFn takes one: all three
+/* onChange by POINTER, for the same reason MakeButton takes one: all three
  * of these handlers are reconstructed, and reaching them through the image
  * would be a seam tools/checkseams.py cannot see -- the AM2_IMAGE would be
  * applied here, to a parameter, with no ADDR_ name anywhere in the text. */
@@ -2514,10 +2515,10 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
     saved[1] = g_streamVolume;
     saved[2] = g_voiceVolume;
 
-    WidgetAddChild(parent, MakeButtonFn(offX + 0x110, offY + 0x5E, AM2_BMP_OK0,
+    WidgetAddChild(parent, MakeButton(offX + 0x110, offY + 0x5E, AM2_BMP_OK0,
                                         AM2_BMP_OK1, AM2_BMP_OK2,
                                         kOnAudioOk));
-    WidgetAddChild(parent, MakeButtonFn(offX + 0x110, offY + 0x8B, AM2_BMP_CAN0,
+    WidgetAddChild(parent, MakeButton(offX + 0x110, offY + 0x8B, AM2_BMP_CAN0,
                                         AM2_BMP_CAN1, AM2_BMP_CAN2,
                                         kOnAudioCancel));
 
@@ -2721,10 +2722,10 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) =
         *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
 
-    WidgetAddChild(panel, MakeButtonFn(0x19C, 0x6B, AM2_BMP_SELECT0,
+    WidgetAddChild(panel, MakeButton(0x19C, 0x6B, AM2_BMP_SELECT0,
                                      AM2_BMP_SELECT1, AM2_BMP_SELECT2,
                                      kStartSelectedGame));
-    WidgetAddChild(panel, MakeButtonFn(0x19C, 0x94, AM2_BMP_CAN0, AM2_BMP_CAN1,
+    WidgetAddChild(panel, MakeButton(0x19C, 0x94, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                      AM2_BMP_CAN2, kOnMenuBack));
     return w;
 }
@@ -2839,14 +2840,14 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
 
     WidgetAddChild(panel, MakeButton(0x123, 0x44, AM2_BMP_RECRUIT0,
                                      AM2_BMP_RECRUIT1, AM2_BMP_RECRUIT2,
-                                     ADDR_ON_RECRUIT));
+                                       kOnRecruit));
     WidgetAddChild(panel, MakeButton(0x123, 0x6B, AM2_BMP_SELECT0,
                                      AM2_BMP_SELECT1, AM2_BMP_SELECT2,
-                                     ADDR_ON_SELECT_PLAYER));
+                                       kOnSelectPlayer));
     WidgetAddChild(panel, MakeButton(0x123, 0x92, AM2_BMP_DELETE0,
                                      AM2_BMP_DELETE1, AM2_BMP_DELETE2,
-                                     ADDR_ON_DELETE_PLAYER));
-    WidgetAddChild(panel, MakeButtonFn(0x123, 0xB9, AM2_BMP_BACK0,
+                                       kOnDeletePlayer));
+    WidgetAddChild(panel, MakeButton(0x123, 0xB9, AM2_BMP_BACK0,
                                        AM2_BMP_BACK1, AM2_BMP_BACK2,
                                        kOnMenuBack));
 
@@ -3263,7 +3264,8 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
  * The right arrow sits at left + width - 9, computed with a `lea` rather than
  * stored. */
 static AM2_Widget *MakeArrow(AM2_Widget *bar, int32_t x, int32_t y,
-                             uint32_t b1, uint32_t b2, uint32_t handler)
+                             uint32_t b1, uint32_t b2,
+                             void (__cdecl *handler)(AM2_Widget *))
 {
     AM2_Widget *arrow = (AM2_Widget *)orig_operator_new(AM2_ARROW_SIZE);
     AM2_Rect    box;
@@ -3299,14 +3301,14 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
     w->vtable = (void *)AM2_IMAGE(VTABLE_SCROLLBAR);
 
     arrow = MakeArrow(w, w->x, w->y, AM2_BMP_LTARROW1, AM2_BMP_LTARROW2,
-                      ADDR_ON_ARROW_LEFT);
+                      kOnArrowLeft);
     *(AM2_Widget **)(self + 0x5C) = arrow;
     WidgetAddChild(parent, arrow);
     *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + 0x5C)
                  + ARROW_OFF_FLAG5C) = 1;
 
     arrow = MakeArrow(w, w->x + w->w - 9, w->y, AM2_BMP_RTARROW1,
-                      AM2_BMP_RTARROW2, ADDR_ON_ARROW_RIGHT);
+                      AM2_BMP_RTARROW2, kOnArrowRight);
     *(AM2_Widget **)(self + 0x60) = arrow;
     WidgetAddChild(parent, arrow);
     *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + 0x60)
@@ -3343,7 +3345,8 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
  * twice at different depths. A dozen lines of Python beat an hour of care. */
 static AM2_Widget *MakeVArrow(AM2_Widget *bar, AM2_Widget *parent,
                               int32_t x, int32_t y, uint32_t b1, uint32_t b2,
-                              uint32_t handler, int32_t flag50)
+                              void (__cdecl *handler)(AM2_Widget *),
+                              int32_t flag50)
 {
     AM2_Widget *arrow = (AM2_Widget *)orig_operator_new(AM2_ARROW_SIZE);
     AM2_Rect    box;
@@ -3385,10 +3388,10 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
 
     *(AM2_Widget **)(self + ARROWBAR_OFF_UP) =
         MakeVArrow(w, parent, w->x, w->y, AM2_BMP_UPARROW1, AM2_BMP_UPARROW2,
-                   ADDR_ON_ARROW_UP, flag50);
+                   kOnArrowUp, flag50);
     *(AM2_Widget **)(self + ARROWBAR_OFF_DOWN) =
         MakeVArrow(w, parent, w->x, w->y + height - 9, AM2_BMP_DNARROW1,
-                   AM2_BMP_DNARROW2, ADDR_ON_ARROW_DOWN, flag50);
+                   AM2_BMP_DNARROW2, kOnArrowDown, flag50);
     *(int32_t *)(self + ARROWBAR_OFF_FLAG50) = flag50;
 
     *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0) =
@@ -3966,6 +3969,108 @@ void __cdecl OnArrowRight(AM2_Widget *w)
     ScrollBarStep(w, 1);
 }
 
+/* ------------------------------------------------------------------ *
+ * SELECT PLAYER's three buttons, DELETE PLAYER's CANCEL, and the REPLAY
+ * prompt's OK.
+ *
+ * The player's name lives in ADDR_GAMEPROC_BLOCK and an EMPTY one is what
+ * these test: three of them measure it with strlen and refuse with wave 3,
+ * the game's "no". Nothing else about the row is consulted -- SELECT PLAYER
+ * does not look at the list at all, because clicking a row has already
+ * copied the name in.
+ * ------------------------------------------------------------------ */
+
+#define g_loadPending     (*(int32_t *)(uintptr_t)ADDR_LOAD_PENDING)
+#define g_missionRetry    (*(int32_t *)(uintptr_t)ADDR_MISSION_RETRY)
+#define g_levelId         (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
+#define g_levelIndex      (*(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX)
+
+typedef void *(__cdecl *am2_find_level_fn)(int32_t id);
+typedef void  (__cdecl *am2_select_level_fn)(void *record);
+#define orig_find_level_record (*(am2_find_level_fn)ADDR_FIND_LEVEL_RECORD)
+#define orig_select_level      (*(am2_select_level_fn)ADDR_SELECT_LEVEL)
+
+/* 0x00451300. RECRUIT: no test at all, straight to ENTER NAME. */
+void __cdecl OnRecruit(AM2_Widget *w)
+{
+    (void)w;
+    RequestScreen(AM2_MENU_REQUEST_ENTER_NAME);
+}
+
+/* 0x00451330. DELETE: refuse with wave 3 when no player is selected. */
+void __cdecl OnDeletePlayer(AM2_Widget *w)
+{
+    (void)w;
+    if (!strlen(g_currentPlayer)) {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        return;
+    }
+    RequestScreen(AM2_MENU_REQUEST_DEL_PLAYER);
+}
+
+/* 0x00451380. SELECT: the name must be there AND level 1 must be in the
+ * table, and BOTH failures give the same refusal. The level id it stores is
+ * the literal 1 rather than the record's own field, which is where this
+ * differs from the Boot Camp button. */
+void __cdecl OnSelectPlayer(AM2_Widget *w)
+{
+    void *level = (void *)0;
+
+    (void)w;
+    if (strlen(g_currentPlayer))
+        level = orig_find_level_record(1);
+    if (!level) {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        return;
+    }
+
+    orig_select_level(level);
+    g_levelId    = 1;
+    g_levelIndex = 1;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = AM2_MENU_REQUEST_LOAD_GAME;
+    g_menuRequestSet = 1;
+}
+
+/* 0x00450A10. DELETE PLAYER's CANCEL, with the same two exits as the OPTIONS
+ * dialogs -- an in-game overlay mode or a menu request -- but a different
+ * pair of codes: 0x1A and 3, back to SELECT PLAYER. */
+void __cdecl OnDelPlayerCancel(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    if (g_gameState == 2) {
+        g_menuMode     = AM2_MENU_MODE_DEL_PLAYER;
+        g_overlayDirty = 1;
+    } else {
+        g_menuRequest    = AM2_MENU_REQUEST_SELECT_PLAYER;
+        g_menuRequestSet = 1;
+    }
+}
+
+/* 0x0044F1B0. The REPLAY prompt's OK -- "do you wish to reattempt your failed
+ * mission?" -- and it is the route to LoadGame this project has been looking
+ * for. With the second name set it raises ADDR_LOAD_PENDING, which the
+ * state-2 entry consumes by validating the save and loading it; without it,
+ * the mission simply restarts from level index 1.
+ *
+ * Both arms set ADDR_MISSION_RETRY, which the teardown turns into the
+ * "Attempt# %d" line. */
+void __cdecl OnReplayOk(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    if (*(const char *)(uintptr_t)ADDR_GAMEPROC_STR_B) {
+        g_loadPending = 1;
+        PlaySoundAt(2, 0, 0, 0, 0);
+        RequestState(2);
+    } else {
+        RequestState(2);
+        g_levelIndex = 1;
+    }
+    g_missionRetry = 1;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4071,6 +4176,18 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_RECRUIT, (const void *)OnRecruit,
+                        "OnRecruit", 0);
+    rc |= patch_replace(ADDR_ON_DELETE_PLAYER, (const void *)OnDeletePlayer,
+                        "OnDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_SELECT_PLAYER, (const void *)OnSelectPlayer,
+                        "OnSelectPlayer", 0);
+    rc |= patch_replace(ADDR_ON_DELPLAYER_CANCEL,
+                        (const void *)OnDelPlayerCancel,
+                        "OnDelPlayerCancel", 0);
+    rc |= patch_replace(ADDR_ON_REPLAY_OK, (const void *)OnReplayOk,
+                        "OnReplayOk", 0);
+
     rc |= patch_replace(ADDR_ON_ARROW_UP, (const void *)OnArrowUp,
                         "OnArrowUp", 0);
     rc |= patch_replace(ADDR_ON_ARROW_DOWN, (const void *)OnArrowDown,

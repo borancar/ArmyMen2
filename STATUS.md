@@ -11,6 +11,54 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **SELECT PLAYER's three buttons, DELETE PLAYER's CANCEL, and the REPLAY
+  prompt's OK.** `0x00451300`, `0x00451330`, `0x00451380`, `0x00450A10` and
+  `0x0044F1B0`. What three of them test is the player NAME in
+  `ADDR_GAMEPROC_BLOCK` -- measured with `strlen` and refused with wave 3, the
+  game's "no". SELECT does not look at the list at all: clicking a row has
+  already copied the name in.
+
+  SELECT stores the level id as the literal 1 rather than the record's own
+  first field, which is where it differs from the Boot Camp button doing the
+  same lookup two screens away.
+
+- **The REPLAY prompt's OK is a SECOND writer of the load flag, and open item
+  2 already knew the first.** `0x0044F1B0` sets `0x00511DD8` when the second
+  name is present and then asks for state 2 -- the same global the GAME SELECT
+  PANEL's LOAD arm sets, and the same one mission start reads at `0x00425360`.
+  So this is not the missing route to `LoadGame`; the puzzle stays exactly
+  where item 2 left it, which is that the flag is set, read as set at
+  `0x00425360`, and read as 0 again by `0x004255CB`.
+
+  What it does add is a name -- `ADDR_LOAD_PENDING`, which that item has been
+  writing out as a bare address -- and a second way to reach the path, which
+  matters if the "entered twice" reading is right: the two writers arrive from
+  different screens.
+
+  `0x0051232C` comes with it: both arms of the handler set it, and the level
+  teardown turns it into the "Attempt# %d" line, so it is `ADDR_MISSION_RETRY`
+  with `ADDR_ATTEMPT_COUNT` beside it.
+
+- **`ab.sh campaign` clicks DELETE and then CANCEL, which deletes nothing and
+  covers two handlers no configuration reached.** The four buttons are 39
+  apart at x 416..497 and the confirm dialog puts OK at y 208..240 and CANCEL
+  at 249..281, so 265 is CANCEL with sixteen pixels either side -- worth being
+  exact, since a miss deletes the campaign player and the next run drives a
+  screen that is not there. Verified by dumping the tree with the dialog up
+  before wiring it in.
+
+- **A counter that MOVES on a handler only our own code installs is the tell
+  that the install went through the image.** `OnDeletePlayer` read 1 on the
+  probe, and it should not have been able to: the only caller is the button
+  widget, whose handler our own constructor writes. It read 1 because the
+  constructor was still passing the ADDRESS, so the call went out to the
+  detour and back. Closing that seam takes the counter to 0.
+
+  All of `widget.cpp` is closed now and the address-taking `MakeButton` is
+  gone -- every site passes a pointer, `kImageHandler(ADDR_X)` where the
+  handler is still the original's and the function itself where it is not.
+  29 by-address sites remain elsewhere in `src/game`.
+
 - **The four arrows are two pairs on two different classes, and only the
   shapes rhyme.** UP and DOWN (`0x004557F0`, `0x004558B0`) belong to the ARROW
   BAR beside a list and move the list's first drawn row; LEFT and RIGHT
@@ -1118,11 +1166,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 712 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 711 | 701 of them below the CRT line |
+| `patch_replace` sites | 717 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 716 | 706 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 128,336 / 372,816 B (**34.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 147,552 / 372,816 B (39.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 128,784 / 372,816 B (**34.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 147,904 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -1183,7 +1231,7 @@ counts probe before reading one as coverage -- that is what turned the
    - The GAME SELECT PANEL's LOAD arm (`0x00452060`) fires: `0x00511B88`
      holds `"map1_mission1.sav"`, `0x00511A68` holds `"sarge"`.
    - Mission start (`0x00425300`) takes the LOAD branch, so `0x00511DD8` was
-     set when it read it at `0x00425360`.
+     set when it read it at `0x00425360`. That global is `ADDR_LOAD_PENDING`.
    - `0x00425950` **succeeds** -- `SetGameDir("save\sarge")`,
      `CheckSaveTag(fp, 0x06660666, gameproc.cpp, 0x528)`,
      `LoadGameProcSection` returning 1. So the flag is NOT cleared at

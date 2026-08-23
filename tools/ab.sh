@@ -281,6 +281,21 @@ play() {
         # The tree is the evidence here.
         if "$REPO/tools/point.py" 240 177 --click >/dev/null 2>&1; then :; fi
         sleep 4
+        # DELETE, then CANCEL on the confirm dialog. Nothing is deleted and
+        # two handlers that no configuration reached are: the DELETE button
+        # refuses with wave 3 when no player is selected, so it also proves
+        # the row click above took.
+        #
+        # The buttons are 39 apart at x 416..497 -- NEW, SELECT, DELETE, BACK
+        # -- and the confirm dialog puts OK at y 208..240 and CANCEL at
+        # 249..281, so 265 is CANCEL with sixteen pixels either side. Worth
+        # being exact: a miss here deletes the campaign player and the next
+        # run drives a screen that is not there.
+        "$REPO/tools/point.py" 455 260 --click >/dev/null 2>&1   # DELETE
+        sleep 5
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        "$REPO/tools/point.py" 477 265 --click >/dev/null 2>&1   # CANCEL
+        sleep 5
         "$REPO/tools/point.py" 455 221 --click >/dev/null 2>&1   # SELECT
         sleep 6
         "$REPO/tools/point.py" 455 181 --click >/dev/null 2>&1   # NEW

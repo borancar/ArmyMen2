@@ -1828,6 +1828,10 @@
 #define AM2_MENU_REQUEST_COMM_PANEL   0x06u
 #define AM2_MENU_REQUEST_SELECT_MAP   0x02u
 #define AM2_MENU_REQUEST_SELECT_PLAYER 0x03u
+#define AM2_MENU_REQUEST_ENTER_NAME    0x04u
+#define AM2_MENU_REQUEST_LOAD_GAME     0x05u
+#define AM2_MENU_REQUEST_DEL_PLAYER    0x14u
+#define AM2_MENU_MODE_DEL_PLAYER       0x1Au
 #define AM2_GAME_OVER_CREDITS         0x04u
 /* 0x0043ED00: reload the Boot Camp level table -- it frees whatever is there,
  * chdirs to `shared` and parses "bootcamp.txt", naming the file in
@@ -2225,6 +2229,20 @@
  * the mission starts. */
 #define AM2_SAVETAG_GAMEPROC     0x06660666u
 #define ADDR_LOAD_GAME           0x00425A10u  /* int32_t(FILE *) */
+/* Set when entering a mission should LOAD its save rather than start it
+ * fresh, and cleared by the state-2 entry as soon as it has acted. That entry
+ * is the only reader that matters: with both names set and this raised, it
+ * calls 0x00425950, which validates the save and leads to LoadGame.
+ *
+ * TWO screens raise it: the GAME SELECT PANEL's LOAD arm, and the REPLAY
+ * prompt's OK -- "do you wish to reattempt your failed mission?". Neither is
+ * the answer to STATUS.md's open item 2, which is that the flag is set, read
+ * as SET at 0x00425360, and read as 0 again by 0x004255CB. */
+#define ADDR_LOAD_PENDING        0x00511DD8u  /* int32_t */
+/* Raised beside it and consumed by the level teardown, which bumps
+ * ADDR_ATTEMPT_COUNT and logs "Attempt# %d". */
+#define ADDR_MISSION_RETRY       0x0051232Cu  /* int32_t */
+#define ADDR_ATTEMPT_COUNT       0x00512330u  /* int32_t */
 #define ADDR_SAVE_GAME           0x00425790u  /* int32_t(const char *) */
 #define ADDR_GAMEPROC_BLOCK      0x00511A68u  /* also a string; see below */
 #define AM2_GAMEPROC_SAVE_SIZE   0x438u       /* 1080 bytes, and its own tag */
