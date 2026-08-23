@@ -394,6 +394,18 @@ play() {
         # guessed -- the tree puts CANCEL at 438..519 by 246..278.
         "$REPO/tools/point.py" 478 262 --click >/dev/null 2>&1
         sleep 5
+
+        # DELETE GAME, arm 21, and it is LEFT UP: the final frame is the
+        # comparison. All four shot slots are spoken for by the time this
+        # runs, and this screen is the one worth the last one -- it is the
+        # only screen in the table built two different ways, with the panel's
+        # offset folded into every rectangle when there is no panel.
+        #
+        # The cost is its destructor, which no configuration runs. Said
+        # plainly rather than left to be discovered.
+        drive ctl "poke 511DC8 15" >/dev/null 2>&1
+        drive ctl "poke 511DC4 1" >/dev/null 2>&1
+        sleep 6
     fi
 
     if [ "$cfg" = mpoptions ]; then

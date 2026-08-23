@@ -1545,6 +1545,12 @@
 #define ADDR_DELETE_GAME_CTOR    0x0044FE50u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_DELETE_GAME_SIZE     0x64u
 #define ADDR_STR_DELGAME_BMP     0x0048B918u  /* "02_011_00_delgame.bmp" */
+#define VTABLE_DELETE_GAME       0x0046FB44u
+#define ADDR_STR_DELGAME_ASK     0x0048B8ECu  /* "Are you sure ... delete this
+                                               * game?" */
+/* Still the original's, and the CANCEL doubles as the screen's escape. */
+#define ADDR_ON_DELGAME_OK       0x004501E0u
+#define ADDR_ON_DELGAME_CANCEL   0x00450180u
 #define ADDR_OPEN_LOAD_GAME      0x00452680u  /* void(void) */
 /* The pieces a screen constructor is built from. */
 #define ADDR_SCREEN_BASE_CTOR    0x00454B00u /* thiscall w *(w, bmp, int32) */

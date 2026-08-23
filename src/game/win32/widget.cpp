@@ -1852,11 +1852,11 @@ void __cdecl OpenDeleteGame(void)
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
         OpenScreen2(AM2_DELETE_GAME_SIZE,
-                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_DELETE_GAME_CTOR),
+                    (AM2_ScreenCtor2Fn)DeleteGameConstruct,
                     (const char *)AM2_IMAGE(ADDR_STR_DELGAME_BMP), 0);
     } else {
         OpenScreen2(AM2_DELETE_GAME_SIZE,
-                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_DELETE_GAME_CTOR),
+                    (AM2_ScreenCtor2Fn)DeleteGameConstruct,
                     (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
     }
 }
@@ -4416,6 +4416,85 @@ AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x0044FE50, thiscall. DELETE GAME -- and the ONE screen in the table that
+ * is built two different ways.
+ *
+ * In a mission it has no panel at all: the children go straight onto the
+ * screen and every rectangle carries the offset the panel would have
+ * supplied, 0x6C by 0x98. On the title screen the panel is made, the offset
+ * becomes zero, and the same four children go into it instead. So the
+ * coordinates in the source are the SAME numbers either way and the parent
+ * and the offset move together -- which is why reading it as two layouts
+ * gets the arithmetic wrong.
+ *
+ * `flag` is passed straight through to the base rather than being consumed
+ * here, which is what makes this constructor take two arguments where most
+ * take one. */
+AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
+                                                          const char *bmp,
+                                                          int32_t flag)
+{
+    AM2_Widget *parent = w;
+    AM2_Widget *ok;
+    AM2_Widget *msg;
+    AM2_Widget *dot;
+    AM2_Rect    box;
+    int32_t     dx = 0x6C;
+    int32_t     dy = 0x98;
+
+    ScreenBaseConstruct(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DELETE_GAME);
+
+    if (g_gameState == 2) {
+        w->flag44 = 1;
+    } else {
+        AM2_Widget *panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+
+        if (panel) {
+            RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
+            panel = PanelConstruct(panel, (const char *)
+                                    AM2_IMAGE(ADDR_STR_DELGAME_BMP), 0, box);
+        }
+        WidgetAddChild(w, panel);
+        dx = 0;
+        dy = 0;
+        panel->flag44 = 1;
+        parent = panel;
+    }
+
+    ok = MakeButton(dx + 0x149, dy + 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+                    AM2_BMP_OK2, kImageHandler(ADDR_ON_DELGAME_OK));
+    WidgetAddChild(parent, ok);
+    parent->focusedChild = ok;
+
+    WidgetAddChild(parent,
+                   MakeButton(dx + 0x149, dy + 0x61, AM2_BMP_CAN0,
+                              AM2_BMP_CAN1, AM2_BMP_CAN2,
+                              kImageHandler(ADDR_ON_DELGAME_CANCEL)));
+
+    msg = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
+    if (msg) {
+        RectSet(&box, dx + 0x28, dy + 0x41, 0xF0, 0x34);
+        msg = TyperConstruct(msg, box.left, box.top, box.right, box.bottom,
+                             (const char *)AM2_IMAGE(ADDR_STR_DELGAME_ASK));
+    }
+    WidgetAddChild(parent, msg);
+
+    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
+    if (dot) {
+        RectSet(&box, dx + 0x23, dy + 0x95, 0x11, 0x10);
+        dot = MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
+                                    (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
+                                    box);
+    }
+    WidgetAddChild(parent, dot);
+    *(AM2_Widget **)((uint8_t *)msg + TYPER_OFF_BLINKER) = dot;
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)(uintptr_t)kImageHandler(ADDR_ON_DELGAME_CANCEL);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4521,6 +4600,10 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_DELETE_GAME_CTOR,
+                        (const void *)DeleteGameConstruct,
+                        "DeleteGameConstruct", 1);
+
     rc |= patch_replace(ADDR_ENTER_NAME_CTOR,
                         (const void *)EnterNameConstruct,
                         "EnterNameConstruct", 1);

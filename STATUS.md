@@ -11,6 +11,26 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **DELETE GAME is the one screen in the table built two different ways, and
+  reading it as two layouts gets the arithmetic wrong.** `0x0044FE50`: in a
+  mission there is no panel at all -- the four children go straight onto the
+  screen and every rectangle carries the offset the panel would have supplied,
+  `0x6C` by `0x98`. On the title screen the panel is made, the offset becomes
+  zero, and the same four children go into it. The coordinates in the source
+  are the SAME numbers either way; the parent and the offset move together.
+
+  Its factory confirms the reading from the other side: in a mission it passes
+  the delgame bitmap with flag 0, and on the title screen the shared backdrop
+  with flag 1 -- so the constructor's `flag` goes straight through to the base
+  and is what makes this one of the two constructors taking two arguments.
+
+  `ab.sh menuscreens` pokes arm 21 last and LEAVES IT UP, so the final frame
+  is the comparison: 65,332 pixels different from the frame before it, across
+  exactly the panel's rectangle. All four shot slots were spoken for by then
+  and this screen is the one worth the last of them. The cost is its
+  destructor, which no configuration runs -- said here rather than left to be
+  found.
+
 - **ENTER NAME, and `selectmap` becomes `menuscreens`.** `0x00451AF0` is
   RECRUIT's dialog and the simplest screen that owns an edit box: a panel, one
   field writing into the SCREEN's own buffer at `0x64`, OK, CANCEL and a green
@@ -1347,10 +1367,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 724 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 723 | 713 of them below the CRT line |
+| `patch_replace` sites | 725 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 724 | 714 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 130,592 / 372,816 B (**35.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 131,360 / 372,816 B (**35.2%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 148,000 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

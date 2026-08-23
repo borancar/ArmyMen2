@@ -1295,6 +1295,13 @@ AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
                                                          const char *bmp);
 
+/* Original: 0x0044FE50, thiscall. DELETE GAME -- the one screen in the table
+ * built two ways: a panel on the title screen, and straight onto the screen
+ * with the panel's offset folded into every rectangle when in a mission. */
+AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
+                                                          const char *bmp,
+                                                          int32_t flag);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
