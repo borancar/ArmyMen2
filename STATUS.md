@@ -11,6 +11,32 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **The "session" pair is a three-field RECORD, and both names came from one
+  call site.** `0x00453910` and `0x00453940` were `ADDR_SESSION_CTOR` and
+  `ADDR_SESSION_RESET` because the multiplayer session object is what the site
+  that named them passes. Their bodies are `{count, rows, ownsRows}` -- the
+  same shape a list box's row array is, which `orig.h` already noted in a
+  different place and under a different name. Renamed to `ADDR_RECORD_CTOR`
+  and `ADDR_RECORD_RESET`, which is what `widget.cpp` has been calling them
+  since `RecordCtor` was written.
+
+  `RecordReset` frees every row's owned dword, then the array, then clears the
+  count -- and it frees the array whether or not the flag is set and whether
+  or not the count is zero, leaning on `free(NULL)` rather than testing.
+  `CommEnumSessions` calls it by name now instead of through the image.
+
+- **`SelectPlayerRow` is why the three buttons beside it never look at the
+  list.** `0x004512A0` is what a list box calls when its selection moves, and
+  the dispatch is `callback(list, rows, selected)` -- found by looking for a
+  register loaded from `+0x68` and called a few instructions later, since the
+  offset is never in the `call` itself. This one ignores the list, which is
+  why its arguments start at the second stack slot and read as odd until the
+  dispatch is known.
+
+  All it does is copy the chosen name into `ADDR_GAMEPROC_BLOCK`. By the time
+  SELECT, DELETE or RECRUIT is pressed the name is already there, which is
+  exactly what those three handlers assume.
+
 - **SELECT PLAYER's three buttons, DELETE PLAYER's CANCEL, and the REPLAY
   prompt's OK.** `0x00451300`, `0x00451330`, `0x00451380`, `0x00450A10` and
   `0x0044F1B0`. What three of them test is the player NAME in
@@ -1166,11 +1192,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 717 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 716 | 706 of them below the CRT line |
+| `patch_replace` sites | 719 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 718 | 708 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 128,784 / 372,816 B (**34.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 147,904 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 128,976 / 372,816 B (**34.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 148,000 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

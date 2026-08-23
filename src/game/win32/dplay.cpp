@@ -360,10 +360,6 @@ static_assert(sizeof(DPSESSIONDESC2) == 0x50, "DPSESSIONDESC2");
 static_assert(DPENUMSESSIONS_AVAILABLE == 1, "DPENUMSESSIONS_AVAILABLE");
 static_assert(DPENUMSESSIONS_ASYNC == 0x10, "DPENUMSESSIONS_ASYNC");
 
-/* Resets the collecting object before it is filled again. Stays original. */
-typedef void (__attribute__((thiscall)) *am2_session_reset_fn)(void *);
-#define orig_session_reset (*(am2_session_reset_fn)ADDR_SESSION_RESET)
-
 #define g_sessionList  (*(void **)(uintptr_t)ADDR_SESSION_LIST)
 /* lpContext for both enumerations is the game window; see orig.h. */
 #define g_enumContext  (*(void **)(uintptr_t)ADDR_HWND)
@@ -382,7 +378,7 @@ int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
     if (!dp)
         return 0;
 
-    orig_session_reset(list);
+    RecordReset(list);
     /* The callback is a plain function and gets the object through this global
      * rather than through lpContext, which carries something else entirely. */
     g_sessionList = list;

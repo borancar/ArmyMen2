@@ -1262,6 +1262,15 @@ void __cdecl OnSelectPlayer(AM2_Widget *w);
 void __cdecl OnDelPlayerCancel(AM2_Widget *w);
 void __cdecl OnReplayOk(AM2_Widget *w);
 
+/* Original: 0x00453940, thiscall. The three-field record's reset -- free each
+ * row's own string, free the array, clear the count. */
+void __attribute__((thiscall)) RecordReset(void *rec);
+
+/* Original: 0x004512A0. SELECT PLAYER's row callback. A list box dispatches
+ * `callback(list, rows, selected)`; this one ignores the first. */
+void __cdecl SelectPlayerRow(AM2_Widget *list, AM2_ListRows *rows,
+                             int32_t selected);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

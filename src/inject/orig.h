@@ -130,7 +130,7 @@
  * is the array's own cleanup, called before the storage goes back. */
 #define ADDR_LIST_DESTRUCT      0x00455090u /* void(AM2_Widget *) */
 #define ADDR_LIST_DELETE        0x00455070u /* AM2_Widget *(AM2_Widget *, int32_t) */
-/* One `jmp` to ADDR_SESSION_RESET, which is the same three-field record under
+/* One `jmp` to ADDR_RECORD_RESET, which is the same three-field record under
  * a different vocabulary -- 0x00453910 is its constructor and 0x00453940 its
  * reset, and the list box's row array is one of the things it holds. Two names
  * for one shape, both the program's callers' rather than the program's. */
@@ -3247,10 +3247,14 @@
  * either place -- CONTROLS, AUDIO -- ends by asking for this when
  * ADDR_GAME_STATE is 2 and for menu request 14 when it is not. */
 #define MENU_MODE_OPTIONS        0x17
-/* The multiplayer session object and the two routines either side of it. */
+/* The multiplayer session object, and the two routines either side of it --
+ * which are NOT a session's. They are the three-field record {count, rows,
+ * ownsRows} that a list box's row array also is, named from this call site
+ * before the bodies were read. Renamed to what the bodies do; RecordCtor and
+ * RecordReset are what widget.cpp calls them. */
 #define ADDR_SESSION_OBJECT      0x00516130u  /* void *, made on demand */
-#define ADDR_SESSION_CTOR        0x00453910u  /* thiscall void(this, int32) */
-#define ADDR_SESSION_RESET       0x00453940u  /* thiscall void(this) */
+#define ADDR_RECORD_CTOR        0x00453910u  /* thiscall void *(this, int32) */
+#define ADDR_RECORD_RESET       0x00453940u  /* thiscall void(this) */
 /* Fills a 0x50-byte DPSESSIONDESC2 -- the app GUID from the comm object lands
  * at +0x18, which is guidApplication -- and asks DirectPlay to enumerate the
  * sessions matching it. Slot 13 is EnumSessions, not Open; it was briefly
@@ -3310,6 +3314,9 @@
  * The name is copied with no bound at all. */
 #define ADDR_LIST_ADD            0x00453A30u  /* thiscall void(this, const char *, void *) */
 #define AM2_LIST_ROW_STRIDE      0x104u
+/* The dword beside the name, which the row OWNS when the record's third
+ * field says so: RecordReset frees it per row. The comm panel keeps its
+ * DirectPlay connection here. */
 #define AM2_LIST_ROW_VALUE       0x100u
 #define ADDR_STR_COMPUTER_ONLY   0x00475300u  /* "Play Against Computer Only" */
 
@@ -3597,7 +3604,7 @@
 #define COMM_STAT_RING           30u
 #define ADDR_SESSION_LIST        0x004FA908u  /* void *, what the callback fills */
 #define COMM_OFF_APP_GUID        0x3D4u       /* GUID *, set by CommConstruct */
-/* Calls ADDR_SESSION_RESET on the object at 0x0051612C when there is one. */
+/* Calls ADDR_RECORD_RESET on the object at 0x0051612C when there is one. */
 #define ADDR_DROP_OBJ_51612C     0x00431D70u  /* void(void) */
 #define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
 #define ADDR_START_MULTIPLAYER   0x0042F310u  /* void(void), a button handler */

@@ -1422,7 +1422,7 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip)
 
 typedef void (__attribute__((thiscall)) *AM2_RecordResetFn)(void *rec);
 #define orig_record_reset \
-    ((AM2_RecordResetFn)(uintptr_t)ADDR_SESSION_RESET)
+    ((AM2_RecordResetFn)(uintptr_t)ADDR_RECORD_RESET)
 
 void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
 {
@@ -2810,7 +2810,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
                                 box.bottom,
                                 *(void **)((uint8_t *)w
                                            + COMMPANEL_OFF_LIST),
-                                (int32_t)AM2_IMAGE(ADDR_SELECT_PLAYER_ROW),
+                                (int32_t)(uintptr_t)SelectPlayerRow,
                                 0, 1);
     }
     WidgetAddChild(panel, list);
@@ -4071,6 +4071,50 @@ void __cdecl OnReplayOk(AM2_Widget *w)
     g_missionRetry = 1;
 }
 
+/* 0x00453940, thiscall. The three-field record's RESET: free every row's own
+ * string, free the array, and clear the count and the pointer.
+ *
+ * The per-row free is gated on the third field and the loop on the count, but
+ * the array itself is freed either way -- free(NULL) is a no-op and the
+ * original leans on that rather than testing. The row stride is 0x104 and the
+ * string it owns is the LAST four bytes of the row, which is the same layout
+ * the comm panel's connection pointer uses. */
+void __attribute__((thiscall)) RecordReset(void *rec)
+{
+    int32_t *r     = (int32_t *)rec;
+    uint8_t *rows  = (uint8_t *)(uintptr_t)r[1];
+    int32_t  i;
+
+    if (r[2] && rows) {
+        for (i = 0; i < r[0]; i++) {
+            void *own = *(void **)(rows + (uint32_t)i * AM2_LIST_ROW_STRIDE
+                                   + AM2_LIST_ROW_VALUE);
+            if (own)
+                am2_free(own);
+        }
+    }
+    r[0] = 0;
+    am2_free(rows);
+    r[1] = 0;
+}
+
+/* 0x004512A0. SELECT PLAYER's row callback -- what a list box calls when its
+ * selection moves. The dispatch is `callback(list, rows, selected)` and this
+ * one ignores the list, which is why its arguments start at the SECOND slot.
+ *
+ * All it does is copy the chosen name into ADDR_GAMEPROC_BLOCK, which is why
+ * the three buttons beside it never look at the list: by the time one is
+ * pressed the name is already there. */
+void __cdecl SelectPlayerRow(AM2_Widget *list, AM2_ListRows *rows,
+                             int32_t selected)
+{
+    (void)list;
+    if (!rows || selected < 0 || selected >= rows->count)
+        return;
+    strcpy(g_currentPlayer, rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
+    PlaySoundAt(2, 0, 0, 0, 0);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4176,6 +4220,11 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_RECORD_RESET, (const void *)RecordReset,
+                        "RecordReset", 1);
+    rc |= patch_replace(ADDR_SELECT_PLAYER_ROW, (const void *)SelectPlayerRow,
+                        "SelectPlayerRow", 0);
+
     rc |= patch_replace(ADDR_ON_RECRUIT, (const void *)OnRecruit,
                         "OnRecruit", 0);
     rc |= patch_replace(ADDR_ON_DELETE_PLAYER, (const void *)OnDeletePlayer,
@@ -4318,7 +4367,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_LIST_ADD, (const void *)ListAdd, "ListAdd", 3);
     rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
                         "KeyNameIndexOf", 1);
-    rc |= patch_replace(ADDR_SESSION_CTOR, (const void *)RecordCtor,
+    rc |= patch_replace(ADDR_RECORD_CTOR, (const void *)RecordCtor,
                         "RecordCtor", 2);
     rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, (const void *)RecordResetAlias,
                         "RecordResetAlias", 1);
