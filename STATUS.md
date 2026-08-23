@@ -210,6 +210,36 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **ENTER BATTLE NAME is reconstructed** (`0x0042FB00`, 1,082 B), and it
+  answers a question the multiplayer code raised: **the two fields edit the
+  DIALOG's own buffers in place.** The constructor copies
+  `ADDR_SAVED_BATTLE_NAME` into its 0x0064 and `ADDR_SAVED_PLAYER_NAME` into
+  its 0x0084 before any widget exists, and hands the edit boxes those
+  addresses. That is why `HostBattle` can read the names back out of globals
+  afterwards without the dialog passing them anywhere.
+
+  `ret 0x34` on the edit constructor is 52 bytes: buffer, a maximum of 0x18
+  characters, sixteen of rectangle, a flag, three colours, a handler and two
+  zeroes. **The handler is `ADDR_HOST_BATTLE`, the same function the OK button
+  gets** -- so RETURN in either field starts the battle.
+
+  **Two defects, both named by `ctl widgets` and neither visible in a pixel
+  count.** The dialog's `focusedChild` is the PANEL, set at `0x0042FC04` right
+  after the panel is added -- I had left it unset, which the tree reported as
+  `foc=2` against `foc=-1` in its first line. And the focus SLOT is called on
+  the first field only, at `0x0042FC9C`, with no such call in the second
+  block; calling it for both left the wrong field marked dirty. The frame was
+  180 pixels either way, inside the budget.
+
+  That is now three defects in this session that the tree named and the pixels
+  could not, against one the pixels named and the tree could not.
+
+  Two smaller findings. `0x00485308` points at
+  `" abcdefghijklmnopqrstuvwxyzABC...0123456789!..."`, which every edit box
+  takes as `EDIT_OFF_CHARSET`: the field is a WHITELIST, not a length limit.
+  And this dialog's buttons are 0x4E wide where every other screen's are 0x51,
+  which is why it does not share `MakeButton`.
+
 - **The AUDIO dialog is reconstructed.** `0x0044F370`, 1,208 B, `ret 8` -- two stack arguments, the backdrop
   and the flag, which is what its factory's two-argument call already implied.
 
@@ -558,10 +588,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 671 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 670 | 660 of them below the CRT line |
+| `patch_replace` sites | 672 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 671 | 661 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 118,736 / 372,816 B (**31.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 119,824 / 372,816 B (**32.1%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

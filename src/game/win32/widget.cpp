@@ -1663,7 +1663,7 @@ void __cdecl OpenBattleName(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_BATTLE_NAME_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_BATTLE_NAME_CTOR),
+               (AM2_ScreenCtorFn)BattleNameConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -2489,6 +2489,127 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
     return w;
 }
 
+/* This dialog's buttons are 0x4E wide where every other screen's are 0x51. */
+static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
+                                  uint32_t b1, uint32_t b2, uint32_t handler)
+{
+    AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    AM2_Rect    box;
+
+    if (!btn)
+        return (AM2_Widget *)0;
+    RectSet(&box, left, top, 0x4E, 0x20);
+    return orig_button_ctor(btn, (const char *)AM2_IMAGE(b0),
+                            (const char *)AM2_IMAGE(b1),
+                            (const char *)AM2_IMAGE(b2), 1, box,
+                            (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
+                            0);
+}
+
+/* 0x0042FB00, thiscall. ENTER BATTLE NAME -- two edit boxes, a green dot
+ * beside each, and OK and CANCEL.
+ *
+ * The two fields are SEEDED from the saved names before any widget is made:
+ * ADDR_SAVED_BATTLE_NAME into the dialog's own 0x0064 and
+ * ADDR_SAVED_PLAYER_NAME into 0x0084, and the edit boxes then edit those
+ * buffers in place. That is why HostBattle can read the names back out of
+ * globals afterwards without the dialog handing them over.
+ *
+ * `ret 0x34` on the edit constructor is 52 bytes: the buffer, a maximum of
+ * 0x18 characters, sixteen of rectangle, a flag, three colours, the handler
+ * and two zeroes. The handler is ADDR_HOST_BATTLE -- the same function the OK
+ * button gets -- so RETURN in either field starts the battle.
+ *
+ * The dot is stored ON THE EDIT BOX at 0x0070 and added to the PANEL, and
+ * each box takes the accepted-character set from ADDR_EDIT_CHARSET_PTR: a
+ * whitelist of letters, digits, space and punctuation rather than a length
+ * limit. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_EditCtorFn)(
+    AM2_Widget *w, char *buf, int32_t maxChars, AM2_Rect box, int32_t flag,
+    int32_t ink, int32_t ink2, int32_t ink3,
+    void (__cdecl *handler)(AM2_Widget *), int32_t a, int32_t b);
+
+#define orig_edit_ctor ((AM2_EditCtorFn)AM2_IMAGE(ADDR_EDIT_CTOR))
+#define g_colourBelowBg (*(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG)
+#define g_editCharset   (*(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_PTR)
+
+/* One field: the box, then the dot that sits beside it. */
+static AM2_Widget *MakeNameField(AM2_Widget *panel, char *buf, int32_t top,
+                                 int32_t dotTop, int32_t focus)
+{
+    AM2_Widget *edit = (AM2_Widget *)orig_operator_new(AM2_EDIT_SIZE);
+    AM2_Widget *dot;
+    AM2_Rect    box;
+
+    if (edit) {
+        RectSet(&box, 0x26, top, 0xF4, 0x11);
+        edit = orig_edit_ctor(edit, buf, AM2_EDIT_MAX_CHARS, box, 1,
+                              g_hiliteColour, g_colourBelowBg,
+                              g_backgroundColour,
+                              (void (__cdecl *)(AM2_Widget *))
+                              AM2_IMAGE(ADDR_HOST_BATTLE), 0, 0);
+    }
+    WidgetAddChild(panel, edit);
+    /* Only the FIRST field gets the focus slot -- the original calls it once,
+     * at 0x0042FC9C, and not at all in the second block. Calling it for both
+     * left the wrong field marked dirty, which `ctl widgets` reported and no
+     * pixel count would have. */
+    if (focus)
+        ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
+    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
+
+    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
+    if (dot) {
+        RectSet(&box, 0xB3, dotTop, 0x11, 0x10);
+        dot = orig_multisprite_ctor(dot,
+                                    (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
+                                    (const char *)AM2_IMAGE(AM2_BMP_GREEN1),
+                                    1, box);
+    }
+    WidgetAddChild(panel, dot);
+    *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
+    return edit;
+}
+
+AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
+                                                          const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Rect    box;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_BATTLE_NAME_DLG);
+
+    strcpy((char *)w + 0x64,
+               (const char *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME));
+    strcpy((char *)w + 0x84,
+               (const char *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME));
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x6C, 0x8F, 0x1A7, 0xC1);
+        panel = orig_panel_ctor(panel,
+                                (const char *)AM2_IMAGE(ADDR_STR_BATTLE_PANEL),
+                                0, box);
+    }
+    WidgetAddChild(w, panel);
+    /* The DIALOG's focused child is the panel, not a field. */
+    w->focusedChild = panel;
+    panel->flag44 = 1;
+
+    MakeNameField(panel, (char *)w + 0x64, 0x39, 0x1B, 1);
+    MakeNameField(panel, (char *)w + 0x84, 0x88, 0x6A, 0);
+
+    WidgetAddChild(panel, MakeWideButton(0x14A, 0x44, AM2_BMP_OK0,
+                                         AM2_BMP_OK1, AM2_BMP_OK2,
+                                         ADDR_HOST_BATTLE));
+    WidgetAddChild(panel, MakeWideButton(0x14A, 0x6D, AM2_BMP_CAN0,
+                                         AM2_BMP_CAN1, AM2_BMP_CAN2,
+                                         ADDR_ON_MENU_BACK));
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2594,6 +2715,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_BATTLE_NAME_CTOR,
+                        (const void *)BattleNameConstruct,
+                        "BattleNameConstruct", 1);
     rc |= patch_replace(ADDR_AUDIO_OPTIONS_CTOR,
                         (const void *)AudioDialogConstruct,
                         "AudioDialogConstruct", 2);

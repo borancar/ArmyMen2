@@ -1040,6 +1040,12 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
                                                            const char *bmp,
                                                            int32_t flag);
 
+/* Original: 0x0042FB00, thiscall. ENTER BATTLE NAME. The two fields are
+ * seeded from the saved names and edit the dialog's own buffers in place,
+ * which is why HostBattle can read them back out of globals. See widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
+                                                          const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

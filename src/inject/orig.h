@@ -1636,6 +1636,25 @@
  * bar position is (volume + 2000) / 100 -- twenty-one steps from silence. */
 #define AM2_VOLUME_FLOOR         2000
 #define AM2_VOLUME_STEP          100
+
+/* ENTER BATTLE NAME, 0x0042FB00. Two edit boxes seeded from the two saved
+ * names, each with a green dot beside it, then OK and CANCEL. */
+#define VTABLE_BATTLE_NAME_DLG   0x0046FA0Cu
+#define ADDR_EDIT_CTOR           0x00454C10u /* thiscall, ret 0x34 */
+#define AM2_EDIT_SIZE            0x80u
+#define AM2_EDIT_MAX_CHARS       0x18u
+/* A char * to the set of characters an edit box accepts:
+ * " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!..." --
+ * so the field is a whitelist and not a length limit. */
+#define ADDR_EDIT_CHARSET_PTR    0x00485308u /* const char ** */
+#define EDIT_OFF_CHARSET         0x68u
+#define EDIT_OFF_DOT             0x70u
+/* The byte immediately below ADDR_BACKGROUND_COLOUR. The edit box is handed
+ * both; what distinguishes them is not established. */
+#define ADDR_COLOUR_BELOW_BG     0x00502AD8u /* uint8_t */
+#define AM2_BMP_GREEN0           0x0048701Cu /* 03_028_0N_green.bmp */
+#define AM2_BMP_GREEN1           0x00487030u
+#define ADDR_STR_BATTLE_PANEL    0x00487094u /* "02_002_00_host.bmp" */
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */
