@@ -170,8 +170,18 @@ Nothing uncommitted.
   in the suite has ever run it: every configuration that opens a menu screen
   does so from the title.
 
-  It is reachable now that `poke` exists -- raise a menu request while
-  ADDR_GAME_STATE is 2 -- and that is the obvious next probe.
+  **The obvious probe does not work, and that is worth knowing before anyone
+  else spends an hour on it.** Driving Boot Camp to live play, confirming
+  `ADDR_GAME_STATE` reads 2, and then poking the menu-request pair leaves
+  everything untouched: `RefreshScreen` 0, `OpenAudioOptions` 0, no dialog,
+  and the state still 2. Nothing in ordinary state-2 play consumes that pair
+  -- the consumer is `0x00425EE0`, which is the in-mission ESCAPE arm, and
+  that is sub-state 34 where ordinary play sits in 33.
+
+  So the state-2 arms of those four factories are verified by reading, and
+  what is missing is not a way to poke but the CONTEXT in which the menu
+  dispatcher runs with the game state at 2. Find that and `RefreshScreen`
+  runs for the first time in this project.
 
 - **The `args` column in `docs/screens.md` earned itself immediately.** These
   constructors are thiscall, so the CALLEE pops: reconstructing a two-argument
@@ -182,8 +192,29 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
-- **Sixteen of the twenty-one screen factories are reconstructed.** The
-  thirteen plain ones went in as one batch, generated from the same
+- **Twenty of the twenty-one screen factories are reconstructed.** The last
+  four were the two-argument ones: COMM CHANNEL SELECT (`0x0042EE40`), AUDIO
+  CONTROLS (`0x0044F9E0`), DELETE GAME (`0x00450250`) and LOAD GAME
+  (`0x00452680`).
+
+  **Where the repaint goes is not the same in all of them, and it was worth
+  not tidying.** AUDIO and DELETE GAME call `RefreshScreen` BEFORE they
+  allocate; LOAD GAME calls it AFTER constructing and publishes the screen
+  only then. Reproduced as written. Whether the ordering matters is not
+  something reading settles, and all three screens are reachable, so it can be
+  measured rather than argued about.
+
+  COMM CHANNEL SELECT is the one factory that does work before allocating
+  rather than around the branch: `CommCreateDirectPlay(comm, 0)`. That literal
+  zero is the one `orig.h` already records as making `CommOnConnected`
+  unreachable in this build, and it now comes from our code.
+
+  **The twenty-first is not a factory.** `0x0044D730` is the TITLE SCREEN and
+  it is 1,108 bytes: it chdirs to `shared`, tears the comm object down, clears
+  three globals, and then builds every button on the screen. It belongs with
+  the dialog constructors, not with this family.
+
+- **The thirteen plain factories went in as one batch**, generated from the same
   measurements `tools/screens.py` reports rather than transcribed: SELECT MAP,
   SELECT PLAYER, ENTER NAME, the CD prompt, ENTER BATTLE NAME, CHOOSE A
   BATTLE, MOVIES, the OPTIONS menu, CONTROLS, DIFFICULTY, CONFIRM GAME EXIT,
@@ -332,11 +363,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 659 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 658 | 648 of them below the CRT line |
+| `patch_replace` sites | 663 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 662 | 652 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 111,600 / 372,816 B (**29.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 139,376 / 372,816 B (37.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 112,368 / 372,816 B (**30.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

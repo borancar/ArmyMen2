@@ -11,6 +11,7 @@
 #include "sprite.h"
 #include "frame.h"
 #include "audio.h"
+#include "dplay.h"   /* CommCreateDirectPlay -- reconstructed */
 #include "../image.h"
 #include "../crt.h"
 #include "../../inject/patch.h"
@@ -1730,6 +1731,101 @@ void __cdecl OpenDeletePlayer(void)
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
+/* The two-argument form. Five of the twenty-one screens exist in two
+ * contexts and their constructors take a backdrop AND a flag; the flag is 0
+ * in a mission and 1 on the title screen. */
+typedef void *(__attribute__((thiscall)) *AM2_ScreenCtor2Fn)(void *obj,
+                                                             const char *bmp,
+                                                             int32_t flag);
+
+static void OpenScreen2(uint32_t size, AM2_ScreenCtor2Fn ctor,
+                        const char *bmp, int32_t flag)
+{
+    void *obj = orig_operator_new(size);
+
+    g_paintObject = obj ? (uint8_t *)ctor(obj, bmp, flag) : (uint8_t *)0;
+}
+
+#define g_gameState (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE)
+
+typedef void (__cdecl *AM2_RefreshFn)(void);
+#define orig_refresh_screen ((AM2_RefreshFn)AM2_IMAGE(ADDR_REFRESH_SCREEN))
+
+/* Arm 6. The COMM CHANNEL SELECT screen, and the one factory that does
+ * something before it allocates rather than around the branch: it asks the
+ * comm object for a DirectPlay interface first, with a null connection --
+ * which is the literal 0 that makes CommOnConnected unreachable in this
+ * build. Our CommCreateDirectPlay, reached directly, so its counter cannot
+ * move. */
+void __cdecl OpenCommPanel(void)
+{
+    CloseCurrentScreen();
+    CommCreateDirectPlay(g_commObject, (void *)0);
+    OpenScreen(AM2_COMM_PANEL_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_COMM_PANEL_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+/* Arm 19. AUDIO CONTROLS -- the three volume sliders. The repaint comes
+ * BEFORE the allocation on this one. */
+void __cdecl OpenAudioOptions(void)
+{
+    CloseCurrentScreen();
+    if (g_gameState == AM2_STATE_MISSION) {
+        orig_refresh_screen();
+        OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
+                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_AUDIO_OPTIONS_CTOR),
+                    (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP), 0);
+    } else {
+        OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
+                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_AUDIO_OPTIONS_CTOR),
+                    (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+    }
+}
+
+/* Arm 21. DELETE GAME, the same shape as AUDIO. */
+void __cdecl OpenDeleteGame(void)
+{
+    CloseCurrentScreen();
+    if (g_gameState == AM2_STATE_MISSION) {
+        orig_refresh_screen();
+        OpenScreen2(AM2_DELETE_GAME_SIZE,
+                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_DELETE_GAME_CTOR),
+                    (const char *)AM2_IMAGE(ADDR_STR_DELGAME_BMP), 0);
+    } else {
+        OpenScreen2(AM2_DELETE_GAME_SIZE,
+                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_DELETE_GAME_CTOR),
+                    (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+    }
+}
+
+/* Arm 5. LOAD GAME, and the odd one out: the repaint happens AFTER the
+ * screen is constructed and the global is published only then. Reproduced as
+ * it is written rather than made to match its two siblings -- whether that
+ * ordering matters is not something reading settles, and the screen is
+ * reachable, so it can be measured rather than argued about. */
+void __cdecl OpenLoadGame(void)
+{
+    CloseCurrentScreen();
+    if (g_gameState == AM2_STATE_MISSION) {
+        void *obj = orig_operator_new(AM2_LOAD_GAME_SIZE);
+        uint8_t *screen = (uint8_t *)0;
+
+        if (obj) {
+            AM2_ScreenCtor2Fn ctor =
+                (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_LOAD_GAME_CTOR);
+            screen = (uint8_t *)ctor(obj, (const char *)
+                                     AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0);
+        }
+        orig_refresh_screen();
+        g_paintObject = screen;
+    } else {
+        OpenScreen2(AM2_LOAD_GAME_SIZE,
+                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_LOAD_GAME_CTOR),
+                    (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+    }
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1835,6 +1931,14 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_OPEN_COMM_PANEL, (const void *)OpenCommPanel,
+                        "OpenCommPanel", 0);
+    rc |= patch_replace(ADDR_OPEN_AUDIO_OPTIONS,
+                        (const void *)OpenAudioOptions, "OpenAudioOptions", 0);
+    rc |= patch_replace(ADDR_OPEN_DELETE_GAME, (const void *)OpenDeleteGame,
+                        "OpenDeleteGame", 0);
+    rc |= patch_replace(ADDR_OPEN_LOAD_GAME, (const void *)OpenLoadGame,
+                        "OpenLoadGame", 0);
     rc |= patch_replace(ADDR_OPEN_MP_HOST, (const void *)OpenMpHost,
                         "OpenMpHost", 0);
     rc |= patch_replace(ADDR_OPEN_MP_JOIN, (const void *)OpenMpJoin,

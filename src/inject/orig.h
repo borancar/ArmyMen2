@@ -1339,6 +1339,9 @@
 #define ADDR_APP_ACTIVE          0x004FA02Cu  /* int32_t; RunFrame ticks only if set */
 #define ADDR_CHAR_HANDLER        0x005125B8u  /* void(*)(wparam, lo, hi), may be null */
 #define ADDR_GAME_STATE          0x00511DA4u  /* int32_t, 0..4 */
+/* The values, measured by a probe in PollKeyboard: 0 at startup, 1 on the
+ * menus, 2 in a mission. The screen factories test for 2 and nothing else. */
+#define AM2_STATE_MISSION        2
 #define ADDR_GAME_STATE_ARG      0x00511DB4u  /* int32_t */
 #define ADDR_STATE_DISPATCH      0x00486550u  /* 12-byte records; +0 is a function */
 #define ADDR_ON_APP_ACTIVATED    0x004269B0u  /* void(void) */
@@ -1513,6 +1516,31 @@
  * constructors are docs/screens.md's, which reads them out of the image. */
 #define ADDR_STR_SCREEN_BMP      0x00485224u  /* "01_000_00_screen.bmp" */
 #define ADDR_STR_CONTROLS_BMP    0x0048B9DCu  /* "01_003_00_controls.bmp" */
+/* The five factories whose constructors take TWO arguments -- a backdrop and
+ * a flag -- because the screen exists in two contexts. `cmp [ADDR_GAME_STATE],
+ * 2` picks between them: in a mission the screen gets its own backdrop and a
+ * flag of 0 and the frame beneath it must be repainted, so RefreshScreen is
+ * called; from the title it gets the shared backdrop and a flag of 1 and no
+ * repaint is needed.
+ *
+ * WHERE the repaint goes is not the same in all of them, and it is not
+ * cosmetic: AUDIO and DELETE GAME call it BEFORE allocating, LOAD GAME calls
+ * it AFTER constructing and only then publishes the screen. */
+#define ADDR_OPEN_COMM_PANEL     0x0042EE40u  /* void(void) */
+#define ADDR_COMM_PANEL_CTOR     0x0042E9C0u  /* thiscall obj *(obj, bmp) */
+#define AM2_COMM_PANEL_SIZE      0x6Cu
+#define ADDR_OPEN_AUDIO_OPTIONS  0x0044F9E0u  /* void(void) */
+#define ADDR_AUDIO_OPTIONS_CTOR  0x0044F370u  /* thiscall obj *(obj, bmp, f) */
+#define AM2_AUDIO_OPTIONS_SIZE   0x7Cu
+#define ADDR_STR_AUDIO_BMP       0x0048B7C4u  /* "02_013_00_audio.bmp" */
+#define ADDR_OPEN_DELETE_GAME    0x00450250u  /* void(void) */
+#define ADDR_DELETE_GAME_CTOR    0x0044FE50u  /* thiscall obj *(obj, bmp, f) */
+#define AM2_DELETE_GAME_SIZE     0x64u
+#define ADDR_STR_DELGAME_BMP     0x0048B918u  /* "02_011_00_delgame.bmp" */
+#define ADDR_OPEN_LOAD_GAME      0x00452680u  /* void(void) */
+#define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
+#define AM2_LOAD_GAME_SIZE       0xA8u
+#define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */
 #define ADDR_OPEN_MP_SELECT_MAP  0x0044DF20u  /* void(void) */
 #define ADDR_MP_SELECT_MAP_CTOR  0x0044DBB0u  /* thiscall obj *(obj, bmp) */
 #define AM2_MP_SELECT_MAP_SIZE   0x68u

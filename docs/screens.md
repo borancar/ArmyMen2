@@ -21,8 +21,8 @@ rather than merely painting the wrong screen.
 | 2 | `0x0042643F` | `0x0044DF20` | 0x68 | `0x0044DBB0` | 1 | 02_004_00_selectmap.bmp | yes |
 | 3 | `0x00426449` | `0x00451910` | 0x68 | `0x00451400` | 1 | 02_005_00_selectplayer.bmp | yes |
 | 4 | `0x00426450` | `0x00451E10` | 0x84 | `0x00451AF0` | 1 | 02_006_00_name.bmp | yes |
-| 5 | `0x00426457` | `0x00452680` | 0xA8 | `0x004520E0` | 2 | 02_007_00_loadgame.bmp |  |
-| 6 | `0x0042645E` | `0x0042EE40` | 0x6C | `0x0042E9C0` | 1 | 02_001_00_commpanel.bmp |  |
+| 5 | `0x00426457` | `0x00452680` | 0xA8 | `0x004520E0` | 2 | 02_007_00_loadgame.bmp | yes |
+| 6 | `0x0042645E` | `0x0042EE40` | 0x6C | `0x0042E9C0` | 1 | 02_001_00_commpanel.bmp | yes |
 | 7 | `0x0042647A` | `0x004317C0` | 0x278 | `0x00430530` | 1 | 01_001_00_mphost.bmp | yes |
 | 8 | `0x00426481` | `0x00432910` | 0x110 | `0x00432320` | 1 | 01_001_03_mphostoptions.bmp | yes |
 | 9 | `0x00426488` | `0x00433480` | 0x278 | `0x00430530` | 1 | 01_002_00_mpjoin.bmp | yes |
@@ -35,6 +35,6 @@ rather than merely painting the wrong screen.
 | 16 | `0x004264AB` | `0x0044EAD0` | 0x68 | `0x0044E730` | 1 | 02_014_00_difficulty.bmp | yes |
 | 17 | `0x004264B2` | `0x0044EE50` | 0x64 | `0x0044EB50` | 1 | buttons: 03_007_02_ok.bmp, 03_018_02_cancel.bmp | yes |
 | 18 | `0x004264B9` | `0x0044F220` | 0x64 | `0x0044EED0` | 1 | buttons: 03_007_02_ok.bmp, 03_018_02_cancel.bmp | yes |
-| 19 | `0x004264C0` | `0x0044F9E0` | 0x7C | `0x0044F370` | 2 | 02_013_00_audio.bmp |  |
+| 19 | `0x004264C0` | `0x0044F9E0` | 0x7C | `0x0044F370` | 2 | 02_013_00_audio.bmp | yes |
 | 20 | `0x004264A4` | `0x00450B70` | 0x64 | `0x00450730` | 1 | buttons: 03_007_02_ok.bmp, 03_018_02_cancel.bmp | yes |
-| 21 | `0x0042649D` | `0x00450250` | 0x64 | `0x0044FE50` | 2 | 02_011_00_delgame.bmp |  |
+| 21 | `0x0042649D` | `0x00450250` | 0x64 | `0x0044FE50` | 2 | 02_011_00_delgame.bmp | yes |

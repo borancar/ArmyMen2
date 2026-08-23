@@ -977,6 +977,20 @@ void __cdecl OpenReplayPrompt(void);
 
 /* Original: 0x00450B70. "Caution: All saved games for this player will also be deleted!". */
 void __cdecl OpenDeletePlayer(void);
+/* Original: 0x0042EE40. COMM CHANNEL SELECT, and the one factory that does
+ * something before it allocates: CommCreateDirectPlay with a null connection. */
+void __cdecl OpenCommPanel(void);
+
+/* Original: 0x0044F9E0. AUDIO CONTROLS -- the three volume sliders. */
+void __cdecl OpenAudioOptions(void);
+
+/* Original: 0x00450250. DELETE GAME. */
+void __cdecl OpenDeleteGame(void);
+
+/* Original: 0x00452680. LOAD GAME. Its repaint comes after the construction
+ * where its two siblings put it before the allocation; see widget.cpp. */
+void __cdecl OpenLoadGame(void);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
