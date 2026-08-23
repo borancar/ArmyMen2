@@ -11,6 +11,76 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **The OPTIONS menu's buttons and the AUDIO dialog's three bars.** Eight more
+  handlers: BACK, CONTROLS, DIFFICULTY and AUDIO (`0x0044E670`, `0x0044FD40`,
+  `0x0044FD70`, `0x0044FDA0`), CONFIRM GAME EXIT's OK (`0x0044EE30`), and the
+  three volume bars' onChange (`0x0044F2A0`, `0x0044F2E0`, `0x0044F320`).
+
+  The first four really are the same four instructions with one immediate
+  changed, so they share a helper -- checked against each other first, which
+  is the habit the title screen's `focusedChild` cost earlier today. QUIT's OK
+  asks for no screen at all: it goes straight to state 4, which is the only
+  handler in the family that ends the process.
+
+  **A volume bar's arithmetic is `(pos - 20) * 100`, with silence a special
+  case rather than the end of the ramp.** Twenty-one positions, DirectSound
+  wanting hundredths of a decibel of attenuation, so the range is -2000..0 --
+  and -2000 is then replaced by `DSBVOLUME_MIN`. The original computes the
+  value and compares against the literal -2000, so the test is on the result
+  and not on `pos == 0`.
+
+- **`audiovol` dragged one bar of three, and now drags all three with a sound
+  device attached.** They sit 69 pixels apart and their handlers differ in
+  what they do with the answer -- a sample, the music stream's volume, a
+  random voice line -- so two thirds of the family were uncompared. Before and
+  after on the original side differ by 324 pixels spanning y 173..340, which
+  is all three thumbs; the two sides then agree to 35.
+
+  **It is also the only place in the project that reaches `SpeakLine`**, which
+  STATUS has listed as unexercised for as long as it has been reconstructed.
+  Everywhere else it is a unit reacting to something in a live mission.
+  Measured rather than claimed: the game's own LCG at `0x0048CC1C` advances
+  four steps across one click on the voice bar and none across a click on the
+  effects bar. One of the four is the handler's own `rand() % 30` and the rest
+  are past SpeakLine's owner check.
+
+  Its counter still reads 0 and will keep doing so -- our handler calls it by
+  name, which is the blind spot `tools/blindspots.py` exists for. The LCG is
+  the probe that resolves it.
+
+- **The seam that reaches our own code through the image has a third shape,
+  and `checkseams` sees none of it.** A menu handler is installed by address
+  and the helper applies `AM2_IMAGE` to the parameter, so nothing in the text
+  names an address: `MakeButton(..., ADDR_ON_MENU_BACK)` and
+  `MakeVolumeBar(..., ADDR_ON_VOLUME_EFFECTS)` both looked clean while
+  routing through a detour into us. The check caught only the two escape slots
+  beside them, which spell the macro out.
+
+  `MakeButtonFn` and a pointer-taking `MakeVolumeBar` are the fix, with the
+  address forms kept for the dozens of handlers that are still the original's.
+  **The tool resolves macros, not dataflow** -- worth remembering before
+  reading a green `checkseams` as "no seams".
+
+- **`windowed`'s pixel-perfect zero was a claim about a frame that never got
+  painted.** The client area used to stay black -- CLAUDE.md said Wine hands
+  this prefix no lockable primary -- and a black rectangle against a black
+  rectangle is exactly 0, which reads as the strongest line in the A/B table.
+  It is not black here now. It paints, mostly white, and four shots two
+  seconds apart differ by 4 pixels each in one 10x10 box at (325,232), so
+  something in it blinks.
+
+  Not caused by anything in this session: `git stash push -- src/` and rebuild
+  reproduces it at HEAD. The budget is 50 now, the wait is 60 rather than 30 --
+  at 30 the shot often lands while one side is still black, which compares as
+  195,785 pixels of nothing -- and both numbers are in `ab.sh` with the
+  measurement beside them.
+
+  Two lessons, and the first is the uncomfortable one. **An exact zero can mean
+  the test is not looking at anything**, and this one was quoted as evidence
+  for a year. The second is that the frame is worth MORE now than when it was
+  perfect: a painted windowed frame compares the whole menu render path in a
+  second configuration, where a black one compared nothing at all.
+
 - **The title screen's seven buttons, and the boundary is down to one
   function.** `0x0044D2E0` to `0x0044D4F0`, none over 160 bytes: a menu sound,
   sometimes a global, then a menu request whose code is the arm number in
@@ -930,11 +1000,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 693 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 692 | 682 of them below the CRT line |
+| `patch_replace` sites | 701 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 700 | 690 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 126,464 / 372,816 B (**33.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 146,016 / 372,816 B (39.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 126,928 / 372,816 B (**34.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 146,416 / 372,816 B (39.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
@@ -1118,10 +1188,15 @@ counts probe before reading one as coverage -- that is what turned the
   Explosives.wav. It goes out on slot 0x10, which orig.h already records as a
   voice slot.
 
-  **It reads 0, and so does PlayDynamicSound underneath it**, even with the
-  ALSA null device attached and both Boot Camp dialogs cleared. So the whole
-  dynamic-sound path is unreached by any configuration here -- which is a
-  pre-existing gap for PlayDynamicSound, now measured rather than assumed.
+  **It read 0, and so did PlayDynamicSound underneath it**, even with the
+  ALSA null device attached and both Boot Camp dialogs cleared -- so the whole
+  dynamic-sound path was unreached by any configuration here.
+
+  **`ab.sh audiovol` reaches it now**, through a route that needs no mission
+  at all: the AUDIO dialog's VOICE bar demonstrates its setting by speaking
+  one line. The counters still read 0, because our handler calls SpeakLine by
+  name; the evidence is the LCG at `0x0048CC1C` advancing four steps across
+  one click on that bar and none across a click on the effects bar.
 
 - **`ListAdd` reallocs per entry.** Every append grows the array to exactly
   count+1 rows of 0x104, so filling a list of n costs n reallocs and n copies

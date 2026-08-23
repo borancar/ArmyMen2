@@ -1219,6 +1219,20 @@ AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
  * cannot honour; see widget.cpp. */
 void __cdecl OpenTitleScreen(void);
 
+/* The OPTIONS menu's four buttons and CONFIRM GAME EXIT's OK: 0x0044E670,
+ * 0x0044FD40, 0x0044FD70, 0x0044FDA0 and 0x0044EE30. */
+void __cdecl OnMenuBack(AM2_Widget *w);
+void __cdecl OnControlsButton(AM2_Widget *w);
+void __cdecl OnDifficultyButton(AM2_Widget *w);
+void __cdecl OnAudioButton(AM2_Widget *w);
+void __cdecl OnQuitOk(AM2_Widget *w);
+
+/* The AUDIO dialog's three bars: 0x0044F2A0, 0x0044F2E0, 0x0044F320. Each is
+ * the bar's onChange, so the argument is the scroll bar itself. */
+void __cdecl OnVolumeEffects(AM2_Widget *w);
+void __cdecl OnVolumeMusic(AM2_Widget *w);
+void __cdecl OnVolumeVoice(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

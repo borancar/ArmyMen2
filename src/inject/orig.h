@@ -1172,6 +1172,10 @@
  * count and up to four wave names -- and the names say what they are:
  * Aerosol.wav, AirStrike.wav, AutoRifle.wav, Bazooka.wav, Disguise.wav. It
  * goes out on slot 0x10, which orig.h already records as a voice slot. */
+/* MSVC's rand, the LCG at 0x00464420 with its state in 0x0048CC1C. Named
+ * here because game code that draws from it must draw from THIS one -- the
+ * sequence is the image's, and libc's would leave it standing still. */
+#define ADDR_GAME_RAND           0x00464420u /* int32_t(void) */
 #define ADDR_SPEAK_LINE          0x0040BFF0u /* void(int32 group, int32 owner) */
 #define ADDR_VOICE_GROUPS        0x00474440u /* {int32 count; const char *[4]} */
 #define AM2_VOICE_GROUP_STRIDE   20
@@ -1798,6 +1802,10 @@
  * MULTI-PLAYER for 6 (COMM CHANNEL SELECT), and SINGLE PLAYER for 3
  * (SELECT PLAYER) or 2 (SELECT MAP). CREDITS asks for no screen at all --
  * it sets the game-over reason to 4 and requests state 0. */
+#define AM2_MENU_REQUEST_TITLE        0x01u
+#define AM2_MENU_REQUEST_CONTROLS     0x0Fu
+#define AM2_MENU_REQUEST_DIFFICULTY   0x10u
+#define AM2_MENU_REQUEST_AUDIO        0x13u
 #define AM2_MENU_REQUEST_MOVIES       0x0Du
 #define AM2_MENU_REQUEST_OPTIONS_MENU 0x0Eu
 #define AM2_MENU_REQUEST_QUIT         0x11u

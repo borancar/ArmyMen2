@@ -137,7 +137,7 @@ void __cdecl ReleaseSoundBuffers(void)
 #define g_dsound     (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
 #define g_dsPrimary  (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DS_PRIMARY)
 #define g_dsListener (*(LPDIRECTSOUND3DLISTENER *)(uintptr_t)ADDR_DS_LISTENER)
-#define g_streamVolume (*(const int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
+#define g_streamVolume  (*(int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
 #define kIID_DS3DListener (*(const IID *)(uintptr_t)ADDR_IID_DS3D_LISTENER)
 
 typedef HRESULT (WINAPI *am2_dsound_create_fn)(GUID *, LPDIRECTSOUND *, IUnknown *);
@@ -813,7 +813,7 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
 #define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
 #define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_DEFAULT_SOUND_POS)
-#define g_volumeAtZero  (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
+#define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
 
 /* The reader fills four out-parameters, and two of them are fields of the
  * DSBUFFERDESC itself -- which is why the original only ever assigns dwSize
@@ -854,7 +854,7 @@ typedef int32_t (__cdecl *am2_read_wave_fn)(int32_t zero, const char *name,
  *
  * Exercisable: a Boot Camp mission plays voice-overs, which is how
  * FillSoundBuffer gets its one call in an otherwise fixed-table run. */
-#define g_voiceVolume (*(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
+#define g_voiceVolume   (*(int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
 #define g_dynamic     ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)
 
 void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,

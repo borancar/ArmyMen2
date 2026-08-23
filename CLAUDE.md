@@ -1098,7 +1098,7 @@ Done on all three configurations, and the results are worth quoting:
 |---|---|---|
 | Boot Camp, fullscreen | identical, 14 messages | 22 / 786,432 |
 | intro, `ARGS=-dbg` | identical, 5 messages | 81,494 — the film is playing |
-| windowed, `-w` | identical, 6 messages | **0** |
+| windowed, `-w` | identical, 6 messages | 2–10 (was **0** while it stayed black) |
 | audio, silent ALSA device | identical, 13 messages | 22 / 786,432 |
 
 `audio` is the same run as Boot Camp with a sound device attached, and it is
@@ -1115,16 +1115,30 @@ run agree, not the absolute number. The intro's pixel figure is meaningless by
 construction — two unsynchronised playbacks of the same movie — so its log is
 the only evidence it carries.
 
-The windowed frame is static, and it comes out *pixel-perfect* — which also
-settles the Boot Camp figure, since a scene with nothing moving gives exactly
-zero and one with animation gives 22 scattered pixels. Windowed also reproduces
-the screen rectangle byte for byte, `04000000 1e000000 84020000 fe010000`,
-so `PositionWindow`'s windowed branch is confirmed numerically and not by eye.
+**The windowed frame was called static and pixel-perfect, and it is neither
+any more.** That claim was made when the client area never got painted at all:
+a black rectangle compared against a black rectangle is exactly zero, and
+reads as the strongest result in the table. Wine hands this prefix a lockable
+primary now, so the area draws — and four shots two seconds apart differ by 4
+pixels each in one 10×10 box at (325,232), so something in it blinks. With
+both sides painted the two frames differ by 2 to 10.
+
+The budget is 50 for that reason and no longer 0. A result in the 195,000
+range still fails loudly and means something different: one side's client area
+stayed black while the other's painted, which happens when the shot lands
+early — the wait is 60 seconds rather than 30 because of it. **Re-run before
+believing a windowed difference, and look at whether one side is black.**
+
+Windowed still reproduces the screen rectangle byte for byte,
+`04000000 1e000000 84020000 fe010000`, so `PositionWindow`'s windowed branch
+is confirmed numerically and not by eye. And the Boot Camp figure no longer
+has windowed's zero to lean on: 22 scattered pixels on an animating scene is
+its own baseline.
 
 `tools/ab.sh bootcamp|windowed|intro|audio|all` runs the whole thing, and each
-configuration now has a pixel budget it must stay inside — 0 for windowed,
-which is static, 500 for the two Boot Camp runs, and none for the intro, which
-is two unsynchronised playbacks of a film. Exceeding it fails the run.
+configuration now has a pixel budget it must stay inside — 50 for windowed,
+which blinks, 500 for the two Boot Camp runs, and none for the intro, which is
+two unsynchronised playbacks of a film. Exceeding it fails the run.
 
 That is there because it once did not. A reconstruction of the map tile
 painter misdecoded its rows, drew 33,137 wrong pixels, and `ab.sh` reported
@@ -2173,9 +2187,13 @@ exact oracle**, however meaningful it is when it is set.
   known as `ADDR_DEBUG_ITEMLIST`.
 - Windowed mode runs and is worth using as a second configuration — the window
   is created, sized and positioned correctly (client area 640x480 at (4,30))
-  and `CalibratePalette` fires — but Wine hands back no lockable primary, so
-  `LockSurface` never succeeds and the client area stays black. Fullscreen
-  remains the configuration to verify against.
+  and `CalibratePalette` fires. **It no longer stays black**: this entry used
+  to say Wine hands back no lockable primary and the client area never draws,
+  and that is not what happens here now — the area paints, mostly white, with
+  a blinking 10×10 element in it. White rather than the title art is still not
+  right, so fullscreen remains the configuration to verify against; what
+  changed is that "it is black" can no longer be quoted as the reason a
+  windowed comparison is trivially exact.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/win32/surface.cpp`.

@@ -133,7 +133,10 @@ play() {
 
     case "$cfg" in
         bootcamp) args="-nointro -dbg"    ; wait=20 ;;
-        windowed) args="-nointro -dbg -w" ; wait=30 ;;
+        # 60 rather than 30: at 30 the client area is often still black when
+        # the shot lands, and a black frame compared against a painted one is
+        # 195,000 pixels of nothing. See the budget note further down.
+        windowed) args="-nointro -dbg -w" ; wait=60 ;;
         intro)    args="-dbg"             ; wait=40 ;;
         # The same run as bootcamp, but with an audio device. Without one
         # DirectSound never starts and nine reconstructed functions -- the
@@ -215,7 +218,18 @@ play() {
         # A scroll bar's own sprite lives at 0x0064, not at the base's 0x0038,
         # so every bar prints spr=-1 and a wrong bar would look identical. The
         # pixels are the evidence here, which is the reverse of `controls`.
-        audiovol) args="-nointro -dbg"   ; wait=25 ;;
+        # With a sound device, because this is the one configuration that
+        # reaches SpeakLine at all -- the VOICE bar's handler plays one line
+        # at random out of thirty groups, and everywhere else SpeakLine is a
+        # unit reacting to something in a live mission.
+        #
+        # Measured rather than assumed: the game's own LCG at 0x0048CC1C
+        # advances FOUR steps across one click on the voice bar and none
+        # across a click on the effects bar. One of those four is the
+        # handler's own `rand() % 30`; the rest are past SpeakLine's
+        # owner check, so the call really does go through.
+        audiovol) args="-nointro -dbg"   ; wait=25
+                  export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         quit)     args="-nointro -dbg"    ; wait=25
                   export ALSA_CONFIG_PATH="$REPO/tools/alsa/asoundrc" ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
@@ -348,11 +362,19 @@ play() {
         # thumb, and the thumb's x is the ONE thing ScrollBarPaint computes --
         # without this the configuration compares three bars that could have
         # been drawn by any arithmetic at all.
-        local i=0
-        while [ $i -lt 4 ]; do
-            "$REPO/tools/point.py" 355 186 --click >/dev/null 2>&1
-            sleep 1
-            i=$((i + 1))
+        #
+        # All THREE bars, not just the first. They are 69 pixels apart and
+        # their handlers differ in what they do with the answer -- a sound,
+        # the music stream's volume, a random voice line -- so dragging only
+        # the top one left two thirds of the family uncompared.
+        local bar
+        for bar in 186 255 324; do
+            local i=0
+            while [ $i -lt 4 ]; do
+                "$REPO/tools/point.py" 355 "$bar" --click >/dev/null 2>&1
+                sleep 1
+                i=$((i + 1))
+            done
         done
         sleep 3
         # A shot AFTER the clicks, and the first version of this configuration
@@ -566,11 +588,21 @@ compare() {
     # its tile rows misdecoded, drew 33,137 wrong pixels, and this script said
     # A/B clean -- the number was right there and nothing acted on it.
     #
-    # windowed is static and must be exact. The two Boot Camp runs animate a
-    # little and have sat at 22 for the whole project. The intro is two
-    # unsynchronised playbacks of the same film and cannot be compared at all.
+    # windowed is NOT static, and the 0 it carried for most of the project was
+    # a claim about a frame that never got painted. Wine now hands this prefix
+    # a lockable primary, so the client area draws -- and four shots two
+    # seconds apart differ by 4 pixels each in one 10x10 box at (325,232),
+    # which is something blinking. With both sides painted the two frames
+    # differ by 10. So the budget is the menu configurations' noise floor, not
+    # zero, and a 195,000-pixel result still fails loudly: that one means one
+    # side's client area stayed black, which happens and is worth re-running
+    # before believing.
+    #
+    # The two Boot Camp runs animate a little and have sat at 22 for the whole
+    # project. The intro is two unsynchronised playbacks of the same film and
+    # cannot be compared at all.
     case "$cfg" in
-        windowed) budget=0 ;;
+        windowed) budget=50 ;;
         intro)    budget=-1 ;;      # -1 disables the check
         # Measured, not guessed -- see the note below the case.
         mission)  budget=-1 ;;

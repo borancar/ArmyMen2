@@ -14,6 +14,7 @@
 #include "audio.h"
 #include "dplay.h"   /* CommCreateDirectPlay -- reconstructed */
 #include "../gamedir.h" /* SetGameDir -- reconstructed */
+#include "../gameproc.h"  /* RequestState -- reconstructed */
 #include "../image.h"
 #include "../crt.h"
 #include "../../inject/patch.h"
@@ -23,6 +24,24 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+
+/* The seven title-screen handlers live in startgame.cpp, beside the other
+ * menu handler that starts a game. They are declared void(void) because that
+ * is what their bodies are; a button handler is called with the widget, and
+ * cdecl means the caller cleans, so the extra argument the original's own
+ * handlers also ignore is harmless. The cast is here rather than in their
+ * declarations so the signature stays the one the disassembly shows. */
+#define AM2_BUTTON_HANDLER(fn) ((void (__cdecl *)(AM2_Widget *))(fn))
+#define kOnBootCamp     AM2_BUTTON_HANDLER(OnBootCamp)
+#define kOnSinglePlayer AM2_BUTTON_HANDLER(OnSinglePlayer)
+#define kOnMultiPlayer  AM2_BUTTON_HANDLER(OnMultiPlayer)
+#define kOnOptionsMenu  AM2_BUTTON_HANDLER(OnOptionsMenu)
+#define kOnMovies       AM2_BUTTON_HANDLER(OnMovies)
+#define kOnCredits      AM2_BUTTON_HANDLER(OnCredits)
+#define kOnQuit         AM2_BUTTON_HANDLER(OnQuit)
+/* These already take the widget, so the cast only spells out the type the
+ * table field wants. */
+#define kOnMenuBack     OnMenuBack
 
 /* The layout claims above are compiler-checked rather than commented. */
 static_assert(offsetof(AM2_Widget, rect)   == 0x14, "widget rect offset");
@@ -1427,6 +1446,11 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
 #define g_gameOverFlags   (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_gameSetting22C  (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
 #define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
+#define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+/* The game's own rand, and it has to be: the LCG state at 0x0048CC1C is the
+ * image's, so drawing from ours would leave it untouched. */
+typedef int32_t (__cdecl *am2_rand_fn)(void);
+#define orig_rand         (*(am2_rand_fn)ADDR_GAME_RAND)
 #define g_menuRequestSet  (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
 #define g_commObject      (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 
@@ -1918,8 +1942,7 @@ AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
             w->focusedChild = btn;
     }
 
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)AM2_IMAGE(ADDR_ON_MENU_BACK);
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
     return w;
 }
 
@@ -1959,20 +1982,6 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
 #define AM2_BMP_RED0   0x00487178u
 #define AM2_BMP_RED1   0x0048718Cu
 
-/* The seven title-screen handlers live in startgame.cpp, beside the other
- * menu handler that starts a game. They are declared void(void) because that
- * is what their bodies are; a button handler is called with the widget, and
- * cdecl means the caller cleans, so the extra argument the original's own
- * handlers also ignore is harmless. The cast is here rather than in their
- * declarations so the signature stays the one the disassembly shows. */
-#define AM2_BUTTON_HANDLER(fn) ((void (__cdecl *)(AM2_Widget *))(fn))
-#define kOnBootCamp     AM2_BUTTON_HANDLER(OnBootCamp)
-#define kOnSinglePlayer AM2_BUTTON_HANDLER(OnSinglePlayer)
-#define kOnMultiPlayer  AM2_BUTTON_HANDLER(OnMultiPlayer)
-#define kOnOptionsMenu  AM2_BUTTON_HANDLER(OnOptionsMenu)
-#define kOnMovies       AM2_BUTTON_HANDLER(OnMovies)
-#define kOnCredits      AM2_BUTTON_HANDLER(OnCredits)
-#define kOnQuit         AM2_BUTTON_HANDLER(OnQuit)
 
 /* The handler by POINTER. Most menu handlers are still the original's and
  * arrive as an address, which the overload below turns into one; the seven
@@ -2384,13 +2393,20 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
  *
  * Only the FIRST bar becomes the parent's focused child. */
 
-#define g_volumeAtZero (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
-#define g_streamVolume  (*(const int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
-#define g_voiceVolume   (*(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
+/* The three the AUDIO dialog reads to place its bars and its own handlers
+ * write back; see OnVolumeEffects and friends below. */
+#define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
+#define g_streamVolume  (*(int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
+#define g_voiceVolume   (*(int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
 
 
+/* onChange by POINTER, for the same reason MakeButtonFn takes one: all three
+ * of these handlers are reconstructed, and reaching them through the image
+ * would be a seam tools/checkseams.py cannot see -- the AM2_IMAGE would be
+ * applied here, to a parameter, with no ADDR_ name anywhere in the text. */
 static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
-                                 int32_t volume, uint32_t onChange)
+                                 int32_t volume,
+                                 void (__cdecl *onChange)(AM2_Widget *))
 {
     AM2_Widget *bar = (AM2_Widget *)orig_operator_new(AM2_SCROLLBAR_SIZE);
     AM2_Rect    box;
@@ -2419,7 +2435,7 @@ static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
                   / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
                   * (long double)travel);
     *(int32_t *)(b + SCROLLBAR_OFF_FLAG50) = 0;
-    *(uint32_t *)(b + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)AM2_IMAGE(onChange);
+    *(uint32_t *)(b + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)onChange;
     return bar;
 }
 
@@ -2458,12 +2474,12 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
     }
 
     bars[0] = MakeVolumeBar(parent, offX + 0x25, offY + 0x38,
-                            g_volumeAtZero, ADDR_ON_VOLUME_EFFECTS);
+                            g_volumeAtZero, OnVolumeEffects);
     parent->focusedChild = bars[0];
     bars[1] = MakeVolumeBar(parent, offX + 0x25, offY + 0x7D,
-                            g_streamVolume, ADDR_ON_VOLUME_MUSIC);
+                            g_streamVolume, OnVolumeMusic);
     bars[2] = MakeVolumeBar(parent, offX + 0x25, offY + 0xC2,
-                            g_voiceVolume, ADDR_ON_VOLUME_VOICE);
+                            g_voiceVolume, OnVolumeVoice);
 
     /* Kept so CANCEL can put them back. */
     saved[0] = g_volumeAtZero;
@@ -2804,12 +2820,11 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     WidgetAddChild(panel, MakeButton(0x123, 0x92, AM2_BMP_DELETE0,
                                      AM2_BMP_DELETE1, AM2_BMP_DELETE2,
                                      ADDR_ON_DELETE_PLAYER));
-    WidgetAddChild(panel, MakeButton(0x123, 0xB9, AM2_BMP_BACK0,
-                                     AM2_BMP_BACK1, AM2_BMP_BACK2,
-                                     ADDR_ON_MENU_BACK));
+    WidgetAddChild(panel, MakeButtonFn(0x123, 0xB9, AM2_BMP_BACK0,
+                                       AM2_BMP_BACK1, AM2_BMP_BACK2,
+                                       kOnMenuBack));
 
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)AM2_IMAGE(ADDR_ON_MENU_BACK);
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
     return w;
 }
 
@@ -3547,6 +3562,101 @@ void __cdecl OpenTitleScreen(void)
     }
 }
 
+/* ------------------------------------------------------------------ *
+ * The OPTIONS menu's buttons, and the AUDIO dialog's three volume bars.
+ *
+ * Four of the five below are the same four instructions with one immediate
+ * changed -- a menu sound, then a request code and its pending flag -- and
+ * the codes are arm numbers in docs/screens.md: 1 the title, 15 CONTROLS,
+ * 16 DIFFICULTY, 19 AUDIO. Checked against each other before sharing a
+ * helper, which is the habit the title screen's focusedChild cost this
+ * session: the four bodies really are identical apart from the code.
+ * ------------------------------------------------------------------ */
+
+static void RequestScreen(int32_t code)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = code;
+    g_menuRequestSet = 1;
+}
+
+/* 0x0044E670. BACK, and the DIFFICULTY dialog's own way out. */
+void __cdecl OnMenuBack(AM2_Widget *w)
+{
+    (void)w;
+    RequestScreen(AM2_MENU_REQUEST_TITLE);
+}
+
+/* 0x0044FD40, 0x0044FD70, 0x0044FDA0: the OPTIONS menu's three entries. */
+void __cdecl OnControlsButton(AM2_Widget *w)
+{
+    (void)w;
+    RequestScreen(AM2_MENU_REQUEST_CONTROLS);
+}
+
+void __cdecl OnDifficultyButton(AM2_Widget *w)
+{
+    (void)w;
+    RequestScreen(AM2_MENU_REQUEST_DIFFICULTY);
+}
+
+void __cdecl OnAudioButton(AM2_Widget *w)
+{
+    (void)w;
+    RequestScreen(AM2_MENU_REQUEST_AUDIO);
+}
+
+/* 0x0044EE30. The OK on CONFIRM GAME EXIT: no screen is asked for at all,
+ * the game simply goes to state 4. This is the only handler in the family
+ * that ends the process, and `ab.sh quit` is the run that takes it. */
+void __cdecl OnQuitOk(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    RequestState(4);
+}
+
+/* The AUDIO dialog's three bars share their arithmetic and differ only in
+ * where the answer goes and what is played to demonstrate it.
+ *
+ * A bar has twenty-one positions and DirectSound wants hundredths of a
+ * decibel of ATTENUATION, so the value is (pos - 20) * 100: 0 at the right
+ * and -2000 at the left. The bottom of that range is then replaced by
+ * DSBVOLUME_MIN -- silence is a special case, not the end of a ramp. The
+ * original writes the -2000 out as a literal and compares against it, which
+ * is why the test is on the computed value rather than on `pos == 0`. */
+static int32_t VolumeFromBar(const AM2_Widget *bar)
+{
+    int32_t pos = *(const int32_t *)((const uint8_t *)bar + SCROLLBAR_OFF_POS);
+    int32_t vol = (pos - AM2_SCROLLBAR_RANGE) * 100;
+
+    return vol == -2000 ? DSBVOLUME_MIN : vol;
+}
+
+/* 0x0044F2A0: sound effects, demonstrated by playing wave 0x27. */
+void __cdecl OnVolumeEffects(AM2_Widget *w)
+{
+    g_volumeAtZero = VolumeFromBar(w);
+    PlaySoundAt(0x27, 0, 0, 0, 0);
+}
+
+/* 0x0044F2E0: the music stream, which needs no sample -- it is already
+ * playing, and SetStreamVolume moves it. */
+void __cdecl OnVolumeMusic(AM2_Widget *w)
+{
+    g_streamVolume = VolumeFromBar(w);
+    SetStreamVolume(0, 0);
+}
+
+/* 0x0044F320: voices, demonstrated by one line at random out of thirty
+ * groups. This is the only route to SpeakLine that does not need a mission
+ * -- everywhere else it is a unit reacting to something. */
+void __cdecl OnVolumeVoice(AM2_Widget *w)
+{
+    g_voiceVolume = VolumeFromBar(w);
+    SpeakLine(orig_rand() % 30, g_defaultOwner);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3652,6 +3762,23 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_MENU_BACK, (const void *)OnMenuBack,
+                        "OnMenuBack", 0);
+    rc |= patch_replace(ADDR_ON_CONTROLS_BUTTON, (const void *)OnControlsButton,
+                        "OnControlsButton", 0);
+    rc |= patch_replace(ADDR_ON_DIFFICULTY_BUTTON,
+                        (const void *)OnDifficultyButton,
+                        "OnDifficultyButton", 0);
+    rc |= patch_replace(ADDR_ON_AUDIO_BUTTON, (const void *)OnAudioButton,
+                        "OnAudioButton", 0);
+    rc |= patch_replace(ADDR_ON_QUIT_OK, (const void *)OnQuitOk, "OnQuitOk", 0);
+    rc |= patch_replace(ADDR_ON_VOLUME_EFFECTS, (const void *)OnVolumeEffects,
+                        "OnVolumeEffects", 0);
+    rc |= patch_replace(ADDR_ON_VOLUME_MUSIC, (const void *)OnVolumeMusic,
+                        "OnVolumeMusic", 0);
+    rc |= patch_replace(ADDR_ON_VOLUME_VOICE, (const void *)OnVolumeVoice,
+                        "OnVolumeVoice", 0);
+
     rc |= patch_replace(ADDR_OPEN_TITLE_SCREEN,
                         (const void *)OpenTitleScreen, "OpenTitleScreen", 0);
     rc |= patch_replace(ADDR_TYPER_CTOR, (const void *)TyperConstruct,
