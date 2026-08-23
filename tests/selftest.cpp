@@ -48,13 +48,21 @@ static uint8_t g_touched[AM2_SCRATCH_CMP];
 typedef uint32_t (__cdecl *am2_any_fn)(uint32_t, uint32_t, uint32_t,
                                        uint32_t, uint32_t, uint32_t);
 
-static void FillScratch(void)
+static void FillScratch(uint32_t salt)
 {
     for (uint32_t i = 0; i < sizeof g_scratch; i++)
-        /* Must match SCRATCH_PATTERN in tools/vectors.py exactly, salt and
-         * all. The salt exists because without it every PTR_STRIDE region
-         * held the same bytes and no copy was observable. */
-        g_scratch[i] = (uint8_t)(((i * 7 + 13) ^ (i >> 11)) & 0xFF);
+        /* Must match scratch_pattern() in tools/vectors.py exactly, both
+         * salts and all.
+         *
+         * `i >> 11` exists because without it every PTR_STRIDE region held
+         * the same bytes and no copy was observable. `salt * 37` exists
+         * because without it every VECTOR held the same bytes: a function
+         * whose only variation is behind a pointer was called with identical
+         * memory 96 times, and 7,353 recorded vectors were 5,355 distinct.
+         * The salt travels as one uint32 and the buffer is recomputed from
+         * it, so the bytes never have to be stored. */
+        g_scratch[i] = (uint8_t)(((i * 7 + 13) ^ (i >> 11) ^ (salt * 37))
+                                 & 0xFF);
 }
 
 static int ScriptTokens(int *passed);
@@ -70,7 +78,7 @@ int main(void)
         const AM2_Vector *t = &kVectors[v];
         uint32_t a[6];
 
-        FillScratch();
+        FillScratch(t->salt);
         /* angr chose these bytes to reach a particular branch; without them
          * the pointer arguments would all see the same fixed pattern and the
          * path coverage would be worth nothing. */

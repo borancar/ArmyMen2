@@ -280,11 +280,21 @@ for every vector, so a function whose only variation is behind a POINTER gets
 the same call every time unless angr supplies the bytes.
 
 `MIN_VECTORS` exists because "one vector cannot distinguish a reconstruction
-from a coincidence" and it had been counting copies. Deduping before emit
-makes it fire: 5,149 vectors and 19 functions reported "too thin to check
-against" where none were before. Nothing got worse; what was already true
-became visible. Measured, not reasoned -- `ColourDistance` at "71 vectors" and
-100% instruction coverage passed with `d1 * d1` replaced by `d1`.
+from a coincidence" and it had been counting copies. Measured, not reasoned --
+`ColourDistance` at "71 vectors" and 100% instruction coverage passed with
+`d1 * d1` replaced by `d1`, and failed at once with the body replaced by
+`return 0`, so the harness worked and the inputs did not.
+
+The cure is a SALT, one uint32 per vector: the pattern is
+`((i*7+13) ^ (i>>11) ^ (salt*37)) & 0xFF`, the salt is the try index, and
+`tests/selftest.cpp` recomputes the buffer from it -- so the bytes are never
+stored. It is applied only where it can be OBSERVED, since a function with no
+pointer argument cannot read the scratch and varying it there would put the
+duplicate count straight back.
+
+6,852 vectors, every one distinct, and the `d1` mutation now fails on ten of
+them. Coverage rose with it because the inputs are real: `ClipRect` went from
+ZERO vectors to 12, `PointInRect` from 43.8% to 56.2%.
 
 Validated on the 17 pure functions that were already reconstructed: 533 vectors,
 all passing. Tested in the failing direction too, and the two results are the

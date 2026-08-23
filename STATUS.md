@@ -47,29 +47,51 @@ Nothing uncommitted.
   changed, `ClipRect`'s second argument from `s` to `p`, which is also right
   and also a pointer.
 
-- **7,353 recorded vectors were 5,355 distinct, and twelve functions had
-  exactly ONE.** `MIN_VECTORS` exists because "one vector cannot distinguish a
-  reconstruction from a coincidence" -- and it had been counting COPIES.
-  `ObjFieldA`, `ObjFieldB`, `ObjFlagBit0`, `ObjFlagBit1`, `Field53C`,
-  `IsKind7`, `CommMean32`, `MsgField12`, `TitleCaseName`, `ReturnZero`,
-  `ReturnOne` and `ObjFlagClear0` were each recorded 82 or 96 times from a
-  single input.
+- **7,353 recorded vectors were 5,355 distinct, twelve functions had exactly
+  ONE, and the cure was one uint32 per vector.** `MIN_VECTORS` exists because
+  "one vector cannot distinguish a reconstruction from a coincidence" -- and
+  it had been counting COPIES. `ObjFieldA`, `ObjFieldB`, `ObjFlagBit0`,
+  `ObjFlagBit1`, `Field53C`, `IsKind7`, `CommMean32`, `MsgField12`,
+  `TitleCaseName`, `ReturnZero`, `ReturnOne` and `ObjFlagClear0` were each
+  recorded 82 or 96 times from a single input.
 
-  The cause is the scratch: it is a deterministic pattern, identical for every
-  vector, so a function whose only variation is behind a POINTER gets the same
-  call every time unless angr supplies the bytes. 96 tries collapse to one.
+  The cause was the scratch: one deterministic pattern for EVERY vector, so a
+  function whose only variation is behind a POINTER got the same call each
+  time unless angr supplied the bytes. 96 tries collapsed to one.
 
-  **Measured rather than reasoned, and the measurement is the point.** With
-  `ColourDistance` at "71 vectors" and 100% instruction coverage, replacing
-  `d1 * d1` with `d1` PASSED. Replacing the whole body with `return 0` failed
-  on the first vector, so the function is called and the harness works -- it
-  simply had two distinct inputs and neither told those apart.
+  **Measured rather than reasoned, in both directions.** With `ColourDistance`
+  at "71 vectors" and 100% instruction coverage, replacing `d1 * d1` with `d1`
+  PASSED; replacing the whole body with `return 0` failed on the first vector,
+  so the harness worked and the inputs did not.
 
-  Deduping before emit makes the number mean what it says: 5,149 vectors, and
-  the existing "too thin to check against" warning now fires for **19**
-  functions instead of none. Nothing got worse; what was already true became
-  visible. **A count that includes duplicates is a coverage claim about
-  effort, not about inputs.**
+  The fix is a SALT: the pattern is `((i*7+13) ^ (i>>11) ^ (salt*37)) & 0xFF`,
+  the salt is the try index, carried as one uint32 per vector and recomputed
+  on the replay side, so the bytes are never stored and the header does not
+  grow. It is applied only where it can be OBSERVED -- a function with no
+  pointer argument cannot read the scratch, and varying it there would put the
+  duplicate count straight back as 96 "distinct" vectors that are one test.
+
+  **6,852 vectors, every one distinct**, and the `d1` mutation now fails on
+  ten of them. Three functions are still under `MIN_VECTORS` and all three
+  earn it: `ReturnZero` and `ReturnOne` take no arguments and return a
+  constant, and `BuildRgb332Palette`'s output does not vary with its input,
+  which the tool already said.
+
+  Coverage rose with it, because the inputs are real now: `ClipRect` from
+  **ZERO vectors** to 12 at 36.2%, `PointInRect` from 43.8% to 56.2%, and
+  `CompareTriple`, `ObjIsItem` and `ObjType2Field548` off their floors. **A
+  count that includes duplicates is a claim about effort, not about inputs.**
+
+- **`str.replace("", x)` inserts between every character, and a slice built
+  from two `index()` calls has to be checked.** Rewriting the bullet above,
+  the end marker matched an entry EARLIER in the file than the start, the
+  slice came out empty, and the replace turned a 269 KB STATUS.md into
+  **529 MB**. It committed cleanly and the push refused it -- GitHub's 100 MB
+  limit was the only thing that noticed.
+
+  Nothing else would have. `make check` does not look at STATUS.md's size,
+  and a diff that large is not read. Assert `end > start` and assert the slice
+  is non-empty; both are one line.
 
 - **Four small functions off the FRONTIER, chosen by asking what our own code
   still reaches by address.** Listing every `orig_` macro in `src/game` with
@@ -1630,7 +1652,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 |---|---|---|
 | `make` | current | builds clean |
 | `make check` (16 static checks) | current | all pass, generated files regenerate identically |
-| `make selftest` | current | **5,149** DISTINCT vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
+| `make selftest` | current | **6,852** DISTINCT vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
 | `tools/objdump.py --leader` | current | max health 140, current 140 -- identical to `AM2_NOPATCH=1` |

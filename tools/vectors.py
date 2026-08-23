@@ -69,8 +69,18 @@ RET_MAGIC = 0x5EADBEE0
 # instruction coverage for exactly that reason. `i >> 11` differs per region,
 # so the regions no longer match. tests/selftest.cpp fills its own buffer and
 # the two expressions have to stay identical.
-SCRATCH_PATTERN = bytes(((((i * 7 + 13) ^ (i >> 11))) & 0xFF)
-                        for i in range(0x8000))
+def scratch_pattern(salt=0):
+    return bytes(((((i * 7 + 13) ^ (i >> 11) ^ (salt * 37))) & 0xFF)
+                 for i in range(0x8000))
+
+
+# `salt` is the second half of the same argument. Without it the buffer is one
+# fixed pattern for EVERY vector, so a function whose only variation is behind
+# a pointer is called with identical memory 96 times: 7,353 recorded vectors
+# were 5,355 distinct and twelve functions had exactly ONE. It travels as a
+# single uint32 per vector and tests/selftest.cpp recomputes the buffer from
+# it, so the bytes themselves never have to be stored.
+SCRATCH_PATTERN = scratch_pattern(0)
 MAX_ARGS = 6
 CRT_FRONTIER = 0x00464420      # measured by tools/crt.py, not the old constant
 DATA_LO, DATA_HI = 0x00473000, 0x00667000
@@ -801,7 +811,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
         if eax is None:
             continue
         writes, wptr = split_writes(before, after)
-        out.append((list(args), eax, writes, pre, (), tuple(wptr)))
+        out.append((list(args), eax, writes, pre, (), tuple(wptr), 0))
 
     for k in range(n):
         args = []
@@ -836,7 +846,15 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                 args.append(EDGE[(k + i) % len(EDGE)])
             else:
                 args.append(rnd.randint(-0x40000, 0x40000))
-        scratch = SCRATCH_PATTERN
+        # One salt per try -- but only where it can be OBSERVED. A function
+        # with no pointer argument cannot read the scratch, so varying it
+        # there would put the duplicate count straight back: 96 "distinct"
+        # vectors that are one test. Functions with a hand-written SEED chain
+        # keep the base pattern too, because the chain's offsets were chosen
+        # against it.
+        takes_ptr = any(kinds.get(i) == "ptr" for i in range(nargs))
+        salt = k if (takes_ptr and not SEED.get(addr)) else 0
+        scratch = SCRATCH_PATTERN if salt == 0 else scratch_pattern(salt)
         chain = SEED.get(addr)
         if chain:
             b = bytearray(scratch)
@@ -971,7 +989,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
                             for si, (arg, at, kind, _v) in enumerate(chain)
                             if kind == "ptr" and (k // (si + 1)) % 5 == 2
                             for i in range(4))
-        out.append((args, eax, writes, pre_in, fx, tuple(wptr)))
+        out.append((args, eax, writes, pre_in, fx, tuple(wptr), salt))
 
     # DEDUPE, and the number this changes is the point of the number.
     #
@@ -990,7 +1008,7 @@ def vectors_for(emu, addr, nargs, kinds, seed=1234, n=NVECTORS, extra=(),
     seen = set()
     uniq = []
     for v in out:
-        key = (tuple(v[0]), tuple(v[3]), tuple(v[4]))
+        key = (tuple(v[0]), tuple(v[3]), tuple(v[4]), v[6])
         if key in seen:
             continue
         seen.add(key)
@@ -1366,6 +1384,7 @@ def main():
                      "    uint8_t     eax_is_ptr;  /* eax is scratch+eax, not a literal */\n"
                      "    uint8_t     void_ret;     /* prototype is void: do not compare eax */\n"
                      "    uint8_t     byte_ret;     /* prototype returns a byte: compare al */\n"
+                     "    uint32_t    salt;         /* the scratch is refilled from this */\n"
                      "    int32_t     nwrites;\n"
                      "    const uint32_t *writes;   /* offset, byte pairs */\n"
                      "    int32_t     ninputs;\n"
@@ -1376,7 +1395,7 @@ def main():
                      "    const uint32_t *wptr;     /* offset, scratch-offset: expected write */\n"
                      "} AM2_Vector;\n\n")
             for cname, nargs, kinds, vs in out:
-                for k, (args, eax, writes, pre, fx, wp) in enumerate(vs):
+                for k, (args, eax, writes, pre, fx, wp, salt) in enumerate(vs):
                     if writes:
                         fh.write("static const uint32_t w_%s_%d[] = {%s};\n"
                                  % (cname, k, ",".join("%d,%d" % (o, b) for o, b in writes)))
@@ -1391,7 +1410,7 @@ def main():
                                  % (cname, k, ",".join("%d,%d" % (o, t) for o, t in wp)))
             fh.write("\nstatic const AM2_Vector kVectors[] = {\n")
             for cname, nargs, kinds, vs in out:
-                for k, (args, eax, writes, pre, fx, wp) in enumerate(vs):
+                for k, (args, eax, writes, pre, fx, wp, salt) in enumerate(vs):
                     # A NULL pointer argument is a literal, not an offset. It
                     # was being emitted as 0 - SCRATCH, i.e. 0xE0000000, which
                     # the replay then rebased onto its own buffer and wrote to.
@@ -1420,13 +1439,13 @@ def main():
                     eaxp = 1 if (has_ptr and SCRATCH <= eax < SCRATCH + SCRATCH_SZ) else 0
                     eaxv = (eax - SCRATCH) if eaxp else eax
                     fh.write('    {"%s", (void *)%s, %d, {%s}, {%s}, 0x%08xu, '
-                             '%d, %d, %d, %d, %s, %d, %s, %d, %s, %d, %s},\n'
+                             '%d, %d, %d, %uu, %d, %s, %d, %s, %d, %s, %d, %s},\n'
                              % (cname, cname, nargs,
                                 ",".join(str(x) for x in p),
                                 ",".join("0x%08xu" % (x & 0xFFFFFFFF) for x in a),
                                 eaxv & 0xFFFFFFFF, eaxp,
                                 1 if cname in VOID else 0,
-                                1 if cname in BYTE else 0, len(writes),
+                                1 if cname in BYTE else 0, salt, len(writes),
                                 ("w_%s_%d" % (cname, k)) if writes else "0",
                                 len(pre),
                                 ("i_%s_%d" % (cname, k)) if pre else "0",
