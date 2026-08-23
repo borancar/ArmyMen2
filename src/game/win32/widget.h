@@ -1080,6 +1080,24 @@ AM2_Widget *__attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w,
                                                       int32_t ink2, int32_t ink3,
                                                       int32_t ink4);
 
+/* Original: 0x00454B00, thiscall, `ret 8`. The SCREEN BASE -- a panel over the
+ * whole 640x480 with the dialog vtable on top. Every screen starts here. */
+AM2_Widget *__attribute__((thiscall)) ScreenBaseConstruct(AM2_Widget *w,
+                                                          const char *bmp,
+                                                          int32_t flag);
+
+/* Original: 0x004540F0, thiscall, `ret 0x28`. The BUTTON: three sprites by
+ * name, a rectangle by value, and two handlers. Only the first bitmap is
+ * tested for null; see widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
+                                                      const char *b0,
+                                                      const char *b1,
+                                                      const char *b2,
+                                                      int32_t flag,
+                                                      AM2_Rect box,
+                                                      void (__cdecl *onLeft)(AM2_Widget *),
+                                                      void (__cdecl *onRight)(AM2_Widget *));
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

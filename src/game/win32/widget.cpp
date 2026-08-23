@@ -1853,16 +1853,7 @@ void __cdecl OpenLoadGame(void)
  * given and cannot tell the difference.
  *
  * It returns `this`, which its factory stores. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScreenBaseCtorFn)(
-    AM2_Widget *w, const char *bmp, int32_t flag);
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ButtonCtorFn)(
-    AM2_Widget *w, const char *b0, const char *b1, const char *b2,
-    int32_t flag, AM2_Rect box, void (__cdecl *handler)(AM2_Widget *),
-    int32_t last);
 
-#define orig_screen_base_ctor \
-    ((AM2_ScreenBaseCtorFn)AM2_IMAGE(ADDR_SCREEN_BASE_CTOR))
-#define orig_button_ctor ((AM2_ButtonCtorFn)AM2_IMAGE(ADDR_BUTTON_CTOR))
 
 typedef struct {
     int32_t     top;
@@ -1892,7 +1883,7 @@ AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
 {
     uint32_t i;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_OPTIONS_MENU);
     w->flag44 = 1;
 
@@ -1904,7 +1895,7 @@ AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
         if (btn) {
             RectSet(&box, AM2_OPTIONS_BUTTON_LEFT, b->top,
                     AM2_OPTIONS_BUTTON_WIDTH, AM2_OPTIONS_BUTTON_HEIGHT);
-            btn = orig_button_ctor(btn,
+            btn = ButtonConstruct(btn,
                                    (const char *)AM2_IMAGE(b->bmp[0]),
                                    (const char *)AM2_IMAGE(b->bmp[1]),
                                    (const char *)AM2_IMAGE(b->bmp[2]),
@@ -1981,7 +1972,7 @@ static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
     if (!btn)
         return (AM2_Widget *)0;
     RectSet(&box, left, top, 0x51, 0x20);
-    return orig_button_ctor(btn, (const char *)AM2_IMAGE(b0),
+    return ButtonConstruct(btn, (const char *)AM2_IMAGE(b0),
                             (const char *)AM2_IMAGE(b1),
                             (const char *)AM2_IMAGE(b2), 1, box,
                             (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
@@ -1998,7 +1989,7 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     AM2_Widget *dot;
     AM2_Rect    box;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(vtable);
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_ALPINE));
 
@@ -2098,7 +2089,7 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     void       *rows;
     AM2_Rect    box;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_DIFFICULTY_DIALOG);
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
@@ -2190,7 +2181,7 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
     AM2_Widget    *ok;
     AM2_Rect       box;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_CONTROLS_DIALOG);
     rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
 
@@ -2275,7 +2266,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
     int32_t        host  = *(const int32_t *)(comm + COMM_OFF_IS_HOST);
     AM2_Rect       box;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_OPTIONS_MENU_MP);
     SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
 
@@ -2381,15 +2372,6 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScrollBarCtorFn)(
 #define g_streamVolume  (*(const int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
 #define g_voiceVolume   (*(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
 
-/* The base constructor again, with the flag as a REAL argument rather than
- * the literal 1 every other screen passes -- this one is handed its caller's.
- * Same address, so the same detour; a second typedef only because the
- * signature differs. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScreenBaseCtor2Fn)(
-    AM2_Widget *w, const char *bmp, int32_t flag);
-#define orig_screen_base_ctor2 \
-    ((AM2_ScreenBaseCtor2Fn)AM2_IMAGE(ADDR_SCREEN_BASE_CTOR))
-
 #define orig_scrollbar_ctor \
     ((AM2_ScrollBarCtorFn)AM2_IMAGE(ADDR_SCROLLBAR_CTOR))
 
@@ -2436,7 +2418,7 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
     int32_t      offY = 0x79;
     AM2_Rect     box;
 
-    orig_screen_base_ctor2(w, bmp, flag);
+    ScreenBaseConstruct(w, bmp, flag);
     w->vtable = (void *)AM2_IMAGE(VTABLE_AUDIO_DIALOG);
 
     if (g_gameState == AM2_STATE_MISSION) {
@@ -2494,7 +2476,7 @@ static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
     if (!btn)
         return (AM2_Widget *)0;
     RectSet(&box, left, top, 0x4E, 0x20);
-    return orig_button_ctor(btn, (const char *)AM2_IMAGE(b0),
+    return ButtonConstruct(btn, (const char *)AM2_IMAGE(b0),
                             (const char *)AM2_IMAGE(b1),
                             (const char *)AM2_IMAGE(b2), 1, box,
                             (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
@@ -2572,7 +2554,7 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
     AM2_Widget *panel;
     AM2_Rect    box;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_BATTLE_NAME_DLG);
 
     strcpy((char *)w + 0x64,
@@ -2636,7 +2618,7 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     void       *rows;
     AM2_Rect    box;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_COMM_PANEL);
     SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
 
@@ -2733,7 +2715,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     uint8_t     found[0x11C];
     int32_t     handle;
 
-    orig_screen_base_ctor(w, bmp, 1);
+    ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_PLAYER);
     orig_read_campaign();
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
@@ -2902,6 +2884,88 @@ AM2_Widget *__attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00454B00, thiscall, `ret 8`. The SCREEN BASE -- every one of the twenty
+ * screens starts here, so this is the single most-executed constructor in the
+ * menu layer and every configuration in the suite runs it.
+ *
+ * It is a PANEL over the whole screen with the dialog vtable stamped on top.
+ * The rectangle is (0, 0, ADDR_SCREEN_W, ADDR_SCREEN_H) -- 640 by 480 read
+ * from the image rather than written down, which is why a screen's backdrop
+ * covers exactly the display and not a constant somebody chose. */
+AM2_Widget *__attribute__((thiscall)) ScreenBaseConstruct(AM2_Widget *w,
+                                                          const char *bmp,
+                                                          int32_t flag)
+{
+    AM2_Rect box;
+
+    RectSet(&box, 0, 0, *(const int32_t *)(uintptr_t)ADDR_SCREEN_W,
+            *(const int32_t *)(uintptr_t)ADDR_SCREEN_H);
+    PanelConstruct(w, bmp, flag, box);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DIALOG);
+    w->flag44 = 1;
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = 0;
+    return w;
+}
+
+/* 0x004540F0, thiscall, `ret 0x28`. The BUTTON: three sprites, a rectangle,
+ * and two handlers.
+ *
+ * The three bitmaps are loaded by NAME through the same wrapper the panel
+ * uses, and all three share the caller's flag. Only the first is tested: a
+ * null normal-state bitmap sets 0x0048 as well, which WidgetRepaint reads as
+ * "defer to an ancestor" -- so a button with no sprite of its own is drawn by
+ * whatever contains it. The other two are loaded unconditionally, so a null
+ * there would go in as a null sprite rather than being caught.
+ *
+ * The normal sprite is also copied to the base's own 0x0038, the field
+ * WidgetPaint draws and WidgetRepaint walks the parent chain for. Same
+ * doubling as the panel's, and reproduced for the same reason.
+ *
+ * 0x0075 goes in as 1 -- BUTTON_OFF_OWNS_SPRITES -- which is what makes
+ * ButtonDestruct release all three. */
+typedef void (__attribute__((thiscall)) *AM2_ButtonBaseCtorFn)(AM2_Widget *w);
+#define orig_button_base_ctor \
+    ((AM2_ButtonBaseCtorFn)AM2_IMAGE(ADDR_BUTTON_BASE_CTOR))
+
+AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
+                                                      const char *b0,
+                                                      const char *b1,
+                                                      const char *b2,
+                                                      int32_t flag,
+                                                      AM2_Rect box,
+                                                      void (__cdecl *onLeft)(AM2_Widget *),
+                                                      void (__cdecl *onRight)(AM2_Widget *))
+{
+    uint8_t *self = (uint8_t *)w;
+
+    orig_button_base_ctor(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON);
+
+    if (b0) {
+        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL) =
+            orig_preload_by_name(b0, flag, 1);
+    } else {
+        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL) = (AM2_Sprite *)0;
+        w->unknown48 = 1;
+    }
+    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS) =
+        orig_preload_by_name(b1, flag, 1);
+    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED) =
+        orig_preload_by_name(b2, flag, 1);
+
+    w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
+    w->x = box.left;
+    w->y = box.top;
+    w->w = box.right;
+    w->h = box.bottom;
+    self[BUTTON_OFF_OWNS_SPRITES] = 1;
+    WidgetScreenRect(w);
+
+    *(void **)(self + BUTTON_OFF_ON_RIGHT) = (void *)onRight;
+    *(void **)(self + BUTTON_OFF_ON_LEFT)  = (void *)onLeft;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3007,6 +3071,11 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_SCREEN_BASE_CTOR,
+                        (const void *)ScreenBaseConstruct,
+                        "ScreenBaseConstruct", 2);
+    rc |= patch_replace(ADDR_BUTTON_CTOR, (const void *)ButtonConstruct,
+                        "ButtonConstruct", 10);
     rc |= patch_replace(ADDR_KEYROW_CTOR, (const void *)KeyRowConstruct,
                         "KeyRowConstruct", 11);
     rc |= patch_replace(ADDR_PANEL_CTOR, (const void *)PanelConstruct,

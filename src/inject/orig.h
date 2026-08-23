@@ -1725,6 +1725,10 @@
 #define FOCUSLABEL_OFF_INK2      0x65u
 #define FOCUSLABEL_OFF_INK3      0x66u
 #define FOCUSLABEL_OFF_INK4      0x67u
+
+/* The SCREEN BASE, 0x00454B00 -- every one of the twenty screens starts here.
+ * It is a PANEL over the whole 640x480, then the dialog vtable on top. */
+#define ADDR_BUTTON_BASE_CTOR    0x004542F0u /* thiscall void(w), no args */
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */

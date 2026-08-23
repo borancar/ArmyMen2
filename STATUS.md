@@ -210,6 +210,29 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The SCREEN BASE and the BUTTON are reconstructed** -- `0x00454B00`
+  (106 B) and `0x004540F0` (203 B), the two most-executed constructors in the
+  menu layer. Every screen starts at the first and nearly every one uses the
+  second, so every configuration in the suite runs both.
+
+  The screen base is just a PANEL over the whole display with the dialog
+  vtable stamped on top, and its rectangle is `(0, 0, ADDR_SCREEN_W,
+  ADDR_SCREEN_H)` -- 640 by 480 READ FROM THE IMAGE rather than written down,
+  which is why a backdrop covers exactly the display and not a constant
+  somebody chose.
+
+  The button is where the reading needed care. **Only the FIRST of its three
+  bitmaps is tested for null**, and a null there also sets 0x0048, which
+  `WidgetRepaint` reads as "defer to an ancestor" -- so a button with no
+  sprite of its own is drawn by whatever contains it. The other two go through
+  unconditionally, so a null there would be stored as a null sprite rather
+  than caught. And the normal sprite is copied to the base's own 0x0038 as
+  well, the same doubling the panel does.
+
+  With these two closed, the whole chain from a menu request down to a
+  rectangle is ours: factory, screen constructor, panel, button, and the
+  key row.
+
 - **The key-capture ROW is reconstructed** (`0x00450C50`, 106 B), and **it
   passes an UNINITIALISED byte to the label constructor.** `mov al, byte ptr
   [esi + 0x64]` at `0x00450C5D` reads the object's own 0x0064 before anything
@@ -663,10 +686,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 676 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 675 | 665 of them below the CRT line |
+| `patch_replace` sites | 678 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 677 | 667 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 122,096 / 372,816 B (**32.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 122,416 / 372,816 B (**32.8%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
