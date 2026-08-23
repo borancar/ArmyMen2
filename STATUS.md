@@ -210,6 +210,37 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The AUDIO dialog is decoded but NOT written, and this is where it got
+  to.** `0x0044F370`, 1,208 B, `ret 8` -- two stack arguments, the backdrop
+  and the flag, which is what its factory's two-argument call already implied.
+
+  It branches on `ADDR_GAME_STATE` like its factory does, and the branch is
+  structural rather than cosmetic: **in a mission there is no panel at all**.
+  The dialog itself becomes the parent and the three bars carry an offset of
+  (0x89, 0x79); with a panel the panel sits at that position and the bars are
+  placed relative to it, so the offset is zeroed. Two stack slots hold that
+  offset and are reused for other things afterwards, which is what makes the
+  listing hard to follow.
+
+  Each bar is `new(0x80)` then `ScrollBarCtor(bar, rect, parent, 0x92)` --
+  `ret 0x18`, so rectangle by value, parent, and a maximum. The rows are at
+  +0x38, +0x7D and +0xC2 from the offset, all at x +0x25, 0xBA by 0x15. The
+  three are stored on the dialog at 0x0064, 0x0068 and 0x006C, their
+  on-change handlers are `0x0044F2A0`, `0x0044F2E0` and `0x0044F320`, and the
+  dialog saves the current volumes at 0x0070 and up so CANCEL can put them
+  back.
+
+  The position arithmetic is the part to be careful with. `bar[0x74]` comes
+  from the volume by a MAGIC-NUMBER DIVISION -- `imul 0x51EB851F` then
+  `sar 5`, which is `(volume + 2000) / 100` -- and is clamped at zero. The
+  thumb at `bar[0x6C]` is then x87: `fild bar[0x74]`, `fidiv bar[0x78]`,
+  `fmulp` against `bar[0x70] - bar[0x64][0x1C]`, and `_ftol` (`0x00464490`).
+  `long double` reproduces the 80-bit intermediate, as it does for
+  `SetMaxHealth` and `Ticks`.
+
+  The three volume globals are already named: `ADDR_VOLUME_AT_ZERO`
+  (effects), `ADDR_STREAM_VOLUME` (music), `ADDR_VOLUME_VOICE`.
+
 - **MULTIPLAYER OPTIONS is reconstructed** (`0x00432320`, 968 B): 43
   checkboxes built from the declarative table, then three buttons -- or one.
 
