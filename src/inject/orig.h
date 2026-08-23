@@ -1729,6 +1729,10 @@
 /* The SCREEN BASE, 0x00454B00 -- every one of the twenty screens starts here.
  * It is a PANEL over the whole 640x480, then the dialog vtable on top. */
 #define ADDR_BUTTON_BASE_CTOR    0x004542F0u /* thiscall void(w), no args */
+#define VTABLE_EDIT              0x0046FC98u
+/* The edit box's DEFAULT character set -- wider than the one ENTER BATTLE
+ * NAME then installs over it, and including ` ~ ! @ # $ % ^ &. */
+#define ADDR_EDIT_CHARSET_DEFAULT 0x00485304u /* const char ** */
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */

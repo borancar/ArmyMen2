@@ -210,6 +210,30 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The EDIT BOX constructor is reconstructed** (`0x00454C10`, 137 B) and it
+  has **thirteen stack arguments**, `ret 0x34` -- the longest list in the
+  widget hierarchy: the buffer, the maximum, four of rectangle, a font, three
+  colours, the RETURN handler and two more that every call site passes as
+  zero. Its seventh argument is the FONT, as the key row's is, and not a flag.
+
+  **The two character sets are a default and an override, not two tables.**
+  The constructor installs the permissive one from `0x00485304` -- with
+  `` ` ~ ! @ # $ % ^ & `` in it -- and ENTER BATTLE NAME then overwrites
+  `EDIT_OFF_CHARSET` with the letters-and-digits set at `0x00485308`. Reading
+  the constructor is what turned two unexplained pointers into one mechanism.
+
+- **The MULTI-SPRITE constructor is decoded and NOT written, because its
+  field layout disagrees with a note already in `widget.h`.** That note says
+  the class keeps an array of two sprites at 0x0064 with a state at 0x006C,
+  and reasons carefully about why the array cannot hold three. The
+  constructor at `0x00456BC0` writes the first sprite to **0x0060** and the
+  second to 0x0064, and zeroes 0x0068 and 0x006C.
+
+  Both readings cannot be right, and the cheap explanation -- that they are
+  two different classes and the note is about another one -- has not been
+  checked. Writing it either way would make one of the two silently wrong, so
+  it waits for whichever vtable the note was taken from to be identified.
+
 - **The SCREEN BASE and the BUTTON are reconstructed** -- `0x00454B00`
   (106 B) and `0x004540F0` (203 B), the two most-executed constructors in the
   menu layer. Every screen starts at the first and nearly every one uses the
@@ -686,10 +710,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 678 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 677 | 667 of them below the CRT line |
+| `patch_replace` sites | 679 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 678 | 668 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 122,416 / 372,816 B (**32.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 122,560 / 372,816 B (**32.9%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

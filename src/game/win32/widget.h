@@ -829,6 +829,12 @@ AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w,
 #define EDIT_OFF_INK_FOCUS  0x64   /* uint8_t, ink while focused */
 #define EDIT_OFF_INK        0x65   /* uint8_t, ink while not focused */
 #define EDIT_OFF_PAPER      0x66   /* uint8_t, background */
+#define EDIT_OFF_MAX        0x5C   /* int32_t, characters the field accepts */
+#define EDIT_OFF_CARET      0x6C   /* int32_t, constructed 0 */
+#define EDIT_OFF_SCROLL     0x70   /* int32_t, constructed 0 */
+#define EDIT_OFF_ON_ENTER   0x74   /* void(__cdecl *)(AM2_Widget *) */
+#define EDIT_OFF_ARG78      0x78
+#define EDIT_OFF_ARG7C      0x7C
 
 /* The original builds its string in 68 bytes of stack. Kept at that size
  * rather than rounded, because the caret is appended into it and the size is
@@ -1097,6 +1103,24 @@ AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
                                                       AM2_Rect box,
                                                       void (__cdecl *onLeft)(AM2_Widget *),
                                                       void (__cdecl *onRight)(AM2_Widget *));
+
+/* Original: 0x00454C10, thiscall, `ret 0x34` -- THIRTEEN stack arguments:
+ * the buffer, the maximum, four of rectangle, a font, three colours, the
+ * RETURN handler and two more.
+ *
+ * It installs the PERMISSIVE character set at 0x00485304 -- the one with
+ * `~!@#$%^& in it -- and a caller that wants a narrower field overwrites
+ * EDIT_OFF_CHARSET afterwards, which is exactly what ENTER BATTLE NAME does
+ * with the letters-and-digits set at 0x00485308. */
+AM2_Widget *__attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf,
+                                                    int32_t maxChars,
+                                                    int32_t left, int32_t top,
+                                                    int32_t width,
+                                                    int32_t height,
+                                                    int32_t font, int32_t inkFocus,
+                                                    int32_t ink, int32_t paper,
+                                                    void (__cdecl *onEnter)(AM2_Widget *),
+                                                    int32_t a, int32_t b);
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 

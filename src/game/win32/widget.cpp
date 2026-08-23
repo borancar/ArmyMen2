@@ -2501,12 +2501,7 @@ static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
  * each box takes the accepted-character set from ADDR_EDIT_CHARSET_PTR: a
  * whitelist of letters, digits, space and punctuation rather than a length
  * limit. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_EditCtorFn)(
-    AM2_Widget *w, char *buf, int32_t maxChars, AM2_Rect box, int32_t flag,
-    int32_t ink, int32_t ink2, int32_t ink3,
-    void (__cdecl *handler)(AM2_Widget *), int32_t a, int32_t b);
 
-#define orig_edit_ctor ((AM2_EditCtorFn)AM2_IMAGE(ADDR_EDIT_CTOR))
 #define g_colourBelowBg (*(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG)
 #define g_editCharset   (*(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_PTR)
 
@@ -2520,11 +2515,12 @@ static AM2_Widget *MakeNameField(AM2_Widget *panel, char *buf, int32_t top,
 
     if (edit) {
         RectSet(&box, 0x26, top, 0xF4, 0x11);
-        edit = orig_edit_ctor(edit, buf, AM2_EDIT_MAX_CHARS, box, 1,
-                              g_hiliteColour, g_colourBelowBg,
-                              g_backgroundColour,
-                              (void (__cdecl *)(AM2_Widget *))
-                              AM2_IMAGE(ADDR_HOST_BATTLE), 0, 0);
+        edit = EditConstruct(edit, buf, AM2_EDIT_MAX_CHARS, box.left,
+                             box.top, box.right, box.bottom, 1,
+                             g_hiliteColour, g_colourBelowBg,
+                             g_backgroundColour,
+                             (void (__cdecl *)(AM2_Widget *))
+                             AM2_IMAGE(ADDR_HOST_BATTLE), 0, 0);
     }
     WidgetAddChild(panel, edit);
     /* Only the FIRST field gets the focus slot -- the original calls it once,
@@ -2966,6 +2962,57 @@ AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00454C10, thiscall, `ret 0x34` -- thirteen stack arguments, which is the
+ * longest list in the widget hierarchy: the buffer, the maximum, four of
+ * rectangle, a font, three colours, the RETURN handler and two more that
+ * every call site passes as zero.
+ *
+ * The seventh argument is the FONT, as it is for the key row, and not a flag.
+ *
+ * It installs the PERMISSIVE character set from 0x00485304 -- the one with
+ * ` ~ ! @ # $ % ^ & in it -- and a caller wanting a narrower field overwrites
+ * EDIT_OFF_CHARSET afterwards. That is exactly what ENTER BATTLE NAME does
+ * with the letters-and-digits set at 0x00485308, so the two sets are a
+ * default and an override rather than two unrelated tables. */
+AM2_Widget *__attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf,
+                                                    int32_t maxChars,
+                                                    int32_t left, int32_t top,
+                                                    int32_t width,
+                                                    int32_t height,
+                                                    int32_t font,
+                                                    int32_t inkFocus,
+                                                    int32_t ink, int32_t paper,
+                                                    void (__cdecl *onEnter)(AM2_Widget *),
+                                                    int32_t a, int32_t b)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    WidgetConstruct(w);
+
+    *(char **)(self + EDIT_OFF_TEXT)   = buf;
+    *(int32_t *)(self + EDIT_OFF_MAX)  = maxChars;
+    *(int32_t *)(self + EDIT_OFF_FONT) = font;
+    self[EDIT_OFF_INK_FOCUS] = (uint8_t)inkFocus;
+    self[EDIT_OFF_INK]       = (uint8_t)ink;
+    self[EDIT_OFF_PAPER]     = (uint8_t)paper;
+    *(int32_t *)(self + EDIT_OFF_ARG78) = a;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_EDIT);
+    *(void **)(self + EDIT_OFF_ON_ENTER) = (void *)onEnter;
+    *(int32_t *)(self + EDIT_OFF_ARG7C)  = b;
+    *(int32_t *)(self + EDIT_OFF_CARET)  = 0;
+    *(const char **)(self + EDIT_OFF_CHARSET) =
+        *(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT;
+    *(int32_t *)(self + EDIT_OFF_SCROLL) = 0;
+
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    WidgetScreenRect(w);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3071,6 +3118,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_EDIT_CTOR, (const void *)EditConstruct,
+                        "EditConstruct", 13);
     rc |= patch_replace(ADDR_SCREEN_BASE_CTOR,
                         (const void *)ScreenBaseConstruct,
                         "ScreenBaseConstruct", 2);
