@@ -210,6 +210,16 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **`ab.sh campaign` compares the SELECT PLAYER tree now**, ten nodes, and
+  until this it compared that screen not at all -- it drove straight through
+  on its way to the map and compared only the log and a live-play frame. The
+  three defects this session that only `ctl widgets` could name were all on
+  screens that HAD a tree dump; this closes the largest screen that did not.
+
+  No screenshot goes with it, deliberately: `campaign`'s pixel budget is -1
+  because it ends in live play, and a frame compared against a check that
+  cannot fail is not a check.
+
 - **COMM. CHANNEL SELECT is reconstructed** (`0x0042E9C0`, 760 B). Its rows
   come from our own `CommEnumConnections` into a record built by our own
   `RecordCtor` -- with a flag of 1 where DIFFICULTY passes 0.

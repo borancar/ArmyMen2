@@ -244,6 +244,15 @@ play() {
         # player is idempotent and the first run creates it.
         "$REPO/tools/point.py" 306 182 --click >/dev/null 2>&1
         sleep 6
+        # SELECT PLAYER is up here, and until this dump existed nothing in the
+        # suite compared it -- campaign drove straight through it on its way to
+        # the map and compared only the log and the final frame. Its tree is
+        # the sharp check for this screen, as it is for CONTROLS.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
+        # No shot: campaign's pixel budget is -1 because it ends in live play,
+        # and a frame compared against a check that cannot fail is not a check.
+        # The tree is the evidence here.
         if "$REPO/tools/point.py" 240 177 --click >/dev/null 2>&1; then :; fi
         sleep 4
         "$REPO/tools/point.py" 455 221 --click >/dev/null 2>&1   # SELECT
