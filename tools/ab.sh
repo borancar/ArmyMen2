@@ -379,6 +379,11 @@ play() {
         # their handlers differ in what they do with the answer -- a sound,
         # the music stream's volume, a random voice line -- so dragging only
         # the top one left two thirds of the family uncompared.
+        #
+        # x 355 is inside the bar's RIGHT ARROW, which spans 351..360 -- not
+        # the trough. So these clicks are OnArrowRight, which steps the
+        # position and then fires the bar's onChange; the volume handlers are
+        # reached THROUGH the arrow rather than directly.
         local bar
         for bar in 186 255 324; do
             local i=0
@@ -387,6 +392,16 @@ play() {
                 sleep 1
                 i=$((i + 1))
             done
+        done
+        # And the LEFT arrow, at 174..183, enough times to run the position
+        # off the bottom of the track. That covers OnArrowLeft and the arm
+        # where the guard skips the move but the callback still fires, which
+        # is the part of that handler a single click cannot reach.
+        local j=0
+        while [ $j -lt 6 ]; do
+            "$REPO/tools/point.py" 178 186 --click >/dev/null 2>&1
+            sleep 1
+            j=$((j + 1))
         done
         sleep 3
         # A shot AFTER the clicks, and the first version of this configuration

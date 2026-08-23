@@ -11,6 +11,39 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **The four arrows are two pairs on two different classes, and only the
+  shapes rhyme.** UP and DOWN (`0x004557F0`, `0x004558B0`) belong to the ARROW
+  BAR beside a list and move the list's first drawn row; LEFT and RIGHT
+  (`0x00455ED0`, `0x00455F60`) belong to the SCROLL BAR, move its own
+  position, and then fire its `onChange`.
+
+  So an arrow click on the AUDIO dialog is how `OnVolumeEffects` is reached,
+  and `ab.sh audiovol` was clicking one all along without anyone saying so:
+  x 355 is inside the right arrow, which spans 351..360, not the trough.
+
+  **The guard skips the MOVE and not the NOTIFICATION.** Both arms of the
+  scroll bar's test fall into the same tail, so holding an arrow against the
+  end of the track keeps calling `onChange` with an unchanged position.
+  Written as an `if` around the move rather than an early return, because an
+  early return is the wrong shape and would be invisible until something
+  depended on the callback.
+
+  `audiovol` now also clicks the LEFT arrow six times, enough to run the
+  position off the bottom, which is the only way to reach that arm. The two
+  bars move 481 pixels between the dlg and mid frames and the two sides agree.
+
+  **UP and DOWN stay verified by reading**, and the reason is structural: they
+  need a list with more rows than fit, and every list this suite reaches --
+  COMM CHANNEL, SELECT PLAYER, DIFFICULTY -- shows all of its rows at once.
+  The guard is what saves them, since `count - visible` would be a division by
+  zero otherwise.
+
+- **`0x00455C10` is not `WidgetRepaint` and is a near-twin of it.** Both walk
+  up to the nearest ancestor owning a sprite and paint through it; this one
+  omits the `0x48` test and does not clear `0x44`, and it is `thiscall` with
+  `ret 0x10` -- a clip rectangle it accepts and ignores. All four arrows end
+  in it. Named `ADDR_REPAINT_ANCESTOR` from its body, and left original.
+
 - **CONTROLS' OK and DEFAULT, and the key table has two columns but one is
   never written.** `0x00451150` walks the dialog's twenty-one rows and stores
   each row's key into `ADDR_KEY_BINDINGS`, which is pairs of bytes -- and only
@@ -1085,11 +1118,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 708 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 707 | 697 of them below the CRT line |
+| `patch_replace` sites | 712 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 711 | 701 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 127,664 / 372,816 B (**34.2%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 147,072 / 372,816 B (39.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 128,336 / 372,816 B (**34.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 147,552 / 372,816 B (39.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

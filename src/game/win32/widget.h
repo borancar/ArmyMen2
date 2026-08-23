@@ -1245,6 +1245,14 @@ void __cdecl ApplyVolumes(int32_t effects, int32_t music, int32_t voice);
 void __cdecl OnControlsOk(AM2_Widget *w);
 void __cdecl OnControlsDefault(AM2_Widget *w);
 
+/* The four arrows: 0x004557F0, 0x004558B0 on the arrow bar beside a list,
+ * and 0x00455ED0, 0x00455F60 on the scroll bar. The argument is the ARROW;
+ * the bar it belongs to is at ARROW_OFF_OWNER. */
+void __cdecl OnArrowUp(AM2_Widget *w);
+void __cdecl OnArrowDown(AM2_Widget *w);
+void __cdecl OnArrowLeft(AM2_Widget *w);
+void __cdecl OnArrowRight(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

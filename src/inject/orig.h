@@ -1779,7 +1779,14 @@
 #define ARROWBAR_OFF_FLAG50      0x50u /* the arrows get the same value */
 #define ARROWBAR_OFF_SPRITE0     0x64u
 #define ARROWBAR_OFF_SPRITE1     0x68u
+#define ARROWBAR_OFF_SHIFT       0x70u /* int32_t, where the thumb sits */
 #define ARROWBAR_OFF_SPAN        0x74u
+/* 0x00455C10, thiscall `ret 0x10`: repaint a widget through the nearest
+ * ANCESTOR that owns a sprite, ignoring the clip rectangle it is handed and
+ * using that ancestor's own. Near-twin of WidgetRepaint (0x00453FF0) without
+ * the 0x48 test and without clearing 0x44, so it is a separate function and
+ * not an alias. The four arrow handlers end in it. */
+#define ADDR_REPAINT_ANCESTOR    0x00455C10u /* void(AM2_Widget *, RECT) */
 
 /* The TYPEWRITER, 0x004566F0 -- and the word-wrap IS the constructor. */
 #define ADDR_CRT_STRCHR          0x004663B0u /* char *(const char *, int) */

@@ -51,6 +51,10 @@
 #define kOnControlsCancel OnControlsCancel
 #define kOnControlsOk      OnControlsOk
 #define kOnControlsDefault OnControlsDefault
+#define kOnArrowUp          OnArrowUp
+#define kOnArrowDown        OnArrowDown
+#define kOnArrowLeft        OnArrowLeft
+#define kOnArrowRight       OnArrowRight
 #define kOnAudioButton      OnAudioButton
 #define kOnControlsButton   OnControlsButton
 #define kOnDifficultyButton OnDifficultyButton
@@ -3844,6 +3848,124 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
     PlaySoundAt(2, 0, 0, 0, 0);
 }
 
+/* ------------------------------------------------------------------ *
+ * The four arrows.
+ *
+ * Two pairs on two different classes, and only the shapes rhyme. UP and DOWN
+ * belong to the ARROW BAR beside a list and move the list's first drawn row;
+ * LEFT and RIGHT belong to the SCROLL BAR and move its own position, then
+ * fire its onChange -- which is how clicking an arrow on the AUDIO dialog
+ * reaches OnVolumeEffects.
+ *
+ * All four end by repainting through the nearest ancestor with a sprite, and
+ * all four play wave 1 rather than the menus' wave 2.
+ * ------------------------------------------------------------------ */
+
+typedef void (__attribute__((thiscall)) *AM2_RepaintAncestorFn)(AM2_Widget *w,
+                                                                RECT clip);
+#define orig_repaint_ancestor \
+    (*(AM2_RepaintAncestorFn)AM2_IMAGE(ADDR_REPAINT_ANCESTOR))
+
+/* The thumb's offset along the bar, in both classes' own terms. The original
+ * computes it in x87 and rounds through _ftol, which truncates toward zero;
+ * both operands are non-negative here, so a C cast is the same function. */
+static int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
+{
+    return (int32_t)((double)pos / (double)range * (double)travel);
+}
+
+/* 0x004557F0 and 0x004558B0. The list scrolls by one row; the guards are the
+ * two ends of the range and the DOWN one computes its own limit, count less
+ * how many rows fit, rather than keeping it anywhere. */
+static void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
+{
+    AM2_Widget *bar  = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
+    AM2_Widget *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
+    uint8_t    *l;
+    uint8_t    *b;
+    const AM2_Sprite *thumb;
+    int32_t     top;
+    int32_t     visible;
+    int32_t     count;
+
+    if (!list)
+        return;
+    l = (uint8_t *)list;
+    b = (uint8_t *)bar;
+    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
+    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
+    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
+
+    if (delta < 0 ? top <= 0 : top >= count - visible)
+        return;
+
+    PlaySoundAt(1, 0, 0, 0, 0);
+    top += delta;
+    *(int32_t *)(l + LIST_OFF_TOP_ROW) = top;
+    ((AM2_WidgetPaintFn *)list->vtable)[WIDGET_VSLOT_PAINT](list, list->rect);
+
+    thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
+    *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+        ThumbShift(top, count - visible,
+                   *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
+                   - thumb->bounds.bottom);
+    orig_repaint_ancestor(bar, bar->rect);
+}
+
+void __cdecl OnArrowUp(AM2_Widget *w)
+{
+    ArrowBarScroll(w, -1);
+}
+
+void __cdecl OnArrowDown(AM2_Widget *w)
+{
+    ArrowBarScroll(w, 1);
+}
+
+/* 0x00455ED0 and 0x00455F60. The scroll bar's own position, one step, and
+ * then its onChange if it has one -- which the AUDIO dialog's three bars do,
+ * so an arrow click is a volume change. Nothing here touches a list. */
+static void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
+{
+    AM2_Widget *bar = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
+    uint8_t    *b   = (uint8_t *)bar;
+    const AM2_Sprite *thumb;
+    void      (__cdecl *onChange)(AM2_Widget *);
+    int32_t     pos   = *(const int32_t *)(b + SCROLLBAR_OFF_POS);
+    int32_t     range = *(const int32_t *)(b + SCROLLBAR_OFF_RANGE);
+
+    /* The guard skips the MOVE and not the NOTIFICATION -- both arms fall
+     * into the same tail in the original, so holding an arrow against the end
+     * of the track keeps calling onChange with an unchanged position. */
+    if (delta < 0 ? pos > 0 : pos < range) {
+        PlaySoundAt(1, 0, 0, 0, 0);
+        pos += delta;
+        *(int32_t *)(b + SCROLLBAR_OFF_POS) = pos;
+
+        thumb = *(const AM2_Sprite *const *)(b + SCROLLBAR_OFF_BAR);
+        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
+            ThumbShift(pos, range,
+                       *(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+                       - thumb->bounds.right);
+        orig_repaint_ancestor(bar, bar->rect);
+    }
+
+    onChange = *(void (__cdecl *const *)(AM2_Widget *))
+                   (b + SCROLLBAR_OFF_ONCHANGE);
+    if (onChange)
+        onChange(bar);
+}
+
+void __cdecl OnArrowLeft(AM2_Widget *w)
+{
+    ScrollBarStep(w, -1);
+}
+
+void __cdecl OnArrowRight(AM2_Widget *w)
+{
+    ScrollBarStep(w, 1);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3949,6 +4071,15 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_ARROW_UP, (const void *)OnArrowUp,
+                        "OnArrowUp", 0);
+    rc |= patch_replace(ADDR_ON_ARROW_DOWN, (const void *)OnArrowDown,
+                        "OnArrowDown", 0);
+    rc |= patch_replace(ADDR_ON_ARROW_LEFT, (const void *)OnArrowLeft,
+                        "OnArrowLeft", 0);
+    rc |= patch_replace(ADDR_ON_ARROW_RIGHT, (const void *)OnArrowRight,
+                        "OnArrowRight", 0);
+
     rc |= patch_replace(ADDR_ON_CONTROLS_OK, (const void *)OnControlsOk,
                         "OnControlsOk", 0);
     rc |= patch_replace(ADDR_ON_CONTROLS_DEFAULT, (const void *)OnControlsDefault,
