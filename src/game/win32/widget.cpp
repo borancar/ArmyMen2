@@ -6,6 +6,7 @@
 
 #include "widget.h"
 #include "surface.h"
+#include "font.h"    /* TextExtent -- reconstructed */
 #include "../rect.h"
 #include "../misc.h"   /* IsKeyDown, KeyChanged */
 #include "sprite.h"
@@ -1944,10 +1945,7 @@ AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
  * costs nothing and diverging would be a silent behavioural change. */
 typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
     AM2_Widget *w, const char *bmp, int32_t flag, AM2_Rect box);
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_TyperCtorFn)(
-    AM2_Widget *w, AM2_Rect box, const char *message);
 
-#define orig_typer_ctor  ((AM2_TyperCtorFn)AM2_IMAGE(ADDR_TYPER_CTOR))
 
 /* The four bitmaps every one of the three uses, and the one string. */
 #define AM2_BMP_OK0    0x00487044u
@@ -2012,7 +2010,9 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     text = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
     if (text) {
         RectSet(&box, 0x28, 0x41, 0xF0, 0x34);
-        text = orig_typer_ctor(text, box, (const char *)AM2_IMAGE(message));
+        text = TyperConstruct(text, box.left, box.top, box.right,
+                              box.bottom,
+                              (const char *)AM2_IMAGE(message));
     }
     WidgetAddChild(panel, text);
 
@@ -3338,6 +3338,100 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x004566F0, thiscall, `ret 0x14` -- rectangle then message. The TYPEWRITER,
+ * and the WORD-WRAP is the constructor: it does not store the message, it
+ * folds it into the 0x400-byte buffer at TYPER_OFF_TEXT with `|` between the
+ * lines. widget.h already records that separator; this is where it is put in.
+ *
+ * The loop keeps two offsets. `start` is what has been committed and `cur` is
+ * the end of the longest run known to fit. Each turn it finds the next space,
+ * measures [start, space+1), and either remembers that as the new `cur` or --
+ * if it is too wide -- commits [start, cur), appends the separator, and moves
+ * `start` to `cur` WITHOUT moving `cur`, so the next measurement starts from
+ * the same place and the word that did not fit is measured again against an
+ * empty line.
+ *
+ * Two things follow that are worth stating rather than discovering. A word
+ * wider than the line commits an EMPTY run and then measures the same word
+ * again, so it ends up on a line of its own overflowing rather than being
+ * broken. And the tail after the last space is measured once more, so a final
+ * word too wide for what is left gets its own line too.
+ *
+ * The width test is `rect.right - rect.left - 12`, against the ABSOLUTE
+ * rectangle -- which is why WidgetScreenRect runs before any of this.
+ *
+ * TextExtent is called with a NULL `out` and its RETURN used, which is the
+ * only caller in the image that does. It was reconstructed as `void`; the
+ * original accumulates into eax and the null-`out` branch falls through to
+ * the `ret`, so eax is the answer. Fixed in font.cpp with this. */
+typedef char *(__cdecl *AM2_StrchrFn)(const char *s, int32_t c);
+typedef char *(__cdecl *AM2_StrncpyFn)(char *d, const char *s, uint32_t n);
+#define orig_strchr  ((AM2_StrchrFn)AM2_IMAGE(ADDR_CRT_STRCHR))
+#define orig_strncpy ((AM2_StrncpyFn)AM2_IMAGE(ADDR_CRT_STRNCPY))
+
+AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
+                                                     int32_t left, int32_t top,
+                                                     int32_t width,
+                                                     int32_t height,
+                                                     const char *message)
+{
+    char    *text = (char *)((uint8_t *)w + TYPER_OFF_TEXT);
+    char     line[AM2_TYPER_LINE_MAX];
+    int32_t  start = 0;
+    int32_t  cur   = 0;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_TYPER);
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    WidgetScreenRect(w);
+    text[0] = '\0';
+
+    for (;;) {
+        const char *space = orig_strchr(message + cur, ' ');
+        int32_t     avail = w->rect.right - w->rect.left - AM2_TYPER_MARGIN;
+        int32_t     next;
+
+        if (!space)
+            break;
+        next = (int32_t)(space - message) + 1;
+        orig_strncpy(line, message + start, (uint32_t)(next - start));
+        line[next - start] = '\0';
+        if (TextExtent(line, 1, (int32_t *)0) <= avail) {
+            cur = next;
+            continue;
+        }
+        orig_strncpy(line, message + start, (uint32_t)(cur - start));
+        line[cur - start] = '\0';
+        strcat(text, line);
+        strcat(text, (const char *)AM2_IMAGE(ADDR_STR_LINE_BREAK));
+        start = cur;
+    }
+
+    /* The tail after the last space, measured once more. */
+    {
+        int32_t avail = w->rect.right - w->rect.left - AM2_TYPER_MARGIN;
+
+        strcpy(line, message + start);
+        if (TextExtent(line, 1, (int32_t *)0) > avail) {
+            orig_strncpy(line, message + start, (uint32_t)(cur - start));
+            line[cur - start] = '\0';
+            strcat(text, line);
+            strcat(text, (const char *)AM2_IMAGE(ADDR_STR_LINE_BREAK));
+            start = cur;
+        }
+    }
+    strcat(text, message + start);
+
+    *(uint32_t *)((uint8_t *)w + TYPER_OFF_LAST)    = 0;
+    *(int32_t *)((uint8_t *)w + TYPER_OFF_SHOWN)    = 0;
+    *(int32_t *)((uint8_t *)w + 0x50)               = 0;
+    *(AM2_Widget **)((uint8_t *)w + TYPER_OFF_BLINKER) = (AM2_Widget *)0;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3443,6 +3537,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_TYPER_CTOR, (const void *)TyperConstruct,
+                        "TyperConstruct", 5);
     rc |= patch_replace(ADDR_ARROWBAR_CTOR, (const void *)ArrowBarConstruct,
                         "ArrowBarConstruct", 9);
     rc |= patch_replace(ADDR_SCROLLBAR_CTOR,

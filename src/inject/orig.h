@@ -1764,6 +1764,12 @@
 #define ARROWBAR_OFF_SPRITE0     0x64u
 #define ARROWBAR_OFF_SPRITE1     0x68u
 #define ARROWBAR_OFF_SPAN        0x74u
+
+/* The TYPEWRITER, 0x004566F0 -- and the word-wrap IS the constructor. */
+#define ADDR_CRT_STRCHR          0x004663B0u /* char *(const char *, int) */
+#define ADDR_STR_LINE_BREAK      0x0048BD8Cu /* "|", not a newline */
+#define AM2_TYPER_MARGIN         12          /* taken off the usable width */
+#define AM2_TYPER_LINE_MAX       0x10Cu      /* the constructor's scratch */
 /* Every checkbox's LEFT-click handler, written by the constructor and not by
  * the caller: the toggle. The caller's handler goes to 0x007C instead, which
  * is why clicking a plain box just ticks it and only a GROUP HEADER does

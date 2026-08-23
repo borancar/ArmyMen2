@@ -1203,6 +1203,16 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
                                                         int32_t span,
                                                         int32_t flag50);
 
+/* Original: 0x004566F0, thiscall, `ret 0x14`. The TYPEWRITER, and the
+ * WORD-WRAP is the constructor: it folds the message into TYPER_OFF_TEXT with
+ * `|` between the lines rather than storing it. See widget.cpp for the two
+ * offsets the loop keeps and what a too-wide word does. */
+AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
+                                                     int32_t left, int32_t top,
+                                                     int32_t width,
+                                                     int32_t height,
+                                                     const char *message);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

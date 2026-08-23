@@ -249,7 +249,23 @@ Nothing uncommitted.
   quoted all session as though it were exact. That much stands; only the
   explanation was wrong.
 
-- **The TYPEWRITER constructor is decoded and not yet written.**
+- **The TYPEWRITER is reconstructed, and writing it found a `void` that
+  should have been a return** -- the RecordCtor lesson a third time, in a
+  function reconstructed months ago.
+
+  `TextExtent` (`0x004468A0`) accumulates the width into eax and its
+  null-`out` branch falls straight through to the `ret`, so eax IS the answer.
+  Ours was declared `void`. Nothing could see it: every earlier caller passes
+  a real `out` and ignores the return. The typewriter's word-wrap is the only
+  caller in the image that passes NULL and uses eax, so the defect became
+  reachable and visible in the same commit.
+
+  **`tools/checkthis.py` does not catch this shape** -- it looks for
+  `mov eax, ecx` at entry, which is the constructor idiom. A function that
+  merely leaves its answer in eax has no such tell, and the only reliable
+  signal is a call site that consumes the result.
+
+- **The TYPEWRITER constructor: the word-wrap IS the constructor.**
   `0x004566F0`, 627 B, `ret 0x14` -- rectangle then message. It is not a
   constructor that stores things: it **word-wraps the message** into the
   0x400-byte buffer at 0x0058 and the wrapping is the function.
@@ -262,9 +278,12 @@ Nothing uncommitted.
   into the same head, and every `strlen`/`strcat` inlined as `repne scasb`
   plus `rep movsd`.
 
-  Testable -- `quit`'s dialog frame is that message and sits at 0 -- but the
-  break bookkeeping wants re-deriving rather than transcribing, so it goes in
-  next turn the way the AUDIO dialog did.
+  Two behaviours fell out that are worth stating rather than rediscovering. A
+  word wider than the line commits an EMPTY run and then measures the same
+  word again against an empty line, so it ends up alone on its line and
+  overflows rather than being broken. And the tail after the last space is
+  measured once more, so a final word too wide for what is left also gets its
+  own line.
 
 - **The SCROLL BAR constructor is reconstructed** (`0x00455FF0`, 453 B) and it
   confirms by running what `widget.h` had worked out by reading: **the arrows
@@ -828,10 +847,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 684 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 683 | 673 of them below the CRT line |
+| `patch_replace` sites | 685 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 684 | 674 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 123,696 / 372,816 B (**33.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 124,336 / 372,816 B (**33.4%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

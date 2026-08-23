@@ -315,7 +315,7 @@ void __cdecl FreeAllFonts(void)
         FreeFont(i);
 }
 
-void __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
+int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
 {
     uint32_t        off   = (uint32_t)font * ADDR_FONT_STRIDE;
     const uint8_t  *base  = *(const uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
@@ -333,13 +333,14 @@ void __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
     }
 
     if (!out)
-        return;
+        return width;
     out[0] = width;
     /* The line height is the space glyph's, whatever the string was. */
     out[1] = *(const uint16_t *)(base
                                  + *(const uint16_t *)
                                        ((uintptr_t)ADDR_GLYPH_OFFSET_SPACE + off)
                                  + 2);
+    return width;
 }
 
 int font_install(void)

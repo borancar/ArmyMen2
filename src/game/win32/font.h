@@ -82,8 +82,15 @@ void __cdecl FreeAllFonts(void);
  * The HEIGHT does not depend on the string at all: it is the second uint16 of
  * the SPACE glyph, read through a fixed entry of the offset table. So an empty
  * string still answers a line height, and `out` is left untouched only when it
- * is null. */
-void __cdecl TextExtent(const char *text, int32_t font, int32_t out[2]);
+ * is null.
+ *
+ * It also RETURNS the width. That is not decoration and was missed when this
+ * went in as `void`: the original accumulates into eax and the null-`out`
+ * branch falls straight through to the `ret`, so eax is the answer. The
+ * typewriter's word-wrap calls it with a null `out` and compares the return,
+ * which is what surfaced it -- every earlier caller passes a real `out` and
+ * ignores eax, so nothing could see it. */
+int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2]);
 
 int font_install(void);
 
