@@ -2242,12 +2242,7 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
  *
  * `ret 0x2C` on the checkbox constructor is 44 bytes -- four bitmaps, sixteen
  * of rectangle, a flag, the caption and the handler. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_CheckBoxCtorFn)(
-    AM2_Widget *w, const char *b0, const char *b1, const char *b2,
-    const char *b3, AM2_Rect box, int32_t flag, const char *caption,
-    void (__cdecl *handler)(AM2_Widget *));
 
-#define orig_checkbox_ctor ((AM2_CheckBoxCtorFn)AM2_IMAGE(ADDR_CHECKBOX_CTOR))
 
 #define OPT_REC(base, off) (*(const int32_t *)((base) + (off)))
 
@@ -2255,6 +2250,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
                                                          const char *bmp)
 {
     const uint8_t *rec;
+    int32_t        record = 0;
     AM2_Widget   **boxes = (AM2_Widget **)((uint8_t *)w + OPTION_PARENT_BOXES);
     const uint8_t *comm  = g_commObject;
     int32_t        host  = *(const int32_t *)(comm + COMM_OFF_IS_HOST);
@@ -2273,15 +2269,16 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
 
         if (cb) {
             RectSet(&box, OPT_REC(rec, 0x04), OPT_REC(rec, 0x08), 0xC8, 0x0D);
-            cb = orig_checkbox_ctor(cb,
-                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK0),
-                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK1),
-                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK2),
-                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK3),
-                                    box, 0,
-                                    *(const char *const *)(rec + 0x20),
-                                    (void (__cdecl *)(AM2_Widget *))
-                                    AM2_IMAGE(ADDR_OPTIONS_SYNC_GROUP));
+            cb = CheckBoxConstruct(cb,
+                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK0),
+                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK1),
+                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK2),
+                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK3),
+                                   box.left, box.top, box.right, box.bottom,
+                                   record,
+                                   *(const char *const *)(rec + 0x20),
+                                   (void (__cdecl *)(AM2_Widget *))
+                                   AM2_IMAGE(ADDR_OPTIONS_SYNC_GROUP));
         }
         boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)] = cb;
         cb->flag3C = 0;
@@ -2293,6 +2290,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
         WidgetAddChild(w, cb);
         if (!host)
             cb->unknown4C = 1;
+        record++;
     }
 
     if (host) {
@@ -3058,10 +3056,15 @@ AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
 /* 0x00454F90, thiscall, `ret 0x20`. The LIST BOX -- the DIFFICULTY rows, the
  * connection list and the saved-player list.
  *
- * **A row is seven pixels tall**, and that number appears nowhere else. It
+ * **A row is fourteen pixels tall**, and that number appears nowhere else. It
  * comes out of a magic-number division: LIST_OFF_VISIBLE is
- * `(height - 4) / 7`, spelled `imul 0x92492493` then `sar 3` and the sign
- * correction. Written as the division, because that is what it is.
+ * `(height - 4) / 14`, spelled `imul 0x92492493` then `sar 3` and the sign
+ * correction.
+ *
+ * The constant alone does not say the divisor -- 0x92492493 serves 7, 14 and
+ * 28 -- and what picks between them is the SHIFT. This one is 3 where 7 would
+ * be 2, and reading the constant without the shift gave 7, twice as many rows
+ * as fit, and seven map names on a lobby that shows four.
  *
  * The hot row starts at -1 -- nothing under the pointer -- and becomes 0 if
  * the rows it was handed are not empty. Note it tests the ROWS pointer and
@@ -3111,6 +3114,68 @@ AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
 
     if (rows && *(const int32_t *)rows > 0)
         *(int32_t *)(self + LIST_OFF_HOT) = 0;
+    return w;
+}
+
+/* 0x00454640, thiscall, `ret 0x2C`. The CHECKBOX -- the 43 boxes on
+ * MULTIPLAYER OPTIONS and nothing else in the game.
+ *
+ * Four sprites, all loaded with a literal flag of 1 rather than the caller's,
+ * and the FIRST is copied to the base's 0x0038 as the button and panel do.
+ *
+ * **Its left-click action is the constructor's, not the caller's**:
+ * ADDR_CHECKBOX_TOGGLE goes into BUTTON_OFF_ON_LEFT unconditionally and the
+ * caller's handler goes to CHECK_OFF_ON_CHANGE. That is why clicking a plain
+ * box only ticks it while a group header also disables its group -- both run
+ * the same OptionsSyncGroup, and it is the RECORD INDEX at CHECK_OFF_GROUP
+ * that decides whether there is a group to sync.
+ *
+ * Four hardcoded palette indices go in at 0x0084: 0xD4, 0xD4, 0xFB, 0xFB. */
+AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
+                                                        const char *b0,
+                                                        const char *b1,
+                                                        const char *b2,
+                                                        const char *b3,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t width,
+                                                        int32_t height,
+                                                        int32_t group,
+                                                        const char *caption,
+                                                        void (__cdecl *onChange)(AM2_Widget *))
+{
+    uint8_t *self = (uint8_t *)w;
+
+    orig_button_base_ctor(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
+
+    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON)  =
+        orig_preload_by_name(b0, 1, 1);
+    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_OFF) =
+        orig_preload_by_name(b1, 1, 1);
+    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_3)   =
+        orig_preload_by_name(b2, 1, 1);
+    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_2)   =
+        orig_preload_by_name(b3, 1, 1);
+    w->sprite = *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON);
+
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    self[CHECK_OFF_TICKED] = 0;
+    WidgetScreenRect(w);
+
+    *(int32_t *)(self + CHECK_OFF_GROUP)   = group;
+    *(const char **)(self + CHECK_OFF_CAPTION) = caption;
+    self[CHECK_OFF_INK0]     = 0xD4;
+    self[CHECK_OFF_INK0 + 1] = 0xD4;
+    self[CHECK_OFF_INK0 + 2] = 0xFB;
+    self[CHECK_OFF_INK0 + 3] = 0xFB;
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) =
+        (uint32_t)AM2_IMAGE(ADDR_CHECKBOX_TOGGLE);
+    *(void **)(self + CHECK_OFF_ON_CHANGE) = (void *)onChange;
+    self[CHECK_OFF_FLAG8C] = 0;
     return w;
 }
 
@@ -3219,6 +3284,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_CHECKBOX_CTOR, (const void *)CheckBoxConstruct,
+                        "CheckBoxConstruct", 11);
     rc |= patch_replace(ADDR_LISTBOX_CTOR, (const void *)ListBoxConstruct,
                         "ListBoxConstruct", 8);
     rc |= patch_replace(ADDR_MULTISPRITE_CTOR,

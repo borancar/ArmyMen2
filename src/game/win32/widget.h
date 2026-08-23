@@ -908,6 +908,10 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
 /* And a group HEADER carries its own record index at 0x0080, which is how
  * OptionsSyncGroup finds the range it owns without searching the table. */
 #define CHECK_OFF_GROUP   0x80   /* int32_t, index into ADDR_OPTION_TABLE */
+#define CHECK_OFF_SPRITE_OFF   0x68
+#define CHECK_OFF_SPRITE_ON    0x6C   /* also copied to the base 0x0038 */
+#define CHECK_OFF_SPRITE_2     0x70
+#define CHECK_OFF_SPRITE_3     0x74
 
 /* Original: 0x00432710, the DEFAULTS button. It reads nothing back: it asks
  * ResetPairMask for the two manufactured default masks and fills all 43
@@ -1154,6 +1158,23 @@ AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
                                                        int32_t callback,
                                                        int32_t arg6C,
                                                        int32_t ownsRows);
+
+/* Original: 0x00454640, thiscall, `ret 0x2C`. The CHECKBOX -- four sprites,
+ * a rectangle, its record index, a caption and a change handler.
+ *
+ * Its LEFT-click action is written by the constructor, not by the caller:
+ * ADDR_CHECKBOX_TOGGLE. The caller's handler goes to CHECK_OFF_ON_CHANGE. */
+AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
+                                                        const char *b0,
+                                                        const char *b1,
+                                                        const char *b2,
+                                                        const char *b3,
+                                                        int32_t left, int32_t top,
+                                                        int32_t width,
+                                                        int32_t height,
+                                                        int32_t group,
+                                                        const char *caption,
+                                                        void (__cdecl *onChange)(AM2_Widget *));
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 

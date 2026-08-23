@@ -210,12 +210,39 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The CHECKBOX constructor is reconstructed, and writing it found a defect
+  in code that had already passed an A/B twice.** `0x00454640`, 255 B.
+
+  **Its left-click action is the constructor's, not the caller's.**
+  `ADDR_CHECKBOX_TOGGLE` goes into `BUTTON_OFF_ON_LEFT` unconditionally and
+  the caller's handler goes to a separate change slot -- which is why clicking
+  a plain box only ticks it while a group header also disables its group.
+  Both run the same `OptionsSyncGroup`; what differs is the RECORD INDEX the
+  constructor stored.
+
+  And that index is the ninth argument, which `MpOptionsConstruct` was passing
+  as a literal **0** -- I had read the original's `push ebp` as a constant
+  when ebp is the loop counter. Every checkbox got group 0.
+
+  **`mpoptions` passed anyway, twice, at 42 nodes and 0 pixels**, because it
+  clicks POWER-UPS -- and POWER-UPS *is* record 0, so the wrong index synced
+  the right group by accident. The configuration now clicks MISCELLANEOUS,
+  record 17, where only the right index reaches the right group. A test that
+  can only pass is worth as little as one that cannot fail, and this one could
+  only pass for one specific input.
+
 - **The LIST BOX constructor is reconstructed** (`0x00454F90`, 209 B), and it
-  is where the row height finally appears. **A row is SEVEN pixels tall**, and
-  that number is written nowhere in the image: it comes out of a magic-number
-  division, `LIST_OFF_VISIBLE = (height - 4) / 7`, spelled `imul 0x92492493`
-  then `sar 3`. Three screens' worth of layout follows from one constant that
-  only exists as a reciprocal.
+  is where the row height finally appears. **A row is FOURTEEN pixels tall**,
+  and that number is written nowhere in the image: it comes out of a
+  magic-number division, `LIST_OFF_VISIBLE = (height - 4) / 14`, spelled
+  `imul 0x92492493` then `sar 3`.
+
+  **The constant alone does not say the divisor.** `0x92492493` serves 7, 14
+  and 28; what picks between them is the SHIFT. I read the constant, wrote 7,
+  and every list drew twice as many rows as it had room for -- seven map names
+  on a lobby that shows four. Caught by `mpoptions` on the very next run, and
+  only because that run also changed which header it clicks. Recognising a
+  magic number is half of reading one.
 
   Its hot row starts at **-1** -- nothing under the pointer -- and becomes 0
   only if the rows it was handed are non-empty, testing the pointer and then
@@ -728,10 +755,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 681 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 680 | 670 of them below the CRT line |
+| `patch_replace` sites | 682 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 681 | 671 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 122,976 / 372,816 B (**33.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 123,232 / 372,816 B (**33.1%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

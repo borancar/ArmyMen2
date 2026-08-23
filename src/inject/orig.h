@@ -1732,14 +1732,30 @@
 #define VTABLE_EDIT              0x0046FC98u
 #define VTABLE_MULTISPRITE       0x0046FD38u
 #define VTABLE_LISTBOX           0x0046FCC0u
+#define VTABLE_CHECKBOX          0x0046FC5Cu
+/* Every checkbox's LEFT-click handler, written by the constructor and not by
+ * the caller: the toggle. The caller's handler goes to 0x007C instead, which
+ * is why clicking a plain box just ticks it and only a GROUP HEADER does
+ * anything else. */
+#define ADDR_CHECKBOX_TOGGLE     0x00454760u
+#define CHECK_OFF_ON_CHANGE      0x7Cu
+#define CHECK_OFF_INK0           0x84u  /* 0xD4, 0xD4, 0xFB, 0xFB -- hardcoded */
+#define CHECK_OFF_CAPTION        0x88u
+#define CHECK_OFF_FLAG8C         0x8Cu
 /* The fourth colour the list box seeds itself with, beside ADDR_COLOUR_WHITE,
  * ADDR_BACKGROUND_COLOUR and ADDR_VIEW_RECT_COLOUR. Named from where it is
  * used rather than from anything it says about itself. */
 #define ADDR_LIST_INK_HOT_SEL    0x00502ACCu /* uint8_t */
-/* A list row is SEVEN pixels tall, which is not written anywhere -- it comes
- * out of the constructor's magic division: LIST_OFF_VISIBLE is
- * (height - 4) / 7, spelled `imul 0x92492493` and `sar 3`. */
-#define AM2_LIST_ROW_HEIGHT      7
+/* A list row is FOURTEEN pixels tall, which is not written anywhere -- it
+ * comes out of the constructor's magic division: LIST_OFF_VISIBLE is
+ * (height - 4) / 14, spelled `imul 0x92492493` and `sar 3`.
+ *
+ * The magic number alone does not say the divisor. 0x92492493 is the constant
+ * for 7 AND for 14 and for 28; what picks between them is the SHIFT, and this
+ * one is 3 where 7 would be 2. Reading the constant and not the shift gave 7,
+ * every list drew twice as many rows as it had room for, and `ab.sh
+ * mpoptions` showed seven map names where the original shows four. */
+#define AM2_LIST_ROW_HEIGHT      14
 #define AM2_LIST_ROW_INSET       4
 /* The edit box's DEFAULT character set -- wider than the one ENTER BATTLE
  * NAME then installs over it, and including ` ~ ! @ # $ % ^ &. */

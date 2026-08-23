@@ -316,7 +316,12 @@ play() {
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
         drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
-        "$REPO/tools/point.py" 69 46 --click >/dev/null 2>&1     # POWER-UPS
+        # MISCELLANEOUS, not POWER-UPS. Both are group headers, but POWER-UPS
+        # is RECORD ZERO -- so a constructor that gave every checkbox a group
+        # index of 0 synced the right group by accident and this
+        # configuration passed. It did, for two commits. MISCELLANEOUS is
+        # record 17 and only the right index reaches it.
+        "$REPO/tools/point.py" 69 335 --click >/dev/null 2>&1
         sleep 2
         "$REPO/tools/point.py" 576 240 --click >/dev/null 2>&1   # DEFAULT
         sleep 3
