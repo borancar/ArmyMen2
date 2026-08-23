@@ -2173,12 +2173,17 @@ exact oracle**, however meaningful it is when it is set.
   are verified by reading — weaker than the rest of the tree, and worth saying
   plainly.
 
-  `g_charHandler` is NOT the same kind of thing and was left alone. It is a
-  slot, not a function: the menu's text fields write their own consumer into
-  `0x005125B8` and `WndProc` just calls whatever is there. Porting "it" means
-  porting the text-field system — `0x00417790`, `0x00418480`, `0x00454CC0` and
-  the two handlers they install — which is about 2.5 KB with no Win32 or COM
-  anywhere in it.
+  `g_charHandler` is NOT the same kind of thing. It is a slot, not a function:
+  the menu's text fields write their own consumer into `0x005125B8` and
+  `WndProc` just calls whatever is there. Porting "it" meant porting the
+  text-field system, and this entry said so as a reason to leave it alone.
+
+  **The text-field system is ours now**, so the argument expired rather than
+  being overturned: the edit box, its focus method and `EditCharHandler`
+  (`0x0044D520`) are all reconstructed, and `EditTakeFocus` installs the
+  handler by NAME. The slot still holds whatever the field put there — what
+  changed is who wrote it. `0x00417790` and `0x00418480` are the two
+  still-original fields that are not the menu's.
 - **`-w` is windowed mode**, global `0x00507344`, and it gates far more than it
   looks: the window border and repositioning, the palettized primary in
   `InitDirectDraw`, and `CalibratePalette`. Anything that reads 0 under the

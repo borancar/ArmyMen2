@@ -321,7 +321,14 @@ play() {
         sleep 5
         # Typing is the point: a character only reaches the field if
         # EditTakeFocus installed g_charHandler.
-        drive ctl "type Zulu" >/dev/null 2>&1
+        #
+        # More than a short word, and deliberately. EditCharHandler has four
+        # classes of character and three refusals, and "Zulu" reached one of
+        # them. '^' is the one printable character the handler excludes by
+        # name, so it falls through to the final refusal; and a string this
+        # long runs the field out of WIDTH, which is the arm that stops one
+        # character early rather than overflowing.
+        drive ctl "type Zulu^Battle Royale With Extra Cheese" >/dev/null 2>&1
         sleep 3
         # The tree here holds the toggles -- the "send" indicators beside the
         # two fields -- and their chosen sprite. A wrong toggle sprite is 212

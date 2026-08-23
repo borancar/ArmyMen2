@@ -1271,6 +1271,11 @@ void __attribute__((thiscall)) RecordReset(void *rec);
 void __cdecl SelectPlayerRow(AM2_Widget *list, AM2_ListRows *rows,
                              int32_t selected);
 
+/* Original: 0x0044D520. The WM_CHAR consumer EditTakeFocus installs, and the
+ * whole of a text field's typing behaviour. It works on the FOCUSED field
+ * rather than on an argument. */
+void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

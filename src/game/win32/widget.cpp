@@ -198,9 +198,11 @@ void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
 }
 
 /* Which edit box has the focus, and the WM_CHAR consumer WndProc dispatches
- * through. The handler itself is still original -- it is the field's typing
- * behaviour, not its lifecycle. */
+ * through. Both are ours now: EditCharHandler is below. */
 #define g_focusedEdit (*(AM2_Widget **)(uintptr_t)ADDR_FOCUSED_EDIT)
+/* The game's own logger, spelled as winproc.cpp spells it. */
+typedef void (__cdecl *am2_log_fn)(const char *fmt, ...);
+#define orig_log      (*(am2_log_fn)ADDR_LOG)
 /* Spelled exactly as winproc.cpp spells it, type and all, so the two stay one
  * definition rather than a drift -- checkglobals refused the first attempt,
  * which had it as a bare void *. */
@@ -754,7 +756,7 @@ void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip)
 void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce)
 {
     g_focusedEdit = w;
-    g_charHandler = (am2_char_fn)AM2_IMAGE(ADDR_EDIT_CHAR_HANDLER);
+    g_charHandler = EditCharHandler;
     WidgetTakeFocus(w, announce);
 }
 
@@ -4115,6 +4117,117 @@ void __cdecl SelectPlayerRow(AM2_Widget *list, AM2_ListRows *rows,
     PlaySoundAt(2, 0, 0, 0, 0);
 }
 
+/* Both editing arms end the same way: the field's own change callback, then
+ * a repaint through its slot 1. The global is re-read between the two,
+ * because the callback is free to move the focus. */
+static void EditNotifyAndRepaint(void)
+{
+    AM2_Widget *edit = g_focusedEdit;
+    void      (__cdecl *onChange)(AM2_Widget *) =
+        *(void (__cdecl *const *)(AM2_Widget *))((uint8_t *)edit
+                                                 + EDIT_OFF_ARG78);
+
+    if (onChange)
+        onChange(edit);
+    edit = g_focusedEdit;
+    ((AM2_WidgetPaintFn *)edit->vtable)[WIDGET_VSLOT_PAINT](edit, edit->rect);
+}
+
+/* 0x0044D520. The text field's WM_CHAR consumer -- the function
+ * EditTakeFocus installs into g_charHandler, and the whole of a field's
+ * typing behaviour. WndProc hands it (ch, lParam low, lParam high) and it
+ * reads only the first; the other two are the repeat count and the flags,
+ * which nothing here wants.
+ *
+ * It works on the FOCUSED field rather than on an argument, re-reading the
+ * global after anything that could have changed it. With no field focused it
+ * says so -- "Error: Key handler not freed" -- which is the harness's own
+ * diagnosis of a handler that outlived its widget.
+ *
+ * Four classes of character and they are tested in this order:
+ *   printable 0x20..0x7F except '^', AND in the field's own character set
+ *   backspace
+ *   RETURN, which fires the field's on-enter
+ *   TAB, which is silently swallowed; anything else is refused with wave 3.
+ *
+ * The printable arm has TWO refusals of its own, both wave 2: the text would
+ * be wider than the field, or it is already at the field's maximum. The width
+ * test runs BEFORE the character is added, on the text as it stands plus a
+ * 12-pixel margin, so the field stops one character early rather than
+ * overflowing and backing out. */
+#define EDIT_TEXT_MARGIN 12
+
+void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
+{
+    AM2_Widget *edit = g_focusedEdit;
+    uint8_t    *self;
+    char       *text;
+    int32_t     len;
+
+    (void)lo;
+    (void)hi;
+    if (!edit) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_KEY_HANDLER_LEAK));
+        return;
+    }
+
+    /* A field with a blinker beside it restarts it on every keystroke, and
+     * plays wave 0 while it does. The global is re-read afterwards because
+     * the blinker's own code can move the focus. */
+    if (*(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT)) {
+        BlinkerStart(*(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT),
+                     0x46, 1);
+        PlaySoundAt(0, 0, 0, 0, 0);
+        edit = g_focusedEdit;
+    }
+
+    self = (uint8_t *)edit;
+    text = *(char **)(self + EDIT_OFF_TEXT);
+    len  = (int32_t)strlen(text);
+
+    if (ch >= 0x20 && ch < 0x80 && ch != '^'
+        && strchr(*(const char *const *)(self + EDIT_OFF_CHARSET), (int)ch)) {
+        int32_t width = TextExtent(*(const char *const *)(self + EDIT_OFF_TEXT),
+                                   *(const int32_t *)(self + EDIT_OFF_FONT), 0)
+                        + EDIT_TEXT_MARGIN;
+
+        edit = g_focusedEdit;
+        self = (uint8_t *)edit;
+        if (width > edit->w
+            || len >= *(const int32_t *)(self + EDIT_OFF_MAX) - 1) {
+            PlaySoundAt(2, 0, 0, 0, 0);
+            return;
+        }
+        text = *(char **)(self + EDIT_OFF_TEXT);
+        text[len]     = (char)ch;
+        text[len + 1] = '\0';
+        EditNotifyAndRepaint();
+        return;
+    }
+
+    if (ch == 8) {
+        if (len <= 0) {
+            PlaySoundAt(2, 0, 0, 0, 0);
+            return;
+        }
+        text[len - 1] = '\0';
+        EditNotifyAndRepaint();
+        return;
+    }
+
+    if (ch == 0x0D) {
+        void (__cdecl *onEnter)(AM2_Widget *) =
+            *(void (__cdecl *const *)(AM2_Widget *))(self + EDIT_OFF_ON_ENTER);
+
+        if (onEnter)
+            onEnter(edit);
+        return;
+    }
+
+    if (ch != 9)
+        PlaySoundAt(3, 0, 0, 0, 0);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4220,6 +4333,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_EDIT_CHAR_HANDLER, (const void *)EditCharHandler,
+                        "EditCharHandler", 0);
+
     rc |= patch_replace(ADDR_RECORD_RESET, (const void *)RecordReset,
                         "RecordReset", 1);
     rc |= patch_replace(ADDR_SELECT_PLAYER_ROW, (const void *)SelectPlayerRow,

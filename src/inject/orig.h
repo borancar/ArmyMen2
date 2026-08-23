@@ -174,6 +174,7 @@
  * g_charHandler. 0x0065A05C holds whichever one currently has the focus, and
  * 0x0044D520 is the WM_CHAR consumer it installs while it does. */
 #define ADDR_FOCUSED_EDIT       0x0065A05Cu /* AM2_Widget *, or null */
+#define ADDR_STR_KEY_HANDLER_LEAK 0x00476E5Cu /* "Error: Key handler not freed\n" */
 #define ADDR_EDIT_CHAR_HANDLER  0x0044D520u /* void(wparam, lo, hi) */
 #define ADDR_EDIT_DELETE        0x00454CA0u /* AM2_Widget *(AM2_Widget *, int32_t) */
 #define ADDR_EDIT_DESTRUCT      0x00454CC0u /* void(AM2_Widget *) */

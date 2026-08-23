@@ -11,6 +11,45 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **`EditCharHandler` is the whole of a text field's typing behaviour, and
+  CLAUDE.md said porting it meant porting the text-field system.** It did, and
+  the text-field system is ours now, so `0x0044D520` went in as the last piece
+  of it. `EditTakeFocus` installs it into `g_charHandler` by name rather than
+  through the image, so `winproc.cpp`'s WM_CHAR dispatch reaches our function
+  directly.
+
+  It works on the FOCUSED field rather than on an argument, and re-reads the
+  global after anything that could move the focus -- the blinker restart, the
+  character-set test, the change callback. With no field focused it says
+  "Error: Key handler not freed", which is the game's own diagnosis of a
+  handler that outlived its widget.
+
+  Four classes of character in this order: printable `0x20..0x7F` except `^`
+  and in the field's own set; backspace; RETURN, which fires the field's
+  on-enter; TAB, swallowed. Anything else is wave 3. The printable arm has two
+  refusals of its own -- the text would be WIDER than the field, or it is at
+  the field's maximum -- and the width test runs BEFORE the character is
+  added, on the text as it stands plus a 12-pixel margin, so the field stops
+  one character early rather than overflowing and backing out.
+
+- **`ab.sh multi` typed "Zulu" and reached one arm of four.** It now types
+  `Zulu^Battle Royale With Extra Cheese`, and the buffer read back out of the
+  running game says what happened: `"ZuluBattle Royale With "`. The `^` is
+  gone, so the excluded-character path ran; the string stops at "With ", so
+  the WIDTH refusal ran. Two arms that no configuration had ever reached,
+  confirmed by reading the field rather than by trusting the click.
+
+  Backspace and RETURN are still unexercised: the control socket's `type`
+  sends the characters of a line, and neither is one.
+
+  **And the coverage figure did not move for it**, which is the split-point
+  problem again: `0x0044D520` is not in `tools/merges.py`'s referenced-starts
+  set, because its only reference is the `push imm32` inside `EditTakeFocus`
+  and that instruction's operand is not where the scan looks. So 336 bytes of
+  reconstruction are real and uncounted. The percentage is a lower bound in
+  both directions now -- too high where an entry cannot be split, too low
+  where a function's only reference is an unaligned operand.
+
 - **The "session" pair is a three-field RECORD, and both names came from one
   call site.** `0x00453910` and `0x00453940` were `ADDR_SESSION_CTOR` and
   `ADDR_SESSION_RESET` because the multiplayer session object is what the site
@@ -1192,8 +1231,8 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 719 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 718 | 708 of them below the CRT line |
+| `patch_replace` sites | 720 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 719 | 709 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
 | sub-CRT code reconstructed | 128,976 / 372,816 B (**34.6%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 148,000 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
