@@ -1615,6 +1615,21 @@
 #define AM2_BMP_DEFAULT0         0x0048730Cu
 #define AM2_BMP_DEFAULT1         0x00487324u
 #define AM2_BMP_DEFAULT2         0x0048733Cu
+
+/* The MULTIPLAYER OPTIONS constructor, 0x00432320. */
+#define VTABLE_OPTIONS_MENU_MP   0x0046FA34u /* the HOST OPTIONS vtable */
+#define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
+#define AM2_CHECKBOX_SIZE        0x90u
+#define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */
+#define AM2_BMP_CHECK1           0x00487368u
+#define AM2_BMP_CHECK2           0x0048737Cu
+#define AM2_BMP_CHECK3           0x00487390u
+/* A buffer in .bss that 56 sites pass as an argument, and every one of the
+ * dialog constructors hands it to SetGameDir. It is uninitialised at load, so
+ * unless something has written it the call is SetGameDir("") -- back to the
+ * base path. Whether anything ever writes it is NOT established; the name
+ * says what it is rather than what it means. */
+#define ADDR_DIR_SCRATCH         0x004F96B8u /* char[] */
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */

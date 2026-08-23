@@ -192,6 +192,39 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
+- **`tools/checkseams.py` had two blind spots and the second one hid eight
+  live seams.** It knew two spellings of "reach our own code through the
+  image": an `orig_` macro on one line, and `callN(ADDR_X)` at a call site. It
+  did not know the third -- a cast around `AM2_IMAGE(ADDR_X)` written inline at
+  the point of use, which is the same function pointer without a name on it.
+  Nor did it know a two-LINE `#define orig_x \` ... `AM2_IMAGE(ADDR_Y)`,
+  because its regex wanted both on one line.
+
+  Found because a seventh instance appeared and only that one was reported --
+  it happened to have been given a name. Teaching the check the third spelling
+  found **eight more, none of them from this work**: `ListRemoveAt` in
+  `army.cpp` and `event.cpp`, `ArmyMessageSend` in `event.cpp`, and five
+  comparator pointers handed to `bsearch` in `defparse.cpp`. Every one was a
+  call into our own reconstruction routed through a detour. All closed.
+
+  A ratchet only guards the spellings it knows. When one fires, ask what else
+  would have looked the same and not fired.
+
+- **MULTIPLAYER OPTIONS is reconstructed** (`0x00432320`, 968 B): 43
+  checkboxes built from the declarative table, then three buttons -- or one.
+
+  Three things depend on being the host, and they are exactly what the two
+  panels differ by. A non-host gets `unknown4C` on every box, so none can be
+  focused; a non-host gets CANCEL alone, at the OK position; and the pass that
+  disables a group whose header is unticked runs for the host only.
+
+  The original walks the table with a cursor four bytes IN, so every field
+  offset in the disassembly reads four low and the loop bound is `0x00486BC8`
+  where the table ends at `0x00486BC4`. Written here from the record base,
+  which is why the numbers do not match the listing on sight -- the same
+  cursor offset that made the 43rd record look like a 42-record table when
+  `OptionsApply` went in.
+
 - **The CONTROLS dialog is reconstructed** (`0x00450E10`, 689 B) -- the only
   screen in the game whose children come out of TABLES rather than being
   written out one at a time. Three walk together: `ADDR_KEY_BINDINGS` for the
@@ -488,10 +521,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 669 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 668 | 658 of them below the CRT line |
+| `patch_replace` sites | 670 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 669 | 659 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 116,544 / 372,816 B (**31.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 117,520 / 372,816 B (**31.5%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

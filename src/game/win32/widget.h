@@ -1023,6 +1023,12 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
 AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
                                                               const char *bmp);
 
+/* Original: 0x00432320, thiscall. MULTIPLAYER OPTIONS -- 43 checkboxes out of
+ * the declarative table, then three buttons for a host and one for anyone
+ * else. See widget.cpp for the three things that depend on being the host. */
+AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
+                                                         const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

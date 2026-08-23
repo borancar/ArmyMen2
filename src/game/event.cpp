@@ -740,9 +740,6 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
 /* Both stay original and are reached by address. ArmyMessageSend is the whole
  * game's transport -- 20 callers -- and EventTriggerImmediate is the local
  * raise that Receive feeds. */
-typedef void (__cdecl *AM2_ArmyMessageSendFn)(const void *msg);
-#define orig_army_message_send \
-    (*(AM2_ArmyMessageSendFn)AM2_IMAGE(ADDR_ARMY_MESSAGE_SEND))
 /* What a registered handler is called as: the seven event fields the trigger
  * received, then the handler's OWN argument from its registration. */
 typedef void (__cdecl *AM2_EventHandlerFn)(int32_t type, int32_t num1,
@@ -778,7 +775,7 @@ void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
     msg.maskB       = maskB;
     msg.removeevent = removeevent;
 
-    orig_army_message_send(&msg);
+    ArmyMessageSend(&msg);
 }
 
 /* 0x0041F320. Unpack one and raise it locally.
@@ -843,8 +840,6 @@ typedef void (__cdecl *AM2_ByRefBFn)(int32_t *slot, int32_t b, int32_t c,
                                      int32_t d, int32_t e);
 #define orig_by_ref_a (*(AM2_ByRefAFn)AM2_IMAGE(ADDR_BY_REF_ACTION_A))
 #define orig_by_ref_b (*(AM2_ByRefBFn)AM2_IMAGE(ADDR_BY_REF_ACTION_B))
-#define orig_list_remove_at \
-    (*(AM2_ListRemoveAtFn)AM2_IMAGE(ADDR_LIST_REMOVE_AT))
 
 /* 0x0041FE70. Deploy the object a uid names.
  *
@@ -1011,7 +1006,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
         uint8_t        *obj  = (uint8_t *)LookupByUID(uids[i]);
 
         if (obj == (uint8_t *)0) {
-            orig_list_remove_at(list, i);
+            ListRemoveAt(list, i);
             continue;                       /* the list shifted; do not ++ */
         }
 
@@ -1640,7 +1635,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
         uint8_t        *obj  = (uint8_t *)LookupByUID(uids[i]);
 
         if (obj == (uint8_t *)0) {
-            orig_list_remove_at(list, i);
+            ListRemoveAt(list, i);
             continue;
         }
 

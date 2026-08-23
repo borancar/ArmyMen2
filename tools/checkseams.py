@@ -88,6 +88,18 @@ def main():
                 if sym in addr and addr[sym] in patched:
                     bad.append(("%s:%d" % (rel, n), "call site", sym,
                                 addr[sym]))
+            # And the third spelling, which is how six of these hid. A cast
+            # around AM2_IMAGE(ADDR_X) is a function pointer to the image
+            # exactly as an orig_ macro is -- it just does not look like one,
+            # because it is written inline at the point of use rather than
+            # given a name. Found when a SEVENTH appeared and only that one
+            # was reported, because it happened to have been given a name.
+            for m in re.finditer(r"\)\s*AM2_IMAGE\(\s*(ADDR_[A-Z0-9_]+)\s*\)",
+                                 line):
+                sym = m.group(1)
+                if sym in addr and addr[sym] in patched:
+                    bad.append(("%s:%d" % (rel, n), "cast through the image",
+                                sym, addr[sym]))
 
     for f, name, sym, a in bad:
         print("  %s: %s -> %s (0x%08X) is reconstructed; call it directly"

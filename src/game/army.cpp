@@ -17,10 +17,6 @@
 #define g_ourLeaderUid (*(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID)
 #define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
 
-typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
-                                                             int32_t i);
-#define orig_list_remove_at \
-    (*(AM2_ListRemoveAtFn)AM2_IMAGE(ADDR_LIST_REMOVE_AT))
 
 /* Reached by offset rather than through a struct, as item.cpp does: only a
  * handful of an object's fields have names and none of these are near the
@@ -113,7 +109,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
         if (!obj) {
             /* Gone: drop it and do NOT advance, since everything after it has
              * just moved down one. */
-            orig_list_remove_at(g_armyObjLists[army], i);
+            ListRemoveAt(g_armyObjLists[army], i);
             list = g_armyObjLists[army];
             continue;
         }

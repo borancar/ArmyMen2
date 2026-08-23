@@ -302,14 +302,14 @@ void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
 
     hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
                        AM2_DEF_OBJ_REC_SIZE,
-                       (const void *)AM2_IMAGE(ADDR_COMPARE_TRIPLE));
+                       (const void *)CompareTriple);
     if (hit != (void *)0)
         return hit;
 
     key[1] = 0;
     hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
                        AM2_DEF_OBJ_REC_SIZE,
-                       (const void *)AM2_IMAGE(ADDR_COMPARE_TRIPLE));
+                       (const void *)CompareTriple);
     if (hit != (void *)0)
         return hit;
 
@@ -317,7 +317,7 @@ void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
     key[2] = 0;
     return orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
                         AM2_DEF_OBJ_REC_SIZE,
-                        (const void *)AM2_IMAGE(ADDR_COMPARE_TRIPLE));
+                        (const void *)CompareTriple);
 }
 
 /* 0x00435FA0. How many links already name this parent key. Walks the whole
@@ -363,7 +363,7 @@ void __cdecl DefCheckLinks(void)
     uint32_t last = 0;
 
     orig_qsort(kDefLinks, (uint32_t)kDefLinkCount, sizeof(AM2_DefLink),
-               (const void *)AM2_IMAGE(ADDR_COMPARE_PAIR));
+               (const void *)ComparePair);
 
     orig_log((const char *)0);
 
@@ -458,7 +458,7 @@ AM2_DefLink *__cdecl DefFindLink(int32_t parent, int32_t siblings)
     return (AM2_DefLink *)orig_bsearch(&key, kDefLinks,
                                        (uint32_t)kDefLinkCount,
                                        sizeof(AM2_DefLink),
-                                       (const void *)AM2_IMAGE(ADDR_COMPARE_PAIR));
+                                       (const void *)ComparePair);
 }
 
 int defparse_install(void)

@@ -1574,7 +1574,6 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 #define orig_mp_panel_ctor    ((AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_PANEL_CTOR))
-#define orig_mp_options_ctor  ((AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_OPTIONS_CTOR))
 #define orig_mp_panel_refresh ((AM2_VoidFn)AM2_IMAGE(ADDR_MP_PANEL_REFRESH))
 
 /* The half every factory opens with: whatever screen is up goes away first.
@@ -1624,7 +1623,7 @@ void __cdecl OpenMpJoin(void)
 void __cdecl OpenMpOptions(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_OPTIONS_SIZE, orig_mp_options_ctor,
+    OpenScreen(AM2_MP_OPTIONS_SIZE, (AM2_ScreenCtorFn)MpOptionsConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_MPHOSTOPTS_BMP));
 }
 
@@ -1688,7 +1687,7 @@ void __cdecl OpenOptionsMenu(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_OPTIONS_MENU_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_OPTIONS_MENU_CTOR),
+               (AM2_ScreenCtorFn)OptionsMenuConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -1696,7 +1695,7 @@ void __cdecl OpenControls(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_CONTROLS_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_CONTROLS_CTOR),
+               (AM2_ScreenCtorFn)ControlsDialogConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_CONTROLS_BMP));
 }
 
@@ -1704,7 +1703,7 @@ void __cdecl OpenDifficulty(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_DIFFICULTY_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_DIFFICULTY_CTOR),
+               (AM2_ScreenCtorFn)DifficultyDialogConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -1712,7 +1711,7 @@ void __cdecl OpenQuitConfirm(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_QUIT_CONFIRM_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_QUIT_CONFIRM_CTOR),
+               (AM2_ScreenCtorFn)QuitDialogConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -1720,7 +1719,7 @@ void __cdecl OpenReplayPrompt(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_REPLAY_PROMPT_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_REPLAY_PROMPT_CTOR),
+               (AM2_ScreenCtorFn)ReplayDialogConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -1728,7 +1727,7 @@ void __cdecl OpenDeletePlayer(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_DELETE_PLAYER_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_DELETE_PLAYER_CTOR),
+               (AM2_ScreenCtorFn)DelPlayerDialogConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -2246,6 +2245,117 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00432320, thiscall. The MULTIPLAYER OPTIONS screen: 43 checkboxes out of
+ * the declarative table at ADDR_OPTION_TABLE, then three buttons -- or one.
+ *
+ * Everything about the layout comes from the table; see orig.h for the record.
+ * The original walks it with a cursor 4 bytes IN, so its field offsets all
+ * read four low, and the loop bound is 0x00486BC8 where the table ends at
+ * 0x00486BC4. Written here from the record base, which is why the numbers do
+ * not match the disassembly on sight.
+ *
+ * Three things depend on being the host, and they are what the two panels in
+ * the screenshots differ by. A non-host gets `unknown4C` set on every box, so
+ * none can be focused; a non-host gets CANCEL alone, at the OK position; and
+ * the group pass that disables a group whose header is unticked runs for the
+ * host only.
+ *
+ * `ret 0x2C` on the checkbox constructor is 44 bytes -- four bitmaps, sixteen
+ * of rectangle, a flag, the caption and the handler. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_CheckBoxCtorFn)(
+    AM2_Widget *w, const char *b0, const char *b1, const char *b2,
+    const char *b3, AM2_Rect box, int32_t flag, const char *caption,
+    void (__cdecl *handler)(AM2_Widget *));
+
+#define orig_checkbox_ctor ((AM2_CheckBoxCtorFn)AM2_IMAGE(ADDR_CHECKBOX_CTOR))
+
+#define OPT_REC(base, off) (*(const int32_t *)((base) + (off)))
+
+AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
+                                                         const char *bmp)
+{
+    const uint8_t *rec;
+    AM2_Widget   **boxes = (AM2_Widget **)((uint8_t *)w + OPTION_PARENT_BOXES);
+    const uint8_t *comm  = g_commObject;
+    int32_t        host  = *(const int32_t *)(comm + COMM_OFF_IS_HOST);
+    AM2_Rect       box;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_OPTIONS_MENU_MP);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    for (rec = (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE);
+         rec < (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE_END);
+         rec += AM2_OPTION_STRIDE) {
+        AM2_Widget *cb = (AM2_Widget *)orig_operator_new(AM2_CHECKBOX_SIZE);
+        uint32_t    bit = (uint32_t)OPT_REC(rec, AM2_OPTION_OFF_BIT);
+        uint32_t    mask;
+
+        if (cb) {
+            RectSet(&box, OPT_REC(rec, 0x04), OPT_REC(rec, 0x08), 0xC8, 0x0D);
+            cb = orig_checkbox_ctor(cb,
+                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK0),
+                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK1),
+                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK2),
+                                    (const char *)AM2_IMAGE(AM2_BMP_CHECK3),
+                                    box, 0,
+                                    *(const char *const *)(rec + 0x20),
+                                    (void (__cdecl *)(AM2_Widget *))
+                                    AM2_IMAGE(ADDR_OPTIONS_SYNC_GROUP));
+        }
+        boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)] = cb;
+        cb->flag3C = 0;
+
+        mask = OPT_REC(rec, AM2_OPTION_OFF_WHICH) ? g_gameOverFlags
+                                                  : g_gameSetting22C;
+        *((uint8_t *)cb + CHECK_OFF_TICKED) = (mask & bit) != 0;
+
+        WidgetAddChild(w, cb);
+        if (!host)
+            cb->unknown4C = 1;
+    }
+
+    if (host) {
+        for (rec = (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE);
+             rec < (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE_END);
+             rec += AM2_OPTION_STRIDE) {
+            AM2_Widget *head;
+            int32_t     i;
+
+            if (!OPT_REC(rec, AM2_OPTION_OFF_GROUP))
+                continue;
+            head = boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)];
+            for (i = OPT_REC(rec, AM2_OPTION_OFF_FIRST);
+                 i <= OPT_REC(rec, AM2_OPTION_OFF_LAST); i++)
+                boxes[i]->unknown4C =
+                    (*((const uint8_t *)head + CHECK_OFF_TICKED) == 0);
+        }
+
+        {
+            AM2_Widget *ok = MakeButton(0x219, 0xAE, AM2_BMP_OK0, AM2_BMP_OK1,
+                                        AM2_BMP_OK2, ADDR_OPTIONS_APPLY);
+
+            WidgetAddChild(w, ok);
+            w->focusedChild = ok;
+            ok->flag44 = 1;
+        }
+        WidgetAddChild(w, MakeButton(0x219, 0xE0, AM2_BMP_DEFAULT0,
+                                     AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
+                                     ADDR_OPTIONS_DEFAULTS));
+        WidgetAddChild(w, MakeButton(0x219, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, ADDR_OPTIONS_REQUEST));
+    } else {
+        AM2_Widget *cancel = MakeButton(0x219, 0xAE, AM2_BMP_CAN0,
+                                        AM2_BMP_CAN1, AM2_BMP_CAN2,
+                                        ADDR_OPTIONS_REQUEST);
+
+        WidgetAddChild(w, cancel);
+        w->focusedChild = cancel;
+        cancel->flag44 = 1;
+    }
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2351,6 +2461,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_MP_OPTIONS_CTOR,
+                        (const void *)MpOptionsConstruct,
+                        "MpOptionsConstruct", 1);
     rc |= patch_replace(ADDR_CONTROLS_CTOR,
                         (const void *)ControlsDialogConstruct,
                         "ControlsDialogConstruct", 1);
