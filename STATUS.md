@@ -192,6 +192,21 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
+- **The DIFFICULTY dialog is reconstructed** (`0x0044E730`, 786 B): the
+  confirm-dialog shape with a LIST BOX where they have a message.
+
+  It builds its rows with `RecordCtor` and `ListAdd`, both ours -- so the
+  record whose missing return took the multiplayer path down for four days is
+  now constructed by our code on a screen the suite drives every run.
+
+  Two of the list's fields are seeded from `ADDR_DIFFICULTY` and which two is
+  the interesting part: `LIST_OFF_SELECTED` **and** `LIST_OFF_HOT`. The dialog
+  opens with the current setting both selected and highlighted rather than
+  merely selected, which is the green bar on Medium in a default install. The
+  list is also kept on the DIALOG at 0x0064 -- the constructor reaches it
+  again twice -- and the blinking dot is stored on the LIST at 0x0094, not on
+  the panel that owns it.
+
 - **The three CONFIRM dialogs are one body three times over** -- CONFIRM GAME
   EXIT (`0x0044EB50`), the replay prompt (`0x0044EED0`) and DELETE PLAYER
   (`0x00450730`), 685 bytes each. They differ in five things and nothing else:
@@ -448,10 +463,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 667 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 666 | 656 of them below the CRT line |
+| `patch_replace` sites | 668 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 667 | 657 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 115,040 / 372,816 B (**30.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 115,840 / 372,816 B (**31.1%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

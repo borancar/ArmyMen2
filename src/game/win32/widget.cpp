@@ -2069,6 +2069,94 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
                               ADDR_ON_DELPLAYER_CANCEL);
 }
 
+/* 0x0044E730, thiscall. The DIFFICULTY dialog -- the same panel-holds-
+ * everything shape as the three confirm dialogs, with a LIST BOX where they
+ * have a message.
+ *
+ * The rows are built with RecordCtor and ListAdd, both of ours, so the record
+ * whose missing return killed the multiplayer path is now constructed by our
+ * code on a screen the suite drives.
+ *
+ * Two fields are seeded from ADDR_DIFFICULTY and it is worth naming which:
+ * LIST_OFF_SELECTED and LIST_OFF_HOT, so the dialog opens with the current
+ * setting both selected AND highlighted rather than merely selected. That is
+ * the green bar on Medium in a default install.
+ *
+ * The list is also stored on the DIALOG at 0x0064 -- the dialog reaches it
+ * again twice before the constructor ends -- and the blinking dot is stored
+ * on the LIST at 0x0094, not on the panel that owns it. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ListBoxCtorFn)(
+    AM2_Widget *w, AM2_Rect box, void *rows, int32_t a, int32_t b, int32_t c);
+
+#define orig_listbox_ctor ((AM2_ListBoxCtorFn)AM2_IMAGE(ADDR_LISTBOX_CTOR))
+#define g_difficulty      (*(const int32_t *)(uintptr_t)ADDR_DIFFICULTY)
+
+AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
+    AM2_Widget *w, const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Widget *list;
+    AM2_Widget *dot;
+    void       *rows;
+    AM2_Rect    box;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DIFFICULTY_DIALOG);
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
+        panel = orig_panel_ctor(panel,
+                                (const char *)AM2_IMAGE(ADDR_STR_DIFFICULTY_BMP),
+                                0, box);
+    }
+    WidgetAddChild(w, panel);
+    panel->flag44 = 1;
+
+    rows = orig_operator_new(AM2_ROWS_SIZE);
+    if (rows)
+        rows = RecordCtor(rows, 0);
+    ListAdd(rows, (const char *)AM2_IMAGE(ADDR_STR_EASY),   (void *)0);
+    ListAdd(rows, (const char *)AM2_IMAGE(ADDR_STR_MEDIUM), (void *)1);
+    ListAdd(rows, (const char *)AM2_IMAGE(ADDR_STR_HARD),   (void *)2);
+
+    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
+    if (list) {
+        RectSet(&box, 0x28, 0x3F, 0xF4, 0x3A);
+        list = orig_listbox_ctor(list, box, rows, 0, 0, 1);
+    }
+    *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
+    WidgetAddChild(panel, list);
+
+    {
+        AM2_Widget *sel = *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST);
+
+        ((AM2_WidgetFocusFn *)sel->vtable)[WIDGET_VSLOT_FOCUS](sel, 0);
+        *(int32_t *)((uint8_t *)sel + LIST_OFF_HOT)      = g_difficulty;
+        *(int32_t *)((uint8_t *)sel + LIST_OFF_SELECTED) = g_difficulty;
+    }
+
+    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
+    if (dot) {
+        RectSet(&box, 0x23, 0x95, 0x11, 0x10);
+        dot = orig_multisprite_ctor(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
+                                    (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
+                                    box);
+    }
+    WidgetAddChild(panel, dot);
+    *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST)
+                     + LIST_OFF_BLINKER) = dot;
+
+    WidgetAddChild(panel, MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
+                                     AM2_BMP_OK2, ADDR_ON_DIFFICULTY_OK));
+    WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, ADDR_ON_DIALOG_CANCEL));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)AM2_IMAGE(ADDR_ON_DIALOG_CANCEL);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2174,6 +2262,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_DIFFICULTY_CTOR,
+                        (const void *)DifficultyDialogConstruct,
+                        "DifficultyDialogConstruct", 1);
     rc |= patch_replace(ADDR_QUIT_CONFIRM_CTOR,
                         (const void *)QuitDialogConstruct,
                         "QuitDialogConstruct", 1);

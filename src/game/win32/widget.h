@@ -1010,6 +1010,12 @@ AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
                                                                const char *bmp);
 
+/* Original: 0x0044E730, thiscall. The DIFFICULTY dialog: the confirm-dialog
+ * shape with a list box where they have a message. See widget.cpp for which
+ * two of the list's fields the current difficulty seeds. */
+AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
+    AM2_Widget *w, const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

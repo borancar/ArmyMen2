@@ -1583,6 +1583,25 @@
 #define AM2_TYPER_SIZE           0x464u
 #define ADDR_MULTISPRITE_CTOR    0x00456BC0u /* thiscall w *(w, b0, b1, f, rect) */
 #define AM2_MULTISPRITE_SIZE     0x80u
+
+/* The DIFFICULTY dialog, 0x0044E730. Same panel-holds-everything shape as the
+ * three confirm dialogs, with a LIST BOX where they have a message. */
+#define VTABLE_DIFFICULTY_DIALOG 0x0046FAE0u
+#define ADDR_ON_DIFFICULTY_OK    0x0044EA80u
+/* The CANCEL handler here, and also what the dialog stores as its escape
+ * action. Distinct from ADDR_ON_MENU_BACK, which the OPTIONS menu uses. */
+#define ADDR_ON_DIALOG_CANCEL    0x0044D490u
+#define ADDR_LISTBOX_CTOR        0x00454F90u /* thiscall w *(w, rect, rows,
+                                              * int32, int32, int32) */
+#define AM2_LISTBOX_SIZE         0x98u
+#define AM2_ROWS_SIZE            0x0Cu       /* the three-field record */
+#define ADDR_STR_DIFFICULTY_BMP  0x0048B730u /* "02_014_00_difficulty.bmp" */
+#define ADDR_STR_EASY            0x0048B728u
+#define ADDR_STR_MEDIUM          0x0048B720u
+#define ADDR_STR_HARD            0x0048B718u
+/* Where the dialog keeps its list, and where the list keeps its blinker. */
+#define DLG_OFF_LIST             0x64u
+#define LIST_OFF_BLINKER         0x94u
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */
