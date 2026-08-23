@@ -718,7 +718,7 @@ pointer field it occupies in memory.
 | `patch_replace` sites | 680 | `grep -rho patch_replace src/game \| wc -l` |
 | distinct addresses reconstructed | 679 | 669 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 122,736 / 372,816 B (**32.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 122,752 / 372,816 B (**32.9%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
