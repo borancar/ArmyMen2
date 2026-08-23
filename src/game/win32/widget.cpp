@@ -3866,11 +3866,6 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
  * all four play wave 1 rather than the menus' wave 2.
  * ------------------------------------------------------------------ */
 
-typedef void (__attribute__((thiscall)) *AM2_RepaintAncestorFn)(AM2_Widget *w,
-                                                                RECT clip);
-#define orig_repaint_ancestor \
-    (*(AM2_RepaintAncestorFn)AM2_IMAGE(ADDR_REPAINT_ANCESTOR))
-
 /* The thumb's offset along the bar, in both classes' own terms. The original
  * computes it in x87 and rounds through _ftol, which truncates toward zero;
  * both operands are non-negative here, so a C cast is the same function. */
@@ -3914,7 +3909,7 @@ static void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
         ThumbShift(top, count - visible,
                    *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
                    - thumb->bounds.bottom);
-    orig_repaint_ancestor(bar, bar->rect);
+    RepaintAncestor(bar, bar->rect);
 }
 
 void __cdecl OnArrowUp(AM2_Widget *w)
@@ -3952,7 +3947,7 @@ static void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
             ThumbShift(pos, range,
                        *(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
                        - thumb->bounds.right);
-        orig_repaint_ancestor(bar, bar->rect);
+        RepaintAncestor(bar, bar->rect);
     }
 
     onChange = *(void (__cdecl *const *)(AM2_Widget *))
@@ -4329,7 +4324,7 @@ AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
                                 box.bottom,
                                 *(void **)((uint8_t *)w
                                            + COMMPANEL_OFF_LIST),
-                                (int32_t)AM2_IMAGE(ADDR_SELECT_MAP_ROW),
+                                (int32_t)(uintptr_t)SelectMapRow,
                                 0, 1);
     }
     WidgetAddChild(panel, list);
@@ -4693,7 +4688,7 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
                                 box.bottom,
                                 *(void **)((uint8_t *)w
                                            + COMMPANEL_OFF_LIST),
-                                (int32_t)AM2_IMAGE(ADDR_LOADGAME_ROW),
+                                (int32_t)(uintptr_t)LoadGameRow,
                                 0, 1);
     }
     WidgetAddChild(parent, list);
@@ -4849,6 +4844,78 @@ void __cdecl OnLoadGameNew(AM2_Widget *w)
     RequestState(2);
 }
 
+/* 0x00455C10, thiscall, `ret 0x10`. Repaint a widget through the nearest
+ * ANCESTOR that owns a sprite -- and repaint it CLIPPED TO THIS WIDGET'S
+ * rectangle, which is the whole point and the thing that makes it not
+ * WidgetRepaint: only the area this widget covers is redrawn, by whoever owns
+ * the background under it.
+ *
+ * With no such ancestor it paints itself instead. The clip rectangle it is
+ * handed is ignored either way -- the signature exists so it can sit in a
+ * paint slot, not because the argument is read. */
+void __attribute__((thiscall)) RepaintAncestor(AM2_Widget *w, RECT clip)
+{
+    AM2_Widget *up = w->parent;
+
+    (void)clip;
+    while (up && !up->sprite)
+        up = up->parent;
+
+    if (up)
+        ((AM2_WidgetPaintFn *)up->vtable)[WIDGET_VSLOT_PAINT](up, w->rect);
+    else
+        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
+/* 0x0044DEA0. SELECT MAP's row callback: the row's VALUE is a pointer to the
+ * level id the constructor malloc'd, so this dereferences twice to get it,
+ * looks the record up and starts that mission.
+ *
+ * It re-reads the row count after choosing the level and only then asks for
+ * state 2 -- a second check of what it has already tested, which changes
+ * nothing here and is reproduced rather than tidied. */
+void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
+                          int32_t selected)
+{
+    const int32_t *id;
+    void          *level;
+
+    (void)list;
+    if (!rows || selected < 0 || selected >= rows->count)
+        return;
+
+    id = *(const int32_t *const *)(rows->text
+                                   + (uint32_t)selected * AM2_LIST_ROW_STRIDE
+                                   + AM2_LIST_ROW_VALUE);
+    level = orig_find_level_record(*id);
+    if (!level)
+        return;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    orig_select_level(level);
+    g_levelId = *(const int32_t *)level;
+    if (selected >= rows->count)
+        return;
+    g_levelIndex = 1;
+    RequestState(2);
+}
+
+/* 0x00451EA0. LOAD GAME's row callback: copy the chosen save's name into the
+ * SCREEN's own slot, which is what its DELETE and LOAD then read. The screen
+ * comes from the paint object rather than from the list's ancestry. */
+void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
+                         int32_t selected)
+{
+    (void)list;
+    if (!rows || selected < 0 || selected >= rows->count)
+        return;
+    if (!g_paintObject)
+        return;
+    strcpy((char *)g_paintObject + LOAD_GAME_OFF_NAME,
+           rows->text + (uint32_t)selected * AM2_LIST_ROW_STRIDE);
+    PlaySoundAt(2, 0, 0, 0, 0);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4954,6 +5021,13 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_REPAINT_ANCESTOR, (const void *)RepaintAncestor,
+                        "RepaintAncestor", 1);
+    rc |= patch_replace(ADDR_SELECT_MAP_ROW, (const void *)SelectMapRow,
+                        "SelectMapRow", 0);
+    rc |= patch_replace(ADDR_LOADGAME_ROW, (const void *)LoadGameRow,
+                        "LoadGameRow", 0);
+
     rc |= patch_replace(ADDR_ON_ENTER_NAME_CANCEL,
                         (const void *)OnEnterNameCancel,
                         "OnEnterNameCancel", 0);

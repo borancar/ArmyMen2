@@ -1322,6 +1322,17 @@ void __cdecl OnLoadGameDelete(AM2_Widget *w);
 void __cdecl OnDelGameCancel(AM2_Widget *w);
 void __cdecl OnLoadGameNew(AM2_Widget *w);
 
+/* Original: 0x00455C10, thiscall `ret 0x10`. Repaint through the nearest
+ * ancestor that owns a sprite, CLIPPED TO THIS WIDGET's rectangle -- which
+ * is what makes it not WidgetRepaint. The clip argument is ignored. */
+void __attribute__((thiscall)) RepaintAncestor(AM2_Widget *w, RECT clip);
+
+/* The two remaining row callbacks: 0x0044DEA0 and 0x00451EA0. */
+void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
+                          int32_t selected);
+void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
+                         int32_t selected);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

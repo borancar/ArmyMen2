@@ -329,6 +329,18 @@ play() {
         # button in the wrong place.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             >> "$WORK/$cfg-$side.widgets" || true
+        # The first save's row, which runs LoadGameRow -- it copies the name
+        # into the screen's own slot and plays a sound. Harmless: unlike
+        # SELECT MAP's row callback, this one starts nothing.
+        #
+        # It EXERCISES the callback and does not DISCRIMINATE it. `save/sarge`
+        # holds one .sav, the constructor already seeded the same name from
+        # the same row, and neither the tree nor the log shows the slot -- so
+        # a callback that did nothing would pass this. Two saves would fix
+        # that and would mean the suite carrying a fixture nobody created on
+        # purpose. Said plainly rather than left to look like coverage.
+        "$REPO/tools/point.py" 240 173 --click >/dev/null 2>&1
+        sleep 2
         "$REPO/tools/point.py" 455 181 --click >/dev/null 2>&1   # NEW
         sleep 25
         # MAP 01: KITCHEN, the strategic map. RETURN starts the mission.

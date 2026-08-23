@@ -11,6 +11,36 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **`RepaintAncestor` is not `WidgetRepaint`, and the difference is the CLIP.**
+  `0x00455C10` walks up to the nearest ancestor owning a sprite and paints
+  THAT widget clipped to **this** widget's rectangle -- so only the area this
+  one covers is redrawn, by whoever owns the background under it. With no such
+  ancestor it paints itself. The clip rectangle it is handed is ignored either
+  way; the signature exists so it can sit in a paint slot.
+
+  All four arrow handlers end in it, so `audiovol` and `menuscreens` run it.
+
+- **SELECT MAP's row callback dereferences twice.** `0x0044DEA0` reads the
+  row's VALUE dword, which the constructor set to a `malloc`'d `int32_t *`
+  holding the level id -- so the id is two dereferences away, not one. It then
+  looks the record up and starts that mission. It also re-reads the row count
+  after choosing the level and only then asks for state 2, a second check of
+  what it has already tested; reproduced rather than tidied.
+
+  **It stays verified by reading, and the reason is that exercising it starts
+  a mission.** Clicking a row here is not a menu action; the callback ends in
+  `RequestState(2)`. Putting that in a menu configuration would turn it into a
+  gameplay one.
+
+- **LOAD GAME's row callback is exercised and NOT discriminated, which is not
+  the same thing.** `0x00451EA0` copies the chosen save's name into the
+  SCREEN's own slot. `ab.sh campaign` clicks the row now -- but `save/sarge`
+  holds one `.sav`, the constructor already seeded the same name from the same
+  row, and neither the widget tree nor the log shows that slot. A callback
+  that did nothing would pass. Two saves would fix it and would mean the suite
+  carrying a fixture nobody created on purpose, so the limitation is written
+  into `ab.sh` beside the click instead.
+
 - **The save-game family's buttons, and a rule that nearly got broken on
   CONSTANTS rather than addresses.** Five handlers: ENTER NAME's CANCEL
   (`0x00451AC0`), LOAD GAME's BACK, DELETE and NEW (`0x00452010`,
@@ -1458,10 +1488,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 732 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 731 | 721 of them below the CRT line |
+| `patch_replace` sites | 735 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 734 | 724 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 134,592 / 372,816 B (**36.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 134,944 / 372,816 B (**36.2%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 149,600 / 372,816 B (40.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
