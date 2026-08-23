@@ -1950,6 +1950,33 @@
 #define AM2_BATTLE_JOIN_SIZE     0x88u
 #define ADDR_OPEN_MOVIES         0x0044E6A0u  /* void(void) */
 #define ADDR_MOVIES_CTOR         0x0044DFA0u  /* thiscall obj *(obj, bmp) */
+#define VTABLE_MOVIES            0x0046FACCu
+#define ADDR_STR_MOVIES_BMP      0x0048B6F8u /* "02_012_00_movies.bmp" */
+/* Twelve thumbnail PAIRS at 0x0064, three pages of four, and the four button
+ * pointers after them at 0x00C4. The sprite ids are set 3, indices 0xC8..0xCB
+ * and then 0xD2..0xD9 -- a gap the screen does not care about, because the
+ * pairs land in twelve contiguous slots either way. */
+#define MOVIES_OFF_SPRITES       0x0064u
+#define MOVIES_OFF_BUTTONS       0x00C4u
+#define AM2_MOVIE_PAGE_SIZE      4
+#define AM2_MOVIE_SET            3
+#define AM2_MOVIE_INDEX_A        0xC8   /* four */
+#define AM2_MOVIE_INDEX_B        0xD2   /* eight */
+/* The button's own slot for which movie it shows; 0x0044E610 reads it. */
+#define MOVIE_BUTTON_OFF_INDEX   0x58u
+/* Which page of four is showing, 0 to 2, wrapped by 0x0044E580. */
+#define ADDR_MOVIE_PAGE          0x0065A060u /* int32_t */
+/* How many movies have been unlocked. The screen shows the first button
+ * unconditionally and each of the other three only if this is past 0, 1, 2. */
+#define ADDR_MOVIE_COUNT         0x00512328u /* int32_t */
+#define ADDR_ON_MOVIE_PLAY       0x0044E610u
+#define ADDR_ON_MOVIE_NEXT_PAGE  0x0044E580u
+#define AM2_BMP_BACK19_0         0x0048B6BCu /* 03_019_0N_back.bmp */
+#define AM2_BMP_BACK19_1         0x0048B6D0u
+#define AM2_BMP_BACK19_2         0x0048B6E4u
+#define AM2_BMP_EGG0             0x0048B680u /* 03_031_0N_egg.bmp */
+#define AM2_BMP_EGG1             0x0048B694u
+#define AM2_BMP_EGG2             0x0048B6A8u
 #define AM2_MOVIES_SIZE          0xD4u
 #define ADDR_OPEN_OPTIONS_MENU   0x0044FDD0u  /* void(void) */
 #define ADDR_OPTIONS_MENU_CTOR   0x0044FAB0u  /* thiscall obj *(obj, bmp) */

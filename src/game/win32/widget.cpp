@@ -1476,6 +1476,8 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
 #define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
 #define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_levelCount      (*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)
+#define g_moviePage       (*(const int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)
+#define g_movieCount      (*(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
 #define g_menuMode        (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 typedef void (__cdecl *am2_void_fn)(void);
@@ -1738,7 +1740,7 @@ void __cdecl OpenMovies(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_MOVIES_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MOVIES_CTOR),
+               (AM2_ScreenCtorFn)MoviesConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -4495,6 +4497,117 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x0044DFA0, thiscall. MOVIES -- twelve thumbnails in three pages of four,
+ * and the only screen that builds its buttons out of SPRITES it loaded itself
+ * rather than out of bitmap names.
+ *
+ * Each button is constructed with the scratch buffer as all three of its
+ * bitmap names -- the same `ADDR_DIR_SCRATCH` every dialog hands SetGameDir,
+ * whose contents are whatever was last written there -- and then the three
+ * sprite fields are overwritten from the preloaded pair. So the names are
+ * never used; the construction just has to not fail. `OWNS_SPRITES` is
+ * cleared afterwards, which is what stops the destructor releasing sprites
+ * the screen preloaded and still holds.
+ *
+ * The pair is (a, b) and the button takes b for NORMAL and a for both FOCUS
+ * and PRESSED -- a, twice, from two separate reads of the same slot.
+ *
+ * The three later buttons are gated on how many movies are unlocked, and so
+ * is the page button: with fewer than three there is nothing to page to. */
+static AM2_Widget *MakeMovieButton(AM2_Widget *w, AM2_Widget *panel,
+                                   int32_t left, int32_t top, int32_t slot,
+                                   uint32_t handler)
+{
+    AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    AM2_Sprite *const *pair;
+    uint8_t    *self;
+    AM2_Rect    box;
+    int32_t     idx;
+
+    if (btn) {
+        RectSet(&box, left, top, 0x90, 0x90);
+        btn = ButtonConstruct(btn,
+                              (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                              (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                              (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                              1, box, kImageHandler(handler),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+
+    idx  = g_moviePage * AM2_MOVIE_PAGE_SIZE + slot;
+    self = (uint8_t *)btn;
+    pair = (AM2_Sprite *const *)((const uint8_t *)w + MOVIES_OFF_SPRITES
+                                 + (uint32_t)idx * 8);
+    *(int32_t *)(self + MOVIE_BUTTON_OFF_INDEX)              = idx;
+    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL)        = pair[1];
+    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS)         = pair[0];
+    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED)       = pair[0];
+    self[BUTTON_OFF_OWNS_SPRITES]                            = 0;
+    WidgetAddChild(panel, btn);
+    return btn;
+}
+
+AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
+                                                      const char *bmp)
+{
+    AM2_Widget  *panel;
+    AM2_Widget **slots = (AM2_Widget **)((uint8_t *)w + MOVIES_OFF_BUTTONS);
+    AM2_Sprite **spr   = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
+    AM2_Rect     box;
+    int32_t      i;
+    int32_t      at = 0;
+
+    ScreenBaseConstruct(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_MOVIES);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_ALPINE));
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x43, 0x20, 0x1FA, 0x19F);
+        panel = PanelConstruct(panel, (const char *)
+                                AM2_IMAGE(ADDR_STR_MOVIES_BMP), 0, box);
+    }
+    WidgetAddChild(w, panel);
+    panel->flag44 = 1;
+
+    /* Four, then eight, and the two runs of ids are not contiguous. */
+    for (i = 0; i < 4; i++) {
+        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 0, 1, 1);
+        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 1, 1, 1);
+    }
+    for (i = 0; i < 8; i++) {
+        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B + i, 0, 1, 1);
+        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B + i, 1, 1, 1);
+    }
+
+    slots[0] = MakeMovieButton(w, panel, 0x21, 0x35, 0, ADDR_ON_MOVIE_PLAY);
+    panel->focusedChild = slots[0];
+    slots[1] = (AM2_Widget *)0;
+    slots[2] = (AM2_Widget *)0;
+    slots[3] = (AM2_Widget *)0;
+
+    if (g_movieCount > 0)
+        slots[1] = MakeMovieButton(w, panel, 0xD5, 0x35, 1,
+                                   ADDR_ON_MOVIE_PLAY);
+    if (g_movieCount > 1)
+        slots[2] = MakeMovieButton(w, panel, 0x21, 0xE9, 2,
+                                   ADDR_ON_MOVIE_PLAY);
+    if (g_movieCount > 2)
+        slots[3] = MakeMovieButton(w, panel, 0xD5, 0xE9, 3,
+                                   ADDR_ON_MOVIE_PLAY);
+
+    WidgetAddChild(panel, MakeButton(0x197, 0xE8, AM2_BMP_BACK19_0,
+                                     AM2_BMP_BACK19_1, AM2_BMP_BACK19_2,
+                                     kOnMenuBack));
+    if (g_movieCount > 2)
+        WidgetAddChild(panel, MakeButton(0x197, 0xB6, AM2_BMP_EGG0,
+                                         AM2_BMP_EGG1, AM2_BMP_EGG2,
+                                         kImageHandler(ADDR_ON_MOVIE_NEXT_PAGE)));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4600,6 +4713,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_MOVIES_CTOR, (const void *)MoviesConstruct,
+                        "MoviesConstruct", 1);
+
     rc |= patch_replace(ADDR_DELETE_GAME_CTOR,
                         (const void *)DeleteGameConstruct,
                         "DeleteGameConstruct", 1);

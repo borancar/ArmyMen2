@@ -247,6 +247,12 @@ play() {
         # It was called `selectmap` for one commit. Two screens in, that name
         # was already wrong.
         menuscreens) args="-nointro -dbg"  ; wait=25 ;;
+        # MOVIES, which the title screen reaches directly -- so it is not a
+        # `menuscreens` screen -- and which no other configuration compares.
+        # It needs ADDR_MOVIE_COUNT poked, because on a fresh profile it is
+        # ZERO: the screen then builds ONE thumbnail and a BACK button, and
+        # three of its four buttons plus the page button are unreachable.
+        movies)   args="-nointro -dbg"   ; wait=25 ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
     esac
 
@@ -350,6 +356,28 @@ play() {
         # pixels, which no budget catches; it is one changed line here.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
+    fi
+
+    if [ "$cfg" = movies ]; then
+        # Three movies unlocked, which is what turns the other three
+        # thumbnails and the page button on. Poked identically on both sides
+        # and never saved -- nothing here presses an options OK.
+        drive ctl "poke 512328 3" >/dev/null 2>&1
+        "$REPO/tools/point.py" 307 302 --click >/dev/null 2>&1   # MOVIES
+        sleep 6
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        # The page button -- the "egg" -- at 474..555 by 214..246. It bumps
+        # ADDR_MOVIE_PAGE and rebuilds, so the shot after it is the SECOND
+        # page: the same four slots reading four different thumbnails, which
+        # is the only thing that exercises the page arithmetic.
+        "$REPO/tools/point.py" 514 230 --click >/dev/null 2>&1
+        sleep 5
+        drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
+        # BACK, measured at 474..555 by 264..296.
+        "$REPO/tools/point.py" 514 280 --click >/dev/null 2>&1
+        sleep 5
     fi
 
     if [ "$cfg" = menuscreens ]; then
@@ -817,6 +845,8 @@ compare() {
         # it had survived every green run. See STATUS.md.
         # Static screens; the cursor and the caret are what move.
         menuscreens) budget=200 ;;
+        # Static thumbnails; the cursor is the only thing that moves.
+        movies)     budget=200 ;;
         mpoptions) budget=200 ;;
         *)        budget=500 ;;
     esac
@@ -898,7 +928,7 @@ PY
 # printed "A/B clean" -- which reads as both configurations passing and is the
 # same failure mode as the two missing files that once diffed as identical.
 cfgs="${*:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens multi mpoptions quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens movies multi mpoptions quit"
 
 fail=0
 for cfg in $cfgs; do

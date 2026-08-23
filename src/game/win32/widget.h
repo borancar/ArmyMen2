@@ -1302,6 +1302,12 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
                                                           const char *bmp,
                                                           int32_t flag);
 
+/* Original: 0x0044DFA0, thiscall. MOVIES -- twelve thumbnails in three pages
+ * of four, and the only screen that builds its buttons out of SPRITES it
+ * loaded itself rather than out of bitmap names. */
+AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
+                                                      const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
