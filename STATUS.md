@@ -5,11 +5,44 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
+Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **SELECT MAP, and a configuration that had to be invented to reach it.**
+  `0x0044DBB0` is the campaign's level picker and the one screen whose list
+  comes out of a PARSED FILE rather than the filesystem or the comm object: it
+  reparses `campaign.txt` on every open -- the same `ADDR_READ_CAMPAIGN_FILE`
+  SELECT PLAYER calls -- then walks the level table by id from 1, adding each
+  record's display name with a `malloc`'d copy of the id beside it. The rows
+  own that copy, which is why the record is constructed with its third field
+  set and `RecordReset` frees it.
+
+  The loop bound is re-read every iteration and the comparison is on `i - 1`,
+  so it runs for ids 1..count. A table whose ids are not contiguous simply
+  skips the gaps: a missing record is a NULL from the lookup, not an error.
+
+  **Nothing in the game reaches it from the title screen.** The campaign goes
+  through SELECT PLAYER, and the multiplayer host panel has its own picker.
+  The two real routes are that panel and SINGLE PLAYER with the "Aye aye
+  Captain!" cheat entered and a shift held. `ab.sh selectmap` takes the third:
+  poke the menu-request pair, which is the same pair the game itself writes
+  and the technique `mpoptions` already uses.
+
+  **It is also the only place in the suite where a list SCROLLS.** The
+  campaign has more levels than the box shows, so four clicks on the down
+  arrow move it -- 4,638 pixels between the two frames, across the list and
+  the bar -- and that is `OnArrowDown` and the arrow bar's thumb running for
+  the first time. STATUS said a day ago that they were verified by reading
+  because every list this suite reached showed all of its rows at once. That
+  was true of the suite, not of the game.
+
+  **A click that lands nowhere looks exactly like one that lands.** The first
+  CANCEL was at 502,297 and the button is 416..497 wide; the run passed
+  anyway. The tell was the log: six messages once the click landed, five
+  while it was missing.
 
 - **`checkseams` had two bugs and the second hid the first.** The fourth
   spelling of the seam -- naming a reconstructed address at all -- went in
@@ -202,11 +235,12 @@ Nothing uncommitted.
   position off the bottom, which is the only way to reach that arm. The two
   bars move 481 pixels between the dlg and mid frames and the two sides agree.
 
-  **UP and DOWN stay verified by reading**, and the reason is structural: they
-  need a list with more rows than fit, and every list this suite reaches --
-  COMM CHANNEL, SELECT PLAYER, DIFFICULTY -- shows all of its rows at once.
-  The guard is what saves them, since `count - visible` would be a division by
-  zero otherwise.
+  **UP and DOWN were verified by reading for one day.** They need a list with
+  more rows than fit, and every list the suite reached -- COMM CHANNEL, SELECT
+  PLAYER, DIFFICULTY -- showed all of its rows at once. That was a fact about
+  the SUITE: SELECT MAP has more levels than its box shows, and `ab.sh
+  selectmap` now scrolls it. The guard is still what saves the short lists,
+  since `count - visible` would be a division by zero otherwise.
 
 - **`0x00455C10` is not `WidgetRepaint` and is a near-twin of it.** Both walk
   up to the nearest ancestor owning a sprite and paint through it; this one
@@ -1288,10 +1322,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 722 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 721 | 711 of them below the CRT line |
+| `patch_replace` sites | 723 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 722 | 712 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 129,136 / 372,816 B (**34.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 129,840 / 372,816 B (**34.8%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 148,000 / 372,816 B (39.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

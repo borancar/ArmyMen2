@@ -1908,6 +1908,15 @@
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */
 #define ADDR_OPEN_MP_SELECT_MAP  0x0044DF20u  /* void(void) */
 #define ADDR_MP_SELECT_MAP_CTOR  0x0044DBB0u  /* thiscall obj *(obj, bmp) */
+#define VTABLE_SELECT_MAP        0x0046FAB8u
+#define ADDR_STR_SELECTMAP_BMP   0x0048B668u /* "02_004_00_selectmap.bmp" */
+/* 0x0044DEA0: SELECT MAP's row callback, still the original's. */
+#define ADDR_SELECT_MAP_ROW      0x0044DEA0u
+/* A level record's display name, which is what the list shows. The record's
+ * first field is the id ADDR_FIND_LEVEL_RECORD keys on; this is 0x44 in. */
+#define LEVEL_OFF_NAME           0x44u
+/* 0x0043ED40 is a one-instruction accessor for it, called twice per
+ * iteration of the SELECT MAP loop; reading the global says the same. */
 #define AM2_MP_SELECT_MAP_SIZE   0x68u
 #define ADDR_OPEN_SELECT_PLAYER  0x00451910u  /* void(void) */
 #define ADDR_SELECT_PLAYER_CTOR  0x00451400u  /* thiscall obj *(obj, bmp) */

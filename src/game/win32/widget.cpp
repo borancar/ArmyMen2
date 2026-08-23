@@ -1475,6 +1475,7 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
 #define g_gameSetting22C  (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
 #define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
 #define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define g_levelCount      (*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)
 #define g_menuMode        (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 typedef void (__cdecl *am2_void_fn)(void);
@@ -1689,8 +1690,7 @@ void __cdecl OpenMpOptions(void)
 void __cdecl OpenSelectMap(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_SELECT_MAP_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_SELECT_MAP_CTOR),
+    OpenScreen(AM2_MP_SELECT_MAP_SIZE, (AM2_ScreenCtorFn)SelectMapConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -4258,6 +4258,94 @@ void __cdecl CheckboxToggle(AM2_Widget *w)
         onChange(w);
 }
 
+/* 0x0044DBB0, thiscall. SELECT MAP -- the campaign's level picker, and the
+ * one screen whose list comes out of a PARSED FILE rather than the
+ * filesystem or the comm object.
+ *
+ * It reparses campaign.txt on every open (the same ADDR_READ_CAMPAIGN_FILE
+ * SELECT PLAYER calls) and then walks the level table by ID from 1, adding
+ * each record's display name with a malloc'd copy of the id beside it. That
+ * id is what the row callback reads back; the rows own it, which is why the
+ * record is constructed with its third field set.
+ *
+ * The loop bound is re-read every iteration and the comparison is on
+ * `i - 1`, so it runs for ids 1..count -- a table whose ids are not
+ * contiguous would simply skip the gaps, since a missing record is a NULL
+ * from the lookup and not an error. */
+AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
+                                                         const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Widget *list;
+    AM2_Widget *bar;
+    void       *rows;
+    AM2_Rect    box;
+    int32_t     i;
+
+    ScreenBaseConstruct(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_MAP);
+    orig_read_campaign();
+
+    rows = orig_operator_new(AM2_ROWS_SIZE);
+    if (rows)
+        rows = RecordCtor(rows, 1);
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
+
+    for (i = 1; i - 1 < g_levelCount; i++) {
+        uint8_t *rec = (uint8_t *)orig_find_level_record(i);
+
+        if (rec) {
+            int32_t *id = (int32_t *)am2_malloc(sizeof *id);
+
+            *id = i;
+            ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST),
+                    (const char *)(rec + LEVEL_OFF_NAME), id);
+        }
+    }
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
+        panel = PanelConstruct(panel, (const char *)
+                                AM2_IMAGE(ADDR_STR_SELECTMAP_BMP), 0, box);
+    }
+    WidgetAddChild(w, panel);
+    w->focusedChild = panel;
+    panel->flag44 = 1;
+
+    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
+    if (list) {
+        RectSet(&box, 0x2A, 0x44, 0x95, 0xAA);
+        list = ListBoxConstruct(list, box.left, box.top, box.right,
+                                box.bottom,
+                                *(void **)((uint8_t *)w
+                                           + COMMPANEL_OFF_LIST),
+                                (int32_t)AM2_IMAGE(ADDR_SELECT_MAP_ROW),
+                                0, 1);
+    }
+    WidgetAddChild(panel, list);
+    ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
+
+    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
+    if (bar) {
+        RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
+        bar = ArrowBarConstruct(bar, box.left, box.top, box.right,
+                                box.bottom, panel,
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                0x92, 1);
+    }
+    WidgetAddChild(panel, bar);
+    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
+    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+
+    WidgetAddChild(panel, MakeButton(0x123, 0xAA, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, kOnMenuBack));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4363,6 +4451,10 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_MP_SELECT_MAP_CTOR,
+                        (const void *)SelectMapConstruct,
+                        "SelectMapConstruct", 1);
+
     rc |= patch_replace(ADDR_BUTTON_BASE_CTOR,
                         (const void *)ButtonBaseConstruct,
                         "ButtonBaseConstruct", 1);

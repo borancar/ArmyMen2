@@ -1285,6 +1285,11 @@ AM2_Widget *__attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w);
  * handler at CHECK_OFF_ON_CHANGE if there is one. */
 void __cdecl CheckboxToggle(AM2_Widget *w);
 
+/* Original: 0x0044DBB0, thiscall. SELECT MAP -- the campaign's level picker,
+ * and the one screen whose list comes out of a PARSED FILE. */
+AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
+                                                         const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
