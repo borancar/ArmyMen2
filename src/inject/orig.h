@@ -1717,6 +1717,14 @@
                                               * PreloadSprite */
 #define PANEL_OFF_SPRITE         0x58u       /* the same sprite as 0x0038 */
 #define PANEL_OFF_FLAG           0x5Cu
+
+/* The key-capture ROW, 0x00450C50 -- a focus-highlighting label with four
+ * colour bytes and the bound key's index. `ret 0x2C` is 44: the index, the
+ * caption, sixteen of rectangle, a font and four colours. */
+#define VTABLE_KEYROW            0x0046FB80u
+#define FOCUSLABEL_OFF_INK2      0x65u
+#define FOCUSLABEL_OFF_INK3      0x66u
+#define FOCUSLABEL_OFF_INK4      0x67u
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */

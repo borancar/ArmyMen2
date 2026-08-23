@@ -1067,6 +1067,19 @@ AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
                                                      int32_t flag,
                                                      AM2_Rect box);
 
+/* Original: 0x00450C50, thiscall, `ret 0x2C`. The key-capture ROW. It passes
+ * an UNINITIALISED byte to the label constructor as the ink, which is the
+ * original's and is harmless for a reason worth reading in widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w,
+                                                      int32_t nameIndex,
+                                                      const char *caption,
+                                                      int32_t left, int32_t top,
+                                                      int32_t width,
+                                                      int32_t height,
+                                                      int32_t font, int32_t ink,
+                                                      int32_t ink2, int32_t ink3,
+                                                      int32_t ink4);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

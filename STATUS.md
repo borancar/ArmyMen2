@@ -210,6 +210,25 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The key-capture ROW is reconstructed** (`0x00450C50`, 106 B), and **it
+  passes an UNINITIALISED byte to the label constructor.** `mov al, byte ptr
+  [esi + 0x64]` at `0x00450C5D` reads the object's own 0x0064 before anything
+  has written it -- the memory is straight out of `operator new` -- and hands
+  it over as the label's ink.
+
+  It is harmless, and knowing WHY took looking rather than assuming, which is
+  why this one waited a turn. The label's ink is at 0x0060, not 0x0064, so the
+  garbage lands there; the focus label overrides it with its own pair at
+  0x0064 and 0x0065, which this function then writes from its arguments.
+  Nothing on this class reads 0x0060. Reading it back is faithful and, through
+  a `uint8_t *`, is not the undefined behaviour it would be through a wider
+  type -- which is the distinction that made it worth checking first rather
+  than either reproducing blind or quietly "fixing".
+
+  Two more readings fell out of the argument map: the seventh argument is the
+  FONT, and the tenth is used twice -- as the label's paper AND as the colour
+  at 0x0066.
+
 - **The PANEL constructor is reconstructed** (`0x00454980`, 136 B) -- the
   container eight of the reconstructed screens hang everything off, and so the
   most-used constructor in the family and the cheapest to check: every
@@ -644,10 +663,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 675 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 674 | 664 of them below the CRT line |
+| `patch_replace` sites | 676 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 675 | 665 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 121,984 / 372,816 B (**32.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 122,096 / 372,816 B (**32.7%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

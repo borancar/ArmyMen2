@@ -2176,11 +2176,6 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
  * the same matched-argument shape MakeBitmap has. It is safe for the same
  * reason: 0x00450C8E reads all three back as `mov al, byte ptr`, so the
  * garbage is never looked at, and passing a zero-extended byte is faithful. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_KeyRowCtorFn)(
-    AM2_Widget *w, int32_t nameIndex, const char *caption, AM2_Rect box,
-    int32_t flag, int32_t ink, int32_t inkFocus, int32_t bg0, int32_t bg1);
-
-#define orig_keyrow_ctor ((AM2_KeyRowCtorFn)AM2_IMAGE(ADDR_KEYROW_CTOR))
 #define AM2_KEYROW_WIDTH   0x41
 #define AM2_KEYROW_HEIGHT  0x0D
 
@@ -2207,11 +2202,12 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
         if (row) {
             RectSet(&box, place[0], place[1], AM2_KEYROW_WIDTH,
                     AM2_KEYROW_HEIGHT);
-            row = orig_keyrow_ctor(row, index,
-                                   *(const char *const *)(names + index * 8
-                                                          + 4),
-                                   box, 1, g_whiteInk, g_hiliteColour,
-                                   g_backgroundColour, g_backgroundColour);
+            row = KeyRowConstruct(row, index,
+                                  *(const char *const *)(names + index * 8
+                                                         + 4),
+                                  box.left, box.top, box.right, box.bottom,
+                                  1, g_whiteInk, g_hiliteColour,
+                                  g_backgroundColour, g_backgroundColour);
         }
         WidgetAddChild(w, row);
         *rows++ = row;
@@ -2863,6 +2859,49 @@ AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00450C50, thiscall, `ret 0x2C`. The key-capture ROW -- the class the
+ * CONTROLS dialog has twenty-one of. A focus-highlighting label underneath,
+ * with four colour bytes at 0x0064..0x0067 and the bound key's index at
+ * 0x0068.
+ *
+ * **It passes an UNINITIALISED byte to the label constructor**, and that is
+ * the original's, reproduced. `mov al, byte ptr [esi + 0x64]` at 0x00450C5D
+ * reads the object's own 0x0064 BEFORE anything has written it -- the memory
+ * is straight out of `operator new` -- and hands it over as the label's ink.
+ *
+ * It is harmless, and knowing WHY took looking rather than assuming. The
+ * label's ink is at 0x0060, not 0x0064, so the garbage lands there; the focus
+ * label overrides it with its own pair at 0x0064 and 0x0065, which this
+ * function then writes from its arguments. Nothing reads 0x0060 on this
+ * class. Reading it back is faithful and, through a `uint8_t *`, is not the
+ * undefined behaviour it would be through a wider type.
+ *
+ * Note the seventh argument is the FONT and the tenth is used twice -- as the
+ * label's paper and as the colour at 0x0066. */
+AM2_Widget *__attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w,
+                                                      int32_t nameIndex,
+                                                      const char *caption,
+                                                      int32_t left, int32_t top,
+                                                      int32_t width,
+                                                      int32_t height,
+                                                      int32_t font, int32_t ink,
+                                                      int32_t ink2, int32_t ink3,
+                                                      int32_t ink4)
+{
+    uint8_t *self = (uint8_t *)w;
+    uint8_t  stale = self[FOCUSLABEL_OFF_INK];
+
+    LabelConstruct(w, caption, left, top, width, height, font, stale, ink3);
+
+    self[FOCUSLABEL_OFF_INK]  = (uint8_t)ink;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_KEYROW);
+    *(int32_t *)(self + KEYROW_OFF_KEY) = nameIndex;
+    self[FOCUSLABEL_OFF_INK2] = (uint8_t)ink2;
+    self[FOCUSLABEL_OFF_INK3] = (uint8_t)ink3;
+    self[FOCUSLABEL_OFF_INK4] = (uint8_t)ink4;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2968,6 +3007,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_KEYROW_CTOR, (const void *)KeyRowConstruct,
+                        "KeyRowConstruct", 11);
     rc |= patch_replace(ADDR_PANEL_CTOR, (const void *)PanelConstruct,
                         "PanelConstruct", 6);
     rc |= patch_replace(ADDR_SELECT_PLAYER_CTOR,
