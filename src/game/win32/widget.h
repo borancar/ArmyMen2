@@ -1308,6 +1308,12 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
                                                       const char *bmp);
 
+/* Original: 0x004520E0, thiscall. LOAD GAME -- the campaign's save picker,
+ * and the second of the two screens built two ways. */
+AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
+                                                        const char *bmp,
+                                                        int32_t flag);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

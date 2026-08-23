@@ -1912,6 +1912,26 @@
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */
+#define VTABLE_LOAD_GAME         0x0046FBD0u
+#define ADDR_STR_SAVE_PLAYER_FMT 0x004851E4u  /* "save\\%s" */
+#define ADDR_STR_GLOB_SAV        0x0048BB50u  /* "*.sav" */
+/* The screen's copy of the chosen save's name, seeded from the first row. */
+#define LOAD_GAME_OFF_NAME       0x68u
+/* Its four buttons and the row callback, all still the original's. */
+#define ADDR_LOADGAME_ROW        0x00451EA0u
+#define ADDR_ON_LOADGAME_NEW     0x00451FB0u
+#define ADDR_ON_LOADGAME_LOAD    0x00452060u
+#define ADDR_ON_LOADGAME_DELETE  0x00451F10u
+#define ADDR_ON_LOADGAME_BACK    0x00452010u
+#define AM2_BMP_NEW0             0x0048BAFCu /* 03_011_0N_new.bmp */
+#define AM2_BMP_NEW1             0x0048BB10u
+#define AM2_BMP_NEW2             0x0048BB24u
+#define AM2_BMP_LOAD0            0x0048BAC0u /* 03_004_0N_load.bmp */
+#define AM2_BMP_LOAD1            0x0048BAD4u
+#define AM2_BMP_LOAD2            0x0048BAE8u
+#define AM2_BMP_DELETE12_0       0x0048B9F4u /* 03_012_0N_delete.bmp */
+#define AM2_BMP_DELETE12_1       0x0048BA0Cu
+#define AM2_BMP_DELETE12_2       0x0048BA24u
 #define ADDR_OPEN_MP_SELECT_MAP  0x0044DF20u  /* void(void) */
 #define ADDR_MP_SELECT_MAP_CTOR  0x0044DBB0u  /* thiscall obj *(obj, bmp) */
 #define VTABLE_SELECT_MAP        0x0046FAB8u

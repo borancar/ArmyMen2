@@ -319,6 +319,16 @@ play() {
         sleep 5
         "$REPO/tools/point.py" 455 221 --click >/dev/null 2>&1   # SELECT
         sleep 6
+        # LOAD GAME's tree, APPENDED to the same file. The comparison is a
+        # diff, so two trees in one file compare as two trees -- which is how
+        # this configuration covers a second screen without a fifth shot slot
+        # and without giving up the SELECT PLAYER dump above.
+        #
+        # It is the only place LOAD GAME is compared at all: campaign's pixel
+        # budget is -1, so its frames prove nothing, and the log cannot see a
+        # button in the wrong place.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            >> "$WORK/$cfg-$side.widgets" || true
         "$REPO/tools/point.py" 455 181 --click >/dev/null 2>&1   # NEW
         sleep 25
         # MAP 01: KITCHEN, the strategic map. RETURN starts the mission.

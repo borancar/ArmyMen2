@@ -11,6 +11,32 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **LOAD GAME, and the menu screen table is finished.** `0x004520E0` is the
+  campaign's save picker and the second of the two screens built two ways --
+  no panel in a mission, with the panel's offset (`0x7D` by `0x62`) folded
+  into every rectangle, and a panel with a zero offset on the title screen.
+  DELETE GAME is the other, and the two are the only ones.
+
+  Its list comes off the FILESYSTEM like SELECT PLAYER's -- `save\<player>`
+  globbed for `*.sav` -- and it seeds its own copy of the chosen name from the
+  first row, so LOAD works without the row ever being clicked.
+
+  **Two things differ between the layouts beyond the offset**, and reading one
+  arm gets the other wrong: the screen's focused child is the PANEL when there
+  is one and the LIST when there is not, and the second is written after the
+  list exists rather than before.
+
+- **Two widget trees in one file, which is how a configuration covers a second
+  screen without a fifth shot slot.** `campaign` already walked through LOAD
+  GAME on its way to the map and compared nothing about it: its pixel budget
+  is -1, so its frames prove nothing, and a log cannot see a button in the
+  wrong place. The tree dump is now APPENDED to the same file as SELECT
+  PLAYER's, and since the comparison is a diff, two trees compare as two
+  trees. 20 nodes, identical.
+
+  Worth remembering as a technique: the four shot slots are a real limit and
+  the widget file is not.
+
 - **MOVIES is the only screen that builds its buttons out of SPRITES rather
   than bitmap names.** `0x0044DFA0` preloads twelve thumbnail PAIRS into
   `0x0064` -- set 3, indices `0xC8..0xCB` then `0xD2..0xD9`, a gap the screen
@@ -1399,10 +1425,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 726 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 725 | 715 of them below the CRT line |
+| `patch_replace` sites | 727 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 726 | 716 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 132,720 / 372,816 B (**35.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 134,112 / 372,816 B (**36.0%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 149,392 / 372,816 B (40.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

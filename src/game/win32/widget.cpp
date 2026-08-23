@@ -1876,16 +1876,15 @@ void __cdecl OpenLoadGame(void)
         uint8_t *screen = (uint8_t *)0;
 
         if (obj) {
-            AM2_ScreenCtor2Fn ctor =
-                (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_LOAD_GAME_CTOR);
-            screen = (uint8_t *)ctor(obj, (const char *)
-                                     AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0);
+            screen = (uint8_t *)LoadGameConstruct(
+                (AM2_Widget *)obj,
+                (const char *)AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0);
         }
         RefreshScreen();
         g_paintObject = screen;
     } else {
         OpenScreen2(AM2_LOAD_GAME_SIZE,
-                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_LOAD_GAME_CTOR),
+                    (AM2_ScreenCtor2Fn)LoadGameConstruct,
                     (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
     }
 }
@@ -2749,6 +2748,9 @@ typedef int32_t (__cdecl *AM2_FindNextFn)(int32_t handle, void *data);
 typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t handle);
 typedef void (__cdecl *AM2_ReadCampaignFn)(void);
 
+/* The game's own sprintf -- the CRT inside the image, as crt.h explains. */
+typedef int32_t (__cdecl *AM2_SprintfFn)(char *, const char *, ...);
+#define orig_sprintf    ((AM2_SprintfFn)AM2_IMAGE(ADDR_GAME_SPRINTF))
 #define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
 #define orig_findnext   ((AM2_FindNextFn)AM2_IMAGE(ADDR_CRT_FINDNEXT))
 #define orig_findclose  ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
@@ -4608,6 +4610,135 @@ AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x004520E0, thiscall. LOAD GAME -- the campaign's save picker, and the
+ * second of the two screens built two ways: no panel in a mission, with the
+ * panel's offset (0x7D by 0x62) folded into every rectangle, and a panel
+ * with a zero offset on the title screen. DELETE GAME is the other.
+ *
+ * Its list comes off the FILESYSTEM, like SELECT PLAYER's -- `save\<player>`
+ * globbed for `*.sav` -- and it seeds its own copy of the chosen name from
+ * the first row, so LOAD works without the row ever being clicked.
+ *
+ * Two things differ between the layouts beyond the offset. The screen's
+ * focused child is the PANEL when there is one and the LIST when there is
+ * not, and the second is written after the list exists rather than before.
+ * Both are the original's, and reading only one of the two arms gets the
+ * focus wrong on the other. */
+AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
+                                                        const char *bmp,
+                                                        int32_t flag)
+{
+    AM2_Widget *parent = w;
+    AM2_Widget *list;
+    AM2_Widget *bar;
+    void       *rows;
+    AM2_Rect    box;
+    char        path[264];
+    char        pattern[264];
+    uint8_t     found[0x11C];
+    int32_t     handle;
+    int32_t     dx = 0x7D;
+    int32_t     dy = 0x62;
+
+    ScreenBaseConstruct(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_LOAD_GAME);
+    *((char *)w + LOAD_GAME_OFF_NAME) = '\0';
+
+    rows = orig_operator_new(AM2_ROWS_SIZE);
+    if (rows)
+        rows = RecordCtor(rows, 1);
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
+
+    orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_SAVE_PLAYER_FMT),
+                 g_currentPlayer);
+    SetGameDir(path);
+
+    strcpy(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_SAV));
+    handle = orig_findfirst(pattern, found);
+    if (handle != -1) {
+        do {
+            ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST),
+                    (const char *)(found + AM2_FIND_OFF_NAME), (void *)0);
+        } while (orig_findnext(handle, found) == 0);
+        orig_findclose(handle);
+    }
+
+    if (g_gameState == 2) {
+        w->flag44 = 1;
+    } else {
+        AM2_Widget *panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+
+        if (panel) {
+            RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
+            panel = PanelConstruct(panel, (const char *)
+                                    AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0, box);
+        }
+        WidgetAddChild(w, panel);
+        w->focusedChild = panel;
+        panel->flag44 = 1;
+        dx = 0;
+        dy = 0;
+        parent = panel;
+    }
+
+    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
+    if (list) {
+        RectSet(&box, dx + 0x2A, dy + 0x44, 0x95, 0xAA);
+        list = ListBoxConstruct(list, box.left, box.top, box.right,
+                                box.bottom,
+                                *(void **)((uint8_t *)w
+                                           + COMMPANEL_OFF_LIST),
+                                (int32_t)AM2_IMAGE(ADDR_LOADGAME_ROW),
+                                0, 1);
+    }
+    WidgetAddChild(parent, list);
+    if (g_gameState == 2)
+        w->focusedChild = list;
+    ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
+
+    /* Opening the screen selects the first save, name and all. */
+    {
+        const int32_t *r = *(const int32_t **)((uint8_t *)w
+                                               + COMMPANEL_OFF_LIST);
+
+        if (r[0] > 0)
+            strcpy((char *)w + LOAD_GAME_OFF_NAME,
+                   *(const char *const *)(r + 1));
+    }
+    list->flag44 = 1;
+
+    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
+    if (bar) {
+        RectSet(&box, dx + 0xD5, dy + 0x3C, 0x13, 0xBA);
+        bar = ArrowBarConstruct(bar, box.left, box.top, box.right,
+                                box.bottom, parent,
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                0x90, 0);
+    }
+    WidgetAddChild(parent, bar);
+    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
+    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+
+    WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x44, AM2_BMP_NEW0,
+                                      AM2_BMP_NEW1, AM2_BMP_NEW2,
+                                      kImageHandler(ADDR_ON_LOADGAME_NEW)));
+    WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x6B, AM2_BMP_LOAD0,
+                                      AM2_BMP_LOAD1, AM2_BMP_LOAD2,
+                                      kImageHandler(ADDR_ON_LOADGAME_LOAD)));
+    WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x92,
+                                      AM2_BMP_DELETE12_0, AM2_BMP_DELETE12_1,
+                                      AM2_BMP_DELETE12_2,
+                                      kImageHandler(ADDR_ON_LOADGAME_DELETE)));
+    WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0xB9, AM2_BMP_BACK19_0,
+                                      AM2_BMP_BACK19_1, AM2_BMP_BACK19_2,
+                                      kImageHandler(ADDR_ON_LOADGAME_BACK)));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)(uintptr_t)kImageHandler(ADDR_ON_LOADGAME_BACK);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -4713,6 +4844,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_LOAD_GAME_CTOR, (const void *)LoadGameConstruct,
+                        "LoadGameConstruct", 1);
+
     rc |= patch_replace(ADDR_MOVIES_CTOR, (const void *)MoviesConstruct,
                         "MoviesConstruct", 1);
 
