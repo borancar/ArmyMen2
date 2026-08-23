@@ -131,6 +131,53 @@ Nothing uncommitted.
   that never visits a screen says nothing about it: this defect sat behind
   every green run in the suite.
 
+- **The first three menu screen factories are reconstructed**: `OpenMpHost`
+  (`0x004317C0`), `OpenMpJoin` (`0x00433480`) and `OpenMpOptions`
+  (`0x00432910`). One shape -- close the current screen, allocate, construct,
+  store the constructor's return -- and the store is the RecordCtor lesson
+  again, which is why this family was worth taking next.
+
+  The host and join panels are ONE class: both allocate 0x278 and call the
+  same constructor at `0x00430530`, differing only in backdrop and in what
+  they write to `ADDR_MP_SESSION` -- 1 and 2. Driving menu request 9 puts up
+  "MULTIPLAYER JOIN PANEL" where 7 puts up "MULTIPLAYER HOST PANEL", from the
+  same vtable. That confirms by running what `orig.h`'s comment on that global
+  had worked out by reading; what stays open is the title screen also writing
+  2, which host-versus-client still does not explain.
+
+  They went into `widget.cpp` rather than a `screens.cpp` of their own, and
+  the ratchet is why. A separate module names no Win32 or COM type at all, so
+  `tools/checksplit.py` refused it -- correctly. The flat-half alternative
+  would have meant writing the vtable call against `void **` instead of
+  `AM2_WidgetDeleteFn`, which is exactly the private signature that hid the
+  `PlaySoundAt` defect. The rule pointed at the right answer both times.
+
+  Counters from one driven run: `OpenMpHost` 1, `OpenMpOptions` 1,
+  `OpenMpJoin` 1, each with the right screen on the frame.
+
+- **`docs/screens.md` is the table, generated.** `tools/screens.py` reads all
+  21 arms out of the jump table and reports each factory's allocation size,
+  constructor and screen. Nineteen name themselves; the other two are
+  identified by their BUTTONS rather than given a name borrowed from whichever
+  function sits next in the image.
+
+  Three things it had to learn, each a mistake this repository has recorded
+  before. **Find the constructor from the STORE**, not from the first
+  `operator new` -- two arms allocate something else first, and one of those
+  constructs a helper that has nothing to do with the screen. **Decode
+  forward**: walking back byte-wise from the call for a `68`/`6A` finds other
+  instructions' operands and reported sizes like `0x8800511A`, which is the
+  aligned-dword cross-reference mistake in another costume. And **a fixed
+  window cannot bound a function** -- 0xC0 bytes was too short for two arms
+  and reading past the `ret` named four screens after their neighbours, giving
+  DELETE GAME twice.
+
+- **`tools/ab.sh` has a fourth comparison slot.** It compared the final frame
+  plus `mid` and `dlg`; `alt` is the fourth, and `mpoptions` now uses all of
+  them -- the host panel, the options dialog before and after DEFAULT, and the
+  join panel are four different screens on one run. Without it `OpenMpJoin`
+  would have been run rather than compared.
+
 - **`tools/ab.sh` took only its first argument.** `cfgs="${1:-bootcamp}"`, so
   `ab.sh bootcamp controls` ran bootcamp alone and printed "A/B clean" -- which
   reads as both configurations passing. It is `"${*:-bootcamp}"` now. Same
@@ -243,11 +290,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 643 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 642 | 632 of them below the CRT line |
+| `patch_replace` sites | 646 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 645 | 635 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 109,072 / 372,816 B (**29.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 134,384 / 372,816 B (36.0%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 109,488 / 372,816 B (**29.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 135,792 / 372,816 B (36.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

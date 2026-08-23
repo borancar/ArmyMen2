@@ -917,6 +917,23 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header);
 void __attribute__((thiscall)) MpDialogDestruct(AM2_Widget *w);
 void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w);
 
+/* The menu screen factories -- see widget.cpp for the shape they share.
+ *
+ * Original: 0x004317C0. The multiplayer HOST panel: the lobby with the player
+ * rows, the game-type and map lists and the comms field. It takes the session
+ * role with it (ADDR_MP_SESSION = 1) and then refreshes the panel. */
+void __cdecl OpenMpHost(void);
+
+/* Original: 0x00433480. The multiplayer JOIN panel. The SAME class and the
+ * same 0x278 bytes as the host panel -- only the backdrop and the role differ,
+ * which is the clearest statement in the image that MP_SESSION is host versus
+ * client and not something else. */
+void __cdecl OpenMpJoin(void);
+
+/* Original: 0x00432910. MULTIPLAYER OPTIONS, the 43-checkbox screen the
+ * OPTIONS button on the host panel opens. */
+void __cdecl OpenMpOptions(void);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

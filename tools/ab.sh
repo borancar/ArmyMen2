@@ -314,6 +314,14 @@ play() {
         drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
         "$REPO/tools/point.py" 576 190 --click >/dev/null 2>&1   # OK
         sleep 4
+        # And the JOIN panel, which is the SAME class as the host one with a
+        # different backdrop and role -- menu request 9 where the host is 7.
+        # One more poke reaches a screen nothing else in the suite does, and
+        # it is what makes OpenMpJoin compared rather than merely run.
+        drive ctl "poke 511DC8 9" >/dev/null 2>&1
+        drive ctl "poke 511DC4 1" >/dev/null 2>&1
+        sleep 5
+        drive shot "ab-$cfg-alt-$side" >/dev/null 2>&1
     fi
 
     if [ "$cfg" = audiovol ]; then
@@ -632,9 +640,14 @@ def find(side, tag):
 # A configuration may take extra shots DURING its sequence, not only at the
 # end. Every one found is compared against the same budget; a settled final
 # frame cannot show a transient, and a menu is mostly transients.
+#
+# Four slots: the final frame, then mid, dlg and alt. A configuration uses as
+# many as it has distinct screens worth comparing -- mpoptions uses all four,
+# because the host panel, the options dialog before and after DEFAULT, and the
+# join panel are four different screens on one run.
 bad = 0
 compared = 0
-for tag in ("", "mid", "dlg"):
+for tag in ("", "mid", "dlg", "alt"):
     o, r = find("orig", tag), find("recon", tag)
     if not o or not r:
         continue

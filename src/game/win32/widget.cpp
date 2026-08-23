@@ -1536,6 +1536,96 @@ void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w)
     WidgetUpdateCancel(w);
 }
 
+/* ---- the menu screen factories ----------------------------------------- *
+ *
+ * RunFrame's menu-request handler dispatches through a 21-entry jump table at
+ * 0x00426518; each arm is seven bytes -- `call <factory>; jmp end` -- and each
+ * factory opens one screen. They are one SHAPE repeated: destroy whatever
+ * dialog is currently the repaint object, allocate, construct on the
+ * allocation, and store the CONSTRUCTOR'S RETURN.
+ *
+ * That last step is the load-bearing one, and it is the RecordCtor lesson
+ * twenty-one times over: `mov [0x0065A058], eax` after the call. A
+ * reconstruction of any of these constructors that returns void puts the
+ * allocation's uninitialised idea of itself on screen -- or worse.
+ *
+ * They live here rather than in a screens.cpp of their own because they
+ * operate on the widget tree and want its real types. A separate module names
+ * no platform type at all, which tools/checksplit.py correctly refuses, and
+ * the alternative -- a flat module with the vtable call written against
+ * `void **` -- is exactly the private signature CLAUDE.md warns about.
+ *
+ * The MSVC SEH prologue each of them carries is not reproduced; see CLAUDE.md.
+ */
+
+/* 0x0065A058 under the spelling startgame.cpp already uses. winproc.cpp calls
+ * the same address g_paintObject through an AM2_PaintObject *, which is the
+ * same object seen through its other three vtable slots; a third spelling
+ * would be a third thing for tools/checkglobals.py to report. */
+#define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
+#define g_mpSession   (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+
+typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
+typedef void *(__attribute__((thiscall)) *AM2_ScreenCtorFn)(void *obj,
+                                                            const char *bmp);
+typedef void (__cdecl *AM2_VoidFn)(void);
+
+#define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
+#define orig_mp_panel_ctor    ((AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_PANEL_CTOR))
+#define orig_mp_options_ctor  ((AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_OPTIONS_CTOR))
+#define orig_mp_panel_refresh ((AM2_VoidFn)AM2_IMAGE(ADDR_MP_PANEL_REFRESH))
+
+/* The half every factory opens with: whatever screen is up goes away first.
+ *
+ * The delete is vtable slot 0 with a flag of 1 -- the MSVC scalar deleting
+ * destructor, which frees as well as destructs. The global is cleared INSIDE
+ * the test, which matters only in that a null one is left alone rather than
+ * written; reproduced because it is one instruction either way. */
+static void CloseCurrentScreen(void)
+{
+    AM2_Widget *cur = (AM2_Widget *)g_paintObject;
+
+    if (cur) {
+        ((AM2_WidgetDeleteFn *)cur->vtable)[WIDGET_VSLOT_DTOR](cur, 1);
+        g_paintObject = (uint8_t *)0;
+    }
+}
+
+/* And the half they close with. `new` answering null is checked at every one
+ * of these sites -- VC6's does answer null rather than throwing, and the game
+ * tests it -- so the global ends up null rather than holding a constructor's
+ * idea of an uninitialised object. */
+static void OpenScreen(uint32_t size, AM2_ScreenCtorFn ctor, const char *bmp)
+{
+    void *obj = orig_operator_new(size);
+
+    g_paintObject = obj ? (uint8_t *)ctor(obj, bmp) : (uint8_t *)0;
+}
+
+void __cdecl OpenMpHost(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_MP_PANEL_SIZE, orig_mp_panel_ctor,
+               (const char *)AM2_IMAGE(ADDR_STR_MPHOST_BMP));
+    g_mpSession = AM2_MP_SESSION_HOST;
+    orig_mp_panel_refresh();
+}
+
+void __cdecl OpenMpJoin(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_MP_PANEL_SIZE, orig_mp_panel_ctor,
+               (const char *)AM2_IMAGE(ADDR_STR_MPJOIN_BMP));
+    g_mpSession = AM2_MP_SESSION_JOIN;
+}
+
+void __cdecl OpenMpOptions(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_MP_OPTIONS_SIZE, orig_mp_options_ctor,
+               (const char *)AM2_IMAGE(ADDR_STR_MPHOSTOPTS_BMP));
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1615,6 +1705,12 @@ int widget_install(void)
                         "FocusLabelTakeFocus", 1);
     rc |= patch_replace(ADDR_OPTIONS_DEFAULTS, (const void *)OptionsDefaults,
                         "OptionsDefaults", 1);
+    rc |= patch_replace(ADDR_OPEN_MP_HOST, (const void *)OpenMpHost,
+                        "OpenMpHost", 0);
+    rc |= patch_replace(ADDR_OPEN_MP_JOIN, (const void *)OpenMpJoin,
+                        "OpenMpJoin", 0);
+    rc |= patch_replace(ADDR_OPEN_MP_OPTIONS, (const void *)OpenMpOptions,
+                        "OpenMpOptions", 0);
     rc |= patch_replace(ADDR_OPTIONS_APPLY, (const void *)OptionsApply,
                         "OptionsApply", 1);
     rc |= patch_replace(ADDR_OPTIONS_REQUEST, (const void *)OptionsRequest,

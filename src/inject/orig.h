@@ -1487,6 +1487,28 @@
  * The two names this address carried before, ADDR_SCRIPT_QUIET and
  * ADDR_COMM_HOST_CHANGED, were each a guess from one call site. */
 #define ADDR_MP_SESSION          0x00511DA0u
+#define AM2_MP_SESSION_HOST      1
+#define AM2_MP_SESSION_JOIN      2
+
+/* The menu SCREEN FACTORIES. RunFrame's menu-request handler dispatches
+ * through a 21-entry jump table at 0x00426518; each arm is seven bytes,
+ * `call <factory>; jmp end`, and each factory opens one screen. See
+ * src/game/win32/screens.h for the shape they share. */
+#define ADDR_OPEN_MP_HOST        0x004317C0u  /* void(void) */
+#define ADDR_OPEN_MP_JOIN        0x00433480u  /* void(void) */
+#define ADDR_OPEN_MP_OPTIONS     0x00432910u  /* void(void) */
+/* The host and join panels are ONE class -- both factories allocate 0x278 and
+ * call the same constructor, differing only in backdrop and role. */
+#define ADDR_MP_PANEL_CTOR       0x00430530u  /* thiscall obj *(obj, bmp) */
+#define AM2_MP_PANEL_SIZE        0x278u
+#define ADDR_MP_OPTIONS_CTOR     0x00432320u  /* thiscall obj *(obj, bmp) */
+#define AM2_MP_OPTIONS_SIZE      0x110u
+/* Called after the host panel is built, and only by that factory: it repaints
+ * the panel from the current session. Still original. */
+#define ADDR_MP_PANEL_REFRESH    0x004301D0u  /* void(void) */
+#define ADDR_STR_MPHOST_BMP      0x004871C4u  /* "01_001_00_mphost.bmp" */
+#define ADDR_STR_MPJOIN_BMP      0x00487408u  /* "01_002_00_mpjoin.bmp" */
+#define ADDR_STR_MPHOSTOPTS_BMP  0x004873C0u  /* "01_001_03_mphostoptions.bmp" */
 
 /* A `char *` to the string "unknown", parked immediately after the keyword
  * table -- it points at 0x0048825C, which is the table's own end address. */
