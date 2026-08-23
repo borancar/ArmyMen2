@@ -604,16 +604,13 @@ compare() {
         # the OPTIONS dialog itself, which is what this configuration is for --
         # sit at 45, the cursor.
         #
-        # **The final frame FAILS today at 918, and that is correct.** It is
-        # the lobby, and its map preview really is drawn wrong: 918 pixels in
-        # x 338..523 / y 272..457, four distinct colour pairs, 888 of them the
-        # original's navy (0,0,128) against our teal (0,128,128). It is
-        # deterministic -- two runs gave 918 with each side bit-identical to
-        # itself -- and it is NOT ours: taking the lobby frame directly, before
-        # the OPTIONS dialog is ever opened, gives the same 918 and the same
-        # bounding box. Nothing reached that screen before this configuration
-        # existed, so nothing had ever compared it. See STATUS.md; the budget
-        # stays where it is rather than being raised to cover a real defect.
+        # It earned its keep on its first run. The final frame -- the lobby --
+        # came out 918 pixels apart, all of them in the map preview, and that
+        # was a real defect: MakeBitmap reserved the first ten palette entries
+        # on the wrong sense of its flag, so the preview was allowed to remap
+        # into the block Windows keeps. 918 -> 50 once fixed, and 50 is the
+        # cursor. Nothing else in the suite reaches that screen, which is why
+        # it had survived every green run. See STATUS.md.
         mpoptions) budget=200 ;;
         *)        budget=500 ;;
     esac
@@ -665,7 +662,11 @@ PY
     return $rc
 }
 
-cfgs="${1:-bootcamp}"
+# Every argument, not just the first. `cfgs="${1:-bootcamp}"` silently
+# dropped the rest, so `ab.sh bootcamp controls` ran bootcamp alone and then
+# printed "A/B clean" -- which reads as both configurations passing and is the
+# same failure mode as the two missing files that once diffed as identical.
+cfgs="${*:-bootcamp}"
 [ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol multi mpoptions quit"
 
 fail=0

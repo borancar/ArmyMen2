@@ -428,7 +428,7 @@
 #define BMP_OFF_KEY          0x18u   /* in: byte count, out: transparent index */
 #define BMP_FLAG_NO_COLORKEY 0x0001u
 #define BMP_FLAG_SYSMEM      0x0040u
-#define BMP_FLAG_RESERVE10   0x0080u /* clear => reserve the first ten entries */
+#define BMP_FLAG_RESERVE10   0x0080u /* SET => reserve the first ten entries */
 #define BMP_FLAG_SOFTWARE    0x1000u
 #define BMP_SOFTWARE_LIMIT   0xEA60  /* 60000 pixels */
 #define BMP_RESERVED_ENTRIES 10

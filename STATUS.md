@@ -87,43 +87,81 @@ Nothing uncommitted.
   `MpDialogDestruct` 2. `Announce` reads 0, which is the usual blind spot --
   `OptionsApply` calls it directly.
 
-- **`mpoptions` failed on its first run, and the defect it found is not
-  ours.** The final frame -- the lobby -- differs by **918 pixels**, all inside
-  x 338..523 / y 272..457, which is the map preview panel and nothing else.
-  Four distinct colour pairs, 888 of them the original's navy `(0,0,128)`
-  against our teal `(0,128,128)`, 25 against magenta `(128,0,128)`, 5 against
-  silver. Those are standard VGA system-palette entries, so this is an INDEX
-  being chosen differently, not a palette being built differently -- every
-  other pixel of the 640x480 frame matches exactly.
+- **`mpoptions` failed on its first run and found a real defect, and it was
+  ours after all -- just not from this work.** `MakeBitmap` reserved the first
+  ten palette entries when `BMP_FLAG_RESERVE10` was CLEAR. The original
+  reserves them when it is SET.
 
-  Re-run before believing it, and then again to place it. Two full A/B runs
-  gave 918 with each side bit-identical to itself between runs, so it is
-  deterministic rather than an unsynchronised animation -- and the lobby's own
-  animation is at most 54 pixels over four seconds, measured. Then the frame
-  was taken directly, on both sides, at the poke and **before the OPTIONS
-  dialog is ever opened**: 918 again, same bounding box. So it predates this
-  work entirely. Nothing had ever reached that screen, so nothing had ever
-  compared it.
+  The symptom was 918 pixels in the lobby's map preview, x 338..523 /
+  y 272..457 and nothing else on the frame. Four colour pairs, 888 of them the
+  original's `(0,0,128)` against our `(0,128,128)`, the rest `(128,0,128)` and
+  `(192,192,192)` -- VGA entries 4, 6, 5 and 7, all inside the ten Windows
+  reserves. Both sides were choosing from that block; ours was allowed to and
+  the original's was not.
 
-  The budget stays at 200 and the configuration stays red, because it is
-  telling the truth.
+  How the sense got lost is worth keeping. The original holds it in ONE
+  register and reads it both ways round: `ebp` is `(flags & 0x80) == 0`, the
+  branch at `0x0041BEDE` jumps PAST the identity fill when `ebp` is non-zero,
+  and the `or al, 0x10` at `0x0041BFBD` tests the same register the other way.
+  Our transcription got the second right and the first backwards, so the two
+  halves of one flag disagreed. It is now written from the FLAG rather than
+  from the register, with the `?:` arms swapped so that half stays identical.
+  **When the original reuses a register for a predicate, decide what the flag
+  means once and write every use from that.**
 
-  Where to start. The three wrong colours are `(0,128,128)`, `(128,0,128)` and
-  `(192,192,192)` -- standard VGA entries, which live in the block Windows
-  reserves at the bottom of the palette. So OUR remap is choosing indices
-  inside the reserved block and the original's is not, and that is exactly what
-  the `from` argument of `NearestPalIndex` exists to prevent. CLAUDE.md records
-  that `from`'s guard "stays verified by reading" because everything Boot Camp
-  remaps lies above the reserved block anyway; **these pixels do not**, so this
-  is the first screen in the project that can discriminate it.
+  Measured, not argued. Taking the lobby frame directly on both sides went
+  from 918 to **50**, which is the cursor; the same screen's own animation
+  measures at most 54 over four seconds. Then the full configuration: 918 to
+  **0**, on all three of its frames, with 42 widget nodes and 35 log messages
+  identical. `bootcamp` stays at 22 and `windowed` stays pixel-perfect, which
+  is what says the inversion cost nothing elsewhere -- every sprite in the game
+  goes through `MakeBitmap`.
 
-  `NearestPalIndex` itself takes its metric from the original and reproduces
-  both the `from & 0xFF` mask and the strict comparison, so suspect the caller
-  and the flag that decides `from` before suspecting it: `MakeBitmap`
-  (`surface.cpp`), whose `reserve` is `(flags & BMP_FLAG_RESERVE10) == 0` --
-  note the inversion -- and the tileset loader in `mapdraw.cpp`, whose is the
-  global `g_tilesetReserve`. The source is `data/mpalpine/alpine3_mp_prev.bmp`,
-  202x202 8-bit with cyan at index 0.
+  The sibling site is right, which is the contrast worth keeping: the tileset
+  loader in `mapdraw.cpp` reserves when the global at `0x00511CC8` is non-zero,
+  and `0x0042C215` really does skip the fill on zero. Two remaps of the same
+  shape, two different conditions, and only one of them inverted.
+
+  It survived this long because nothing had ever reached that screen. Boot Camp
+  is clean either way, which says the flag is clear for everything it loads;
+  the preview is the first bitmap in the project that sets it. Two things
+  follow. `NearestPalIndex`'s `from` guard, which CLAUDE.md records as never
+  having been discriminated by any configuration, IS discriminated here -- it
+  was doing its job and being handed the wrong threshold. And a whole-frame A/B
+  that never visits a screen says nothing about it: this defect sat behind
+  every green run in the suite.
+
+- **`tools/ab.sh` took only its first argument.** `cfgs="${1:-bootcamp}"`, so
+  `ab.sh bootcamp controls` ran bootcamp alone and printed "A/B clean" -- which
+  reads as both configurations passing. It is `"${*:-bootcamp}"` now. Same
+  family as the two missing files that once diffed as identical: a check that
+  can report success on work it did not do.
+
+- **The menu is a 21-entry table of screen factories, and none of them is
+  named.** `RunFrame`'s menu-request arm dispatches through a jump table at
+  `0x00426518`; every arm is seven bytes -- `call <factory>; jmp end` -- and
+  every factory is the same shape: destroy whatever dialog is the repaint
+  object, allocate, construct on it, store the CONSTRUCTOR'S RETURN into
+  `0x0065A058`. That last is the RecordCtor lesson again, twenty-one times.
+
+  Seven name themselves from the bitmap the FACTORY passes -- LOAD GAME
+  (`0x00452680`), MP HOST (`0x004317C0`), MP HOST OPTIONS (`0x00432910`),
+  MP JOIN (`0x00433480`), CONTROLS (`0x00451210`), AUDIO (`0x0044F9E0`) and
+  DELETE GAME (`0x00450250`). The other fourteen open on the shared
+  `01_000_00_screen.bmp`, and reading the CONSTRUCTOR's bitmaps instead names
+  nine more: SELECT MAP `0x0044DF20`, SELECT PLAYER `0x00451910`, ENTER NAME
+  `0x00451E10`, CHANNEL HOST `0x0042F440`, ENTER BATTLE NAME `0x0042FF60`,
+  JOIN `0x0042F880`, MOVIES `0x0044E6A0`, the OPTIONS menu itself `0x0044FDD0`
+  and DIFFICULTY `0x0044EAD0`.
+
+  Three more -- `0x0044EE50`, `0x0044F220`, `0x00450B70` -- carry only OK and
+  CANCEL, so they need their captions read rather than their bitmaps. Two,
+  `0x0044D730` and `0x0042EE40`, push no bitmap at all and are probably not
+  dialogs; check what they are before assuming the table is homogeneous.
+
+  A good next batch: it is one shape repeated, it gives twenty-one screens
+  real names from the program's own vocabulary, and `mpoptions`, `controls`,
+  `audiovol` and `difficulty` between them already drive four of the arms.
 
 - **The poke/key asymmetry stands and is not an oversight.** `poke` writes a
   global the game ACCUMULATES, so the write survives and becomes the next

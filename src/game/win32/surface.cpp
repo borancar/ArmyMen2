@@ -749,7 +749,16 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 {
     uint8_t   table[256];
     uint32_t  flags   = *(uint32_t *)(dest + BMP_OFF_FLAGS);
-    int32_t   reserve = (flags & BMP_FLAG_RESERVE10) == 0;
+    /* The original keeps ONE register for this and reads it both ways round,
+     * which is how the sense got transcribed wrong. `ebp` is
+     * `(flags & 0x80) == 0`, and the branch that builds the table jumps PAST
+     * the identity fill when ebp is non-zero -- so the first ten entries are
+     * reserved when the bit is SET, not when it is clear. The `|= 8 : 0x10`
+     * at the end tests the same register the other way and was right.
+     *
+     * Written from the flag rather than from the register, with the `?:` arms
+     * swapped to keep that half identical. */
+    int32_t   reserve = (flags & BMP_FLAG_RESERVE10) != 0;
     int32_t   w, h, i;
 
     /* Copy the geometry across first; the original does this before anything
@@ -794,7 +803,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
         } else {
             result = orig_encode_small(pixels, dest, w, h, remap);
-            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= reserve ? 8 : 0x10;
+            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= reserve ? 0x10 : 8;
         }
         return result;
     }
