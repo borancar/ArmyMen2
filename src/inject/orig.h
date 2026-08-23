@@ -1509,6 +1509,49 @@
 #define ADDR_STR_MPHOST_BMP      0x004871C4u  /* "01_001_00_mphost.bmp" */
 #define ADDR_STR_MPJOIN_BMP      0x00487408u  /* "01_002_00_mpjoin.bmp" */
 #define ADDR_STR_MPHOSTOPTS_BMP  0x004873C0u  /* "01_001_03_mphostoptions.bmp" */
+/* The plain screen factories: close, allocate, construct, store. Sizes and
+ * constructors are docs/screens.md's, which reads them out of the image. */
+#define ADDR_STR_SCREEN_BMP      0x00485224u  /* "01_000_00_screen.bmp" */
+#define ADDR_STR_CONTROLS_BMP    0x0048B9DCu  /* "01_003_00_controls.bmp" */
+#define ADDR_OPEN_MP_SELECT_MAP  0x0044DF20u  /* void(void) */
+#define ADDR_MP_SELECT_MAP_CTOR  0x0044DBB0u  /* thiscall obj *(obj, bmp) */
+#define AM2_MP_SELECT_MAP_SIZE   0x68u
+#define ADDR_OPEN_SELECT_PLAYER  0x00451910u  /* void(void) */
+#define ADDR_SELECT_PLAYER_CTOR  0x00451400u  /* thiscall obj *(obj, bmp) */
+#define AM2_SELECT_PLAYER_SIZE   0x68u
+#define ADDR_OPEN_ENTER_NAME     0x00451E10u  /* void(void) */
+#define ADDR_ENTER_NAME_CTOR     0x00451AF0u  /* thiscall obj *(obj, bmp) */
+#define AM2_ENTER_NAME_SIZE      0x84u
+#define ADDR_OPEN_CD_PROMPT      0x0042F440u  /* void(void) */
+#define ADDR_CD_PROMPT_CTOR      0x0042EED0u  /* thiscall obj *(obj, bmp) */
+#define AM2_CD_PROMPT_SIZE       0x64u
+#define ADDR_OPEN_BATTLE_NAME    0x0042FF60u  /* void(void) */
+#define ADDR_BATTLE_NAME_CTOR    0x0042FB00u  /* thiscall obj *(obj, bmp) */
+#define AM2_BATTLE_NAME_SIZE     0xA4u
+#define ADDR_OPEN_BATTLE_JOIN    0x0042F880u  /* void(void) */
+#define ADDR_BATTLE_JOIN_CTOR    0x0042F4C0u  /* thiscall obj *(obj, bmp) */
+#define AM2_BATTLE_JOIN_SIZE     0x88u
+#define ADDR_OPEN_MOVIES         0x0044E6A0u  /* void(void) */
+#define ADDR_MOVIES_CTOR         0x0044DFA0u  /* thiscall obj *(obj, bmp) */
+#define AM2_MOVIES_SIZE          0xD4u
+#define ADDR_OPEN_OPTIONS_MENU   0x0044FDD0u  /* void(void) */
+#define ADDR_OPTIONS_MENU_CTOR   0x0044FAB0u  /* thiscall obj *(obj, bmp) */
+#define AM2_OPTIONS_MENU_SIZE    0x64u
+#define ADDR_OPEN_CONTROLS       0x00451210u  /* void(void) */
+#define ADDR_CONTROLS_CTOR       0x00450E10u  /* thiscall obj *(obj, bmp) */
+#define AM2_CONTROLS_SIZE        0xB8u
+#define ADDR_OPEN_DIFFICULTY     0x0044EAD0u  /* void(void) */
+#define ADDR_DIFFICULTY_CTOR     0x0044E730u  /* thiscall obj *(obj, bmp) */
+#define AM2_DIFFICULTY_SIZE      0x68u
+#define ADDR_OPEN_QUIT_CONFIRM   0x0044EE50u  /* void(void) */
+#define ADDR_QUIT_CONFIRM_CTOR   0x0044EB50u  /* thiscall obj *(obj, bmp) */
+#define AM2_QUIT_CONFIRM_SIZE    0x64u
+#define ADDR_OPEN_REPLAY_PROMPT  0x0044F220u  /* void(void) */
+#define ADDR_REPLAY_PROMPT_CTOR  0x0044EED0u  /* thiscall obj *(obj, bmp) */
+#define AM2_REPLAY_PROMPT_SIZE   0x64u
+#define ADDR_OPEN_DELETE_PLAYER  0x00450B70u  /* void(void) */
+#define ADDR_DELETE_PLAYER_CTOR  0x00450730u  /* thiscall obj *(obj, bmp) */
+#define AM2_DELETE_PLAYER_SIZE   0x64u
 
 /* A `char *` to the string "unknown", parked immediately after the keyword
  * table -- it points at 0x0048825C, which is the table's own end address. */

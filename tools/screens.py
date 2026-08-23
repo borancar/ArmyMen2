@@ -68,13 +68,19 @@ PAINT_OBJECT = 0x0065A058
 
 
 def factory(img, addr, span=0x200):
-    """(size, ctor, backdrop) for one factory, found from the STORE.
+    """(size, ctor, backdrop, argc) for one factory, found from the STORE.
 
     Not from the first `operator new` in the body: two of the twenty-one
     allocate something else first. The definitive tell is
     `mov [0x0065A058], eax` -- the store of the constructor's RETURN -- so the
     constructor is the last `call` before it and the size is the last `push`
     before the call to operator new.
+
+    `argc` is how many stack arguments the constructor takes, which is the one
+    number here that a reconstruction cannot get wrong quietly: these are
+    thiscall, so the CALLEE pops, and calling a two-argument constructor with
+    one argument corrupts the stack rather than merely painting the wrong
+    screen. All 21 take exactly one today.
 
     Decoded forward rather than scanned. A byte-wise search for 0x68/0x6A
     walking backwards from the call finds other instructions' OPERANDS and
@@ -89,9 +95,12 @@ def factory(img, addr, span=0x200):
 
     size = ctor = back = None
     last_push = last_call = None
+    pushes = []
+    args = 0
     for insn in md.disasm(code, addr):
         m = insn.mnemonic
         if m == "push":
+            pushes.append(insn.op_str)
             op = insn.op_str
             if op.startswith("0x") or op.lstrip("-").isdigit():
                 try:
@@ -111,6 +120,8 @@ def factory(img, addr, span=0x200):
                 target = int(insn.op_str, 0)
             except ValueError:
                 continue
+            if target == OPERATOR_NEW:
+                pushes = []
             if target == OPERATOR_NEW and size is None:
                 # The FIRST allocation, not the last. Two arms construct one
                 # of two backdrops behind a `cmp [0x00511DA4], 2`; both
@@ -120,11 +131,13 @@ def factory(img, addr, span=0x200):
                 size = last_push
             elif 0x400000 < target < CRT_START:
                 last_call = target
+                args = len(pushes)
+                pushes = []
         elif m == "mov" and insn.op_str.startswith("dword ptr [0x%x], eax"
                                                    % PAINT_OBJECT):
             ctor = last_call
             break
-    return size, ctor, back
+    return size, ctor, back, args
 
 
 def main():
@@ -139,7 +152,7 @@ def main():
             rows.append((arm, stub, None, [], [], [], "not a call"))
             continue
         f = stub + 5 + struct.unpack_from("<i", b, 1)[0]
-        size, ctor, back = factory(img, f)
+        size, ctor, back, argc = factory(img, f)
         # Name the screen: the factory's own backdrop if it is specific, else
         # the constructor's. Four of them have neither and are identified by
         # their BUTTONS instead, which is the honest answer rather than a name
@@ -160,7 +173,7 @@ def main():
                     keep.append(x)
             name = ("buttons: " + ", ".join(keep[:3])) if keep else ""
         rows.append((arm, stub, f, [size] if size else [],
-                     [ctor] if ctor else [], [back], name))
+                     [ctor] if ctor else [], [back], name, argc))
 
     out = []
     out.append("# The menu screen factories")
@@ -177,17 +190,22 @@ def main():
     out.append("one of two backdrops depending on `0x%08X` and show both."
                % STATE)
     out.append("")
-    out.append("| arm | stub | factory | size | ctor | screen | done |")
-    out.append("|---:|---|---|---|---|---|---|")
-    for arm, stub, f, sizes, ctors, backs, name in rows:
+    out.append("`args` is how many stack arguments the constructor takes.")
+    out.append("These are thiscall, so the CALLEE pops: reconstructing a")
+    out.append("two-argument constructor with one argument corrupts the stack")
+    out.append("rather than merely painting the wrong screen.")
+    out.append("")
+    out.append("| arm | stub | factory | size | ctor | args | screen | done |")
+    out.append("|---:|---|---|---|---|---:|---|---|")
+    for arm, stub, f, sizes, ctors, backs, name, argc in rows:
         if f is None:
-            out.append("| %d | `0x%08X` | -- | | | | |" % (arm, stub))
+            out.append("| %d | `0x%08X` | -- | | | | | |" % (arm, stub))
             continue
-        out.append("| %d | `0x%08X` | `0x%08X` | %s | %s | %s | %s |"
+        out.append("| %d | `0x%08X` | `0x%08X` | %s | %s | %d | %s | %s |"
                    % (arm, stub, f,
                       ", ".join("0x%X" % s for s in sizes) or "?",
                       ", ".join("`0x%08X`" % c for c in ctors if c) or "?",
-                      name or "(shared backdrop)",
+                      argc, name or "(shared backdrop)",
                       "yes" if f in done else ""))
     out.append("")
 

@@ -934,6 +934,49 @@ void __cdecl OpenMpJoin(void);
  * OPTIONS button on the host panel opens. */
 void __cdecl OpenMpOptions(void);
 
+/* Original: 0x0044DF20. SELECT MAP -- the campaign's map chooser, a list and a preview. */
+void __cdecl OpenSelectMap(void);
+
+/* Original: 0x00451910. SELECT PLAYER -- the saved-player list, with RECRUIT and DELETE. */
+void __cdecl OpenSelectPlayer(void);
+
+/* Original: 0x00451E10. ENTER NAME -- the edit box RECRUIT opens. */
+void __cdecl OpenEnterName(void);
+
+/* Original: 0x0042F440. the CD prompt: its constructor pushes "Copy Protection" and
+ * "The ARMYMEN2 CD must be in the drive to play Army Men II." This build
+ * has the five CD checks patched to jump past their MessageBoxA, but this
+ * screen is a different mechanism and is reached through the menu table. */
+void __cdecl OpenCdPrompt(void);
+
+/* Original: 0x0042FF60. ENTER BATTLE NAME -- two text fields and an OK, which ab.sh multi drives. */
+void __cdecl OpenBattleName(void);
+
+/* Original: 0x0042F880. CHOOSE A BATTLE -- the session browser. */
+void __cdecl OpenBattleJoin(void);
+
+/* Original: 0x0044E6A0. the movie viewer. */
+void __cdecl OpenMovies(void);
+
+/* Original: 0x0044FDD0. the OPTIONS menu itself -- the AUDIO, CONTROLS and DIFFICULTY buttons.
+ * It pushes no caption and no backdrop of its own; its identity is in the
+ * three button bitmaps its constructor loads. */
+void __cdecl OpenOptionsMenu(void);
+
+/* Original: 0x00451210. CONTROLS -- the twenty-one key-capture rows ab.sh controls drives. */
+void __cdecl OpenControls(void);
+
+/* Original: 0x0044EAD0. DIFFICULTY -- the Easy/Medium/Hard list. */
+void __cdecl OpenDifficulty(void);
+
+/* Original: 0x0044EE50. CONFIRM GAME EXIT: "Are you sure you want to quit?". */
+void __cdecl OpenQuitConfirm(void);
+
+/* Original: 0x0044F220. "Do you wish to reattempt your failed mission?". */
+void __cdecl OpenReplayPrompt(void);
+
+/* Original: 0x00450B70. "Caution: All saved games for this player will also be deleted!". */
+void __cdecl OpenDeletePlayer(void);
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

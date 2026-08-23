@@ -1626,6 +1626,110 @@ void __cdecl OpenMpOptions(void)
                (const char *)AM2_IMAGE(ADDR_STR_MPHOSTOPTS_BMP));
 }
 
+void __cdecl OpenSelectMap(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_MP_SELECT_MAP_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_SELECT_MAP_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenSelectPlayer(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_SELECT_PLAYER_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_SELECT_PLAYER_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenEnterName(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_ENTER_NAME_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_ENTER_NAME_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenCdPrompt(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_CD_PROMPT_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_CD_PROMPT_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenBattleName(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_BATTLE_NAME_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_BATTLE_NAME_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenBattleJoin(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_BATTLE_JOIN_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_BATTLE_JOIN_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenMovies(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_MOVIES_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MOVIES_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenOptionsMenu(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_OPTIONS_MENU_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_OPTIONS_MENU_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenControls(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_CONTROLS_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_CONTROLS_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_CONTROLS_BMP));
+}
+
+void __cdecl OpenDifficulty(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_DIFFICULTY_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_DIFFICULTY_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenQuitConfirm(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_QUIT_CONFIRM_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_QUIT_CONFIRM_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenReplayPrompt(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_REPLAY_PROMPT_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_REPLAY_PROMPT_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
+void __cdecl OpenDeletePlayer(void)
+{
+    CloseCurrentScreen();
+    OpenScreen(AM2_DELETE_PLAYER_SIZE,
+               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_DELETE_PLAYER_CTOR),
+               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -1705,6 +1809,32 @@ int widget_install(void)
                         "FocusLabelTakeFocus", 1);
     rc |= patch_replace(ADDR_OPTIONS_DEFAULTS, (const void *)OptionsDefaults,
                         "OptionsDefaults", 1);
+    rc |= patch_replace(ADDR_OPEN_MP_SELECT_MAP, (const void *)OpenSelectMap,
+                        "OpenSelectMap", 0);
+    rc |= patch_replace(ADDR_OPEN_SELECT_PLAYER, (const void *)OpenSelectPlayer,
+                        "OpenSelectPlayer", 0);
+    rc |= patch_replace(ADDR_OPEN_ENTER_NAME, (const void *)OpenEnterName,
+                        "OpenEnterName", 0);
+    rc |= patch_replace(ADDR_OPEN_CD_PROMPT, (const void *)OpenCdPrompt,
+                        "OpenCdPrompt", 0);
+    rc |= patch_replace(ADDR_OPEN_BATTLE_NAME, (const void *)OpenBattleName,
+                        "OpenBattleName", 0);
+    rc |= patch_replace(ADDR_OPEN_BATTLE_JOIN, (const void *)OpenBattleJoin,
+                        "OpenBattleJoin", 0);
+    rc |= patch_replace(ADDR_OPEN_MOVIES, (const void *)OpenMovies,
+                        "OpenMovies", 0);
+    rc |= patch_replace(ADDR_OPEN_OPTIONS_MENU, (const void *)OpenOptionsMenu,
+                        "OpenOptionsMenu", 0);
+    rc |= patch_replace(ADDR_OPEN_CONTROLS, (const void *)OpenControls,
+                        "OpenControls", 0);
+    rc |= patch_replace(ADDR_OPEN_DIFFICULTY, (const void *)OpenDifficulty,
+                        "OpenDifficulty", 0);
+    rc |= patch_replace(ADDR_OPEN_QUIT_CONFIRM, (const void *)OpenQuitConfirm,
+                        "OpenQuitConfirm", 0);
+    rc |= patch_replace(ADDR_OPEN_REPLAY_PROMPT, (const void *)OpenReplayPrompt,
+                        "OpenReplayPrompt", 0);
+    rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
+                        "OpenDeletePlayer", 0);
     rc |= patch_replace(ADDR_OPEN_MP_HOST, (const void *)OpenMpHost,
                         "OpenMpHost", 0);
     rc |= patch_replace(ADDR_OPEN_MP_JOIN, (const void *)OpenMpJoin,

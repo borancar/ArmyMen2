@@ -155,6 +155,48 @@ Nothing uncommitted.
   Counters from one driven run: `OpenMpHost` 1, `OpenMpOptions` 1,
   `OpenMpJoin` 1, each with the right screen on the frame.
 
+- **`RefreshScreen` is what a menu screen opened DURING a mission calls, and
+  that answers a standing open item.** CLAUDE.md lists it as unexercised with
+  seven callers and says "whatever forces an out-of-band repaint is somewhere
+  further in". It is the screen factories: four of them -- AUDIO, DELETE GAME,
+  LOAD GAME and the two-branch pair beside them -- open with
+  `cmp [ADDR_GAME_STATE], 2`, and the state-2 arm calls `RefreshScreen` before
+  it allocates.
+
+  So the two arms are the same screen in two contexts. In a mission it gets
+  its own backdrop and a flag of 0, and the frame under it has to be repainted
+  because a mission is not a menu; on the title screen it gets the shared
+  backdrop and a flag of 1 and no repaint is needed. That is also why nothing
+  in the suite has ever run it: every configuration that opens a menu screen
+  does so from the title.
+
+  It is reachable now that `poke` exists -- raise a menu request while
+  ADDR_GAME_STATE is 2 -- and that is the obvious next probe.
+
+- **The `args` column in `docs/screens.md` earned itself immediately.** These
+  constructors are thiscall, so the CALLEE pops: reconstructing a two-argument
+  one with a single argument corrupts the stack rather than merely painting
+  the wrong screen. Sixteen of the twenty-one take one argument and are
+  reconstructed; the remaining five take two, and they are exactly the five
+  that are not. That correspondence was not designed -- the batch was chosen
+  by "has no branch and no extra call" and the argument counts agreed
+  afterwards.
+
+- **Sixteen of the twenty-one screen factories are reconstructed.** The
+  thirteen plain ones went in as one batch, generated from the same
+  measurements `tools/screens.py` reports rather than transcribed: SELECT MAP,
+  SELECT PLAYER, ENTER NAME, the CD prompt, ENTER BATTLE NAME, CHOOSE A
+  BATTLE, MOVIES, the OPTIONS menu, CONTROLS, DIFFICULTY, CONFIRM GAME EXIT,
+  the replay prompt and DELETE PLAYER.
+
+  Three of them named themselves through their captions rather than a bitmap
+  -- "Are you sure you want to quit?", "Do you wish to reattempt your failed
+  mission?", "Caution: All saved games for this player will also be deleted!"
+  -- and one through both: `0x0042F440` pushes "Copy Protection" and "The
+  ARMYMEN2 CD must be in the drive to play Army Men II.", so the menu table
+  has a CD prompt in it that is a screen rather than one of the five patched
+  `MessageBoxA` sites.
+
 - **`docs/screens.md` is the table, generated.** `tools/screens.py` reads all
   21 arms out of the jump table and reports each factory's allocation size,
   constructor and screen. Nineteen name themselves; the other two are
@@ -290,11 +332,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 646 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 645 | 635 of them below the CRT line |
+| `patch_replace` sites | 659 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 658 | 648 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 109,488 / 372,816 B (**29.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 135,792 / 372,816 B (36.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 111,600 / 372,816 B (**29.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 139,376 / 372,816 B (37.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
