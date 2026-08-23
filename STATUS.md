@@ -231,11 +231,40 @@ Nothing uncommitted.
   constructor included. Writing 480 bytes of real code moved the total by
   zero.
 
-  That is the merged-entry over-count CLAUDE.md records against
-  `coverage.py`, still live in `reconstructed.py`: containment within a real
-  function is deliberate, but this entry is several functions and the rule
-  cannot tell. **The percentage is an upper bound, and by an unmeasured
-  amount.** It has been quoted all session as though it were exact.
+  **And the cause is not what I said it was.** `reconstructed.py` does split
+  merged entries -- it has used `merges.real_functions` all along. The split
+  point simply cannot be FOUND: `ret 0x24` sits at `0x00455B4D` and `push esi`
+  at `0x00455B50` with **no padding between them at all**, and both of
+  `merges.py`'s rules require padding. A function MSVC did not align is
+  invisible to the splitter.
+
+  Loosening the rule to "a referenced address straight after a `ret`" would
+  find this one and would also invent split points at switch arms, which are
+  referenced through jump tables and can follow an early-exit `ret`. That
+  trades a number that is conservative for one that might be wrong, which is
+  the opposite of what CLAUDE.md asks for -- it says plainly not to rewrite
+  `functions.tsv` from the naive scan. The rule stays.
+
+  So the percentage is an upper bound by an unmeasured amount, and has been
+  quoted all session as though it were exact. That much stands; only the
+  explanation was wrong.
+
+- **The TYPEWRITER constructor is decoded and not yet written.**
+  `0x004566F0`, 627 B, `ret 0x14` -- rectangle then message. It is not a
+  constructor that stores things: it **word-wraps the message** into the
+  0x400-byte buffer at 0x0058 and the wrapping is the function.
+
+  The loop takes the next space with `strchr`, copies the candidate line,
+  measures it with the text-extent helper at `0x004468A0`, and compares
+  against `rect.right - rect.left - 12`. Over-width, it commits the LAST
+  fitting run and appends the newline at `0x0048BD8C`; otherwise it remembers
+  the fit and takes the next space. Two loop-carried offsets, two back-edges
+  into the same head, and every `strlen`/`strcat` inlined as `repne scasb`
+  plus `rep movsd`.
+
+  Testable -- `quit`'s dialog frame is that message and sits at 0 -- but the
+  break bookkeeping wants re-deriving rather than transcribing, so it goes in
+  next turn the way the AUDIO dialog did.
 
 - **The SCROLL BAR constructor is reconstructed** (`0x00455FF0`, 453 B) and it
   confirms by running what `widget.h` had worked out by reading: **the arrows
