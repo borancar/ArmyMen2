@@ -1067,7 +1067,7 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
                          + COMM_SLOT_OFF_TAKEN) = 1;
     }
 
-    comm_u32(shared, COMM_OFF_READY)  = 1;
+    comm_u32(shared, COMM_OFF_IS_HOST)  = 1;
     comm_u32(shared, COMM_OFF_JOINED) = 1;
     orig_register_self((DPID)comm_u32(shared, COMM_OFF_OUR_PLAYER_ID));
     return 1;

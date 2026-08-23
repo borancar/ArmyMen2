@@ -1370,13 +1370,14 @@ typedef void (__attribute__((thiscall)) *AM2_RecordResetFn)(void *rec);
 #define orig_record_reset \
     ((AM2_RecordResetFn)(uintptr_t)ADDR_SESSION_RESET)
 
-void __attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
+void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
 {
     int32_t *r = (int32_t *)rec;
 
     r[0] = 0;
     r[1] = 0;
     r[2] = value;
+    return rec;
 }
 
 void __attribute__((thiscall)) RecordResetAlias(void *rec)
@@ -1411,6 +1412,128 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
     strcpy((char *)row, name);
     *(void **)(row + AM2_LIST_ROW_VALUE) = value;
     *count = *count + 1;
+}
+
+/* The OPTIONS dialog, declared by the table at ADDR_OPTION_TABLE. Both the
+ * load and the apply walk it with a cursor 0x18 bytes INTO each record, which
+ * is why the original reads the bit and the mask choice at +0 and +4 and the
+ * widget index at -0x18; written out here from the record base instead. */
+
+#define g_gameOverFlags   (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
+#define g_gameSetting22C  (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
+#define g_menuRequest     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST)
+#define g_menuRequestSet  (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
+#define g_commObject      (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+
+typedef void (__cdecl *AM2_SendPlayersFn)(int32_t which);
+#define orig_comm_send_players \
+    ((AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
+
+/* The checkbox a record names, reached through the header's parent -- the
+ * dialog holds them in an array at 0x0064, the same shape as the CONTROLS
+ * dialog's key rows. */
+static AM2_Widget *OptionBox(AM2_Widget *parent, int32_t index)
+{
+    return *(AM2_Widget **)((uint8_t *)parent + OPTION_PARENT_BOXES
+                            + index * 4);
+}
+
+void __cdecl OptionsDefaults(AM2_Widget *button)
+{
+    AM2_Widget    *parent = button->parent;
+    const uint8_t *rec    = (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE;
+    uint32_t       flags;
+    uint32_t       other;
+
+    ResetPairMask(&flags, &other);
+
+    do {
+        AM2_Widget *box =
+            OptionBox(parent, *(const int32_t *)(rec + AM2_OPTION_OFF_WIDGET));
+        uint32_t    bit = *(const uint32_t *)(rec + AM2_OPTION_OFF_BIT);
+        uint32_t    mask = *(const int32_t *)(rec + AM2_OPTION_OFF_WHICH)
+                           ? flags : other;
+
+        box->unknown4C = 0;
+        *((uint8_t *)box + CHECK_OFF_TICKED) = (mask & bit) != 0;
+        ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
+        rec += AM2_OPTION_STRIDE;
+    } while (rec < (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE_END);
+}
+
+void __cdecl OptionsApply(AM2_Widget *button)
+{
+    AM2_Widget    *parent = button->parent;
+    const uint8_t *rec    = (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE;
+    uint32_t       flags  = 0;
+    uint32_t       other  = 0;
+
+    do {
+        AM2_Widget *box =
+            OptionBox(parent, *(const int32_t *)(rec + AM2_OPTION_OFF_WIDGET));
+
+        if (*((const uint8_t *)box + CHECK_OFF_TICKED)) {
+            uint32_t bit = *(const uint32_t *)(rec + AM2_OPTION_OFF_BIT);
+
+            if (*(const int32_t *)(rec + AM2_OPTION_OFF_WHICH))
+                flags |= bit;
+            else
+                other |= bit;
+        }
+        rec += AM2_OPTION_STRIDE;
+    } while (rec < (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE_END);
+
+    g_gameOverFlags  = flags;
+    g_gameSetting22C = other;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = AM2_MENU_REQUEST_OPTIONS;
+    g_menuRequestSet = 1;
+    orig_comm_send_players(0);
+    Announce("Options changed by host.");
+}
+
+void __cdecl OptionsRequest(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequestSet = 1;
+    g_menuRequest = *(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)
+                    ? AM2_MENU_REQUEST_OPTIONS
+                    : AM2_MENU_REQUEST_OPTIONS_VIEW;
+}
+
+void __cdecl OptionsSyncGroup(AM2_Widget *header)
+{
+    AM2_Widget    *parent = header->parent;
+    const uint8_t *rec    = (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE
+                            + *(const int32_t *)((uint8_t *)header
+                                                 + CHECK_OFF_GROUP)
+                              * AM2_OPTION_STRIDE;
+    int32_t        i;
+
+    if (!*(const int32_t *)(rec + AM2_OPTION_OFF_GROUP))
+        return;
+
+    for (i = *(const int32_t *)(rec + AM2_OPTION_OFF_FIRST);
+         i <= *(const int32_t *)(rec + AM2_OPTION_OFF_LAST);
+         i++) {
+        AM2_Widget *box    = OptionBox(parent, i);
+        uint8_t     ticked = *((const uint8_t *)header + CHECK_OFF_TICKED);
+
+        *((uint8_t *)box + CHECK_OFF_TICKED) = ticked;
+        box->unknown4C = (ticked == 0);
+        ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
+    }
+}
+
+void __attribute__((thiscall)) MpDialogDestruct(AM2_Widget *w)
+{
+    DialogDestruct(w);
+}
+
+void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w)
+{
+    WidgetUpdateCancel(w);
 }
 
 int widget_install(void)
@@ -1490,6 +1613,20 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FOCUSLABEL_TAKE_FOCUS,
                         (const void *)FocusLabelTakeFocus,
                         "FocusLabelTakeFocus", 1);
+    rc |= patch_replace(ADDR_OPTIONS_DEFAULTS, (const void *)OptionsDefaults,
+                        "OptionsDefaults", 1);
+    rc |= patch_replace(ADDR_OPTIONS_APPLY, (const void *)OptionsApply,
+                        "OptionsApply", 1);
+    rc |= patch_replace(ADDR_OPTIONS_REQUEST, (const void *)OptionsRequest,
+                        "OptionsRequest", 1);
+    rc |= patch_replace(ADDR_OPTIONS_SYNC_GROUP, (const void *)OptionsSyncGroup,
+                        "OptionsSyncGroup", 1);
+    rc |= patch_replace(ADDR_MP_DIALOG_DESTRUCT,
+                        (const void *)MpDialogDestruct,
+                        "MpDialogDestruct", 1);
+    rc |= patch_replace(ADDR_OPTIONS_UPDATE,
+                        (const void *)OptionsUpdate,
+                        "OptionsUpdate", 1);
     rc |= patch_replace(ADDR_LIST_ADD, (const void *)ListAdd, "ListAdd", 3);
     rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
                         "KeyNameIndexOf", 1);

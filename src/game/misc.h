@@ -544,7 +544,11 @@ int32_t __cdecl GetMenuRow(void);
  * constructor; the second is one `jmp` to the teardown at 0x0042A680, which is
  * still original -- the same shape as FreeSpriteListAlias, and reconstructed
  * as the alias it is rather than left as a jump to somewhere else. */
-void __attribute__((thiscall)) InitPtrList(void *rec);
+/* It returns `this`, like every i386 MSVC constructor, and the caller at
+ * 0x0040A628 stores the result. Declared `void` this is the RecordCtor defect
+ * exactly -- see widget.h -- and it was found by the same sweep rather than by
+ * anything going wrong, because nothing has reached that caller yet. */
+void *__attribute__((thiscall)) InitPtrList(void *rec);
 void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 
 /* 0x0042A680, six callers -- what that alias jumps to, and the last of the

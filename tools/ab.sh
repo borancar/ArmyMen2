@@ -180,6 +180,26 @@ play() {
         # whole DirectPlay subsystem is otherwise unreachable. Both sides get
         # it, so the comparison is still like for like.
         multi)    args="-nointro -dbg"    ; wait=25 ;;
+        # MULTIPLAYER OPTIONS -- 43 checkboxes in two columns under five group
+        # headings, and the only screen in the game that is DECLARED rather
+        # than built: a 43-record table at 0x004865B8 says where every box
+        # sits, what it is called, and which bit of which of two masks it owns.
+        #
+        # It is reached by POKING the menu-request pair, because the ordinary
+        # route needs a DirectPlay session that will not open on this machine.
+        # That is legitimate rather than a cheat: those are the GAME's globals
+        # and the poke is the same write ESCAPE makes, so the same three
+        # commands drive both sides and AM2_NOPATCH=1 takes them unchanged.
+        # comm+0x3D8 is poked too -- the host flag, which is what puts OK and
+        # DEFAULT on the panel beside CANCEL. Without it the screen is
+        # read-only and neither OptionsApply nor OptionsDefaults can run.
+        #
+        # The three clicks it then makes are the three functions: a group
+        # header (OptionsSyncGroup), DEFAULT (OptionsDefaults) and OK
+        # (OptionsApply, which names itself "Options changed by host." and
+        # puts that line in the comms panel -- so the final frame carries the
+        # evidence that the apply reached its end).
+        mpoptions) args="-nointro -dbg"  ; wait=25 ;;
         # OPTIONS -> DIFFICULTY, which is the only screen with a LIST BOX --
         # the Easy/Medium/Hard rows. `ctl widgets` says that dialog is the only
         # place the class at 0x0046FCC0 is instantiated, so its painter and its
@@ -204,6 +224,7 @@ play() {
     [ "$side" = orig ] && export AM2_NOPATCH=1 || unset AM2_NOPATCH
     local extra=""
     [ "$cfg" = multi ] && extra="AM2_MULTIPLAYER=1"
+    [ "$cfg" = mpoptions ] && extra="AM2_MULTIPLAYER=1"
     AM2_MAKEVARS="TRACE=1" drive start "$wait" "ARGS=$args" $extra \
         >/dev/null 2>&1
 
@@ -257,6 +278,42 @@ play() {
         # pixels, which no budget catches; it is one changed line here.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
+    fi
+
+    if [ "$cfg" = mpoptions ]; then
+        "$REPO/tools/point.py" 306 222 --click >/dev/null 2>&1   # MULTI-PLAYER
+        sleep 4
+        "$REPO/tools/point.py" 200 176 --click >/dev/null 2>&1   # TCP/IP
+        sleep 3
+        "$REPO/tools/point.py" 515 221 --click >/dev/null 2>&1   # SELECT
+        sleep 4
+        # The comm object is a pointer, so its address has to be read at
+        # runtime rather than written down. dump prints little-endian bytes.
+        local raw ptr
+        raw=$(drive ctl "dump 4751B0 4" 2>/dev/null | awk '{print $3}')
+        ptr=$(echo "$raw" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')
+        if [ -n "$ptr" ]; then
+            drive ctl "poke $(printf '%X' $((0x$ptr + 0x3D8))) 1" >/dev/null 2>&1
+        else
+            echo "  WARNING: could not read the comm pointer -- the panel will"
+            echo "           be read-only and two of the three clicks do nothing"
+        fi
+        # The menu request, which is the route the game itself takes.
+        drive ctl "poke 511DC8 7" >/dev/null 2>&1
+        drive ctl "poke 511DC4 1" >/dev/null 2>&1
+        sleep 5
+        "$REPO/tools/point.py" 582 339 --click >/dev/null 2>&1   # OPTIONS
+        sleep 4
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
+        drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
+        "$REPO/tools/point.py" 69 46 --click >/dev/null 2>&1     # POWER-UPS
+        sleep 2
+        "$REPO/tools/point.py" 576 240 --click >/dev/null 2>&1   # DEFAULT
+        sleep 3
+        drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
+        "$REPO/tools/point.py" 576 190 --click >/dev/null 2>&1   # OK
+        sleep 4
     fi
 
     if [ "$cfg" = audiovol ]; then
@@ -542,6 +599,22 @@ compare() {
         # 12,552 EditUpdate calls and the whole dialog -- and gross errors.
         # The handler itself is checked by driving and looking at the field.
         multi)    budget=500 ;;
+        # A static dialog like controls and difficulty, plus the same cursor
+        # noise, so 200 for the same measured reason. The dlg and mid frames --
+        # the OPTIONS dialog itself, which is what this configuration is for --
+        # sit at 45, the cursor.
+        #
+        # **The final frame FAILS today at 918, and that is correct.** It is
+        # the lobby, and its map preview really is drawn wrong: 918 pixels in
+        # x 338..523 / y 272..457, four distinct colour pairs, 888 of them the
+        # original's navy (0,0,128) against our teal (0,128,128). It is
+        # deterministic -- two runs gave 918 with each side bit-identical to
+        # itself -- and it is NOT ours: taking the lobby frame directly, before
+        # the OPTIONS dialog is ever opened, gives the same 918 and the same
+        # bounding box. Nothing reached that screen before this configuration
+        # existed, so nothing had ever compared it. See STATUS.md; the budget
+        # stays where it is rather than being raised to cover a real defect.
+        mpoptions) budget=200 ;;
         *)        budget=500 ;;
     esac
     # Overridable, mainly so the check itself can be tested.
@@ -593,7 +666,7 @@ PY
 }
 
 cfgs="${1:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol multi quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol multi mpoptions quit"
 
 fail=0
 for cfg in $cfgs; do

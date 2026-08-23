@@ -5,11 +5,135 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-22**, at `8d0fcfa`+1. Working tree clean.
+Last updated: **2026-08-23**, at `edccf4b`+1. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **An i386 MSVC constructor returns `this` in eax, and a reconstruction that
+  drops it had been killing the multiplayer path for four days.** `RecordCtor`
+  (`0x00453910`) sets three fields and its body was byte-for-byte right; what
+  it did not do was return. Declared `void`, it left the `value` argument in
+  eax, and the caller at `0x00451473` stores that straight into the dialog's
+  `0x0064` -- so the SELECT PLAYER and COMM CHANNEL lists became the pointer
+  `1`, and the next `ListAdd` took the process down.
+
+  Nothing static could see it. `make check` was green throughout, the body
+  passes any reading, and `tools/checkdetour.py` says the patch site is sound.
+  The only witness was `tools/ab.sh multi`, which had gone from 8 widget nodes
+  to none and 291,000 differing pixels at `19282a4` and stayed that way through
+  eleven commits, because nothing re-ran it. **Run the configuration that
+  covers what you just touched, not the one that is quickest.**
+
+  Found by bisecting `19282a4..HEAD` on one question -- does clicking
+  MULTI-PLAYER leave the process alive -- eight builds, and then by disabling
+  the commit's eight patches two at a time. The trace's last line was
+  `ListAdd#1("Internet TCP/IP Connection For DirectPlay", ...)`, which named
+  the list but not the pointer.
+
+  The tell is exact and cheap: MSVC opens such a function with `mov eax, ecx`
+  purely so the value survives to the `ret`. `tools/checkthis.py` resolves
+  every patched address, reads the original's first two bytes, and fails if a
+  function that opens `8B C1` is reconstructed as `void`. It is in `make
+  check`, and tested in the failing direction by putting `void` back.
+
+  It found a second one immediately. `InitPtrList` (`0x0042A660`) has the same
+  shape and the same omission, and its caller at `0x0040A628` stores the result
+  too -- `eb 02 / 33 c0 / 89 06`, the identical `jmp` past an `xor eax,eax`.
+  Nothing has reached that caller yet, so this one was found before it cost
+  anything.
+
+- **The whole MULTIPLAYER OPTIONS screen is reconstructed, and it is
+  DECLARED rather than built.** `OptionsDefaults` (`0x00432710`),
+  `OptionsApply` (`0x004327A0`, which names itself "Options changed by host."),
+  `OptionsRequest` (`0x00432830`), `OptionsSyncGroup` (`0x00432870`) and the
+  two aliases in front of them, `MpDialogDestruct` (`0x004326F0`) and
+  `OptionsUpdate` (`0x00432700`).
+
+  A 43-record table at `0x004865B8`, 36 bytes each, is the entire screen: per
+  checkbox an x, a y, a label, the bit it owns, which of two masks that bit is
+  in, and -- for the five group headers -- the range of boxes it commands. The
+  columns and the mask choice agree exactly: records 0..21 are the left column
+  and `ADDR_GAME_OVER_FLAGS`, 22..42 the right and `ADDR_GAME_SETTING_22C`.
+
+  **Its end is not the literal the original compares against, and taking it as
+  one froze the game.** The loop walks with a cursor 0x18 bytes INTO each
+  record, so the bound in the image, `0x00486BDC`, is 0x18 past the last
+  record's base. Read as a record bound it runs one record too far and lands in
+  the label strings -- `"Heavy MG Pillbox"` decoded as a widget index, which is
+  a wild pointer. The first click of DEFAULT stopped the frame loop dead;
+  `OptionsUpdate` froze at a fixed count and nothing else logged. The table is
+  43 records, `0x004865B8..0x00486BC4`.
+
+- **`tools/ab.sh mpoptions` is the configuration that compares it**, and it
+  needed a new harness command to exist at all. The screen is reached through a
+  DirectPlay session that will not open on this machine, so `poke` -- a
+  one-dword write, symmetric with the `dump` that was already there -- writes
+  the menu-request pair that the game's own ESCAPE handler writes. Those are
+  the GAME's globals, so the same three commands drive both sides and
+  `AM2_NOPATCH=1` takes them unchanged; that is what makes it an A/B rather
+  than a demonstration.
+
+  One more poke earns its keep: `comm+0x3D8` is the host flag, and without it
+  the panel is read-only with CANCEL alone. Set, OK and DEFAULT appear and the
+  three interesting functions become clickable. The run ends on the lobby with
+  "Options changed by host." in the comms panel, which is the apply's own last
+  line and about 360 pixels of menu text -- comfortably over the budget of 200,
+  so an apply that stopped short would be caught.
+
+  Counters from one traced run: `OptionsUpdate` 26,355, `OptionsApply` 1,
+  `OptionsDefaults` 1, `OptionsSyncGroup` 1, `OptionsRequest` 1,
+  `MpDialogDestruct` 2. `Announce` reads 0, which is the usual blind spot --
+  `OptionsApply` calls it directly.
+
+- **`mpoptions` failed on its first run, and the defect it found is not
+  ours.** The final frame -- the lobby -- differs by **918 pixels**, all inside
+  x 338..523 / y 272..457, which is the map preview panel and nothing else.
+  Four distinct colour pairs, 888 of them the original's navy `(0,0,128)`
+  against our teal `(0,128,128)`, 25 against magenta `(128,0,128)`, 5 against
+  silver. Those are standard VGA system-palette entries, so this is an INDEX
+  being chosen differently, not a palette being built differently -- every
+  other pixel of the 640x480 frame matches exactly.
+
+  Re-run before believing it, and then again to place it. Two full A/B runs
+  gave 918 with each side bit-identical to itself between runs, so it is
+  deterministic rather than an unsynchronised animation -- and the lobby's own
+  animation is at most 54 pixels over four seconds, measured. Then the frame
+  was taken directly, on both sides, at the poke and **before the OPTIONS
+  dialog is ever opened**: 918 again, same bounding box. So it predates this
+  work entirely. Nothing had ever reached that screen, so nothing had ever
+  compared it.
+
+  The budget stays at 200 and the configuration stays red, because it is
+  telling the truth.
+
+  Where to start. The three wrong colours are `(0,128,128)`, `(128,0,128)` and
+  `(192,192,192)` -- standard VGA entries, which live in the block Windows
+  reserves at the bottom of the palette. So OUR remap is choosing indices
+  inside the reserved block and the original's is not, and that is exactly what
+  the `from` argument of `NearestPalIndex` exists to prevent. CLAUDE.md records
+  that `from`'s guard "stays verified by reading" because everything Boot Camp
+  remaps lies above the reserved block anyway; **these pixels do not**, so this
+  is the first screen in the project that can discriminate it.
+
+  `NearestPalIndex` itself takes its metric from the original and reproduces
+  both the `from & 0xFF` mask and the strict comparison, so suspect the caller
+  and the flag that decides `from` before suspecting it: `MakeBitmap`
+  (`surface.cpp`), whose `reserve` is `(flags & BMP_FLAG_RESERVE10) == 0` --
+  note the inversion -- and the tileset loader in `mapdraw.cpp`, whose is the
+  global `g_tilesetReserve`. The source is `data/mpalpine/alpine3_mp_prev.bmp`,
+  202x202 8-bit with cyan at index 0.
+
+- **The poke/key asymmetry stands and is not an oversight.** `poke` writes a
+  global the game ACCUMULATES, so the write survives and becomes the next
+  starting point. There is still no way to set the key buffer, because
+  `PollKeyboard` replaces it wholesale every poll. Same reasoning as `cursor`.
+
+- **`COMM_OFF_READY` was `COMM_OFF_IS_HOST` under an invented name.** Both
+  named `0x3D8`; the first came from a call site, the second from `DPCAPS_ISHOST`
+  and has provenance. `startgame.cpp` sets it to 1 when hosting and 0 when not,
+  which settles it. Gone, along with a `const` drift on `g_gameOverFlags`.
 
 - **Four reconstructions had never been installed.** `dist_install` opened
   with `return patch_replace(...)` and had three calls under it;
@@ -81,11 +205,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 637 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 636 | 626 of them below the CRT line |
+| `patch_replace` sites | 643 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 642 | 632 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 108,528 / 372,816 B (**29.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 133,840 / 372,816 B (35.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 109,072 / 372,816 B (**29.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 134,384 / 372,816 B (36.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

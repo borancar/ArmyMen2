@@ -877,6 +877,46 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
  * scancode has this low byte, or -1. Only the low byte is compared, which is
  * all a DirectInput scancode is; the records are 8 bytes and the table's end
  * is a literal address in the original, not a count. */
+/* The OPTIONS dialog. Its whole screen is the declarative table at
+ * ADDR_OPTION_TABLE -- see orig.h for the record layout -- and these four are
+ * everything that reads it.
+ *
+ * The checkbox's ticked flag is at 0x0078, which the two apply/load bodies and
+ * the group sync all agree on. */
+#define CHECK_OFF_TICKED  0x78   /* uint8_t */
+/* And a group HEADER carries its own record index at 0x0080, which is how
+ * OptionsSyncGroup finds the range it owns without searching the table. */
+#define CHECK_OFF_GROUP   0x80   /* int32_t, index into ADDR_OPTION_TABLE */
+
+/* Original: 0x00432710, the DEFAULTS button. It reads nothing back: it asks
+ * ResetPairMask for the two manufactured default masks and fills all 43
+ * checkboxes from them, re-enabling each one on the way. */
+void __cdecl OptionsDefaults(AM2_Widget *button);
+
+/* Original: 0x004327A0, and it names itself -- "Options changed by host."
+ *
+ * The apply. Build both masks from scratch out of what is ticked, so unticking
+ * needs no handling at all and nothing reads the previous value. Then the
+ * click sound, a menu request of 7, a broadcast of the player list, and the
+ * line. */
+void __cdecl OptionsApply(AM2_Widget *button);
+
+/* Original: 0x00432830. Ask for the options menu: 7 if we are the host and 9
+ * if we are not, which is the usual neg/sbb spelling of a boolean. */
+void __cdecl OptionsRequest(void);
+
+/* Original: 0x00432870. A group header was clicked, so push its own tick down
+ * onto every checkbox in its range -- and set each one's 0x004C, which is the
+ * "cannot be focused" field, to the OPPOSITE. A ticked header therefore both
+ * ticks its group and locks it. */
+void __cdecl OptionsSyncGroup(AM2_Widget *header);
+
+/* Originals: 0x004326F0 and 0x00432700, one `jmp` each into DialogDestruct and
+ * WidgetUpdateCancel. The alias shape: the OPTIONS dialog wants those two
+ * behaviours under its own vtable slots and the linker gave it thunks. */
+void __attribute__((thiscall)) MpDialogDestruct(AM2_Widget *w);
+void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
@@ -891,7 +931,19 @@ int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 void __attribute__((thiscall)) ListAdd(void *list, const char *name,
                                        void *value);
 
-void __attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
+/* 0x00453910, thiscall, 11 callers: the three-field record's constructor --
+ * two zeroes and the caller's value.
+ *
+ * It RETURNS `this`, and that is not decoration. The body opens `mov eax, ecx`
+ * and every i386 MSVC constructor does; the caller at 0x00451473 stores the
+ * result straight into the dialog's 0x0064, and the list it builds there is
+ * what ListAdd then writes through.
+ *
+ * Declared `void` this returned the value argument instead -- so the SELECT
+ * PLAYER and COMM CHANNEL dialogs got a list pointer of 1 and the process
+ * died inside ListAdd. See STATUS.md; nothing static caught it and the two
+ * A/B configurations that reach those dialogs are the only witnesses. */
+void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
 void __attribute__((thiscall)) RecordResetAlias(void *rec);
 
 int widget_install(void);

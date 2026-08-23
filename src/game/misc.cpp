@@ -935,13 +935,14 @@ int32_t __cdecl GetMenuRow(void)
     return g_menuRow;
 }
 
-void __attribute__((thiscall)) InitPtrList(void *rec)
+void *__attribute__((thiscall)) InitPtrList(void *rec)
 {
     int32_t *r = (int32_t *)rec;
 
     r[0] = 0;
     r[1] = 0;
     r[2] = 0;
+    return rec;
 }
 
 void __attribute__((thiscall)) ClearPtrListAlias(void *rec)

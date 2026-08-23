@@ -2968,6 +2968,77 @@
  * every player, and 0x00413480 reads our own entry through ADDR_OUR_SLOT. */
 #define ADDR_ARMY_SETTING        0x00515FE0u  /* int32_t[4] */
 #define ADDR_GAME_SETTING_22C    0x00515FDCu  /* int32_t, beside ADDR_GAME_OVER_FLAGS */
+/* The OPTIONS dialog is DECLARED rather than built: a 43-record table at
+ * 0x004865B8, 0x24 bytes each, is the whole screen. Every record is one
+ * checkbox -- where it sits, what it is called, which bit of which mask it
+ * owns, and whether it heads a group.
+ *
+ *   +0x00 int32   index of the checkbox in the parent's widget array
+ *   +0x04 int32   x; 0x48 and 0x13B are the two columns, and a group
+ *                 header sits ten pixels left of its own column
+ *   +0x08 int32   y; 0x28 and then 0x11 per row
+ *   +0x0C int32   non-zero: this record heads a group
+ *   +0x10 int32   first widget of the group
+ *   +0x14 int32   last widget of the group, inclusive
+ *   +0x18 int32   the bit this checkbox owns
+ *   +0x1C int32   which mask that bit is in -- non-zero picks
+ *                 ADDR_GAME_OVER_FLAGS, zero picks ADDR_GAME_SETTING_22C
+ *   +0x20 char *  the label
+ *
+ * The left column is records 0..21 and the right 22..42, and the split at
+ * +0x1C follows the columns exactly: one global per column. The five group
+ * headers are "POWER-UPS", "MISCELLANEOUS", "TROOPERS", "ASSETS" and the
+ * record at 28.
+ *
+ * A widget index is NOT a record index -- the last group runs to 42, past the
+ * end of the table -- so the parent's array is the longer of the two. */
+/* The end is 0x00486BC4, and the literal in the image is 0x00486BDC.
+ *
+ * They differ because the original walks with a cursor 0x18 bytes INTO each
+ * record, so its bound is 0x18 past the last record's base. Taking that
+ * literal as a record bound runs one record past the table and lands in the
+ * label strings -- "Heavy MG Pillbox" read as a widget index, which is a wild
+ * pointer and froze the frame loop on the first click of DEFAULT. */
+#define ADDR_OPTION_TABLE        0x004865B8u
+#define ADDR_OPTION_TABLE_END    0x00486BC4u  /* one past the last record */
+#define AM2_OPTION_COUNT         43
+#define AM2_OPTION_STRIDE        0x24u
+#define AM2_OPTION_OFF_WIDGET    0x00u
+#define AM2_OPTION_OFF_GROUP     0x0Cu
+#define AM2_OPTION_OFF_FIRST     0x10u
+#define AM2_OPTION_OFF_LAST      0x14u
+#define AM2_OPTION_OFF_BIT       0x18u
+#define AM2_OPTION_OFF_WHICH     0x1Cu
+/* The parent holds the checkboxes in an array at 0x0064, the same shape the
+ * CONTROLS dialog uses for its key rows. */
+#define OPTION_PARENT_BOXES      0x64u
+/* 0x00432710: the DEFAULTS button. It does not read the current settings at
+ * all -- it calls ResetPairMask, which manufactures the two default masks, and
+ * fills every checkbox from those. */
+#define ADDR_OPTIONS_DEFAULTS    0x00432710u  /* void(AM2_Widget *button) */
+/* 0x004327A0, and it names itself: "Options changed by host." The apply --
+ * build both masks from scratch out of what is ticked, so unticking is handled
+ * by simply not contributing and nothing reads the previous value. */
+#define ADDR_OPTIONS_APPLY       0x004327A0u  /* void(AM2_Widget *button) */
+/* 0x00432830: ask for the options menu -- 7 if we are the host and 9 if we
+ * are not, computed with the usual neg/sbb. */
+#define ADDR_OPTIONS_REQUEST     0x00432830u  /* void(void) */
+/* 0x00432870: a group header was clicked, so push its own tick down onto
+ * every checkbox in its range, and disable them while it is set. */
+#define ADDR_OPTIONS_SYNC_GROUP  0x00432870u  /* void(AM2_Widget *header) */
+#define AM2_MENU_REQUEST_OPTIONS      7
+#define AM2_MENU_REQUEST_OPTIONS_VIEW 9
+/* The two in front of the group are one `jmp` each to ADDR_DIALOG_DESTRUCT and
+ * ADDR_WIDGET_UPDATE_CANCEL, both reconstructed -- the alias shape.
+ *
+ * The first is NOT the options dialog's alone, which is what naming it from
+ * its neighbours would have said. Slot 0 of BOTH 0x0046FA0C (ENTER BATTLE
+ * NAME) and 0x0046FA34 (HOST OPTIONS) is 0x0042FF40, the shared scalar
+ * deleting destructor, and that is what calls it -- so it is the destructor
+ * for the whole multiplayer dialog pair. The second really is options-only:
+ * it appears in one vtable, as slot 2 of 0x0046FA34. */
+#define ADDR_MP_DIALOG_DESTRUCT 0x004326F0u /* thiscall void(AM2_Widget *) */
+#define ADDR_OPTIONS_UPDATE   0x00432700u /* thiscall void(AM2_Widget *) */
 /* The pair a client checks before agreeing to play: a constant in .rdata and a
  * value computed at run time. SendPlayerMsg puts both in the record and this
  * compares them; a mismatch says "has a different version of the game". They
@@ -3046,7 +3117,6 @@
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
 #define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */
-#define COMM_OFF_READY           0x3D8u
 #define COMM_SLOT_OFF_NAME       0x00Cu   /* 0x40-byte string; CommConstruct
                                            * clears it, StartSelectedGame writes
                                            * "Computer%d" into it */

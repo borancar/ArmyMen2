@@ -64,7 +64,7 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 #define COMM_SLOT_STRIDE  0x70
 #define SLOT_OFF_ACTIVE   0x50
 
-/* COMM_OFF_LOCAL, COMM_OFF_READY and COMM_OFF_DPLAY are in orig.h. */
+/* COMM_OFF_LOCAL, COMM_OFF_IS_HOST and COMM_OFF_DPLAY are in orig.h. */
 
 /* Menu request codes, as written to ADDR_MENU_REQUEST. */
 #define REQUEST_REFUSED   1
@@ -133,7 +133,7 @@ void __cdecl StartSelectedGame(void)
     g_menuRequest    = REQUEST_LOCAL;
     g_menuRequestSet = 1;
     orig_apply_game_settings();
-    *(int32_t *)(comm + COMM_OFF_READY) = 1;
+    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
 }
 
 /* The multiplayer HOST button, 0x0042F310, registered the same way.
@@ -198,7 +198,7 @@ void __cdecl StartMultiplayerGame(void)
     orig_drop_obj();
 
     comm = g_commObject;
-    *(int32_t *)(comm + COMM_OFF_READY) = 0;
+    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 0;
 
     /* Made once and kept. A failed allocation leaves it null, which the open
      * below then refuses -- the original checks rather than assuming. */

@@ -296,6 +296,32 @@ static void handle_line(SOCKET s, char *line)
         reply(s, "ok %p %s", (void *)p, out);
         return;
     }
+    /* `poke <hex addr> <hex dword>` -- write one dword of the game's memory.
+     *
+     * The asymmetry with the keyboard is deliberate and is explained in
+     * CLAUDE.md: some globals the game ACCUMULATES and a write survives, and
+     * some it overwrites every frame. This is for the first kind, and its one
+     * real use is the menu-request pair -- writing ADDR_MENU_REQUEST and
+     * ADDR_MENU_REQUEST_SET is the route the game itself takes into a menu
+     * screen, and it is the only way to reach the screens no click in this
+     * build can arrive at. The multiplayer host options screen is the
+     * example: it needs a DirectPlay session that will not open here.
+     *
+     * It writes through the GAME's memory, so it works identically under
+     * AM2_NOPATCH=1 -- which is the whole point, because a screen only one
+     * side can reach cannot be compared. */
+    if (!strcmp(argv[0], "poke") && argc >= 3) {
+        uint32_t *p = (uint32_t *)(uintptr_t)strtoul(argv[1], NULL, 16);
+        uint32_t  v = (uint32_t)strtoul(argv[2], NULL, 16);
+
+        if (IsBadWritePtr(p, sizeof *p)) {
+            reply(s, "err %p not writable", (void *)p);
+            return;
+        }
+        *p = v;
+        reply(s, "ok %p = %08x", (void *)p, v);
+        return;
+    }
     /* `widgets` -- walk the current dialog's widget tree and describe every
      * node. This exists because the menu layer's defects are TOO SMALL for a
      * whole-frame comparison: STATUS.md's table has a wrong toggle sprite at

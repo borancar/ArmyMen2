@@ -150,7 +150,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
  * checkglobals refused to let both exist. */
 #define g_mpSession    (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_netGame  (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
-#define g_gameOverFlags (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
+#define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)
 #define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 #define g_overlayDirty (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
