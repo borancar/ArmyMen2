@@ -1731,6 +1731,16 @@
 #define ADDR_BUTTON_BASE_CTOR    0x004542F0u /* thiscall void(w), no args */
 #define VTABLE_EDIT              0x0046FC98u
 #define VTABLE_MULTISPRITE       0x0046FD38u
+#define VTABLE_LISTBOX           0x0046FCC0u
+/* The fourth colour the list box seeds itself with, beside ADDR_COLOUR_WHITE,
+ * ADDR_BACKGROUND_COLOUR and ADDR_VIEW_RECT_COLOUR. Named from where it is
+ * used rather than from anything it says about itself. */
+#define ADDR_LIST_INK_HOT_SEL    0x00502ACCu /* uint8_t */
+/* A list row is SEVEN pixels tall, which is not written anywhere -- it comes
+ * out of the constructor's magic division: LIST_OFF_VISIBLE is
+ * (height - 4) / 7, spelled `imul 0x92492493` and `sar 3`. */
+#define AM2_LIST_ROW_HEIGHT      7
+#define AM2_LIST_ROW_INSET       4
 /* The edit box's DEFAULT character set -- wider than the one ENTER BATTLE
  * NAME then installs over it, and including ` ~ ! @ # $ % ^ &. */
 #define ADDR_EDIT_CHARSET_DEFAULT 0x00485304u /* const char ** */

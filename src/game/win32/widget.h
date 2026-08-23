@@ -680,6 +680,10 @@ typedef struct AM2_ListRows {
 #define LIST_OFF_INK_SEL     0x84   /* uint8_t, the selected row */
 #define LIST_OFF_INK_SEL_DOWN 0x88  /* uint8_t, selected with the button down */
 #define LIST_OFF_INK_HOT_SEL 0x8C   /* uint8_t, hot AND selected AND eligible */
+#define LIST_OFF_CALLBACK    0x68   /* the row callback, or ADDR_LOG for none */
+#define LIST_OFF_ARG6C       0x6C
+#define LIST_OFF_ARG70       0x70   /* constructed 0 */
+#define LIST_OFF_ARG7C       0x7C   /* constructed 0 */
 #define LIST_ROW_STRIDE      0x104  /* 260 bytes per row record */
 #define LIST_TEXT_INDENT     4
 
@@ -1136,6 +1140,20 @@ AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
                                                            const char *b1,
                                                            int32_t flag,
                                                            AM2_Rect box);
+
+/* Original: 0x00454F90, thiscall, `ret 0x20`. The LIST BOX. It works out how
+ * many rows fit by dividing by SEVEN -- a magic-number division that is the
+ * only place the row height appears. Its hot row starts at -1 and becomes 0
+ * if the rows it was given are not empty. */
+AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
+                                                       int32_t left,
+                                                       int32_t top,
+                                                       int32_t right,
+                                                       int32_t bottom,
+                                                       void *rows,
+                                                       int32_t callback,
+                                                       int32_t arg6C,
+                                                       int32_t ownsRows);
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 

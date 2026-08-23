@@ -2070,10 +2070,7 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
  * The list is also stored on the DIALOG at 0x0064 -- the dialog reaches it
  * again twice before the constructor ends -- and the blinking dot is stored
  * on the LIST at 0x0094, not on the panel that owns it. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ListBoxCtorFn)(
-    AM2_Widget *w, AM2_Rect box, void *rows, int32_t a, int32_t b, int32_t c);
 
-#define orig_listbox_ctor ((AM2_ListBoxCtorFn)AM2_IMAGE(ADDR_LISTBOX_CTOR))
 #define g_difficulty      (*(const int32_t *)(uintptr_t)ADDR_DIFFICULTY)
 
 AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
@@ -2108,7 +2105,8 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
     if (list) {
         RectSet(&box, 0x28, 0x3F, 0xF4, 0x3A);
-        list = orig_listbox_ctor(list, box, rows, 0, 0, 1);
+        list = ListBoxConstruct(list, box.left, box.top, box.right, box.bottom,
+                                 rows, 0, 0, 1);
     }
     *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
     WidgetAddChild(panel, list);
@@ -2633,10 +2631,11 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
     if (list) {
         RectSet(&box, 0x2A, 0x44, 0x11F, 0xAA);
-        list = orig_listbox_ctor(list, box,
-                                 *(void **)((uint8_t *)w
-                                            + COMMPANEL_OFF_ROWS),
-                                 (int32_t)AM2_IMAGE(ADDR_LOG), 0, 1);
+        list = ListBoxConstruct(list, box.left, box.top, box.right,
+                                box.bottom,
+                                *(void **)((uint8_t *)w
+                                           + COMMPANEL_OFF_ROWS),
+                                (int32_t)AM2_IMAGE(ADDR_LOG), 0, 1);
     }
     *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST) = list;
     WidgetAddChild(panel, list);
@@ -2745,11 +2744,12 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
     if (list) {
         RectSet(&box, 0x29, 0x43, 0x96, 0xAB);
-        list = orig_listbox_ctor(list, box,
-                                 *(void **)((uint8_t *)w
-                                            + COMMPANEL_OFF_LIST),
-                                 (int32_t)AM2_IMAGE(ADDR_SELECT_PLAYER_ROW),
-                                 0, 1);
+        list = ListBoxConstruct(list, box.left, box.top, box.right,
+                                box.bottom,
+                                *(void **)((uint8_t *)w
+                                           + COMMPANEL_OFF_LIST),
+                                (int32_t)AM2_IMAGE(ADDR_SELECT_PLAYER_ROW),
+                                0, 1);
     }
     WidgetAddChild(panel, list);
     ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
@@ -3055,6 +3055,65 @@ AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00454F90, thiscall, `ret 0x20`. The LIST BOX -- the DIFFICULTY rows, the
+ * connection list and the saved-player list.
+ *
+ * **A row is seven pixels tall**, and that number appears nowhere else. It
+ * comes out of a magic-number division: LIST_OFF_VISIBLE is
+ * `(height - 4) / 7`, spelled `imul 0x92492493` then `sar 3` and the sign
+ * correction. Written as the division, because that is what it is.
+ *
+ * The hot row starts at -1 -- nothing under the pointer -- and becomes 0 if
+ * the rows it was handed are not empty. Note it tests the ROWS pointer and
+ * then its count, so an empty list leaves the hot row at -1 and a list with
+ * rows opens with the first one hot. The SELECTED row is 0 either way. */
+AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
+                                                       int32_t left,
+                                                       int32_t top,
+                                                       int32_t right,
+                                                       int32_t bottom,
+                                                       void *rows,
+                                                       int32_t callback,
+                                                       int32_t arg6C,
+                                                       int32_t ownsRows)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    WidgetConstruct(w);
+
+    w->x = left;
+    w->y = top;
+    w->w = right;
+    w->h = bottom;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_LISTBOX);
+
+    *(void **)(self + LIST_OFF_ROWS)       = rows;
+    *(int32_t *)(self + LIST_OFF_OWNS_ROWS) = ownsRows;
+    *(int32_t *)(self + LIST_OFF_ARG70)     = 0;
+    *(int32_t *)(self + LIST_OFF_ARG6C)     = arg6C;
+    *(int32_t *)(self + LIST_OFF_CALLBACK)  = callback;
+    *(int32_t *)(self + LIST_OFF_HOT)       = -1;
+    *(int32_t *)(self + LIST_OFF_SELECTED)  = 0;
+
+    WidgetScreenRect(w);
+
+    *(int32_t *)(self + LIST_OFF_VISIBLE) =
+        (bottom - AM2_LIST_ROW_INSET) / AM2_LIST_ROW_HEIGHT;
+    *(int32_t *)(self + LIST_OFF_TOP_ROW) = 0;
+
+    *(int32_t *)(self + LIST_OFF_INK) = g_whiteInk;
+    *(int32_t *)(self + LIST_OFF_INK_SEL) = g_backgroundColour;
+    *(int32_t *)(self + LIST_OFF_INK_SEL_DOWN) = g_hiliteColour;
+    *(int32_t *)(self + LIST_OFF_INK_HOT_SEL) =
+        *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL;
+    *(int32_t *)(self + LIST_OFF_ARG7C)  = 0;
+    *(int32_t *)(self + LIST_OFF_BLINKER) = 0;
+
+    if (rows && *(const int32_t *)rows > 0)
+        *(int32_t *)(self + LIST_OFF_HOT) = 0;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3160,6 +3219,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_LISTBOX_CTOR, (const void *)ListBoxConstruct,
+                        "ListBoxConstruct", 8);
     rc |= patch_replace(ADDR_MULTISPRITE_CTOR,
                         (const void *)MultiSpriteConstruct,
                         "MultiSpriteConstruct", 7);

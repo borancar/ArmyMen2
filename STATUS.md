@@ -210,6 +210,19 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The LIST BOX constructor is reconstructed** (`0x00454F90`, 209 B), and it
+  is where the row height finally appears. **A row is SEVEN pixels tall**, and
+  that number is written nowhere in the image: it comes out of a magic-number
+  division, `LIST_OFF_VISIBLE = (height - 4) / 7`, spelled `imul 0x92492493`
+  then `sar 3`. Three screens' worth of layout follows from one constant that
+  only exists as a reciprocal.
+
+  Its hot row starts at **-1** -- nothing under the pointer -- and becomes 0
+  only if the rows it was handed are non-empty, testing the pointer and then
+  the count. The selected row is 0 either way. So an empty connection list
+  opens with nothing hot and a populated one opens with the first row hot,
+  which is what DIFFICULTY's green bar and the player list's highlight are.
+
 - **The EDIT BOX constructor is reconstructed** (`0x00454C10`, 137 B) and it
   has **thirteen stack arguments**, `ret 0x34` -- the longest list in the
   widget hierarchy: the buffer, the maximum, four of rectangle, a font, three
@@ -715,10 +728,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 680 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 679 | 669 of them below the CRT line |
+| `patch_replace` sites | 681 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 680 | 670 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 122,752 / 372,816 B (**32.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 122,976 / 372,816 B (**33.0%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
