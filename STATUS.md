@@ -11,6 +11,44 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **`checkseams` had two bugs and the second hid the first.** The fourth
+  spelling of the seam -- naming a reconstructed address at all -- went in
+  report-only, with a caveat that "some are data, not calls" and about two
+  hundred sites. Both were artefacts: it was scanning COMMENTS, and every
+  `ADDR_` name in this tree is discussed in one. Stripping them left 21, every
+  one a genuine call.
+
+  Stripping them also exposed the older bug. The single-line `#define orig_x
+  ... ADDR_Y` match never saw a macro continued with a backslash, and five of
+  `commmsg.cpp`'s and one of `dplay.cpp`'s were -- six real seams that the
+  gate had been green over for as long as they existed. Joining continuations
+  before matching costs nothing.
+
+  **A check nobody can read is a check nobody acts on**, and a check with a
+  caveat attached is one nobody trusts. The caveat was the bug.
+
+- **All 21 are closed and the rule is a gate.** Four groups, and each one says
+  something:
+
+  - `commmsg.cpp` reached three comm methods by address because it is in the
+    FLAT half and `win32/dplay.h` names DirectPlay types. Their own signatures
+    name nothing platform, so a forward declaration is enough -- which is what
+    `script.cpp` already does for `PreloadSprite`. `extern "C"`, because that
+    is how `dplay.h` declares them and a C++-mangled declaration links against
+    nothing while looking perfectly correct.
+  - `objscript.cpp` reached four functions through a SECOND set of `ADDR_`
+    names for addresses that already had one -- `ADDR_OBJ_TAKES_SCRIPT` for
+    `ADDR_OBJ_IS_ITEM`, and three more. Both mistakes at once, and neither
+    check could see it: the alias ratchet counts names, not uses.
+  - `winmain.cpp`'s thirteen-entry teardown table was plain integers, which is
+    exactly the shape nothing was looking at. Eight of the thirteen are ours
+    and go in by name now; the other four stay addresses, and the shape says
+    which is which.
+  - `air.cpp` passes a predicate to a still-original walker, which is a
+    genuine function-pointer argument -- and the pointer should be OURS.
+
+  Tested in the failing direction by putting one address back.
+
 - **The base BUTTON's constructor and the checkbox's toggle.** `0x004542F0` is
   what every three-state button and every checkbox derives from -- the widget
   base, its own vtable, three fields cleared -- and it returns `this`, which

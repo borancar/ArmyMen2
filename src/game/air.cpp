@@ -10,6 +10,7 @@
 #include "crt.h"      /* am2_free, am2_realloc -- the game's own */
 #include "savetag.h"
 #include "image.h"
+#include "misc.h"   /* MeetsAllThree -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -72,8 +73,7 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
 
     o = (uint8_t *)orig_objects_in_rect(&box,
                                         (void *)(uintptr_t)ADDR_OBJ_TABLE_ARG,
-                                        (const void *)(uintptr_t)
-                                            ADDR_MEETS_ALL_THREE);
+                                        (const void *)MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
      * OBJ_OFF_OWNER is NOT -- that constant is 0x0004 and belongs to a

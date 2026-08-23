@@ -1495,14 +1495,9 @@ void __attribute__((thiscall)) CommSessionOver(void *comm)
     CommSendLobbyProperty(comm, 1);
 }
 
-typedef int32_t (__attribute__((thiscall)) *AM2_CommSlotOfIdFn)(void *comm,
-                                                                uint32_t id);
-#define orig_comm_slot_of_id \
-    ((AM2_CommSlotOfIdFn)(uintptr_t)ADDR_COMM_SLOT_OF_ID)
-
 int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id)
 {
-    return orig_comm_slot_of_id(comm, id);
+    return CommSlotOfId(comm, id);
 }
 
 int32_t __attribute__((thiscall)) CommDropSession(void *comm)

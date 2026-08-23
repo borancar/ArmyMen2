@@ -42,6 +42,7 @@
 #include "winmain.h"
 #include "../gameproc.h"  /* SetGameOver */
 #include "../air.h"    /* FreeSpriteList -- what the alias jumps to */
+#include "../anim.h"   /* the five anim sweeps -- reconstructed */
 /* Compiled for the check, not called: see the header. The retail copy
  * protection is recorded there because this binary has it patched out. */
 #include "cdcheck.h"
@@ -192,17 +193,26 @@ void __cdecl InitTimer(void)
  * per entry would be a guess per entry.
  *
  * The first is thiscall on a fixed object; the rest take nothing. */
-static const uint32_t kTeardown[] = {
+static const am2_void_fn kTeardown[] = {
     /* The first five entries are the anim sweeps, and none of them is a guess
      * any more -- each is a `push <table>; call FreeAnimTable` and the table
      * says which `.ani` it holds. The fifth read as 432 bytes and "does more
      * than free" until docs/functions.tsv was checked against the disassembly:
      * 0x0043C720 is twelve bytes and the rest of that entry is the roach
      * mask builder next door. A merged entry, exactly as merges.py says. */
-    ADDR_FREE_EXPLOSION_ANIMS, ADDR_FREE_MISSILE_ANIMS, ADDR_FREE_ROACH_ANIMS,
-    ADDR_FREE_VEHICLE_ANIMS, ADDR_FREE_SOLDIER_ANIMS,
-    ADDR_FREE_SPRITE_LIST, 0x00445F40u, 0x00446880u, 0x0042E590u,
-    0x0040C9F0u, ADDR_SHUTDOWN_DDRAW, ADDR_SHUTDOWN_INPUT,
+    /* Eight of the thirteen are ours and go in BY NAME. Reaching them by
+     * address worked -- the detour is there -- but it is the seam
+     * tools/checkseams.py exists to stop, and this table was invisible to it
+     * for as long as the table held plain integers. The other four are still
+     * the original's and stay as addresses; the shape says which is which. */
+    FreeExplosionAnims, FreeMissileAnims, FreeRoachAnims,
+    FreeVehicleAnims, FreeSoldierAnims,
+    FreeSpriteList,
+    (am2_void_fn)(uintptr_t)0x00445F40u,
+    (am2_void_fn)(uintptr_t)0x00446880u,
+    (am2_void_fn)(uintptr_t)0x0042E590u,
+    (am2_void_fn)(uintptr_t)0x0040C9F0u,
+    ShutdownDirectDraw, ShutdownInput,
 };
 
 void __cdecl ShutdownSubsystems(void)
@@ -211,7 +221,7 @@ void __cdecl ShutdownSubsystems(void)
         (void *)(uintptr_t)ADDR_SHUTDOWN_OBJ);
 
     for (uint32_t i = 0; i < sizeof kTeardown / sizeof kTeardown[0]; i++)
-        ((am2_void_fn)(uintptr_t)kTeardown[i])();
+        kTeardown[i]();
 
     ReleaseMutex(*(HANDLE *)(uintptr_t)ADDR_APP_MUTEX);
 }

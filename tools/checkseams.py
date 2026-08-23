@@ -31,16 +31,23 @@ So both spellings are checked: a `#define orig_x ... ADDR_Y`, and a
 
 Deliberate ones are listed in ALLOWED, with the reason.
 
-There is a FOURTH spelling and it is not a gate. A menu handler is installed by
-ADDRESS -- `MakeButton(..., ADDR_ON_MENU_BACK)`, with the helper applying
-AM2_IMAGE to the parameter -- so the call site names a reconstructed function
-and nothing on the line looks like a cast or a call. `--by-address` reports
-every use of a reconstructed address in src/game and there are about two
-hundred, which is why it only reports: not all of them are calls. Some are
-DATA, and correct as data -- a list's "no callback" field is written as
-AM2_IMAGE(ADDR_NULL_STUB) and the game compares pointers against that exact
-address, so replacing it with ours would break the comparison. Sorting the
-calls from the sentinels is the work that would turn this into a gate.
+There is a FOURTH spelling and it IS a gate now: naming a reconstructed
+address anywhere in src/game except its own patch_replace. That covers the
+three above and everything they missed -- a menu handler installed by ADDRESS
+(`MakeButton(..., ADDR_ON_MENU_BACK)`, with the helper applying AM2_IMAGE to
+the parameter), an inline `((Fn)(uintptr_t)ADDR_X)(...)`, and a table of
+plain integers that are function pointers.
+
+It looked unpromotable at first, reporting about two hundred sites and a
+caveat that "some are data, not calls". Both were wrong for the same reason:
+comments were being scanned, and every ADDR_ name in this tree is discussed in
+one. With comments stripped it was 21, all of them calls, and closing them was
+an afternoon rather than a project.
+
+Two bugs in this file came out of that. The single-line `#define` match missed
+every macro continued with a backslash -- six real seams, unreported for as
+long as they had existed. And the by-address rule needed comment stripping to
+be worth reading at all. A check nobody can read is a check nobody acts on.
 """
 import glob
 import os
@@ -57,6 +64,39 @@ ALLOWED = {
 }
 
 
+def join_continuations(text):
+    """Fold `\\`-continued lines onto the first, leaving blanks behind."""
+    out = []
+    for line in text.split("\n"):
+        if out and out[-1].endswith("\\"):
+            out[-1] = out[-1][:-1] + " " + line.strip()
+            out.append("")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def strip_comments(text):
+    """Blank out /* */ and // comments, keeping every newline in place."""
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append("".join(c if c == "\n" else " " for c in text[i:j]))
+            i = j
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+            out.append(" " * (j - i))
+            i = j
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
 def macros():
     out = {}
     text = open(os.path.join(ROOT, "src/inject/orig.h")).read()
@@ -66,7 +106,6 @@ def macros():
 
 
 def main():
-    by_address = "--by-address" in sys.argv
     addr = macros()
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import coverage
@@ -81,12 +120,25 @@ def main():
             patched.add(addr[n])
 
     bad = []
-    loose = []
     for f in sorted(glob.glob(os.path.join(ROOT, "src/**/*.c*"), recursive=True)
                     + glob.glob(os.path.join(ROOT, "src/**/*.h"), recursive=True)):
         rel = os.path.relpath(f, ROOT)
-        seen = set()
-        for n, line in enumerate(open(f), 1):
+        # Comments are blanked for the by-address rule and only for it. The
+        # other three match code shapes that do not occur in prose; this one
+        # matches a bare identifier, and every ADDR_ macro in this tree is
+        # discussed in a comment somewhere. Newlines are kept so the line
+        # numbers still name the right line.
+        raw = open(f).read()
+        # A `#define` continued with a backslash puts the macro name on one
+        # line and the address on the next, and the first rule below matches
+        # a single line -- so every multi-line orig_ macro was invisible to
+        # it. Six of them were, all genuine seams. Joining continuations
+        # first costs nothing and keeps the line numbers, because the joined
+        # text replaces the FIRST line and the rest become blank.
+        raw = join_continuations(raw)
+        code = strip_comments(raw)
+        for n, (line, bare) in enumerate(zip(raw.split("\n"),
+                                             code.split("\n")), 1):
             m = re.match(r"\s*#define\s+(orig_\w+)\s+.*?(ADDR_[A-Z0-9_]+)", line)
             if m:
                 name, sym = m.group(1), m.group(2)
@@ -114,19 +166,15 @@ def main():
                 if sym in addr and addr[sym] in patched:
                     bad.append(("%s:%d" % (rel, n), "cast through the image",
                                 sym, addr[sym]))
-            # The FOURTH spelling, and REPORT-ONLY -- see the note in the
-            # docstring for why it is not a gate yet.
-            if by_address and rel.startswith("src/game/"):
-                for m in re.finditer(r"\b(ADDR_[A-Z0-9_]+)\b", line):
+            # The FOURTH spelling: the address named at all. Comments are
+            # stripped for this one and only this one -- the other three
+            # match code shapes that do not occur in prose.
+            if rel.startswith("src/game/"):
+                for m in re.finditer(r"\b(ADDR_[A-Z0-9_]+)\b", bare):
                     sym = m.group(1)
                     if sym in addr and addr[sym] in patched:
-                        loose.append(("%s:%d" % (rel, n), sym, addr[sym]))
-
-    if by_address:
-        for f, sym, a in loose:
-            print("  %s: %s (0x%08X)" % (f, sym, a))
-        print("  %d site(s) in src/game name a reconstructed address."
-              " REPORT ONLY -- some are data, not calls." % len(loose))
+                        bad.append(("%s:%d" % (rel, n), "named by address",
+                                    sym, addr[sym]))
 
     for f, name, sym, a in bad:
         print("  %s: %s -> %s (0x%08X) is reconstructed; call it directly"

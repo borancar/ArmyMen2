@@ -24,6 +24,7 @@
 
 #include "commmsg.h"
 #include "msgslot.h"   /* FindPlayerById */
+#include "gameproc.h"  /* RequestState -- reconstructed */
 #include "item.h"      /* UidOnWire, UidArmy -- reconstructed */
 #include "event.h"     /* EventMessageReceive -- reconstructed */
 #include "misc.h"      /* XorChecksum, reconstructed */
@@ -33,6 +34,29 @@
 #include "crt.h"        /* am2_log */
 #include "image.h"      /* AM2_IMAGE */
 #include "../inject/patch.h"
+
+/* Three comm methods, forward-declared rather than reached by address.
+ *
+ * They live in win32/dplay.cpp and are declared in win32/dplay.h, which this
+ * module cannot include: dplay.h names DirectPlay types and commmsg.cpp is in
+ * the FLAT half, where tools/checksplit.py refuses anything that reaches a
+ * Win32 header even transitively. Their own signatures name nothing platform
+ * -- a void * and an integer -- so a declaration here is enough, and it is
+ * what script.cpp already does for PreloadSprite and for the same reason.
+ *
+ * Reaching them by address instead is what tools/checkseams.py exists to
+ * catch, and it could not: the macros were `#define` continued over two
+ * lines, and the check matched a single line.
+ *
+ * `extern "C"` because that is how dplay.h declares them -- the linkage has
+ * to match the definition, and a C++-mangled declaration here links against
+ * nothing while looking perfectly correct. */
+extern "C" {
+int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
+int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
+int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
+}
+
 
 /* Fields of the comm object these two read. Named for position: what +0x3E4
  * and +0x418 actually hold is not established, only which one gates the send
@@ -161,10 +185,6 @@ typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn)(void *w, AM2_Rect r);
 
 /* 0x0040F160, thiscall on the comm object: which slot holds this DirectPlay
  * id. Still original. */
-typedef int32_t (__attribute__((thiscall)) *AM2_SlotOfIdFn)(void *comm,
-                                                            int32_t dpid);
-#define orig_comm_slot_of_id \
-    ((AM2_SlotOfIdFn)(uintptr_t)ADDR_COMM_SLOT_OF_ID)
 typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
 #define orig_comm_send_players \
     (*(AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
@@ -182,14 +202,14 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("SendGameReadyToLoadMsg\n %s", ready ? "TRUE" : "FALSE");
 
-    slot = orig_comm_slot_of_id(comm,
+    slot = CommSlotOfId(comm,
                                 *(const int32_t *)(comm + AM2_COMM_SELF_ID));
     *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_READY_TO_LOAD) = ready;
 
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
-                orig_comm_slot_of_id(comm,
+                CommSlotOfId(comm,
                                      *(const int32_t *)(comm + AM2_COMM_SELF_ID)),
                 ready ? "TRUE" : "FALSE");
 
@@ -265,7 +285,7 @@ void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
         am2_log("ReceivedMapMsg from %x  Result = %d (4 is nominal) \n",
                 dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
-    slot  = orig_comm_slot_of_id(comm, dpid);
+    slot  = CommSlotOfId(comm, dpid);
     value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
 
     /* From the table at 0x00411998, in table order. 5 and 7 fall through to
@@ -314,7 +334,7 @@ void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
         am2_log("ReceivedColorMsg from %x  Color =%d \n",
                 dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
-    slot = orig_comm_slot_of_id(comm, dpid);
+    slot = CommSlotOfId(comm, dpid);
     if (orig_comm_set_army_colour(
             comm, slot,
             *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE)) == -1)
@@ -335,7 +355,7 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
         am2_log("ReceivedTeamMsg from %x  Team =%d \n",
                 dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
-    slot = orig_comm_slot_of_id(comm, dpid);
+    slot = CommSlotOfId(comm, dpid);
     /* Written straight in, with none of the colour half's checking. */
     *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_TEAM)
@@ -387,7 +407,7 @@ void __cdecl SendGameReadyMsg(int32_t ready)
 
     /* Our own slot: the id comes from the comm object, where the receive half
      * takes it from the message. */
-    slot = orig_comm_slot_of_id(comm,
+    slot = CommSlotOfId(comm,
                                 *(const int32_t *)(comm + AM2_COMM_SELF_ID));
     *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_READY) = ready;
@@ -396,7 +416,7 @@ void __cdecl SendGameReadyMsg(int32_t ready)
         /* The lookup runs a second time inside the `if`, as in both
          * ready-to-load halves. */
         am2_log("Setting m_ArmyReady[%d] to %s\n",
-                orig_comm_slot_of_id(comm,
+                CommSlotOfId(comm,
                                      *(const int32_t *)(comm + AM2_COMM_SELF_ID)),
                 ready ? "TRUE" : "FALSE");
     }
@@ -420,13 +440,13 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
         am2_log("ReceiveGameReadyMsg\n");
 
     value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
-    slot  = orig_comm_slot_of_id(comm, dpid);
+    slot  = CommSlotOfId(comm, dpid);
     *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_READY) = value;
 
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("Setting m_ArmyReady[%d] to %s\n",
-                orig_comm_slot_of_id(comm, dpid),
+                CommSlotOfId(comm, dpid),
                 value ? "TRUE" : "FALSE");
 
     CommEndSetup();
@@ -447,7 +467,7 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
         am2_log("ReceiveGameReadyToLoadMsg\n");
 
     value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
-    slot  = orig_comm_slot_of_id(comm, dpid);
+    slot  = CommSlotOfId(comm, dpid);
     *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_READY_TO_LOAD) = value;
 
@@ -455,7 +475,7 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
         /* The lookup runs a SECOND time here; the original does not reuse the
          * slot it just computed. */
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
-                orig_comm_slot_of_id(comm, dpid),
+                CommSlotOfId(comm, dpid),
                 value ? "TRUE" : "FALSE");
     }
 
@@ -529,8 +549,6 @@ typedef void (__cdecl *AM2_HudMessageFn)(const char *text, int32_t colour);
 typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
                                           int32_t b);
 
-#define orig_find_player_by_id \
-    ((AM2_FindPlayerFn)(uintptr_t)ADDR_FIND_PLAYER_BY_ID)
 #define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
 #define orig_menu_message  ((AM2_MenuMessageFn)(uintptr_t)ADDR_MENU_MESSAGE)
 
@@ -566,12 +584,8 @@ typedef int32_t (__attribute__((thiscall)) *AM2_GetSessionFn)(void *comm);
 typedef int32_t (__cdecl *AM2_RegisterSelfFn)(uint32_t dpid);
 typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
-#define orig_comm_get_session \
-    ((AM2_GetSessionFn)(uintptr_t)ADDR_COMM_GET_SESSION)
 #define orig_comm_register_self \
     ((AM2_RegisterSelfFn)(uintptr_t)ADDR_COMM_REGISTER_SELF)
-#define orig_request_state \
-    ((AM2_RequestStateFn)(uintptr_t)ADDR_REQUEST_STATE)
 
 void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 {
@@ -610,7 +624,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 
         /* Only if this player has no queue yet. Both tests re-read the id from
          * the record rather than reusing the one above. */
-        if (!orig_find_player_by_id(id) && !orig_comm_register_self(id)) {
+        if (!FindPlayerById(id) && !orig_comm_register_self(id)) {
             ok = 0;
             am2_log("FlowQ creation Failure %x\n", id);
         }
@@ -619,7 +633,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
     /* Checked once, after every player -- so one failure stops the game for
      * all of them. A zero player count skips this test entirely. */
     if (!ok) {
-        orig_comm_get_session(comm);
+        CommGetSessionDesc(comm);
         am2_log("Error in start\n");
         return;
     }
@@ -627,7 +641,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
     /* Nothing in the image handles 0x0469. */
     orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_START_GAME, 0, 0);
     SendGamePause(1, 0x10000);
-    orig_request_state(2);
+    RequestState(2);
     *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
     *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
     *(int32_t *)(uintptr_t)ADDR_GAME_SEED =
@@ -636,8 +650,6 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 
 typedef int32_t (__attribute__((thiscall)) *AM2_PlayerSlotFn)(void *comm,
                                                               int32_t dpid);
-#define orig_comm_player_slot \
-    ((AM2_PlayerSlotFn)(uintptr_t)ADDR_COMM_PLAYER_SLOT)
 
 #define AM2_MSG_PAUSE  8        /* non-zero: pause. zero: resume. */
 #define AM2_MSG_FLAGS  0x0C
@@ -666,7 +678,7 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
     const uint8_t *comm = kCommObj;
-    int32_t        slot = orig_comm_player_slot((void *)comm, dpid);
+    int32_t        slot = CommPlayerSlot((void *)comm, dpid);
     int32_t        pause = *(const int32_t *)(m + AM2_MSG_PAUSE);
     uint32_t       flags = *(const uint32_t *)(m + AM2_MSG_FLAGS);
     uint32_t       mask  = 0;
@@ -800,7 +812,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
 {
     uint8_t  *pkt   = (uint8_t *)packet;
     uint8_t  *comm  = (uint8_t *)kCommObj;
-    int32_t   slot  = orig_comm_slot_of_id(comm, dpid);
+    int32_t   slot  = CommSlotOfId(comm, dpid);
     /* The length as it arrived. The loop below decrements the field itself,
      * and the bogus-length test is against THIS, not against the remainder. */
     int32_t   total = *(const int32_t *)(pkt + PACKET_OFF_LEN);
@@ -960,7 +972,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
             if (i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
                 CommSetSlotRemote(comm, i);
             comm = (uint8_t *)kCommObj;
-            if (!orig_find_player_by_id(
+            if (!FindPlayerById(
                     *(const uint32_t *)(slotRec + AM2_PLAYER_ID))) {
                 am2_log("PlayerMsg received before DPSYS_CREATEPLAYERORGROUP. "
                         "Unusual but should work. No flowq yet",
@@ -1034,7 +1046,7 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
 
     /* OUR record, not the sender's. */
     comm = (uint8_t *)kCommObj;
-    q = (uint8_t *)orig_find_player_by_id(
+    q = (uint8_t *)FindPlayerById(
             *(const uint32_t *)(comm + AM2_COMM_SELF_ID));
     if (!q)
         return;
@@ -1107,7 +1119,7 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
         ReceivePacket(m, dpid);
         /* The slot writer's first argument is a PLAYER record here, not the
          * comm object msgslot.h describes -- FindPlayerById returns one. */
-        MsgSlotB0(orig_find_player_by_id((uint32_t)dpid),
+        MsgSlotB0(FindPlayerById((uint32_t)dpid),
                   *(const uint32_t *)(m + AM2_MSG_VALUE));
         return;
 

@@ -565,17 +565,29 @@ into our own code. `tools/checkseams.py` checks `callN(ADDR_X)` at a call site
 now as well as `#define orig_x ... ADDR_X`, and is tested by putting the call
 back.
 
-**And it only sees an address written down.** The menu installs a button
-handler by address, and `MakeButton` turns that address into a pointer with
-`AM2_IMAGE` — right while the handler is the original's, a lie once it is
-ours. The check caught the DIFFICULTY dialog's escape slot, written
-`AM2_IMAGE(ADDR_ON_OPTIONS_MENU)`, and could not catch the title screen's
-button table beside it, where the same call reads `AM2_IMAGE(b->handler)` from
-a struct field and no `ADDR_` name appears in the text at all. The fix is a
-`MakeButtonFn` taking the pointer, with the address form a wrapper over it, so
-the handlers that are ours are installed by name and the ones that are not
-keep going through the image. **A seam that reaches the image through a
-variable is invisible to this check**; the tool resolves macros, not dataflow.
+**There is a fourth spelling and it is now the general rule: naming a
+reconstructed address at all.** The menu installs a button handler by address,
+and `MakeButton` turned that address into a pointer with `AM2_IMAGE` — right
+while the handler is the original's, a lie once it is ours, and invisible,
+because nothing on the line looks like a call. Same for an inline
+`((Fn)(uintptr_t)ADDR_X)(...)` and for a table of plain integers that are
+function pointers. So the check now fails on any `ADDR_` in `src/game` that
+resolves to a patched address, outside its own `patch_replace`.
+
+**It looked unpromotable and the reason was a bug in the check.** It reported
+about two hundred sites with a caveat that some were data rather than calls —
+and it was scanning COMMENTS, where every `ADDR_` name in this tree is
+discussed. With comments stripped it was 21, all genuine, and closing them was
+an afternoon. A caveat attached to a check is worth suspecting before it is
+worth believing.
+
+That fix exposed an older one. The single-line `#define orig_x ... ADDR_Y`
+match never saw a macro continued with a backslash, and six were — six real
+seams the gate had been green over for as long as they existed. Continuations
+are joined before matching now.
+
+What stays out of reach is a seam that reaches the image through a VARIABLE:
+the tool resolves macros, not dataflow.
 
 That seam also made `tools/blindspots.py` wrong in the other direction: it
 reported `MovieStepCurrent` blind because both callers are reconstructed, while

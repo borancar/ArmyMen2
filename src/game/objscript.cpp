@@ -15,6 +15,14 @@
 #include "savetag.h"
 #include "script.h"
 #include "scriptint.h"
+/* The object table and the item predicate, both reconstructed. objscript.cpp
+ * used to reach all four through the image under a SECOND set of ADDR_ names
+ * -- ADDR_OBJ_BY_UID, ADDR_OBJ_TAKES_SCRIPT, ADDR_FIRST_SCRIPT_OBJ and
+ * ADDR_NEXT_SCRIPT_OBJ -- for addresses that already had one. Both mistakes
+ * at once, and checkseams could see neither: an inline cast written
+ * ((Fn)(uintptr_t)ADDR_X)(...) matches none of its three patterns. */
+#include "objtable.h"
+#include "objtype.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -241,11 +249,10 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 
         target->u.name = name;
 
-        uint8_t *obj = ((uint8_t *(__cdecl *)(int32_t))(uintptr_t)
-            ADDR_OBJ_BY_UID)(kScriptNames[name].value);
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (uint32_t)(uintptr_t)kScriptNames[name].value);
 
-        if (!obj || !((int32_t (__cdecl *)(uint8_t *))(uintptr_t)
-                          ADDR_OBJ_TAKES_SCRIPT)(obj)) {
+        if (!obj || !ObjIsItem((const AM2_Object *)obj)) {
             am2_log("Token %s is not a valid object.\n",
                     kScriptNames[name].name);
             return 0;
@@ -279,13 +286,9 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
         target->u.cls[1] = (uint16_t)(uintptr_t)tok->value;
         (*at)++;
 
-        for (uint8_t *obj = ((uint8_t *(__cdecl *)(void))(uintptr_t)
-                 ADDR_FIRST_SCRIPT_OBJ)();
-             obj;
-             obj = ((uint8_t *(__cdecl *)(void))(uintptr_t)
-                 ADDR_NEXT_SCRIPT_OBJ)()) {
-            if (((int32_t (__cdecl *)(uint8_t *))(uintptr_t)
-                     ADDR_OBJ_TAKES_SCRIPT)(obj))
+        for (uint8_t *obj = (uint8_t *)FirstItem(); obj;
+             obj = (uint8_t *)NextItem()) {
+            if (ObjIsItem((const AM2_Object *)obj))
                 ScriptAttachTo(obj);
         }
 
