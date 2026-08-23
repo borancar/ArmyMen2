@@ -50,14 +50,14 @@ whether a mechanism is being measured at all.
 
 | channel | how it is found | outstanding |
 |---|---|---|
-| named imports | `docs/imports.tsv` | 6 non-incidental site(s) |
+| named imports | `docs/imports.tsv` | 2 non-incidental site(s) |
 | imports by ordinal | `#N` in the same file, checked through the callers of its thunk | 0 |
 | COM vtables | `docs/comcalls.tsv`, `stdcall` only | 0 |
 | runtime resolution | `LoadLibraryA` + `GetProcAddress` sites | 0 |
 | delay-loaded imports | PE delay-import directory | none in this image |
 
-The six named-import sites are three `MessageBoxA` calls and the
-`GetActiveWindow` each passes as its owner, and
+The 2 named-import site(s) left are `MessageBoxA` calls
+and the `GetActiveWindow` each passes as its owner, and
 `docs/binarypatches.md` shows nothing in the image can reach any of
 them. The value of this table is not the zeroes -- it is that each
 mechanism was looked for at all. `tools/comcalls.py` exists because
@@ -69,8 +69,8 @@ outside it.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 76 | 188 |
-| still boundary | 3 | 6 |
+| reconstructed | 78 | 192 |
+| still boundary | 1 | 2 |
 | game logic, incidental calls only | 52 | 82 |
 | **total** | **131** | **276** |
 
@@ -82,7 +82,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 90 | 130 |  |
+| USER32 | 94 | 130 |  |
 | KERNEL32 | 51 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -98,23 +98,28 @@ site still outside reconstructed code:
 
 | symbol | sites |
 |---|---:|
-| `MessageBoxA` | 3 |
+| `MessageBoxA` | 1 |
 
-**These three are a decision, not an omission.** Each of
-`0x0042F290`, `0x0044D2E0` and `0x0044D3F0` holds exactly two
+**This one is a decision, not an omission.** `0x0042f290` holds exactly two
 import sites -- a `MessageBoxA` and the `GetActiveWindow` it
-passes as owner -- and no COM dispatch at all. Both sit inside a
+passes as owner -- and no COM dispatch at all. It sits inside a
 block the section above proves nothing can reach. Everything else
-in them is menu logic: sound requests, menu state, calls into
+in it is menu logic: sound requests, menu state, calls into
 other game code.
 
-Porting them would move pure menu logic into the reconstruction
+Porting it would move pure menu logic into the reconstruction
 to capture a dialog that cannot appear -- the opposite of what
-ranking targets by boundary density is for. The figure stays at
-three by choice.
+ranking targets by boundary density is for.
 
-Read that table with `docs/binarypatches.md` beside it. Most of
-those `MessageBoxA` sites are the "insert the CD" dialog, and
+The count reached one by the other route, though, and that is
+worth recording: the two that left were the title screen's
+SINGLE PLAYER and BOOT CAMP handlers, ported for their own sake
+as part of the menu, with the CD check coming along through
+`cdcheck.h`. A function declined on density can still arrive
+because the layer around it did.
+
+Read that table with `docs/binarypatches.md` beside it. Those
+`MessageBoxA` sites are the "insert the CD" dialog, and
 every CD check in this executable has been patched to skip it --
 so the sites are still there, still import the symbol, and can
 never execute. A site that cannot run is not outstanding boundary
@@ -198,8 +203,6 @@ function from game logic with a call in it.
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
 | `0x0042f290` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
-| `0x0044d2e0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
-| `0x0044d3f0` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 
 ## By library
 

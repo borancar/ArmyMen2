@@ -565,6 +565,18 @@ into our own code. `tools/checkseams.py` checks `callN(ADDR_X)` at a call site
 now as well as `#define orig_x ... ADDR_X`, and is tested by putting the call
 back.
 
+**And it only sees an address written down.** The menu installs a button
+handler by address, and `MakeButton` turns that address into a pointer with
+`AM2_IMAGE` — right while the handler is the original's, a lie once it is
+ours. The check caught the DIFFICULTY dialog's escape slot, written
+`AM2_IMAGE(ADDR_ON_OPTIONS_MENU)`, and could not catch the title screen's
+button table beside it, where the same call reads `AM2_IMAGE(b->handler)` from
+a struct field and no `ADDR_` name appears in the text at all. The fix is a
+`MakeButtonFn` taking the pointer, with the address form a wrapper over it, so
+the handlers that are ours are installed by name and the ones that are not
+keep going through the image. **A seam that reaches the image through a
+variable is invisible to this check**; the tool resolves macros, not dataflow.
+
 That seam also made `tools/blindspots.py` wrong in the other direction: it
 reported `MovieStepCurrent` blind because both callers are reconstructed, while
 the counter read 746,792 — because those callers reached it by ADDRESS. Closing
@@ -1703,9 +1715,9 @@ exact oracle**, however meaningful it is when it is set.
   four addresses) were stale by many commits, which is what quoting a generated
   number in prose always comes to. Of the 80 import-touching functions not
   reconstructed, 77 are game logic — a `GetTickCount` or a `PostMessageA`
-  inside something that is otherwise not boundary at all — leaving 3 functions
-  and 6 sites, every one a `MessageBoxA` and its `GetActiveWindow` inside menu
-  code that no branch in the image can reach. The channels
+  inside something that is otherwise not boundary at all — leaving 1 function
+  and 2 sites, a `MessageBoxA` and its `GetActiveWindow` inside menu code that
+  no branch in the image can reach. The channels
   themselves are owned: every DirectX object in the process is created,
   configured and destroyed by reconstructed code, and the registry is opened
   and closed by ours. What still dispatches through COM is game logic holding a
@@ -1788,17 +1800,24 @@ exact oracle**, however meaningful it is when it is set.
 - **The import side is done, in the only sense the word can bear here.** Every
   Win32 call site in the image that can actually execute is now either inside
   reconstructed code or incidental — a `GetTickCount`, an `IntersectRect`, a
-  mutex wait. What is left outside is three `MessageBoxA` calls, and all three
-  sit behind copy-protection checks that have been patched to skip them.
+  mutex wait. What is left outside is one `MessageBoxA` call, and it sits
+  behind a copy-protection check that has been patched to skip it.
 
-  **Those three are a decision and the number stays at three.** `0x0042F290`,
-  `0x0044D2E0` and `0x0044D3F0` hold exactly two import sites each — a
-  `MessageBoxA` and the `GetActiveWindow` it passes as owner — and no COM
-  dispatch at all. Everything else in them is menu logic: sound requests, menu
-  state, calls into other game code. Porting them would move pure menu logic
-  into the reconstruction to capture a dialog that cannot appear, which is the
-  opposite of what ranking by boundary density is for. Measured, not assumed:
-  `docs/boundary.md` prints the reasoning with the count.
+  **It is a decision, and the number was three until the layer around two of
+  them arrived.** `0x0042F290`, `0x0044D2E0` and `0x0044D3F0` each hold exactly
+  two import sites — a `MessageBoxA` and the `GetActiveWindow` it passes as
+  owner — and no COM dispatch at all. Everything else in them is menu logic:
+  sound requests, menu state, calls into other game code. Porting one to
+  capture a dialog that cannot appear is the opposite of what ranking by
+  boundary density is for, and that reasoning has not changed.
+
+  What changed is that two of the three turned out to be the title screen's
+  SINGLE PLAYER and BOOT CAMP buttons. They were reconstructed for their own
+  sake, as part of finishing the menu, and the CD check came along through
+  `src/game/win32/cdcheck.h` at no extra cost. So the figure is 1 and 2 now,
+  and it moved without the decision being revisited. **A function declined on
+  density can still arrive because the layer around it did** — which is a
+  better reason to re-read `docs/boundary.md` than any argument in prose.
 
   **That last step is now proved rather than asserted**, and the proof needed
   two corrections to be worth anything. `tools/binpatches.py` checks each
@@ -1990,12 +2009,11 @@ exact oracle**, however meaningful it is when it is set.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. What is left outside is **3 functions
-  and 6 sites** — three `MessageBoxA` calls and the `GetActiveWindow` each one
-  passes as its owner — and all three sit behind CD checks this build has
-  patched to jump past them (`docs/binarypatches.md`), so none can execute. The
-  other 122 sites are game logic that happens to read a clock or call
-  `IntersectRect`.
+  drift from what the harness installs. What is left outside is **1 function
+  and 2 sites** — a `MessageBoxA` and the `GetActiveWindow` it passes as its
+  owner — and it sits behind a CD check this build has patched to jump past
+  (`docs/binarypatches.md`), so it cannot execute. The other 122 sites are game
+  logic that happens to read a clock or call `IntersectRect`.
 
   **Re-read those numbers from `docs/boundary.md`, never from here**, and
   expect them to move for reasons that are not progress. This bullet said "one

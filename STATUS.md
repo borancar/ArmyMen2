@@ -11,6 +11,54 @@ Last updated: **2026-08-23**, at `9c50c5b`+1. Working tree clean.
 
 Nothing uncommitted.
 
+- **The title screen's seven buttons, and the boundary is down to one
+  function.** `0x0044D2E0` to `0x0044D4F0`, none over 160 bytes: a menu sound,
+  sometimes a global, then a menu request whose code is the arm number in
+  `docs/screens.md`. MOVIES asks for 13, OPTIONS for 14, QUIT for 17,
+  MULTI-PLAYER for 6. CREDITS asks for no screen at all -- it sets the
+  game-over reason to 4 and requests state 0, so the credits are the
+  end-of-game sequence played from the title.
+
+  Two of them hold CD checks, which is why this closes the boundary rather
+  than merely adding seven small functions. `docs/boundary.md` read **3
+  functions and 6 sites** for a long time and now reads **1 and 2**: the last
+  is `0x0042F290`, and like these it is a `MessageBoxA` and its
+  `GetActiveWindow` behind a check this build jumps past. Both new ones went
+  in through `RequireGameCD()`, which `cdcheck.h` already had.
+
+  **The two CD arms are not the same, and the difference is not tidiness.**
+  SINGLE PLAYER's sets the menu request AND the pending flag to 1; BOOT CAMP's
+  sets only the request, so nothing consumes it. Reproduced as written.
+
+- **"Aye aye Captain!" is a level select, and the flag says so in one place.**
+  `0x004FCF98` is written by the cheat handler at `0x00417CAA` and read by
+  exactly one instruction in the image: SINGLE PLAYER, which with the flag set
+  and either SHIFT held asks for SELECT MAP (arm 2) instead of SELECT PLAYER
+  (arm 3). A global with one reader is worth following to it -- the name comes
+  free.
+
+- **`ADDR_ON_DIALOG_CANCEL` was a name from a call site, the fourth.**
+  `0x0044D490` is the DIFFICULTY dialog's CANCEL and its escape action, which
+  is where the name came from; its body plays a sound and asks for menu
+  request 14, the OPTIONS menu. It is `ADDR_ON_OPTIONS_MENU` now, and the two
+  spellings of it in `widget.cpp` are the reason the rename mattered.
+
+- **`checkseams` caught one of the two ways a reconstructed handler reaches
+  itself through the image, and could not see the other.** A button handler is
+  installed by address, and `MakeButton` turns that address into a pointer
+  with `AM2_IMAGE` -- correct while the handler is the original's, and a lie
+  once it is ours. The check found the DIFFICULTY dialog's escape slot, where
+  the address is written as `AM2_IMAGE(ADDR_ON_OPTIONS_MENU)` and resolves
+  statically. It could NOT find the title screen's table, where the same call
+  reads `AM2_IMAGE(b->handler)` and the handler is a struct field: nothing in
+  the text names an address, so nothing fires.
+
+  `MakeButtonFn` takes the pointer instead and `MakeButton` is a wrapper over
+  it, so the seven that are ours are installed by name and the dozens that are
+  still the original's keep going through the image. Worth saying plainly what
+  the tool sees: it resolves `ADDR_` macros in the text, so a seam that
+  reaches the image through a variable is invisible to it.
+
 - **The TITLE SCREEN, and the binary patch that lives inside it.** `0x0044D730`
   is arm 1 of the menu table and the one arm that is not a factory: it builds
   its seven buttons inline rather than calling a constructor. Before any of
@@ -882,15 +930,15 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 686 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 685 | 675 of them below the CRT line |
+| `patch_replace` sites | 693 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 692 | 682 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 125,456 / 372,816 B (**33.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 144,544 / 372,816 B (38.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 126,464 / 372,816 B (**33.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 146,016 / 372,816 B (39.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
-| boundary functions reconstructed | 68, 179 import sites | `docs/boundary.md` |
+| boundary functions reconstructed | 78, 192 import sites | `docs/boundary.md` |
 | COM dispatch outstanding | 0 of 79 functions | `docs/boundary.md` |
 
 Read the percentage as what still crosses an original boundary, not as how

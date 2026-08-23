@@ -29,6 +29,8 @@
 #include "cdcheck.h"
 #include "dplay.h"
 #include "../gamedir.h"
+#include "../gameproc.h"
+#include "../misc.h"
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -294,6 +296,135 @@ void __cdecl HostBattle(void)
     CopyName((char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME, battle);
 }
 
+/* ------------------------------------------------------------------ *
+ * The title screen's seven buttons.
+ *
+ * Each is a handler installed by OpenTitleScreen and reached only through
+ * the button's function pointer, so a `push imm32` is their one reference in
+ * the image -- see CLAUDE.md on why an aligned-dword scan misses those.
+ *
+ * They are all the same three or four lines: a menu sound, sometimes a
+ * global, then a menu request. Written out rather than tabulated, because
+ * five of the seven differ in what they do BESIDES asking for a screen, and
+ * the title screen has already shown this session what a table costs when one
+ * block carries a line the others do not.
+ * ------------------------------------------------------------------ */
+
+#define g_winEnabled       (*(int32_t *)(uintptr_t)ADDR_WIN_ENABLED)
+#define g_levelId          (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
+#define g_levelIndex       (*(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX)
+#define g_cheatLevelSelect (*(int32_t *)(uintptr_t)ADDR_CHEAT_LEVEL_SELECT)
+
+/* IsKeyDown, RequestState and SetGameOver are ours -- misc.cpp and
+ * gameproc.cpp -- so they are called by name, not through the image. */
+typedef void  *(__cdecl *am2_find_level_fn)(int32_t id);
+typedef void   (__cdecl *am2_select_level_fn)(void *record);
+
+#define orig_load_bootcamp_levels (*(am2_void_fn)ADDR_LOAD_BOOTCAMP_LEVELS)
+#define orig_find_level_record    (*(am2_find_level_fn)ADDR_FIND_LEVEL_RECORD)
+#define orig_select_level         (*(am2_select_level_fn)ADDR_SELECT_LEVEL)
+
+/* Boot Camp is level 1 of its own table, and the record's first field is the
+ * id the lookup keys on -- so this reads it back out rather than reusing the
+ * literal, which is what the original does too. */
+#define BOOTCAMP_LEVEL_ID  1
+#define LEVEL_OFF_ID       0
+
+void __cdecl OnSinglePlayer(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_winEnabled = 0;
+
+    /* The CD check, disabled in this executable; see cdcheck.h. Its failure
+     * arm here sets BOTH the request and the flag to 1 -- unlike Boot Camp's,
+     * which sets only the request. Reproduced, not tidied. */
+    if (!RequireGameCD()) {
+        g_menuRequest    = REQUEST_REFUSED;
+        g_menuRequestSet = REQUEST_REFUSED;
+        return;
+    }
+
+    /* With the "Aye aye Captain!" cheat entered, SHIFT turns SINGLE PLAYER
+     * into a level select: SELECT MAP rather than SELECT PLAYER. Either shift
+     * will do, and the flag is read nowhere else in the image. */
+    if (g_cheatLevelSelect
+        && (IsKeyDown(AM2_DIK_LSHIFT) || IsKeyDown(AM2_DIK_RSHIFT))) {
+        g_menuRequest    = AM2_MENU_REQUEST_SELECT_MAP;
+        g_menuRequestSet = 1;
+        return;
+    }
+
+    g_menuRequest    = AM2_MENU_REQUEST_SELECT_PLAYER;
+    g_menuRequestSet = 1;
+}
+
+void __cdecl OnMultiPlayer(void)
+{
+    g_winEnabled = 0;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = AM2_MENU_REQUEST_COMM_PANEL;
+    g_menuRequestSet = 1;
+}
+
+void __cdecl OnMovies(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = AM2_MENU_REQUEST_MOVIES;
+    g_menuRequestSet = 1;
+}
+
+void __cdecl OnBootCamp(void)
+{
+    void *level;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+
+    /* The only arm of the five CD sites that leaves the request flag alone,
+     * so nothing consumes what it wrote. */
+    if (!RequireGameCD()) {
+        g_menuRequest = REQUEST_REFUSED;
+        return;
+    }
+
+    /* Boot Camp keeps its own level table and rebuilds it on every visit. */
+    orig_load_bootcamp_levels();
+    g_winEnabled = 1;
+
+    level = orig_find_level_record(BOOTCAMP_LEVEL_ID);
+    if (!level)
+        return;
+
+    PlaySoundAt(2, 0, 0, 0, 0);          /* a second one, and deliberate */
+    orig_select_level(level);
+    g_levelId    = *(int32_t *)((uint8_t *)level + LEVEL_OFF_ID);
+    g_levelIndex = 1;
+    RequestState(2);
+}
+
+void __cdecl OnOptionsMenu(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
+    g_menuRequestSet = 1;
+}
+
+void __cdecl OnCredits(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    /* No screen at all: the credits are the game-over sequence with reason 4,
+     * played from state 0. */
+    SetGameOver(AM2_GAME_OVER_CREDITS);
+    RequestState(0);
+}
+
+void __cdecl OnQuit(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_winEnabled     = 1;
+    g_menuRequest    = AM2_MENU_REQUEST_QUIT;
+    g_menuRequestSet = 1;
+}
+
 int startgame_install(void)
 {
     int rc = 0;
@@ -305,5 +436,17 @@ int startgame_install(void)
                         "StartSelectedGame", 0);
     rc |= patch_replace(ADDR_START_MULTIPLAYER, (const void *)StartMultiplayerGame,
                         "StartMultiplayerGame", 0);
+
+    rc |= patch_replace(ADDR_ON_SINGLE_PLAYER, (const void *)OnSinglePlayer,
+                        "OnSinglePlayer", 0);
+    rc |= patch_replace(ADDR_ON_MULTI_PLAYER, (const void *)OnMultiPlayer,
+                        "OnMultiPlayer", 0);
+    rc |= patch_replace(ADDR_ON_MOVIES, (const void *)OnMovies, "OnMovies", 0);
+    rc |= patch_replace(ADDR_ON_BOOT_CAMP, (const void *)OnBootCamp,
+                        "OnBootCamp", 0);
+    rc |= patch_replace(ADDR_ON_OPTIONS_MENU, (const void *)OnOptionsMenu,
+                        "OnOptionsMenu", 0);
+    rc |= patch_replace(ADDR_ON_CREDITS, (const void *)OnCredits, "OnCredits", 0);
+    rc |= patch_replace(ADDR_ON_QUIT, (const void *)OnQuit, "OnQuit", 0);
     return rc;
 }

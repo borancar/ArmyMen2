@@ -363,8 +363,8 @@ def main():
           f"{dynamic_left} |\n")
         w(f"| delay-loaded imports | PE delay-import directory | "
           f"{delay} |\n")
-        w("\nThe six named-import sites are three `MessageBoxA` calls and the\n"
-          "`GetActiveWindow` each passes as its owner, and\n"
+        w(f"\nThe {sites(real)} named-import site(s) left are `MessageBoxA` calls\n"
+          "and the `GetActiveWindow` each passes as its owner, and\n"
           "`docs/binarypatches.md` shows nothing in the image can reach any of\n"
           "them. The value of this table is not the zeroes -- it is that each\n"
           "mechanism was looked for at all. `tools/comcalls.py` exists because\n"
@@ -417,19 +417,25 @@ def main():
             w("| symbol | sites |\n|---|---:|\n")
             for sym, n in real_left:
                 w(f"| `{sym}` | {n} |\n")
-            w("\n**These three are a decision, not an omission.** Each of\n"
-              "`0x0042F290`, `0x0044D2E0` and `0x0044D3F0` holds exactly two\n"
+            names = ", ".join(f"`0x{f:08x}`" for f in sorted(real))
+            w(f"\n**{'This one is' if len(real) == 1 else 'These are'} a decision, "
+              f"not an omission.** {names} holds exactly two\n"
               "import sites -- a `MessageBoxA` and the `GetActiveWindow` it\n"
-              "passes as owner -- and no COM dispatch at all. Both sit inside a\n"
+              "passes as owner -- and no COM dispatch at all. It sits inside a\n"
               "block the section above proves nothing can reach. Everything else\n"
-              "in them is menu logic: sound requests, menu state, calls into\n"
+              "in it is menu logic: sound requests, menu state, calls into\n"
               "other game code.\n\n"
-              "Porting them would move pure menu logic into the reconstruction\n"
+              "Porting it would move pure menu logic into the reconstruction\n"
               "to capture a dialog that cannot appear -- the opposite of what\n"
-              "ranking targets by boundary density is for. The figure stays at\n"
-              "three by choice.\n")
-            w("\nRead that table with `docs/binarypatches.md` beside it. Most of\n"
-              "those `MessageBoxA` sites are the \"insert the CD\" dialog, and\n"
+              "ranking targets by boundary density is for.\n\n"
+              "The count reached one by the other route, though, and that is\n"
+              "worth recording: the two that left were the title screen's\n"
+              "SINGLE PLAYER and BOOT CAMP handlers, ported for their own sake\n"
+              "as part of the menu, with the CD check coming along through\n"
+              "`cdcheck.h`. A function declined on density can still arrive\n"
+              "because the layer around it did.\n")
+            w("\nRead that table with `docs/binarypatches.md` beside it. Those\n"
+              "`MessageBoxA` sites are the \"insert the CD\" dialog, and\n"
               "every CD check in this executable has been patched to skip it --\n"
               "so the sites are still there, still import the symbol, and can\n"
               "never execute. A site that cannot run is not outstanding boundary\n"

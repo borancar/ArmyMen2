@@ -28,6 +28,25 @@ void __cdecl StartSelectedGame(void);
  * the hosting player. */
 void __cdecl HostBattle(void);
 
+/* The title screen's seven buttons, 0x0044D2E0 .. 0x0044D4F0. Each is a
+ * handler OpenTitleScreen installs; a `push imm32` into the button
+ * constructor is their only reference in the image.
+ *
+ * They are void(void) because that is what the bodies are -- a button handler
+ * is called with its widget, and cdecl means the extra argument nothing reads
+ * costs nothing. widget.cpp casts them where it installs them.
+ *
+ * OnSinglePlayer and OnBootCamp hold two of the three MessageBoxA sites
+ * docs/boundary.md had left outstanding, both behind a CD check this build
+ * jumps past; see cdcheck.h. */
+void __cdecl OnSinglePlayer(void);
+void __cdecl OnMultiPlayer(void);
+void __cdecl OnMovies(void);
+void __cdecl OnBootCamp(void);
+void __cdecl OnOptionsMenu(void);
+void __cdecl OnCredits(void);
+void __cdecl OnQuit(void);
+
 int startgame_install(void);
 
 #ifdef __cplusplus

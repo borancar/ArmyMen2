@@ -17,6 +17,7 @@
 #include "../image.h"
 #include "../crt.h"
 #include "../../inject/patch.h"
+#include "startgame.h"
 #include "../../inject/restore.h"
 
 #include <stdint.h>
@@ -1958,8 +1959,28 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
 #define AM2_BMP_RED0   0x00487178u
 #define AM2_BMP_RED1   0x0048718Cu
 
-static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
-                              uint32_t b1, uint32_t b2, uint32_t handler)
+/* The seven title-screen handlers live in startgame.cpp, beside the other
+ * menu handler that starts a game. They are declared void(void) because that
+ * is what their bodies are; a button handler is called with the widget, and
+ * cdecl means the caller cleans, so the extra argument the original's own
+ * handlers also ignore is harmless. The cast is here rather than in their
+ * declarations so the signature stays the one the disassembly shows. */
+#define AM2_BUTTON_HANDLER(fn) ((void (__cdecl *)(AM2_Widget *))(fn))
+#define kOnBootCamp     AM2_BUTTON_HANDLER(OnBootCamp)
+#define kOnSinglePlayer AM2_BUTTON_HANDLER(OnSinglePlayer)
+#define kOnMultiPlayer  AM2_BUTTON_HANDLER(OnMultiPlayer)
+#define kOnOptionsMenu  AM2_BUTTON_HANDLER(OnOptionsMenu)
+#define kOnMovies       AM2_BUTTON_HANDLER(OnMovies)
+#define kOnCredits      AM2_BUTTON_HANDLER(OnCredits)
+#define kOnQuit         AM2_BUTTON_HANDLER(OnQuit)
+
+/* The handler by POINTER. Most menu handlers are still the original's and
+ * arrive as an address, which the overload below turns into one; the seven
+ * that are ours must not, or they would reach our own code through the image
+ * -- the seam tools/checkseams.py exists to catch. */
+static AM2_Widget *MakeButtonFn(int32_t left, int32_t top, uint32_t b0,
+                                uint32_t b1, uint32_t b2,
+                                void (__cdecl *handler)(AM2_Widget *))
 {
     AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
     AM2_Rect    box;
@@ -1969,9 +1990,14 @@ static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
     RectSet(&box, left, top, 0x51, 0x20);
     return ButtonConstruct(btn, (const char *)AM2_IMAGE(b0),
                             (const char *)AM2_IMAGE(b1),
-                            (const char *)AM2_IMAGE(b2), 1, box,
-                            (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
-                            0);
+                            (const char *)AM2_IMAGE(b2), 1, box, handler, 0);
+}
+
+static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
+                              uint32_t b1, uint32_t b2, uint32_t handler)
+{
+    return MakeButtonFn(left, top, b0, b1, b2,
+                        (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler));
 }
 
 static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
@@ -2133,11 +2159,10 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
 
     WidgetAddChild(panel, MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
                                      AM2_BMP_OK2, ADDR_ON_DIFFICULTY_OK));
-    WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
-                                     AM2_BMP_CAN2, ADDR_ON_DIALOG_CANCEL));
+    WidgetAddChild(panel, MakeButtonFn(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                       AM2_BMP_CAN2, kOnOptionsMenu));
 
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)AM2_IMAGE(ADDR_ON_DIALOG_CANCEL);
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnOptionsMenu;
     return w;
 }
 
@@ -3451,24 +3476,24 @@ AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
  * agreeing: the `orig` side still gets its button from the byte. */
 typedef struct {
     int32_t  top;
-    uint32_t handler;
+    void   (__cdecl *handler)(AM2_Widget *);
     uint32_t bmp[3];
 } AM2_TitleButton;
 
 static const AM2_TitleButton kTitleButtons[] = {
-    { 0x0082, ADDR_ON_BOOT_CAMP,
+    { 0x0082, kOnBootCamp,
       { 0x0048B620, 0x0048B638, 0x0048B650 } },  /* 03_102 bootcamp  */
-    { 0x00AA, ADDR_ON_SINGLE_PLAYER,
+    { 0x00AA, kOnSinglePlayer,
       { 0x0048B5D8, 0x0048B5F0, 0x0048B608 } },  /* 03_100 oneplay   */
-    { 0x00D2, ADDR_ON_MULTI_PLAYER,
+    { 0x00D2, kOnMultiPlayer,
       { 0x0048B590, 0x0048B5A8, 0x0048B5C0 } },  /* 03_101 multiplay */
-    { 0x00FA, ADDR_ON_DIALOG_CANCEL,
+    { 0x00FA, kOnOptionsMenu,
       { 0x0048B548, 0x0048B560, 0x0048B578 } },  /* 03_103 options   */
-    { 0x0122, ADDR_ON_MOVIES,
+    { 0x0122, kOnMovies,
       { 0x0048B500, 0x0048B518, 0x0048B530 } },  /* 03_104 movies    */
-    { 0x014A, ADDR_ON_CREDITS,
+    { 0x014A, kOnCredits,
       { 0x0048B4B8, 0x0048B4D0, 0x0048B4E8 } },  /* 03_105 credits   */
-    { 0x0172, ADDR_ON_QUIT,
+    { 0x0172, kOnQuit,
       { 0x0048B47C, 0x0048B490, 0x0048B4A4 } },  /* 03_106 quit      */
 };
 #define AM2_TITLE_MULTIPLAYER_ROW 2
@@ -3508,8 +3533,7 @@ void __cdecl OpenTitleScreen(void)
             btn = ButtonConstruct(btn, (const char *)AM2_IMAGE(b->bmp[0]),
                                   (const char *)AM2_IMAGE(b->bmp[1]),
                                   (const char *)AM2_IMAGE(b->bmp[2]), 0, box,
-                                  (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(b->handler),
+                                  b->handler,
                                   (void (__cdecl *)(AM2_Widget *))0);
         }
         WidgetAddChild(screen, btn);

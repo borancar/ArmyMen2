@@ -1589,8 +1589,11 @@
 #define VTABLE_DIFFICULTY_DIALOG 0x0046FAE0u
 #define ADDR_ON_DIFFICULTY_OK    0x0044EA80u
 /* The CANCEL handler here, and also what the dialog stores as its escape
- * action. Distinct from ADDR_ON_MENU_BACK, which the OPTIONS menu uses. */
-#define ADDR_ON_DIALOG_CANCEL    0x0044D490u
+ * action -- and the title screen's OPTIONS button, which is what its body
+ * says it is: a sound and menu request 14. Named from the body rather than
+ * from this call site, where it read as a cancel. Distinct from
+ * ADDR_ON_MENU_BACK, which the OPTIONS menu uses. */
+#define ADDR_ON_OPTIONS_MENU     0x0044D490u
 #define ADDR_LISTBOX_CTOR        0x00454F90u /* thiscall w *(w, rect, rows,
                                               * int32, int32, int32) */
 #define AM2_LISTBOX_SIZE         0x98u
@@ -1790,6 +1793,41 @@
 #define AM2_TITLE_BUTTON_LEFT    0xE7
 #define AM2_TITLE_BUTTON_WIDTH   0x98
 #define AM2_TITLE_BUTTON_HEIGHT  0x19
+/* The seven handlers' menu request codes, which are arm numbers in
+ * docs/screens.md: MOVIES asks for 13, OPTIONS for 14, QUIT for 17,
+ * MULTI-PLAYER for 6 (COMM CHANNEL SELECT), and SINGLE PLAYER for 3
+ * (SELECT PLAYER) or 2 (SELECT MAP). CREDITS asks for no screen at all --
+ * it sets the game-over reason to 4 and requests state 0. */
+#define AM2_MENU_REQUEST_MOVIES       0x0Du
+#define AM2_MENU_REQUEST_OPTIONS_MENU 0x0Eu
+#define AM2_MENU_REQUEST_QUIT         0x11u
+#define AM2_MENU_REQUEST_COMM_PANEL   0x06u
+#define AM2_MENU_REQUEST_SELECT_MAP   0x02u
+#define AM2_MENU_REQUEST_SELECT_PLAYER 0x03u
+#define AM2_GAME_OVER_CREDITS         0x04u
+/* 0x0043ED00: reload the Boot Camp level table -- it frees whatever is there,
+ * chdirs to `shared` and parses "bootcamp.txt", naming the file in
+ * "Couldn't parse %s!" if that fails. */
+#define ADDR_LOAD_BOOTCAMP_LEVELS 0x0043ED00u  /* void(void) */
+/* 0x0043E1F0: bsearch the level table -- 0x30C-byte records at
+ * ADDR_LEVEL_TABLE, count at ADDR_LEVEL_TABLE_COUNT -- for the one whose
+ * first field is the id given. Returns the record or NULL. */
+#define ADDR_FIND_LEVEL_RECORD    0x0043E1F0u  /* void *(int32_t id) */
+#define ADDR_LEVEL_TABLE          0x00656338u  /* the 0x30C-byte records */
+#define ADDR_LEVEL_TABLE_COUNT    0x0065633Cu  /* int32_t */
+#define AM2_LEVEL_RECORD_SIZE     0x30Cu
+/* 0x0043ED50: copy the names out of a level record into the globals the
+ * loader reads -- ADDR_MAP_NAME, ADDR_MAP_FOLDER and two more. */
+#define ADDR_SELECT_LEVEL         0x0043ED50u  /* void(void *record) */
+/* The chosen level's id, written beside ADDR_LEVEL_INDEX by everything that
+ * picks one: the Boot Camp button, SELECT MAP's OK and the state-2 entry. */
+#define ADDR_LEVEL_ID             0x00511D98u  /* int32_t */
+/* Set by the "Aye aye Captain!" cheat at 0x00417CAA and read in exactly one
+ * place: SINGLE PLAYER, which with it set and either SHIFT held asks for
+ * SELECT MAP instead of SELECT PLAYER. The cheat is a level select. */
+#define ADDR_CHEAT_LEVEL_SELECT   0x004FCF98u  /* int32_t */
+#define AM2_DIK_LSHIFT            0x2Au
+#define AM2_DIK_RSHIFT            0x36u
 /* Every checkbox's LEFT-click handler, written by the constructor and not by
  * the caller: the toggle. The caller's handler goes to 0x007C instead, which
  * is why clicking a plain box just ticks it and only a GROUP HEADER does
