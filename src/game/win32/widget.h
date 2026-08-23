@@ -1176,6 +1176,18 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
                                                         const char *caption,
                                                         void (__cdecl *onChange)(AM2_Widget *));
 
+/* Original: 0x00455FF0, thiscall, `ret 0x18`. The SCROLL BAR -- the three
+ * volume sliders. It builds its own two arrows, each a BUTTON with a NULL
+ * first bitmap and VTABLE_ARROW stamped over the button's, which is the one
+ * place the null-bitmap branch is taken. Its RANGE is a literal twenty. */
+AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
+                                                         int32_t left,
+                                                         int32_t top,
+                                                         int32_t width,
+                                                         int32_t height,
+                                                         AM2_Widget *parent,
+                                                         int32_t span);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

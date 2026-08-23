@@ -1733,6 +1733,20 @@
 #define VTABLE_MULTISPRITE       0x0046FD38u
 #define VTABLE_LISTBOX           0x0046FCC0u
 #define VTABLE_CHECKBOX          0x0046FC5Cu
+#define VTABLE_ARROW             0x0046FCD4u /* stamped over the button's */
+/* The scroll bar's two arrow handlers, and the three bitmaps it loads. */
+#define ADDR_ON_ARROW_LEFT       0x00455ED0u
+#define ADDR_ON_ARROW_RIGHT      0x00455F60u
+#define AM2_BMP_HSCROLLBAR       0x0048BD10u /* 03_020_00_hscrollbar.bmp */
+#define AM2_BMP_RTARROW1         0x0048BD2Cu
+#define AM2_BMP_RTARROW2         0x0048BD44u
+#define AM2_BMP_LTARROW1         0x0048BD5Cu
+#define AM2_BMP_LTARROW2         0x0048BD74u
+#define ARROW_OFF_OWNER          0x78u /* back to the bar */
+#define ARROW_OFF_FLAG5C         0x5Cu
+#define AM2_ARROW_SIZE           0x7Cu
+#define AM2_SCROLLBAR_RANGE      0x14u /* twenty steps, and what the AUDIO
+                                        * dialog divides its position by */
 /* Every checkbox's LEFT-click handler, written by the constructor and not by
  * the caller: the toggle. The caller's handler goes to 0x007C instead, which
  * is why clicking a plain box just ticks it and only a GROUP HEADER does

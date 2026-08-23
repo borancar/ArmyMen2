@@ -2357,15 +2357,11 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
  * naive (pos * span) / range would.
  *
  * Only the FIRST bar becomes the parent's focused child. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScrollBarCtorFn)(
-    AM2_Widget *w, AM2_Rect box, AM2_Widget *parent, int32_t max);
 
 #define g_volumeAtZero (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
 #define g_streamVolume  (*(const int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
 #define g_voiceVolume   (*(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
 
-#define orig_scrollbar_ctor \
-    ((AM2_ScrollBarCtorFn)AM2_IMAGE(ADDR_SCROLLBAR_CTOR))
 
 static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
                                  int32_t volume, uint32_t onChange)
@@ -2378,7 +2374,9 @@ static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
 
     if (bar) {
         RectSet(&box, x, y, 0xBA, 0x15);
-        bar = orig_scrollbar_ctor(bar, box, parent, 0x92);
+        bar = ScrollBarConstruct(bar, box.left, box.top,
+                                 box.right, box.bottom, parent,
+                                 0x92);
     }
     WidgetAddChild(parent, bar);
 
@@ -3179,6 +3177,92 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00455FF0, thiscall, `ret 0x18`. The SCROLL BAR -- the three volume
+ * sliders and nothing else.
+ *
+ * It builds its own two arrows, and widget.h already records how: there is no
+ * arrow constructor, so each one is a BUTTON with VTABLE_ARROW stamped over
+ * the button's vtable afterwards. Reading this function is what confirms it.
+ *
+ * Each arrow is built with a NULL first bitmap, which is the path
+ * ButtonConstruct tests for: it sets 0x0048 as well, and WidgetRepaint reads
+ * that as "defer to an ancestor", so an arrow has no backdrop of its own and
+ * the bar behind it is what gets redrawn. That is why the arrows are the one
+ * place the null-bitmap branch is taken.
+ *
+ * The RANGE goes in as a literal 0x14 -- twenty steps -- which is the number
+ * the AUDIO dialog divides a position by, and which matches
+ * (volume + 2000) / 100 landing in 0..20. Two independent places agreeing on
+ * twenty is better evidence than either alone.
+ *
+ * The right arrow sits at left + width - 9, computed with a `lea` rather than
+ * stored. */
+static AM2_Widget *MakeArrow(AM2_Widget *bar, int32_t x, int32_t y,
+                             uint32_t b1, uint32_t b2, uint32_t handler)
+{
+    AM2_Widget *arrow = (AM2_Widget *)orig_operator_new(AM2_ARROW_SIZE);
+    AM2_Rect    box;
+
+    if (!arrow)
+        return (AM2_Widget *)0;
+    RectSet(&box, x, y, 9, 0x13);
+    ButtonConstruct(arrow, (const char *)0, (const char *)AM2_IMAGE(b1),
+                    (const char *)AM2_IMAGE(b2), 1, box,
+                    (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
+                    (void (__cdecl *)(AM2_Widget *))0);
+    arrow->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+    *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER) = bar;
+    return arrow;
+}
+
+AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
+                                                         int32_t left,
+                                                         int32_t top,
+                                                         int32_t width,
+                                                         int32_t height,
+                                                         AM2_Widget *parent,
+                                                         int32_t span)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Widget *arrow;
+
+    WidgetConstruct(w);
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_SCROLLBAR);
+
+    arrow = MakeArrow(w, w->x, w->y, AM2_BMP_LTARROW1, AM2_BMP_LTARROW2,
+                      ADDR_ON_ARROW_LEFT);
+    *(AM2_Widget **)(self + 0x5C) = arrow;
+    WidgetAddChild(parent, arrow);
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + 0x5C)
+                 + ARROW_OFF_FLAG5C) = 1;
+
+    arrow = MakeArrow(w, w->x + w->w - 9, w->y, AM2_BMP_RTARROW1,
+                      AM2_BMP_RTARROW2, ADDR_ON_ARROW_RIGHT);
+    *(AM2_Widget **)(self + 0x60) = arrow;
+    WidgetAddChild(parent, arrow);
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + 0x60)
+                 + ARROW_OFF_FLAG5C) = 1;
+
+    *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR) =
+        orig_preload_by_name((const char *)AM2_IMAGE(AM2_BMP_HSCROLLBAR),
+                             1, 1);
+    WidgetScreenRect(w);
+
+    *(int32_t *)(self + SCROLLBAR_OFF_SPAN)  = span;
+    *(int32_t *)(self + 0x58)                = 0;
+    w->unknown48                             = 0;
+    *(int32_t *)(self + SCROLLBAR_OFF_POS)   = 0;
+    *(int32_t *)(self + SCROLLBAR_OFF_RANGE) = AM2_SCROLLBAR_RANGE;
+    *(int32_t *)(self + SCROLLBAR_OFF_SHIFT) = 0;
+    *(int32_t *)(self + 0x68)                = 0;
+    *(uint32_t *)(self + SCROLLBAR_OFF_ONCHANGE) = 0;
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -3284,6 +3368,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_SCROLLBAR_CTOR,
+                        (const void *)ScrollBarConstruct, "ScrollBarConstruct",
+                        6);
     rc |= patch_replace(ADDR_CHECKBOX_CTOR, (const void *)CheckBoxConstruct,
                         "CheckBoxConstruct", 11);
     rc |= patch_replace(ADDR_LISTBOX_CTOR, (const void *)ListBoxConstruct,

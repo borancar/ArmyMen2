@@ -210,6 +210,23 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The SCROLL BAR constructor is reconstructed** (`0x00455FF0`, 453 B) and it
+  confirms by running what `widget.h` had worked out by reading: **the arrows
+  have no constructor.** Each one is a BUTTON with `VTABLE_ARROW` stamped over
+  the button's vtable afterwards.
+
+  They are also the one place the button's null-bitmap branch is taken. Each
+  arrow goes in with a NULL first bitmap, which sets 0x0048, which
+  `WidgetRepaint` reads as "defer to an ancestor" -- so an arrow has no
+  backdrop of its own and the bar behind it is what gets redrawn. A branch
+  that looked defensive when the button went in has exactly two callers and
+  they are both here.
+
+  And the RANGE is a literal **twenty**, which is the number the AUDIO dialog
+  divides a position by and which matches `(volume + 2000) / 100` landing in
+  0..20. Two independent places agreeing on twenty is better evidence than
+  either alone.
+
 - **The CHECKBOX constructor is reconstructed, and writing it found a defect
   in code that had already passed an A/B twice.** `0x00454640`, 255 B.
 
@@ -755,10 +772,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 682 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 681 | 671 of them below the CRT line |
+| `patch_replace` sites | 683 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 682 | 672 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 123,232 / 372,816 B (**33.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 123,696 / 372,816 B (**33.2%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
