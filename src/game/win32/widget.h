@@ -1046,6 +1046,12 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
                                                           const char *bmp);
 
+/* Original: 0x0042E9C0, thiscall. COMM. CHANNEL SELECT -- the connection
+ * list, filled by our own CommEnumConnections. Its list box takes ADDR_LOG as
+ * a callback, which is the folded empty-virtual address; see widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
+                                                         const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

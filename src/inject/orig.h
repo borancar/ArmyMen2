@@ -1655,6 +1655,26 @@
 #define AM2_BMP_GREEN0           0x0048701Cu /* 03_028_0N_green.bmp */
 #define AM2_BMP_GREEN1           0x00487030u
 #define ADDR_STR_BATTLE_PANEL    0x00487094u /* "02_002_00_host.bmp" */
+
+/* COMM. CHANNEL SELECT, 0x0042E9C0 -- the connection list. */
+#define VTABLE_COMM_PANEL        0x0046F9D0u
+#define ADDR_STR_COMMPANEL_BMP   0x00486EACu /* "02_001_00_commpanel.bmp" */
+/* The scroll bar WITH arrows, as against the bare one the volume sliders use.
+ * `ret 0x24` is 36: rectangle, the list it drives, two bitmaps, a maximum and
+ * a zero. */
+#define ADDR_ARROWBAR_CTOR       0x00455970u /* thiscall, ret 0x24 */
+#define AM2_ARROWBAR_SIZE        0x78u
+#define AM2_BMP_SCROLLBAR0       0x00486E7Cu /* 03_010_0N_scrollbar.bmp */
+#define AM2_BMP_SCROLLBAR1       0x00486E94u
+#define AM2_BMP_SELECT0          0x00486E34u /* 03_005_0N_select.bmp */
+#define AM2_BMP_SELECT1          0x00486E4Cu
+#define AM2_BMP_SELECT2          0x00486E64u
+/* The list and its bar point at each other. */
+#define LIST_OFF_ARROWBAR        0x7Cu
+#define ARROWBAR_OFF_LIST        0x58u
+/* Where this dialog keeps them: the list at 0x0064 and the rows at 0x0068. */
+#define COMMPANEL_OFF_LIST       0x64u
+#define COMMPANEL_OFF_ROWS       0x68u
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */

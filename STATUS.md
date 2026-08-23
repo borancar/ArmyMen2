@@ -210,6 +210,21 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **COMM. CHANNEL SELECT is reconstructed** (`0x0042E9C0`, 760 B). Its rows
+  come from our own `CommEnumConnections` into a record built by our own
+  `RecordCtor` -- with a flag of 1 where DIFFICULTY passes 0.
+
+  **Its list box takes `ADDR_LOG` as a callback, and that is not a mistake in
+  either direction.** `orig.h` already records that the linker folded an empty
+  virtual and the stubbed varargs logger onto one address, because both are a
+  single `ret` byte. Passing it here means "no callback" -- and it is passed
+  as the literal address rather than as a null, which is what the original
+  does and what we reproduce. A reconstruction that "cleaned it up" to 0 would
+  be a behavioural change nobody could see until something read the slot.
+
+  The bar is the arrow-ended one, `ret 0x24`, and the list and bar point at
+  each other afterwards -- the list at 0x007C and the bar at 0x0058.
+
 - **ENTER BATTLE NAME is reconstructed** (`0x0042FB00`, 1,082 B), and it
   answers a question the multiplayer code raised: **the two fields edit the
   DIALOG's own buffers in place.** The constructor copies
@@ -588,10 +603,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 672 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 671 | 661 of them below the CRT line |
+| `patch_replace` sites | 673 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 672 | 662 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 119,824 / 372,816 B (**32.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 120,592 / 372,816 B (**32.3%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

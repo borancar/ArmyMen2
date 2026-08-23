@@ -1759,7 +1759,7 @@ void __cdecl OpenCommPanel(void)
     CloseCurrentScreen();
     CommCreateDirectPlay(g_commObject, (void *)0);
     OpenScreen(AM2_COMM_PANEL_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_COMM_PANEL_CTOR),
+               (AM2_ScreenCtorFn)CommPanelConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -2610,6 +2610,96 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x0042E9C0, thiscall. COMM. CHANNEL SELECT -- the connection list.
+ *
+ * The rows come from our own CommEnumConnections, into a record built by our
+ * own RecordCtor with a flag of 1 where DIFFICULTY passes 0. Both are kept on
+ * the dialog: the list at 0x0064 and the rows at 0x0068.
+ *
+ * The list box's third argument is a FUNCTION POINTER and it is ADDR_LOG.
+ * That is not a mistake either way round: orig.h already records that the
+ * linker folded an empty virtual and the stubbed varargs logger onto one
+ * address, because both are a single `ret` byte. Passing it here means "no
+ * callback", and it is passed as the literal address rather than as a null
+ * because that is what the original does.
+ *
+ * The bar is the arrow-ended one -- `ret 0x24`, 36 bytes: rectangle, the list
+ * it drives, two bitmaps, a maximum and a zero -- and the two point at each
+ * other afterwards, the list at 0x007C and the bar at 0x0058. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ArrowBarCtorFn)(
+    AM2_Widget *w, AM2_Rect box, AM2_Widget *list, const char *b0,
+    const char *b1, int32_t max, int32_t zero);
+
+#define orig_arrowbar_ctor ((AM2_ArrowBarCtorFn)AM2_IMAGE(ADDR_ARROWBAR_CTOR))
+
+AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
+                                                         const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Widget *list;
+    AM2_Widget *bar;
+    void       *rows;
+    AM2_Rect    box;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_COMM_PANEL);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    rows = orig_operator_new(AM2_ROWS_SIZE);
+    if (rows)
+        rows = RecordCtor(rows, 1);
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS) = rows;
+    CommEnumConnections(g_commObject, rows);
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x40, 0x62, 0x200, 0x11C);
+        panel = orig_panel_ctor(panel,
+                                (const char *)AM2_IMAGE(ADDR_STR_COMMPANEL_BMP),
+                                0, box);
+    }
+    WidgetAddChild(w, panel);
+    panel->flag44 = 1;
+
+    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
+    if (list) {
+        RectSet(&box, 0x2A, 0x44, 0x11F, 0xAA);
+        list = orig_listbox_ctor(list, box,
+                                 *(void **)((uint8_t *)w
+                                            + COMMPANEL_OFF_ROWS),
+                                 (int32_t)AM2_IMAGE(ADDR_LOG), 0, 1);
+    }
+    *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST) = list;
+    WidgetAddChild(panel, list);
+    {
+        AM2_Widget *l = *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
+
+        ((AM2_WidgetFocusFn *)l->vtable)[WIDGET_VSLOT_FOCUS](l, 0);
+    }
+
+    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
+    if (bar) {
+        RectSet(&box, 0x15E, 0x3C, 0x13, 0xBA);
+        bar = orig_arrowbar_ctor(bar, box, panel,
+                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                 0x92, 0);
+    }
+    WidgetAddChild(panel, bar);
+    *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w
+                                                 + COMMPANEL_OFF_LIST)
+                     + LIST_OFF_ARROWBAR) = bar;
+    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) =
+        *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
+
+    WidgetAddChild(panel, MakeButton(0x19C, 0x6B, AM2_BMP_SELECT0,
+                                     AM2_BMP_SELECT1, AM2_BMP_SELECT2,
+                                     ADDR_START_SELECTED_GAME));
+    WidgetAddChild(panel, MakeButton(0x19C, 0x94, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                     AM2_BMP_CAN2, ADDR_ON_MENU_BACK));
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2715,6 +2805,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_COMM_PANEL_CTOR,
+                        (const void *)CommPanelConstruct,
+                        "CommPanelConstruct", 1);
     rc |= patch_replace(ADDR_BATTLE_NAME_CTOR,
                         (const void *)BattleNameConstruct,
                         "BattleNameConstruct", 1);
