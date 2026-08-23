@@ -1707,6 +1707,16 @@
 #define AM2_FIND_OFF_ATTRIB      0x00u
 #define AM2_FIND_OFF_NAME        0x14u
 #define AM2_FIND_ATTR_DIR        0x10u
+
+/* The PANEL, 0x00454980 -- a widget whose whole job is to hold a backdrop
+ * sprite, and the container eight of the reconstructed screens hang
+ * everything else off. `ret 0x18`: bitmap, flag, rectangle by value. */
+#define VTABLE_PANEL             0x0046FC70u
+#define ADDR_PRELOAD_SPRITE_NAME 0x00445CF0u /* AM2_Sprite *(name, f, 1) --
+                                              * splits the name and calls
+                                              * PreloadSprite */
+#define PANEL_OFF_SPRITE         0x58u       /* the same sprite as 0x0038 */
+#define PANEL_OFF_FLAG           0x5Cu
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */

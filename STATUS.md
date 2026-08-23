@@ -210,6 +210,22 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **The PANEL constructor is reconstructed** (`0x00454980`, 136 B) -- the
+  container eight of the reconstructed screens hang everything off, and so the
+  most-used constructor in the family and the cheapest to check: every
+  configuration that opens a dialog draws one.
+
+  **It keeps the sprite twice**, at 0x0038 and 0x0058. 0x0038 is the base
+  class's own field -- what `WidgetPaint` draws and what `WidgetRepaint` walks
+  the parent chain looking for -- and 0x0058 is the panel's. Reproduced rather
+  than collapsed: something reads one of them and nothing here establishes
+  which.
+
+  It also named `0x00445CF0`, which is not `PreloadSprite` but a wrapper: it
+  splits a bitmap NAME into set, index and frame through `0x0042E310` and then
+  calls `PreloadSprite` with the three numbers. That is how a screen can name
+  `03_017_00_check.bmp` where the sprite layer wants integers.
+
 - **SELECT PLAYER is reconstructed** (`0x00451400`, 1,247 B) -- the one screen
   whose rows come off the FILESYSTEM rather than from a table or the comm
   object. It chdirs to `save` and walks it with the CRT's `_findfirst` /
@@ -628,10 +644,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 674 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 673 | 663 of them below the CRT line |
+| `patch_replace` sites | 675 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 674 | 664 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 121,840 / 372,816 B (**32.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 121,984 / 372,816 B (**32.7%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

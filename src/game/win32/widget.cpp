@@ -1958,7 +1958,6 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_TyperCtorFn)(
 typedef AM2_Widget *(__attribute__((thiscall)) *AM2_MultiSpriteCtorFn)(
     AM2_Widget *w, const char *b0, const char *b1, int32_t flag, AM2_Rect box);
 
-#define orig_panel_ctor  ((AM2_PanelCtorFn)AM2_IMAGE(ADDR_PANEL_CTOR))
 #define orig_typer_ctor  ((AM2_TyperCtorFn)AM2_IMAGE(ADDR_TYPER_CTOR))
 #define orig_multisprite_ctor \
     ((AM2_MultiSpriteCtorFn)AM2_IMAGE(ADDR_MULTISPRITE_CTOR))
@@ -2006,7 +2005,7 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
-        panel = orig_panel_ctor(panel, (const char *)AM2_IMAGE(panelBmp), 0,
+        panel = PanelConstruct(panel, (const char *)AM2_IMAGE(panelBmp), 0,
                                 box);
     }
     WidgetAddChild(w, panel);
@@ -2105,7 +2104,7 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
-        panel = orig_panel_ctor(panel,
+        panel = PanelConstruct(panel,
                                 (const char *)AM2_IMAGE(ADDR_STR_DIFFICULTY_BMP),
                                 0, box);
     }
@@ -2453,7 +2452,7 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
 
         if (panel) {
             RectSet(&box, offX, offY, 0x16E, 0xED);
-            panel = orig_panel_ctor(panel,
+            panel = PanelConstruct(panel,
                                     (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP),
                                     0, box);
         }
@@ -2589,7 +2588,7 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x6C, 0x8F, 0x1A7, 0xC1);
-        panel = orig_panel_ctor(panel,
+        panel = PanelConstruct(panel,
                                 (const char *)AM2_IMAGE(ADDR_STR_BATTLE_PANEL),
                                 0, box);
     }
@@ -2654,7 +2653,7 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x40, 0x62, 0x200, 0x11C);
-        panel = orig_panel_ctor(panel,
+        panel = PanelConstruct(panel,
                                 (const char *)AM2_IMAGE(ADDR_STR_COMMPANEL_BMP),
                                 0, box);
     }
@@ -2766,7 +2765,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-        panel = orig_panel_ctor(panel, (const char *)
+        panel = PanelConstruct(panel, (const char *)
                                 AM2_IMAGE(ADDR_STR_SELECTPLAYER_BMP), 0, box);
     }
     WidgetAddChild(w, panel);
@@ -2821,6 +2820,46 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
         (uint32_t)AM2_IMAGE(ADDR_ON_MENU_BACK);
+    return w;
+}
+
+/* 0x00454980, thiscall, `ret 0x18`. The PANEL: a widget whose whole job is to
+ * hold a backdrop sprite. Eight of the reconstructed screens hang everything
+ * else off one of these, so this is the most-used constructor in the family
+ * and the cheapest to check -- every configuration that opens a dialog draws
+ * it.
+ *
+ * It keeps the sprite TWICE, at 0x0038 and at 0x0058. 0x0038 is the base
+ * class's own field, which WidgetPaint draws and WidgetRepaint walks the
+ * parent chain looking for; 0x0058 is the panel's, and widget.h already
+ * records that pairing. Reproduced rather than collapsed: something reads one
+ * of them and nothing here establishes which.
+ *
+ * The rectangle arrives by value and goes straight into the base's four
+ * offset fields, and WidgetScreenRect then turns it into the absolute one. */
+typedef AM2_Sprite *(__cdecl *AM2_PreloadByNameFn)(const char *name,
+                                                   int32_t flag, int32_t one);
+#define orig_preload_by_name \
+    ((AM2_PreloadByNameFn)AM2_IMAGE(ADDR_PRELOAD_SPRITE_NAME))
+
+AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
+                                                     const char *bmp,
+                                                     int32_t flag,
+                                                     AM2_Rect box)
+{
+    AM2_Sprite *spr;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_PANEL);
+    spr = orig_preload_by_name(bmp, flag, 1);
+    *(AM2_Sprite **)((uint8_t *)w + PANEL_OFF_SPRITE) = spr;
+    w->sprite = spr;
+    w->x = box.left;
+    w->y = box.top;
+    w->w = box.right;
+    w->h = box.bottom;
+    WidgetScreenRect(w);
+    *(int32_t *)((uint8_t *)w + PANEL_OFF_FLAG) = flag;
     return w;
 }
 
@@ -2929,6 +2968,8 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_PANEL_CTOR, (const void *)PanelConstruct,
+                        "PanelConstruct", 6);
     rc |= patch_replace(ADDR_SELECT_PLAYER_CTOR,
                         (const void *)SelectPlayerConstruct,
                         "SelectPlayerConstruct", 1);

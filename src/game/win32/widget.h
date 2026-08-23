@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "../../inject/orig.h"
 #include "../../inject/win32.h"
+#include "../rect.h"   /* AM2_Rect, by value in the widget constructors */
 
 #ifdef __cplusplus
 extern "C" {
@@ -1056,6 +1057,15 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
  * come off the FILESYSTEM. See widget.cpp. */
 AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
                                                             const char *bmp);
+
+/* Original: 0x00454980, thiscall, `ret 0x18`. The PANEL -- a widget whose
+ * whole job is to hold a backdrop sprite, and what eight of the reconstructed
+ * screens hang everything else off. It keeps the sprite twice, at 0x0038 and
+ * 0x0058; see widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
+                                                     const char *bmp,
+                                                     int32_t flag,
+                                                     AM2_Rect box);
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
