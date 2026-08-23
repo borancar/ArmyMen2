@@ -1639,7 +1639,7 @@ void __cdecl OpenSelectPlayer(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_SELECT_PLAYER_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_SELECT_PLAYER_CTOR),
+               (AM2_ScreenCtorFn)SelectPlayerConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -2700,6 +2700,130 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x00451400, thiscall. SELECT PLAYER -- and the one screen whose rows come
+ * off the FILESYSTEM rather than from a table or the comm object.
+ *
+ * It chdirs to `save` and walks it with the CRT's _findfirst / _findnext,
+ * taking every entry that is a DIRECTORY and whose name does not begin with a
+ * dot -- which is how "." and ".." are skipped without comparing whole names.
+ * Each one becomes a row. Then, once the list exists, the FIRST row's name is
+ * copied into the current-player string at ADDR_GAMEPROC_BLOCK, so opening
+ * this screen selects a player whether or not anyone clicks.
+ *
+ * The glob is the literal "*" copied to a local first. The copy is the
+ * original's -- _findfirst takes a const char * and would have been happy with
+ * the constant -- and it is reproduced because a local buffer is what the
+ * stack layout says was there. */
+typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *pattern, void *data);
+typedef int32_t (__cdecl *AM2_FindNextFn)(int32_t handle, void *data);
+typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t handle);
+typedef void (__cdecl *AM2_ReadCampaignFn)(void);
+
+#define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findnext   ((AM2_FindNextFn)AM2_IMAGE(ADDR_CRT_FINDNEXT))
+#define orig_findclose  ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_read_campaign \
+    ((AM2_ReadCampaignFn)AM2_IMAGE(ADDR_READ_CAMPAIGN_FILE))
+#define g_currentPlayer ((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
+
+AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
+                                                            const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Widget *list;
+    AM2_Widget *bar;
+    void       *rows;
+    AM2_Rect    box;
+    char        pattern[264];
+    uint8_t     found[0x11C];
+    int32_t     handle;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_PLAYER);
+    orig_read_campaign();
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    g_currentPlayer[0] = '\0';
+
+    rows = orig_operator_new(AM2_ROWS_SIZE);
+    if (rows)
+        rows = RecordCtor(rows, 1);
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
+
+    strcpy(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_ALL));
+    handle = orig_findfirst(pattern, found);
+    if (handle != -1) {
+        do {
+            const char *name = (const char *)(found + AM2_FIND_OFF_NAME);
+
+            if ((found[AM2_FIND_OFF_ATTRIB] & AM2_FIND_ATTR_DIR)
+                    && name[0] != '.')
+                ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), name,
+                        (void *)0);
+        } while (orig_findnext(handle, found) == 0);
+        orig_findclose(handle);
+    }
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
+        panel = orig_panel_ctor(panel, (const char *)
+                                AM2_IMAGE(ADDR_STR_SELECTPLAYER_BMP), 0, box);
+    }
+    WidgetAddChild(w, panel);
+    w->focusedChild = panel;
+    panel->flag44 = 1;
+
+    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
+    if (list) {
+        RectSet(&box, 0x29, 0x43, 0x96, 0xAB);
+        list = orig_listbox_ctor(list, box,
+                                 *(void **)((uint8_t *)w
+                                            + COMMPANEL_OFF_LIST),
+                                 (int32_t)AM2_IMAGE(ADDR_SELECT_PLAYER_ROW),
+                                 0, 1);
+    }
+    WidgetAddChild(panel, list);
+    ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
+
+    /* Opening the screen selects the first player. */
+    {
+        const int32_t *r = *(const int32_t **)((uint8_t *)w
+                                               + COMMPANEL_OFF_LIST);
+
+        if (r[0] > 0)
+            strcpy(g_currentPlayer, *(const char *const *)(r + 1));
+    }
+
+    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
+    if (bar) {
+        RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
+        bar = orig_arrowbar_ctor(bar, box, panel,
+                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                 (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                 0x92, 0);
+    }
+    WidgetAddChild(panel, bar);
+    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
+    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
+
+    WidgetAddChild(panel, MakeButton(0x123, 0x44, AM2_BMP_RECRUIT0,
+                                     AM2_BMP_RECRUIT1, AM2_BMP_RECRUIT2,
+                                     ADDR_ON_RECRUIT));
+    WidgetAddChild(panel, MakeButton(0x123, 0x6B, AM2_BMP_SELECT0,
+                                     AM2_BMP_SELECT1, AM2_BMP_SELECT2,
+                                     ADDR_ON_SELECT_PLAYER));
+    WidgetAddChild(panel, MakeButton(0x123, 0x92, AM2_BMP_DELETE0,
+                                     AM2_BMP_DELETE1, AM2_BMP_DELETE2,
+                                     ADDR_ON_DELETE_PLAYER));
+    WidgetAddChild(panel, MakeButton(0x123, 0xB9, AM2_BMP_BACK0,
+                                     AM2_BMP_BACK1, AM2_BMP_BACK2,
+                                     ADDR_ON_MENU_BACK));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)AM2_IMAGE(ADDR_ON_MENU_BACK);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2805,6 +2929,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_SELECT_PLAYER_CTOR,
+                        (const void *)SelectPlayerConstruct,
+                        "SelectPlayerConstruct", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_CTOR,
                         (const void *)CommPanelConstruct,
                         "CommPanelConstruct", 1);

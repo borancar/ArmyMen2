@@ -210,6 +210,21 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
+- **SELECT PLAYER is reconstructed** (`0x00451400`, 1,247 B) -- the one screen
+  whose rows come off the FILESYSTEM rather than from a table or the comm
+  object. It chdirs to `save` and walks it with the CRT's `_findfirst` /
+  `_findnext`, taking every entry that is a DIRECTORY and whose name does not
+  begin with a dot, which is how "." and ".." are skipped without comparing
+  whole names.
+
+  Then, once the list exists, **the first row's name is copied into the
+  current-player string** at `ADDR_GAMEPROC_BLOCK` -- so opening this screen
+  selects a player whether or not anyone clicks. That the campaign still
+  reaches MAP 01 is what says the copy works; the widget tree alone would not.
+
+  Reconstructed the turn after the dump that made it comparable, which is the
+  order that costs least.
+
 - **`ab.sh campaign` compares the SELECT PLAYER tree now**, ten nodes, and
   until this it compared that screen not at all -- it drove straight through
   on its way to the map and compared only the log and a live-play frame. The
@@ -613,10 +628,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 673 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 672 | 662 of them below the CRT line |
+| `patch_replace` sites | 674 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 673 | 663 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 120,592 / 372,816 B (**32.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 121,840 / 372,816 B (**32.7%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

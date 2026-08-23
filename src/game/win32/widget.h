@@ -1052,6 +1052,11 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
                                                          const char *bmp);
 
+/* Original: 0x00451400, thiscall. SELECT PLAYER -- the one screen whose rows
+ * come off the FILESYSTEM. See widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
+                                                            const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

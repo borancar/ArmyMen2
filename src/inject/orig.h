@@ -1675,6 +1675,38 @@
 /* Where this dialog keeps them: the list at 0x0064 and the rows at 0x0068. */
 #define COMMPANEL_OFF_LIST       0x64u
 #define COMMPANEL_OFF_ROWS       0x68u
+
+/* SELECT PLAYER, 0x00451400 -- the saved-player list, and the one screen whose
+ * rows come off the FILESYSTEM rather than from a table or the comm object. */
+#define VTABLE_SELECT_PLAYER     0x0046FBA8u
+#define ADDR_READ_CAMPAIGN_FILE  0x0043EC80u /* void(void): DefParseInfoFile
+                                              * on "campaign.txt", with the
+                                              * same "Couldn't parse %s!" as
+                                              * ReadMpMapsFile */
+#define ADDR_STR_SAVE_DIR        0x004851CCu /* "save" */
+#define ADDR_STR_GLOB_ALL        0x0048BAA0u /* "*" */
+#define ADDR_STR_SELECTPLAYER_BMP 0x0048BA84u
+#define ADDR_ON_RECRUIT          0x00451300u
+#define ADDR_ON_SELECT_PLAYER    0x00451380u
+#define ADDR_ON_DELETE_PLAYER    0x00451330u
+#define ADDR_SELECT_PLAYER_ROW   0x004512A0u /* the list's row callback */
+#define AM2_BMP_RECRUIT0         0x0048BA3Cu
+#define AM2_BMP_RECRUIT1         0x0048BA54u
+#define AM2_BMP_RECRUIT2         0x0048BA6Cu
+#define AM2_BMP_DELETE0          0x0048B9F4u
+#define AM2_BMP_DELETE1          0x0048BA0Cu
+#define AM2_BMP_DELETE2          0x0048BA24u
+#define AM2_BMP_BACK0            0x0048B6BCu
+#define AM2_BMP_BACK1            0x0048B6D0u
+#define AM2_BMP_BACK2            0x0048B6E4u
+/* MSVC's _findfirst / _findnext / _findclose, and the two fields of
+ * _finddata_t this screen reads. */
+#define ADDR_CRT_FINDFIRST       0x00465BA3u
+#define ADDR_CRT_FINDNEXT        0x00465C6Du
+#define ADDR_CRT_FINDCLOSE       0x00465D32u
+#define AM2_FIND_OFF_ATTRIB      0x00u
+#define AM2_FIND_OFF_NAME        0x14u
+#define AM2_FIND_ATTR_DIR        0x10u
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */
