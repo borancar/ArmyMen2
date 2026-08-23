@@ -1923,6 +1923,24 @@
 #define ADDR_ON_LOADGAME_LOAD    0x00452060u
 #define ADDR_ON_LOADGAME_DELETE  0x00451F10u
 #define ADDR_ON_LOADGAME_BACK    0x00452010u
+/* The save DELETE GAME is about to remove -- LOAD GAME's DELETE copies the
+ * chosen name in, DELETE GAME's CANCEL clears it, and its OK reads it. */
+#define ADDR_PENDING_DELETE      0x00659F58u /* char[] */
+#define ADDR_STR_DATA_DIR        0x0048BAB8u /* "data" */
+/* The in-mission overlay mode DELETE GAME asks with. Its CANCEL goes back to
+ * AM2_MENU_MODE_DEL_PLAYER (0x1A) when it came from here and to 0x19
+ * otherwise -- computed with `sete` and `add 0x19` rather than written.
+ *
+ * TWO names for 0x1A and two for 0x17 were nearly added here. They are one
+ * screen each: LOAD GAME's BACK targets the same 0x17 the OPTIONS dialogs do,
+ * and DELETE GAME's CANCEL the same 0x1A DELETE PLAYER's does. Both existing
+ * names come from the first CALL SITE seen and may be under-specific -- the
+ * mode is a sub-state index into the table at 0x00426230, and what each arm
+ * shows is not established here. A possibly-narrow name beats a second name
+ * on one value. */
+#define AM2_MENU_MODE_DEL_GAME   0x1D
+#define AM2_MENU_MODE_AFTER_LOAD 0x19
+#define AM2_MENU_REQUEST_DEL_GAME 0x15u
 #define AM2_BMP_NEW0             0x0048BAFCu /* 03_011_0N_new.bmp */
 #define AM2_BMP_NEW1             0x0048BB10u
 #define AM2_BMP_NEW2             0x0048BB24u

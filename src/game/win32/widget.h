@@ -1314,6 +1314,14 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
                                                         const char *bmp,
                                                         int32_t flag);
 
+/* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,
+ * 0x00450180 and 0x00451FB0. */
+void __cdecl OnEnterNameCancel(AM2_Widget *w);
+void __cdecl OnLoadGameBack(AM2_Widget *w);
+void __cdecl OnLoadGameDelete(AM2_Widget *w);
+void __cdecl OnDelGameCancel(AM2_Widget *w);
+void __cdecl OnLoadGameNew(AM2_Widget *w);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:

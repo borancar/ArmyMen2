@@ -60,6 +60,11 @@
 #define kOnSelectPlayer     OnSelectPlayer
 #define kOnDelPlayerCancel  OnDelPlayerCancel
 #define kOnReplayOk         OnReplayOk
+#define kOnEnterNameCancel  OnEnterNameCancel
+#define kOnLoadGameBack     OnLoadGameBack
+#define kOnLoadGameDelete   OnLoadGameDelete
+#define kOnDelGameCancel    OnDelGameCancel
+#define kOnLoadGameNew      OnLoadGameNew
 #define kOnAudioButton      OnAudioButton
 #define kOnControlsButton   OnControlsButton
 #define kOnDifficultyButton OnDifficultyButton
@@ -4403,7 +4408,7 @@ AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
                                      kImageHandler(ADDR_ON_ENTER_NAME_OK)));
     WidgetAddChild(panel, MakeButton(0x14A, 0x48, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                      AM2_BMP_CAN2,
-                                     kImageHandler(ADDR_ON_ENTER_NAME_CANCEL)));
+                                     kOnEnterNameCancel));
 
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
@@ -4416,7 +4421,7 @@ AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
     *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)(uintptr_t)kImageHandler(ADDR_ON_ENTER_NAME_CANCEL);
+        (uint32_t)(uintptr_t)kOnEnterNameCancel;
     return w;
 }
 
@@ -4474,7 +4479,7 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
     WidgetAddChild(parent,
                    MakeButton(dx + 0x149, dy + 0x61, AM2_BMP_CAN0,
                               AM2_BMP_CAN1, AM2_BMP_CAN2,
-                              kImageHandler(ADDR_ON_DELGAME_CANCEL)));
+                              kOnDelGameCancel));
 
     msg = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
     if (msg) {
@@ -4495,7 +4500,7 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
     *(AM2_Widget **)((uint8_t *)msg + TYPER_OFF_BLINKER) = dot;
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)(uintptr_t)kImageHandler(ADDR_ON_DELGAME_CANCEL);
+        (uint32_t)(uintptr_t)kOnDelGameCancel;
     return w;
 }
 
@@ -4722,21 +4727,126 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
 
     WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x44, AM2_BMP_NEW0,
                                       AM2_BMP_NEW1, AM2_BMP_NEW2,
-                                      kImageHandler(ADDR_ON_LOADGAME_NEW)));
+                                      kOnLoadGameNew));
     WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x6B, AM2_BMP_LOAD0,
                                       AM2_BMP_LOAD1, AM2_BMP_LOAD2,
                                       kImageHandler(ADDR_ON_LOADGAME_LOAD)));
     WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0x92,
                                       AM2_BMP_DELETE12_0, AM2_BMP_DELETE12_1,
                                       AM2_BMP_DELETE12_2,
-                                      kImageHandler(ADDR_ON_LOADGAME_DELETE)));
+                                      kOnLoadGameDelete));
     WidgetAddChild(parent, MakeButton(dx + 0x123, dy + 0xB9, AM2_BMP_BACK19_0,
                                       AM2_BMP_BACK19_1, AM2_BMP_BACK19_2,
-                                      kImageHandler(ADDR_ON_LOADGAME_BACK)));
+                                      kOnLoadGameBack));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (uint32_t)(uintptr_t)kImageHandler(ADDR_ON_LOADGAME_BACK);
+        (uint32_t)(uintptr_t)kOnLoadGameBack;
     return w;
+}
+
+/* ------------------------------------------------------------------ *
+ * The save-game family's buttons: ENTER NAME's CANCEL, and LOAD GAME's and
+ * DELETE GAME's exits.
+ *
+ * Every one of them that can be opened from a mission has the two-armed
+ * ending the OPTIONS dialogs have -- an overlay MODE in state 2 and a menu
+ * REQUEST otherwise -- and the modes differ per screen. ENTER NAME's CANCEL
+ * is the exception and has only the request, because RECRUIT is not reachable
+ * from play.
+ * ------------------------------------------------------------------ */
+
+#define g_pendingDelete   ((char *)(uintptr_t)ADDR_PENDING_DELETE)
+
+/* 0x00451AC0. ENTER NAME's CANCEL, and the screen's escape action. */
+void __cdecl OnEnterNameCancel(AM2_Widget *w)
+{
+    (void)w;
+    RequestScreen(AM2_MENU_REQUEST_SELECT_PLAYER);
+}
+
+/* 0x00452010. LOAD GAME's BACK, and its escape action. */
+void __cdecl OnLoadGameBack(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    if (g_gameState == 2) {
+        g_menuMode     = MENU_MODE_OPTIONS;
+        g_overlayDirty = 1;
+    } else {
+        g_menuRequest    = AM2_MENU_REQUEST_SELECT_PLAYER;
+        g_menuRequestSet = 1;
+    }
+}
+
+/* 0x00451F10. LOAD GAME's DELETE: refuse with wave 3 if nothing is chosen,
+ * otherwise copy the name where DELETE GAME will read it and open that
+ * screen. The name is the SCREEN's copy at 0x68, which the constructor seeded
+ * from the first row -- so DELETE works on a screen nobody has clicked. */
+void __cdecl OnLoadGameDelete(AM2_Widget *w)
+{
+    const char *name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
+
+    (void)w;
+    if (!g_paintObject)
+        return;
+    if (!strlen(name)) {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        return;
+    }
+    strcpy(g_pendingDelete, name);
+    PlaySoundAt(2, 0, 0, 0, 0);
+    if (g_gameState == 2) {
+        g_menuMode     = AM2_MENU_MODE_DEL_GAME;
+        g_overlayDirty = 1;
+    } else {
+        g_menuRequest    = AM2_MENU_REQUEST_DEL_GAME;
+        g_menuRequestSet = 1;
+    }
+}
+
+/* 0x00450180. DELETE GAME's CANCEL, and its escape action. It CLEARS the
+ * pending name on the way out, so a cancelled delete cannot be completed by
+ * the next screen -- and its mode is the only one in the family computed
+ * rather than written: 0x1A when it was asked from 0x1D and 0x19 otherwise,
+ * spelled `sete` and `add 0x19`. */
+void __cdecl OnDelGameCancel(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_pendingDelete[0] = '\0';
+    if (g_gameState == 2) {
+        int32_t from = g_menuMode;
+
+        g_overlayDirty = 1;
+        g_menuMode = (from == AM2_MENU_MODE_DEL_GAME)
+                         ? AM2_MENU_MODE_DEL_PLAYER
+                         : AM2_MENU_MODE_AFTER_LOAD;
+    } else {
+        g_menuRequest    = AM2_MENU_REQUEST_LOAD_GAME;
+        g_menuRequestSet = 1;
+    }
+}
+
+/* 0x00451FB0. LOAD GAME's NEW: start the campaign from level 1 without
+ * loading anything. It chdirs to `data` first, and unlike SELECT PLAYER --
+ * which does the same lookup two screens earlier -- it stores the RECORD's
+ * own id rather than the literal 1. */
+void __cdecl OnLoadGameNew(AM2_Widget *w)
+{
+    void *level;
+
+    (void)w;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_DATA_DIR));
+    level = orig_find_level_record(1);
+    if (!level)
+        return;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    orig_select_level(level);
+    g_levelId    = *(const int32_t *)level;
+    g_levelIndex = 1;
+    RequestState(2);
 }
 
 int widget_install(void)
@@ -4844,6 +4954,19 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_ON_ENTER_NAME_CANCEL,
+                        (const void *)OnEnterNameCancel,
+                        "OnEnterNameCancel", 0);
+    rc |= patch_replace(ADDR_ON_LOADGAME_BACK, (const void *)OnLoadGameBack,
+                        "OnLoadGameBack", 0);
+    rc |= patch_replace(ADDR_ON_LOADGAME_DELETE,
+                        (const void *)OnLoadGameDelete,
+                        "OnLoadGameDelete", 0);
+    rc |= patch_replace(ADDR_ON_DELGAME_CANCEL, (const void *)OnDelGameCancel,
+                        "OnDelGameCancel", 0);
+    rc |= patch_replace(ADDR_ON_LOADGAME_NEW, (const void *)OnLoadGameNew,
+                        "OnLoadGameNew", 0);
+
     rc |= patch_replace(ADDR_LOAD_GAME_CTOR, (const void *)LoadGameConstruct,
                         "LoadGameConstruct", 1);
 

@@ -11,6 +11,39 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **The save-game family's buttons, and a rule that nearly got broken on
+  CONSTANTS rather than addresses.** Five handlers: ENTER NAME's CANCEL
+  (`0x00451AC0`), LOAD GAME's BACK, DELETE and NEW (`0x00452010`,
+  `0x00451F10`, `0x00451FB0`) and DELETE GAME's CANCEL (`0x00450180`).
+
+  Every one that can be opened from a mission has the two-armed ending the
+  OPTIONS dialogs have -- an overlay MODE in state 2 and a menu REQUEST
+  otherwise. ENTER NAME's CANCEL is the exception and has only the request,
+  because RECRUIT is not reachable from play.
+
+  **`0x00659F58` is the save DELETE GAME is about to remove**, and the three
+  handlers around it make a chain: LOAD GAME's DELETE copies the chosen name
+  in, DELETE GAME's CANCEL clears it, and its OK reads it. The name is the
+  SCREEN's own copy at `0x68`, which the constructor seeded from the first
+  row -- so DELETE works on a screen nobody has clicked.
+
+  **DELETE GAME's CANCEL is the only mode in the family that is computed**:
+  `sete` on `mode == 0x1D` and `add 0x19`, so 0x1A when it was asked from
+  DELETE GAME and 0x19 otherwise.
+
+  **Two names for one constant is the same mistake as two names for one
+  address, and this batch nearly made it twice.** LOAD GAME's BACK targets
+  mode `0x17` and DELETE GAME's CANCEL `0x1A` -- the same values
+  `MENU_MODE_OPTIONS` and `AM2_MENU_MODE_DEL_PLAYER` already carry. Both of
+  those names come from the first CALL SITE seen and may be under-specific;
+  the mode is a sub-state index into the table at `0x00426230` and what each
+  arm shows is not established. A possibly-narrow name beats a second name on
+  one value, so the existing ones are reused and the doubt is written down.
+
+  `OnLoadGameNew` is exercised by `campaign`, which clicks NEW to reach the
+  map -- and it stores the level record's OWN id where SELECT PLAYER, doing
+  the same lookup two screens earlier, stores the literal 1.
+
 - **LOAD GAME, and the menu screen table is finished.** `0x004520E0` is the
   campaign's save picker and the second of the two screens built two ways --
   no panel in a mission, with the panel's offset (`0x7D` by `0x62`) folded
@@ -1425,11 +1458,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 727 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 726 | 716 of them below the CRT line |
+| `patch_replace` sites | 732 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 731 | 721 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 134,112 / 372,816 B (**36.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 149,392 / 372,816 B (40.1%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 134,592 / 372,816 B (**36.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 149,600 / 372,816 B (40.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
