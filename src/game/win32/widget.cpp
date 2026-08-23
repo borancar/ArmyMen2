@@ -1777,11 +1777,11 @@ void __cdecl OpenAudioOptions(void)
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
         OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
-                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_AUDIO_OPTIONS_CTOR),
+                    (AM2_ScreenCtor2Fn)AudioDialogConstruct,
                     (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP), 0);
     } else {
         OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
-                    (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_AUDIO_OPTIONS_CTOR),
+                    (AM2_ScreenCtor2Fn)AudioDialogConstruct,
                     (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
     }
 }
@@ -2356,6 +2356,139 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
     return w;
 }
 
+/* 0x0044F370, thiscall, `ret 8`. AUDIO CONTROLS -- three volume sliders.
+ *
+ * The only screen whose SHAPE depends on where it was opened from. In a
+ * mission there is no panel at all: the dialog itself is the parent and the
+ * three bars carry an offset of (0x89, 0x79), which is exactly where the panel
+ * would have been. From the menus the panel is made, sits at that position,
+ * and the offset becomes zero because the bars are then placed relative to it.
+ * The original keeps the offset in two stack slots and reuses them afterwards,
+ * which is what makes the listing hard to follow.
+ *
+ * A bar's POSITION comes from its volume by a magic-number division --
+ * `imul 0x51EB851F` then `sar 5` and the sign correction, which is signed
+ * division by 100. The volumes are DirectSound attenuations in hundredths of
+ * a decibel, so (volume + 2000) / 100 is twenty-one steps from silence, and
+ * the clamp below zero is what keeps a volume under -2000 on the end stop.
+ *
+ * The THUMB is x87: (pos / range) * (SPAN - the bar sprite's right edge),
+ * truncated through _ftol. `long double` reproduces the 80-bit intermediate,
+ * as it does for SetMaxHealth and Ticks; the division happens first and the
+ * multiply second, which is the order fidiv/fmulp gives and not the order a
+ * naive (pos * span) / range would.
+ *
+ * Only the FIRST bar becomes the parent's focused child. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScrollBarCtorFn)(
+    AM2_Widget *w, AM2_Rect box, AM2_Widget *parent, int32_t max);
+
+#define g_volumeAtZero (*(const int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
+#define g_streamVolume  (*(const int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
+#define g_voiceVolume   (*(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE)
+
+/* The base constructor again, with the flag as a REAL argument rather than
+ * the literal 1 every other screen passes -- this one is handed its caller's.
+ * Same address, so the same detour; a second typedef only because the
+ * signature differs. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_ScreenBaseCtor2Fn)(
+    AM2_Widget *w, const char *bmp, int32_t flag);
+#define orig_screen_base_ctor2 \
+    ((AM2_ScreenBaseCtor2Fn)AM2_IMAGE(ADDR_SCREEN_BASE_CTOR))
+
+#define orig_scrollbar_ctor \
+    ((AM2_ScrollBarCtorFn)AM2_IMAGE(ADDR_SCROLLBAR_CTOR))
+
+static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
+                                 int32_t volume, uint32_t onChange)
+{
+    AM2_Widget *bar = (AM2_Widget *)orig_operator_new(AM2_SCROLLBAR_SIZE);
+    AM2_Rect    box;
+    int32_t     pos;
+    int32_t     travel;
+    uint8_t    *b;
+
+    if (bar) {
+        RectSet(&box, x, y, 0xBA, 0x15);
+        bar = orig_scrollbar_ctor(bar, box, parent, 0x92);
+    }
+    WidgetAddChild(parent, bar);
+
+    b   = (uint8_t *)bar;
+    pos = (volume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (pos < 0)
+        pos = 0;
+    *(int32_t *)(b + SCROLLBAR_OFF_POS) = pos;
+
+    travel = *(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+             - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right;
+    *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
+        (int32_t)((long double)pos
+                  / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
+                  * (long double)travel);
+    *(int32_t *)(b + SCROLLBAR_OFF_FLAG50) = 0;
+    *(uint32_t *)(b + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)AM2_IMAGE(onChange);
+    return bar;
+}
+
+AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
+                                                           const char *bmp,
+                                                           int32_t flag)
+{
+    AM2_Widget **bars  = (AM2_Widget **)((uint8_t *)w + AUDIO_OFF_BARS);
+    int32_t     *saved = (int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED);
+    AM2_Widget  *parent;
+    int32_t      offX = 0x89;
+    int32_t      offY = 0x79;
+    AM2_Rect     box;
+
+    orig_screen_base_ctor2(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_AUDIO_DIALOG);
+
+    if (g_gameState == AM2_STATE_MISSION) {
+        w->flag44 = 1;
+        parent = w;
+    } else {
+        AM2_Widget *panel =
+            (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+
+        if (panel) {
+            RectSet(&box, offX, offY, 0x16E, 0xED);
+            panel = orig_panel_ctor(panel,
+                                    (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP),
+                                    0, box);
+        }
+        WidgetAddChild(w, panel);
+        panel->flag44 = 1;
+        parent = panel;
+        offX = 0;
+        offY = 0;
+    }
+
+    bars[0] = MakeVolumeBar(parent, offX + 0x25, offY + 0x38,
+                            g_volumeAtZero, ADDR_ON_VOLUME_EFFECTS);
+    parent->focusedChild = bars[0];
+    bars[1] = MakeVolumeBar(parent, offX + 0x25, offY + 0x7D,
+                            g_streamVolume, ADDR_ON_VOLUME_MUSIC);
+    bars[2] = MakeVolumeBar(parent, offX + 0x25, offY + 0xC2,
+                            g_voiceVolume, ADDR_ON_VOLUME_VOICE);
+
+    /* Kept so CANCEL can put them back. */
+    saved[0] = g_volumeAtZero;
+    saved[1] = g_streamVolume;
+    saved[2] = g_voiceVolume;
+
+    WidgetAddChild(parent, MakeButton(offX + 0x110, offY + 0x5E, AM2_BMP_OK0,
+                                      AM2_BMP_OK1, AM2_BMP_OK2,
+                                      ADDR_ON_AUDIO_OK));
+    WidgetAddChild(parent, MakeButton(offX + 0x110, offY + 0x8B, AM2_BMP_CAN0,
+                                      AM2_BMP_CAN1, AM2_BMP_CAN2,
+                                      ADDR_ON_AUDIO_CANCEL));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)AM2_IMAGE(ADDR_ON_AUDIO_CANCEL);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2461,6 +2594,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_AUDIO_OPTIONS_CTOR,
+                        (const void *)AudioDialogConstruct,
+                        "AudioDialogConstruct", 2);
     rc |= patch_replace(ADDR_MP_OPTIONS_CTOR,
                         (const void *)MpOptionsConstruct,
                         "MpOptionsConstruct", 1);

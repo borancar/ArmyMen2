@@ -210,8 +210,7 @@ Nothing uncommitted.
   A ratchet only guards the spellings it knows. When one fires, ask what else
   would have looked the same and not fired.
 
-- **The AUDIO dialog is decoded but NOT written, and this is where it got
-  to.** `0x0044F370`, 1,208 B, `ret 8` -- two stack arguments, the backdrop
+- **The AUDIO dialog is reconstructed.** `0x0044F370`, 1,208 B, `ret 8` -- two stack arguments, the backdrop
   and the flag, which is what its factory's two-argument call already implied.
 
   It branches on `ADDR_GAME_STATE` like its factory does, and the branch is
@@ -238,8 +237,15 @@ Nothing uncommitted.
   `long double` reproduces the 80-bit intermediate, as it does for
   `SetMaxHealth` and `Ticks`.
 
-  The three volume globals are already named: `ADDR_VOLUME_AT_ZERO`
+  The three volume globals were already named: `ADDR_VOLUME_AT_ZERO`
   (effects), `ADDR_STREAM_VOLUME` (music), `ADDR_VOLUME_VOICE`.
+
+  It is the best-checked of the screen constructors, because `audiovol` does
+  not only open the dialog -- it nudges the SOUND EFFECTS thumb four times.
+  The thumb position IS the x87 arithmetic, and STATUS already records that
+  dropping the thumb offset from `ScrollBarPaint` moves 336 pixels on that
+  frame. So the division-then-multiply order is compared and not merely
+  reasoned about. 13 nodes identical, all three frames at cursor noise.
 
 - **MULTIPLAYER OPTIONS is reconstructed** (`0x00432320`, 968 B): 43
   checkboxes built from the declarative table, then three buttons -- or one.
@@ -552,10 +558,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 670 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 669 | 659 of them below the CRT line |
+| `patch_replace` sites | 671 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 670 | 660 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 117,520 / 372,816 B (**31.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 118,736 / 372,816 B (**31.8%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

@@ -109,6 +109,10 @@ typedef struct AM2_Widget {
 #define SCROLLBAR_OFF_BAR   0x64   /* AM2_Sprite *, the bar the paint draws */
 #define SCROLLBAR_OFF_SHIFT 0x6C   /* int32_t, added to the centred x */
 #define SCROLLBAR_OFF_SPAN  0x70   /* int32_t, taken off the width first */
+#define SCROLLBAR_OFF_FLAG50 0x50  /* int32_t, constructed 0 by the dialog */
+#define SCROLLBAR_OFF_POS   0x74   /* int32_t, 0..RANGE */
+#define SCROLLBAR_OFF_RANGE 0x78   /* int32_t, what POS is out of */
+#define SCROLLBAR_OFF_ONCHANGE 0x7C /* void(__cdecl *)(AM2_Widget *) */
 #define ICON_OFF_SPRITE     0x58
 
 /* The label's own fields, offsets from the widget base. The paper colour is
@@ -1028,6 +1032,13 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
  * else. See widget.cpp for the three things that depend on being the host. */
 AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
                                                          const char *bmp);
+
+/* Original: 0x0044F370, thiscall, `ret 8`. AUDIO CONTROLS -- three volume
+ * sliders. The only screen whose SHAPE depends on where it was opened from:
+ * see widget.cpp. */
+AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
+                                                           const char *bmp,
+                                                           int32_t flag);
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 

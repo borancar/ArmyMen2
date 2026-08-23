@@ -1618,6 +1618,24 @@
 
 /* The MULTIPLAYER OPTIONS constructor, 0x00432320. */
 #define VTABLE_OPTIONS_MENU_MP   0x0046FA34u /* the HOST OPTIONS vtable */
+
+/* The AUDIO CONTROLS dialog, 0x0044F370 -- `ret 8`, two stack arguments. */
+#define VTABLE_AUDIO_DIALOG      0x0046FB1Cu
+#define ADDR_SCROLLBAR_CTOR      0x00455FF0u /* thiscall, ret 0x18 */
+#define AM2_SCROLLBAR_SIZE       0x80u
+#define ADDR_ON_VOLUME_EFFECTS   0x0044F2A0u
+#define ADDR_ON_VOLUME_MUSIC     0x0044F2E0u
+#define ADDR_ON_VOLUME_VOICE     0x0044F320u
+#define ADDR_ON_AUDIO_OK         0x0044F930u
+#define ADDR_ON_AUDIO_CANCEL     0x0044F8B0u
+/* Three bars at 0x0064..0x006C, and the volumes they started from at
+ * 0x0070..0x0078 so CANCEL can put them back. */
+#define AUDIO_OFF_BARS           0x64u
+#define AUDIO_OFF_SAVED          0x70u
+/* The volumes are DirectSound attenuations in hundredths of a decibel, so a
+ * bar position is (volume + 2000) / 100 -- twenty-one steps from silence. */
+#define AM2_VOLUME_FLOOR         2000
+#define AM2_VOLUME_STEP          100
 #define ADDR_CHECKBOX_CTOR       0x00454640u /* thiscall, ret 0x2C */
 #define AM2_CHECKBOX_SIZE        0x90u
 #define AM2_BMP_CHECK0           0x00487354u /* 03_017_0N_check.bmp */
