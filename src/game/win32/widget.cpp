@@ -2157,6 +2157,95 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     return w;
 }
 
+/* 0x00450E10, thiscall. The CONTROLS dialog: twenty-one key-capture rows and
+ * three buttons, and the only screen in the game whose children come out of
+ * TABLES rather than being written out one at a time.
+ *
+ * Three tables walk together. ADDR_KEY_BINDINGS is the scancode each row is
+ * bound to -- a `uint8_t[][2]` walked one byte at a time with a stride of two,
+ * which is why the loop bound is on that pointer and not on a counter.
+ * ADDR_KEYROW_POSITIONS gives the row's x and y as int16s. And the row's index
+ * into the key-name table, from our own KeyNameIndexOf, selects the caption
+ * out of ADDR_KEY_NAME_TABLE's second field.
+ *
+ * The rows are then written into the dialog's own array at
+ * KEYROW_PARENT_ROWS, which is what KeyRowUpdate walks when it clears a key
+ * off whichever other row had it.
+ *
+ * `ret 0x2C` on the row constructor is 44 bytes: index, caption, sixteen of
+ * rectangle, a flag and four colours. Three of those colours are pushed as
+ * whole dwords from BYTE loads, so their top three bytes are stale stack --
+ * the same matched-argument shape MakeBitmap has. It is safe for the same
+ * reason: 0x00450C8E reads all three back as `mov al, byte ptr`, so the
+ * garbage is never looked at, and passing a zero-extended byte is faithful. */
+typedef AM2_Widget *(__attribute__((thiscall)) *AM2_KeyRowCtorFn)(
+    AM2_Widget *w, int32_t nameIndex, const char *caption, AM2_Rect box,
+    int32_t flag, int32_t ink, int32_t inkFocus, int32_t bg0, int32_t bg1);
+
+#define orig_keyrow_ctor ((AM2_KeyRowCtorFn)AM2_IMAGE(ADDR_KEYROW_CTOR))
+#define AM2_KEYROW_WIDTH   0x41
+#define AM2_KEYROW_HEIGHT  0x0D
+
+AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
+                                                              const char *bmp)
+{
+    const uint8_t *binding = (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+    const int16_t *place   = (const int16_t *)AM2_IMAGE(ADDR_KEYROW_POSITIONS);
+    const uint8_t *names   = (const uint8_t *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    AM2_Widget   **rows;
+    AM2_Widget    *first;
+    AM2_Widget    *ok;
+    AM2_Rect       box;
+
+    orig_screen_base_ctor(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_CONTROLS_DIALOG);
+    rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
+
+    while (binding < (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS)
+                     + KEYROW_ROW_COUNT * 2) {
+        int32_t     index = KeyNameIndexOf(*binding);
+        AM2_Widget *row   = (AM2_Widget *)orig_operator_new(AM2_KEYROW_SIZE);
+
+        if (row) {
+            RectSet(&box, place[0], place[1], AM2_KEYROW_WIDTH,
+                    AM2_KEYROW_HEIGHT);
+            row = orig_keyrow_ctor(row, index,
+                                   *(const char *const *)(names + index * 8
+                                                          + 4),
+                                   box, 1, g_whiteInk, g_hiliteColour,
+                                   g_backgroundColour, g_backgroundColour);
+        }
+        WidgetAddChild(w, row);
+        *rows++ = row;
+        binding += 2;
+        place += 2;
+    }
+
+    first = *(AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
+    ((AM2_WidgetFocusFn *)first->vtable)[WIDGET_VSLOT_FOCUS](first, 0);
+
+    /* Same shape as the confirm dialogs' buttons, in a column at x 0x218:
+     * flag 1, size 0x51 by 0x20. The `push 0` at the top of each block is the
+     * TRAILING argument, not the flag -- reading it as the flag put the three
+     * buttons one palette step off and cost 547 pixels on a frame whose
+     * widget tree was identical, which is the failure `ctl widgets` cannot
+     * see and the pixels can. */
+    ok = MakeButton(0x218, 0xAD, AM2_BMP_OK0, AM2_BMP_OK1, AM2_BMP_OK2,
+                    ADDR_ON_CONTROLS_OK);
+    WidgetAddChild(w, ok);
+    ((AM2_WidgetFocusFn *)ok->vtable)[WIDGET_VSLOT_FOCUS](ok, 0);
+
+    WidgetAddChild(w, MakeButton(0x218, 0xDF, AM2_BMP_DEFAULT0,
+                                 AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
+                                 ADDR_ON_CONTROLS_DEFAULT));
+    WidgetAddChild(w, MakeButton(0x218, 0x112, AM2_BMP_CAN0, AM2_BMP_CAN1,
+                                 AM2_BMP_CAN2, ADDR_ON_CONTROLS_CANCEL));
+
+    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (uint32_t)AM2_IMAGE(ADDR_ON_CONTROLS_CANCEL);
+    return w;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -2262,6 +2351,9 @@ int widget_install(void)
                         "OpenReplayPrompt", 0);
     rc |= patch_replace(ADDR_OPEN_DELETE_PLAYER, (const void *)OpenDeletePlayer,
                         "OpenDeletePlayer", 0);
+    rc |= patch_replace(ADDR_CONTROLS_CTOR,
+                        (const void *)ControlsDialogConstruct,
+                        "ControlsDialogConstruct", 1);
     rc |= patch_replace(ADDR_DIFFICULTY_CTOR,
                         (const void *)DifficultyDialogConstruct,
                         "DifficultyDialogConstruct", 1);

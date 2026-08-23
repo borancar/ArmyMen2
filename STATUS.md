@@ -192,6 +192,31 @@ Nothing uncommitted.
   by "has no branch and no extra call" and the argument counts agreed
   afterwards.
 
+- **The CONTROLS dialog is reconstructed** (`0x00450E10`, 689 B) -- the only
+  screen in the game whose children come out of TABLES rather than being
+  written out one at a time. Three walk together: `ADDR_KEY_BINDINGS` for the
+  scancode each row is bound to (a `uint8_t[][2]` walked one byte at a time
+  with a stride of two, which is why the loop bound is on the pointer and not
+  a counter), `ADDR_KEYROW_POSITIONS` for the row's x and y as int16s, and the
+  caption out of `ADDR_KEY_NAME_TABLE`'s second field, selected by our own
+  `KeyNameIndexOf`.
+
+  **`ret 0x2C` on the row constructor is 44 bytes** -- index, caption, sixteen
+  of rectangle, a flag and four colours. Three of the colours are pushed as
+  whole dwords from BYTE loads, so their top three bytes are stale stack, the
+  same matched-argument shape `MakeBitmap` has. Safe for the same reason and
+  checked rather than assumed: `0x00450C8E` reads all three back as
+  `mov al, byte ptr`, so a zero-extended byte is faithful.
+
+  **The defect it shipped with is one the widget tree could not see.** The
+  three buttons' flag is the `push 1` in the middle of the block, not the
+  `push 0` at the top -- that one is the TRAILING argument. Reading it as the
+  flag left the buttons one palette step off: 547 pixels on the dialog frame,
+  with the tree **identical at all 25 nodes**. The exact reverse of the
+  OPTIONS menu's focus bug an hour earlier, where the tree named it and the
+  pixels only said "something". The suite needs both and this pair of defects
+  is why.
+
 - **The DIFFICULTY dialog is reconstructed** (`0x0044E730`, 786 B): the
   confirm-dialog shape with a LIST BOX where they have a message.
 
@@ -463,10 +488,10 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 668 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 667 | 657 of them below the CRT line |
+| `patch_replace` sites | 669 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 668 | 658 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 115,840 / 372,816 B (**31.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 116,544 / 372,816 B (**31.3%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 140,144 / 372,816 B (37.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |

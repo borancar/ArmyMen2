@@ -1602,6 +1602,19 @@
 /* Where the dialog keeps its list, and where the list keeps its blinker. */
 #define DLG_OFF_LIST             0x64u
 #define LIST_OFF_BLINKER         0x94u
+
+/* The CONTROLS dialog, 0x00450E10. Twenty-one key-capture rows built from
+ * three parallel tables and then three buttons. */
+#define VTABLE_CONTROLS_DIALOG   0x0046FB94u
+#define ADDR_KEYROW_POSITIONS    0x0048AEC8u /* int16 x, y per row */
+#define ADDR_KEYROW_CTOR         0x00450C50u /* thiscall, ret 0x2C */
+#define AM2_KEYROW_SIZE          0x6Cu
+#define ADDR_ON_CONTROLS_OK      0x00451150u
+#define ADDR_ON_CONTROLS_DEFAULT 0x004511A0u
+#define ADDR_ON_CONTROLS_CANCEL  0x00451100u
+#define AM2_BMP_DEFAULT0         0x0048730Cu
+#define AM2_BMP_DEFAULT1         0x00487324u
+#define AM2_BMP_DEFAULT2         0x0048733Cu
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
 #define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */

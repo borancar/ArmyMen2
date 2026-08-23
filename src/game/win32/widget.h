@@ -1016,6 +1016,13 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     AM2_Widget *w, const char *bmp);
 
+/* Original: 0x00450E10, thiscall. The CONTROLS dialog -- twenty-one
+ * key-capture rows out of three parallel tables, then three buttons. See
+ * widget.cpp for the tables and for why three of the row constructor's
+ * arguments carry stale upper bytes in the original. */
+AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
+                                                              const char *bmp);
+
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 
 /* 0x00453A30, 16 callers, thiscall. Append one named entry to a list object:
