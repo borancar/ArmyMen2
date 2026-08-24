@@ -5440,6 +5440,37 @@ void __cdecl RefreshMapSelection(void)
     g_levelIndex = 0;
 }
 
+/* 0x00431CE0 -- the panel's chat line, and what happens when it is sent.
+ *
+ * Log it locally in OUR army's colour, broadcast it, empty the field, repaint.
+ * The `system` argument to SendChatMsg is 0 here, so the sender byte is the
+ * army rather than the announcement colour 4 -- this is a player talking, not
+ * the game.
+ *
+ * The colour reaches MenuMessage as a dword whose upper three bytes are
+ * whatever the caller's `ecx` held: the original stores AL into a stack local
+ * and then reads the whole dword back. It cannot matter, because MenuMessage
+ * masks to a byte before it uses it, and passing the byte is the same
+ * function.
+ *
+ * **The field is not cleared, it is overwritten from ADDR_DIR_SCRATCH** -- a
+ * shared char[] with eighty references across the image. It is empty here and
+ * the effect is a clear, but that is a property of what ran before rather
+ * than of this code, and it is reproduced as written rather than turned into
+ * a `text[0] = 0` that would be a different function. */
+void __cdecl OnChatEnter(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    char    *text = *(char **)(self + EDIT_OFF_TEXT);
+    int32_t  army = orig_comm_army_of_slot((void *)g_commObject,
+                                           (int32_t)g_defaultOwner);
+
+    MenuMessage(text, (int32_t)(uint8_t)army, 0);
+    SendChatMsg(text, 0);
+    strcpy(text, (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -5581,6 +5612,8 @@ int widget_install(void)
                         "OnMpTeamRight", 1);
     rc |= patch_replace(ADDR_ON_MP_NAME, (const void *)OnMpName,
                         "OnMpName", 1);
+    rc |= patch_replace(ADDR_ON_CHAT_ENTER, (const void *)OnChatEnter,
+                        "OnChatEnter", 0);
     rc |= patch_replace(ADDR_REFRESH_MAP_SEL, (const void *)RefreshMapSelection,
                         "RefreshMapSelection", 4);
     rc |= patch_replace(ADDR_SHOW_BAD_PREVIEW, (const void *)ShowBadMapPreview,

@@ -247,9 +247,23 @@ static void handle_line(SOCKET s, char *line)
          * and the translated one back to back, so the game discards the second
          * itself. The two together produce one character, correctly cased,
          * from the full three-message sequence a keyboard would send. */
+        /* `\r` is the one escape, and it is here because RETURN is what
+         * commits an edit box: EditCharHandler fires the field's handler on
+         * WM_CHAR 0x0D and on nothing else, so a DirectInput `key 1c tap`
+         * -- which is what the game polls for menus -- never reaches it.
+         * A literal backslash is not in the edit box's whitelist, so the
+         * escape cannot collide with anything that would have been typed. */
         for (; *p; p++, n++) {
-            unsigned char c  = (unsigned char)*p;
-            WPARAM        vk = (c >= 'a' && c <= 'z') ? (WPARAM)(c - 32) : (WPARAM)c;
+            unsigned char c;
+            WPARAM        vk;
+
+            if (p[0] == '\\' && p[1] == 'r') {
+                p++;
+                c = '\r';
+            } else {
+                c = (unsigned char)*p;
+            }
+            vk = (c >= 'a' && c <= 'z') ? (WPARAM)(c - 32) : (WPARAM)c;
 
             PostMessageA(hwnd, WM_KEYDOWN, vk, 1);
             PostMessageA(hwnd, WM_CHAR, (WPARAM)c, 1);

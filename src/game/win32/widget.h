@@ -1342,6 +1342,9 @@ void __cdecl OnMpTeamLeft(AM2_Widget *w);
 void __cdecl OnMpTeamRight(AM2_Widget *w);
 void __cdecl OnMpName(AM2_Widget *w);
 
+/* 0x00431CE0, the panel's chat line: log, broadcast, empty, repaint. */
+void __cdecl OnChatEnter(AM2_Widget *w);
+
 /* The map thumbnail and what keeps it, the checksums and the ready flag in
  * step with the chosen map. RefreshMapSelection is called from three places
  * that have no panel at all, which is why the widget half is conditional. */

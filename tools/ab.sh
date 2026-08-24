@@ -525,6 +525,23 @@ play() {
         drive ctl "cursor 200 81" >/dev/null 2>&1
         drive ctl "mouse right tap" >/dev/null 2>&1
         sleep 2
+        # The CHAT LINE, which is the panel's edit box at 23,339..270,355 and
+        # the only route to its handler: click it, type, and RETURN. The
+        # handler logs the line in our army's colour, broadcasts it, empties
+        # the field from a shared scratch buffer and repaints -- and the
+        # broadcast lands in the same static record the OK click uses, so the
+        # state dump below sees the sender byte this time as an ARMY rather
+        # than the announcement colour 4.
+        "$REPO/tools/point.py" 146 347 --click >/dev/null 2>&1
+        sleep 1
+        drive ctl "type Zulu" >/dev/null 2>&1
+        sleep 1
+        # `\r` and not a scancode: EditCharHandler commits on WM_CHAR 0x0D,
+        # and `key` injects DirectInput, which never produces a WM_CHAR.
+        drive ctl "type \\r" >/dev/null 2>&1
+        sleep 2
+        drive ctl "dump 4FA910 40" 2>/dev/null \
+            >> "$WORK/$cfg-$side.state" || true
         # And AFTER, appended: the comparison is a diff, so a handler that
         # changed the wrong row -- or nothing -- shows up here.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \

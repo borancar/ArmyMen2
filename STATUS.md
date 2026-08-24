@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `5b5884e`. Working tree clean.
+Last updated: **2026-08-24**, at `23c263b`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,36 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`OnChatEnter` (0x00431CE0), the panel's chat line.** Log the text locally
+  in our own army's colour, broadcast it with `system` zero so the sender byte
+  is the army rather than the announcement colour 4, empty the field, repaint.
+  It is referenced nowhere in the image except one `push 0x431ce0` inside the
+  panel constructor, which is why `callsites.py` reports zero callers -- the
+  `push imm32` shape this project has been caught by twice.
+
+- **The field is not cleared, it is overwritten from `ADDR_DIR_SCRATCH`** -- a
+  shared `char[]` with eighty references across the image. It is empty at that
+  moment and the effect is a clear, but that is a property of what ran before
+  rather than of this code. Reproduced as written; a `text[0] = 0` would be a
+  different function.
+
+- **Driving it needed a WM_CHAR that the socket could not send.**
+  `EditCharHandler` fires the field's handler on `ch == 0x0D` and on nothing
+  else, and `key 1c tap` injects DirectInput, which never produces a WM_CHAR
+  at all -- so RETURN through the keyboard path is invisible to an edit box.
+  `type` grew one escape, `\r`, and a literal backslash is not in the edit
+  box's whitelist so it cannot collide with anything typeable.
+
+  Before that the probe read `OnChatEnter=0` with the field focused and the
+  text typed, which reads exactly like a broken handler and was a missing
+  message.
+
+- **`mpoptions` now types a line and sends it**, and the chat record comes
+  back `03000000 08010000 01 "Zulu"` on both sides -- the sender byte is the
+  army, where the OK click's is 4. Passing `system` as 1 instead of 0 fails
+  it. The colour and the text never reach the screen in a form the pixel
+  check could resolve, so this is the record or nothing.
 
 - **`ListDropOldest` (0x004539A0), and it is UNEXERCISED.** It is the other
   end of `ListAdd`: drop row zero. It does not memmove in place and it does
@@ -1957,10 +1987,10 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 766 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 765 | 754 of them below the CRT line |
+| `patch_replace` sites | 767 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 766 | 755 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 138,720 / 372,816 B (**37.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 138,864 / 372,816 B (**37.2%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 153,376 / 372,816 B (41.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
