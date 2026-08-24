@@ -180,6 +180,11 @@ void __cdecl FreeMapSurfaces(void);
 
 /* Original: 0x00412FE0. The animated menu cursor and its save-under -- the
  * last function in the image with any COM dispatch. */
+/* 0x00412D30, thirty callers. Choose the menu row the cursor animates, and
+ * reset the animation and the two overlays with it. Throttled to one row
+ * change per millisecond outside a net game unless `force` is set. */
+void __cdecl OverlayPrepare(int32_t row, int32_t force);
+
 void __cdecl DrawMenuCursor(void);
 
 /* 0x00425AF0. The menu overlay, drawn by ten of state 2's thirteen sub-state

@@ -484,7 +484,15 @@
  * slot just past the end, and a surface of its own. */
 #define ADDR_FREE_MENU_SPRITES 0x00412F80u /* void(void) */
 #define ADDR_MENU_SPRITES      0x004FCAACu /* AM2_Sprite *[190] */
-#define ADDR_MENU_SPRITES_END  0x004FCDA4u /* one past; also cleared as a slot */
+/* One past ADDR_MENU_SPRITES, and a slot in its own right: OverlayPrepare
+ * writes the chosen row's FIRST sprite here and DrawMenuCursor draws whatever
+ * is in it, which is why surface.cpp calls it g_cursorSprite. The name is the
+ * address's arithmetic, not its job. */
+#define ADDR_MENU_SPRITES_END  0x004FCDA4u
+/* The clock reading the last prepare was throttled against -- see
+ * ADDR_OVERLAY_PREPARE, which does at most one row change per millisecond
+ * unless it is a net game or the caller forces it. */
+#define ADDR_MENU_ROW_STAMP    0x004FCDF0u /* uint32_t */
 #define ADDR_MENU_SURFACE      0x004FCDF4u /* IDirectDrawSurface * */
 /* The animated menu cursor, and the save-under it needs so the frame beneath
  * it survives. The LAST function in the image with any COM dispatch. */

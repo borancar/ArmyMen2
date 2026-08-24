@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `200fb1d`. Working tree clean.
+Last updated: **2026-08-24**, at `4719bc7`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,44 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`OverlayPrepare` (0x00412D30), thirty callers and not one of them runs
+  here.** It chooses the menu row the cursor animates and resets the
+  animation and the two optional overlays with it. Two guards in front, and
+  they are not the same: the first is a THROTTLE -- outside a net game, and
+  unless the caller forces it, a row change is refused when one has already
+  happened this millisecond -- and the second is the ordinary "already on
+  that row" test. The stamp is written between them, so a repeated call on
+  the same row still consumes the millisecond.
+
+  The row's first sprite goes into the slot one past the sprite array, which
+  is what `DrawMenuCursor` draws. `orig.h` called that slot
+  `ADDR_MENU_SPRITES_END`, "one past; also cleared as a slot"; `surface.cpp`
+  has called it `g_cursorSprite` all along and was right. The comment says
+  so now -- the name is the address's arithmetic, not its job.
+
+- **Three mutations passed and the third one is what explained the other
+  two.** Picking the wrong sprite frame, and refusing to change the row at
+  all, both left every configuration identical. Zeroing the cursor sprite at
+  the very TOP of the function -- before any guard -- also changed nothing,
+  and a probe then read the global back as non-zero. It does not run.
+
+  `DrawMenuCursor` reads 25,999 on the same run while `DrawMenuOverlay`, the
+  one reconstructed caller, reads 0: the cursor is reached by another route
+  entirely and the overlay path is not taken. The other thirty callers are
+  in-game cursor modes -- unit orders and the like -- that no drive this
+  project has reaches, and a live Boot Camp mission with the mouse moving
+  over the map leaves the counter at 0 too.
+
+- **The front has moved into code this environment cannot drive, and that is
+  worth saying plainly rather than one function at a time.** Five of the
+  functions landed this session are unexercised: `ListDropOldest`, the three
+  multiplayer row-colour ones, and now this. Two causes, both structural --
+  the multiplayer panel needs a second player on a DirectPlay session this
+  machine will not open, and the in-game cursor modes need gameplay the
+  drives do not reach. They are verified by reading and by transcription,
+  which is a weaker standing than everything before them, and CLAUDE.md's
+  unexercised list is where that is recorded.
 
 - **`MpPanelDestruct` (0x00430480), and a leak that nothing could see until
   the oracle was the REFERENCE COUNT.** The panel's destructor releases two
@@ -2108,11 +2146,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 774 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 773 | 762 of them below the CRT line |
+| `patch_replace` sites | 775 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 774 | 763 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 139,664 / 372,816 B (**37.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 154,240 / 372,816 B (41.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 139,824 / 372,816 B (**37.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 154,400 / 372,816 B (41.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

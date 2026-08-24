@@ -927,7 +927,7 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
 }
 
 
-#define g_menuRow (*(const int32_t *)(uintptr_t)ADDR_MENU_ROW)
+#define g_menuRow (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)
 
 
 int32_t __cdecl GetMenuRow(void)

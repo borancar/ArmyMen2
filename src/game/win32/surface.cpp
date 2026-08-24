@@ -27,6 +27,7 @@
  */
 
 #include "surface.h"
+#include "../image.h"  /* AM2_IMAGE, for the clock global's one spelling */
 #include "sprite.h"
 #include "mapdraw.h"   /* SetDrawTarget */
 #include "../rect.h"
@@ -898,7 +899,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
  * fullscreen and wrong in a window. */
 typedef void (__attribute__((thiscall)) *am2_paint_slot1_fn)(void *self, RECT area);
 typedef void (__attribute__((thiscall)) *am2_paint_slot2_fn)(void *self);
-typedef void (__cdecl *am2_overlay_prep_fn)(int32_t a, int32_t b);
 typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
@@ -908,7 +908,6 @@ typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag
 #define g_overlayDirty  (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 #define g_presenting    (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
 #define g_screenRectPtr ((LPRECT)(uintptr_t)ADDR_SCREEN_RECT)
-#define orig_overlay_prepare (*(am2_overlay_prep_fn)ADDR_OVERLAY_PREPARE)
 
 void __cdecl DrawMenuOverlay(void)
 {
@@ -949,7 +948,7 @@ void __cdecl DrawMenuOverlay(void)
     }
     SetDrawTarget(g_backBuffer);
 
-    orig_overlay_prepare(0, 1);
+    OverlayPrepare(0, 1);
     DrawMenuCursor();
 
     IDirectDrawSurface_BltFast(g_primarySurface, (DWORD)g_originDx,
@@ -1001,7 +1000,7 @@ void __cdecl DrawMenuOverlay(void)
 static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 
 #define g_menuEnabled   (*(int32_t *)(uintptr_t)ADDR_MENU_ENABLED)
-#define g_menuRow       (*(const int32_t *)(uintptr_t)ADDR_MENU_ROW)
+#define g_menuRow       (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)
 #define g_animFrame     (*(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME)
 #define g_animNext      (*(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT)
 #define g_menuSprites2  ((uint8_t **)(uintptr_t)ADDR_MENU_SPRITES)
@@ -1018,9 +1017,65 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 #define g_curY          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
 #define g_overlayA      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A)
 #define g_overlayB      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B)
-#define g_spriteMode    (*(const int32_t *)(uintptr_t)ADDR_MENU_SPRITE_MODE)
-#define g_overlayAFld   (*(const int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_FLD)
-#define g_overlayBFld   (*(const int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_FLD)
+#define g_spriteMode    (*(int32_t *)(uintptr_t)ADDR_MENU_SPRITE_MODE)
+#define g_overlayAFld   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_FLD)
+#define g_overlayBFld   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_FLD)
+
+#define g_netGame       (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
+#define g_gameClockMs   (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_menuRowStamp  (*(uint32_t *)(uintptr_t)ADDR_MENU_ROW_STAMP)
+
+/* 0x00412D30, thirty callers -- everything that highlights a menu row goes
+ * through it. Choose the row whose sprites the cursor animates, and reset the
+ * animation and the two optional overlays to go with it.
+ *
+ * Two guards in front, and they are not the same. The first is a THROTTLE:
+ * outside a net game, and unless the caller forces it, a row change is
+ * refused when one has already happened this millisecond. The second is the
+ * ordinary "already on that row" test, and the stamp is written BEFORE it --
+ * so a repeated call on the same row still consumes the millisecond.
+ *
+ * The row's first sprite goes into the slot one past the sprite array, which
+ * is what DrawMenuCursor draws. Ten sprites a row, nineteen rows, and the
+ * bound is MENU_ROW_DIRECT because a row at or above it means "no cursor".
+ *
+ * The three offset fields are seeded from ADDR_DEFAULT_SOUND_POS -- read as a
+ * dword, which is what a packed point is. That global carries two features:
+ * the position a sound with no owner and no place is given, and the offset an
+ * overlay starts at. Both are the origin, and the name is the one already on
+ * the address. */
+void __cdecl OverlayPrepare(int32_t row, int32_t force)
+{
+    uint32_t now;
+    uint32_t origin;
+
+    if (row < 0 || row >= MENU_ROW_DIRECT)
+        return;
+
+    now = g_gameClockMs;
+    if (!g_netGame && !force && g_menuRowStamp == now)
+        return;
+
+    g_menuRowStamp = now;
+    if (g_menuRow == row)
+        return;
+
+    g_menuRow      = row;
+    g_cursorSprite = g_menuSprites2[row * MENU_ANIM_FRAMES];
+    g_animFrame    = 0;
+    g_animNext     = Ticks();
+
+    origin = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_SOUND_POS;
+
+    g_overlayA    = (uint8_t *)0;
+    g_overlayB    = (uint8_t *)0;
+    g_spriteMode  = 0;
+    g_overlayAFld = 0;
+    g_overlayBFld = 0;
+    *(uint32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX    = origin;
+    *(uint32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX = origin;
+    *(uint32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX = origin;
+}
 
 typedef uint32_t (__cdecl *am2_ticks_fn)(void);
 
@@ -1211,6 +1266,8 @@ int surface_install(void)
                         "ProgressBar", 1);
     rc |= patch_replace(ADDR_REFRESH_GATE, (const void *)RefreshGate,
                         "RefreshGate", 1);
+    rc |= patch_replace(ADDR_OVERLAY_PREPARE, (const void *)OverlayPrepare,
+                        "OverlayPrepare", 30);
     rc |= patch_replace(ADDR_DRAW_MENU_CURSOR, (const void *)DrawMenuCursor,
                         "DrawMenuCursor", 0);
 
