@@ -2409,10 +2409,13 @@ exact oracle**, however meaningful it is when it is set.
   why the ESCAPE arm — number 34 — never runs. And `ADDR_STATE_WANTED` really
   does sit at -1 while nothing is pending, as `orig.h` claims.
 
-  **`StopNamedSound` is still unexecuted and is a harder case than it looks.**
-  Its only call site is `0x00424DC3`, guarded by the name buffer at
-  `0x00511D58` being non-empty. That buffer stays all-zero for an entire Boot
-  Camp mission — polled repeatedly — so nothing is ever named to be stopped.
+  **`StopNamedSound` is still unexecuted, and the reason is now the LEVEL
+  RECORD rather than a mystery.** Its only call site is `0x00424DC3`, guarded
+  by the name buffer at `0x00511D58` being non-empty -- and that buffer is
+  filled by `SelectLevel` (`0x0043ED50`) from the chosen level's record, field
+  +0x288. Boot Camp's record leaves it empty, so nothing is ever named to be
+  stopped. A level that names one would reach the call. That buffer stays
+  all-zero for an entire Boot Camp mission — polled repeatedly — so nothing is ever named to be stopped.
   Forcing a name into it does not help either: the counter stays at 0 through
   90,000 further frames, so the code path holding that call is not reached in
   this mission at all. Note `tools/merges.py` does NOT split the entry at

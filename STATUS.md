@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `1ea8c81`. Working tree clean.
+Last updated: **2026-08-24**, at `f29f28a`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,35 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`SelectLevel` (0x0043ED50), and the reason `StopNamedSound` never runs.**
+  Ten callers -- the Boot Camp button, SELECT MAP's OK, the multiplayer panel
+  and the state-2 entry all go through it. Seven strings out of the level
+  record into the globals the loader reads, and one flag. Nothing else: the
+  record stays where it is, nothing is validated, and a null record is the
+  only refusal.
+
+  One of those globals is `0x00511D58`, the buffer `StopNamedSound`'s only
+  call site guards on being non-empty. CLAUDE.md has recorded for a while
+  that it stays all-zero for an entire Boot Camp mission. It stays zero
+  because THIS is what fills it and Boot Camp's level record leaves the field
+  empty -- not because nothing writes it. The record's field is a level
+  property, so a level that names a sound would reach that call.
+
+  `0x00511CC8` is `ADDR_TILESET_RESERVE`, already named from the tileset
+  loader, so the flag at +0x244 is "reserve the first ten palette entries".
+
+- **`LEVEL_OFF_NAME` was already taken, by a different field.** The record's
+  DISPLAY name is at +0x44 and already carries that name; the MAP name is at
+  +0x004. The compiler caught the redefinition. Mine is
+  `LEVEL_OFF_MAP_NAME`, and the comment says which is which.
+
+- **Dropping one copy is a log failure, not a pixel one.** Leaving the map
+  FOLDER uncopied puts `bootcamp` three messages apart -- "Unable to open
+  object data file", "Failed to open Object.aai for reading", "Couldn't parse
+  Object.aai!" -- because every data file after it is opened by bare name
+  from a directory that was never entered. The function's output is a set of
+  paths, so the evidence is what fails to open.
 
 - **The palette loader, and a second table that is a copy of the first.**
   `0x0041B6D0` reads an 8-bit `.bmp`'s HEADER and palette and nothing else --
@@ -2174,11 +2203,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 778 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 777 | 766 of them below the CRT line |
+| `patch_replace` sites | 779 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 778 | 767 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 140,128 / 372,816 B (**37.6%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 154,704 / 372,816 B (41.5%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 140,432 / 372,816 B (**37.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 155,008 / 372,816 B (41.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

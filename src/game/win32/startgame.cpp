@@ -25,6 +25,7 @@
 
 #include "widget.h"   /* RecordCtor, the three-field record */
 #include "audio.h"
+#include "../map.h"      /* SelectLevel -- reconstructed */
 #include "startgame.h"
 #include "cdcheck.h"
 #include "dplay.h"
@@ -318,11 +319,9 @@ void __cdecl HostBattle(void)
 /* IsKeyDown, RequestState and SetGameOver are ours -- misc.cpp and
  * gameproc.cpp -- so they are called by name, not through the image. */
 typedef void  *(__cdecl *am2_find_level_fn)(int32_t id);
-typedef void   (__cdecl *am2_select_level_fn)(void *record);
 
 #define orig_load_bootcamp_levels (*(am2_void_fn)ADDR_LOAD_BOOTCAMP_LEVELS)
 #define orig_find_level_record    (*(am2_find_level_fn)ADDR_FIND_LEVEL_RECORD)
-#define orig_select_level         (*(am2_select_level_fn)ADDR_SELECT_LEVEL)
 
 /* Boot Camp is level 1 of its own table, and the record's first field is the
  * id the lookup keys on -- so this reads it back out rather than reusing the
@@ -395,7 +394,7 @@ void __cdecl OnBootCamp(void)
         return;
 
     PlaySoundAt(2, 0, 0, 0, 0);          /* a second one, and deliberate */
-    orig_select_level(level);
+    SelectLevel(level);
     g_levelId    = *(int32_t *)((uint8_t *)level + LEVEL_OFF_ID);
     g_levelIndex = 1;
     RequestState(2);

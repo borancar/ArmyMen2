@@ -72,4 +72,9 @@ uint32_t __cdecl RulesChecksum(void);
 uint32_t __cdecl MpScriptChecksum(void);
 uint32_t __cdecl MapChecksum(void);
 
+/* 0x0043ED50. Copy the seven strings and one flag out of a level record into
+ * the globals the loader reads. Unbounded strcpy, as the original writes it;
+ * a null record is the only refusal. */
+void __cdecl SelectLevel(const void *record);
+
 #endif /* AM2_MAP_H */

@@ -4037,9 +4037,7 @@ void __cdecl OnArrowRight(AM2_Widget *w)
 #define g_mapChecksum      (*(uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL)
 
 typedef void *(__cdecl *am2_find_level_fn)(int32_t id);
-typedef void  (__cdecl *am2_select_level_fn)(void *record);
 #define orig_find_level_record (*(am2_find_level_fn)ADDR_FIND_LEVEL_RECORD)
-#define orig_select_level      (*(am2_select_level_fn)ADDR_SELECT_LEVEL)
 
 /* 0x00451300. RECRUIT: no test at all, straight to ENTER NAME. */
 void __cdecl OnRecruit(AM2_Widget *w)
@@ -4075,7 +4073,7 @@ void __cdecl OnSelectPlayer(AM2_Widget *w)
         return;
     }
 
-    orig_select_level(level);
+    SelectLevel(level);
     g_levelId    = 1;
     g_levelIndex = 1;
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -4892,7 +4890,7 @@ void __cdecl OnLoadGameNew(AM2_Widget *w)
         return;
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    orig_select_level(level);
+    SelectLevel(level);
     g_levelId    = *(const int32_t *)level;
     g_levelIndex = 1;
     RequestState(2);
@@ -4946,7 +4944,7 @@ void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
         return;
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    orig_select_level(level);
+    SelectLevel(level);
     g_levelId = *(const int32_t *)level;
     if (selected >= rows->count)
         return;

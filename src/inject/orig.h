@@ -1912,6 +1912,30 @@
 /* 0x0043ED50: copy the names out of a level record into the globals the
  * loader reads -- ADDR_MAP_NAME, ADDR_MAP_FOLDER and two more. */
 #define ADDR_SELECT_LEVEL         0x0043ED50u  /* void(void *record) */
+/* The seven strings and one flag it copies, and the globals they land in.
+ * The strings are 0x40 bytes apart at both ends and copied with an unbounded
+ * strcpy, so the record's own field size is the only bound there is.
+ *
+ * The one at +0x288 is worth knowing about: it lands in the buffer
+ * StopNamedSound's only call site guards on, which CLAUDE.md records as
+ * staying all-zero for an entire Boot Camp mission. It stays zero because
+ * THIS is what fills it and Boot Camp's level record leaves it empty -- not
+ * because nothing writes it. */
+#define LEVEL_OFF_MAP_NAME        0x004u  /* -> ADDR_MAP_NAME; NOT
+                                           * LEVEL_OFF_NAME, which is the
+                                           * DISPLAY name at +0x44 */
+#define LEVEL_OFF_FOLDER          0x084u  /* -> ADDR_MAP_FOLDER */
+#define LEVEL_OFF_STR_1C4         0x1C4u  /* -> ADDR_LEVEL_STR_A */
+#define LEVEL_OFF_STR_204         0x204u  /* -> ADDR_LEVEL_STR_B */
+#define LEVEL_OFF_RESERVE10       0x244u  /* -> ADDR_TILESET_RESERVE */
+#define LEVEL_OFF_STR_248         0x248u  /* -> ADDR_LEVEL_STR_C */
+#define LEVEL_OFF_SOUND_NAME      0x288u  /* -> ADDR_LEVEL_SOUND_NAME */
+#define LEVEL_OFF_STR_2C8         0x2C8u  /* -> ADDR_LEVEL_STR_D */
+#define ADDR_LEVEL_STR_A          0x00511C48u  /* char[0x40] */
+#define ADDR_LEVEL_STR_B          0x00511C88u  /* char[0x40] */
+#define ADDR_LEVEL_STR_C          0x00511D18u  /* char[0x40] */
+#define ADDR_LEVEL_STR_D          0x00511CD8u  /* char[0x40] */
+#define ADDR_LEVEL_SOUND_NAME     0x00511D58u  /* char[0x40] */
 /* The chosen level's id, written beside ADDR_LEVEL_INDEX by everything that
  * picks one: the Boot Camp button, SELECT MAP's OK and the state-2 entry. */
 #define ADDR_LEVEL_ID             0x00511D98u  /* int32_t */

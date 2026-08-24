@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include <stdio.h>
+#include <string.h>
 
 #include "gamedir.h"
 #include "map.h"
@@ -145,6 +146,42 @@ uint32_t __cdecl MapChecksum(void)
     return sum ^ Checksum((const char *)AM2_IMAGE(ADDR_STR_OBJECT_AAI));
 }
 
+/* 0x0043ED50, ten callers -- everything that chooses a level goes through it:
+ * the Boot Camp button, SELECT MAP's OK, the multiplayer panel and the
+ * state-2 entry.
+ *
+ * Seven strings out of the level record into the globals the loader reads,
+ * and one flag. Nothing else: the record stays where it is and nothing is
+ * validated. A null record is the only refusal.
+ *
+ * The copies are unbounded `strcpy` into 0x40-byte globals, exactly as the
+ * original writes them -- the record's own field size is the only bound, and
+ * the fields are 0x40 apart at both ends. Kept as it is, for the reason
+ * SetGameDir's overrun is kept: a bounded copy here would be a different
+ * function whose failure mode nothing else expects.
+ *
+ * The order is the original's, which copies +0x204 before +0x1C4. Nothing
+ * observes the difference; it is free to keep and it is one less thing that
+ * differs from the disassembly. */
+void __cdecl SelectLevel(const void *record)
+{
+    const char *r = (const char *)record;
+
+    if (!r)
+        return;
+
+    strcpy((char *)AM2_IMAGE(ADDR_MAP_NAME),          r + LEVEL_OFF_MAP_NAME);
+    strcpy((char *)AM2_IMAGE(ADDR_MAP_FOLDER),        r + LEVEL_OFF_FOLDER);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_B),       r + LEVEL_OFF_STR_204);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_A),       r + LEVEL_OFF_STR_1C4);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_C),       r + LEVEL_OFF_STR_248);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_SOUND_NAME),  r + LEVEL_OFF_SOUND_NAME);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_D),       r + LEVEL_OFF_STR_2C8);
+
+    *(int32_t *)AM2_IMAGE(ADDR_TILESET_RESERVE) =
+        *(const int32_t *)(r + LEVEL_OFF_RESERVE10);
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_POINT_OF_TILE, (const void *)PointOfTile,
@@ -162,4 +199,6 @@ void map_install(void)
                   "MpScriptChecksum", 1);
     patch_replace(ADDR_MAP_CHECKSUM, (const void *)MapChecksum,
                   "MapChecksum", 1);
+    patch_replace(ADDR_SELECT_LEVEL, (const void *)SelectLevel,
+                  "SelectLevel", 10);
 }
