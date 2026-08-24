@@ -4155,7 +4155,17 @@
  * is what callers test to know it has already been done. */
 #define ADDR_OBJ_TAKE_OFF_MAP  0x004296E0u  /* void(obj *) */
 #define OBJ_FLAG_OFF_MAP       0x0800u
+/* The bit that says the object's rows are REGISTERED with the map descriptor.
+ * Taking one off the map lowers it and unregisters; nothing raises it here. */
+#define OBJ_FLAG_ON_MAP        0x0200u
 #define OBJ_OFF_FLAGS          0x08u
+/* The object's own sub-list: a count and an array of 0x60-byte rows, each of
+ * which registers itself with the map. */
+#define OBJ_OFF_ROW_COUNT      0x70u
+#define OBJ_OFF_ROWS           0x74u
+#define AM2_OBJ_ROW_STRIDE     0x60u
+/* 0x0041D480: take one row out of the map descriptor's cell lists. */
+#define ADDR_ROW_UNREGISTER    0x0041D480u /* void(row *, int32, void *desc) */
 #define OBJ_OFF_RETURN_AT      0x5Cu   /* game-clock ms, set by the below */
 /* 0x004097D0, 112 bytes, two callers. Everything of type 2, 3 or 8 within a
  * radius of a point goes off the map and comes back later. */

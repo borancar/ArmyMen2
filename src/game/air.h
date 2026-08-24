@@ -112,6 +112,12 @@ void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius,
  * looking at the count, so it is "make room", called by whoever is about to
  * need it, not "grow if full". Nothing checks the realloc. */
 void __cdecl FreeSpriteList(void);
+
+/* Original: 0x004296E0, eight callers. Take one object off the map. Two
+ * flags and they are not symmetric: OBJ_FLAG_OFF_MAP goes up
+ * unconditionally and is what callers test, while OBJ_FLAG_ON_MAP gates the
+ * row work and is lowered by it. */
+void __cdecl TakeOffMap(void *obj);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded

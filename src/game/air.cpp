@@ -89,8 +89,45 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     return 0;
 }
 
-typedef void (__cdecl *AM2_TakeOffMapFn)(void *obj);
-#define orig_take_off_map   ((AM2_TakeOffMapFn)(uintptr_t)ADDR_OBJ_TAKE_OFF_MAP)
+typedef void (__cdecl *AM2_RowUnregisterFn)(void *row, int32_t a, void *desc);
+#define orig_row_unregister \
+    ((AM2_RowUnregisterFn)(uintptr_t)ADDR_ROW_UNREGISTER)
+
+/* 0x004296E0, eight callers. Take one object off the map.
+ *
+ * Two flags and they are not symmetric. `OBJ_FLAG_OFF_MAP` goes up
+ * unconditionally and is what callers test to know this has been done;
+ * `OBJ_FLAG_ON_MAP` is the one that gates the work, and if it was already
+ * down the rows are left alone. So calling this twice raises the first bit
+ * twice and unregisters once, which is the point of having two.
+ *
+ * The row loop re-reads the count every iteration and clears bit 1 of each
+ * row before unregistering it, in that order -- the unregister reads the
+ * row's flags. */
+void __cdecl TakeOffMap(void *obj)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint32_t  flags;
+    int32_t   i;
+
+    if (!obj)
+        return;
+
+    flags = *(uint32_t *)(o + OBJ_OFF_FLAGS) | OBJ_FLAG_OFF_MAP;
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags;
+    if (!(flags & OBJ_FLAG_ON_MAP))
+        return;
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_ON_MAP;
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+
+        *(uint32_t *)row &= ~(uint32_t)OBJ_FLAG_OVERDUE;
+        orig_row_unregister(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+}
+
 /* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
  * stay one definition. */
 #define g_gameClockMs (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
@@ -110,7 +147,7 @@ void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius, int32_t delayMs)
                 > radius)
             continue;
 
-        orig_take_off_map(o);
+        TakeOffMap(o);
         *(int32_t *)(o + OBJ_OFF_RETURN_AT) =
             (int32_t)g_gameClockMs + delayMs;
     }
@@ -292,6 +329,8 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_OBJ_TAKE_OFF_MAP, (const void *)TakeOffMap,
+                  "TakeOffMap", 1);
     patch_replace(ADDR_REMAP_SPRITE_RUNS, (const void *)RemapSpriteRuns,
                   "RemapSpriteRuns", 1);
     patch_replace(ADDR_FREE_SPRITE_LIST, (const void *)FreeSpriteList,

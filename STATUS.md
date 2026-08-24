@@ -11,6 +11,17 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **`TakeOffMap`'s two flags are not symmetric, and that is the whole design.**
+  `0x004296E0` raises `OBJ_FLAG_OFF_MAP` (0x0800) UNCONDITIONALLY -- it is what
+  eight callers test to know the work has been done -- and then gates the work
+  itself on `OBJ_FLAG_ON_MAP` (0x0200), which it lowers. Call it twice and the
+  first bit goes up twice while the rows are unregistered once. Reading either
+  flag as "the" off-map flag gets one of the two calls wrong.
+
+  The row loop re-reads the count every iteration and clears bit 1 of each row
+  BEFORE unregistering it, in that order, because the unregister reads the
+  row's flags.
+
 - **`CommFindPlayer` returns a stored FIELD where the loop counter would do,
   and the two are not the same thing.** `0x0040F330` walks the comm object's
   player slots for a DirectPlay id and hands back `AM2_PLAYER_INDEX` -- the
@@ -1646,11 +1657,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 747 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 746 | 735 of them below the CRT line |
+| `patch_replace` sites | 748 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 747 | 736 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 135,920 / 372,816 B (**36.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 150,192 / 372,816 B (40.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 136,016 / 372,816 B (**36.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 150,288 / 372,816 B (40.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
