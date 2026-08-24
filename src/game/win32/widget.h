@@ -52,7 +52,14 @@ typedef struct AM2_Widget {
     int32_t  unknown40;             /* 0x0040  NOT written by the constructor */
     int32_t  flag44;                /* 0x0044  constructed as 0 */
     int32_t  unknown48;             /* 0x0048 */
-    int32_t  unknown4C;             /* 0x004C  set disqualifies from focus */
+    int32_t  disabled;              /* 0x004C  set disqualifies from focus, and
+                                     * the multiplayer panel's update writes it
+                                     * per row on exactly the policy its button
+                                     * handlers guard on -- a row with a real
+                                     * player is editable only if it is ours,
+                                     * an empty one only by the host. So it is
+                                     * "greyed out" and not merely a focus
+                                     * rule; `ctl widgets` prints it as nofoc. */
     int32_t  flag50;                /* 0x0050  constructed as 1; CLEAR
                                      * disqualifies from focus, so it reads as
                                      * "can be focused" -- but that is from the
@@ -1360,6 +1367,10 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview);
 /* 0x00430140. Clear a list box's rows and refill them from a text file in
  * `rules/`, one row per line, newline and all. */
 void __cdecl FillListFromRules(const char *path, void *panel);
+
+/* 0x004316D0, slot 2 of the multiplayer panel: grey the row buttons on the
+ * same policy their handlers guard on, then push five numbers into text. */
+void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w);
 void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,

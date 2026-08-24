@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `1a2a5b6`. Working tree clean.
+Last updated: **2026-08-24**, at `7df729e`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,28 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`MpPanelUpdate` (0x004316D0), and the field at +0x4C has a name now.**
+  The panel's per-frame update greys the COLOUR and TEAM buttons row by row,
+  and the policy is exactly the one their handlers guard on: a row holding a
+  real player may be edited only if it is OURS, an empty row only by the
+  HOST. Both buttons of a row always agree.
+
+  That is what settles what +0x4C is. `widget.h` had it as `unknown4C`, "set
+  disqualifies from focus", which is true and is what the two focus walkers
+  do with it -- but a function that writes it per row on an editing policy is
+  writing "greyed out". Renamed to `disabled`.
+
+- **It is compared exactly, because `ctl widgets` already prints it.** The
+  dump's `nofoc` column IS this field, so the sweep needs no pixels: making
+  the team button disagree with the colour button flips `nofoc` on four
+  nodes and fails the tree. That is the second time the widget dump has
+  turned out to cover a function nobody chose it for.
+
+- **The second sweep pushes five numbers into text every frame**, the score
+  limit into the panel's own buffer and each army's setting into the row's
+  inner edit box -- which is why those four fields cannot be typed into:
+  anything a keystroke put there would be overwritten before it was drawn.
 
 - **`FillListFromRules` (0x00430140), and the only place the game's FILE is
   not opaque.** It clears a list box's rows and refills them from a text file
@@ -2062,11 +2084,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 772 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 771 | 760 of them below the CRT line |
+| `patch_replace` sites | 773 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 772 | 761 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 139,328 / 372,816 B (**37.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 153,824 / 372,816 B (41.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 139,520 / 372,816 B (**37.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 154,064 / 372,816 B (41.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

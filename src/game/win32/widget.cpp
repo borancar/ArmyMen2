@@ -285,7 +285,7 @@ void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w)
 
     WidgetScreenRect(w);
 
-    if (w->parent && orig_mouse_moved && !w->unknown4C) {
+    if (w->parent && orig_mouse_moved && !w->disabled) {
         w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
                                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
         if (w->unknown40)
@@ -624,7 +624,7 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
 
     WidgetScreenRect(w);
 
-    if (!w->parent || w->unknown4C) {
+    if (!w->parent || w->disabled) {
         WidgetUpdate(w);
         return;
     }
@@ -798,7 +798,7 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w)
 
     /* Hover to focus, and nothing else -- which is how clicking a text field
      * gives it the caret and the keyboard. */
-    if (w->parent && orig_mouse_moved && !w->unknown4C) {
+    if (w->parent && orig_mouse_moved && !w->disabled) {
         w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
                                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
         if (w->unknown40)
@@ -1129,7 +1129,7 @@ void __attribute__((thiscall)) WidgetFocusNext(AM2_Widget *w, int32_t announce)
     while (cand) {
         if (cand == w)
             break;                      /* all the way round; give up */
-        if (cand->flag50 && !cand->unknown4C)
+        if (cand->flag50 && !cand->disabled)
             break;                      /* eligible */
         if (cand->nextSibling) {
             cand = cand->nextSibling;
@@ -1144,7 +1144,7 @@ void __attribute__((thiscall)) WidgetFocusNext(AM2_Widget *w, int32_t announce)
 
     if (!cand || cand == w)
         return;
-    if (!cand->flag50 || cand->unknown4C)
+    if (!cand->flag50 || cand->disabled)
         return;
     ((AM2_WidgetFocusFn *)cand->vtable)[WIDGET_VSLOT_FOCUS](cand, announce);
 }
@@ -1353,7 +1353,7 @@ AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
      * whatever it is arrives from the allocator. */
     w->flag44      = 0;
     w->unknown48   = 0;
-    w->unknown4C   = 0;
+    w->disabled   = 0;
     w->flag50      = 1;
     w->activate    = 0;
     return w;
@@ -1572,7 +1572,7 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
         uint32_t    mask = *(const int32_t *)(rec + AM2_OPTION_OFF_WHICH)
                            ? flags : other;
 
-        box->unknown4C = 0;
+        box->disabled = 0;
         *((uint8_t *)box + CHECK_OFF_TICKED) = (mask & bit) != 0;
         ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
         rec += AM2_OPTION_STRIDE;
@@ -1639,7 +1639,7 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header)
         uint8_t     ticked = *((const uint8_t *)header + CHECK_OFF_TICKED);
 
         *((uint8_t *)box + CHECK_OFF_TICKED) = ticked;
-        box->unknown4C = (ticked == 0);
+        box->disabled = (ticked == 0);
         ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
     }
 }
@@ -2351,7 +2351,7 @@ AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
  * not match the disassembly on sight.
  *
  * Three things depend on being the host, and they are what the two panels in
- * the screenshots differ by. A non-host gets `unknown4C` set on every box, so
+ * the screenshots differ by. A non-host gets `disabled` set on every box, so
  * none can be focused; a non-host gets CANCEL alone, at the OK position; and
  * the group pass that disables a group whose header is unticked runs for the
  * host only.
@@ -2405,7 +2405,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
 
         WidgetAddChild(w, cb);
         if (!host)
-            cb->unknown4C = 1;
+            cb->disabled = 1;
         record++;
     }
 
@@ -2421,7 +2421,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
             head = boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)];
             for (i = OPT_REC(rec, AM2_OPTION_OFF_FIRST);
                  i <= OPT_REC(rec, AM2_OPTION_OFF_LAST); i++)
-                boxes[i]->unknown4C =
+                boxes[i]->disabled =
                     (*((const uint8_t *)head + CHECK_OFF_TICKED) == 0);
         }
 
@@ -5361,6 +5361,60 @@ void __cdecl OnMpName(AM2_Widget *w)
 typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 #define orig_fgets_line (*(AM2_FgetsFn)AM2_IMAGE(ADDR_CRT_FGETS))
 
+/* 0x004316D0 -- the multiplayer panel's per-frame update, slot 2.
+ *
+ * The cancel key first, through the base, and then two sweeps.
+ *
+ * The first greys the COLOUR and TEAM buttons row by row, and the policy is
+ * exactly the one their handlers guard on: a row holding a real player may be
+ * edited only if it is OURS, and an empty row only by the HOST. Both buttons
+ * of a row always agree. `disabled` is what `ctl widgets` prints as nofoc, so
+ * this sweep is compared exactly rather than by pixels.
+ *
+ * The second pushes five numbers into text: the score limit into the panel's
+ * own buffer, and each army's setting into the row's inner edit box. It does
+ * that EVERY FRAME, which is why those four fields cannot be typed into --
+ * anything a keystroke put there would be gone before it was drawn.
+ *
+ * The row loop is written with a byte cursor over the player array in the
+ * original and a widget cursor beside it; both are indices here. */
+void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w)
+{
+    uint8_t     *self = (uint8_t *)w;
+    AM2_Widget **colours = (AM2_Widget **)(self + MP_PANEL_OFF_COLOURS);
+    AM2_Widget **teams   = (AM2_Widget **)(self + MP_PANEL_OFF_TEAMS);
+    AM2_Widget **rows    = (AM2_Widget **)(self + MP_PANEL_OFF_ARMY_ROWS);
+    const int32_t *setting = (const int32_t *)(uintptr_t)ADDR_ARMY_SETTING;
+    int32_t      i;
+
+    WidgetUpdateCancel(w);
+
+    for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+        const uint8_t *comm = g_commObject;
+        const uint8_t *rec  = comm + (uint32_t)i * AM2_PLAYER_STRIDE;
+        int32_t        off;
+
+        if (*(const uint32_t *)(rec + AM2_PLAYER_ID) > 0)
+            off = (i == g_ourSlot) ? 0 : 1;
+        else
+            off = *(const int32_t *)(comm + COMM_OFF_IS_HOST) ? 0 : 1;
+
+        colours[i]->disabled = off;
+        teams[i]->disabled   = off;
+    }
+
+    orig_sprintf((char *)(self + MP_PANEL_OFF_SCORE_TEXT),
+                 (const char *)AM2_IMAGE(ADDR_FMT_INT),
+                 *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+
+    for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+        uint8_t *inner = *(uint8_t **)((uint8_t *)rows[i] + AM2_MP_ROW_INNER);
+
+        orig_sprintf(*(char **)(inner + EDIT_OFF_TEXT),
+                     (const char *)AM2_IMAGE(ADDR_FMT_INT), setting[i]);
+    }
+}
+
 /* 0x00430140 -- fill a list box from a text file in `rules/`, one row per
  * line, three callers each with a different filename.
  *
@@ -5748,6 +5802,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_FILL_LIST_FROM_RULES,
                         (const void *)FillListFromRules,
                         "FillListFromRules", 3);
+    rc |= patch_replace(ADDR_MP_PANEL_UPDATE, (const void *)MpPanelUpdate,
+                        "MpPanelUpdate", 1);
 
     rc |= patch_replace(ADDR_MP_NAME_CTOR, (const void *)MpNameConstruct,
                         "MpNameConstruct", 9);

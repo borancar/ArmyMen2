@@ -3780,6 +3780,11 @@
 #define MP_PANEL_OFF_COLOURS   0x230u
 #define MP_PANEL_OFF_TEAMS     0x240u
 #define MP_PANEL_OFF_COLOUR_SEL 0x268u
+#define MP_PANEL_OFF_SCORE_TEXT 0x1E4u  /* char[], the score limit as text */
+#define MP_PANEL_OFF_ARMY_ROWS  0x258u  /* AM2_Widget *[4], each wrapping an edit */
+#define AM2_MP_ROW_INNER        0x58u   /* the row's edit, whose text is at +0x58 */
+#define ADDR_MP_PANEL_UPDATE    0x004316D0u /* thiscall void(this) */
+#define ADDR_FMT_INT            0x00476A04u /* "%i" */
 #define AM2_MP_TEAM_MAX        12
 
 #define ADDR_MP_DIALOG_DESTRUCT 0x004326F0u /* thiscall void(AM2_Widget *) */
