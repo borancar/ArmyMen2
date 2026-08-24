@@ -11,6 +11,39 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **The multiplayer panel, started from the LEAVES.** `0x00430530` is 4,497
+  bytes and was declined twice as too big to start between two other things.
+  It builds three button classes, one of each per player row, and those are
+  ordinary widget constructors of the kind this project has done a dozen of:
+  `0x004329A0` (0x74), `0x00432E20` and `0x00433030` (0x68 each). All three
+  are reconstructed now, and the panel is still the original's -- so they run
+  in the middle of a live path and `ab.sh mpoptions` compares the result.
+
+  **A 4.5 KB root is a bad first step and its leaves are a good one.** Nothing
+  had to wait for the layer above it, which is the same shape as the script
+  handlers calling the original's parsers.
+
+- **The names are from the SHAPES and nothing in the image says otherwise.**
+  All three derive from the base button and all three carry the row they
+  belong to in the base's `0x0058`, which is how their handlers know which
+  player they are for. The first takes a string and two ink bytes and is the
+  row's name; the other two are 18x20 at a column the caller picks, and the
+  one with a RIGHT handler and auto-repeat is a spinner where the one with
+  only a left handler is a toggle. That difference is the whole distinction
+  between them.
+
+  `0x004329A0` is also the only widget constructor here that takes its
+  rectangle as FOUR SEPARATE ARGUMENTS -- nine stack arguments in all -- and
+  writes it into the base directly instead of going through `RectSet` first.
+  Same result, one fewer call.
+
+- **Measured: 4, 4, 4.** A probe down the host-panel path reads
+  `MpNameConstruct=4 MpToggleConstruct=4 MpSpinnerConstruct=4`, one of each
+  per player row, with `ButtonBaseConstruct=0` beside them -- the usual blind
+  spot, since all three call it by name. Worth doing because `ab.sh multi`
+  does NOT reach the panel: its START A WAR opens ENTER BATTLE NAME, and it is
+  `mpoptions`, poking menu request 7, that builds the thing.
+
 - **`FreeSubrecordRows` and `ItemPreDestroy`, and one structure seen two
   ways.** The sub-list header at `OBJ_OFF_SUBRECORD` is
   `{?, count, rows, capacity}`, so the count the object reads at
@@ -1691,11 +1724,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 750 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 749 | 738 of them below the CRT line |
+| `patch_replace` sites | 753 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 752 | 741 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 136,224 / 372,816 B (**36.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 150,496 / 372,816 B (40.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 137,328 / 372,816 B (**36.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 151,824 / 372,816 B (40.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

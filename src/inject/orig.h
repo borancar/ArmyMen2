@@ -3631,6 +3631,39 @@
  * deleting destructor, and that is what calls it -- so it is the destructor
  * for the whole multiplayer dialog pair. The second really is options-only:
  * it appears in one vtable, as slot 2 of 0x0046FA34. */
+/* The three BUTTON classes the multiplayer host/join panel builds one of per
+ * player row. All three derive from the base button (ADDR_BUTTON_BASE_CTOR)
+ * and all three carry the row they belong to in the base's 0x0058, which is
+ * how their handlers know which player they are for.
+ *
+ * The names are from the SHAPES, not from the program -- nothing in the image
+ * says what they are called. The first takes a string and two ink bytes and
+ * is the row's name; the other two are 18x20 at fixed columns, and the one
+ * with a RIGHT handler and auto-repeat is a spinner where the one with only a
+ * left handler is a toggle. */
+#define ADDR_MP_NAME_CTOR      0x004329A0u /* thiscall, ret 0x24 */
+#define VTABLE_MP_NAME         0x0046FA48u
+#define ADDR_ON_MP_NAME        0x00432D50u
+#define AM2_MP_NAME_SIZE       0x74u
+#define MPBTN_OFF_ROW          0x58u   /* which player row, in every one */
+#define MPNAME_OFF_TEXT        0x68u   /* const char *, the name shown */
+#define MPNAME_OFF_FLAG        0x6Cu   /* int32_t, 1 from the panel */
+#define MPNAME_OFF_INK         0x70u   /* uint8_t */
+#define MPNAME_OFF_PAPER       0x71u   /* uint8_t */
+
+#define ADDR_MP_TOGGLE_CTOR    0x00432E20u /* thiscall, ret 0x0C */
+#define VTABLE_MP_TOGGLE       0x0046FA5Cu
+#define ADDR_ON_MP_TOGGLE      0x00432EC0u
+#define AM2_MP_TOGGLE_SIZE     0x68u
+
+#define ADDR_MP_SPINNER_CTOR   0x00433030u /* thiscall, ret 0x0C */
+#define VTABLE_MP_SPINNER      0x0046FA70u
+#define ADDR_ON_MP_SPIN_LEFT   0x004330E0u
+#define ADDR_ON_MP_SPIN_RIGHT  0x00433190u
+/* Both small ones are the same 18 by 20 at a column the caller picks. */
+#define AM2_MP_SMALL_W         0x12
+#define AM2_MP_SMALL_H         0x14
+
 #define ADDR_MP_DIALOG_DESTRUCT 0x004326F0u /* thiscall void(AM2_Widget *) */
 #define ADDR_OPTIONS_UPDATE   0x00432700u /* thiscall void(AM2_Widget *) */
 /* The pair a client checks before agreeing to play: a constant in .rdata and a

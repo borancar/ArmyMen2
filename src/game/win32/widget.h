@@ -1314,6 +1314,27 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
                                                         const char *bmp,
                                                         int32_t flag);
 
+/* The three button classes the multiplayer host/join panel builds one of per
+ * player row: 0x004329A0, 0x00432E20 and 0x00433030. All three derive from
+ * the base button and carry their row in the base's 0x0058. */
+AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
+                                                      const char *text,
+                                                      int32_t left, int32_t top,
+                                                      int32_t width,
+                                                      int32_t height,
+                                                      int32_t flag,
+                                                      uint8_t ink,
+                                                      uint8_t paper,
+                                                      int32_t row);
+AM2_Widget *__attribute__((thiscall)) MpToggleConstruct(AM2_Widget *w,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t row);
+AM2_Widget *__attribute__((thiscall)) MpSpinnerConstruct(AM2_Widget *w,
+                                                         int32_t left,
+                                                         int32_t top,
+                                                         int32_t row);
+
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,
  * 0x00450180 and 0x00451FB0. */
 void __cdecl OnEnterNameCancel(AM2_Widget *w);

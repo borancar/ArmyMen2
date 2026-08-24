@@ -5015,6 +5015,105 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
     RequestState(2);
 }
 
+/* ------------------------------------------------------------------ *
+ * The three BUTTON classes the multiplayer host/join panel builds one of per
+ * player row. All three derive from the base button and all three carry the
+ * row they belong to in the base's 0x0058, which is how their handlers know
+ * which player they are for.
+ *
+ * The panel itself is still the original's -- 4,497 bytes -- so these run in
+ * the middle of a live path and `ab.sh multi` and `ab.sh mpoptions` compare
+ * the result. Working inward from the leaves rather than starting at the
+ * root is what makes that possible.
+ * ------------------------------------------------------------------ */
+
+/* 0x004329A0, thiscall `ret 0x24` -- NINE stack arguments, and the four in
+ * the middle are the rectangle spelled out rather than passed by value, which
+ * is what makes this one different from every other widget constructor here.
+ *
+ * It writes the rectangle into the base DIRECTLY and then calls
+ * WidgetScreenRect, where the others go through RectSet first. Same result,
+ * one fewer call. */
+AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
+                                                      const char *text,
+                                                      int32_t left, int32_t top,
+                                                      int32_t width,
+                                                      int32_t height,
+                                                      int32_t flag,
+                                                      uint8_t ink,
+                                                      uint8_t paper,
+                                                      int32_t row)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    ButtonBaseConstruct(w);
+    *(const char **)(self + MPNAME_OFF_TEXT)  = text;
+    *(int32_t *)(self + MPNAME_OFF_FLAG)      = flag;
+    self[MPNAME_OFF_INK]                      = ink;
+    self[MPNAME_OFF_PAPER]                    = paper;
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_MP_NAME);
+    WidgetScreenRect(w);
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) =
+        (uint32_t)AM2_IMAGE(ADDR_ON_MP_NAME);
+    *(int32_t *)(self + MPBTN_OFF_ROW) = row;
+    return w;
+}
+
+/* 0x00432E20 and 0x00433030, thiscall `ret 0x0C`. Both are 18 by 20 at a
+ * column the caller picks, and the only differences are the vtable, the
+ * handlers, and whether the button repeats.
+ *
+ * The spinner has a RIGHT handler and auto-repeat where the toggle has
+ * neither -- which is the whole distinction between them, and the reason
+ * their names here are from the shape rather than from the program. */
+static AM2_Widget *MpSmallConstruct(AM2_Widget *w, int32_t left, int32_t top,
+                                    int32_t row, uint32_t vtable,
+                                    uint32_t onLeft, uint32_t onRight,
+                                    int32_t repeats)
+{
+    uint8_t *self = (uint8_t *)w;
+    AM2_Rect box;
+
+    ButtonBaseConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(vtable);
+    RectSet(&box, left, top, AM2_MP_SMALL_W, AM2_MP_SMALL_H);
+    w->x = box.left;
+    w->y = box.top;
+    w->w = box.right;
+    w->h = box.bottom;
+    WidgetScreenRect(w);
+    *(int32_t *)(self + MPBTN_OFF_ROW)        = row;
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT)  = (uint32_t)AM2_IMAGE(onLeft);
+    if (onRight) {
+        *(uint32_t *)(self + BUTTON_OFF_ON_RIGHT) =
+            (uint32_t)AM2_IMAGE(onRight);
+        *(int32_t *)(self + BUTTON_OFF_REPEATS) = repeats;
+    }
+    return w;
+}
+
+AM2_Widget *__attribute__((thiscall)) MpToggleConstruct(AM2_Widget *w,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t row)
+{
+    return MpSmallConstruct(w, left, top, row, VTABLE_MP_TOGGLE,
+                            ADDR_ON_MP_TOGGLE, 0, 0);
+}
+
+AM2_Widget *__attribute__((thiscall)) MpSpinnerConstruct(AM2_Widget *w,
+                                                         int32_t left,
+                                                         int32_t top,
+                                                         int32_t row)
+{
+    return MpSmallConstruct(w, left, top, row, VTABLE_MP_SPINNER,
+                            ADDR_ON_MP_SPIN_LEFT, ADDR_ON_MP_SPIN_RIGHT, 1);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -5147,6 +5246,13 @@ int widget_install(void)
                         "OnDelGameCancel", 0);
     rc |= patch_replace(ADDR_ON_LOADGAME_NEW, (const void *)OnLoadGameNew,
                         "OnLoadGameNew", 0);
+
+    rc |= patch_replace(ADDR_MP_NAME_CTOR, (const void *)MpNameConstruct,
+                        "MpNameConstruct", 9);
+    rc |= patch_replace(ADDR_MP_TOGGLE_CTOR, (const void *)MpToggleConstruct,
+                        "MpToggleConstruct", 3);
+    rc |= patch_replace(ADDR_MP_SPINNER_CTOR, (const void *)MpSpinnerConstruct,
+                        "MpSpinnerConstruct", 3);
 
     rc |= patch_replace(ADDR_LOAD_GAME_CTOR, (const void *)LoadGameConstruct,
                         "LoadGameConstruct", 1);
