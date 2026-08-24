@@ -76,6 +76,10 @@ int32_t __cdecl RemoveFromItemList(AM2_Object *obj);
 void *__cdecl FirstItem(void);
 void *__cdecl NextItem(void);
 
+/* 0x00427CE0. Add an object's uid to the selected group, unless it is already
+ * there or the group is over its cap, and mark the object. */
+void __cdecl SelectUnit(void *obj);
+
 int objtable_install(void);
 
 #ifdef __cplusplus

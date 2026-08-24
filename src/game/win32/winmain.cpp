@@ -218,7 +218,7 @@ static const am2_void_fn kTeardown[] = {
 void __cdecl ShutdownSubsystems(void)
 {
     ((void (__attribute__((thiscall)) *)(void *))(uintptr_t)0x0042A680u)(
-        (void *)(uintptr_t)ADDR_SHUTDOWN_OBJ);
+        (void *)(uintptr_t)ADDR_SELECTED_UIDS);
 
     for (uint32_t i = 0; i < sizeof kTeardown / sizeof kTeardown[0]; i++)
         kTeardown[i]();

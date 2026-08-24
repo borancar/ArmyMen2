@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `f29f28a`. Working tree clean.
+Last updated: **2026-08-24**, at `1aaa875`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,37 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`SelectUnit` (0x00427CE0), and the cap is 65 rather than 64.** Fifteen
+  callers -- the HUD, the script and the unit code. Three refusals and then
+  two writes: a null object; a list already OVER sixty-four, which is
+  `> 0x40` and not `>=`, so sixty-five is the real cap; and a uid already in
+  the list. Past those the uid is appended and the object is marked with bit
+  0x400.
+
+  The duplicate scan compares UIDS, not object pointers -- the list holds
+  uids and so does the comparison, which is the part that would be easy to
+  get wrong.
+
+- **`ADDR_SHUTDOWN_OBJ` named a call site, not an object.** `0x00512308` is a
+  `{capacity, count, items}` ptr list of object uids; all the old name knew is
+  that `ShutdownSubsystems` empties it. It is `ADDR_SELECTED_UIDS` now, on the
+  evidence of the cap, the deduplication, the per-object bit, and the consumer
+  at `0x00427990` that walks it with our own army.
+
+- **The natural name was taken by Win32.** `SelectObject` is a GDI function
+  that `wingdi.h` declares and `dllmain.c` sees, so the reconstruction is
+  `SelectUnit`. The compiler caught it -- "conflicting types for
+  'SelectObject'" -- which is the third name clash this session that a build
+  found rather than a check.
+
+- **It is unexercised, and this time the pre-test was available and I did not
+  run it.** Boot Camp with the mouse clicking and right-clicking over live
+  gameplay leaves the counter at 0. The script route is the `group` action,
+  and `group` appears in the shipped scripts ONLY under `data/mp*` -- the
+  multiplayer maps this environment cannot open a session for. Grepping the
+  data for the keyword would have said so before the function was written,
+  in seconds. That is a cheap check and CLAUDE.md has it now.
 
 - **`SelectLevel` (0x0043ED50), and the reason `StopNamedSound` never runs.**
   Ten callers -- the Boot Camp button, SELECT MAP's OK, the multiplayer panel
@@ -2203,11 +2234,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 779 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 778 | 767 of them below the CRT line |
+| `patch_replace` sites | 780 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 779 | 768 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 140,432 / 372,816 B (**37.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 155,008 / 372,816 B (41.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 140,528 / 372,816 B (**37.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 155,104 / 372,816 B (41.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

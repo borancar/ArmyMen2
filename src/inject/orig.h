@@ -4090,7 +4090,22 @@
 #define ADDR_DBL_MAX_PERIOD      0x0046F988u  /* 1.0 -- worse than 1 kHz loses */
 #define ADDR_STR_HIGH_PERF       0x00485438u  /* "Using High Performance Counter\n" */
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE, ArmyMenMutex */
-#define ADDR_SHUTDOWN_OBJ        0x00512308u  /* the `this` of the first teardown */
+/* Was ADDR_SHUTDOWN_OBJ, which named the ONE teardown call site rather than
+ * the object. It is a {capacity, count, items} ptr list of object UIDs, capped
+ * at 64 and deduplicated on the way in, and adding to it also sets bit 0x400
+ * on the object. Its callers are the HUD, the script and the unit code, and
+ * the consumer at 0x00427990 walks it with our own army -- so "the selected
+ * group" is the reading. ShutdownSubsystems empties it, which is all the old
+ * name knew. */
+#define ADDR_SELECTED_UIDS       0x00512308u  /* {capacity, count, items} */
+#define AM2_MAX_SELECTED         0x40
+#define OBJ_FLAG_SELECTED        0x400u
+#define ADDR_SELECT_UNIT         0x00427CE0u  /* void(void *obj) -- NOT
+                                               * SelectObject: wingdi.h has that
+                                               * name and dllmain.c sees it */
+#define ADDR_ON_SELECTION_CHANGED 0x00427990u /* void(uint32_t packedPoint) */
+#define orig_on_selection_changed \
+            ((void (__cdecl *)(uint32_t))(uintptr_t)ADDR_ON_SELECTION_CHANGED)
 #define ADDR_FREE_SPRITE_LIST    0x004098B0u  /* what the alias jumps to */
 #define ADDR_MAP_NAME_DEFAULT    0x00485108u  /* const char **, used when empty */
 #define ADDR_MP_SCRIPT_DEFAULT   0x0048510Cu  /* const char ** */

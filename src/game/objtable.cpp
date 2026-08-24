@@ -25,6 +25,8 @@
  */
 
 #include "objtable.h"
+#include "misc.h"      /* PtrListPush -- reconstructed */
+#include "image.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -259,6 +261,45 @@ void *__cdecl ObjByUidAlias(uint32_t uid)
     return LookupByUID(uid);
 }
 
+/* 0x00427CE0, fifteen callers -- the HUD, the script and the unit code all
+ * add to the selection through it.
+ *
+ * Three refusals and then two writes. A null object; a list already OVER
+ * sixty-four, which is `> 0x40` and not `>=`, so sixty-five is the real cap;
+ * and an object whose uid is already in the list. Past those, the uid is
+ * appended and the object is marked.
+ *
+ * The duplicate scan re-reads the items base once and walks it, comparing
+ * UIDS rather than object pointers -- the list holds uids and so does the
+ * comparison, which is the part that would be easy to get wrong.
+ *
+ * The last call is handed ADDR_DEFAULT_SOUND_POS as a packed point, the same
+ * global OverlayPrepare seeds its offsets from. */
+void __cdecl SelectUnit(void *obj)
+{
+    uint8_t       *o     = (uint8_t *)obj;
+    int32_t       *rec   = (int32_t *)(uintptr_t)ADDR_SELECTED_UIDS;
+    uint32_t       uid;
+    const uint32_t *items;
+    int32_t        i;
+
+    if (!o)
+        return;
+    if (rec[1] > AM2_MAX_SELECTED)
+        return;
+
+    uid   = *(const uint32_t *)(o + 4);
+    items = *(const uint32_t *const *)&rec[2];
+    for (i = 0; i < rec[1]; i++)
+        if (items[i] == uid)
+            return;
+
+    PtrListPush(rec, (void *)(uintptr_t)uid);
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+    orig_on_selection_changed(*(const uint32_t *)(uintptr_t)
+                              ADDR_DEFAULT_SOUND_POS);
+}
+
 int objtable_install(void)
 {
     int rc = 0;
@@ -272,5 +313,7 @@ int objtable_install(void)
     rc |= patch_replace(ADDR_NEXT_ITEM, (const void *)NextItem, "NextItem", 0);
     rc |= patch_replace(ADDR_OBJ_BY_UID_ALIAS, (const void *)ObjByUidAlias,
                         "ObjByUidAlias", 1);
+    rc |= patch_replace(ADDR_SELECT_UNIT, (const void *)SelectUnit,
+                        "SelectUnit", 15);
     return rc;
 }

@@ -539,6 +539,15 @@ it takes the "or it is mine" arm and never reaches the comparison at all.
 Clicking row 1 as well puts the inverted guard 584 pixels out. Before
 believing a configuration covers a branch, ask which arm the input takes.
 
+**Before reconstructing a function reached from a SCRIPT ACTION, grep the
+shipped data for the keyword.** `SelectUnit` (`0x00427CE0`) has fifteen
+callers and reaches none of them here: its script route is the `group` action,
+and `group` appears only under `data/mp*` -- the multiplayer maps this
+environment cannot open a session for. One `grep -rl group data/` would have
+said so in seconds, before the function was written. The 109 shipped scripts
+are the cheapest reachability oracle this project has and it is not only for
+the parser.
+
 **Reach for the count the defect changes, not the count that is easy to
 read.** Leaving one of `MpPanelDestruct`'s two sprite arrays unreleased passed
 the pixels, the log and the 128-node widget tree -- and passed the REGISTERED
@@ -2279,7 +2288,7 @@ exact oracle**, however meaningful it is when it is set.
   `0x00425950` on any campaign start with a save present. The entry below
   predates that and is left for the others.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
-  `MpNameInk`, `MpNamePaper`, `PlayerLatency`, `OverlayPrepare`,
+  `MpNameInk`, `MpNamePaper`, `PlayerLatency`, `OverlayPrepare`, `SelectUnit`,
   `RestoreTileSet`, and `RefreshScreen` — `OverlayPrepare` has THIRTY
   callers and reaches none of them: they are in-game cursor modes, and its
   one reconstructed caller `DrawMenuOverlay` reads 0 while `DrawMenuCursor`
