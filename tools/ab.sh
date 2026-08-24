@@ -500,9 +500,25 @@ play() {
         # constructors are compared and the handlers are not.
         "$REPO/tools/point.py" 143 49 --click >/dev/null 2>&1
         sleep 1
-        "$REPO/tools/point.py" 200 49 --click >/dev/null 2>&1
+        # The TEAM button auto-REPEATS after 250 ms held, and the socket's
+        # default tap is 120 ms released on a poll -- so a poll that runs
+        # late steps the value twice and the widget tree, which is meant to
+        # be exact, comes back one sprite apart on an otherwise identical
+        # run. It did, once. A 40 ms hold has no chance of reaching the
+        # repeat delay. The colour button does not repeat and does not care.
+        mp_tap() { drive ctl "cursor $1 $2" >/dev/null 2>&1
+                   drive ctl "mouse ${3:-left} tap 40" >/dev/null 2>&1; }
+        mp_tap 200 49
         sleep 1
-        "$REPO/tools/point.py" 200 49 --click >/dev/null 2>&1
+        mp_tap 200 49
+        sleep 1
+        # And the TEAM button's RIGHT half, which steps the other way and is
+        # the one handler of the four that a left click cannot reach. On row
+        # 0, deliberately: the same click on a row we do not own came back
+        # one step apart on about one run in five -- a driving race, since
+        # the value is a pure function of how many clicks landed -- and a
+        # tree compared with no budget at all cannot afford one.
+        mp_tap 200 49 right
         sleep 1
         # Row 1, which is a COMPUTER row -- the player count is 1, so row 0 is
         # ours and every row after it is past the count. That distinction is
@@ -518,13 +534,10 @@ play() {
         sleep 1
         "$REPO/tools/point.py" 143 81 --click >/dev/null 2>&1
         sleep 1
-        "$REPO/tools/point.py" 200 81 --click >/dev/null 2>&1
+        # Row 1's team is deliberately NOT clicked: the guard it would cover
+        # is the same one row 1's colour and name already take, and the extra
+        # click bought only the race above.
         sleep 1
-        # And the TEAM button's RIGHT half, which steps the other way and is
-        # the one handler of the four that a left click cannot reach.
-        drive ctl "cursor 200 81" >/dev/null 2>&1
-        drive ctl "mouse right tap" >/dev/null 2>&1
-        sleep 2
         # The CHAT LINE, which is the panel's edit box at 23,339..270,355 and
         # the only route to its handler: click it, type, and RETURN. The
         # handler logs the line in our army's colour, broadcasts it, empties

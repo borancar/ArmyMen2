@@ -5471,6 +5471,81 @@ void __cdecl OnChatEnter(AM2_Widget *w)
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 
+/* 0x00432C50 -- the INK a player row's name is drawn in, chosen by how the
+ * connection is behaving. Our own row is always the default; everybody
+ * else's degrades in three steps, and the tests are cumulative rather than
+ * exclusive, so 1200 ms of latency picks the second colour and then the
+ * third.
+ *
+ * The last step is not latency at all but SILENCE: the player's record
+ * stamps GetTickCount at +0x70 on every packet, and 1250 ms without one
+ * overrides whatever the average said.
+ *
+ * It returns a byte in AL and leaves the rest of EAX holding its own
+ * working value, which is why the prototype is uint8_t. */
+uint8_t __cdecl MpNameInk(int32_t row)
+{
+    const uint8_t *comm = g_commObject;
+    uint32_t       id   = *(const uint32_t *)(comm
+                                              + (uint32_t)row * AM2_PLAYER_STRIDE
+                                              + AM2_PLAYER_ID);
+    int32_t        ms   = PlayerLatency(id);
+    uint8_t        ink  = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    const uint8_t *player;
+
+    /* Re-read, as the original does: it loads the comm object again after
+     * the call rather than keeping the register. */
+    comm = g_commObject;
+    id   = *(const uint32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                               + AM2_PLAYER_ID);
+
+    if (id == *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
+        return ink;
+
+    if ((uint32_t)ms > AM2_LATENCY_MID)
+        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+    if ((uint32_t)ms > AM2_LATENCY_BAD)
+        ink = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+
+    player = (const uint8_t *)FindPlayerById(id);
+    if (!player)
+        return ink;
+
+    if (orig_get_tick_count()
+        - *(const uint32_t *)(player + AM2_PLAYER_LAST_SEEN) > AM2_SILENCE_BAD)
+        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE;
+
+    return ink;
+}
+
+/* 0x00432CE0 -- the PAPER behind it, and it answers a different question: not
+ * how the link is behaving but whether the player is ready.
+ *
+ * Only the HOST sees the "has not confirmed the map" colour, and only for a
+ * row that has not. Everyone else, and every confirmed row, falls through to
+ * the ready pair. */
+uint8_t __cdecl MpNamePaper(int32_t row)
+{
+    const uint8_t *comm   = g_commObject;
+    const uint8_t *player = comm + (uint32_t)row * AM2_PLAYER_STRIDE;
+
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
+        && !*(const int32_t *)(player + COMM_ARMY_OFF_MAP_OK))
+        return *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
+
+    return *(const int32_t *)(player + COMM_ARMY_OFF_READY_TO_LOAD)
+               ? *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG
+               : *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+}
+
+/* 0x00432D40, thiscall, two instructions: the row name's ink setter. It is a
+ * separate function rather than a store at the call site because the caller
+ * computes the colour with MpNameInk and hands it straight over. */
+void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink)
+{
+    ((uint8_t *)w)[MPNAME_OFF_INK] = ink;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -5614,6 +5689,12 @@ int widget_install(void)
                         "OnMpName", 1);
     rc |= patch_replace(ADDR_ON_CHAT_ENTER, (const void *)OnChatEnter,
                         "OnChatEnter", 0);
+    rc |= patch_replace(ADDR_MP_NAME_INK, (const void *)MpNameInk,
+                        "MpNameInk", 1);
+    rc |= patch_replace(ADDR_MP_NAME_PAPER, (const void *)MpNamePaper,
+                        "MpNamePaper", 1);
+    rc |= patch_replace(ADDR_MP_NAME_SET_INK, (const void *)MpNameSetInk,
+                        "MpNameSetInk", 3);
     rc |= patch_replace(ADDR_REFRESH_MAP_SEL, (const void *)RefreshMapSelection,
                         "RefreshMapSelection", 4);
     rc |= patch_replace(ADDR_SHOW_BAD_PREVIEW, (const void *)ShowBadMapPreview,

@@ -46,12 +46,22 @@ void __cdecl MsgSlotB2(void *comm, uint32_t seq);
  * object; the same callers read the uid at +4. */
 uint32_t __cdecl MsgField12(const void *msg);
 
-/* 0x00402E90. Mean of the 32 dwords at +0x3A0 of the comm object, divided with
- * round-toward-zero rather than an arithmetic shift: the original adds 31 when
- * the sum is negative before shifting by 5. A plain `sum >> 5` would round the
- * wrong way for negative totals. Thirty-two samples on the comm object is the
- * shape of a latency or rate average. */
-int32_t __cdecl CommMean32(const void *comm);
+/* 0x00402E90. Mean of the 32 dwords at +0x3A0 of a PLAYER record -- not of the
+ * comm object, which is what this comment used to say. Its one caller passes
+ * the result of FindPlayerById, and so does PlayerLatency below.
+ *
+ * And the samples are LATENCY IN MILLISECONDS, which the callers settle
+ * rather than the body: both compare the answer against 750 and 1000 to pick
+ * the colour a player's name is drawn in. "The shape of a latency or rate
+ * average" was as far as reading this function alone could get.
+ *
+ * Divided with round-toward-zero rather than an arithmetic shift: the
+ * original adds 31 when the sum is negative before shifting by 5, and a plain
+ * `sum >> 5` would round the wrong way for negative totals. */
+int32_t __cdecl CommMean32(const void *player);
+
+/* 0x00402EC0. The same mean by player ID, and 0 for an ID nobody knows. */
+int32_t __cdecl PlayerLatency(uint32_t id);
 
 /* 0x00402E50. The writer for the ring CommMean32 averages: one dword into the
  * 32 entries at +0x3A0, with the write index at +0x39C, post-incremented and

@@ -2269,12 +2269,19 @@ exact oracle**, however meaningful it is when it is set.
   `0x00425950` on any campaign start with a save present. The entry below
   predates that and is left for the others.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
-  `RestoreTileSet`, and `RefreshScreen` — `ListDropOldest` is the sharpest
-  case of a function that cannot be driven rather than merely has not been:
-  its one caller is `MenuMessage` and it fires only above a hundred logged
-  menu lines, which no configuration in `ab.sh` produces. `RefreshScreen` has 7
-  callers and is reached by none of Boot Camp, the intro, the HQ dialog or
-  F1, so whatever forces an out-of-band repaint is somewhere further in. `RestoreTileSet` is a
+  `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
+  `RestoreTileSet`, and `RefreshScreen` — the three multiplayer ones need a
+  live DirectPlay session with a second player, which this machine cannot
+  open: the row painter has two branches and with nothing connected it
+  takes the other one. `MpNameSetInk` beside them runs 60,152 times, so the
+  painter itself is thoroughly exercised and the branch is not.
+
+  `ListDropOldest` is the sharpest case of a function that cannot be driven
+  rather than merely has not been: its one caller is `MenuMessage` and it
+  fires only above a hundred logged menu lines, which no configuration in
+  `ab.sh` produces. `RefreshScreen` has 7 callers and is reached by none of
+  Boot Camp, the intro, the HQ dialog or F1, so whatever forces an
+  out-of-band repaint is somewhere further in. `RestoreTileSet` is a
   different case and probably a permanent one: it runs only when DirectDraw
   takes a surface back, which needs an alt-tab or a mode change, and nothing
   under Xvfb does either. Anyone on a real display should alt-tab out of a

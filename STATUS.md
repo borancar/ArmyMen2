@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `23c263b`. Working tree clean.
+Last updated: **2026-08-24**, at `b731b98`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,60 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **The player row's two colours, and what they are chosen by.** `0x00432C50`
+  picks the INK by how the CONNECTION is behaving and `0x00432CE0` picks the
+  PAPER by whether the player is READY -- two questions, not one, on the same
+  row.
+
+  The ink degrades in three cumulative steps for everyone but ourselves:
+  latency over 750 ms, over 1000 ms, and then a fourth colour that is not
+  latency at all but SILENCE -- the player's record stamps `GetTickCount` at
+  +0x70 on every packet, and 1250 ms without one overrides whatever the
+  average said. The paper's first arm is the host's alone: a row that has not
+  confirmed the map gets its own colour, and everyone else falls through to
+  the ready pair.
+
+- **`CommMean32` was documented as averaging the COMM OBJECT and it averages a
+  PLAYER.** Its one caller passes the result of `FindPlayerById`, and so does
+  `PlayerLatency` (`0x00402EC0`), which is the same mean reached by id. The
+  header said "thirty-two samples on the comm object is the shape of a latency
+  or rate average" -- which was as far as reading that function alone could
+  get, and wrong about the object.
+
+  What settles the MEANING is the callers rather than the body: both compare
+  the answer against 750 and 1000 to choose a colour. It is milliseconds.
+
+- **Three of the four are UNEXERCISED and the fourth runs 60,152 times.** The
+  row painter has two branches and with nothing connected it takes the other
+  one, so `MpNameInk`, `MpNamePaper` and `PlayerLatency` all read 0 -- while
+  `MpNameSetInk`, which the same painter shares with two other call sites,
+  reads 60,152. Reaching the branch needs a live DirectPlay session with a
+  second player, which this machine cannot open.
+
+  Measured rather than assumed: disabling the paper's no-map arm entirely
+  changes NOTHING in `mpoptions`, on any of its four frames. That is what
+  sent me to the counters, and the counters said the function never runs --
+  ask whether the code runs before asking whether the term matters.
+
+- **The TEAM button click was a race, and shortening the tap did not fix
+  it.** Two `mpoptions` runs in a row came back with a team sprite one step
+  apart on an otherwise identical tree, the rest clean -- about one in five.
+  The first theory was auto-repeat: the button repeats after 250 ms held and
+  the socket's default tap is 120 ms *released on a poll*, so a late poll
+  could step it twice. An explicit 40 ms hold did not stop it, which is what
+  says the theory was wrong.
+
+  What the value actually is, is a pure function of how many clicks landed,
+  and the flaky one was on a row we do not own -- so it is a driving race and
+  not a reconstruction defect. The right-click moved to row 0 and row 1's
+  team click is gone: the guard it covered is the same one row 1's colour and
+  name already take, so the coverage is unchanged and the race is not there
+  to lose. Three consecutive runs identical.
+
+  Worth stating as a rule rather than a fix: **a tree compared with no budget
+  at all cannot afford a driving race**, and the way to tell a race from a
+  defect is that a race is intermittent on an unchanged build.
 
 - **`OnChatEnter` (0x00431CE0), the panel's chat line.** Log the text locally
   in our own army's colour, broadcast it with `system` zero so the sender byte
@@ -1987,11 +2041,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 767 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 766 | 755 of them below the CRT line |
+| `patch_replace` sites | 771 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 770 | 759 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 138,864 / 372,816 B (**37.2%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 153,376 / 372,816 B (41.1%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 139,184 / 372,816 B (**37.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 153,680 / 372,816 B (41.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

@@ -1345,6 +1345,13 @@ void __cdecl OnMpName(AM2_Widget *w);
 /* 0x00431CE0, the panel's chat line: log, broadcast, empty, repaint. */
 void __cdecl OnChatEnter(AM2_Widget *w);
 
+/* The two colours a player row's name is drawn in. The ink says how the link
+ * is behaving, the paper says whether the player is ready; both return a
+ * palette index in AL. */
+uint8_t __cdecl MpNameInk(int32_t row);
+uint8_t __cdecl MpNamePaper(int32_t row);
+void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink);
+
 /* The map thumbnail and what keeps it, the checksums and the ready flag in
  * step with the chosen map. RefreshMapSelection is called from three places
  * that have no panel at all, which is why the widget half is conditional. */

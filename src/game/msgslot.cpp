@@ -44,6 +44,17 @@ int32_t __cdecl CommMean32(const void *comm)
     return (sum + (sum < 0 ? 31 : 0)) >> 5;
 }
 
+/* 0x00402EC0. The same mean, by player ID rather than by pointer, and 0 for a
+ * player nobody knows. The original inlines the loop rather than calling
+ * CommMean32 -- reproduced as a call, because they are the same function and
+ * one of them is already checked. */
+int32_t __cdecl PlayerLatency(uint32_t id)
+{
+    const void *player = FindPlayerById(id);
+
+    return player ? CommMean32(player) : 0;
+}
+
 #define AM2_RING32_INDEX  0x39C
 #define AM2_RING32_ENTRY  0x3A0
 #define AM2_RING32_COUNT  32
@@ -271,6 +282,8 @@ int msgslot_install(void)
     patch_replace(ADDR_MSGSLOT_B2, (const void *)MsgSlotB2, "MsgSlotB2", 2);
     patch_replace(ADDR_MSG_FIELD_12, (const void *)MsgField12, "MsgField12", 1);
     patch_replace(ADDR_COMM_MEAN_32, (const void *)CommMean32, "CommMean32", 1);
+    patch_replace(ADDR_PLAYER_LATENCY, (const void *)PlayerLatency,
+                  "PlayerLatency", 1);
     patch_replace(ADDR_RING_PUSH_32, (const void *)RingPush32, "RingPush32", 2);
     patch_replace(ADDR_COMM_REMOVE_KEYED, (const void *)CommRemoveKeyed,
                   "CommRemoveKeyed", 2);

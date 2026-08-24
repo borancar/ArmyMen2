@@ -3525,6 +3525,20 @@
  * It scans six 0x7E0-byte records at 0x004F1980 and does NOT stop at the first
  * match -- eax is overwritten each time -- so the LAST match wins. */
 #define ADDR_FIND_PLAYER_BY_ID   0x00402990u  /* void *(uint32 id); NULL when unknown */
+#define ADDR_PLAYER_LATENCY      0x00402EC0u  /* int32_t(uint32 id), ms */
+/* The panel's row-name colours. The first three are reused from elsewhere in
+ * the image -- one palette index serves several features -- and the names
+ * they already carry are kept rather than aliased. */
+#define ADDR_COLOUR_LAG_MID      0x004FE092u  /* uint8_t, latency over 750 ms */
+#define ADDR_COLOUR_STALE        0x004FE090u  /* uint8_t, silent over 1250 ms */
+#define ADDR_COLOUR_NO_MAP       0x00502CE5u  /* uint8_t, has not confirmed */
+#define AM2_LATENCY_MID          0x2EEu       /* 750 */
+#define AM2_LATENCY_BAD          0x3E8u       /* 1000 */
+#define AM2_SILENCE_BAD          0x4E2u       /* 1250 */
+#define AM2_PLAYER_LAST_SEEN     0x70u        /* GetTickCount at the last packet */
+#define ADDR_MP_NAME_INK         0x00432C50u  /* uint8_t(int32_t row) */
+#define ADDR_MP_NAME_PAPER       0x00432CE0u  /* uint8_t(int32_t row) */
+#define ADDR_MP_NAME_SET_INK     0x00432D40u  /* thiscall void(this, uint8_t) */
 #define ADDR_PLAYER_RECORDS      0x004F1980u  /* six of them, 0x7E0 apart */
 
 /* Two masks out of that record, each named by its own error message. */
