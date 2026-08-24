@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `f93b741`. Working tree clean.
+Last updated: **2026-08-24**, at `5b5884e`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,25 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`ListDropOldest` (0x004539A0), and it is UNEXERCISED.** It is the other
+  end of `ListAdd`: drop row zero. It does not memmove in place and it does
+  not realloc -- it allocates a fresh array of the new size, copies rows
+  1..n into it, frees the old one and swaps, so the array is rebuilt on every
+  trim. The count is decremented FIRST, which is what makes the loop copy
+  `count` rows starting at row 1 rather than `count - 1`.
+
+  Its one caller is `MenuMessage` and it fires only above a hundred logged
+  lines. No drive this project has posts a hundred menu messages, so nothing
+  in `ab.sh all` executes it and the counter is 0 twice over -- once for the
+  blind spot, once because it genuinely never runs. It is verified by reading
+  and by mirroring `ListAdd`, which IS exercised, and that is stated here
+  rather than left to be assumed from a clean suite.
+
+  Two details worth keeping. When the count reaches zero the allocation still
+  happens, with a size of zero, and the pointer is stored -- reproduced,
+  because a caller that then appends expects a block it can realloc. And the
+  discarded row's value pointer is freed only when +8 says the list owns it.
 
 - **`MenuMessage` (0x00431C30), and its third argument is not a flag.** It
   logs a line in the menu's message list -- a string list capped at 100,
@@ -1938,11 +1957,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 765 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 764 | 753 of them below the CRT line |
+| `patch_replace` sites | 766 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 765 | 754 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 138,576 / 372,816 B (**37.2%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 153,232 / 372,816 B (41.1%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 138,720 / 372,816 B (**37.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 153,376 / 372,816 B (41.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

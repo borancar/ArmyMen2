@@ -1387,6 +1387,9 @@ int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
 void __attribute__((thiscall)) ListAdd(void *list, const char *name,
                                        void *value);
 
+/* 0x004539A0. Drop row zero, by rebuilding the array one row shorter. */
+void __attribute__((thiscall)) ListDropOldest(void *list);
+
 /* 0x00453910, thiscall, 11 callers: the three-field record's constructor --
  * two zeroes and the caller's value.
  *

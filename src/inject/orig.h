@@ -1065,7 +1065,6 @@
  * passes 1, so a message about the game itself and a message about the
  * session light different lamps. */
 #define ADDR_MENU_MSG_LIST       0x0051612Cu  /* the message log, a string list */
-#define ADDR_LIST_DROP_OLDEST    0x004539A0u  /* thiscall(this) */
 #define AM2_MENU_MSG_MAX         0x64         /* trimmed above this many lines */
 #define ADDR_CHATBOX_REFLOW      0x00455D60u  /* thiscall(this) on [widget+0x7C] */
 #define AM2_BLINK_PERIOD         0x64
@@ -3503,6 +3502,11 @@
  * field says so: RecordReset frees it per row. The comm panel keeps its
  * DirectPlay connection here. */
 #define AM2_LIST_ROW_VALUE       0x100u
+/* +8 is whether the list OWNS the value pointers: ListDropOldest frees the
+ * one it is discarding only when it is set, and only the DIFFICULTY dialog's
+ * rows carry plain integers there. */
+#define AM2_LIST_OWNS_VALUES     8u
+#define ADDR_LIST_DROP_OLDEST    0x004539A0u  /* thiscall void(this) */
 #define ADDR_STR_COMPUTER_ONLY   0x00475300u  /* "Play Against Computer Only" */
 
 /* The packet transmit and the three helpers its watchdog uses. */

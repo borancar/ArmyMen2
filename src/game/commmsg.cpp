@@ -1285,12 +1285,10 @@ void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
                                             int32_t flips);
 void __attribute__((thiscall)) ListAdd(void *list, const char *name,
                                        void *value);
+void __attribute__((thiscall)) ListDropOldest(void *list);
 }
 
 typedef void (__attribute__((thiscall)) *AM2_PaintSlotFn)(void *w, AM2_Rect r);
-#define orig_list_drop_oldest \
-            ((void (__attribute__((thiscall)) *)(void *)) \
-             (uintptr_t)ADDR_LIST_DROP_OLDEST)
 #define orig_chatbox_reflow \
             ((void (__attribute__((thiscall)) *)(void *)) \
              (uintptr_t)ADDR_CHATBOX_REFLOW)
@@ -1306,7 +1304,7 @@ void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
 
     ListAdd(log, text, (void *)(uintptr_t)((uint32_t)colour & 0xFFu));
     if (*(const int32_t *)log > AM2_MENU_MSG_MAX)
-        orig_list_drop_oldest(log);
+        ListDropOldest(log);
 
     if (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE == AM2_MENU_MODE_NO_CHAT)
         return;

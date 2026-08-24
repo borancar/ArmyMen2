@@ -1477,6 +1477,49 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
     *count = *count + 1;
 }
 
+/* 0x004539A0, the other end of ListAdd: drop the OLDEST row.
+ *
+ * It does not memmove in place and it does not realloc. It allocates a fresh
+ * array of the NEW size, copies rows 1..n into it, frees the old one and
+ * swaps -- so the array is rebuilt on every trim, which for the menu message
+ * log means once per line above a hundred.
+ *
+ * The count is decremented FIRST, and everything after it is computed from
+ * the new count. That is what makes the loop copy `count` rows starting at
+ * row 1 rather than `count - 1`.
+ *
+ * A list that owns its values frees the discarded row's pointer. When the
+ * count reaches zero the allocation still happens, with a size of zero, and
+ * the pointer it returns is stored -- reproduced rather than special-cased,
+ * because a caller that then appends expects a block it can realloc. */
+void __attribute__((thiscall)) ListDropOldest(void *list)
+{
+    int32_t  *count = (int32_t *)list;
+    uint8_t **base  = (uint8_t **)((uint8_t *)list + 4);
+    uint8_t  *fresh;
+    int32_t   i;
+
+    *count = *count - 1;
+
+    if (*(const int32_t *)((const uint8_t *)list + AM2_LIST_OWNS_VALUES)) {
+        void *owned = *(void **)(*base + AM2_LIST_ROW_VALUE);
+
+        if (owned)
+            am2_free(owned);
+    }
+
+    fresh = (uint8_t *)am2_malloc((size_t)*count * AM2_LIST_ROW_STRIDE);
+
+    /* The count is re-read each time round, as the original does. */
+    for (i = 0; i < *count; i++)
+        memcpy(fresh + (size_t)i * AM2_LIST_ROW_STRIDE,
+               *base + (size_t)(i + 1) * AM2_LIST_ROW_STRIDE,
+               AM2_LIST_ROW_STRIDE);
+
+    am2_free(*base);
+    *base = fresh;
+}
+
 /* The OPTIONS dialog, declared by the table at ADDR_OPTION_TABLE. Both the
  * load and the apply walk it with a cursor 0x18 bytes INTO each record, which
  * is why the original reads the bit and the mask choice at +0 and +4 and the
@@ -5722,6 +5765,8 @@ int widget_install(void)
                         (const void *)OptionsUpdate,
                         "OptionsUpdate", 1);
     rc |= patch_replace(ADDR_LIST_ADD, (const void *)ListAdd, "ListAdd", 3);
+    rc |= patch_replace(ADDR_LIST_DROP_OLDEST, (const void *)ListDropOldest,
+                        "ListDropOldest", 1);
     rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
                         "KeyNameIndexOf", 1);
     rc |= patch_replace(ADDR_RECORD_CTOR, (const void *)RecordCtor,
