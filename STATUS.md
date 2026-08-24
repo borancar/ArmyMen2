@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `1999e2c`. Working tree clean.
+Last updated: **2026-08-25**, at `a7c25fc`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,33 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`RepaintDirtyList` (0x0041D000), and the third draw counter is not a
+  counter.** It walks the registered dirty rectangles, clips each against the
+  region it is given and repaints the INTERSECTION -- an entry half outside
+  the region redraws only the half inside.
+
+  The list is 20-byte records chained through an index at +0x12, and record
+  ZERO is the head sentinel: the walk starts at `records[0].next` and stops
+  when a `next` is zero, so index 0 is both the head and the end marker. That
+  is what `0x00508AD6` is. `orig.h` had it as `ADDR_DRAW_COUNT_C`, one of
+  "three uint16 counters ... what each counts is not established" -- which is
+  exactly what it looks like from the sweep that clears the three together,
+  and the walk is what settles it. `ADDR_DIRTY_HEAD` now, and the comment
+  says which two are still counters.
+
+- **Its coverage cannot be settled by sampling, and that is a property of the
+  data.** The walk itself runs whenever the view scrolls -- `ScrollMapCache`
+  calls it unconditionally on that path. Whether the LOOP BODY runs is
+  another question, and the honest answer is that the list is built and
+  cleared inside a single frame: `ADDR_RESET_DRAW_COUNTS` empties it at the
+  top of every frame, so anything sampling from the control thread sees zero
+  almost by construction. Forty samples during a scrolling mission came back
+  non-empty zero times.
+
+  So the entry and the empty-list exit are exercised and the body is verified
+  by reading. Worth stating plainly: a probe that CANNOT see a thing is not
+  evidence the thing does not happen.
 
 - **The level table, its lookup and the three files that fill it.** Five
   functions in one band: `FreeLevelTables` (0x0043E8B0), `FindLevelRecord`
@@ -2301,11 +2328,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 786 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 785 | 774 of them below the CRT line |
+| `patch_replace` sites | 787 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 786 | 775 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 141,248 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 155,824 / 372,816 B (41.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 141,344 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 155,920 / 372,816 B (41.8%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

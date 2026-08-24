@@ -775,15 +775,24 @@
  * the map's extent on screen. */
 #define ADDR_MAP_BOUNDS          0x00514DE8u  /* AM2_Rect */
 /* Walks the registered dirty rectangles at 0x00508AC4 and repaints the ones
- * meeting the given region. Its only import is IntersectRect, so it is game
- * logic by the coverage rules and stays original. */
+ * meeting the given region. Its only import is IntersectRect. */
 #define ADDR_REPAINT_DIRTY_LIST  0x0041D000u  /* void(const AM2_Rect *) */
-/* Three uint16 counters beside the dirty list at 0x00508AC4, all cleared
- * together at the top of a frame. The names are ours; what each counts is not
- * established, only that they are 16-bit and reset as a set. */
+/* The dirty list is 20-byte records: a RECT and, at +0x12, the index of the
+ * next one. Record ZERO is the head sentinel -- its `next` field is the list
+ * head, which is why the head address is the array base plus 0x12. */
+#define AM2_DIRTY_RECORD_SIZE    20u
+#define DIRTY_OFF_NEXT           0x12u
+#define ADDR_DIRTY_RECTS         0x00508AC4u  /* the records */
+/* Two uint16 counters beside the list, cleared with it at the top of a frame.
+ * The names are ours and what each counts is not established.
+ *
+ * There were THREE. The third, at 0x00508AD6, is not a counter at all: it is
+ * `ADDR_DIRTY_RECTS + 0x12`, the head sentinel's `next` -- which the walk in
+ * ADDR_REPAINT_DIRTY_LIST makes plain and a reset-them-together sweep could
+ * not. It is ADDR_DIRTY_HEAD now. */
 #define ADDR_DRAW_COUNT_A        0x00508AC0u  /* uint16_t */
 #define ADDR_DRAW_COUNT_B        0x00508AD4u  /* uint16_t */
-#define ADDR_DRAW_COUNT_C        0x00508AD6u  /* uint16_t */
+#define ADDR_DIRTY_HEAD          0x00508AD6u  /* uint16_t, records[0].next */
 #define ADDR_RESET_DRAW_COUNTS   0x0041DCE0u  /* void(void) */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */

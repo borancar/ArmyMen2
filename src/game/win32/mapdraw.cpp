@@ -563,7 +563,6 @@ void __cdecl ComposeFrame(void)
 #define g_viewPrev   ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV)
 
 typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
-#define orig_repaint_dirty (*(am2_rect_fn)ADDR_REPAINT_DIRTY_LIST)
 
 /* Scroll the painted map cache and repaint what that exposed -- 0x0042D6D0.
  *
@@ -604,6 +603,34 @@ typedef void (__cdecl *am2_rect_fn)(const AM2_Rect *r);
 
 /* The margin, in tiles, the view may drift before the camera follows it. */
 #define CAMERA_MARGIN 2
+
+/* 0x0041D000 -- repaint every registered dirty rectangle that meets the given
+ * region.
+ *
+ * The list is a chain of 20-byte records through an index at +0x12, and
+ * record ZERO is the head sentinel: the walk starts at `records[0].next` and
+ * stops when a `next` is zero, so index 0 is both the head and the end
+ * marker. That is what the head global at ADDR_DIRTY_HEAD is -- it was filed
+ * as a third draw counter, which is what it looks like from the sweep that
+ * clears the three together.
+ *
+ * The clipped rectangle is what gets repainted, not the record: an entry
+ * half outside the region redraws only the half inside. */
+void __cdecl RepaintDirtyList(const AM2_Rect *region)
+{
+    uint32_t n = *(const uint16_t *)(uintptr_t)ADDR_DIRTY_HEAD;
+
+    while (n) {
+        uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS
+                       + n * AM2_DIRTY_RECORD_SIZE;
+        RECT     hit;
+
+        if (IntersectRect(&hit, (const RECT *)rec, (const RECT *)region))
+            RedrawMapRegion((const AM2_Rect *)&hit);
+
+        n = *(const uint16_t *)(rec + DIRTY_OFF_NEXT);
+    }
+}
 
 void __cdecl ScrollMapCache(void)
 {
@@ -730,7 +757,7 @@ void __cdecl ScrollView(void)
                                    g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
     }
 
-    orig_repaint_dirty(&common);
+    RepaintDirtyList(&common);
 
     /* The horizontal band the scroll exposed, and the vertical extent the
      * next strip will use. */
@@ -936,7 +963,7 @@ static void __cdecl DrawViewRect(void)
 
 void __cdecl ResetDrawCounts(void)
 {
-    *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_C = 0;
+    *(uint16_t *)(uintptr_t)ADDR_DIRTY_HEAD  = 0;
     *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_B = 0;
     *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_A = 0;
 }
@@ -961,6 +988,8 @@ int mapdraw_install(void)
                         "ComposeFrame", 0);
     rc |= patch_replace(ADDR_SCROLL_DECAY, (const void *)ScrollDecay,
                         "ScrollDecay", 1);
+    rc |= patch_replace(ADDR_REPAINT_DIRTY_LIST, (const void *)RepaintDirtyList,
+                        "RepaintDirtyList", 1);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,

@@ -60,6 +60,10 @@ void __cdecl RestoreTileSet(void);
  * amplitude, and shift the view rectangle by the whole-pixel result. */
 void __cdecl ScrollDecay(void);
 
+/* 0x0041D000. Repaint every registered dirty rectangle meeting a region --
+ * the clipped intersection, not the whole record. */
+void __cdecl RepaintDirtyList(const AM2_Rect *region);
+
 void __cdecl ComposeFrame(void);
 
 /* Original: 0x0041D060, called from ComposeFrame. Move the part of the view
