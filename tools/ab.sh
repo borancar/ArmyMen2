@@ -480,10 +480,29 @@ play() {
         drive ctl "poke 511DC8 7" >/dev/null 2>&1
         drive ctl "poke 511DC4 1" >/dev/null 2>&1
         sleep 5
+        # The PANEL's own tree, which nothing compared until now -- 44 nodes,
+        # four player rows of {name, toggle, spinner, message} plus the map
+        # list, the chat and their bars.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
+        # Row 0's toggle at 134..152 by 39..59 and its spinner at 191..209,
+        # measured from that tree. These are the only clicks in the suite that
+        # reach the three MP button classes' HANDLERS; without them the
+        # constructors are compared and the handlers are not.
+        "$REPO/tools/point.py" 143 49 --click >/dev/null 2>&1
+        sleep 1
+        "$REPO/tools/point.py" 200 49 --click >/dev/null 2>&1
+        sleep 1
+        "$REPO/tools/point.py" 200 49 --click >/dev/null 2>&1
+        sleep 2
+        # And AFTER, appended: the comparison is a diff, so a handler that
+        # changed the wrong row -- or nothing -- shows up here.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            >> "$WORK/$cfg-$side.widgets" || true
         "$REPO/tools/point.py" 582 339 --click >/dev/null 2>&1   # OPTIONS
         sleep 4
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
-            > "$WORK/$cfg-$side.widgets" || true
+            >> "$WORK/$cfg-$side.widgets" || true
         drive shot "ab-$cfg-dlg-$side" >/dev/null 2>&1
         # MISCELLANEOUS, not POWER-UPS. Both are group headers, but POWER-UPS
         # is RECORD ZERO -- so a constructor that gave every checkbox a group

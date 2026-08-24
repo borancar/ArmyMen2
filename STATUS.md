@@ -11,6 +11,29 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **The multiplayer panel's own tree was never compared, and now it is --
+  before and after clicking it.** `mpoptions` built the panel, walked straight
+  past it to the OPTIONS dialog, and dumped only that. The panel is 44 nodes:
+  four player rows of {name, toggle, spinner, message} plus the map list, the
+  chat field and their bars.
+
+  It now dumps the panel, clicks row 0's toggle once and its spinner twice --
+  134..152 and 191..209 by 39..59, measured from that tree -- and dumps it
+  again, appended. 128 nodes over three dumps, identical on both sides.
+
+  **The clicks demonstrably do something**: 19 lines move between the two
+  panel dumps, the toggle's sprite id going 1574528 to 1574529 and the
+  spinner's 1575808 to 1575811. A handler that changed the wrong row, or
+  nothing, would show up as a different 19 lines.
+
+  These are the only clicks in the suite that reach the three MP button
+  classes' HANDLERS. Those are still the original's -- only the constructors
+  are ours -- so what this checks today is that our widgets behave correctly
+  under the original's handlers, which is exactly the check the constructors
+  needed. It also sets the handlers up as the next unit: `0x00432D50`,
+  `0x00432EC0`, `0x004330E0` and `0x00433190`, each around 200 bytes, guarding
+  on host-ness and the slot count and reaching `CommSendPlayers`.
+
 - **The multiplayer panel, started from the LEAVES.** `0x00430530` is 4,497
   bytes and was declined twice as too big to start between two other things.
   It builds three button classes, one of each per player row, and those are
