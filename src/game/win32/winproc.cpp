@@ -43,6 +43,7 @@
 #include "winproc.h"
 #include "winmain.h"
 #include "mapdraw.h"
+#include "../commmsg.h"  /* CommFindPlayer -- reconstructed */
 #include "../rect.h"
 #include "../msgslot.h"  /* CommEndSetup, shared with both ready handlers */
 #include "../gameproc.h" /* GameOverState indexes the dispatch table */
@@ -176,7 +177,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 #define orig_drain_msgs     (*(am2_void_fn2)ADDR_COMM_DRAIN_MSGS)
 #define orig_no_buffers     (*(am2_void_fn2)ADDR_COMM_NO_BUFFERS)
-#define orig_find_player    (*(am2_comm_id_fn)ADDR_COMM_FIND_PLAYER)
 #define orig_remove_player_rec (*(am2_comm_id_fn)ADDR_COMM_REMOVE_PLAYER)
 #define orig_player_left    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_LEFT)
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
@@ -226,7 +226,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
 
     if (!id || id == 0xFFFFFFFFu)
         return 1;
-    if (orig_find_player(comm, id) == -1)
+    if (CommFindPlayer(comm, id) == -1)
         return 1;
 
     /* Each player owns three bits; drop them all. */

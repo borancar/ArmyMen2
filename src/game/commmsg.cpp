@@ -721,6 +721,42 @@ typedef void (__cdecl *AM2_RawLogFn)(const void *a, int32_t b, int32_t c);
  *
  * A missing slot, a null object and a kind of zero are all indistinguishable
  * in the answer. */
+/* 0x0040F330, thiscall. The slot holding this DirectPlay id -- and what it
+ * returns is the slot's own INDEX FIELD, not the loop counter. The two are
+ * the same in every state this project has driven; they are separate fields
+ * and the original reads the stored one, so this does too.
+ *
+ * -1 when the count is zero or nothing matches. */
+int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid)
+{
+    const uint8_t *c = (const uint8_t *)comm;
+    int32_t        n = *(const int32_t *)(c + COMM_OFF_PLAYER_COUNT);
+    int32_t        i;
+
+    for (i = 0; i < n; i++)
+        if (*(const int32_t *)(c + (uint32_t)i * AM2_PLAYER_STRIDE
+                               + AM2_PLAYER_ID) == dpid)
+            return *(const int32_t *)(c + (uint32_t)i * AM2_PLAYER_STRIDE
+                                      + AM2_PLAYER_INDEX);
+    return -1;
+}
+
+/* 0x0040F920, thiscall. Is the army that owns this uid still playing?
+ *
+ * Army 4 is the neutral one and answers YES without touching the object,
+ * which is the same special case CommArmyOfSlot and CommSlotForArmy both
+ * carry. Everything else reads the slot's active flag. */
+int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid)
+{
+    int32_t army = UidArmy((int32_t)UidOnWire(uid));
+
+    if (army == AM2_PLAYERS_MAX)
+        return 1;
+    return *(const int32_t *)((const uint8_t *)comm
+                              + (uint32_t)army * AM2_PLAYER_STRIDE
+                              + AM2_PLAYER_ACTIVE);
+}
+
 int32_t __cdecl UidObjKind(uint32_t uid)
 {
     int32_t   insert;
@@ -735,7 +771,6 @@ int32_t __cdecl UidObjKind(uint32_t uid)
     return (int32_t)obj[0];
 }
 
-#define orig_army_in_play  ((AM2_ArmyInPlayFn)(uintptr_t)ADDR_ARMY_IN_PLAY)
 #define orig_army_msg_filter ((AM2_FilterFn)(uintptr_t)ADDR_ARMY_MSG_FILTER)
 #define orig_troop_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_TROOP_MESSAGE_RECV)
 #define orig_vehicle_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_VEHICLE_MSG_RECV)
@@ -772,7 +807,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
         return;
 
     uid = *(const uint32_t *)(m + AM2_ARMYMSG_UID);
-    if (!orig_army_in_play(comm, uid)) {
+    if (!ArmyInPlay(comm, uid)) {
         am2_log("ignoring message from defunct army\n");
         return;
     }
@@ -1231,6 +1266,10 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_COMM_FIND_PLAYER, (const void *)CommFindPlayer,
+                  "CommFindPlayer", 2);
+    patch_replace(ADDR_ARMY_IN_PLAY, (const void *)ArmyInPlay,
+                  "ArmyInPlay", 2);
     patch_replace(ADDR_UID_OBJ_KIND, (const void *)UidObjKind,
                   "UidObjKind", 1);
     patch_replace(ADDR_TROOPER_FIRE_SEND, (const void *)TrooperFireSend,

@@ -3082,6 +3082,9 @@
 #define ADDR_COMM_ARMY_OF_SLOT   0x0040F190u /* thiscall int32(this, slot) */
 #define AM2_PLAYER_ID            0x214u   /* the DirectPlay id; 0 or -1 is none */
 #define AM2_PLAYER_ACTIVE        0x25Cu
+/* Slot i's own index field, four bytes before its army. What
+ * ADDR_COMM_FIND_PLAYER hands back rather than the loop counter. */
+#define AM2_PLAYER_INDEX         0x20Cu
 #define AM2_COMM_VERBOSE         0x418u   /* gates the per-script logging */
 /* This went in as ADDR_COMM_PLAYER_IS_AI, read off the one call site that
  * skips an AI script when it answers yes -- and it means the opposite. The

@@ -11,6 +11,21 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **`CommFindPlayer` returns a stored FIELD where the loop counter would do,
+  and the two are not the same thing.** `0x0040F330` walks the comm object's
+  player slots for a DirectPlay id and hands back `AM2_PLAYER_INDEX` -- the
+  slot's own index field at `+0x20C`, four bytes before its army -- rather
+  than `i`. They agree in every state this project has driven, and they are
+  separate fields, so the reconstruction reads the stored one because the
+  original does. Writing `return i` would be a guess that happens to work.
+
+- **`ArmyInPlay` carries the neutral-army special case a third time.**
+  `0x0040F920` resolves a uid to its army through `UidOnWire` and `UidArmy`,
+  and army 4 answers YES without touching the comm object at all -- the same
+  shortcut `CommArmyOfSlot` and `CommSlotForArmy` both have. Three functions
+  with the same exception is the object model saying something: slot 4 is not
+  a player.
+
 - **`ColourDistance`, `SpriteSlotOf` and `UidObjKind`, and a comment in
   `orig.h` that was wrong in three ways.** It said the sprite registry is "a
   count at 0x006598C0 and a table of AM2_Sprite* at 0x006598C4; the lookup
@@ -1631,11 +1646,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 745 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 744 | 733 of them below the CRT line |
+| `patch_replace` sites | 747 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 746 | 735 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 135,776 / 372,816 B (**36.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 150,048 / 372,816 B (40.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 135,920 / 372,816 B (**36.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 150,192 / 372,816 B (40.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
