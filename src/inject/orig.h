@@ -4166,6 +4166,24 @@
 #define AM2_OBJ_ROW_STRIDE     0x60u
 /* 0x0041D480: take one row out of the map descriptor's cell lists. */
 #define ADDR_ROW_UNREGISTER    0x0041D480u /* void(row *, int32, void *desc) */
+/* 0x0041D3A0: the same row's TEARDOWN -- unregister it and free the buffer it
+ * owns at +0x38, but only when its +0x34 flag says there is one. */
+#define ADDR_ROW_RELEASE       0x0041D3A0u /* void(row *, void *desc) */
+/* The sub-list header inside an object: {?, count, rows, capacity} at
+ * OBJ_OFF_SUBRECORD, so the count the object reads at OBJ_OFF_ROW_COUNT and
+ * the header's own +4 are the same dword seen two ways. */
+#define SUBREC_OFF_COUNT       0x04u
+#define SUBREC_OFF_ROWS        0x08u
+#define SUBREC_OFF_CAPACITY    0x0Cu
+/* The object's REGISTRATION table -- a byte count and an array of 0x10-byte
+ * entries, each holding the index of the cell list it is linked into. -1 is
+ * "not linked", which is what the teardown writes back. */
+#define OBJ_OFF_CELL_COUNT     0x8Cu   /* uint8_t */
+#define OBJ_OFF_CELL_ENTRIES   0x90u
+#define AM2_CELL_ENTRY_STRIDE  0x10u
+#define CELL_ENTRY_OFF_INDEX   0x0Cu   /* int32_t, or -1 */
+/* The argument's array of list heads, indexed by that. */
+#define CELLS_OFF_HEADS        0x0Cu
 #define OBJ_OFF_RETURN_AT      0x5Cu   /* game-clock ms, set by the below */
 /* 0x004097D0, 112 bytes, two callers. Everything of type 2, 3 or 8 within a
  * radius of a point goes off the map and comes back later. */

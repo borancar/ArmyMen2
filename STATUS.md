@@ -11,6 +11,40 @@ Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
 
 Nothing uncommitted.
 
+- **`FreeSubrecordRows` and `ItemPreDestroy`, and one structure seen two
+  ways.** The sub-list header at `OBJ_OFF_SUBRECORD` is
+  `{?, count, rows, capacity}`, so the count the object reads at
+  `OBJ_OFF_ROW_COUNT` (0x70) and the header's own `+4` are the SAME dword --
+  which is why `TakeOffMap`'s offsets look four bytes off from
+  `FreeSubrecordRows`'. Naming both shapes rather than picking one is what
+  makes the two functions read consistently.
+
+  `0x00434EC0` frees the array only when there is one, and clears the CAPACITY
+  unconditionally -- so an already-empty list still gets that written over it.
+  Neither the count nor the header's first dword is touched.
+
+- **`ItemPreDestroy` has three things worth not tidying.** `0x0042A0A0`
+  unlinks an object from every cell list it is registered in: a byte count at
+  `0x8C`, `0x10`-byte entries at `0x90`, each holding the index of the list it
+  is linked into or -1, and each unlink writes -1 back -- so a second call
+  returns on the first entry.
+
+  The count is re-read every iteration though nothing changes it. Entry ZERO's
+  index is tested BEFORE the loop as well as inside it, so an object whose
+  first entry is already unlinked leaves the rest linked. And the second
+  `test al, al` cannot be taken at all: the first already returned on zero and
+  `jbe` on a byte asks the same question.
+
+- **A python edit inserted the same function body twice and the COMPILER
+  caught it, which is the second time this session an edit script went wrong
+  in a way only a downstream check saw.** The first was `str.replace("", x)`
+  turning STATUS.md into 529 MB, caught by GitHub's push limit. Here it was a
+  redefinition error. Both were silent at the point of the mistake.
+
+  The pattern is the same: a scripted edit whose match did not do what the
+  script assumed. Reading the diff for `^+void __cdecl` -- two lines where one
+  was intended -- located it in one command.
+
 - **`TakeOffMap`'s two flags are not symmetric, and that is the whole design.**
   `0x004296E0` raises `OBJ_FLAG_OFF_MAP` (0x0800) UNCONDITIONALLY -- it is what
   eight callers test to know the work has been done -- and then gates the work
@@ -1657,11 +1691,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 748 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 747 | 736 of them below the CRT line |
+| `patch_replace` sites | 750 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 749 | 738 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 136,016 / 372,816 B (**36.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 150,288 / 372,816 B (40.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 136,224 / 372,816 B (**36.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 150,496 / 372,816 B (40.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

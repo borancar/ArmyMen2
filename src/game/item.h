@@ -139,6 +139,16 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink);
  * array and clear the record. */
 void __cdecl ItemsReset(void);
 
+/* 0x00434EC0. Release an object's sub-list: every row's own teardown, then
+ * the array, then the capacity -- which is cleared unconditionally where the
+ * array is freed only when there is one. */
+void __cdecl FreeSubrecordRows(void *subrecord);
+
+/* 0x0042A0A0. Unlink an object from every cell list it is registered in.
+ * Each unlink writes -1 back, so a second call returns on the first entry --
+ * and entry zero's index is tested BEFORE the loop as well as inside it. */
+void __cdecl ItemPreDestroy(void *obj, int32_t cells);
+
 /* 0x0045EE80. A weapon by uid. Null for a zero uid or one that resolves to
  * nothing, and null WITH a log line for one that resolves to a non-weapon. */
 void *__cdecl WeaponByUid(uint32_t uid);

@@ -170,9 +170,45 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     return 1;
 }
 
-typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
-#define orig_item_pre_destroy \
-    (*(AM2_ItemPreDestroyFn)AM2_IMAGE(ADDR_ITEM_PRE_DESTROY))
+/* 0x0042A0A0. Unlink an object from every cell list it is registered in,
+ * before the storage goes back.
+ *
+ * The table is a BYTE count at 0x8C and 0x10-byte entries at 0x90, each
+ * holding the index of the list it is linked into or -1. Each unlink writes
+ * -1 back, so calling this twice is harmless -- the second pass returns on
+ * the first entry.
+ *
+ * Three things reproduced rather than tidied. The count is re-read every
+ * iteration though nothing here changes it. Entry ZERO's index is tested
+ * BEFORE the loop as well as inside it, so an object whose first entry is
+ * already unlinked leaves the rest linked. And the second `test al, al`
+ * cannot be taken: the first one already returned on zero, and `jbe` on a
+ * byte asks the same question. */
+void __cdecl ItemPreDestroy(void *obj, int32_t cells)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *entries;
+    int32_t  i;
+
+    if (!*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT))
+        return;
+    entries = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES);
+    if (*(const int32_t *)(entries + CELL_ENTRY_OFF_INDEX) < 0)
+        return;
+
+    for (i = 0; i < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
+        uint8_t *e = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
+                     + (uint32_t)i * AM2_CELL_ENTRY_STRIDE;
+        int32_t  at = *(const int32_t *)(e + CELL_ENTRY_OFF_INDEX);
+
+        if (at < 0)
+            return;
+        ListUnlink(e, (void **)(*(uint8_t **)((uint8_t *)(uintptr_t)cells
+                                              + CELLS_OFF_HEADS)
+                                + (uint32_t)at * 4));
+        *(int32_t *)(e + CELL_ENTRY_OFF_INDEX) = -1;
+    }
+}
 
 #define kCommDbg \
     (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
@@ -191,9 +227,39 @@ typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
  *
  * Note the log prints the object's uid at +4 and is gated on the comm object's
  * debug field, the same one the event functions read. */
-typedef void (__cdecl *AM2_FreeRowsFn)(void *subrecord);
-#define orig_free_subrecord_rows \
-    ((AM2_FreeRowsFn)(uintptr_t)ADDR_FREE_SUBRECORD_ROWS)
+typedef void (__cdecl *AM2_RowReleaseFn)(void *row, void *desc);
+#define orig_row_release  ((AM2_RowReleaseFn)(uintptr_t)ADDR_ROW_RELEASE)
+
+/* 0x00434EC0. Release an object's sub-list: every row's own teardown, then
+ * the array, then the capacity.
+ *
+ * The header is {?, count, rows, capacity} and the object reads the same two
+ * dwords from its own side as OBJ_OFF_ROW_COUNT and OBJ_OFF_ROWS -- one
+ * structure seen two ways, which is why the offsets look four bytes apart
+ * from the shape TakeOffMap uses.
+ *
+ * The count is re-read every iteration, as it is everywhere else in this
+ * family, and the array is freed only when there is one -- but the CAPACITY
+ * is cleared unconditionally, so an already-empty list still has that written
+ * over it. Neither the count nor the header's first dword is touched. */
+void __cdecl FreeSubrecordRows(void *subrecord)
+{
+    uint8_t *rec = (uint8_t *)subrecord;
+    void    *rows;
+    int32_t  i;
+
+    for (i = 0; i < *(const int32_t *)(rec + SUBREC_OFF_COUNT); i++)
+        orig_row_release(*(uint8_t **)(rec + SUBREC_OFF_ROWS)
+                         + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
+                         (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    rows = *(void **)(rec + SUBREC_OFF_ROWS);
+    if (rows) {
+        am2_free(rows);
+        *(void **)(rec + SUBREC_OFF_ROWS) = (void *)0;
+    }
+    *(int32_t *)(rec + SUBREC_OFF_CAPACITY) = 0;
+}
 
 void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
 {
@@ -222,7 +288,7 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
     if (alloc)
         am2_free(alloc);
 
-    orig_free_subrecord_rows(t + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows(t + OBJ_OFF_SUBRECORD);
     DestroyItemObject(trooper, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
                       unlink);
     am2_free(trooper);
@@ -250,7 +316,7 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
     /* The one step neither of the other two arms has. */
     ClearPtrList(v + VEHICLE_OFF_PTR_LIST);
 
-    orig_free_subrecord_rows(v + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows(v + OBJ_OFF_SUBRECORD);
     DestroyItemObject(vehicle, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
                       unlink);
     am2_free(vehicle);
@@ -261,7 +327,7 @@ void __cdecl DestroyItemCommon(void *item, int32_t unlink)
     if (!item)
         return;
 
-    orig_free_subrecord_rows((uint8_t *)item + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);
     DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
     am2_free(item);
 }
@@ -278,7 +344,7 @@ void __cdecl DestroyKind7(void *item, int32_t unlink)
     if (*live < 0)
         *live = 0;
 
-    orig_free_subrecord_rows((uint8_t *)item + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);
     DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
     am2_free(item);
 }
@@ -293,7 +359,7 @@ void __cdecl DestroyWeapon(void *weapon, int32_t unlink)
     /* Not gated on the verbosity flag, unlike DestroyTrooper's. */
     orig_log("DestroyWeapon, %x\n", *(const int32_t *)(w + 4));
 
-    orig_free_subrecord_rows(w + OBJ_OFF_SUBRECORD);
+    FreeSubrecordRows(w + OBJ_OFF_SUBRECORD);
     DestroyItemObject(weapon, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
     am2_free(weapon);
 }
@@ -309,7 +375,7 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
         orig_log("DestroyItemObject, %x\n", *(const int32_t *)(o + 4));
 
     if (notify)
-        orig_item_pre_destroy(obj, arg);
+        ItemPreDestroy(obj, arg);
 
     am2_free(*(void **)(o + OBJ_OFF_ALLOC_PTR));
 
@@ -434,10 +500,6 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
 
 #define g_tileAttrs (*(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS)
 
-typedef void (__cdecl *AM2_ItemPreDestroyFn)(void *obj, int32_t arg);
-#define orig_item_pre_destroy \
-    (*(AM2_ItemPreDestroyFn)AM2_IMAGE(ADDR_ITEM_PRE_DESTROY))
-
 int32_t __cdecl ObjTileAttr(const void *obj)
 {
     uint32_t tile = *(const uint16_t *)((const uint8_t *)obj + OBJ_OFF_TILE);
@@ -472,11 +534,15 @@ void __cdecl ObjMarkIfOverdue(void *obj)
 
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 {
-    orig_item_pre_destroy(obj, arg);
+    ItemPreDestroy(obj, arg);
 }
 
 void item_install(void)
 {
+    patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
+                  "ItemPreDestroy", 2);
+    patch_replace(ADDR_FREE_SUBRECORD_ROWS, (const void *)FreeSubrecordRows,
+                  "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
     patch_replace(ADDR_WEAPON_BY_UID, (const void *)WeaponByUid,
