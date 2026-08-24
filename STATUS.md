@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `7df729e`. Working tree clean.
+Last updated: **2026-08-24**, at `200fb1d`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,30 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`MpPanelDestruct` (0x00430480), and a leak that nothing could see until
+  the oracle was the REFERENCE COUNT.** The panel's destructor releases two
+  sprite arrays and chains to the dialog base. Neither array is a field of
+  the panel: both are globals, and their bounds are this function's loop
+  limits rather than anything declared -- five sprites from one and thirteen
+  from the other, and the first array's limit is the address of the message
+  log, the next global along.
+
+  Leaving the second array unreleased passed everything. The pixels, the log
+  and the 128-node widget tree were all identical, and so was the REGISTERED
+  SPRITE COUNT -- which was the obvious thing to reach for and is useless
+  here, because every one of those sprites is still referenced elsewhere and
+  the slot is never freed.
+
+  What moves is the refcount inside the sprite. `ab.sh` reads the first
+  array's pointer, dumps the dword at +4 and puts only that in the state
+  file: 1 on a correct teardown, 3 with the loop disabled. The pointer itself
+  is a heap address and stays out, which is the rule the widget dump already
+  follows -- carry one real datum, never the pointer.
+
+  **Reach for the count that the defect changes, not the count that is easy
+  to read.** The registry total was the first thing tried and it answers a
+  different question.
 
 - **`MpPanelUpdate` (0x004316D0), and the field at +0x4C has a name now.**
   The panel's per-frame update greys the COLOUR and TEAM buttons row by row,
@@ -2084,11 +2108,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 773 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 772 | 761 of them below the CRT line |
+| `patch_replace` sites | 774 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 773 | 762 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 139,520 / 372,816 B (**37.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 154,064 / 372,816 B (41.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 139,664 / 372,816 B (**37.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 154,240 / 372,816 B (41.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

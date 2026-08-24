@@ -1067,6 +1067,16 @@
  * the argument is for: Announce passes 0 and the host-migrated handler
  * passes 1, so a message about the game itself and a message about the
  * session light different lamps. */
+/* Two arrays of sprites the multiplayer panel owns, and their bounds are the
+ * destructor's loop bounds rather than anything declared: the first ends
+ * exactly where ADDR_MENU_MSG_LIST begins, which is the same "the next global
+ * is the limit" shape the registration table has -- so that bound is spelled
+ * with the name already on the address rather than a second one. */
+#define ADDR_MP_PANEL_SPRITES_A  0x00516118u  /* AM2_Sprite *[5] */
+#define ADDR_MP_PANEL_SPRITES_B  0x00515FA0u  /* AM2_Sprite *[13] */
+#define ADDR_MP_PANEL_SPRITES_B_END 0x00515FD4u
+#define ADDR_MP_PANEL_DESTRUCT   0x00430480u  /* thiscall void(this) */
+#define VTABLE_MP_PANEL          0x0046FA20u
 #define ADDR_MENU_MSG_LIST       0x0051612Cu  /* the message log, a string list */
 #define AM2_MENU_MSG_MAX         0x64         /* trimmed above this many lines */
 #define ADDR_CHATBOX_REFLOW      0x00455D60u  /* thiscall(this) on [widget+0x7C] */

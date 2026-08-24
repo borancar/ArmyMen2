@@ -1371,6 +1371,10 @@ void __cdecl FillListFromRules(const char *path, void *panel);
 /* 0x004316D0, slot 2 of the multiplayer panel: grey the row buttons on the
  * same policy their handlers guard on, then push five numbers into text. */
 void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w);
+
+/* 0x00430480, slot 0: release the panel's two GLOBAL sprite arrays and chain
+ * to the dialog base. */
+void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w);
 void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,

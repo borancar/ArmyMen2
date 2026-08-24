@@ -603,6 +603,24 @@ play() {
         drive ctl "poke 511DC4 1" >/dev/null 2>&1
         sleep 5
         drive shot "ab-$cfg-alt-$side" >/dev/null 2>&1
+        # Opening JOIN destroyed the HOST panel, and its destructor released
+        # two arrays of sprites that nothing else can see it release: the
+        # registered-sprite count does not move, because every one of them is
+        # still referenced elsewhere. What does move is the REFERENCE COUNT.
+        #
+        # The sprite pointer itself is a heap address and differs run to run,
+        # so only the count goes into the file -- the same rule the widget
+        # dump follows, carrying one real datum and not the pointer. Leaving
+        # the second array unreleased reads 2 here where a correct teardown
+        # reads 1.
+        local spr
+        spr=$(drive ctl "dump 515FA0 4" 2>/dev/null | awk '{print $3}' \
+              | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')
+        if [ -n "$spr" ] && [ "$spr" != 00000000 ]; then
+            echo "panel sprite refs $(drive ctl \
+                "dump $(printf '%X' $((0x$spr + 4))) 4" 2>/dev/null \
+                | awk '{print $3}')" >> "$WORK/$cfg-$side.state"
+        fi
     fi
 
     if [ "$cfg" = audiovol ]; then

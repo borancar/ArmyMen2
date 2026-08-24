@@ -539,6 +539,16 @@ it takes the "or it is mine" arm and never reaches the comparison at all.
 Clicking row 1 as well puts the inverted guard 584 pixels out. Before
 believing a configuration covers a branch, ask which arm the input takes.
 
+**Reach for the count the defect changes, not the count that is easy to
+read.** Leaving one of `MpPanelDestruct`'s two sprite arrays unreleased passed
+the pixels, the log and the 128-node widget tree -- and passed the REGISTERED
+SPRITE COUNT too, which was the obvious global to check and answers a
+different question: every one of those sprites is still referenced elsewhere,
+so no slot is ever freed. What moves is the refcount INSIDE the sprite, 1
+against 3. `tools/ab.sh` reads the array's pointer, dumps the dword at +4 and
+puts only that in the `state` file; the pointer is a heap address and stays
+out, which is the rule the widget dump already follows.
+
 **Where the evidence is a global rather than a pixel, dump the global.**
 The three data checksums the multiplayer handshake compares never reach the
 screen, and the game's own logger is stubbed to `ret` in this build, so the

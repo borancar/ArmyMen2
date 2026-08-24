@@ -5361,6 +5361,33 @@ void __cdecl OnMpName(AM2_Widget *w)
 typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 #define orig_fgets_line (*(AM2_FgetsFn)AM2_IMAGE(ADDR_CRT_FGETS))
 
+/* 0x00430480 -- the multiplayer panel's destructor, slot 0.
+ *
+ * Two sprite arrays and then the base. Neither array is a field of the panel:
+ * both are GLOBALS, and their bounds are this function's loop limits rather
+ * than anything declared -- five sprites from one and thirteen from the
+ * other. The first array's limit is the address of the message log, which is
+ * the next global along.
+ *
+ * The MSVC SEH prologue on it is not reproduced; see CLAUDE.md for why that
+ * is safe in a program with no throw. */
+void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w)
+{
+    AM2_Sprite **p;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_MP_PANEL);
+
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_MENU_MSG_LIST; p++)
+        ReleaseSprite(*p);
+
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END; p++)
+        ReleaseSprite(*p);
+
+    DialogDestruct(w);
+}
+
 /* 0x004316D0 -- the multiplayer panel's per-frame update, slot 2.
  *
  * The cancel key first, through the base, and then two sweeps.
@@ -5804,6 +5831,8 @@ int widget_install(void)
                         "FillListFromRules", 3);
     rc |= patch_replace(ADDR_MP_PANEL_UPDATE, (const void *)MpPanelUpdate,
                         "MpPanelUpdate", 1);
+    rc |= patch_replace(ADDR_MP_PANEL_DESTRUCT, (const void *)MpPanelDestruct,
+                        "MpPanelDestruct", 1);
 
     rc |= patch_replace(ADDR_MP_NAME_CTOR, (const void *)MpNameConstruct,
                         "MpNameConstruct", 9);
