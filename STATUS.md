@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `a1c63e6`. Working tree clean.
+Last updated: **2026-08-25**, at `1999e2c`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,39 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **The level table, its lookup and the three files that fill it.** Five
+  functions in one band: `FreeLevelTables` (0x0043E8B0), `FindLevelRecord`
+  (0x0043E1F0), and `ReadCampaignLevels`, `ReadMpMapList` and
+  `ReadBootcampLevels` (0x0043EC80, 0x0043ECC0, 0x0043ED00) -- one shape three
+  times, differing only in the filename.
+
+  Each reader empties the tables, chdirs to whatever the shared scratch buffer
+  holds, and parses. A failure is logged and nothing else: the tables are left
+  empty and the caller finds no record.
+
+- **The reset is what identifies the SECOND table.** `0x0043E8B0` owns two
+  `{base, count, capacity}` triples side by side -- the level records, and the
+  registry `ADDR_SCRIPT_LIST_FIND` searches. When that searcher was named, two
+  commits ago, its comment had to say the registry "has not been identified":
+  a lookup alone cannot say who fills it. The function that FREES it can, and
+  it is loaded from the same `.txt` by the same reader.
+
+- **The bsearch key is a whole 0x30C-byte record with one dword set.** The
+  rest is never initialised and never read, because `CompareDword` looks at
+  that one field. Reproduced as written rather than shrunk to a four-byte key,
+  which would be a different function the day the comparator grows.
+
+- **Seven seams closed at once, which is the most this session.** Five
+  `orig_` macros across `dplay.cpp`, `startgame.cpp` and `widget.cpp`, plus
+  two spellings of a reconstructed comparator reached through the image from
+  `map.cpp` itself. `defparse.cpp`'s private `bsearch` typedef moved to
+  `orig.h` at the same time, because two modules want it now.
+
+- **Looking up the wrong id is a seven-line log difference.** `id + 1` in the
+  key leaves `bootcamp` without its map: the object-link complaints, the
+  "freeing temporary map load data" line and everything after it are simply
+  absent, because no record was found and no level was selected.
 
 - **`ScrollDecay` (0x0042B420) is the screen SHAKE, and it is the view
   rectangle that shakes.** One step per frame, and the first thing
@@ -2268,11 +2301,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 781 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 780 | 769 of them below the CRT line |
+| `patch_replace` sites | 786 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 785 | 774 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 140,912 / 372,816 B (**37.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 155,488 / 372,816 B (41.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 141,248 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 155,824 / 372,816 B (41.8%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

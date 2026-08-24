@@ -1918,6 +1918,20 @@
  * chdirs to `shared` and parses "bootcamp.txt", naming the file in
  * "Couldn't parse %s!" if that fails. */
 #define ADDR_LOAD_BOOTCAMP_LEVELS 0x0043ED00u  /* void(void) */
+/* The two tables those three readers fill and 0x0043E8B0 frees, each a
+ * {base, count, capacity} triple. The SECOND is the registry
+ * ADDR_SCRIPT_LIST_FIND searches -- which that macro's comment could not name
+ * when it was written, because the searcher alone does not say who fills it.
+ * The reset does: both are loaded from the same `.txt` by DefParseInfoFile. */
+#define ADDR_LEVEL_TABLE_CAP      0x00656340u  /* int32_t */
+#define ADDR_NAME_TABLE_BASE      0x00656344u  /* the ADDR_SCRIPT_LIST_FIND one */
+#define ADDR_NAME_TABLE_COUNT     0x00656348u
+#define ADDR_NAME_TABLE_CAP       0x0065634Cu
+#define ADDR_FREE_LEVEL_TABLES    0x0043E8B0u  /* void(void) */
+#define ADDR_STR_CAMPAIGN_TXT     0x00487C34u  /* "campaign.txt" */
+#define ADDR_STR_MPMAPS_TXT       0x00487C44u  /* "mpmaps.txt" */
+#define ADDR_STR_BOOTCAMP_TXT     0x00487C50u  /* "bootcamp.txt" */
+#define ADDR_FMT_COULDNT_PARSE    0x00473D7Cu  /* "Couldn't parse %s!\n" */
 /* 0x0043E1F0: bsearch the level table -- 0x30C-byte records at
  * ADDR_LEVEL_TABLE, count at ADDR_LEVEL_TABLE_COUNT -- for the one whose
  * first field is the id given. Returns the record or NULL. */
@@ -2964,6 +2978,11 @@
 #define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
 #define ADDR_CRT_QSORT             0x004660B2u
 #define ADDR_CRT_BSEARCH           0x00466280u
+/* One spelling for the game's bsearch, because two modules want it now.
+ * defparse.cpp had it privately; map.cpp's level lookup uses the same. */
+typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
+                                       uint32_t n, uint32_t size,
+                                       const void *cmp);
 /* The link table's capacity, and how it grows: 50 records to begin with, then
  * twenty MORE RECORDS at a time -- not twenty bytes. Both numbers are the
  * original's. */

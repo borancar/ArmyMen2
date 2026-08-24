@@ -5,6 +5,9 @@
 #include <string.h>
 
 #include "gamedir.h"
+#include "misc.h"      /* CompareDword -- reconstructed */
+#include "definfo.h"   /* DefParseInfoFile -- reconstructed */
+#include "crt.h"       /* am2_log, am2_free */
 #include "map.h"
 #include "savetag.h"
 #include "image.h"
@@ -182,6 +185,87 @@ void __cdecl SelectLevel(const void *record)
         *(const int32_t *)(r + LEVEL_OFF_RESERVE10);
 }
 
+/* 0x0043E8B0 -- empty both level tables. Two {base, count, capacity} triples
+ * side by side: the level RECORDS, and the name registry
+ * ADDR_SCRIPT_LIST_FIND searches. The counts and capacities are cleared
+ * before the frees and the bases after, which is the order the original
+ * writes and costs nothing to keep.
+ *
+ * That the same function owns both is what identifies the second table: it is
+ * loaded from the same `.txt` by the same reader, which the searcher alone
+ * could not have said. */
+void __cdecl FreeLevelTables(void)
+{
+    void *levels = *(void **)AM2_IMAGE(ADDR_LEVEL_TABLE);
+    void *names;
+
+    *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) = 0;
+    *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP)   = 0;
+    if (levels)
+        am2_free(levels);
+
+    names = *(void **)AM2_IMAGE(ADDR_NAME_TABLE_BASE);
+    *(void **)AM2_IMAGE(ADDR_LEVEL_TABLE) = (void *)0;
+    *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT) = 0;
+    *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP)   = 0;
+    if (names)
+        am2_free(names);
+
+    *(void **)AM2_IMAGE(ADDR_NAME_TABLE_BASE) = (void *)0;
+}
+
+/* 0x0043E1F0 -- find a level record by id, with the CRT's own bsearch over
+ * the sorted table.
+ *
+ * The KEY is a whole 0x30C-byte record on the stack with only its first dword
+ * set. The rest is never initialised and never read: the comparator at
+ * CompareDword looks at that one field. Reproduced as written -- a
+ * four-byte key would be a different function if the comparator ever grew. */
+void *__cdecl FindLevelRecord(int32_t id)
+{
+    uint8_t key[AM2_LEVEL_RECORD_SIZE];
+
+    *(int32_t *)key = id;
+
+    return ((AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))(
+               key, *(void **)AM2_IMAGE(ADDR_LEVEL_TABLE),
+               (uint32_t)*(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT),
+               AM2_LEVEL_RECORD_SIZE,
+               (const void *)CompareDword);
+}
+
+/* 0x0043EC80, 0x0043ECC0 and 0x0043ED00 -- one shape three times, differing
+ * only in the filename: empty the tables, chdir to whatever the shared
+ * scratch buffer holds, and parse. A failure is logged and nothing else; the
+ * tables are simply left empty.
+ *
+ * The chdir target is ADDR_DIR_SCRATCH, the same eighty-reference char[] the
+ * panel's chat line "clears" its field from. Here it holds a directory, which
+ * is what the name says and what the other use does not. */
+static void ReadLevelFile(const char *name)
+{
+    FreeLevelTables();
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    if (!DefParseInfoFile(name))
+        am2_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE), name);
+}
+
+void __cdecl ReadCampaignLevels(void)
+{
+    ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_CAMPAIGN_TXT));
+}
+
+void __cdecl ReadMpMapList(void)
+{
+    ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_MPMAPS_TXT));
+}
+
+void __cdecl ReadBootcampLevels(void)
+{
+    ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_BOOTCAMP_TXT));
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_POINT_OF_TILE, (const void *)PointOfTile,
@@ -201,4 +285,14 @@ void map_install(void)
                   "MapChecksum", 1);
     patch_replace(ADDR_SELECT_LEVEL, (const void *)SelectLevel,
                   "SelectLevel", 10);
+    patch_replace(ADDR_FREE_LEVEL_TABLES, (const void *)FreeLevelTables,
+                  "FreeLevelTables", 3);
+    patch_replace(ADDR_FIND_LEVEL_RECORD, (const void *)FindLevelRecord,
+                  "FindLevelRecord", 10);
+    patch_replace(ADDR_READ_CAMPAIGN_FILE, (const void *)ReadCampaignLevels,
+                  "ReadCampaignLevels", 2);
+    patch_replace(ADDR_READ_MP_MAPS, (const void *)ReadMpMapList,
+                  "ReadMpMapList", 3);
+    patch_replace(ADDR_LOAD_BOOTCAMP_LEVELS, (const void *)ReadBootcampLevels,
+                  "ReadBootcampLevels", 1);
 }

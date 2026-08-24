@@ -77,4 +77,13 @@ uint32_t __cdecl MapChecksum(void);
  * a null record is the only refusal. */
 void __cdecl SelectLevel(const void *record);
 
+/* The level table and the name registry beside it: empty both, look one up by
+ * id, and the three readers that fill them from campaign.txt, mpmaps.txt and
+ * bootcamp.txt. */
+void  __cdecl FreeLevelTables(void);
+void *__cdecl FindLevelRecord(int32_t id);
+void  __cdecl ReadCampaignLevels(void);
+void  __cdecl ReadMpMapList(void);
+void  __cdecl ReadBootcampLevels(void);
+
 #endif /* AM2_MAP_H */

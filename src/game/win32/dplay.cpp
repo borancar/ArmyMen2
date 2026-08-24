@@ -24,6 +24,7 @@
  */
 
 #include "../gameproc.h"
+#include "../map.h"      /* the level table -- reconstructed */
 #include "widget.h"   /* ListAdd */
 #include "dplay.h"
 #include "../armymsg.h"   /* SendGamePause */
@@ -833,7 +834,6 @@ static_assert(sizeof(DPLCONNECTION) <= LOBBY_CONN_BUF_SIZE, "the 0x800 buffer");
 
 typedef void (__cdecl *am2_lobby_void_fn)(void);
 /* CommCreatePlayer is reconstructed; called directly below. */
-#define orig_read_mp_maps    (*(am2_lobby_void_fn)ADDR_READ_MP_MAPS)
 #define orig_on_lobby_slave  (*(am2_lobby_void_fn)ADDR_ON_LOBBY_SLAVE)
 #define orig_apply_settings  (*(am2_lobby_void_fn)ADDR_APPLY_GAME_SETTINGS)
 
@@ -868,7 +868,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
 
     comm_u32(self, COMM_OFF_LOBBY_STARTING) = 1;
     orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_START);
-    orig_read_mp_maps();
+    ReadMpMapList();
 
     /* Answers 0 or 1, never negative, so this test can only ever pass -- the
      * original's, kept. */

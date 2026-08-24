@@ -2807,8 +2807,6 @@ typedef int32_t (__cdecl *AM2_SprintfFn)(char *, const char *, ...);
 #define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
 #define orig_findnext   ((AM2_FindNextFn)AM2_IMAGE(ADDR_CRT_FINDNEXT))
 #define orig_findclose  ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
-#define orig_read_campaign \
-    ((AM2_ReadCampaignFn)AM2_IMAGE(ADDR_READ_CAMPAIGN_FILE))
 #define g_currentPlayer ((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
 
 AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
@@ -2825,7 +2823,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
 
     ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_PLAYER);
-    orig_read_campaign();
+    ReadCampaignLevels();
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
     g_currentPlayer[0] = '\0';
 
@@ -4037,7 +4035,6 @@ void __cdecl OnArrowRight(AM2_Widget *w)
 #define g_mapChecksum      (*(uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL)
 
 typedef void *(__cdecl *am2_find_level_fn)(int32_t id);
-#define orig_find_level_record (*(am2_find_level_fn)ADDR_FIND_LEVEL_RECORD)
 
 /* 0x00451300. RECRUIT: no test at all, straight to ENTER NAME. */
 void __cdecl OnRecruit(AM2_Widget *w)
@@ -4067,7 +4064,7 @@ void __cdecl OnSelectPlayer(AM2_Widget *w)
 
     (void)w;
     if (strlen(g_currentPlayer))
-        level = orig_find_level_record(1);
+        level = FindLevelRecord(1);
     if (!level) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
@@ -4340,7 +4337,7 @@ AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
 
     ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_MAP);
-    orig_read_campaign();
+    ReadCampaignLevels();
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
     if (rows)
@@ -4348,7 +4345,7 @@ AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
     *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
 
     for (i = 1; i - 1 < g_levelCount; i++) {
-        uint8_t *rec = (uint8_t *)orig_find_level_record(i);
+        uint8_t *rec = (uint8_t *)FindLevelRecord(i);
 
         if (rec) {
             int32_t *id = (int32_t *)am2_malloc(sizeof *id);
@@ -4885,7 +4882,7 @@ void __cdecl OnLoadGameNew(AM2_Widget *w)
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_DATA_DIR));
-    level = orig_find_level_record(1);
+    level = FindLevelRecord(1);
     if (!level)
         return;
 
@@ -4939,7 +4936,7 @@ void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
     id = *(const int32_t *const *)(rows->text
                                    + (uint32_t)selected * AM2_LIST_ROW_STRIDE
                                    + AM2_LIST_ROW_VALUE);
-    level = orig_find_level_record(*id);
+    level = FindLevelRecord(*id);
     if (!level)
         return;
 

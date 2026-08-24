@@ -24,9 +24,6 @@ typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
 #define orig_qsort (*(AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
-typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
-                                       uint32_t n, uint32_t size,
-                                       const void *cmp);
 #define orig_bsearch (*(AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
 #define kDefLinkCap    (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_CAP))
 #define kDefObjRecs      (*(void **)AM2_IMAGE(ADDR_DEF_OBJ_RECS))

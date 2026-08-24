@@ -320,8 +320,6 @@ void __cdecl HostBattle(void)
  * gameproc.cpp -- so they are called by name, not through the image. */
 typedef void  *(__cdecl *am2_find_level_fn)(int32_t id);
 
-#define orig_load_bootcamp_levels (*(am2_void_fn)ADDR_LOAD_BOOTCAMP_LEVELS)
-#define orig_find_level_record    (*(am2_find_level_fn)ADDR_FIND_LEVEL_RECORD)
 
 /* Boot Camp is level 1 of its own table, and the record's first field is the
  * id the lookup keys on -- so this reads it back out rather than reusing the
@@ -386,10 +384,10 @@ void __cdecl OnBootCamp(void)
     }
 
     /* Boot Camp keeps its own level table and rebuilds it on every visit. */
-    orig_load_bootcamp_levels();
+    ReadBootcampLevels();
     g_winEnabled = 1;
 
-    level = orig_find_level_record(BOOTCAMP_LEVEL_ID);
+    level = FindLevelRecord(BOOTCAMP_LEVEL_ID);
     if (!level)
         return;
 
