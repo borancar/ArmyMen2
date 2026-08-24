@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `58a5a97`. Working tree clean.
+Last updated: **2026-08-24**, at `1d1dfdc`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,38 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`SendChatMsg` (0x00411E90), and the name it was carrying was wrong.**
+  `orig.h` had it as `ADDR_CHAT_APPEND`, which is what `Announce`'s second
+  call looks like from where it sits -- put a line on the menu, then append it
+  to the chat log. The body does not append anything: it stamps a static
+  record at `0x004FA910` with a sender byte and the text and hands it to
+  `SendGameMsg`. The FIRST call is the local append. Renamed, and the comment
+  in `misc.cpp` that described the wrong behaviour went with it.
+
+  Third instance this session of a name taken from a call site being wrong
+  about the body, and the second where the OLD name was the one that had to
+  go rather than a new one beside it.
+
+- **`AnnounceToPanel` was `Announce`, reconstructed in `misc.cpp` months ago.**
+  I had read `0x00430120`, named it, written it and wired it in before
+  `checkpatches.py` refused the build: "0x00430120 patched 2 times". Fifth
+  near-duplicate the project has stopped, and the second in two commits. The
+  rule that would have caught it earlier is the one already written down --
+  grep the tree for the ADDRESS as well as for the name -- and it is cheap.
+
+- **It truncates in the caller's buffer**, at `[0xFE]` and not at `[0xFF]`, so
+  the signature is `char *`. `Announce` takes `const char *` and hands its
+  argument straight through, which is a promise the callee does not keep; the
+  cast is written out with a comment rather than hidden, because the two
+  callers that pass a stack buffer would really lose the tail.
+
+- **The record is the evidence and the screen is not.** With nothing
+  connected the send goes nowhere, so clicking OK on the multiplayer options
+  shows only the local half. `ab.sh`'s `state` artifact reads the record
+  instead: `03000000 08010000 04 "Options changed by host."`, identical on
+  both sides. Stamping sender 5 instead of 4 -- invisible in every frame --
+  fails it.
 
 - **The map-selection refresh and the three checksums under it.**
   `0x004301D0` is what runs when the chosen map changes, and the four
@@ -1853,15 +1885,23 @@ both ends. The newest is `SaveObjScriptSection`, the deepest of them -- four
 nested levels, with each action's string length-prefixed in place of the
 pointer field it occupies in memory.
 
+Beside it, and worked from its leaves rather than from the top, is the
+**multiplayer host panel** -- `0x00430530`, 4,497 bytes, declined twice as a
+starting point. Its four row-button handlers, the map-selection refresh, the
+three data checksums a session compares and the chat sender are ours; the
+constructor itself is not, and is reached by address. Everything here is
+compared through `ab.sh mpoptions`, which is the only configuration that
+opens the panel at all.
+
 ## Measured
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 763 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 762 | 751 of them below the CRT line |
+| `patch_replace` sites | 764 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 763 | 752 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 138,272 / 372,816 B (**37.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 152,784 / 372,816 B (41.0%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 138,400 / 372,816 B (**37.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 152,912 / 372,816 B (41.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

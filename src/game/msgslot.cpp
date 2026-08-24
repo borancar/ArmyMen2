@@ -1,5 +1,6 @@
 /* msgslot.cpp -- see msgslot.h. */
 #include <stdint.h>
+#include <string.h>
 
 #include "msgslot.h"
 #include "rect.h"   /* AM2_Rect, for the dialog paint slot */
@@ -205,6 +206,51 @@ void *__cdecl FindPlayerById(uint32_t id)
     return found;
 }
 
+/* SendChatMsg lives here rather than beside SendColorMsg and SendTeamMsg,
+ * which it otherwise belongs with. misc.cpp's Announce calls it and misc.cpp
+ * is in the offline test's link; commmsg.cpp is not, and adding it drags in
+ * two dozen symbols from modules that are not. The declaration is beside its
+ * siblings in msgslot.h either way. */
+#define kMsgCommObj  (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define orig_send_game_msg \
+            ((int32_t (__cdecl *)(void *, int32_t, int32_t)) \
+             (uintptr_t)ADDR_SEND_GAME_MSG)
+
+/* 0x00411E90, and the one message in this family that is not a value.
+ *
+ * It TRUNCATES IN THE CALLER'S BUFFER. If the text is longer than 255 bytes
+ * it writes a terminator at [0xFE] -- not at [0xFF], and not into a copy --
+ * so a caller that passes a buffer it still wants intact loses the tail. The
+ * argument is `char *` here rather than `const char *` for exactly that
+ * reason, and no caller in the image passes a literal.
+ *
+ * The sender byte is 4 for a system announcement and otherwise the ARMY of
+ * our own slot, which is a colour index for the chat window rather than a
+ * player number. Note there is no connected check: unlike the colour and team
+ * senders above, this one always hands the record on.
+ *
+ * `system` is only ever tested for zero, so the 4 is not a flag value. */
+void __cdecl SendChatMsg(char *text, int32_t system)
+{
+    uint8_t *record = (uint8_t *)AM2_IMAGE(ADDR_MSG_CHAT);
+    uint8_t  sender;
+
+    if (strlen(text) > 0xFF)
+        text[0xFE] = '\0';
+
+    strcpy((char *)(record + AM2_MSG_CHAT_TEXT), text);
+
+    if (system)
+        sender = 4;
+    else
+        sender = (uint8_t)orig_comm_army_of_slot((void *)kMsgCommObj,
+                                                 (int32_t)g_defaultOwner);
+
+    record[AM2_MSG_CHAT_SENDER] = sender;
+    orig_send_game_msg(record, 0, 0);
+}
+
 int msgslot_install(void)
 {
     patch_replace(ADDR_FIND_PLAYER_BY_ID, (const void *)FindPlayerById,
@@ -232,5 +278,7 @@ int msgslot_install(void)
                   "GetPlayerMask", 4);
     patch_replace(ADDR_GET_RESEND_MASK, (const void *)GetReSendMask,
                   "GetReSendMask", 1);
+    patch_replace(ADDR_SEND_CHAT_MSG, (const void *)SendChatMsg,
+                  "SendChatMsg", 5);
     return 0;
 }

@@ -116,6 +116,14 @@ uint32_t __cdecl GetReSendMask(uint32_t id);
 void __cdecl SendColorMsg(int32_t colour);
 void __cdecl SendTeamMsg(int32_t team);
 
+/* 0x00411E90, the third of the family and the one that is not a value.
+ * `char *`, not `const char *`: a text longer than 255 bytes is truncated IN
+ * THE CALLER'S BUFFER, at [0xFE] and not at [0xFF]. `system` non-zero stamps
+ * sender 4, the announcement colour; zero stamps the army of our own slot.
+ * Unlike the two above there is no connected check -- this one always hands
+ * the record to SendGameMsg. */
+void __cdecl SendChatMsg(char *text, int32_t system);
+
 /* Original: 0x004010C0, cdecl, the mirror of MsgListAdd. Unlink the head node
  * under the mutex and answer it, or answer null when the list is empty.
  *

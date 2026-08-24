@@ -924,9 +924,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
 }
 
 typedef int32_t (__cdecl *AM2_MapRulesFn)(int32_t a, int32_t b, int32_t c);
-typedef void (__cdecl *AM2_ChatAppendFn)(const char *text, int32_t flag);
 #define orig_check_map_rules ((AM2_MapRulesFn)(uintptr_t)ADDR_CHECK_MAP_RULES)
-#define orig_chat_append     ((AM2_ChatAppendFn)(uintptr_t)ADDR_CHAT_APPEND)
 typedef int32_t (__cdecl *AM2_SprintfFn)(char *out, const char *fmt, ...);
 #define orig_sprintf ((AM2_SprintfFn)(uintptr_t)ADDR_GAME_SPRINTF)
 
@@ -1082,7 +1080,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
                                       * COMM_ARMY_RECORD_SIZE
                                     + COMM_OFF_PLAYERS));
         orig_menu_message(buf, 4, 0);
-        orig_chat_append(buf, 1);
+        SendChatMsg(buf, 1);
         SendMapMsg(5, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
     }
 

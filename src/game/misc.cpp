@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "commmsg.h" /* SendChatMsg -- reconstructed */
 #include "misc.h"
 #include "crt.h"
 #include "image.h"
@@ -976,14 +977,17 @@ void __cdecl FreeIfNotNull(void *p)
 }
 
 typedef void (__cdecl *AM2_MenuMessageFn)(const char *s, int32_t a, int32_t b);
-typedef void (__cdecl *AM2_ChatAppendFn)(const char *s, int32_t a);
 #define orig_menu_message (*(AM2_MenuMessageFn)AM2_IMAGE(ADDR_MENU_MESSAGE))
-#define orig_chat_append  (*(AM2_ChatAppendFn)AM2_IMAGE(ADDR_CHAT_APPEND))
 
+/* The second call is a BROADCAST, not a second local append -- see
+ * SendChatMsg. The cast is the honest one: that function truncates a text
+ * longer than 255 bytes in the buffer it is given, and the original hands it
+ * this argument unchanged, so Announce's own `const` is a promise the callee
+ * does not keep. Nothing in the image announces anything near that long. */
 void __cdecl Announce(const char *text)
 {
     orig_menu_message(text, 4, 0);
-    orig_chat_append(text, 1);
+    SendChatMsg((char *)text, 1);
 }
 
 #define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)

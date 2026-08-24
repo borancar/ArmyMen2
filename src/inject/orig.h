@@ -1054,7 +1054,11 @@
 #define ADDR_LOBBY_RESET         0x00413480u  /* void(void), 320 bytes */
 #define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */
 #define ADDR_MENU_MESSAGE        0x00431C30u  /* void(const char *, int32, int32) */
-#define ADDR_CHAT_APPEND         0x00411E90u  /* void(const char *, int32), 128 bytes */
+/* Was ADDR_CHAT_APPEND, which is what Announce's second call LOOKS like from
+ * where it sits and not what the body does: it stamps a static message record
+ * and hands it to SendGameMsg. Appending the line locally is what the FIRST
+ * call does. Renamed, not aliased. */
+#define ADDR_SEND_CHAT_MSG       0x00411E90u  /* void(char *, int32), 128 bytes */
 /* NOT a sprite anything. 0x00457820 walks every object an army owns and calls
  * the SECOND argument on each -- `call ebp`, where ebp is that argument. It
  * went in as ADDR_SPRITE_DROP_NAMED from the one call site, which passes
@@ -3511,6 +3515,15 @@
  * and 0x0040FE14 -- each with the value the sender writes at +8. */
 #define ADDR_MSG_COLOR           0x004FC898u
 #define ADDR_MSG_TEAM            0x004FC8A8u
+/* The chat record is not one of the value pair: it carries a SENDER byte at
+ * +8 and the text inline from +9, and the eight bytes before that are set up
+ * in .data and never written at runtime. */
+#define ADDR_MSG_CHAT            0x004FA910u
+#define AM2_MSG_CHAT_SENDER      8u
+#define AM2_MSG_CHAT_TEXT        9u
+#define orig_comm_army_of_slot \
+            ((int32_t (__attribute__((thiscall)) *)(void *, int32_t)) \
+             (uintptr_t)ADDR_COMM_ARMY_OF_SLOT)
 
 /* The two senders themselves. */
 #define ADDR_SEND_COLOR_MSG      0x004119C0u  /* void(int32_t colour) */

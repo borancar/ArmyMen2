@@ -556,6 +556,14 @@ play() {
         sleep 3
         drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
         "$REPO/tools/point.py" 576 190 --click >/dev/null 2>&1   # OK
+        sleep 2
+        # The chat record OK stamps on its way out: "Options changed by host."
+        # goes to the panel through Announce and to everyone else through
+        # SendChatMsg, which writes the sender byte and the text into this
+        # static record. With nothing connected the send goes nowhere, so the
+        # record IS the evidence -- the screen shows only the local half.
+        drive ctl "dump 4FA910 40" 2>/dev/null \
+            >> "$WORK/$cfg-$side.state" || true
         sleep 4
         # And the JOIN panel, which is the SAME class as the host one with a
         # different backdrop and role -- menu request 9 where the host is 7.

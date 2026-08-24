@@ -187,7 +187,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_lobby_reset    (*(am2_void_fn2)ADDR_LOBBY_RESET)
 #define orig_hud_message    (*(am2_str_int_fn)ADDR_HUD_MESSAGE)
 #define orig_menu_message   (*(am2_str_int2_fn)ADDR_MENU_MESSAGE)
-#define orig_chat_append    (*(am2_str_int_fn)ADDR_CHAT_APPEND)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -312,7 +311,7 @@ static LRESULT OnHostMigrated(void)
         orig_hud_message(text, g_hudColour);
     else
         orig_menu_message(text, 4, 1);
-    orig_chat_append(text, 1);
+    SendChatMsg(text, 1);
     return 1;
 }
 
