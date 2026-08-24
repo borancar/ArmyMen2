@@ -1356,6 +1356,10 @@ void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink);
  * step with the chosen map. RefreshMapSelection is called from three places
  * that have no panel at all, which is why the widget half is conditional. */
 void __cdecl ShowBadMapPreview(AM2_Widget *preview);
+
+/* 0x00430140. Clear a list box's rows and refill them from a text file in
+ * `rules/`, one row per line, newline and all. */
+void __cdecl FillListFromRules(const char *path, void *panel);
 void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,

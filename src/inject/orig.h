@@ -2850,6 +2850,12 @@
  * original. */
 #define ADDR_DEF_DISPATCH_LINE     0x0041A6B0u  /* int32_t(FILE *) */
 #define ADDR_CRT_FGETS             0x004655B8u
+/* The ONE place the game's FILE is not opaque. 0x00430140 tests the MSVC 6
+ * `_flag` field for _IOEOF inline rather than calling feof, and reproducing
+ * the loop means reading the same byte -- so the two offsets are here with
+ * the reason, rather than a struct that pretends to be an _iobuf. */
+#define AM2_FILE_OFF_FLAG          0x0Cu
+#define AM2_FILE_EOF               0x10u
 #define ADDR_CRT_STRLWR           0x0046D7D6u  /* the plain ASCII _strlwr */
 #define ADDR_STR_DEF_FILE_MODE     0x004779F4u  /* "rt" */
 #define AM2_DEF_LINE_MAX           0x140        /* both line buffers */
@@ -3120,6 +3126,7 @@
  * it does: three of its four callers have no panel at all. Renamed, not
  * aliased. */
 #define ADDR_REFRESH_MAP_SEL     0x004301D0u  /* void(void) */
+#define ADDR_FILL_LIST_FROM_RULES 0x00430140u /* void(const char *, void *) */
 #define ADDR_GAME_DIR            0x0051235Cu  /* char[], the install directory */
 #define ADDR_STR_AVI_DIR         0x004852C8u  /* const char **, -> "avi" */
 #define ADDR_STR_PATH_SEP        0x00478984u  /* "\\" */
@@ -3766,6 +3773,8 @@
 #define AM2_MP_SMALL_H         0x14
 /* The panel's four arrays of one widget per player row, and the fourth is
  * the per-row colour SELECTION the colour handler cycles. */
+#define MP_PANEL_OFF_TYPE_BOX  0x204u   /* the list box a rules file fills */
+#define LISTBOX_OFF_ROWS       0x60u    /* its string list */
 #define MP_PANEL_OFF_PREVIEW   0x218u   /* the map thumbnail widget */
 #define MP_PANEL_OFF_NAMES     0x220u
 #define MP_PANEL_OFF_COLOURS   0x230u

@@ -5356,6 +5356,52 @@ void __cdecl OnMpName(AM2_Widget *w)
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 
+/* The game's own stdio, for the same reason crt.h gives for its allocator: a
+ * FILE opened by the game's CRT cannot be read or closed by ours. */
+typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
+#define orig_fgets_line (*(AM2_FgetsFn)AM2_IMAGE(ADDR_CRT_FGETS))
+
+/* 0x00430140 -- fill a list box from a text file in `rules/`, one row per
+ * line, three callers each with a different filename.
+ *
+ * The row value is 3 for every line, which is the same slot ListAdd stores a
+ * pointer in for the difficulty rows; here it is a plain constant and nothing
+ * reads it back through this path.
+ *
+ * The EOF test is the original's, inline: it reads the MSVC FILE's `_flag`
+ * for _IOEOF rather than calling feof, and it does it BEFORE the first fgets
+ * as well as after each one. A file that opens already at EOF therefore
+ * clears the list and adds nothing, which is a different answer from
+ * "leave the list alone", and is why the reset comes first.
+ *
+ * The line keeps its newline: fgets is given the whole 0x100 buffer and
+ * nothing trims. */
+void __cdecl FillListFromRules(const char *path, void *panel)
+{
+    char      line[0x100];
+    am2_FILE *fp;
+    void     *rows;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_RULES_DIR));
+
+    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_STR_DEF_FILE_MODE));
+    if (!fp)
+        return;
+
+    rows = *(void **)(*(uint8_t **)((uint8_t *)panel + MP_PANEL_OFF_TYPE_BOX)
+                      + LISTBOX_OFF_ROWS);
+    RecordReset(rows);
+
+    while (!(*(const uint8_t *)((const uint8_t *)fp + AM2_FILE_OFF_FLAG)
+             & AM2_FILE_EOF)) {
+        if (!orig_fgets_line(line, (int32_t)sizeof(line), fp))
+            break;
+        ListAdd(rows, line, (void *)3);
+    }
+
+    orig_fclose(fp);
+}
+
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
  * copied into a 0x100 local before being handed on, which is the original's
  * inlined strcpy and not something the callee needs; kept, because the callee
@@ -5699,6 +5745,9 @@ int widget_install(void)
                         "RefreshMapSelection", 4);
     rc |= patch_replace(ADDR_SHOW_BAD_PREVIEW, (const void *)ShowBadMapPreview,
                         "ShowBadMapPreview", 1);
+    rc |= patch_replace(ADDR_FILL_LIST_FROM_RULES,
+                        (const void *)FillListFromRules,
+                        "FillListFromRules", 3);
 
     rc |= patch_replace(ADDR_MP_NAME_CTOR, (const void *)MpNameConstruct,
                         "MpNameConstruct", 9);

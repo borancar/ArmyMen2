@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `b731b98`. Working tree clean.
+Last updated: **2026-08-24**, at `1a2a5b6`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,27 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`FillListFromRules` (0x00430140), and the only place the game's FILE is
+  not opaque.** It clears a list box's rows and refills them from a text file
+  in `rules/`, one row per line, three callers each with a different
+  filename. The line keeps its newline: `fgets` gets the whole 0x100 buffer
+  and nothing trims.
+
+  The EOF test is inline -- the MSVC `_flag` byte at +0x0C against `_IOEOF`
+  -- rather than a call to `feof`, so reproducing the loop means reading the
+  same byte. `orig.h` has kept the game's FILE opaque on the argument that we
+  never dereference it; that is now true everywhere but here, and the two
+  offsets are recorded with the reason rather than a struct pretending to be
+  an `_iobuf`.
+
+  The test comes BEFORE the first `fgets` as well as after each one. A file
+  that opens already at EOF therefore clears the list and adds nothing, which
+  is a different answer from leaving it alone -- and is why the reset comes
+  first.
+
+  It runs once per panel open (`FillListFromRules=1` on a probe) and adding
+  no rows puts `mpoptions` 1,966 pixels out against a budget of 300.
 
 - **The player row's two colours, and what they are chosen by.** `0x00432C50`
   picks the INK by how the CONNECTION is behaving and `0x00432CE0` picks the
@@ -2041,11 +2062,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 771 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 770 | 759 of them below the CRT line |
+| `patch_replace` sites | 772 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 771 | 760 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 139,184 / 372,816 B (**37.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 153,680 / 372,816 B (41.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 139,328 / 372,816 B (**37.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 153,824 / 372,816 B (41.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
