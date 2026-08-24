@@ -186,7 +186,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_set_ai         (*(am2_int_fn2)ADDR_SET_AI_CONTROL)
 #define orig_lobby_reset    (*(am2_void_fn2)ADDR_LOBBY_RESET)
 #define orig_hud_message    (*(am2_str_int_fn)ADDR_HUD_MESSAGE)
-#define orig_menu_message   (*(am2_str_int2_fn)ADDR_MENU_MESSAGE)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -254,7 +253,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
             ((am2_paint_flush_fn)vt[2])(obj);
             ((am2_repaint_fn)vt[1])(*(const RECT *)(obj + PAINT_OFF_DAMAGE));
             orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_LEFT_GAME, name);
-            orig_menu_message(text, 4, 1);
+            MenuMessage(text, 4, 1);
         }
 
         if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 4
@@ -310,7 +309,7 @@ static LRESULT OnHostMigrated(void)
     if (g_gameState == 2)
         orig_hud_message(text, g_hudColour);
     else
-        orig_menu_message(text, 4, 1);
+        MenuMessage(text, 4, 1);
     SendChatMsg(text, 1);
     return 1;
 }

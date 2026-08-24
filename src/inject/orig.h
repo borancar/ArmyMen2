@@ -1054,6 +1054,27 @@
 #define ADDR_LOBBY_RESET         0x00413480u  /* void(void), 320 bytes */
 #define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */
 #define ADDR_MENU_MESSAGE        0x00431C30u  /* void(const char *, int32, int32) */
+/* What MenuMessage reaches. The log itself is the string-list class already
+ * named at ADDR_LIST_ADD; the trim below it drops the OLDEST record and frees
+ * its string when the list owns one.
+ *
+ * The last step is a BLINKER -- ADDR_BLINKER_START, already named from the
+ * widget vtable survey -- with a period of 100 and 20 flashes, and the third
+ * argument picks WHICH of the panel's two indicators flashes. That is what
+ * the argument is for: Announce passes 0 and the host-migrated handler
+ * passes 1, so a message about the game itself and a message about the
+ * session light different lamps. */
+#define ADDR_MENU_MSG_LIST       0x0051612Cu  /* the message log, a string list */
+#define ADDR_LIST_DROP_OLDEST    0x004539A0u  /* thiscall(this) */
+#define AM2_MENU_MSG_MAX         0x64         /* trimmed above this many lines */
+#define ADDR_CHATBOX_REFLOW      0x00455D60u  /* thiscall(this) on [widget+0x7C] */
+#define AM2_BLINK_PERIOD         0x64
+#define AM2_BLINK_FLASHES        0x14
+#define MP_PANEL_OFF_CHATBOX     0x21Cu
+#define MP_PANEL_OFF_BLINKER_0   0x250u
+#define MP_PANEL_OFF_BLINKER_1   0x254u
+#define CHATBOX_OFF_INNER        0x7Cu
+#define AM2_MENU_MODE_NO_CHAT    8
 /* Was ADDR_CHAT_APPEND, which is what Announce's second call LOOKS like from
  * where it sits and not what the body does: it stamps a static message record
  * and hands it to SendGameMsg. Appending the line locally is what the FIRST

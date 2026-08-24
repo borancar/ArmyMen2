@@ -8,6 +8,7 @@
 #include "surface.h"
 #include "font.h"    /* TextExtent -- reconstructed */
 #include "../rect.h"
+#include "../commmsg.h" /* Announce -- reconstructed */
 #include "../misc.h"   /* IsKeyDown, KeyChanged */
 #include "../msgslot.h" /* SendColorMsg, SendTeamMsg -- reconstructed */
 #include "sprite.h"

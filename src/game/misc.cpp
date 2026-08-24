@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "commmsg.h" /* SendChatMsg -- reconstructed */
 #include "misc.h"
 #include "crt.h"
 #include "image.h"
@@ -976,20 +975,6 @@ void __cdecl FreeIfNotNull(void *p)
         am2_free(p);
 }
 
-typedef void (__cdecl *AM2_MenuMessageFn)(const char *s, int32_t a, int32_t b);
-#define orig_menu_message (*(AM2_MenuMessageFn)AM2_IMAGE(ADDR_MENU_MESSAGE))
-
-/* The second call is a BROADCAST, not a second local append -- see
- * SendChatMsg. The cast is the honest one: that function truncates a text
- * longer than 255 bytes in the buffer it is given, and the original hands it
- * this argument unchanged, so Announce's own `const` is a promise the callee
- * does not keep. Nothing in the image announces anything near that long. */
-void __cdecl Announce(const char *text)
-{
-    orig_menu_message(text, 4, 0);
-    SendChatMsg((char *)text, 1);
-}
-
 #define g_keyPressed ((int32_t *)(uintptr_t)ADDR_KEY_PRESSED)
 
 int32_t __cdecl KeyPressed(int32_t dik)
@@ -1242,7 +1227,6 @@ int misc_install(void)
     patch_replace(ADDR_OBJ_CODE_UNMAPPED, (const void *)ObjCodeUnmapped,
                   "ObjCodeUnmapped", 1);
     patch_replace(ADDR_GET_MENU_ROW, (const void *)GetMenuRow, "GetMenuRow", 0);
-    patch_replace(ADDR_ANNOUNCE, (const void *)Announce, "Announce", 1);
     patch_replace(ADDR_UNIT_TYPE_COST, (const void *)UnitTypeCost,
                   "UnitTypeCost", 1);
     patch_replace(ADDR_FREE_IF_NOT_NULL, (const void *)FreeIfNotNull,

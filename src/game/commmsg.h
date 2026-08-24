@@ -43,6 +43,13 @@ int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid);
  * Does nothing at all without a DirectPlay session. */
 void __cdecl TrooperFireSend(void *trooper, void *target);
 
+/* 0x00431C30 and 0x00430120. MenuMessage logs a line and shows it; its third
+ * argument picks WHICH of the panel's two indicators blinks, and is not a
+ * boolean. Announce is the pair -- log it locally, broadcast it -- and both
+ * ends stamp colour 4, the system colour. */
+void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
+void __cdecl Announce(const char *text);
+
 int commmsg_install(void);
 
 #ifdef __cplusplus

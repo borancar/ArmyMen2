@@ -646,10 +646,6 @@ void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index);
  * than to be necessary. */
 void __cdecl FreeIfNotNull(void *p);
 
-/* 0x00430120, 12 callers. Put a line on the menu and append it to the chat
- * log, in that order, and nothing else. Both callees are still original. The
- * name is ours; what the two calls do is what it is for. */
-void __cdecl Announce(const char *text);
 
 /* 0x0043A5E0, three callers. One dword out of the unit-type table at
  * 0x004878B8 -- 12 records of 40 bytes whose names are IN them: bazookaman,

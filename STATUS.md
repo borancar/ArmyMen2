@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `1d1dfdc`. Working tree clean.
+Last updated: **2026-08-24**, at `f93b741`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,46 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`MenuMessage` (0x00431C30), and its third argument is not a flag.** It
+  logs a line in the menu's message list -- a string list capped at 100,
+  trimmed one at a time from the oldest end -- and then makes the panel show
+  it. The last thing it does is `BlinkerStart(widget, 100, 20)`, and the
+  third argument picks WHICH of the panel's two indicators flashes:
+  `Announce` passes 0, the host-migrated handler passes 1. A message about
+  the game and a message about the session light different lamps.
+
+  That reading came free from the alias ratchet. I had named `0x00456DC0`
+  `ADDR_CHATBOX_SCROLL_END` from the two constants pushed into it; it has
+  been `ADDR_BLINKER_START` since the widget vtable survey, and the name
+  already there knew what the call was. Second time in three commits that
+  the old name was the informed one.
+
+- **It reads the panel's chat widget out of the CURRENT SCREEN without
+  checking that the current screen is a panel.** Reproduced. Every caller in
+  the image is a panel path or in-mission, and a guard here would be a
+  different function -- but it is worth knowing the field offset is applied
+  blind.
+
+- **The seam it closed ran through three modules and two of them are flat.**
+  `orig_menu_message` was in `misc.cpp`, `commmsg.cpp` and `winproc.cpp`.
+  `MenuMessage` calls `BlinkerStart` and `ListAdd`, which live in
+  `win32/widget.cpp`, so it cannot sit in a flat module that includes
+  `widget.h` -- that header reaches `LPDIRECTDRAWSURFACE` through the sprite
+  in a widget and `checksplit.py` would fail it. Both are declared
+  `extern "C"` in `commmsg.cpp` instead, which is the seam that file already
+  uses for three comm methods.
+
+  `Announce` moved out of `misc.cpp` with it, because `misc.cpp` is in the
+  offline test's link and `commmsg.cpp` is not.
+
+- **Two mutations, and only one of them is caught.** Returning before the
+  log puts `mpoptions` at 327 pixels against a budget of 300 -- real signal,
+  and a thin margin, because a chat line in a menu font is small. Swapping
+  the two blinkers changes NOTHING: 0 pixels on all four frames. Twenty
+  flashes at 100 ms is two seconds and the shot lands four seconds after the
+  click, so the lamp is already still. Which indicator blinks stays verified
+  by reading, and that is a timing gap rather than a coverage one.
 
 - **`SendChatMsg` (0x00411E90), and the name it was carrying was wrong.**
   `orig.h` had it as `ADDR_CHAT_APPEND`, which is what `Announce`'s second
@@ -1888,7 +1928,8 @@ pointer field it occupies in memory.
 Beside it, and worked from its leaves rather than from the top, is the
 **multiplayer host panel** -- `0x00430530`, 4,497 bytes, declined twice as a
 starting point. Its four row-button handlers, the map-selection refresh, the
-three data checksums a session compares and the chat sender are ours; the
+three data checksums a session compares and both halves of an announcement
+are ours; the
 constructor itself is not, and is reached by address. Everything here is
 compared through `ab.sh mpoptions`, which is the only configuration that
 opens the panel at all.
@@ -1897,11 +1938,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 764 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 763 | 752 of them below the CRT line |
+| `patch_replace` sites | 765 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 764 | 753 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 138,400 / 372,816 B (**37.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 152,912 / 372,816 B (41.0%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 138,576 / 372,816 B (**37.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 153,232 / 372,816 B (41.1%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

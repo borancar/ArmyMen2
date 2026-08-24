@@ -547,11 +547,11 @@ void __cdecl ExitGamePostClose(void)
 typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);
 typedef void (__cdecl *AM2_MsgHandlerFn)(void *msg, int32_t dpid);
 typedef void (__cdecl *AM2_HudMessageFn)(const char *text, int32_t colour);
-typedef void (__cdecl *AM2_MenuMessageFn)(const char *text, int32_t a,
-                                          int32_t b);
+/* MenuMessage is reconstructed below; this forward declaration is here
+ * because the two callers in this file come before it. */
+void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
 
 #define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
-#define orig_menu_message  ((AM2_MenuMessageFn)(uintptr_t)ADDR_MENU_MESSAGE)
 
 #define AM2_MSG_TYPE   0        /* the first dword: what the arm is chosen on */
 #define AM2_MSG_SENDER 8        /* the chat arm reads this as a SIGNED byte */
@@ -569,7 +569,7 @@ static void DispatchChat(const uint8_t *msg)
         /* The original loads only DL here and pushes the whole of EDX, so the
          * top three bytes of that argument are whatever was in the register.
          * The callee reads a byte; passing the byte is the same call. */
-        orig_menu_message((const char *)(msg + AM2_MSG_TEXT), sender, 1);
+        MenuMessage((const char *)(msg + AM2_MSG_TEXT), sender, 1);
         return;
     }
 
@@ -1079,7 +1079,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
                                     + g_defaultOwner
                                       * COMM_ARMY_RECORD_SIZE
                                     + COMM_OFF_PLAYERS));
-        orig_menu_message(buf, 4, 0);
+        MenuMessage(buf, 4, 0);
         SendChatMsg(buf, 1);
         SendMapMsg(5, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
     }
@@ -1262,6 +1262,86 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
     *(int32_t *)(t + TROOPER_OFF_LAST_SEQ) = seq;
 }
 
+/* 0x00431C30 -- put a line in the menu's message log and make the panel show
+ * it. Three arguments and the third is not a flag: it picks WHICH of the
+ * panel's two indicators blinks.
+ *
+ * The log is a string list capped at 100 lines, trimmed one at a time from
+ * the OLDEST end. Above that comes the display half, and it is skipped
+ * entirely in menu mode 8 -- so a message posted there is logged and not
+ * shown.
+ *
+ * The display half reads the panel's chat widget out of the CURRENT SCREEN
+ * without checking that the current screen is a panel. Reproduced: every
+ * caller in the image is a panel or in-mission path, and a guard here would
+ * be a different function.
+ *
+ * BlinkerStart and ListAdd live in win32/widget.cpp and are declared here
+ * rather than included: this module is flat, and widget.h reaches
+ * LPDIRECTDRAWSURFACE through the sprite in a widget. Same seam and the same
+ * reason as the three comm methods above. */
+extern "C" {
+void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
+                                            int32_t flips);
+void __attribute__((thiscall)) ListAdd(void *list, const char *name,
+                                       void *value);
+}
+
+typedef void (__attribute__((thiscall)) *AM2_PaintSlotFn)(void *w, AM2_Rect r);
+#define orig_list_drop_oldest \
+            ((void (__attribute__((thiscall)) *)(void *)) \
+             (uintptr_t)ADDR_LIST_DROP_OLDEST)
+#define orig_chatbox_reflow \
+            ((void (__attribute__((thiscall)) *)(void *)) \
+             (uintptr_t)ADDR_CHATBOX_REFLOW)
+
+void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
+{
+    uint8_t *log = *(uint8_t **)(uintptr_t)ADDR_MENU_MSG_LIST;
+    uint8_t *screen;
+    uint8_t *chatbox;
+
+    if (!log)
+        return;
+
+    ListAdd(log, text, (void *)(uintptr_t)((uint32_t)colour & 0xFFu));
+    if (*(const int32_t *)log > AM2_MENU_MSG_MAX)
+        orig_list_drop_oldest(log);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE == AM2_MENU_MODE_NO_CHAT)
+        return;
+
+    screen = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    if (!screen)
+        return;
+
+    chatbox = *(uint8_t **)(screen + MP_PANEL_OFF_CHATBOX);
+    orig_chatbox_reflow(*(void **)(chatbox + CHATBOX_OFF_INNER));
+
+    /* Re-read, as the original does: it loads the field again rather than
+     * keeping the register it had across the call. */
+    chatbox = *(uint8_t **)(screen + MP_PANEL_OFF_CHATBOX);
+    ((AM2_PaintSlotFn *)*(void **)chatbox)[1](chatbox,
+                                              *(const AM2_Rect *)(chatbox + 0x14));
+
+    BlinkerStart(*(void **)(screen + (indicator ? MP_PANEL_OFF_BLINKER_1
+                                                : MP_PANEL_OFF_BLINKER_0)),
+                 AM2_BLINK_PERIOD, AM2_BLINK_FLASHES);
+}
+
+/* 0x00430120. The local half and the remote half of one announcement, and
+ * the colour they agree on is 4 -- the same byte SendChatMsg stamps on a
+ * system message, so the line looks the same at both ends. */
+void __cdecl Announce(const char *text)
+{
+    MenuMessage(text, 4, 0);
+    /* SendChatMsg truncates above 255 bytes in the buffer it is given, and
+     * the original hands it this argument unchanged -- so Announce's own
+     * `const` is a promise the callee does not keep. Nothing in the image
+     * announces anything near that long. */
+    SendChatMsg((char *)text, 1);
+}
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_COMM_FIND_PLAYER, (const void *)CommFindPlayer,
@@ -1321,5 +1401,8 @@ int commmsg_install(void)
                   "SendColorMsg", 1);
     patch_replace(ADDR_SEND_TEAM_MSG, (const void *)SendTeamMsg,
                   "SendTeamMsg", 1);
+    patch_replace(ADDR_MENU_MESSAGE, (const void *)MenuMessage,
+                  "MenuMessage", 6);
+    patch_replace(ADDR_ANNOUNCE, (const void *)Announce, "Announce", 12);
     return 0;
 }
