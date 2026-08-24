@@ -529,6 +529,25 @@ to a registration decides whether the teardown frees the handler's argument
 too. `DeclareRuleVars` passes 0, so the `if` records it registers are not freed
 by the table pointing at them.
 
+**A guard is not compared until something takes the arm that needs it.** The
+four multiplayer row buttons share one test -- a row may be edited when it is
+ours, or when we are the host and the row is at or past the human player
+count. I read the `jl` backwards and wrote `row < count`, which is the host
+editing other people's rows and never the computer ones. It passed a clean
+`mpoptions` A/B, because that configuration clicked row 0 and row 0 is ours:
+it takes the "or it is mine" arm and never reaches the comparison at all.
+Clicking row 1 as well puts the inverted guard 584 pixels out. Before
+believing a configuration covers a branch, ask which arm the input takes.
+
+**Where the evidence is a global rather than a pixel, dump the global.**
+The three data checksums the multiplayer handshake compares never reach the
+screen, and the game's own logger is stubbed to `ret` in this build, so the
+"Checksum of %s is %x" lines the code writes go nowhere -- a wrong total is
+invisible to both halves of an A/B. `tools/ab.sh` has a `state` artifact for
+this: bytes read over the control socket on both sides and diffed exactly. It
+is the same idea as `tools/trigdump.py` and worth reaching for whenever a
+subsystem's output is a number the frame does not show.
+
 **Reusing an entry for a repeated key pair is load-bearing**, which a mutation
 settles: making the lookup always miss, so every registration makes its own
 entry, puts `bootcamp` at 79,695 differing pixels against a budget of 500.

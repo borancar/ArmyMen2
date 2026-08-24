@@ -9,11 +9,13 @@
 #include "font.h"    /* TextExtent -- reconstructed */
 #include "../rect.h"
 #include "../misc.h"   /* IsKeyDown, KeyChanged */
+#include "../msgslot.h" /* SendColorMsg, SendTeamMsg -- reconstructed */
 #include "sprite.h"
 #include "frame.h"
 #include "audio.h"
 #include "dplay.h"   /* CommCreateDirectPlay -- reconstructed */
 #include "../gamedir.h" /* SetGameDir -- reconstructed */
+#include "../map.h"     /* Checksum and the three totals -- reconstructed */
 #include "../gameproc.h"  /* RequestState -- reconstructed */
 #include "../image.h"
 #include "../crt.h"
@@ -1644,7 +1646,6 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 #define orig_mp_panel_ctor    ((AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_PANEL_CTOR))
-#define orig_mp_panel_refresh ((AM2_VoidFn)AM2_IMAGE(ADDR_MP_PANEL_REFRESH))
 
 /* The half every factory opens with: whatever screen is up goes away first.
  *
@@ -1679,7 +1680,7 @@ void __cdecl OpenMpHost(void)
     OpenScreen(AM2_MP_PANEL_SIZE, orig_mp_panel_ctor,
                (const char *)AM2_IMAGE(ADDR_STR_MPHOST_BMP));
     g_mpSession = AM2_MP_SESSION_HOST;
-    orig_mp_panel_refresh();
+    RefreshMapSelection();
 }
 
 void __cdecl OpenMpJoin(void)
@@ -3984,6 +3985,12 @@ void __cdecl OnArrowRight(AM2_Widget *w)
 #define g_missionRetry    (*(int32_t *)(uintptr_t)ADDR_MISSION_RETRY)
 #define g_levelId         (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
 #define g_levelIndex      (*(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX)
+/* Named as army.cpp already names it, not `g_ourArmy` -- the address is the
+ * same one and a second name for it is what the globals ratchet is for. */
+#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define g_rulesChecksum    (*(uint32_t *)(uintptr_t)ADDR_RULES_CHECKSUM_VAL)
+#define g_mpScriptChecksum (*(uint32_t *)(uintptr_t)ADDR_MP_SCRIPT_CHKSUM_VAL)
+#define g_mapChecksum      (*(uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL)
 
 typedef void *(__cdecl *am2_find_level_fn)(int32_t id);
 typedef void  (__cdecl *am2_select_level_fn)(void *record);
@@ -5015,6 +5022,11 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
     RequestState(2);
 }
 
+void __cdecl OnMpColour(AM2_Widget *w);
+void __cdecl OnMpTeamLeft(AM2_Widget *w);
+void __cdecl OnMpTeamRight(AM2_Widget *w);
+void __cdecl OnMpName(AM2_Widget *w);
+
 /* ------------------------------------------------------------------ *
  * The three BUTTON classes the multiplayer host/join panel builds one of per
  * player row. All three derive from the base button and all three carry the
@@ -5057,8 +5069,7 @@ AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
     w->h = height;
     w->vtable = (void *)AM2_IMAGE(VTABLE_MP_NAME);
     WidgetScreenRect(w);
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) =
-        (uint32_t)AM2_IMAGE(ADDR_ON_MP_NAME);
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpName;
     *(int32_t *)(self + MPBTN_OFF_ROW) = row;
     return w;
 }
@@ -5067,9 +5078,9 @@ AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
  * column the caller picks, and the only differences are the vtable, the
  * handlers, and whether the button repeats.
  *
- * The spinner has a RIGHT handler and auto-repeat where the toggle has
- * neither -- which is the whole distinction between them, and the reason
- * their names here are from the shape rather than from the program. */
+ * The TEAM one has a RIGHT handler and auto-repeat where the COLOUR one has
+ * neither, which is the shape difference; the names come from what the
+ * handlers do, not from that. */
 static AM2_Widget *MpSmallConstruct(AM2_Widget *w, int32_t left, int32_t top,
                                     int32_t row, uint32_t vtable,
                                     uint32_t onLeft, uint32_t onRight,
@@ -5086,32 +5097,303 @@ static AM2_Widget *MpSmallConstruct(AM2_Widget *w, int32_t left, int32_t top,
     w->w = box.right;
     w->h = box.bottom;
     WidgetScreenRect(w);
+    /* The handlers arrive as ready POINTERS, already through AM2_IMAGE where
+     * they are still the original's: two of the three are ours now, and
+     * applying the slide here would have sent those through the detour. */
     *(int32_t *)(self + MPBTN_OFF_ROW)        = row;
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT)  = (uint32_t)AM2_IMAGE(onLeft);
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT)  = onLeft;
     if (onRight) {
-        *(uint32_t *)(self + BUTTON_OFF_ON_RIGHT) =
-            (uint32_t)AM2_IMAGE(onRight);
+        *(uint32_t *)(self + BUTTON_OFF_ON_RIGHT) = onRight;
         *(int32_t *)(self + BUTTON_OFF_REPEATS) = repeats;
     }
     return w;
 }
 
-AM2_Widget *__attribute__((thiscall)) MpToggleConstruct(AM2_Widget *w,
+AM2_Widget *__attribute__((thiscall)) MpColourConstruct(AM2_Widget *w,
                                                         int32_t left,
                                                         int32_t top,
                                                         int32_t row)
 {
-    return MpSmallConstruct(w, left, top, row, VTABLE_MP_TOGGLE,
-                            ADDR_ON_MP_TOGGLE, 0, 0);
+    return MpSmallConstruct(w, left, top, row, VTABLE_MP_COLOUR,
+                            (uint32_t)(uintptr_t)OnMpColour, 0, 0);
 }
 
-AM2_Widget *__attribute__((thiscall)) MpSpinnerConstruct(AM2_Widget *w,
+AM2_Widget *__attribute__((thiscall)) MpTeamConstruct(AM2_Widget *w,
                                                          int32_t left,
                                                          int32_t top,
                                                          int32_t row)
 {
-    return MpSmallConstruct(w, left, top, row, VTABLE_MP_SPINNER,
-                            ADDR_ON_MP_SPIN_LEFT, ADDR_ON_MP_SPIN_RIGHT, 1);
+    return MpSmallConstruct(w, left, top, row, VTABLE_MP_TEAM,
+                            (uint32_t)(uintptr_t)OnMpTeamLeft,
+                            (uint32_t)(uintptr_t)OnMpTeamRight, 1);
+}
+
+/* 0x00432EC0 and 0x004330E0: the COLOUR and TEAM buttons' left handlers, and
+ * what NAMED those two classes. Both open with the same guard -- a row that is
+ * not ours may only be touched by the host, and only within the player count
+ * -- and both cycle a value and tell the network. What they do after that is
+ * where they part.
+ *
+ * The colour one refuses row 3 outright, seeds the selection from the row
+ * itself when it has never been set, and wraps not to zero but to `row + 1`.
+ * Then, as HOST, it writes the army through CommSetArmyColour and repaints
+ * ALL FOUR colour buttons; as a guest it sends SendColorMsg and repaints
+ * nothing, because the answer has to come back from the host.
+ *
+ * The team one wraps at 12 to zero, stores only as host, and repaints just
+ * ITSELF. A guest sends SendTeamMsg and, again, does not store -- so a guest
+ * clicking either button changes nothing locally until the host says so. */
+
+#define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
+
+typedef int32_t (__attribute__((thiscall)) *AM2_SetArmyColourFn)(void *comm,
+                                                                 int32_t slot,
+                                                                 int32_t army);
+typedef void (__cdecl *AM2_SendIntFn)(int32_t v);
+#define orig_set_army_colour \
+    ((AM2_SetArmyColourFn)AM2_IMAGE(ADDR_COMM_SET_ARMY_COLOUR))
+/* SendColorMsg and SendTeamMsg are ours -- msgslot.cpp -- so they are called
+ * by name; CommSendPlayers is not. */
+#define orig_send_players ((AM2_SendIntFn)AM2_IMAGE(ADDR_COMM_SEND_PLAYERS))
+
+/* The guard both share: our own row is always ours to change. */
+static int32_t MpRowEditable(void *comm, int32_t row)
+{
+    const uint8_t *c = (const uint8_t *)comm;
+
+    if (g_ourSlot == row)
+        return 1;
+    if (!*(const int32_t *)(c + COMM_OFF_IS_HOST))
+        return 0;
+    /* The host may edit the rows PAST the human player count -- the computer
+     * slots -- and not the rows belonging to other people.  `jl` returns. */
+    return row >= *(const int32_t *)(c + COMM_OFF_PLAYER_COUNT);
+}
+
+void __cdecl OnMpColour(AM2_Widget *w)
+{
+    uint8_t *screen = g_paintObject;
+    void    *comm   = g_commObject;
+    int32_t  row    = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    int32_t *sel;
+    int32_t  next;
+    int32_t  army;
+    int32_t  i;
+
+    if (!MpRowEditable(comm, row))
+        return;
+    /* Row 3 is not colourable and the test is on the row read BEFORE the
+     * guard, which is the same value either way. */
+    if (row == 3)
+        return;
+
+    sel = (int32_t *)(screen + MP_PANEL_OFF_COLOUR_SEL);
+    if (sel[row] == -1)
+        sel[row] = row;
+
+    row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    next = sel[row] + 1;
+    if (next >= AM2_PLAYERS_MAX)
+        next = row + 1;
+    sel[row] = next;
+
+    army = CommArmyOfSlot(comm, next);
+    if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
+        SendColorMsg(army);
+        return;
+    }
+
+    orig_set_army_colour(comm,
+                         *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
+                         army);
+    PlaySoundAt(2, 0, 0, 0, 0);
+    orig_send_players(0);
+
+    for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+        AM2_Widget *b = ((AM2_Widget **)(screen + MP_PANEL_OFF_COLOURS))[i];
+
+        ((AM2_WidgetPaintFn *)b->vtable)[WIDGET_VSLOT_PAINT](b, b->rect);
+    }
+}
+
+void __cdecl OnMpTeamLeft(AM2_Widget *w)
+{
+    void    *comm = g_commObject;
+    int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    int32_t *team;
+    int32_t  next;
+
+    if (!MpRowEditable(comm, row))
+        return;
+
+    team = (int32_t *)((uint8_t *)comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                       + COMM_ARMY_OFF_TEAM);
+    next = *team + 1;
+    if (next > AM2_MP_TEAM_MAX)
+        next = 0;
+
+    if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
+        SendTeamMsg(next);
+        return;
+    }
+
+    *team = next;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    orig_send_players(0);
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
+/* 0x00433190 -- the TEAM button's right half.  Identical to the left except
+ * for the step: `dec` then `jns`, so it wraps at -1 to 12 rather than at 13
+ * to 0.  Everything after the arithmetic is shared. */
+void __cdecl OnMpTeamRight(AM2_Widget *w)
+{
+    void    *comm = g_commObject;
+    int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    int32_t *team;
+    int32_t  next;
+
+    if (!MpRowEditable(comm, row))
+        return;
+
+    team = (int32_t *)((uint8_t *)comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                       + COMM_ARMY_OFF_TEAM);
+    next = *team - 1;
+    if (next < 0)
+        next = AM2_MP_TEAM_MAX;
+
+    if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
+        SendTeamMsg(next);
+        return;
+    }
+
+    *team = next;
+    PlaySoundAt(2, 0, 0, 0, 0);
+    orig_send_players(0);
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
+/* 0x00432D50 -- the NAME button.  It is not a spinner and it has no guest
+ * path at all: the host check is unconditional, so a guest clicking a name
+ * does nothing whatever.  What it toggles is whether the slot holds a
+ * computer player, and when it turns one ON it names it -- which is where
+ * the "Computer1", "Computer2" in a multiplayer roster come from.
+ *
+ * The row test is the one MpRowEditable makes, without the "or it is mine"
+ * arm: a name may only be toggled on a row past the human player count. */
+void __cdecl OnMpName(AM2_Widget *w)
+{
+    uint8_t *comm = (uint8_t *)g_commObject;
+    int32_t  row;
+    int32_t *active;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    row = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+    if (row < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
+        return;
+
+    active = (int32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                         + AM2_PLAYER_ACTIVE);
+    if (*active) {
+        *active = 0;
+    } else {
+        *active = 1;
+        /* Numbered from the first computer slot, not from the row. */
+        orig_sprintf((char *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                              + COMM_OFF_PLAYERS),
+                     (const char *)AM2_IMAGE(ADDR_FMT_COMPUTER_N),
+                     row - *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1);
+    }
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    orig_send_players(0);
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
+/* 0x00430330 -- the thumbnail when the map is not installed. The literal is
+ * copied into a 0x100 local before being handed on, which is the original's
+ * inlined strcpy and not something the callee needs; kept, because the callee
+ * is still the original's and a pointer into the image is not what it is
+ * given anywhere else. */
+void __cdecl ShowBadMapPreview(AM2_Widget *preview)
+{
+    char name[0x100];
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    strcpy(name, (const char *)AM2_IMAGE(ADDR_STR_BAD_MP_PREV));
+
+    orig_mp_preview_setbitmap(preview, name);
+    ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
+        preview, preview->rect);
+}
+
+/* 0x004301D0 -- what runs when the chosen map changes, on the host panel and
+ * from three other places besides.
+ *
+ * The preview widget is only fetched when the repaint object exists AND the
+ * game is on the menu AND the menu mode is the HOST panel: everywhere else it
+ * stays null and the whole thumbnail half is skipped. That is not a guard
+ * against a missing widget, it is how the same function serves the panel and
+ * the three callers that have no panel at all.
+ *
+ * The two halves are then the same shape with opposite answers. If <map>.amm
+ * is there: point the thumbnail at <map>_prev.bmp, repaint it, take the three
+ * checksums, and mark OUR army as having the map. If it is not: clear the
+ * thumbnail, play sound 3, and mark our army as not having it -- and the map
+ * checksum, alone of the three, is zeroed rather than left.
+ *
+ * ADDR_LEVEL_INDEX is set to zero on both paths, which is "<map>.txt".
+ *
+ * The existence test chdirs into the map folder TWICE on the success path,
+ * once before it and once after. The second is not redundant: FileExists
+ * takes a bare name, so the first is what makes it look in the right place,
+ * and everything after it opens files by bare name too. */
+void __cdecl RefreshMapSelection(void)
+{
+    AM2_Widget *preview = (AM2_Widget *)0;
+    char        path[0x100];
+
+    if (g_paintObject != (uint8_t *)0
+        && g_gameState == AM2_STATE_MENU
+        && g_menuMode == AM2_MENU_MP_HOST)
+        preview = ((AM2_Widget **)(g_paintObject + MP_PANEL_OFF_PREVIEW))[0];
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_AMM),
+                 (const char *)AM2_IMAGE(ADDR_MAP_NAME));
+
+    if (!FileExists(path)) {
+        if (preview)
+            ShowBadMapPreview(preview);
+        PlaySoundAt(3, 0, 0, 0, 0);
+        g_mapChecksum = 0;
+        *(int32_t *)((uint8_t *)g_commObject
+                     + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
+                     + COMM_ARMY_OFF_MAP_OK) = 0;
+        g_levelIndex = 0;
+        return;
+    }
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+
+    if (preview) {
+        orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_PREV_BMP),
+                     (const char *)AM2_IMAGE(ADDR_MAP_NAME));
+        orig_mp_preview_setbitmap(preview, path);
+        ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
+            preview, preview->rect);
+    }
+
+    g_rulesChecksum    = RulesChecksum();
+    g_mpScriptChecksum = MpScriptChecksum();
+    g_mapChecksum      = MapChecksum();
+
+    *(int32_t *)((uint8_t *)g_commObject
+                 + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
+                 + COMM_ARMY_OFF_MAP_OK) = 1;
+    g_levelIndex = 0;
 }
 
 int widget_install(void)
@@ -5247,12 +5529,25 @@ int widget_install(void)
     rc |= patch_replace(ADDR_ON_LOADGAME_NEW, (const void *)OnLoadGameNew,
                         "OnLoadGameNew", 0);
 
+    rc |= patch_replace(ADDR_ON_MP_COLOUR, (const void *)OnMpColour,
+                        "OnMpColour", 1);
+    rc |= patch_replace(ADDR_ON_MP_TEAM_LEFT, (const void *)OnMpTeamLeft,
+                        "OnMpTeamLeft", 1);
+    rc |= patch_replace(ADDR_ON_MP_TEAM_RIGHT, (const void *)OnMpTeamRight,
+                        "OnMpTeamRight", 1);
+    rc |= patch_replace(ADDR_ON_MP_NAME, (const void *)OnMpName,
+                        "OnMpName", 1);
+    rc |= patch_replace(ADDR_REFRESH_MAP_SEL, (const void *)RefreshMapSelection,
+                        "RefreshMapSelection", 4);
+    rc |= patch_replace(ADDR_SHOW_BAD_PREVIEW, (const void *)ShowBadMapPreview,
+                        "ShowBadMapPreview", 1);
+
     rc |= patch_replace(ADDR_MP_NAME_CTOR, (const void *)MpNameConstruct,
                         "MpNameConstruct", 9);
-    rc |= patch_replace(ADDR_MP_TOGGLE_CTOR, (const void *)MpToggleConstruct,
-                        "MpToggleConstruct", 3);
-    rc |= patch_replace(ADDR_MP_SPINNER_CTOR, (const void *)MpSpinnerConstruct,
-                        "MpSpinnerConstruct", 3);
+    rc |= patch_replace(ADDR_MP_COLOUR_CTOR, (const void *)MpColourConstruct,
+                        "MpColourConstruct", 3);
+    rc |= patch_replace(ADDR_MP_TEAM_CTOR, (const void *)MpTeamConstruct,
+                        "MpTeamConstruct", 3);
 
     rc |= patch_replace(ADDR_LOAD_GAME_CTOR, (const void *)LoadGameConstruct,
                         "LoadGameConstruct", 1);

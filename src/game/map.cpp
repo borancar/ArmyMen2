@@ -1,6 +1,9 @@
 /* map.cpp -- see map.h. */
 #include <stdint.h>
 
+#include <stdio.h>
+
+#include "gamedir.h"
 #include "map.h"
 #include "savetag.h"
 #include "image.h"
@@ -89,6 +92,59 @@ uint32_t __cdecl PointOfTile(int32_t tile)
     return (uint32_t)x | ((uint32_t)y << 16);
 }
 
+/* The three data checksums a multiplayer session compares, 0x004303B0,
+ * 0x00430400 and 0x00430450.
+ *
+ * They are XOR folds of Checksum over the files each side has to agree on --
+ * the rules, the mission script and the map -- and the panel refresh below
+ * stores all three in globals for the handshake to send. Nothing here is
+ * cryptographic and nothing is meant to be: it catches a different EDITION of
+ * the data, not a tampered one.
+ *
+ * Each one chdirs first, because the game opens data files by bare name. */
+uint32_t __cdecl RulesChecksum(void)
+{
+    uint32_t sum;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_AAI_DIR));
+
+    sum  = Checksum((const char *)AM2_IMAGE(ADDR_STR_GAME_AAI));
+    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_OBJECT_AAI));
+    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_TROOP_AAI));
+    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_VEHICLE_AAI));
+    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_WEAPON_AAI));
+    return sum;
+}
+
+/* 0x00430400. The guard is a lookup in a registry, not a test that the string
+ * is non-empty -- a multiplayer script that is not registered gets no checksum
+ * at all and the side that has it disagrees with nobody. Note the lookup
+ * LOWER-CASES its argument in place; the buffer is the game's own. */
+uint32_t __cdecl MpScriptChecksum(void)
+{
+    char path[0x100];
+
+    if (!orig_script_list_find((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME)))
+        return 0;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_RULES_DIR));
+    sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_TXT),
+            (const char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME));
+    return Checksum(path);
+}
+
+/* 0x00430450. The map's own contribution is the .amm reader's answer -- which
+ * is NOT Checksum over the file, but a walk of its chunks -- xored with the
+ * object table the map was authored against. */
+uint32_t __cdecl MapChecksum(void)
+{
+    uint32_t sum = orig_amm_checksum((const char *)AM2_IMAGE(ADDR_MAP_NAME),
+                                     (const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    return sum ^ Checksum((const char *)AM2_IMAGE(ADDR_STR_OBJECT_AAI));
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_POINT_OF_TILE, (const void *)PointOfTile,
@@ -100,4 +156,10 @@ void map_install(void)
                   "SaveMapSection", 1);
     patch_replace(ADDR_LOAD_MAP_SECTION, (const void *)LoadMapSection,
                   "LoadMapSection", 1);
+    patch_replace(ADDR_RULES_CHECKSUM, (const void *)RulesChecksum,
+                  "RulesChecksum", 1);
+    patch_replace(ADDR_MP_SCRIPT_CHECKSUM, (const void *)MpScriptChecksum,
+                  "MpScriptChecksum", 1);
+    patch_replace(ADDR_MAP_CHECKSUM, (const void *)MapChecksum,
+                  "MapChecksum", 1);
 }

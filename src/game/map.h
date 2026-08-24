@@ -65,4 +65,11 @@ void map_install(void);
  * a file it cannot open. Seven callers. */
 uint32_t __cdecl Checksum(const char *path);
 
+/* The three totals a multiplayer session compares before it will start. Each
+ * chdirs into the directory it reads, so calling one leaves the process
+ * somewhere else than it found it. */
+uint32_t __cdecl RulesChecksum(void);
+uint32_t __cdecl MpScriptChecksum(void);
+uint32_t __cdecl MapChecksum(void);
+
 #endif /* AM2_MAP_H */

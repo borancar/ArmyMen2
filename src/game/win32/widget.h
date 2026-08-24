@@ -1326,14 +1326,27 @@ AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
                                                       uint8_t ink,
                                                       uint8_t paper,
                                                       int32_t row);
-AM2_Widget *__attribute__((thiscall)) MpToggleConstruct(AM2_Widget *w,
+AM2_Widget *__attribute__((thiscall)) MpColourConstruct(AM2_Widget *w,
                                                         int32_t left,
                                                         int32_t top,
                                                         int32_t row);
-AM2_Widget *__attribute__((thiscall)) MpSpinnerConstruct(AM2_Widget *w,
+AM2_Widget *__attribute__((thiscall)) MpTeamConstruct(AM2_Widget *w,
                                                          int32_t left,
                                                          int32_t top,
                                                          int32_t row);
+
+/* Their left handlers, 0x00432EC0 and 0x004330E0 -- and what named the two
+ * classes. A guest changes nothing locally: it sends and waits. */
+void __cdecl OnMpColour(AM2_Widget *w);
+void __cdecl OnMpTeamLeft(AM2_Widget *w);
+void __cdecl OnMpTeamRight(AM2_Widget *w);
+void __cdecl OnMpName(AM2_Widget *w);
+
+/* The map thumbnail and what keeps it, the checksums and the ready flag in
+ * step with the chosen map. RefreshMapSelection is called from three places
+ * that have no panel at all, which is why the widget half is conditional. */
+void __cdecl ShowBadMapPreview(AM2_Widget *preview);
+void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,
  * 0x00450180 and 0x00451FB0. */

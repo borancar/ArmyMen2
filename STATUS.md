@@ -5,11 +5,121 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-23**, at `36793c4`. Working tree clean.
+Last updated: **2026-08-24**, at `58a5a97`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **The four MP button handlers are reconstructed, and reading them RENAMED
+  two of the three classes.** "Toggle" and "spinner" were honest guesses from
+  an 18x20 rectangle and the presence of a right handler. `0x00432EC0` and
+  `0x004330E0` settled it: the one at column 134 cycles a player's COLOUR and
+  its non-host path is `SendColorMsg`; the one at 191 cycles a TEAM and sends
+  `SendTeamMsg`. The shape names are gone.
+
+  This is the rule this project already carries -- name a function from its
+  body -- applied one level out: name a CLASS from what its handler does. The
+  constructor alone could not have said.
+
+- **All four share one guard, and I read it BACKWARDS.** The original is
+  `cmp eax, [comm+0x3D0]; jl <return>`, so a row may be edited when it is
+  ours, or when we are the host AND the row is **at or past** the human
+  player count -- the computer slots. I wrote `row < count`, which is the
+  host editing other people's rows and never the AI ones.
+
+  **It passed a clean A/B**, because `mpoptions` clicked row 0 only and row 0
+  is ours: it takes the "or it is mine" arm and never reaches the comparison
+  at all. The configuration now clicks row 1 as well, and with that the
+  inverted guard puts the panel 584 pixels out against a budget of 300 and
+  moves the widget tree. A guard is not compared until something takes the
+  arm that needs it.
+
+- **Past the guard the four part company.**
+
+  - COLOUR refuses row 3 outright, seeds the selection from the row itself
+    when it has never been set (-1), and wraps not to zero but to `row + 1`;
+  - TEAM steps by one and wraps -- left at 13 to 0, right at -1 to 12, which
+    is the only difference between the two halves;
+  - as host, COLOUR writes through `CommSetArmyColour` and repaints ALL FOUR
+    colour buttons, while TEAM stores directly and repaints just ITSELF;
+  - **as a guest, neither stores anything.** Both send and return, because
+    the answer has to come back from the host.
+  - NAME is not a spinner and has **no guest path and no "it is mine" arm at
+    all**: the host check is unconditional and the row test is bare, so it
+    runs on computer rows and nowhere else. What it toggles is whether the
+    slot holds a computer player, and turning one on is where the
+    `Computer1`, `Computer2` in a multiplayer roster are written -- numbered
+    from the first computer slot, not from the row.
+
+- **Closing the seam takes the counters to 0, and the tree is the evidence.**
+  Our own constructors install all four by pointer now, so nothing crosses a
+  patched entry -- the documented blind spot. What proves they run is that
+  the panel's tree moves by 31 lines between the dump before the clicks and
+  the dump after, identically on both sides. Had a pointer been wrong the
+  clicks would have done nothing and the two dumps would have matched.
+
+- **The alias ratchet caught its author again**, this time within the minute:
+  `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
+  for some time. Grep the address, not the name.
+
+- **The map-selection refresh and the three checksums under it.**
+  `0x004301D0` is what runs when the chosen map changes, and the four
+  functions below it are the data-file checksums a multiplayer session
+  compares before it will start: the rules `.aai` files, the mission script,
+  and the map xored with the object table it was authored against.
+
+  None of it is cryptographic and none of it is meant to be. It catches a
+  different EDITION of the data, not a tampered one, which is why an XOR fold
+  of 32-bit words is enough.
+
+- **`Checksum` was already reconstructed, and the alias ratchet is what said
+  so.** I had written `ADDR_FILE_CHECKSUM` on `0x0042DBB0` and was about to
+  write the body a second time; `map.cpp` has had it as `Checksum` since the
+  savegame work. Four more names in the same batch were duplicates of ones
+  already in `orig.h` -- `ADDR_FOPEN`, `ADDR_FCLOSE`, `ADDR_FREAD` and
+  `ADDR_MODE_RB`, which I was about to add as a CRT seam that already exists.
+
+  Five collisions in one edit, all caught before the build. This is the
+  fourth near-duplicate reconstruction the project has stopped, and the
+  fourth different mechanism to stop one.
+
+- **`ADDR_SCRIPT_FIND_NAME` was already taken, by a different function.**
+  `0x0043F670` searches the script NAME table; `0x0043E900`, which
+  `MpScriptChecksum` guards on, lower-cases its argument in place and
+  searches a different registry entirely at `0x00656344`. The compiler
+  caught the redefinition. The second one is `ADDR_SCRIPT_LIST_FIND` and the
+  registry it reads is not yet identified -- said plainly rather than
+  papered over with a plausible name.
+
+- **`FileExists` opens the file.** There is no `GetFileAttributes` anywhere
+  in this image: all its file handling is CRT, so an existence test is
+  `fopen` then `fclose`. It opens `"r"` where the checksum opens `"rb"`,
+  which reads like an oversight and is not worth improving on -- nothing is
+  read through the handle.
+
+- **The refresh serves four callers and only one of them has a panel.** The
+  thumbnail is fetched only when the repaint object exists AND the game is on
+  the menu AND the menu mode is 7, the host panel; the other three callers
+  fall through the whole widget half. That triple test is not defensive
+  coding, it is the function's structure.
+
+- **The three checksums are compared exactly, by reading the globals.** They
+  go out in the handshake and never reach the screen, and the game's own
+  logger is stubbed to `ret` in this build -- so the "Checksum of %s is %x"
+  lines the code writes go nowhere and neither the log nor the pixels can see
+  a wrong total. `ab.sh` grew a `state` artifact for this: twelve bytes at
+  `0x00511CCC`, dumped over the control socket on both sides and diffed.
+
+  It reads `df072909 717e6220 2d690575` -- map, script, rules -- identically
+  on both sides. Dropping `weapon.aai` from the rules fold changes the last
+  word to `3b775438` and the check fails, so it discriminates.
+
+- **And the panel now gets a map-list row clicked.** That is what
+  `RefreshMapSelection` is FOR -- the "map changed" and "game type changed by
+  host" arms both call it -- so the state dump is taken again afterwards and
+  appended.
+
 
 - **The multiplayer panel's own tree was never compared, and now it is --
   before and after clicking it.** `mpoptions` built the panel, walked straight
@@ -61,7 +171,7 @@ Nothing uncommitted.
   Same result, one fewer call.
 
 - **Measured: 4, 4, 4.** A probe down the host-panel path reads
-  `MpNameConstruct=4 MpToggleConstruct=4 MpSpinnerConstruct=4`, one of each
+  `MpNameConstruct=4 MpColourConstruct=4 MpTeamConstruct=4`, one of each
   per player row, with `ButtonBaseConstruct=0` beside them -- the usual blind
   spot, since all three call it by name. Worth doing because `ab.sh multi`
   does NOT reach the panel: its START A WAR opens ENTER BATTLE NAME, and it is
@@ -1747,11 +1857,11 @@ pointer field it occupies in memory.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 753 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 752 | 741 of them below the CRT line |
+| `patch_replace` sites | 763 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 762 | 751 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 137,328 / 372,816 B (**36.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 151,824 / 372,816 B (40.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 138,272 / 372,816 B (**37.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 152,784 / 372,816 B (41.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

@@ -1355,6 +1355,7 @@
 #define ADDR_GAME_STATE          0x00511DA4u  /* int32_t, 0..4 */
 /* The values, measured by a probe in PollKeyboard: 0 at startup, 1 on the
  * menus, 2 in a mission. The screen factories test for 2 and nothing else. */
+#define AM2_STATE_MENU           1
 #define AM2_STATE_MISSION        2
 #define ADDR_GAME_STATE_ARG      0x00511DB4u  /* int32_t */
 #define ADDR_STATE_DISPATCH      0x00486550u  /* 12-byte records; +0 is a function */
@@ -1522,7 +1523,6 @@
 #define AM2_MP_OPTIONS_SIZE      0x110u
 /* Called after the host panel is built, and only by that factory: it repaints
  * the panel from the current session. Still original. */
-#define ADDR_MP_PANEL_REFRESH    0x004301D0u  /* void(void) */
 #define ADDR_STR_MPHOST_BMP      0x004871C4u  /* "01_001_00_mphost.bmp" */
 #define ADDR_STR_MPJOIN_BMP      0x00487408u  /* "01_002_00_mpjoin.bmp" */
 #define ADDR_STR_MPHOSTOPTS_BMP  0x004873C0u  /* "01_001_03_mphostoptions.bmp" */
@@ -3051,6 +3051,48 @@
  * declaration here said void for as long as script.cpp was the only caller
  * that mattered, because that one ignores the answer. */
 #define ADDR_SET_DATA_DIR        0x00422DE0u  /* int32_t(const char *subdir) */
+#define ADDR_FILE_EXISTS         0x00422D80u  /* int32_t(const char *) */
+#define ADDR_RULES_CHECKSUM      0x004303B0u  /* uint32_t(void) */
+#define ADDR_MP_SCRIPT_CHECKSUM  0x00430400u  /* uint32_t(void) */
+#define ADDR_MAP_CHECKSUM        0x00430450u  /* uint32_t(void) */
+#define ADDR_AMM_CHECKSUM        0x0042C350u  /* uint32_t(const char *map) */
+/* NOT ADDR_SCRIPT_FIND_NAME, which is 0x0043F670 over a different table.
+ * This one lower-cases its argument IN PLACE and searches the list at
+ * 0x00656344/0x00656348 -- a registry this reconstruction has not identified,
+ * built lazily by 0x0043ECC0 on the first call. Named from what it does. */
+#define ADDR_SCRIPT_LIST_FIND    0x0043E900u  /* int32_t(char *) */
+#define orig_script_list_find \
+            ((int32_t (__cdecl *)(char *))(uintptr_t)ADDR_SCRIPT_LIST_FIND)
+#define orig_amm_checksum \
+            ((uint32_t (__cdecl *)(const char *, const char *)) \
+             (uintptr_t)ADDR_AMM_CHECKSUM)
+/* FileExists opens "r" where the checksum opens ADDR_MODE_RB, which on the
+ * platform this came from is not a distinction without a difference. */
+#define ADDR_STR_MODE_R          0x00478950u  /* "r" */
+#define ADDR_STR_RULES_DIR       0x004774ACu  /* "rules" */
+#define ADDR_STR_AAI_DIR         0x00473D9Cu  /* "aai" */
+#define ADDR_FMT_DOT_TXT         0x00485178u  /* "%s.txt" */
+#define ADDR_FMT_DOT_AMM         0x00486330u  /* "%s.amm" */
+#define ADDR_FMT_PREV_BMP        0x004870A8u  /* "%s_prev.bmp" */
+#define ADDR_STR_GAME_AAI        0x004870E8u  /* "game.aai" */
+#define ADDR_STR_OBJECT_AAI      0x004870DCu  /* "object.aai" */
+#define ADDR_STR_TROOP_AAI       0x004870D0u  /* "troop.aai" */
+#define ADDR_STR_VEHICLE_AAI     0x00473D64u  /* "vehicle.aai" */
+#define ADDR_STR_WEAPON_AAI      0x004870C4u  /* "weapon.aai" */
+#define ADDR_RULES_CHECKSUM_VAL  0x00511CD4u  /* uint32_t, the rules total */
+#define ADDR_MP_SCRIPT_CHKSUM_VAL 0x00511CD0u /* uint32_t */
+#define ADDR_MAP_CHECKSUM_VAL    0x00511CCCu  /* uint32_t */
+#define ADDR_MP_PREVIEW_SETBITMAP 0x00454AD0u /* thiscall(const char *) */
+#define ADDR_SHOW_BAD_PREVIEW    0x00430330u  /* void(AM2_Widget *) */
+#define ADDR_STR_BITMAPS_DIR     0x00478670u  /* "bitmaps" */
+#define ADDR_STR_BAD_MP_PREV     0x004870B4u  /* "bad_mp_prev.bmp" */
+#define orig_mp_preview_setbitmap \
+            ((void (__attribute__((thiscall)) *)(void *, const char *)) \
+             (uintptr_t)ADDR_MP_PREVIEW_SETBITMAP)
+/* Was ADDR_MP_PANEL_REFRESH, which is where OpenMpHost calls it and not what
+ * it does: three of its four callers have no panel at all. Renamed, not
+ * aliased. */
+#define ADDR_REFRESH_MAP_SEL     0x004301D0u  /* void(void) */
 #define ADDR_GAME_DIR            0x0051235Cu  /* char[], the install directory */
 #define ADDR_STR_AVI_DIR         0x004852C8u  /* const char **, -> "avi" */
 #define ADDR_STR_PATH_SEP        0x00478984u  /* "\\" */
@@ -3354,6 +3396,9 @@
  * local game). */
 #define ADDR_MENU_REQUEST        0x00511DC8u  /* int32_t, the code */
 #define ADDR_MENU_MODE           0x00511DBCu  /* int32_t; 0x21 = back to play */
+/* The mode is the menu-request arm number, so 7 is the multiplayer HOST
+ * panel -- the same 7 ab.sh pokes to open it. */
+#define AM2_MENU_MP_HOST         7
 #define ADDR_OVERLAY_DIRTY       0x00511DC0u  /* int32_t; the primary needs saving */
 #define ADDR_DRAW_MENU_OVERLAY   0x00425AF0u  /* void(void) */
 #define ADDR_OVERLAY_PREPARE     0x00412D30u  /* void(int32, int32) */
@@ -3636,11 +3681,12 @@
  * and all three carry the row they belong to in the base's 0x0058, which is
  * how their handlers know which player they are for.
  *
- * The names are from the SHAPES, not from the program -- nothing in the image
- * says what they are called. The first takes a string and two ink bytes and
- * is the row's name; the other two are 18x20 at fixed columns, and the one
- * with a RIGHT handler and auto-repeat is a spinner where the one with only a
- * left handler is a toggle. */
+ * The names came from the SHAPES first -- a string with two inks, and two
+ * 18x20 buttons distinguished only by one having a RIGHT handler and
+ * auto-repeat. Reading the HANDLERS settled them properly: the one at column
+ * 134 cycles a player's colour and its non-host path is SendColorMsg, and the
+ * one at 191 cycles a team and sends SendTeamMsg. So they are COLOUR and TEAM
+ * and the shape names ("toggle", "spinner") are gone. */
 #define ADDR_MP_NAME_CTOR      0x004329A0u /* thiscall, ret 0x24 */
 #define VTABLE_MP_NAME         0x0046FA48u
 #define ADDR_ON_MP_NAME        0x00432D50u
@@ -3651,18 +3697,26 @@
 #define MPNAME_OFF_INK         0x70u   /* uint8_t */
 #define MPNAME_OFF_PAPER       0x71u   /* uint8_t */
 
-#define ADDR_MP_TOGGLE_CTOR    0x00432E20u /* thiscall, ret 0x0C */
-#define VTABLE_MP_TOGGLE       0x0046FA5Cu
-#define ADDR_ON_MP_TOGGLE      0x00432EC0u
-#define AM2_MP_TOGGLE_SIZE     0x68u
+#define ADDR_MP_COLOUR_CTOR    0x00432E20u /* thiscall, ret 0x0C */
+#define VTABLE_MP_COLOUR       0x0046FA5Cu
+#define ADDR_ON_MP_COLOUR      0x00432EC0u
+#define AM2_MP_COLOUR_SIZE     0x68u
 
-#define ADDR_MP_SPINNER_CTOR   0x00433030u /* thiscall, ret 0x0C */
-#define VTABLE_MP_SPINNER      0x0046FA70u
-#define ADDR_ON_MP_SPIN_LEFT   0x004330E0u
-#define ADDR_ON_MP_SPIN_RIGHT  0x00433190u
+#define ADDR_MP_TEAM_CTOR   0x00433030u /* thiscall, ret 0x0C */
+#define VTABLE_MP_TEAM      0x0046FA70u
+#define ADDR_ON_MP_TEAM_LEFT   0x004330E0u
+#define ADDR_ON_MP_TEAM_RIGHT  0x00433190u
 /* Both small ones are the same 18 by 20 at a column the caller picks. */
 #define AM2_MP_SMALL_W         0x12
 #define AM2_MP_SMALL_H         0x14
+/* The panel's four arrays of one widget per player row, and the fourth is
+ * the per-row colour SELECTION the colour handler cycles. */
+#define MP_PANEL_OFF_PREVIEW   0x218u   /* the map thumbnail widget */
+#define MP_PANEL_OFF_NAMES     0x220u
+#define MP_PANEL_OFF_COLOURS   0x230u
+#define MP_PANEL_OFF_TEAMS     0x240u
+#define MP_PANEL_OFF_COLOUR_SEL 0x268u
+#define AM2_MP_TEAM_MAX        12
 
 #define ADDR_MP_DIALOG_DESTRUCT 0x004326F0u /* thiscall void(AM2_Widget *) */
 #define ADDR_OPTIONS_UPDATE   0x00432700u /* thiscall void(AM2_Widget *) */

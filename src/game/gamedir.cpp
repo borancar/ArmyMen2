@@ -38,8 +38,32 @@ int32_t __cdecl SetGameDir(const char *subdir)
     return am2_chdir(path) == 0;
 }
 
+/* 0x00422D80 -- "is this file there", answered by opening it and closing it
+ * again. There is no GetFileAttributes anywhere in the image; the whole of
+ * this game's file handling goes through the CRT, so this is what an
+ * existence test looks like here.
+ *
+ * The mode is "r" and not the "rb" the checksum uses. Nothing is read, so the
+ * text-mode translation never happens -- but it is the byte the original
+ * pushes and there is no reason to improve on it. */
+int32_t __cdecl FileExists(const char *path)
+{
+    am2_FILE *fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_STR_MODE_R));
+
+    if (fp == (am2_FILE *)0)
+        return 0;
+
+    orig_fclose(fp);
+    return 1;
+}
+
 int gamedir_install(void)
 {
-    return patch_replace(ADDR_SET_DATA_DIR, (const void *)SetGameDir,
-                         "SetGameDir", 82);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_SET_DATA_DIR, (const void *)SetGameDir,
+                        "SetGameDir", 82);
+    rc |= patch_replace(ADDR_FILE_EXISTS, (const void *)FileExists,
+                        "FileExists", 1);
+    return rc;
 }

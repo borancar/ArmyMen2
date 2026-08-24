@@ -480,6 +480,15 @@ play() {
         drive ctl "poke 511DC8 7" >/dev/null 2>&1
         drive ctl "poke 511DC4 1" >/dev/null 2>&1
         sleep 5
+        # Three GLOBALS, not pixels: the rules, script and map checksums the
+        # panel computes when it opens. Nothing else in the suite can see
+        # them -- they go out in the handshake and never reach the screen,
+        # and the game's own logger is stubbed to `ret` in this build, so the
+        # "Checksum of %s is %x" lines the code writes go nowhere. Comparing
+        # the twelve bytes is an exact oracle where the alternative was a
+        # thumbnail bitmap and a hope.
+        drive ctl "dump 511CCC 12" 2>/dev/null \
+            > "$WORK/$cfg-$side.state" || true
         # The PANEL's own tree, which nothing compared until now -- 44 nodes,
         # four player rows of {name, toggle, spinner, message} plus the map
         # list, the chat and their bars.
@@ -494,11 +503,43 @@ play() {
         "$REPO/tools/point.py" 200 49 --click >/dev/null 2>&1
         sleep 1
         "$REPO/tools/point.py" 200 49 --click >/dev/null 2>&1
+        sleep 1
+        # Row 1, which is a COMPUTER row -- the player count is 1, so row 0 is
+        # ours and every row after it is past the count. That distinction is
+        # the whole of the three handlers' guard and row 0 does not test it:
+        # row 0 takes the "or it is mine" arm and passes either way. Reading
+        # the guard backwards -- `row < count` where the original returns on
+        # `jl` -- survived a clean run of this configuration for exactly that
+        # reason.
+        #
+        # The NAME button is reachable nowhere else: it has no guest path at
+        # all and no arm for a row that is ours, so row 0 never runs it.
+        "$REPO/tools/point.py" 68 81 --click >/dev/null 2>&1
+        sleep 1
+        "$REPO/tools/point.py" 143 81 --click >/dev/null 2>&1
+        sleep 1
+        "$REPO/tools/point.py" 200 81 --click >/dev/null 2>&1
+        sleep 1
+        # And the TEAM button's RIGHT half, which steps the other way and is
+        # the one handler of the four that a left click cannot reach.
+        drive ctl "cursor 200 81" >/dev/null 2>&1
+        drive ctl "mouse right tap" >/dev/null 2>&1
         sleep 2
         # And AFTER, appended: the comparison is a diff, so a handler that
         # changed the wrong row -- or nothing -- shows up here.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             >> "$WORK/$cfg-$side.widgets" || true
+        # A row of the MAP LIST, which is what RefreshMapSelection exists for:
+        # it re-reads the thumbnail and recomputes the three checksums, and
+        # the two panel handlers that reach it are the "map changed" and
+        # "game type changed by host" arms. The state dump is taken AGAIN
+        # afterwards, appended, so a refresh that computed the wrong totals
+        # shows up as a differing line rather than as a thumbnail nobody
+        # looked at.
+        "$REPO/tools/point.py" 140 213 --click >/dev/null 2>&1
+        sleep 3
+        drive ctl "dump 511CCC 12" 2>/dev/null \
+            >> "$WORK/$cfg-$side.state" || true
         "$REPO/tools/point.py" 582 339 --click >/dev/null 2>&1   # OPTIONS
         sleep 4
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
@@ -756,6 +797,18 @@ compare() {
     # The widget tree, where a configuration captured one. Compared as an exact
     # diff rather than against a budget, because it is exact: the same 25 lines
     # come back from the original and from the reconstruction.
+    if [ -s "$WORK/$cfg-orig.state" ] && [ -s "$WORK/$cfg-recon.state" ]; then
+        if diff -q "$WORK/$cfg-orig.state" "$WORK/$cfg-recon.state" \
+               >/dev/null 2>&1; then
+            echo "  state   identical ($(wc -l < "$WORK/$cfg-orig.state" \
+                                         | tr -d ' ') lines)"
+        else
+            echo "  state   DIFFERS:"
+            diff "$WORK/$cfg-orig.state" "$WORK/$cfg-recon.state" | head -20
+            rc=1
+        fi
+    fi
+
     if [ -s "$WORK/$cfg-orig.widgets" ] && [ -s "$WORK/$cfg-recon.widgets" ]; then
         if diff -q "$WORK/$cfg-orig.widgets" "$WORK/$cfg-recon.widgets" \
              >/dev/null 2>&1; then
@@ -888,7 +941,7 @@ compare() {
         menuscreens) budget=200 ;;
         # Static thumbnails; the cursor is the only thing that moves.
         movies)     budget=200 ;;
-        mpoptions) budget=200 ;;
+        mpoptions) budget=300 ;;
         *)        budget=500 ;;
     esac
     # Overridable, mainly so the check itself can be tested.

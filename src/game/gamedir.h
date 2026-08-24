@@ -28,6 +28,10 @@ extern "C" {
  * CD path already carries one -- and that asymmetry is not cosmetic. */
 int32_t __cdecl SetGameDir(const char *subdir);
 
+/* 1 if the file can be opened for reading, 0 if it cannot. Nothing is read
+ * and nothing distinguishes "absent" from "unreadable". */
+int32_t __cdecl FileExists(const char *path);
+
 int gamedir_install(void);
 
 #ifdef __cplusplus
