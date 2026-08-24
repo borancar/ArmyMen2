@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `4719bc7`. Working tree clean.
+Last updated: **2026-08-24**, at `1ea8c81`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,34 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **The palette loader, and a second table that is a copy of the first.**
+  `0x0041B6D0` reads an 8-bit `.bmp`'s HEADER and palette and nothing else --
+  the pixels are never touched -- and expands it into the pair of 256-entry
+  tables the renderer wants. Three functions: the file half (`0x00422F60`),
+  the expansion (`0x0041AEB0`) and the pair.
+
+  `biClrUsed` of zero means 256, which the original writes back into the
+  caller's header before using it; anything not 8 bits per pixel is rejected
+  after the header is already read.
+
+- **The two tables come out IDENTICAL and that is not a misreading.** The
+  second is built by reading the first back byte by byte and dropping the top
+  one -- but `SwapColourBytes` has already zeroed that byte, so the mask
+  removes nothing. What the second is FOR is the copy that survives: the
+  first is the working palette and gets written over, the second is the
+  pristine one to restore from.
+
+  The expansion count is a fixed 256 and does NOT consult `biClrUsed`, so a
+  file declaring fewer entries still expands whatever the reader left behind
+  them.
+
+- **One half is worth 128,570 pixels and the other nothing at all.**
+  Dropping the channel swap puts `bootcamp` at 128,570 differing pixels
+  against a budget of 500. Zeroing the pristine table changes NOTHING -- not
+  in `bootcamp`, `movies`, `menuscreens` or `intro`. Nothing this project can
+  drive reads it, so that half stays verified by reading, and the asymmetry
+  is stated rather than left for a clean suite to imply.
 
 - **`OverlayPrepare` (0x00412D30), thirty callers and not one of them runs
   here.** It chooses the menu row the cursor animates and resets the
@@ -2146,11 +2174,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 775 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 774 | 763 of them below the CRT line |
+| `patch_replace` sites | 778 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 777 | 766 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 139,824 / 372,816 B (**37.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 154,400 / 372,816 B (41.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 140,128 / 372,816 B (**37.6%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 154,704 / 372,816 B (41.5%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

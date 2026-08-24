@@ -2,6 +2,7 @@
 #define AM2_PALETTE_H
 
 #include <stdint.h>
+#include "../../inject/win32.h"  /* BITMAPINFO, for the palette reader */
 #include "../../inject/orig.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
@@ -77,6 +78,12 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
  * harmless, because the matcher masks. */
 uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
                                    uint32_t b, uint32_t from);
+
+/* 0x0041B6D0 and the two halves under it. Read an 8-bit .bmp's palette and
+ * expand it into the renderer's pair of 256-entry tables. */
+int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out);
+void    __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi);
+int32_t __cdecl LoadPaletteFile(const char *path, void *dst);
 
 int palette_install(void);
 

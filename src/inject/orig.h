@@ -4267,6 +4267,13 @@
  * reads 0x00BBGGRR. It was also ADDR_SWAP_COLOUR_BYTES, which named it for the
  * caller that hands it a bitmap's palette rather than for what it does. */
 #define ADDR_SWAP_COLOUR_BYTES 0x0041AE90u  /* uint32_t(uint32_t) */
+/* The palette loader, its file half and its expansion half. The destination
+ * is 0x800 bytes: 256 dwords of working colour and 256 more behind them. */
+#define ADDR_LOAD_PALETTE_FILE 0x0041B6D0u  /* int32_t(const char *, void *) */
+#define ADDR_READ_BMP_PALETTE  0x00422F60u  /* int32_t(const char *, BITMAPINFO *) */
+#define ADDR_EXPAND_PALETTE    0x0041AEB0u  /* void(void *, const BITMAPINFO *) */
+#define AM2_PALETTE_ENTRIES    0x100
+#define AM2_PALETTE_PRISTINE   0x400u       /* the second table, in bytes */
 #define ADDR_NULL_STUB_4       0x004170E0u  /* void __stdcall(uint32_t) */
 #define ADDR_NULL_STUB         0x0042E170u  /* void(void) */
 #define ADDR_RETURN_ZERO       0x0042E980u  /* int32_t(void) */

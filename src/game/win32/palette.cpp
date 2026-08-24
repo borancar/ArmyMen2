@@ -33,6 +33,7 @@
  */
 
 #include "palette.h"
+#include "../image.h"  /* AM2_IMAGE */
 #include "../misc.h"   /* ColourDistance -- pure, so it lives in the flat half */
 #include "surface.h"
 #include "mapdraw.h"
@@ -392,6 +393,90 @@ uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
                                 | ((b & 0xFFu) << 16), from);
 }
 
+/* 0x00422F60 -- read an 8-bit .bmp's HEADER and palette and nothing else.
+ *
+ * The file header is read into a local and discarded: only its 14 bytes of
+ * position matter. The info header goes to the caller, and anything that is
+ * not 8 bits per pixel is rejected -- this is a palette reader, not a bitmap
+ * loader, and the pixels are never touched.
+ *
+ * biClrUsed of zero means 256, which is what the format says and what the
+ * original writes back into the caller's header before using it. */
+int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
+{
+    BITMAPFILEHEADER  fh;
+    am2_FILE         *fp;
+
+    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp)
+        return 0;
+
+    orig_fread(&fh, sizeof(fh), 1, fp);
+    orig_fread(&out->bmiHeader, sizeof(out->bmiHeader), 1, fp);
+
+    if (out->bmiHeader.biBitCount != 8) {
+        orig_fclose(fp);
+        return 0;
+    }
+
+    if (out->bmiHeader.biClrUsed == 0)
+        out->bmiHeader.biClrUsed = AM2_PALETTE_ENTRIES;
+
+    orig_fread(out->bmiColors, 4, out->bmiHeader.biClrUsed, fp);
+    orig_fclose(fp);
+    return 1;
+}
+
+/* 0x0041AEB0 -- expand a file palette into the pair of tables the renderer
+ * wants: 256 swapped colours, and 256 more 0x400 bytes behind them.
+ *
+ * **The two tables come out IDENTICAL**, and that is not a misreading. The
+ * second is built by reading the first back byte by byte and dropping the top
+ * one -- but SwapColourBytes has already zeroed that byte, so the mask
+ * removes nothing. What the second table is FOR is the copy that survives:
+ * the first is the working palette and gets written over, and this is the
+ * pristine one to restore from.
+ *
+ * The count is a fixed 256 and does NOT consult biClrUsed, so a file that
+ * declared fewer entries still expands whatever the reader left behind them.
+ *
+ * SwapColourBytes takes a second argument that it never reads, and the
+ * original pushes only one; zero here, with the same effect. */
+void __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi)
+{
+    uint32_t       *working  = (uint32_t *)dst;
+    uint32_t       *pristine = (uint32_t *)((uint8_t *)dst
+                                            + AM2_PALETTE_PRISTINE);
+    const uint32_t *src = (const uint32_t *)bi->bmiColors;
+    int32_t         i;
+
+    for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
+        const uint8_t *b;
+
+        working[i] = SwapColourBytes(src[i], 0);
+
+        /* Read back through bytes, as the original does. */
+        b = (const uint8_t *)&working[i];
+        pristine[i] = (uint32_t)b[0]
+                    | ((uint32_t)b[1] << 8)
+                    | ((uint32_t)b[2] << 16);
+    }
+}
+
+/* 0x0041B6D0, ten callers -- the pair, and the only one of the three anything
+ * else calls. Nothing is written to `dst` when the file will not open or is
+ * not 8-bit. */
+int32_t __cdecl LoadPaletteFile(const char *path, void *dst)
+{
+    uint8_t buf[sizeof(BITMAPINFOHEADER) + AM2_PALETTE_ENTRIES * 4];
+
+    if (!ReadBitmapPalette(path, (BITMAPINFO *)buf))
+        return 0;
+
+    ExpandPalette(dst, (const BITMAPINFO *)buf);
+    return 1;
+}
+
 int palette_install(void)
 {
     int rc = 0;
@@ -410,5 +495,11 @@ int palette_install(void)
                         "RealizeSystemPalette", 1);
     rc |= patch_replace(ADDR_SNAPSHOT_PALETTE, (const void *)SnapshotSystemPalette,
                         "SnapshotSystemPalette", 0);
+    rc |= patch_replace(ADDR_READ_BMP_PALETTE, (const void *)ReadBitmapPalette,
+                        "ReadBitmapPalette", 1);
+    rc |= patch_replace(ADDR_EXPAND_PALETTE, (const void *)ExpandPalette,
+                        "ExpandPalette", 1);
+    rc |= patch_replace(ADDR_LOAD_PALETTE_FILE, (const void *)LoadPaletteFile,
+                        "LoadPaletteFile", 10);
     return rc;
 }
