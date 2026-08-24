@@ -396,12 +396,12 @@ bad:
  *
  * Exercised by every frame, so the Boot Camp pixel budget is what checks it. */
 #define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
-#define g_viewRect   ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+/* Not const: ScrollDecay shifts all four edges every frame. */
+#define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
 #define g_fullRedraw (*(int32_t *)(uintptr_t)ADDR_FULL_REDRAW)
 #define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
 typedef void (__cdecl *am2_void_fn)(void);
-#define orig_scroll_decay      (*(am2_void_fn)ADDR_SCROLL_DECAY)
 
 /* Save `n` dwords from `src` to `dst`. The original writes the nine stores out
  * one at a time, interleaved; they are independent, so a loop is the same
@@ -413,11 +413,89 @@ static void SavePrev(void *dst, const void *src, int32_t dwords)
         ((uint32_t *)dst)[i] = ((const uint32_t *)src)[i];
 }
 
+#define g_shakeTime    (*(int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
+#define g_shakePhaseX  (*(float *)(uintptr_t)ADDR_SHAKE_PHASE_X)
+#define g_shakeStepX   (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X)
+#define g_shakePhaseY  (*(float *)(uintptr_t)ADDR_SHAKE_PHASE_Y)
+#define g_shakeStepY   (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y)
+#define g_shakeAmp     (*(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
+#define g_shakeRate    (*(const float *)(uintptr_t)ADDR_SHAKE_RATE)
+#define g_frameDeltaMs (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+
+/* One axis of the shake: advance the phase, bounce it off +/-amp reversing
+ * the step, and answer the whole-pixel offset. */
+static int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
+{
+    *phase = (float)*step * g_shakeRate + *phase;
+
+    if (*phase > (float)amp) {
+        *phase = (float)amp;
+        *step  = -*step;
+    } else if ((float)(-amp) > *phase) {
+        *phase = -(float)amp;
+        *step  = -*step;
+    }
+
+    /* _ftol truncates toward zero, which is what a C cast does. */
+    return (int32_t)*phase;
+}
+
+/* 0x0042B420 -- the screen SHAKE, one step per frame, and the first thing
+ * ComposeFrame does.
+ *
+ * The timer is counted down by the per-frame delta. When it runs out
+ * everything is zeroed -- timer, both phases, both steps and the amplitude --
+ * so the view returns to exactly where it was and no residue is left for the
+ * next shake to inherit.
+ *
+ * The amplitude fades only over the LAST 1024 ms: above that the shake is at
+ * full strength, and `(amp * left) >> 10` is an arithmetic shift, so the taper
+ * is linear rather than smooth.
+ *
+ * What moves is the view RECTANGLE, not a camera or a scale: the X offset is
+ * added to left and right and the Y offset to top and bottom. Both axes use
+ * the same faded amplitude.
+ *
+ * The comparisons are the x87's, which is why they are written with the
+ * constant on the left in the second arm -- `(-amp) > phase` and not
+ * `phase < -amp`. For ordinary numbers the two are the same; the original
+ * compares in that direction and there is no reason to differ. */
+void __cdecl ScrollDecay(void)
+{
+    int32_t left = g_shakeTime - g_frameDeltaMs;
+    int32_t amp;
+    int32_t dx;
+    int32_t dy;
+
+    g_shakeTime = left;
+    if (left <= 0) {
+        g_shakeTime   = 0;
+        g_shakeStepX  = 0;
+        g_shakeStepY  = 0;
+        g_shakeAmp    = 0;
+        g_shakePhaseX = 0.0f;
+        g_shakePhaseY = 0.0f;
+        return;
+    }
+
+    amp = g_shakeAmp;
+    if (left <= AM2_SHAKE_FADE_MS)
+        amp = (amp * left) >> 10;
+
+    dx = ShakeAxis(&g_shakePhaseX, &g_shakeStepX, amp);
+    g_viewRect->left  += dx;
+    g_viewRect->right += dx;
+
+    dy = ShakeAxis(&g_shakePhaseY, &g_shakeStepY, amp);
+    g_viewRect->top    += dy;
+    g_viewRect->bottom += dy;
+}
+
 void __cdecl ComposeFrame(void)
 {
     AM2_Rect src;
 
-    orig_scroll_decay();
+    ScrollDecay();
     ScrollMapCache();
 
     if (g_fullRedraw)
@@ -881,6 +959,8 @@ int mapdraw_install(void)
 
     rc |= patch_replace(ADDR_COMPOSE_FRAME, (const void *)ComposeFrame,
                         "ComposeFrame", 0);
+    rc |= patch_replace(ADDR_SCROLL_DECAY, (const void *)ScrollDecay,
+                        "ScrollDecay", 1);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,

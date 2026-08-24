@@ -55,6 +55,11 @@ void __cdecl RestoreTileSet(void);
 /* Original: 0x0042DA30. Compose one frame into the offscreen surface and
  * BltFast it onto the back buffer, then save this frame's rectangles as last
  * frame's for the dirty-rectangle merge to compare against. */
+/* 0x0042B420. The screen shake, one step per frame and the first thing
+ * ComposeFrame does: advance both phases, bounce them off the faded
+ * amplitude, and shift the view rectangle by the whole-pixel result. */
+void __cdecl ScrollDecay(void);
+
 void __cdecl ComposeFrame(void);
 
 /* Original: 0x0041D060, called from ComposeFrame. Move the part of the view

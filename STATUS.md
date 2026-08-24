@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-24**, at `1aaa875`. Working tree clean.
+Last updated: **2026-08-25**, at `a1c63e6`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,40 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`ScrollDecay` (0x0042B420) is the screen SHAKE, and it is the view
+  rectangle that shakes.** One step per frame, and the first thing
+  `ComposeFrame` does. The X offset is added to left and right and the Y
+  offset to top and bottom, so the whole rectangle moves and nothing is
+  scaled or re-centred -- which is what settles what the four globals at
+  `0x00514E14` are being used for here.
+
+  The timer is counted down by the per-frame delta beside the game clock.
+  When it runs out everything is zeroed -- timer, both phases, both steps and
+  the amplitude -- so the view returns exactly where it was and no residue is
+  left for the next shake to inherit. The amplitude fades only over the LAST
+  1024 ms; above that the shake is at full strength, and `(amp * left) >> 10`
+  is an arithmetic shift, so the taper is linear rather than smooth.
+
+  Each axis advances its phase by `step * rate`, bounces off `+/-amp`
+  reversing the step, and contributes the truncated whole-pixel offset. The
+  phases are floats and the steps are integers, which is why the whole thing
+  is done on the x87 stack.
+
+- **Half of it is worth 122,875 pixels and the other half never runs.**
+  Adding a constant four pixels to the view rect before the early return puts
+  `bootcamp` that far out against a budget of 500, so the function executes
+  and the rectangle really is what it moves. But a probe reads the shake
+  TIMER as zero for sixteen seconds of live Boot Camp, so only the
+  early-return arm is taken: the oscillation is verified by reading. Same
+  shape as the palette expander's second table, one commit earlier.
+
+- **This one was chosen by asking whether it runs FIRST**, which is the rule
+  the previous commit had to write down. `ComposeFrame` calls it
+  unconditionally on every frame and `ComposeFrame`'s own counter is in the
+  tens of thousands, so reachability was settled before a line was written.
+  The counter for `ScrollDecay` itself reads 0, which is the ordinary blind
+  spot and not a surprise.
 
 - **`SelectUnit` (0x00427CE0), and the cap is 65 rather than 64.** Fifteen
   callers -- the HUD, the script and the unit code. Three refusals and then
@@ -2234,11 +2268,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 780 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 779 | 768 of them below the CRT line |
+| `patch_replace` sites | 781 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 780 | 769 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 140,528 / 372,816 B (**37.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 155,104 / 372,816 B (41.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 140,912 / 372,816 B (**37.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 155,488 / 372,816 B (41.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

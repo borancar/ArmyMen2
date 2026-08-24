@@ -673,6 +673,22 @@
  * the camera from the SOURCE rectangle and these from the DESTINATION point,
  * and they are not the same offset. Also distinct from ADDR_ORIGIN_DX/DY,
  * which shift for a windowed primary. */
+/* The SCREEN SHAKE, and it is the view rectangle that shakes: ScrollDecay
+ * adds its X offset to left and right and its Y offset to top and bottom, so
+ * the whole rectangle moves and nothing is scaled. The phases are floats and
+ * the steps are integers, which is why the decay is done on the x87 stack.
+ *
+ * The timer is counted down by the per-frame delta beside the game clock, and
+ * the amplitude fades linearly over the last 1024 ms and not before. */
+#define ADDR_SHAKE_TIME          0x00514E64u  /* int32_t, ms remaining */
+#define ADDR_SHAKE_PHASE_X       0x00514E68u  /* float */
+#define ADDR_SHAKE_STEP_X        0x00514E6Cu  /* int32_t, sign flips at a limit */
+#define ADDR_SHAKE_PHASE_Y       0x00514E70u  /* float */
+#define ADDR_SHAKE_STEP_Y        0x00514E74u  /* int32_t */
+#define ADDR_SHAKE_AMPLITUDE     0x00514E78u  /* int32_t, pixels */
+#define ADDR_SHAKE_RATE          0x00511E10u  /* float, applied to each step */
+#define ADDR_FRAME_DELTA_MS      0x00511E08u  /* int32_t, beside the clock */
+#define AM2_SHAKE_FADE_MS        0x400        /* the linear fade window */
 #define ADDR_VIEW_ORIGIN_X       0x00514E14u  /* int32_t */
 #define ADDR_VIEW_ORIGIN_Y       0x00514E18u  /* int32_t */
 /* Last frame's copies, written by ComposeFrame at the end of every frame and
