@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `aaaaa5a`. Working tree clean.
+Last updated: **2026-08-25**, at `b0f05df`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,39 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`DepthInsert` (0x0041E160), and the answer is not "did it draw".** 0
+  means the list is FULL, which is what makes the walker subdivide its region
+  and try again with less to hold; an object that does not meet the region is
+  dropped and 1 is returned, because nothing is wrong with the list. Reading
+  the return as success/failure would have inverted the subdivision.
+
+  The list is doubly linked, kept sorted by the comparator at `0x0041D740`,
+  and the insert starts from a CURSOR -- the node the last insert landed on --
+  rather than from the head. Objects arrive in cell order, which is close to
+  sorted, so walking from the last position is usually a step or two where a
+  walk from the head would be a scan every time.
+
+  An equal comparison inserts AFTER the cursor, so objects that compare the
+  same keep the order the walk found them in.
+
+- **Two flags override the comparator entirely**, and the rule is read from
+  both sides: a `0x20` object goes after the first `0x40` it finds, a `0x40`
+  object before the first `0x20`. Everything with `0x40` sorts before
+  everything with `0x20` whatever the depth says -- two layers. With neither
+  flag present both fall through to the ordinary compare.
+
+- **Measured: the comparator walk is worth 3,938 pixels and the layer rule
+  nothing at all.** Reversing the direction of the backward walk puts
+  `bootcamp` over its 500 budget. Swapping the two flags changes 22 pixels,
+  which is the noise floor -- no object visible in that frame carries either,
+  so the two-layer rule is exercised by nothing this project can drive and
+  stays verified by reading.
+
+  With the walker from the previous commit that makes three checks on this
+  subsystem: drawing no objects at all is 50,985 pixels, dropping the cell
+  dedup is 800, and reversing the sort is 3,938. What is NOT caught is the
+  cell off-by-one (117) and the layer flags (22).
 
 - **`DrawMapObjects` (0x0041E440) -- the map's OBJECT painter, and the name
   it carried said tiles.** `orig.h` had `0x0041E440` as `ADDR_DRAW_MAP_TILES`,
@@ -2490,11 +2523,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 790 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 789 | 778 of them below the CRT line |
+| `patch_replace` sites | 791 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 790 | 779 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 142,064 / 372,816 B (**38.1%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 156,640 / 372,816 B (42.0%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 142,800 / 372,816 B (**38.3%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 157,376 / 372,816 B (42.2%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

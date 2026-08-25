@@ -464,10 +464,186 @@ static int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
 #define g_depthHead  (*(int32_t *)(uintptr_t)ADDR_DEPTH_HEAD)
 #define g_depthDC    (*(int32_t *)(uintptr_t)ADDR_DEPTH_FIELD_DC)
 
-typedef int32_t (__cdecl *AM2_DepthInsertFn)(void *obj, const AM2_Rect *world);
 typedef void    (__cdecl *AM2_DrawObjFn)(void *obj, const AM2_Rect *world);
-#define orig_depth_insert ((AM2_DepthInsertFn)(uintptr_t)ADDR_DEPTH_INSERT)
 #define orig_draw_object  ((AM2_DrawObjFn)(uintptr_t)ADDR_DRAW_MAP_OBJECT)
+
+/* One node of the depth list: the object, and the two links. The array is
+ * fixed at 500 and the cursor sits eight bytes in front of it. */
+typedef struct AM2_DepthNode {
+    void                 *obj;
+    struct AM2_DepthNode *prev;
+    struct AM2_DepthNode *next;
+} AM2_DepthNode;
+
+#define g_depthNodes  ((AM2_DepthNode *)(uintptr_t)ADDR_DEPTH_NODES)
+#define g_depthCursor (*(AM2_DepthNode **)(uintptr_t)ADDR_DEPTH_CURSOR)
+
+typedef int32_t (__cdecl *AM2_DepthCompareFn)(void *a, void *b);
+#define orig_depth_compare ((AM2_DepthCompareFn)(uintptr_t)ADDR_DEPTH_COMPARE)
+
+/* Link a fresh node in after `at`, before `at`, or at the front, and leave the
+ * cursor on it. Three shapes the original writes out four times between them;
+ * the only one that needs care is `after`, which the original does NOT guard
+ * against a null successor because it is only reached when there is one. */
+static AM2_DepthNode *DepthLinkAfter(AM2_DepthNode *at, int32_t n)
+{
+    AM2_DepthNode *fresh = &g_depthNodes[n];
+
+    g_depthCursor = fresh;
+    fresh->prev   = at;
+    fresh->next   = at->next;
+    at->next      = fresh;
+    fresh->next->prev = fresh;
+    return fresh;
+}
+
+static AM2_DepthNode *DepthAppend(AM2_DepthNode *at, int32_t n)
+{
+    AM2_DepthNode *fresh = &g_depthNodes[n];
+
+    g_depthCursor = fresh;
+    at->next      = fresh;
+    fresh->prev   = at;
+    fresh->next   = (AM2_DepthNode *)0;
+    return fresh;
+}
+
+static void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
+{
+    AM2_DepthNode *fresh = &g_depthNodes[n];
+
+    g_depthCursor = fresh;
+    fresh->prev   = at->prev;
+    fresh->next   = at;
+    at->prev      = fresh;
+
+    if (fresh->prev)
+        fresh->prev->next = fresh;
+    else
+        g_depthHead = n;
+}
+
+/* 0x0041E160 -- insert one object into the depth list, sorted.
+ *
+ * The answer is NOT "did it draw": 0 means the list is FULL, which is what
+ * makes the walker subdivide its region and try again with less to hold. An
+ * object that does not meet the region is dropped and 1 is returned, because
+ * nothing is wrong with the list.
+ *
+ * The list is doubly linked and kept sorted by the comparator, and the insert
+ * starts from a CURSOR -- the node the last insert landed on -- rather than
+ * from the head. Objects arrive in cell order, which is close to sorted, so
+ * walking from the last position is usually a step or two; from the head it
+ * would be a scan every time.
+ *
+ * Two flags override the comparator entirely: everything with 0x40 sorts
+ * before everything with 0x20. It is read from both sides -- a 0x20 object
+ * goes after the first 0x40 it finds, a 0x40 object before the first 0x20 --
+ * and with neither present both fall through to the ordinary compare.
+ *
+ * An equal comparison inserts AFTER the cursor, so objects that compare the
+ * same are drawn in the order the walk found them. */
+int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
+{
+    RECT           hit;
+    int32_t        n;
+    int32_t        cmp;
+    AM2_DepthNode *at;
+
+    if (g_depthCount >= AM2_DEPTH_MAX)
+        return 0;
+
+    if (!IntersectRect(&hit, (const RECT *)((uint8_t *)obj + OBJ_OFF_BOUNDS),
+                       (const RECT *)world))
+        return 1;
+
+    n = g_depthCount;
+    g_depthNodes[n].obj = obj;
+
+    if (n == 0) {
+        g_depthHead            = 0;
+        g_depthNodes[0].prev   = (AM2_DepthNode *)0;
+        g_depthNodes[0].next   = (AM2_DepthNode *)0;
+        g_depthCursor          = &g_depthNodes[0];
+        g_depthCount           = 1;
+        return 1;
+    }
+
+    if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_FRONT) {
+        for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
+            if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_BACK) {
+                g_depthCursor = at;
+                if (at->next)
+                    DepthLinkAfter(at, n);
+                else
+                    DepthAppend(at, n);
+                g_depthCount = n + 1;
+                return 1;
+            }
+    } else if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_BACK) {
+        AM2_DepthNode *head = &g_depthNodes[g_depthHead];
+
+        for (at = head; at; at = at->next)
+            if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_FRONT) {
+                if (at == head) {
+                    /* At the front, and the head moves. */
+                    g_depthCursor = &g_depthNodes[n];
+                    at->prev      = g_depthCursor;
+                    g_depthCursor->prev = (AM2_DepthNode *)0;
+                    g_depthCursor->next = at;
+                    g_depthHead   = n;
+                    g_depthCount  = n + 1;
+                    return 1;
+                }
+                DepthLinkBefore(at, n);
+                g_depthCount = n + 1;
+                return 1;
+            }
+    }
+
+    at  = g_depthCursor;
+    cmp = orig_depth_compare(obj, at->obj);
+
+    if (cmp == 0) {
+        DepthLinkAfter(at, n);
+        g_depthCount = n + 1;
+        return 1;
+    }
+
+    if (cmp < 0) {
+        while (at->prev) {
+            g_depthCursor = at->prev;
+            if (orig_depth_compare(obj, g_depthCursor->obj) >= 0) {
+                DepthLinkAfter(g_depthCursor, n);
+                g_depthCount = n + 1;
+                return 1;
+            }
+            at = g_depthCursor;
+        }
+        /* Off the front. */
+        g_depthCursor       = &g_depthNodes[n];
+        at->prev            = g_depthCursor;
+        g_depthCursor->prev = (AM2_DepthNode *)0;
+        g_depthCursor->next = at;
+        g_depthHead         = n;
+        g_depthCount        = n + 1;
+        return 1;
+    }
+
+    while (at->next) {
+        g_depthCursor = at->next;
+        if (orig_depth_compare(obj, g_depthCursor->obj) <= 0) {
+            DepthLinkBefore(g_depthCursor, n);
+            g_depthCount = n + 1;
+            return 1;
+        }
+        at = g_depthCursor;
+    }
+
+    DepthAppend(at, n);
+    g_depthCount = n + 1;
+    return 1;
+}
 
 /* 0x0041E440 -- the map's OBJECT painter: collect, sort, draw, and split the
  * region and recurse when the sort runs out of room.
@@ -568,7 +744,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
                     && col > l0)
                     goto nextNode;
 
-                if (!orig_depth_insert(obj, world)) {
+                if (!DepthInsert(obj, world)) {
                     if (!deep)
                         goto subdivide;
                     break;      /* abandon the rest of this cell's list */
@@ -1158,6 +1334,8 @@ int mapdraw_install(void)
                         "RepaintDirtyList", 1);
     rc |= patch_replace(ADDR_DRAW_MAP_OBJECTS, (const void *)DrawMapObjects,
                         "DrawMapObjects", 3);
+    rc |= patch_replace(ADDR_DEPTH_INSERT, (const void *)DepthInsert,
+                        "DepthInsert", 1);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,

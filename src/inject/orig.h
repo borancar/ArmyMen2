@@ -802,7 +802,18 @@
 #define ADDR_DEPTH_NODES         0x00507350u  /* {obj, ?, next}[500] */
 #define AM2_DEPTH_NODE_SIZE      12u
 #define DEPTH_OFF_OBJ            0x00u
+#define DEPTH_OFF_PREV           0x04u
 #define DEPTH_OFF_NEXT           0x08u
+#define ADDR_DEPTH_CURSOR        0x00507348u  /* the last node inserted */
+#define ADDR_DEPTH_COMPARE       0x0041D740u  /* int32_t(void *a, void *b) */
+#define AM2_DEPTH_MAX            0x1F4        /* 500 nodes */
+/* Two object flags that override the comparison entirely: everything with
+ * 0x40 sorts before everything with 0x20, whatever the comparator says.
+ * The rule is read from both sides -- a 0x20 object is inserted AFTER the
+ * first 0x40 it finds, and a 0x40 object BEFORE the first 0x20 -- and with
+ * neither present both fall through to the ordinary compare. */
+#define OBJ_DEPTH_FLAG_BACK      0x40u
+#define OBJ_DEPTH_FLAG_FRONT     0x20u
 #define MAPDESC_OFF_COLS         0x00u
 #define MAPDESC_OFF_ROWS         0x04u
 #define MAPDESC_OFF_SHIFT        0x08u

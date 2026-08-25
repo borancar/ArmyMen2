@@ -65,6 +65,11 @@ void __cdecl ScrollDecay(void);
  * and recurse when the sort runs out of room. */
 void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep);
 
+/* 0x0041E160. Insert one object into the sorted depth list. 0 means the list
+ * is FULL, which is what makes the walker subdivide; an object outside the
+ * region is dropped and 1 is returned. */
+int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world);
+
 /* 0x0041D000. Repaint every registered dirty rectangle meeting a region --
  * the clipped intersection, not the whole record. */
 void __cdecl RepaintDirtyList(const AM2_Rect *region);

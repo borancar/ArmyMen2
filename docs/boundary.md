@@ -69,9 +69,9 @@ outside it.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 80 | 194 |
+| reconstructed | 81 | 195 |
 | still boundary | 1 | 2 |
-| game logic, incidental calls only | 50 | 80 |
+| game logic, incidental calls only | 49 | 79 |
 | **total** | **131** | **276** |
 
 ## By library
@@ -82,7 +82,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 95 | 130 |  |
+| USER32 | 96 | 130 |  |
 | KERNEL32 | 52 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -208,7 +208,7 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 79 |
+| USER32.dll | 130 | 80 |
 | KERNEL32.dll | 99 | 41 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
