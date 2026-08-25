@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `2793f72`. Working tree clean.
+Last updated: **2026-08-25**, at `15ba70f`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,32 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`SpriteRegister` (0x004459E0), and the registry keeps two orders.** The
+  SPRITES are appended and a table of `{id, slot}` PAIRS is kept sorted so a
+  lookup can binary search it. A sprite's slot is the order it was registered
+  in; its position among the pairs is the order of its id. Two orders, one
+  object -- which is what `orig.h` describes and this confirms from the
+  writing side.
+
+  Both arrays grow by fifty at a time and only when the count has caught the
+  capacity, so it is one realloc each rather than one per sprite.
+
+- **The original computes the move length by WRAPAROUND.**
+  `((lo << 29) - lo + count) << 3` is exactly `8 * (count - lo)`, because
+  `lo << 29 << 3` is `lo << 32` and vanishes. Written here as what it means,
+  with the note that the original arrived at it that way -- reading it as a
+  multiply by 0x20000000 is what a first pass does.
+
+- **Measured: the recorded slot is worth 23 log lines and the duplicate check
+  nothing.** Recording `count + 1` instead of `count` puts `bootcamp` 23
+  messages apart, all of them `Error in release: Wrong sprite!` -- every
+  lookup finds the neighbour's sprite and the release check catches it, which
+  is a sharper signal than pixels and comes from the game's own log.
+
+  Registering an id that is already there does nothing, and removing that test
+  changes nothing either: no sprite is registered twice in a Boot Camp run, so
+  that arm stays verified by reading.
 
 - **`DrawTextClipped` (0x00446AB0), eleven callers and every string in the
   game.** Four things worth keeping.
@@ -2680,11 +2706,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 797 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 796 | 785 of them below the CRT line |
+| `patch_replace` sites | 798 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 797 | 786 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 144,768 / 372,816 B (**38.8%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 159,344 / 372,816 B (42.7%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 145,008 / 372,816 B (**38.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 159,584 / 372,816 B (42.8%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

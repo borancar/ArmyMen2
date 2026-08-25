@@ -356,13 +356,71 @@ void __cdecl FreeMenuSprites(void)
     }
 }
 
+/* 0x004459E0, two callers -- put a sprite in the registry.
+ *
+ * The registry is two arrays that grow together: the SPRITES are appended,
+ * and a table of {id, slot} PAIRS is kept sorted so a lookup can binary
+ * search it. So a sprite's slot is the order it was registered in and its
+ * position among the pairs is the order of its id -- two orders, one object.
+ *
+ * Registering an id that is already there does NOTHING: the search finds it
+ * and returns, without replacing the sprite or complaining. The caller cannot
+ * tell, because the function answers nothing.
+ *
+ * Both arrays grow by fifty at a time and only when the count has caught the
+ * capacity, which is one realloc each rather than one per sprite.
+ *
+ * The original computes the move length as `((lo << 29) - lo + count) << 3`,
+ * which is `8 * (count - lo)` exactly: `lo << 29 << 3` is `lo << 32` and
+ * vanishes. Written here as what it means, with the note that the original
+ * arrived at it by wraparound rather than by a multiply. */
+void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id)
+{
+    AM2_SpritePair **pairsp  = (AM2_SpritePair **)(uintptr_t)ADDR_SPRITE_REG_PAIRS;
+    AM2_Sprite    ***slotsp  = (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE;
+    int32_t         *countp  = (int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT;
+    int32_t         *capp    = (int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP;
+    int32_t          lo      = 0;
+    int32_t          hi      = *countp;
+    int32_t          count;
+
+    while (hi > lo) {
+        int32_t mid = lo + (hi - lo) / 2;
+
+        if ((*pairsp)[mid].id == id)
+            return;
+        if ((*pairsp)[mid].id < id)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+
+    count = *countp;
+    if (count >= *capp) {
+        int32_t grown = *capp + AM2_SPRITE_REG_GROW;
+
+        *slotsp = (AM2_Sprite **)am2_realloc(*slotsp, (size_t)grown * 4);
+        *pairsp = (AM2_SpritePair *)am2_realloc(*pairsp, (size_t)grown * 8);
+        count   = *countp;
+        *capp   = grown;
+    }
+
+    (*slotsp)[count] = spr;
+
+    if (lo < count)
+        memmove(&(*pairsp)[lo + 1], &(*pairsp)[lo],
+                (size_t)(count - lo) * sizeof(AM2_SpritePair));
+
+    (*pairsp)[lo].id   = id;
+    (*pairsp)[lo].slot = count;
+    *countp = count + 1;
+}
+
 typedef int32_t (__cdecl *am2_sprite_load_fn)(AM2_Sprite *spr, int32_t a,
                                               int32_t b, int32_t c,
                                               int32_t flags);
-typedef void (__cdecl *am2_sprite_register_fn)(AM2_Sprite *spr, uint32_t id);
 
 #define orig_sprite_load_triple (*(am2_sprite_load_fn)ADDR_SPRITE_LOAD_TRIPLE)
-#define orig_sprite_register    (*(am2_sprite_register_fn)ADDR_SPRITE_REGISTER)
 
 /* Allocate and fill one, or give the record back for free()ing. */
 static AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
@@ -419,7 +477,7 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
 
     spr->id = id;
     spr->refs = 1;
-    orig_sprite_register(spr, id);
+    SpriteRegister(spr, id);
     return spr;
 }
 
@@ -860,6 +918,8 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_TURRET_ANIM_SPRITE, (const void *)TurretAnimSprite,
                         "TurretAnimSprite", 2);
     rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
+    rc |= patch_replace(ADDR_SPRITE_REGISTER, (const void *)SpriteRegister,
+                        "SpriteRegister", 2);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
                         "DrawSpriteClipped", 5);
     rc |= patch_replace(ADDR_RESTORE_CHAIN, (const void *)RestoreSpriteSurface,

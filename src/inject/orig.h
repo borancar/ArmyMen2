@@ -624,6 +624,8 @@
  * walk over the sprites, and what it returns is the slot. */
 #define ADDR_SPRITE_REG_COUNT    0x006598C0u  /* int32_t */
 #define ADDR_SPRITE_REG_PAIRS    0x006598C8u  /* {uint32 id; int32 slot} * */
+#define ADDR_SPRITE_REG_CAP      0x006598BCu  /* int32_t, grown 50 at a time */
+#define AM2_SPRITE_REG_GROW      50
 #define ADDR_FILL_SOUND_BUFFER   0x0040C440u  /* int32(buf, const void *, uint32) */
 #define ADDR_STR_SND_LOCK_FAIL   0x00474E6Cu  /* "Unable to lock sound buffer\n" */
 #define ADDR_STR_SND_NO_ARGS     0x00474E44u  /* "Fill sound buffer missing arguments\n" */
