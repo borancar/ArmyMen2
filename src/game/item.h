@@ -130,6 +130,9 @@ void __cdecl RowRelease(void *row, void *desc);
 /* 0x00428DA0, 22 callers. Destroy an object by type, then broadcast. */
 void __cdecl DestroyByType(void *obj);
 
+/* 0x00428C40. Free every item past its deadline; runs on leaving a level. */
+void __cdecl FreeOverdueItems(void);
+
 void item_install(void);
 
 #ifdef __cplusplus

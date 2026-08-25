@@ -1058,6 +1058,15 @@ sorted set while everything else is still compared in sequence; sorting the
 whole log would hide a genuine ordering change, and the load order of the map
 and the palette is exactly the sort of thing worth catching.
 
+**And one of them can be ABSENT, not merely out of order, which a sorted set
+does not fix.** One `quit` run came back with `Receive thread got event 0` on
+the original side and not on ours; three re-runs were clean, and the line is
+the receive thread's own, which no reconstruction in that run touched. So the
+thread sometimes exits before it logs. Sorting makes the ORDER stable and
+leaves the COUNT racing, so this configuration can still fail for a reason that
+is not a defect -- re-run it before believing a one-line difference here, the
+same as for a windowed pixel figure.
+
 What it found: `ReleaseSprite` logged "Error in release: Wrong sprite!" where
 the original logged nothing. The original tests the register still holding
 `table[slot]` from the compare above it — "is the slot occupied by someone

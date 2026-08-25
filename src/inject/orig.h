@@ -4864,6 +4864,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * call site and which says nothing about what the function does. Renamed
  * rather than aliased -- the checkpatches ratchet refused the second name,
  * which is the rule this file states and which I had just broken. */
+/* 0x00428C40, one caller -- 0x00425EE0 -- and it runs EVERY FRAME of a live
+ * mission, 69 times in a driven Boot Camp window. Read the caller's BODY, not
+ * its summary: 0x00425EE0 consumes a pending menu request and RETURNS on that
+ * branch, so the teardown is the short arm and everything after it, this sweep
+ * included, is the ordinary per-frame path. Filed here because the opposite
+ * was written down first, from the caller's name alone.
+ *
+ * It walks the whole item registry and frees everything past its deadline,
+ * telling the other players first. Bit 27 exempts an object from the sweep;
+ * what it means is not established, so it is named structurally as
+ * OBJ_FLAG8_BIT40 already is. */
+#define ADDR_FREE_OVERDUE_ITEMS    0x00428C40u  /* void(void) */
+#define OBJ_FLAG_NO_SWEEP          0x08000000u  /* bit 27, meaning unestablished */
 #define ADDR_DESTROY_BY_TYPE       0x00428DA0u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */

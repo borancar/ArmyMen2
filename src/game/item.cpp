@@ -615,6 +615,55 @@ void __cdecl DestroyByType(void *obj)
         SendObjDestroyed(obj);
 }
 
+/* 0x00428C40, one caller. Free every item that is past its deadline.
+ *
+ * Measured: SIXTY-NINE calls in a driven Boot Camp window, so this is
+ * thoroughly exercised and the A/B compares it on live data.
+ *
+ * I first wrote the opposite here -- that it runs only on LEAVING a level --
+ * from the caller's name rather than its body. 0x00425EE0 consumes a pending
+ * menu request and RETURNS on that branch, so the teardown is the short arm
+ * and this sweep is on the ordinary per-frame path that follows it. Second
+ * time this session I have taken a function's role from a caller's summary
+ * instead of reading it; the rule is in CLAUDE.md and it is about callees just
+ * as much as callers.
+ *
+ * OBJ_FLAG_OVERDUE is set by ADDR_OBJ_MARK_IF_OVERDUE when an object passes
+ * the deadline at OBJ_OFF_DEADLINE_58, so the sweep is a deferred free: mark
+ * during play, collect on the way out. Bit 27 exempts an object from it; what
+ * that means is not established and the name says so.
+ *
+ * `next` is taken BEFORE the free, which is the only thing here that has to be
+ * right -- FreeItem unlinks, so reading the walk after it would follow a
+ * pointer through freed memory. The original is careful about this and the
+ * order is worth preserving deliberately rather than by luck.
+ *
+ * The broadcast asks CommMustBroadcast rather than testing a session directly,
+ * so a single-player game sends nothing and the neutral army is special-cased;
+ * see that function. */
+void __cdecl FreeOverdueItems(void)
+{
+    void *obj = FirstItem();
+
+    if (!obj)
+        return;
+
+    do {
+        void   *next  = NextItem();
+        uint8_t *o    = (uint8_t *)obj;
+        uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+
+        if ((flags & OBJ_FLAG_OVERDUE) && !(flags & OBJ_FLAG_NO_SWEEP)) {
+            if (CommMustBroadcast(kItemComm,
+                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+                ItemGoneMessageSend(obj);
+            FreeItem(obj, 1);
+        }
+
+        obj = next;
+    } while (obj);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -630,6 +679,8 @@ void item_install(void)
                   "RemoveInventoryItem", 4);
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
+    patch_replace(ADDR_FREE_OVERDUE_ITEMS, (const void *)FreeOverdueItems,
+                  "FreeOverdueItems", 1);
     patch_replace(ADDR_DESTROY_BY_TYPE, (const void *)DestroyByType,
                   "DestroyByType", 22);
     patch_replace(ADDR_FREE_ITEM_KIND2, (const void *)DestroyTrooper,
