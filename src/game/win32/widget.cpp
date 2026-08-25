@@ -1527,7 +1527,7 @@ void __attribute__((thiscall)) ListDropOldest(void *list)
 #define g_levelCount      (*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)
 #define g_moviePage       (*(int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)
 #define g_movieCount      (*(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
-#define g_menuMode        (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
+#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_save_options (*(am2_void_fn)ADDR_SAVE_OPTIONS)
@@ -3737,7 +3737,7 @@ void __cdecl OnVolumeVoice(AM2_Widget *w)
 static void ReturnToOptions(void)
 {
     if (g_gameState == 2) {
-        g_menuMode     = MENU_MODE_OPTIONS;
+        g_subState     = MENU_MODE_OPTIONS;
         g_overlayDirty = 1;
     } else {
         g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
@@ -4076,7 +4076,7 @@ void __cdecl OnDelPlayerCancel(AM2_Widget *w)
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
     if (g_gameState == 2) {
-        g_menuMode     = AM2_MENU_MODE_DEL_PLAYER;
+        g_subState     = AM2_MENU_MODE_DEL_PLAYER;
         g_overlayDirty = 1;
     } else {
         g_menuRequest    = AM2_MENU_REQUEST_SELECT_PLAYER;
@@ -4804,7 +4804,7 @@ void __cdecl OnLoadGameBack(AM2_Widget *w)
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
     if (g_gameState == 2) {
-        g_menuMode     = MENU_MODE_OPTIONS;
+        g_subState     = MENU_MODE_OPTIONS;
         g_overlayDirty = 1;
     } else {
         g_menuRequest    = AM2_MENU_REQUEST_SELECT_PLAYER;
@@ -4830,7 +4830,7 @@ void __cdecl OnLoadGameDelete(AM2_Widget *w)
     strcpy(g_pendingDelete, name);
     PlaySoundAt(2, 0, 0, 0, 0);
     if (g_gameState == 2) {
-        g_menuMode     = AM2_MENU_MODE_DEL_GAME;
+        g_subState     = AM2_MENU_MODE_DEL_GAME;
         g_overlayDirty = 1;
     } else {
         g_menuRequest    = AM2_MENU_REQUEST_DEL_GAME;
@@ -4849,10 +4849,10 @@ void __cdecl OnDelGameCancel(AM2_Widget *w)
     PlaySoundAt(2, 0, 0, 0, 0);
     g_pendingDelete[0] = '\0';
     if (g_gameState == 2) {
-        int32_t from = g_menuMode;
+        int32_t from = g_subState;
 
         g_overlayDirty = 1;
-        g_menuMode = (from == AM2_MENU_MODE_DEL_GAME)
+        g_subState = (from == AM2_MENU_MODE_DEL_GAME)
                          ? AM2_MENU_MODE_DEL_PLAYER
                          : AM2_MENU_MODE_AFTER_LOAD;
     } else {
@@ -5022,7 +5022,7 @@ void __cdecl OnMoviePlay(AM2_Widget *w)
     strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY, names[idx]);
     RequestState(3);
     *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
-    g_menuMode = AM2_MENU_MODE_MOVIE;
+    g_subState = AM2_MENU_MODE_MOVIE;
 }
 
 /* 0x00452060. LOAD GAME's LOAD -- and this is the arm STATUS's open item 2
@@ -5513,7 +5513,7 @@ void __cdecl RefreshMapSelection(void)
 
     if (g_paintObject != (uint8_t *)0
         && g_gameState == AM2_STATE_MENU
-        && g_menuMode == AM2_MENU_MP_HOST)
+        && g_subState == AM2_MENU_MP_HOST)
         preview = ((AM2_Widget **)(g_paintObject + MP_PANEL_OFF_PREVIEW))[0];
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));

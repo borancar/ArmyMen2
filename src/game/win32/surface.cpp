@@ -1118,7 +1118,7 @@ typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
 #define g_paintObj      (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
-#define g_menuMode      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
+#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_menuPending   (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
 #define g_overlayDirty  (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 #define g_presenting    (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
@@ -1135,7 +1135,7 @@ void __cdecl DrawMenuOverlay(void)
             (*(am2_delete_fn)vt[0])(paint, 1);
             g_paintObj = NULL;
         }
-        g_menuMode     = MENU_MODE_PLAYING;
+        g_subState     = MENU_MODE_PLAYING;
         g_menuPending  = 0;
         g_overlayDirty = 0;
         g_presenting   = 1;

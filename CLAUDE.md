@@ -2506,7 +2506,7 @@ exact oracle**, however meaningful it is when it is set.
   game itself takes and it exercises `TakeMenuRequest` too.
 
   Two readings from the same session, both measured. The in-mission sub-state
-  `ADDR_MENU_REQUEST_TAKEN` reads **33** throughout Boot Camp play, which is
+  `ADDR_MENU_MODE` reads **33** throughout Boot Camp play, which is
   why the ESCAPE arm — number 34 — never runs. And `ADDR_STATE_WANTED` really
   does sit at -1 while nothing is pending, as `orig.h` claims.
 

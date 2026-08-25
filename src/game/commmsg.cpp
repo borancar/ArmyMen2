@@ -562,7 +562,7 @@ void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
  * in-game HUD. */
 static void DispatchChat(const uint8_t *msg)
 {
-    int32_t screen = *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_TAKEN;
+    int32_t screen = *(const int32_t *)(uintptr_t)ADDR_MENU_MODE;
     int32_t sender = (int32_t)*(const int8_t *)(msg + AM2_MSG_SENDER);
 
     if (screen == 7 || screen == 9 || screen == 8) {

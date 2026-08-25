@@ -581,7 +581,6 @@ static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 typedef int32_t (__attribute__((thiscall)) *am2_slot_of_id_fn)(void *, DPID);
 typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
 #define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_POOL)
-#define g_joinContext  (*(int32_t *)(uintptr_t)ADDR_JOIN_CONTEXT)
 
 #define AM2_MAX_PLAYERS 4
 
@@ -617,7 +616,7 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
             return 0;
     }
 
-    g_joinContext  = 0;
+    g_commEnumCount = 0;
     g_defaultOwner = 0;
     g_ourSlot     = 0;
     return 1;

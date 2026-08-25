@@ -58,7 +58,7 @@ import am2
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # What was in the tree when this check was written. Lower them, never raise.
-ALIAS_BASELINE = 37
+ALIAS_BASELINE = 31
 DRIFT_BASELINE = 15
 
 DEFINE = re.compile(r"^\s*#\s*define\s+(g_[A-Za-z0-9_]*)\s+(.+?)\s*$")

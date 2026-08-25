@@ -155,7 +155,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define g_hudColour    (*(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR)
 #define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 #define g_overlayDirty (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
-#define g_reqTaken     (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_TAKEN)
+#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 
 typedef int32_t (__attribute__((thiscall)) *am2_comm_id_fn)(void *comm,
                                                             uint32_t id);
@@ -230,7 +230,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
     /* Each player owns three bits; drop them all. */
     g_eventFlags &= ~(0x20810u << CommPlayerSlot(comm, id));
 
-    if (g_gameState == 1 || (g_gameState == 2 && g_reqTaken == 0x22)) {
+    if (g_gameState == 1 || (g_gameState == 2 && g_subState == 0x22)) {
         /* Lobby: copy the name out before the record is recycled. */
         char name[128];
 
@@ -297,7 +297,7 @@ static LRESULT OnHostMigrated(void)
     *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
     g_mpSession = 1;
     if (g_gameState == 1) {
-        g_reqTaken     = 7;
+        g_subState     = 7;
         g_overlayDirty = 1;
     }
 

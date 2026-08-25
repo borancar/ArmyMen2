@@ -49,7 +49,7 @@ void __cdecl StartAudioStream(void *track, int32_t which);
  * They are released and not nulled, so calling this twice would release them
  * twice. That is what the original does; every call site drops them
  * immediately afterwards. */
-void __cdecl ReleaseSoundBuffers(void);
+void __cdecl ReleaseSoundObjects(void);
 
 /* Original: 0x0040C800, 1 call site. Bring DirectSound up.
  *

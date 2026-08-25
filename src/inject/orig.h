@@ -1372,14 +1372,19 @@
 #define ADDR_INIT_DIRECTSOUND    0x0040C800u  /* int32_t(void); 1 on success */
 #define ADDR_SET_STREAM_VOLUME   0x0040CE90u  /* void(int32 pan) */
 #define ADDR_DIRECTSOUNDCREATE   0x00463390u  /* jmp [0x0046F01C] */
-#define ADDR_DSOUND              0x004FA46Cu  /* IDirectSound * (same as BUF_C) */
+/* Three consecutive dwords, one object each, and our own InitDirectSound is
+ * what settles which is which: DirectSoundCreate fills the first,
+ * CreateSoundBuffer the second, and QueryInterface(IID_IDirectSound3DListener)
+ * the third. They carried a second set of names -- ADDR_DSOUND_BUF_A/B/C --
+ * taken from the SHAPE of ReleaseSoundBuffers, three Releases in a row, rather
+ * than from what it releases. It releases one buffer, one listener and the
+ * DEVICE. Those names are gone, and so is ADDR_MOVIE_DSOUND, which was a third
+ * name for the first of these. */
+#define ADDR_DSOUND              0x004FA46Cu  /* IDirectSound * */
 #define ADDR_DS_PRIMARY          0x004FA470u  /* the primary sound buffer */
 #define ADDR_DS_LISTENER         0x004FA474u  /* IDirectSound3DListener * */
 #define ADDR_IID_DS3D_LISTENER   0x0046F3E8u
 #define ADDR_STREAM_VOLUME       0x0051231Cu  /* int32_t, the wanted volume */
-#define ADDR_DSOUND_BUF_A        0x004FA470u
-#define ADDR_DSOUND_BUF_B        0x004FA474u
-#define ADDR_DSOUND_BUF_C        0x004FA46Cu
 #define ADDR_AUDIO_TIMER_ID      0x004FA408u
 #define ADDR_AUDIO_TIMER_RUN     0x004FA464u
 #define ADDR_AUDIO_PERIOD        0x004FA448u  /* divided by 4 for timeBeginPeriod */
@@ -1433,7 +1438,6 @@
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
 #define ADDR_MOVIE_OPEN          0x00444FC0u  /* thiscall this(this,name,w,h,big) */
 #define ADDR_MOVIE_MAKE_SURFACE  0x00445690u  /* surface *(w, h), stays original */
-#define ADDR_MOVIE_DSOUND        0x004FA46Cu  /* the DirectSound object, may be null */
 #define ADDR_IAT_SMACK_OPEN      0x0046F2C8u
 #define ADDR_IAT_SMACK_DDTYPE    0x0046F2CCu
 #define ADDR_IAT_SMACK_USE_DSOUND 0x0046F2C4u
@@ -2657,7 +2661,7 @@
  *   - in a multiplayer session, only the HOST raises events (ADDR_MP_SESSION
  *     set and COMM_OFF_IS_HOST clear means return), which is the authority
  *     rule stated in one line;
- *   - and never while ADDR_MENU_REQUEST_TAKEN is 0x22. That is 34, the ESCAPE
+ *   - and never while ADDR_MENU_MODE is 0x22. That is 34, the ESCAPE
  *     sub-state CLAUDE.md records ordinary play as never being in -- so the
  *     game stops raising events the moment that menu arm is entered.
  *
@@ -3528,7 +3532,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_PADTRIG_BOAT         0x0800u
 #define AM2_PADTRIG_GROUNDVEH    0x1000u
 #define AM2_PADTRIG_NPC          0x2000u
-#define ADDR_MENU_REQUEST_TAKEN  0x00511DBCu  /* int32_t, the consumed code */
 
 #define ADDR_HINSTANCE           0x00512580u  /* HINSTANCE */
 /* Not HINSTANCE-related at all, despite sitting beside it: DetectCpuSpeed sets
@@ -3632,6 +3635,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_COMM_OBJECT         0x004751B0u  /* void ** */
 /* Reset to 0 before an enumeration and used by the callback as the slot it
  * fills next, so after EnumPlayers returns it is how many were found. */
+/* How many players the enumeration has seen, which is also the SLOT it is
+ * filling: the callback at 0x0040E0B0 multiplies it by the 112-byte comm slot
+ * stride and indexes the slot array with it, and stores it as "our slot" when
+ * the player it just saw is us. It carried a second name, ADDR_JOIN_CONTEXT,
+ * invented from the two sites that only ever write ZERO to it -- which is why
+ * neither could settle what it was. Find the reader. */
 #define ADDR_COMM_ENUM_COUNT     0x004751B4u  /* int32_t */
 /* EnumPlayers' DPENUMPLAYERSCALLBACK2. Left original -- it is the other side
  * of the same enumeration and touches no import. */
@@ -3647,6 +3656,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * codes seen so far are 1 (refused), 0xA (joined a session) and 0xB (start a
  * local game). */
 #define ADDR_MENU_REQUEST        0x00511DC8u  /* int32_t, the code */
+/* The in-mission SUB-STATE, which frame.cpp dispatches its thirteen-arm table
+ * on: 0x21 is ordinary play and 0x22 is the ESCAPE arm. It carried a second
+ * name, ADDR_MENU_REQUEST_TAKEN, taken from the function that WRITES it after
+ * consuming a menu request -- and CLAUDE.md went on calling it "the in-mission
+ * sub-state ADDR_MENU_REQUEST_TAKEN", which is the misreading and its own
+ * refutation in one sentence. */
 #define ADDR_MENU_MODE           0x00511DBCu  /* int32_t; 0x21 = back to play */
 /* The mode is the menu-request arm number, so 7 is the multiplayer HOST
  * panel -- the same 7 ab.sh pokes to open it. */
@@ -3715,7 +3730,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the host", which names US -- correct, because that handler runs on the
  * machine that has just taken over. */
 #define ADDR_OUR_SLOT            0x004FA904u
-#define ADDR_JOIN_CONTEXT        0x004751B4u  /* int32_t, cleared once a session exists */
 /* Creates the DirectPlay session -- slot 24 is Open, with DPOPEN_CREATE. */
 #define ADDR_COMM_OPEN_SESSION   0x0040DFC0u  /* thiscall int32(this, const char *) */
 /* Appends one named entry to a list object. 16 callers.
@@ -4448,7 +4462,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *
  *   - if ADDR_STATE_PENDING is set it tail-jumps to ADDR_LEVEL_TEARDOWN, which
  *     is a DIFFERENT function and the one that calls StopAllSounds;
- *   - otherwise it dispatches on ADDR_MENU_REQUEST_TAKEN, biased by 22, over a
+ *   - otherwise it dispatches on ADDR_MENU_MODE, biased by 22, over a
  *     13-entry table at 0x00426230 -- the in-mission sub-states. */
 #define ADDR_STATE2_FRAME        0x004260C0u  /* void(void), state 2 per frame */
 /* The actual teardown, and it was called ADDR_STATE2_FRAME's address for as

@@ -119,24 +119,33 @@ void __cdecl StartAudioStream(void *track, int32_t which)
                              AudioTimerProc, 0, TIME_PERIODIC);
 }
 
-#define g_dsBufA (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_A)
-#define g_dsBufB (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_B)
-#define g_dsBufC (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DSOUND_BUF_C)
-
-void __cdecl ReleaseSoundBuffers(void)
-{
-    /* Released without being nulled -- see audio.h. */
-    if (g_dsBufA)
-        IDirectSoundBuffer_Release(g_dsBufA);
-    if (g_dsBufB)
-        IDirectSoundBuffer_Release(g_dsBufB);
-    if (g_dsBufC)
-        IDirectSoundBuffer_Release(g_dsBufC);
-}
-
 #define g_dsound     (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)
 #define g_dsPrimary  (*(LPDIRECTSOUNDBUFFER *)(uintptr_t)ADDR_DS_PRIMARY)
 #define g_dsListener (*(LPDIRECTSOUND3DLISTENER *)(uintptr_t)ADDR_DS_LISTENER)
+
+/* It does not release three buffers. It releases the PRIMARY BUFFER, the 3D
+ * LISTENER and the DEVICE -- one of each, in that order -- which is what
+ * InitDirectSound creates and in the order that leaves the device last. The
+ * name and the three ADDR_DSOUND_BUF_A/B/C macros this used to reach them
+ * through came from the shape of the body, three Releases in a row, and
+ * orig.h even carried "(same as BUF_C)" beside the device without drawing the
+ * conclusion.
+ *
+ * It worked anyway, for the wrong reason: under CINTERFACE both
+ * IDirectSoundBuffer_Release and IDirectSound_Release are vtable slot 2, so
+ * releasing the device through a buffer macro called the right method. Each
+ * now goes through the interface it actually is.
+ *
+ * Still released without being nulled -- see audio.h. */
+void __cdecl ReleaseSoundObjects(void)
+{
+    if (g_dsPrimary)
+        IDirectSoundBuffer_Release(g_dsPrimary);
+    if (g_dsListener)
+        IDirectSound3DListener_Release(g_dsListener);
+    if (g_dsound)
+        IDirectSound_Release(g_dsound);
+}
 #define g_streamVolume  (*(int32_t *)(uintptr_t)ADDR_STREAM_VOLUME)
 #define kIID_DS3DListener (*(const IID *)(uintptr_t)ADDR_IID_DS3D_LISTENER)
 
@@ -162,7 +171,7 @@ static_assert(sizeof(DSBUFFERDESC) == 0x14, "DSBUFFERDESC");
 static int32_t SoundFailed(const char *what)
 {
     orig_log(what);
-    ReleaseSoundBuffers();
+    ReleaseSoundObjects();
     return 0;
 }
 
@@ -1682,8 +1691,8 @@ int audio_install(void)
                         "LoadAudioSection", 1);
     rc |= patch_replace(ADDR_START_AUDIO_STREAM, (const void *)StartAudioStream,
                         "StartAudioStream", 2);
-    rc |= patch_replace(ADDR_RELEASE_SOUND_BUFS, (const void *)ReleaseSoundBuffers,
-                        "ReleaseSoundBuffers", 0);
+    rc |= patch_replace(ADDR_RELEASE_SOUND_BUFS, (const void *)ReleaseSoundObjects,
+                        "ReleaseSoundObjects", 0);
     rc |= patch_replace(ADDR_INIT_DIRECTSOUND, (const void *)InitDirectSound,
                         "InitDirectSound", 0);
     rc |= patch_replace(ADDR_FILL_SOUND_BUFFER, (const void *)FillSoundBuffer,

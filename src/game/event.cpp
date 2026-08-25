@@ -1724,7 +1724,7 @@ void __cdecl EvtShowBitmap(const char *name)
 {
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
 
-    *(int32_t *)AM2_IMAGE(ADDR_MENU_REQUEST_TAKEN) = AM2_SUBSTATE_BITMAP;
+    *(int32_t *)AM2_IMAGE(ADDR_MENU_MODE) = AM2_SUBSTATE_BITMAP;
     *(int32_t *)AM2_IMAGE(ADDR_OVERLAY_DIRTY)      = 1;
 
     SendGamePause(1, AM2_EVENT_FLAG_8);
@@ -1934,7 +1934,7 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0)
         return;
 
-    if (*(const int32_t *)AM2_IMAGE(ADDR_MENU_REQUEST_TAKEN)
+    if (*(const int32_t *)AM2_IMAGE(ADDR_MENU_MODE)
         == AM2_SUBSTATE_ESCAPE)
         return;
 

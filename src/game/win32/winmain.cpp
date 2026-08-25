@@ -248,7 +248,7 @@ int32_t __cdecl InitAudio(void)
             *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 1;
             return 1;
         }
-        ReleaseSoundBuffers();
+        ReleaseSoundObjects();
     }
     *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 0;
     return 1;

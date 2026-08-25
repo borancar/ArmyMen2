@@ -90,7 +90,7 @@ typedef void (__cdecl *am2_delete_fn)(void *);
 
 typedef LPDIRECTDRAWSURFACE (__cdecl *am2_make_surface_fn)(int32_t w, int32_t h);
 #define orig_make_surface (*(am2_make_surface_fn)ADDR_MOVIE_MAKE_SURFACE)
-#define g_movieDSound (*(void **)(uintptr_t)ADDR_MOVIE_DSOUND)
+#define g_movieDSound (*(void **)(uintptr_t)ADDR_DSOUND)
 #define g_soundReady  (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
 
 /* Still in the original image: the palette apply and the blit to screen are
