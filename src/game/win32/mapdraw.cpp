@@ -20,6 +20,7 @@
  */
 
 #include "mapdraw.h"
+#include "../objflag.h"  /* ObjFlagBit1 -- reconstructed */
 #include "surface.h"
 #include "../gamedir.h"
 #include "palette.h"
@@ -43,7 +44,6 @@
  * Not reconstructed. */
 typedef void (__cdecl *am2_draw_map_tiles_fn)(const AM2_Rect *world,
                                               void *mapDesc, int32_t flag);
-#define orig_draw_map_tiles (*(am2_draw_map_tiles_fn)ADDR_DRAW_MAP_TILES)
 
 /* The map is painted once into a cache surface and the visible part copied out
  * of it a rectangle at a time; this is that copy. Both surfaces and both
@@ -109,7 +109,7 @@ void __cdecl RedrawMapRegion(const AM2_Rect *world)
     if (!LockSurface(g_offscreen))
         return;
 
-    orig_draw_map_tiles(world, g_mapDesc, 0);
+    DrawMapObjects(world, g_mapDesc, 0);
     UnlockSurface();
 }
 
@@ -460,6 +460,172 @@ static int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
  * constant on the left in the second arm -- `(-amp) > phase` and not
  * `phase < -amp`. For ordinary numbers the two are the same; the original
  * compares in that direction and there is no reason to differ. */
+#define g_depthCount (*(int32_t *)(uintptr_t)ADDR_DEPTH_COUNT)
+#define g_depthHead  (*(int32_t *)(uintptr_t)ADDR_DEPTH_HEAD)
+#define g_depthDC    (*(int32_t *)(uintptr_t)ADDR_DEPTH_FIELD_DC)
+
+typedef int32_t (__cdecl *AM2_DepthInsertFn)(void *obj, const AM2_Rect *world);
+typedef void    (__cdecl *AM2_DrawObjFn)(void *obj, const AM2_Rect *world);
+#define orig_depth_insert ((AM2_DepthInsertFn)(uintptr_t)ADDR_DEPTH_INSERT)
+#define orig_draw_object  ((AM2_DrawObjFn)(uintptr_t)ADDR_DRAW_MAP_OBJECT)
+
+/* 0x0041E440 -- the map's OBJECT painter: collect, sort, draw, and split the
+ * region and recurse when the sort runs out of room.
+ *
+ * The grid is a fixed spatial hash and not the map's tile extent -- measured
+ * as {cols 16, rows 16, shift 4} on both Boot Camp and the campaign's first
+ * map, with the shift exactly log2(cols), so a cell is 256 world units
+ * square.
+ *
+ * **The BOTTOM edge is clamped against `cols - 1`, not `rows - 1`.** That is
+ * what the original does and it is reproduced. On a square grid the two are
+ * the same number, which is why nothing has ever noticed; whether a
+ * non-square grid exists is not established, so this is recorded rather than
+ * corrected.
+ *
+ * The two "already seen" tests are the interesting part. An object wider or
+ * taller than a cell is in several cells, and would otherwise be handed to
+ * the sort once per cell -- so a cell only offers an object whose bounds
+ * START in it. The exception is the clamped edge: at the first row or column
+ * of the walk, an object that begins off-screen has no earlier cell to be
+ * offered from, so the test is skipped there.
+ *
+ * When the sort refuses -- it holds at most 500 -- there are two behaviours.
+ * With `deep` set, the rest of THIS CELL's list is abandoned and the walk
+ * moves on. With it clear, the region is split in half along its longer axis
+ * and each half is walked separately, which gives the sort two smaller sets
+ * instead of one it cannot hold.
+ *
+ * The split sets `deep` for the halves once the region is down to 0x20, so
+ * the recursion has a floor and cannot subdivide forever.
+ *
+ * **The vertical split leaves the second rectangle's BOTTOM unwritten.** Seven
+ * of the eight fields are stored and `[esp+0x44]` is not; the horizontal
+ * split writes all eight. Reproduced -- but ours is a different uninitialised
+ * value from theirs, so this is one place where the two builds cannot be
+ * expected to agree if it is ever reached. Nothing observed reaches it: it
+ * needs 500 visible objects and a region wider than it is tall. */
+void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
+{
+    const uint8_t *d    = (const uint8_t *)desc;
+    int32_t        cols = 0;
+    int32_t        last;
+    int32_t        l, t, r, b, l0, t0;
+    int32_t        row, col, stride;
+    const uint8_t *const *cell;
+
+    g_depthCount = 0;
+    g_depthHead  = -1;
+    g_depthDC    = 0;
+
+    l = world->left   >> AM2_CELL_SHIFT;
+    t = world->top    >> AM2_CELL_SHIFT;
+    r = world->right  >> AM2_CELL_SHIFT;
+    b = world->bottom >> AM2_CELL_SHIFT;
+
+    if (b < 0)
+        return;
+    if (t > *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1)
+        return;
+    if (r < 0)
+        return;
+
+    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    last = cols - 1;
+    if (l > last)
+        return;
+
+    l0 = (l <= 0) ? 0 : l;
+    t0 = (t <= 0) ? 0 : t;
+    if (r >= last)
+        r = last;
+    if (b >= last)          /* cols - 1, as the original has it */
+        b = last;
+
+    cell = (const uint8_t *const *)
+           (*(const uint8_t *const *)(d + MAPDESC_OFF_CELLS))
+           + ((t0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + l0);
+    stride = cols - r + l0 - 1;
+
+    for (row = t0; row <= b; row++) {
+        for (col = l0; col <= r; col++) {
+            const uint8_t *node = *cell++;
+
+            while (node) {
+                void *obj = *(void *const *)(node + CELL_NODE_OFF_OBJ);
+
+                if (!obj)
+                    break;
+                if (ObjFlagBit1(obj))
+                    goto nextNode;
+
+                if (*(const int32_t *)((uint8_t *)obj + OBJ_OFF_BOUNDS + 4)
+                        >> AM2_CELL_SHIFT < row
+                    && row > t0)
+                    goto nextNode;
+                if (*(const int32_t *)((uint8_t *)obj + OBJ_OFF_BOUNDS)
+                        >> AM2_CELL_SHIFT < col
+                    && col > l0)
+                    goto nextNode;
+
+                if (!orig_depth_insert(obj, world)) {
+                    if (!deep)
+                        goto subdivide;
+                    break;      /* abandon the rest of this cell's list */
+                }
+            nextNode:
+                node = *(const uint8_t *const *)(node + CELL_NODE_OFF_NEXT);
+            }
+        }
+        cell += stride;
+    }
+
+    if (g_depthHead != -1) {
+        const uint8_t *n = (const uint8_t *)(uintptr_t)ADDR_DEPTH_NODES
+                           + (uint32_t)g_depthHead * AM2_DEPTH_NODE_SIZE;
+
+        while (n) {
+            orig_draw_object(*(void *const *)(n + DEPTH_OFF_OBJ), world);
+            n = *(const uint8_t *const *)(n + DEPTH_OFF_NEXT);
+        }
+    }
+    return;
+
+subdivide:
+    {
+        int32_t   left   = world->left;
+        int32_t   top    = world->top;
+        int32_t   right  = world->right;
+        int32_t   bottom = world->bottom;
+        int32_t   dw     = right - left;
+        int32_t   dh     = bottom - top;
+        int32_t   half;
+        int32_t   sub;
+        AM2_Rect  a;
+        AM2_Rect  c;
+
+        if (dw > dh) {
+            sub  = (dw <= AM2_SUBDIVIDE_FLOOR) ? deep : 1;
+            half = left + dw / 2;
+
+            a.left = left;   a.top = top;    a.right  = half;  a.bottom = bottom;
+            c.left = half + 1; c.top = top;  c.right  = right;
+            /* c.bottom is NOT written by the original -- see above. */
+        } else {
+            if (dh > AM2_SUBDIVIDE_FLOOR)
+                deep = 1;
+            sub  = deep;
+            half = top + dh / 2;
+
+            a.left = left; a.top = top;      a.right = right;  a.bottom = half;
+            c.left = left; c.top = half + 1; c.right = right;  c.bottom = bottom;
+        }
+
+        DrawMapObjects(&a, desc, sub);
+        DrawMapObjects(&c, desc, sub);
+    }
+}
+
 void __cdecl ScrollDecay(void)
 {
     int32_t left = g_shakeTime - g_frameDeltaMs;
@@ -990,6 +1156,8 @@ int mapdraw_install(void)
                         "ScrollDecay", 1);
     rc |= patch_replace(ADDR_REPAINT_DIRTY_LIST, (const void *)RepaintDirtyList,
                         "RepaintDirtyList", 1);
+    rc |= patch_replace(ADDR_DRAW_MAP_OBJECTS, (const void *)DrawMapObjects,
+                        "DrawMapObjects", 3);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,

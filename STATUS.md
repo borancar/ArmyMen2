@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `8b92334`. Working tree clean.
+Last updated: **2026-08-25**, at `aaaaa5a`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,54 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`DrawMapObjects` (0x0041E440) -- the map's OBJECT painter, and the name
+  it carried said tiles.** `orig.h` had `0x0041E440` as `ADDR_DRAW_MAP_TILES`,
+  which is what its one call site sits next to and not what it does: the tile
+  painter is `0x0042D580` and this draws the objects ON the tiles. Renamed.
+
+  Collect, sort, draw. It walks a grid of cells over the world rectangle,
+  hands every object to the depth sort at `0x0041E160`, and then draws the
+  sorted list. The grid is a fixed spatial hash and NOT the map's tile extent
+  -- `{cols 16, rows 16, shift 4}` on both Boot Camp and the campaign's first
+  map, with the shift exactly `log2(cols)`, so a cell is 256 world units
+  square.
+
+- **The two "already seen" tests are the subtle part.** An object bigger than
+  a cell is in several cells and would otherwise be offered to the sort once
+  per cell, so a cell only offers an object whose bounds START in it. The
+  exception is the clamped edge: at the first row or column of the walk an
+  object beginning off-screen has no earlier cell to be offered from, so the
+  test is skipped there. Dropping the row half puts `bootcamp` 800 pixels out
+  against a budget of 500.
+
+- **When the sort refuses there are two behaviours, and the recursion has a
+  floor.** The sort holds 500; past that, with `deep` set the rest of THIS
+  cell's list is abandoned and the walk moves on, and with it clear the region
+  is split in half along its longer axis and each half walked separately. The
+  split sets `deep` for the halves once the region is down to 0x20, so it
+  cannot subdivide forever.
+
+- **The vertical split leaves the second rectangle's BOTTOM unwritten.** Seven
+  of the eight fields are stored and `[esp+0x44]` is not; the horizontal split
+  writes all eight. Reproduced -- and this is one place the two builds cannot
+  be expected to agree if it is ever reached, because our uninitialised value
+  is not theirs. Nothing observed reaches it: it needs 500 visible objects and
+  a region wider than it is tall.
+
+- **The BOTTOM edge is clamped against `cols - 1`, not `rows - 1`**, and that
+  is reproduced rather than corrected. On a square grid the two are the same
+  number, which is why nothing has noticed; both maps measured are square and
+  the grid looks fixed, so this may not be reachable at all.
+
+- **Measured, and one of the three mutations does not discriminate.** Drawing
+  no objects at all puts `bootcamp` 50,985 pixels out, so the function is
+  properly observed there -- which is worth knowing, because `mission` has its
+  pixel check disabled and `campaign`'s budget is -1, so this was the one
+  configuration that could see it. Dropping the row dedup is 800. But walking
+  the grid one cell late is only **117**, inside the budget: the visible set
+  barely changes, and that particular off-by-one is not caught. Said plainly
+  rather than left to look like full coverage.
 
 ## A correction: two functions were not unexercised
 
@@ -2442,11 +2490,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 789 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 788 | 777 of them below the CRT line |
+| `patch_replace` sites | 790 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 789 | 778 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 141,472 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 156,048 / 372,816 B (41.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 142,064 / 372,816 B (**38.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 156,640 / 372,816 B (42.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

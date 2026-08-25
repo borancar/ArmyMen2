@@ -655,7 +655,6 @@
 #define ADDR_SET_DRAW_TARGET     0x0041AC40u  /* void(LPDIRECTDRAWSURFACE) */
 #define ADDR_REDRAW_MAP_REGION   0x0041CF90u  /* void(const AM2_Rect*) */
 #define ADDR_BLIT_MAP_BACKDROP   0x0042D9B0u  /* void(AM2_Rect by value) */
-#define ADDR_DRAW_MAP_TILES      0x0041E440u  /* void(const AM2_Rect*,void*,int32) */
 /* A second offscreen surface, the same size again, and NOT the back buffer --
  * that is ADDR_BACK_BUFFER. This was ADDR_BACK_SURFACE for a long time, with a
  * comment here saying the name was wrong and had been kept anyway because it
@@ -777,6 +776,42 @@
 /* Walks the registered dirty rectangles at 0x00508AC4 and repaints the ones
  * meeting the given region. Its only import is IntersectRect. */
 #define ADDR_REPAINT_DIRTY_LIST  0x0041D000u  /* void(const AM2_Rect *) */
+/* The map's OBJECT painter: collect, sort, draw.
+ *
+ * 0x0041E440 walks a grid of cells over the world, hands every object it
+ * finds to the depth sort, and then draws the sorted list. The grid is
+ * described by {cols, rows, shift, cells} at ADDR_MAP_DESC and measured as
+ * {16, 16, 4, ...} on both Boot Camp and the campaign's first map -- a fixed
+ * spatial hash, not the map's tile extent, with the shift exactly log2(cols).
+ *
+ * World coordinates are shifted right by 8 to index it, so each cell is 256
+ * units square.
+ *
+ * The sort is 0x0041E160, into at most 500 twelve-byte nodes at 0x00507350.
+ * Its head index lives in 0x0050B1D8 and its count in 0x0050B1D4, and the
+ * walker clears both on entry. */
+/* Was ADDR_DRAW_MAP_TILES, which is what its one call site sits next to and
+ * not what it does: the tile painter is 0x0042D580 and this draws the objects
+ * ON the tiles. Renamed, not aliased. */
+#define ADDR_DRAW_MAP_OBJECTS    0x0041E440u  /* void(const AM2_Rect *, desc, int32) */
+#define ADDR_DEPTH_INSERT        0x0041E160u  /* int32_t(void *obj, const AM2_Rect *) */
+#define ADDR_DRAW_MAP_OBJECT     0x0040A090u  /* void(void *obj, const AM2_Rect *) */
+#define ADDR_DEPTH_COUNT         0x0050B1D4u  /* int32_t, 0..500 */
+#define ADDR_DEPTH_HEAD          0x0050B1D8u  /* int32_t, -1 when empty */
+#define ADDR_DEPTH_FIELD_DC      0x0050B1DCu  /* int32_t, cleared with them */
+#define ADDR_DEPTH_NODES         0x00507350u  /* {obj, ?, next}[500] */
+#define AM2_DEPTH_NODE_SIZE      12u
+#define DEPTH_OFF_OBJ            0x00u
+#define DEPTH_OFF_NEXT           0x08u
+#define MAPDESC_OFF_COLS         0x00u
+#define MAPDESC_OFF_ROWS         0x04u
+#define MAPDESC_OFF_SHIFT        0x08u
+#define MAPDESC_OFF_CELLS        0x0Cu
+#define CELL_NODE_OFF_OBJ        0x00u
+#define CELL_NODE_OFF_NEXT       0x08u
+#define AM2_CELL_SHIFT           8    /* world units per cell, as a shift */
+#define AM2_SUBDIVIDE_FLOOR      0x20 /* below this a split stops recursing */
+#define OBJ_OFF_BOUNDS           0x0Cu /* AM2_Rect; +0x0C left, +0x10 top */
 /* The dirty list is 20-byte records: a RECT and, at +0x12, the index of the
  * next one. Record ZERO is the head sentinel -- its `next` field is the list
  * head, which is why the head address is the array base plus 0x12. */

@@ -60,6 +60,11 @@ void __cdecl RestoreTileSet(void);
  * amplitude, and shift the view rectangle by the whole-pixel result. */
 void __cdecl ScrollDecay(void);
 
+/* 0x0041E440. Walk the map's cell grid over a world rectangle, hand every
+ * object to the depth sort, draw the sorted list -- and split the rectangle
+ * and recurse when the sort runs out of room. */
+void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep);
+
 /* 0x0041D000. Repaint every registered dirty rectangle meeting a region --
  * the clipped intersection, not the whole record. */
 void __cdecl RepaintDirtyList(const AM2_Rect *region);
