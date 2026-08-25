@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `5cf0e49`. Working tree clean.
+Last updated: **2026-08-25**, at `2909d55`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,33 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`PreloadSpriteName` (0x00445CF0) and `ParseSpriteName` (0x0042E310): a
+  sprite by NAME, and set 99 is reserved for names that carry no number.**
+
+  The loader turns three integers into `"%02d_%03d_%02d_*.bmp"`, and the
+  parser reads exactly that back at fixed positions 0, 3 and 7 -- so a named
+  lookup and a numbered one land on the same sprite. It checks the FIRST
+  separator and not the second, so `01_001x00_...` parses.
+
+  A name that does NOT parse is loaded as a bitmap and registered under a
+  synthesised id: `PreloadSprite`'s own packing with SET 99, frame 0, and an
+  index that is the registry count plus one. So every bitmap has an id in the
+  same key space whether or not its name carries one. The original writes
+  that as `(count + 0x63001) << 7`, which is the same arithmetic with the
+  shifts folded -- and recognising `0x63000` as `99 << 12` is what turns a
+  magic constant into a reserved set number.
+
+- **Measured: reading the frame one byte early is 265 pixels and a WIDGET
+  TREE difference.** `controls` comes back with one node's `sid` off by one
+  -- 1573760 against 1573761 -- because the sprite id is the packed identity
+  and a wrong frame changes it. The tree caught what the pixels only hinted
+  at: 265 is inside `bootcamp`'s 500 budget, so on frames alone this would
+  have passed.
+
+  That is the second time the `sid` column has earned its place. It was added
+  because a first-seen index cannot see a SUBSTITUTION; here it sees a
+  MISPARSE.
 
 - **`PaletteLoaded` (0x00423C50) rebuilds three sets, not one thing.** Each
   sprite set carries the palette it was loaded WITH, and the remap answers
@@ -2729,11 +2756,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 799 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 798 | 787 of them below the CRT line |
+| `patch_replace` sites | 801 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 800 | 789 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 145,216 / 372,816 B (**39.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 159,792 / 372,816 B (42.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 145,488 / 372,816 B (**39.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 160,064 / 372,816 B (42.9%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

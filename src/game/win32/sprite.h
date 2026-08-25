@@ -75,6 +75,12 @@ typedef struct {
  * id already present is left alone and nothing is reported. */
 void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id);
 
+/* 0x00445CF0. A sprite by NAME: parsed into {set, index, frame} when the name
+ * carries them, and otherwise loaded as a bitmap and registered under set 99
+ * with an index that counts up. */
+AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
+                                      int32_t addref);
+
 void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode);
 
 /* DrawSpriteClipped -- original 0x00446070, 14 call sites.

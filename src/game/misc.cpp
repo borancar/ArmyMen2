@@ -1089,6 +1089,39 @@ int32_t __cdecl ActionKeyPressed(int32_t action)
     return 0;
 }
 
+/* The game's own atoi. The offline test maps the image as data and cannot
+ * call into it, so this goes through AM2_IMAGE like the rest of misc.cpp's
+ * seams -- and atoi is stateless, so the two agree anyway. */
+typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
+#define orig_atoi ((AM2_AtoiFn)AM2_IMAGE(ADDR_CRT_ATOI))
+
+/* 0x0042E310, one caller -- read a sprite's identity back out of its FILENAME.
+ *
+ * The loader turns three integers into "%02d_%03d_%02d_*.bmp"; this is the
+ * same convention read the other way, at fixed positions 0, 3 and 7. Hence
+ * the two tests: at least ten characters, and an underscore at index 2. It
+ * checks the FIRST separator and not the second, so "01_001x00_..." parses.
+ *
+ * All three outputs are cleared before either test, so a caller that ignores
+ * the answer still sees zeroes rather than whatever was on its stack. */
+int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
+                                int32_t *index, int32_t *frame)
+{
+    *set   = 0;
+    *index = 0;
+    *frame = 0;
+
+    if (strlen(name) < 10)
+        return 0;
+    if (name[2] != '_')
+        return 0;
+
+    *set   = orig_atoi(name);
+    *index = orig_atoi(name + 3);
+    *frame = orig_atoi(name + 7);
+    return 1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_COLOUR_DISTANCE, (const void *)ColourDistance,
@@ -1163,6 +1196,8 @@ int misc_install(void)
                   "BitmapBitSet", 5);
     patch_replace(ADDR_LIST_UNLINK, (const void *)ListUnlink, "ListUnlink", 6);
     patch_replace(ADDR_REMAP_BYTES, (const void *)RemapBytes, "RemapBytes", 2);
+    patch_replace(ADDR_PARSE_SPRITE_NAME, (const void *)ParseSpriteName,
+                  "ParseSpriteName", 1);
     patch_replace(ADDR_MASK_PIXEL_SOLID32, (const void *)MaskPixelSolid32,
                   "MaskPixelSolid32", 2);
     patch_replace(ADDR_OBJ_MASK_BIT_AT, (const void *)ObjMaskBitAt,

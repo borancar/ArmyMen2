@@ -2858,6 +2858,12 @@
 #define ADDR_CURRENT_BITMAP       0x005122C4u
 #define ADDR_FREE_BITMAP          0x00446410u  /* void(void **slot) */
 #define ADDR_LOAD_BITMAP          0x004462F0u  /* void *(const char *, int32) */
+#define ADDR_CRT_ATOI             0x004660A7u  /* int32_t(const char *) */
+#define ADDR_PARSE_SPRITE_NAME    0x0042E310u  /* int32_t(name, int32*x3) */
+/* The pseudo-SET a bitmap loaded by plain filename is registered under. The
+ * id is PreloadSprite's own packing with set 99 and frame 0, so a name that
+ * does not parse still lands in the same key space as one that does. */
+#define AM2_SPRITE_SET_BY_NAME    99
 #define ADDR_STR_BITMAPS_DIR      0x00478670u  /* "bitmaps" */
 /* 0x16 is 22, which is AM2_SUBSTATE_BASE -- the FIRST arm of the thirteen-entry
  * sub-state table, and one of the nine that repaint when the overlay is dirty

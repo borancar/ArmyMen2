@@ -325,6 +325,12 @@ void __cdecl ListUnlink(void *node, void **head);
  * Reproduced as a dword loop then a byte loop rather than as memcpy, because
  * `rep movs` copies FORWARD and memcpy is undefined on overlap; dst and src
  * are only known to be different, not disjoint. */
+/* 0x0042E310. Read a sprite's {set, index, frame} back out of a filename in
+ * the "%02d_%03d_%02d_*.bmp" convention. All three outputs are cleared before
+ * either test. */
+int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
+                                int32_t *index, int32_t *frame);
+
 void __cdecl RemapBytes(void *dst, const void *src, const void *table,
                         int32_t count);
 

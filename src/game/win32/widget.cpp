@@ -2917,11 +2917,6 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
  *
  * The rectangle arrives by value and goes straight into the base's four
  * offset fields, and WidgetScreenRect then turns it into the absolute one. */
-typedef AM2_Sprite *(__cdecl *AM2_PreloadByNameFn)(const char *name,
-                                                   int32_t flag, int32_t one);
-#define orig_preload_by_name \
-    ((AM2_PreloadByNameFn)AM2_IMAGE(ADDR_PRELOAD_SPRITE_NAME))
-
 AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
                                                      const char *bmp,
                                                      int32_t flag,
@@ -2931,7 +2926,7 @@ AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
 
     WidgetConstruct(w);
     w->vtable = (void *)AM2_IMAGE(VTABLE_PANEL);
-    spr = orig_preload_by_name(bmp, flag, 1);
+    spr = PreloadSpriteName(bmp, flag, 1);
     *(AM2_Sprite **)((uint8_t *)w + PANEL_OFF_SPRITE) = spr;
     w->sprite = spr;
     w->x = box.left;
@@ -3041,15 +3036,15 @@ AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
 
     if (b0) {
         *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL) =
-            orig_preload_by_name(b0, flag, 1);
+            PreloadSpriteName(b0, flag, 1);
     } else {
         *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL) = (AM2_Sprite *)0;
         w->unknown48 = 1;
     }
     *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS) =
-        orig_preload_by_name(b1, flag, 1);
+        PreloadSpriteName(b1, flag, 1);
     *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED) =
-        orig_preload_by_name(b2, flag, 1);
+        PreloadSpriteName(b2, flag, 1);
 
     w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
     w->x = box.left;
@@ -3150,7 +3145,7 @@ AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
     w->vtable = (void *)AM2_IMAGE(VTABLE_MULTISPRITE);
     *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITE0) = w->sprite;
     *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES) =
-        orig_preload_by_name(b1, flag, 1);
+        PreloadSpriteName(b1, flag, 1);
 
     w->x = box.left;
     w->y = box.top;
@@ -3258,13 +3253,13 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
     w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
 
     *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON)  =
-        orig_preload_by_name(b0, 1, 1);
+        PreloadSpriteName(b0, 1, 1);
     *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_OFF) =
-        orig_preload_by_name(b1, 1, 1);
+        PreloadSpriteName(b1, 1, 1);
     *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_3)   =
-        orig_preload_by_name(b2, 1, 1);
+        PreloadSpriteName(b2, 1, 1);
     *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_2)   =
-        orig_preload_by_name(b3, 1, 1);
+        PreloadSpriteName(b3, 1, 1);
     w->sprite = *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON);
 
     w->x = left;
@@ -3358,7 +3353,7 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
                  + ARROW_OFF_FLAG5C) = 1;
 
     *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR) =
-        orig_preload_by_name((const char *)AM2_IMAGE(AM2_BMP_HSCROLLBAR),
+        PreloadSpriteName((const char *)AM2_IMAGE(AM2_BMP_HSCROLLBAR),
                              1, 1);
     WidgetScreenRect(w);
 
@@ -3438,9 +3433,9 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
     *(int32_t *)(self + ARROWBAR_OFF_FLAG50) = flag50;
 
     *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0) =
-        orig_preload_by_name(b0, 1, 1);
+        PreloadSpriteName(b0, 1, 1);
     *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE1) =
-        orig_preload_by_name(b1, 1, 1);
+        PreloadSpriteName(b1, 1, 1);
     WidgetScreenRect(w);
 
     *(int32_t *)(self + ARROWBAR_OFF_SPAN) = span;

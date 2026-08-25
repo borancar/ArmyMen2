@@ -22,6 +22,7 @@
 #include "../anim.h"
 #include "../dist.h"   /* RoundTo8 */
 #include "../packkey.h"  /* the three key fields */
+#include "../image.h"  /* AM2_IMAGE */
 #include "../misc.h"   /* MaskPixelSolid */
 #include "../blit.h"
 #include "../rect.h"
@@ -354,6 +355,52 @@ void __cdecl FreeMenuSprites(void)
         IDirectDrawSurface_Release(g_menuSurface);
         g_menuSurface = NULL;
     }
+}
+
+typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flags);
+#define orig_load_bitmap_named ((AM2_LoadBitmapFn)AM2_IMAGE(ADDR_LOAD_BITMAP))
+
+/* 0x00445CF0, fourteen callers -- get a sprite by NAME rather than by number.
+ *
+ * If the name is in the loader's own "%02d_%03d_%02d_*.bmp" convention it is
+ * read back into the three integers and PreloadSprite does the rest, so a
+ * named lookup and a numbered one land on the same sprite.
+ *
+ * If it is NOT, the bitmap is loaded by filename and registered under a
+ * SYNTHESISED id -- PreloadSprite's own packing with set 99, frame 0, and an
+ * index that is the registry count plus one. So every bitmap has an id in the
+ * same key space whether or not its name carries one, and set 99 is reserved
+ * for the ones that do not.
+ *
+ * The original computes that id as `(count + 0x63001) << 7`, which is the
+ * same arithmetic with the shifts already folded.
+ *
+ * A sprite arriving by this route is given a reference count of ONE directly
+ * rather than through the addref path, because it has just been created and
+ * has exactly one holder. */
+AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
+                                      int32_t addref)
+{
+    int32_t     set;
+    int32_t     index;
+    int32_t     frame;
+    uint32_t    id;
+    AM2_Sprite *spr;
+
+    if (ParseSpriteName(name, &set, &index, &frame))
+        return PreloadSprite(set, index, frame, flags, addref);
+
+    id  = (uint32_t)(((AM2_SPRITE_SET_BY_NAME << 12)
+                      + *(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT + 1)
+                     << 7);
+    spr = (AM2_Sprite *)orig_load_bitmap_named(name, flags);
+    if (!spr)
+        return (AM2_Sprite *)0;
+
+    spr->id   = id;
+    spr->refs = 1;
+    SpriteRegister(spr, id);
+    return spr;
 }
 
 /* 0x004459E0, two callers -- put a sprite in the registry.
@@ -920,6 +967,8 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
     rc |= patch_replace(ADDR_SPRITE_REGISTER, (const void *)SpriteRegister,
                         "SpriteRegister", 2);
+    rc |= patch_replace(ADDR_PRELOAD_SPRITE_NAME, (const void *)PreloadSpriteName,
+                        "PreloadSpriteName", 14);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
                         "DrawSpriteClipped", 5);
     rc |= patch_replace(ADDR_RESTORE_CHAIN, (const void *)RestoreSpriteSurface,
