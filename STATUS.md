@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `15ba70f`. Working tree clean.
+Last updated: **2026-08-25**, at `5cf0e49`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,29 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`PaletteLoaded` (0x00423C50) rebuilds three sets, not one thing.** Each
+  sprite set carries the palette it was loaded WITH, and the remap answers
+  "which entry of the palette now in force is nearest to the colour this set
+  expected" -- so a set drawn under a different palette comes out close rather
+  than wrong. With NO active palette the remap is the IDENTITY, which is the
+  same answer by a shorter route.
+
+  The second table beside it is the first with entries 0..9 left as the
+  identity: the reserved block, the same convention `BMP_FLAG_RESERVE10` and
+  `ADDR_TILESET_RESERVE` name from the other side. The original writes the
+  LOOP COUNTER into those ten rather than zero, which is what makes them the
+  identity and not all-black -- an easy thing to transcribe as `= 0` and be
+  wrong about.
+
+- **Measured: the channel swap is worth 18,932 pixels and the reserved block
+  nothing.** Dropping `SwapColourBytes` before the nearest-colour search puts
+  `bootcamp` that far out. Writing zero into the reserved ten instead of the
+  identity changes NOTHING in `bootcamp` or `controls` -- nothing drawn in
+  either uses the reserved remap, which is consistent with `NearestPalIndex`'s
+  own note that the nearest colour lies above the reserved block anyway. So
+  that half stays verified by reading, and it is the third table this session
+  whose existence is clear and whose use is not.
 
 - **`SpriteRegister` (0x004459E0), and the registry keeps two orders.** The
   SPRITES are appended and a table of `{id, slot}` PAIRS is kept sorted so a
@@ -2706,11 +2729,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 798 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 797 | 786 of them below the CRT line |
+| `patch_replace` sites | 799 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 798 | 787 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 145,008 / 372,816 B (**38.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 159,584 / 372,816 B (42.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 145,216 / 372,816 B (**39.0%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 159,792 / 372,816 B (42.9%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

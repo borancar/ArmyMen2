@@ -248,7 +248,6 @@ typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
 #define g_remapShades  ((uint8_t **)(uintptr_t)ADDR_REMAP_SHADES)
 
 typedef void (__cdecl *am2_void_fn)(void);
-#define orig_palette_loaded (*(am2_void_fn)ADDR_PALETTE_LOADED)
 
 /* Was a private helper here with the reserved-block threshold hardcoded at 9.
  * 0x0041B820 is that function and takes the threshold as a fifth argument; the
@@ -352,7 +351,7 @@ void __cdecl SetGamePalette(uint8_t *pal)
             MatchRGB(pal, kNamedColours[i].r, kNamedColours[i].g,
                      kNamedColours[i].b);
 
-    orig_palette_loaded();
+    PaletteLoaded();
 }
 
 /* 0x0041B7C0, 11 call sites. The palette entry nearest a colour, searching
@@ -477,6 +476,59 @@ int32_t __cdecl LoadPaletteFile(const char *path, void *dst)
     return 1;
 }
 
+/* 0x00423C50, one caller -- rebuild every sprite set's remap tables against
+ * the palette that has just been loaded.
+ *
+ * Three sets, and each carries the palette it was loaded WITH. The remap
+ * answers "which entry of the palette now in force is nearest to the colour
+ * this set expected", so a set drawn under a different palette still comes
+ * out close rather than wrong.
+ *
+ * With NO active palette the remap is the IDENTITY, which is the same answer
+ * by a shorter route: nothing is being remapped, so every index stands.
+ *
+ * The second table is the first with entries 0..9 left as the identity --
+ * the reserved block, the same convention BMP_FLAG_RESERVE10 and
+ * ADDR_TILESET_RESERVE name from the other side. The original writes the
+ * loop counter into those ten rather than zero, which is what makes them the
+ * identity rather than all-black.
+ *
+ * SwapColourBytes takes a second argument nothing reads and the original
+ * pushes one; zero here, with the same effect. */
+/* Spelled as surface.cpp spells it, so the two stay one definition. */
+#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+
+void __cdecl PaletteLoaded(void)
+{
+    static const uintptr_t kSets[3] = {
+        ADDR_SPRITE_SET_TITLE, ADDR_SPRITE_SET_SHARED, ADDR_SPRITE_SET_THIRD
+    };
+    int32_t n;
+
+    for (n = 0; n < 3; n++) {
+        uint8_t        *set   = (uint8_t *)kSets[n];
+        const uint32_t *pal   = (const uint32_t *)(set + SPRITE_SET_OFF_PALETTE);
+        uint8_t        *remap = set + SPRITE_SET_OFF_REMAP;
+        uint8_t        *ten   = set + SPRITE_SET_OFF_REMAP10;
+        const uint32_t *active = g_activePalette;
+        int32_t         i;
+
+        if (active) {
+            for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
+                remap[i] = NearestPalIndex(active,
+                                           SwapColourBytes(pal[i], 0), 0);
+        } else {
+            for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
+                remap[i] = (uint8_t)i;
+        }
+
+        for (i = 0; i < AM2_PALETTE_RESERVED; i++)
+            ten[i] = (uint8_t)i;
+        for (i = AM2_PALETTE_RESERVED; i < AM2_PALETTE_ENTRIES; i++)
+            ten[i] = remap[i];
+    }
+}
+
 int palette_install(void)
 {
     int rc = 0;
@@ -501,5 +553,7 @@ int palette_install(void)
                         "ExpandPalette", 1);
     rc |= patch_replace(ADDR_LOAD_PALETTE_FILE, (const void *)LoadPaletteFile,
                         "LoadPaletteFile", 10);
+    rc |= patch_replace(ADDR_PALETTE_LOADED, (const void *)PaletteLoaded,
+                        "PaletteLoaded", 1);
     return rc;
 }

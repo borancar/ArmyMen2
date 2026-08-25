@@ -85,6 +85,10 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out);
 void    __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi);
 int32_t __cdecl LoadPaletteFile(const char *path, void *dst);
 
+/* 0x00423C50. Rebuild all three sprite sets' remap tables against the palette
+ * now in force -- and the reserved-block copy beside each. */
+void __cdecl PaletteLoaded(void);
+
 int palette_install(void);
 
 #ifdef __cplusplus

@@ -893,6 +893,9 @@
  * CreatePalette, so until this was reconstructed the display palette was the
  * one DirectX object the port did not create. */
 #define ADDR_SET_GAME_PALETTE    0x0041B0E0u  /* void(uint8_t *palette) */
+/* Rebuilds the remap tables of all three sprite sets against the palette that
+ * has just been loaded. The name is from the call site; the body is a sweep
+ * over the sets, which is what the comment now says. */
 #define ADDR_PALETTE_LOADED      0x00423C50u  /* void(void), run afterwards */
 /* The fixed 256-entry table handed to CreatePalette when windowed, where the
  * desktop owns the real palette and the game may not set it. */
@@ -4234,6 +4237,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SPRITE_SET_TITLE    0x00510A40u
 #define ADDR_SPRITE_SET_SHARED   0x00510230u
 #define ADDR_SPRITE_SET_THIRD    0x00511250u
+/* Inside a sprite set: the palette it was loaded with, and TWO remap tables
+ * built from it. The second is the first with entries 0..9 left as the
+ * identity -- the same "reserve the first ten" convention BMP_FLAG_RESERVE10
+ * and ADDR_TILESET_RESERVE name from the other side. */
+#define SPRITE_SET_OFF_PALETTE   0x20Cu  /* uint32_t[256] */
+#define SPRITE_SET_OFF_REMAP     0x60Cu  /* uint8_t[256] */
+#define SPRITE_SET_OFF_REMAP10   0x70Cu  /* uint8_t[256], first ten identity */
+#define AM2_PALETTE_RESERVED     10
 #define ADDR_STR_SET_TITLE       0x00478AC0u  /* "title" */
 #define ADDR_STR_SET_SHARED      0x00478AACu  /* "shared" */
 /* Renamed from ADDR_FILL_PALETTE, which was invented -- no such string exists
