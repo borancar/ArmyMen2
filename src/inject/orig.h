@@ -806,6 +806,16 @@
 #define DEPTH_OFF_NEXT           0x08u
 #define ADDR_DEPTH_CURSOR        0x00507348u  /* the last node inserted */
 #define ADDR_DEPTH_COMPARE       0x0041D740u  /* int32_t(void *a, void *b) */
+/* What the comparator reads. The bounds at OBJ_OFF_BOUNDS end at +0x1B and
+ * these follow: a screen position, a LAYER that only counts when both objects
+ * have a positive one, and a per-object SLOPE that projects a horizontal
+ * distance onto the vertical axis -- which is how two objects at different x
+ * are ordered by which is in front rather than by y alone. */
+#define OBJ_OFF_SCREEN_X         0x1Cu  /* int16_t */
+#define OBJ_OFF_SCREEN_Y         0x1Eu  /* int16_t */
+#define OBJ_OFF_DEPTH_LAYER      0x26u  /* int16_t, only when > 0 on both */
+#define OBJ_OFF_DEPTH_SLOPE      0x28u  /* float */
+#define ADDR_FLOAT_ZERO          0x0046F928u  /* 0.0f */
 #define AM2_DEPTH_MAX            0x1F4        /* 500 nodes */
 /* Two object flags that override the comparison entirely: everything with
  * 0x40 sorts before everything with 0x20, whatever the comparator says.

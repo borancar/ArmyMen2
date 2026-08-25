@@ -70,6 +70,11 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep);
  * region is dropped and 1 is returned. */
 int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world);
 
+/* 0x0041D740. Which of two objects is drawn first: layer, then a slope
+ * projection, then y, then the two pointers as addresses so the order is
+ * total. 0 is a null argument, not a tie. */
+int32_t __cdecl DepthCompare(void *a, void *b);
+
 /* 0x0041D000. Repaint every registered dirty rectangle meeting a region --
  * the clipped intersection, not the whole record. */
 void __cdecl RepaintDirtyList(const AM2_Rect *region);

@@ -478,8 +478,6 @@ typedef struct AM2_DepthNode {
 #define g_depthNodes  ((AM2_DepthNode *)(uintptr_t)ADDR_DEPTH_NODES)
 #define g_depthCursor (*(AM2_DepthNode **)(uintptr_t)ADDR_DEPTH_CURSOR)
 
-typedef int32_t (__cdecl *AM2_DepthCompareFn)(void *a, void *b);
-#define orig_depth_compare ((AM2_DepthCompareFn)(uintptr_t)ADDR_DEPTH_COMPARE)
 
 /* Link a fresh node in after `at`, before `at`, or at the front, and leave the
  * cursor on it. Three shapes the original writes out four times between them;
@@ -521,6 +519,101 @@ static void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
         fresh->prev->next = fresh;
     else
         g_depthHead = n;
+}
+
+/* The projection the comparator turns a horizontal distance into: `dx` units
+ * across, times the object's own slope, TRUNCATED TO 16 BITS.
+ *
+ * The 16 bits are not incidental -- the original takes `_ftol`'s answer in AX
+ * and sign-extends that, so a projection past 32767 wraps rather than
+ * saturating. Written out here because it is the one place this function can
+ * surprise. */
+static int32_t DepthProject(int32_t dx, float slope, int32_t y)
+{
+    return (int16_t)(int32_t)((float)dx * slope) + y;
+}
+
+/* 0x0041D740, nine callers -- which of two objects is drawn first.
+ *
+ * Four tests in order, each falling through to the next when it cannot
+ * decide.
+ *
+ * A LAYER at +0x26, but only when BOTH objects have a positive one: a layer
+ * of zero or less means "no layer", and two such objects are compared by
+ * position instead of both being treated as layer 0.
+ *
+ * Then the SLOPE at +0x28, which is what makes this more than a y sort. Each
+ * object projects the horizontal distance to the other onto the vertical
+ * axis and the two answers are compared with the other's y. When both
+ * projections agree the answer is theirs; when they disagree -- which is what
+ * happens where two sprites overlap ambiguously -- the plain y comparison
+ * decides. An object with a slope of exactly zero projects nothing, and the
+ * three combinations of zero and non-zero are three separate arms.
+ *
+ * Then plain y. And finally the two POINTERS, compared as addresses, so the
+ * order is total: two objects at the same place still have a fixed order and
+ * the sort cannot loop. Answering 0 would have been the obvious thing and it
+ * is not what this does -- 0 is reserved for a null argument. */
+int32_t __cdecl DepthCompare(void *a, void *b)
+{
+    const uint8_t *pa = (const uint8_t *)a;
+    const uint8_t *pb = (const uint8_t *)b;
+    int16_t        la, lb;
+    float          sa, sb;
+    int32_t        ax, ay, bx, by;
+
+    if (!pa || !pb)
+        return 0;
+
+    la = *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER);
+    lb = *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER);
+    if (la > 0 && lb > 0) {
+        if (la > lb)
+            return 1;
+        if (la < lb)
+            return -1;
+    }
+
+    sa = *(const float *)(pa + OBJ_OFF_DEPTH_SLOPE);
+    sb = *(const float *)(pb + OBJ_OFF_DEPTH_SLOPE);
+    ax = *(const int16_t *)(pa + OBJ_OFF_SCREEN_X);
+    ay = *(const int16_t *)(pa + OBJ_OFF_SCREEN_Y);
+    bx = *(const int16_t *)(pb + OBJ_OFF_SCREEN_X);
+    by = *(const int16_t *)(pb + OBJ_OFF_SCREEN_Y);
+
+    if (sa != 0.0f && sb != 0.0f) {
+        int32_t fromA = DepthProject(bx - ax, sa, ay);
+        int32_t fromB = DepthProject(ax - bx, sb, by);
+        int32_t aInFront = (fromA > by) ? 1 : 0;
+
+        if (ay > fromB && aInFront)
+            return 1;
+        if (ay < fromB && !aInFront)
+            return -1;
+        /* They disagree: plain y decides. */
+    } else if (sa != 0.0f) {
+        /* Only A has a slope, so only A's projection is available. */
+        if (DepthProject(bx - ax, sa, ay) > by)
+            return 1;
+        if (DepthProject(bx - ax, sa, ay) == by)
+            return (pb < pa) ? 1 : -1;
+        return -1;
+    } else if (sb != 0.0f) {
+        int32_t fromB = DepthProject(ax - bx, sb, by);
+
+        if (ay > fromB)
+            return 1;
+        if (ay == fromB)
+            return (pb < pa) ? 1 : -1;
+        return -1;
+    }
+
+    if ((int16_t)ay > (int16_t)by)
+        return 1;
+    if ((int16_t)ay < (int16_t)by)
+        return -1;
+
+    return (pb < pa) ? 1 : -1;
 }
 
 /* 0x0041E160 -- insert one object into the depth list, sorted.
@@ -602,7 +695,7 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
     }
 
     at  = g_depthCursor;
-    cmp = orig_depth_compare(obj, at->obj);
+    cmp = DepthCompare(obj, at->obj);
 
     if (cmp == 0) {
         DepthLinkAfter(at, n);
@@ -613,7 +706,7 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
     if (cmp < 0) {
         while (at->prev) {
             g_depthCursor = at->prev;
-            if (orig_depth_compare(obj, g_depthCursor->obj) >= 0) {
+            if (DepthCompare(obj, g_depthCursor->obj) >= 0) {
                 DepthLinkAfter(g_depthCursor, n);
                 g_depthCount = n + 1;
                 return 1;
@@ -632,7 +725,7 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
 
     while (at->next) {
         g_depthCursor = at->next;
-        if (orig_depth_compare(obj, g_depthCursor->obj) <= 0) {
+        if (DepthCompare(obj, g_depthCursor->obj) <= 0) {
             DepthLinkBefore(g_depthCursor, n);
             g_depthCount = n + 1;
             return 1;
@@ -1336,6 +1429,8 @@ int mapdraw_install(void)
                         "DrawMapObjects", 3);
     rc |= patch_replace(ADDR_DEPTH_INSERT, (const void *)DepthInsert,
                         "DepthInsert", 1);
+    rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
+                        "DepthCompare", 9);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,

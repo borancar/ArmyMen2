@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `b0f05df`. Working tree clean.
+Last updated: **2026-08-25**, at `6a5aa2a`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,36 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`DepthCompare` (0x0041D740), and 0 is a null argument rather than a
+  tie.** Four tests in order, each falling through when it cannot decide.
+
+  A LAYER at +0x26, but only when BOTH objects have a positive one -- a layer
+  of zero or less means "no layer", so two such objects are compared by
+  position rather than both being treated as layer 0.
+
+  Then the SLOPE at +0x28, which is what makes this more than a y sort. Each
+  object projects the horizontal distance to the other onto the vertical axis
+  and the two answers are compared with the other's y. When both projections
+  agree the answer is theirs; when they DISAGREE the plain y comparison
+  decides. A slope of exactly zero projects nothing, and the three
+  combinations of zero and non-zero are three separate arms.
+
+  Then plain y. And finally the two POINTERS compared as ADDRESSES, so the
+  order is total: two objects at the same place still have a fixed order and
+  the sort cannot loop. Returning 0 would have been the obvious thing to do
+  there and is not what this does -- 0 is reserved for a null argument.
+
+- **The projection is truncated to SIXTEEN BITS**, and that is not
+  incidental: the original takes `_ftol`'s answer in AX and sign-extends
+  that, so a projection past 32767 wraps rather than saturating.
+
+- **Measured: inverting the y order is 4,698 pixels and the 16-bit wrap is
+  0.** Removing the truncation entirely changes 22 pixels, the noise floor --
+  no projection in that frame gets near 32767, so the wrap is reproduced on
+  the strength of reading the instruction and nothing else. Third gap of this
+  kind in the object subsystem, beside the cell off-by-one and the layer
+  flags, and all three are written down rather than left to look covered.
 
 - **`DepthInsert` (0x0041E160), and the answer is not "did it draw".** 0
   means the list is FULL, which is what makes the walker subdivide its region
@@ -2523,11 +2553,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 791 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 790 | 779 of them below the CRT line |
+| `patch_replace` sites | 792 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 791 | 780 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 142,800 / 372,816 B (**38.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 157,376 / 372,816 B (42.2%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 143,232 / 372,816 B (**38.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 157,808 / 372,816 B (42.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
