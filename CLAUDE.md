@@ -2288,14 +2288,24 @@ exact oracle**, however meaningful it is when it is set.
   `0x00425950` on any campaign start with a save present. The entry below
   predates that and is left for the others.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
-  `MpNameInk`, `MpNamePaper`, `PlayerLatency`, `OverlayPrepare`, `SelectUnit`,
+  `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`,
-  `RestoreTileSet`, and `RefreshScreen` — `OverlayPrepare` has THIRTY
-  callers and reaches none of them: they are in-game cursor modes, and its
-  one reconstructed caller `DrawMenuOverlay` reads 0 while `DrawMenuCursor`
-  reads 25,999 on the same run, so the cursor is reached by another route.
-  Three mutations passed before a fourth -- zeroing a global at the very top
-  of the function, before any guard -- showed it does not execute.
+  `RestoreTileSet`, and `RefreshScreen` —
+
+  **`OverlayPrepare` and `SelectUnit` were on this list and should not have
+  been.** With a drive that actually reaches a Boot Camp mission they read
+  86 and 3. What put them here was a hand-written probe script that clicked
+  BOOT CAMP at the wrong Y -- `ab.sh` uses (306, 143) -- so the game sat on
+  the title screen while the script reported counters as though a mission
+  were running. **Check a live control value before believing a probe**: the
+  game clock at `ADDR_GAME_CLOCK_MS` read 0 in every one of those runs, and
+  CLAUDE.md already records that it ticks in play. One dump would have caught
+  it.
+
+  `OverlayPrepare` does run, once per frame, and always with row 0 -- so
+  after the first call the "already on that row" test returns and the tail is
+  skipped. That is why three mutations to the tail passed: not because the
+  function is dead, but because the tail runs ONCE per session.
 
   The three multiplayer ones need a live DirectPlay session with a second
   player, which this machine cannot open: the row painter has two branches and with nothing connected it

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `899fb0c`. Working tree clean.
+Last updated: **2026-08-25**, at `8b92334`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,46 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+## A correction: two functions were not unexercised
+
+**A hand-written probe clicked BOOT CAMP at the wrong Y and never entered a
+mission**, and three findings in this file rested on it. `ab.sh` clicks
+(306, 143); the probe used (306, 302), so the game sat on the title screen
+while the script read counters as though a mission were running.
+
+Re-run with the real drive, at the same point in the same mission:
+
+| | claimed | measured |
+|---|---|---|
+| `OverlayPrepare` | "thirty callers and not one of them runs here" | **86**, once per frame |
+| `SelectUnit` | "leaves the counter at 0" | **3** |
+| shake timer while playing | zero | zero -- this one stands |
+
+**`OverlayPrepare` does run**, and the rest of its account survives: the row
+is always 0, so after the first call the "already on that row" test returns
+and the tail is skipped. That is why three mutations to the tail passed --
+not because the function is dead, but because its tail runs ONCE per session.
+The claim to withdraw is "it does not execute", which came from zeroing a
+global at the top and reading it back on the TITLE SCREEN and then
+generalising to a mission.
+
+**`SelectUnit` does run**, three times in a Boot Camp mission. What survives
+is the separate finding that `group` appears only under `data/mp*` -- that is
+about the SCRIPT route and was measured from the shipped data, not from the
+broken probe.
+
+**The check that would have caught it costs one line.** `ADDR_GAME_CLOCK_MS`
+read 0 in every one of those runs, and this project already records that it
+ticks in play. Dump a value that is known to change before believing anything
+a probe says about a state it claims to be in.
+
+**And the map descriptor is now measured rather than guessed.** In Boot Camp
+it is `{cols 16, rows 16, shift 4, cells 0x02B53F40}` -- a SQUARE map, with
+the shift exactly `log2(cols)`. So the object walker's clamp of the bottom
+edge against `cols - 1` rather than `rows - 1`, recorded below as an open
+question, is indistinguishable on this map. It stays open: it needs a
+non-square map to settle, and whether the game ships one is not yet known.
 
 - **`RowRelease` (0x0041D3A0), and one flag gates two actions.** A row that
   does not own a buffer is left entirely alone -- and in particular is NOT
