@@ -40,6 +40,7 @@
  */
 
 #include "winmain.h"
+#include "sprite.h"   /* SpriteSetLoad, SpriteSetFree -- reconstructed */
 #include "../gameproc.h"  /* SetGameOver */
 #include "../air.h"    /* FreeSpriteList -- what the alias jumps to */
 #include "../anim.h"   /* the five anim sweeps -- reconstructed */
@@ -118,8 +119,6 @@ typedef void (__cdecl *am2_str_fn)(const char *);
 typedef void (__cdecl *am2_ptr_fn)(void *);
 typedef void (__cdecl *am2_i32_fn)(int32_t);
 
-#define orig_sprite_set_load  (*(am2_str_fn)ADDR_SPRITE_SET_LOAD)
-#define orig_sprite_set_free  (*(am2_ptr_fn)ADDR_SPRITE_SET_FREE)
 #define orig_strncpy          (*(char *(__cdecl *)(char *, const char *, \
                                                    uint32_t))ADDR_CRT_STRNCPY)
 
@@ -288,8 +287,8 @@ void __cdecl ResetToTitle(void)
     SetGamePalette(palette);
 
     if (*(const int32_t *)(uintptr_t)ADDR_OPT_DF) {
-        orig_sprite_set_load((const char *)(uintptr_t)ADDR_STR_SET_TITLE);
-        orig_sprite_set_load((const char *)(uintptr_t)ADDR_STR_SET_SHARED);
+        SpriteSetLoad((const char *)(uintptr_t)ADDR_STR_SET_TITLE);
+        SpriteSetLoad((const char *)(uintptr_t)ADDR_STR_SET_SHARED);
     }
 
     static const uint32_t kCleared[] = {
@@ -372,9 +371,9 @@ void __cdecl FreeSpriteSets(void)
     if (!*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
         return;
 
-    orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_TITLE);
-    orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_SHARED);
-    orig_sprite_set_free((void *)(uintptr_t)ADDR_SPRITE_SET_THIRD);
+    SpriteSetFree((void *)(uintptr_t)ADDR_SPRITE_SET_TITLE);
+    SpriteSetFree((void *)(uintptr_t)ADDR_SPRITE_SET_SHARED);
+    SpriteSetFree((void *)(uintptr_t)ADDR_SPRITE_SET_THIRD);
 }
 
 /* 0x0041E690. What the debug allocator has left over.

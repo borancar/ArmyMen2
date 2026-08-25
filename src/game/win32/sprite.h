@@ -90,6 +90,18 @@ typedef struct {
 /* 0x00423940. Which of the three sets holds a key. */
 void *__cdecl SpriteSetForKey(uint32_t key);
 
+/* 0x004236A0. Point `set` at the record a set name means and `id` at the file
+ * id its archive must carry. Nonzero when the record is already pointing at
+ * that file and there is nothing to open. */
+int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id);
+
+/* 0x004239B0. Open a set's archive: header, palette, remap tables and the
+ * directory. Zero if it could not be opened or the id is wrong. */
+int32_t __cdecl SpriteSetLoad(const char *name);
+
+/* 0x00423970. Close a set's archive and free its directory. */
+void __cdecl SpriteSetFree(void *set);
+
 /* 0x00423D50. The directory index for a key, or -1. */
 int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
 

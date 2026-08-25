@@ -4281,12 +4281,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define SPRITE_SET_OFF_PALETTE   0x20Cu  /* uint32_t[256] */
 #define SPRITE_SET_OFF_REMAP     0x60Cu  /* uint8_t[256] */
 #define SPRITE_SET_OFF_REMAP10   0x70Cu  /* uint8_t[256], first ten identity */
-/* And the archive itself: the open file and a directory into it, sorted by
- * key, which ADDR_SPRITE_DIR_INDEX halves. Each entry is {key, offset}. */
+/* And the archive itself: the two names it is opened from, the open file, and
+ * a directory into it sorted by key, which ADDR_SPRITE_DIR_INDEX halves. Each
+ * entry is {key, offset}. The whole record is 0x80C bytes. */
+#define SPRITE_SET_OFF_FOLDER    0x000u  /* char[0x100], chdir'd into first */
+#define SPRITE_SET_OFF_NAME      0x100u  /* char[0x100], the .dat itself */
 #define SPRITE_SET_OFF_FILE      0x200u  /* am2_FILE * */
 #define SPRITE_SET_OFF_DIR_COUNT 0x204u  /* int32_t */
 #define SPRITE_SET_OFF_DIR       0x208u  /* {uint32_t key, offset} * */
 #define ADDR_SPRITE_SET_FOR_KEY  0x00423940u  /* void *(uint32_t key) */
+/* Which of the three records a set NAME means, and what file id its archive
+ * must start with. Returns nonzero when the record already names that file,
+ * so nothing has to be reopened. */
+#define ADDR_SPRITE_SET_RESOLVE  0x004236A0u  /* int32(name, void**, uint32*) */
+#define AM2_DAT_ID_OBJECTS       0x81920666u
+#define AM2_DAT_ID_TITLE         0x81920667u
+#define AM2_DAT_ID_SHARED        0x81920668u
+#define ADDR_STR_DAT_TITLE       0x00478AB4u  /* "title.dat" */
+#define ADDR_STR_DAT_SHARED      0x00478AA0u  /* "shared.dat" */
+#define ADDR_STR_DAT_OBJECTS     0x00478A88u  /* "objects.dat" */
+#define ADDR_STR_FMT_OBJECTS_DIR 0x00478A94u  /* "%s\\objects" */
+#define ADDR_STR_DAT_OPEN_FAIL   0x00478AF4u  /* "Unable to open object data
+                                               *  file <%s>\n" */
+#define ADDR_STR_DAT_BAD_ID      0x00478AC8u  /* "Invalid file id in object
+                                               *  data file <%s>\n" */
 #define ADDR_SPRITE_DIR_INDEX    0x00423D50u  /* int32_t(void *, uint32_t) */
 #define ADDR_STR_DF_SEEK_FAIL    0x00478C1Cu  /* "Error seeking to location %d
                                                *  in data file.\n" */

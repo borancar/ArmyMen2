@@ -618,6 +618,189 @@ int32_t __cdecl SpriteDirIndex(void *set, uint32_t key)
     return -1;
 }
 
+#define SET_FOLDER(s) ((char *)((uint8_t *)(s) + SPRITE_SET_OFF_FOLDER))
+#define SET_NAME(s)   ((char *)((uint8_t *)(s) + SPRITE_SET_OFF_NAME))
+
+/* 0x004236A0. Which record a set name means, and what its archive must be.
+ *
+ * Three names and three records, and the last arm is not a name at all:
+ * anything that is neither "title" nor "shared" is a MAP, whose archive is
+ * `<map>\objects\objects.dat`. That is the same 20-and-above band
+ * SpriteSetForKey picks the third record for, arrived at from the other end.
+ *
+ * The return value is "nothing to do": each arm compares what the record
+ * already holds against what it would be set to, and answers 1 when they
+ * match. The two fixed arms compare the FILE name, the map arm compares the
+ * FOLDER -- because the file name is "objects.dat" for every map and only the
+ * folder distinguishes them. Getting that pair the wrong way round would make
+ * every map after the first reuse the previous map's archive.
+ *
+ * The fixed arms also clear the folder, which is how their archives end up
+ * being opened from the game root rather than from wherever the last map
+ * left the current directory. */
+int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
+{
+    char folder[0x40];
+    char file[0x40];
+
+    if (strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_SET_TITLE)) == 0) {
+        void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_TITLE);
+
+        *set = rec;
+        *id  = AM2_DAT_ID_TITLE;
+        if (strcmp(SET_NAME(rec),
+                   (const char *)AM2_IMAGE(ADDR_STR_DAT_TITLE)) == 0)
+            return 1;
+        SET_FOLDER(rec)[0] = '\0';
+        strcpy(SET_NAME(rec), (const char *)AM2_IMAGE(ADDR_STR_DAT_TITLE));
+        return 0;
+    }
+
+    if (strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_SET_SHARED)) == 0) {
+        void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_SHARED);
+
+        *set = rec;
+        *id  = AM2_DAT_ID_SHARED;
+        if (strcmp(SET_NAME(rec),
+                   (const char *)AM2_IMAGE(ADDR_STR_DAT_SHARED)) == 0)
+            return 1;
+        SET_FOLDER(rec)[0] = '\0';
+        strcpy(SET_NAME(rec), (const char *)AM2_IMAGE(ADDR_STR_DAT_SHARED));
+        return 0;
+    }
+
+    {
+        void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_THIRD);
+
+        *set = rec;
+        *id  = AM2_DAT_ID_OBJECTS;
+        orig_sprintf(folder, (const char *)AM2_IMAGE(ADDR_STR_FMT_OBJECTS_DIR),
+                     name);
+        strcpy(file, (const char *)AM2_IMAGE(ADDR_STR_DAT_OBJECTS));
+        if (strcmp(SET_FOLDER(rec), folder) == 0)
+            return 1;
+        strcpy(SET_FOLDER(rec), folder);
+        strcpy(SET_NAME(rec), file);
+        return 0;
+    }
+}
+
+/* 0x00423970. Close a set's archive and free its directory.
+ *
+ * Two things it does NOT do, both reproduced. It never clears the file or the
+ * directory pointer, so both dangle afterwards and a second call on the same
+ * record would close the file twice -- the guard is on the file being
+ * non-NULL, which it still is. Nothing does call it twice: SpriteSetLoad
+ * reassigns the file on the next line, and FreeSpriteSets runs once at
+ * shutdown. And it clears four bytes at the front of the FOLDER rather than
+ * one, which is a dword store where a terminator would have done; kept as a
+ * dword so the record compares byte for byte. */
+void __cdecl SpriteSetFree(void *set)
+{
+    am2_FILE *fp = SET_FILE(set);
+
+    if (!fp)
+        return;
+
+    orig_fclose(fp);
+    if (SET_DIR(set))
+        orig_free(SET_DIR(set));
+    *(uint32_t *)set = 0;
+}
+
+/* 0x004239B0. Open a set's archive and read everything but the sprites.
+ *
+ * Header, 256-entry palette, the two remap tables, then the directory. The
+ * remap is what maps the archive's own palette onto the display's: each entry
+ * is the nearest display index to that colour, and with no display palette
+ * loaded it is the identity instead. The second table is the first with
+ * entries 0..9 forced back to the identity -- the reserved block, the same
+ * convention BMP_FLAG_RESERVE10 names -- and SpriteLoadFromDataFile picks
+ * between them by format.
+ *
+ * The file name is copied out and straight back in around SpriteSetFree, and
+ * that round trip is a no-op: the free clears the FOLDER, not the name.
+ * Reproduced rather than dropped, because "this cannot matter" is a claim
+ * about a function that may yet be read again.
+ *
+ * The directory is allocated, zeroed and then read over in full, so the zeroing
+ * cannot be observed either. Also reproduced. */
+int32_t __cdecl SpriteSetLoad(const char *name)
+{
+    uint8_t  *set;
+    uint32_t  want = 0;
+    uint32_t  id   = 0;
+    char      file[0x100];
+    am2_FILE *fp;
+    int32_t   i;
+    int32_t   count;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    if (SpriteSetResolve(name, (void **)&set, &want))
+        return SET_FILE(set) != 0;
+
+    SetGameDir(SET_FOLDER(set));
+
+    strcpy(file, SET_NAME(set));
+    if (SET_FILE(set))
+        SpriteSetFree(set);
+    strcpy(SET_NAME(set), file);
+
+    SET_FILE(set) = orig_fopen(SET_NAME(set),
+                               (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!SET_FILE(set)) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_DAT_OPEN_FAIL,
+                 SET_NAME(set));
+        return 0;
+    }
+    fp = SET_FILE(set);
+
+    orig_fread(&id, 4, 1, fp);
+    if (id != want) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_DAT_BAD_ID, SET_NAME(set));
+        return 0;
+    }
+
+    orig_fread(set + SPRITE_SET_OFF_PALETTE, 4, 0x100, fp);
+
+    {
+        const uint32_t *pal = (const uint32_t *)(set + SPRITE_SET_OFF_PALETTE);
+        uint8_t        *remap = set + SPRITE_SET_OFF_REMAP;
+        const uint32_t *display = *(const uint32_t *const *)
+                                      (uintptr_t)ADDR_ACTIVE_PALETTE;
+
+        if (display) {
+            /* The original pushes ONE argument here, not two -- `add esp, 0x10`
+             * after this pair of calls covers exactly one push for the swap and
+             * three for the match. SwapColourBytes reads no second parameter,
+             * so what the original leaves in that slot is whatever was on the
+             * stack; zero is the same function. */
+            for (i = 0; i < 256; i++)
+                remap[i] = NearestPalIndex(display,
+                                           SwapColourBytes(pal[i], 0), 0);
+        } else {
+            for (i = 0; i < 256; i++)
+                remap[i] = (uint8_t)i;
+        }
+
+        for (i = 0; i < AM2_PALETTE_RESERVED; i++)
+            set[SPRITE_SET_OFF_REMAP10 + i] = (uint8_t)i;
+        for (i = AM2_PALETTE_RESERVED; i < 256; i++)
+            set[SPRITE_SET_OFF_REMAP10 + i] = remap[i];
+    }
+
+    orig_fread(set + SPRITE_SET_OFF_DIR_COUNT, 4, 1, fp);
+    count = SET_COUNT(set);
+    if (count > 0) {
+        SET_DIR(set) = (AM2_SpriteDirEntry *)
+                           orig_malloc((size_t)count * 8);
+        memset(SET_DIR(set), 0, (size_t)count * 8);
+        orig_fread(SET_DIR(set), (size_t)count * 8, 1, fp);
+    }
+    return 1;
+}
+
 /* 0x00423FE0. Fill a sprite record from the packed data file.
  *
  * Seek to the entry, check the key it starts with, then read the record: two
@@ -1268,6 +1451,12 @@ int sprite_install(void)
                         "SpriteDirIndex", 2);
     rc |= patch_replace(ADDR_SPRITE_LOAD_DF, (const void *)SpriteLoadFromDataFile,
                         "SpriteLoadFromDataFile", 2);
+    rc |= patch_replace(ADDR_SPRITE_SET_RESOLVE, (const void *)SpriteSetResolve,
+                        "SpriteSetResolve", 1);
+    rc |= patch_replace(ADDR_SPRITE_SET_LOAD, (const void *)SpriteSetLoad,
+                        "SpriteSetLoad", 3);
+    rc |= patch_replace(ADDR_SPRITE_SET_FREE, (const void *)SpriteSetFree,
+                        "SpriteSetFree", 4);
     rc |= patch_replace(ADDR_PRELOAD_SPRITE_NAME, (const void *)PreloadSpriteName,
                         "PreloadSpriteName", 14);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
