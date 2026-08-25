@@ -2864,13 +2864,23 @@ that and `OBJ_FLAG_OVERDUE` -- set when an object passes the deadline at
 (0x00428C40, 69 times a mission), and the two senders beneath them,
 `SendObjDestroyed` and `ItemGoneMessageSend`.
 
-**Read next, deliberately NOT written yet: `0x00429320`**, the shared tail of
-every per-type destroy and the thing that actually sets `flags & 4`. It is not
-the flat leaf its siblings are -- it walks a chain at `obj+0xAC` with a
-RECURSIVE self-call, through a slot lookup at `0x004277A0` and a table at
-`0x00514F0C`, neither named. `tools/disasm.py` also desynchronises in its
-middle, so it needs a re-dump from a clean boundary rather than a reading of
-what the tool prints. Worth doing carefully; not worth rushing.
+**`0x00429320` is written too**, the shared tail of every per-type destroy and
+the thing that actually sets the gone flag. It walks a chain of attached
+objects with a RECURSIVE self-call, and the flag going on BEFORE the walk is
+what terminates it: every chained object re-enters and one already marked
+returns at once. The chain is by UID rather than by pointer, which matters --
+the object table memmoves its tail on an insert, so a pointer held across the
+recursion would be wrong and a uid is not.
+
+Two notes on how it was read, both corrections of mine. I first said
+`tools/disasm.py` desynchronises in its middle; it does not -- I had started
+the dump at `0x004293A0`, inside the function, and a linear decoder cannot
+land on an instruction boundary by luck. From `0x00429320` it decodes 90
+instructions to a clean `ret`. And I expected to need a dozen invented names;
+in the event only ONE callee was unnamed, because `FindSlot`, `g_objTable`,
+`ADDR_ROW_UNREGISTER` and `ADDR_ITEM_PRE_DESTROY_ALIAS` were all already
+there. **Check what is already named before estimating what a function will
+cost.**
 
 What is still true of the rest: `0x00449570`, `0x00405050` and `0x004582F0`
 would each need a dozen invented names -- `AM2_Object` fields at `0xB0`,

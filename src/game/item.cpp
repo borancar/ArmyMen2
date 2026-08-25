@@ -12,6 +12,7 @@
 #include "misc.h"      /* ClearPtrList */
 #include "objtable.h"
 #include "objtype.h"   /* ObjType2Field548 */
+#include "objflag.h"   /* ObjFlagClear0 -- reconstructed */
 #include "savetag.h"
 #include "image.h"
 #include "crt.h"
@@ -571,8 +572,6 @@ typedef void (__cdecl *am2_destroy_fn)(void *obj);
 #define orig_destroy_type2      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE2))
 #define orig_destroy_type3      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE3))
 #define orig_destroy_type8      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE8))
-#define orig_destroy_obj_common \
-            ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_OBJ_COMMON))
 #define kItemComm  (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
 
 /* 0x00428DA0, 22 callers. Destroy an object, then tell the others.
@@ -606,13 +605,92 @@ void __cdecl DestroyByType(void *obj)
     case 2:  orig_destroy_type2(obj); break;
     case 3:  orig_destroy_type3(obj); break;
     case 8:  orig_destroy_type8(obj); break;
-    default: orig_destroy_obj_common(obj); break;
+    default: DestroyObjCommon(obj); break;
     }
 
     if (CommMustBroadcast(kItemComm,
                                  (int16_t)*(const int8_t *)((const uint8_t *)obj
                                                             + OBJ_OFF_ARMY)))
         SendObjDestroyed(obj);
+}
+
+typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
+#define orig_row_unregister \
+            ((am2_row_unregister_fn)AM2_IMAGE(ADDR_ROW_UNREGISTER))
+#define orig_item_teardown  ((am2_destroy_fn)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
+
+/* 0x00429320, five callers. The shared tail of every per-type destroy, and the
+ * thing that actually marks an object gone.
+ *
+ * Five steps, and the ORDER is the content: unlink the rows, run the item-only
+ * teardown, run the pre-destroy, set the flag, then walk the chain. The flag
+ * going on before the chain walk is what stops the recursion below -- every
+ * chained object re-enters here and an object already marked returns at once.
+ *
+ * The rows at OBJ_OFF_ROWS are taken out of the map descriptor's cell lists one
+ * at a time. The count is re-read every iteration though nothing in the loop
+ * changes it, which is the same shape ItemPreDestroy has and is reproduced for
+ * the same reason.
+ *
+ * The chain is by UID, not by pointer: each link goes through FindSlot and the
+ * object comes back out of g_objTable. That matters because the table moves --
+ * an insert memmoves the tail -- so holding a pointer across the recursion
+ * would be wrong and holding a uid is not.
+ *
+ * Two exits that look like `continue` and are not. A chain entry that is not an
+ * item RETURNS, abandoning the rest of the chain rather than skipping one; and
+ * so does an object that is not an item before the walk starts. Reproduced.
+ *
+ * The broadcast is per chained object, after its own teardown, and asks
+ * CommMustBroadcast rather than testing a session -- so a single-player game
+ * sends nothing. */
+void __cdecl DestroyObjCommon(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t next;
+    int32_t  insertAt;
+    int32_t  i;
+
+    if (!obj)
+        return;
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
+        return;
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                       + (uint32_t)i * AM2_ROW_STRIDE;
+
+        ObjFlagClear0(row);
+        orig_row_unregister(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+    }
+
+    if (ObjIsItem((const AM2_Object *)obj))
+        orig_item_teardown(obj);
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & 1u)
+        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG);
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BLOCKED;
+
+    if (!ObjIsItem((const AM2_Object *)obj))
+        return;
+
+    next = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID);
+    while (next) {
+        int32_t  slot = FindSlot(next, &insertAt);
+        uint8_t *cur  = (slot >= 0) ? (uint8_t *)g_objTable[slot].obj : 0;
+
+        if (!ObjIsItem((const AM2_Object *)cur))
+            return;
+
+        DestroyObjCommon(cur);
+
+        next = *(const uint32_t *)(cur + OBJ_OFF_CHAIN_NEXT_UID);
+
+        if (CommMustBroadcast(kItemComm,
+                              (int16_t)*(const int8_t *)(cur + OBJ_OFF_ARMY)))
+            SendObjDestroyed(cur);
+    }
 }
 
 /* 0x00428C40, one caller. Free every item that is past its deadline.
@@ -679,6 +757,8 @@ void item_install(void)
                   "RemoveInventoryItem", 4);
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
+    patch_replace(ADDR_DESTROY_OBJ_COMMON, (const void *)DestroyObjCommon,
+                  "DestroyObjCommon", 5);
     patch_replace(ADDR_FREE_OVERDUE_ITEMS, (const void *)FreeOverdueItems,
                   "FreeOverdueItems", 1);
     patch_replace(ADDR_DESTROY_BY_TYPE, (const void *)DestroyByType,

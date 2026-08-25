@@ -133,6 +133,9 @@ void __cdecl DestroyByType(void *obj);
 /* 0x00428C40. Free every item past its deadline; runs on leaving a level. */
 void __cdecl FreeOverdueItems(void);
 
+/* 0x00429320. The shared tail of every per-type destroy. */
+void __cdecl DestroyObjCommon(void *obj);
+
 void item_install(void);
 
 #ifdef __cplusplus

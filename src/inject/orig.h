@@ -4886,6 +4886,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
 #define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
+/* What DestroyObjCommon iterates before it marks anything. Each record goes to
+ * ObjFlagClear0 and then to ADDR_ROW_UNREGISTER, whose first parameter is
+ * already documented as a `row *` -- which is what says these are ROWS rather
+ * than some other 0x60-byte thing. */
+#define OBJ_OFF_ROW_COUNT          0x70u   /* int32_t */
+#define OBJ_OFF_ROWS               0x74u   /* row *, stride 0x60 */
+#define AM2_ROW_STRIDE             0x60u
+/* The chain of attached objects DestroyObjCommon walks after marking. Both
+ * hold a UID and not a pointer: each is handed to FindSlot, whose parameter is
+ * a uid, and the object comes back out of the table. The head is on the object
+ * being destroyed and the link is on each one found. */
+#define OBJ_OFF_CHAIN_UID          0xA8u   /* uint32_t, head of the chain */
+#define OBJ_OFF_CHAIN_NEXT_UID     0xACu   /* uint32_t, on each chained object */
+/* 656 bytes, six callers, still original -- the item-only half of the common
+ * teardown, and the only callee of DestroyObjCommon without a name. */
+#define ADDR_ITEM_TEARDOWN         0x00439320u  /* void(void *obj) */
 /* 0x00429C80, "DestroyItemObject, %x" -- its own name. Five callers. Frees the
  * allocation at +0x90 and clears the live byte at +0x8C; does nothing at all
  * if that byte is already clear, which makes it idempotent. */
