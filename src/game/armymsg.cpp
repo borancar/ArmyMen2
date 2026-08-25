@@ -219,7 +219,17 @@ void __cdecl SendObjDestroyed(const void *obj)
  * The log line is behind COMM_OFF_VERBOSE and prints the RAW uid, where the
  * message carries the wire one -- the same disagreement SendTrooperSetWeapon
  * has, and the same reason: the log is for a human reading a single machine's
- * trace, not for matching two machines' traffic. */
+ * trace, not for matching two machines' traffic.
+ *
+ * Its counter reads 0 in a driven Boot Camp mission, and the reason is worth
+ * getting right because I first wrote it down backwards. It is NOT the session
+ * guard returning early -- the trace stub counts on ENTRY, before any of this
+ * body runs, so a guard cannot hold the counter down. Nor is it the usual
+ * count-of-0 blind spot, which needs the CALLER to be ours: the only caller is
+ * the registry sweep at 0x00428C40 and that is still the original's, so a call
+ * would cross the patch and be counted. Zero here means the function is simply
+ * never called in that window -- the sweep frees only items flagged for it,
+ * and nothing in a Boot Camp mission is. Verified by reading. */
 void __cdecl ItemGoneMessageSend(const void *obj)
 {
     uint8_t         msg[AM2_MSG_OBJ_DESTROYED_LEN];
