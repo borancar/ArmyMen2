@@ -567,6 +567,9 @@
  * bitmap header MakeBitmap also reads -- ten dwords then a 256-entry palette --
  * and returns the pixels in a buffer the caller frees. */
 #define ADDR_READ_DIB_CHUNK  0x00422FF0u
+#define ADDR_FTELL           0x00464DC0u  /* long(FILE *) */
+#define ADDR_STR_TOO_MANY_COLOURS 0x004789A8u /* "Too many colors in bitmap.\n" */
+#define ADDR_STR_DIB_MALLOC_FAIL  0x00478988u /* "malloc failed in ReadBitmap()\n" */
 /* 0x00423200: open a file, read one DIB chunk from it, and flip the result
  * top-down into a fresh buffer. The two header fields it needs are the row
  * count and the total byte size. */
@@ -4855,6 +4858,8 @@ typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
 #define orig_fopen   (*(am2_fopen_fn)ADDR_FOPEN)
 #define orig_fclose  (*(am2_fclose_fn)ADDR_FCLOSE)
 #define orig_fseek   (*(am2_fseek_fn)ADDR_FSEEK)
+typedef int32_t (__cdecl *am2_ftell_fn)(am2_FILE *fp);
+#define orig_ftell   (*(am2_ftell_fn)ADDR_FTELL)
 #define orig_log     (*(am2_log_fn)ADDR_LOG)
 /* The game's heap, not ours -- msvcrt has a different one entirely, so anything
  * the game allocated must be freed here and vice versa. */

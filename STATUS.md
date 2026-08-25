@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `c5ceca9`. Working tree clean.
+Last updated: **2026-08-25**, at `a37dbd8`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,31 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`ReadDibChunk` (0x00422FF0), and the seek is RELATIVE to the chunk.**
+  It reads one bitmap out of a stream that may hold several: `ftell` first,
+  then seek to that plus `bfOffBits`. A plain seek to `bfOffBits` would read
+  the first bitmap every time, which is what makes this the one line in the
+  function that has to be right -- and it is worth 90,411 pixels when it is
+  not.
+
+  `biClrUsed` of zero means `1 << biBitCount`, written BACK into the caller's
+  header before the palette is read, so the caller sees the count that was
+  used rather than the zero the file had.
+
+  And when `biSizeImage` is zero the row size is computed two different ways:
+  at 8 bits per pixel it is `width + 3`, below that `(width + 7) / 8` with the
+  compiler's signed division. Both are then masked to a multiple of four --
+  which is the same thing as rounding a positive width up, and is why the
+  `+ 3` is there at all.
+
+- **Closing that seam moved `LoadDibFlipped` between modules.** It was in
+  `misc.cpp`, which is flat and is in the offline test's link; the reader it
+  calls needs `BITMAPINFO`, which a flat module cannot name. Both are in
+  `win32/surface.cpp` now, beside `MakeBitmap`, which reads the same 0x428
+  header shape. That is the second time this session a seam has decided where
+  a function lives -- the first was `MenuMessage`, for the same reason in
+  reverse.
 
 - **`DrawMapObject` (0x0040A090) -- the last piece of the object subsystem.**
   Clip the object's bounds against the region, and past that turn the CLIPPED
@@ -2591,11 +2616,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 793 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 792 | 781 of them below the CRT line |
+| `patch_replace` sites | 794 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 793 | 782 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 143,392 / 372,816 B (**38.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 157,968 / 372,816 B (42.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 143,648 / 372,816 B (**38.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 158,224 / 372,816 B (42.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

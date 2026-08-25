@@ -745,6 +745,117 @@ typedef int32_t (__cdecl *am2_encode_fn)(const void *pixels, void *dest,
 #define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 #define g_ddraw2obj       (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
 
+/* 0x00422FF0, four callers -- read ONE bitmap out of a stream that may hold
+ * several, and answer its pixels in a buffer the caller frees.
+ *
+ * The header goes into the caller's 0x428 bytes, which is the same shape
+ * MakeBitmap reads: a BITMAPINFOHEADER and 256 palette entries.
+ *
+ * Three things are worth keeping.
+ *
+ * The seek is RELATIVE to where the chunk began, not to the file: `ftell`
+ * first, then seek to that plus `bfOffBits`. That is what makes several
+ * bitmaps in one file work at all, and a plain seek to `bfOffBits` would read
+ * the first one every time.
+ *
+ * `biClrUsed` of zero means `1 << biBitCount`, written back into the caller's
+ * header before the palette is read, so the caller sees the count that was
+ * used.
+ *
+ * And when `biSizeImage` is zero the size is computed from the width, but by
+ * two different routes: at 8 bits per pixel the row is `width + 3`, and below
+ * that it is `(width + 7) / 8` with the compiler's signed division. Both are
+ * then rounded DOWN to a multiple of four -- which is the same thing as
+ * rounding a positive width up, and is why the `+ 3` is there. */
+void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
+{
+    BITMAPFILEHEADER  fh;
+    BITMAPINFO       *bi   = (BITMAPINFO *)header;
+    int32_t           base = (int32_t)orig_ftell(fp);
+    int32_t           size;
+    void             *pixels;
+
+    orig_fread(&fh, sizeof(fh), 1, fp);
+    orig_fread(&bi->bmiHeader, sizeof(bi->bmiHeader), 1, fp);
+
+    if (bi->bmiHeader.biBitCount > 8) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_TOO_MANY_COLOURS));
+        return (void *)0;
+    }
+
+    if (bi->bmiHeader.biClrUsed == 0)
+        bi->bmiHeader.biClrUsed = 1u << bi->bmiHeader.biBitCount;
+
+    orig_fread(bi->bmiColors, bi->bmiHeader.biClrUsed * 4, 1, fp);
+    orig_fseek(fp, base + (int32_t)fh.bfOffBits, SEEK_SET);
+
+    size = (int32_t)bi->bmiHeader.biSizeImage;
+    if (!size) {
+        int32_t row;
+
+        if (bi->bmiHeader.biBitCount == 8)
+            row = bi->bmiHeader.biWidth + 3;
+        else
+            row = (bi->bmiHeader.biWidth + 7) / 8;
+
+        size = (row & ~3) * bi->bmiHeader.biHeight;
+    }
+
+    pixels = orig_malloc((size_t)size);
+    if (!pixels) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_DIB_MALLOC_FAIL));
+        return (void *)0;
+    }
+
+    orig_fread(pixels, (size_t)size, 1, fp);
+    return pixels;
+}
+
+/* 0x00423200 -- open a file, read one chunk from it, and flip the rows.
+ *
+ * It lived in misc.cpp while the reader above was still the original's;
+ * closing that seam moved it here, because a flat module cannot name
+ * BITMAPINFO and the offline test's link cannot reach a win32 one. */
+void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
+{
+    am2_FILE *fp;
+    void     *src;
+    void     *dst;
+    int32_t   total;
+
+    if (!path || !path[0])
+        return (void *)0;
+
+    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp)
+        return (void *)0;
+
+    src = ReadDibChunk(fp, hdr);
+    orig_fclose(fp);
+    if (!src)
+        return (void *)0;
+
+    /* Cleared before anything below can fail, so a caller that ignores the
+     * return value still sees zero. */
+    *size = 0;
+
+    total = *(const int32_t *)((const uint8_t *)hdr + DIB_OFF_SIZE);
+    if (!total) {
+        orig_log("ERROR: %s has listed size of 0 (try resaving)\n", path);
+        return (void *)0;
+    }
+
+    dst = orig_malloc((size_t)total);
+    if (!dst)
+        return (void *)0;   /* leaks `src` -- the original's only such exit */
+
+    ReverseBlocks(dst, src, total,
+                  *(const int32_t *)((const uint8_t *)hdr + DIB_OFF_BLOCKS));
+    *size = (uint16_t)total;
+    orig_free(src);
+    return dst;
+}
+
 int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
                            uint8_t *dest, const uint8_t *remap)
 {
@@ -1303,6 +1414,10 @@ int surface_install(void)
                         "BlitCentred", 1);
     rc |= patch_replace(ADDR_MAKE_BITMAP, (const void *)MakeBitmap,
                         "MakeBitmap", 4);
+    rc |= patch_replace(ADDR_READ_DIB_CHUNK, (const void *)ReadDibChunk,
+                        "ReadDibChunk", 4);
+    rc |= patch_replace(ADDR_LOAD_DIB_FLIPPED, (const void *)LoadDibFlipped,
+                        "LoadDibFlipped", 1);
     rc |= patch_replace(ADDR_DRAW_MENU_OVERLAY, (const void *)DrawMenuOverlay,
                         "DrawMenuOverlay", 0);
     rc |= patch_replace(ADDR_FREE_MAP_SURFACES, (const void *)FreeMapSurfaces,

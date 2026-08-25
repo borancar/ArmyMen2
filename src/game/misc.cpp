@@ -880,53 +880,6 @@ int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot)
     return id != 0 && id != -1;
 }
 
-/* 0x00422FF0, still original: reads one DIB chunk from an open stream into the
- * 0x428-byte header and answers the pixels in a buffer the caller frees. */
-typedef void *(__cdecl *AM2_ReadDibChunkFn)(void *fp, void *hdr);
-#define orig_read_dib_chunk \
-    (*(AM2_ReadDibChunkFn)AM2_IMAGE(ADDR_READ_DIB_CHUNK))
-
-void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
-{
-    am2_FILE *fp;
-    void     *src;
-    void     *dst;
-    int32_t   total;
-
-    if (!path || !path[0])
-        return (void *)0;
-
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
-    if (!fp)
-        return (void *)0;
-
-    src = orig_read_dib_chunk(fp, hdr);
-    orig_fclose(fp);
-    if (!src)
-        return (void *)0;
-
-    /* Cleared before anything below can fail, so a caller that ignores the
-     * return value still sees zero. */
-    *size = 0;
-
-    total = *(const int32_t *)((const uint8_t *)hdr + DIB_OFF_SIZE);
-    if (!total) {
-        orig_log("ERROR: %s has listed size of 0 (try resaving)\n", path);
-        return (void *)0;
-    }
-
-    dst = orig_malloc((size_t)total);
-    if (!dst)
-        return (void *)0;   /* leaks `src` -- the original's only such exit */
-
-    ReverseBlocks(dst, src, total,
-                  *(const int32_t *)((const uint8_t *)hdr + DIB_OFF_BLOCKS));
-    *size = (uint16_t)total;
-    orig_free(src);
-    return dst;
-}
-
-
 #define g_menuRow (*(int32_t *)(uintptr_t)ADDR_MENU_ROW)
 
 
@@ -1161,8 +1114,6 @@ int misc_install(void)
     patch_replace(ADDR_NULL_STUB, (const void *)NullStub, "NullStub", 0);
     patch_replace(ADDR_RETURN_ZERO, (const void *)ReturnZero, "ReturnZero", 0);
     patch_replace(ADDR_RETURN_ONE, (const void *)ReturnOne, "ReturnOne", 0);
-    patch_replace(ADDR_LOAD_DIB_FLIPPED, (const void *)LoadDibFlipped,
-                  "LoadDibFlipped", 1);
     patch_replace(ADDR_REVERSE_BLOCKS, (const void *)ReverseBlocks,
                   "ReverseBlocks", 4);
     patch_replace(ADDR_COMPARE_PAIR, (const void *)ComparePair, "ComparePair", 2);

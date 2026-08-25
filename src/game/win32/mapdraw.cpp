@@ -252,10 +252,8 @@ static_assert(sizeof(DDSURFACEDESC) == 0x6C, "the descriptor the original sizes"
 #define TILESET_RESERVED   10
 
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
-typedef void *(__cdecl *am2_read_dib_fn)(am2_FILE *fp, uint32_t *header);
 
 #define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
-#define orig_read_dib      (*(am2_read_dib_fn)ADDR_READ_DIB_CHUNK)
 
 #define g_tilesetName    ((const char *)(uintptr_t)ADDR_TILESET_NAME)
 #define g_tilesetPath    ((const char *)(uintptr_t)ADDR_TILESET_PATH)
@@ -318,7 +316,7 @@ void __cdecl RestoreTileSet(void)
         }
         offset += (int32_t)chunkSize;
 
-        pixels = orig_read_dib(fp, header);
+        pixels = ReadDibChunk(fp, header);
         if (!pixels)
             goto bad;
 

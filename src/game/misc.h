@@ -109,7 +109,6 @@ int32_t  __cdecl   ReturnOne(void);           /* 0x004354F0 */
  * Its only caller loads `%02d_%03d_%02d_*.msk` out of a `masks` directory, so
  * the masks are DIBs. The function itself knows nothing about masks and is not
  * named for them. */
-void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size);
 
 int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
                               int32_t count);
