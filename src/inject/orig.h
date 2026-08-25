@@ -3201,7 +3201,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Object lookup and iteration. The two iterators take no arguments: they walk
  * whatever the record at ADDR_SCRIPT_OBJ_TARGET selects, which the objclass
  * branch has just filled in. */
-#define ADDR_OBJ_BY_UID           0x00427820u  /* obj *(int32_t uid) */
 /* 0x0044BA60, 14 callers. A cdecl wrapper for the line above, passing its one
  * argument straight through -- the same shape as ADDR_BUILD_FONT_ALIAS. */
 #define ADDR_OBJ_BY_UID_ALIAS     0x0044BA60u  /* obj *(uint32_t uid) */
@@ -3260,9 +3259,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_INVENTORY_SEL    0x568u  /* int32_t, which slot is in hand */
 #define AM2_INVENTORY_SLOTS       6
 #define AM2_OBJ_KIND_WEAPON       4
-#define ADDR_FIRST_SCRIPT_OBJ     0x00427850u
-#define ADDR_NEXT_SCRIPT_OBJ      0x00427880u
-#define ADDR_OBJ_TAKES_SCRIPT     0x00433860u  /* int32_t(obj *) */
 
 /* The object-script count, and what gets written into every object the
  * statement selects -- read AFTER ADDR_NEW_OBJ_SCRIPT has incremented it. */
@@ -4509,6 +4505,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_KEY_FIELD_C    0x00433850u
 
 /* Object type predicates; all accept NULL and answer 0. */
+/* The body is `type == 1 || type == 4` with a NULL check, so this comment is
+ * the function and not a guess. It also carried ADDR_OBJ_TAKES_SCRIPT, which
+ * was objscript.cpp's name for the same predicate because the objects that
+ * take a script are exactly types 1 and 4 -- true, and a fact about the
+ * CALLER. Removed, along with three more dead second names on this family's
+ * addresses: ADDR_OBJ_BY_UID, ADDR_FIRST_SCRIPT_OBJ and ADDR_NEXT_SCRIPT_OBJ.
+ * objscript.cpp stopped using all four some time ago and the macros outlived
+ * their last use. */
 #define ADDR_OBJ_IS_ITEM    0x00433860u  /* types 1, 4 */
 #define ADDR_OBJ_IS_TYPE2   0x00457470u
 #define ADDR_OBJ_IS_TYPE3   0x00457490u

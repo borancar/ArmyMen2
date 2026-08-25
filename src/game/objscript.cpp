@@ -16,9 +16,10 @@
 #include "script.h"
 #include "scriptint.h"
 /* The object table and the item predicate, both reconstructed. objscript.cpp
- * used to reach all four through the image under a SECOND set of ADDR_ names
- * -- ADDR_OBJ_BY_UID, ADDR_OBJ_TAKES_SCRIPT, ADDR_FIRST_SCRIPT_OBJ and
- * ADDR_NEXT_SCRIPT_OBJ -- for addresses that already had one. Both mistakes
+ * used to reach all four through the image under a SECOND set of ADDR_ names,
+ * for addresses that already had one. Those four macros are gone now; the
+ * survivors are ADDR_LOOKUP_BY_UID, ADDR_OBJ_IS_ITEM, ADDR_FIRST_ITEM and
+ * ADDR_NEXT_ITEM. Both mistakes
  * at once, and checkseams could see neither: an inline cast written
  * ((Fn)(uintptr_t)ADDR_X)(...) matches none of its three patterns. */
 #include "objtable.h"
