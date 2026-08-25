@@ -633,7 +633,12 @@ typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
  * the same reason.
  *
  * The chain is by UID, not by pointer: each link goes through FindSlot and the
- * object comes back out of g_objTable. That matters because the table moves --
+ * object comes back out of g_objTable. Note this reading holds for an ITEM,
+ * which is what the guard above has just established -- for types 2, 3 and 8
+ * the same two dwords are a count and an array pointer instead. See
+ * OBJ_OFF_CHAIN_UID.
+ *
+ * That the chain is by uid matters because the table moves --
  * an insert memmoves the tail -- so holding a pointer across the recursion
  * would be wrong and holding a uid is not.
  *

@@ -4893,12 +4893,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_ROW_COUNT          0x70u   /* int32_t */
 #define OBJ_OFF_ROWS               0x74u   /* row *, stride 0x60 */
 #define AM2_ROW_STRIDE             0x60u
-/* The chain of attached objects DestroyObjCommon walks after marking. Both
- * hold a UID and not a pointer: each is handed to FindSlot, whose parameter is
- * a uid, and the object comes back out of the table. The head is on the object
- * being destroyed and the link is on each one found. */
-#define OBJ_OFF_CHAIN_UID          0xA8u   /* uint32_t, head of the chain */
-#define OBJ_OFF_CHAIN_NEXT_UID     0xACu   /* uint32_t, on each chained object */
+/* The chain of attached objects DestroyObjCommon walks after marking, and
+ * these two names describe the ITEM reading only -- types 1 and 4, which is
+ * what that function has already checked before it reads them. Both hold a
+ * UID rather than a pointer: each is handed to FindSlot, whose parameter is a
+ * uid, and the object comes back out of the table.
+ *
+ * The same two dwords mean something else for types 2, 3 and 8. 0x00458070
+ * reads +0xA8 as a signed COUNT -- it is the bound of a loop -- and +0xAC as a
+ * POINTER to an array of uids indexed four bytes at a time. So the pair is
+ * type-dependent, and a reader who takes these names as universal will
+ * misread the other half of the object model.
+ *
+ * Found by reading 0x00458070 BEFORE writing the three handlers that call it,
+ * which is the order STATUS.md argued for; the names had already gone in two
+ * commits earlier without the qualification. */
+#define OBJ_OFF_CHAIN_UID          0xA8u   /* uint32_t, item: head of the chain */
+#define OBJ_OFF_CHAIN_NEXT_UID     0xACu   /* uint32_t, item: the next link */
 /* 656 bytes, six callers, still original -- the item-only half of the common
  * teardown, and the only callee of DestroyObjCommon without a name. */
 #define ADDR_ITEM_TEARDOWN         0x00439320u  /* void(void *obj) */
