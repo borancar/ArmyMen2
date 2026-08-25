@@ -75,6 +75,11 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world);
  * total. 0 is a null argument, not a tie. */
 int32_t __cdecl DepthCompare(void *a, void *b);
 
+/* 0x0040A090. Draw one map object: clip, convert the clipped rectangle into a
+ * destination position and a source rectangle inside the sprite, put the
+ * object's own remap table and palette into the sprite, and blit. */
+void __cdecl DrawMapObject(void *obj, const AM2_Rect *world);
+
 /* 0x0041D000. Repaint every registered dirty rectangle meeting a region --
  * the clipped intersection, not the whole record. */
 void __cdecl RepaintDirtyList(const AM2_Rect *region);

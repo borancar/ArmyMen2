@@ -815,6 +815,15 @@
 #define OBJ_OFF_SCREEN_Y         0x1Eu  /* int16_t */
 #define OBJ_OFF_DEPTH_LAYER      0x26u  /* int16_t, only when > 0 on both */
 #define OBJ_OFF_DEPTH_SLOPE      0x28u  /* float */
+/* The rest of a map object, as the drawer reads it. The lut and the palette
+ * are the object's own and are written INTO the shared sprite immediately
+ * before it is drawn, so a sprite used by several objects carries whichever
+ * one drew last. */
+#define MAPOBJ_OFF_FLAGS         0x00u  /* bit 0 clear means do not draw */
+#define MAPOBJ_OFF_SPRITE        0x04u  /* AM2_Sprite * */
+#define MAPOBJ_OFF_LUT           0x2Cu  /* -> the sprite's +0x34 */
+#define MAPOBJ_OFF_PALETTE       0x30u  /* -> the sprite's +0x38 */
+#define MAPOBJ_FLAG_VISIBLE      0x01u
 #define ADDR_FLOAT_ZERO          0x0046F928u  /* 0.0f */
 #define AM2_DEPTH_MAX            0x1F4        /* 500 nodes */
 /* Two object flags that override the comparison entirely: everything with

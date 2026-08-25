@@ -22,6 +22,7 @@
 #include "mapdraw.h"
 #include "../objflag.h"  /* ObjFlagBit1 -- reconstructed */
 #include "surface.h"
+#include "sprite.h"   /* AM2_Sprite, DrawSpriteClipped -- reconstructed */
 #include "../gamedir.h"
 #include "palette.h"
 #include "../misc.h"
@@ -464,8 +465,6 @@ static int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
 #define g_depthHead  (*(int32_t *)(uintptr_t)ADDR_DEPTH_HEAD)
 #define g_depthDC    (*(int32_t *)(uintptr_t)ADDR_DEPTH_FIELD_DC)
 
-typedef void    (__cdecl *AM2_DrawObjFn)(void *obj, const AM2_Rect *world);
-#define orig_draw_object  ((AM2_DrawObjFn)(uintptr_t)ADDR_DRAW_MAP_OBJECT)
 
 /* One node of the depth list: the object, and the two links. The array is
  * fixed at 500 and the cursor sits eight bytes in front of it. */
@@ -531,6 +530,59 @@ static void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
 static int32_t DepthProject(int32_t dx, float slope, int32_t y)
 {
     return (int16_t)(int32_t)((float)dx * slope) + y;
+}
+
+/* 0x0040A090 -- draw one map object, and the last piece of the object
+ * subsystem.
+ *
+ * It clips the object's bounds against the region first and does nothing if
+ * they do not meet, or if bit 0 of the object's flags is clear. Past that it
+ * converts the CLIPPED rectangle into two things: a destination position, by
+ * subtracting the view origin, and a source rectangle inside the sprite, by
+ * subtracting the object's own bounds. So an object half off the edge draws
+ * its visible half from the matching part of the sprite rather than being
+ * dropped or squashed.
+ *
+ * Both degenerate cases are checked AFTER the arithmetic rather than before:
+ * a clipped rectangle with no height, and one with no width, each return.
+ * IntersectRect has already answered no for an empty intersection, so these
+ * two are about a rectangle that touches along an edge.
+ *
+ * The last two stores are the interesting part. The object's own remap table
+ * and palette are written INTO the sprite immediately before the draw --
+ * the sprite is shared, so it carries whichever object drew last, and the
+ * pair has to be set every time rather than once at load. */
+void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
+{
+    uint8_t        *o      = (uint8_t *)obj;
+    const AM2_Rect *bounds = (const AM2_Rect *)(o + OBJ_OFF_BOUNDS);
+    RECT            clip;
+    AM2_Rect        src;
+    AM2_Sprite     *spr;
+
+    if (!IntersectRect(&clip, (const RECT *)bounds, (const RECT *)world))
+        return;
+    if (!(*(const uint8_t *)(o + MAPOBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
+        return;
+
+    src.left   = clip.left   - bounds->left;
+    src.top    = clip.top    - bounds->top;
+    src.right  = clip.right  - bounds->left;
+    src.bottom = clip.bottom - bounds->top;
+
+    if (src.top == src.bottom)
+        return;
+    if (src.left == src.right)
+        return;
+
+    spr = *(AM2_Sprite **)(o + MAPOBJ_OFF_SPRITE);
+    spr->lut     = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
+    spr->palette = *(void **)(o + MAPOBJ_OFF_PALETTE);
+
+    DrawSpriteClipped(spr,
+                      clip.left - g_viewRect->left,
+                      clip.top  - g_viewRect->top,
+                      &src, 0);
 }
 
 /* 0x0041D740, nine callers -- which of two objects is drawn first.
@@ -854,7 +906,7 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
                            + (uint32_t)g_depthHead * AM2_DEPTH_NODE_SIZE;
 
         while (n) {
-            orig_draw_object(*(void *const *)(n + DEPTH_OFF_OBJ), world);
+            DrawMapObject(*(void *const *)(n + DEPTH_OFF_OBJ), world);
             n = *(const uint8_t *const *)(n + DEPTH_OFF_NEXT);
         }
     }
@@ -1431,6 +1483,8 @@ int mapdraw_install(void)
                         "DepthInsert", 1);
     rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
                         "DepthCompare", 9);
+    rc |= patch_replace(ADDR_DRAW_MAP_OBJECT, (const void *)DrawMapObject,
+                        "DrawMapObject", 1);
 
     rc |= patch_replace(ADDR_SET_DRAW_TARGET, (const void *)SetDrawTarget, "SetDrawTarget", 1);
     rc |= patch_replace(ADDR_RESTORE_TILESET, (const void *)RestoreTileSet,

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `6a5aa2a`. Working tree clean.
+Last updated: **2026-08-25**, at `c5ceca9`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,44 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`DrawMapObject` (0x0040A090) -- the last piece of the object subsystem.**
+  Clip the object's bounds against the region, and past that turn the CLIPPED
+  rectangle into two things: a destination position, by subtracting the view
+  origin, and a source rectangle inside the sprite, by subtracting the
+  object's own bounds. So an object half off the edge draws its visible half
+  from the matching part of the sprite rather than being dropped or squashed.
+
+  Both degenerate cases are checked AFTER the arithmetic and not before -- a
+  clipped rectangle with no height, and one with no width. `IntersectRect`
+  has already answered no for an empty intersection, so those two tests are
+  about a rectangle that touches along an edge.
+
+- **The remap table and the palette belong to the OBJECT and are written into
+  the SPRITE.** The last two stores before the blit copy the object's `+0x2C`
+  and `+0x30` into the sprite's `lut` and `palette`. The sprite is shared, so
+  it carries whichever object drew last, and the pair has to be set on every
+  draw rather than once at load. That is what makes two soldiers of different
+  armies possible from one sprite.
+
+- **Measured: the source rectangle is worth 41,291 pixels and the remap table
+  nothing.** Adding one to `src.left` puts `bootcamp` that far out. Not
+  applying the object's lut at all changes 22 pixels, the noise floor --
+  Boot Camp's visible objects all carry a null table, so the store is
+  reproduced on the strength of reading it. Fourth gap of this kind in this
+  subsystem, and all four are recorded.
+
+- **One suite run reported `audiovol`'s mid frame at 274 against a budget of
+  200, and two re-runs came back at 0.** That configuration never enters a
+  mission, so it cannot see any of this work; it is the blinking scroll-bar
+  element the budget exists for, one run in several. Re-read before believing,
+  as the file already says -- and worth noting that 200 is a budget set from a
+  sample, exactly the trap recorded for `controls`.
+
+**The map's object pipeline is now complete**: `DrawMapObjects` walks the
+cells, `DepthInsert` sorts, `DepthCompare` orders, `DrawMapObject` draws.
+Four functions, 1,920 bytes, and the strongest single check on any of them is
+that removing the draw is 50,985 differing pixels.
 
 - **`DepthCompare` (0x0041D740), and 0 is a null argument rather than a
   tie.** Four tests in order, each falling through when it cannot decide.
@@ -2553,11 +2591,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 792 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 791 | 780 of them below the CRT line |
+| `patch_replace` sites | 793 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 792 | 781 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 143,232 / 372,816 B (**38.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 157,808 / 372,816 B (42.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 143,392 / 372,816 B (**38.5%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 157,968 / 372,816 B (42.4%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
