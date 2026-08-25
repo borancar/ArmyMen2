@@ -2882,6 +2882,21 @@ in the event only ONE callee was unnamed, because `FindSlot`, `g_objTable`,
 there. **Check what is already named before estimating what a function will
 cost.**
 
+**The immediate next unit is three 64-byte functions and one 640-byte one, and
+the order matters.** `0x00449460`, `0x0045A9C0` and `0x0043CF30` are the three
+per-type destroy handlers `DestroyByType` dispatches to, 64 bytes each, and
+they share one shape: zero the dword at `OBJ_OFF_SCRIPT_ID` and another at
+`+0xC0`, call `0x00458070(obj, 0)`, then tail into `DestroyObjCommon`. Two of
+them run a type-specific step first (`0x0045A770`, `0x0043CA00`).
+
+They are trivial EXCEPT that they all need `0x00458070` named, and that is 640
+bytes with 20 callers and unread. What can be seen of its head: it takes TWO
+objects, returns at once if they are equal or the first is null, requires the
+first to be type 2, 3 or 8, and then clears link fields at `+0xCC` and reads
+`+0xC4`. Enough to guess a name from and not enough to justify one -- naming a
+function from its first twenty instructions is how five of the misreadings
+corrected this session were made. Read it before writing the three, not after.
+
 What is still true of the rest: `0x00449570`, `0x00405050` and `0x004582F0`
 would each need a dozen invented names -- `AM2_Object` fields at `0xB0`,
 `0xE4`, `0xEC`, `0xF4`, `0x104`, `0x544`, `0x568`, plus tables at `0x00473DD0`,
