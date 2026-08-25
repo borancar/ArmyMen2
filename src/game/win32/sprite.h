@@ -75,6 +75,30 @@ typedef struct {
  * id already present is left alone and nothing is reported. */
 void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id);
 
+/* 0x004457E0. Fill a record from {set, index, frame}: a tail call into the
+ * packed data file by default, and a two-file glob under -df. */
+int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
+                                 int32_t frame, int32_t flags);
+
+/* One entry of a sprite set's directory: the key, and where in the archive
+ * that sprite starts. Sorted by key. */
+typedef struct {
+    uint32_t key;
+    uint32_t offset;
+} AM2_SpriteDirEntry;
+
+/* 0x00423940. Which of the three sets holds a key. */
+void *__cdecl SpriteSetForKey(uint32_t key);
+
+/* 0x00423D50. The directory index for a key, or -1. */
+int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
+
+/* 0x00423FE0. Fill a record from the packed data file -- the default path,
+ * and what SpriteLoadTriple tail-calls unless -df was given. */
+int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
+                                       int32_t index, int32_t frame,
+                                       int32_t flags);
+
 /* 0x00445CF0. A sprite by NAME: parsed into {set, index, frame} when the name
  * carries them, and otherwise loaded as a bitmap and registered under set 99
  * with an index that counts up. */

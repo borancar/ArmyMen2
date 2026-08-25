@@ -25,9 +25,20 @@ extern "C" {
  * wrong: it is exactly the kind of latent limit that would only show up on a
  * large map.
  *
- * What the three fields *mean* is not established, so they are named
- * structurally. The widths are suggestive -- 7 bits is 0..127, which would suit
- * a tile coordinate -- but that is not evidence and nothing here depends on it.
+ * What the three fields mean is established for ONE family of users and not
+ * for the other, which is why they keep structural names. In the sprite
+ * loaders A is the SET, B the index and C the frame, and four readers say so
+ * independently. PreloadSprite composes a sprite id with exactly PackKey's
+ * arithmetic written out inline; SpriteSetForKey takes field A and splits it
+ * on the same 1..9 / 20 bands ADDR_SPRITE_SET_DIRS uses to pick a directory;
+ * SpriteLoadFromDataFile packs its own {set, index, frame} arguments with
+ * PackKey and stores the result as the sprite id; and PreloadSpriteByKey
+ * unpacks a key with all three accessors and hands the results straight to
+ * PreloadSprite's set, index and frame parameters, which is as direct as it
+ * gets.
+ *
+ * KeyLookupTriple's table at 0x00516150 is a different user of the same
+ * packing and none of that applies to it, so the accessors are not renamed.
  */
 
 /* Original: 0x00433810. */

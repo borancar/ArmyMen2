@@ -5,6 +5,7 @@
 #   tools/ab.sh bootcamp     fullscreen, into the first Boot Camp mission
 #   tools/ab.sh windowed     -w, title screen only; the frame is static
 #   tools/ab.sh intro        -dbg, so the Smacker film plays
+#   tools/ab.sh df           -df, so sprites come off disk rather than the .dat
 #   tools/ab.sh audio        Boot Camp again, with a silent sound device
 #   tools/ab.sh mission      past both dialogs into live play, and scrolling
 #   tools/ab.sh campaign     SINGLE PLAYER into MAP 01, the only `variable` path
@@ -253,6 +254,20 @@ play() {
         # ZERO: the screen then builds ONE thumbnail and a BACK button, and
         # three of its four buttons plus the page button are unreachable.
         movies)   args="-nointro -dbg"   ; wait=25 ;;
+        # -df, which the flag at 0x0047894C reads BACKWARDS from its name: the
+        # image ships it as 1 and the switch CLEARS it, so the default is the
+        # packed .dat and -df is what selects loose files on disk. Nothing else
+        # in the suite reaches that arm at all -- SpriteLoadTriple is a tail
+        # call into the data-file loader on every other configuration, and its
+        # whole body, both globs and the failure message, is unreachable.
+        #
+        # The install ships exactly one loose sprite, 01-title's
+        # 01_000_00_screen.bmp, so this run paints the splash and then reports
+        # every other sprite missing. That is the point: 26 "Sprite file not
+        # found" lines with the pattern in each is a far tighter check on the
+        # glob than one success would be. There is no menu to drive -- the
+        # button sprites are in the .dat -- so it shows what it shows.
+        df)       args="-nointro -dbg -df" ; wait=25 ;;
         *) echo "ab.sh: unknown configuration '$cfg'" >&2; return 1 ;;
     esac
 
@@ -950,6 +965,8 @@ compare() {
         # one-colour slip in LabelDraw is 17,110 and a width-from-height slip
         # in WidgetScreenRect is 305,939.
         controls) budget=200 ;;
+        # A static splash with the cursor on it, same as the dialogs.
+        df)       budget=200 ;;
         # A static dialog like controls, and the cursor moves the same way.
         difficulty) budget=200 ;;
         # 200, and measured in both directions rather than assumed. Two clean
@@ -1078,7 +1095,7 @@ PY
 # printed "A/B clean" -- which reads as both configurations passing and is the
 # same failure mode as the two missing files that once diffed as identical.
 cfgs="${*:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens movies multi mpoptions quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens movies multi mpoptions df quit"
 
 fail=0
 for cfg in $cfgs; do

@@ -130,11 +130,27 @@ different expansions.
 
 It found **38 surplus names and 17 surplus spellings** on its first run, so it
 is a baseline that may only go down, not a clean bill of health. Some of the
-backlog is harmless const-vs-non-const; some is not, and the sharpest is
-`ADDR_FONT_SURFACE`, reached through **five** names including `g_backBuffer`
-and `g_fontSurface`. Those cannot both be right, and settling it means reading
-what the surface is for rather than renaming the loser — the same job as
-`ADDR_CD_PATH` and `ADDR_GAME_DIR_ALT`.
+backlog is harmless const-vs-non-const; some is not.
+
+**The example this paragraph used went stale by being fixed, which is the good
+way for prose to go wrong and still worth correcting.** It named
+`ADDR_FONT_SURFACE`, reached through five names including `g_backBuffer` and
+`g_fontSurface`, and said settling it meant reading what the surface is for
+rather than renaming the loser. That was done: `InitDirectDraw` takes it off
+the primary with `DDSCAPS_BACKBUFFER` when fullscreen and makes a plain
+offscreen surface of the same size when windowed, `PresentFrame` blits it to
+the primary, and it is `ADDR_BACK_BUFFER` now. Read the tool's own output for
+what is outstanding, never this sentence.
+
+What the backlog actually holds today is mostly SPELLING rather than
+misreading, and that is a cheaper job than the one described above:
+`g_originDX` beside `g_originDx`, `g_originDY` beside `g_originDy`, `g_curX`
+beside `g_cursorX`, `g_clipRect` beside `g_screenClip`, `g_comm` beside
+`g_commObject`. Those need no reading at all — they need one spelling. The ones
+that do need reading are the DirectSound buffer slots, where `g_dsBufA` and
+`g_dsPrimary` are on one address and `g_dsBufC`, `g_dsound` and
+`g_movieDSound` on another, and a name there is a claim about which object it
+is.
 
 **Count the surplus, not the addresses that have any.** The first version
 counted addresses with more than one name, and a fifth name landing on an
@@ -1210,7 +1226,23 @@ is confirmed numerically and not by eye. And the Boot Camp figure no longer
 has windowed's zero to lean on: 22 scattered pixels on an animating scene is
 its own baseline.
 
-`tools/ab.sh bootcamp|windowed|intro|audio|all` runs the whole thing, and each
+**A command-line switch can hide a whole arm of the tree, and `-df` hid one for
+the length of this project.** The flag at `0x0047894C` ships as **1** and the
+switch CLEARS it, so its name says the opposite of what it does: the packed
+`.dat` is the default and `-df` is what selects loose sprite files off disk.
+Every configuration in the suite ran with sprites coming out of the archive,
+so `SpriteLoadTriple` was a tail call on all of them and its whole loose-file
+body — both globs, the failure message, the map-directory prefix — was
+unreachable. Two `orig.h` comments had the polarity backwards as well.
+
+`tools/ab.sh df` is that configuration. The install ships exactly one loose
+sprite, so it paints the splash from it and reports every other sprite
+missing, which is a tighter check than one success: the found arm runs once
+and the missing arm twenty times. **Before believing a function is compared,
+ask which command line reaches it** — a switch is as capable of gating a
+branch as a dialog is.
+
+`tools/ab.sh bootcamp|windowed|intro|audio|df|all` runs the whole thing, and each
 configuration now has a pixel budget it must stay inside — 50 for windowed,
 which blinks, 500 for the two Boot Camp runs, and none for the intro, which is
 two unsynchronised playbacks of a film. Exceeding it fails the run.
@@ -1250,6 +1282,27 @@ Found by editing three functions during an `ab.sh all` on the belief that only
 `audio-orig` starting, so no configuration straddled it and every result stood
 — luck, not care. If a source file has to change while a suite is running,
 kill the suite and restart it.
+
+**It happened again, and the second time the edit was not intentional at all.**
+A staged unit was held back precisely because a suite was running, and then
+"dry run" against copies in a scratch directory — except the script's first
+line is `os.chdir` to the repo, so `cd`ing elsewhere changed nothing and it
+wrote straight into `src/`. The tar that was supposed to make the copies failed
+with six `Cannot stat` lines and the script printed `applied` underneath them.
+Nine files were modified mid-suite; the run had to be killed with six
+configurations to go.
+
+**A script that chdirs is not made safe by running it somewhere else**, and
+that is the general form. Anything holding an absolute path — `os.chdir`, a
+`$REPO` variable, a hardcoded `/home/...` — ignores the caller's directory
+entirely. To rehearse one, point it at a copy by ARGUMENT or edit the path out;
+and read what the setup printed before believing the result, because a failed
+copy and a successful apply look identical from the last line alone.
+
+What survived is worth stating too: the configurations that had already
+finished ran on the old DLL and stand. It is only the ones after the edit that
+are void. Say which is which rather than discarding the whole run or, worse,
+quoting all of it.
 
 **A vtable slot can point at a stubbed function the harness has claimed, and
 `0x0045CAA0` is the example.** One widget class's slot 2 is that address, which

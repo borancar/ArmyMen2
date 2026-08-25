@@ -650,8 +650,12 @@
 /* The three ways a sprite's pixels are put back after its surface is restored.
  * All stay original; which one applies is decided in RestoreSpriteSurface. */
 #define ADDR_SPRITE_RELOAD_NAMED 0x004456B0u  /* int32(spr, const char *, flags) */
-#define ADDR_SPRITE_REBUILD_DF   0x004243B0u  /* int32(spr, flags), when -df is set */
-#define ADDR_SPRITE_REBUILD_ALT  0x00445C00u  /* int32(spr, flags), when it is not */
+/* The switch reads the other way round from what these names suggest, and the
+ * comments here said so backwards for as long as they existed. ADDR_OPT_DF is
+ * 1 in the image and `-df` CLEARS it, so the packed-data-file arm is the
+ * DEFAULT and the loose-file arm is what the switch selects. */
+#define ADDR_SPRITE_REBUILD_DF   0x004243B0u  /* int32(spr, flags), the default */
+#define ADDR_SPRITE_REBUILD_ALT  0x00445C00u  /* int32(spr, flags), under -df */
 #define ADDR_STR_RESTORE_FAIL_S  0x004897ACu  /* "unable to restore sprite %s.\n" */
 #define ADDR_STR_RESTORE_FAIL_X  0x0048978Cu  /* "unable to restore sprite %x.\n" */
 #define ADDR_OVERLAY_PALETTE     0x004FE1A4u  /* void *, set before the overlay blit */
@@ -2303,6 +2307,26 @@
  * Both stay original -- they are the bitmap loader and the table, not the
  * cache decision this port is taking over. */
 #define ADDR_SPRITE_LOAD_TRIPLE   0x004457E0u  /* int32(spr,a,b,c,flags) */
+/* What ADDR_SPRITE_LOAD_TRIPLE hands the work to when ADDR_OPT_DF is set,
+ * which is every run that does not pass -df: the same {set, index, frame} out
+ * of the packed .dat rather than off the disk. It seeks and validates -- its
+ * own two messages are "Error seeking to location %d in data file." and
+ * "Error in validating object in data file." */
+#define ADDR_SPRITE_LOAD_DF       0x00423FE0u  /* int32(spr,set,idx,frm,flags) */
+/* The .sha half of a loose sprite: a 1-bit DIB read into spr->overlay. Named
+ * from its own "ERROR: %s not in 1-bit mode\n". */
+#define ADDR_LOAD_SHADOW_BMP      0x00423300u  /* void(const char *, spr) */
+/* One directory name per sprite SET, indexed by the set number. Sets 0..19 are
+ * the fixed ones -- "00-cursors", "01-title", "10-dash", "19-other" -- and
+ * 20 and up are the map's own art, which is why those get the loaded map's
+ * directory in front. Entry 24 is ADDR_DIR_SCRATCH, so one set's directory is
+ * whatever was last written there. */
+#define ADDR_SPRITE_SET_DIRS      0x00489554u  /* const char *[] */
+#define ADDR_STR_FMT_DIR_SUB      0x00489738u  /* "%s\\%s" */
+#define ADDR_STR_FMT_S            0x004852B4u  /* "%s" */
+#define ADDR_STR_GLOB_BMP         0x00489720u  /* "%02d_%03d_%02d_*.bmp" */
+#define ADDR_STR_GLOB_SHA         0x00489708u  /* "%02d_%03d_%02d_*.sha" */
+#define ADDR_STR_SPRITE_MISSING   0x004896ECu  /* "Sprite file not found %s\n" */
 #define ADDR_SPRITE_REGISTER      0x004459E0u  /* void(spr, id) */
 #define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
 
@@ -2491,7 +2515,7 @@
 #define ADDR_LOAD_SCRIPT_COND    0x0041EC70u  /* void(FILE *, cond *) */
 #define ADDR_LOAD_EVENT_SECTION  0x004225E0u  /* int32_t(FILE *) */
 /* map.cpp's savegame section: one fixed 236-byte block and nothing else, which
- * is why the pair is 48 and 64 bytes. The block is at 0x00514D90. */
+ * is why the pair is 48 and 64 bytes. The block is ADDR_MAP_BLOCK. */
 /* event.cpp's OTHER section: a tag, then the block's own length as a second
  * tag, then 16008 bytes straight out of 0x0050C368. The length goes out
  * through WriteSaveTag and comes back through CheckSaveTag, which is why
@@ -2577,8 +2601,15 @@
 
 #define ADDR_SAVE_MAP_SECTION    0x0042DB40u  /* int32_t(FILE *) */
 #define ADDR_LOAD_MAP_SECTION    0x0042DB70u  /* int32_t(FILE *) */
-#define ADDR_MAP_SAVE_BLOCK      0x00514D90u
-#define AM2_MAP_SAVE_SIZE        0xECu        /* 236 bytes */
+/* The block the map loader owns, and its first field is a STRING: the level
+ * loader at 0x0042C440 zeroes 416 bytes here and then strcpy's in the map
+ * directory it was just handed, which is what the sprite and mask paths put in
+ * front of a set number 20 or above. Only the first 236 go into a savegame,
+ * so the block is larger than the part map.cpp writes out. Named for the block
+ * rather than for either use -- both call sites had a name for it and each was
+ * silent about the other. */
+#define ADDR_MAP_BLOCK           0x00514D90u  /* char[] first, 416 bytes total */
+#define AM2_MAP_SAVE_SIZE        0xECu        /* 236 bytes, the saved prefix */
 #define AM2_SAVETAG_MAP          0x06660009u
 #define ADDR_STR_MAP_CPP         0x00486410u  /* "C:\\ArmyMen2\\source\\map.cpp" */
 /* 0x0042DBB0, "Checksum of %s " and "is %x " -- its own name. Seven callers,
@@ -4250,6 +4281,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define SPRITE_SET_OFF_PALETTE   0x20Cu  /* uint32_t[256] */
 #define SPRITE_SET_OFF_REMAP     0x60Cu  /* uint8_t[256] */
 #define SPRITE_SET_OFF_REMAP10   0x70Cu  /* uint8_t[256], first ten identity */
+/* And the archive itself: the open file and a directory into it, sorted by
+ * key, which ADDR_SPRITE_DIR_INDEX halves. Each entry is {key, offset}. */
+#define SPRITE_SET_OFF_FILE      0x200u  /* am2_FILE * */
+#define SPRITE_SET_OFF_DIR_COUNT 0x204u  /* int32_t */
+#define SPRITE_SET_OFF_DIR       0x208u  /* {uint32_t key, offset} * */
+#define ADDR_SPRITE_SET_FOR_KEY  0x00423940u  /* void *(uint32_t key) */
+#define ADDR_SPRITE_DIR_INDEX    0x00423D50u  /* int32_t(void *, uint32_t) */
+#define ADDR_STR_DF_SEEK_FAIL    0x00478C1Cu  /* "Error seeking to location %d
+                                               *  in data file.\n" */
+#define ADDR_STR_DF_BAD_OBJECT   0x00478BF0u  /* "Error in validating object in
+                                               *  data file.\n" */
 #define AM2_PALETTE_RESERVED     10
 #define ADDR_STR_SET_TITLE       0x00478AC0u  /* "title" */
 #define ADDR_STR_SET_SHARED      0x00478AACu  /* "shared" */

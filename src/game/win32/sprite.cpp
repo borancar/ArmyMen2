@@ -28,7 +28,9 @@
 #include "../rect.h"
 #include "../air.h"        /* RemapSpriteRuns, GrowSpriteList */
 #include "palette.h"       /* NearestPalIndex -- reconstructed */
+#include "surface.h"       /* CreateBitmapSurface -- reconstructed */
 #include "../crt.h"        /* am2_malloc */
+#include "../gamedir.h"    /* SetGameDir -- reconstructed */
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -463,11 +465,302 @@ void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id)
     *countp = count + 1;
 }
 
-typedef int32_t (__cdecl *am2_sprite_load_fn)(AM2_Sprite *spr, int32_t a,
-                                              int32_t b, int32_t c,
-                                              int32_t flags);
+typedef void (__cdecl *am2_load_shadow_fn)(const char *file, AM2_Sprite *spr);
+typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
+typedef int32_t (__cdecl *am2_findfirst_fn)(const char *pattern, void *data);
+typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
 
-#define orig_sprite_load_triple (*(am2_sprite_load_fn)ADDR_SPRITE_LOAD_TRIPLE)
+#define orig_sprintf        ((am2_sprintf_fn)AM2_IMAGE(ADDR_GAME_SPRINTF))
+#define orig_load_shadow    ((am2_load_shadow_fn)AM2_IMAGE(ADDR_LOAD_SHADOW_BMP))
+#define orig_findfirst      ((am2_findfirst_fn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findclose      ((am2_findclose_fn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define g_spriteSetDirs     ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))
+
+/* 0x004457E0. Fill a sprite record from {set, index, frame}.
+ *
+ * Two halves, and the FIRST decides whether the rest of the function runs at
+ * all: with ADDR_OPT_DF set -- which is every run that does not pass -df --
+ * the whole thing is a tail call into the packed-data-file loader, and the
+ * loose-file body below is unreachable. That is the shipped configuration, so
+ * what this reconstruction mostly does in practice is choose.
+ *
+ * The loose half chdirs to the set's own directory and then globs for the two
+ * files that make one sprite: a `.bmp` of pixels and a `.sha` of shadow. Both
+ * are optional individually -- a missing one clears its field and the sprite
+ * is still good -- and only losing BOTH is a failure. The names carry the
+ * numbers, so the glob is `%02d_%03d_%02d_*` with anything after the third
+ * number free text: `01_000_00_screen.bmp` is set 1, index 0, frame 0.
+ *
+ * A set of 20 or above is the map's own art and gets the loaded map directory
+ * in front of it; below that the directory stands alone. Both formats and the
+ * table are the original's -- see ADDR_SPRITE_SET_DIRS.
+ *
+ * The two patterns share one buffer, which is visible in the failure message:
+ * it names the `.sha` pattern, never the `.bmp` one, because by then the
+ * second sprintf has overwritten the first. Reproduced rather than tidied.
+ *
+ * What `tools/ab.sh df` covers and what it does not, measured both ways. The
+ * install ships exactly one loose sprite, so a run reaches the found arm once
+ * and the missing arm twenty times, and clearing the wrong field on a missing
+ * `.sha` costs an extra log line and 303,757 pixels. The `set >= 20` arm is
+ * NOT covered: only sets 0, 1 and 3 arrive, because there is no menu under
+ * -df and so no map, and replacing the test with `if (0)` passes the
+ * configuration unchanged. That branch and the map directory in front of it
+ * stay verified by reading. */
+int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
+                                 int32_t frame, int32_t flags)
+{
+    char    pattern[0x100];
+    uint8_t found[0x118];
+    char    dir[0x100];
+    int32_t handle;
+
+    if (g_optDf)
+        return SpriteLoadFromDataFile(spr, set, index, frame, flags);
+
+    if (set >= 20)
+        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_DIR_SUB),
+                     (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
+                     g_spriteSetDirs[set]);
+    else
+        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_S),
+                     g_spriteSetDirs[set]);
+    SetGameDir(dir);
+
+    orig_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_BMP),
+                 set, index, frame);
+    handle = orig_findfirst(pattern, found);
+    if (handle == -1) {
+        spr->image.rle16 = 0;
+    } else {
+        orig_sprite_reload_named(spr, (const char *)(found + AM2_FIND_OFF_NAME),
+                                 flags);
+        orig_findclose(handle);
+    }
+
+    orig_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_SHA),
+                 set, index, frame);
+    handle = orig_findfirst(pattern, found);
+    if (handle == -1) {
+        spr->overlay = 0;
+    } else {
+        orig_load_shadow((const char *)(found + AM2_FIND_OFF_NAME), spr);
+        orig_findclose(handle);
+    }
+
+    if (!spr->image.rle16 && !spr->overlay) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_SPRITE_MISSING, pattern);
+        return 0;
+    }
+    return 1;
+}
+
+/* ---- the packed data file ----------------------------------------------
+ *
+ * Three sets -- title, shared and the map's own -- each a palette, two remap
+ * tables, an open file and a directory of {key, offset} sorted by key. This is
+ * where every sprite in a shipped run comes from; the loose-file path above is
+ * only reachable under -df.
+ *
+ * The key is the sprite id, and that is what identifies PackKey's three fields
+ * as {set, index, frame}. See packkey.h.
+ */
+#define SET_FILE(s)  (*(am2_FILE **)((uint8_t *)(s) + SPRITE_SET_OFF_FILE))
+#define SET_DIR(s)   (*(AM2_SpriteDirEntry **)((uint8_t *)(s) + \
+                                               SPRITE_SET_OFF_DIR))
+#define SET_COUNT(s) (*(int32_t *)((uint8_t *)(s) + SPRITE_SET_OFF_DIR_COUNT))
+
+/* 0x00423940. Which of the three sets holds a key.
+ *
+ * Sets 1..9 are the title archive, 20 and up the map's own, and everything
+ * else -- 0, and 10..19 -- the shared one. The same bands ADDR_SPRITE_SET_DIRS
+ * splits on: one directory name per set on the loose side, one open archive
+ * per BAND on this one. */
+void *__cdecl SpriteSetForKey(uint32_t key)
+{
+    int32_t set = (int32_t)KeyFieldA(key);
+
+    if (set >= 20)
+        return (void *)AM2_IMAGE(ADDR_SPRITE_SET_THIRD);
+    if (set < 1 || set > 9)
+        return (void *)AM2_IMAGE(ADDR_SPRITE_SET_SHARED);
+    return (void *)AM2_IMAGE(ADDR_SPRITE_SET_TITLE);
+}
+
+/* 0x00423D50. The directory index for a key, or -1.
+ *
+ * A binary search by halving. The compare is SIGNED (`jge`) where the sprite
+ * registry's own search in SpriteSlotOf is UNSIGNED (`jae`) -- two tables
+ * holding the same kind of id, disagreeing about it. Reproduced: a key with
+ * bit 31 set would be searched differently by the two, and PackKey only
+ * produces 26 bits, so nothing can tell them apart. */
+int32_t __cdecl SpriteDirIndex(void *set, uint32_t key)
+{
+    const AM2_SpriteDirEntry *dir;
+    int32_t lo = 0;
+    int32_t hi = SET_COUNT(set);
+
+    if (hi <= 0)
+        return -1;
+
+    dir = SET_DIR(set);
+    do {
+        int32_t mid = lo + ((hi - lo) >> 1);
+
+        if (dir[mid].key == key)
+            return mid;
+        if ((int32_t)dir[mid].key < (int32_t)key)
+            lo = mid + 1;
+        else
+            hi = mid;
+    } while (hi > lo);
+
+    return -1;
+}
+
+/* 0x00423FE0. Fill a sprite record from the packed data file.
+ *
+ * Seek to the entry, check the key it starts with, then read the record: two
+ * dimensions, a flags word, the hot spot, the two file fields, and one or two
+ * length-prefixed blocks. The dimensions become the bounds rectangle with its
+ * origin at zero, which is why left and top are written as constants.
+ *
+ * `format` is derived from the flags word rather than stored: bit 2 gives 1,
+ * bit 3 gives 2, bit 4 gives 3, and none of them gives 0. Zero is the hardware
+ * arm, and it is the one that goes to CreateBitmapSurface -- the other three
+ * malloc the block and remap it in place. That is the same selector sprite.h's
+ * union is decided by; here is where it is written.
+ *
+ * Which REMAP table applies is the only thing the format changes at the tail:
+ * format 3 uses the one whose first ten entries are the identity. Both arms
+ * pass the format itself as RemapRleRuns' `wide`, so the branch is about the
+ * table alone -- reproduced as the original wrote it rather than folded.
+ *
+ * That table choice is NOT checked by anything, and it is worth saying so
+ * rather than letting three passing mutations read as full coverage. Making
+ * SpriteDirIndex always miss puts bootcamp 293,671 pixels out and drops four
+ * of its log lines, and so does making SpriteSetForKey always answer the
+ * shared archive -- so this function certainly runs and its archive choice is
+ * certainly observed. But swapping REMAP10 for REMAP on the format-3 arm
+ * leaves bootcamp at its usual 22 pixels with an identical log. Either no
+ * format-3 sprite loads there or the two tables agree on the indices those
+ * sprites use; the reserved-block distinction stays verified by reading.
+ *
+ * The failure path frees both blocks and clears them, and it cannot fire: both
+ * were cleared on the way in and nothing between there and here writes either.
+ * Reproduced.
+ *
+ * The original reads each dword into its own ARGUMENT slots -- MSVC reusing
+ * the incoming stack -- so `frame` and `spr` are overwritten as it goes. Only
+ * `flags` survives to be read at the end, which is why locals here are
+ * equivalent rather than merely tidier. */
+int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
+                                       int32_t index, int32_t frame,
+                                       int32_t flags)
+{
+    const AM2_SpriteDirEntry *dir;
+    uint8_t  *sset;
+    am2_FILE *fp;
+    uint32_t  key;
+    int32_t   slot;
+    int32_t   value;
+    int32_t   len;
+    int32_t   ok = 0;
+
+    spr->image.rle16 = 0;
+    spr->overlay     = 0;
+
+    key  = PackKey((uint32_t)set, (uint32_t)index, (uint32_t)frame);
+    sset = (uint8_t *)SpriteSetForKey(key);
+    if (!sset)
+        return 0;
+
+    slot = SpriteDirIndex(sset, key);
+    if (slot < 0)
+        return 0;
+
+    fp  = SET_FILE(sset);
+    dir = SET_DIR(sset);
+
+    if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_DF_SEEK_FAIL,
+                 dir[slot].offset);
+    } else {
+        orig_fread(&value, 4, 1, fp);
+        if ((uint32_t)value == key)
+            ok = 1;
+        else
+            orig_log((const char *)(uintptr_t)ADDR_STR_DF_BAD_OBJECT);
+    }
+
+    if (!ok) {
+        if (spr->image.rle16)
+            orig_free(spr->image.rle16);
+        if (spr->overlay)
+            orig_free(spr->overlay);
+        spr->image.rle16 = 0;
+        spr->overlay     = 0;
+        return 0;
+    }
+
+    spr->id = key;
+
+    orig_fread(&value, 4, 1, fp);
+    spr->bounds.top   = 0;
+    spr->bounds.left  = 0;
+    spr->bounds.right = value;
+
+    orig_fread(&value, 4, 1, fp);
+    spr->bounds.bottom = value;
+
+    orig_fread(&value, 4, 1, fp);
+    spr->flags = (uint32_t)value;
+    if (value & 4)
+        spr->format = 1;
+    else if (value & 8)
+        spr->format = 2;
+    else if (value & 0x10)
+        spr->format = 3;
+    else
+        spr->format = 0;
+
+    /* The caller may force the colour-key bit on; it can never turn one off. */
+    if (flags & 1)
+        spr->flags = (uint32_t)(value | 1);
+
+    /* Both halves of each pair in one four-byte read, as the file stores
+     * them and as the original reads them. */
+    orig_fread(&spr->hotX, 4, 1, fp);
+    orig_fread(&spr->fileA, 4, 1, fp);
+
+    orig_fread(&len, 4, 1, fp);
+    if (len > 0) {
+        if (spr->format == 0) {
+            spr->image.surface =
+                CreateBitmapSurface(fp, (uint32_t)len, spr->bounds.right,
+                                    spr->bounds.bottom,
+                                    sset + SPRITE_SET_OFF_REMAP,
+                                    (uint32_t)flags);
+        } else {
+            spr->image.rle16 = (AM2_Rle16 *)orig_malloc((size_t)len);
+            orig_fread(spr->image.rle16, (size_t)len, 1, fp);
+            if (spr->format == 3)
+                RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)len, 3,
+                             sset + SPRITE_SET_OFF_REMAP10);
+            else
+                RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)len,
+                             (int32_t)spr->format,
+                             sset + SPRITE_SET_OFF_REMAP);
+        }
+    }
+
+    orig_fread(&len, 4, 1, fp);
+    if (len > 0) {
+        spr->overlay = (AM2_Rle16 *)orig_malloc((size_t)len);
+        orig_fread(spr->overlay, (size_t)len, 1, fp);
+    }
+    return 1;
+}
 
 /* Allocate and fill one, or give the record back for free()ing. */
 static AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
@@ -479,7 +772,7 @@ static AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
      * the allocation, so neither does this. */
     memset(spr, 0, sizeof(AM2_Sprite));
 
-    if (!orig_sprite_load_triple(spr, set, index, frame, flags)) {
+    if (!SpriteLoadTriple(spr, set, index, frame, flags)) {
         orig_free(spr);
         return 0;
     }
@@ -967,6 +1260,14 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
     rc |= patch_replace(ADDR_SPRITE_REGISTER, (const void *)SpriteRegister,
                         "SpriteRegister", 2);
+    rc |= patch_replace(ADDR_SPRITE_LOAD_TRIPLE, (const void *)SpriteLoadTriple,
+                        "SpriteLoadTriple", 2);
+    rc |= patch_replace(ADDR_SPRITE_SET_FOR_KEY, (const void *)SpriteSetForKey,
+                        "SpriteSetForKey", 3);
+    rc |= patch_replace(ADDR_SPRITE_DIR_INDEX, (const void *)SpriteDirIndex,
+                        "SpriteDirIndex", 2);
+    rc |= patch_replace(ADDR_SPRITE_LOAD_DF, (const void *)SpriteLoadFromDataFile,
+                        "SpriteLoadFromDataFile", 2);
     rc |= patch_replace(ADDR_PRELOAD_SPRITE_NAME, (const void *)PreloadSpriteName,
                         "PreloadSpriteName", 14);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,

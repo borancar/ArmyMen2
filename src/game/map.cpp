@@ -14,7 +14,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-#define kMapSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_MAP_SAVE_BLOCK))
+#define kMapSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_MAP_BLOCK))
 
 int32_t __cdecl SaveMapSection(am2_FILE *fp)
 {

@@ -444,13 +444,20 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count);
  * That is the same pair MaskPixelSolid and MaskPixelSolid32 are, which is what
  * this function settles: the two decoders are not near-duplicates that happened
  * to be compiled twice, they are the two halves of a format that carries its
- * offset width as a parameter. The one caller passes 3 here.
+ * offset width as a parameter.
  *
- * The second argument is never read. It is not padding -- the caller pushes a
- * real value into it -- so it is either vestigial or belongs to a signature
- * this function shares with something else. Reproduced as an ignored
- * parameter, because dropping it would silently change the calling
- * convention.
+ * Both open questions here are answered by the one call site, which is now
+ * reconstructed -- SpriteLoadFromDataFile in win32/sprite.cpp. `wide` is the
+ * sprite's FORMAT, 1, 2 or 3, straight out of the file: the same selector
+ * sprite.h describes, so the parameter and the union arm are one decision made
+ * twice. This comment said "the one caller passes 3", which is true of only
+ * one of that call site's two arms.
+ *
+ * And the second argument, read as "either vestigial or part of a shared
+ * signature", is the RLE block's byte LENGTH. The caller has just malloc'd and
+ * fread that many bytes and passes the count on; this function walks the row
+ * table instead and never looks at it. Still reproduced as an ignored
+ * parameter, because dropping it would change the calling convention.
  *
  * The accumulator is 16-bit and only its low half is ever compared, so a row
  * whose runs overshoot wraps rather than saturating -- the same arithmetic

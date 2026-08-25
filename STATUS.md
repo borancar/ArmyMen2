@@ -5,11 +5,100 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `2909d55`. Working tree clean.
+Last updated: **2026-08-25**, at `67b8321`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`SpriteLoadTriple` is reconstructed, and reading it produced a whole new
+  A/B configuration.** `0x004457E0`, 432 bytes, the function `PreloadSprite`
+  reaches for every sprite the game does not already hold. Two halves, and the
+  first decides whether the second runs at all.
+
+- **The `-df` flag reads BACKWARDS from its name.** `0x0047894C` ships as **1**
+  in the image and the switch **clears** it, so the packed `.dat` is the
+  DEFAULT and `-df` is what selects loose files off disk. Two comments in
+  `orig.h` had the polarity the other way round -- `ADDR_SPRITE_REBUILD_DF`
+  "when -df is set" and its sibling "when it is not" -- and both are corrected.
+  The names happened to be right about substance and wrong about the switch.
+
+- **So the loose-file body was unreachable by every configuration in the
+  suite**, and `tools/ab.sh df` exists now to reach it. The install ships
+  exactly ONE loose sprite -- `01-title/01_000_00_screen.bmp` -- so the run
+  paints the splash from it and reports every other sprite missing: 24
+  identical game messages, 20 of them naming a distinct `{set, index, frame}`
+  pattern, and 0 of 786,432 pixels.
+
+  That is a better check than one success would have been. The found arm runs
+  once, the missing arm twenty times, and the failure message is exercised on
+  every one of them.
+
+- **Measured in both directions, which is the only way a new configuration is
+  worth anything.** Clearing the wrong field when the `.sha` is missing --
+  `image` instead of `overlay`, which wipes the one sprite that DID load --
+  costs an extra log line and **303,757** pixels against a budget of 200. And
+  replacing `set >= 20` with `if (0)` passes it **unchanged**: only sets 0, 1
+  and 3 arrive, because there is no menu under `-df` and so no map. That arm
+  and the loaded map directory in front of it stay verified by reading, and
+  the source comment says so.
+
+- **The failure message names the `.sha` pattern and never the `.bmp` one**,
+  because the two share one buffer and the second `sprintf` has already
+  overwritten the first by the time it is printed. Visible in every one of the
+  twenty lines. Reproduced rather than tidied.
+
+- **The packed data file is ours too, and it is the path every configuration
+  takes.** `SpriteSetForKey` (0x00423940), `SpriteDirIndex` (0x00423D50) and
+  `SpriteLoadFromDataFile` (0x00423FE0) -- what `SpriteLoadTriple` tail-calls
+  unless `-df` was given, which is every shipped run. Three sets, each a
+  palette, two remap tables, an open file and a directory of {key, offset}
+  sorted by key; the search halves it.
+
+- **Measured, and the third mutation does not discriminate.** Making
+  `SpriteDirIndex` always miss puts `bootcamp` **293,671** pixels out and drops
+  four of its log lines -- the mission never loads. Making `SpriteSetForKey`
+  always answer the shared archive does exactly the same. So the code runs and
+  its archive choice is observed, which is the question the counters cannot
+  answer: all four read 0 because every caller is ours. But swapping `REMAP10`
+  for `REMAP` on the format-3 arm leaves `bootcamp` at its usual 22 pixels with
+  an identical log, so that table choice stays verified by reading. Said
+  plainly rather than letting two passing mutations read as full coverage.
+
+- **Closing that seam is what proved the seam checker earns its keep.**
+  `SpriteLoadTriple` was still reaching 0x00423FE0 through
+  `orig_sprite_load_df`, which had just become our own code.
+  `tools/checkseams.py` failed the build until it called
+  `SpriteLoadFromDataFile` directly -- exactly the lie it exists for, and
+  invisible to everything else.
+
+- **`PackKey`'s three fields are identified, for the sprite family only.** A is
+  the SET, B the index, C the frame, and five readers say so independently:
+  `PreloadSprite` composes the id with PackKey's arithmetic written out inline;
+  `SpriteSetForKey` splits field A on the same 1..9 / 20 bands
+  `ADDR_SPRITE_SET_DIRS` uses; `SpriteLoadFromDataFile` packs its own three
+  arguments and stores the result as the sprite id; `PreloadSpriteByKey`
+  unpacks a key with all three accessors and hands them straight to
+  `PreloadSprite`'s set, index and frame parameters; and `SpriteRebuildDf` does
+  the same. `packkey.h` still names them structurally, because
+  `KeyLookupTriple`'s table at 0x00516150 is a different user of the same
+  packing and none of it applies there.
+
+- **`RemapRleRuns`' two open questions are both answered by its one call
+  site**, which is now reconstructed. `misc.h` said "the one caller passes 3",
+  true of only one of that site's two arms -- `wide` is the sprite's FORMAT,
+  1, 2 or 3, the same selector `sprite.h`'s union is decided by, so the
+  parameter and the union arm are one decision made twice. And the second
+  argument, filed as "either vestigial or part of a shared signature", is the
+  RLE block's byte LENGTH: the caller has just malloc'd and read that many
+  bytes and passes the count on, and the callee walks the row table instead.
+
+- **`ADDR_MAP_SAVE_BLOCK` was a call-site name and is now `ADDR_MAP_BLOCK`.**
+  The same 0x00514D90 that `map.cpp` writes into a savegame is a STRING at its
+  head: the level loader zeroes 416 bytes there and `strcpy`s in the map
+  directory, which is what goes in front of a sprite set numbered 20 or above.
+  Two call sites, each with a name for it, each silent about the other -- and
+  only 236 of the 416 bytes are saved, so neither name covered the block.
 
 - **The four MP button handlers are reconstructed, and reading them RENAMED
   two of the three classes.** "Toggle" and "spinner" were honest guesses from
@@ -2756,11 +2845,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 801 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 800 | 789 of them below the CRT line |
+| `patch_replace` sites | 805 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 805 | each patched exactly once |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 145,488 / 372,816 B (**39.0%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 160,064 / 372,816 B (42.9%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 146,704 / 372,816 B (**39.4%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 161,280 / 372,816 B (43.3%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
