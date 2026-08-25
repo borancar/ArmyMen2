@@ -136,6 +136,9 @@ void __cdecl FreeOverdueItems(void);
 /* 0x00429320. The shared tail of every per-type destroy. */
 void __cdecl DestroyObjCommon(void *obj);
 
+/* 0x00449460. DestroyByType's type-2 arm. */
+void __cdecl DestroyType2(void *obj);
+
 void item_install(void);
 
 #ifdef __cplusplus

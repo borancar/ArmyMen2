@@ -4885,6 +4885,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FREE_OVERDUE_ITEMS    0x00428C40u  /* void(void) */
 #define OBJ_FLAG_NO_SWEEP          0x08000000u  /* bit 27, meaning unestablished */
 #define ADDR_DESTROY_BY_TYPE       0x00428DA0u  /* void(void *obj) */
+/* Zeroed by every per-type destroy handler, in a pair of 16-bit stores, right
+ * beside the script id. It sits immediately after the four script dwords at
+ * 0xB0..0xBC, which is suggestive and not evidence, so it is named the way
+ * OBJ_OFF_FIELD_540 already is -- structurally, until something reads it. */
+#define OBJ_OFF_FIELD_C0           0xC0u
 #define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */

@@ -569,7 +569,6 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 
 /* The four teardowns and the broadcast test, all still the original's. */
 typedef void (__cdecl *am2_destroy_fn)(void *obj);
-#define orig_destroy_type2      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE2))
 #define orig_destroy_type3      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE3))
 #define orig_destroy_type8      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE8))
 #define kItemComm  (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
@@ -602,7 +601,7 @@ void __cdecl DestroyByType(void *obj)
     int32_t type = *(const int32_t *)obj;
 
     switch (type) {
-    case 2:  orig_destroy_type2(obj); break;
+    case 2:  DestroyType2(obj); break;
     case 3:  orig_destroy_type3(obj); break;
     case 8:  orig_destroy_type8(obj); break;
     default: DestroyObjCommon(obj); break;
@@ -618,6 +617,46 @@ typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
 #define orig_row_unregister \
             ((am2_row_unregister_fn)AM2_IMAGE(ADDR_ROW_UNREGISTER))
 #define orig_item_teardown  ((am2_destroy_fn)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
+
+#define orig_obj_attach_to \
+            ((void (__cdecl *)(void *, void *))AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
+
+/* 0x00449460, one caller -- DestroyByType's type-2 arm.
+ *
+ * The simplest of the three per-type handlers and the only one with no
+ * type-specific step before the shared work: clear the script id and the field
+ * beside it, detach from whatever holds this object, then fall into the common
+ * tail. Its two siblings, 0x0045A9C0 and 0x0043CF30, are the same four lines
+ * with one extra call in front; they wait until 0x0045A770 and 0x0043CA00 have
+ * been READ, rather than being written around a name guessed from their heads.
+ *
+ * ObjAttachTo with a null target is a pure detach -- see its note in orig.h --
+ * so this is "forget where you were, then be destroyed".
+ *
+ * The four stores are 16-bit in the original, two per dword, and are kept that
+ * way. The value is zero so a single dword store would be indistinguishable in
+ * effect; matching the width costs nothing and means the next reader compares
+ * like with like.
+ *
+ * Its counter reads 0 and this one really IS the blind spot, unlike the last
+ * zero I explained in this file: the only caller is DestroyByType, which is
+ * ours and calls this by name, so nothing crosses a patch stub and the counter
+ * cannot move whether the arm is taken or not. What is NOT known is whether a
+ * type-2 destroy happens in a Boot Camp mission at all -- DestroyByType runs
+ * three times there and which arms those take would need a probe. Said plainly
+ * rather than left to read as coverage. */
+void __cdecl DestroyType2(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
+    *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
+
+    orig_obj_attach_to(obj, 0);
+    DestroyObjCommon(obj);
+}
 
 /* 0x00429320, five callers. The shared tail of every per-type destroy, and the
  * thing that actually marks an object gone.
@@ -762,6 +801,8 @@ void item_install(void)
                   "RemoveInventoryItem", 4);
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
+    patch_replace(ADDR_DESTROY_TYPE2, (const void *)DestroyType2,
+                  "DestroyType2", 1);
     patch_replace(ADDR_DESTROY_OBJ_COMMON, (const void *)DestroyObjCommon,
                   "DestroyObjCommon", 5);
     patch_replace(ADDR_FREE_OVERDUE_ITEMS, (const void *)FreeOverdueItems,
