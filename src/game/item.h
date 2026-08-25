@@ -123,6 +123,10 @@ int32_t __cdecl ObjHeight(const void *obj);
  * still original -- both arguments go straight through. */
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);
 
+/* 0x0041D3A0. One row's teardown: unregister it from the map's cell lists and
+ * free the buffer it owns, both gated on the single flag at +0x34. */
+void __cdecl RowRelease(void *row, void *desc);
+
 void item_install(void);
 
 #ifdef __cplusplus

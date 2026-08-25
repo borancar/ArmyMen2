@@ -228,7 +228,34 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells)
  * Note the log prints the object's uid at +4 and is gated on the comm object's
  * debug field, the same one the event functions read. */
 typedef void (__cdecl *AM2_RowReleaseFn)(void *row, void *desc);
-#define orig_row_release  ((AM2_RowReleaseFn)(uintptr_t)ADDR_ROW_RELEASE)
+#define orig_row_unregister_all \
+            ((AM2_RowReleaseFn)(uintptr_t)ADDR_ROW_UNREGISTER_ALL)
+
+/* 0x0041D3A0, five callers -- one row's teardown.
+ *
+ * The +0x34 flag gates everything: a row that does not own a buffer is left
+ * entirely alone, and in particular is NOT unregistered. So the flag means
+ * "this row is in the map's cell lists AND owns an allocation", the two
+ * together, rather than either separately -- which is what makes one test
+ * enough for both actions.
+ *
+ * The order is unregister, then free, then clear both fields. Taking the row
+ * out of the cell lists before the buffer goes is the part that matters:
+ * anything walking those lists in between would otherwise reach freed
+ * memory. */
+void __cdecl RowRelease(void *row, void *desc)
+{
+    uint8_t *r = (uint8_t *)row;
+
+    if (!r[ROW_OFF_OWNS])
+        return;
+
+    orig_row_unregister_all(r, desc);
+    am2_free(*(void **)(r + ROW_OFF_BUFFER));
+
+    *(void **)(r + ROW_OFF_BUFFER) = (void *)0;
+    r[ROW_OFF_OWNS] = 0;
+}
 
 /* 0x00434EC0. Release an object's sub-list: every row's own teardown, then
  * the array, then the capacity.
@@ -249,9 +276,9 @@ void __cdecl FreeSubrecordRows(void *subrecord)
     int32_t  i;
 
     for (i = 0; i < *(const int32_t *)(rec + SUBREC_OFF_COUNT); i++)
-        orig_row_release(*(uint8_t **)(rec + SUBREC_OFF_ROWS)
-                         + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
-                         (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowRelease(*(uint8_t **)(rec + SUBREC_OFF_ROWS)
+                   + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
+                   (void *)(uintptr_t)ADDR_MAP_DESC);
 
     rows = *(void **)(rec + SUBREC_OFF_ROWS);
     if (rows) {
@@ -579,4 +606,5 @@ void item_install(void)
     patch_replace(ADDR_OBJ_HEIGHT, (const void *)ObjHeight, "ObjHeight", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
+    patch_replace(ADDR_ROW_RELEASE, (const void *)RowRelease, "RowRelease", 5);
 }

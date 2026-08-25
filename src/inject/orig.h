@@ -4435,8 +4435,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x0041D480: take one row out of the map descriptor's cell lists. */
 #define ADDR_ROW_UNREGISTER    0x0041D480u /* void(row *, int32, void *desc) */
 /* 0x0041D3A0: the same row's TEARDOWN -- unregister it and free the buffer it
- * owns at +0x38, but only when its +0x34 flag says there is one. */
+ * owns at +0x38, but only when its +0x34 flag says there is one.
+ *
+ * The unregister it calls is 0x0041DB20 and NOT ADDR_ROW_UNREGISTER above,
+ * which this comment used to imply. The two are different functions; this one
+ * takes the row and the descriptor and no index. */
 #define ADDR_ROW_RELEASE       0x0041D3A0u /* void(row *, void *desc) */
+#define ADDR_ROW_UNREGISTER_ALL 0x0041DB20u /* void(row *, void *desc) */
+#define ROW_OFF_OWNS           0x34u  /* uint8_t: there is a buffer at +0x38 */
+#define ROW_OFF_BUFFER         0x38u
 /* The sub-list header inside an object: {?, count, rows, capacity} at
  * OBJ_OFF_SUBRECORD, so the count the object reads at OBJ_OFF_ROW_COUNT and
  * the header's own +4 are the same dword seen two ways. */

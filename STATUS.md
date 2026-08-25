@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `dd9042d`. Working tree clean.
+Last updated: **2026-08-25**, at `899fb0c`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,51 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`RowRelease` (0x0041D3A0), and one flag gates two actions.** A row that
+  does not own a buffer is left entirely alone -- and in particular is NOT
+  unregistered. So `+0x34` means "this row is in the map's cell lists AND owns
+  an allocation", the two together, which is what makes one test enough for
+  both. The order is unregister, free, clear: taking the row out of the cell
+  lists before the buffer goes is the part that matters, because anything
+  walking those lists in between would reach freed memory.
+
+  It also corrects a comment: the unregister it calls is `0x0041DB20`, not
+  `ADDR_ROW_UNREGISTER` (`0x0041D480`) as `orig.h` implied. Different
+  functions -- this one takes the row and the descriptor and no index.
+
+- **Unexercised, for the reason CLAUDE.md already gives.** Its caller
+  `FreeSubrecordRows` is ours, so the counter is blind either way; what
+  decides it is that nothing in an observed Boot Camp or campaign window
+  dies, so `FreeItem` and the whole unlink family never run. A mutation
+  before the first guard changes nothing.
+
+## The next target, read but not written
+
+**`0x0041E440` and `0x0041E160` are the map's object painter, and between
+them they are the last large thing in the render path that this environment
+definitely exercises.** Recorded here because the reading is done and the
+writing is not.
+
+`0x0041E440` (592 B, three callers, called from our own `PaintMapTiles`)
+walks the map's cell grid. It clamps the world rectangle to the map -- shifted
+right by 8, so these are tile indices -- and the clamp on the BOTTOM edge is
+against `cols - 1`, not `rows - 1`, which is either a bug or a square-map
+assumption and is worth settling before transcribing. Each cell holds a linked
+list of `{obj, ?, next}`; each object is filtered by a predicate at
+`0x0040A040` and by two "did we already pass this edge" tests, then handed to
+`0x0041E160`.
+
+`0x0041E160` (736 B) is the DEPTH SORT: it inserts the object into a sorted
+list of at most 500 (`0x1F4`) twelve-byte nodes at `0x00507350`, with the head
+index in `0x0050B1D8` and the count in `0x0050B1D4` -- the three globals
+`0x0041E440` clears on entry. The walker's tail then draws that list in order
+through `0x0040A090`.
+
+So the shape is collect-then-sort-then-draw, and the three globals are the
+sort's state rather than draw counters. Both functions run constantly in a
+mission and a mistake in either is worth tens of thousands of pixels, which
+makes them well-chosen and worth doing carefully rather than quickly.
 
 - **`StateLeave` (0x0042E720): two movie pointers, and they are not the same
   one.** It owns `ADDR_STATE_MOVIE` (`0x00515F98`) while `MovieForget` clears
@@ -2357,11 +2402,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 788 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 787 | 776 of them below the CRT line |
+| `patch_replace` sites | 789 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 788 | 777 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 141,424 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 156,000 / 372,816 B (41.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 141,472 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 156,048 / 372,816 B (41.9%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
