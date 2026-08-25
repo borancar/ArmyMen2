@@ -205,6 +205,48 @@ void __cdecl SendObjDestroyed(const void *obj)
     ArmyMessageSend(msg);
 }
 
+/* 0x0042A9A0. Tell the other players an item is gone.
+ *
+ * The name is the program's own -- "itemGoneMessageSend uid %x item_type %d"
+ * -- which also settles what kind 0x0E means without needing a receiver, the
+ * thing its sibling SendObjDestroyed had to infer from its callers.
+ *
+ * Same eight-byte shape as that one and the same ADDR_MP_SESSION guard, with
+ * one extra gate: the object's TYPE must be 1..4. So this is the ITEM half of
+ * the family and the sibling is the general one, which is why the sweep that
+ * calls this can leave the rest alone.
+ *
+ * The log line is behind COMM_OFF_VERBOSE and prints the RAW uid, where the
+ * message carries the wire one -- the same disagreement SendTrooperSetWeapon
+ * has, and the same reason: the log is for a human reading a single machine's
+ * trace, not for matching two machines' traffic. */
+void __cdecl ItemGoneMessageSend(const void *obj)
+{
+    uint8_t         msg[AM2_MSG_OBJ_DESTROYED_LEN];
+    const uint8_t  *comm;
+    uint32_t        uid;
+    int32_t         type;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+
+    type = *(const int32_t *)obj;
+    if (type <= 0 || type > 4)
+        return;
+
+    uid = *(const uint32_t *)((const uint8_t *)obj + 4);
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_ITEM_GONE;
+    *(uint32_t *)(msg + 4) = UidOnWire(uid);
+
+    comm = (const uint8_t *)kComm;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_ITEM_GONE_SEND, uid, type);
+
+    ArmyMessageSend(msg);
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
@@ -216,6 +258,8 @@ int armymsg_install(void)
                         "SendTrooperSetWeapon", 10);
     rc |= patch_replace(ADDR_SEND_OBJ_DESTROYED, (const void *)SendObjDestroyed,
                         "SendObjDestroyed", 2);
+    rc |= patch_replace(ADDR_ITEM_GONE_SEND, (const void *)ItemGoneMessageSend,
+                        "ItemGoneMessageSend", 1);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,
                         "SendGamePause", 2);
     return rc;

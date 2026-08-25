@@ -49,6 +49,10 @@ void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
  * Silent outside a multiplayer session. */
 void __cdecl SendObjDestroyed(const void *obj);
 
+/* 0x0042A9A0. Tell the other players an ITEM is gone. Silent outside a
+ * multiplayer session, and only for object types 1..4. */
+void __cdecl ItemGoneMessageSend(const void *obj);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

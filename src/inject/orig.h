@@ -4819,6 +4819,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * message is "that object was destroyed"; there is no receiver read yet and
  * the name should be revisited if one turns up saying otherwise. */
 #define ADDR_SEND_OBJ_DESTROYED  0x0042AA10u  /* void(const void *obj) */
+/* 0x0042A9A0, and it names itself: "itemGoneMessageSend uid %x item_type %d".
+ * The same eight-byte shape as the one above with a different kind, and one
+ * extra gate -- the object's TYPE must be 1..4, so the message is only sent
+ * for the four kinds that are items. */
+#define ADDR_ITEM_GONE_SEND      0x0042A9A0u  /* void(const void *obj) */
+#define AM2_MSG_ITEM_GONE        0x0Eu
+#define ADDR_STR_ITEM_GONE_SEND  0x00485E10u
 #define AM2_MSG_OBJ_DESTROYED    0x10u
 #define AM2_MSG_OBJ_DESTROYED_LEN 8u
 #define ADDR_STR_SEND_TROOPER_WEAPON 0x0048AA60u
