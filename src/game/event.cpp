@@ -822,9 +822,9 @@ typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
 #define orig_type238_action \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
-typedef void (__cdecl *AM2_ObjPairFn)(void *a, void *b);
-#define orig_obj_pair_action \
-    (*(AM2_ObjPairFn)AM2_IMAGE(ADDR_OBJ_PAIR_ACTION))
+typedef void (__cdecl *AM2_ObjAttachFn)(void *a, void *b);
+#define orig_obj_attach_to \
+    (*(AM2_ObjAttachFn)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
 #define orig_obj_set        (*(AM2_ObjSetFn)AM2_IMAGE(ADDR_OBJ_SET))
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
@@ -1690,7 +1690,7 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
     if (ObjIsType2((const AM2_Object *)a))
         *(int32_t *)(a + OBJ_OFF_FIELD_540) = 0;
 
-    orig_obj_pair_action(a, b);
+    orig_obj_attach_to(a, b);
 }
 
 /* --------------------------------------------------- bitmaps ---- */

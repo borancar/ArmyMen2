@@ -523,7 +523,15 @@ already there, and in five cases the OLD name was the one that knew something:
 
 None of it changed behaviour -- the address is the address -- but every one of
 those comments described the mechanism less well than the name already in the
-file did. **Before naming a global, grep `orig.h` for its address.** The one
+file did. **Before naming a global, grep `orig.h` for its address.** This rule is stated
+here, restated under the alias ratchet, and was still broken THREE TIMES in a
+single session -- on `0x00428DA0`, which was `ADDR_OBJ_ACTION`; on
+`0x0040F560`, which was already reconstructed; and on `0x00458070`, which was
+`ADDR_OBJ_PAIR_ACTION`. Every one was caught by `checkpatches` rather than by
+remembering, which is the argument for the ratchet existing and NOT an
+argument that the rule is optional: the check only fires after the name has
+been written, and each time the right fix was to decide which name is
+body-derived and delete the other. The grep costs one command. The one
 that is genuinely unresolved is `0x005125C4`, which was `ADDR_OPT_MUSIC` and
 which `SetGameDir` latches on entering the `avi` directory; one of the two
 readings is wrong and it is not yet established which.

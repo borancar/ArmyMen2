@@ -2516,7 +2516,10 @@
  * a third. Whatever the field holds, several actions reset it before giving
  * the object something new to do. */
 #define ADDR_EVT_OBJ_PAIR        0x0041FD50u  /* void(uint32_t, uint32_t) */
-#define ADDR_OBJ_PAIR_ACTION     0x00458070u  /* void(void *a, void *b) */
+/* Was ADDR_OBJ_PAIR_ACTION, a placeholder its own neighbour admitted was not
+ * a name -- "640 bytes with twenty callers, unnamed". Read now; see the block
+ * further down. Renamed rather than aliased. */
+#define ADDR_OBJ_ATTACH_TO       0x00458070u  /* void(subject, target) */
 /* 0x0041FA10. EvtArmyAtPoint's sibling: the same CommSlotForArmy -> list walk,
  * the same +8 flag gate and ObjFieldA filter, the same prune-and-do-not-
  * advance for a dead uid -- plus a type test the other one does not have, and
@@ -4913,6 +4916,29 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 656 bytes, six callers, still original -- the item-only half of the common
  * teardown, and the only callee of DestroyObjCommon without a name. */
 #define ADDR_ITEM_TEARDOWN         0x00439320u  /* void(void *obj) */
+/* 0x00458070, 640 bytes, 20 callers -- READ but not yet written, and the name
+ * is from the whole body rather than its head. 191 instructions, five returns.
+ *
+ * ObjAttachTo(subject, target). It DETACHES the subject from whatever it was
+ * attached to and then, if a target is given, attaches it to that instead:
+ *
+ *   - refuses subject == target, a null subject, and any subject whose type is
+ *     not 2, 3 or 8;
+ *   - takes the old holder's uid from +0xC4, looks it up, and walks its
+ *     membership list -- the COUNT at +0xA8 and the ARRAY at +0xAC, four bytes
+ *     a slot -- removing the subject's own uid through 0x0042A750;
+ *   - with a NULL target it stops there, clearing +0xA0 and +0xC4. That is how
+ *     the three per-type destroy handlers call it, so for them it is purely a
+ *     detach;
+ *   - otherwise it decides a stance code into +0xE4 -- 0, 3, 6 or 7 -- from the
+ *     two armies, ADDR_DEFAULT_OWNER and three comm queries at 0x0040F190,
+ *     0x0040F230 and 0x0040F250, then stores the target's uid in +0xC4 and
+ *     appends itself to the target's list through 0x0042A6E0.
+ *
+ * NOT written yet on purpose: it would need names for nine fields (+0xA0,
+ * +0xA4, +0xA8, +0xAC, +0xC4, +0xCC, +0xE4, +0x52C, +0x544), three comm
+ * methods and four 0x100-byte blocks at 0x004F9ACC..0x004F9DCC. The three
+ * 64-byte handlers that call it need only this name and can go first. */
 /* 0x00429C80, "DestroyItemObject, %x" -- its own name. Five callers. Frees the
  * allocation at +0x90 and clears the live byte at +0x8C; does nothing at all
  * if that byte is already clear, which makes it idempotent. */
