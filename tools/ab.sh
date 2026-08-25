@@ -203,7 +203,9 @@ play() {
         # (OptionsApply, which names itself "Options changed by host." and
         # puts that line in the comms panel -- so the final frame carries the
         # evidence that the apply reached its end).
-        mpoptions) args="-nointro -dbg"  ; wait=25 ;;
+        # The team button is driven to this value rather than to whatever the
+        # clicks happen to produce; see the loop in the drive below.
+        mpoptions) args="-nointro -dbg"  ; wait=25 ; MP_TEAM_SID=1575810 ;;
         # OPTIONS -> DIFFICULTY, which is the only screen with a LIST BOX --
         # the Easy/Medium/Hard rows. `ctl widgets` says that dialog is the only
         # place the class at 0x0046FCC0 is instantiated, so its painter and its
@@ -535,6 +537,38 @@ play() {
         # tree compared with no budget at all cannot afford one.
         mp_tap 200 49 right
         sleep 1
+        # Then CLOSE THE LOOP on the result rather than trusting the count.
+        #
+        # Measured, not feared: across four runs the button came back at
+        # sid=1575809 or sid=1575810 with about equal frequency, INDEPENDENTLY
+        # on each side -- so the two sides agree only half the time and this
+        # check failed one run in two. The comment above says one in five and
+        # was wrong about the rate; the fix above did not work.
+        #
+        # The three clicks are left, left, right, a net of +1, and the outcome
+        # is always base+1 or base+2 and never base+0. So either the right
+        # click sometimes does not land, or a left click sometimes doubles.
+        # The data cannot separate those and a previous confident story about
+        # this button -- the 250 ms auto-repeat -- was already found wrong, so
+        # no third theory is offered here.
+        #
+        # What is certain is that the value is READABLE, which makes the drive
+        # closeable: step it until it is the one we want, exactly as point.py
+        # closes the cursor loop on a screenshot instead of computing a delta.
+        # The tree holds two dumps by this point, so the live value is the
+        # LAST match.
+        team_sid() { drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+                     | grep 'r=191,39,209,59' | tail -1 | grep -o 'sid=[0-9]*'; }
+        n=0
+        while [ "$(team_sid)" != "sid=$MP_TEAM_SID" ] && [ $n -lt 16 ]; do
+            mp_tap 200 49
+            sleep 1
+            n=$((n + 1))
+        done
+        if [ "$(team_sid)" != "sid=$MP_TEAM_SID" ]; then
+            echo "ab.sh: mpoptions could not settle the team button on" \
+                 "$MP_TEAM_SID (got $(team_sid)) -- the tree will differ" >&2
+        fi
         # Row 1, which is a COMPUTER row -- the player count is 1, so row 0 is
         # ours and every row after it is past the count. That distinction is
         # the whole of the three handlers' guard and row 0 does not test it:

@@ -1640,6 +1640,27 @@ being wrong is not a failed test, it is the user's session. A surviving game als
 keeps holding `ArmyMenMutex`, which silently makes the next run in that prefix
 exit; `tools/drive.sh stop` walks the process tree for this reason.
 
+**`pkill` on a SCRIPT does not kill the game it started, and the leftovers
+produce completely convincing false failures.** Three in one session: an
+`ab.sh` whose reconstructed side "produced no game log lines"; a black screen
+with an empty log while the control socket still answered; and an `mpoptions`
+run that sat on the wrong screen because
+`control: bind/listen on port 31436 failed (10013)` -- a stale instance still
+held the port, so every drive command went nowhere. Each read exactly like a
+broken reconstruction and none was.
+
+The mutex is only half of it. The control PORT is the other half, and it fails
+differently: with the mutex the new game exits, with the port it runs happily
+and ignores everything you tell it. After killing anything, check BOTH before
+believing the next run:
+
+```
+pgrep -c -f 'ArmyMen2[.]exe'      # want 0
+ss -ltn | grep 31436              # want nothing
+```
+
+and grep the run's own log for `bind/listen`, which says so outright.
+
 ## Open items
 
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
