@@ -45,13 +45,17 @@ typedef struct AM2_Sprite {
     AM2_Rect bounds;             /* +0x14 .. +0x23 */
     int16_t  hotX;               /* +0x24, subtracted from the draw position */
     int16_t  hotY;               /* +0x26 */
-    int16_t  fileA;              /* +0x28  read straight out of the sprite
-                                  *        file by LoadSpriteSet, beside hotX
-                                  *        and hotY and in the same shape --
-                                  *        what they mean is not established,
-                                  *        but they are not padding */
+    /* fileA and fileB are the OTHER half of the same two dwords the hot spot
+     * comes out of. The data file stores {hotX, hotY} then {fileA, fileB};
+     * the bitmap path stores {hotX, fileA} and {hotY, fileB}, because it has
+     * only biXPelsPerMeter and biYPelsPerMeter to smuggle them through and
+     * splits them by axis. What they MEAN is still not established. */
+    int16_t  fileA;              /* +0x28 */
     int16_t  fileB;              /* +0x2A */
-    uint8_t  pad2C[4];           /* +0x2C */
+    uint8_t  keyIndex;           /* +0x2C  the transparent palette index, out
+                                  *        of the bitmap record's BMP_OFF_KEY.
+                                  *        Was called pad2C; it is not pad. */
+    uint8_t  pad2D[3];           /* +0x2D */
     AM2_Rle16 *overlay;          /* +0x30  second layer, drawn after the first */
     uint8_t *lut;                /* +0x34  256-entry remap table, may be NULL */
     void    *palette;            /* +0x38  overlay palette; NULL means default */
@@ -89,6 +93,15 @@ typedef struct {
 
 /* 0x00423940. Which of the three sets holds a key. */
 void *__cdecl SpriteSetForKey(uint32_t key);
+
+/* 0x004230F0. Fill a 0x1C-byte bitmap record from a file NAME: open it, read
+ * one DIB chunk, hand it to MakeBitmap, free the pixels. Zero if any step
+ * failed. */
+int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out);
+
+/* 0x004456B0. Reload a sprite from a named bitmap, through the record above. */
+int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
+                                  int32_t flags);
 
 /* 0x004236A0. Point `set` at the record a set name means and `id` at the file
  * id its archive must carry. Nonzero when the record is already pointing at

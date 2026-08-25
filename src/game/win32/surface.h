@@ -68,6 +68,17 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour);
  * that opens a file, reads one, and flips its rows. */
 void *__cdecl ReadDibChunk(am2_FILE *fp, void *header);
 
+/* 0x0041BE80. Turn a DIB header and its pixels into the 0x1C-byte bitmap
+ * record the BMP_OFF_* offsets describe: geometry, flags, the transparent
+ * index, and either a DirectDraw surface or an encoded software image. `remap`
+ * may be NULL, in which case it builds its own table from the display palette.
+ *
+ * Declared here for the first time because until sprite.cpp's
+ * LoadBitmapDescriptor was reconstructed it had no caller of ours -- it was
+ * defined, patched, and reached only through the detour. */
+int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
+                           uint8_t *dest, const uint8_t *remap);
+
 /* 0x0041BBC0 and 0x0041BD20. The two run-length encoders, which differ only
  * in the width of a row-table entry. Both answer the encoded SIZE; the buffer
  * goes back through `dest`. */

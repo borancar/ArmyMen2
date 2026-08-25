@@ -433,8 +433,24 @@
 #define BMP_OFF_SURFACE      0x00u
 #define BMP_OFF_WIDTH        0x04u
 #define BMP_OFF_HEIGHT       0x08u
+/* The two dwords MakeBitmap copies straight out of the DIB header, from
+ * biXPelsPerMeter and biYPelsPerMeter -- which is where this game's tools
+ * smuggle the hot spot. Each packs two int16: the low half is the hot spot and
+ * the high half is the field AM2_Sprite calls fileA/fileB. Confirmed against
+ * the shipped bitmaps, which carry a REAL resolution there (2834 for 72 dpi,
+ * 5038 for 128), so the +/-2048 clamp in SpriteReloadNamed fires on every one
+ * of them and the hot spot comes out (0,0). Firing is measured; MATTERING is
+ * not -- deleting the clamp changes no pixel of the one configuration that
+ * runs the code. See the note there. */
+#define BMP_OFF_HOT_X        0x0Cu   /* {hotX, fileA} */
+#define BMP_OFF_HOT_Y        0x10u   /* {hotY, fileB} */
 #define BMP_OFF_FLAGS        0x14u
 #define BMP_OFF_KEY          0x18u   /* in: byte count, out: transparent index */
+#define AM2_BMP_RECORD_SIZE  0x1Cu
+/* The BMP record from a file NAME: open, read one DIB chunk, hand it to
+ * MakeBitmap, free the pixels. Its only caller is SpriteReloadNamed. */
+#define ADDR_LOAD_BITMAP_DESC 0x004230F0u  /* int32(const char *, void *) */
+#define ADDR_STR_BITMAP_OPEN_FAIL 0x004789C4u /* "Couldn't open bitmap file!\n" */
 #define BMP_FLAG_NO_COLORKEY 0x0001u
 #define BMP_FLAG_SYSMEM      0x0040u
 #define BMP_FLAG_RESERVE10   0x0080u /* SET => reserve the first ten entries */

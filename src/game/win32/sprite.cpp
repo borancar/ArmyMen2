@@ -167,9 +167,7 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
 
 /* The three reload routines and the -df switch that picks between two of
  * them. All original; this function only decides which applies. */
-typedef int32_t (__cdecl *am2_reload_named_fn)(AM2_Sprite *, const char *, int32_t);
 typedef int32_t (__cdecl *am2_rebuild_fn)(AM2_Sprite *, int32_t);
-#define orig_sprite_reload_named (*(am2_reload_named_fn)ADDR_SPRITE_RELOAD_NAMED)
 #define orig_sprite_rebuild_df   (*(am2_rebuild_fn)ADDR_SPRITE_REBUILD_DF)
 #define orig_sprite_rebuild_alt  (*(am2_rebuild_fn)ADDR_SPRITE_REBUILD_ALT)
 #define g_optDf                  (*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
@@ -195,7 +193,7 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
     flags = (int32_t)(spr->flags & 0x1D);
 
     if (spr->source) {
-        if (orig_sprite_reload_named(spr, spr->source, flags))
+        if (SpriteReloadNamed(spr, spr->source, flags))
             return;
         orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_S, spr->source);
         return;
@@ -533,7 +531,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
     if (handle == -1) {
         spr->image.rle16 = 0;
     } else {
-        orig_sprite_reload_named(spr, (const char *)(found + AM2_FIND_OFF_NAME),
+        SpriteReloadNamed(spr, (const char *)(found + AM2_FIND_OFF_NAME),
                                  flags);
         orig_findclose(handle);
     }
@@ -552,6 +550,125 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
         orig_log((const char *)(uintptr_t)ADDR_STR_SPRITE_MISSING, pattern);
         return 0;
     }
+    return 1;
+}
+
+/* 0x004230F0. A bitmap record from a file NAME.
+ *
+ * Open, read one DIB chunk, hand the header and the pixels to MakeBitmap, free
+ * the pixels. Everything below it is already ours -- ReadDibChunk fills the
+ * 0x428-byte header (ten dwords then a 256-entry palette) and MakeBitmap turns
+ * it into the 0x1C-byte record the sprite fields come out of.
+ *
+ * The file is closed BEFORE the pixels are checked, which is the order the
+ * original writes and the only order that does not leak the handle on a failed
+ * read. `remap` is passed as NULL, so MakeBitmap builds its own table from the
+ * display palette. */
+int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
+{
+    uint8_t   header[0x428];
+    am2_FILE *fp;
+    void     *pixels;
+    int32_t   rc;
+
+    if (!name || !name[0])
+        return 0;
+
+    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_BITMAP_OPEN_FAIL);
+        return 0;
+    }
+
+    pixels = ReadDibChunk(fp, header);
+    orig_fclose(fp);
+    if (!pixels)
+        return 0;
+
+    rc = MakeBitmap((const uint32_t *)header, pixels, (uint8_t *)out, 0);
+    orig_free(pixels);
+    return rc;
+}
+
+/* Keep a hot spot only if it is plausible.
+ *
+ * The two dwords it comes out of are the DIB header's biXPelsPerMeter and
+ * biYPelsPerMeter, so an ordinary paint program's output lands here as a real
+ * resolution: every bitmap in this install carries 2834 (72 dpi) or 5038 (128
+ * dpi), read out of the files themselves. Both are outside this range, so the
+ * clamp fires on every sprite this path loads and they all get (0,0).
+ *
+ * That it FIRES is measured; that it MATTERS is not, and the difference was
+ * worth finding out rather than assuming. Deleting the clamp outright changes
+ * not one pixel of `ab.sh df`, the only configuration that runs this code --
+ * so whatever consumes the hot spot, it is not what places the backdrop that
+ * configuration draws. Making the function fail instead costs 300,424 pixels
+ * and a log line, so the code around it is thoroughly observed and this is a
+ * term that does not matter rather than a path that does not run. The clamp
+ * stays verified by reading. */
+static int16_t ClampHotSpot(int16_t v)
+{
+    return (v > 2048 || v < -2048) ? 0 : v;
+}
+
+/* 0x004456B0. Reload a sprite from a named bitmap.
+ *
+ * The record's flags word is an IN parameter as well as an out one: the
+ * caller's flags go in before the load, because MakeBitmap reads
+ * BMP_FLAG_RESERVE10 and the software-path bits out of it to decide what to
+ * build. What comes back is merged into the sprite one way -- `(record & 0x1C)
+ * | (caller & 1)` is OR'd IN and never clears a bit, the same as the data-file
+ * path.
+ *
+ * The hot spot and the two file fields share two dwords, split by AXIS rather
+ * than in struct order: x carries {hotX, fileA} and y carries {hotY, fileB}.
+ * That is not how the data file packs the same four values -- see sprite.h --
+ * and it is a consequence of having only the two resolution fields to put them
+ * in. All four are clamped; the archive's are not, because the archive is the
+ * game's own file and a .bmp on disk is whatever a tool wrote. */
+int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
+                                  int32_t flags)
+{
+    uint8_t  rec[AM2_BMP_RECORD_SIZE];
+    int32_t  x, y;
+    uint32_t merged;
+
+    *(uint32_t *)(rec + BMP_OFF_FLAGS) = (uint32_t)flags;
+
+    if (!LoadBitmapDescriptor(name, rec)) {
+        spr->image.rle16 = 0;
+        return 0;
+    }
+
+    spr->image.rle16 = *(AM2_Rle16 **)(rec + BMP_OFF_SURFACE);
+    spr->keyIndex    = rec[BMP_OFF_KEY];
+
+    spr->bounds.top    = 0;
+    spr->bounds.left   = 0;
+    spr->bounds.right  = *(const int32_t *)(rec + BMP_OFF_WIDTH);
+    spr->bounds.bottom = *(const int32_t *)(rec + BMP_OFF_HEIGHT);
+
+    x = *(const int32_t *)(rec + BMP_OFF_HOT_X);
+    y = *(const int32_t *)(rec + BMP_OFF_HOT_Y);
+
+    spr->hotX  = ClampHotSpot((int16_t)x);
+    spr->hotY  = ClampHotSpot((int16_t)y);
+    spr->fileA = ClampHotSpot((int16_t)(x >> 16));
+    spr->fileB = ClampHotSpot((int16_t)(y >> 16));
+
+    merged = (*(const uint32_t *)(rec + BMP_OFF_FLAGS) & 0x1Cu)
+             | ((uint32_t)flags & 1u);
+    spr->flags |= merged;
+
+    if (spr->flags & 4)
+        spr->format = 1;
+    else if (spr->flags & 8)
+        spr->format = 2;
+    else if (spr->flags & 0x10)
+        spr->format = 3;
+    else
+        spr->format = 0;
+
     return 1;
 }
 
@@ -1457,6 +1574,10 @@ int sprite_install(void)
                         "SpriteSetLoad", 3);
     rc |= patch_replace(ADDR_SPRITE_SET_FREE, (const void *)SpriteSetFree,
                         "SpriteSetFree", 4);
+    rc |= patch_replace(ADDR_LOAD_BITMAP_DESC, (const void *)LoadBitmapDescriptor,
+                        "LoadBitmapDescriptor", 1);
+    rc |= patch_replace(ADDR_SPRITE_RELOAD_NAMED, (const void *)SpriteReloadNamed,
+                        "SpriteReloadNamed", 4);
     rc |= patch_replace(ADDR_PRELOAD_SPRITE_NAME, (const void *)PreloadSpriteName,
                         "PreloadSpriteName", 14);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,
