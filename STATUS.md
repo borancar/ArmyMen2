@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `5c1ea97`. Working tree clean.
+Last updated: **2026-08-25**, at `2793f72`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,35 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`DrawTextClipped` (0x00446AB0), eleven callers and every string in the
+  game.** Four things worth keeping.
+
+  The `^` ESCAPE recolours the rest of the line: the character after it
+  becomes the colour, sign-extended from a byte, and the original writes it
+  over its own colour ARGUMENT -- so the change lasts to the end of the call
+  and no further. It is taken only when a character follows, so a `^` at the
+  end of a string is drawn as a glyph.
+
+  Every glyph is clipped TWICE and the order matters: first against the
+  screen rectangle, then against the caller's, with the second working on the
+  first's output. A caller's rectangle reaching off-screen cannot widen what
+  the screen already refused.
+
+  The pen advances by the glyph's own width and by nothing else -- no
+  kerning, no letter spacing -- and it advances even when the glyph was
+  clipped away entirely, which is what keeps a partly off-screen line aligned
+  with a fully visible one.
+
+  And the windowed origin shift is applied LAST and only when the draw target
+  is the primary surface: everything above works in screen coordinates.
+
+- **Measured: one extra pixel of letter spacing is 512 pixels and the colour
+  escape is 0.** Adding one to the advance puts `controls`' dialog frame over
+  its 200 budget. Disabling the escape entirely changes NOTHING in `controls`
+  or `bootcamp` -- no string either screen draws contains a `^`, so that arm
+  is reproduced on the strength of reading it and of the comment
+  `widget.cpp` already carried about it.
 
 - **The two RLE encoders (0x0041BBC0, 0x0041BD20), and they differ in one
   thing.** The width of a row-table entry, 32 bits or 16. Two exist because a
@@ -2651,11 +2680,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 796 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 795 | 784 of them below the CRT line |
+| `patch_replace` sites | 797 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 796 | 785 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 144,352 / 372,816 B (**38.7%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 158,928 / 372,816 B (42.6%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 144,768 / 372,816 B (**38.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 159,344 / 372,816 B (42.7%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

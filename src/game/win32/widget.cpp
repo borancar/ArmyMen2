@@ -98,11 +98,6 @@ static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
  * overwrites its own colour ARGUMENT in place, so a caret sequence recolours
  * the rest of the line. The clip rectangle is passed by value. Still
  * original. */
-typedef void (__cdecl *AM2_DrawTextClippedFn)(int32_t x, int32_t y,
-                                              const char *text, int32_t font,
-                                              RECT clip, int32_t colour);
-#define orig_draw_text_clipped \
-    ((AM2_DrawTextClippedFn)(uintptr_t)ADDR_DRAW_TEXT_CLIPPED)
 
 void __attribute__((thiscall)) WidgetDestruct(AM2_Widget *w)
 {
@@ -517,7 +512,7 @@ void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip)
 
         if (!LockSurface(g_drawTarget))
             return;
-        orig_draw_text_clipped(rowRect.left + LIST_TEXT_INDENT, rowRect.top,
+        DrawTextClipped(rowRect.left + LIST_TEXT_INDENT, rowRect.top,
                                rows->text + offset, 1, paint, ink);
         UnlockSurface();
 
@@ -757,7 +752,7 @@ void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip)
     if (!LockSurface(g_drawTarget))
         return;
 
-    orig_draw_text_clipped(w->rect.left, w->rect.top, buf,
+    DrawTextClipped(w->rect.left, w->rect.top, buf,
                            *(const int32_t *)(self + EDIT_OFF_FONT),
                            paint, ink);
 
@@ -956,7 +951,7 @@ static int32_t TyperDrawLine(AM2_Widget *w, const char *line, int32_t y,
     if (!LockSurface(g_drawTarget))
         return 0;
 
-    orig_draw_text_clipped(w->rect.left, y, line, 1, clip, ink);
+    DrawTextClipped(w->rect.left, y, line, 1, clip, ink);
     UnlockSurface();
     return 1;
 }
@@ -1424,7 +1419,7 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip)
     if (!LockSurface(g_drawTarget))
         return;
 
-    orig_draw_text_clipped(w->rect.left, w->rect.top,
+    DrawTextClipped(w->rect.left, w->rect.top,
                            *(const char *const *)(self + LABEL_OFF_TEXT),
                            *(const int32_t *)(self + LABEL_OFF_FONT),
                            paint,

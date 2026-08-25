@@ -46,6 +46,13 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
 /* Original: 0x004464C0. Encodes the locked surface into `out` and returns the
  * number of bytes written. Also wipes the scratch area ready for the next
  * glyph. The fourth argument is passed by the caller but never read. */
+/* 0x00446AB0. Draw one line of text: the '^' escape recolours the rest of the
+ * line, every glyph is clipped against the screen and then against the
+ * caller's rectangle, and the pen advances by the glyph's own width whether
+ * or not it was drawn. */
+void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
+                             int32_t font, RECT clip, int32_t colour);
+
 uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused);
 

@@ -337,6 +337,7 @@
 /* The entry for ' ' inside that table -- 0x006598D4 + 0x20 * 2 -- which is
  * what TextExtent reads to get a line height without measuring anything. */
 #define ADDR_GLYPH_OFFSET_SPACE 0x00659914u
+#define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,text,font,RECT,colour) */
 /* 0x004468A0, nine callers: how wide a string is in a font, and how tall a
  * line is. The width is the sum of each glyph's own width; '^' is skipped as
  * an escape and anything below 0x1F is skipped as a control. The height does

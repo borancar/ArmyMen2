@@ -18,6 +18,9 @@
 #include "font.h"
 #include "../../inject/patch.h"
 #include "surface.h"
+#include "../rect.h"    /* ClipRect -- reconstructed */
+#include "../blit.h"    /* BlitGlyph -- reconstructed */
+#include "../image.h"
 #include <string.h>
 
 #include <stdint.h>
@@ -343,6 +346,99 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
     return width;
 }
 
+/* 0x00446AB0, eleven callers -- draw one line of text, clipped twice.
+ *
+ * The '^' ESCAPE recolours the rest of the line: the character after it
+ * becomes the colour, sign-extended from a byte, and the original writes it
+ * over its own colour ARGUMENT -- so the change lasts to the end of this call
+ * and no further. It is taken only when a character follows; a '^' at the end
+ * of the string is drawn as a glyph.
+ *
+ * Every glyph is clipped TWICE, and the order matters: first against the
+ * screen rectangle, then against the caller's. The second clip works on the
+ * first one's output, so a caller's rectangle reaching off-screen cannot
+ * widen what the screen already refused.
+ *
+ * The pen advances by the glyph's own width and by nothing else -- no
+ * kerning, no letter spacing -- and it advances even when the glyph was
+ * clipped away entirely, which is what keeps a partly off-screen line
+ * aligned with a fully visible one.
+ *
+ * The origin shift is applied LAST and only when drawing to the primary
+ * surface, which is the windowed offset: everything above works in screen
+ * coordinates and the two deltas move the result into the client area.
+ *
+ * Nothing is drawn at all unless a surface is locked -- the very first test,
+ * before even measuring the string. */
+/* Spelled as surface.cpp spells them, so the three stay one definition. */
+#define g_drawTarget     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
+#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+
+void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
+                             int32_t font, RECT clip, int32_t colour)
+{
+    const uint8_t *record;
+    const uint16_t *offsets;
+    int32_t         len;
+    int32_t         i;
+    int32_t         col;
+    int32_t         penX = x;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
+        return;
+
+    len = (int32_t)strlen(text);
+    if (len <= 0)
+        return;
+
+    record  = (const uint8_t *)(uintptr_t)ADDR_GLYPH_SIZE
+              + (size_t)font * ADDR_FONT_STRIDE;
+    offsets = (const uint16_t *)(record + 4);
+
+    for (i = 0, col = 1; i < len; i++, col++) {
+        uint8_t          ch = (uint8_t)text[i];
+        const AM2_Rle16 *glyph;
+        AM2_Rect         src;
+        AM2_Rect         mid;
+        AM2_Rect         out;
+        int32_t          dx;
+        int32_t          dy;
+        int32_t          width;
+
+        if (ch == '^' && col < len) {
+            colour = (int32_t)(int8_t)text[i + 1];
+            i++;
+            col++;
+            continue;
+        }
+
+        glyph = (const AM2_Rle16 *)(*(const uint8_t *const *)(record + 0x204)
+                                    + offsets[ch]);
+        width = glyph->width;
+
+        src.left   = 0;
+        src.top    = 0;
+        src.right  = width;
+        src.bottom = glyph->height;
+
+        dx = penX;
+        dy = y;
+
+        if (ClipRect(&src, (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
+                     &dx, &dy, &mid)
+            && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &out)) {
+            if (g_drawTarget == g_primarySurface) {
+                dx += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX;
+                dy += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY;
+            }
+            BlitGlyph(dx, dy, glyph, out, colour);
+        }
+
+        penX += width;
+    }
+}
+
+
 int font_install(void)
 {
     int rc = 0;
@@ -359,5 +455,7 @@ int font_install(void)
                         "FreeAllFonts", 0);
     rc |= patch_replace(ADDR_BUILD_FONT_ALIAS, (const void *)BuildFontAlias,
                         "BuildFontAlias", 1);
+    rc |= patch_replace(ADDR_DRAW_TEXT_CLIPPED, (const void *)DrawTextClipped,
+                        "DrawTextClipped", 11);
     return rc;
 }
