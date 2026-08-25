@@ -167,9 +167,6 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
 
 /* The three reload routines and the -df switch that picks between two of
  * them. All original; this function only decides which applies. */
-typedef int32_t (__cdecl *am2_rebuild_fn)(AM2_Sprite *, int32_t);
-#define orig_sprite_rebuild_df   (*(am2_rebuild_fn)ADDR_SPRITE_REBUILD_DF)
-#define orig_sprite_rebuild_alt  (*(am2_rebuild_fn)ADDR_SPRITE_REBUILD_ALT)
 #define g_optDf                  (*(const int32_t *)(uintptr_t)ADDR_OPT_DF)
 
 /* Put a lost sprite back. See sprite.h.
@@ -200,10 +197,10 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
     }
 
     if (g_optDf) {
-        if (orig_sprite_rebuild_df(spr, flags))
+        if (SpriteRebuildDf(spr, flags))
             return;
     } else {
-        if (orig_sprite_rebuild_alt(spr, flags))
+        if (SpriteRebuildAlt(spr, flags))
             return;
     }
     orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_X, spr->id);
@@ -1062,6 +1059,138 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
     return 1;
 }
 
+/* 0x00445C00. Put a lost sprite's pixels back from LOOSE files.
+ *
+ * SpriteLoadTriple's second half with the key taken from spr->id instead of
+ * from arguments: the same three buffers, the same two directory formats, the
+ * same glob. Two differences, both the original's. It never looks for the
+ * `.sha`, so a lost surface cannot restore an overlay; and it returns
+ * SpriteReloadNamed's result rather than a flat 1.
+ *
+ * The key is unpacked INLINE here where SpriteRebuildDf calls KeyFieldA/B/C
+ * for the same three fields, and the set is compared UNSIGNED (`jb`) where
+ * SpriteLoadTriple compares it signed (`jl`). Seven bits cannot be negative so
+ * nothing can tell either pair apart; both are transcribed as written rather
+ * than made to match.
+ *
+ * NEITHER rebuild is exercised, and not for want of a drive. They run only
+ * when DirectDraw takes a surface back, which needs an alt-tab or a mode
+ * change, and nothing under Xvfb does either. A clean `ab.sh all` after this
+ * proves the SEAMS -- RestoreSpriteSurface calls both by name now, so a wrong
+ * signature would show at once -- and reaches no line of either body. Both are
+ * verified by reading. Anyone on a real display should alt-tab out of a
+ * mission and back, which is the same thing RestoreTileSet has been waiting
+ * for. */
+int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
+{
+    char     dir[0x100];
+    char     pattern[0x100];
+    uint8_t  found[0x118];
+    int32_t  handle;
+    int32_t  rc;
+    uint32_t id    = spr->id;
+    uint32_t set   = (id >> 19) & 0x7Fu;
+    uint32_t index = (id >> 7) & 0x3FFu;
+    uint32_t frame = id & 0x7Fu;
+
+    if (set >= 20)
+        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_DIR_SUB),
+                     (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
+                     g_spriteSetDirs[set]);
+    else
+        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_S),
+                     g_spriteSetDirs[set]);
+    SetGameDir(dir);
+
+    orig_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_BMP),
+                 (int32_t)set, (int32_t)index, (int32_t)frame);
+    handle = orig_findfirst(pattern, found);
+    if (handle == -1) {
+        spr->image.rle16 = 0;
+        return 0;
+    }
+
+    rc = SpriteReloadNamed(spr, (const char *)(found + AM2_FIND_OFF_NAME),
+                           flags);
+    orig_findclose(handle);
+    return rc;
+}
+
+/* 0x004243B0. Put a lost sprite's pixels back from the packed data file.
+ *
+ * With no image at all there is nothing to put back INTO, so it delegates to
+ * the full loader -- and that call is the fifth place the three key accessors
+ * are used as {set, index, frame}. Otherwise it repeats the seek and the key
+ * check and then reads SIX header dwords it throws away: width, height, flags,
+ * the hot pair, the file pair. Only the length is kept. It does not compute
+ * where the pixels start, it re-walks the header to get there, which is why
+ * that read sequence has to match SpriteLoadFromDataFile's exactly.
+ *
+ * Four conditions share the failure path and two of them are not failures in
+ * any ordinary sense. A zero length is one. The other is `spr->format != 0`: a
+ * software-format sprite holds a malloc'd RLE rather than a surface and cannot
+ * have lost anything, so arriving here with one means the CALLER was wrong --
+ * and the response is to free both blocks and zero them. Reproduced. */
+int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
+{
+    const AM2_SpriteDirEntry *dir;
+    uint8_t  *sset;
+    am2_FILE *fp;
+    int32_t   slot;
+    int32_t   value;
+    int32_t   len = 0;
+    int32_t   i;
+    int32_t   ok = 0;
+
+    if (!spr->image.rle16)
+        return SpriteLoadFromDataFile(spr, (int32_t)KeyFieldA(spr->id),
+                                      (int32_t)KeyFieldB(spr->id),
+                                      (int32_t)KeyFieldC(spr->id), flags);
+
+    sset = (uint8_t *)SpriteSetForKey(spr->id);
+    if (!sset)
+        return 0;
+
+    slot = SpriteDirIndex(sset, spr->id);
+    if (slot < 0)
+        return 0;
+
+    fp  = SET_FILE(sset);
+    dir = SET_DIR(sset);
+
+    if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_DF_SEEK_FAIL,
+                 dir[slot].offset);
+    } else {
+        orig_fread(&value, 4, 1, fp);
+        if ((uint32_t)value == spr->id) {
+            /* The header again, discarded: width, height, flags, hot, file.
+             * The sixth read is the one that matters. */
+            for (i = 0; i < 5; i++)
+                orig_fread(&value, 4, 1, fp);
+            orig_fread(&len, 4, 1, fp);
+            if (len > 0 && spr->format == 0)
+                ok = 1;
+        } else {
+            orig_log((const char *)(uintptr_t)ADDR_STR_DF_BAD_OBJECT);
+        }
+    }
+
+    if (!ok) {
+        if (spr->image.rle16)
+            orig_free(spr->image.rle16);
+        if (spr->overlay)
+            orig_free(spr->overlay);
+        spr->image.rle16 = 0;
+        spr->overlay     = 0;
+        return 0;
+    }
+
+    return ReloadBitmapSurface(spr->image.surface, fp, (uint32_t)len,
+                               spr->bounds.right, spr->bounds.bottom,
+                               sset + SPRITE_SET_OFF_REMAP, (uint32_t)flags);
+}
+
 /* Allocate and fill one, or give the record back for free()ing. */
 static AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
                                     int32_t flags)
@@ -1578,6 +1707,10 @@ int sprite_install(void)
                         "LoadBitmapDescriptor", 1);
     rc |= patch_replace(ADDR_SPRITE_RELOAD_NAMED, (const void *)SpriteReloadNamed,
                         "SpriteReloadNamed", 4);
+    rc |= patch_replace(ADDR_SPRITE_REBUILD_DF, (const void *)SpriteRebuildDf,
+                        "SpriteRebuildDf", 1);
+    rc |= patch_replace(ADDR_SPRITE_REBUILD_ALT, (const void *)SpriteRebuildAlt,
+                        "SpriteRebuildAlt", 1);
     rc |= patch_replace(ADDR_PRELOAD_SPRITE_NAME, (const void *)PreloadSpriteName,
                         "PreloadSpriteName", 14);
     rc |= patch_replace(ADDR_DRAW_SPRITE_CLIPPED, (const void *)DrawSpriteClipped,

@@ -118,6 +118,11 @@ void __cdecl SpriteSetFree(void *set);
 /* 0x00423D50. The directory index for a key, or -1. */
 int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
 
+/* 0x004243B0. Put a lost sprite's pixels back from the packed data file, and
+ * 0x00445C00, the same from loose files. Both take the key from spr->id. */
+int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags);
+int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags);
+
 /* 0x00423FE0. Fill a record from the packed data file -- the default path,
  * and what SpriteLoadTriple tail-calls unless -df was given. */
 int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
