@@ -569,7 +569,6 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 
 /* The four teardowns and the broadcast test, all still the original's. */
 typedef void (__cdecl *am2_destroy_fn)(void *obj);
-#define orig_destroy_type3      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE3))
 #define orig_destroy_type8      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE8))
 #define kItemComm  (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
 
@@ -602,7 +601,7 @@ void __cdecl DestroyByType(void *obj)
 
     switch (type) {
     case 2:  DestroyType2(obj); break;
-    case 3:  orig_destroy_type3(obj); break;
+    case 3:  DestroyType3(obj); break;
     case 8:  orig_destroy_type8(obj); break;
     default: DestroyObjCommon(obj); break;
     }
@@ -620,6 +619,9 @@ typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
 
 #define orig_obj_attach_to \
             ((void (__cdecl *)(void *, void *))AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
+
+#define orig_obj_clear_footprint \
+            ((am2_destroy_fn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
 
 /* 0x00449460, one caller -- DestroyByType's type-2 arm.
  *
@@ -648,6 +650,31 @@ typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
 void __cdecl DestroyType2(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
+
+    *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
+    *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
+
+    orig_obj_attach_to(obj, 0);
+    DestroyObjCommon(obj);
+}
+
+/* 0x0045A9C0, one caller -- DestroyByType's type-3 arm.
+ *
+ * DestroyType2 with one step in front: take the object's footprint back out of
+ * the map's cell weights before forgetting where it was. See
+ * ADDR_OBJ_CLEAR_FOOTPRINT, which is read but not reconstructed -- it is
+ * reached by address here.
+ *
+ * That callee is also why type 3 is probably a VEHICLE: it indexes the vehicle
+ * mask with obj->[0x52C] as the kind. Recorded in orig.h with the caveat that
+ * it has six other callers. */
+void __cdecl DestroyType3(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    orig_obj_clear_footprint(obj);
 
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
@@ -803,6 +830,8 @@ void item_install(void)
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
     patch_replace(ADDR_DESTROY_TYPE2, (const void *)DestroyType2,
                   "DestroyType2", 1);
+    patch_replace(ADDR_DESTROY_TYPE3, (const void *)DestroyType3,
+                  "DestroyType3", 1);
     patch_replace(ADDR_DESTROY_OBJ_COMMON, (const void *)DestroyObjCommon,
                   "DestroyObjCommon", 5);
     patch_replace(ADDR_FREE_OVERDUE_ITEMS, (const void *)FreeOverdueItems,

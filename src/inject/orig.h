@@ -4891,6 +4891,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * OBJ_OFF_FIELD_540 already is -- structurally, until something reads it. */
 #define OBJ_OFF_FIELD_C0           0xC0u
 #define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
+/* 0x0045A770, 336 bytes, seven callers -- READ, and it identifies its own
+ * table. It takes an object's footprint back OUT of the map's cell weights:
+ * gated on flag 0x00200000, which it clears on the way out, it walks the
+ * points of ADDR_VEHICLE_MASK record [obj->[0x52C] * 32 + dir] -- the same
+ * count-below-points layout that block documents -- and for each point
+ * subtracts 15 from the cell byte and calls 0x00438520.
+ *
+ * The direction comes from RoundTo8 of two facings summed, and a per-call
+ * STAMP at 0x00662020 with a mark array at 0x00661E20 stops a cell being
+ * decremented twice when two points land in it -- the same idea FirstItem's
+ * stamp uses on the object table.
+ *
+ * Which says something the project lists as unknown. CLAUDE.md records object
+ * types 2, 3 and 8 as unidentified; this is called by the TYPE 3 destroy
+ * handler and indexes the VEHICLE mask with obj->[0x52C] as the kind, and that
+ * table is named from the builder that logs "vehicle mask direction: %d". So
+ * type 3 is a vehicle, or at any rate carries a vehicle kind and a vehicle
+ * footprint. Evidence, not proof: the function has seven callers and only one
+ * of them is that handler. */
+#define ADDR_OBJ_CLEAR_FOOTPRINT   0x0045A770u  /* void(void *obj) */
+#define OBJ_FLAG_FOOTPRINT_ON      0x00200000u
 #define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
 #define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
