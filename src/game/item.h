@@ -127,6 +127,9 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg);
  * free the buffer it owns, both gated on the single flag at +0x34. */
 void __cdecl RowRelease(void *row, void *desc);
 
+/* 0x00428DA0, 22 callers. Destroy an object by type, then broadcast. */
+void __cdecl DestroyByType(void *obj);
+
 void item_install(void);
 
 #ifdef __cplusplus

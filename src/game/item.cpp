@@ -15,6 +15,8 @@
 #include "savetag.h"
 #include "image.h"
 #include "crt.h"
+#include "armymsg.h"  /* SendObjDestroyed -- reconstructed */
+#include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -564,6 +566,55 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
     ItemPreDestroy(obj, arg);
 }
 
+/* The four teardowns and the broadcast test, all still the original's. */
+typedef void (__cdecl *am2_destroy_fn)(void *obj);
+#define orig_destroy_type2      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE2))
+#define orig_destroy_type3      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE3))
+#define orig_destroy_type8      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE8))
+#define orig_destroy_obj_common \
+            ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_OBJ_COMMON))
+#define kItemComm  (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
+
+/* 0x00428DA0, 22 callers. Destroy an object, then tell the others.
+ *
+ * Two halves. The teardown is chosen by object TYPE -- 2, 3 and 8 each have
+ * their own, everything else shares one -- and all four arms end in the same
+ * tail at ADDR_DESTROY_OBJ_COMMON, which is what actually sets `flags & 4` and
+ * makes the destruction idempotent. Types 2, 3 and 8 are still unidentified,
+ * so the arms keep structural names, as ObjIsType2/3/8 already do.
+ *
+ * Then the broadcast, and the question it asks is not "are we in a game" but
+ * "must I tell the other players what this army just did" -- see
+ * ADDR_COMM_MUST_BROADCAST, which answers no for a single-player game and
+ * treats the neutral army specially.
+ *
+ * The original writes `movsx ax, byte [obj+0x10]` and pushes the whole EAX, so
+ * the top half of that argument is whatever the teardown left in the register.
+ * It cannot matter -- the callee takes an int16 -- and passing the sign-
+ * extended byte is the same function. Noted because the instruction looks like
+ * a truncation and is not.
+ *
+ * Measured: THREE calls in a driven Boot Camp mission, so the type dispatch is
+ * compared against the original on live data. The broadcast beneath it is not
+ * -- CommMustBroadcast answers no without a multiplayer session, so
+ * SendObjDestroyed stays at 0 and is verified by reading. */
+void __cdecl DestroyByType(void *obj)
+{
+    int32_t type = *(const int32_t *)obj;
+
+    switch (type) {
+    case 2:  orig_destroy_type2(obj); break;
+    case 3:  orig_destroy_type3(obj); break;
+    case 8:  orig_destroy_type8(obj); break;
+    default: orig_destroy_obj_common(obj); break;
+    }
+
+    if (CommMustBroadcast(kItemComm,
+                                 (int16_t)*(const int8_t *)((const uint8_t *)obj
+                                                            + OBJ_OFF_ARMY)))
+        SendObjDestroyed(obj);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -579,6 +630,8 @@ void item_install(void)
                   "RemoveInventoryItem", 4);
     patch_replace(ADDR_UID_ARMY, (const void *)UidArmy, "UidArmy", 1);
     patch_replace(ADDR_FREE_ITEM, (const void *)FreeItem, "FreeItem", 2);
+    patch_replace(ADDR_DESTROY_BY_TYPE, (const void *)DestroyByType,
+                  "DestroyByType", 22);
     patch_replace(ADDR_FREE_ITEM_KIND2, (const void *)DestroyTrooper,
                   "DestroyTrooper", 1);
     patch_replace(ADDR_FREE_ITEM_KIND3, (const void *)DestroyVehicle,

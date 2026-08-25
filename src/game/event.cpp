@@ -1214,8 +1214,6 @@ void __cdecl EvtAtObjPosB(int32_t a, int32_t b, uint32_t uid, int32_t d)
 
 /* ------------------------------------------------------- reset ---- */
 
-typedef void (__cdecl *AM2_ObjActionFn)(void *obj);
-#define orig_obj_action (*(AM2_ObjActionFn)AM2_IMAGE(ADDR_OBJ_ACTION))
 
 /* 0x00422450. Drop the whole script and event state.
  *
@@ -1254,7 +1252,7 @@ void __cdecl EvtObjAction(uint32_t uid)
     if (obj == (void *)0)
         return;
 
-    orig_obj_action(obj);
+    DestroyByType(obj);
 }
 
 /* --------------------------------------------------- name -> uid ---- */

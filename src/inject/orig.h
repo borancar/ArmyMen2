@@ -2496,7 +2496,6 @@
 #define ADDR_POINT_ACTION_C      0x00428F80u  /* void(obj, point) */
 #define OBJ_OFF_X                0x12u
 #define OBJ_OFF_Y                0x14u
-#define ADDR_OBJ_ACTION          0x00428DA0u  /* void(void *obj) */
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
  * comm object agrees, or when a state word reads 0x22. Named for what it is
  * observed to do from here -- announce an event -- and not from any one of
@@ -4843,6 +4842,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 3 and 8 as unidentified -- this narrows where to look rather than answering
  * it. */
 #define ADDR_FREE_ITEM             0x004285F0u  /* int32_t(void *, int32_t) */
+/* The object's ARMY, and this one is not a guess from a single site: SIX
+ * independent callers of ADDR_COMM_MUST_BROADCAST reach it the same way --
+ * `movsx ax, byte ptr [obj+0x10]` -- and that function's parameter is
+ * documented as the army from its own three answers. A signed byte. */
+#define OBJ_OFF_ARMY               0x10u       /* int8_t */
+/* 0x00428DA0, 22 callers: destroy an object, choosing the teardown by TYPE and
+ * then telling the other players if this army's actions are their business.
+ * The three typed arms and the default all end in 0x00429320, which is the
+ * shared tail that sets `flags & 4`. Types 2, 3 and 8 are still unidentified,
+ * so the arms are named structurally, exactly as ObjIsType2/3/8 are.
+ *
+ * This was ADDR_OBJ_ACTION, which event.cpp's reset path took from its own
+ * call site and which says nothing about what the function does. Renamed
+ * rather than aliased -- the checkpatches ratchet refused the second name,
+ * which is the rule this file states and which I had just broken. */
+#define ADDR_DESTROY_BY_TYPE       0x00428DA0u  /* void(void *obj) */
+#define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
+#define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */
+#define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
+#define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
 /* 0x00429C80, "DestroyItemObject, %x" -- its own name. Five callers. Frees the
  * allocation at +0x90 and clears the live byte at +0x8C; does nothing at all
  * if that byte is already clear, which makes it idempotent. */
