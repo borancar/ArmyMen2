@@ -158,8 +158,11 @@ int32_t __cdecl DefGameParse(int32_t cmd, char *line)
 #define g_gameOverSaved  ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SAVED)
 #define g_gameOverSource ((const int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)
 
-typedef void (__cdecl *AM2_StateLeaveFn)(void);
-#define orig_state_leave (*(AM2_StateLeaveFn)AM2_IMAGE(ADDR_STATE_LEAVE))
+/* StateLeave lives in win32/movie.cpp -- it clears the primary surface, so it
+ * cannot live in the flat half -- and this module cannot include movie.h for
+ * the same reason. Declared instead, the way commmsg.cpp declares the comm
+ * methods and the widget helpers it needs. */
+extern "C" void __cdecl StateLeave(void);
 
 void __cdecl SetGameOver(int32_t state)
 {
@@ -182,7 +185,7 @@ int32_t __cdecl GameOverState(void)
 
 void __cdecl StateLeaveAlias(void)
 {
-    orig_state_leave();
+    StateLeave();
 }
 
 #define g_statePending (*(int32_t *)(uintptr_t)ADDR_STATE_PENDING)

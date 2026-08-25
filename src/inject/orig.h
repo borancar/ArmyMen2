@@ -1351,6 +1351,10 @@
 #define ADDR_IAT_SMACK_WAIT      0x0046F2BCu
 #define ADDR_MOVIE_APPLY_PALETTE 0x00445320u  /* thiscall void(this, surface) */
 #define ADDR_MOVIE_CURRENT       0x006568A0u  /* the movie being played, or null */
+/* A SECOND movie pointer, and not the same one: ADDR_STATE_LEAVE owns this
+ * and MovieForget clears the other. Whatever put a movie here is responsible
+ * for stopping and deleting it when the state is left. */
+#define ADDR_STATE_MOVIE         0x00515F98u  /* the state's movie, or null */
 /* The four one-liners around ADDR_MOVIE_CURRENT. Between them they are the
  * whole of how the rest of the game touches a playing film: one sets it, one
  * steps it every frame in states 0 and 3, and two put it down. */

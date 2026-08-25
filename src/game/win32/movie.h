@@ -78,7 +78,11 @@ int32_t __attribute__((thiscall)) MoviePoll(void *movie);
 void __cdecl MovieSetCurrent(void *movie);   /* 0x00445620 */
 void __cdecl MovieStepCurrent(void);         /* 0x00445630, states 0 and 3 */
 void __cdecl MovieEndCurrent(void);          /* 0x00445650 */
-void __cdecl MovieForget(void);              /* 0x00445670 */
+void __cdecl MovieForget(void);
+
+/* 0x0042E720. Leaving a game state: stop and delete the state's movie if it
+ * has one, and clear the primary surface either way. */
+void __cdecl StateLeave(void);              /* 0x00445670 */
 
 int movie_install(void);
 

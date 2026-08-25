@@ -466,6 +466,43 @@ void __cdecl MovieForget(void)
     g_movieCurrent = 0;
 }
 
+/* Spelled as device.cpp and surface.cpp spell it, so the three stay one
+ * definition rather than a drift. */
+#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+
+/* 0x0042E720, four callers -- what leaving a game state does about the movie
+ * and the screen.
+ *
+ * Two movie pointers are in play and they are NOT the same one: this owns
+ * ADDR_STATE_MOVIE, while MovieForget clears ADDR_MOVIE_CURRENT. So the call
+ * to MovieForget is not the teardown, it is the other global being let go
+ * first, and the stop and delete below act on this one.
+ *
+ * The outer test and the inner one are both reproduced. The global is re-read
+ * between them, which is what makes the second test more than a repetition:
+ * MovieForget is a call, and nothing here establishes that it cannot reach
+ * something that clears this pointer too.
+ *
+ * The screen is cleared to colour zero on BOTH paths -- with a movie and
+ * without -- so leaving a state always blanks the primary. */
+void __cdecl StateLeave(void)
+{
+    if (*(void **)(uintptr_t)ADDR_STATE_MOVIE) {
+        void *movie;
+
+        MovieForget();
+
+        movie = *(void **)(uintptr_t)ADDR_STATE_MOVIE;
+        if (movie) {
+            MovieStop(movie);
+            orig_delete(movie);
+        }
+        *(void **)(uintptr_t)ADDR_STATE_MOVIE = (void *)0;
+    }
+
+    ClearSurface(g_primarySurface, 0);
+}
+
 int movie_install(void)
 {
     int rc = 0;
@@ -483,6 +520,8 @@ int movie_install(void)
                         "MovieEndCurrent", 0);
     rc |= patch_replace(ADDR_MOVIE_FORGET, (const void *)MovieForget,
                         "MovieForget", 0);
+    rc |= patch_replace(ADDR_STATE_LEAVE, (const void *)StateLeave,
+                        "StateLeave", 4);
     rc |= patch_replace(ADDR_MOVIE_FINISHED, (const void *)MovieFinished,
                         "MovieFinished", 0);
     rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);

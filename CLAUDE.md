@@ -2289,6 +2289,7 @@ exact oracle**, however meaningful it is when it is set.
   predates that and is left for the others.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`, `OverlayPrepare`, `SelectUnit`,
+  `StateLeave`,
   `RestoreTileSet`, and `RefreshScreen` — `OverlayPrepare` has THIRTY
   callers and reaches none of them: they are in-game cursor modes, and its
   one reconstructed caller `DrawMenuOverlay` reads 0 while `DrawMenuCursor`

@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `a7c25fc`. Working tree clean.
+Last updated: **2026-08-25**, at `dd9042d`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,35 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **`StateLeave` (0x0042E720): two movie pointers, and they are not the same
+  one.** It owns `ADDR_STATE_MOVIE` (`0x00515F98`) while `MovieForget` clears
+  `ADDR_MOVIE_CURRENT` (`0x006568A0`) -- so the call to `MovieForget` is not
+  the teardown, it is the OTHER global being let go first, and the stop and
+  delete below act on this one. Reading it as one pointer would have made the
+  second null test look like a repetition of the first.
+
+  It is not. The global is re-read between them, and `MovieForget` is a call:
+  nothing here establishes that it cannot reach something that clears this
+  pointer too. Both tests are reproduced.
+
+  The primary surface is cleared to colour zero on BOTH paths, with a movie
+  and without, so leaving a state always blanks the screen.
+
+- **Unexercised, and the counter could not have said so.** Its four callers
+  are state transitions; two of them are now ours, so `StateLeave`'s counter
+  is 0 by construction and the other two never fired. What settled it was a
+  mutation: clearing the primary to colour 200 instead of 0 changes nothing
+  in `bootcamp` or `movies`. The `WndProc` arm that reaches it needs
+  `g_gameState != 0`, and the intro -- the obvious candidate -- runs in state
+  0 and takes the other branch. `0x00515F98` reads null in every
+  configuration tried.
+
+  The rule from two commits ago says to check reachability BEFORE writing.
+  For a function nothing has patched yet there is no counter to read, so the
+  check available was "do its callers run", and that was not decisive. The
+  one that is decisive costs a build: patch it, mutate something
+  unconditional at the top, and look.
 
 - **`RepaintDirtyList` (0x0041D000), and the third draw counter is not a
   counter.** It walks the registered dirty rectangles, clips each against the
@@ -2328,11 +2357,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 787 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 786 | 775 of them below the CRT line |
+| `patch_replace` sites | 788 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 787 | 776 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 141,344 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 155,920 / 372,816 B (41.8%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 141,424 / 372,816 B (**37.9%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 156,000 / 372,816 B (41.8%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

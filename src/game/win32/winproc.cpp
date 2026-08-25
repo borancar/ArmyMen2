@@ -39,6 +39,7 @@
  */
 
 #include "dplay.h"
+#include "movie.h"    /* StateLeave -- reconstructed */
 #include "audio.h"
 #include "winproc.h"
 #include "winmain.h"
@@ -121,7 +122,6 @@ typedef int32_t (__cdecl *am2_int_fn)(void);
 typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 
 #define orig_on_app_activated  (*(am2_void_fn)ADDR_ON_APP_ACTIVATED)
-#define orig_state_leave       (*(am2_void_fn)ADDR_STATE_LEAVE)
 
 /* ---- comm traffic -------------------------------------------------------
  *
@@ -448,7 +448,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (g_gameState == 0)
             g_stateDispatch[GameOverState()].fn();
         else {
-            orig_state_leave();
+            StateLeave();
             RequestState(g_stateArg);
         }
         break;
