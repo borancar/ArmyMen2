@@ -426,6 +426,7 @@
 #define ADDR_MAKE_BITMAP     0x0041BE80u  /* int32(src, pixels, dest, remap) */
 #define ADDR_ENCODE_BIG      0x0041BBC0u  /* the >= 60000 pixel encoder */
 #define ADDR_ENCODE_SMALL    0x0041BD20u
+#define AM2_ENCODE_SCRATCH   0x30D58u     /* the encoders' stack buffer */
 #define ADDR_ACTIVE_PALETTE  0x00477A58u  /* NULL means no remapping */
 /* The record MakeBitmap fills in. Not an AM2_Sprite despite the resemblance. */
 #define BMP_OFF_SURFACE      0x00u

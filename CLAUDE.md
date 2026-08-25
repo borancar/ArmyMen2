@@ -2289,7 +2289,7 @@ exact oracle**, however meaningful it is when it is set.
   predates that and is left for the others.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
-  `StateLeave`, `RowRelease`,
+  `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, and `RefreshScreen` —
 
   **`OverlayPrepare` and `SelectUnit` were on this list and should not have
@@ -2306,6 +2306,13 @@ exact oracle**, however meaningful it is when it is set.
   after the first call the "already on that row" test returns and the tail is
   skipped. That is why three mutations to the tail passed: not because the
   function is dead, but because the tail runs ONCE per session.
+
+  **The two encoders are a SUBSYSTEM rather than a path.** They sit behind
+  `BMP_FLAG_SOFTWARE`, which nothing sets while DirectDraw is handing out real
+  surfaces -- `MakeBitmap` runs three times in a Boot Camp mission and takes
+  the hardware branch every time. It is the same reason `BlitCopy16` and
+  `BlitCopy32` have always read 0. The software rasteriser is not a function
+  this environment misses, it is a layer it never enters.
 
   The three multiplayer ones need a live DirectPlay session with a second
   player, which this machine cannot open: the row painter has two branches and with nothing connected it

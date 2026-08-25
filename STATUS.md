@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `a37dbd8`. Working tree clean.
+Last updated: **2026-08-25**, at `5c1ea97`. Working tree clean.
 
 ## In flight
 
@@ -62,6 +62,41 @@ Nothing uncommitted.
 - **The alias ratchet caught its author again**, this time within the minute:
   `ADDR_STR_COMPUTER_FMT` on `0x00486EC4`, which has been `ADDR_FMT_COMPUTER_N`
   for some time. Grep the address, not the name.
+
+- **The two RLE encoders (0x0041BBC0, 0x0041BD20), and they differ in one
+  thing.** The width of a row-table entry, 32 bits or 16. Two exist because a
+  16-bit offset reaches only 64KB of encoded data, and `MakeBitmap` picks by
+  pixel count. Everything else is the same function, so it is written once
+  with the width as an argument.
+
+  **Reconstructing them CONFIRMS what `blit.h` could only assume.** That
+  header says of `AM2_Rle32`: "Only the 16-bit header has been confirmed
+  against real data; the 32-bit variant is assumed to match." The two
+  encoders are instruction-for-instruction identical apart from the store
+  width and the table stride, so the assumption was right and is now a
+  measurement.
+
+- **Three details worth keeping.** A NEGATIVE height means top-down and a
+  positive one bottom-up -- the DIB convention arriving intact, with the row
+  stride negated and the walk starting at the last row. The transparent
+  colour is not a parameter: it is the FIRST PIXEL of the first row encoded.
+  And each count is capped at 255, so a run of 300 identical pixels becomes
+  255, a zero-length skip, and 45.
+
+- **`RemapBytes` was already reconstructed**, and the duplicate-patch check
+  is what said so -- I had written the copier out again as `CopyRemapped`.
+  Sixth near-duplicate this project has stopped, and the second this session.
+
+- **Unexercised, and the reason is a whole subsystem rather than a path.**
+  `MakeBitmap` runs three times in a Boot Camp mission and takes the
+  HARDWARE branch every time; the encoders sit behind `BMP_FLAG_SOFTWARE`,
+  which nothing sets while DirectDraw is handing out real surfaces. That is
+  the same reason `BlitCopy16` and `BlitCopy32` have always read 0. The
+  software rasteriser is not a function this environment misses, it is a
+  layer it never enters -- worth saying once rather than per function.
+
+  Measured rather than assumed: corrupting the first row-table entry, and
+  encoding against the wrong transparent colour, each change 22 pixels.
 
 - **`ReadDibChunk` (0x00422FF0), and the seek is RELATIVE to the chunk.**
   It reads one bitmap out of a stream that may hold several: `ftell` first,
@@ -2616,11 +2651,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 794 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 793 | 782 of them below the CRT line |
+| `patch_replace` sites | 796 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 795 | 784 of them below the CRT line |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 143,648 / 372,816 B (**38.5%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 158,224 / 372,816 B (42.4%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 144,352 / 372,816 B (**38.7%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 158,928 / 372,816 B (42.6%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |

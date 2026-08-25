@@ -67,6 +67,14 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour);
  * several -- the seek is relative to where the chunk began -- and the loader
  * that opens a file, reads one, and flips its rows. */
 void *__cdecl ReadDibChunk(am2_FILE *fp, void *header);
+
+/* 0x0041BBC0 and 0x0041BD20. The two run-length encoders, which differ only
+ * in the width of a row-table entry. Both answer the encoded SIZE; the buffer
+ * goes back through `dest`. */
+int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
+                          int32_t h, const uint8_t *remap);
+int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
+                            int32_t h, const uint8_t *remap);
 void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size);
 
 /* Original: 0x0041AC60. Put the finished frame on the screen. 2 call sites.

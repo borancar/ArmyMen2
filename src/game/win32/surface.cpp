@@ -737,11 +737,6 @@ static_assert((DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH) == 7, "the descriptor flags
 static_assert(DDSCAPS_OFFSCREENPLAIN == 0x40, "DDSCAPS_OFFSCREENPLAIN");
 static_assert(DDSCAPS_SYSTEMMEMORY == 0x800, "DDSCAPS_SYSTEMMEMORY");
 
-typedef int32_t (__cdecl *am2_encode_fn)(const void *pixels, void *dest,
-                                         int32_t w, int32_t h,
-                                         const uint8_t *remap);
-#define orig_encode_big   (*(am2_encode_fn)ADDR_ENCODE_BIG)
-#define orig_encode_small (*(am2_encode_fn)ADDR_ENCODE_SMALL)
 #define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 #define g_ddraw2obj       (*(LPDIRECTDRAW2 *)(uintptr_t)ADDR_DIRECTDRAW2)
 
@@ -856,6 +851,115 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
     return dst;
 }
 
+/* The remap copier this uses is RemapBytes in misc.cpp -- 0x0041BB60, which
+ * was already reconstructed. Grepping the address before naming it is the
+ * rule; the duplicate-patch check is what actually caught it. */
+/* 0x0041BBC0 and 0x0041BD20 -- run-length encode an image into the shape
+ * blit.h describes, and hand back a fresh buffer holding it.
+ *
+ * The two differ in ONE thing: the width of a row-table entry, 32 bits or 16.
+ * Two exist because a 16-bit offset reaches only 64KB of encoded data, and
+ * MakeBitmap picks by pixel count. Everything else is the same function, so
+ * it is written once here with the width as an argument -- and reconstructing
+ * it CONFIRMS what blit.h could only assume, that the 32-bit variant matches
+ * the 16-bit one field for field.
+ *
+ * A NEGATIVE height means top-down and a positive one bottom-up, which is the
+ * DIB convention arriving intact: with h > 0 the walk starts at the last row
+ * and the row stride is negated.
+ *
+ * The transparent colour is not a parameter. It is the FIRST PIXEL of the
+ * first row encoded, whichever row that is.
+ *
+ * Each row is alternating counts, skip then run, each capped at 255 -- so a
+ * run of 300 identical pixels becomes 255, a zero-length skip, and 45. The
+ * row's offset is stored from the START OF THE HEADER, which is what makes
+ * the buffer relocatable.
+ *
+ * The whole thing is built in a 199,000-byte stack buffer and copied into an
+ * allocation of exactly the size used. That is the original's shape and the
+ * reason the answer is the SIZE rather than the pointer: the pointer goes
+ * back through the caller's `dest`. */
+static int32_t EncodeRle(const uint8_t *pixels, void **dest, int32_t w,
+                         int32_t h, const uint8_t *remap, int32_t wide)
+{
+    static uint8_t  scratch[AM2_ENCODE_SCRATCH];
+    uint8_t        *table = scratch + 4;
+    uint8_t        *out;
+    const uint8_t  *row;
+    int32_t         stride = (w + 3) & ~3;
+    int32_t         rows;
+    int32_t         r;
+    uint8_t         key;
+    int32_t         size;
+
+    if (h > 0) {
+        row     = pixels + (h - 1) * stride;
+        stride  = -stride;
+        rows    = h;
+    } else {
+        row     = pixels;
+        rows    = -h;
+    }
+
+    key = *row;
+    *(uint16_t *)scratch       = (uint16_t)w;
+    *(uint16_t *)(scratch + 2) = (uint16_t)rows;
+
+    out = table + (size_t)rows * (wide ? 4u : 2u);
+
+    for (r = 0; r < rows; r++) {
+        const uint8_t *p   = row;
+        const uint8_t *end = row + w;
+
+        if (wide)
+            *(uint32_t *)(table + (size_t)r * 4) = (uint32_t)(out - scratch);
+        else
+            *(uint16_t *)(table + (size_t)r * 2) = (uint16_t)(out - scratch);
+
+        do {
+            uint8_t skip = 0;
+            uint8_t run  = 0;
+
+            while (p != end && *p == key && skip < 0xFF) {
+                p++;
+                skip++;
+            }
+            *out++ = skip;
+
+            while (p != end && *p != key && run < 0xFF) {
+                p++;
+                run++;
+            }
+            *out++ = run;
+
+            if (run) {
+                RemapBytes(out, p - run, remap, run);
+                out += run;
+            }
+        } while (p != end);
+
+        row += stride;
+    }
+
+    size  = (int32_t)(out - scratch);
+    *dest = orig_malloc((size_t)size);
+    memcpy(*dest, scratch, (size_t)size);
+    return size;
+}
+
+int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
+                          int32_t h, const uint8_t *remap)
+{
+    return EncodeRle((const uint8_t *)pixels, (void **)dest, w, h, remap, 1);
+}
+
+int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
+                            int32_t h, const uint8_t *remap)
+{
+    return EncodeRle((const uint8_t *)pixels, (void **)dest, w, h, remap, 0);
+}
+
 int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
                            uint8_t *dest, const uint8_t *remap)
 {
@@ -911,10 +1015,10 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         dest[BMP_OFF_KEY] = 0;
 
         if (w * h >= BMP_SOFTWARE_LIMIT) {
-            result = orig_encode_big(pixels, dest, w, h, remap);
+            result = EncodeBig(pixels, dest, w, h, remap);
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
         } else {
-            result = orig_encode_small(pixels, dest, w, h, remap);
+            result = EncodeSmall(pixels, dest, w, h, remap);
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= reserve ? 0x10 : 8;
         }
         return result;
@@ -1416,6 +1520,10 @@ int surface_install(void)
                         "MakeBitmap", 4);
     rc |= patch_replace(ADDR_READ_DIB_CHUNK, (const void *)ReadDibChunk,
                         "ReadDibChunk", 4);
+    rc |= patch_replace(ADDR_ENCODE_BIG, (const void *)EncodeBig,
+                        "EncodeBig", 1);
+    rc |= patch_replace(ADDR_ENCODE_SMALL, (const void *)EncodeSmall,
+                        "EncodeSmall", 1);
     rc |= patch_replace(ADDR_LOAD_DIB_FLIPPED, (const void *)LoadDibFlipped,
                         "LoadDibFlipped", 1);
     rc |= patch_replace(ADDR_DRAW_MENU_OVERLAY, (const void *)DrawMenuOverlay,
