@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `67b8321`. Working tree clean.
+Last updated: **2026-08-25**, at `4ffd9e9`. Working tree clean.
 
 ## In flight
 
@@ -2840,6 +2840,30 @@ are ours; the
 constructor itself is not, and is reached by address. Everything here is
 compared through `ab.sh mpoptions`, which is the only configuration that
 opens the panel at all.
+
+**Sprite loading is finished except one function, and it was the front for a
+whole session.** From a set NAME to a drawable record is now ours end to end:
+`SpriteSetResolve` picks the archive, `SpriteSetLoad` opens it and builds both
+remap tables, `SpriteSetFree` closes it, `SpriteSetForKey` and
+`SpriteDirIndex` find a sprite in it, `SpriteLoadFromDataFile` reads the
+record, `SpriteLoadTriple` chooses between that and loose files,
+`LoadBitmapDescriptor` and `SpriteReloadNamed` do the loose half, and
+`SpriteRebuildDf` and `SpriteRebuildAlt` put a lost surface back. What is left
+is `0x00423300`, the `.sha` shadow loader, and it is deliberately last: NOT
+ONE `.sha` file ships, so its body cannot execute here at all, and at 720
+bytes with a 32 KB scratch frame it is the most that could be written with no
+way to check the answer.
+
+**The next front needs groundwork before it needs transposition, and that is
+the honest state of it.** The hot unreconstructed functions left --
+`0x00428DA0` (96 B, 22 callers), `0x00449570`, `0x00405050`, `0x004582F0` --
+are all object logic, and every one of them would need a dozen invented names
+before a line could be written: `AM2_Object` fields at `0xB0`, `0xE4`, `0xEC`,
+`0xF4`, `0x104`, `0x544`, `0x568`, plus tables at `0x00473DD0`, `0x00475198`,
+`0x0050712C` and `0x00659F00`. Naming those from the sites that USE them is
+exactly how the three misreadings corrected in `02488b0` were made. The next
+unit of work here is reading what writes those fields, not reaching for the
+next function by caller count.
 
 ## Measured
 
