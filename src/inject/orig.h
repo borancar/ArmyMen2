@@ -4806,6 +4806,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 
 #define ADDR_UID_ARMY        0x0042A7A0u  /* uint32_t(uint32_t uid) */
 #define ADDR_UID_ON_WIRE     0x0042A7B0u  /* uint32_t(uint32_t uid) */
+/* 0x0044C370, ten callers, and it names itself: "Send TrooperSetWeapon
+ * message, trooper: %08x, weapon:%08x". */
+#define ADDR_SEND_TROOPER_WEAPON 0x0044C370u  /* void(obj, uid, int32) */
+#define ADDR_STR_SEND_TROOPER_WEAPON 0x0048AA60u
+#define AM2_MSG_TROOPER_WEAPON   0x22u
+#define AM2_MSG_TROOPER_WEAPON_LEN 0x1Cu
 /* A 3-bit field at bit 18 of the object's word at +8, get and set. Named for
  * its position rather than its meaning; src/game/item.h records what points at
  * an army index and what argues against it. */

@@ -126,12 +126,62 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
                  flags);
 }
 
+/* 0x0044C370. Tell the other players that a trooper's weapon changed.
+ *
+ * Silent unless a DirectPlay session exists -- the same COMM_OFF_DPLAY test the
+ * colour and team senders use, and the reason nothing in a single-player run
+ * ever emits this.
+ *
+ * The record is 0x1C bytes and only FIVE fields of it are written: the length,
+ * the kind, the two uids and the weapon at +0x18. Everything from +0x0C to
+ * +0x17 is left as whatever was on the stack. That is the original's, not a
+ * transcription gap -- it declares 0x1C of stack, fills the fields it means to
+ * send, and hands the lot to ArmyMessageSend. Reproduced, and worth knowing
+ * before anyone compares two of these records byte for byte.
+ *
+ * Both uids go through UidOnWire on the way out, which is what every other
+ * message in this family does; the weapon does not, because it is a type
+ * rather than an object. Note the LOG prints the raw values, not the wire
+ * ones -- so a message and its log line disagree by construction.
+ *
+ * Measured: it runs EIGHT times in a Boot Camp mission, and all eight return
+ * at the session test, because this machine cannot open a DirectPlay session.
+ * So the guard is thoroughly exercised and nothing past it is -- the record,
+ * both UidOnWire calls and the log line are verified by reading. That is the
+ * same ceiling every sender in this family has, and the counter moving at all
+ * is only visible because the ten callers are still the original's. */
+void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
+                                  int32_t weapon)
+{
+    uint8_t         msg[AM2_MSG_TROOPER_WEAPON_LEN];
+    const uint8_t  *comm = kComm;
+    uint32_t        uid;
+
+    if (!*(void *const *)(comm + COMM_OFF_DPLAY))
+        return;
+
+    uid = *(const uint32_t *)((const uint8_t *)trooper + 4);
+
+    *(uint16_t *)(msg + 0)    = AM2_MSG_TROOPER_WEAPON_LEN;
+    *(uint16_t *)(msg + 2)    = AM2_MSG_TROOPER_WEAPON;
+    *(uint32_t *)(msg + 4)    = UidOnWire(uid);
+    *(uint32_t *)(msg + 8)    = UidOnWire(weaponUid);
+    *(int32_t  *)(msg + 0x18) = weapon;
+
+    ArmyMessageSend(msg);
+    orig_log((const char *)(uintptr_t)ADDR_STR_SEND_TROOPER_WEAPON,
+             uid, weaponUid);
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_SEND_TROOPER_WEAPON,
+                        (const void *)SendTrooperSetWeapon,
+                        "SendTrooperSetWeapon", 10);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,
                         "SendGamePause", 2);
     return rc;

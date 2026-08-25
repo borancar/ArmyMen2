@@ -40,6 +40,11 @@ void __cdecl ArmyMessageSend(const void *msg);
  * reason mask. Does nothing unless the session is joined. Eight callers. */
 void __cdecl SendGamePause(int32_t pause, int32_t mask);
 
+/* 0x0044C370, ten callers. Tell the other players a trooper's weapon changed.
+ * Silent unless a DirectPlay session exists. */
+void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
+                                  int32_t weapon);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

@@ -2845,11 +2845,11 @@ opens the panel at all.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 805 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 805 | each patched exactly once |
+| `patch_replace` sites | 813 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 813 | each patched exactly once |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 146,704 / 372,816 B (**39.4%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 161,280 / 372,816 B (43.3%) | what every earlier session quoted, and an over-count |
+| sub-CRT code reconstructed | 149,424 / 372,816 B (**40.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 164,000 / 372,816 B (44.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
