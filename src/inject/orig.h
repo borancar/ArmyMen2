@@ -4809,6 +4809,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x0044C370, ten callers, and it names itself: "Send TrooperSetWeapon
  * message, trooper: %08x, weapon:%08x". */
 #define ADDR_SEND_TROOPER_WEAPON 0x0044C370u  /* void(obj, uid, int32) */
+/* 0x0042AA10, two callers, and the SHORTEST message in the family: eight
+ * bytes, the length and the kind and one uid, no payload at all.
+ *
+ * What kind 0x10 means comes from both callers rather than from a receiver.
+ * 0x00429320 is the shared tail of every per-type destroy handler -- it
+ * returns immediately if `flags & 4` is already set and sets it on the way
+ * out, which is an idempotent "this is now gone" -- and 0x00428DA0 dispatches
+ * on the object TYPE to one of those handlers and then sends this. So the
+ * message is "that object was destroyed"; there is no receiver read yet and
+ * the name should be revisited if one turns up saying otherwise. */
+#define ADDR_SEND_OBJ_DESTROYED  0x0042AA10u  /* void(const void *obj) */
+#define AM2_MSG_OBJ_DESTROYED    0x10u
+#define AM2_MSG_OBJ_DESTROYED_LEN 8u
 #define ADDR_STR_SEND_TROOPER_WEAPON 0x0048AA60u
 #define AM2_MSG_TROOPER_WEAPON   0x22u
 #define AM2_MSG_TROOPER_WEAPON_LEN 0x1Cu

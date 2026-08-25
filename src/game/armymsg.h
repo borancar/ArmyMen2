@@ -45,6 +45,10 @@ void __cdecl SendGamePause(int32_t pause, int32_t mask);
 void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
                                   int32_t weapon);
 
+/* 0x0042AA10, two callers. Tell the other players an object was destroyed.
+ * Silent outside a multiplayer session. */
+void __cdecl SendObjDestroyed(const void *obj);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

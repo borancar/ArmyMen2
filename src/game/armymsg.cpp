@@ -173,6 +173,38 @@ void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
              uid, weaponUid);
 }
 
+/* 0x0042AA10. Tell the other players an object was destroyed.
+ *
+ * The shortest message in this family: eight bytes, and after the length and
+ * the kind there is nothing but the uid. Both callers have already done the
+ * destroying by the time they reach it.
+ *
+ * The guard is ADDR_MP_SESSION, not the COMM_OFF_DPLAY test SendTrooperSetWeapon
+ * uses -- a session that is being HOST or JOIN rather than a live DirectPlay
+ * pointer. The two are not the same question and the family is not consistent
+ * about which it asks; reproduced per function rather than unified.
+ *
+ * Unexercised, and for a reason this project already has written down. The
+ * counter reads 0 through a driven Boot Camp mission -- nothing in that window
+ * dies -- which is the same window that leaves RemoveFromItemList and FreeItem
+ * cold. Reaching it needs a mission driven long enough for something to be
+ * killed, which is a drive this project does not yet have. Not a missing code
+ * path; a missing drive. Verified by reading. */
+void __cdecl SendObjDestroyed(const void *obj)
+{
+    uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_OBJ_DESTROYED;
+    *(uint32_t *)(msg + 4) =
+        UidOnWire(*(const uint32_t *)((const uint8_t *)obj + 4));
+
+    ArmyMessageSend(msg);
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
@@ -182,6 +214,8 @@ int armymsg_install(void)
     rc |= patch_replace(ADDR_SEND_TROOPER_WEAPON,
                         (const void *)SendTrooperSetWeapon,
                         "SendTrooperSetWeapon", 10);
+    rc |= patch_replace(ADDR_SEND_OBJ_DESTROYED, (const void *)SendObjDestroyed,
+                        "SendObjDestroyed", 2);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,
                         "SendGamePause", 2);
     return rc;
