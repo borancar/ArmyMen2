@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-25**, at `4ffd9e9`. Working tree clean.
+Last updated: **2026-08-26**, at `5eff8f7`. Working tree clean.
 
 ## In flight
 
@@ -2854,25 +2854,39 @@ ONE `.sha` file ships, so its body cannot execute here at all, and at 720
 bytes with a 32 KB scratch frame it is the most that could be written with no
 way to check the answer.
 
-**The next front needs groundwork before it needs transposition, and that is
-the honest state of it.** The hot unreconstructed functions left --
-`0x00428DA0` (96 B, 22 callers), `0x00449570`, `0x00405050`, `0x004582F0` --
-are all object logic, and every one of them would need a dozen invented names
-before a line could be written: `AM2_Object` fields at `0xB0`, `0xE4`, `0xEC`,
-`0xF4`, `0x104`, `0x544`, `0x568`, plus tables at `0x00473DD0`, `0x00475198`,
-`0x0050712C` and `0x00659F00`. Naming those from the sites that USE them is
-exactly how the three misreadings corrected in `02488b0` were made. The next
-unit of work here is reading what writes those fields, not reaching for the
-next function by caller count.
+**The object and item family is the front now, and the groundwork that was
+blocking it is partly done.** What unblocked it was not a bigger function but
+one FIELD: `obj+0x10` is the army, evidenced by SIX independent callers of
+`CommMustBroadcast` that all reach it as `movsx ax, byte ptr [obj+0x10]`. With
+that and `OBJ_FLAG_OVERDUE` -- set when an object passes the deadline at
+`OBJ_OFF_DEADLINE_58` -- four functions fell out in a row: `DestroyByType`
+(0x00428DA0, 22 callers, runs 3 times a mission), `FreeOverdueItems`
+(0x00428C40, 69 times a mission), and the two senders beneath them,
+`SendObjDestroyed` and `ItemGoneMessageSend`.
+
+**Read next, deliberately NOT written yet: `0x00429320`**, the shared tail of
+every per-type destroy and the thing that actually sets `flags & 4`. It is not
+the flat leaf its siblings are -- it walks a chain at `obj+0xAC` with a
+RECURSIVE self-call, through a slot lookup at `0x004277A0` and a table at
+`0x00514F0C`, neither named. `tools/disasm.py` also desynchronises in its
+middle, so it needs a re-dump from a clean boundary rather than a reading of
+what the tool prints. Worth doing carefully; not worth rushing.
+
+What is still true of the rest: `0x00449570`, `0x00405050` and `0x004582F0`
+would each need a dozen invented names -- `AM2_Object` fields at `0xB0`,
+`0xE4`, `0xEC`, `0xF4`, `0x104`, `0x544`, `0x568`, plus tables at `0x00473DD0`,
+`0x00475198`, `0x0050712C` and `0x00659F00`. The `obj+0x10` result is the model
+for how to unblock them: find the function whose PARAMETER is already
+documented, then let its callers tell you what the field is.
 
 ## Measured
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 813 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 813 | each patched exactly once |
+| `patch_replace` sites | 817 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 817 | each patched exactly once |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 149,424 / 372,816 B (**40.1%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 149,792 / 372,816 B (**40.2%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 164,000 / 372,816 B (44.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
