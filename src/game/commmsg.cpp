@@ -769,7 +769,6 @@ int32_t __cdecl UidObjKind(uint32_t uid)
     return (int32_t)obj[0];
 }
 
-#define orig_army_msg_filter ((AM2_FilterFn)(uintptr_t)ADDR_ARMY_MSG_FILTER)
 #define orig_troop_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_TROOP_MESSAGE_RECV)
 #define orig_vehicle_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_VEHICLE_MSG_RECV)
 #define orig_raw_log       ((AM2_RawLogFn)(uintptr_t)ADDR_LOG)
@@ -817,7 +816,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
      * where a format string goes. Kept because it is what the image does. */
     orig_raw_log(m, 0, army);
 
-    if (orig_army_msg_filter(m, army))
+    if (ArmyMsgFilter(m, army))
         return;
 
     kind = UidObjKind(UidOnWire(uid));

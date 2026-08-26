@@ -5495,7 +5495,31 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * extra gate -- the object's TYPE must be 1..4, so the message is only sent
  * for the four kinds that are items. */
 #define ADDR_ITEM_GONE_SEND      0x0042A9A0u  /* void(const void *obj) */
+/* The six message codes ADDR_ARMY_MSG_FILTER handles, and the six receivers
+ * it hands them to. FIVE OF THE SIX NAME THEMSELVES in their own trace lines,
+ * which is what identified codes 0x0F, 0x11 and 0x12 -- they were unnamed
+ * until the handlers were read:
+ *
+ *   0x0E  "itemGoneMessageReceive %x"
+ *   0x0F  "itemDeployMessageReceive: uid=%x, pos=(%d,%d), facing=%d"
+ *   0x10  -- no string; the code was already AM2_MSG_OBJ_DESTROYED
+ *   0x11  "Recieved Damage: item->uid %x, amount: %d, army %d, dir: %d"
+ *   0x12  "==> Receive Item Create [uid:%08x, item type: %d, subtype: %d"
+ *   0x23  "Received Death Message: item->uid %x, army %d"
+ *
+ * The misspelling in 0x11's line is the game's own. Codes 0x13..0x22 fall to
+ * the default and the filter answers 0 for them -- including
+ * AM2_MSG_TROOPER_WEAPON at 0x22, which is handled somewhere else entirely. */
 #define AM2_MSG_ITEM_GONE        0x0Eu
+#define AM2_MSG_ITEM_DEPLOY      0x0Fu
+#define AM2_MSG_DAMAGE           0x11u
+#define AM2_MSG_ITEM_CREATE      0x12u
+#define ADDR_RECV_ITEM_GONE      0x0042AEB0u  /* int32_t(msg) */
+#define ADDR_RECV_ITEM_DEPLOY    0x0042AF30u
+#define ADDR_RECV_OBJ_DESTROYED  0x0042AF00u
+#define ADDR_RECV_DAMAGE         0x0042ADA0u
+#define ADDR_RECV_ITEM_CREATE    0x0042AFA0u
+#define ADDR_RECV_DEATH          0x0042AE50u
 #define ADDR_STR_ITEM_GONE_SEND  0x00485E10u
 #define AM2_MSG_OBJ_DESTROYED    0x10u
 #define AM2_MSG_OBJ_DESTROYED_LEN 8u

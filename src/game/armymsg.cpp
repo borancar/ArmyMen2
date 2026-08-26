@@ -257,12 +257,75 @@ void __cdecl ItemGoneMessageSend(const void *obj)
     ArmyMessageSend(msg);
 }
 
+typedef int32_t (__cdecl *AM2_RecvFn)(void *msg);
+#define orig_recv_item_gone     ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_GONE)
+#define orig_recv_item_deploy   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_DEPLOY)
+#define orig_recv_obj_destroyed ((AM2_RecvFn)(uintptr_t)ADDR_RECV_OBJ_DESTROYED)
+#define orig_recv_damage        ((AM2_RecvFn)(uintptr_t)ADDR_RECV_DAMAGE)
+#define orig_recv_item_create   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_CREATE)
+#define orig_recv_death         ((AM2_RecvFn)(uintptr_t)ADDR_RECV_DEATH)
+
+/* 0x0042ACE0, one caller. Routes an incoming army message to its receiver and
+ * answers whether it took it -- 1 for the six codes it knows, 0 otherwise, so
+ * the caller can go on looking.
+ *
+ * The original is a sparse switch: a 22-byte index table at 0x0042AD7C mapping
+ * code-0x0E to an arm, then a seven-entry jump table. Written as an ordinary
+ * switch, because the codes are what the source had and the two tables are the
+ * compiler's way of spelling it -- what matters is which codes are handled and
+ * that is preserved exactly.
+ *
+ * THE RANGE IS 0x0E..0x23 AND THE MIDDLE OF IT IS UNHANDLED. Codes 0x13
+ * through 0x22 land on the default and get 0, so the handled set is five
+ * consecutive codes and then one lone code at the far end. Reading the six
+ * arms as consecutive would be wrong by eleven.
+ *
+ * AM2_MSG_TROOPER_WEAPON is 0x22 and falls in that gap -- it is handled
+ * somewhere else entirely, which is worth knowing before assuming this is the
+ * one place army messages are dispatched.
+ *
+ * Five of the six receivers name themselves in their own trace lines, which is
+ * where AM2_MSG_ITEM_DEPLOY, AM2_MSG_DAMAGE and AM2_MSG_ITEM_CREATE came from
+ * -- those three codes had no name until the handlers were read.
+ *
+ * THE SECOND ARGUMENT IS IGNORED. The caller computes an army and pushes it,
+ * and nothing in the 192 bytes reads [esp+8]; the six receivers are each
+ * called with the message alone. It is cdecl, so the extra push is harmless,
+ * and the parameter is kept in the signature because the call site has it --
+ * dropping it would make the two disagree about the ABI for no gain.
+ *
+ * VERIFIED BY READING. Its counter is blind -- ReceiveArmyMsg is ours -- and
+ * that caller reads 0 itself through a full Boot Camp mission, because no army
+ * message arrives without a peer to send one. So this is the DirectPlay wall
+ * again, and the reconstruction's real check is the dispatch table, which was
+ * read out of the image rather than inferred: the 22-byte index table at
+ * 0x0042AD7C and the seven-entry jump table above it agree that exactly six
+ * codes are handled and which arm each takes. */
+int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
+{
+    uint32_t code = *(const uint16_t *)((const uint8_t *)msg + 2);
+
+    (void)army;   /* pushed by the caller and never read -- see above */
+
+    switch (code) {
+    case AM2_MSG_ITEM_GONE:      orig_recv_item_gone(msg);     return 1;
+    case AM2_MSG_ITEM_DEPLOY:    orig_recv_item_deploy(msg);   return 1;
+    case AM2_MSG_OBJ_DESTROYED:  orig_recv_obj_destroyed(msg); return 1;
+    case AM2_MSG_DAMAGE:         orig_recv_damage(msg);        return 1;
+    case AM2_MSG_ITEM_CREATE:    orig_recv_item_create(msg);   return 1;
+    case AM2_MSG_DEATH:          orig_recv_death(msg);         return 1;
+    default:                                                   return 0;
+    }
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_ARMY_MSG_FILTER, (const void *)ArmyMsgFilter,
+                        "ArmyMsgFilter", 1);
     rc |= patch_replace(ADDR_SEND_TROOPER_WEAPON,
                         (const void *)SendTrooperSetWeapon,
                         "SendTrooperSetWeapon", 10);

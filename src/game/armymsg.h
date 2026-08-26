@@ -53,6 +53,11 @@ void __cdecl SendObjDestroyed(const void *obj);
  * multiplayer session, and only for object types 1..4. */
 void __cdecl ItemGoneMessageSend(const void *obj);
 
+/* 0x0042ACE0. Routes an army message to its receiver; 1 if it took it. Six
+ * codes, and the middle of the range is NOT among them -- 0x13..0x22 get 0.
+ * `army` is pushed by the caller and never read. */
+int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus
