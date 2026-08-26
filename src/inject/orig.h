@@ -1108,6 +1108,13 @@
  * happens to be in front of you is the mistake this file has already recorded
  * three times. */
 #define ADDR_COMM_DRAIN_MSGS     0x00402690u  /* void(void), walks the msg list */
+/* 0x00410090, 912 bytes, one caller -- the drain above. The DirectPlay SYSTEM
+ * message handler, and it names its own cases: "DPSYS_HOST Size=%d, from=%x",
+ * "CreatePlayer to=%x, name = %s id = %x", "DestroyPlayer Id=%x, to = %x",
+ * "SESSIONLOST from=%x, to = %x" and, for anything else, "UnHandled System
+ * Message %x %d". Stays original. */
+#define ADDR_COMM_SYSTEM_MSG     0x00410090u  /* void(int32, int32, int32,
+                                               *      int32) */
 #define ADDR_COMM_NO_BUFFERS     0x00403280u  /* void(void), "COMM ERROR: NO BUFFERS" */
 #define ADDR_COMM_PLAYER_SLOT    0x0040F320u  /* thiscall int32(this,id), 16 bytes */
 /* Three tiny thiscall accessors for one per-player field, 0x020C. The names

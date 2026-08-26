@@ -1340,6 +1340,64 @@ void __cdecl Announce(const char *text)
     SendChatMsg((char *)text, 1);
 }
 
+typedef void (__cdecl *AM2_CommSystemMsgFn)(void *msg, int32_t dpid,
+                                            int32_t kind, int32_t last);
+#define orig_comm_system_msg \
+    ((AM2_CommSystemMsgFn)(uintptr_t)ADDR_COMM_SYSTEM_MSG)
+
+/* 0x00402690. Take everything the receive thread has queued and hand each one
+ * on, then return the node to the pool. Called from FramePre -- but only when
+ * CommActive(), which is the point.
+ *
+ * Its own guard is AM2_COMM_OFF_ACTIVE, which is exactly the field
+ * frame.cpp's CommActive() already tests before calling it, so at that call
+ * site the test is redundant. Reproduced anyway: it is the function's, not the
+ * caller's, and nothing says the next caller will check first.
+ *
+ * UNEXERCISED, and this was picked in the belief that it was hot. "Called once
+ * a frame" is what FramePre looks like at a glance; the gate is on the same
+ * line. Measured: MsgListRemHead, which this would call at least once per
+ * frame, reads 0 over a whole Boot Camp mission, and MsgListInit reads 6 --
+ * setup only. So AM2_COMM_OFF_ACTIVE is clear in single player and FramePre
+ * never calls this at all. Verified by reading; the A/B compares nothing here.
+ *
+ * The message's +0x08 decides where it goes. Zero routes to the DirectPlay
+ * SYSTEM handler with a zero in that argument's place; anything else is a game
+ * message and goes to CommDispatchMessage with the field itself.
+ *
+ * The original pushes FOUR arguments for both and cleans them itself, but the
+ * game-message half only ever reads two -- its first is a message pointer and
+ * its second a dpid, which is exactly the signature that function was already
+ * reconstructed with. So the extra pair is dead on that path and is not
+ * reproduced: under cdecl the caller cleans, and a callee cannot observe
+ * arguments it does not read. The system handler really does take four.
+ *
+ * The loop re-reads the head after each node rather than snapshotting the
+ * list, so a handler that queues more work has it drained in the same pass. */
+void __cdecl CommDrainMsgs(void)
+{
+    uint8_t *node;
+
+    if (!*(const int32_t *)(kCommObj + AM2_COMM_OFF_ACTIVE))
+        return;
+
+    for (node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B);
+         node;
+         node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B)) {
+        int32_t  kind = *(const int32_t *)(node + 0x08);
+        int32_t  last = *(const int32_t *)(node + 0x0C);
+        void    *msg  = *(void *const *)(node + 0x20);
+        int32_t  dpid = *(const int32_t *)(node + 0x24);
+
+        if (kind)
+            CommDispatchMessage(msg, dpid);
+        else
+            orig_comm_system_msg(msg, dpid, 0, last);
+
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+    }
+}
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_COMM_FIND_PLAYER, (const void *)CommFindPlayer,
@@ -1366,6 +1424,8 @@ int commmsg_install(void)
                   "ReceiveStartGameMsg", 1);
     patch_replace(ADDR_COMM_DISPATCH_MSG, (const void *)CommDispatchMessage,
                   "CommDispatchMessage", 1);
+    patch_replace(ADDR_COMM_DRAIN_MSGS, (const void *)CommDrainMsgs,
+                  "CommDrainMsgs", 0);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
                   "MsgListRemHead", 10);
     patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,

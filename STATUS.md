@@ -3035,7 +3035,33 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**The death sequence is complete: `SendDeathMessage` (`0x0042A930`) and
+**`CommDrainMsgs` (`0x00402690`) is reconstructed, and I picked it wrongly.**
+The rule from three commits ago -- pick a seam whose caller has a non-zero
+counter -- was applied to "called once a frame from FramePre", which is what
+that call site looks like at a glance. It is gated on `CommActive()`, on the
+same line, and that reads the same field the function itself re-tests.
+
+Measured after the fact: `MsgListRemHead`, which the drain would call at least
+once per frame, reads **0** over a whole Boot Camp mission, and `MsgListInit`
+reads 6 -- setup only. So the field is clear in single player and `FramePre`
+never calls this. Unexercised, verified by reading, and the clean A/B says
+nothing about it. **A caller's counter is only evidence if you read the
+CONDITION it calls under.**
+
+The reconstruction itself is worth having: the loop re-reads the head after
+each node rather than snapshotting, so a handler that queues more work is
+drained in the same pass, and `0x00410090` is named from its own strings --
+the DirectPlay SYSTEM handler, with `DPSYS_HOST`, `CreatePlayer`,
+`DestroyPlayer`, `SESSIONLOST` and `UnHandled System Message` as its cases.
+
+One asymmetry reproduced deliberately: the original pushes FOUR arguments for
+both branches, but the game-message half only reads two -- a message pointer
+and a dpid, exactly the signature `CommDispatchMessage` was already
+reconstructed with. The extra pair is dead on that path, so it is not passed;
+under cdecl the caller cleans, and a callee cannot observe arguments it does
+not read. Both callees were checked by prologue rather than assumed.
+
+**The death sequence is complete:**The death sequence is complete: `SendDeathMessage` (`0x0042A930`) and
 `ObjDeathCleanup` (`0x00428070`) finish it.** Both turn out to be entirely
 MULTIPLAYER bookkeeping -- a 16-byte type-0x23 packet in one, and two delayed
 events scheduled 3 seconds and 5 minutes out in the other, each behind a bit of

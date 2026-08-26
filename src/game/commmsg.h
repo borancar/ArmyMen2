@@ -56,4 +56,8 @@ int commmsg_install(void);
 }
 #endif
 
+/* Original: 0x00402690. Drain the receive queue, dispatching each message and
+ * returning its node to the pool. Called once a frame from FramePre. */
+void __cdecl CommDrainMsgs(void);
+
 #endif

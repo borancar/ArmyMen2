@@ -1,5 +1,6 @@
 /* frame.cpp -- see frame.h. */
 #include "../msgslot.h"
+#include "../commmsg.h"  /* CommDrainMsgs -- reconstructed */
 #include "../../inject/win32.h"
 
 #include <stdint.h>
@@ -84,7 +85,7 @@ void __cdecl PollInput(void)
 void __cdecl FramePre(void)
 {
     if (CommActive() && !GetPauseFlags())
-        call0(ADDR_COMM_DRAIN_MSGS);
+        CommDrainMsgs();
 
     call0(ADDR_COMM_FRAME_PRE_A);
 }
