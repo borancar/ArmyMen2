@@ -5,11 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `15f9021`. Working tree clean.
+Last updated: **2026-08-26**, at `1f6766f`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`ArmyMsgFilter` is reconstructed, and five of its six receivers named
+  themselves.** `0x0042ACE0` routes an incoming army message and answers
+  whether it took it. The receivers' own trace lines identified **three
+  message codes that had no name at all**:
+
+  | code | the handler's own line |
+  |---|---|
+  | `0x0E` | `itemGoneMessageReceive %x` |
+  | `0x0F` | `itemDeployMessageReceive: uid=%x, pos=(%d,%d), facing=%d` |
+  | `0x10` | -- no string; already `AM2_MSG_OBJ_DESTROYED` |
+  | `0x11` | `Recieved Damage: item->uid %x, amount: %d, army %d, dir: %d` |
+  | `0x12` | `==> Receive Item Create [uid:%08x, item type: %d, subtype: %d` |
+  | `0x23` | `Received Death Message: item->uid %x, army %d` |
+
+  So `AM2_MSG_ITEM_DEPLOY`, `AM2_MSG_DAMAGE` and `AM2_MSG_ITEM_CREATE` are the
+  game's vocabulary rather than ours. The misspelling in `0x11` is the game's.
+
+- **The middle of the range is unhandled.** The switch spans `0x0E..0x23` but
+  `0x13` through `0x22` fall to the default and get 0 -- five consecutive
+  codes and then one lone code eleven past them. Reading the six arms as
+  consecutive would be **wrong by eleven**, and only the sparse index table
+  says otherwise. `AM2_MSG_TROOPER_WEAPON` is `0x22` and sits in that gap: it
+  is dispatched somewhere else entirely.
+
+- **The second argument is ignored.** The caller computes an army and pushes
+  it; nothing in the 192 bytes reads `[esp+8]`, and the six receivers each get
+  the message alone. cdecl, so harmless -- the parameter is kept because the
+  call site has it.
+
+- Verified by reading: the counter is blind and `ReceiveArmyMsg` itself reads
+  0 through a Boot Camp mission, since no army message arrives without a peer.
+  The real check is the dispatch table, read out of the image rather than
+  inferred.
 
 - **`ObjFrameStep` is reconstructed, and it is the hottest function in the
   tree.** `0x004284D0`, called by `ObjFrameSweep` for every registered object
