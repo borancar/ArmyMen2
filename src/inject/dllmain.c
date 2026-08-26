@@ -25,6 +25,7 @@
 #include "../game/dist.h"
 #include "../game/win32/font.h"
 #include "../game/win32/mapdraw.h"
+#include "../game/maprow.h"
 #include "../game/win32/widget.h"
 #include "../game/item.h"
 #include "../game/msgslot.h"
@@ -462,6 +463,7 @@ static void install(void)
     packkey_install();
     text_install();
     font_install();
+    maprow_install();
     mapdraw_install();
     widget_install();
     report_install();

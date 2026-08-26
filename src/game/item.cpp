@@ -22,6 +22,7 @@
 #include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "maprow.h"   /* RowUpdate -- reconstructed */
 
 /* 0x0042A7A0, 18 call sites.
  *
@@ -667,9 +668,6 @@ void __cdecl DestroyByType(void *obj)
         SendObjDestroyed(obj);
 }
 
-typedef void (__cdecl *am2_row_update_fn)(void *row, int32_t a, void *desc);
-#define orig_row_update \
-            ((am2_row_update_fn)AM2_IMAGE(ADDR_ROW_UPDATE))
 #define orig_item_teardown  ((am2_destroy_fn)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
 
 #define orig_obj_attach_to \
@@ -813,7 +811,7 @@ void __cdecl DestroyObjCommon(void *obj)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         ObjFlagClear0(row);
-        orig_row_update(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        RowUpdate(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
     }
 
     if (ObjIsItem((const AM2_Object *)obj))

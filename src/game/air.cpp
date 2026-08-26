@@ -15,6 +15,7 @@
 #include "misc.h"   /* MeetsAllThree -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "maprow.h"   /* RowUpdate -- reconstructed */
 
 #define kAirSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_AIR_SAVE_BLOCK))
 
@@ -91,9 +92,6 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     return 0;
 }
 
-typedef void (__cdecl *AM2_RowUpdateFn)(void *row, int32_t a, void *desc);
-#define orig_row_update \
-    ((AM2_RowUpdateFn)(uintptr_t)ADDR_ROW_UPDATE)
 
 /* 0x004296E0, eight callers. Reveal one object: show it through the fog.
  *
@@ -132,7 +130,7 @@ void __cdecl RevealObj(void *obj)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
-        orig_row_update(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 }
 

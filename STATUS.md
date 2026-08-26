@@ -3035,7 +3035,32 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`DepthLink` (`0x0041D8F0`, 2,888 calls a mission) is reconstructed** -- the
+**`RowUpdate` (`0x0041D480`, THIRTY-SEVEN callers) is reconstructed at
+242,936 calls a mission** -- the hottest thing here by two orders of magnitude,
+and the centre of the row/cell subsystem. It brings one row's membership of the
+map's cell grid up to date: four early exits, then the sprite rectangle placed
+at the row's position, shifted down by 8 into cells, clamped, and then a double
+loop that links each covered cell, re-sorting an entry already in the right one
+and unlinking any that has moved. Surplus entries are trimmed at the end.
+
+One clamping asymmetry is the original's and is REPRODUCED: the bottom edge is
+clamped against COLS-1 where the top was tested against ROWS-1. Every shipped
+map is square, so nothing here can tell the two apart -- the same situation
+CLAUDE.md records for `ADDR_MAP_TILES_W`, and correcting it would be a
+behaviour change defended by a guess.
+
+**`selftest-link` forced a module move, and it was right to.** `air.cpp` and
+`item.cpp` call `RowUpdate`, and a flat module may not reach a `win32/` header
+-- so a declaration-only header looked like enough. It is not: `make check`
+builds `tests/selftest.exe` from the flat sources alone, and that link cannot
+see a symbol defined in `win32/`. **The split is a LINK-TIME fact, not only a
+naming convention.** So `DepthCompare`, `DepthLink`, `DepthResort`, `RowUpdate`
+and their helper now live in a new flat `src/game/maprow.cpp` -- which is where
+they always belonged, since not one of them names a platform type. Two commits
+ago I wrote that leaving them in `win32/` was a considered choice; the check
+disagreed and the check was correct.
+
+**`DepthLink` (`0x0041D8F0`, 2,888 calls a mission) is reconstructed****`DepthLink` (`0x0041D8F0`, 2,888 calls a mission) is reconstructed** -- the
 list primitive that puts a node which is NOT yet in the list into its sorted
 place. Same four-exit shape as `DepthResort`, minus the unlink, and it only
 ever walks forward, because a node that is not linked has no position to walk

@@ -70,11 +70,6 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep);
  * region is dropped and 1 is returned. */
 int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world);
 
-/* 0x0041D740. Which of two objects is drawn first: layer, then a slope
- * projection, then y, then the two pointers as addresses so the order is
- * total. 0 is a null argument, not a tie. */
-int32_t __cdecl DepthCompare(void *a, void *b);
-
 /* 0x0040A090. Draw one map object: clip, convert the clipped rectangle into a
  * destination position and a source rectangle inside the sprite, put the
  * object's own remap table and palette into the sprite, and blit. */
@@ -106,14 +101,5 @@ int mapdraw_install(void);
 #ifdef __cplusplus
 }
 #endif
-
-/* Original: 0x0041D8F0. Link a node that is not yet in the list into its
- * sorted place. The primitive under DepthInsert, which is a different
- * address. */
-void __cdecl DepthLink(void *node, void **head);
-
-/* Original: 0x0041DB90. Put one node back into depth order after the object it
- * points at has moved. Walks outward in one direction and re-links once. */
-void __cdecl DepthResort(void *node, void **head);
 
 #endif /* AM2_MAPDRAW_H */

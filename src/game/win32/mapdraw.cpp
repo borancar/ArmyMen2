@@ -27,6 +27,7 @@
 #include "palette.h"
 #include "../misc.h"
 #include "../../inject/patch.h"
+#include "../maprow.h"  /* the flat declaration of RowUpdate */
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
@@ -518,18 +519,6 @@ static void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
         g_depthHead = n;
 }
 
-/* The projection the comparator turns a horizontal distance into: `dx` units
- * across, times the object's own slope, TRUNCATED TO 16 BITS.
- *
- * The 16 bits are not incidental -- the original takes `_ftol`'s answer in AX
- * and sign-extends that, so a projection past 32767 wraps rather than
- * saturating. Written out here because it is the one place this function can
- * surprise. */
-static int32_t DepthProject(int32_t dx, float slope, int32_t y)
-{
-    return (int16_t)(int32_t)((float)dx * slope) + y;
-}
-
 /* 0x0040A090 -- draw one map object, and the last piece of the object
  * subsystem.
  *
@@ -581,89 +570,6 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
                       clip.left - g_viewRect->left,
                       clip.top  - g_viewRect->top,
                       &src, 0);
-}
-
-/* 0x0041D740, nine callers -- which of two objects is drawn first.
- *
- * Four tests in order, each falling through to the next when it cannot
- * decide.
- *
- * A LAYER at +0x26, but only when BOTH objects have a positive one: a layer
- * of zero or less means "no layer", and two such objects are compared by
- * position instead of both being treated as layer 0.
- *
- * Then the SLOPE at +0x28, which is what makes this more than a y sort. Each
- * object projects the horizontal distance to the other onto the vertical
- * axis and the two answers are compared with the other's y. When both
- * projections agree the answer is theirs; when they disagree -- which is what
- * happens where two sprites overlap ambiguously -- the plain y comparison
- * decides. An object with a slope of exactly zero projects nothing, and the
- * three combinations of zero and non-zero are three separate arms.
- *
- * Then plain y. And finally the two POINTERS, compared as addresses, so the
- * order is total: two objects at the same place still have a fixed order and
- * the sort cannot loop. Answering 0 would have been the obvious thing and it
- * is not what this does -- 0 is reserved for a null argument. */
-int32_t __cdecl DepthCompare(void *a, void *b)
-{
-    const uint8_t *pa = (const uint8_t *)a;
-    const uint8_t *pb = (const uint8_t *)b;
-    int16_t        la, lb;
-    float          sa, sb;
-    int32_t        ax, ay, bx, by;
-
-    if (!pa || !pb)
-        return 0;
-
-    la = *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER);
-    lb = *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER);
-    if (la > 0 && lb > 0) {
-        if (la > lb)
-            return 1;
-        if (la < lb)
-            return -1;
-    }
-
-    sa = *(const float *)(pa + OBJ_OFF_DEPTH_SLOPE);
-    sb = *(const float *)(pb + OBJ_OFF_DEPTH_SLOPE);
-    ax = *(const int16_t *)(pa + OBJ_OFF_SCREEN_X);
-    ay = *(const int16_t *)(pa + OBJ_OFF_SCREEN_Y);
-    bx = *(const int16_t *)(pb + OBJ_OFF_SCREEN_X);
-    by = *(const int16_t *)(pb + OBJ_OFF_SCREEN_Y);
-
-    if (sa != 0.0f && sb != 0.0f) {
-        int32_t fromA = DepthProject(bx - ax, sa, ay);
-        int32_t fromB = DepthProject(ax - bx, sb, by);
-        int32_t aInFront = (fromA > by) ? 1 : 0;
-
-        if (ay > fromB && aInFront)
-            return 1;
-        if (ay < fromB && !aInFront)
-            return -1;
-        /* They disagree: plain y decides. */
-    } else if (sa != 0.0f) {
-        /* Only A has a slope, so only A's projection is available. */
-        if (DepthProject(bx - ax, sa, ay) > by)
-            return 1;
-        if (DepthProject(bx - ax, sa, ay) == by)
-            return (pb < pa) ? 1 : -1;
-        return -1;
-    } else if (sb != 0.0f) {
-        int32_t fromB = DepthProject(ax - bx, sb, by);
-
-        if (ay > fromB)
-            return 1;
-        if (ay == fromB)
-            return (pb < pa) ? 1 : -1;
-        return -1;
-    }
-
-    if ((int16_t)ay > (int16_t)by)
-        return 1;
-    if ((int16_t)ay < (int16_t)by)
-        return -1;
-
-    return (pb < pa) ? 1 : -1;
 }
 
 /* 0x0041E160 -- insert one object into the depth list, sorted.
@@ -1453,166 +1359,7 @@ void __cdecl ResetDrawCounts(void)
     *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_A = 0;
 }
 
-#define DEPTH_OBJ(n)  (*(void **)((uint8_t *)(n) + DEPTH_OFF_OBJ))
-#define DEPTH_PREV(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_PREV))
-#define DEPTH_NEXT(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_NEXT))
 
-/* 0x0041D8F0, two callers. Link a node that is NOT yet in the list into its
- * sorted place. The primitive under DepthInsert, which is a different address
- * and takes an object and a world rectangle instead.
- *
- * Same four-exit shape as DepthResort below, minus the unlink: empty list,
- * before the head, before some later node, or appended at the tail. It only
- * ever walks FORWARD, because a node that is not linked has no position to
- * walk back from.
- *
- * The head cases are the ones to get right. An empty list writes both of the
- * node's links to zero and makes it the head; taking the head position writes
- * `prev` to zero and `*head`, and the other two exits touch neither.
- *
- * Measured: 2,888 calls in a Boot Camp mission. Which exit each takes is not.
- *
- * Reconstructing this took DepthCompare's counter from 12,661 to ZERO in the
- * same run, with no behaviour change at all: its only two live callers are
- * this and DepthResort, and both now call it by name rather than through the
- * patched entry. A textbook instance of the first kind of counter blindness,
- * recorded here because it happened between two commits and would otherwise
- * read as a function that stopped running. */
-void __cdecl DepthLink(void *node, void **head)
-{
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *e = (uint8_t *)*head;
-
-    if (!e) {
-        *head          = n;
-        DEPTH_NEXT(n)  = (uint8_t *)0;
-        DEPTH_PREV(n)  = (uint8_t *)0;
-        return;
-    }
-
-    if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-        DEPTH_PREV(n) = (uint8_t *)0;
-        DEPTH_NEXT(n) = e;
-        DEPTH_PREV(e) = n;
-        *head         = n;
-        return;
-    }
-
-    while (DEPTH_NEXT(e)) {
-        e = DEPTH_NEXT(e);
-        if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-            DEPTH_NEXT(n)              = e;
-            DEPTH_PREV(n)              = DEPTH_PREV(e);
-            DEPTH_PREV(e)              = n;
-            DEPTH_NEXT(DEPTH_PREV(n))  = n;
-            return;
-        }
-    }
-
-    DEPTH_NEXT(e) = n;
-    DEPTH_PREV(n) = e;
-    DEPTH_NEXT(n) = (uint8_t *)0;
-}
-
-/* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Put one node back into depth
- * order after the thing it points at has moved.
- *
- * The list is doubly linked and kept sorted by ADDR_DEPTH_COMPARE over the
- * OBJECT each node holds, not over the node. Only one node is out of place, so
- * this walks outward from it in whichever direction the first comparison
- * indicates and re-links it once -- an insertion sort's inner loop, run alone.
- *
- * Four exits and they are not symmetric, which is the part worth stating.
- * Walking toward the tail ends either before some node or after the LAST one;
- * walking toward the head ends either after some node or at the head itself,
- * and only that last case writes `*head`. The two middle cases do not, because
- * a node inserted between two others cannot become the head.
- *
- * Note also that the unlink differs between the two directions. Going forward,
- * `n->next` is known non-null -- that is why we are here -- so its back
- * pointer is written unconditionally; going backward, `n->prev` is the known
- * one and `n->next` has to be tested. The original writes each accordingly and
- * this reproduces the asymmetry rather than guarding both.
- *
- * It lives here rather than in flat map.cpp only because DepthCompare does:
- * this function names no platform type, but a flat module may not reach a
- * win32/ header even transitively, and splitting a two-function list across
- * the boundary to satisfy a rule about API contact would be worse.
- *
- * Measured: 3,922 calls in a Boot Camp mission, with DepthCompare at 12,661 on
- * the same run -- about 3.2 comparisons per call, which is the walk loops
- * doing real work rather than every node landing on the first test. This is
- * the hottest function reconstructed in this run of work, and it is pointer
- * surgery, so a wrong re-link would corrupt the draw order and show. Which of
- * the four exits each call takes is NOT measured. */
-void __cdecl DepthResort(void *node, void **head)
-{
-    uint8_t *n = (uint8_t *)node;
-    uint8_t *e;
-
-    if (DEPTH_NEXT(n)
-        && DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_NEXT(n))) > 0) {
-        for (e = DEPTH_NEXT(n); DEPTH_NEXT(e); ) {
-            e = DEPTH_NEXT(e);
-            if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-                /* Unlink, then insert before `e`. */
-                if (DEPTH_PREV(n))
-                    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-                else
-                    *head = DEPTH_NEXT(n);
-                DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
-
-                DEPTH_PREV(n) = DEPTH_PREV(e);
-                DEPTH_NEXT(n) = e;
-                DEPTH_NEXT(DEPTH_PREV(e)) = n;
-                DEPTH_PREV(e) = n;
-                return;
-            }
-        }
-
-        /* Ran off the end: unlink and append after `e`, the last node. */
-        if (DEPTH_PREV(n))
-            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-        else
-            *head = DEPTH_NEXT(n);
-        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
-
-        DEPTH_PREV(n) = e;
-        DEPTH_NEXT(n) = (uint8_t *)0;
-        DEPTH_NEXT(e) = n;
-        return;
-    }
-
-    if (!DEPTH_PREV(n)
-        || DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_PREV(n))) >= 0)
-        return;
-
-    for (e = DEPTH_PREV(n); DEPTH_PREV(e); ) {
-        e = DEPTH_PREV(e);
-        if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) >= 0) {
-            /* Unlink, then insert after `e`. */
-            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-            if (DEPTH_NEXT(n))
-                DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
-
-            DEPTH_PREV(n) = e;
-            DEPTH_NEXT(n) = DEPTH_NEXT(e);
-            DEPTH_PREV(DEPTH_NEXT(e)) = n;
-            DEPTH_NEXT(e) = n;
-            return;
-        }
-    }
-
-    /* Ran off the front: unlink and make `n` the head, before `e`. */
-    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-    if (DEPTH_NEXT(n))
-        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
-
-    DEPTH_PREV(n) = (uint8_t *)0;
-    DEPTH_NEXT(n) = e;
-    DEPTH_PREV(e) = n;
-    *head = n;
-}
 
 int mapdraw_install(void)
 {
@@ -1640,12 +1387,6 @@ int mapdraw_install(void)
                         "DrawMapObjects", 3);
     rc |= patch_replace(ADDR_DEPTH_INSERT, (const void *)DepthInsert,
                         "DepthInsert", 1);
-    rc |= patch_replace(ADDR_DEPTH_LINK, (const void *)DepthLink,
-                        "DepthLink", 2);
-    rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
-                        "DepthResort", 2);
-    rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
-                        "DepthCompare", 9);
     rc |= patch_replace(ADDR_DRAW_MAP_OBJECT, (const void *)DrawMapObject,
                         "DrawMapObject", 1);
 

@@ -4842,6 +4842,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * "nothing has changed, skip the work" test and is what identifies the pair. */
 #define ROW_OFF_SPRITE         0x04u
 #define ROW_OFF_PREV_SPRITE    0x08u
+/* Where the row is now and where it was when it was last registered. The
+ * "was" pair is written as ONE dword copied from the "now" pair, which is what
+ * fixes their layout: 0x1C/0x1E and 0x22/0x24, two int16 each. */
+#define ROW_OFF_X              0x1Cu  /* int16_t */
+#define ROW_OFF_Y              0x1Eu  /* int16_t */
+#define ROW_OFF_Y_ADJUST       0x20u  /* int16_t, taken off Y as well as hotY */
+#define ROW_OFF_PREV_X         0x22u  /* int16_t */
+#define ROW_OFF_PREV_Y         0x24u  /* int16_t */
+/* One entry of the row's buffer: which map cell it is linked into, or -1. */
+#define ROW_ENTRY_BYTES        0x10u
+#define ROW_ENTRY_OFF_CELL     0x0Cu  /* int32_t */
+/* Bit 1 asks ADDR_ROW_UPDATE to remove rather than re-link; bit 2 is its own
+ * record that it has done so. */
+#define ROW_FLAG_REMOVED_DONE  0x04u
 #define ROW_OFF_OWNS           0x34u  /* uint8_t: there is a buffer at +0x38 */
 #define ROW_OFF_BUFFER         0x38u
 /* The sub-list header inside an object: {?, count, rows, capacity} at

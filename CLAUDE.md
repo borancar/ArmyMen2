@@ -87,7 +87,7 @@ division is visible, use it.
 
 `src/game/win32/` holds every module that talks to Win32 or DirectX -- **16**
 of them. The flat part of `src/game/` holds the reconstruction that touches no
-API at all, and there are **30**; the split is the answer to "what still talks
+API at all, and there are **31**; the split is the answer to "what still talks
 to the outside world" in directory form.
 
 **The flat half is the one that grows, and this file's count of it went stale
