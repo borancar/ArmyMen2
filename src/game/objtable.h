@@ -80,6 +80,10 @@ void *__cdecl NextItem(void);
  * there or the group is over its cap, and mark the object. */
 void __cdecl SelectUnit(void *obj);
 
+/* Original: 0x00427C80, four callers. The counterpart of SelectUnit: drop the
+ * object from the selection list and clear OBJ_FLAG_SELECTED. */
+void __cdecl DeselectUnit(void *obj);
+
 int objtable_install(void);
 
 #ifdef __cplusplus

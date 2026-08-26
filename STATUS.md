@@ -3035,7 +3035,33 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`NotifyDamaged` (`0x00427E10`) is reconstructed** -- event kind 5, the exact
+**`TriggerItemDestroyed` (`0x00427FD0`) and `DeselectUnit` (`0x00427C80`) are
+reconstructed**, which takes the death sequence to three of its five steps.
+The first is event kind 4 and the third member of the 4/5/6 notifier family;
+the second is the exact counterpart of `SelectUnit` and lives beside it,
+reusing the same `rec` idiom for the selection list. Two of its details are
+kept rather than tidied: the loop does not advance after a removal, and
+`OBJ_FLAG_SELECTED` is cleared twice.
+
+**A tool of mine was silently wrong and it cost two real names.** The sweep for
+pushed string literals -- the cheap antidote this project recommends before
+inventing a name -- required every byte in 32..127, so it rejected any string
+ending in a NEWLINE. That is what every log message in this image is. It had
+reported all ten damage-family functions as naming nothing.
+
+Re-run correctly it recovers `TriggerItemDestroyed` and `Send Death Message`,
+and independently **confirms `ADDR_DAMAGE_TROOPER`** -- which had been derived
+from a jump-table index alone and turns out to log "DamageTrooper: droping
+armor uid:%x". So `ADDR_ON_OBJ_DIED` and `ADDR_KILL_BROADCAST`, both invented
+last commit, are renamed to what the program calls them.
+
+**And the wrong name would have survived the A/B.** The log line is gated on
+`COMM_OFF_VERBOSE`, which no configuration in the suite sets, so an invented
+message there never prints and never diverges. A wrong string behind a debug
+flag is invisible to every check this project has -- which is the argument for
+taking the literal off the image rather than writing one that reads plausibly.
+
+**`NotifyDamaged` (`0x00427E10`) is reconstructed****`NotifyDamaged` (`0x00427E10`) is reconstructed** -- event kind 5, the exact
 mirror of the kind-6 heal notify, and both call sites are inside `DamageObject`.
 Each party contributes a triple to `EventNotify`: its `num1`, its uid, and its
 event mask from `ADDR_OBJ_EVENT_MASK` (`0x00427D40`, fifteen callers), whose

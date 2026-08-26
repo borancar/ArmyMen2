@@ -300,6 +300,47 @@ void __cdecl SelectUnit(void *obj)
                               ADDR_ZERO_POINT);
 }
 
+/* 0x00427C80, four callers, and the exact counterpart of SelectUnit above --
+ * which is why it lives beside it and uses the same `rec` idiom for the
+ * selection list.
+ *
+ * Two details are the original's rather than tidied. The loop does NOT advance
+ * its index after a removal, re-testing the same slot against the shortened
+ * list, which is right for a remove-in-place; and OBJ_FLAG_SELECTED is cleared
+ * TWICE -- once inside the loop when a match is removed, once unconditionally
+ * afterwards -- so an object that was never in the list still comes out with
+ * the flag down.
+ *
+ * The final notify is handed ADDR_ZERO_POINT as a packed point, exactly as
+ * SelectUnit's is. */
+void __cdecl DeselectUnit(void *obj)
+{
+    uint8_t        *o    = (uint8_t *)obj;
+    int32_t        *rec  = (int32_t *)(uintptr_t)ADDR_SELECTED_UIDS;
+    const uint32_t *items;
+    uint32_t        uid;
+    int32_t         i    = 0;
+
+    if (!o)
+        return;
+
+    uid   = *(const uint32_t *)(o + 4);
+    items = *(const uint32_t *const *)&rec[2];
+
+    while (i < rec[1]) {
+        if (items[i] == uid) {
+            ListRemoveAt(rec, i);
+            *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
+        } else {
+            i++;
+        }
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
+    orig_on_selection_changed(*(const uint32_t *)(uintptr_t)
+                              ADDR_ZERO_POINT);
+}
+
 int objtable_install(void)
 {
     int rc = 0;
@@ -313,6 +354,8 @@ int objtable_install(void)
     rc |= patch_replace(ADDR_NEXT_ITEM, (const void *)NextItem, "NextItem", 0);
     rc |= patch_replace(ADDR_OBJ_BY_UID_ALIAS, (const void *)ObjByUidAlias,
                         "ObjByUidAlias", 1);
+    rc |= patch_replace(ADDR_DESELECT_UNIT, (const void *)DeselectUnit,
+                        "DeselectUnit", 1);
     rc |= patch_replace(ADDR_SELECT_UNIT, (const void *)SelectUnit,
                         "SelectUnit", 15);
     return rc;

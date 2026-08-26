@@ -2499,12 +2499,16 @@
 #define ADDR_DAMAGE_OBJECT       0x00428140u  /* void(obj,int32,int32,uid,
                                                *      int32,int32) */
 #define ADDR_DAMAGE_ITEM         0x004356C0u  /* type 1 */
-#define ADDR_DAMAGE_TROOPER      0x00447A40u  /* type 2 */
+#define ADDR_DAMAGE_TROOPER      0x00447A40u  /* type 2 -- and this one
+                                               * is NOT a guess: it logs
+                                               * "DamageTrooper: droping armor
+                                               * uid:%x" */
 #define ADDR_DAMAGE_VEHICLE      0x0045B4D0u  /* type 3 */
 #define ADDR_DAMAGE_ROACH        0x0043D280u  /* type 8 */
 /* The two event kinds these notifiers raise. Both come from the literal each
  * pushes as EventNotify's `type`, and the pair is what makes them readable:
  * 5 is raised after damage, 6 after a heal. */
+#define AM2_EVENT_KILLED         4
 #define AM2_EVENT_DAMAGED        5
 #define AM2_EVENT_HEALED         6
 /* Called twice by ADDR_DAMAGE_OBJECT and by nothing else. Reconstructed. */
@@ -2515,9 +2519,12 @@
  * ADDR_NOTIFY_HEALED pass to EventNotify's maskA and maskB, and event.h
  * already calls those parameters masks -- which is what grounds this name. */
 #define ADDR_OBJ_EVENT_MASK      0x00427D40u  /* int32_t(const void *obj) */
-/* The death sequence, in the order ADDR_DAMAGE_OBJECT runs it. */
-#define ADDR_ON_OBJ_DIED         0x00427FD0u  /* void(obj, void *attacker) */
-#define ADDR_KILL_BROADCAST      0x0042A930u  /* void(obj, uid, int32) */
+/* The death sequence, in the order ADDR_DAMAGE_OBJECT runs it. The first two
+ * name THEMSELVES -- "TriggerItemDestroyed, item uid=%x, by uid = %x" and
+ * "Send Death Message: uid %x, army %d" -- so neither is ours. The first is
+ * reconstructed and is the third member of the kind 4/5/6 notifier family. */
+#define ADDR_TRIGGER_ITEM_DESTROYED 0x00427FD0u /* void(obj, void *attacker) */
+#define ADDR_SEND_DEATH_MESSAGE  0x0042A930u  /* void(obj, uid, int32) */
 #define ADDR_OBJ_DEATH_CLEANUP   0x00428070u  /* void(obj) */
 /* The counterpart of ADDR_SELECT_UNIT, which sits 0x60 above it. */
 #define ADDR_DESELECT_UNIT       0x00427C80u  /* void(obj) */

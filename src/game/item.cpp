@@ -890,7 +890,7 @@ typedef void (__cdecl *AM2_ObjAttackerFn)(void *obj, void *attacker);
 typedef void (__cdecl *AM2_DamageBroadcastFn)(void *obj, uint32_t attacker,
                                               int32_t amount, int32_t kind,
                                               const void *where, int32_t f);
-typedef void (__cdecl *AM2_KillBroadcastFn)(void *obj, uint32_t attacker,
+typedef void (__cdecl *AM2_SendDeathMsgFn)(void *obj, uint32_t attacker,
                                             int32_t kind);
 typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
@@ -898,12 +898,10 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 #define orig_damage_vehicle   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_VEHICLE)
 #define orig_damage_roach     ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_ROACH)
-#define orig_on_obj_died      ((AM2_ObjAttackerFn)(uintptr_t)ADDR_ON_OBJ_DIED)
 #define orig_damage_broadcast \
     ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
-#define orig_kill_broadcast   ((AM2_KillBroadcastFn)(uintptr_t)ADDR_KILL_BROADCAST)
+#define orig_send_death_message   ((AM2_SendDeathMsgFn)(uintptr_t)ADDR_SEND_DEATH_MESSAGE)
 #define orig_death_cleanup    ((AM2_ObjOnlyFn)(uintptr_t)ADDR_OBJ_DEATH_CLEANUP)
-#define orig_deselect_unit    ((AM2_ObjOnlyFn)(uintptr_t)ADDR_DESELECT_UNIT)
 
 /* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
  * belongs to a different structure, as air.cpp already records. */
@@ -957,6 +955,56 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
     }
 
     EventNotify(AM2_EVENT_DAMAGED,
+                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                ((const AM2_Object *)obj)->uid,
+                orig_obj_event_mask(obj),
+                0, 0, 0, 0, 0, 0);
+}
+
+/* 0x00427FD0, and the name is the ORIGINAL's, off its own log line. Event kind
+ * 4 -- killed -- and the third member of the family: the same two-party shape
+ * as NotifyDamaged above and as the kind-6 heal notify, differing only in the
+ * literal and in the log line it can emit first.
+ *
+ * That log line is why this is not called OnObjDied, which is what it was
+ * about to be. A sweep for pushed string literals had reported this function
+ * as naming nothing -- the sweep required every byte in 32..127 and so
+ * rejected any string ending in a newline, which is what every log message in
+ * this image is. Re-run correctly it names this function, names
+ * ADDR_SEND_DEATH_MESSAGE, and independently CONFIRMS ADDR_DAMAGE_TROOPER,
+ * which had been derived from a jump table index alone.
+ *
+ * The log is gated on the comm object's COMM_OFF_VERBOSE, so it costs nothing
+ * in an ordinary run, and it prints the attacker's uid as 0 when there is no
+ * attacker rather than skipping the line. Note what that gate means for
+ * checking: an invented message here would NOT have failed the A/B, because
+ * the line never prints on any configuration the suite drives. A wrong string
+ * behind a debug flag is invisible -- which is the argument for taking the
+ * literal off the image rather than writing one that reads plausibly. */
+static void __cdecl TriggerItemDestroyed(void *obj, void *attacker)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (*(const int32_t *)((const uint8_t *)kItemComm + COMM_OFF_VERBOSE))
+        am2_log("TriggerItemDestroyed, item uid=%x, by uid = %x\n",
+                ((const AM2_Object *)obj)->uid,
+                attacker ? ((const AM2_Object *)attacker)->uid : 0u);
+
+    if (attacker) {
+        const uint8_t *a = (const uint8_t *)attacker;
+
+        EventNotify(AM2_EVENT_KILLED,
+                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)obj)->uid,
+                    orig_obj_event_mask(obj),
+                    *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)attacker)->uid,
+                    orig_obj_event_mask(attacker),
+                    0, 0, 0);
+        return;
+    }
+
+    EventNotify(AM2_EVENT_KILLED,
                 *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
                 ((const AM2_Object *)obj)->uid,
                 orig_obj_event_mask(obj),
@@ -1073,14 +1121,14 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
                               (int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF)))
         return;
 
-    orig_on_obj_died(obj, attacker);
-    orig_kill_broadcast(obj, attackerUid, kind);
+    TriggerItemDestroyed(obj, attacker);
+    orig_send_death_message(obj, attackerUid, kind);
     orig_death_cleanup(obj);
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED))
         return;
 
-    orig_deselect_unit(obj);
+    DeselectUnit(obj);
 
     if ((uint32_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF) != g_defaultOwner
         || g_selectedCount != 0)
@@ -1183,6 +1231,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_TRIGGER_ITEM_DESTROYED, (const void *)TriggerItemDestroyed,
+                  "TriggerItemDestroyed", 2);
     patch_replace(ADDR_NOTIFY_DAMAGED, (const void *)NotifyDamaged,
                   "NotifyDamaged", 2);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
