@@ -5,11 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `fc4f68b`. Working tree clean.
+Last updated: **2026-08-27**, at `06c140c`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **Three army-message receivers reconstructed**, each the far end of a sender
+  already in `armymsg.cpp`: `RecvObjDestroyed` (`0x0042AF00`), `RecvItemGone`
+  (`0x0042AEB0`), `RecvDeath` (`0x0042AE50`). **The pairing is the check** --
+  the sender packs a field and the receiver reads the same offset, so the
+  layouts witness each other rather than resting on one reading.
+
+- **They disagree about their own tracing, and it is reproduced.** `ItemGone`
+  logs only under `COMM_OFF_VERBOSE`, `Death` logs **unconditionally**, and
+  `ObjDestroyed` does not log at all. Three siblings in one band -- unifying
+  that is exactly what a rewrite would do. `Death`'s log also prints the
+  ATTACKER's army and the victim's LOCAL uid, not the victim's army and not
+  the wire uid.
+
+- **All three put the received uid through `UidOnWire`, having been sent
+  through it too** -- and that is not a swap undone twice. This build's
+  `UidOnWire` is the **identity**, a placeholder for a conversion the port does
+  not need. Reproduced rather than elided, so the place it belongs stays
+  visible.
+
+- `0x00428450` is named `ADDR_OBJ_DIE` by these callers: it reaches
+  `FindSlot`, `ADDR_TRIGGER_ITEM_DESTROYED` and `ADDR_OBJ_DEATH_CLEANUP`,
+  which between them are what happens when an object **dies** rather than
+  merely being removed.
+
+- **The line-continuation trap is fixed rather than noted a third time.**
+  Macro removal now goes through a continuation-aware helper, which is what I
+  said the fix was after it bit in each of the last two commits.
 
 - **`StepType1And4` is reconstructed** -- `0x00433EC0`, the handler
   `ObjFrameStep`'s jump table gives to types 1 AND 4: **24.8 million calls** in
