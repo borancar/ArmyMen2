@@ -3035,7 +3035,31 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`ObjFrameSweep` (`0x00428700`) and `AdvanceSecondDeadline` (`0x00424FE0`) are
+**`PadAdvanceDeadlines` (`0x00437A50`) and `RefreshObjCtx` (`0x00425E70`)**,
+two more per-frame steps at 18,546 and 18,617 against `ComposeFrame`'s 18,699 --
+predicted from the caller again, before either was written.
+
+**A bare address resolved into two struct fields.** The pad loop walks
+`0x005161D4` with a stride of `0x48`; that is `ADDR_PADS` plus `0x3C`, and 72 is
+`AM2_Pad`'s known stride -- so the two dwords it touches are fields `+0x38` and
+`+0x3C`, now named `period` and `dueAt`. A deadline advances by ONE period per
+frame rather than to the next future multiple, so a pad that has fallen behind
+catches up a step at a time.
+
+**`RefreshObjCtx` carries what looks like a copy-paste slip in the original,
+and it is reproduced.** Three context slots are re-resolved from their uids;
+the first and third clear their UID when the lookup fails, so the slot stops
+being retried. The middle one writes the null back over its own CACHE instead
+-- which already holds it -- and leaves the uid alone. The consequence is that
+a stale uid there is looked up again every frame forever. Kept exactly, with
+`/* sic */` on the line, since fixing it would change how often a dead uid is
+searched for.
+
+It also calls `LookupOwnerObj` and DISCARDS the result -- the next call
+overwrites the register before anything reads it -- so that call runs for
+whatever it does on the way, not for what it returns.
+
+**`ObjFrameSweep` (`0x00428700`) and `AdvanceSecondDeadline` (`0x00424FE0`) are**`ObjFrameSweep` (`0x00428700`) and `AdvanceSecondDeadline` (`0x00424FE0`) are
 reconstructed, both once a composed frame** -- 17,716 and 17,791 against
 `ComposeFrame`'s 17,866.
 

@@ -266,7 +266,14 @@ typedef struct {
     int32_t threshold;      /* +0x1C */
     int32_t delay0;         /* +0x20, from the optional `delay` clause */
     int32_t delay1;         /* +0x24 */
-    uint8_t rest[72 - 0x28];
+    uint8_t rest[0x38 - 0x28];  /* +0x28 is the event key; event.cpp writes it
+                                 * through this, which is why it stays a blob */
+    /* The pad's own repeat clock, advanced once a frame by PadAdvanceDeadlines
+     * -- see maprow.cpp's neighbours in item.cpp. A period of zero or less
+     * means the pad does not repeat and the deadline is left alone. */
+    int32_t period;         /* +0x38, milliseconds */
+    int32_t dueAt;          /* +0x3C, game-clock ms */
+    uint8_t rest40[72 - 0x40];
 } AM2_Pad;
 
 /* Everything sharing one pad number, and where that number sits on the map.

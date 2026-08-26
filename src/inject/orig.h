@@ -2403,6 +2403,18 @@
  * several pads may share. */
 #define ADDR_PADS                 0x00516198u  /* AM2_Pad[], stride 72 */
 #define ADDR_PAD_COUNT            0x00511DF8u
+/* 0x00437A50, one caller -- the per-frame path. Walks every pad and pushes the
+ * repeat deadline of each one that has a period forward, once the game clock
+ * has passed it. The stride is 72 and the two fields are AM2_Pad's +0x38 and
+ * +0x3C, which is how the loop's bare 0x005161D4 resolves. */
+#define ADDR_PAD_ADVANCE_DEADLINES 0x00437A50u  /* void(void) */
+/* 0x00425E70, one caller -- also per-frame. Re-resolves the three object
+ * context slots from their uids. */
+#define ADDR_REFRESH_OBJ_CTX      0x00425E70u  /* void(void) */
+/* The third member of the ADDR_OBJ_CTX_* triple. What distinguishes it from
+ * VAL and VAL_PREV is not established; it is named for its position. */
+#define ADDR_OBJ_CTX_VAL_A        0x00511E24u
+#define ADDR_OBJ_CTX_OBJ_A        0x005122C8u
 #define ADDR_PAD_NUMBERS          0x0051F198u  /* AM2_PadNumber[], stride 76 */
 #define ADDR_PAD_FINALISE         0x004375A0u  /* void(AM2_Pad *, int32_t) */
 

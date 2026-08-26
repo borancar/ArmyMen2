@@ -23,6 +23,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "maprow.h"   /* RowUpdate -- reconstructed */
+#include "script.h"   /* AM2_Pad */
 
 /* 0x0042A7A0, 18 call sites.
  *
@@ -949,6 +950,79 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
     orig_item_deploy_msg(obj, resurrect);
 }
 
+/* 0x00437A50, one caller, on the per-frame path. Push every repeating pad's
+ * deadline forward once the game clock has passed it.
+ *
+ * A period of zero or less means the pad does not repeat, and its deadline is
+ * left exactly where it is rather than being reset -- so a pad can be stopped
+ * by clearing its period without also having to fix up its clock.
+ *
+ * The deadline advances by ONE period per frame, not to the next future
+ * multiple, so a pad whose deadline has fallen far behind catches up one step
+ * at a time. Reproduced: it is what the original does, and the difference is
+ * observable in how long such a pad takes to fire again.
+ *
+ * The original walks a bare 0x005161D4 with a stride of 0x48; that resolves as
+ * ADDR_PADS plus AM2_Pad's +0x3C, which is what makes the two fields nameable
+ * at all.
+ *
+ * Measured at 18,546 calls against ComposeFrame's 18,699 -- once a frame, as
+ * predicted from the caller before the code was written. */
+void __cdecl PadAdvanceDeadlines(void)
+{
+    AM2_Pad *pads = (AM2_Pad *)(uintptr_t)ADDR_PADS;
+    uint32_t now  = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    int32_t  n    = *(const int32_t *)(uintptr_t)ADDR_PAD_COUNT;
+    int32_t  i;
+
+    for (i = 0; i < n; i++) {
+        if (pads[i].period <= 0)
+            continue;
+        if (now > (uint32_t)pads[i].dueAt)
+            pads[i].dueAt += pads[i].period;
+    }
+}
+
+/* 0x00425E70, one caller, on the per-frame path. Re-resolve the three object
+ * context slots from the uids they were set with, so a slot whose object has
+ * gone becomes null rather than stale.
+ *
+ * Two things here are the original's and are reproduced. LookupOwnerObj is
+ * called on the default owner and its RESULT DISCARDED -- the next call
+ * overwrites eax before anything reads it -- so it runs for whatever it does
+ * on the way, not for what it returns.
+ *
+ * And the three slots are not treated alike. The first and the third clear
+ * their UID when the lookup fails, so the slot stops being retried; the middle
+ * one writes the null back over its own CACHE instead, which it already holds,
+ * and leaves the uid alone. That asymmetry has the shape of a copy-paste slip
+ * in the original -- the line was edited for the wrong variable -- and its
+ * consequence is that a stale ADDR_OBJ_CTX_VAL is looked up again every frame
+ * forever. Kept exactly, since fixing it would change how often a dead uid is
+ * searched for.
+ *
+ * Measured at 18,617 calls on the same run. Which of the three slots is ever
+ * non-null is NOT measured -- the asymmetry above is read, not observed. */
+void __cdecl RefreshObjCtx(void)
+{
+    LookupOwnerObj(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+    *(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A =
+        LookupByUID(*(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A);
+    if (!*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A)
+        *(uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A = 0;
+
+    *(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ =
+        LookupByUID(*(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL);
+    if (!*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ)
+        *(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ = (void *)0;   /* sic */
+
+    *(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV =
+        LookupByUID(*(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV);
+    if (!*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV)
+        *(uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV = 0;
+}
+
 typedef void (__cdecl *AM2_ObjStepFn)(void *obj);
 typedef void (__cdecl *AM2_VoidFn)(void);
 #define orig_obj_frame_step  ((AM2_ObjStepFn)(uintptr_t)ADDR_OBJ_FRAME_STEP)
@@ -1554,6 +1628,11 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_PAD_ADVANCE_DEADLINES,
+                  (const void *)PadAdvanceDeadlines,
+                  "PadAdvanceDeadlines", 0);
+    patch_replace(ADDR_REFRESH_OBJ_CTX, (const void *)RefreshObjCtx,
+                  "RefreshObjCtx", 0);
     patch_replace(ADDR_OBJ_FRAME_SWEEP, (const void *)ObjFrameSweep,
                   "ObjFrameSweep", 0);
     patch_replace(ADDR_ADVANCE_SECOND, (const void *)AdvanceSecondDeadline,

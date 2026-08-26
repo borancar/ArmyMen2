@@ -45,6 +45,14 @@ void __cdecl RowUnregisterAll(void *row, void *desc);
  * registered object, and check comm in a session. */
 void __cdecl ObjFrameSweep(void);
 
+/* Original: 0x00437A50. Push every repeating pad's deadline forward once the
+ * clock has passed it, one period per frame. */
+void __cdecl PadAdvanceDeadlines(void);
+
+/* Original: 0x00425E70. Re-resolve the three object context slots from their
+ * uids, so a slot whose object has gone becomes null rather than stale. */
+void __cdecl RefreshObjCtx(void);
+
 /* Original: 0x00424FE0. Push a one-second deadline forward once the clock
  * passes it. Nothing reads the deadline; see the source. */
 void __cdecl AdvanceSecondDeadline(void);
