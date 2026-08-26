@@ -4446,6 +4446,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define COMM_OFF_STAT_MAX        0x1F0u
 #define COMM_OFF_STAT_BYTES      0x1F8u
 #define COMM_OFF_STAT_PACKETS    0x200u
+/* The bandwidth counters, all seven named from ADDR_COMM_REPORT_STATS' own
+ * format strings rather than from the reset that clears them:
+ * " SEND    BANDWIDTH (%6d samples) MAX was %6d;  %6d (%3d%%) exceeded design
+ * spec(%d)", and the same line for RECEIVE. So the three per direction are a
+ * sample count, the largest seen, and how many of those samples went over --
+ * the percentage is computed, not stored, and the spec is the literal 2880.
+ *
+ * The STAT_ prefix is send and RX_ is receive, which is the vocabulary the
+ * scalars above already use. */
+#define COMM_OFF_STAT_BW_MAX     0x458u   /* int32_t, largest send sample */
+#define COMM_OFF_RX_BW_MAX       0x45Cu   /* int32_t, largest receive sample */
+#define COMM_OFF_STAT_BW_SAMPLES 0x460u   /* int32_t */
+#define COMM_OFF_RX_BW_SAMPLES   0x464u   /* int32_t */
+#define COMM_OFF_STAT_BW_OVER    0x468u   /* int32_t, samples over the spec */
+#define COMM_OFF_RX_BW_OVER      0x46Cu   /* int32_t */
+#define AM2_COMM_BW_DESIGN_SPEC  0xB40    /* 2880, printed as "design spec" */
+/* Stamped from GetTickCount by the reset and read only by the report, which
+ * divides the elapsed milliseconds by 1000 and clamps the result up to 1. */
+#define COMM_OFF_STATS_SINCE     0x40Cu   /* uint32_t, ms */
+/* Both stat rings are 30 samples, and the four arrays TILE: 0x00C, 0x084,
+ * 0x0FC and 0x174 are 0x78 apart, which is 30 dwords, and the last ends
+ * exactly where COMM_OFF_RX_MAX begins. A layout that tiles is the check that
+ * no base is off. */
+#define AM2_COMM_STAT_SAMPLES    30
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
 #define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */

@@ -244,8 +244,6 @@ extern "C" void     __cdecl UnPauseGame(uint32_t bits);
 typedef int32_t (__attribute__((thiscall)) *AM2_SetColourFn)(void *comm,
                                                              int32_t slot,
                                                              int32_t colour);
-#define orig_comm_set_army_colour \
-    ((AM2_SetColourFn)(uintptr_t)ADDR_COMM_SET_ARMY_COLOUR)
 
 int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 {
@@ -336,7 +334,7 @@ void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
                 dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
     slot = CommSlotOfId(comm, dpid);
-    if (orig_comm_set_army_colour(
+    if (CommSetArmyColour(
             comm, slot,
             *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE)) == -1)
         return;

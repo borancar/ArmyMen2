@@ -871,6 +871,61 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
     return 0;
 }
 
+/* 0x0040F280, thiscall, two callers. Gives a slot an army colour, moving
+ * whoever already had that colour into the slot it displaces -- a SWAP, not an
+ * assignment, so no two players end up the same colour.
+ *
+ * Three things gate it and each rules out a different mistake.
+ *
+ * A negative colour is refused outright with -1, and that is the only path
+ * that does not return the slot it was given.
+ *
+ * Only the HOST rearranges anything: the test is COMM_OFF_IS_HOST on the
+ * GLOBAL comm object, not on `this`, and it is reproduced that way rather than
+ * tidied into a field of the object being edited.
+ *
+ * The last guard is `jae` -- UNSIGNED -- against the slot CommSlotForArmy
+ * answers for the incoming colour, and its safety comes from that callee
+ * rather than from anything here. CommSlotForArmy answers 0 when no slot holds
+ * the colour, so an unheld colour gives `slot >= 0`, which is always true
+ * unsigned, and the swap is skipped. Had the miss answered -1 the comparison
+ * would pass for every ordinary slot and the write would land 112 bytes before
+ * the array. Worth stating because the guard reads as an ordinary bounds check
+ * and is not one.
+ *
+ * WHAT VERIFIED THIS. Its counter is 0 and always will be -- both callers are
+ * reconstructed, so nothing crosses the patched entry, and blindspots.py lists
+ * it. A temporary probe on the mpoptions drive resolved it: one call,
+ * `slot=0 colour=1 held=1`, which takes the guard and performs the SWAP rather
+ * than skipping it. The arm that matters is the arm that runs.
+ *
+ * And ab.sh mpoptions can see a defect here, which was measured rather than
+ * assumed: with the swap suppressed, the 128-node widget tree differs on the
+ * colour toggle's SPRITE ID -- 1574528 against 1574530, the real datum carried
+ * beside the renumbered pointer for exactly this reason -- and the frame goes
+ * to 826 pixels against a budget of 300. Two independent detectors, neither of
+ * which is the log. The -1 arm and the skip arm stay verified by reading. */
+int32_t __attribute__((thiscall)) CommSetArmyColour(void *comm, int32_t slot,
+                                                    int32_t colour)
+{
+    if (colour < 0)
+        return -1;
+
+    int32_t        held  = CommSlotForArmy(comm, colour);
+    const uint8_t *world = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+    if (*(const int32_t *)(world + COMM_OFF_IS_HOST)
+        && (uint32_t)slot < (uint32_t)held) {
+        uint8_t *base = (uint8_t *)comm + AM2_PLAYER_ARMY;
+        int32_t *mine = (int32_t *)(base + (uint32_t)slot * AM2_PLAYER_STRIDE);
+        int32_t  was  = *mine;
+
+        *mine = colour;
+        *(int32_t *)(base + (uint32_t)held * AM2_PLAYER_STRIDE) = was;
+    }
+    return slot;
+}
+
 int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot)
 {
     int32_t id = *(const int32_t *)((const uint8_t *)comm +
@@ -1266,6 +1321,8 @@ int misc_install(void)
                   "CommSlotForArmy", 20);
     patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
                   "CommSlotHasPlayer", 5);
+    patch_replace(ADDR_COMM_SET_ARMY_COLOUR, (const void *)CommSetArmyColour,
+                  "CommSetArmyColour", 2);
     patch_replace(ADDR_BITMAP_BIT_SET, (const void *)BitmapBitSet,
                   "BitmapBitSet", 5);
     patch_replace(ADDR_LIST_UNLINK, (const void *)ListUnlink, "ListUnlink", 6);

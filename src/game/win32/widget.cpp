@@ -5180,8 +5180,6 @@ typedef int32_t (__attribute__((thiscall)) *AM2_SetArmyColourFn)(void *comm,
                                                                  int32_t slot,
                                                                  int32_t army);
 typedef void (__cdecl *AM2_SendIntFn)(int32_t v);
-#define orig_set_army_colour \
-    ((AM2_SetArmyColourFn)AM2_IMAGE(ADDR_COMM_SET_ARMY_COLOUR))
 /* SendColorMsg and SendTeamMsg are ours -- msgslot.cpp -- so they are called
  * by name; CommSendPlayers is not. */
 #define orig_send_players ((AM2_SendIntFn)AM2_IMAGE(ADDR_COMM_SEND_PLAYERS))
@@ -5233,7 +5231,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
         return;
     }
 
-    orig_set_army_colour(comm,
+    CommSetArmyColour(comm,
                          *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
                          army);
     PlaySoundAt(2, 0, 0, 0, 0);

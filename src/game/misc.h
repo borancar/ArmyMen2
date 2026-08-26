@@ -558,6 +558,12 @@ int32_t __cdecl MeetsAllThree(const void *p);
 int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
 int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot);
 
+/* 0x0040F280, thiscall. Gives a slot an army colour, SWAPPING with whoever
+ * already held it, so no two players end up the same. -1 for a negative
+ * colour; otherwise the slot it was given. Only the host rearranges. */
+int32_t __attribute__((thiscall)) CommSetArmyColour(void *comm, int32_t slot,
+                                                    int32_t colour);
+
 /* 0x00412DD0, 21 callers and five bytes of body: one load of the menu row and
  * a `ret`. A getter over a global, which is why so much of the menu code goes
  * through it rather than reading the global. */

@@ -33,6 +33,7 @@
 #include "../msgslot.h"
 #include "../objtable.h"
 #include "../../inject/patch.h"
+#include "winmain.h"   /* Ticks */
 
 #include <stdint.h>
 
@@ -255,7 +256,6 @@ static_assert(KEY_ALL_ACCESS == 0xF003F, "KEY_ALL_ACCESS");
 
 typedef void (__cdecl *am2_comm_void_fn)(void);
 #define orig_comm_init_defaults (*(am2_comm_void_fn)ADDR_COMM_INIT_DEFAULTS)
-#define orig_comm_reset_state   (*(am2_comm_method_fn)ADDR_COMM_RESET_STATE)
 /* The logger is called with no arguments at all. It is stubbed to `ret` in the
  * shipping image, so this is a no-op either way, but it is reproduced rather
  * than dropped -- see ADDR_LOG. */
@@ -300,7 +300,7 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     comm_u32(self, 0x408) = now;
     comm_u32(self, 0x004) = 0;
     comm_u32(self, 0x410) = 0x400;
-    orig_comm_reset_state(comm);
+    CommResetStats(comm);
 
     /* The one key the game ever touches. Created, never read. */
     RegCreateKeyExA(HKEY_LOCAL_MACHINE, (const char *)(uintptr_t)ADDR_REGISTRY_KEY,
@@ -1489,6 +1489,59 @@ void __cdecl CommMarkLobbied(void)
     *(int32_t *)(g_commObject + COMM_OFF_MSGS_ENABLED) = 1;
 }
 
+/* 0x0040F380, thiscall, three callers. Clears the traffic statistics and
+ * restarts the window they are measured over. Nothing here affects a packet;
+ * it is all bookkeeping the report below prints.
+ *
+ * Four parallel rings of AM2_COMM_STAT_SAMPLES entries -- send times, send
+ * sizes, receive times, receive sizes -- and the original walks all four in
+ * ONE loop, thirty iterations, stepping a single pointer and reaching the
+ * other three at fixed displacements of 0x78. That is what says the arrays are
+ * contiguous, and they tile: 0x00C, 0x084, 0x0FC, 0x174 are 0x78 apart, which
+ * is thirty dwords, and the last ends exactly where COMM_OFF_RX_MAX begins. A
+ * layout that tiles is the check that no base is off by an element.
+ *
+ * The two TIME rings are stamped with the current tick and the two SIZE rings
+ * are zeroed -- not all four cleared alike, which is the detail a tidier
+ * rewrite would lose. A zero timestamp would read as a sample from 1970 rather
+ * than as an empty slot.
+ *
+ * The same tick goes into COMM_OFF_STATS_SINCE, which only the report reads,
+ * and the six bandwidth counters go to zero.
+ *
+ * Its counter is NOT blind -- one of the three callers is still original -- and
+ * it read 0 on the multiplayer drive anyway, so a probe was used rather than a
+ * guess: it fires once, during comm setup, on the mpoptions path. */
+void __attribute__((thiscall)) CommResetStats(void *comm)
+{
+    uint8_t *c   = (uint8_t *)comm;
+    uint32_t now = Ticks();
+    int32_t  i;
+
+    *(uint32_t *)(c + COMM_OFF_STATS_SINCE) = now;
+
+    *(int32_t *)(c + COMM_OFF_STAT_PACKETS) = 0;
+    *(int32_t *)(c + COMM_OFF_RX_PACKETS)   = 0;
+    *(int32_t *)(c + COMM_OFF_STAT_BYTES)   = 0;
+    *(int32_t *)(c + COMM_OFF_RX_BYTES)     = 0;
+    *(int32_t *)(c + COMM_OFF_STAT_MAX)     = 0;
+    *(int32_t *)(c + COMM_OFF_RX_MAX)       = 0;
+
+    for (i = 0; i < AM2_COMM_STAT_SAMPLES; i++) {
+        *(uint32_t *)(c + COMM_OFF_STAT_TIMES + (uint32_t)i * 4) = now;
+        *(int32_t  *)(c + COMM_OFF_STAT_SIZES + (uint32_t)i * 4) = 0;
+        *(uint32_t *)(c + COMM_OFF_RX_TIMES   + (uint32_t)i * 4) = now;
+        *(int32_t  *)(c + COMM_OFF_RX_SIZES   + (uint32_t)i * 4) = 0;
+    }
+
+    *(int32_t *)(c + COMM_OFF_STAT_BW_MAX)     = 0;
+    *(int32_t *)(c + COMM_OFF_RX_BW_MAX)       = 0;
+    *(int32_t *)(c + COMM_OFF_RX_BW_SAMPLES)   = 0;
+    *(int32_t *)(c + COMM_OFF_STAT_BW_SAMPLES) = 0;
+    *(int32_t *)(c + COMM_OFF_STAT_BW_OVER)    = 0;
+    *(int32_t *)(c + COMM_OFF_RX_BW_OVER)      = 0;
+}
+
 void __attribute__((thiscall)) CommSessionOver(void *comm)
 {
     CommSendLobbyProperty(comm, 1);
@@ -1580,6 +1633,8 @@ int dplay_install(void)
                         "CommMarkLobbied", 0);
     rc |= patch_replace(ADDR_COMM_SESSION_OVER, (const void *)CommSessionOver,
                         "CommSessionOver", 1);
+    rc |= patch_replace(ADDR_COMM_RESET_STATE, (const void *)CommResetStats,
+                        "CommResetStats", 3);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;
