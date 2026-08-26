@@ -5,11 +5,47 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `96eda4f`. Working tree clean.
+Last updated: **2026-08-26**, at `7629759`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`Type2ActionB` is reconstructed, and its ordering is the whole function.**
+  `0x00448220`: soldier kind 8, AI mode 2 -- `ignore`, per the action-parser
+  oracle -- and the unit loses its weapon. That last part is two writes and
+  only one is on the unit: the weapon object is looked up by uid and marked
+  `OBJ_FLAG_OVERDUE` so `FreeOverdueItems` collects it, and only THEN is the
+  uid cleared. The other order loses the uid before anything can find the
+  object, and the weapon leaks.
+
+- **`OBJ_OFF_MP_ROLE` is probably a SOLDIER KIND, and that is recorded rather
+  than renamed on a hunch.** `0x00449570` is its only writer, and what it does
+  is index `ADDR_SOLDIER_ANIMS` with the value it stores --
+  `lea eax,[edi*8 + 0x659F00]` -- then hang that table off the object's `0x74`
+  sub-object. So "MP role" would be one consequence of one value rather than
+  the field's meaning, and the two `>= 6` / `>= 7` guards elsewhere read as an
+  ordinal, which fits a kind index and does not fit a role.
+
+  What stops it being a rename today: only 7 and 8 reach the setter directly,
+  the rest arrive through the 44-arm dispatcher at `0x00449660`, and
+  `ADDR_SOLDIER_ANIMS` is `.bss` so the file says nothing about the nine
+  entries. **Strong, not conclusive.** Both writers are named now
+  (`ADDR_SET_SOLDIER_KIND`, `ADDR_UNIT_ACTION`) so the next session starts
+  from the dispatcher's arms rather than from scratch.
+
+- **A zero that is read from a global rather than folded.** The write to
+  `OBJ_OFF_SCRIPT_STATE` comes from `ADDR_ZERO_POINT`, not from an immediate.
+  Reproduced as the read: that global is `.bss`, nothing writes it, and 103
+  sites read it for "no position", so the field being assigned a POINT is the
+  likelier reading of the source and folding it to `0` would hide that.
+
+- **Verified by reading, and the counter says so cleanly for once.** It is
+  live -- `blindspots.py` does not list it -- and reads **0** through a full
+  Boot Camp mission while `WeaponByUid`, one of its own callees, reads
+  **201,368** on the same drive. Both callers are event handlers, so reaching
+  it needs a scripted event no mission this project drives fires: the same
+  wall `FreeItem` and `RemoveFromItemList` are behind.
 
 - **A dispatch table was based one column late, and it read correctly at every
   use.** `orig.h` carried `ADDR_STATE_DISPATCH = 0x00486550`, "12-byte records;
