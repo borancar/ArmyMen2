@@ -2473,7 +2473,7 @@
 /* 0x0041F6E0. The one that does NOT null-check: it passes whatever LookupByUID
  * returned straight on. 0x00428370 has eight callers and no name. */
 #define ADDR_EVT_OBJ_SET         0x0041F6E0u  /* void(uint32_t, int32_t) */
-#define ADDR_OBJ_SET             0x00428370u  /* void(obj, int32_t, int32_t) */
+#define ADDR_HEAL_OBJECT         0x00428370u  /* void(obj, int32 pct, void *src) */
 /* 0x0041F710. The most guarded member of the family: uid threshold, pointer,
  * a flag bit CLEAR at +8, and a positive int16 at +0x62, all before it acts.
  * Its callee has nineteen callers and no name. */
@@ -3011,6 +3011,29 @@
  * second is 0x004351C0, reached from nine places. */
 #define ADDR_UPDATE_OBJECT_SCRIPT  0x004371A0u  /* int32_t(void *obj) */
 #define ADDR_CHANGE_OBJECT_FRAME   0x004351C0u  /* int32_t(obj, frame, int32) */
+/* 0x00427E80, and its ONLY caller is ADDR_HEAL_OBJECT below -- all three call
+ * sites are inside it -- so the name cannot be wrong about anything else. It
+ * raises event kind 6 through ADDR_EVENT_NOTIFY for the object that was
+ * healed, and for a second object too when one is supplied; a null second
+ * argument takes the shorter arm and names only the first. */
+#define ADDR_NOTIFY_HEALED       0x00427E80u  /* void(void *obj, void *src) */
+/* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
+ * health, then notify. The percentage is clamped to 0..100 first, and the
+ * result to the maximum, and an object already at or below zero health is
+ * never touched -- healing does not resurrect.
+ *
+ * An ITEM -- ADDR_OBJ_IS_ITEM, types 1 and 4 -- ignores the percentage
+ * entirely and goes to full health. Which of its two arms runs depends on
+ * OBJ_OFF_REPAIR_FRAME: positive means the item also gets
+ * ADDR_CHANGE_OBJECT_FRAME(obj, 0, 0) and is repaired unconditionally, while
+ * zero or less repairs only an item that is alive and not already full.
+ *
+ * One of the eight callers is the "doctor doctor" cheat's per-object callback
+ * at 0x00417A90, which is what confirms the reading: its message is
+ * "Avoid the agony...". */
+/* Positive means the item has a repair frame; see ADDR_HEAL_OBJECT, which is
+ * the only reader this reconstruction has read. */
+#define OBJ_OFF_REPAIR_FRAME     0x9Cu  /* int32_t */
 /* Runs one parsed action against an owner. 4096 bytes in event.cpp with three
  * callers, and it names itself nowhere -- so this is a ROLE, not a recovered
  * source name, and it stays that way until the body says otherwise. */

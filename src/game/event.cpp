@@ -817,7 +817,6 @@ typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
 #define orig_type2_action_a  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_A))
 #define orig_type2_action_b  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_B))
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
-typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
 #define orig_type2_action_c \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
 #define orig_type238_action \
@@ -825,7 +824,6 @@ typedef void (__cdecl *AM2_ObjSetFn)(void *obj, int32_t a, int32_t b);
 typedef void (__cdecl *AM2_ObjAttachFn)(void *a, void *b);
 #define orig_obj_attach_to \
     (*(AM2_ObjAttachFn)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
-#define orig_obj_set        (*(AM2_ObjSetFn)AM2_IMAGE(ADDR_OBJ_SET))
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
 typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
@@ -927,17 +925,21 @@ void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg)
  * returned straight to 0x00428370.
  *
  * That is a fourth checking style, and it is the unsafe one: a uid at or above
- * the threshold that is not registered gives null, and null goes on to a
- * function with eight callers that this code cannot vouch for. event.h already
- * records the same hazard for another member of the family. Reproduced, not
- * guarded -- adding a null test here would be behaviour this build does not
- * have. */
+ * the threshold that is not registered gives null. The callee is HealObject,
+ * reconstructed since this comment was written, and it turns out to open with
+ * its own null test -- so the hazard is real in this function and absorbed by
+ * the next one. Reproduced, not guarded: adding a test here would still be
+ * behaviour this build does not have.
+ *
+ * Note what the value means now that the callee is read. It is a PERCENTAGE of
+ * maximum health, clamped to 0..100, so the script action behind this is
+ * "heal that object by N percent". */
 void __cdecl EvtObjSet(uint32_t uid, int32_t value)
 {
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    orig_obj_set(LookupByUID(uid), value, 0);
+    HealObject(LookupByUID(uid), value, 0);
 }
 
 /* 0x0041FEC0. Resurrect a named item, by its own log line.

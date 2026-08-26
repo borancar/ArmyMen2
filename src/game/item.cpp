@@ -789,6 +789,95 @@ void __cdecl DestroyObjCommon(void *obj)
     }
 }
 
+/* orig_change_object_frame is orig.h's, shared with event.cpp and
+ * objscript.cpp -- one definition, not a fourth private copy. */
+typedef void (__cdecl *AM2_NotifyHealedFn)(void *obj, void *src);
+#define orig_notify_healed \
+    ((AM2_NotifyHealedFn)(uintptr_t)ADDR_NOTIFY_HEALED)
+
+/* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
+ * health and notify. `src` is the other party, passed straight through to the
+ * event and allowed to be null.
+ *
+ * The percentage is clamped to 0..100 before anything else, so a caller cannot
+ * over-heal by asking for 500. Healing never resurrects: every arm gives up on
+ * an object already at or below zero health.
+ *
+ * An ITEM ignores the percentage and goes to full. Which of its two arms runs
+ * is decided by OBJ_OFF_REPAIR_FRAME -- positive means it is also stepped back
+ * to frame 0 and repaired unconditionally, while zero or less repairs only an
+ * item that is alive and not already at full health. Note the ORDER of that
+ * second arm's two tests is the original's: alive first, then not-full.
+ *
+ * Everything else adds `pct` percent of the maximum and clamps. Two details
+ * that are the original's and not tidied:
+ *
+ *   - the sum is formed in 32 bits and then TRUNCATED to 16 before it is
+ *     compared against the maximum, so the comparison is on the stored value
+ *     rather than on the arithmetic one;
+ *   - the health is written BEFORE the clamp and again after it when the clamp
+ *     bites, which is two stores to the same field and is what the original
+ *     does.
+ *
+ * The original loads the current health with `mov bx, ...`, leaving the top
+ * half of ebx holding whatever the caller left there, and then adds the full
+ * 32-bit register. Only the low 16 bits are ever read back, so the garbage
+ * cannot reach the result -- worth stating, because the disassembly looks like
+ * it depends on an uninitialised value and does not.
+ *
+ * What is EXERCISED, measured with a temporary probe rather than inferred from
+ * the counter: exactly one call in a Boot Camp mission, a real object, and
+ * pct = 100. So the non-item path runs, and that is all. The percentage
+ * arithmetic below 100, both clamps, and both item arms are reached by nothing
+ * this project can drive. The counter itself reads 0 and cannot do otherwise:
+ * the one caller that runs is our own EvtObjSet, which calls this by name. */
+void __cdecl HealObject(void *obj, int32_t pct, void *src)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int16_t  maxHp;
+    int16_t  hp;
+
+    if (!obj)
+        return;
+
+    if (pct > 100)
+        pct = 100;
+    else if (pct < 0)
+        pct = 0;
+
+    maxHp = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+
+    if (ObjIsItem((const AM2_Object *)obj)) {
+        if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) > 0) {
+            orig_change_object_frame(obj, 0, 0);
+            *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
+            orig_notify_healed(obj, src);
+            return;
+        }
+
+        hp = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+        if (hp <= 0 || hp >= maxHp)
+            return;
+
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
+        orig_notify_healed(obj, src);
+        return;
+    }
+
+    hp = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+    if (hp <= 0)
+        return;
+
+    {
+        int16_t next = (int16_t)(((int32_t)maxHp * pct) / 100 + hp);
+
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = next;
+        if (next > maxHp)
+            *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
+    }
+    orig_notify_healed(obj, src);
+}
+
 /* 0x00428C40, one caller. Free every item that is past its deadline.
  *
  * Measured: SIXTY-NINE calls in a driven Boot Camp window, so this is
@@ -878,6 +967,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,
+                  "HealObject", 3);
     patch_replace(ADDR_OBJ_FIELD_A, (const void *)ObjFieldA, "ObjFieldA", 1);
     patch_replace(ADDR_OBJ_SET_FIELD_A, (const void *)ObjSetFieldA,
                   "ObjSetFieldA", 2);

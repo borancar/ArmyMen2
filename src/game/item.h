@@ -30,6 +30,11 @@ extern "C" {
  * slot it slides down by one. If it was below it is left alone -- and the
  * `jle` that decides this makes "equal" go the first way, which is why the
  * equal case is tested first and cannot fall through to the decrement. */
+/* Original: 0x00428370, eight callers. Heal `obj` by `pct` percent of its
+ * maximum health, clamped both ends, and raise the heal event. Items ignore
+ * the percentage and go to full; nothing at or below zero health is healed. */
+void __cdecl HealObject(void *obj, int32_t pct, void *src);
+
 void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
 
 /* A uid carries its owner in the top three bits, over a 29-bit per-owner

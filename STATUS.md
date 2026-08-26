@@ -3035,7 +3035,34 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`MovieMakeSurface` (`0x00445690`, 32 bytes) is reconstructed, and this one IS
+**`HealObject` (`0x00428370`, 224 bytes) is reconstructed, and it RUNS.** It
+heals by a percentage of maximum health, clamped to 0..100 and then to the
+maximum, and never touches anything already at or below zero -- healing does
+not resurrect. An item ignores the percentage and goes to full, by one of two
+arms chosen on `OBJ_OFF_REPAIR_FRAME`. What settled the reading was one of the
+eight callers: the per-object callback of the **"doctor doctor"** cheat, whose
+message is "Avoid the agony...".
+
+**The seam rule needed refining, and the refinement is checkable up front.** A
+seam guarantees our code CONTAINS the call, not that our code RUNS. This one
+sits behind `EvtObjSet`, a script action handler -- so the question is whether
+that handler fires, and its counter answers before any work starts.
+`EvtObjSet=1` on Boot Camp, so the path is live; `MovieOpen=2` was the same
+check for the last one. **Pick a seam whose caller has a non-zero counter.**
+
+`HealObject`'s own counter reads 0 and cannot do otherwise: closing the seam --
+which `checkseams` requires -- made its one live caller ours, calling by name.
+A temporary probe resolved it rather than a guess: one call, a real object,
+`pct = 100`. So the non-item path runs and that is all; the arithmetic below
+100, both clamps and both item arms are reached by nothing here.
+
+**The alias ratchet caught me for the sixth time.** `0x00428370` already had a
+name -- `ADDR_OBJ_SET`, and it was in the seam listing I chose the target
+from -- and I added `ADDR_HEAL_OBJECT` beside it anyway. Renamed, not aliased:
+`OBJ_SET` came off the call site `EvtObjSet`, `HEAL_OBJECT` comes off the body.
+`MAX_ALIASES` stays 21.
+
+**`MovieMakeSurface` (`0x00445690`, 32 bytes) is reconstructed, and this one IS**`MovieMakeSurface` (`0x00445690`, 32 bytes) is reconstructed, and this one IS
 verified.** It was picked deliberately: after three commits of unexercised
 code, the `orig_` seams are a list of calls from our own code into the
 original, so anything reachable by a caller we already own is guaranteed to
