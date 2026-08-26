@@ -58,6 +58,11 @@ void __cdecl ItemGoneMessageSend(const void *obj);
  * `army` is pushed by the caller and never read. */
 int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army);
 
+/* 0x0042AA50. Tell the other players an item was deployed. Sixteen bytes; the
+ * two trailing bytes are the item's facing and the caller's argument, in that
+ * order. Guarded on the SESSION pointer, not COMM_OFF_DPLAY. */
+void __cdecl SendItemDeploy(const void *item, int32_t arg);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

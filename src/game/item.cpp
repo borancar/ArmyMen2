@@ -871,12 +871,9 @@ void __cdecl DestroyObjCommon(void *obj)
 typedef void (__cdecl *AM2_DeployTypeFn)(void *obj, int32_t x, int32_t y,
                                          int32_t resurrect);
 typedef void (__cdecl *AM2_PlaceObjFn)(void *obj, uint32_t where);
-typedef void (__cdecl *AM2_ItemDeployMsgFn)(void *obj, int32_t resurrect);
 #define orig_deploy_trooper ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_TROOPER)
 #define orig_deploy_vehicle ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_VEHICLE)
 #define orig_place_obj      ((AM2_PlaceObjFn)(uintptr_t)ADDR_PLACE_OBJ)
-#define orig_item_deploy_msg \
-    ((AM2_ItemDeployMsgFn)(uintptr_t)ADDR_ITEM_DEPLOY_MSG)
 
 /* 0x00428CA0, seven callers, and it names itself in the resurrection log line.
  * Put an object into the world at `where`, then tell the other machines.
@@ -958,7 +955,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
     if (!CommMustBroadcast(kItemComm, owner))
         return;
 
-    orig_item_deploy_msg(obj, resurrect);
+    SendItemDeploy(obj, resurrect);
 }
 
 typedef void (__cdecl *AM2_ByRefBFn2)(int32_t *slot, int32_t b, int32_t c,

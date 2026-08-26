@@ -5536,6 +5536,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_MSG_ITEM_CREATE      0x12u
 #define ADDR_RECV_ITEM_GONE      0x0042AEB0u  /* int32_t(msg) */
 #define ADDR_RECV_ITEM_DEPLOY    0x0042AF30u
+/* The SENDER for the same code, and it names itself the same way:
+ * "itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d". Sixteen bytes. */
+#define AM2_MSG_ITEM_DEPLOY_LEN  0x10u
+#define ADDR_STR_SEND_ITEM_DEPLOY 0x00485E3Cu
 #define ADDR_RECV_OBJ_DESTROYED  0x0042AF00u
 #define ADDR_RECV_DAMAGE         0x0042ADA0u
 #define ADDR_RECV_ITEM_CREATE    0x0042AFA0u

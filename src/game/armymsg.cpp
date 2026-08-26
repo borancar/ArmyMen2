@@ -318,12 +318,68 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
     }
 }
 
+/* 0x0042AA50, one caller. Tell the other players an item was deployed --
+ * placed on the map with a facing.
+ *
+ * Sixteen bytes and it uses fourteen of them: length, code, the uid on the
+ * wire, the packed position, then TWO bytes -- the item's own facing and the
+ * caller's second argument. The two bytes are adjacent and easy to transpose;
+ * the facing comes from the OBJECT and the other from the CALLER, which is the
+ * only thing distinguishing them.
+ *
+ * The guard is the multiplayer SESSION pointer, not COMM_OFF_DPLAY as the
+ * senders above it use. Reproduced as the original has it rather than made
+ * consistent with its neighbours -- they are different questions, and which
+ * one a sender asks is not ours to normalise.
+ *
+ * The trailing log is gated on COMM_OFF_VERBOSE, so it is silent in an
+ * ordinary session, and it re-reads the object's fields rather than the ones
+ * just packed. That matters for the position: the message carries the packed
+ * dword while the log prints the two int16 halves.
+ *
+ * VERIFIED BY READING. Its counter is blind and its first line returns unless
+ * a multiplayer session is up, so it cannot run on any drive this project has.
+ * What the reconstruction rests on is the message LAYOUT, and that has a
+ * second witness: ADDR_RECV_ITEM_DEPLOY unpacks the same sixteen bytes at the
+ * other end and prints the same four fields in the same order. */
+void __cdecl SendItemDeploy(const void *item, int32_t arg)
+{
+    uint8_t        msg[AM2_MSG_ITEM_DEPLOY_LEN];
+    const uint8_t *it = (const uint8_t *)item;
+    const uint8_t *comm;
+    uint32_t       uid;
+
+    if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+
+    uid = *(const uint32_t *)(it + 4);
+
+    *(uint16_t *)(msg + 0)    = AM2_MSG_ITEM_DEPLOY_LEN;
+    *(uint16_t *)(msg + 2)    = AM2_MSG_ITEM_DEPLOY;
+    *(uint32_t *)(msg + 4)    = UidOnWire(uid);
+    *(uint32_t *)(msg + 8)    = *(const uint32_t *)(it + OBJ_OFF_POS);
+    *(uint8_t  *)(msg + 0x0C) = *(const uint8_t *)(it + OBJ_OFF_FACING);
+    *(uint8_t  *)(msg + 0x0D) = (uint8_t)arg;
+
+    ArmyMessageSend(msg);
+
+    comm = kComm;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_SEND_ITEM_DEPLOY,
+                 uid,
+                 (int32_t)*(const int16_t *)(it + OBJ_OFF_POS),
+                 (int32_t)*(const int16_t *)(it + OBJ_OFF_POS + 2),
+                 (int32_t)*(const uint8_t *)(it + OBJ_OFF_FACING));
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_ITEM_DEPLOY_MSG, (const void *)SendItemDeploy,
+                        "SendItemDeploy", 1);
     rc |= patch_replace(ADDR_ARMY_MSG_FILTER, (const void *)ArmyMsgFilter,
                         "ArmyMsgFilter", 1);
     rc |= patch_replace(ADDR_SEND_TROOPER_WEAPON,
