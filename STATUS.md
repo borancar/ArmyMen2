@@ -5,11 +5,46 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `8f1c688`. Working tree clean.
+Last updated: **2026-08-27**, at `e28b1c7`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`Type2ActionC` is reconstructed** -- `0x004480E0`, `Type2ActionB`'s
+  sibling: same guard on `OBJ_OFF_MP_ROLE` (refusing at 7 rather than 6), same
+  shape, soldier kind 6 rather than 8.
+
+- **The new part is a SELECTION HANDOVER, and it is a two-step.** Deselect;
+  then, only if the object belonged to the player AND nothing is selected any
+  more, select the player's own object instead -- unless that is destroyed.
+  `ADDR_SELECTED_COUNT` is read **after** the deselect, so it asks "did that
+  empty the selection", not "was anything selected".
+
+- **I read `ADDR_STEP_TYPE1_4` and did NOT write it.** It is the best-covered
+  target available -- **24.8M calls** a mission between types 1 and 4 -- but at
+  416 bytes it produced three unresolved naming conflicts before it produced a
+  line of code, and the hottest function in the tree is the worst place to land
+  a hurried one. It stays the identified next big target.
+
+- **Two object fields are TYPE-DEPENDENT, which is a fact about the struct.**
+  `0xA0`: `air.cpp` passes it to `ADDR_FORMATION_POINT` as an index into a
+  **twelve**-entry table, while the stepper increments it, skips the value 1,
+  wraps after **sixteen** and hands it to `ChangeObjectFrame` -- an animation
+  cycle that would run off the end of that table. `0x94`: the stepper and
+  `misc.cpp` both dereference it as a pointer to a record whose first dword is
+  a code, while `Type2ActionC` stores the literal **1** into it.
+
+  Different type arms, so the object is very likely a **union past its
+  header**. Recorded at the offset rather than aliased -- a second name would
+  push `checkoffsets`' family baseline from 13 to 14, and buying a name with a
+  ratchet is the wrong trade.
+
+- **I repeated a mistake I had just written down.** Removing an `orig_` macro
+  with a single-line regex broke a line **continuation** again -- one commit
+  after recording that exact trap -- leaving an orphan expression the compiler
+  caught. The fix is to match the macro name *through* its continuations, not
+  to note it a third time.
 
 - **`PointActionA` is reconstructed, and its point makes a ROUND TRIP.**
   `0x004582F0`: the argument goes to `TileOfPoint` by value to get a tile,
