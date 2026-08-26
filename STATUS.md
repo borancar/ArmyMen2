@@ -5,11 +5,47 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `e28b1c7`. Working tree clean.
+Last updated: **2026-08-27**, at `fc4f68b`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`StepType1And4` is reconstructed** -- `0x00433EC0`, the handler
+  `ObjFrameStep`'s jump table gives to types 1 AND 4: **24.8 million calls** in
+  one Boot Camp mission. Deferred last commit as too big to hurry; the naming
+  conflicts it raised are recorded at their offsets now, so what was left was
+  four callee names and the transcription.
+
+- **Every guard in it is FALSE on every drive this project has.** Counted over
+  **36,000,000** calls:
+
+  | guard | times true |
+  |---|---:|
+  | flags bit 7 set | **0** |
+  | record code == `0x2A` | **0** |
+  | record +8 == watched id | **0** |
+
+  So the only line that executes is the `UpdateObjectScript` call at the top.
+  The reveal, the frame cycle, the countdown and the spawn are all dead, and a
+  clean `bootcamp`/`mission`/`campaign` run says **nothing whatever** about
+  them.
+
+- **A mutation told me that -- I did not suspect it.** Dropping the "skip
+  frame 1" rule from the animation cycle should have failed the A/B and did
+  not: not one pixel on either drive. That is what sent me to the probe. It is
+  the `ObjFrameStep` histogram one level further in: **a hot function whose hot
+  path is its first instruction**, and the reason "24.8M calls" is not the
+  coverage claim it looks like.
+
+- Everything below that first call is **verified by reading**, at the same
+  standing as the multiplayer functions, despite sitting on the busiest code
+  path in the game.
+
+- **`air.cpp` and `trig.cpp` join `SELFTEST_SRC`**, for the reason `map.cpp`
+  did: `item.cpp` gained a call into `air.cpp`, and adding the flat module
+  beats stubbing a flat function. Only `ReleaseSprite` crosses into `win32`
+  and it is stubbed.
 
 - **`Type2ActionC` is reconstructed** -- `0x004480E0`, `Type2ActionB`'s
   sibling: same guard on `OBJ_OFF_MP_ROLE` (refusing at 7 rather than 6), same
