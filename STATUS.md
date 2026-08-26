@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `d9b0627`. Working tree clean.
+Last updated: **2026-08-26**, at `6f65ce7`. Working tree clean.
 
 ## In flight
 
