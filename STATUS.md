@@ -3035,7 +3035,26 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`CommDrainMsgs` (`0x00402690`) is reconstructed, and I picked it wrongly.**
+**`RowUnregisterAll` (`0x0041DB20`) is reconstructed, and the corrected rule
+worked.** Three of its four callers are inside `ADDR_ROW_UPDATE`, which has 37
+call sites and runs whenever a row joins or leaves the map's cell lists -- so
+the condition was checked before the work, not after. Its counter reads **74**
+on a Boot Camp mission, with `ListUnlink` at 38 on the same run.
+
+It takes a row out of every cell list it is linked into. Three guards first,
+and the middle one is the one worth knowing: the FIRST entry's cell index
+decides whether the row counts as linked at all, and a negative there means
+nothing happens -- not even the dirty mark. The dirty rectangle is collected
+BEFORE anything is unlinked, so the row still knows where it was and the region
+it occupied gets repainted.
+
+Both the entry count and the buffer pointer are re-read from the row on every
+iteration rather than held, and the loop RETURNS on a negative index rather
+than skipping it. Reproduced as written: an unlink that shortened the row would
+otherwise be a use-after-free, and it is not this function's business to decide
+that cannot happen.
+
+**`CommDrainMsgs` (`0x00402690`) is reconstructed, and I picked it wrongly.****`CommDrainMsgs` (`0x00402690`) is reconstructed, and I picked it wrongly.**
 The rule from three commits ago -- pick a seam whose caller has a non-zero
 counter -- was applied to "called once a frame from FramePre", which is what
 that call site looks like at a glance. It is gated on `CommActive()`, on the

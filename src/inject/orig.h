@@ -4717,6 +4717,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CHAIN_FIELD_14    0x004010B0u  /* uint32_t(const void *p) */
 #define ADDR_LIST_PUSH_FRONT   0x00429F20u  /* void(void *node, void **head) */
 #define ADDR_LIST_UNLINK       0x0041DAD0u  /* void(void *node, void **head) */
+/* 0x0041DD90, the dirty-rectangle collector -- IntersectRect into a 500-entry
+ * list with an overflow flag, and it touches no row flag at all. Named here
+ * because ADDR_ROW_UNREGISTER_ALL calls it before it unlinks anything, so the
+ * region a row occupied is marked for repaint while the row still knows where
+ * it was. Stays original. */
+#define ADDR_DIRTY_COLLECT     0x0041DD90u  /* void(const AM2_Rect *) */
+/* A row's own rectangle, which is what it hands the collector. */
+#define ROW_OFF_RECT           0x0Cu
 #define ADDR_REMAP_BYTES       0x0041BB60u  /* void(dst, src, table, count) */
 #define ADDR_SET_FIELD_IN_ALL  0x00434E90u  /* int32_t(void *record, void *v) */
 #define ADDR_FIELD51_MEETS_MIN 0x0040A490u  /* int32_t(const void *p) */

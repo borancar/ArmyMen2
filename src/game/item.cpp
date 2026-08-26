@@ -232,9 +232,63 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells)
  *
  * Note the log prints the object's uid at +4 and is gated on the comm object's
  * debug field, the same one the event functions read. */
-typedef void (__cdecl *AM2_RowReleaseFn)(void *row, void *desc);
-#define orig_row_unregister_all \
-            ((AM2_RowReleaseFn)(uintptr_t)ADDR_ROW_UNREGISTER_ALL)
+typedef void (__cdecl *AM2_DirtyCollectFn)(const void *rect);
+#define orig_dirty_collect ((AM2_DirtyCollectFn)(uintptr_t)ADDR_DIRTY_COLLECT)
+
+/* 0x0041DB20, four callers in the image plus RowRelease below. Take one row
+ * out of every map cell list it is linked into.
+ *
+ * Three guards before any work, and the middle one is the interesting one: the
+ * FIRST entry's cell index decides whether the whole row is considered linked.
+ * A negative there and nothing happens at all, not even the dirty mark.
+ *
+ * The dirty rectangle is collected BEFORE anything is unlinked, which is the
+ * ordering that matters -- the row still knows where it was, so the region it
+ * occupied gets marked for repaint.
+ *
+ * Both the entry count at +0x34 and the buffer pointer at +0x38 are re-read
+ * from the row on EVERY iteration rather than held, and the loop breaks the
+ * moment an entry's index is negative rather than skipping it. Reproduced as
+ * written: an unlink that reallocated or shortened the row would otherwise be
+ * a use-after-free here, and it is not this function's business to decide that
+ * cannot happen.
+ *
+ * Exercised, and measured before the claim rather than after: its counter
+ * reads 74 on a Boot Camp mission, from the original's own callers -- three of
+ * the four are inside ADDR_ROW_UPDATE, which has 37 call sites. ListUnlink
+ * reads 38 on the same run, which is consistent with the inner loop doing real
+ * work, though that counter is shared with its other call sites and cannot be
+ * attributed here on its own. So both the early returns and the loop body run.
+ * RowRelease, the caller in this file, reads 0. */
+void __cdecl RowUnregisterAll(void *row, void *desc)
+{
+    uint8_t *r = (uint8_t *)row;
+    int32_t  i;
+    uint32_t off;
+
+    if (!r[ROW_OFF_OWNS])
+        return;
+    if (*(const int32_t *)(*(uint8_t *const *)(r + ROW_OFF_BUFFER) + 0x0C) < 0)
+        return;
+
+    orig_dirty_collect(r + ROW_OFF_RECT);
+
+    if (!r[ROW_OFF_OWNS])
+        return;
+
+    for (i = 0, off = 0; i < (int32_t)r[ROW_OFF_OWNS]; i++, off += 0x10) {
+        uint8_t *entry = *(uint8_t *const *)(r + ROW_OFF_BUFFER) + off;
+        int32_t  cell  = *(const int32_t *)(entry + 0x0C);
+
+        if (cell < 0)
+            return;
+
+        ListUnlink(entry,
+                   (void **)(*(uint8_t *const *)((const uint8_t *)desc + 0x0C)
+                             + (uint32_t)cell * 4));
+        *(int32_t *)(entry + 0x0C) = -1;
+    }
+}
 
 /* 0x0041D3A0, five callers -- one row's teardown.
  *
@@ -255,7 +309,7 @@ void __cdecl RowRelease(void *row, void *desc)
     if (!r[ROW_OFF_OWNS])
         return;
 
-    orig_row_unregister_all(r, desc);
+    RowUnregisterAll(r, desc);
     am2_free(*(void **)(r + ROW_OFF_BUFFER));
 
     *(void **)(r + ROW_OFF_BUFFER) = (void *)0;
@@ -1300,6 +1354,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_ROW_UNREGISTER_ALL, (const void *)RowUnregisterAll,
+                  "RowUnregisterAll", 2);
     patch_replace(ADDR_SEND_DEATH_MESSAGE, (const void *)SendDeathMessage,
                   "SendDeathMessage", 3);
     patch_replace(ADDR_OBJ_DEATH_CLEANUP, (const void *)ObjDeathCleanup,

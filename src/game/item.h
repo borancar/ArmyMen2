@@ -34,6 +34,10 @@ extern "C" {
  * handler for its type, notify and broadcast, and run the death sequence if it
  * has just died. `suppress` non-zero skips the multiplayer broadcast tests,
  * which is how a machine applies damage it was TOLD about. */
+/* Original: 0x0041DB20. Take one row out of every map cell list it is linked
+ * into, marking the region it occupied dirty first. */
+void __cdecl RowUnregisterAll(void *row, void *desc);
+
 void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
                           uint32_t attackerUid, int32_t extra,
                           int32_t suppress);
