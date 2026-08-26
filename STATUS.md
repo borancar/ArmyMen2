@@ -2972,10 +2972,40 @@ evidence this image has. 40 words dispatching through a 39-entry jump table,
 with `when all else fails...` as the master switch -- and words 3 and 4,
 `spidey senses tingling` and `moleman`, are what settled the fog of war.
 
-**The next move is still `0x00404730`.** It resolves an object's attachment
-target through `+0xC4` and rejects it on five conditions, which makes it the
-clearest statement in the image of what a valid target is. It needs
-`0x00404580` (96 B) and `0x00404400` below that, both in the same band.
+**`ResolveFormationPoint` (`0x00404580`) is reconstructed, and the cluster has
+a name now: FORMATION.** What identified it was the table `0x00404400` indexes
+-- twelve 6-byte entries at `0x00473EA0`, matching that function's own
+`slot < 12` guard, and every one decodes to a squad position:
+
+    0 behind 64    3 behind 96    6 right 64    9 behind-left 96
+    1 b-left 48    4 f-right 96   7 left 64    10 behind-right 96
+    2 b-right 48   5 f-left 96    8 FRONT 128  11 behind 128
+
+Every facing a multiple of 45 degrees, every distance 48, 64, 96 or 128, added
+to the leader's own facing so the formation turns with it, and doubled for a
+type 3 -- vehicles get twice the spacing. So `OBJ_OFF_FORMATION_SLOT` (`0xA0`)
+and `OBJ_OFF_FOLLOW_UID` (`0xC4`) are named, and `0x00404730`'s five rejection
+tests are revealed as "is my leader still worth following".
+
+The reconstruction itself is the small half: a leader who is RIDING something
+is not the thing to follow, so a type 2 with a non-zero `OBJ_OFF_RIDING` is
+looked up and the vehicle takes its place. `ADDR_FORMATION_POINT` below it
+stays original and is reached by address.
+
+**It is dormant, and for a reason worth stating rather than a bare zero.** Its
+three callers are all original code, so the counter is not blind -- it reads 0
+after 76,194 composed frames of Boot Camp. Both drivable missions start with a
+squad of ONE: the HUD's SQUAD panel shows only Sarge on Boot Camp and on
+campaign MAP 01 alike, and formation code needs a follower. Reaching it needs a
+mission far enough in for Sarge to have squadmates, which is a drive this
+project does not have -- the same shape as `RemoveFromItemList` needing
+something to die.
+
+**The next move is `0x00404400` itself** (384 bytes). Its callees are all named
+now except two, and both can stay original: the `slot >= 12` variant at
+`0x004042A0` and the tile resolver at `0x00439F40`. What it needs care over is
+the x87 -- `fild`/`fmul`/`fiadd` through `_ftol` -- and the two reverse trig
+lookups at `0x0042DD70` and `0x0042DDC0`.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and

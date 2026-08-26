@@ -113,6 +113,12 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius,
  * need it, not "grow if full". Nothing checks the realloc. */
 void __cdecl FreeSpriteList(void);
 
+/* Original: 0x00404580, three callers, and the name is ours. Place `follower`
+ * in formation on `leader`, redirecting to the vehicle when the leader is a
+ * type 2 that is riding one. The placement below it stays original. */
+void __cdecl ResolveFormationPoint(void *follower, void *leader,
+                                   AM2_Point *out);
+
 /* Original: 0x00403AF0, three callers, and the name is ours. The object's
  * position with its sprite's second anchor pair subtracted. Picks row 1 when
  * there is more than one row and row 0 when there is exactly one. */

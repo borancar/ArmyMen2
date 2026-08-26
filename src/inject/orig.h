@@ -4752,6 +4752,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * rather than tidied. A null object answers ADDR_ZERO_POINT; every other
  * failure along the way answers the unadjusted position. */
 #define ADDR_OBJ_ANCHOR_POINT  0x00403AF0u  /* uint32_t(const void *obj) */
+/* 0x00404400, two callers. Writes the follower's formation position for
+ * `slot` into `out`. Stays original; see OBJ_OFF_FORMATION_SLOT. */
+#define ADDR_RESOLVE_FORMATION_POINT 0x00404580u /* void(follower, leader,
+                                                  *      AM2_Point *out) */
+#define ADDR_FORMATION_POINT   0x00404400u  /* void(follower, leader,
+                                             *      AM2_Point *out, int32 slot) */
 #define ADDR_REVEAL_NEARBY 0x004097D0u /* void(AM2_Point, int32, int32) */
 /* The sprite LIST -- the array ADDR_FREE_SPRITE_LIST releases and frees, and
  * ADDR_FREE_SPRITE_LIST_ALIAS jumps to. It sits just past the air save block
@@ -5112,6 +5118,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_VEHICLE_DROP_OCCUPANT 0x0045E3C0u  /* void(vehicle, occupant) */
 #define ADDR_DAMAGE_BROADCAST      0x0042A880u  /* void(obj,uid,int,int,pt,int) */
 #define VEHICLE_OFF_KIND           0x52Cu  /* 2 and 3 skip the damage entirely */
+/* FORMATION. 0x00404400 places a follower relative to whatever it is
+ * following, and the table it indexes is what identifies the whole cluster:
+ * twelve 6-byte entries at 0x00473EA0, {uint8 facing, pad, int16 distance},
+ * and the guard above it is `slot < 12`. Decoded, they are squad positions --
+ * every facing a multiple of 45 degrees and every distance 48, 64, 96 or 128:
+ *
+ *    0 behind 64     3 behind 96     6 right 64      9 behind-left 96
+ *    1 b-left 48     4 f-right 96    7 left 64      10 behind-right 96
+ *    2 b-right 48    5 f-left 96     8 FRONT 128    11 behind 128
+ *
+ * The slot's facing is ADDED to the leader's, so the formation turns with it,
+ * and the distance is doubled for a type 3 -- vehicles get twice the spacing.
+ * The result is clamped to the map bounds and then put through the tile
+ * resolver, so a follower is never placed off the map or inside terrain.
+ *
+ * A slot of 12 or more goes to 0x004042A0 instead, which is not reconstructed
+ * and is reached by address. */
+#define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
+/* The uid of what this object is following. 0x00404730 resolves it and drops
+ * it -- writing 0 back -- when the leader is concealed, out of health, already
+ * destroyed, or the wrong type. */
+#define OBJ_OFF_FOLLOW_UID         0xC4u   /* uint32_t */
 #define OBJ_OFF_RIDING             0x570u  /* cleared as an occupant gets out */
 #define AM2_VEHICLE_DEATH_DAMAGE   0x2710
 #define AM2_VEHICLE_DEATH_KIND     4

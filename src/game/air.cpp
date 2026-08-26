@@ -179,6 +179,53 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
     return *(const uint32_t *)&pt;
 }
 
+typedef void (__cdecl *AM2_FormationPointFn)(void *follower, void *leader,
+                                             AM2_Point *out, int32_t slot);
+#define orig_formation_point \
+    ((AM2_FormationPointFn)(uintptr_t)ADDR_FORMATION_POINT)
+
+/* 0x00404580, three callers. Place a follower in formation on its leader,
+ * except that a leader who is RIDING something is not the thing to follow --
+ * the vehicle is.
+ *
+ * So a type 2 leader with a non-zero OBJ_OFF_RIDING is looked up, and on
+ * success the follower's OBJ_OFF_FOLLOW_UID is repointed at the vehicle and
+ * the vehicle becomes the leader for the placement below. Every other case
+ * falls through with the leader unchanged, including a riding uid that no
+ * longer resolves -- the stale uid is left alone rather than cleared, which
+ * 0x00404730 is the function that eventually clears.
+ *
+ * The type test is only ObjIsType2. A type 3 leader is never redirected, which
+ * is consistent: a vehicle does not ride anything.
+ *
+ * The placement itself stays original and is reached by address; see
+ * ADDR_FORMATION_POINT for the twelve-slot table it indexes. */
+void __cdecl ResolveFormationPoint(void *follower, void *leader,
+                                   AM2_Point *out)
+{
+    uint8_t *f = (uint8_t *)follower;
+
+    if (!follower || !leader)
+        return;
+
+    if (ObjIsType2((const AM2_Object *)leader)) {
+        uint32_t riding =
+            *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING);
+
+        if (riding) {
+            AM2_Object *veh = (AM2_Object *)LookupByUID(riding);
+
+            if (veh) {
+                *(uint32_t *)(f + OBJ_OFF_FOLLOW_UID) = veh->uid;
+                leader = veh;
+            }
+        }
+    }
+
+    orig_formation_point(follower, leader, out,
+                         *(const int32_t *)(f + OBJ_OFF_FORMATION_SLOT));
+}
+
 /* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
  * stay one definition. */
 #define g_gameClockMs (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
@@ -380,6 +427,9 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_RESOLVE_FORMATION_POINT,
+                  (const void *)ResolveFormationPoint,
+                  "ResolveFormationPoint", 3);
     patch_replace(ADDR_OBJ_ANCHOR_POINT, (const void *)ObjAnchorPoint,
                   "ObjAnchorPoint", 1);
     patch_replace(ADDR_OBJ_REVEAL, (const void *)RevealObj,
