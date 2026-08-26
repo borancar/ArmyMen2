@@ -847,6 +847,10 @@
  * assumed not to be linked anywhere. Shares its cell arithmetic, and its
  * COLS-for-ROWS clamp, with ADDR_ROW_UPDATE. */
 #define ADDR_ROW_REGISTER_ALL    0x0041D980u  /* void(row *, desc *) */
+/* 0x0041D2B0, six callers. Give a row its entry buffer, sized from a width and
+ * a height in world units, fill the entries in, work out the row's rectangle
+ * from its sprite and register it. Returns the buffer's size in bytes. */
+#define ADDR_ROW_ALLOC           0x0041D2B0u  /* int32_t(w, h, row *, desc *) */
 /* What the comparator reads. The bounds at OBJ_OFF_BOUNDS end at +0x1B and
  * these follow: a screen position, a LAYER that only counts when both objects
  * have a positive one, and a per-object SLOPE that projects a horizontal

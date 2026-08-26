@@ -21,6 +21,11 @@ void __cdecl DepthLink(void *node, void **head);
  * points at has moved. Walks outward in one direction and re-links once. */
 void __cdecl DepthResort(void *node, void **head);
 
+/* Original: 0x0041D2B0, six callers. Give a row its entry buffer, sized from a
+ * width and height in world units, and put it on the map. Returns the buffer's
+ * size in bytes. */
+int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc);
+
 /* Original: 0x0041D980. Link every cell the row's current rectangle covers,
  * from entries assumed not to be in any list yet. */
 void __cdecl RowRegisterAll(void *row, void *desc);

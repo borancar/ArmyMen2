@@ -20,6 +20,7 @@
 #include "objflag.h"   /* ObjFlagBit0 -- reconstructed */
 #include "item.h"      /* RowUnregisterAll -- reconstructed */
 #include "misc.h"      /* ListUnlink -- reconstructed */
+#include "crt.h"       /* am2_malloc -- the game's own */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -128,6 +129,85 @@ int32_t __cdecl DepthCompare(void *a, void *b)
         return -1;
 
     return (pb < pa) ? 1 : -1;
+}
+
+/* 0x0041D2B0, six callers. Give a row its entry buffer and put it on the map.
+ *
+ * The size is the point. A width and a height in world units become a cell
+ * count by taking 2 off each first -- so a span that exactly fills a cell
+ * boundary does not claim the next one -- shifting down by 8, and adding 2 back
+ * for the partial cells at either end. The multiply is an 8-BIT `imul`, and
+ * only AL is kept, so a row wide enough to need more than 255 cells wraps. That
+ * is the original's and is reproduced; nothing this project drives comes near
+ * it, and a wider type here would be a silent behaviour change.
+ *
+ * Every entry is initialised to point back at the row with both list links
+ * null and no cell, which is exactly the state RowRegisterAll assumes and
+ * RowUnregisterAll leaves behind.
+ *
+ * The rectangle is the sprite's box at the row's position less the hot spot --
+ * and NOT less ROW_OFF_Y_ADJUST, which RowUpdate does subtract. The two
+ * disagree, and this is the one that runs first; whatever adjustment the row
+ * carries is applied only once RowUpdate has seen it. Reproduced rather than
+ * reconciled, since making them agree would change one of them.
+ *
+ * A row with no sprite gets a zero rectangle and is not registered at all, and
+ * the return value is the byte count either way.
+ *
+ * Measured: 2,512 calls in a Boot Camp mission -- and RowRegisterAll's counter
+ * went 1,587 to 0 with it, this having been its only caller. That is the fifth
+ * member of this family to fall silent for the same reason, and the file now
+ * has exactly two counters that can move: this one and RowUpdate. */
+int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc)
+{
+    uint8_t *r = (uint8_t *)row;
+    uint8_t *spr;
+    int32_t  bytes;
+    int32_t  i;
+
+    if (w > 2)
+        w -= 2;
+    if (h > 2)
+        h -= 2;
+
+    r[ROW_OFF_OWNS] = (uint8_t)(int8_t)((int8_t)((w >> 8) + 2)
+                                        * (int8_t)((h >> 8) + 2));
+
+    bytes = (int32_t)r[ROW_OFF_OWNS] * (int32_t)ROW_ENTRY_BYTES;
+    ROW_FLD(r, ROW_OFF_BUFFER, void *) = am2_malloc((uint32_t)bytes);
+
+    for (i = 0; i < (int32_t)r[ROW_OFF_OWNS]; i++) {
+        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
+                         + (uint32_t)i * ROW_ENTRY_BYTES;
+
+        ROW_FLD(entry, DEPTH_OFF_OBJ, void *)       = r;
+        ROW_FLD(entry, DEPTH_OFF_NEXT, uint32_t)    = 0;
+        ROW_FLD(entry, DEPTH_OFF_PREV, uint32_t)    = 0;
+        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
+    }
+
+    spr = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
+    if (!spr) {
+        ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) = 0;
+        ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) = 0;
+        ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) = 0;
+        ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) = 0;
+        return bytes;
+    }
+
+    ROW_FLD(r, ROW_OFF_RECT + 0, int32_t) =
+        ROW_FLD(r, ROW_OFF_X, int16_t) - ROW_FLD(spr, SPR_OFF_HOTX, int16_t);
+    ROW_FLD(r, ROW_OFF_RECT + 4, int32_t) =
+        ROW_FLD(r, ROW_OFF_Y, int16_t) - ROW_FLD(spr, SPR_OFF_HOTY, int16_t);
+    ROW_FLD(r, ROW_OFF_RECT + 8, int32_t) =
+        ROW_FLD(spr, SPR_OFF_W, int32_t) + ROW_FLD(r, ROW_OFF_RECT + 0, int32_t);
+    ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) =
+        ROW_FLD(spr, SPR_OFF_H, int32_t) + ROW_FLD(r, ROW_OFF_RECT + 4, int32_t);
+
+    if (ObjFlagBit0(r))
+        RowRegisterAll(r, desc);
+
+    return bytes;
 }
 
 /* 0x0041D980, one caller. The counterpart of RowUnregisterAll: link every cell
@@ -544,6 +624,8 @@ int maprow_install(void)
                         "DepthLink", 2);
     rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
                         "DepthResort", 2);
+    rc |= patch_replace(ADDR_ROW_ALLOC, (const void *)RowAlloc,
+                        "RowAlloc", 4);
     rc |= patch_replace(ADDR_ROW_REGISTER_ALL, (const void *)RowRegisterAll,
                         "RowRegisterAll", 2);
     rc |= patch_replace(ADDR_ROW_UPDATE, (const void *)RowUpdate,

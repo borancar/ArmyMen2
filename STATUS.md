@@ -3035,7 +3035,29 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`RowRegisterAll` (`0x0041D980`, 1,587 calls a mission) is reconstructed**,
+**`RowAlloc` (`0x0041D2B0`, six callers, 2,512 calls a mission) is
+reconstructed** -- the row's constructor: size the entry buffer, fill it in,
+work out the rectangle and register.
+
+The sizing is the interesting part. A width and height in world units become a
+cell count by taking 2 off each FIRST -- so a span that exactly fills a cell
+boundary does not claim the next one -- then shifting down by 8 and adding 2
+back for the partial cells at either end. The multiply is an 8-BIT `imul` with
+only AL kept, so a row needing more than 255 cells wraps. Reproduced: nothing
+here comes near it, and a wider type would be a silent behaviour change.
+
+**And it disagrees with `RowUpdate` about the rectangle.** This one subtracts
+the sprite's hot spot and stops; `RowUpdate` also subtracts `ROW_OFF_Y_ADJUST`.
+Both are the original's, and this is the one that runs first -- so whatever
+that adjustment is, it only takes effect once `RowUpdate` has seen the row.
+Reproduced rather than reconciled, since making them agree would change one of
+them.
+
+`RowRegisterAll` went 1,587 to 0 with this commit, this having been its only
+caller: the fifth member of the family to fall silent that way. `maprow.cpp`
+now has exactly two counters that can move, `RowAlloc` and `RowUpdate`.
+
+**`RowRegisterAll` (`0x0041D980`, 1,587 calls a mission) is reconstructed****`RowRegisterAll` (`0x0041D980`, 1,587 calls a mission) is reconstructed**,
 the counterpart of `RowUnregisterAll`. It shares `RowUpdate`'s cell arithmetic
 exactly -- including the COLS-for-ROWS clamp -- which is what makes that quirk
 convincing as a deliberate copy in the original rather than a slip in one of
