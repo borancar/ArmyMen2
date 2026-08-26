@@ -3614,6 +3614,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * that was not inferred. */
 
 #define ADDR_SCRIPT_CONTEXT      0x00656478u  /* what reset and parse are given */
+/* The path ADDR_TAKE_MENU_REQUEST re-reads on a script reload -- the level's
+ * own script file, kept so the reload does not have to rebuild the name. */
+#define ADDR_SCRIPT_RELOAD_PATH  0x00511BC8u  /* char[] */
 #define ADDR_MAP_NAME            0x00511A88u  /* char[], "kitchen" */
 #define ADDR_LEVEL_INDEX         0x00511D9Cu  /* int32_t; 0 means "<map>.txt" */
 
@@ -3978,6 +3981,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * sub-state ADDR_MENU_REQUEST_TAKEN", which is the misreading and its own
  * refutation in one sentence. */
 #define ADDR_MENU_MODE           0x00511DBCu  /* int32_t; 0x21 = back to play */
+/* Stamped from ADDR_TICKS when a level load completes, beside the game clock
+ * being reset to zero. Read by nothing below the CRT line. */
+#define ADDR_CLOCK_BASE_MS       0x00511E00u  /* uint32_t */
+/* Asks for the level script to be re-read on the next frame. */
+#define ADDR_SCRIPT_RELOAD       0x00511DCCu  /* int32_t */
+/* Set while that reload is in progress, and only under -dbg. */
+#define ADDR_SCRIPT_RELOADING    0x0050C350u  /* int32_t */
+/* Counts frames since a network game started, to ten, and then checks once for
+ * abandoned armies. Not a timer: it counts FRAMES. */
+#define ADDR_NET_SETTLE_COUNT    0x0051234Cu  /* int32_t */
+#define AM2_NET_SETTLE_FRAMES    10
+/* The float ADDR_FRAME_DELTA_SEC is pinned to in a network game: 0.066, the
+ * same 66 ms the measured delta is clamped to. */
+#define AM2_NET_FRAME_DELTA_SEC  0x3D872B02u
 /* The mode is the menu-request arm number, so 7 is the multiplayer HOST
  * panel -- the same 7 ab.sh pokes to open it. */
 #define AM2_MENU_MP_HOST         7

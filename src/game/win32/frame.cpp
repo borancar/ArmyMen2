@@ -23,6 +23,12 @@
 #include "winmain.h"      /* Ticks -- reconstructed */
 #include "audio.h"       /* PlayDynamicSound, StopNamedSound */
 #include "sprite.h"      /* FreeBitmap -- reconstructed */
+#include "../script.h"   /* ReadScript -- reconstructed */
+#include "../event.h"    /* MissionStartup, TimerTick */
+#include "../air.h"      /* ClearFrameCounts */
+#include "widget.h"      /* HudUpdate, HudPaint */
+#include "mapdraw.h"     /* ViewUpdate */
+#include "../item.h"     /* ObjFrameSweep and the per-frame steps */
 
 /* ---- what stays in the original image --------------------------------- */
 
@@ -54,6 +60,7 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 #define orig_show_info_mp    ((AM2_VoidFn0b)(uintptr_t)ADDR_SHOW_INFO_MP)
 #define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
 #define orig_event_flag8     ((AM2_EventFlag8Fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)
+
 
 /* 0x00424CA0, one caller -- the per-frame path. In-mission input: three
  * separate jobs that share a function because they share the mouse.
@@ -482,6 +489,9 @@ static const uint32_t kSubStatePainter[] = {
     0x004506A0u,           /* 31 */
 };
 
+/* Defined below, beside the rest of the per-frame chain. */
+void __cdecl TakeMenuRequest(void);
+
 /* 0x004260C0. State 2 -- a live mission.
  *
  * The entry action has an early RETURN in it that the other states do not:
@@ -502,7 +512,7 @@ void __cdecl State2Frame(void)
 
         call0(ADDR_STATE2_ENTER);
         if (*once) {
-            call0(ADDR_TAKE_MENU_REQUEST);
+            TakeMenuRequest();
             *once = 0;
             return;
         }
@@ -532,7 +542,7 @@ void __cdecl State2Frame(void)
         if (GetPauseFlags())
             MissionPausedFrame();
         else
-            call0(ADDR_TAKE_MENU_REQUEST);
+            TakeMenuRequest();
     } else if (arm == 12) {
         call0(ADDR_SUBSTATE34_ESCAPE);
     }
@@ -559,6 +569,151 @@ void __cdecl State3Frame(void)
 
     MovieStepCurrent();
     call0(ADDR_STATE_FRAME_COMMON);
+}
+
+typedef void (__cdecl *AM2_NoArgFn)(void);
+typedef void (__attribute__((thiscall)) *AM2_PaintUpdateFn)(void *self);
+#define orig_log_noargs   ((AM2_NoArgFn)(uintptr_t)ADDR_LOG)
+#define orig_refresh_draw2 ((AM2_NoArgFn)(uintptr_t)ADDR_REFRESH_DRAW)
+
+/* 0x00425EE0, one caller -- RunFrame's state 2, on every unpaused frame. The
+ * in-mission driver, and the last piece of this chain: every one of its
+ * eighteen callees is now named and most are reconstructed.
+ *
+ * Three jobs share the entry. A pending MENU REQUEST short-circuits everything:
+ * it becomes the wanted menu mode, the pair is cleared and the state-pending
+ * flag goes up, which is the route CLAUDE.md traces from a menu request to the
+ * level teardown. Otherwise, if the overlay is dirty, a level load is being
+ * finished -- the clock is reset to zero, the base stamped from Ticks, and
+ * MissionStartup fires. Otherwise the ordinary frame runs.
+ *
+ * The SCRIPT RELOAD arm is the odd one and it is gated twice: it needs
+ * ADDR_SCRIPT_RELOAD raised, and what it does afterwards depends on -dbg. With
+ * the switch on it raises the reloading flag, re-reads the script, redeclares
+ * the rule variables, restarts the mission and then shows the info bitmap;
+ * without it, the same reload happens but the function simply returns. So the
+ * feature works in a retail build and only announces itself in a debug one.
+ *
+ * The log call has NO ARGUMENTS. The original pushes nothing and calls the
+ * varargs logger, which is a `ret` in this build and harmless -- but it is
+ * reproduced through a no-argument function pointer rather than as `Log("")`,
+ * because those are different calls and this one runs once per level load with
+ * our capture installed.
+ *
+ * A network game replaces the measured frame delta with a fixed 0.066 and
+ * skips both the clock step and the timer sweep, so its timing comes from the
+ * wire rather than from the wall clock. It also counts ten FRAMES -- not
+ * milliseconds -- before looking once for abandoned armies.
+ *
+ * The tail is the same either way, and the last branch decides how the frame
+ * reaches the screen: a full HudPaint and PresentFrame normally, or
+ * RefreshDraw when ADDR_STATE_ENTER_ONCE is clear. */
+void __cdecl TakeMenuRequest(void)
+{
+    if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
+        *(int32_t *)(uintptr_t)ADDR_MENU_MODE =
+            *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST     = 0;
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
+        *(int32_t *)(uintptr_t)ADDR_STATE_PENDING    = 1;
+        return;
+    }
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+        if (*(const int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD) {
+            int32_t dbg = *(const int32_t *)(uintptr_t)ADDR_OPT_DBG;
+
+            if (dbg)
+                *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
+
+            ReadScript((const char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH,
+                       (AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
+            DeclareRuleVars();
+            MissionStartup();
+
+            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
+            if (!dbg)
+                return;
+
+            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 0;
+            *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_SUBSTATE_INFO_BITMAP;
+            *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+            return;
+        }
+    } else {
+        if (!*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING) {
+            *(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS = 0;
+            *(uint32_t *)(uintptr_t)ADDR_CLOCK_BASE_MS =
+                *(const int32_t *)(uintptr_t)ADDR_FIXED_STEP ? 0u : Ticks();
+            *(uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS = 0;
+            MissionStartup();
+        }
+
+        if (g_mpSession)
+            *(int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT = 1;
+
+        *(uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS =
+            *(const int32_t *)(uintptr_t)ADDR_FIXED_STEP ? 0u : Ticks();
+
+        orig_log_noargs();      /* no arguments -- the original's, see above */
+
+        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
+        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+        *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING  = 0;
+    }
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        FrameClockStep();
+        TimerTick();
+    }
+
+    MissionInput();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        *(uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_SEC = AM2_NET_FRAME_DELTA_SEC;
+
+        if (g_mpSession) {
+            int32_t n = *(const int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT;
+
+            if (n > 0) {
+                n++;
+                *(int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT = n;
+                if (n == AM2_NET_SETTLE_FRAMES) {
+                    *(int32_t *)(uintptr_t)ADDR_NET_SETTLE_COUNT = 0;
+                    if (*(const int32_t *)(g_comm + COMM_OFF_IS_HOST))
+                        AiTakeAbandoned();
+                }
+            }
+        }
+    }
+
+    RefreshObjCtx();
+    HudUpdate();
+    ClearFrameCounts();
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        ObjFrameSweep();
+    } else {
+        void *paint = *(void *const *)(uintptr_t)ADDR_PAINT_OBJECT;
+
+        if (paint)
+            ((AM2_PaintUpdateFn *)*(void **)paint)[2](paint);
+    }
+
+    PadAdvanceDeadlines();
+    Update3DAudioVolumes();
+    ViewUpdate();
+    FreeOverdueItems();
+    SeqRunBoth();
+    FlameTick();
+    AdvanceSecondDeadline();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE) {
+        HudPaint();
+        PresentFrame();
+        return;
+    }
+    orig_refresh_draw2();
 }
 
 /* 0x00426790. State 4 -- leaving. Posts WM_CLOSE to the game's own window and
@@ -598,6 +753,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_TAKE_MENU_REQUEST, (const void *)TakeMenuRequest,
+                        "TakeMenuRequest", 0);
     rc |= patch_replace(ADDR_MISSION_INPUT, (const void *)MissionInput,
                         "MissionInput", 0);
     rc |= patch_replace(ADDR_FRAME_CLOCK_STEP, (const void *)FrameClockStep,

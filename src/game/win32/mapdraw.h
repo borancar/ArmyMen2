@@ -96,6 +96,12 @@ void __cdecl ScrollMapCache(void);
  * not established; that they are 16 bits and reset together is. */
 void __cdecl ResetDrawCounts(void);
 
+/* 0x0042B5A0, one caller -- TakeMenuRequest, once a frame. The camera: glides
+ * the eye toward ADDR_VIEW_TARGET at a limited speed, honours the two one-shot
+ * flags, and derives the three view rectangles the map painter and the HUD
+ * both read. See the body for what separates snap from hold. */
+void __cdecl ViewUpdate(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus
