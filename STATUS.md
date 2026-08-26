@@ -3050,7 +3050,37 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`AiTakeAbandoned` (`0x0043B7C0`) is the AI taking over armies whose players
+**`ViewUpdate` (`0x0042B5A0`) is THE CAMERA**, 15,534 calls a mission. Clamp
+the target so half a screen either side of it is still on the map; move the eye
+toward it by at most `speed * frame delta in seconds`; clamp the eye the same
+way; then derive three rectangles -- the view in world coordinates, that
+shifted by the blit origin and sized to the SCREEN, and the two intersected
+with the map bounds.
+
+**The audio listener IS the camera centre.** `ADDR_LISTENER_POS` -- named "the
+ear" long ago -- is the point this glides, so sounds are heard from wherever
+the view is looking. One address, two true readings, and it keeps the one name
+it had; the note is in `orig.h` rather than in a second name.
+
+**And `ADDR_FRAME_DELTA_SEC` reads as an identity here.** Renaming it away from
+`ADDR_SHAKE_RATE` three commits ago was worth doing for exactly this: the
+camera speed is units per second times the frame delta in seconds, which is
+obvious under the new name and was not under the old.
+
+Two one-shot flags that are not the same: `ADDR_VIEW_SNAP` teleports the eye
+and clears itself; `ADDR_VIEW_HOLD` skips the distance-limiting arithmetic for
+one frame and clears itself, but moves nothing.
+
+**`ab.sh mission` is the run that matters here** -- it is the configuration
+that SCROLLS, so the glide, both clamps and every derived rectangle are
+compared against the original rather than sitting still. Clean at 281.
+
+**The install failed silently again and the log caught it again.** Same shape as
+`SeqRunBoth`: the edit did not match `mapdraw_install`'s opening line, `counts`
+said `(nothing traced)`, and the log said 856 patch lines against
+`checkpatches`' 857. Checking that pair is now routine, and it has paid twice.
+
+**`AiTakeAbandoned` (`0x0043B7C0`) is the AI taking over armies**`AiTakeAbandoned` (`0x0043B7C0`) is the AI taking over armies whose players
 have gone.** Four army records at `AM2_PLAYER_STRIDE`, and two conditions per
 army, both needed: `COMM_ARMY_OFF_WAS_HERE` set, so somebody once held it, and
 `CommSlotHasPlayer` false, so nobody holds it now. An army that was NEVER

@@ -1313,6 +1313,126 @@ static void __cdecl DrawRect(const AM2_Rect *r, int32_t colour)
     DrawHLine(r->bottom, r->left, r->right, colour);
 }
 
+#define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
+/* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
+ * g_listenerPos and a second name would be an alias, while a non-const twin of
+ * the same name would be a drift. It is written through a cast here, and the
+ * one-address-two-readings note lives in orig.h. */
+#define VIEW_EYE ((AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
+
+/* 0x0042B5A0, one caller -- the per-frame path. The CAMERA.
+ *
+ * Three things in order. The target is clamped so half a screen either side of
+ * it still lies on the map. The eye is then moved toward the target by at most
+ * `speed * frame delta in seconds` -- which is what ADDR_FRAME_DELTA_SEC is
+ * for, and reads as an identity now that the global is not called
+ * ADDR_SHAKE_RATE. And the eye is clamped the same way the target was, so the
+ * view can never leave the map even if something drops the eye outside it.
+ *
+ * The eye is ADDR_LISTENER_POS -- the audio listener and the camera centre are
+ * one point, which is why sounds are heard from wherever the view is looking.
+ *
+ * Two flags bypass the glide and they are not the same. ADDR_VIEW_SNAP moves
+ * the eye to the target instantly and CLEARS ITSELF, so it is a one-shot jump.
+ * ADDR_VIEW_HOLD skips the distance-limiting arithmetic for one frame and also
+ * clears itself, but leaves the eye where it is. Both are one-shot; only the
+ * first teleports.
+ *
+ * Then the rectangles, and there are three. ADDR_SECOND_RECT is the view in
+ * world coordinates. ADDR_VIEW_ORIGIN_X is that shifted by the blit rectangle's
+ * own origin and sized to the SCREEN rather than to the view, which is the
+ * pair BlitMapBackdrop subtracts. ADDR_VIEW_CLIPPED is the second intersected
+ * with ADDR_MAP_BOUNDS.
+ *
+ * The division is integer and truncating: `delta * step / distance` with the
+ * multiply first, so a step shorter than the distance loses the remainder and
+ * the eye creeps a fraction slower than `speed` would suggest. Reproduced.
+ *
+ * Measured at 15,534 calls a mission -- once a frame -- and ab.sh mission is
+ * clean, which matters here more than usual: that is the configuration that
+ * SCROLLS, so the glide, both clamps and every derived rectangle are being
+ * compared against the original rather than sitting still. */
+void __cdecl ViewUpdate(void)
+{
+    int32_t w     = g_blitRect->right - g_blitRect->left;
+    int32_t h     = g_blitRect->bottom - g_blitRect->top;
+    int32_t halfW = w >> 1;
+    int32_t halfH = h >> 1;
+    int32_t left  = *(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT;
+    int32_t top   = *(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP;
+    int32_t right = *(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT;
+    int32_t bot   = *(const int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM;
+    int32_t dist, step, dx, dy;
+    int32_t vx, vy;
+    void   *obj;
+
+    g_viewTarget.x = (int16_t)Clamp(g_viewTarget.x, halfW + left,
+                                    right - halfW - 1);
+    g_viewTarget.y = (int16_t)Clamp(g_viewTarget.y, halfH + top,
+                                    bot - halfH - 1);
+
+    obj = *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ;
+    if (obj) {
+        const uint8_t *o = (const uint8_t *)obj;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_VIEW_SNAP) {
+            g_viewTarget = *(const AM2_Point *)(o + OBJ_OFF_POS);
+            *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 0;
+            goto clamp_eye;
+        }
+        if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET)
+            g_viewTarget = *(const AM2_Point *)(o + OBJ_OFF_POS);
+    }
+
+    dist = ApproxDist(VIEW_EYE, &g_viewTarget);
+    step = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
+                     * (double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+
+    dx = g_viewTarget.x - VIEW_EYE->x;
+    dy = g_viewTarget.y - VIEW_EYE->y;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_VIEW_HOLD) {
+        *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD = 0;
+    } else {
+        if (dist > step) {
+            dx = dx * step / dist;
+            dy = dy * step / dist;
+        }
+        dx += VIEW_EYE->x;
+        dy += VIEW_EYE->y;
+        g_viewTarget.x = (int16_t)dx;   /* the original's scratch slot */
+        g_viewTarget.y = (int16_t)dy;
+    }
+
+clamp_eye:
+    vx = Clamp(g_viewTarget.x, halfW + left, right - halfW - 1);
+    vy = Clamp(g_viewTarget.y, halfH + top, bot - halfH - 1);
+
+    {
+        int32_t *world  = (int32_t *)(uintptr_t)ADDR_SECOND_RECT;
+        int32_t *origin = (int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+        int32_t  vl = vx - halfW;
+        int32_t  vt = vy - halfH;
+
+        world[0] = vl;
+        world[1] = vt;
+        world[2] = vl + w;
+        world[3] = vt + h;
+
+        origin[0] = vl - g_blitRect->left;
+        origin[1] = vt - g_blitRect->top;
+        origin[2] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W + origin[0];
+        origin[3] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_H + origin[1];
+
+        VIEW_EYE->x = (int16_t)vx;
+        VIEW_EYE->y = (int16_t)vy;
+
+        IntersectRect((RECT *)(uintptr_t)ADDR_VIEW_CLIPPED,
+                      (const RECT *)origin,
+                      (const RECT *)(uintptr_t)ADDR_MAP_BOUNDS);
+    }
+}
+
 /* 0x00413610. Outline a rectangle held in view space.
  *
  * A role name. The four edges live in the same coordinate space as
@@ -1363,6 +1483,7 @@ void __cdecl ResetDrawCounts(void)
 
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
     patch_replace(ADDR_RESET_DRAW_COUNTS, (const void *)ResetDrawCounts,
                   "ResetDrawCounts", 0);
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);

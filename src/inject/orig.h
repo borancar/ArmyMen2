@@ -761,6 +761,14 @@
 #define ADDR_FRAME_DELTA_MS      0x00511E08u  /* int32_t, beside the clock */
 #define AM2_SHAKE_FADE_MS        0x400        /* the linear fade window */
 #define ADDR_VIEW_ORIGIN_X       0x00514E14u  /* int32_t */
+/* 0x0042B5A0, one caller -- the per-frame path. Move the camera toward its
+ * target, clamp both to the map, and derive every rectangle that follows. */
+#define ADDR_VIEW_UPDATE         0x0042B5A0u  /* void(void) */
+#define ADDR_VIEW_TARGET         0x00514E08u  /* AM2_Point, what the eye chases */
+#define ADDR_VIEW_SNAP           0x00511E34u  /* int32_t, jump rather than glide */
+#define ADDR_VIEW_HOLD           0x00511E38u  /* int32_t, skip the glide once */
+#define ADDR_VIEW_SPEED          0x004852E0u  /* int32_t, units per second */
+#define ADDR_VIEW_CLIPPED        0x00514E54u  /* AM2_Rect, the intersection */
 #define ADDR_VIEW_ORIGIN_Y       0x00514E18u  /* int32_t */
 /* Last frame's copies, written by ComposeFrame at the end of every frame and
  * read by the dirty-rectangle merge to find what has scrolled. The listener
@@ -1392,6 +1400,12 @@
 #define AM2_SAVETAG_AUDIO        0x01326413u
 #define SOUND_DYNAMIC_SAVED      16           /* exclusive bound, see above */
 #define ADDR_STR_AUDIO_CPP      0x00474D7Cu  /* "C:\\ArmyMen2\\source\\audio.cpp" */
+/* The ear -- and also the CAMERA CENTRE, which is the same point and was not
+ * recorded here before. ADDR_VIEW_UPDATE derives the view rectangles from it
+ * and moves it toward ADDR_VIEW_TARGET a little each frame, so the listener
+ * sits wherever the view is looking. One address, two true readings, and it
+ * keeps the one name it already had. Distinct from ADDR_CAMERA_X/Y, which are
+ * the same idea in TILES. */
 #define ADDR_LISTENER_POS        0x00514E0Cu  /* AM2_Point, the ear */
 /* The ZERO POINT. It is .bss and 103 sites read it; NOTHING in the image
  * writes it, so it holds {0,0} for the life of the process and every one of
