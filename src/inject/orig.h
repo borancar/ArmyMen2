@@ -2502,8 +2502,19 @@
 #define ADDR_DAMAGE_TROOPER      0x00447A40u  /* type 2 */
 #define ADDR_DAMAGE_VEHICLE      0x0045B4D0u  /* type 3 */
 #define ADDR_DAMAGE_ROACH        0x0043D280u  /* type 8 */
-/* Called twice by ADDR_DAMAGE_OBJECT and by nothing else. */
+/* The two event kinds these notifiers raise. Both come from the literal each
+ * pushes as EventNotify's `type`, and the pair is what makes them readable:
+ * 5 is raised after damage, 6 after a heal. */
+#define AM2_EVENT_DAMAGED        5
+#define AM2_EVENT_HEALED         6
+/* Called twice by ADDR_DAMAGE_OBJECT and by nothing else. Reconstructed. */
 #define ADDR_NOTIFY_DAMAGED      0x00427E10u  /* void(obj, void *attacker) */
+/* 0x00427D40, fifteen callers. The event MASK for an object: one bit per army,
+ * chosen from the object's owner through the comm slot lookup at 0x0040F190,
+ * then narrowed by its type. It is what ADDR_NOTIFY_DAMAGED and
+ * ADDR_NOTIFY_HEALED pass to EventNotify's maskA and maskB, and event.h
+ * already calls those parameters masks -- which is what grounds this name. */
+#define ADDR_OBJ_EVENT_MASK      0x00427D40u  /* int32_t(const void *obj) */
 /* The death sequence, in the order ADDR_DAMAGE_OBJECT runs it. */
 #define ADDR_ON_OBJ_DIED         0x00427FD0u  /* void(obj, void *attacker) */
 #define ADDR_KILL_BROADCAST      0x0042A930u  /* void(obj, uid, int32) */

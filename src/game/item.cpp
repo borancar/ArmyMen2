@@ -18,6 +18,7 @@
 #include "crt.h"
 #include "armymsg.h"  /* SendObjDestroyed -- reconstructed */
 #include "army.h"     /* LookupOwnerObj -- reconstructed */
+#include "event.h"    /* EventNotify -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -897,7 +898,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 #define orig_damage_vehicle   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_VEHICLE)
 #define orig_damage_roach     ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_ROACH)
-#define orig_notify_damaged   ((AM2_ObjAttackerFn)(uintptr_t)ADDR_NOTIFY_DAMAGED)
 #define orig_on_obj_died      ((AM2_ObjAttackerFn)(uintptr_t)ADDR_ON_OBJ_DIED)
 #define orig_damage_broadcast \
     ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
@@ -908,8 +908,60 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 /* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
  * belongs to a different structure, as air.cpp already records. */
 #define AM2_OBJ_OWNER_OFF  0x10u
+/* The dword EventNotify takes as `num1`. Not an OBJ_OFF_ name on purpose:
+ * orig.h already has OBJ_OFF_BOUNDS on 0x0C for a different structure, and a
+ * second one there would be a family alias the ratchet is right to refuse. */
+#define AM2_OBJ_EVENT_NUM_OFF  0x0Cu
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
+
+typedef int32_t (__cdecl *AM2_ObjEventMaskFn)(const void *obj);
+#define orig_obj_event_mask \
+    ((AM2_ObjEventMaskFn)(uintptr_t)ADDR_OBJ_EVENT_MASK)
+
+/* 0x00427E10, and its only two call sites are inside DamageObject. Raise event
+ * kind 5 -- damage -- for the object, and for the attacker as well when there
+ * is one.
+ *
+ * The exact mirror of ADDR_NOTIFY_HEALED, which is kind 6 and the same shape.
+ * Each party contributes a triple to EventNotify: its `num1` dword, its uid,
+ * and its event mask. A null attacker leaves that second triple as three
+ * zeros, which the original arranges by pushing the three zeros BEFORE the
+ * branch and letting both arms share them. Written here as the `else` it is.
+ *
+ * The last three arguments are always zero: no delay, so this never takes
+ * EventNotify's delayed path, which is the one that would drop the masks.
+ *
+ * Coverage follows from DamageObject's probe rather than from a new one: all
+ * six of its Boot Camp calls take the main path, which reaches this
+ * unconditionally, so this runs six times. Every one of them has attacker uid
+ * 0 and therefore a NULL attacker -- so the `else` runs and the two-party arm
+ * above it does not. Its counter is 0 and always will be: the only caller is
+ * DamageObject, calling by name. */
+static void __cdecl NotifyDamaged(void *obj, void *attacker)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (attacker) {
+        const uint8_t *a = (const uint8_t *)attacker;
+
+        EventNotify(AM2_EVENT_DAMAGED,
+                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)obj)->uid,
+                    orig_obj_event_mask(obj),
+                    *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)attacker)->uid,
+                    orig_obj_event_mask(attacker),
+                    0, 0, 0);
+        return;
+    }
+
+    EventNotify(AM2_EVENT_DAMAGED,
+                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                ((const AM2_Object *)obj)->uid,
+                orig_obj_event_mask(obj),
+                0, 0, 0, 0, 0, 0);
+}
 
 /* 0x00428140, nineteen callers. Damage one object: dispatch to the handler for
  * its type, tell the world, and run the death sequence if it has just died.
@@ -981,7 +1033,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         return;
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0) {
-        orig_notify_damaged(obj, attacker);
+        NotifyDamaged(obj, attacker);
         if (g_mpSession && suppress == 0
             && CommMustBroadcast(kItemComm, attackerOwner))
             orig_damage_broadcast(obj, attackerUid, amount, kind,
@@ -1006,7 +1058,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         break;                  /* types 4..7 have no handler */
     }
 
-    orig_notify_damaged(obj, attacker);
+    NotifyDamaged(obj, attacker);
 
     if (g_mpSession && suppress == 0
         && CommMustBroadcast(kItemComm, attackerOwner))
@@ -1131,6 +1183,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_NOTIFY_DAMAGED, (const void *)NotifyDamaged,
+                  "NotifyDamaged", 2);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

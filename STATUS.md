@@ -3035,7 +3035,28 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`DamageObject` (`0x00428140`, 560 bytes, NINETEEN callers) is reconstructed,
+**`NotifyDamaged` (`0x00427E10`) is reconstructed** -- event kind 5, the exact
+mirror of the kind-6 heal notify, and both call sites are inside `DamageObject`.
+Each party contributes a triple to `EventNotify`: its `num1`, its uid, and its
+event mask from `ADDR_OBJ_EVENT_MASK` (`0x00427D40`, fifteen callers), whose
+name is grounded by `event.h` already calling those parameters masks. A null
+attacker leaves the second triple as zeros, which the original arranges by
+pushing them BEFORE the branch so both arms share them; written here as the
+`else` it is.
+
+**Its coverage needed no new run.** All six of `DamageObject`'s Boot Camp calls
+take the main path, which reaches this unconditionally -- so it runs six times,
+and every one has attacker uid 0, so the NULL arm runs and the two-party arm
+does not. Transitivity from a probe already taken, which is cheaper than
+another probe and just as good.
+
+One naming call worth recording: the `num1` offset is `0x0C`, and `orig.h`
+already has `OBJ_OFF_BOUNDS` there for a different structure. A second
+`OBJ_OFF_` name on that offset would be a family alias, so the constant is a
+local in `item.cpp` instead. The ratchet is right to refuse it and the fix is
+not to raise the baseline.
+
+**`DamageObject` (`0x00428140`, 560 bytes, NINETEEN callers) is reconstructed,**`DamageObject` (`0x00428140`, 560 bytes, NINETEEN callers) is reconstructed,
 and it is the best-covered thing this session.** It was `ADDR_GUARDED_ACTION`,
 a name this file admitted was a role. The body settles it: a jump table at
 `0x0042834C` dispatches on object type to a per-type damage handler, then it
