@@ -461,6 +461,24 @@
  * docs/boundary.md until someone went looking. */
 #define ADDR_RELEASE_PALETTE   0x0041B6A0u  /* void(void *holder) */
 #define ADDR_SET_PALETTE_RANGE 0x0041B720u  /* void(PALETTEENTRY*, first, last) */
+
+/* The reserved-palette animation, all of it. ADDR_CYCLE_PALETTE re-uploads
+ * entries 1..8 from one of six variants of the tileset palette, stepping
+ * through a PING-PONG sequence -- 0,1,2,3,4,5,4,3,2,1 -- so the ramp runs up
+ * and back down instead of snapping. Count and interval live beside the
+ * sequence and are read every time; the shipped image has 10 and 160 ms.
+ *
+ * The palette array is .bss, filled when the tileset loads, and its stride is
+ * 513 dwords -- what `shl 9; add` computes, reproduced rather than re-derived
+ * from a guess at the element type. */
+#define ADDR_CYCLE_PALETTE       0x0042B1A0u  /* void(void) */
+#define ADDR_PALETTE_CYCLE_SEQ   0x00486138u  /* uint32_t[], the ping-pong */
+#define ADDR_PALETTE_CYCLE_INDEX 0x00486160u  /* int32_t, cursor into it */
+#define ADDR_PALETTE_CYCLE_COUNT 0x00486164u  /* int32_t, sequence length */
+#define ADDR_PALETTE_CYCLE_INTERVAL 0x00486168u /* uint32_t, ms between steps */
+#define ADDR_PALETTE_CYCLE_STAMP 0x00514F70u  /* uint32_t, last step's clock */
+#define ADDR_TILESET_PALETTES    0x00503108u  /* PALETTEENTRY[][513] */
+#define AM2_TILESET_PALETTE_BYTES (513u * 4u)
 #define ADDR_SET_SURF_COLORKEY 0x0041B970u  /* void(surface *, uint8_t key) */
 #define PALETTE_HOLDER_OFF     0x800u       /* where the DD palette hangs */
 

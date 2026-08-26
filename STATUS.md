@@ -11,6 +11,61 @@ Last updated: **2026-08-26**, at `d9b0627`. Working tree clean.
 
 Nothing uncommitted.
 
+- **`TakeMenuRequest` is reconstructed and the in-mission frame chain is now
+  closed.** `0x00425EE0`, 480 bytes, is what RunFrame's state 2 runs on every
+  unpaused frame, and it was the last original piece of that chain -- all
+  eighteen of its callees were already named or reconstructed when it was
+  reached.
+
+  Three jobs share the entry. A pending menu request short-circuits everything
+  and raises the state-pending flag, which is the documented route from a menu
+  request to the level teardown. A dirty overlay means a level load is
+  finishing. Otherwise the ordinary frame runs.
+
+  Two details that reading alone would have got wrong. The log call takes **no
+  arguments at all** -- the original pushes nothing before calling the varargs
+  logger -- so it is reproduced through a no-argument function pointer rather
+  than as `Log("")`. And the abandoned-army sweep is gated on
+  `COMM_OFF_IS_HOST` (`0x3D8`), not the `0x400` "started" flag a first reading
+  took it for; only the host looks.
+
+  The network arm counts ten **frames**, not milliseconds, before that sweep.
+
+- **`checkseams` caught three seams the reconstruction itself created**, which
+  is the tool working exactly as intended: two call sites that reached
+  `0x00425EE0` by address, now that the address is ours, and
+  `orig_declare_rule_vars`. All three call directly now.
+
+- **A frame ratio of 1.36 was re-run before being believed, and it was noise.**
+  `ab.sh mission` came out 4982/3660 on the first run -- above the 1.00-1.14
+  spread seen honestly. The re-run gave 4802/5554, ratio 1.16 the other way
+  round with the reconstruction ahead. The direction flipping between runs is
+  what noise looks like; the defect this gate was added for sat at 3.9 in one
+  direction and stayed there.
+
+- **`CyclePalette` is reconstructed, and its counter is a trap.** `0x0042B1A0`,
+  112 bytes, animates the eight reserved palette entries by re-uploading one of
+  six tileset palettes on a timer. The sequence is a **ping-pong** --
+  0,1,2,3,4,5,4,3,2,1 -- so the ramp runs up and back down rather than snapping
+  from 5 to 0.
+
+  Its counter reads **11,198** on a Boot Camp mission, once a frame, which
+  reads as thorough coverage and is nothing of the kind: `ADDR_TILESET_RESERVE`
+  is **0** for that entire run, so every one of those calls returned at the
+  first line and the cursor never left its initial 1. A high count is coverage
+  of the ENTRY.
+
+- **The body was reached by poking the game's own gate**, which is legitimate
+  for the same reason the menu-request poke is: it is the game's global, so the
+  original can be driven identically. Sampling the cursor 24 times at 0.4 s
+  gives 0..9 on both sides, advancing about 6.25 steps a second -- the 160 ms
+  interval -- and wrapping through 9 to 0 on both.
+
+  Tested in the failing direction, because a plausible-looking sequence of
+  numbers is not a check: with the wrap at `i > count` instead of `i >=`, the
+  cursor reaches 10 and indexes one past the ten-entry table, showing up as an
+  `0a` the correct build never produces.
+
 - **`SpriteLoadTriple` is reconstructed, and reading it produced a whole new
   A/B configuration.** `0x004457E0`, 432 bytes, the function `PreloadSprite`
   reaches for every sprite the game does not already hold. Two halves, and the

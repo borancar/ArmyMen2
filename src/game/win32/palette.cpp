@@ -495,6 +495,81 @@ int32_t __cdecl LoadPaletteFile(const char *path, void *dst)
  *
  * SwapColourBytes takes a second argument nothing reads and the original
  * pushes one; zero here, with the same effect. */
+/* 0x0042B1A0, one caller -- RefreshDraw, once a frame. Animates the eight
+ * RESERVED palette entries, 1..8, by re-uploading one of six variants of the
+ * tileset palette on a timer. This is how water and fire shimmer without
+ * anything being redrawn.
+ *
+ * The sequence at ADDR_PALETTE_CYCLE_SEQ is a PING-PONG and that is the whole
+ * character of the effect: 0,1,2,3,4,5,4,3,2,1 -- ten steps over six distinct
+ * palettes, so the ramp runs up and back down rather than snapping from 5 to
+ * 0. Count and interval are read from memory beside it (10 and 160 ms in the
+ * shipped image) rather than being constants here, because the function reads
+ * them every time and nothing in this reconstruction may assume they are
+ * fixed.
+ *
+ * Two comparisons, two signednesses, and they are not interchangeable. The
+ * elapsed test is `jbe` -- UNSIGNED -- so the clock wrapping past 2^32 makes
+ * the difference enormous rather than negative and the cycle simply continues.
+ * The wrap test is `jl` -- SIGNED. Reproduced as uint32_t and int32_t
+ * respectively.
+ *
+ * The stride is 513 dwords, which is 2052 bytes and looks wrong until you note
+ * it is what the original computes: `shl 9` then `add` is x512 + x1. The
+ * palette array is .bss, filled when the tileset loads, so there is nothing in
+ * the file to check it against -- the arithmetic is reproduced exactly rather
+ * than re-derived from a guess at the element type.
+ *
+ * WHAT VERIFIED THIS, and what did not. The counter reads 11,198 on a Boot
+ * Camp mission, which is once a frame and looks like thorough coverage. It is
+ * not: ADDR_TILESET_RESERVE is 0 for the whole of that run, so every one of
+ * those calls returned at the first line and the cursor sat at its initial 1.
+ * A high count is coverage of the ENTRY.
+ *
+ * The body was reached by POKING that gate to 1 in a live mission -- the
+ * game's own global, so it works identically under AM2_NOPATCH=1 and both
+ * sides can be driven the same way. Sampling the cursor 24 times at 0.4 s
+ * gives 0..9 on both, advancing about 6.25 steps a second, which is the 160 ms
+ * interval, and wrapping through 9 to 0 on both. The palettes it uploads are
+ * still zeros here, because nothing filled the array in a mission that has the
+ * feature off; the arithmetic and the wrap are what this exercises.
+ *
+ * Tested in the failing direction, because a sequence of numbers that looks
+ * plausible is not a check: with the wrap at `i > count` instead of `i >=`,
+ * the cursor reaches 10 and indexes one past the ten-entry table. That shows
+ * up in the same sample as an `0a` the correct build never produces. */
+void __cdecl CyclePalette(void)
+{
+    uint32_t now, elapsed;
+    int32_t  i;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+        return;
+
+    now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    elapsed = now - *(const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_STAMP;
+
+    if (elapsed <= *(const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INTERVAL)
+        return;
+
+    *(uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_STAMP = now;
+
+    i = *(const int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX + 1;
+    *(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX = i;
+    if (i >= *(const int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT) {
+        i = 0;
+        *(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX = 0;
+    }
+
+    {
+        uint32_t which = ((const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_SEQ)[i];
+
+        SetPaletteRange((PALETTEENTRY *)(uintptr_t)
+                            (ADDR_TILESET_PALETTES + which * AM2_TILESET_PALETTE_BYTES),
+                        1, 8);
+    }
+}
+
 /* Spelled as surface.cpp spells it, so the two stay one definition. */
 #define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
@@ -555,5 +630,7 @@ int palette_install(void)
                         "LoadPaletteFile", 10);
     rc |= patch_replace(ADDR_PALETTE_LOADED, (const void *)PaletteLoaded,
                         "PaletteLoaded", 1);
+    rc |= patch_replace(ADDR_CYCLE_PALETTE, (const void *)CyclePalette,
+                        "CyclePalette", 1);
     return rc;
 }

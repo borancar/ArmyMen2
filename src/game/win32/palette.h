@@ -89,6 +89,12 @@ int32_t __cdecl LoadPaletteFile(const char *path, void *dst);
  * now in force -- and the reserved-block copy beside each. */
 void __cdecl PaletteLoaded(void);
 
+/* 0x0042B1A0, one caller -- RefreshDraw, once a frame. Animates the eight
+ * reserved palette entries by re-uploading one of six tileset palettes on a
+ * 160 ms timer, stepping a ping-pong sequence. See the body for the two
+ * comparisons and why their signednesses differ. */
+void __cdecl CyclePalette(void);
+
 int palette_install(void);
 
 #ifdef __cplusplus
