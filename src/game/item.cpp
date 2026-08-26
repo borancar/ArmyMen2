@@ -25,6 +25,16 @@
 #include "maprow.h"   /* RowUpdate -- reconstructed */
 #include "script.h"   /* AM2_Pad */
 
+/* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
+ * by including that header because this module is on the flat side of the
+ * split and audio.h names Win32 types -- the same reason air.cpp and
+ * commmsg.cpp do it, and spelled the same way so the three cannot drift.
+ * `extern "C"` is correct: audio.h's block spans that declaration, unlike
+ * LoadAudioSection below it, which gameproc.cpp declares with C++ linkage. */
+extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
+                                    int32_t unused, int32_t x, int32_t y);
+
+
 /* 0x0042A7A0, 18 call sites.
  *
  *     mov eax,[esp+4] / shr eax,0x1d / ret
@@ -1295,7 +1305,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_damage_item      ((AM2_DamageItemFn)(uintptr_t)ADDR_DAMAGE_ITEM)
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 #define orig_damage_vehicle   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_VEHICLE)
-#define orig_damage_roach     ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_ROACH)
 #define orig_damage_broadcast \
     ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
 
@@ -1470,6 +1479,10 @@ static void __cdecl ObjDeathCleanup(void *obj)
                     0, 0, 0, 0, AM2_DEATH_DELAY_LONG, 0, 1);
 }
 
+/* Defined below, beside the rest of the damage family. */
+void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir,
+                         int32_t kind, uint32_t attackerUid);
+
 /* 0x00428140, nineteen callers. Damage one object: dispatch to the handler for
  * its type, tell the world, and run the death sequence if it has just died.
  *
@@ -1559,7 +1572,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         orig_damage_vehicle(obj, amount, extra, kind, attackerUid);
         break;
     case 8:
-        orig_damage_roach(obj, amount, extra, kind, attackerUid);
+        DamageRoach(obj, amount, extra, kind, attackerUid);
         break;
     default:
         break;                  /* types 4..7 have no handler */
@@ -1868,6 +1881,78 @@ void __cdecl ObjFrameStep(void *obj)
     }
 }
 
+/* 0x0043D280, one caller -- DamageObject's type 8 arm. A roach takes a hit.
+ *
+ * The third argument is a DIRECTION and not a second amount, which is the
+ * thing most likely to be got wrong here: ADDR_RECV_DAMAGE computes it from
+ * the message position and the object's own and masks it to a byte, and the
+ * message's trace line calls it "dir". It is clamped UP to 1 before being
+ * stored -- `cmp al,1; jae` on the low byte -- so OBJ_OFF_HIT_DIR is never 0,
+ * and the clamp reads the byte while the rest of the function reads the full
+ * dword. Both are reproduced.
+ *
+ * Armour is a subtraction, not a scale: damage is `max(0, amount - 2)`, spelt
+ * as `amount - min(amount, armour)` so it cannot go negative, then clamped to
+ * the health left so health cannot go below zero. The image ships 2.
+ *
+ * Death picks a state from the KIND: 1 and 3 give 5, everything else 6. The
+ * original spells that `dec; je` then `sub 2; je`, which is 1 and 3 -- not a
+ * range, and not consecutive.
+ *
+ * The fifth argument, the attacker's uid, is never read. Kept in the signature
+ * because DamageObject passes it and the other three type handlers take it.
+ *
+ * VERIFIED BY READING. Its counter is blind, but the interesting number is its
+ * CALLER's: DamageObject reads 0 through a full Boot Camp mission, so the
+ * whole damage path is cold on every drive this project has -- nothing in the
+ * observed window shoots anything, which is the same wall FreeItem,
+ * RemoveFromItemList and Type2ActionB sit behind. Reaching it needs a mission
+ * driven long enough for something to die.
+ *
+ * So the checks here are the two constants read out of the image rather than
+ * guessed -- the armour is 2 and the wave is 0x32 -- and the direction
+ * argument, which ADDR_RECV_DAMAGE independently confirms by computing it from
+ * two positions and calling it "dir" in its own trace line. */
+void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
+                         uint32_t attackerUid)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  armour;
+    int32_t  hurt;
+    int16_t  health;
+
+    (void)attackerUid;
+
+    *(uint8_t *)(o + OBJ_OFF_HIT_DIR) =
+        ((uint8_t)dir >= 1u) ? (uint8_t)dir : (uint8_t)1;
+    *(uint32_t *)(o + OBJ_OFF_HIT_TIME) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    armour = *(const int32_t *)(uintptr_t)ADDR_ROACH_ARMOUR;
+    if (amount < armour)
+        armour = amount;
+    hurt = amount - armour;
+
+    health = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+    if (hurt > (int32_t)health)
+        hurt = (int32_t)health;
+    *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(health - (int16_t)hurt);
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = (kind == 1 || kind == 3) ? 5 : 6;
+
+    PlaySoundAt(AM2_ROACH_DEATH_SOUND, 0, 0,
+                (int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2));
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0) {
+        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG);
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT0;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -1876,6 +1961,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_DAMAGE_ROACH, (const void *)DamageRoach,
+                  "DamageRoach", 1);
     patch_replace(ADDR_OBJ_FRAME_STEP, (const void *)ObjFrameStep,
                   "ObjFrameStep", 1);
     patch_replace(ADDR_SELECT_INVENTORY_SLOT, (const void *)SelectInventorySlot,

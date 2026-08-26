@@ -483,3 +483,17 @@ extern "C" void __cdecl PlayDynamicSound(const char *, int32_t, int32_t,
                                          uint32_t)
 {
 }
+
+/* item.cpp's DamageRoach plays a wave when the roach dies, and PlaySoundAt is
+ * in win32/audio.cpp. Same reasoning again, and the same route in: this
+ * arrived by CLOSING a seam, not by adding a call.
+ *
+ * air.cpp reaches the same function and needs no stub, which is worth knowing
+ * before assuming a flat module can always call it -- air.cpp is not in
+ * SELFTEST_SRC, so the link never sees it. The rule is not "flat modules may
+ * not call into win32"; it is "modules IN THIS LINK may not", and the two sets
+ * are different. */
+extern "C" void __cdecl PlaySoundAt(int32_t, int32_t, int32_t, int32_t,
+                                    int32_t)
+{
+}

@@ -5435,6 +5435,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_SPRITE_PALETTE_SIZE  256
 #define AM2_AIR_ENEMY_RADIUS   0x1F4        /* 500 */
 #define OBJ_OFF_HEALTH         0x62u        /* int16_t */
+/* What a damage handler records about the hit before applying it. The third
+ * argument of the damage family is a DIRECTION, not a second amount:
+ * ADDR_RECV_DAMAGE computes it from the message position and the object's own
+ * with 0x0042DEB0 and masks it to a byte, and the message's own trace line
+ * calls it "dir". It is clamped up to 1 on the way in, so 0 is never stored.
+ *
+ * The time is the game clock, so a reader can age the hit. */
+#define OBJ_OFF_HIT_DIR        0x104u       /* uint8_t, >= 1 */
+#define OBJ_OFF_HIT_TIME       0x108u       /* uint32_t, ADDR_GAME_CLOCK_MS */
+/* Written 5 or 6 by ADDR_DAMAGE_ROACH when health reaches zero, chosen on the
+ * damage KIND: 1 and 3 give 5, everything else 6. */
+#define OBJ_OFF_DEATH_STATE    0x554u       /* int32_t */
+/* Bit 0 of OBJ_OFF_FLAGS. Cleared after ADDR_ITEM_PRE_DESTROY_ALIAS runs, and
+ * named structurally because nothing yet read says what it means. */
+#define OBJ_FLAG_BIT0          0x01u
+/* The armour subtraction every roach hit goes through: damage is
+ * max(0, amount - this), and the image ships 2. */
+#define ADDR_ROACH_ARMOUR      0x00487BB0u  /* int32_t */
+/* Wave index 0x32, played at the roach's own position when it dies. */
+#define AM2_ROACH_DEATH_SOUND  0x32
 #define OBJ_OFF_QUERY_NEXT     0x68u        /* obj *, the query result's thread */
 #define ADDR_OBJ_TYPE2_FIELD548 0x00457450u /* uint32_t(const AM2_Object *) */
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
