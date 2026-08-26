@@ -1193,6 +1193,57 @@ int32_t __cdecl ActionKeyReleased(int32_t action)
     return 0;
 }
 
+/* 0x00424900, four callers. Asks whether any of four keys has just been
+ * RELEASED, and CONSUMES the one that had.
+ *
+ * The four are SPACE, F1, ESCAPE and RETURN -- every key that means "I have
+ * read this, take it away" -- and they are tried in that order, first match
+ * wins. Each is the same `!IsKeyDown && KeyChanged` idiom ActionKeyReleased
+ * uses, so this is that function's logic over a fixed set rather than over a
+ * bound action.
+ *
+ * IT IS DESTRUCTIVE, which the old name hid completely. ConsumeKey runs on the
+ * key that matched, so asking twice in one frame answers yes then no. Both of
+ * frame.cpp's call sites depend on that: the overlay is dismissed once, not on
+ * every frame the key happens to be up.
+ *
+ * The name it replaces was ADDR_EVENT_FLAG_8_TEST, taken from what two callers
+ * do with the answer -- clear pause flag 8 -- rather than from what the
+ * function decides.
+ *
+ * DRIVEN, on the info bitmap. In a live mission F1 puts the sub-state to 0x16
+ * and each of these dismisses it back to 0x21: a click, SPACE, and ESCAPE,
+ * checked on separate runs. The counter is blind -- all three call sites are
+ * in frame.cpp and ours -- so the sub-state is the evidence.
+ *
+ * Stubbing it to always answer no changes the outcome: F1 then never reaches
+ * 0x16 at all. That says the drive genuinely exercises this function and not
+ * something else doing the dismissing. What it does NOT say is why the RAISE
+ * is affected -- the three call sites interact through the pause flag and the
+ * bitmap slot, and that chain was not traced. Recorded as an observation, not
+ * as a mechanism.
+ *
+ * The consume itself is verified by READING. Nothing in these drives asks
+ * twice in one frame, so a build without ConsumeKey would behave identically
+ * on every configuration this project has. */
+int32_t __cdecl DismissKeyReleased(void)
+{
+    static const int32_t keys[4] = {
+        AM2_DIK_SPACE, AM2_DIK_F1, AM2_DIK_ESCAPE, AM2_DIK_RETURN
+    };
+    int32_t i;
+
+    for (i = 0; i < 4; i++) {
+        if (IsKeyDown(keys[i]))
+            continue;
+        if (!KeyChanged(keys[i]))
+            continue;
+        ConsumeKey(keys[i]);
+        return 1;
+    }
+    return 0;
+}
+
 /* The game's own atoi. The offline test maps the image as data and cannot
  * call into it, so this goes through AM2_IMAGE like the rest of misc.cpp's
  * seams -- and atoi is stateless, so the two agree anyway. */
@@ -1408,6 +1459,8 @@ int misc_install(void)
                   "ActionKeyPressed", 1);
     patch_replace(ADDR_ACTION_KEY_RELEASED, (const void *)ActionKeyReleased,
                   "ActionKeyReleased", 4);
+    patch_replace(ADDR_DISMISS_KEY_RELEASED, (const void *)DismissKeyReleased,
+                  "DismissKeyReleased", 4);
     patch_replace(ADDR_COMM_ARMY_OF_SLOT, (const void *)CommArmyOfSlot,
                   "CommArmyOfSlot", 20);
     patch_replace(ADDR_PTR_LIST_PUSH, (const void *)PtrListPush,

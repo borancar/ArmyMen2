@@ -57,7 +57,6 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 #define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 #define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
 #define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
-#define orig_event_flag8     ((AM2_EventFlag8Fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)
 
 
 /* 0x00424CA0, one caller -- the per-frame path. In-mission input: three
@@ -130,7 +129,7 @@ void __cdecl MissionInput(void)
      * makes this "a click just happened" rather than "the mouse did anything".
      * Getting it wrong dismisses the sign on the first mouse MOVE. */
     if (g_currentBitmap
-        && (orig_event_flag8()
+        && (DismissKeyReleased()
             || (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
                 && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED))) {
         *(int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED = 1;
@@ -552,7 +551,7 @@ void __cdecl State2Frame(void)
     }
 
     if ((GetPauseFlags() & AM2_EVENT_FLAG_8)
-        && ((am2_int_fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)()) {
+        && DismissKeyReleased()) {
         UnPauseGame(AM2_EVENT_FLAG_8);
         SendGamePause(0, AM2_EVENT_FLAG_8);
     }
@@ -893,7 +892,7 @@ void __cdecl Substate22(void)
         }
     }
 
-    if (((am2_int_fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)()
+    if (DismissKeyReleased()
         || (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
             && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)) {
         SendGamePause(0, AM2_EVENT_FLAG_8);

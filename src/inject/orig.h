@@ -3010,6 +3010,9 @@ typedef struct {
  * the widget layer and the in-mission paused frame both test it, and both test
  * it as RELEASED -- !IsKeyDown && KeyChanged. One definition, not two. */
 #define AM2_DIK_ESCAPE             1
+#define AM2_DIK_RETURN             0x1Cu
+#define AM2_DIK_SPACE              0x39u
+#define AM2_DIK_F1                 0x3Bu
 /* The timer table: 1,000 records of {start, period, count, id} at 0x0050C370,
  * with the live count at 0x0050C36C. A slot is FREE when its id is zero, which
  * is why the scan walks the id field at 0x0050C37C rather than the record. */
@@ -4863,7 +4866,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_TAKE_MENU_REQUEST runs when it is not. Named for the body rather than
  * for its position in the table -- it was ADDR_SUBSTATE33_ALT. */
 #define ADDR_MISSION_PAUSED_FRAME 0x00425CD0u  /* void(void) */
-#define ADDR_EVENT_FLAG_8_TEST   0x00424900u
+/* Four keys, one idiom, and the name this used to carry came from a call site
+ * rather than from the body. It asks whether any of SPACE, F1, ESCAPE or
+ * RETURN has just been RELEASED -- `!IsKeyDown && KeyChanged` -- and CONSUMES
+ * the one that had, so the answer is destructive and cannot be asked twice.
+ *
+ * It was ADDR_EVENT_FLAG_8_TEST, after the pause flag its callers clear when
+ * it says yes. That describes what two of the four callers do with the answer,
+ * not what the function decides. Renamed rather than aliased; four use sites,
+ * all in frame.cpp. */
+#define ADDR_DISMISS_KEY_RELEASED 0x00424900u  /* int32_t(void) */
 /* Its own log string calls it SendGamePause, so it is renamed rather than
  * aliased -- the old name came from this one call site. Knowing the body makes
  * the call site legible: frame.cpp passes (0, AM2_EVENT_FLAG_8), which is

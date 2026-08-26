@@ -637,6 +637,10 @@ int32_t __cdecl ActionKeyPressed(int32_t action);
  * action has just come UP. `!down && changed`. */
 int32_t __cdecl ActionKeyReleased(int32_t action);
 
+/* 0x00424900. True when SPACE, F1, ESCAPE or RETURN has just come up -- and it
+ * CONSUMES that key, so the answer cannot be asked for twice. */
+int32_t __cdecl DismissKeyReleased(void);
+
 /* 0x0040F190, 47 callers -- CommSlotForArmy's inverse. Slot 4 answers 4
  * without touching the object, the same convention army 4 has everywhere. */
 int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);
