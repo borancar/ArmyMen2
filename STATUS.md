@@ -5,11 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `1f6766f`. Working tree clean.
+Last updated: **2026-08-26**, at `2014c98`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`DamageRoach` is reconstructed, and its third argument is a DIRECTION.**
+  `0x0043D280`, `DamageObject`'s type 8 arm. Not a second amount:
+  `ADDR_RECV_DAMAGE` computes it from the message position and the object's
+  own and calls it `"dir"` in its own trace line. It is clamped UP to 1 on the
+  low byte while the rest of the function reads the full dword, so
+  `OBJ_OFF_HIT_DIR` is never 0.
+
+- **Armour is a subtraction, not a scale**: `max(0, amount - 2)`, spelt as
+  `amount - min(amount, armour)` so it cannot go negative, then clamped to the
+  health left. The 2 is read out of the image. Death picks a state from the
+  KIND -- 1 and 3 give 5, everything else 6 -- which the original spells
+  `dec; je` then `sub 2; je`: not a range, and not consecutive.
+
+- **The selftest stub is the part worth keeping.** `item.cpp` now calls
+  `PlaySoundAt`, which lives in `win32/audio.cpp`, and `selftest-link` failed
+  -- the flat half links without `win32/`. But `air.cpp` calls the same
+  function and needs no stub, which looks like a contradiction and is not:
+  **`air.cpp` is not in `SELFTEST_SRC`**, so that link never sees it.
+
+  So the rule is not "flat modules may not call into `win32`". It is **"modules
+  in this link may not"**, and the two sets are different. The stub says so,
+  beside the three that were already there.
+
+- **Two modules disagreeing about `extern "C"` turned out to be both right.**
+  `air.cpp` declares `PlaySoundAt` with C linkage; `gameproc.cpp` says audio.h
+  "does not wrap it" for `LoadAudioSection`. audio.h's block spans lines
+  11..167 -- `PlaySoundAt` is at 142 and inside, `LoadAudioSection` at 177 and
+  outside. Checked rather than assumed, and the answer was that nothing is
+  wrong.
+
+- Verified by reading. The counter is blind, but its caller's is the telling
+  number: **`DamageObject` reads 0** through a full Boot Camp mission, so the
+  whole damage path is cold on every drive this project has.
 
 - **`ArmyMsgFilter` is reconstructed, and five of its six receivers named
   themselves.** `0x0042ACE0` routes an incoming army message and answers
