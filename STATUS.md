@@ -5,11 +5,59 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `02825e4`. Working tree clean.
+Last updated: **2026-08-26**, at `75a3659`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`Substate22` is reconstructed** -- `0x00425C10`, the INFO BITMAP F1 raises
+  in a mission. Three parts, and the order between the first two is what makes
+  it work: a pending menu request is handled FIRST and unconditionally, and
+  the third part is what sets that request, so a dismissal takes effect on the
+  NEXT frame rather than inside the frame that noticed the click. The paint
+  clears the dirty flag BEFORE testing the bitmap, so a null bitmap still
+  consumes the repaint rather than leaving it pending for ever.
+
+- **Verified by driving the round trip**, which exercises all three parts at
+  once:
+
+  | | sub-state | bitmap slot |
+  |---|---|---|
+  | play | `0x21` | -- |
+  | after F1 | `0x16` | `00896f04` raised, loaded, painted |
+  | after click | `0x21` | `00000000` dismissed and **freed** |
+
+  The counter is blind, so the globals are the evidence -- and better evidence
+  than a count. Dropping the `FreeBitmap` leaves the slot at `00896f04`: a
+  LEAK, with the screen returning to play looking right either way, so no
+  pixel comparison could have found it.
+
+- **The `state3` budget I set two commits ago was wrong, and this found it by
+  accident.** `state3` came out **11,056** over budget. I stashed and re-ran on
+  the committed baseline: clean. That reads exactly like a regression from the
+  new work.
+
+  It was not. `Substate22` is arm 0 of state 2's table and `state3` never
+  enters state 2, so it cannot run there at all. Four samples of ONE build
+  settled it -- **11056, 5750, 0, 5750**, with the mid frame 0 every time.
+
+- **The cause: `ab.sh`'s final shot lands after state 3 has fallen back to
+  state 0**, where the intro film is still stepping. A film frame is
+  meaningless by construction, exactly as `intro` already says. The single
+  clean baseline run was luck, and a budget of 500 was set on a sample that
+  could not distinguish "stable" from "half the time" -- the `controls` lesson
+  repeating, on a configuration I had written the `controls` lesson into.
+
+- **Fixed by RE-ENTERING state 3 just before the final shot**, so both frames
+  land on the same screen. Three clean runs after, and the mechanism is
+  understood rather than merely sampled. Mutation-checked again because the
+  configuration changed: dropping `PlayMovie` now fails on **both** frames,
+  224,483 and 32,713, where before only the final one caught it reliably.
+
+- One real defect in my own edit, caught by reading rather than by a tool: the
+  forward declaration for `Substate22` landed **inside a function body**.
+  Legal C++, so it compiled and nothing complained.
 
 - **`SelectInventorySlot` is reconstructed, and four stores are not in address
   order.** `0x00449860` puts an inventory slot in the unit's hand: records the
