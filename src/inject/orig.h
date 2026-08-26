@@ -4507,6 +4507,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_KEY_FIELD_B    0x00433840u
 #define ADDR_KEY_FIELD_C    0x00433850u
 
+/* THE OBJECT TYPES, at offset 0, which FreeItem and DestroyByType both switch
+ * on and ObjIsItem tests. CLAUDE.md called 2, 3 and 8 unidentified; the answer
+ * was already spread across the tree and simply never assembled. Evidence per
+ * row, best first:
+ *
+ *   1  item      ObjIsItem answers yes for 1 and 4
+ *   2  TROOPER   FreeItem's arm for 2 logs "DestroyTrooper %x" -- the
+ *                program's own name, not ours
+ *   3  VEHICLE   two independent routes: FreeItem's arm is DestroyVehicle,
+ *                and the type-3 destroy handler clears a footprint out of
+ *                ADDR_VEHICLE_MASK, indexed by a kind at obj+0x52C
+ *   4  WEAPON    its arm logs "DestroyWeapon, %x"
+ *   8  ROACH     the type-8 destroy handler clears a footprint out of
+ *                ADDR_ROACH_MASK, which has no kind index because there is
+ *                one roach
+ *
+ * 5, 6 and 7 remain unread; 5, 6 and 8 share FreeItem's common arm with 1, so
+ * that grouping says nothing about what they are. The footprint evidence for 3
+ * and 8 is evidence and not proof -- each clearer has other callers -- but it
+ * agrees with the FreeItem arm in the one case where both speak. */
+
 /* Object type predicates; all accept NULL and answer 0. */
 /* The body is `type == 1 || type == 4` with a NULL check, so this comment is
  * the function and not a guess. It also carried ADDR_OBJ_TAKES_SCRIPT, which

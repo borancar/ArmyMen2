@@ -2580,7 +2580,23 @@ exact oracle**, however meaningful it is when it is set.
   `variable`, `pad` and `object` declared; `compounds` counts the `if`
   statements that parsed. Four independent numbers agreeing on both sides is
   worth more than "the log is identical".
-- Object types 2, 3 and 8 are still unidentified.
+- **Object types 2, 3 and 8 are identified now, and the answer had been in the
+  tree for some time.** Type 2 is a TROOPER -- `FreeItem`'s arm for it logs
+  `"DestroyTrooper %x"`, so the program names it. Type 4 is a WEAPON on the
+  same evidence. Type 3 is a VEHICLE by two independent routes: `FreeItem`'s
+  arm is `DestroyVehicle`, and the type-3 destroy handler clears a footprint
+  out of `ADDR_VEHICLE_MASK` indexed by a kind. Type 8 is a ROACH, from the
+  matching clearer that indexes `ADDR_ROACH_MASK` with no kind index at all.
+  The table is in `orig.h` above the type predicates.
+
+  Worth noting HOW it stayed open: nothing was missing. `DestroyTrooper` had
+  been named from its own log string, and `FreeItem`'s switch had been
+  reconstructed with all its arms, and this line went on saying unidentified
+  because nobody put the switch beside the question. Before recording something
+  as unknown, grep the tree for what already answers it.
+
+- Types 5, 6 and 7 are still unread. They share `FreeItem`'s common arm with
+  type 1, which says nothing about what they are.
 - **`object.aai`'s `link 33-1..4` complaint is explained, and it is data
   rather than a defect.** The message is "Object AAI record not found for link
   %02d-%-3d", emitted by `0x00435FD0` -- a post-parse validator that qsorts the
