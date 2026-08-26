@@ -107,6 +107,11 @@ int mapdraw_install(void);
 }
 #endif
 
+/* Original: 0x0041D8F0. Link a node that is not yet in the list into its
+ * sorted place. The primitive under DepthInsert, which is a different
+ * address. */
+void __cdecl DepthLink(void *node, void **head);
+
 /* Original: 0x0041DB90. Put one node back into depth order after the object it
  * points at has moved. Walks outward in one direction and re-links once. */
 void __cdecl DepthResort(void *node, void **head);

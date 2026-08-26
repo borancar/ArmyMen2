@@ -3035,7 +3035,26 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`DepthResort` (`0x0041DB90`) is reconstructed and it is the hottest thing
+**`DepthLink` (`0x0041D8F0`, 2,888 calls a mission) is reconstructed** -- the
+list primitive that puts a node which is NOT yet in the list into its sorted
+place. Same four-exit shape as `DepthResort`, minus the unlink, and it only
+ever walks forward, because a node that is not linked has no position to walk
+back from.
+
+**Grepping the address stopped a wrong assumption, not a duplicate.** A
+`DepthInsert` already exists in the tree, so the counter dump made this look
+like work already done. It is not: that one is `0x0041E160` and takes an object
+and a world rectangle. This is the layer beneath it. The two names are close
+because the operation really is split in two -- which is exactly why the
+address, not the name, is what settles it.
+
+**And `DepthCompare`'s counter went from 12,661 to ZERO between two commits,
+with no behaviour change.** Its only two live callers are `DepthResort` and
+`DepthLink`, and both now call it by name instead of through the patched entry.
+A textbook first-kind blind spot, caught as it happened -- without the previous
+run's number in hand it would read as a function that had stopped running.
+
+**`DepthResort` (`0x0041DB90`) is reconstructed and it is the hottest thing**`DepthResort` (`0x0041DB90`) is reconstructed and it is the hottest thing
 here: 3,922 calls in a Boot Camp mission**, with `DepthCompare` at 12,661 on
 the same run -- about 3.2 comparisons per call, so the walk loops are doing
 real work rather than every node landing on the first test.

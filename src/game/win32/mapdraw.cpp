@@ -1457,6 +1457,63 @@ void __cdecl ResetDrawCounts(void)
 #define DEPTH_PREV(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_PREV))
 #define DEPTH_NEXT(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_NEXT))
 
+/* 0x0041D8F0, two callers. Link a node that is NOT yet in the list into its
+ * sorted place. The primitive under DepthInsert, which is a different address
+ * and takes an object and a world rectangle instead.
+ *
+ * Same four-exit shape as DepthResort below, minus the unlink: empty list,
+ * before the head, before some later node, or appended at the tail. It only
+ * ever walks FORWARD, because a node that is not linked has no position to
+ * walk back from.
+ *
+ * The head cases are the ones to get right. An empty list writes both of the
+ * node's links to zero and makes it the head; taking the head position writes
+ * `prev` to zero and `*head`, and the other two exits touch neither.
+ *
+ * Measured: 2,888 calls in a Boot Camp mission. Which exit each takes is not.
+ *
+ * Reconstructing this took DepthCompare's counter from 12,661 to ZERO in the
+ * same run, with no behaviour change at all: its only two live callers are
+ * this and DepthResort, and both now call it by name rather than through the
+ * patched entry. A textbook instance of the first kind of counter blindness,
+ * recorded here because it happened between two commits and would otherwise
+ * read as a function that stopped running. */
+void __cdecl DepthLink(void *node, void **head)
+{
+    uint8_t *n = (uint8_t *)node;
+    uint8_t *e = (uint8_t *)*head;
+
+    if (!e) {
+        *head          = n;
+        DEPTH_NEXT(n)  = (uint8_t *)0;
+        DEPTH_PREV(n)  = (uint8_t *)0;
+        return;
+    }
+
+    if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
+        DEPTH_PREV(n) = (uint8_t *)0;
+        DEPTH_NEXT(n) = e;
+        DEPTH_PREV(e) = n;
+        *head         = n;
+        return;
+    }
+
+    while (DEPTH_NEXT(e)) {
+        e = DEPTH_NEXT(e);
+        if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
+            DEPTH_NEXT(n)              = e;
+            DEPTH_PREV(n)              = DEPTH_PREV(e);
+            DEPTH_PREV(e)              = n;
+            DEPTH_NEXT(DEPTH_PREV(n))  = n;
+            return;
+        }
+    }
+
+    DEPTH_NEXT(e) = n;
+    DEPTH_PREV(n) = e;
+    DEPTH_NEXT(n) = (uint8_t *)0;
+}
+
 /* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Put one node back into depth
  * order after the thing it points at has moved.
  *
@@ -1583,6 +1640,8 @@ int mapdraw_install(void)
                         "DrawMapObjects", 3);
     rc |= patch_replace(ADDR_DEPTH_INSERT, (const void *)DepthInsert,
                         "DepthInsert", 1);
+    rc |= patch_replace(ADDR_DEPTH_LINK, (const void *)DepthLink,
+                        "DepthLink", 2);
     rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
                         "DepthResort", 2);
     rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,

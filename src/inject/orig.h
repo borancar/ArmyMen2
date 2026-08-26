@@ -836,6 +836,12 @@
  * order after its object's depth has changed, by walking outward in whichever
  * direction the comparison says and re-linking it there. */
 #define ADDR_DEPTH_RESORT        0x0041DB90u  /* void(node *, node **head) */
+/* 0x0041D8F0, two callers. The list PRIMITIVE under ADDR_DEPTH_INSERT: put a
+ * node that is not in the list into its sorted place. Distinct from
+ * ADDR_DEPTH_INSERT (0x0041E160), which takes an object and a world rectangle
+ * and is the layer above -- the names are close because the two really are one
+ * operation split in two, and the address had to be grepped to notice. */
+#define ADDR_DEPTH_LINK          0x0041D8F0u  /* void(node *, node **head) */
 /* What the comparator reads. The bounds at OBJ_OFF_BOUNDS end at +0x1B and
  * these follow: a screen position, a LAYER that only counts when both objects
  * have a positive one, and a per-object SLOPE that projects a horizontal
