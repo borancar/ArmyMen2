@@ -808,6 +808,7 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                                  msg->maskB, msg->removeevent, 1);
 }
 
+
 /* 0x0041E950, one caller, on the per-frame path. Fire every timer that has
  * come due, and no more often than once every 100 ms.
  *

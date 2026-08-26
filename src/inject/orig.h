@@ -711,7 +711,14 @@
 #define ADDR_SHAKE_PHASE_Y       0x00514E70u  /* float */
 #define ADDR_SHAKE_STEP_Y        0x00514E74u  /* int32_t */
 #define ADDR_SHAKE_AMPLITUDE     0x00514E78u  /* int32_t, pixels */
-#define ADDR_SHAKE_RATE          0x00511E10u  /* float, applied to each step */
+/* Not a shake constant, despite living in this block and being read by the
+ * shake: it is the frame delta in SECONDS, the twin of ADDR_FRAME_DELTA_MS at
+ * 0x00511E08. ADDR_FRAME_CLOCK_STEP writes it as delta_ms * 0.001, and
+ * ADDR_TAKE_MENU_REQUEST forces it to 0x3D872B02 -- 0.066, which is the same
+ * 66 ms the delta itself is clamped to -- in a network game. It was
+ * ADDR_FRAME_DELTA_SEC, a name off the one call site that reads it; the shake
+ * integrates its phase per second and so wants exactly this. */
+#define ADDR_FRAME_DELTA_SEC     0x00511E10u  /* float, seconds */
 #define ADDR_FRAME_DELTA_MS      0x00511E08u  /* int32_t, beside the clock */
 #define AM2_SHAKE_FADE_MS        0x400        /* the linear fade window */
 #define ADDR_VIEW_ORIGIN_X       0x00514E14u  /* int32_t */
@@ -2824,6 +2831,19 @@
 /* 0x0041E950, one caller -- the per-frame path. Fire every timer that is due,
  * at most once every 100 ms. */
 #define ADDR_TIMER_TICK            0x0041E950u /* void(void) */
+/* 0x00424B20, one caller -- the per-frame path. THE GAME CLOCK: measure the
+ * frame, clamp it, add it to ADDR_GAME_CLOCK_MS and publish it in both units.
+ * This is what makes that clock tick. */
+#define ADDR_FRAME_CLOCK_STEP      0x00424B20u /* void(void) */
+#define ADDR_LAST_TICK_MS          0x00511E0Cu /* uint32_t, from ADDR_TICKS */
+/* Selects a FIXED 16 ms step instead of measuring. Below the CRT line it is
+ * READ three times and written nowhere, so it is always zero and the fixed
+ * path never runs -- the same shape as ADDR_SECOND_DEADLINE, one step further
+ * on: there the writes had no reader, here the reads have no writer. */
+#define ADDR_FIXED_STEP            0x00512598u /* int32_t, always 0 */
+#define AM2_FIXED_STEP_MS          0x10        /* 16 ms */
+#define AM2_FRAME_DELTA_CAP_MS     0x42        /* 66 ms, about 15 fps */
+#define ADDR_MS_TO_SEC             0x0046F980u /* const float, 0.001 */
 #define AM2_TIMER_TICK_MS          0x64        /* 100 ms between sweeps */
 /* The last sweep's timestamp is the dword at 0x0050C368 -- which already has a
  * name, ADDR_EVENT_BLOCK, because it is also the first dword of the 16,008-byte

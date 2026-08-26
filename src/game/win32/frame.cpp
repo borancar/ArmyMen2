@@ -20,6 +20,7 @@
 #include "mapdraw.h"      /* SetDrawTarget -- reconstructed */
 #include "../image.h"     /* AM2_IMAGE */
 #include "../gamedir.h"   /* SetGameDir -- reconstructed */
+#include "winmain.h"      /* Ticks -- reconstructed */
 
 /* ---- what stays in the original image --------------------------------- */
 
@@ -36,6 +37,77 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 #define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+
+/* 0x00424B20, one caller, on the per-frame path -- and it is THE GAME CLOCK.
+ * Measure how long the last frame took, clamp it, add it to
+ * ADDR_GAME_CLOCK_MS, and publish the delta in both milliseconds and seconds.
+ * Everything that treats 0x00511E04 as "now" is being driven from here.
+ *
+ * The clamp is 66 ms, so a frame that took longer advances the game by 66 ms
+ * and no more: the world slows down rather than jumping, which is what keeps a
+ * stalled frame from teleporting anything. The raw delta is stored FIRST and
+ * the clamped value written over it, which is the original's order and is
+ * visible to nothing in between.
+ *
+ * ADDR_FIXED_STEP would substitute a flat 16 ms for the measurement. Nothing
+ * below the CRT line writes it -- three reads, no writers -- so that path is
+ * dead and the game is always wall-clock timed. Reproduced anyway; it costs a
+ * test that is always false.
+ *
+ * The seconds twin is delta * 0.001 and is what the screen shake integrates
+ * its phase with. That is the whole reason the global used to be called
+ * ADDR_SHAKE_RATE -- a name off its one reader rather than off this, its
+ * writer.
+ *
+ * It lives in win32/ for one reason: it calls Ticks, which is reconstructed in
+ * winmain.cpp, and a flat module may not reach a win32/ header even
+ * transitively -- nor link against it, which is the harder half. The same
+ * constraint that moved the depth list the other way.
+ *
+ * Measured: 19,803 calls against ComposeFrame's 19,977. And Ticks now reads
+ * FOUR on the same run -- this function calls it by name roughly twenty
+ * thousand times and the counter cannot see any of them, so what is left is
+ * whatever other original callers it has. A counter that large collapsing to a
+ * single digit is the most dramatic instance of the first blind spot in this
+ * tree; nothing about the behaviour changed.
+ *
+ * The clock is also self-evidencing in a way most functions are not. It drives
+ * ADDR_GAME_CLOCK_MS, which the timers, the pads and the audio all compare
+ * against -- so a wrong delta here would stall or race every one of them at
+ * once, and the mission plays normally. */
+void __cdecl FrameClockStep(void)
+{
+    uint32_t *clock   = (uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    uint32_t *last    = (uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS;
+    int32_t  *deltaMs = (int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    uint32_t  delta;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_FIXED_STEP) {
+        *last = *clock;
+        delta = AM2_FIXED_STEP_MS;
+        *deltaMs = (int32_t)delta;
+    } else {
+        uint32_t now = Ticks();
+
+        delta    = now - *last;
+        *last    = now;
+        *deltaMs = (int32_t)delta;          /* the raw one... */
+        if (delta > AM2_FRAME_DELTA_CAP_MS) {
+            delta    = AM2_FRAME_DELTA_CAP_MS;
+            *deltaMs = (int32_t)delta;      /* ...then the clamp over it */
+        }
+    }
+
+    *clock += delta;
+
+    /* The original converts the delta to a 64-bit integer, multiplies in
+     * DOUBLE precision -- `fmul` against a dword operand widens it -- and
+     * stores a float. Written the same way round rather than as a float
+     * multiply, which would round twice. */
+    *(float *)(uintptr_t)ADDR_FRAME_DELTA_SEC =
+        (float)((double)delta
+                * (double)*(const float *)AM2_IMAGE(ADDR_MS_TO_SEC));
+}
 
 typedef void  (__cdecl *AM2_VoidFn0)(void);
 typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
@@ -396,6 +468,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_FRAME_CLOCK_STEP, (const void *)FrameClockStep,
+                        "FrameClockStep", 0);
     rc |= patch_replace(ADDR_MISSION_PAUSED_FRAME,
                         (const void *)MissionPausedFrame,
                         "MissionPausedFrame", 0);

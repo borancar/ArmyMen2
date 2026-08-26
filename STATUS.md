@@ -3035,7 +3035,32 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`TimerTick` (`0x0041E950`) fires the timer table**, at most once every 100 ms
+**`FrameClockStep` (`0x00424B20`) is THE GAME CLOCK** -- 19,803 calls against
+`ComposeFrame`'s 19,977. It measures the frame, clamps it to 66 ms, adds it to
+`ADDR_GAME_CLOCK_MS` and publishes the delta in both units. Everything that
+treats `0x00511E04` as "now" -- the timers, the pads, the audio -- is being
+driven from here, which also makes it self-evidencing: a wrong delta would
+stall or race all of them at once.
+
+**`ADDR_SHAKE_RATE` was a name off its one reader, and is renamed.** It holds
+the frame delta in SECONDS -- `delta_ms * 0.001`, written here -- and its
+millisecond twin `ADDR_FRAME_DELTA_MS` was already named four bytes away. Two
+confirmations: the constant is exactly 0.001, and `TakeMenuRequest` forces the
+field to `0x3D872B02` = 0.066 in a network game, which is the same 66 ms the
+delta itself is clamped to. The screen shake integrates its phase per second
+and so wants exactly this value; that is a use, not an identity.
+
+**A dead switch, the mirror of last week's dead deadline.**
+`ADDR_FIXED_STEP` would substitute a flat 16 ms for the measurement. Below the
+CRT line it is READ three times and written nowhere, so the game is always
+wall-clock timed. `ADDR_SECOND_DEADLINE` was writes with no reader; this is
+reads with no writer.
+
+**And `Ticks` collapsed from thousands to FOUR** on the same run, because this
+calls it by name. The largest instance of the first blind spot in the tree so
+far, and nothing about the behaviour changed.
+
+**`TimerTick` (`0x0041E950`) fires the timer table****`TimerTick` (`0x0041E950`) fires the timer table**, at most once every 100 ms
 and 23,901 times against `ComposeFrame`'s 24,056. The gate is a SUBTRACTION
 against the last sweep rather than a comparison with a deadline, so it survives
 the clock wrapping -- the timers' own due times are compared directly and do

@@ -419,14 +419,14 @@ static void SavePrev(void *dst, const void *src, int32_t dwords)
 #define g_shakePhaseY  (*(float *)(uintptr_t)ADDR_SHAKE_PHASE_Y)
 #define g_shakeStepY   (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y)
 #define g_shakeAmp     (*(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
-#define g_shakeRate    (*(const float *)(uintptr_t)ADDR_SHAKE_RATE)
+#define g_frameDeltaSec (*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC)
 #define g_frameDeltaMs (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
 
 /* One axis of the shake: advance the phase, bounce it off +/-amp reversing
  * the step, and answer the whole-pixel offset. */
 static int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
 {
-    *phase = (float)*step * g_shakeRate + *phase;
+    *phase = (float)*step * g_frameDeltaSec + *phase;
 
     if (*phase > (float)amp) {
         *phase = (float)amp;
