@@ -7,6 +7,7 @@
 #include "item.h"          /* UidOnWire, UidArmy */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "objtable.h" /* LookupByUID */
 
 /* ArmyMessageFlush stays original and is reached by address. It empties the
  * packet and resets the cursor to AM2_ARMY_PACKET_HDR, returning zero when it
@@ -258,12 +259,14 @@ void __cdecl ItemGoneMessageSend(const void *obj)
 }
 
 typedef int32_t (__cdecl *AM2_RecvFn)(void *msg);
-#define orig_recv_item_gone     ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_GONE)
 #define orig_recv_item_deploy   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_DEPLOY)
-#define orig_recv_obj_destroyed ((AM2_RecvFn)(uintptr_t)ADDR_RECV_OBJ_DESTROYED)
 #define orig_recv_damage        ((AM2_RecvFn)(uintptr_t)ADDR_RECV_DAMAGE)
 #define orig_recv_item_create   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_CREATE)
-#define orig_recv_death         ((AM2_RecvFn)(uintptr_t)ADDR_RECV_DEATH)
+
+/* The three receivers, defined below beside the senders they pair with. */
+void __cdecl RecvObjDestroyed(void *msg);
+void __cdecl RecvItemGone(void *msg);
+void __cdecl RecvDeath(void *msg);
 
 /* 0x0042ACE0, one caller. Routes an incoming army message to its receiver and
  * answers whether it took it -- 1 for the six codes it knows, 0 otherwise, so
@@ -308,12 +311,12 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
     (void)army;   /* pushed by the caller and never read -- see above */
 
     switch (code) {
-    case AM2_MSG_ITEM_GONE:      orig_recv_item_gone(msg);     return 1;
+    case AM2_MSG_ITEM_GONE:      RecvItemGone(msg);     return 1;
     case AM2_MSG_ITEM_DEPLOY:    orig_recv_item_deploy(msg);   return 1;
-    case AM2_MSG_OBJ_DESTROYED:  orig_recv_obj_destroyed(msg); return 1;
+    case AM2_MSG_OBJ_DESTROYED:  RecvObjDestroyed(msg); return 1;
     case AM2_MSG_DAMAGE:         orig_recv_damage(msg);        return 1;
     case AM2_MSG_ITEM_CREATE:    orig_recv_item_create(msg);   return 1;
-    case AM2_MSG_DEATH:          orig_recv_death(msg);         return 1;
+    case AM2_MSG_DEATH:          RecvDeath(msg);         return 1;
     default:                                                   return 0;
     }
 }
@@ -372,12 +375,86 @@ void __cdecl SendItemDeploy(const void *item, int32_t arg)
                  (int32_t)*(const uint8_t *)(it + OBJ_OFF_FACING));
 }
 
+typedef void (__cdecl *AM2_ObjDieFn)(void *obj, int32_t kind, uint32_t by);
+#define orig_obj_die ((AM2_ObjDieFn)(uintptr_t)ADDR_OBJ_DIE)
+
+/* 0x0042AF00, 0x0042AEB0 and 0x0042AE50 -- three of the six receivers
+ * ArmyMsgFilter routes to, and each is the far end of a sender in this file.
+ * That pairing is the check: the sender packs a field and the receiver reads
+ * the same offset, so the layouts witness each other.
+ *
+ * All three call UidOnWire on the uid they RECEIVE, having been sent through
+ * UidOnWire too. That is not a mistake and not a byte swap undone twice: this
+ * build's UidOnWire is the identity, a placeholder for a conversion the port
+ * does not need. Reproduced rather than elided, because eliding it would hide
+ * where the conversion belongs if it ever comes back.
+ *
+ * THEY DIFFER IN WHEN THEY LOG, and it is not tidy. ItemGone logs only under
+ * COMM_OFF_VERBOSE; Death logs UNCONDITIONALLY. ObjDestroyed does not log at
+ * all. Reproduced as found -- three sibling functions in one band disagreeing
+ * about their own tracing is exactly the sort of thing a rewrite unifies. */
+void __cdecl RecvObjDestroyed(void *msg)
+{
+    const uint8_t *m   = (const uint8_t *)msg;
+    void          *obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + 4)));
+
+    if (!obj)
+        return;
+    /* Health ZERO means it is already gone; this destroys only what is still
+     * alive, so a duplicate message is harmless. */
+    if (*(const int16_t *)((uint8_t *)obj + OBJ_OFF_HEALTH) == 0)
+        return;
+
+    DestroyByType(obj);
+}
+
+void __cdecl RecvItemGone(void *msg)
+{
+    const uint8_t *m   = (const uint8_t *)msg;
+    void          *obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + 4)));
+    const uint8_t *comm;
+
+    if (!obj)
+        return;
+
+    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+
+    comm = kComm;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_RECV_ITEM_GONE,
+                 ((const AM2_Object *)obj)->uid);
+}
+
+void __cdecl RecvDeath(void *msg)
+{
+    const uint8_t *m  = (const uint8_t *)msg;
+    uint32_t       by = UidOnWire(*(const uint32_t *)(m + 8));
+    void          *obj;
+
+    obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + 4)));
+    if (!obj)
+        return;
+
+    /* The log prints the ATTACKER's army, not the victim's, and the victim's
+     * LOCAL uid rather than the one that came over the wire. */
+    orig_log((const char *)(uintptr_t)ADDR_STR_RECV_DEATH,
+             ((const AM2_Object *)obj)->uid, UidArmy(by));
+
+    orig_obj_die(obj, (int32_t)*(const uint8_t *)(m + 0x0C), by);
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_RECV_OBJ_DESTROYED, (const void *)RecvObjDestroyed,
+                        "RecvObjDestroyed", 1);
+    rc |= patch_replace(ADDR_RECV_ITEM_GONE, (const void *)RecvItemGone,
+                        "RecvItemGone", 1);
+    rc |= patch_replace(ADDR_RECV_DEATH, (const void *)RecvDeath,
+                        "RecvDeath", 1);
     rc |= patch_replace(ADDR_ITEM_DEPLOY_MSG, (const void *)SendItemDeploy,
                         "SendItemDeploy", 1);
     rc |= patch_replace(ADDR_ARMY_MSG_FILTER, (const void *)ArmyMsgFilter,

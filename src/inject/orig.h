@@ -5604,6 +5604,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_RECV_DAMAGE         0x0042ADA0u
 #define ADDR_RECV_ITEM_CREATE    0x0042AFA0u
 #define ADDR_RECV_DEATH          0x0042AE50u
+/* 0x00428450, and the receivers above are what named it: it calls FindSlot,
+ * ADDR_TRIGGER_ITEM_DESTROYED and ADDR_OBJ_DEATH_CLEANUP, which between them
+ * are what happens when an object dies rather than merely being removed. */
+#define ADDR_OBJ_DIE             0x00428450u  /* void(obj, int32 kind, uint32 by) */
+#define ADDR_STR_RECV_ITEM_GONE  0x00485F20u
+#define ADDR_STR_RECV_DEATH      0x00485EF0u
 #define ADDR_STR_ITEM_GONE_SEND  0x00485E10u
 #define AM2_MSG_OBJ_DESTROYED    0x10u
 #define AM2_MSG_OBJ_DESTROYED_LEN 8u
