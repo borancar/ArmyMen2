@@ -545,7 +545,15 @@ single session -- on `0x00428DA0`, which was `ADDR_OBJ_ACTION`; on
 remembering, which is the argument for the ratchet existing and NOT an
 argument that the rule is optional: the check only fires after the name has
 been written, and each time the right fix was to decide which name is
-body-derived and delete the other. The grep costs one command. The one
+body-derived and delete the other. The grep costs one command.
+
+It went to FIVE before the session ended, and the fifth was committed in the
+act of writing this paragraph -- `0x0041DB20` was already
+`ADDR_ROW_UNREGISTER_ALL` and got a second name anyway. Writing the rule down
+and citing it repeatedly did not produce compliance; only the check did. Treat
+that as the finding: the ratchet is not a backstop for carelessness, it is the
+mechanism, and the same argument says the offset macros need one too, since
+their fourth duplicate passed every check silently. The one
 that is genuinely unresolved is `0x005125C4`, which was `ADDR_OPT_MUSIC` and
 which `SetGameDir` latches on entering the `avi` directory; one of the two
 readings is wrong and it is not yet established which.

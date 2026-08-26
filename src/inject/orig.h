@@ -4638,8 +4638,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_ROW_COUNT      0x70u
 #define OBJ_OFF_ROWS           0x74u
 #define AM2_OBJ_ROW_STRIDE     0x60u
-/* 0x0041D480: take one row out of the map descriptor's cell lists. */
-#define ADDR_ROW_UNREGISTER    0x0041D480u /* void(row *, int32, void *desc) */
+/* 0x0041D480, 37 callers. It was ADDR_ROW_UNREGISTER, "take one row out of the
+ * map descriptor's cell lists", and that is only one of its two outcomes.
+ *
+ * Read: it removes -- by calling ADDR_ROW_UNREGISTER_ALL, which is the function that
+ * really does that -- when the row's bit 0 is clear, or when bit 1 is set, and
+ * otherwise it RE-LINKS the row at cell coordinates it recomputes from the
+ * row's own position fields. So the caller CHOOSES which by setting bit 1
+ * first, and the second argument forces the work even when nothing moved.
+ *
+ * That resolves what looked like a contradiction in 0x00429650, which sets bit
+ * 1 on every row before calling this and therefore removes, while TakeOffMap
+ * clears bit 1 and therefore does not. TakeOffMap's own comment in air.cpp
+ * says "unregister" for the clear-bit-1 path and should be re-read against
+ * this; flagged rather than rewritten, because that path also depends on the
+ * row's bit 0 and I have not read ADDR_ROW_UNREGISTER_ALL. */
+#define ADDR_ROW_UPDATE        0x0041D480u /* void(row *, int32 force, desc) */
 /* 0x0041D3A0: the same row's TEARDOWN -- unregister it and free the buffer it
  * owns at +0x38, but only when its +0x34 flag says there is one.
  *

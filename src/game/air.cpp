@@ -89,9 +89,9 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     return 0;
 }
 
-typedef void (__cdecl *AM2_RowUnregisterFn)(void *row, int32_t a, void *desc);
-#define orig_row_unregister \
-    ((AM2_RowUnregisterFn)(uintptr_t)ADDR_ROW_UNREGISTER)
+typedef void (__cdecl *AM2_RowUpdateFn)(void *row, int32_t a, void *desc);
+#define orig_row_update \
+    ((AM2_RowUpdateFn)(uintptr_t)ADDR_ROW_UPDATE)
 
 /* 0x004296E0, eight callers. Take one object off the map.
  *
@@ -124,7 +124,7 @@ void __cdecl TakeOffMap(void *obj)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row &= ~(uint32_t)OBJ_FLAG_OVERDUE;
-        orig_row_unregister(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        orig_row_update(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 }
 

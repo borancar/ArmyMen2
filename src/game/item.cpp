@@ -611,9 +611,9 @@ void __cdecl DestroyByType(void *obj)
         SendObjDestroyed(obj);
 }
 
-typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
-#define orig_row_unregister \
-            ((am2_row_unregister_fn)AM2_IMAGE(ADDR_ROW_UNREGISTER))
+typedef void (__cdecl *am2_row_update_fn)(void *row, int32_t a, void *desc);
+#define orig_row_update \
+            ((am2_row_update_fn)AM2_IMAGE(ADDR_ROW_UPDATE))
 #define orig_item_teardown  ((am2_destroy_fn)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
 
 #define orig_obj_attach_to \
@@ -757,7 +757,7 @@ void __cdecl DestroyObjCommon(void *obj)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         ObjFlagClear0(row);
-        orig_row_unregister(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        orig_row_update(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
     }
 
     if (ObjIsItem((const AM2_Object *)obj))
