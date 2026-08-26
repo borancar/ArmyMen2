@@ -5,11 +5,59 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `4e1e6d1`. Working tree clean.
+Last updated: **2026-08-26**, at `96eda4f`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **A dispatch table was based one column late, and it read correctly at every
+  use.** `orig.h` carried `ADDR_STATE_DISPATCH = 0x00486550`, "12-byte records;
+  +0 is a function". The real base is **`0x0048654C`**. Two of the three fields
+  are function pointers, and the image's two call sites read different COLUMNS
+  of one table:
+
+  | site | operand | column |
+  |---|---|---|
+  | `0x0040A9F0`, WndProc | `call [eax*4 + 0x486550]` | 1 |
+  | `0x00426623`, StateEnter0 | `call [edx*4 + 0x48654C]` | 0 |
+
+  Both scale the index identically -- `lea eax,[eax+eax*2]` then `*4` -- so the
+  stride is 12 and the difference is exactly one field. Naming the second
+  column as the base worked only because `winproc.cpp` never read any other
+  field. Same shape as a mis-centred trig table: correct at every use, wrong
+  about the layout.
+
+- **The two callers are not independent, which is what settles the record's
+  meaning.** WndProc's arm is guarded on the game state being **0** -- the very
+  state `StateEnter0` is entering. So one record holds what state 0 does on
+  entry and what it does when a message arrives while in it.
+  `AM2_StateAction` is in `orig.h` now, so both readers share one layout
+  instead of one of them having a private struct.
+
+- **The base was verified by PROBE, because a base is exactly what an A/B
+  cannot check.** Printing the state and the pointer about to be called gives
+  `over=0 fn=0042E8E0` and `over=1 fn=0042E930`, which are the column-0 entries
+  read straight out of the image. One column late would have printed
+  `0042E910` and `0042E960`, and nothing on screen would have differed.
+
+- **Four names I was about to invent already existed.** I had read the
+  dispatch as a movie mode and was adding `ADDR_MOVIE_MODE`,
+  `ADDR_GET_MOVIE_MODE` and `ADDR_SET_MOVIE_MODE` over
+  `ADDR_GAME_OVER_STATE`, `ADDR_CURRENT_STATE` and `ADDR_SET_GAME_OVER`. The
+  alias ratchet failed the build at 24 against a baseline of 21. **Fourth**
+  time that rule has caught me this session.
+
+- **A plain startup never reaches `StateEnter0`.** The game BEGINS in state 0
+  rather than transitioning into it, so `g_stateEntered` is never set for it
+  there and the counter is blind besides. `ab.sh state3` is what reaches it,
+  on the way back out of the movie state, and it covers two game-over states
+  -- a second reason that configuration earns its keep.
+
+- **`ClearBothSurfaces`** (`0x0041ADB0`) clears the primary and the back
+  buffer to the background colour. The colour is a BYTE zero-extended to 32
+  bits on both calls, so reading it as an `int32` would agree only while the
+  byte above it happened to be zero.
 
 - **`StateEnter3` is reconstructed, and finding out how to exercise it was
   most of the work.** `0x004266F0` is the state 3 entry action, and state 3 is
