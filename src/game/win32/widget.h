@@ -1440,4 +1440,8 @@ int widget_install(void);
 }
 #endif
 
+/* Original: 0x004143A0. Paint the three top-level HUD widgets to the back
+ * buffer through vtable slot 1. */
+void __cdecl HudPaint(void);
+
 #endif /* AM2_WIDGET_H */

@@ -23,6 +23,7 @@
 #include "../../inject/patch.h"
 #include "startgame.h"
 #include "../../inject/restore.h"
+#include "mapdraw.h"   /* SetDrawTarget -- reconstructed */
 
 #include <stdint.h>
 #include <stddef.h>
@@ -5650,6 +5651,47 @@ uint8_t __cdecl MpNamePaper(int32_t row)
                : *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
 }
 
+#define g_hudWidgetA (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
+#define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
+#define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
+
+/* 0x004143A0, two callers, one of them the per-frame path. Point the drawing
+ * at the back buffer and paint the three top-level HUD widgets through vtable
+ * slot 1, each with its own absolute rectangle.
+ *
+ * The third is null-checked and the first two are not, which is the same
+ * asymmetry 0x00414370 has for the update pass -- so it is the arrangement of
+ * the HUD rather than a slip in one of them.
+ *
+ * A note on the original's stack, because it looks wrong and is not, and
+ * because a previous session left this function alone over exactly that. The
+ * first of the three does `sub esp, 0xc` and then writes SIXTEEN bytes of
+ * rectangle. That reads as a four-byte overrun and an unbalanced epilogue --
+ * until you notice that SetDrawTarget's pushed argument is never cleaned up.
+ * The stale dword is still sitting there, the compiler counts it as the last
+ * quarter of the struct, and the callee pops all sixteen. It balances exactly.
+ * The other two reserve the full 0x10 because by then there is nothing stale
+ * to reuse. None of that survives into C, where the argument is a value and
+ * the accounting is the compiler's -- it is written down so the next reader
+ * does not stop where I stopped.
+ *
+ * Measured at 19,177 calls against ComposeFrame's 19,257, and the HUD it
+ * produces is correct by eye: minimap, the two panels, the portrait and its
+ * stats, and the command bar all present. */
+void __cdecl HudPaint(void)
+{
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER);
+
+    ((AM2_WidgetPaintFn *)g_hudWidgetA->vtable)[WIDGET_VSLOT_PAINT](
+        g_hudWidgetA, g_hudWidgetA->rect);
+    ((AM2_WidgetPaintFn *)g_hudWidgetB->vtable)[WIDGET_VSLOT_PAINT](
+        g_hudWidgetB, g_hudWidgetB->rect);
+
+    if (g_hudWidgetC)
+        ((AM2_WidgetPaintFn *)g_hudWidgetC->vtable)[WIDGET_VSLOT_PAINT](
+            g_hudWidgetC, g_hudWidgetC->rect);
+}
+
 /* 0x00432D40, thiscall, two instructions: the row name's ink setter. It is a
  * separate function rather than a store at the call site because the caller
  * computes the colour with MpNameInk and hands it straight over. */
@@ -5661,6 +5703,9 @@ void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink)
 int widget_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_HUD_PAINT, (const void *)HudPaint,
+                        "HudPaint", 0);
 
     rc |= patch_replace(ADDR_WIDGET_PAINT, (const void *)WidgetPaint,
                         "WidgetPaint", 6);

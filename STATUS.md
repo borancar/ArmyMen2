@@ -3050,13 +3050,23 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`0x004143A0` was DECLINED and the reason is a puzzle, not a size.** It paints
-three HUD panels through vtable slot 1, pushing a 16-byte rectangle by value --
-but the first of the three reserves only 12 bytes with `sub esp, 0xc` and then
-writes 16. By my reading that leaves the epilogue's `pop edi; pop esi`
-unbalanced, which cannot be right for a function the game calls every frame. I
-do not yet understand it, and reconstructing what I cannot explain is how a
-confident wrong comment gets written. Left for a session that can settle it.
+**`HudPaint` (`0x004143A0`) -- the function declined last commit, now settled
+and reconstructed.** 19,177 calls against `ComposeFrame`'s 19,257, and the HUD
+it produces is correct by eye: minimap, both panels, the portrait and its
+stats, the command bar.
+
+**The stack puzzle was my misreading and the answer is one line above it.** The
+first of the three paint calls does `sub esp, 0xc` and then writes SIXTEEN
+bytes of rectangle, which looks like a four-byte overrun leaving the epilogue
+unbalanced. It is not: `SetDrawTarget`'s pushed argument is **never cleaned
+up**. That stale dword is still on the stack, the compiler counts it as the
+last quarter of the struct, and the callee pops all sixteen. It balances
+exactly, and the other two reserve the full `0x10` because by then there is
+nothing stale left to reuse.
+
+Worth having stopped for it. Declining to reconstruct what I could not explain
+cost one commit; writing it from the wrong reading would have cost a confident
+comment asserting an overrun that is not there.
 
 **`FrameClockStep` (`0x00424B20`) is THE GAME CLOCK****`FrameClockStep` (`0x00424B20`) is THE GAME CLOCK** -- 19,803 calls against
 `ComposeFrame`'s 19,977. It measures the frame, clamps it to 66 ms, adds it to

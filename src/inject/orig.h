@@ -327,6 +327,15 @@
  * It is what the lock target starts out pointing at, and PresentFrame is what
  * blits it to the primary. It is the back buffer, and it is named that now. */
 #define ADDR_BACK_BUFFER   0x004FE08Cu  /* IDirectDrawSurface *, the back buffer */
+/* The three top-level HUD widgets, in the order they are painted and updated.
+ * The third is optional -- both 0x004143A0 and 0x00414370 test it for null and
+ * the first two they do not. Named for their position in that sequence; what
+ * each one IS has not been established here. */
+#define ADDR_HUD_WIDGET_A  0x004FCF00u  /* AM2_Widget * */
+#define ADDR_HUD_WIDGET_B  0x004FCF54u
+#define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
+/* 0x004143A0, two callers. Paint all three through vtable slot 1. */
+#define ADDR_HUD_PAINT     0x004143A0u  /* void(void) */
 /* One record per font, 524 bytes apart -- BuildFont computes the stride as
  * ((f<<6)+f)*2+f then <<2, which is 131 dwords and not the 133 this said
  * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
