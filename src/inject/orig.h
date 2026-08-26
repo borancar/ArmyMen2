@@ -88,6 +88,9 @@
 #define ADDR_INPUT_SUPPRESS     0x00511E44u /* int32_t */
 /* What the info action does in a network game instead of pausing. */
 #define ADDR_SHOW_INFO_MP       0x00462A40u /* void(void) */
+/* The flag that function toggles -- an INFO OVERLAY the map painter tests at
+ * two sites. It is the whole of the function's effect. */
+#define ADDR_INFO_OVERLAY_ON    0x0048C7D8u /* int32_t, 0 or 1 */
 #define AM2_SCROLL_MARGIN       3           /* pixels from the edge */
 #define AM2_STATE_ESCAPE_MENU   0x17
 #define AM2_SUBSTATE_INFO_BITMAP 0x16
@@ -1134,7 +1137,15 @@
 #define ADDR_STR_UNPAUSE_GAME    0x0048526Cu  /* "UnPauseGame: %x (reset: %x)\n" */
 #define COMM_DROP_EVENT_MASK     0x1E78F0u    /* what the teardown clears */
 #define ADDR_STR_RELEASING_COMM  0x00475434u  /* "Releasing Comm Connection \n" */
-#define ADDR_COMM_UNKNOWN_4F48E0 0x004F48E0u  /* cleared with the connection */
+/* The once-only latch on the NO BUFFERS report. CommNoBuffers logs and posts
+ * WM_CLOSE the FIRST time buffers run out and does nothing on every call after,
+ * so this is what stops a failing session spraying the log while it comes
+ * down. Cleared with the connection, which is what re-arms it.
+ *
+ * It was ADDR_COMM_UNKNOWN_4F48E0 until CommNoBuffers was read. Renamed rather
+ * than aliased, so nothing goes on carrying the old spelling. */
+#define ADDR_COMM_NO_BUFFERS_LATCH 0x004F48E0u  /* int32_t */
+#define ADDR_STR_NO_BUFFERS      0x00473D34u  /* "COMM ERROR: NO BUFFERS\n" */
 #define ADDR_COMM_CONNECTED      0x0040E660u  /* thiscall int32(this) */
 #define COMM_OFF_CAPS            0x42Cu   /* DPCAPS, filled by GetCaps */
 #define COMM_OFF_BUFFER_MAX      0x410u   /* set to 0x400 by CommConstruct */

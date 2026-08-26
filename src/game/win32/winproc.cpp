@@ -174,7 +174,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 
 #define orig_log            (*(am2_log_fn)ADDR_LOG)
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
-#define orig_no_buffers     (*(am2_void_fn2)ADDR_COMM_NO_BUFFERS)
 #define orig_remove_player_rec (*(am2_comm_id_fn)ADDR_COMM_REMOVE_PLAYER)
 #define orig_player_left    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_LEFT)
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
@@ -455,7 +454,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         return 1;
 
     case AM2_WM_NO_BUFFERS:
-        orig_no_buffers();
+        CommNoBuffers();
         return 1;
 
     case AM2_WM_PLAYER_GONE:

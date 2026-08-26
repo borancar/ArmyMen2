@@ -69,6 +69,10 @@ void __cdecl SetGameOver(int32_t state);
 int32_t __cdecl GameOverState(void);
 void __cdecl StateLeaveAlias(void);
 
+/* 0x00462A40. Toggles the info overlay -- what the info action does in a
+ * network game, where pausing is not allowed. Strictly 0 or 1. */
+void __cdecl ShowInfoMp(void);
+
 void gameproc_install(void);
 
 #ifdef __cplusplus

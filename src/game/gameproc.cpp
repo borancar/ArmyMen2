@@ -209,6 +209,35 @@ void __cdecl CommitState(void)
     g_stateEntered = 1;
 }
 
+/* 0x00462A40, one caller -- MissionInput, when the info action is pressed in a
+ * NETWORK game. Toggles the info overlay and nothing else: one player must not
+ * be able to stop everybody else's game, so where a solo mission pauses, this
+ * flips a display flag instead.
+ *
+ * The original writes the flag through `sete`, so the stored value is strictly
+ * 0 or 1 rather than the negation of whatever was there. That matters because
+ * the two sites in the map painter that read it are testing it, not counting
+ * it -- but a reconstruction that wrote `!x` on an int would agree only while
+ * the flag stayed in {0,1}, and this is the only writer that keeps it there.
+ *
+ * VERIFIED BY READING. Its only caller is ours, so the counter is 0 by
+ * construction and blindspots.py lists it -- and the branch that reaches it
+ * needs a network game, which this machine cannot host.
+ *
+ * Forcing it by poking ADDR_NET_GAME to 1 in a live solo mission does not
+ * work, and the reason is recorded so nobody tries it twice: the process dies
+ * within seconds. That is NOT this reconstruction. The identical poke under
+ * AM2_NOPATCH=1 kills the original in the same place, because the flag steers
+ * the frame path into the paint-object branch of a comm session that does not
+ * exist. An unexplained crash beside new code is worth ten minutes to
+ * attribute rather than leaving as a suspicion. */
+void __cdecl ShowInfoMp(void)
+{
+    int32_t *on = (int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON;
+
+    *on = (*on == 0) ? 1 : 0;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
@@ -228,4 +257,5 @@ void gameproc_install(void)
                   "GameOverState", 0);
     patch_replace(ADDR_STATE_LEAVE_ALIAS, (const void *)StateLeaveAlias,
                   "StateLeaveAlias", 0);
+    patch_replace(ADDR_SHOW_INFO_MP, (const void *)ShowInfoMp, "ShowInfoMp", 0);
 }

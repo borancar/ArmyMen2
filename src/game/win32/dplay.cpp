@@ -723,7 +723,7 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
  * Returns 0 always, which every caller ignores. */
 typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
 #define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
-#define g_commUnknown4F48E0    (*(int32_t *)(uintptr_t)ADDR_COMM_UNKNOWN_4F48E0)
+#define g_noBuffersLatch       (*(int32_t *)(uintptr_t)ADDR_COMM_NO_BUFFERS_LATCH)
 
 int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
 {
@@ -789,7 +789,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
 
     UnPauseGame(COMM_DROP_EVENT_MASK);
     g_defaultOwner      = 0;
-    g_commUnknown4F48E0 = 0;
+    g_noBuffersLatch = 0;
     return 0;
 }
 
@@ -1595,6 +1595,36 @@ void __attribute__((thiscall)) CommReportStats(void *comm)
     }
 }
 
+/* 0x00403280, two callers -- WndProc's AM2_WM_NO_BUFFERS handler and the frame
+ * path. The end of the line for a session that has run out of send buffers: it
+ * reports once and asks the window to close.
+ *
+ * The whole function is behind a LATCH, and that is its point rather than a
+ * detail. Buffers run out repeatedly once they run out at all, so without
+ * ADDR_COMM_NO_BUFFERS_LATCH the log would fill with the same line while the
+ * game came down, and a second WM_CLOSE would be posted for every failed send.
+ * The latch is cleared with the connection, which re-arms it for the next
+ * session.
+ *
+ * The message posted is WM_CLOSE -- 0x10, the ordinary window one -- and NOT
+ * AM2_WM_NO_BUFFERS, which is what got this function called. Worth being
+ * explicit about, because the two sit one line apart in the handler that
+ * dispatches here and reading them as the same message would turn a quit into
+ * a loop.
+ *
+ * VERIFIED BY READING. Reaching it needs the send buffers to actually run out,
+ * which needs a live session with a peer -- the same wall CommReportStats is
+ * behind. Both call sites are ours, so it is exercised the moment one is. */
+void __cdecl CommNoBuffers(void)
+{
+    if (g_noBuffersLatch)
+        return;
+
+    g_noBuffersLatch = 1;
+    orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_NO_BUFFERS));
+    PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, WM_CLOSE, 0, 0);
+}
+
 /* 0x0040F380, thiscall, three callers. Clears the traffic statistics and
  * restarts the window they are measured over. Nothing here affects a packet;
  * it is all bookkeeping the report below prints.
@@ -1743,6 +1773,8 @@ int dplay_install(void)
                         "CommResetStats", 3);
     rc |= patch_replace(ADDR_COMM_REPORT_STATS, (const void *)CommReportStats,
                         "CommReportStats", 3);
+    rc |= patch_replace(ADDR_COMM_NO_BUFFERS, (const void *)CommNoBuffers,
+                        "CommNoBuffers", 2);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;

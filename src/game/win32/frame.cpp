@@ -29,6 +29,7 @@
 #include "widget.h"      /* HudUpdate, HudPaint */
 #include "mapdraw.h"     /* ViewUpdate */
 #include "../item.h"     /* ObjFrameSweep and the per-frame steps */
+#include "dplay.h"       /* CommNoBuffers */
 
 /* ---- what stays in the original image --------------------------------- */
 
@@ -57,7 +58,6 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 #define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 #define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
-#define orig_show_info_mp    ((AM2_VoidFn0b)(uintptr_t)ADDR_SHOW_INFO_MP)
 #define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
 #define orig_event_flag8     ((AM2_EventFlag8Fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)
 
@@ -120,7 +120,7 @@ void __cdecl MissionInput(void)
             LatchKeyState();
         }
     } else if (orig_action_released(AM2_ACTION_SHOW_INFO)) {
-        orig_show_info_mp();
+        ShowInfoMp();
     }
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER)
@@ -397,7 +397,7 @@ void __cdecl FramePost(void)
 
     if (MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
         < AM2_COMM_MIN_BUFFERS)
-        call0(ADDR_COMM_NO_BUFFERS);
+        CommNoBuffers();
 }
 
 /* 0x004266B0. State 0 -- the intro. Leaving wins over entering, and the entry

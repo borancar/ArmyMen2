@@ -175,6 +175,10 @@ void __attribute__((thiscall)) CommSessionOver(void *comm);
 /* 0x0040F380, thiscall. Clears the four 30-sample traffic rings and the six
  * bandwidth counters, and restarts the window they are measured over. The two
  * TIME rings are stamped with the current tick, not zeroed. */
+/* 0x00403280. Reports "COMM ERROR: NO BUFFERS" once and posts WM_CLOSE. The
+ * latch is the point: buffers run out repeatedly once they run out at all. */
+void __cdecl CommNoBuffers(void);
+
 void __attribute__((thiscall)) CommResetStats(void *comm);
 
 /* 0x0040F320, six callers, sixteen bytes: a thiscall that pushes its one
