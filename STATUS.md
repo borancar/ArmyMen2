@@ -2916,10 +2916,14 @@ The three handlers need none of that and can go first.
 inverse of the already-reconstructed `TakeOffMap` -- and then sets bit 1 on
 every row, which is what makes `ADDR_ROW_UPDATE` REMOVE rather than re-link.
 An object going back onto the map unregistering its own rows does not read
-right, and the answer is in one of three unread places: the row's bit 0,
-`ADDR_ROW_UNREGISTER_ALL`, or `0x0041DD90`. Read those before writing
-`0x00429650`, and re-read `TakeOffMap`'s own "unregister" comment against the
-answer -- by this reading it re-links.
+right. All three candidates are READ now and none dissolves it -- 
+`ADDR_ROW_UNREGISTER_ALL` is correctly named, `ObjFlagBit0` is `row->flags & 1`,
+and `0x0041DD90` is the dirty-rectangle collector and touches no flag. So the
+branch stands, and the pair are exact opposites whose object-level names
+contradict them. **The next move is the OTHER callers of `OBJ_FLAG_ON_MAP` and
+`OBJ_FLAG_OFF_MAP`** -- whoever TESTS them says which way round they are,
+exactly as `TakeNearbyOffMap`'s guard settled that `0x0800` is not invented.
+Not more of this pair; they have said all they can.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and

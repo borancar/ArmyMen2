@@ -4631,10 +4631,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * But 0x00429650 also sets bit 1 on every row before calling ADDR_ROW_UPDATE,
  * and bit 1 is precisely what makes that function REMOVE rather than re-link.
  * An object being put back on the map removing its own rows does not read
- * right. Three things could explain it and only reading settles which: the
- * row's bit 0, which ADDR_ROW_UPDATE tests first and which sends it to the
- * unregister regardless; ADDR_ROW_UNREGISTER_ALL, which is unread; or
- * 0x0041DD90, called just before the branch and also unread. Do those first. */
+ * right. All three candidates have now been READ and none of them dissolves
+ * it; what they do is make it exact.
+ *
+ *   ADDR_ROW_UNREGISTER_ALL is correctly named -- it walks the row's cell
+ *   entries, unlinks each from its cell list and marks it -1.
+ *   ObjFlagBit0 is `row->flags & 1`, and a clear bit 0 routes ADDR_ROW_UPDATE
+ *   straight to that removal.
+ *   0x0041DD90 is the dirty-rectangle collector -- IntersectRect into a
+ *   500-entry list with an overflow flag -- and touches no row flag at all.
+ *
+ * So ADDR_ROW_UPDATE's branch stands as read: bit 1 SET removes, bit 1 CLEAR
+ * re-links. And the two callers are opposites of each other in a way their
+ * object-level names contradict:
+ *
+ *   TakeOffMap        sets OBJ_FLAG_OFF_MAP, and CLEARS row bit 1 -> re-links
+ *   0x00429650        clears it and raises ON_MAP, and SETS bit 1 -> removes
+ *
+ * Either OBJ_FLAG_ON_MAP and OBJ_FLAG_OFF_MAP are swapped and TakeOffMap is
+ * really the put-on, or "off the map" means something other than "rows
+ * unregistered" -- a request bit rather than a state bit, which the
+ * TakeNearbyOffMap guard and its return-at stamp would also fit. Settling it
+ * needs the OTHER callers of both flags, not more of this pair. Note
+ * air.cpp's TakeOffMap comment says "unregistering" for the clear-bit-1 path,
+ * which by this reading it does not do. */
 #define OBJ_FLAG_ON_MAP        0x0200u
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
