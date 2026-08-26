@@ -3035,7 +3035,26 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`TriggerItemDestroyed` (`0x00427FD0`) and `DeselectUnit` (`0x00427C80`) are
+**`ObjEventMask` (`0x00427D40`, fifteen callers) is reconstructed** -- the top
+bit always, one more for the owner's ARMY, then overlapping bits per type
+property. The six type tests are independent `if`s and their bits deliberately
+overlap, so an ordinary type 2 accumulates two of them; collapsing that into a
+switch would change the answer. Its counter reads 1 from an original caller on
+top of six calls our own notifiers make that the counter cannot see.
+
+**And a claim from last commit is now measured rather than inferred.** I wrote
+that the death sequence runs "since 1000 is lethal" -- an inference, and the
+kind this project is supposed to distrust, especially with a
+"DamageTrooper: droping armor" message hinting that armour absorbs. A probe on
+`TriggerItemDestroyed` settles it: six calls, every one a type 2 already at
+zero health. The inference was right, and it is now a measurement.
+
+The same probe explains `DeselectUnit=0` exactly. The dying troopers' flags
+read 0 and 0x800 and never 0x400, so none of them was the selected unit and
+that arm is simply not reached -- rather than the function being broken or the
+death path not running.
+
+**`TriggerItemDestroyed` (`0x00427FD0`) and `DeselectUnit` (`0x00427C80`) are**`TriggerItemDestroyed` (`0x00427FD0`) and `DeselectUnit` (`0x00427C80`) are
 reconstructed**, which takes the death sequence to three of its five steps.
 The first is event kind 4 and the third member of the 4/5/6 notifier family;
 the second is the exact counterpart of `SelectUnit` and lives beside it,

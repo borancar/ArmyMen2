@@ -913,10 +913,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
 
-typedef int32_t (__cdecl *AM2_ObjEventMaskFn)(const void *obj);
-#define orig_obj_event_mask \
-    ((AM2_ObjEventMaskFn)(uintptr_t)ADDR_OBJ_EVENT_MASK)
-
 /* 0x00427E10, and its only two call sites are inside DamageObject. Raise event
  * kind 5 -- damage -- for the object, and for the attacker as well when there
  * is one.
@@ -946,10 +942,10 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
         EventNotify(AM2_EVENT_DAMAGED,
                     *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
                     ((const AM2_Object *)obj)->uid,
-                    orig_obj_event_mask(obj),
+                    ObjEventMask((const AM2_Object *)obj),
                     *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
                     ((const AM2_Object *)attacker)->uid,
-                    orig_obj_event_mask(attacker),
+                    ObjEventMask((const AM2_Object *)attacker),
                     0, 0, 0);
         return;
     }
@@ -957,7 +953,7 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
     EventNotify(AM2_EVENT_DAMAGED,
                 *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
                 ((const AM2_Object *)obj)->uid,
-                orig_obj_event_mask(obj),
+                ObjEventMask((const AM2_Object *)obj),
                 0, 0, 0, 0, 0, 0);
 }
 
@@ -976,7 +972,16 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
  *
  * The log is gated on the comm object's COMM_OFF_VERBOSE, so it costs nothing
  * in an ordinary run, and it prints the attacker's uid as 0 when there is no
- * attacker rather than skipping the line. Note what that gate means for
+ * attacker rather than skipping the line.
+ *
+ * Measured: this runs SIX times in a Boot Camp mission, every one a type 2
+ * with health already at 0. That confirms by probe what the previous commit
+ * had only inferred from "1000 damage is lethal" -- the death path really is
+ * reached, and DamageObject's per-type handler really does take these troopers
+ * to zero. Their flags read 0 and 0x800 and never 0x400, which is why
+ * DeselectUnit is not reached: none of them was the selected unit.
+ *
+ * Note what that gate means for
  * checking: an invented message here would NOT have failed the A/B, because
  * the line never prints on any configuration the suite drives. A wrong string
  * behind a debug flag is invisible -- which is the argument for taking the
@@ -996,10 +1001,10 @@ static void __cdecl TriggerItemDestroyed(void *obj, void *attacker)
         EventNotify(AM2_EVENT_KILLED,
                     *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
                     ((const AM2_Object *)obj)->uid,
-                    orig_obj_event_mask(obj),
+                    ObjEventMask((const AM2_Object *)obj),
                     *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
                     ((const AM2_Object *)attacker)->uid,
-                    orig_obj_event_mask(attacker),
+                    ObjEventMask((const AM2_Object *)attacker),
                     0, 0, 0);
         return;
     }
@@ -1007,7 +1012,7 @@ static void __cdecl TriggerItemDestroyed(void *obj, void *attacker)
     EventNotify(AM2_EVENT_KILLED,
                 *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
                 ((const AM2_Object *)obj)->uid,
-                orig_obj_event_mask(obj),
+                ObjEventMask((const AM2_Object *)obj),
                 0, 0, 0, 0, 0, 0);
 }
 

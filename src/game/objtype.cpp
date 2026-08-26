@@ -16,6 +16,7 @@
 
 #include "objtype.h"
 #include "objtable.h"
+#include "misc.h"          /* CommArmyOfSlot -- reconstructed */
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -97,9 +98,66 @@ AM2_Object *__cdecl LookupType3ByUID(uint32_t uid)
     return ObjIsType3(obj) ? obj : 0;
 }
 
+#define kEventComm (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
+
+/* 0x00427D40, fifteen callers. The event MASK for an object: the top bit
+ * always, one more bit for the owner's ARMY, and then a bit per type property.
+ * event.h calls EventNotify's third and sixth parameters masks, and this is
+ * what fills them.
+ *
+ * Note the army comes out of CommArmyOfSlot applied to the object's owner
+ * byte, so that byte is a SLOT here and the switch is over the army it maps
+ * to. Anything above 3 -- including the slot-4 answer that function is
+ * documented to give -- leaves the mask with only its top bit, which is the
+ * default rather than a special case.
+ *
+ * The six type tests are independent `if`s and NOT a chain, and their bits
+ * deliberately overlap: 0x01C00000 for a type 2 carrying field 548, then
+ * 0x01400000 for any type 2, then 0x01000000 for any of types 2, 3 and 8. So
+ * an ordinary type 2 accumulates two of them and a type 3 accumulates
+ * 0x01000000 | 0x00200000. Reproduced as written; collapsing them into a
+ * switch would change the answer.
+ *
+ * Exercised: its counter reads 1 on a Boot Camp mission, from one of the
+ * thirteen callers that are still the original's, on top of six more calls
+ * from our own notifiers that the counter cannot see. All six of those are
+ * type 2, so they take the 0x01400000 and 0x01000000 bits and no other; the
+ * item, type 4 and type 3 bits are unexercised here. */
+int32_t __cdecl ObjEventMask(const AM2_Object *obj)
+{
+    int32_t mask = (int32_t)0x80000000;
+
+    switch (CommArmyOfSlot(kEventComm,
+                           *(const int8_t *)((const uint8_t *)obj + 0x10))) {
+    case 0:  mask = (int32_t)0xC0000000; break;
+    case 1:  mask = (int32_t)0xA0000000; break;
+    case 2:  mask = (int32_t)0x90000000; break;
+    case 3:  mask = (int32_t)0x88000000; break;
+    default: break;
+    }
+
+    if (ObjIsItem(obj))
+        mask |= 0x04000000;
+    if (ObjIsType4(obj))
+        mask |= 0x02000000;
+    if (ObjType2Field548(obj))
+        mask |= 0x01C00000;
+    if (ObjIsType2(obj))
+        mask |= 0x01400000;
+    if (ObjIsTypeIn238(obj))
+        mask |= 0x01000000;
+    if (ObjIsType3(obj))
+        mask |= 0x00200000;
+
+    return mask;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_OBJ_EVENT_MASK, (const void *)ObjEventMask,
+                        "ObjEventMask", 1);
 
     rc |= patch_replace(ADDR_OBJ_IS_ITEM, (const void *)ObjIsItem, "ObjIsItem", 1);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);

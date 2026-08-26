@@ -52,6 +52,11 @@ int32_t __cdecl ObjIsType4(const AM2_Object *obj);
  * and so does any other type, so the field is only meaningful on type 2. */
 uint32_t __cdecl ObjType2Field548(const AM2_Object *obj);
 
+/* Original: 0x00427D40, fifteen callers. The event mask for an object -- top
+ * bit, a bit for its owner's army, and overlapping bits per type property.
+ * What EventNotify takes as maskA and maskB. */
+int32_t __cdecl ObjEventMask(const AM2_Object *obj);
+
 /* Original: 0x00457420. Types 2, 3 and 8 -- the owned non-item types. */
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj);
 
