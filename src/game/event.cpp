@@ -949,7 +949,6 @@ typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
 typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
                                                              int32_t i);
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
-#define orig_point_action_a (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_A))
 #define orig_point_action_c (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_C))
 typedef void (__cdecl *AM2_ByRefAFn)(int32_t *slot, int32_t b, int32_t c);
 typedef void (__cdecl *AM2_ByRefBFn)(int32_t *slot, int32_t b, int32_t c,
@@ -1146,7 +1145,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
             point = (uint32_t)x | ((uint32_t)y << 16);
         }
 
-        orig_point_action_a(obj, point);
+        PointActionA(obj, point);
         i++;
     }
 }
@@ -1193,7 +1192,7 @@ void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative)
     if (ObjIsType2((const AM2_Object *)obj))
         *(int32_t *)(obj + OBJ_OFF_FIELD_540) = 0;
 
-    orig_point_action_a(obj, point);
+    PointActionA(obj, point);
 }
 
 void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)

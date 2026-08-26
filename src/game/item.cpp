@@ -24,6 +24,7 @@
 #include "../inject/patch.h"
 #include "maprow.h"   /* RowUpdate -- reconstructed */
 #include "script.h"   /* AM2_Pad */
+#include "map.h"      /* TileOfPoint */
 
 /* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
  * by including that header because this module is on the flat side of the
@@ -1950,6 +1951,78 @@ void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
     }
 }
 
+typedef void (__cdecl *AM2_AttachFn)(void *subject, void *target);
+typedef void (__cdecl *AM2_ResolvePtFn)(void *obj, int32_t tile, uint32_t *pt);
+#define orig_obj_attach_to  ((AM2_AttachFn)(uintptr_t)ADDR_OBJ_ATTACH_TO)
+#define orig_resolve_point  ((AM2_ResolvePtFn)(uintptr_t)ADDR_RESOLVE_POINT_FOR_TILE)
+
+/* 0x004582F0, nine callers. Points an object at a place: detach it from
+ * whatever it was attached to, clear its script id, resolve the tile the
+ * point falls in back to a point, and store that.
+ *
+ * The type guard is the familiar 2/3/8 set, spelt as a RANGE plus an equality
+ * -- `< 2` refuse, `<= 3` accept, `!= 8` refuse -- so it is two comparisons
+ * and not the ObjIsTypeIn238 call other sites use. Reproduced as the original
+ * spells it rather than routed through that predicate: they agree today, and
+ * an inlined test that stops agreeing is a fact about this function.
+ *
+ * THE POINT MAKES A ROUND TRIP. It goes to TileOfPoint by VALUE to get a tile,
+ * then the caller's own argument slot is passed to
+ * ADDR_RESOLVE_POINT_FOR_TILE by ADDRESS, and what comes back out of that slot
+ * is what gets stored -- not the point that came in. So a caller's point is
+ * snapped to whatever that resolver decides, and reading the store as "save
+ * the argument" would be wrong whenever the two differ.
+ *
+ * ADDR_OBJ_ATTACH_TO is given a NULL target, which is the detach case of a
+ * two-argument attach rather than a function of its own.
+ *
+ * The tail is two small writes: a flag set from whether OBJ_OFF_FIELD_F4 is
+ * positive -- `setg`, so strictly greater, and stored as 0 or 1 rather than
+ * the value -- and an AI mode of 3 demoted to 1, which is the only mode this
+ * touches.
+ *
+ * VERIFIED BY READING, and this one is NOT a blind counter: blindspots.py
+ * does not list it, so its 0 through a full Boot Camp mission means the code
+ * did not run. TileOfPoint, which it calls, reads 2,312,945 on the same drive,
+ * so the module around it is thoroughly live.
+ *
+ * Two attempts to reach it are recorded so they are not repeated: clicking on
+ * the map, and selecting then right-clicking a destination at three places.
+ * Both leave it at 0. Nine callers and none of them fires here, so whatever
+ * orders an object to a point is something this drive does not do. Checked on
+ * the CAMPAIGN map as well, which is a different map with different scripted
+ * content: also 0. So this is not a Boot Camp peculiarity. */
+void __cdecl PointActionA(void *obj, uint32_t point)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  type;
+    int32_t  tile;
+
+    if (!obj)
+        return;
+
+    type = *(const int32_t *)o;
+    if (type < 2)
+        return;
+    if (type > 3 && type != 8)
+        return;
+
+    orig_obj_attach_to(obj, 0);
+
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID) = 0;
+    *(uint16_t *)(o + OBJ_OFF_FIELD_B2)  = 0;
+
+    tile = TileOfPoint(point);
+    orig_resolve_point(obj, tile, &point);
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_EC) =
+        (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0) ? 1 : 0;
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) = point;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_E4) == 3)
+        *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 1;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -1958,6 +2031,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_POINT_ACTION_A, (const void *)PointActionA,
+                  "PointActionA", 9);
     patch_replace(ADDR_DAMAGE_ROACH, (const void *)DamageRoach,
                   "DamageRoach", 1);
     patch_replace(ADDR_OBJ_FRAME_STEP, (const void *)ObjFrameStep,

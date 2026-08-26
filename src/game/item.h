@@ -224,6 +224,11 @@ void __cdecl Type2ActionB(void *obj);
  * 1 and 4 share one; type 2 is the only arm with no destroyed check. */
 void __cdecl ObjFrameStep(void *obj);
 
+/* 0x004582F0. Points an object at a place: detach, clear the script id, and
+ * store the point ADDR_RESOLVE_POINT_FOR_TILE snaps it to -- NOT the point
+ * passed in. Types 2, 3 and 8 only. */
+void __cdecl PointActionA(void *obj, uint32_t point);
+
 /* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
  * +0x8C is both the guard and the record. `notify` gates a call that runs
  * BEFORE the free. Five callers. */

@@ -3417,6 +3417,27 @@ typedef struct {
  * UpdateObjectScript's body rather than guessed at a call site. */
 #define OBJ_OFF_SCRIPT_ID        0xB0u   /* 1-based index into the table; 0 = none */
 #define OBJ_OFF_SCRIPT_STATE     0xB4u
+/* UNRESOLVED, and recorded rather than renamed. Two functions WRITE a POINT
+ * into this field -- Type2ActionB puts ADDR_ZERO_POINT there and PointActionA
+ * puts the point ADDR_RESOLVE_POINT_FOR_TILE hands back -- while two READ it
+ * as an int32 and compare it against a script value (objscript.cpp's state
+ * compare and event.cpp's testvar). Both cannot be describing the same thing.
+ *
+ * Two independent writers agreeing it is a position is the stronger half, but
+ * the readers are not obviously wrong either, and nothing here settles which.
+ * Left alone until something does; the byte pattern is identical either way,
+ * so no code depends on the answer yet. */
+/* Named structurally: nothing read so far says what any of the three is. The
+ * word at 0xB2 is cleared beside the script id, 0xEC is set to whether 0xF4 is
+ * positive, and 0xE4 is the AI mode OBJ_OFF_FIELD_E4 already names. */
+#define OBJ_OFF_FIELD_B2         0xB2u   /* uint16_t */
+#define OBJ_OFF_FIELD_EC         0xECu   /* int32_t, 0 or 1 */
+#define OBJ_OFF_FIELD_F4         0xF4u   /* int32_t; only its sign is read */
+/* 0x0043A0A0, six callers. Takes an object, a TILE and a point by ADDRESS,
+ * consults ADDR_POINT_OF_TILE and writes a point back through that pointer.
+ * Named for what it does with its arguments; what it is FOR is not
+ * established, and the object argument's role least of all. */
+#define ADDR_RESOLVE_POINT_FOR_TILE 0x0043A0A0u /* void(obj, tile, AM2_Point*) */
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
 /* A second deadline on the same clock, at +0x58, and 0x004355D0 is the only
