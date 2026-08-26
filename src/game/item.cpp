@@ -854,6 +854,101 @@ void __cdecl DestroyObjCommon(void *obj)
  * second one there would be a family alias the ratchet is right to refuse. */
 #define AM2_OBJ_EVENT_NUM_OFF  0x0Cu
 
+#define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+
+typedef void (__cdecl *AM2_DeployTypeFn)(void *obj, int32_t x, int32_t y,
+                                         int32_t resurrect);
+typedef void (__cdecl *AM2_PlaceObjFn)(void *obj, uint32_t where);
+typedef void (__cdecl *AM2_ItemDeployMsgFn)(void *obj, int32_t resurrect);
+#define orig_deploy_trooper ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_TROOPER)
+#define orig_deploy_vehicle ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_VEHICLE)
+#define orig_place_obj      ((AM2_PlaceObjFn)(uintptr_t)ADDR_PLACE_OBJ)
+#define orig_item_deploy_msg \
+    ((AM2_ItemDeployMsgFn)(uintptr_t)ADDR_ITEM_DEPLOY_MSG)
+
+/* 0x00428CA0, seven callers, and it names itself in the resurrection log line.
+ * Put an object into the world at `where`, then tell the other machines.
+ *
+ * `resurrect` turns it into the revive path, and that path is more suspicious
+ * of its caller than anything else here. It logs the uid and health; if the
+ * health is NOT zero it logs a second complaint and then gives up UNLESS the
+ * object is flagged destroyed -- so an item that is alive and not marked dead
+ * is refused, while one whose health survived its destruction is allowed
+ * through and healed to full. Both log lines are the original's text.
+ *
+ * The type dispatch has only two arms and a default. Types 2 and 3 get their
+ * own deployers and are handed the point as two separate int16; everything
+ * else is placed generically with the point still packed, and on the
+ * resurrection path prints "check if resurrect command works with this object
+ * type!" -- a warning the original leaves in and this keeps.
+ *
+ * `suppress` non-zero skips both multiplayer tests, the guard on entry and the
+ * message on the way out, which is the same convention DamageObject uses for
+ * its sixth argument: a machine acting on something it was told about does not
+ * tell anyone back.
+ *
+ * Exercised once per Boot Camp mission, through EvtDeployItem, with
+ * `resurrect` and `suppress` both zero -- so the type dispatch runs and the
+ * multiplayer guards fall through on g_mpSession. The counter is blind, that
+ * caller being ours, but the LOG settles the rest: not one
+ * "DeployItem(resurrection)" line appears in a whole run, which is direct
+ * evidence that the revive path is untaken rather than an inference from the
+ * caller. An absent log line is evidence when the line is unconditional on the
+ * path you are asking about. */
+void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
+                        int32_t suppress)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int16_t  owner =
+        (int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF);
+
+    if (g_mpSession && suppress == 0
+        && !CommMustBroadcast(kItemComm, owner))
+        return;
+
+    if (resurrect) {
+        am2_log("DeployItem(resurrection): uid:%x, health:%d\n",
+                ((const AM2_Object *)obj)->uid,
+                *(const int16_t *)(o + OBJ_OFF_HEALTH));
+
+        if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0) {
+            am2_log("DeployItem(resurrection): Item Health not zero, "
+                    "uid:%x, health:%d\n",
+                    ((const AM2_Object *)obj)->uid,
+                    *(const int16_t *)(o + OBJ_OFF_HEALTH));
+            if (!(o[OBJ_OFF_FLAGS] & OBJ_FLAG_DESTROYED))
+                return;
+        }
+
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+    }
+
+    switch (*(const int32_t *)o) {
+    case 2:
+        orig_deploy_trooper(obj, (int16_t)where, (int16_t)(where >> 16),
+                            resurrect);
+        break;
+    case 3:
+        orig_deploy_vehicle(obj, (int16_t)where, (int16_t)(where >> 16),
+                            resurrect);
+        break;
+    default:
+        orig_place_obj(obj, where);
+        if (resurrect)
+            am2_log("Warning: check if resurrect command works with this "
+                    "object type!\n");
+        break;
+    }
+
+    if (suppress)
+        return;
+    if (!CommMustBroadcast(kItemComm, owner))
+        return;
+
+    orig_item_deploy_msg(obj, resurrect);
+}
+
 /* 0x00427E80, and its only caller is HealObject. Event kind 6 -- healed -- and
  * the last of the three notifiers: identical in shape to NotifyDamaged and
  * TriggerItemDestroyed above, differing only in the literal.
@@ -1006,7 +1101,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
     ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
 
 #define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
-#define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
 
 /* 0x00427E10, and its only two call sites are inside DamageObject. Raise event
@@ -1397,6 +1491,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_DEPLOY_ITEM, (const void *)DeployItem,
+                  "DeployItem", 4);
     patch_replace(ADDR_NOTIFY_HEALED, (const void *)NotifyHealed,
                   "NotifyHealed", 2);
     patch_replace(ADDR_ROW_UNREGISTER_ALL, (const void *)RowUnregisterAll,

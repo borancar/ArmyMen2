@@ -2484,6 +2484,16 @@
  * deploy at; passing 0 there means "where it already is". */
 #define ADDR_EVT_DEPLOY_ITEM     0x0041FE70u  /* void(uint32_t, uint32_t) */
 #define ADDR_DEPLOY_ITEM         0x00428CA0u  /* void(obj, point, int32, int32) */
+/* The two per-type arms ADDR_DEPLOY_ITEM dispatches to, and the message it
+ * sends afterwards. Two of the three name themselves: "DeployTrooper: uid:%x,
+ * pos=(%d,%d)" and "itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d".
+ * The vehicle one does not, and takes its name from the dispatch index in the
+ * same way ADDR_DAMAGE_VEHICLE does -- a method that has now been confirmed
+ * twice by a sibling that does carry a string. */
+#define ADDR_DEPLOY_TROOPER      0x00449250u  /* type 2 */
+#define ADDR_DEPLOY_VEHICLE      0x0045B9F0u  /* type 3 */
+#define ADDR_PLACE_OBJ           0x00429220u  /* everything else; name ours */
+#define ADDR_ITEM_DEPLOY_MSG     0x0042AA50u  /* void(obj, int32 resurrect) */
 /* 0x0041FBE0 and 0x0041FC10 are the same shim twice: uid >= 1000, look it up,
  * and if ObjIsType2 call one function on it -- 0x00448170 for the first and
  * 0x00448220 for the second. Neither callee names itself and object type 2 is

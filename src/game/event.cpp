@@ -810,10 +810,7 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
 
 /* --------------------------------------------- object shims ---- */
 
-typedef void (__cdecl *AM2_DeployItemFn)(void *obj, uint32_t point,
-                                         int32_t a, int32_t b);
 typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
-#define orig_deploy_item     (*(AM2_DeployItemFn)AM2_IMAGE(ADDR_DEPLOY_ITEM))
 #define orig_type2_action_a  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_A))
 #define orig_type2_action_b  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_B))
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
@@ -857,7 +854,7 @@ void __cdecl EvtDeployItem(uint32_t uid, uint32_t where)
     if ((uint16_t)where == 0)
         where = *(const uint32_t *)(obj + OBJ_OFF_POS);
 
-    orig_deploy_item(obj, where, 0, 0);
+    DeployItem(obj, where, 0, 0);
 }
 
 /* 0x0041FBE0 and 0x0041FC10. The same shim twice, differing only in which
@@ -969,7 +966,7 @@ void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
     if ((uint16_t)where == 0)
         where = *(const uint32_t *)(obj + OBJ_OFF_POS);
 
-    orig_deploy_item(obj, where, AM2_DEPLOY_RESURRECT, 0);
+    DeployItem(obj, where, AM2_DEPLOY_RESURRECT, 0);
 }
 
 /* 0x0041F8B0. Apply the point action to every object an army owns.

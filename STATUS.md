@@ -3035,7 +3035,28 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`NotifyHealed` (`0x00427E80`) completes the notifier family** -- kinds 4
+**`DeployItem` (`0x00428CA0`, seven callers) is reconstructed**, and it names
+itself in its own resurrection log. Put an object into the world and tell the
+other machines; `resurrect` takes a revive path that is unusually suspicious of
+its caller -- it logs the uid and health, and if the health is NOT zero it logs
+a second complaint and gives up UNLESS the object is flagged destroyed. So an
+item that is alive and unmarked is refused, while one whose health outlived its
+destruction is healed to full.
+
+**The string sweep paid again**: `0x00449250` is `DeployTrooper` and
+`0x0042AA50` is `itemDeployMessageSend`, both from their own text. The vehicle
+arm carries no string and takes its name from the dispatch index, the same way
+`ADDR_DAMAGE_VEHICLE` did -- a method now confirmed twice by a sibling that
+does carry one.
+
+**An absent log line is evidence.** The counter is blind, `EvtDeployItem` being
+ours, so it says only that the caller ran once. What settles the rest is that
+not one `DeployItem(resurrection)` line appears in a whole run -- direct
+evidence the revive path is untaken, rather than an inference from the caller's
+arguments. That works because the line is unconditional on the path in
+question, which is the condition for reading silence as a measurement.
+
+**`NotifyHealed` (`0x00427E80`) completes the notifier family****`NotifyHealed` (`0x00427E80`) completes the notifier family** -- kinds 4
 killed, 5 damaged, 6 healed, all three now ours and all three the same shape:
 one event for the object, a second party's triple when there is one, and a zero
 delay so none can take `EventNotify`'s delayed path. That they are identical is

@@ -38,6 +38,12 @@ extern "C" {
  * into, marking the region it occupied dirty first. */
 void __cdecl RowUnregisterAll(void *row, void *desc);
 
+/* Original: 0x00428CA0, seven callers. Put an object into the world at
+ * `where` and tell the other machines. `resurrect` takes the revive path,
+ * which refuses an object that is alive and not flagged destroyed. */
+void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
+                        int32_t suppress);
+
 void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
                           uint32_t attackerUid, int32_t extra,
                           int32_t suppress);
