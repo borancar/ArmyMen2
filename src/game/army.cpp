@@ -25,7 +25,7 @@
 /* `type` and `owner` come from objtable.h's AM2_Object; only the two far
  * fields need offsets. OBJ_OFF_OWNER is NOT reused -- orig.h already has that
  * name on 0x04 of a different record. */
-#define OBJ_OFF_MP_ROLE  0x544u   /* 7 is the one value anything tests for */
+/* OBJ_OFF_MP_ROLE now lives in orig.h -- item.cpp needs it too. */
 #define OBJ_OFF_LEADS    0x548u   /* ObjType2Field548 reads the same dword */
 #define OBJ_FLAG_SKIP    0x04u
 #define AM2_ARMY_ALL     4        /* the value that is allied with everybody */

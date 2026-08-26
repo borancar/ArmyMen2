@@ -2532,6 +2532,23 @@
 #define ADDR_SELECTED_COUNT      0x0051230Cu  /* int32_t */
 /* Set by ADDR_DESTROY_OBJ_COMMON; every reader treats it as "already gone". */
 #define OBJ_FLAG_DESTROYED       0x04u
+/* Promoted out of army.cpp, which had it as a local, so item.cpp can use the
+ * same one rather than a second copy that could drift. 7 is the only value
+ * anything compares it against, and army.h records what that means: a type 2
+ * carrying 7 is never friendly in a multiplayer session. NOT the AI mode --
+ * that is +0xE4, per ADDR_EVT_SET_AI_MODE. */
+#define OBJ_OFF_MP_ROLE          0x544u
+#define AM2_MP_ROLE_SEVEN        7
+/* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
+ * the field gates the first delayed event, the flag suppresses the second. */
+#define OBJ_OFF_FIELD_94         0x94u
+#define OBJ_FLAG_8000            0x8000u
+/* The two delays that cleanup schedules, in game-clock milliseconds. */
+#define AM2_DEATH_DELAY_SHORT    0xBB8      /* 3,000 ms */
+#define AM2_DEATH_DELAY_LONG     0x493E0    /* 300,000 ms */
+/* The death message: 16 bytes, type 0x23. */
+#define AM2_MSG_DEATH            0x23
+#define AM2_MSG_DEATH_BYTES      0x10
 #define OBJ_OFF_FLAGS8           8u    /* bit 2 blocks the action above */
 #define OBJ_FLAG8_BLOCKED        4u
 #define OBJ_OFF_COUNT62          0x62u /* int16; must be > 0 */

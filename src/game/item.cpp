@@ -900,8 +900,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_damage_roach     ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_ROACH)
 #define orig_damage_broadcast \
     ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
-#define orig_send_death_message   ((AM2_SendDeathMsgFn)(uintptr_t)ADDR_SEND_DEATH_MESSAGE)
-#define orig_death_cleanup    ((AM2_ObjOnlyFn)(uintptr_t)ADDR_OBJ_DEATH_CLEANUP)
 
 /* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
  * belongs to a different structure, as air.cpp already records. */
@@ -910,6 +908,7 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * orig.h already has OBJ_OFF_BOUNDS on 0x0C for a different structure, and a
  * second one there would be a family alias the ratchet is right to refuse. */
 #define AM2_OBJ_EVENT_NUM_OFF  0x0Cu
+#define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
 
@@ -1014,6 +1013,71 @@ static void __cdecl TriggerItemDestroyed(void *obj, void *attacker)
                 ((const AM2_Object *)obj)->uid,
                 ObjEventMask((const AM2_Object *)obj),
                 0, 0, 0, 0, 0, 0);
+}
+
+/* 0x0042A930, and the name is the original's: "Send Death Message: uid %x,
+ * army %d". A 16-byte type-0x23 packet carrying both uids in their on-wire
+ * form and the damage kind as one byte, then the log line.
+ *
+ * The whole body is behind ADDR_MP_SESSION, so in single player this returns
+ * at its first instruction. Measured: it runs six times in a Boot Camp mission
+ * and does nothing all six, which is the arm the A/B compares. Everything past
+ * the gate is verified by reading. */
+static void __cdecl SendDeathMessage(void *obj, uint32_t attackerUid,
+                                     int32_t kind)
+{
+    uint8_t msg[AM2_MSG_DEATH_BYTES];
+
+    if (!g_mpSession)
+        return;
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_DEATH_BYTES;
+    *(uint16_t *)(msg + 2) = AM2_MSG_DEATH;
+    *(uint32_t *)(msg + 4) = UidOnWire(((const AM2_Object *)obj)->uid);
+    *(uint32_t *)(msg + 8) = UidOnWire(attackerUid);
+    msg[12]                = (uint8_t)kind;
+
+    ArmyMessageSend(msg);
+    am2_log("Send Death Message: uid %x, army %d\n",
+            ((const AM2_Object *)obj)->uid, UidArmy(attackerUid));
+}
+
+/* 0x00428070. The last step of the death sequence, and it is entirely
+ * multiplayer bookkeeping: two DELAYED events, scheduled 3 seconds and 5
+ * minutes out, each gated on a bit of ADDR_GAME_OVER_FLAGS.
+ *
+ * Three tests come first and the third is the one that matters here: types 2,
+ * 3 and 8 only, not one carrying ObjType2Field548, and only in a multiplayer
+ * session. So in single player this returns before doing anything, which is
+ * what all six of its Boot Camp calls do.
+ *
+ * Both events pass a RULE uid as EventNotify's num1 and a delay as its eighth
+ * argument -- which is the path event.h notes drops the masks and the second
+ * pair, and both calls duly pass zeros for those. */
+static void __cdecl ObjDeathCleanup(void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+        return;
+    if (ObjType2Field548((const AM2_Object *)obj))
+        return;
+    if (!g_mpSession)
+        return;
+
+    if (ObjIsType2((const AM2_Object *)obj)
+        && (g_gameOverFlags & 0x200000u)
+        && *(const int32_t *)(o + OBJ_OFF_MP_ROLE) != AM2_MP_ROLE_SEVEN
+        && *(const int32_t *)(o + OBJ_OFF_FIELD_94) == 0)
+        EventNotify(0, *(const int32_t *)(uintptr_t)ADDR_RULE_UID_B,
+                    ((const AM2_Object *)obj)->uid,
+                    0, 0, 0, 0, AM2_DEATH_DELAY_SHORT, 0, 1);
+
+    if ((g_gameOverFlags & 0x80000u)
+        && !(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_8000))
+        EventNotify(0, *(const int32_t *)(uintptr_t)ADDR_RULE_UID_A,
+                    ((const AM2_Object *)obj)->uid,
+                    0, 0, 0, 0, AM2_DEATH_DELAY_LONG, 0, 1);
 }
 
 /* 0x00428140, nineteen callers. Damage one object: dispatch to the handler for
@@ -1127,8 +1191,8 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         return;
 
     TriggerItemDestroyed(obj, attacker);
-    orig_send_death_message(obj, attackerUid, kind);
-    orig_death_cleanup(obj);
+    SendDeathMessage(obj, attackerUid, kind);
+    ObjDeathCleanup(obj);
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED))
         return;
@@ -1236,6 +1300,10 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_SEND_DEATH_MESSAGE, (const void *)SendDeathMessage,
+                  "SendDeathMessage", 3);
+    patch_replace(ADDR_OBJ_DEATH_CLEANUP, (const void *)ObjDeathCleanup,
+                  "ObjDeathCleanup", 1);
     patch_replace(ADDR_TRIGGER_ITEM_DESTROYED, (const void *)TriggerItemDestroyed,
                   "TriggerItemDestroyed", 2);
     patch_replace(ADDR_NOTIFY_DAMAGED, (const void *)NotifyDamaged,

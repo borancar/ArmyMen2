@@ -3035,7 +3035,30 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`ObjEventMask` (`0x00427D40`, fifteen callers) is reconstructed** -- the top
+**The death sequence is complete: `SendDeathMessage` (`0x0042A930`) and
+`ObjDeathCleanup` (`0x00428070`) finish it.** Both turn out to be entirely
+MULTIPLAYER bookkeeping -- a 16-byte type-0x23 packet in one, and two delayed
+events scheduled 3 seconds and 5 minutes out in the other, each behind a bit of
+`ADDR_GAME_OVER_FLAGS`. Both sit behind `ADDR_MP_SESSION`, so in single player
+they return almost immediately, which is what all six of their Boot Camp calls
+do. That early arm is what the A/B compares; everything past the gate is
+verified by reading, and the source says so.
+
+**Grepping first prevented a wrong reading.** `obj->[0x544] != 7` looked like an
+AI-mode test, because CLAUDE.md records the AI modes as attack 6 and DEFEND 7.
+It is not: `army.cpp` already had that offset as `OBJ_OFF_MP_ROLE` with "7 is
+the one value anything tests for", and the AI mode is at `+0xE4` per
+`ADDR_EVT_SET_AI_MODE`. A plausible connection to a fact already in the file,
+and wrong. The macro is promoted to `orig.h` so both modules share one
+definition rather than drifting apart.
+
+**And the same `const` mistake twice in one session.** `g_gameOverFlags` and
+`g_mpSession` both went in as `const` where the existing definitions are not,
+and `checkglobals` refused both. Matching an existing `g_` spelling means
+matching it EXACTLY, qualifiers included -- the ratchet is not comparing
+addresses, it is comparing expansions.
+
+**`ObjEventMask` (`0x00427D40`, fifteen callers) is reconstructed****`ObjEventMask` (`0x00427D40`, fifteen callers) is reconstructed** -- the top
 bit always, one more for the owner's ARMY, then overlapping bits per type
 property. The six type tests are independent `if`s and their bits deliberately
 overlap, so an ordinary type 2 accumulates two of them; collapsing that into a
