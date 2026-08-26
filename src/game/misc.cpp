@@ -1144,6 +1144,55 @@ int32_t __cdecl ActionKeyPressed(int32_t action)
     return 0;
 }
 
+/* 0x004275B0, four callers. The exact mirror of the function above, and the
+ * only difference is which way the first test goes: PRESSED wants the key down
+ * and changed, RELEASED wants it up and changed. Both bindings are tried, and
+ * either one answering yes is enough.
+ *
+ * That is the `!IsKeyDown && KeyChanged` idiom the in-mission ESCAPE handler
+ * and the widget layer's cancel both use, here over an ACTION rather than a
+ * scancode -- ADDR_KEY_BINDINGS is a pair of scancodes per action, so a player
+ * with two keys bound to one action releases it by letting go of either.
+ *
+ * The original unrolls the two bindings and bounces each scancode through a
+ * stack slot to zero-extend it. Written as the same loop the pressed variant
+ * uses: the memory round-trip is the compiler's, not the function's, and
+ * having the pair differ only in one operator is worth more than matching
+ * instruction for instruction.
+ *
+ * VERIFIED BY DRIVING THE KEY APART, which is the one thing an A/B can never
+ * do here: both sides get the same keystroke and would agree about ignoring
+ * it, so a pressed/released mix-up is invisible to the frame comparison.
+ *
+ * F1 is action 0x14 and MissionInput is one of the four callers. In a live
+ * mission, with the sub-state read over the control socket:
+ *
+ *   before        0x21   ordinary play
+ *   F1 HELD       0x21   still ordinary play
+ *   F1 RELEASED   0x16   the info bitmap
+ *
+ * `key F1 down` and `key F1 up` separate the two edges; a tap has both and
+ * would not have told the two apart. Tested in the failing direction with the
+ * first test inverted -- i.e. spelled exactly like ActionKeyPressed -- and the
+ * held reading becomes 0x16, so the check discriminates the only thing that
+ * distinguishes this function from its sibling.
+ *
+ * It runs 11,419 times in a Boot Camp mission, so the coverage is real. */
+int32_t __cdecl ActionKeyReleased(int32_t action)
+{
+    int32_t i;
+
+    for (i = 0; i < 2; i++) {
+        uint32_t k = g_keyBindings[action * 2 + i];
+
+        if (g_curKeys[k] & 0x80)
+            continue;
+        if ((g_prevKeys[k] ^ g_curKeys[k]) & 0x80)
+            return 1;
+    }
+    return 0;
+}
+
 /* The game's own atoi. The offline test maps the image as data and cannot
  * call into it, so this goes through AM2_IMAGE like the rest of misc.cpp's
  * seams -- and atoi is stateless, so the two agree anyway. */
@@ -1357,6 +1406,8 @@ int misc_install(void)
                   "ActionKeyDown", 1);
     patch_replace(ADDR_ACTION_KEY_PRESSED, (const void *)ActionKeyPressed,
                   "ActionKeyPressed", 1);
+    patch_replace(ADDR_ACTION_KEY_RELEASED, (const void *)ActionKeyReleased,
+                  "ActionKeyReleased", 4);
     patch_replace(ADDR_COMM_ARMY_OF_SLOT, (const void *)CommArmyOfSlot,
                   "CommArmyOfSlot", 20);
     patch_replace(ADDR_PTR_LIST_PUSH, (const void *)PtrListPush,

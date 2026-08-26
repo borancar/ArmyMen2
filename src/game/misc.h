@@ -633,6 +633,10 @@ int32_t __cdecl ActionKeyDown(int32_t action);
  * scancode 0 and gets nothing. */
 int32_t __cdecl ActionKeyPressed(int32_t action);
 
+/* 0x004275B0. The mirror of the above: true when either bound key for this
+ * action has just come UP. `!down && changed`. */
+int32_t __cdecl ActionKeyReleased(int32_t action);
+
 /* 0x0040F190, 47 callers -- CommSlotForArmy's inverse. Slot 4 answers 4
  * without touching the object, the same convention army 4 has everywhere. */
 int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);

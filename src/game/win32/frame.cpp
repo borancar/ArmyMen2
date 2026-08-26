@@ -51,7 +51,6 @@ typedef int32_t (__cdecl *AM2_ActionKeyFn)(int32_t action);
 typedef void    (__cdecl *AM2_VoidFn0b)(void);
 typedef void   *(__cdecl *AM2_LoadBitmapFn2)(const char *name, int32_t flag);
 typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
-#define orig_action_released ((AM2_ActionKeyFn)(uintptr_t)ADDR_ACTION_KEY_RELEASED)
 /* The camera pair, reached by cast for the same reason mapdraw.cpp does it:
  * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
@@ -102,7 +101,7 @@ void __cdecl MissionInput(void)
     }
 
     if (!g_mpSession) {
-        if (orig_action_released(AM2_ACTION_SHOW_INFO)) {
+        if (ActionKeyReleased(AM2_ACTION_SHOW_INFO)) {
             if (*(const char *)(uintptr_t)ADDR_LEVEL_STR_C) {
                 SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
                 FreeBitmap(&g_currentBitmap);
@@ -119,7 +118,7 @@ void __cdecl MissionInput(void)
                     0, 0, 0, 0, 1, 0, 0);
             LatchKeyState();
         }
-    } else if (orig_action_released(AM2_ACTION_SHOW_INFO)) {
+    } else if (ActionKeyReleased(AM2_ACTION_SHOW_INFO)) {
         ShowInfoMp();
     }
 
