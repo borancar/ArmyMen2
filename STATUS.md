@@ -2920,10 +2920,17 @@ right. All three candidates are READ now and none dissolves it --
 `ADDR_ROW_UNREGISTER_ALL` is correctly named, `ObjFlagBit0` is `row->flags & 1`,
 and `0x0041DD90` is the dirty-rectangle collector and touches no flag. So the
 branch stands, and the pair are exact opposites whose object-level names
-contradict them. **The next move is the OTHER callers of `OBJ_FLAG_ON_MAP` and
-`OBJ_FLAG_OFF_MAP`** -- whoever TESTS them says which way round they are,
-exactly as `TakeNearbyOffMap`'s guard settled that `0x0800` is not invented.
-Not more of this pair; they have said all they can.
+contradict them. **That move worked and the answer is that `OBJ_FLAG_ON_MAP` is inverted.**
+Only two functions test either flag; one is `TakeNearbyOffMap`'s known guard,
+and the other -- `0x00404730` -- drops an attachment target when `0x200` is
+set, alongside zero health and already-destroyed. So `0x200` means HIDDEN, both
+callers become self-consistent, and `TakeOffMap` puts an object BACK.
+
+Not renamed yet, and that is the remaining work rather than timidity:
+`TakeOffMap` is reconstructed and `TakeNearbyOffMap` still reads the other way,
+skipping objects that carry `0x800` and stamping a return-at time. **Read what
+`0x0800` is for and what consumes `OBJ_OFF_RETURN_AT`**, then rename both the
+flag and the function together.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and

@@ -4648,13 +4648,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *   TakeOffMap        sets OBJ_FLAG_OFF_MAP, and CLEARS row bit 1 -> re-links
  *   0x00429650        clears it and raises ON_MAP, and SETS bit 1 -> removes
  *
- * Either OBJ_FLAG_ON_MAP and OBJ_FLAG_OFF_MAP are swapped and TakeOffMap is
- * really the put-on, or "off the map" means something other than "rows
- * unregistered" -- a request bit rather than a state bit, which the
- * TakeNearbyOffMap guard and its return-at stamp would also fit. Settling it
- * needs the OTHER callers of both flags, not more of this pair. Note
- * air.cpp's TakeOffMap comment says "unregistering" for the clear-bit-1 path,
- * which by this reading it does not do. */
+ * The other callers settle it, and they say 0x200 is BACKWARDS. Only two
+ * functions in the image test either flag through the high-byte form the
+ * compiler uses, and one is TakeNearbyOffMap's known guard. The other is
+ * 0x00404730, which resolves an object's attachment target and DROPS it when
+ * any of these hold: `flags & 0x200`, health at +0x62 is zero, already
+ * destroyed, a type 2 with a zero field, or a type 3. So 0x200 keeps company
+ * with dead-and-gone, not with registered-on-the-map.
+ *
+ * With 0x200 read as HIDDEN, both callers become internally consistent and
+ * the puzzle disappears:
+ *
+ *   0x00429650   requires 0x200 clear, SETS it, removes the rows  -> hide
+ *   TakeOffMap   requires 0x200 set,   CLEARS it, re-links rows   -> unhide
+ *
+ * Which means OBJ_FLAG_ON_MAP is inverted and the name TakeOffMap with it --
+ * it puts an object back. NOT renamed here, deliberately: TakeOffMap is
+ * reconstructed and has a caller whose behaviour still reads the other way,
+ * since TakeNearbyOffMap skips objects carrying 0x800 and stamps a return-at
+ * time after calling it. One more reading is needed -- what 0x800 is for, and
+ * what consumes OBJ_OFF_RETURN_AT -- before a rename touches live code.
+ * Recorded so that reading starts from evidence instead of from the puzzle. */
 #define OBJ_FLAG_ON_MAP        0x0200u
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
