@@ -754,7 +754,7 @@ void __cdecl DestroyObjCommon(void *obj)
 
     for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
         uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
-                       + (uint32_t)i * AM2_ROW_STRIDE;
+                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         ObjFlagClear0(row);
         orig_row_unregister(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));

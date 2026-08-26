@@ -115,6 +115,20 @@ Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
 
+**Offset macros have no ratchet at all, and that is where the fourth duplicate
+of the session landed.** `checkpatches.py` counts `ADDR_` aliases and
+`checkglobals.py` counts `g_` ones; nothing counts `OBJ_OFF_*`, `AM2_*` or the
+other plain constants. So when `OBJ_OFF_ROW_COUNT` and `OBJ_OFF_ROWS` were
+defined a second time with the same values, and `AM2_ROW_STRIDE` invented
+beside the existing `AM2_OBJ_ROW_STRIDE`, everything compiled and every check
+passed -- an identical redefinition is legal C, and the third name is simply a
+different spelling of a number.
+
+It was found by reading `TakeOffMap`, which had been using the originals all
+along. Until something counts them, the only defence is the same one the
+`ADDR_` rule states: grep for the OFFSET before defining a name for it, not
+just for the name.
+
 **`tools/checkglobals.py` ratchets the `g_` macros, and there is a large
 backlog behind it.** `src/game` reaches the original's globals through macros
 like `#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)`, and

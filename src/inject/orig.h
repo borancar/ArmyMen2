@@ -4949,13 +4949,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_CLEAR_ROACH_FOOTPRINT 0x0043CA00u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
 #define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
-/* What DestroyObjCommon iterates before it marks anything. Each record goes to
- * ObjFlagClear0 and then to ADDR_ROW_UNREGISTER, whose first parameter is
- * already documented as a `row *` -- which is what says these are ROWS rather
- * than some other 0x60-byte thing. */
-#define OBJ_OFF_ROW_COUNT          0x70u   /* int32_t */
-#define OBJ_OFF_ROWS               0x74u   /* row *, stride 0x60 */
-#define AM2_ROW_STRIDE             0x60u
+/* DestroyObjCommon iterates the same rows TakeOffMap does -- see
+ * OBJ_OFF_ROW_COUNT, OBJ_OFF_ROWS and AM2_OBJ_ROW_STRIDE further up, which
+ * already existed. I defined a second copy of all three here and the compiler
+ * said nothing, because an identical redefinition is legal; no ratchet watches
+ * offset macros the way checkpatches watches ADDR_ names. Removed. */
 /* The chain of attached objects DestroyObjCommon walks after marking, and
  * these two names describe the ITEM reading only -- types 1 and 4, which is
  * what that function has already checked before it reads them. Both hold a
