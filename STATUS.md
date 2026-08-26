@@ -5,11 +5,43 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `2014c98`. Working tree clean.
+Last updated: **2026-08-27**, at `d9a6229`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **The combat question is now MEASURED, not assumed.** Four functions in a
+  row landed "verified by reading" because nothing takes damage on any drive,
+  so I tried to provoke some: into a live Boot Camp mission, then movement
+  keys, the two plausible fire keys, and six clicks on the map.
+  **`DamageObject` stayed at 0.** `SendTrooperSetWeapon` moved to 6, so the
+  input was arriving and being acted on -- the drive is not dead, Boot Camp's
+  opening simply has nothing to shoot.
+
+  Recorded so the next session does not repeat the attempt blind. Reaching
+  `FreeItem`, `RemoveFromItemList`, `Type2ActionB` and `DamageRoach` needs a
+  **different mission, not a longer one**.
+
+- **`SendItemDeploy` is reconstructed** -- `0x0042AA50`, and it names itself:
+  `"itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d"`. Sixteen bytes,
+  fourteen used, and the two trailing bytes are the transposable pair: the
+  facing comes from the OBJECT and the other from the CALLER, which is the
+  only thing telling them apart.
+
+- **Its guard is the session pointer, not `COMM_OFF_DPLAY`** -- unlike the two
+  senders directly above it in the same file. Reproduced as the original has
+  it rather than made consistent with its neighbours; they are different
+  questions, and which one a sender asks is not ours to normalise.
+
+- Verified by reading, but the layout has a **second witness**:
+  `ADDR_RECV_ITEM_DEPLOY` unpacks the same sixteen bytes at the other end and
+  prints the same four fields in the same order.
+
+- One self-inflicted defect: removing an `orig_` macro with a single-line
+  regex left the second half of a **line continuation** behind as an orphan
+  expression. The compiler caught it. Same continuation blind spot
+  `checkseams` itself once had.
 
 - **`DamageRoach` is reconstructed, and its third argument is a DIRECTION.**
   `0x0043D280`, `DamageObject`'s type 8 arm. Not a second amount:
