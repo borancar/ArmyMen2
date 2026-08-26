@@ -2946,10 +2946,36 @@ One family error came out with it. `air.cpp` cleared a ROW's bit 1 using
 `OBJ_FLAG_OVERDUE`, which is an OBJECT flag in a different struct that merely
 shares the value 0x02. It is `ROW_FLAG_REMOVED` now.
 
-**The next move is `0x00404730`** -- the function that supplied the decisive
-evidence and has still not been read for its own sake. It resolves an object's
-attachment target through `+0xC4` and rejects it on five conditions, which
-makes it the clearest statement in the image of what a valid target is.
+**`ObjAnchorPoint` (`0x00403AF0`, 80 bytes) is reconstructed**, found while
+reading toward `0x00404730`. It answers an object's position with its sprite's
+second anchor pair subtracted, and it picks row ONE when the object has more
+than one row -- reproduced rather than tidied. Two new offsets came with it,
+`ROW_OFF_SPRITE` and `ROW_OFF_PREV_SPRITE`, identified from `ADDR_ROW_UPDATE`
+comparing the two alongside the current and previous rectangles.
+
+**It is installed and it does not execute.** The counter exists and reads 0
+after 57,508 composed frames of live Boot Camp, and so do `RevealObj` and
+`RevealNearby`: all three callers are original code, so this is not the
+caller-is-ours blind spot -- the whole air-support and fog cluster is simply
+dormant on every drive this project has. Verified by reading and by the A/B
+showing no change, which is weaker than the rest of the tree and is said
+plainly rather than left to be inferred from a zero.
+
+**A two-name alias was resolved on the way.** `0x005125A0` carried
+`ADDR_DEFAULT_SOUND_POS` and `ADDR_PAD_DEFAULT_POS`, both from call sites. It
+is `.bss`, 103 sites read it and **nothing in the image writes it**, so it is
+permanently `{0,0}`: it is `ADDR_ZERO_POINT`, and every reader is asking for
+"no position". `MAX_ALIASES` is 21.
+
+**The cheat table is now in `orig.h`**, because it is the strongest naming
+evidence this image has. 40 words dispatching through a 39-entry jump table,
+with `when all else fails...` as the master switch -- and words 3 and 4,
+`spidey senses tingling` and `moleman`, are what settled the fog of war.
+
+**The next move is still `0x00404730`.** It resolves an object's attachment
+target through `+0xC4` and rejects it on five conditions, which makes it the
+clearest statement in the image of what a valid target is. It needs
+`0x00404580` (96 B) and `0x00404400` below that, both in the same band.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and

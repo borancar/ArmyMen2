@@ -2374,7 +2374,7 @@ static void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
         return;
 
     /* One dword store covering both words -- the default before the scan. */
-    *(int32_t *)&pn->cx = *(const int32_t *)AM2_IMAGE(ADDR_PAD_DEFAULT_POS);
+    *(int32_t *)&pn->cx = *(const int32_t *)AM2_IMAGE(ADDR_ZERO_POINT);
 
     /* The original divides by 0x00514DE0 to recover x, which is the map's
      * HEIGHT in tiles -- TileOfPoint, PointOfTile and ADDR_MAP_ROW_SHIFT all

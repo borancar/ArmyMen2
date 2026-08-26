@@ -821,7 +821,7 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
  * volume levels, the object lookup and the wave reader. */
 typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
 #define g_listenerPos   (*(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
-#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_DEFAULT_SOUND_POS)
+#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
 #define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
 
 /* The reader fills four out-parameters, and two of them are fields of the

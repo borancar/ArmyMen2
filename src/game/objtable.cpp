@@ -273,7 +273,7 @@ void *__cdecl ObjByUidAlias(uint32_t uid)
  * UIDS rather than object pointers -- the list holds uids and so does the
  * comparison, which is the part that would be easy to get wrong.
  *
- * The last call is handed ADDR_DEFAULT_SOUND_POS as a packed point, the same
+ * The last call is handed ADDR_ZERO_POINT as a packed point, the same
  * global OverlayPrepare seeds its offsets from. */
 void __cdecl SelectUnit(void *obj)
 {
@@ -297,7 +297,7 @@ void __cdecl SelectUnit(void *obj)
     PtrListPush(rec, (void *)(uintptr_t)uid);
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
     orig_on_selection_changed(*(const uint32_t *)(uintptr_t)
-                              ADDR_DEFAULT_SOUND_POS);
+                              ADDR_ZERO_POINT);
 }
 
 int objtable_install(void)

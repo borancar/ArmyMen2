@@ -1312,8 +1312,15 @@
 #define SOUND_DYNAMIC_SAVED      16           /* exclusive bound, see above */
 #define ADDR_STR_AUDIO_CPP      0x00474D7Cu  /* "C:\\ArmyMen2\\source\\audio.cpp" */
 #define ADDR_LISTENER_POS        0x00514E0Cu  /* AM2_Point, the ear */
-#define ADDR_DEFAULT_SOUND_POS   0x005125A0u  /* AM2_Point, used when a sound
-                                               * has neither owner nor place */
+/* The ZERO POINT. It is .bss and 103 sites read it; NOTHING in the image
+ * writes it, so it holds {0,0} for the life of the process and every one of
+ * those readers is asking for "no position" rather than for a configured
+ * default. It carried two names before this, ADDR_ZERO_POINT and
+ * ADDR_ZERO_POINT, and both were taken from a call site -- audio's,
+ * where a sound has neither owner nor place, and the pad centroid's. Neither
+ * is wrong about its own caller and both are wrong about the global. Found
+ * while reading a third user in air.cpp, which returns it for a null object. */
+#define ADDR_ZERO_POINT          0x005125A0u  /* AM2_Point, always {0,0} */
 #define ADDR_VOLUME_AT_ZERO      0x00512318u  /* int32_t, volume at no distance */
 #define SOUND_REC_OFF_POS        0x10u   /* AM2_Point */
 #define SOUND_REC_OFF_OWNER      0x14u   /* uid; the object making the sound */
@@ -1609,7 +1616,23 @@
  * "I am the Juggernaut!", "I can fly!" and "Aye aye Captain!", so the typed
  * line is a cheat code and this is what executes one. */
 #define ADDR_SCRIPT_RUN_LINE     0x00444C40u
+/* The cheat runner. It matches the typed line against a table of 40 words at
+ * ADDR_CHEAT_WORDS and dispatches through a 39-entry jump table; anything it
+ * does not recognise falls through to ADDR_SCRIPT_RUN_LINE, which is why that
+ * function is reachable at all. Entry 0, "when all else fails...", is the
+ * master switch and is compared separately before the table is walked.
+ *
+ * Two of the arms are what identified the fog of war -- see the block at
+ * OBJ_FLAG_REVEALED. Word 3 is "spidey senses tingling", which prints
+ * "I see everything!" and reveals every object; word 4 is "moleman", which
+ * prints "I bury my head 'neath the sand." and conceals them. A cheat word
+ * naming what its handler does is the strongest kind of evidence in this
+ * image, and it is worth checking this table before inventing a name for
+ * anything it reaches. */
 #define ADDR_CHEAT_ENTRY         0x00417B80u
+#define ADDR_CHEAT_ENABLED       0x004FCF94u  /* int32_t, "when all else fails..." */
+#define ADDR_CHEAT_WORDS         0x00476704u  /* const char *[41] */
+#define ADDR_CHEAT_JUMP_TABLE    0x004183E4u  /* void *[39], indexed word - 1 */
 #define ADDR_SCRIPT_NEXT_TOKEN   0x0043F450u  /* the tokeniser; stops at // */
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
@@ -2363,7 +2386,6 @@
 #define ADDR_MAP_PAD_LAYER        0x00514EC8u
 #define ADDR_MAP_PADBIT_LAYER     0x00514EC4u
 #define ADDR_PAD_BIT_TABLE        0x00486444u  /* int32_t[8], 1<<n */
-#define ADDR_PAD_DEFAULT_POS      0x005125A0u  /* both centroid words at once */
 #define ADDR_SCRIPT_VARIABLE      0x00443F70u  /* keyword 133 */
 #define ADDR_SCRIPT_IF            0x004432F0u  /* keyword 44 */
 
@@ -4696,6 +4718,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * takes the row and the descriptor and no index. */
 #define ADDR_ROW_RELEASE       0x0041D3A0u /* void(row *, void *desc) */
 #define ADDR_ROW_UNREGISTER_ALL 0x0041DB20u /* void(row *, void *desc) */
+/* The row's sprite slot and the copy of it ADDR_ROW_UPDATE last registered.
+ * That function needs +0x04 non-null to do anything and compares it against
+ * +0x08 alongside the current and previous rectangles, which is the shape of a
+ * "nothing has changed, skip the work" test and is what identifies the pair. */
+#define ROW_OFF_SPRITE         0x04u
+#define ROW_OFF_PREV_SPRITE    0x08u
 #define ROW_OFF_OWNS           0x34u  /* uint8_t: there is a buffer at +0x38 */
 #define ROW_OFF_BUFFER         0x38u
 /* The sub-list header inside an object: {?, count, rows, capacity} at
@@ -4716,6 +4744,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_REVEALED_UNTIL      0x5Cu   /* game-clock ms, set by the below */
 /* 0x004097D0, 112 bytes, two callers. Everything of type 2, 3 or 8 within a
  * radius of a point goes off the map and comes back later. */
+/* 0x00403AF0, 80 bytes, three callers. An object's position with its sprite's
+ * second anchor pair taken off it -- see SPR_OFF_OVX. The name is ours.
+ *
+ * It picks ROW 1 when the object has more than one row and row 0 when it has
+ * exactly one, which is not the same as "the first row" and is reproduced
+ * rather than tidied. A null object answers ADDR_ZERO_POINT; every other
+ * failure along the way answers the unadjusted position. */
+#define ADDR_OBJ_ANCHOR_POINT  0x00403AF0u  /* uint32_t(const void *obj) */
 #define ADDR_REVEAL_NEARBY 0x004097D0u /* void(AM2_Point, int32, int32) */
 /* The sprite LIST -- the array ADDR_FREE_SPRITE_LIST releases and frees, and
  * ADDR_FREE_SPRITE_LIST_ALIAS jumps to. It sits just past the air save block

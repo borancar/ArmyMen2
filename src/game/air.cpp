@@ -134,6 +134,51 @@ void __cdecl RevealObj(void *obj)
     }
 }
 
+/* 0x00403AF0, three callers. The object's position, moved by its sprite's
+ * second anchor pair -- the one DrawMenuCursor ADDS when it places the cursor
+ * and this SUBTRACTS to get back to where the object logically is.
+ *
+ * Which row supplies the sprite is the odd part and it is reproduced exactly:
+ * exactly one row uses row 0, more than one uses row ONE, and no rows at all
+ * falls through with the position unadjusted. The null test is applied AFTER
+ * the stride is added, so an object claiming two rows with a null array tests
+ * 0x60 rather than 0 and passes -- the original's behaviour, kept.
+ *
+ * Only a null object gets the zero point; every other way out returns the
+ * position as it stood. The original writes all of this through its own
+ * argument slot, which is why the point and the object share a register in
+ * the disassembly; a local is the same thing said once. */
+uint32_t __cdecl ObjAnchorPoint(const void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    const uint8_t *row;
+    const uint8_t *spr;
+    AM2_Point      pt;
+    int32_t        rows;
+
+    if (!obj)
+        return *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT);
+
+    pt   = *(const AM2_Point *)(o + OBJ_OFF_POS);
+    rows = *(const int32_t *)(o + OBJ_OFF_ROW_COUNT);
+    if (rows < 1)
+        return *(const uint32_t *)&pt;
+
+    row = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    if (rows > 1)
+        row += AM2_OBJ_ROW_STRIDE;
+    if (!row)
+        return *(const uint32_t *)&pt;
+
+    spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
+    if (!spr)
+        return *(const uint32_t *)&pt;
+
+    pt.x = (int16_t)(pt.x - *(const int16_t *)(spr + SPR_OFF_OVX));
+    pt.y = (int16_t)(pt.y - *(const int16_t *)(spr + SPR_OFF_OVY));
+    return *(const uint32_t *)&pt;
+}
+
 /* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
  * stay one definition. */
 #define g_gameClockMs (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
@@ -335,6 +380,8 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
+    patch_replace(ADDR_OBJ_ANCHOR_POINT, (const void *)ObjAnchorPoint,
+                  "ObjAnchorPoint", 1);
     patch_replace(ADDR_OBJ_REVEAL, (const void *)RevealObj,
                   "RevealObj", 1);
     patch_replace(ADDR_REMAP_SPRITE_RUNS, (const void *)RemapSpriteRuns,

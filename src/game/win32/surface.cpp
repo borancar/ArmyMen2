@@ -1254,7 +1254,7 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
  * is what DrawMenuCursor draws. Ten sprites a row, nineteen rows, and the
  * bound is MENU_ROW_DIRECT because a row at or above it means "no cursor".
  *
- * The three offset fields are seeded from ADDR_DEFAULT_SOUND_POS -- read as a
+ * The three offset fields are seeded from ADDR_ZERO_POINT -- read as a
  * dword, which is what a packed point is. That global carries two features:
  * the position a sound with no owner and no place is given, and the offset an
  * overlay starts at. Both are the origin, and the name is the one already on
@@ -1280,7 +1280,7 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
     g_animFrame    = 0;
     g_animNext     = Ticks();
 
-    origin = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_SOUND_POS;
+    origin = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
     g_overlayA    = (uint8_t *)0;
     g_overlayB    = (uint8_t *)0;

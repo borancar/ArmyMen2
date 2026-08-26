@@ -113,6 +113,11 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius,
  * need it, not "grow if full". Nothing checks the realloc. */
 void __cdecl FreeSpriteList(void);
 
+/* Original: 0x00403AF0, three callers, and the name is ours. The object's
+ * position with its sprite's second anchor pair subtracted. Picks row 1 when
+ * there is more than one row and row 0 when there is exactly one. */
+uint32_t __cdecl ObjAnchorPoint(const void *obj);
+
 /* Original: 0x004296E0, eight callers. Reveal one object through the fog. Two
  * flags and they are not symmetric: OBJ_FLAG_REVEALED goes up
  * unconditionally and is what callers test, while OBJ_FLAG_CONCEALED gates the
