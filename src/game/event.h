@@ -32,6 +32,10 @@ typedef struct AM2_Timer {
     int32_t  id;       /* zero means the slot is free */
 } AM2_Timer;
 
+/* Original: 0x0041E950. Fire every timer that has come due, at most once every
+ * 100 ms. Sets `removeevent` on a timer's final tick. */
+void __cdecl TimerTick(void);
+
 /* Original: 0x0041E820, "CreateTimer". Schedule `count` fires of `id`, `period`
  * milliseconds apart, starting at `start` -- which is relative to now unless
  * `absolute` says otherwise. Answers the id, or a negative code.

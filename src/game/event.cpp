@@ -808,6 +808,66 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
                                  msg->maskB, msg->removeevent, 1);
 }
 
+/* 0x0041E950, one caller, on the per-frame path. Fire every timer that has
+ * come due, and no more often than once every 100 ms.
+ *
+ * The gate is a SUBTRACTION against the last sweep rather than a comparison
+ * with a deadline, so it survives the clock wrapping; the timers' own due
+ * times are compared directly and do not.
+ *
+ * `removeevent` is set on the LAST fire -- the ninth argument is
+ * `count == 1`, evaluated before the decrement -- so the event registration is
+ * torn down by the same call that delivers the final tick rather than by a
+ * separate pass.
+ *
+ * A slot is freed by zeroing its id, which is what the scan skips on, and the
+ * live count is decremented with it. A repeating timer instead has its next
+ * due time computed from NOW plus its period, not from the due time it just
+ * met, so a timer whose sweep was late does not try to catch up.
+ *
+ * Measured, and the obvious counter would have misled. TimerTick reads 23,901
+ * against ComposeFrame's 24,056, so the sweep is per-frame -- but CreateTimer
+ * reads 0 on the same run, which looks like "no timers exist" and is worth
+ * nothing: its only caller in the image is our own EventTriggerDelayed,
+ * calling by name, so that counter cannot move at all.
+ *
+ * A probe settles it instead: THREE timers fire in a Boot Camp mission, slots
+ * 0, 1 and 2, every one with count == 1. So the firing path runs, the
+ * `removeevent` argument is exercised in its TRUE form, and the slot-free
+ * branch with its count decrement runs three times. What does NOT run is the
+ * repeating branch -- no timer here has a second tick, so the line that
+ * recomputes `start` from now is reached by nothing. */
+void __cdecl TimerTick(void)
+{
+    AM2_Timer *timers = (AM2_Timer *)(uintptr_t)ADDR_TIMER_TABLE;
+    uint32_t   now    = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    uint32_t  *last   = (uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK;
+    int32_t    i;
+
+    if (now - *last < AM2_TIMER_TICK_MS)
+        return;
+    *last = now;
+
+    for (i = 0; i < AM2_TIMER_MAX; i++) {
+        AM2_Timer *t = &timers[i];
+
+        if (!t->id)
+            continue;
+        if (t->start > now)
+            continue;
+
+        EventNotify(1, t->id, 0, 0, 0, 0, 0, 0, t->count == 1, 0);
+
+        if (--t->count <= 0) {
+            t->id = 0;
+            (*(int32_t *)(uintptr_t)ADDR_TIMER_COUNT)--;
+        } else {
+            t->start = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS)
+                       + t->period;
+        }
+    }
+}
+
 /* --------------------------------------------- object shims ---- */
 
 typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
@@ -2128,6 +2188,8 @@ int event_install(void)
                         "AdvanceMission", 2);
     rc |= patch_replace(ADDR_ACTION_POINT, (const void *)ActionPoint,
                         "ActionPoint", 14);
+    rc |= patch_replace(ADDR_TIMER_TICK, (const void *)TimerTick,
+                        "TimerTick", 0);
     rc |= patch_replace(ADDR_EVENT_NOTIFY, (const void *)EventNotify,
                         "EventNotify", 26);
     rc |= patch_replace(ADDR_SCRIPT_RESURRECT_ITEM,

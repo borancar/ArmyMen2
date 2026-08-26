@@ -2821,6 +2821,15 @@
 /* The timer table: 1,000 records of {start, period, count, id} at 0x0050C370,
  * with the live count at 0x0050C36C. A slot is FREE when its id is zero, which
  * is why the scan walks the id field at 0x0050C37C rather than the record. */
+/* 0x0041E950, one caller -- the per-frame path. Fire every timer that is due,
+ * at most once every 100 ms. */
+#define ADDR_TIMER_TICK            0x0041E950u /* void(void) */
+#define AM2_TIMER_TICK_MS          0x64        /* 100 ms between sweeps */
+/* The last sweep's timestamp is the dword at 0x0050C368 -- which already has a
+ * name, ADDR_EVENT_BLOCK, because it is also the first dword of the 16,008-byte
+ * block the savegame writes out. Both readings are right and it is one address,
+ * so it keeps the one name: the block is {lastSweep, count, timers[1000]} and
+ * its base IS the timestamp field. */
 #define ADDR_TIMER_COUNT           0x0050C36Cu /* int32_t */
 #define ADDR_TIMER_TABLE           0x0050C370u /* AM2_Timer[1000] */
 #define ADDR_TIMER_TABLE_ID_END    0x005101FCu /* one past the last id field */

@@ -3035,7 +3035,28 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`FlameTick` (`0x00417810`) is the "Flame On!" cheat's per-frame effect**, and
+**`TimerTick` (`0x0041E950`) fires the timer table**, at most once every 100 ms
+and 23,901 times against `ComposeFrame`'s 24,056. The gate is a SUBTRACTION
+against the last sweep rather than a comparison with a deadline, so it survives
+the clock wrapping -- the timers' own due times are compared directly and do
+not. `removeevent` is `count == 1` evaluated BEFORE the decrement, so the event
+registration is torn down by the same call that delivers the final tick.
+
+**And the obvious counter would have misled me.** `CreateTimer` reads 0 on the
+same run, which looks like "no timers exist" and is worth nothing: its only
+caller in the image is our own `EventTriggerDelayed`, calling by name, so that
+counter cannot move at all. A probe settles it instead -- **three timers fire**,
+slots 0, 1 and 2, every one with `count == 1`. So the firing path runs, the
+`removeevent` argument is exercised in its TRUE form, and the slot-free branch
+runs three times. The repeating branch does not: no timer here has a second
+tick.
+
+That is the distinction from `FlameTick` below drawn the other way. There the
+call count was high and the body dead; here a callee's zero suggested the body
+was dead and it is not. **Neither number means anything until you know which
+counters can move.**
+
+**`FlameTick` (`0x00417810`) is the "Flame On!" cheat's per-frame effect****`FlameTick` (`0x00417810`) is the "Flame On!" cheat's per-frame effect**, and
 that is what identifies every global in it -- the two cheat arms that write
 `ADDR_FLAME_ON` and its clock are at `0x00417E20` and `0x00417EF0`. Every 200 ms
 it points the army leader's weapon field at `ADDR_FLAME_RECORD` and fires
