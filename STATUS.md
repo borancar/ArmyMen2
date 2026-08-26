@@ -5,11 +5,64 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `8ae67dd`. Working tree clean.
+Last updated: **2026-08-26**, at `4e1e6d1`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`StateEnter3` is reconstructed, and finding out how to exercise it was
+  most of the work.** `0x004266F0` is the state 3 entry action, and state 3 is
+  the MOVIE state: a greyscale palette off disk, a filename built from
+  `ADDR_MOVIE_TO_PLAY`, and the Smacker constructor handed the result.
+
+- **The intro is NOT state 3, and nothing in the suite entered it.** Three
+  films play during `ab.sh intro` and the game sits in **state 0** the whole
+  time -- sampled with a probe, not assumed. So `State3Frame` and
+  `StateEnter3` had never executed once in this project's life, and both
+  counters are blind, so nothing said so.
+
+- **`tools/ab.sh state3` reaches it by poking the game's own transition**, the
+  same way `mpoptions` reaches the host panel: `ADDR_STATE_WANTED` and the
+  pending flag are exactly what `RequestState` writes, and
+  `ADDR_MOVIE_TO_PLAY` is given `"3do"` as a dword. Probes confirm the whole
+  path -- `want='3do' built='3do.smk'`, then `MovieOpen("3do.smk")`.
+
+- **Three separate things would each have left a test that cannot fail.**
+  The harness trace naming the resolved file does not exist on the orig side
+  at all, so it can never be the evidence -- the state is dumped as a compared
+  artifact instead. That dump has to be taken at ONE second, not eight,
+  because state 3 falls through to state 0 within a couple of seconds and the
+  first version read 0 on both sides. And the budget started at **-1**, on the
+  assumption that a film is never on the same frame twice.
+
+- **That last one is the tile-painter trap, reproduced exactly.** The frame
+  here is stable -- three clean runs give 0 on both shots -- so disabling the
+  budget made the configuration report **A/B clean while 28% of the screen
+  differed**. Measured in the failing direction: dropping the `PlayMovie` call
+  gives **224,390** pixels on the final frame and **32,713** on the mid one.
+  The budget is 500, a 65x margin against the smaller.
+
+- **And what it does not catch was measured too.** Clearing the surfaces
+  BEFORE the palette is set instead of after changes not a single pixel, so
+  that ordering stays verified by reading.
+
+- **Two more small ones, both behind a network game.** `ShowInfoMp`
+  (`0x00462A40`) toggles the info overlay -- what F1 does in multiplayer,
+  where pausing is not allowed -- and the original writes it through `sete`,
+  so the value is strictly 0 or 1 and not the negation of whatever was there.
+  `CommNoBuffers` (`0x00403280`) reports once and posts **WM_CLOSE**, not
+  `AM2_WM_NO_BUFFERS`, which is what got it called; the two sit a line apart
+  in the handler that dispatches here and confusing them would turn a quit
+  into a loop.
+
+- **A crash was attributed rather than left as a suspicion.** Poking
+  `ADDR_NET_GAME` to 1 in a live solo mission -- an attempt to force
+  `ShowInfoMp` -- kills the process within seconds. The identical poke under
+  `AM2_NOPATCH=1` kills the ORIGINAL in the same place, because the flag
+  steers the frame path into the paint-object branch of a comm session that
+  does not exist. Ten minutes to attribute; otherwise it is exactly the shape
+  of thing that becomes a false lead three sessions later.
 
 - **Three comm methods reconstructed, and seven struct offsets named from the
   right function.** `CommSetArmyColour` (`0x0040F280`), `CommResetStats`
