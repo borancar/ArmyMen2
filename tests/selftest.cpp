@@ -497,3 +497,12 @@ extern "C" void __cdecl PlaySoundAt(int32_t, int32_t, int32_t, int32_t,
                                     int32_t)
 {
 }
+
+/* air.cpp's sprite teardown reaches ReleaseSprite, in win32/sprite.cpp. Same
+ * reasoning as the stubs above, and air.cpp arrived in SELFTEST_SRC for the
+ * same reason map.cpp did: item.cpp gained a call into it, and adding the flat
+ * module it lives in beats stubbing a flat function. Its own flat dependency,
+ * trig.cpp, came with it; only this one crosses into win32. */
+extern "C" void __cdecl ReleaseSprite(AM2_Sprite *)
+{
+}

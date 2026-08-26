@@ -3465,6 +3465,36 @@ typedef struct {
  * Type 7's is ADDR_OBJ_MARK_IF_OVERDUE, which already had a name from its own
  * body -- a useful check that these really are per-frame handlers. */
 #define ADDR_STEP_TYPE1_4        0x00433EC0u  /* void(obj); types 1 AND 4 */
+/* What ADDR_STEP_TYPE1_4 reaches, named from what each does with its
+ * arguments -- none of the four names itself and none carries a string.
+ *
+ * 0x00429040 calls RoundTo8, Cos8, Sin8, ftol and RowUpdate, so it moves an
+ * object along a facing and re-links its map rows. 0x00422860 calls
+ * GameMalloc and TileOfPoint and takes TEN arguments, so it makes something
+ * new at a place. What either is FOR is not established.
+ *
+ * 0x00516164 holds the literal 0xE80609, written once, and the stepper
+ * compares it against the +8 field of the record at OBJ_OFF_FIELD_94 -- so it
+ * is a type id being matched, not a count. 0x006622BC is read at exactly one
+ * site, this one, and passed straight through as an argument. */
+#define ADDR_OBJ_MOVE_ALONG_FACING 0x00429040u /* void(obj, int32, int32, int32) */
+#define ADDR_SPAWN_AT              0x00422860u /* void(x, y, kind, army, uid, ...) */
+#define ADDR_WATCHED_TYPE_ID       0x00516164u /* int32_t, ships 0xE80609 */
+#define ADDR_SPAWN_EXTRA_6622BC    0x006622BCu /* int32_t, one reader */
+/* Bit 7 of OBJ_OFF_FLAGS. The stepper acts on it and then clears it, so it is
+ * a one-shot request; what requests it is not established. */
+#define OBJ_FLAG_BIT7              0x80u
+/* The three periods ADDR_STEP_TYPE1_4 measures, all against ADDR_GAME_CLOCK_MS
+ * -- literals in the image, named here so the use sites read. */
+#define AM2_REVEAL_PERIOD_MS       0x76Cu   /* 1900 ms between reveals */
+#define AM2_FRAME_PERIOD_MS        0x15Eu   /* 350 ms between frames */
+#define AM2_FUSE_MS                0x2710u  /* 10000 ms, then it spawns */
+#define AM2_REVEAL_NEAR            0x800    /* ADDR_REVEAL_NEARBY's two radii */
+#define AM2_REVEAL_FAR             0xBB8
+#define AM2_SPAWN_KIND_8B          0x8B     /* what it spawns when the fuse ends */
+/* The row's own timestamp, which the frame advance is timed off rather than
+ * the object's -- they are different clocks for different things. */
+#define ROW_OFF_STAMP_54           0x54u    /* uint32_t */
 #define ADDR_STEP_TYPE2          0x0044B7D0u  /* void(obj) */
 #define ADDR_STEP_TYPE3          0x0045D660u  /* void(obj) */
 #define ADDR_STEP_TYPE5          0x0043C110u  /* void(obj) */

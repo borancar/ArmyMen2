@@ -25,6 +25,9 @@
 #include "maprow.h"   /* RowUpdate -- reconstructed */
 #include "script.h"   /* AM2_Pad */
 #include "map.h"      /* TileOfPoint */
+#include "air.h"      /* RevealNearby */
+#include "objscript.h" /* UpdateObjectScript */
+#include "msgslot.h"   /* CommMustBroadcast */
 
 /* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
  * by including that header because this module is on the flat side of the
@@ -1792,12 +1795,14 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
 }
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);
-#define orig_step_type1_4 ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE1_4)
 #define orig_step_type2   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE2)
 #define orig_step_type3   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE3)
 #define orig_step_type5   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE5)
 #define orig_step_type6   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE6)
 #define orig_step_type8   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE8)
+
+/* Defined below, beside the rest of the object stepping. */
+void __cdecl StepType1And4(void *obj);
 
 /* 0x004284D0, one caller -- ObjFrameSweep, for every registered object every
  * frame. Copies the position aside and hands the object to its type's stepper.
@@ -1869,7 +1874,7 @@ void __cdecl ObjFrameStep(void *obj)
         return;
 
     switch (type) {
-    case 0: case 3: orig_step_type1_4(obj); break;
+    case 0: case 3: StepType1And4(obj);     break;   /* ours already */
     case 1:         orig_step_type2(obj);   break;
     case 2:         orig_step_type3(obj);   break;
     case 4:         orig_step_type5(obj);   break;
@@ -2078,6 +2083,165 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
     orig_set_soldier_kind(obj, 6);
 }
 
+typedef void (__cdecl *AM2_MoveFacingFn)(void *obj, int32_t a, int32_t b,
+                                         int32_t c);
+typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
+                                      int32_t army, uint32_t uid, int32_t extra,
+                                      int32_t e, int32_t f, int32_t g,
+                                      int32_t h);
+typedef int32_t (__cdecl *AM2_ChangeFrameFn)(void *obj, int32_t frame,
+                                             int32_t flag);
+#define orig_move_along_facing ((AM2_MoveFacingFn)(uintptr_t)ADDR_OBJ_MOVE_ALONG_FACING)
+#define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
+#define orig_change_obj_frame  ((AM2_ChangeFrameFn)(uintptr_t)ADDR_CHANGE_OBJECT_FRAME)
+
+/* 0x00433EC0, and the jump table gives it to types 1 AND 4 -- 24.8 million
+ * calls between them in one Boot Camp mission, which makes this the
+ * best-exercised reconstruction in the tree and the worst place to be sloppy.
+ *
+ * Four parts, and only the first runs for every object.
+ *
+ * The script update always runs. Then a ONE-SHOT: flags bit 7 asks for a move
+ * along the object's facing, and the bit is cleared after, so whoever sets it
+ * gets exactly one.
+ *
+ * The next two blocks are both behind `record->code == 0x2A && health > 0`,
+ * where the record is the pointer at OBJ_OFF_FIELD_94 -- see the note there,
+ * that field is a pointer for THIS object type and a scalar for others.
+ *
+ *   - Only the PLAYER's own such object reveals its surroundings, and only
+ *     every 0x76C ms. The deadline compare is UNSIGNED (`jb`), so a clock
+ *     wrap makes the difference enormous and the reveal simply happens.
+ *   - The frame advance is timed off the ROW's stamp, not the object's, and
+ *     the cycle SKIPS 1: n+1, and if that is 1 use 2, if it is past 16 wrap to
+ *     0. Reproduced exactly; a plain modulo would be wrong twice per cycle.
+ *
+ * The last block is a countdown and it is independent of the two above --
+ * different guard, different clock field. When the record's +8 matches
+ * ADDR_WATCHED_TYPE_ID the object shows `9 - elapsed_seconds` as its frame,
+ * clamped at 9, and after ten seconds it spawns something and marks itself
+ * OBJ_FLAG_OVERDUE.
+ *
+ * TWO DETAILS IN THAT SPAWN ARE EASY TO GET BACKWARDS. The uid passed is the
+ * OWNER's object's uid when the owner has one and the object's OWN uid when it
+ * does not -- not the other way round. And the extra argument is
+ * ADDR_SPAWN_EXTRA_6622BC when there is NO multiplayer session, or when there
+ * is one and the comm object says this army must broadcast; it is 0 only in
+ * the remaining case. A single-session game therefore takes the same arm as a
+ * broadcasting host.
+ *
+ * The seconds division is the compiler's reciprocal for /1000, written as an
+ * ordinary unsigned divide.
+ *
+ * NOW THE PART THAT MATTERS FOR ANYONE READING A CLEAN A/B HERE. This
+ * function is called 24.8 MILLION times a mission and every guard in it is
+ * FALSE on every drive this project has. Counted over 36,000,000 calls:
+ *
+ *   flags bit 7 set          0
+ *   record code == 0x2A      0
+ *   record +8 == watched id  0
+ *
+ * So the only line that executes is the UpdateObjectScript call at the top.
+ * The reveal, the frame cycle, the countdown and the spawn are all dead here,
+ * and a clean bootcamp/mission/campaign run says nothing whatever about them.
+ *
+ * Measured rather than suspected, and the suspicion came from a MUTATION that
+ * should have failed and did not: dropping the `skip frame 1` rule from the
+ * cycle above changes not one pixel on either drive. That is what sent me
+ * looking, and it is the ObjFrameStep histogram one level further in -- a hot
+ * function whose hot path is its first instruction.
+ *
+ * Everything below that first call is therefore VERIFIED BY READING, at the
+ * same standing as the multiplayer functions, despite sitting on the busiest
+ * code path in the game. */
+void __cdecl StepType1And4(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *rec;
+    uint32_t now;
+
+    UpdateObjectScript(obj);
+
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT7) {
+        orig_move_along_facing(obj, 0, 0, 0);
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT7;
+    }
+
+    rec = *(uint8_t **)(o + OBJ_OFF_FIELD_94);
+    now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    if (*(const int32_t *)rec == 0x2A
+        && *(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+
+        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+                == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+            && now >= *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+                      + AM2_REVEAL_PERIOD_MS) {
+            RevealNearby(*(const AM2_Point *)(o + OBJ_OFF_POS),
+                         AM2_REVEAL_NEAR, AM2_REVEAL_FAR);
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        }
+
+        {
+            uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    - *(const uint32_t *)(row + ROW_OFF_STAMP_54)
+                > AM2_FRAME_PERIOD_MS) {
+                int32_t n = *(const int32_t *)(o + OBJ_OFF_FORMATION_SLOT) + 1;
+
+                if (n == 1)
+                    n = 2;
+                else if (n > 0x10)
+                    n = 0;
+
+                orig_change_obj_frame(obj, n, 1);
+                *(uint32_t *)(row + ROW_OFF_STAMP_54) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            }
+        }
+    }
+
+    if (*(const int32_t *)(rec + 8)
+            != *(const int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID)
+        return;
+
+    {
+        uint32_t secs = (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                         - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) / 1000u;
+
+        if (secs >= 9u)
+            secs = 9u;
+        orig_change_obj_frame(obj, (int32_t)(9u - secs), 1);
+    }
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        <= *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) + AM2_FUSE_MS)
+        return;
+
+    {
+        int32_t   army = (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY);
+        void     *mine = LookupOwnerObj((uint32_t)army);
+        uint32_t  uid  = mine ? ((const AM2_Object *)mine)->uid
+                              : ((const AM2_Object *)obj)->uid;
+        int32_t   extra = 0;
+
+        if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION
+            || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                 (int16_t)army))
+            extra = *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6622BC;
+
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+        orig_spawn_at((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                      (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2),
+                      AM2_SPAWN_KIND_8B, army, uid, extra, 0, 0, 0, 0);
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2086,6 +2250,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
+                  "StepType1And4", 1);
     patch_replace(ADDR_TYPE2_ACTION_C, (const void *)Type2ActionC,
                   "Type2ActionC", 3);
     patch_replace(ADDR_POINT_ACTION_A, (const void *)PointActionA,
