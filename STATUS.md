@@ -3035,7 +3035,30 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`FrameClockStep` (`0x00424B20`) is THE GAME CLOCK** -- 19,803 calls against
+**`ClearFrameCounts` (`0x004035F0`) is sixteen bytes that clear two counters,
+and BOTH are vestigial.** The whole image -- not just below the CRT line --
+holds exactly three references to the pair: the two writes here, and one read
+of `ADDR_PERFRAME_COUNT_A` at the top of `0x00403B40`, which gives up when it
+is above 10. Nothing increments either. So the first is permanently zero and
+that guard is dead code, and the second is written once a frame and read by
+nothing at all. 18,069 calls a mission: two stores to nothing, eighteen
+thousand times.
+
+**That is the third piece of consumerless bookkeeping on this one path.**
+`ADDR_SECOND_DEADLINE` is writes with no reader; `ADDR_FIXED_STEP` is reads
+with no writer; this is both at once. Whatever the per-frame block once did, a
+good deal of it was cut and the scaffolding left standing -- which is worth
+knowing before reading any of it as meaningful.
+
+**`0x004143A0` was DECLINED and the reason is a puzzle, not a size.** It paints
+three HUD panels through vtable slot 1, pushing a 16-byte rectangle by value --
+but the first of the three reserves only 12 bytes with `sub esp, 0xc` and then
+writes 16. By my reading that leaves the epilogue's `pop edi; pop esi`
+unbalanced, which cannot be right for a function the game calls every frame. I
+do not yet understand it, and reconstructing what I cannot explain is how a
+confident wrong comment gets written. Left for a session that can settle it.
+
+**`FrameClockStep` (`0x00424B20`) is THE GAME CLOCK****`FrameClockStep` (`0x00424B20`) is THE GAME CLOCK** -- 19,803 calls against
 `ComposeFrame`'s 19,977. It measures the frame, clamps it to 66 ms, adds it to
 `ADDR_GAME_CLOCK_MS` and publishes the delta in both units. Everything that
 treats `0x00511E04` as "now" -- the timers, the pads, the audio -- is being

@@ -124,6 +124,10 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
 void __cdecl ResolveFormationPoint(void *follower, void *leader,
                                    AM2_Point *out);
 
+/* Original: 0x004035F0. Zero the two per-frame counters, both of which are
+ * vestigial -- see the source for the whole-image reference count. */
+void __cdecl ClearFrameCounts(void);
+
 /* Original: 0x00403AF0, three callers, and the name is ours. The object's
  * position with its sprite's second anchor pair subtracted. Picks row 1 when
  * there is more than one row and row 0 when there is exactly one. */

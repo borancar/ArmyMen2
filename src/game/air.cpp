@@ -134,6 +134,34 @@ void __cdecl RevealObj(void *obj)
     }
 }
 
+/* 0x004035F0, one caller, on the per-frame path. Zero two counters -- and
+ * both of them are vestigial, which took a whole-image scan to be sure of
+ * rather than the usual one below the CRT line.
+ *
+ * There are exactly THREE references to the pair in the entire image: the two
+ * writes here, and a single read of ADDR_PERFRAME_COUNT_A at the top of
+ * 0x00403B40, which returns immediately when it is above 10. Nothing
+ * increments either one. So the first is always zero and that guard is dead
+ * code, and the second is written once a frame and read by nothing at all.
+ *
+ * This is the third piece of bookkeeping with no consumer on this one path --
+ * after ADDR_SECOND_DEADLINE, whose writes have no reader, and ADDR_FIXED_STEP,
+ * whose reads have no writer. Whatever this per-frame block once did, a good
+ * deal of it was cut and the scaffolding left standing.
+ *
+ * Reconstructed rather than skipped for the same reason as the others: it is
+ * two stores on a path that runs every frame, and leaving them out would be a
+ * difference even though making them is not.
+ *
+ * Measured at 18,069 calls against ComposeFrame's 18,146 -- once a frame, like
+ * everything else on this path. Which is worth putting beside the finding: two
+ * stores to nothing, eighteen thousand times a mission. */
+void __cdecl ClearFrameCounts(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_A = 0;
+    *(int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_B = 0;
+}
+
 /* 0x00403AF0, three callers. The object's position, moved by its sprite's
  * second anchor pair -- the one DrawMenuCursor ADDS when it places the cursor
  * and this SUBTRACTS to get back to where the object logically is.
@@ -531,6 +559,8 @@ void air_install(void)
     patch_replace(ADDR_RESOLVE_FORMATION_POINT,
                   (const void *)ResolveFormationPoint,
                   "ResolveFormationPoint", 3);
+    patch_replace(ADDR_CLEAR_FRAME_COUNTS, (const void *)ClearFrameCounts,
+                  "ClearFrameCounts", 0);
     patch_replace(ADDR_OBJ_ANCHOR_POINT, (const void *)ObjAnchorPoint,
                   "ObjAnchorPoint", 1);
     patch_replace(ADDR_OBJ_REVEAL, (const void *)RevealObj,

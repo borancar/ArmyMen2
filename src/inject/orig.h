@@ -2835,6 +2835,21 @@
  * frame, clamp it, add it to ADDR_GAME_CLOCK_MS and publish it in both units.
  * This is what makes that clock tick. */
 #define ADDR_FRAME_CLOCK_STEP      0x00424B20u /* void(void) */
+/* 0x004035F0, one caller -- the per-frame path. Sixteen bytes that zero the
+ * two counters below, and both of them are vestigial.
+ *
+ * The whole image holds exactly THREE references to the pair: the two writes
+ * here, and one read of the first inside 0x00403B40, which refuses to do
+ * anything when it is above 10. Nothing anywhere increments either. So the
+ * first is always zero and that guard can never fire, and the second is
+ * written and never read at all.
+ *
+ * Named for the mechanism -- cleared together, once a frame -- rather than for
+ * what they were meant to count, which nothing surviving in the image says. */
+#define ADDR_CLEAR_FRAME_COUNTS    0x004035F0u /* void(void) */
+#define ADDR_PERFRAME_COUNT_A      0x004F93B8u /* int32_t, gates 0x00403B40 */
+#define ADDR_PERFRAME_COUNT_B      0x004F93BCu /* int32_t, never read */
+#define AM2_PERFRAME_COUNT_LIMIT   10
 #define ADDR_LAST_TICK_MS          0x00511E0Cu /* uint32_t, from ADDR_TICKS */
 /* Selects a FIXED 16 ms step instead of measuring. Below the CRT line it is
  * READ three times and written nowhere, so it is always zero and the fixed
