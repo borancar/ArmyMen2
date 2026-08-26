@@ -219,6 +219,11 @@ void *__cdecl WeaponByUid(uint32_t uid);
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */
 void __cdecl Type2ActionB(void *obj);
 
+/* 0x004480E0. Type2ActionB's sibling: soldier kind 6, and a SELECTION
+ * handover -- deselect, and if that emptied the player's selection, select
+ * the player's own object instead. `prev` is incremented before storing. */
+void __cdecl Type2ActionC(void *obj, int32_t prev);
+
 /* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
  * ahead of every guard -- then dispatches to the object's type stepper. Types
  * 1 and 4 share one; type 2 is the only arm with no destroyed check. */

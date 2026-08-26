@@ -2776,6 +2776,15 @@ typedef struct {
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
  * the field gates the first delayed event, the flag suppresses the second. */
 #define OBJ_OFF_FIELD_94         0x94u
+/* And 0x94 is type-dependent too, on the same evidence as 0xA0 above.
+ * ADDR_STEP_TYPE1_4 dereferences it -- `mov eax,[obj+0x94]; cmp [eax],0x2A` --
+ * and misc.cpp's MeetsAllThree does the same for 0x1F, so for those objects it
+ * is a POINTER to a record whose first dword is a code. Type2ActionC stores
+ * the literal 1 into it, which is not a pointer. Different type arms of the
+ * same union, recorded where the offset is rather than argued in one file. */
+/* Incremented from Type2ActionC's argument and stored; 0x0044BBA0 answers
+ * whether it is positive. Structural until something says what it counts. */
+#define OBJ_OFF_FIELD_5A4        0x5A4u  /* int32_t */
 #define OBJ_FLAG_8000            0x8000u
 /* The two delays that cleanup schedules, in game-clock milliseconds. */
 #define AM2_DEATH_DELAY_SHORT    0xBB8      /* 3,000 ms */
@@ -5767,6 +5776,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * own facing before going to ADDR_COS8/ADDR_SIN8, which mask to 8 bits. */
 #define OBJ_OFF_FACING             0x40u   /* uint8_t */
 #define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
+/* AND 0xA0 IS PROBABLY TYPE-DEPENDENT, which is a fact about the STRUCT
+ * rather than about this name. Two readings, both from live code:
+ *
+ *   air.cpp passes it to ADDR_FORMATION_POINT as a slot, and that function
+ *   indexes ADDR_FORMATION_SLOTS, which has TWELVE entries.
+ *
+ *   ADDR_STEP_TYPE1_4 reads it, adds one, skips the value 1, wraps after
+ *   SIXTEEN, and hands the result to ADDR_CHANGE_OBJECT_FRAME. That is an
+ *   animation cycle, and it would run off the end of a twelve-entry table.
+ *
+ * The two cannot both be true of one field -- but they are reached from
+ * different object TYPES, air.cpp's follower being a 2/3/8 and the stepper's
+ * being a type 1 or 4. So the likeliest answer is that the object is a union
+ * past its header and 0xA0 means different things in different arms.
+ *
+ * Recorded rather than aliased: a second name at this offset would push
+ * checkoffsets' family-alias baseline from 13 to 14, and buying a name with a
+ * ratchet is the wrong trade for something not yet established. */
 /* The uid of what this object is following. 0x00404730 resolves it and drops
  * it -- writing 0 back -- when the leader is concealed, out of health, already
  * destroyed, or the wrong type. */

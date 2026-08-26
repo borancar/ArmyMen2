@@ -2023,6 +2023,61 @@ void __cdecl PointActionA(void *obj, uint32_t point)
         *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 1;
 }
 
+/* 0x004480E0, three callers. Type2ActionB's sibling and the same shape: the
+ * same guard on OBJ_OFF_MP_ROLE, refusing at 7 here rather than at 6, then a
+ * set of writes and a change of soldier kind -- 6 rather than 8.
+ *
+ * What is new is the SELECTION handover, and it is a two-step. If the object
+ * is selected it is deselected; then, only if it belonged to the player AND
+ * nothing is selected any more, the player's own object is selected instead --
+ * unless that object is already destroyed. So losing your selected unit moves
+ * the cursor to you, and losing somebody else's does not.
+ *
+ * The count test is what makes the second step conditional rather than
+ * automatic: ADDR_SELECTED_COUNT is read AFTER the deselect, so it is asking
+ * "did that empty the selection", not "was anything selected".
+ *
+ * The argument is INCREMENTED before it is stored, so the caller passes a
+ * previous value rather than the value to set. Both Type2Action siblings write
+ * OBJ_OFF_SCRIPT_STATE from ADDR_ZERO_POINT; see the note there about what
+ * that field probably is.
+ *
+ * VERIFIED BY READING. Same wall as Type2ActionB -- the callers are event
+ * handlers, and no drive this project has fires them. */
+void __cdecl Type2ActionC(void *obj, int32_t prev)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (!o)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 7)
+        return;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
+        DeselectUnit(obj);
+
+        if (*(const int8_t *)(o + OBJ_OFF_ARMY) ==
+                (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+            && *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT == 0) {
+            void *mine = LookupOwnerObj(
+                *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+            if (!(*(const uint8_t *)((uint8_t *)mine + OBJ_OFF_FLAGS)
+                  & OBJ_FLAG_DESTROYED))
+                SelectUnit(mine);
+        }
+    }
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_5A4)  = prev + 1;
+    *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    *(int32_t *)(o + OBJ_OFF_FIELD_94)   = 1;
+    *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    orig_set_soldier_kind(obj, 6);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2031,6 +2086,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_TYPE2_ACTION_C, (const void *)Type2ActionC,
+                  "Type2ActionC", 3);
     patch_replace(ADDR_POINT_ACTION_A, (const void *)PointActionA,
                   "PointActionA", 9);
     patch_replace(ADDR_DAMAGE_ROACH, (const void *)DamageRoach,
