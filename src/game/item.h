@@ -41,6 +41,14 @@ void __cdecl RowUnregisterAll(void *row, void *desc);
 /* Original: 0x00428CA0, seven callers. Put an object into the world at
  * `where` and tell the other machines. `resurrect` takes the revive path,
  * which refuses an object that is alive and not flagged destroyed. */
+/* Original: 0x00428700. The per-frame object sweep: bump the stamp, step every
+ * registered object, and check comm in a session. */
+void __cdecl ObjFrameSweep(void);
+
+/* Original: 0x00424FE0. Push a one-second deadline forward once the clock
+ * passes it. Nothing reads the deadline; see the source. */
+void __cdecl AdvanceSecondDeadline(void);
+
 void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                         int32_t suppress);
 

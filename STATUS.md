@@ -3035,7 +3035,34 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`MissionPausedFrame` (`0x00425CD0`) is reconstructed and UNEXERCISED, and I
+**`ObjFrameSweep` (`0x00428700`) and `AdvanceSecondDeadline` (`0x00424FE0`) are
+reconstructed, both once a composed frame** -- 17,716 and 17,791 against
+`ComposeFrame`'s 17,866.
+
+**And this time the coverage was predicted before the code was written.**
+`Update3DAudioVolumes` is already reconstructed, already known to read five
+figures, and sits on the same path -- so an existing counter said the caller
+was hot without a probe, a drive, or a guess. That is what the last two
+mis-picks were missing, and it costs nothing.
+
+The sweep bumps `ADDR_ITER_STAMP` BEFORE the walk and exactly once, which is
+what lets a per-object step tell "this frame" from "some earlier frame" without
+carrying a frame number. Its comm check is a tail JUMP in the original, which
+for a void function with no arguments is the same as a call and a fall-through.
+
+`AdvanceSecondDeadline` pushes a deadline a second further out once the clock
+passes it -- **and nothing reads that deadline.** Below the CRT line
+`0x005122F8` has exactly three references: the seed, and the two in this
+function. Kept because it is on a path that runs every frame and its absence
+would be a difference even though its presence is not.
+
+**`TakeMenuRequest` itself was declined**, and the reason is worth recording:
+it is verifiably hot, but fifteen of its callees are unnamed and only one names
+itself in a string. Fourteen invented names in one commit is how the damage
+family went wrong. Its small callees are the better unit, and two of them are
+this commit.
+
+**`MissionPausedFrame` (`0x00425CD0`) is reconstructed and UNEXERCISED**`MissionPausedFrame` (`0x00425CD0`) is reconstructed and UNEXERCISED, and I
 mis-picked it the same way as `CommDrainMsgs`.** "Runs every frame while the
 game is paused" is true and useless: Boot Camp's opening dialogs have sub-state
 arms of their own, so the combination this arm needs -- sub-state 33 AND a

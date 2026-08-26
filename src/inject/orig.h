@@ -5394,7 +5394,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * once per pass so a walk can tell which entries it has already visited even
  * though inserts shift indices underneath it. */
 #define ADDR_ITER_CURSOR    0x00514F08u  /* int32_t */
-#define ADDR_ITER_STAMP     0x0051308Cu  /* uint32_t */
+#define ADDR_ITER_STAMP     0x0051308Cu
+/* 0x00428700, one caller -- the per-frame object sweep, from
+ * ADDR_TAKE_MENU_REQUEST's ordinary path. Bumps ADDR_ITER_STAMP, steps every
+ * registered object, and in a session tail-jumps to the comm check. */
+#define ADDR_OBJ_FRAME_SWEEP  0x00428700u  /* void(void) */
+#define ADDR_OBJ_FRAME_STEP   0x004284D0u  /* void(obj *), one caller */
+#define ADDR_COMM_SYNC_CHECK  0x00411FB0u  /* void(void); name ours */
+/* 0x00424FE0, one caller. Advances a deadline one second at a time -- and
+ * NOTHING reads that deadline. 0x005122F8 is written by this function and
+ * seeded by 0x00424E80, and there is no other reference to it below the CRT
+ * line. So the whole thing is bookkeeping with no consumer. Reconstructed
+ * anyway: it is on the per-frame path and its absence would be a difference,
+ * even if its presence is not. */
+#define ADDR_ADVANCE_SECOND   0x00424FE0u  /* void(void) */
+#define ADDR_SECOND_DEADLINE  0x005122F8u  /* uint32_t, game-clock ms */
+#define ADDR_TICK_INTERVAL_MS 0x00485104u  /* int32_t, 1000 */  /* uint32_t */
 
 /* A UID is (owner << 29) | counter, so eight owners each with a 29-bit
  * counter. These are the per-owner counters, indexed 0..7. */

@@ -949,6 +949,69 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
     orig_item_deploy_msg(obj, resurrect);
 }
 
+typedef void (__cdecl *AM2_ObjStepFn)(void *obj);
+typedef void (__cdecl *AM2_VoidFn)(void);
+#define orig_obj_frame_step  ((AM2_ObjStepFn)(uintptr_t)ADDR_OBJ_FRAME_STEP)
+#define orig_comm_sync_check ((AM2_VoidFn)(uintptr_t)ADDR_COMM_SYNC_CHECK)
+
+#define g_iterStamp       (*(uint32_t *)(uintptr_t)ADDR_ITER_STAMP)
+#define g_secondDeadline  (*(uint32_t *)(uintptr_t)ADDR_SECOND_DEADLINE)
+
+/* 0x00428700, one caller -- the ordinary per-frame path of
+ * ADDR_TAKE_MENU_REQUEST, so this runs once a frame for a whole mission.
+ *
+ * Bump the sweep stamp, step every registered object, and in a multiplayer
+ * session tail-jump to the comm check. The stamp is bumped BEFORE the walk and
+ * exactly once, which is what lets a per-object step tell "this frame" from
+ * "some earlier frame" without carrying a frame number itself.
+ *
+ * The comm check is a tail JUMP in the original, not a call, so it inherits
+ * this function's return -- written here as a call followed by falling off the
+ * end, which is the same thing for a void function with no arguments.
+ *
+ * Measured: 17,716 calls against ComposeFrame's 17,866 on the same run, so it
+ * really is once a composed frame. And that was predicted BEFORE the code was
+ * written, from Update3DAudioVolumes -- already reconstructed, already known
+ * to read five figures, and called from the same path. Checking a hot caller
+ * through a counter that already exists costs nothing and is what the last two
+ * mis-picks were missing. */
+void __cdecl ObjFrameSweep(void)
+{
+    void *obj;
+
+    g_iterStamp++;
+
+    for (obj = FirstItem(); obj; obj = NextItem())
+        orig_obj_frame_step(obj);
+
+    if (g_mpSession)
+        orig_comm_sync_check();
+}
+
+/* 0x00424FE0, one caller, also on the per-frame path.
+ *
+ * Once the game clock passes the deadline, push the deadline a second further
+ * out. That is the whole function -- and NOTHING READS THE DEADLINE. Below the
+ * CRT line 0x005122F8 has exactly three references: the seed in 0x00424E80 and
+ * the two here. So this is bookkeeping with no consumer, kept because it is on
+ * a path that runs every frame and leaving it out would be a difference even
+ * though leaving it in is not.
+ *
+ * The comparison is UNSIGNED and the clock is milliseconds since startup, so
+ * the first call after a wrap would push the deadline out from a small clock
+ * rather than skipping -- which no run here is long enough to reach, and which
+ * nothing would observe anyway.
+ *
+ * Measured at 17,791 calls, the same once-a-frame as the sweep above. */
+void __cdecl AdvanceSecondDeadline(void)
+{
+    uint32_t now = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+
+    if (now > g_secondDeadline)
+        g_secondDeadline =
+            now + (uint32_t)*(const int32_t *)AM2_IMAGE(ADDR_TICK_INTERVAL_MS);
+}
+
 /* 0x00427E80, and its only caller is HealObject. Event kind 6 -- healed -- and
  * the last of the three notifiers: identical in shape to NotifyDamaged and
  * TriggerItemDestroyed above, differing only in the literal.
@@ -1491,6 +1554,10 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_OBJ_FRAME_SWEEP, (const void *)ObjFrameSweep,
+                  "ObjFrameSweep", 0);
+    patch_replace(ADDR_ADVANCE_SECOND, (const void *)AdvanceSecondDeadline,
+                  "AdvanceSecondDeadline", 0);
     patch_replace(ADDR_DEPLOY_ITEM, (const void *)DeployItem,
                   "DeployItem", 4);
     patch_replace(ADDR_NOTIFY_HEALED, (const void *)NotifyHealed,
