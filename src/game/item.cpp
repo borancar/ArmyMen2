@@ -17,6 +17,7 @@
 #include "image.h"
 #include "crt.h"
 #include "armymsg.h"  /* SendObjDestroyed -- reconstructed */
+#include "army.h"     /* LookupOwnerObj -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -878,6 +879,169 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
     orig_notify_healed(obj, src);
 }
 
+typedef void (__cdecl *AM2_DamageTypeFn)(void *obj, int32_t amount,
+                                         int32_t d, int32_t kind,
+                                         uint32_t attacker);
+typedef void (__cdecl *AM2_DamageItemFn)(void *obj, int32_t amount, int32_t d,
+                                         int32_t kind, uint32_t attacker,
+                                         int32_t f);
+typedef void (__cdecl *AM2_ObjAttackerFn)(void *obj, void *attacker);
+typedef void (__cdecl *AM2_DamageBroadcastFn)(void *obj, uint32_t attacker,
+                                              int32_t amount, int32_t kind,
+                                              const void *where, int32_t f);
+typedef void (__cdecl *AM2_KillBroadcastFn)(void *obj, uint32_t attacker,
+                                            int32_t kind);
+typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
+
+#define orig_damage_item      ((AM2_DamageItemFn)(uintptr_t)ADDR_DAMAGE_ITEM)
+#define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
+#define orig_damage_vehicle   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_VEHICLE)
+#define orig_damage_roach     ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_ROACH)
+#define orig_notify_damaged   ((AM2_ObjAttackerFn)(uintptr_t)ADDR_NOTIFY_DAMAGED)
+#define orig_on_obj_died      ((AM2_ObjAttackerFn)(uintptr_t)ADDR_ON_OBJ_DIED)
+#define orig_damage_broadcast \
+    ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
+#define orig_kill_broadcast   ((AM2_KillBroadcastFn)(uintptr_t)ADDR_KILL_BROADCAST)
+#define orig_death_cleanup    ((AM2_ObjOnlyFn)(uintptr_t)ADDR_OBJ_DEATH_CLEANUP)
+#define orig_deselect_unit    ((AM2_ObjOnlyFn)(uintptr_t)ADDR_DESELECT_UNIT)
+
+/* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
+ * belongs to a different structure, as air.cpp already records. */
+#define AM2_OBJ_OWNER_OFF  0x10u
+#define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+#define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
+
+/* 0x00428140, nineteen callers. Damage one object: dispatch to the handler for
+ * its type, tell the world, and run the death sequence if it has just died.
+ *
+ * The shape is three questions in a row, and the multiplayer rule is the one
+ * that shows up three times: in a session, only a machine that MAY broadcast
+ * for the relevant army does the work at all -- and the army in question is
+ * the ATTACKER's for the damage, and the VICTIM's for the death. `suppress`
+ * non-zero skips those tests, which is how a machine applies damage it has
+ * been told about rather than damage it decided on.
+ *
+ * The attacker is resolved from a uid through the object table by hand rather
+ * than through LookupByUID -- FindSlot, then the table entry -- and its owner
+ * is what the broadcast tests use. A uid that resolves to nothing gives owner
+ * 4, which is not a real army and is what makes the test fail closed.
+ *
+ * An object that is ALREADY at or below zero health takes the early arm: it is
+ * notified and broadcast, but no per-type handler runs and it does not die a
+ * second time. That is the guard against double-killing, and it is why the
+ * health test appears twice.
+ *
+ * The tail is the selection fix-up and it is worth stating because it is
+ * player-visible: if the unit that died was the selected one, it is
+ * deselected, and if it belonged to us and nothing else is selected, the
+ * army's leader is selected instead. LookupOwnerObj's result is dereferenced
+ * with NO null test, which is the original's and is reproduced.
+ *
+ * What is EXERCISED, measured with a temporary probe because the counter is
+ * blind -- both callers that fire are ours and call by name. Six calls in a
+ * Boot Camp mission, every one of them type 2 with amount 1000 against 30 or
+ * 60 health, attacker uid 0 and suppress 0. So the trooper arm runs, and so
+ * does the whole death sequence, since 1000 is lethal to all of them.
+ *
+ * What does NOT run here: the item, vehicle and roach arms; the types 4 to 7
+ * fall-through; the early "already at zero health" arm; and every multiplayer
+ * branch, because g_mpSession is 0 in a single-player mission. The attacker
+ * lookup is only ever exercised with uid 0, which takes the no-attacker path
+ * and the owner-4 default. */
+void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
+                          uint32_t attackerUid, int32_t extra,
+                          int32_t suppress)
+{
+    uint8_t *o = (uint8_t *)obj;
+    void    *attacker;
+    int16_t  attackerOwner;
+    int32_t  slot;
+    int32_t  insertAt;
+
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return;
+
+    slot = FindSlot(attackerUid, &insertAt);
+    if (slot >= 0)
+        attacker = g_objTable[slot].obj;
+    else
+        attacker = (void *)0;
+
+    if (attacker) {
+        attackerOwner =
+            (int16_t)*(const int8_t *)((const uint8_t *)attacker
+                                       + AM2_OBJ_OWNER_OFF);
+    } else {
+        attacker      = (void *)0;
+        attackerOwner = 4;
+    }
+
+    if (g_mpSession && suppress == 0
+        && !CommMustBroadcast(kItemComm, attackerOwner))
+        return;
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0) {
+        orig_notify_damaged(obj, attacker);
+        if (g_mpSession && suppress == 0
+            && CommMustBroadcast(kItemComm, attackerOwner))
+            orig_damage_broadcast(obj, attackerUid, amount, kind,
+                                  o + OBJ_OFF_POS, 0);
+        return;
+    }
+
+    switch (*(const int32_t *)o) {
+    case 1:
+        orig_damage_item(obj, amount, extra, kind, attackerUid, 0);
+        break;
+    case 2:
+        orig_damage_trooper(obj, amount, extra, kind, attackerUid);
+        break;
+    case 3:
+        orig_damage_vehicle(obj, amount, extra, kind, attackerUid);
+        break;
+    case 8:
+        orig_damage_roach(obj, amount, extra, kind, attackerUid);
+        break;
+    default:
+        break;                  /* types 4..7 have no handler */
+    }
+
+    orig_notify_damaged(obj, attacker);
+
+    if (g_mpSession && suppress == 0
+        && CommMustBroadcast(kItemComm, attackerOwner))
+        orig_damage_broadcast(obj, attackerUid, amount, kind,
+                              o + OBJ_OFF_POS, 0);
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0)
+        return;
+
+    if (g_mpSession
+        && !CommMustBroadcast(kItemComm,
+                              (int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF)))
+        return;
+
+    orig_on_obj_died(obj, attacker);
+    orig_kill_broadcast(obj, attackerUid, kind);
+    orig_death_cleanup(obj);
+
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED))
+        return;
+
+    orig_deselect_unit(obj);
+
+    if ((uint32_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF) != g_defaultOwner
+        || g_selectedCount != 0)
+        return;
+
+    {
+        uint8_t *leader = (uint8_t *)LookupOwnerObj(g_defaultOwner);
+
+        if (!(*(const uint8_t *)(leader + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+            SelectUnit(leader);
+    }
+}
+
 /* 0x00428C40, one caller. Free every item that is past its deadline.
  *
  * Measured: SIXTY-NINE calls in a driven Boot Camp window, so this is
@@ -967,6 +1131,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
+                  "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,
                   "HealObject", 3);
     patch_replace(ADDR_OBJ_FIELD_A, (const void *)ObjFieldA, "ObjFieldA", 1);

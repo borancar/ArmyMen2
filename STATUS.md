@@ -3035,7 +3035,37 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`HealObject` (`0x00428370`, 224 bytes) is reconstructed, and it RUNS.** It
+**`DamageObject` (`0x00428140`, 560 bytes, NINETEEN callers) is reconstructed,
+and it is the best-covered thing this session.** It was `ADDR_GUARDED_ACTION`,
+a name this file admitted was a role. The body settles it: a jump table at
+`0x0042834C` dispatches on object type to a per-type damage handler, then it
+notifies, broadcasts through the already-named `ADDR_DAMAGE_BROADCAST`, and
+runs the death sequence when the health it just reduced has hit zero.
+
+Two independent confirmations arrived without being looked for. One of the
+nineteen callers is the **"suicide kings"** cheat, which sets health to 1 and
+then calls this. And `army.cpp` -- already reconstructed -- calls it twice,
+passing `1` for the sixth argument on the branch that has ALREADY broadcast and
+`0` on the branch that has not, which is exactly what that argument does.
+
+Ten names came with it and all ten are OURS -- none of the functions names
+itself in a string, which was checked first. The four per-type handlers are the
+safest, because their evidence is a jump table INDEX rather than a call site:
+item, trooper, vehicle, roach for types 1, 2, 3 and 8, with types 4 to 7 having
+no handler at all.
+
+**Measured coverage, not assumed.** The counter is blind -- both live callers
+are ours now -- so a probe: six calls in a Boot Camp mission, every one type 2,
+amount 1000 against 30 or 60 health, attacker uid 0, suppress 0. The trooper
+arm runs and so does the entire death sequence, since 1000 is lethal. What does
+NOT run: the item, vehicle and roach arms, the 4-to-7 fall-through, the early
+already-dead arm, and every multiplayer branch. The source says so.
+
+Closing the seams broke `selftest-link`, which is exactly the failure that
+check was written for -- an address call became a real symbol, so `SELFTEST_SRC`
+needed `army.cpp`. It said so in its own message and the fix was one word.
+
+**`HealObject` (`0x00428370`, 224 bytes) is reconstructed, and it RUNS.****`HealObject` (`0x00428370`, 224 bytes) is reconstructed, and it RUNS.** It
 heals by a percentage of maximum health, clamped to 0..100 and then to the
 maximum, and never touches anything already at or below zero -- healing does
 not resurrect. An item ignores the percentage and goes to full, by one of two

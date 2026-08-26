@@ -30,6 +30,14 @@ extern "C" {
  * slot it slides down by one. If it was below it is left alone -- and the
  * `jle` that decides this makes "equal" go the first way, which is why the
  * equal case is tested first and cannot fall through to the decrement. */
+/* Original: 0x00428140, nineteen callers. Damage `obj`: dispatch to the
+ * handler for its type, notify and broadcast, and run the death sequence if it
+ * has just died. `suppress` non-zero skips the multiplayer broadcast tests,
+ * which is how a machine applies damage it was TOLD about. */
+void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
+                          uint32_t attackerUid, int32_t extra,
+                          int32_t suppress);
+
 /* Original: 0x00428370, eight callers. Heal `obj` by `pct` percent of its
  * maximum health, clamped both ends, and raise the heal event. Items ignore
  * the percentage and go to full; nothing at or below zero health is healed. */

@@ -3,6 +3,7 @@
 
 #include "army.h"
 #include "objtable.h"
+#include "item.h"     /* DamageObject -- reconstructed */
 #include "misc.h"      /* ListRemoveAt */
 #include "msgslot.h"   /* CommMustBroadcast */
 #include "objtype.h"   /* ObjType2Field548 */
@@ -202,8 +203,6 @@ typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
     (*(AM2_DropOccupantFn)AM2_IMAGE(ADDR_VEHICLE_DROP_OCCUPANT))
 #define orig_damage_broadcast \
     (*(AM2_DamageBroadcastFn)AM2_IMAGE(ADDR_DAMAGE_BROADCAST))
-#define orig_guarded_action \
-    (*(AM2_GuardedActionFn2)AM2_IMAGE(ADDR_GUARDED_ACTION))
 
 void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 {
@@ -253,12 +252,12 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
                                       AM2_VEHICLE_DEATH_DAMAGE,
                                       AM2_VEHICLE_DEATH_KIND,
                                       (const uint8_t *)rider + OBJ_OFF_POS, 0);
-                orig_guarded_action(rider, AM2_VEHICLE_DEATH_DAMAGE,
+                DamageObject(rider, AM2_VEHICLE_DEATH_DAMAGE,
                                     AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 1);
             } else {
                 am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
                         "damage owner is me\n");
-                orig_guarded_action(rider, AM2_VEHICLE_DEATH_DAMAGE,
+                DamageObject(rider, AM2_VEHICLE_DEATH_DAMAGE,
                                     AM2_VEHICLE_DEATH_KIND, damageOwner, 0, 0);
             }
         }

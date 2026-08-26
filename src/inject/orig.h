@@ -2478,7 +2478,42 @@
  * a flag bit CLEAR at +8, and a positive int16 at +0x62, all before it acts.
  * Its callee has nineteen callers and no name. */
 #define ADDR_EVT_GUARDED_ACTION  0x0041F710u  /* void(uint32_t, int32, int32) */
-#define ADDR_GUARDED_ACTION      0x00428140u  /* void(obj,int32,int32,0,0,0) */
+/* 0x00428140, 560 bytes, NINETEEN callers. Damage one object.
+ *
+ * It was ADDR_DAMAGE_OBJECT, which this file admitted was a role rather than
+ * a recovered name. The body settles it: it dispatches on the object's type
+ * through a jump table at 0x0042834C to a per-type damage handler, calls
+ * ADDR_DAMAGE_BROADCAST -- a name that was already here -- and, when the
+ * health it just reduced has reached zero, runs the death sequence. One of the
+ * nineteen callers is the "suicide kings" cheat, which sets health to 1 and
+ * then calls this.
+ *
+ * None of the ten functions below names itself in a string, so all ten names
+ * are OURS and describe roles. The four per-type ones are the safest of them:
+ * their evidence is the jump table's index, not a call site. Types 4 to 7 have
+ * no handler and fall straight to the common tail.
+ *
+ * Arguments: the object, an amount, a kind, the attacker's uid, a fourth value
+ * passed only to the per-type handler, and a fifth that suppresses the
+ * multiplayer broadcast when non-zero. */
+#define ADDR_DAMAGE_OBJECT       0x00428140u  /* void(obj,int32,int32,uid,
+                                               *      int32,int32) */
+#define ADDR_DAMAGE_ITEM         0x004356C0u  /* type 1 */
+#define ADDR_DAMAGE_TROOPER      0x00447A40u  /* type 2 */
+#define ADDR_DAMAGE_VEHICLE      0x0045B4D0u  /* type 3 */
+#define ADDR_DAMAGE_ROACH        0x0043D280u  /* type 8 */
+/* Called twice by ADDR_DAMAGE_OBJECT and by nothing else. */
+#define ADDR_NOTIFY_DAMAGED      0x00427E10u  /* void(obj, void *attacker) */
+/* The death sequence, in the order ADDR_DAMAGE_OBJECT runs it. */
+#define ADDR_ON_OBJ_DIED         0x00427FD0u  /* void(obj, void *attacker) */
+#define ADDR_KILL_BROADCAST      0x0042A930u  /* void(obj, uid, int32) */
+#define ADDR_OBJ_DEATH_CLEANUP   0x00428070u  /* void(obj) */
+/* The counterpart of ADDR_SELECT_UNIT, which sits 0x60 above it. */
+#define ADDR_DESELECT_UNIT       0x00427C80u  /* void(obj) */
+/* The count word of ADDR_SELECTED_UIDS, which is {capacity, count, items}. */
+#define ADDR_SELECTED_COUNT      0x0051230Cu  /* int32_t */
+/* Set by ADDR_DESTROY_OBJ_COMMON; every reader treats it as "already gone". */
+#define OBJ_FLAG_DESTROYED       0x04u
 #define OBJ_OFF_FLAGS8           8u    /* bit 2 blocks the action above */
 #define OBJ_FLAG8_BLOCKED        4u
 #define OBJ_OFF_COUNT62          0x62u /* int16; must be > 0 */

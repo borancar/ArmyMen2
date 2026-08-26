@@ -829,7 +829,6 @@ typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
 typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
 typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
                                                              int32_t i);
-#define orig_guarded_action (*(AM2_GuardedActionFn)AM2_IMAGE(ADDR_GUARDED_ACTION))
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
 #define orig_point_action_a (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_A))
 #define orig_point_action_c (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_C))
@@ -1170,7 +1169,7 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
     if (*(const int16_t *)(obj + OBJ_OFF_COUNT62) <= 0)
         return;
 
-    orig_guarded_action(obj, a, b, 0, 0, 0);
+    DamageObject(obj, a, b, 0, 0, 0);
 }
 
 /* 0x0041F880 and 0x0041F970. Two more of the "On" shape.
