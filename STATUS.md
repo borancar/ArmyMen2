@@ -5,11 +5,52 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `799de06`. Working tree clean.
+Last updated: **2026-08-26**, at `15f9021`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`ObjFrameStep` is reconstructed, and it is the hottest function in the
+  tree.** `0x004284D0`, called by `ObjFrameSweep` for every registered object
+  every frame: **25,000,000** calls in one Boot Camp mission. It copies
+  `OBJ_OFF_POS` into `OBJ_OFF_PREV_POS` first and unconditionally, ahead of
+  every guard, so that field is where the object was last frame even for an
+  object whose stepper never runs.
+
+- **Types 1 and 4 share a handler.** The jump table holds `0x004284F9` twice,
+  so reading the eight bodies top to bottom and numbering as you go gets every
+  arm after type 3 wrong -- the same trap the sub-state table set.
+
+- **Type 2 is the only arm without the destroyed guard.** In the original that
+  check sits inside seven of the eight arms. Here it is hoisted to one
+  `type != 1 && destroyed` before the switch -- equivalent, since the seven
+  that have it all do the same thing and return. The asymmetry is reproduced
+  while the duplication is not, and the source says exactly that rather than
+  claiming nothing was tidied.
+
+- **Half the dispatch never runs, measured rather than assumed.** A histogram
+  probe over one Boot Camp mission:
+
+  | type | calls | type | calls |
+  |---|---:|---|---:|
+  | 1 | 23,896,810 | 5 | **0** |
+  | 2 | 108,766 | 6 | **0** |
+  | 3 | 62,152 | 7 | **0** |
+  | 4 | 932,272 | 8 | **0** |
+
+  Out-of-range: 0, so the `type > 7` guard never fires either. **A clean A/B
+  over this function covers four arms, not eight**, and the source now says
+  so. The shared arm is covered from both sides -- types 1 and 4 are 24.8M of
+  the calls between them -- so the detail most likely to be transcribed wrong
+  is the one best exercised.
+
+- The type 2 asymmetry is **not** exercised: it only shows when a destroyed
+  type 2 is stepped, and nothing in these drives destroys anything.
+
+- The eight steppers are named by the type they serve, because the jump table
+  establishes that and none of them names itself -- all six unnamed ones were
+  swept for pushed string literals and not one carries any.
 
 - **`DismissKeyReleased` is reconstructed, and its old name described its
   callers instead of itself.** `0x00424900` asks whether any of SPACE, F1,
