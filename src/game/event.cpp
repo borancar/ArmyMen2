@@ -935,7 +935,6 @@ void __cdecl TimerTick(void)
 
 typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
 #define orig_type2_action_a  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_A))
-#define orig_type2_action_b  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_B))
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
 #define orig_type2_action_c \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE2_ACTION_C))
@@ -1019,7 +1018,7 @@ void __cdecl EvtType2ActionB(uint32_t uid)
     if (!ObjIsType2((const AM2_Object *)obj))
         return;
 
-    orig_type2_action_b(obj);
+    Type2ActionB(obj);
 }
 
 /* 0x0041FBA0. The third of the type-2 twins, and the only one that forwards an

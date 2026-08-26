@@ -2751,6 +2751,22 @@ typedef struct {
  * carrying 7 is never friendly in a multiplayer session. NOT the AI mode --
  * that is +0xE4, per ADDR_EVT_SET_AI_MODE. */
 #define OBJ_OFF_MP_ROLE          0x544u
+/* UNRESOLVED, and recorded rather than renamed on a hunch. 0x00449570 is the
+ * only writer, and what it does is index ADDR_SOLDIER_ANIMS with the value it
+ * stores -- `lea eax,[edi*8 + 0x659F00]` -- then hang that table off the
+ * object's 0x74 sub-object. So the field looks like a SOLDIER KIND, an index
+ * into the nine animation tables, and "MP role" would then be one consequence
+ * of one value rather than the field's meaning.
+ *
+ * What stops that being a rename today: only 7 and 8 are pushed to the setter
+ * directly, the rest arrive through the 44-arm dispatcher at 0x00449660, and
+ * ADDR_SOLDIER_ANIMS is .bss so the file says nothing about the nine entries.
+ * Two guards elsewhere read it as an ordinal (`>= 6`, `>= 7`), which fits a
+ * kind index and does not fit a role.
+ *
+ * Strong, not conclusive. Resolving it means reading the dispatcher's arms. */
+#define ADDR_SET_SOLDIER_KIND    0x00449570u  /* void(obj, kind) -- the writer */
+#define ADDR_UNIT_ACTION         0x00449660u  /* void(obj, action) -- 44 arms */
 #define AM2_MP_ROLE_SEVEN        7
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
  * the field gates the first delayed event, the flag suppresses the second. */

@@ -1650,6 +1650,67 @@ void __cdecl FreeOverdueItems(void)
     } while (obj);
 }
 
+typedef void (__cdecl *AM2_SetKindFn)(void *obj, int32_t kind);
+typedef void (__cdecl *AM2_UnitActionFn)(void *obj, int32_t action);
+#define orig_set_soldier_kind ((AM2_SetKindFn)(uintptr_t)ADDR_SET_SOLDIER_KIND)
+#define orig_unit_action      ((AM2_UnitActionFn)(uintptr_t)ADDR_UNIT_ACTION)
+
+/* 0x00448220, two callers. Three effects, and together they are what a unit
+ * giving up looks like: it changes to soldier kind 8, its AI mode goes to 2 --
+ * `ignore`, per the action-parser oracle -- and it loses its weapon.
+ *
+ * Losing the weapon is two separate writes and only one of them is on the
+ * unit. The weapon object is looked up by uid and marked OBJ_FLAG_OVERDUE, so
+ * FreeOverdueItems collects it later; only then is the unit's uid field
+ * cleared. Doing it the other way round would lose the uid before anything
+ * could find the object, and the weapon would leak.
+ *
+ * The zero written to OBJ_OFF_SCRIPT_STATE comes from ADDR_ZERO_POINT rather
+ * than from an immediate, which is what the original does -- that global is
+ * .bss, nothing in the image writes it, and 103 sites read it for "no
+ * position". Reproduced as the read rather than folded to 0, because the field
+ * being assigned a POINT is the more likely reading of the source and folding
+ * it would hide that.
+ *
+ * The guard is on the same field ADDR_SET_SOLDIER_KIND writes, refusing at 6
+ * and above. What that field IS is not settled -- see OBJ_OFF_MP_ROLE in
+ * orig.h, where the evidence that it is a soldier kind is recorded along with
+ * what stops that being a rename yet.
+ *
+ * The name is orig.h's and deliberately neutral. The three effects read as a
+ * surrender, but nothing in the image says so and there is no string to ask.
+ *
+ * VERIFIED BY READING. Its counter is live -- blindspots.py does not list it,
+ * so a 0 here means the code did not run -- and it reads 0 through a full Boot
+ * Camp mission while WeaponByUid, one of its own callees, reads 201,368 on the
+ * same drive. Both its callers are event handlers, so reaching it needs a
+ * scripted event no mission this project drives fires. That is the same wall
+ * FreeItem and RemoveFromItemList are behind: nothing in the observed window
+ * makes anything give up or die. */
+void __cdecl Type2ActionB(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    void    *weapon;
+
+    if (!o)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 6)
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 2;
+
+    orig_set_soldier_kind(o, 8);
+
+    weapon = WeaponByUid(*(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
+    if (weapon)
+        *(uint32_t *)((uint8_t *)weapon + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+
+    *(int32_t *)(o + TROOPER_OFF_WEAPON_UID) = 0;
+    orig_unit_action(o, 0);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -1658,6 +1719,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_TYPE2_ACTION_B, (const void *)Type2ActionB,
+                  "Type2ActionB", 2);
     patch_replace(ADDR_WEAPON_BY_UID, (const void *)WeaponByUid,
                   "WeaponByUid", 1);
     patch_replace(ADDR_REMOVE_INVENTORY_ITEM,

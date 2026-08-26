@@ -214,6 +214,11 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells);
  * nothing, and null WITH a log line for one that resolves to a non-weapon. */
 void *__cdecl WeaponByUid(uint32_t uid);
 
+/* 0x00448220. A unit gives up: soldier kind 8, AI mode 2 (ignore), and its
+ * weapon marked OBJ_FLAG_OVERDUE before the uid is cleared -- in that order,
+ * or the weapon would leak. The name is orig.h's and deliberately neutral. */
+void __cdecl Type2ActionB(void *obj);
+
 /* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
  * +0x8C is both the guard and the record. `notify` gates a call that runs
  * BEFORE the free. Five callers. */
