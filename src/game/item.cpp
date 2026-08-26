@@ -1088,7 +1088,6 @@ void __cdecl RefreshObjCtx(void)
 
 typedef void (__cdecl *AM2_ObjStepFn)(void *obj);
 typedef void (__cdecl *AM2_VoidFn)(void);
-#define orig_obj_frame_step  ((AM2_ObjStepFn)(uintptr_t)ADDR_OBJ_FRAME_STEP)
 #define orig_comm_sync_check ((AM2_VoidFn)(uintptr_t)ADDR_COMM_SYNC_CHECK)
 
 #define g_iterStamp       (*(uint32_t *)(uintptr_t)ADDR_ITER_STAMP)
@@ -1119,7 +1118,7 @@ void __cdecl ObjFrameSweep(void)
     g_iterStamp++;
 
     for (obj = FirstItem(); obj; obj = NextItem())
-        orig_obj_frame_step(obj);
+        ObjFrameStep(obj);
 
     if (g_mpSession)
         orig_comm_sync_check();
@@ -1781,6 +1780,94 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
     SendTrooperSetWeapon(unit, ((const AM2_Object *)w)->uid, slot);
 }
 
+typedef void (__cdecl *AM2_StepFn)(void *obj);
+#define orig_step_type1_4 ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE1_4)
+#define orig_step_type2   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE2)
+#define orig_step_type3   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE3)
+#define orig_step_type5   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE5)
+#define orig_step_type6   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE6)
+#define orig_step_type8   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE8)
+
+/* 0x004284D0, one caller -- ObjFrameSweep, for every registered object every
+ * frame. Copies the position aside and hands the object to its type's stepper.
+ *
+ * The position copy happens FIRST and unconditionally, ahead of every guard,
+ * so OBJ_OFF_PREV_POS is where the object was last frame even for an object
+ * whose stepper never runs. Anything that moves it does so afterwards.
+ *
+ * TYPES 1 AND 4 SHARE A HANDLER. The jump table at 0x00428564 holds 0x004284F9
+ * twice, so reading the eight bodies top to bottom and numbering as you go
+ * gets every arm after type 3 wrong -- the same trap the sub-state table set.
+ * Written as a shared `case` so the sharing is a fact of the source rather
+ * than a coincidence of two identical calls.
+ *
+ * WHICH ARMS ACTUALLY RUN, measured rather than assumed. A histogram probe
+ * over one Boot Camp mission -- 25,000,000 calls, so this is the hottest
+ * function in the tree by some margin:
+ *
+ *   type 1  23,896,810      type 5  0
+ *   type 2     108,766      type 6  0
+ *   type 3      62,152      type 7  0
+ *   type 4     932,272      type 8  0
+ *   out of range 0
+ *
+ * So HALF the dispatch is unexercised here, including type 7's
+ * ObjMarkIfOverdue, and the `type > 7` guard never fires at all. Worth knowing
+ * before reading a clean A/B as covering this function: it covers four arms.
+ *
+ * The shared arm IS covered from both sides -- type 1 and type 4 between them
+ * account for 24.8M of the calls -- so the one detail most likely to be
+ * transcribed wrong is the one best exercised.
+ *
+ * TYPE 2 IS THE ONLY ARM WITHOUT THE DESTROYED GUARD. In the original the
+ * check sits INSIDE seven of the eight arms and type 2 simply does not have
+ * it. Here it is hoisted to one test before the switch, written as
+ * `type != 1 && destroyed` -- equivalent, because the seven arms that have it
+ * all do the same thing with it and return, and it is the only difference
+ * between them.
+ *
+ * So the ASYMMETRY is reproduced while the duplication is not. That is worth
+ * being exact about: one `test` missing from one arm out of eight is precisely
+ * the shape of thing a tidy rewrite unifies away, and no frame comparison
+ * would ever notice. Hoisting keeps it in one place where it can be read;
+ * dropping the `type != 1` would lose it.
+ *
+ * That asymmetry is NOT exercised, though: it only shows when a destroyed
+ * type 2 is stepped, and nothing in these drives destroys anything. Verified
+ * by reading, like the arms above that never run.
+ *
+ * The ADDR_EVT_ID15_FLAG gate is the other way round from how it reads: when
+ * the flag is SET, only objects carrying OBJ_FLAG8_BIT40 are stepped at all.
+ * A clear flag steps everything. */
+void __cdecl ObjFrameStep(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t type;
+
+    *(uint32_t *)(o + OBJ_OFF_PREV_POS) = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_EVT_ID15_FLAG
+        && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BIT40))
+        return;
+
+    type = *(const uint32_t *)o - 1u;
+    if (type > 7u)
+        return;
+
+    if (type != 1u && (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+        return;
+
+    switch (type) {
+    case 0: case 3: orig_step_type1_4(obj); break;
+    case 1:         orig_step_type2(obj);   break;
+    case 2:         orig_step_type3(obj);   break;
+    case 4:         orig_step_type5(obj);   break;
+    case 5:         orig_step_type6(obj);   break;
+    case 6:         ObjMarkIfOverdue(obj);  break;   /* ours already */
+    default:        orig_step_type8(obj);   break;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -1789,6 +1876,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_OBJ_FRAME_STEP, (const void *)ObjFrameStep,
+                  "ObjFrameStep", 1);
     patch_replace(ADDR_SELECT_INVENTORY_SLOT, (const void *)SelectInventorySlot,
                   "SelectInventorySlot", 8);
     patch_replace(ADDR_TYPE2_ACTION_B, (const void *)Type2ActionB,

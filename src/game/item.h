@@ -219,6 +219,11 @@ void *__cdecl WeaponByUid(uint32_t uid);
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */
 void __cdecl Type2ActionB(void *obj);
 
+/* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
+ * ahead of every guard -- then dispatches to the object's type stepper. Types
+ * 1 and 4 share one; type 2 is the only arm with no destroyed check. */
+void __cdecl ObjFrameStep(void *obj);
+
 /* 0x00429C80. Release an item object's allocation. Idempotent: the byte at
  * +0x8C is both the guard and the record. `notify` gates a call that runs
  * BEFORE the free. Five callers. */

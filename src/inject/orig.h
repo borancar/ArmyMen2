@@ -1491,6 +1491,11 @@
 #define SOUND_REC_OFF_OWNER      0x14u   /* uid; the object making the sound */
 #define SOUND_REC_OFF_ACTIVE     0x18u
 #define OBJ_OFF_POS              0x12u   /* AM2_Point inside a game object */
+/* The copy ADDR_OBJ_FRAME_STEP makes of it on the way in, before any type
+ * handler can move the object -- so a handler that reads it sees where the
+ * object was LAST frame. Written unconditionally, ahead of every guard in that
+ * function, which is what makes it reliable for a handler that never runs. */
+#define OBJ_OFF_PREV_POS         0x16u   /* AM2_Point */
 #define SOUND_3D_CUTOFF          0x320   /* silence beyond this */
 #define SOUND_3D_FALLOFF         3       /* volume lost per unit */
 #define ADDR_INIT_WAVE_SOUNDS    0x0040C710u  /* int32(void) */
@@ -3418,7 +3423,24 @@ typedef struct {
  * thing that reads it: past it, bit 1 of the flags goes on. Both names ours. */
 #define OBJ_OFF_DEADLINE_58      0x58u
 #define OBJ_FLAG_OVERDUE         0x02u
-#define ADDR_OBJ_MARK_IF_OVERDUE 0x004355D0u /* void(void *obj) */
+/* The eight per-TYPE frame steppers ADDR_OBJ_FRAME_STEP dispatches to. Named
+ * by the type they serve, because the jump table at 0x00428564 is what
+ * establishes that and none of them names itself -- swept for pushed string
+ * literals and not one carries any.
+ *
+ * TYPES 1 AND 4 SHARE AN ARM. The table has 0x004284F9 twice, so reading the
+ * eight bodies top to bottom and numbering as you go gets everything after
+ * type 3 wrong. Take the order from the table, as with the sub-state arms.
+ *
+ * Type 7's is ADDR_OBJ_MARK_IF_OVERDUE, which already had a name from its own
+ * body -- a useful check that these really are per-frame handlers. */
+#define ADDR_STEP_TYPE1_4        0x00433EC0u  /* void(obj); types 1 AND 4 */
+#define ADDR_STEP_TYPE2          0x0044B7D0u  /* void(obj) */
+#define ADDR_STEP_TYPE3          0x0045D660u  /* void(obj) */
+#define ADDR_STEP_TYPE5          0x0043C110u  /* void(obj) */
+#define ADDR_STEP_TYPE6          0x00422B90u  /* void(obj) */
+#define ADDR_OBJ_MARK_IF_OVERDUE 0x004355D0u /* void(void *obj) -- type 7 */
+#define ADDR_STEP_TYPE8          0x0043D980u  /* void(obj) */
 #define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */
 #define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
