@@ -88,8 +88,6 @@ typedef void (__stdcall *am2_movie_slot_fn)(void);
 typedef void (__cdecl *am2_delete_fn)(void *);
 #define orig_delete (*(am2_delete_fn)ADDR_GAME_DELETE)
 
-typedef LPDIRECTDRAWSURFACE (__cdecl *am2_make_surface_fn)(int32_t w, int32_t h);
-#define orig_make_surface (*(am2_make_surface_fn)ADDR_MOVIE_MAKE_SURFACE)
 #define g_movieDSound (*(void **)(uintptr_t)ADDR_DSOUND)
 #define g_soundReady  (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
 
@@ -104,6 +102,37 @@ typedef void (__attribute__((thiscall)) *am2_movie_arg_fn)(void *movie, void *ar
 /* Non-zero once the movie subsystem has handed Smacker a DirectSound object. */
 #define g_movieSoundReady (*(const int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
 #define g_movieCurrent (*(void **)(uintptr_t)ADDR_MOVIE_CURRENT)
+
+/* 0x00445690, one caller. The movie's own offscreen surface.
+ *
+ * It takes a width and a height -- the original's caller computes them from
+ * the film's source rectangle and pushes both, and this cleans 8 bytes off the
+ * stack for them -- and then IGNORES them, creating a fixed 640x480 surface
+ * every time. Reproduced with the arguments still in the signature, because
+ * the caller genuinely passes them and a no-argument declaration would be a
+ * different ABI; the discard is the original's and is the point of the
+ * comment: a film smaller than the screen would still get a full-screen
+ * surface.
+ *
+ * "Would" rather than "does", and that is measured. Replacing the literals
+ * with `w` and `h` -- the mutation that tests exactly this claim -- changes
+ * nothing on the intro, because a probe says the caller passes 640 by 480
+ * both times it runs. The shipped film is already full-screen, so the discard
+ * is real code with no observable consequence on any drive here, and the
+ * frame it produces is identical either way.
+ *
+ * 0x40 is DDSCAPS_OFFSCREENPLAIN and the trailing 0 is the colour key, which
+ * for CreateOffscreenSurface means key index zero rather than none -- a
+ * negative is what asks for none. */
+LPDIRECTDRAWSURFACE __cdecl MovieMakeSurface(int32_t w, int32_t h)
+{
+    (void)w;
+    (void)h;
+    /* 640x480 as IMMEDIATES in the original, not ADDR_SCREEN_W/H. Kept
+     * literal: reading the globals instead would silently change behaviour in
+     * any mode where they are not 640x480. */
+    return CreateOffscreenSurface(0x280, 0x1E0, DDSCAPS_OFFSCREENPLAIN, 0);
+}
 
 /* Smacker names its audio tracks by bit, starting here and shifting up. */
 #define SMACK_TRACK_FIRST 0x2000u
@@ -305,7 +334,7 @@ void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
     /* Note this runs whether or not the open succeeded, on a source rectangle
      * that is still zero if it did not. Kept as written. */
     fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE) =
-        orig_make_surface(fld(movie, MOVIE_SRC_W, int32_t) -
+        MovieMakeSurface(fld(movie, MOVIE_SRC_W, int32_t) -
                           fld(movie, MOVIE_SRC_X, int32_t),
                           fld(movie, MOVIE_SRC_H, int32_t) -
                           fld(movie, MOVIE_SRC_Y, int32_t));
@@ -507,6 +536,8 @@ int movie_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_MOVIE_MAKE_SURFACE, (const void *)MovieMakeSurface,
+                        "MovieMakeSurface", 2);
     rc |= patch_replace(ADDR_MOVIE_STOP, (const void *)MovieStop, "MovieStop", 0);
     rc |= patch_replace(ADDR_MOVIE_SET_VOLUME, (const void *)MovieSetVolume,
                         "MovieSetVolume", 1);

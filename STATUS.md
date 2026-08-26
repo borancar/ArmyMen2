@@ -3035,10 +3035,33 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**The next move is a mission with squadmates**, because it would light up
+**`MovieMakeSurface` (`0x00445690`, 32 bytes) is reconstructed, and this one IS
+verified.** It was picked deliberately: after three commits of unexercised
+code, the `orig_` seams are a list of calls from our own code into the
+original, so anything reachable by a caller we already own is guaranteed to
+run. This one is on the intro path.
+
+The function takes a width and a height -- the original's caller computes them
+from the film's source rectangle, pushes both, and this cleans 8 bytes for them
+-- and then IGNORES them, making a fixed 640x480 surface every time. The
+arguments stay in the signature because the caller really passes them; the
+discard is the original's.
+
+Verified by watching the film render in full colour through our surface, with
+`MovieOpen` at 2 and `MoviePoll` past 970,000. Then the mutation that tests the
+claim directly -- use `w` and `h` instead of the literals -- and it changed
+NOTHING. A probe says why: the caller passes 640 by 480 both times. The shipped
+intro is already full-screen, so the discard is real code with no observable
+consequence on any drive here. Said in the source as "would" rather than
+"does".
+
+**The next move is still a mission with squadmates**, which would light up
 `FormationPoint`, `ResolveFormationPoint`, `ObjAnchorPoint` and `0x00404730`
-together -- four reconstructions with no execution evidence between them. That
-is worth more than the next function.
+together. Failing that, the seam list is the place to pick from: every entry is
+a call our own code already makes, so its coverage is known before the work
+starts. `ADDR_MISSION_NETWORKED` (`0x00421800`, 144 B) is read and understood
+-- it decides won-or-lost from the two players' team fields -- but it is
+multiplayer mission end, so it would be another unexercised one.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and
