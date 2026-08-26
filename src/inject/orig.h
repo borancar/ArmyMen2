@@ -4754,6 +4754,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_ANCHOR_POINT  0x00403AF0u  /* uint32_t(const void *obj) */
 /* 0x00404400, two callers. Writes the follower's formation position for
  * `slot` into `out`. Stays original; see OBJ_OFF_FORMATION_SLOT. */
+/* The twelve formation slots, {uint8 facing, pad, int16 distance, pad}. */
+#define ADDR_FORMATION_SLOTS   0x00473EA0u
+#define AM2_FORMATION_SLOTS        12
+#define AM2_FORMATION_SLOT_STRIDE  6u
+/* Slot 12 and above, which the table does not cover. Stays original. */
+#define ADDR_FORMATION_POINT_FAR 0x004042A0u /* void(follower, leader,
+                                              *      AM2_Point *, int32) */
+/* 0x00439F40, five callers, all of them `TileOfPoint(pt)` and then this with
+ * the same point. It reads ADDR_REGION_OF_CELL at that tile and dispatches
+ * through the function pointer at 0x00523DDC, rewriting the point; every
+ * caller discards the return. The name is ours and describes the effect --
+ * what the dispatch actually does is not established here. Stays original. */
+#define ADDR_SETTLE_POINT_IN_REGION 0x00439F40u /* int32_t(int32 tile,
+                                                 *         AM2_Point *) */
+/* The map's bounds in pixels, four int32 read as one 16-byte block out of the
+ * map file by 0x0042C440 and written nowhere else. Distinct from
+ * ADDR_MAP_EXTENT_X/Y, which are a different pair at 0x00514DD0. */
+#define ADDR_MAP_BOUNDS_LEFT     0x00514DF8u
+#define ADDR_MAP_BOUNDS_TOP      0x00514DFCu
+#define ADDR_MAP_BOUNDS_RIGHT    0x00514E00u
+#define ADDR_MAP_BOUNDS_BOTTOM   0x00514E04u
 #define ADDR_RESOLVE_FORMATION_POINT 0x00404580u /* void(follower, leader,
                                                   *      AM2_Point *out) */
 #define ADDR_FORMATION_POINT   0x00404400u  /* void(follower, leader,
@@ -5135,6 +5156,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *
  * A slot of 12 or more goes to 0x004042A0 instead, which is not reconstructed
  * and is reached by address. */
+/* An 8-bit heading. Read for types 2, 3 and 8 and ADDED to a formation slot's
+ * own facing before going to ADDR_COS8/ADDR_SIN8, which mask to 8 bits. */
+#define OBJ_OFF_FACING             0x40u   /* uint8_t */
 #define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
 /* The uid of what this object is following. 0x00404730 resolves it and drops
  * it -- writing 0 back -- when the leader is concealed, out of health, already

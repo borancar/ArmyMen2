@@ -3001,11 +3001,44 @@ mission far enough in for Sarge to have squadmates, which is a drive this
 project does not have -- the same shape as `RemoveFromItemList` needing
 something to die.
 
-**The next move is `0x00404400` itself** (384 bytes). Its callees are all named
-now except two, and both can stay original: the `slot >= 12` variant at
-`0x004042A0` and the tile resolver at `0x00439F40`. What it needs care over is
-the x87 -- `fild`/`fmul`/`fiadd` through `_ftol` -- and the two reverse trig
-lookups at `0x0042DD70` and `0x0042DDC0`.
+**`FormationPoint` (`0x00404400`, 384 bytes) is reconstructed**, which completes
+the formation pair. The slot's facing is added to the leader's, the distance is
+doubled for a type 3, and a type-3 leader gets one extra rule: a follower whose
+slot lies within a quarter turn of the leader's heading -- in FRONT of it -- is
+swung 0x3D or 0xC3 aside by the sign of the delta and pushed 0x20 further out.
+No standing in front of a moving vehicle. The result is clamped to the map
+bounds (`ADDR_MAP_BOUNDS_*`, four int32 read as one block out of the map file)
+and settled onto a tile.
+
+**My first hand-trace of its stack was WRONG, and a tool is what caught it.**
+Reading the frame by hand gave slots that contradicted each other -- the second
+`AngleDelta` argument came out as the `out` pointer, which is nonsense. A depth
+tracker over the disassembly showed why: my count had followed the early-return
+path through `add esp, 0x10` and `pop esi`, which the `slot < 12` branch jumps
+over. On the real fall-through the slots are consistent, and the argument is
+the leader's own facing. **Do not hand-count a frame across a branch you do not
+take** -- and the giveaway was that the wrong reading produced an absurdity
+rather than a plausible one, which is luck.
+
+Two details that would each have been a defect. `ADDR_ANGLE_DELTA` masks both
+arguments with 0xFF, which is what makes the original's dirty dword there
+harmless -- it stores a facing BYTE over a slot still holding pointer bytes.
+And the original keeps the whole expression in x87 and truncates once through
+`_ftol`; done here in double, which is exact for these magnitudes, with a C
+cast for the truncation.
+
+**Neither of the pair executes, and the A/B cannot see them.** 69,467 composed
+frames of Boot Camp with both counters at 0. `FormationPoint`'s other caller,
+`0x0043E0EF`, is original so its counter is not blind -- it simply is not
+reached. Both drivable missions start with a squad of ONE. So this is the
+largest piece of unexercised arithmetic in the tree and it is verified by
+reading alone; the A/B being clean says nothing about it either way, and is
+reported as no-regression rather than as coverage.
+
+**The next move is a mission with squadmates**, because it would light up
+`FormationPoint`, `ResolveFormationPoint`, `ObjAnchorPoint` and `0x00404730`
+together -- four reconstructions with no execution evidence between them. That
+is worth more than the next function.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and
