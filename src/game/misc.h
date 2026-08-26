@@ -675,6 +675,10 @@ int misc_install(void);
 }
 #endif
 
+/* Original: 0x0043B7C0. Hand every abandoned army to the AI. Network games
+ * only, so verified by reading. */
+void __cdecl AiTakeAbandoned(void);
+
 /* Original: 0x00461930. Run the seq walker over both contexts. */
 void __cdecl SeqRunBoth(void);
 

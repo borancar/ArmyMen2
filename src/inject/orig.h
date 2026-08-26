@@ -1236,6 +1236,15 @@
 #define ADDR_COMM_CLEAR_REMOTE   0x0040F620u /* thiscall void(this, int32 slot) */
 #define COMM_ARMY_OFF_REMOTE     0x20Cu
 #define COMM_ARMY_OFF_WAS_HERE   0x25Cu   /* what the query falls back to */
+/* 0x0043B7C0, one caller -- the per-frame path, and only in a network game.
+ * Walk the four army records; any that WAS here but now has no player has its
+ * .aai loaded, which is the AI taking the abandoned army over. The stride is
+ * AM2_PLAYER_STRIDE and the records begin at the comm object itself. */
+#define ADDR_AI_TAKE_ABANDONED   0x0043B7C0u  /* void(void) */
+/* 0x0043B700, one caller. Load one army's .aai through DefParseInfoFile and
+ * complain with "Couldn't parse %s!" if it will not read. */
+#define ADDR_LOAD_ARMY_AI        0x0043B700u  /* void(int32_t army) */
+#define AM2_COMM_ARMY_COUNT      4
 #define ADDR_COMM_FIND_PLAYER    0x0040F330u  /* thiscall int32(this,id), -1 if absent */
 #define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
                                                * "Remove Player numPlayers now = %d" */

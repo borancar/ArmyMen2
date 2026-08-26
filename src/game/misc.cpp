@@ -1098,6 +1098,44 @@ typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
 typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
 #define orig_seq_run ((AM2_SeqRunFn)(uintptr_t)ADDR_SEQ_RUN)
 
+typedef void (__cdecl *AM2_LoadArmyAiFn)(int32_t army);
+#define orig_load_army_ai ((AM2_LoadArmyAiFn)(uintptr_t)ADDR_LOAD_ARMY_AI)
+
+/* 0x0043B7C0, one caller -- the per-frame path, and reached only in a network
+ * game. The AI taking over armies whose players have gone.
+ *
+ * Two conditions per army and both are needed: COMM_ARMY_OFF_WAS_HERE set, so
+ * somebody once held it, and CommSlotHasPlayer false, so nobody holds it now.
+ * An army that was never occupied is left alone, which is what stops the AI
+ * being handed every empty slot at the start of a session.
+ *
+ * There is no "already done" flag. This runs every frame and will reload the
+ * .aai on each one for as long as the army stays abandoned -- unless loading
+ * it clears WAS_HERE, which is 0x0043B700's business and is not established
+ * here. Worth knowing before reading a repeated parse as a fault.
+ *
+ * Reached only in a network game and this project cannot start one, so it is
+ * verified by reading. Its counter reads 0 on a Boot Camp mission, which is
+ * the expected answer rather than a surprise: TakeMenuRequest guards the call
+ * on ADDR_NET_GAME. Confirmed installed the other way, against the log --
+ * 856 patch lines, 856 from checkpatches. */
+void __cdecl AiTakeAbandoned(void)
+{
+    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        army;
+
+    for (army = 0; army < AM2_COMM_ARMY_COUNT; army++) {
+        const uint8_t *rec = comm + (uint32_t)army * AM2_PLAYER_STRIDE;
+
+        if (!*(const int32_t *)(rec + COMM_ARMY_OFF_WAS_HERE))
+            continue;
+        if (CommSlotHasPlayer((void *)(uintptr_t)comm, army))
+            continue;
+
+        orig_load_army_ai(army);
+    }
+}
+
 /* 0x00461930, one caller -- the per-frame path. Run the seq walker over both
  * contexts, in this order.
  *
@@ -1156,6 +1194,8 @@ int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
 
 int misc_install(void)
 {
+    patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
+                  "AiTakeAbandoned", 0);
     patch_replace(ADDR_SEQ_RUN_BOTH, (const void *)SeqRunBoth,
                   "SeqRunBoth", 0);
     patch_replace(ADDR_COLOUR_DISTANCE, (const void *)ColourDistance,

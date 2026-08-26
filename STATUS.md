@@ -3050,7 +3050,28 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`MissionStartup` (`0x00444EF0`) raises the level's `startupN` script event
+**`AiTakeAbandoned` (`0x0043B7C0`) is the AI taking over armies whose players
+have gone.** Four army records at `AM2_PLAYER_STRIDE`, and two conditions per
+army, both needed: `COMM_ARMY_OFF_WAS_HERE` set, so somebody once held it, and
+`CommSlotHasPlayer` false, so nobody holds it now. An army that was NEVER
+occupied is left alone -- which is what stops the AI being handed every empty
+slot at the start of a session.
+
+The callee parses that army's `.aai` through `DefParseInfoFile` and complains
+`"Couldn't parse %s!"` if it will not read, which is what identifies the whole
+thing: this is CLAUDE.md's "left, AI takes over" from the other end.
+
+**There is no "already done" flag**, so this reloads the `.aai` every frame for
+as long as an army stays abandoned -- unless loading it clears `WAS_HERE`,
+which is the callee's business and is not established. Recorded so a repeated
+parse is not later read as a fault.
+
+Counter reads 0, which is the expected answer and not a surprise:
+`TakeMenuRequest` guards the call on `ADDR_NET_GAME`, and this project cannot
+start a session. Verified by reading; confirmed INSTALLED the other way, against
+the log -- 856 patch lines, 856 from `checkpatches`.
+
+**`MissionStartup` (`0x00444EF0`) raises the level's `startupN` script event**`MissionStartup` (`0x00444EF0`) raises the level's `startupN` script event
 and then autosaves.** The event name is BUILT rather than looked up -- the
 level index forced to 1 when not positive, so a level that set none still fires
 `startup1` -- and a script declaring no such name simply raises nothing.
