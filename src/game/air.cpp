@@ -134,6 +134,70 @@ void __cdecl RevealObj(void *obj)
     }
 }
 
+/* 0x004295C0, one caller -- WndProc's setup-done handler, which passes bit 18
+ * of the game flags, so fog is a negotiated multiplayer option.
+ *
+ * The argument is INVERTED against the flag it sets: a non-zero argument turns
+ * fog OFF and returns at once. Only turning fog ON does any work, and what it
+ * does is reveal every type 2/3/8 object first, so the fog starts from a clean
+ * slate rather than from whatever the previous mission left behind.
+ *
+ * The inner body is RevealObj's MINUS ONE LINE, and the missing line is the
+ * point: RevealObj also sets OBJ_FLAG_REVEALED, and this does not. So it
+ * cannot be written as a call to RevealObj however similar the two look --
+ * that would leave every object on the map carrying a revealed flag it never
+ * had, and RevealNearby skips an object already carrying it. The original
+ * inlines the shared part and drops that one write; reproduced the same way.
+ *
+ * Everything else matches: guard on CONCEALED, clear it, then walk the rows
+ * clearing ROW_FLAG_REMOVED before RowUpdate, which is what re-links each row
+ * into the map's cell lists.
+ *
+ * VERIFIED BY READING, and the wall is a known one. The single call site is
+ * WndProc's AM2_WM_SETUP_DONE arm, and that message is posted by the ready /
+ * end-setup handshake -- one of the five window messages this project can only
+ * reach with a live DirectPlay session and a second player. So it is the same
+ * standing as those five, and weaker than the rest of this file.
+ *
+ * What IS checked is the shape rather than the run: the inner body is
+ * RevealObj's, which is exercised, and the one line that differs is called out
+ * above precisely because a reader comparing them would otherwise assume they
+ * are the same code. */
+void __cdecl SetFogOfWar(int32_t noFog)
+{
+    void *obj;
+
+    if (noFog) {
+        *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 0;
+        return;
+    }
+    *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 1;
+
+    for (obj = FirstItem(); obj; obj = NextItem()) {
+        uint8_t *o = (uint8_t *)obj;
+        uint32_t flags;
+        int32_t  i;
+
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            continue;
+        if (!ObjIsTypeIn238((const AM2_Object *)obj))
+            continue;
+
+        flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+        if (!(flags & OBJ_FLAG_CONCEALED))
+            continue;
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
+
+        for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+            uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+
+            *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
+            RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        }
+    }
+}
+
 /* 0x004035F0, one caller, on the per-frame path. Zero two counters -- and
  * both of them are vestigial, which took a whole-image scan to be sure of
  * rather than the usual one below the CRT line.
@@ -588,4 +652,6 @@ void air_install(void)
                   "SaveAirSection", 1);
     patch_replace(ADDR_LOAD_AIR_SECTION, (const void *)LoadAirSection,
                   "LoadAirSection", 1);
+    patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
+                  "SetFogOfWar", 1);
 }

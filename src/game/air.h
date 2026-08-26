@@ -138,6 +138,12 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj);
  * unconditionally and is what callers test, while OBJ_FLAG_CONCEALED gates the
  * row work and is lowered by it. ADDR_OBJ_CONCEAL is the exact inverse. */
 void __cdecl RevealObj(void *obj);
+
+/* 0x004295C0. Sets the fog flag from an INVERTED argument -- non-zero turns
+ * fog off -- and, when turning it on, reveals every type 2/3/8 object so the
+ * fog starts from a clean slate. Not a call to RevealObj: it omits that
+ * function's OBJ_FLAG_REVEALED write, deliberately. */
+void __cdecl SetFogOfWar(int32_t noFog);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded
