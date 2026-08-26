@@ -41,13 +41,15 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** Fifteen analysis
+**`make check` runs everything that does not need the game.** **18** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
-said "eight" here for a long time after it stopped being eight, which is what
-a hand-maintained number in prose always comes to.
+said "eight" here for a long time after it stopped being eight, and then said
+"fifteen" while the recipe ran seventeen -- a warning about stale numbers is
+not a defence against one. `checkclaims.py` counts the recipe now, so this
+sentence cannot drift again.
 
-One of the fifteen is `tools/checkclaims.py`, which reads the numeric claims out
+One of the 18 is `tools/checkclaims.py`, which reads the numeric claims out
 of *this file* and recomputes them. It exists because three separate figures
 here were found stale by measuring rather than reading, each from the same
 cause: a tool changed, some prose was updated, the rest kept asserting the old

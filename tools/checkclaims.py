@@ -85,6 +85,22 @@ def module_split():
     return len(srcs) - len(win32), len(win32)
 
 
+def check_tool_count():
+    """How many analysis tools `make check` actually runs.
+
+    CLAUDE.md's own paragraph about this says it "said eight here for a long
+    time after it stopped being eight, which is what a hand-maintained number
+    in prose always comes to" -- and then said fifteen while the recipe ran
+    seventeen. A warning about stale numbers is not a defence against one.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    text = open(os.path.join(root, "Makefile"), encoding="utf-8").read()
+    m = re.search(r"^\tfor t in ([a-z0-9 ]+); do", text, re.M)
+    if not m:
+        raise SystemExit("checkclaims: cannot find the check recipe's tool list")
+    return (len(m.group(1).split()),)
+
+
 def claims():
     com = com_rows()
     game = [r for r in com if int(r["func"], 16) < CRT_START and r["func"] != "0x00000000"]
@@ -120,6 +136,10 @@ def claims():
         ("functions calling the Lock/Unlock bracket, and how many are ours",
          r"Measured: \*\*(\d+) functions\*\* call the bracket and \*\*(\d+)\*\*",
          (total, ours)),
+
+        ("analysis tools `make check` runs",
+         r"does not need the game\.\*\* \*\*(\d+)\*\* analysis",
+         check_tool_count()),
     ]
 
 

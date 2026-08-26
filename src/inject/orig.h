@@ -337,7 +337,6 @@
 /* The entry for ' ' inside that table -- 0x006598D4 + 0x20 * 2 -- which is
  * what TextExtent reads to get a line height without measuring anything. */
 #define ADDR_GLYPH_OFFSET_SPACE 0x00659914u
-#define ADDR_DRAW_TEXT_CLIPPED 0x00446AB0u /* void(x,y,text,font,RECT,colour) */
 /* 0x004468A0, nine callers: how wide a string is in a font, and how tall a
  * line is. The width is the sum of each glyph's own width; '^' is skipped as
  * an escape and anything below 0x1F is skipped as a control. The height does
@@ -1077,9 +1076,6 @@
 #define ADDR_EVENT_CLOSE         0x00402170u  /* void(void *holder) */
 /* The four lists, in the order they are created. */
 #define ADDR_MSG_LIST_POOL       0x0048D8E8u  /* the free-buffer pool */
-#define ADDR_MSG_LIST_B          0x004F48C8u
-#define ADDR_MSG_LIST_C          0x0048D8D8u
-#define ADDR_MSG_LIST_D          0x004F8780u
 /* 400 records of 0x28 bytes, each pointing at 0x400 bytes of buffer. */
 #define ADDR_PACKET_RECORDS      0x004F48F8u
 #define ADDR_PACKET_BUFFERS      0x0048D978u
@@ -1096,7 +1092,6 @@
 #define ADDR_PACKET_SLOT_RESET   0x00402750u  /* void(int32_t), six times */
 #define ADDR_PACKET_THREAD_PROC  0x00401F00u  /* the thread, stays original */
 #define ADDR_PACKET_THREAD_ID    0x004F8B90u  /* DWORD */
-#define ADDR_PACKET_THREAD       0x004F48D8u  /* HANDLE */
 #define ADDR_STR_THREAD_FAILED   0x0047384Cu  /* "Error launching packet thread" */
 #define ADDR_GAME_SRAND          0x00464416u  /* void(uint32_t) */
 #define ADDR_GAME_RAND           0x00464420u  /* int32_t(void) */
@@ -1350,7 +1345,6 @@
 /* MSVC's rand, the LCG at 0x00464420 with its state in 0x0048CC1C. Named
  * here because game code that draws from it must draw from THIS one -- the
  * sequence is the image's, and libc's would leave it standing still. */
-#define ADDR_GAME_RAND           0x00464420u /* int32_t(void) */
 #define ADDR_SPEAK_LINE          0x0040BFF0u /* void(int32 group, int32 owner) */
 #define ADDR_VOICE_GROUPS        0x00474440u /* {int32 count; const char *[4]} */
 #define AM2_VOICE_GROUP_STRIDE   20
@@ -1361,13 +1355,11 @@
 #define SOUND_REC_OFF_PRIORITY   0x0Cu
 #define SOUND_REC_OFF_LOOPING    0x1Cu
 #define SOUND_VOICE_SLOT_HI      0x10    /* slot 16, like slot 0, is a voice */
-#define ADDR_POINTS_EQUAL        0x0042E140u /* int32(const AM2_Point*, const AM2_Point*) */
 /* 0x00457750, 21 callers. Reconstructed in src/game/army.cpp -- the name was
  * already here and is kept, being the more careful of the two readings. */
 #define ADDR_LOOKUP_OWNER_OBJ    0x00457750u /* void *(uint32 owner) */
 #define SOUND_DYN_OFF_BUFFER     0x00u
 #define SOUND_DYN_OFF_DATA       0x04u
-#define SOUND_SLOT_STRIDE        0x10u
 #define ADDR_RELEASE_SOUND_BUFS  0x0040C7D0u  /* void(void), 8 call sites */
 #define ADDR_INIT_DIRECTSOUND    0x0040C800u  /* int32_t(void); 1 on success */
 #define ADDR_SET_STREAM_VOLUME   0x0040CE90u  /* void(int32 pan) */
@@ -1756,7 +1748,6 @@
  *
  * The shape is worth knowing before reading any of them: the panel is a child
  * of the dialog, and everything else is a child of the PANEL. */
-#define ADDR_QUIT_CONFIRM_CTOR    0x0044EB50u /* thiscall w *(w, bmp) */
 #define VTABLE_QUIT_DIALOG       0x0046FAF4u
 #define VTABLE_REPLAY_DIALOG     0x0046FB08u
 #define VTABLE_DELPLAYER_DIALOG  0x0046FB6Cu
@@ -3337,7 +3328,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MAP_CHECKSUM_VAL    0x00511CCCu  /* uint32_t */
 #define ADDR_MP_PREVIEW_SETBITMAP 0x00454AD0u /* thiscall(const char *) */
 #define ADDR_SHOW_BAD_PREVIEW    0x00430330u  /* void(AM2_Widget *) */
-#define ADDR_STR_BITMAPS_DIR     0x00478670u  /* "bitmaps" */
 #define ADDR_STR_BAD_MP_PREV     0x004870B4u  /* "bad_mp_prev.bmp" */
 #define orig_mp_preview_setbitmap \
             ((void (__attribute__((thiscall)) *)(void *, const char *)) \
@@ -4277,7 +4267,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_DBL_MS_PER_SEC      0x0046F990u  /* 1000.0 */
 #define ADDR_DBL_MAX_PERIOD      0x0046F988u  /* 1.0 -- worse than 1 kHz loses */
 #define ADDR_STR_HIGH_PERF       0x00485438u  /* "Using High Performance Counter\n" */
-#define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE, ArmyMenMutex */
 /* Was ADDR_SHUTDOWN_OBJ, which named the ONE teardown call site rather than
  * the object. It is a {capacity, count, items} ptr list of object UIDs, capped
  * at 64 and deduplicated on the way in, and adding to it also sets bit 0x400
