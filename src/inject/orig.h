@@ -3001,6 +3001,11 @@ typedef struct {
  * calls "the notify". That one is kept: it describes the same body just as
  * well, and renaming an established name for a synonym is churn. */
 #define AM2_SUBSTATE_ESCAPE        0x22
+/* 0x21 is 33, ordinary play -- what ADDR_MENU_MODE reads through a whole
+ * mission and what Substate22 puts back when the info bitmap is dismissed.
+ * ADDR_MENU_MODE's own comment already said "0x21 = back to play"; this is
+ * that number given a name so a use site does not have to carry it. */
+#define AM2_SUBSTATE_PLAY          0x21
 /* DirectInput scancode 1. Promoted out of widget.cpp, which had it as a local:
  * the widget layer and the in-mission paused frame both test it, and both test
  * it as RELEASED -- !IsKeyDown && KeyChanged. One definition, not two. */

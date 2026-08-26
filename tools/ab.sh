@@ -435,7 +435,18 @@ play() {
         { drive ctl "dump 511DA4 4"; drive ctl "dump 511B08 16"; } 2>/dev/null \
             > "$WORK/$cfg-$side.state" || true
         drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
-        sleep 6
+        # RE-ENTER state 3 before the run's final shot, which ab.sh takes at
+        # the very end. Without this the final frame lands seconds after the
+        # state has fallen back to 0, where the intro film is still stepping --
+        # and a film frame is meaningless by construction, exactly as `intro`
+        # says. Measured before it was fixed: four runs of ONE build gave
+        # 11056, 5750, 0 and 5750 on that frame while the mid frame was 0 every
+        # time. Re-entering puts both shots on the same stable screen.
+        sleep 3
+        drive ctl "poke 511B08 006F6433" >/dev/null 2>&1
+        drive ctl "poke 511DB0 3" >/dev/null 2>&1
+        drive ctl "poke 511DAC 1" >/dev/null 2>&1
+        sleep 1
     fi
 
     if [ "$cfg" = movies ]; then

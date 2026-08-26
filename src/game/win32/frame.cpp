@@ -17,17 +17,14 @@
 #include "../gameproc.h"  /* RequestState -- reconstructed */
 #include "../misc.h"      /* IsKeyDown, KeyChanged -- reconstructed */
 #include "sprite.h"       /* DrawSprite -- reconstructed */
-#include "mapdraw.h"      /* SetDrawTarget -- reconstructed */
 #include "../image.h"     /* AM2_IMAGE */
 #include "../gamedir.h"   /* SetGameDir -- reconstructed */
 #include "winmain.h"      /* Ticks -- reconstructed */
 #include "audio.h"       /* PlayDynamicSound, StopNamedSound */
-#include "sprite.h"      /* FreeBitmap -- reconstructed */
 #include "../script.h"   /* ReadScript -- reconstructed */
 #include "../event.h"    /* MissionStartup, TimerTick */
 #include "../air.h"      /* ClearFrameCounts */
 #include "widget.h"      /* HudUpdate, HudPaint */
-#include "mapdraw.h"     /* ViewUpdate */
 #include "../item.h"     /* ObjFrameSweep and the per-frame steps */
 #include "dplay.h"       /* CommNoBuffers */
 
@@ -55,6 +52,8 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
  * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
+/* Spelled exactly as surface.cpp spells it; checkglobals enforces that. */
+#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 #define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 #define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
 #define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
@@ -252,6 +251,8 @@ typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
 #define orig_load_bitmap  ((AM2_LoadBitmapFn)(uintptr_t)ADDR_LOAD_BITMAP)
 
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
+/* Spelled exactly as surface.cpp spells it; checkglobals enforces that. */
+#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
 
 /* 0x00425CD0. Sub-state 33's PAUSED arm -- what an in-mission frame does while
  * something has the game stopped, where TakeMenuRequest runs when nothing has.
@@ -401,6 +402,7 @@ void __cdecl FramePost(void)
 
 /* Defined below, beside the rest of the per-frame chain. */
 void __cdecl TakeMenuRequest(void);
+void __cdecl Substate22(void);
 void __cdecl StateEnter3(void);
 void __cdecl StateEnter0(void);
 
@@ -531,7 +533,7 @@ void __cdecl State2Frame(void)
      * unknown sub-state is not an error. Arm 32 is in range and does the same
      * nothing, by pointing at that tail in the table. */
     if (arm == 0) {
-        call0(ADDR_SUBSTATE22);
+        Substate22();
     } else if (arm >= AM2_SUBSTATE_PAINTED_FIRST
                && arm <= AM2_SUBSTATE_PAINTED_LAST) {
         uint32_t painter = kSubStatePainter[arm - AM2_SUBSTATE_PAINTED_FIRST];
@@ -823,6 +825,83 @@ void __cdecl StateEnter0(void)
 }
 
 
+/* 0x00425C10, one caller -- the sub-state table, arm 0x16. The INFO BITMAP,
+ * which F1 raises during a mission: MissionInput loads the level's bitmap,
+ * pauses with flag 8 and puts the sub-state here, and this is what holds it on
+ * screen and takes it away again.
+ *
+ * Three parts and the ORDER between the first two is what makes it work. A
+ * pending menu request is handled FIRST and unconditionally: the bitmap is
+ * freed, the sub-state goes back to 0x21 -- ordinary play -- and both the
+ * request and the dirty flag are cleared. That request is what the third part
+ * sets, so the dismissal takes effect on the NEXT frame rather than inside the
+ * frame that noticed the click. Nothing here is re-entrant and it does not
+ * need to be.
+ *
+ * The second part paints, once, and only while the overlay is dirty -- the
+ * flag is cleared before the bitmap is even tested, so a null bitmap still
+ * consumes the repaint rather than leaving it pending for ever.
+ *
+ * The centring is against ADDR_SCREEN_W/H, NOT the ADDR_BITMAP_AREA pair that
+ * RefreshDraw uses for the same job. Two different screen-size pairs live in
+ * this image and they are not interchangeable; taken from the operands rather
+ * than from what the other centring site does. Both shifts are `sar`, so
+ * signed, which matters for a bitmap wider than the screen.
+ *
+ * The third part dismisses. Either the event-flag-8 test passes, or mouse
+ * button 0 is BOTH down and changed -- a click, not a hold. It unpauses flag 8
+ * and raises the menu request the first part will consume.
+ *
+ * VERIFIED BY DRIVING THE WHOLE ROUND TRIP, which exercises all three parts in
+ * one go. In a live mission, reading the sub-state and the bitmap slot over
+ * the control socket:
+ *
+ *   play         0x21   bmp = -
+ *   after F1     0x16   bmp = 00896f04   raised, loaded, painted
+ *   after click  0x21   bmp = 00000000   dismissed and FREED
+ *
+ * The counter is blind -- the sub-state dispatcher is ours -- so the globals
+ * are the evidence, and they are better evidence than a count would have been.
+ *
+ * Tested in the failing direction by dropping the FreeBitmap: the slot still
+ * reads 00896f04 after the click. That is a LEAK, and the screen returns to
+ * play looking exactly right either way, so no pixel comparison could have
+ * found it. */
+void __cdecl Substate22(void)
+{
+    if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
+        FreeBitmap(&g_currentBitmap);
+        *(int32_t *)(uintptr_t)ADDR_MENU_MODE        = AM2_SUBSTATE_PLAY;
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
+        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY    = 0;
+        return;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+        void *bmp = g_currentBitmap;
+
+        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+        if (bmp) {
+            int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
+            int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
+
+            SetDrawTarget(g_primarySurface);
+            DrawSprite((AM2_Sprite *)bmp,
+                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W - w) >> 1,
+                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H - h) >> 1,
+                       0);
+        }
+    }
+
+    if (((am2_int_fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)()
+        || (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)) {
+        SendGamePause(0, AM2_EVENT_FLAG_8);
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+    }
+}
+
+
 /* 0x00426790. State 4 -- leaving. Posts WM_CLOSE to the game's own window and
  * clears the entered flag so it happens once, and there is nothing else in it:
  * the shutdown proper runs from WndProc. */
@@ -860,6 +939,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_SUBSTATE22, (const void *)Substate22,
+                        "Substate22", 0);
     rc |= patch_replace(ADDR_STATE0_ENTER, (const void *)StateEnter0,
                         "StateEnter0", 0);
     rc |= patch_replace(ADDR_STATE3_ENTER, (const void *)StateEnter3,
