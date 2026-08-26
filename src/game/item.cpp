@@ -266,7 +266,7 @@ void __cdecl RowRelease(void *row, void *desc)
  * The header is {?, count, rows, capacity} and the object reads the same two
  * dwords from its own side as OBJ_OFF_ROW_COUNT and OBJ_OFF_ROWS -- one
  * structure seen two ways, which is why the offsets look four bytes apart
- * from the shape TakeOffMap uses.
+ * from the shape RevealObj uses.
  *
  * The count is re-read every iteration, as it is everywhere else in this
  * family, and the array is freed only when there is one -- but the CAPACITY

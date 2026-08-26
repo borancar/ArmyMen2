@@ -142,7 +142,6 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
  */
 #define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 #define g_eventFlags   (*(uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
-#define g_aiControlled (*(int32_t *)(uintptr_t)ADDR_AI_CONTROLLED)
 /* The multiplayer-session flag, and it is spelled that way here because that
  * is what it IS -- OnHostChanged writing 1 into it is not a second meaning,
  * it is a machine that has just become the host asserting there is a session.
@@ -183,7 +182,7 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_comm_reset     (*(am2_comm_void_fn)ADDR_COMM_RESET_STATE)
 #define orig_remove_player  (*(am2_int_fn2)ADDR_REMOVE_PLAYER)
 #define orig_show_mp_result (*(am2_int_fn2)ADDR_SHOW_MP_RESULT)
-#define orig_set_ai         (*(am2_int_fn2)ADDR_SET_AI_CONTROL)
+#define orig_set_fog         (*(am2_int_fn2)ADDR_SET_FOG_OF_WAR)
 #define orig_lobby_reset    (*(am2_void_fn2)ADDR_LOBBY_RESET)
 #define orig_hud_message    (*(am2_str_int_fn)ADDR_HUD_MESSAGE)
 
@@ -320,7 +319,7 @@ static LRESULT OnSetupDone(void)
     uint8_t *comm = g_commObject;
 
     g_netGame = 0;
-    orig_set_ai((int32_t)((g_gameOverFlags >> 18) & 1u));
+    orig_set_fog((int32_t)((g_gameOverFlags >> 18) & 1u));
     PlayDynamicSound((const char *)(uintptr_t)ADDR_STR_ALLRIGHT_WAV,
                       0, 0, 0, 0, 0, 3, 0);
     orig_lobby_reset();

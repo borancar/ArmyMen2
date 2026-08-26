@@ -2920,17 +2920,36 @@ right. All three candidates are READ now and none dissolves it --
 `ADDR_ROW_UNREGISTER_ALL` is correctly named, `ObjFlagBit0` is `row->flags & 1`,
 and `0x0041DD90` is the dirty-rectangle collector and touches no flag. So the
 branch stands, and the pair are exact opposites whose object-level names
-contradict them. **That move worked and the answer is that `OBJ_FLAG_ON_MAP` is inverted.**
-Only two functions test either flag; one is `TakeNearbyOffMap`'s known guard,
-and the other -- `0x00404730` -- drops an attachment target when `0x200` is
-set, alongside zero health and already-destroyed. So `0x200` means HIDDEN, both
-callers become self-consistent, and `TakeOffMap` puts an object BACK.
+contradict them. **Done, and the whole family was inverted.** `0x0041A1B0` walks the registry
+and applies one of the two functions to every enemy object, chosen by a flag it
+flips on entry -- and its only two callers are arms of the cheat table, which
+name the pair outright:
 
-Not renamed yet, and that is the remaining work rather than timidity:
-`TakeOffMap` is reconstructed and `TakeNearbyOffMap` still reads the other way,
-skipping objects that carry `0x800` and stamping a return-at time. **Read what
-`0x0800` is for and what consumes `OBJ_OFF_RETURN_AT`**, then rename both the
-flag and the function together.
+    "I see everything!"                 -> reveal every object
+    "I bury my head 'neath the sand."   -> conceal every object
+
+So this was never map registration at all. It is the **fog of war**, `0x0200`
+is CONCEALED, `0x0800` is REVEALED, and the evidence is the game's own strings
+rather than another reading of the same two bodies. Renamed together:
+`OBJ_FLAG_ON_MAP`/`OBJ_FLAG_OFF_MAP` -> `OBJ_FLAG_CONCEALED`/`OBJ_FLAG_REVEALED`,
+`TakeOffMap` -> `RevealObj`, `TakeNearbyOffMap` -> `RevealNearby`,
+`OBJ_OFF_RETURN_AT` -> `OBJ_OFF_REVEALED_UNTIL`, and `ADDR_AI_CONTROLLED` --
+itself a name off a call site -- -> `ADDR_FOG_OF_WAR`. `ADDR_OBJ_CONCEAL` and
+`ADDR_TOGGLE_FOG_OF_WAR` are named for the first time.
+
+Everything that looked asymmetric dissolves: `RevealNearby` skips an object
+already carrying `0x0800` because it is already revealed, and the sweep reads
+the stamp it leaves to decline concealing one whose window is still open. An
+air strike lights up what it flies over.
+
+One family error came out with it. `air.cpp` cleared a ROW's bit 1 using
+`OBJ_FLAG_OVERDUE`, which is an OBJECT flag in a different struct that merely
+shares the value 0x02. It is `ROW_FLAG_REMOVED` now.
+
+**The next move is `0x00404730`** -- the function that supplied the decisive
+evidence and has still not been read for its own sake. It resolves an object's
+attachment target through `+0xC4` and rejects it on five conditions, which
+makes it the clearest statement in the image of what a valid target is.
 
 Worth saying why this is the recommendation rather than "write the function":
 the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and

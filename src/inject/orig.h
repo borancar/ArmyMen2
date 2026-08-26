@@ -1176,7 +1176,12 @@
 #define ADDR_COMM_SEND_PLAYERS   0x00411270u  /* void(int32) -- "SendPlayerMsg for %d" */
 #define ADDR_COMM_SESSION_OVER   0x0040FB70u  /* thiscall void(this), tail-calls 0x40FAA0 */
 #define ADDR_SHOW_MP_RESULT      0x00426A90u  /* void(int32) -- loads bitmaps/mpwon.bmp */
-#define ADDR_SET_AI_CONTROL      0x004295C0u  /* void(int32), sets 0x00476FB0 */
+/* Sets the fog flag, and its argument is INVERTED against it: a non-zero
+ * argument turns fog OFF. It also reveals every type 2/3/8 object on the way
+ * in, so turning fog on starts from a clean slate rather than from whatever
+ * the last frame left. WndProc's setup-done handler passes bit 18 of the game
+ * flags, which makes fog a negotiated multiplayer option. */
+#define ADDR_SET_FOG_OF_WAR      0x004295C0u  /* void(int32_t noFog) */
 #define ADDR_LOBBY_RESET         0x00413480u  /* void(void), 320 bytes */
 #define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */
 #define ADDR_MENU_MESSAGE        0x00431C30u  /* void(const char *, int32, int32) */
@@ -1221,7 +1226,10 @@
  * 0x0045A030; that is a function too, not a sprite. See src/game/army.h. */
 #define ADDR_FOR_EACH_ARMY_OBJECT 0x00457820u /* void(army, void(*)(void*)) */
 
-#define ADDR_AI_CONTROLLED       0x00476FB0u  /* int32_t, set by ADDR_SET_AI_CONTROL */
+/* Non-zero means fog is ON -- objects get concealed. It was ADDR_AI_CONTROLLED,
+ * a name taken from a call site; the cheat strings that drive it are about
+ * seeing, not about who is playing. */
+#define ADDR_FOG_OF_WAR       0x00476FB0u  /* int32_t, 1 = fog on */
 #define ADDR_PAUSE_FLAGS         0x005122FCu  /* uint32_t, one bit per reason */
 /* Raised by 0x00411000 and lowered by the 0x046E handler, and read from 21
  * places -- the lobby, the overlay, TakeMenuRequest and the mission code. The
@@ -4612,64 +4620,45 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00409710, "DoAirSupport paratroopers where: %d, from %d, army %d,
  * count: %d" -- its own name, on its own line. Three callers. */
 #define ADDR_DO_AIR_SUPPORT    0x00409710u  /* int32_t(int32, uint32, uint32) */
-/* 0x004296E0, 96 bytes, eight callers. Take one object off the map: raise
- * 0x0800 in its flags, and if 0x0200 was up, lower it and unregister every row
- * of the object's sub-list from the map descriptor. The name is ours; 0x0800
- * is what callers test to know it has already been done. */
-#define ADDR_OBJ_TAKE_OFF_MAP  0x004296E0u  /* void(obj *) */
-#define OBJ_FLAG_OFF_MAP       0x0800u
-/* The bit that says the object's rows are REGISTERED with the map descriptor.
- * Taking one off the map lowers it and unregisters; nothing raises it here.
+/* THE FOG OF WAR. What follows replaces three commits of a puzzle, and the
+ * puzzle only existed because two names were inverted from the start.
  *
- * 0x00429650 is what raises it -- the counterpart this comment says is absent
- * -- and reading it leaves one question open that is worth stating rather than
- * guessing at. It lowers OBJ_FLAG_OFF_MAP and raises this one, which is the
- * clean inverse of TakeOffMap, and 0x0800's meaning is not in doubt:
- * TakeNearbyOffMap SKIPS an object that already carries it and stamps a
- * return-at time after calling TakeOffMap, so a caller's guard confirms it.
+ * 0x0041A1B0 walks the whole registry and, for every enemy object of type 2,
+ * 3 or 8 that is not already destroyed, calls one of these two -- chosen by
+ * ADDR_FOG_OF_WAR, which it flips on entry. Its two callers are arms of the
+ * cheat table at 0x00417B80, and they name the pair outright:
  *
- * But 0x00429650 also sets bit 1 on every row before calling ADDR_ROW_UPDATE,
- * and bit 1 is precisely what makes that function REMOVE rather than re-link.
- * An object being put back on the map removing its own rows does not read
- * right. All three candidates have now been READ and none of them dissolves
- * it; what they do is make it exact.
+ *   "I see everything!"                 clears the flag -> ADDR_OBJ_REVEAL
+ *   "I bury my head 'neath the sand."   sets it         -> ADDR_OBJ_CONCEAL
  *
- *   ADDR_ROW_UNREGISTER_ALL is correctly named -- it walks the row's cell
- *   entries, unlinks each from its cell list and marks it -1.
- *   ObjFlagBit0 is `row->flags & 1`, and a clear bit 0 routes ADDR_ROW_UPDATE
- *   straight to that removal.
- *   0x0041DD90 is the dirty-rectangle collector -- IntersectRect into a
- *   500-entry list with an overflow flag -- and touches no row flag at all.
+ * So 0x0200 is CONCEALED and 0x0800 is REVEALED, established by the game's own
+ * strings rather than by inference. The two functions are exact inverses --
+ * each guarded on 0x0200, each setting it the other way, each writing row bit
+ * 1 the other way -- which is why every reading of them in isolation came out
+ * self-consistent and contradictory with its neighbour.
  *
- * So ADDR_ROW_UPDATE's branch stands as read: bit 1 SET removes, bit 1 CLEAR
- * re-links. And the two callers are opposites of each other in a way their
- * object-level names contradict:
+ * With that, the last piece falls out. RevealNearby skips an object already
+ * carrying 0x0800 because it is already revealed, and stamps
+ * OBJ_OFF_REVEALED_UNTIL so it stays that way; the sweep's other arm reads
+ * exactly that stamp and declines to conceal an object whose window is still
+ * open. Nothing is asymmetric and nothing needs explaining away.
  *
- *   TakeOffMap        sets OBJ_FLAG_OFF_MAP, and CLEARS row bit 1 -> re-links
- *   0x00429650        clears it and raises ON_MAP, and SETS bit 1 -> removes
- *
- * The other callers settle it, and they say 0x200 is BACKWARDS. Only two
- * functions in the image test either flag through the high-byte form the
- * compiler uses, and one is TakeNearbyOffMap's known guard. The other is
- * 0x00404730, which resolves an object's attachment target and DROPS it when
- * any of these hold: `flags & 0x200`, health at +0x62 is zero, already
- * destroyed, a type 2 with a zero field, or a type 3. So 0x200 keeps company
- * with dead-and-gone, not with registered-on-the-map.
- *
- * With 0x200 read as HIDDEN, both callers become internally consistent and
- * the puzzle disappears:
- *
- *   0x00429650   requires 0x200 clear, SETS it, removes the rows  -> hide
- *   TakeOffMap   requires 0x200 set,   CLEARS it, re-links rows   -> unhide
- *
- * Which means OBJ_FLAG_ON_MAP is inverted and the name TakeOffMap with it --
- * it puts an object back. NOT renamed here, deliberately: TakeOffMap is
- * reconstructed and has a caller whose behaviour still reads the other way,
- * since TakeNearbyOffMap skips objects carrying 0x800 and stamps a return-at
- * time after calling it. One more reading is needed -- what 0x800 is for, and
- * what consumes OBJ_OFF_RETURN_AT -- before a rename touches live code.
- * Recorded so that reading starts from evidence instead of from the puzzle. */
-#define OBJ_FLAG_ON_MAP        0x0200u
+ * The names this replaces were OBJ_FLAG_ON_MAP, OBJ_FLAG_OFF_MAP, TakeOffMap
+ * and TakeNearbyOffMap, and every one of them meant the opposite of what it
+ * said. They came from reading 0x004296E0's row loop as unregistering, which
+ * is what it does -- to the CONCEALED half of a two-state pair, so the object
+ * disappears from the map when the flag goes DOWN. */
+#define ADDR_OBJ_REVEAL        0x004296E0u  /* void(obj *) */
+/* The counterpart, 144 bytes, thirteen callers. Takes a second argument that
+ * ADDR_OBJ_REVEAL has no equivalent of: it declines when fog is off unless
+ * that argument is non-zero, so a caller can force a conceal past the cheat. */
+#define ADDR_OBJ_CONCEAL       0x00429650u  /* void(obj *, int32_t force) */
+/* 0x0041A1B0, the sweep. FLIPS ADDR_FOG_OF_WAR on entry, then applies the
+ * matching one of the pair to every enemy object. Not "recompute visibility";
+ * it is the cheat's own toggle and has no other caller. */
+#define ADDR_TOGGLE_FOG_OF_WAR 0x0041A1B0u  /* void(void) */
+#define OBJ_FLAG_REVEALED      0x0800u
+#define OBJ_FLAG_CONCEALED     0x0200u
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
  * which registers itself with the map. */
@@ -4686,12 +4675,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * first, and the second argument forces the work even when nothing moved.
  *
  * That resolves what looked like a contradiction in 0x00429650, which sets bit
- * 1 on every row before calling this and therefore removes, while TakeOffMap
- * clears bit 1 and therefore does not. TakeOffMap's own comment in air.cpp
+ * 1 on every row before calling this and therefore removes, while RevealObj
+ * clears bit 1 and therefore does not. RevealObj's own comment in air.cpp
  * says "unregister" for the clear-bit-1 path and should be re-read against
  * this; flagged rather than rewritten, because that path also depends on the
  * row's bit 0 and I have not read ADDR_ROW_UNREGISTER_ALL. */
 #define ADDR_ROW_UPDATE        0x0041D480u /* void(row *, int32 force, desc) */
+/* Bit 1 of a ROW's own flags word, which is what ADDR_ROW_UPDATE branches on:
+ * set means take the row out of the map's cell lists, clear means put it back.
+ * It shares its value with OBJ_FLAG_OVERDUE and nothing else -- that one lives
+ * in an OBJECT's flags at +0x08 and is a different field in a different
+ * struct. air.cpp spelled the row's bit with the object's name for as long as
+ * both were 0x02 and it read as though the two were related. */
+#define ROW_FLAG_REMOVED         0x02u
 /* 0x0041D3A0: the same row's TEARDOWN -- unregister it and free the buffer it
  * owns at +0x38, but only when its +0x34 flag says there is one.
  *
@@ -4717,10 +4713,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define CELL_ENTRY_OFF_INDEX   0x0Cu   /* int32_t, or -1 */
 /* The argument's array of list heads, indexed by that. */
 #define CELLS_OFF_HEADS        0x0Cu
-#define OBJ_OFF_RETURN_AT      0x5Cu   /* game-clock ms, set by the below */
+#define OBJ_OFF_REVEALED_UNTIL      0x5Cu   /* game-clock ms, set by the below */
 /* 0x004097D0, 112 bytes, two callers. Everything of type 2, 3 or 8 within a
  * radius of a point goes off the map and comes back later. */
-#define ADDR_TAKE_NEARBY_OFF_MAP 0x004097D0u /* void(AM2_Point, int32, int32) */
+#define ADDR_REVEAL_NEARBY 0x004097D0u /* void(AM2_Point, int32, int32) */
 /* The sprite LIST -- the array ADDR_FREE_SPRITE_LIST releases and frees, and
  * ADDR_FREE_SPRITE_LIST_ALIAS jumps to. It sits just past the air save block
  * and is not part of it. Capacity grows a HUNDRED entries at a time, the same
@@ -5001,7 +4997,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_CLEAR_ROACH_FOOTPRINT 0x0043CA00u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
 #define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
-/* DestroyObjCommon iterates the same rows TakeOffMap does -- see
+/* DestroyObjCommon iterates the same rows RevealObj does -- see
  * OBJ_OFF_ROW_COUNT, OBJ_OFF_ROWS and AM2_OBJ_ROW_STRIDE further up, which
  * already existed. I defined a second copy of all three here and the compiler
  * said nothing, because an identical redefinition is legal; no ratchet watches

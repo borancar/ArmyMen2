@@ -93,18 +93,24 @@ typedef void (__cdecl *AM2_RowUpdateFn)(void *row, int32_t a, void *desc);
 #define orig_row_update \
     ((AM2_RowUpdateFn)(uintptr_t)ADDR_ROW_UPDATE)
 
-/* 0x004296E0, eight callers. Take one object off the map.
+/* 0x004296E0, eight callers. Reveal one object: show it through the fog.
  *
- * Two flags and they are not symmetric. `OBJ_FLAG_OFF_MAP` goes up
+ * Two flags and they are not symmetric. `OBJ_FLAG_REVEALED` goes up
  * unconditionally and is what callers test to know this has been done;
- * `OBJ_FLAG_ON_MAP` is the one that gates the work, and if it was already
+ * `OBJ_FLAG_CONCEALED` is the one that gates the work, and if it was already
  * down the rows are left alone. So calling this twice raises the first bit
- * twice and unregisters once, which is the point of having two.
+ * twice and re-links once, which is the point of having two.
  *
  * The row loop re-reads the count every iteration and clears bit 1 of each
- * row before unregistering it, in that order -- the unregister reads the
- * row's flags. */
-void __cdecl TakeOffMap(void *obj)
+ * row before calling ADDR_ROW_UPDATE, in that order -- a clear bit 1 is what
+ * makes that function RE-LINK the row into the map's cell lists, which is how
+ * a revealed object comes back onto the map. ADDR_OBJ_CONCEAL is the exact
+ * inverse, setting the bit and removing.
+ *
+ * This was `TakeOffMap`, and both flags were named the other way round too.
+ * See the fog-of-war block in orig.h: the cheat table settles it, because
+ * "I see everything!" is what reaches this function. */
+void __cdecl RevealObj(void *obj)
 {
     uint8_t  *o = (uint8_t *)obj;
     uint32_t  flags;
@@ -113,17 +119,17 @@ void __cdecl TakeOffMap(void *obj)
     if (!obj)
         return;
 
-    flags = *(uint32_t *)(o + OBJ_OFF_FLAGS) | OBJ_FLAG_OFF_MAP;
+    flags = *(uint32_t *)(o + OBJ_OFF_FLAGS) | OBJ_FLAG_REVEALED;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags;
-    if (!(flags & OBJ_FLAG_ON_MAP))
+    if (!(flags & OBJ_FLAG_CONCEALED))
         return;
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_ON_MAP;
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;
 
     for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
         uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
-        *(uint32_t *)row &= ~(uint32_t)OBJ_FLAG_OVERDUE;
+        *(uint32_t *)row &= ~(uint32_t)ROW_FLAG_REMOVED;
         orig_row_update(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 }
@@ -132,23 +138,23 @@ void __cdecl TakeOffMap(void *obj)
  * stay one definition. */
 #define g_gameClockMs (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
 
-void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius, int32_t delayMs)
+void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 {
     uint8_t *o;
 
     for (o = (uint8_t *)FirstItem(); o; o = (uint8_t *)NextItem()) {
-        /* Types 2, 3 and 8 only; not one that is already off the map; and
+        /* Types 2, 3 and 8 only; not one that is already revealed; and
          * ApproxDist -- a diamond, not a circle -- within the radius. */
         if (!ObjIsTypeIn238((const AM2_Object *)o))
             continue;
-        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_OFF_MAP)
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_REVEALED)
             continue;
         if (ApproxDist(&where, (const AM2_Point *)(o + OBJ_OFF_POS))
                 > radius)
             continue;
 
-        TakeOffMap(o);
-        *(int32_t *)(o + OBJ_OFF_RETURN_AT) =
+        RevealObj(o);
+        *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) =
             (int32_t)g_gameClockMs + delayMs;
     }
 }
@@ -329,17 +335,17 @@ void __cdecl AirSupportPop(void)
 
 void air_install(void)
 {
-    patch_replace(ADDR_OBJ_TAKE_OFF_MAP, (const void *)TakeOffMap,
-                  "TakeOffMap", 1);
+    patch_replace(ADDR_OBJ_REVEAL, (const void *)RevealObj,
+                  "RevealObj", 1);
     patch_replace(ADDR_REMAP_SPRITE_RUNS, (const void *)RemapSpriteRuns,
                   "RemapSpriteRuns", 1);
     patch_replace(ADDR_FREE_SPRITE_LIST, (const void *)FreeSpriteList,
                   "FreeSpriteList", 3);
     patch_replace(ADDR_GROW_SPRITE_LIST, (const void *)GrowSpriteList,
                   "GrowSpriteList", 1);
-    patch_replace(ADDR_TAKE_NEARBY_OFF_MAP,
-                  (const void *)TakeNearbyOffMap,
-                  "TakeNearbyOffMap", 2);
+    patch_replace(ADDR_REVEAL_NEARBY,
+                  (const void *)RevealNearby,
+                  "RevealNearby", 2);
     patch_replace(ADDR_DO_AIR_SUPPORT, (const void *)DoAirSupport,
                   "DoAirSupport", 3);
     patch_replace(ADDR_FIND_ENEMY_NEAR, (const void *)FindEnemyNear,

@@ -80,12 +80,12 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from);
 int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from);
 
 /* Original: 0x004097D0, and the name is ours. Walk every registered object and
- * take the ones near `where` off the map, each scheduled to return at the game
- * clock plus `delayMs`.
+ * reveal the ones near `where`, each staying visible until the game clock
+ * plus `delayMs` -- an air strike lighting up what it flies over.
  *
  * Three tests, in the original's order and all three needed: the object is a
- * type 2, 3 or 8; it is not ALREADY off the map, which is the 0x0800 flag the
- * taking-off sets; and ApproxDist from `where` is no more than `radius`.
+ * type 2, 3 or 8; it is not ALREADY revealed, which is the 0x0800 flag
+ * RevealObj sets; and ApproxDist from `where` is no more than `radius`.
  *
  * The distance is ApproxDist, not a true one -- so the "radius" is that
  * function's diamond-ish approximation and not a circle. Reproduced, since it
@@ -93,7 +93,7 @@ int32_t __cdecl DoAirSupport(int32_t kind, uint32_t where, uint32_t from);
  *
  * The point arrives BY VALUE and its address is taken to pass to ApproxDist,
  * which is why the parameter cannot become a pointer. */
-void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius,
+void __cdecl RevealNearby(AM2_Point where, int32_t radius,
                               int32_t delayMs);
 
 /* Originals: 0x004098B0 and 0x00409930, the sprite list's teardown and its
@@ -113,11 +113,11 @@ void __cdecl TakeNearbyOffMap(AM2_Point where, int32_t radius,
  * need it, not "grow if full". Nothing checks the realloc. */
 void __cdecl FreeSpriteList(void);
 
-/* Original: 0x004296E0, eight callers. Take one object off the map. Two
- * flags and they are not symmetric: OBJ_FLAG_OFF_MAP goes up
- * unconditionally and is what callers test, while OBJ_FLAG_ON_MAP gates the
- * row work and is lowered by it. */
-void __cdecl TakeOffMap(void *obj);
+/* Original: 0x004296E0, eight callers. Reveal one object through the fog. Two
+ * flags and they are not symmetric: OBJ_FLAG_REVEALED goes up
+ * unconditionally and is what callers test, while OBJ_FLAG_CONCEALED gates the
+ * row work and is lowered by it. ADDR_OBJ_CONCEAL is the exact inverse. */
+void __cdecl RevealObj(void *obj);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded
