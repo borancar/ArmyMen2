@@ -1233,7 +1233,7 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
 typedef void (__cdecl *AM2_CancelFn)(AM2_Widget *w);
 #define WIDGET_OFF_CANCEL 0x60
 
-#define AM2_DIK_ESCAPE 1
+/* AM2_DIK_ESCAPE now lives in orig.h -- frame.cpp tests it too. */
 
 void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
 {

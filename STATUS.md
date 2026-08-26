@@ -3035,7 +3035,30 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`checkseams` was green over a real seam, and the bug was in its own
+**`MissionPausedFrame` (`0x00425CD0`) is reconstructed and UNEXERCISED, and I
+mis-picked it the same way as `CommDrainMsgs`.** "Runs every frame while the
+game is paused" is true and useless: Boot Camp's opening dialogs have sub-state
+arms of their own, so the combination this arm needs -- sub-state 33 AND a
+pause -- never arises on any drive here. The counter reads 0 with both dialogs
+up and 0 again in play.
+
+**Reading the condition a caller calls under is not the same as observing that
+it holds.** That is the third clause of the seam rule, and I had already
+written it down once.
+
+The function itself is worth having read. ESCAPE leaves, tested as RELEASED and
+clearing EVERY pause bit rather than the one that caused the pause. The
+map-wait bitmap is loaded, drawn and FREED inside one call, with the slot
+cleared on both sides of the load -- so it is not cached at all, and what stops
+it reloading every frame is the pause bits changing rather than the slot being
+occupied.
+
+Two names were nearly duplicated and both were caught by grepping first:
+`0x00425CD0` already had `ADDR_SUBSTATE33_ALT` (renamed, since the body beats
+its position in a table), and `AM2_DIK_ESCAPE` already existed as a local in
+`widget.cpp` (promoted to `orig.h`, so both testers share one definition).
+
+**`checkseams` was green over a real seam**`checkseams` was green over a real seam, and the bug was in its own
 continuation joiner.** `join_continuations` folded exactly ONE `\`-continued
 line: after each fold it appended a blank, so the next line saw `out[-1] == ""`
 rather than the line it had just extended. A macro continued TWICE therefore

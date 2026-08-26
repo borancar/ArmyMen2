@@ -2802,6 +2802,10 @@
  * calls "the notify". That one is kept: it describes the same body just as
  * well, and renaming an established name for a synonym is churn. */
 #define AM2_SUBSTATE_ESCAPE        0x22
+/* DirectInput scancode 1. Promoted out of widget.cpp, which had it as a local:
+ * the widget layer and the in-mission paused frame both test it, and both test
+ * it as RELEASED -- !IsKeyDown && KeyChanged. One definition, not two. */
+#define AM2_DIK_ESCAPE             1
 /* The timer table: 1,000 records of {start, period, count, id} at 0x0050C370,
  * with the live count at 0x0050C36C. A slot is FREE when its id is zero, which
  * is why the scan walks the id field at 0x0050C37C rather than the record. */
@@ -3036,6 +3040,20 @@
 #define ADDR_EVT_SHOW_BITMAP      0x0041F600u  /* void(const char *) */
 #define ADDR_EVT_SHOW_BITMAP_NP   0x0041F650u  /* void(const char *) */
 #define ADDR_CURRENT_BITMAP       0x005122C4u
+/* The width and height the map-wait bitmap is centred in. They hold 640 and
+ * 480 -- exactly what ADDR_SCREEN_W and ADDR_SCREEN_H hold, at different
+ * addresses -- so nothing available here distinguishes the two pairs. Named
+ * for the use rather than merged with the other pair on a guess. */
+#define ADDR_BITMAP_AREA_W        0x00485318u  /* int32_t, 640 */
+#define ADDR_BITMAP_AREA_H        0x0048531Cu  /* int32_t, 480 */
+/* The pause bits that mean "the map is still loading", which is what puts the
+ * wait bitmap up. Four bits, 17 through 20, tested as a group. */
+#define AM2_PAUSE_MAP_WAIT        0x1E0000u
+/* 0x00462600, 1088 bytes. Whatever the paused mission frame drives before it
+ * considers the wait bitmap; stays original and unnamed, since nothing here
+ * says what it is. */
+#define ADDR_PAUSED_FRAME_STEP    0x00462600u  /* void(void) */
+
 #define ADDR_FREE_BITMAP          0x00446410u  /* void(void **slot) */
 #define ADDR_LOAD_BITMAP          0x004462F0u  /* void *(const char *, int32) */
 #define ADDR_CRT_ATOI             0x004660A7u  /* int32_t(const char *) */
@@ -3045,6 +3063,7 @@
  * does not parse still lands in the same key space as one that does. */
 #define AM2_SPRITE_SET_BY_NAME    99
 #define ADDR_STR_BITMAPS_DIR      0x00478670u  /* "bitmaps" */
+#define ADDR_STR_MAPWAIT_BMP      0x0048520Cu  /* "mapwait.bmp" */
 /* 0x16 is 22, which is AM2_SUBSTATE_BASE -- the FIRST arm of the thirteen-entry
  * sub-state table, and one of the nine that repaint when the overlay is dirty
  * and then call DrawMenuOverlay. The flag it raises alongside is
@@ -4527,7 +4546,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MOVIE_FRAME_STEP    0x00445630u  /* states 0 and 3, per frame */
 #define ADDR_STATE2_ENTER        0x00425300u
 #define ADDR_SUBSTATE22          0x00425C10u
-#define ADDR_SUBSTATE33_ALT      0x00425CD0u
+/* Sub-state 33's other arm: the one that runs while the game is PAUSED, where
+ * ADDR_TAKE_MENU_REQUEST runs when it is not. Named for the body rather than
+ * for its position in the table -- it was ADDR_SUBSTATE33_ALT. */
+#define ADDR_MISSION_PAUSED_FRAME 0x00425CD0u  /* void(void) */
 #define ADDR_EVENT_FLAG_8_TEST   0x00424900u
 /* Its own log string calls it SendGamePause, so it is renamed rather than
  * aliased -- the old name came from this one call site. Knowing the body makes

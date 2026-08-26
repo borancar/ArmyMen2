@@ -14,6 +14,12 @@
 #include "surface.h"
 #include "../../inject/orig.h"
 #include "../../inject/patch.h"
+#include "../gameproc.h"  /* RequestState -- reconstructed */
+#include "../misc.h"      /* IsKeyDown, KeyChanged -- reconstructed */
+#include "sprite.h"       /* DrawSprite -- reconstructed */
+#include "mapdraw.h"      /* SetDrawTarget -- reconstructed */
+#include "../image.h"     /* AM2_IMAGE */
+#include "../gamedir.h"   /* SetGameDir -- reconstructed */
 
 /* ---- what stays in the original image --------------------------------- */
 
@@ -30,6 +36,79 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 #define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+
+typedef void  (__cdecl *AM2_VoidFn0)(void);
+typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
+#define orig_paused_frame_step \
+    ((AM2_VoidFn0)(uintptr_t)ADDR_PAUSED_FRAME_STEP)
+#define orig_load_bitmap  ((AM2_LoadBitmapFn)(uintptr_t)ADDR_LOAD_BITMAP)
+
+#define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
+
+/* 0x00425CD0. Sub-state 33's PAUSED arm -- what an in-mission frame does while
+ * something has the game stopped, where TakeMenuRequest runs when nothing has.
+ *
+ * ESCAPE leaves. The test is `!IsKeyDown && KeyChanged`, the key being RELEASED
+ * rather than pressed, which is the same idiom as the in-mission escape handler
+ * and the widget layer's cancel; and it does two things, requesting state 1 and
+ * clearing EVERY pause bit at once rather than the one that caused the pause.
+ *
+ * Otherwise it redraws. The wait bitmap appears only while the pause is one of
+ * the four map-loading bits AND no bitmap is already up -- so it is put on
+ * screen once, not once a frame, even though this runs every frame.
+ *
+ * And it is loaded, drawn and FREED within the one call, with the slot cleared
+ * on both sides of the load. So the bitmap is not cached at all; the guard that
+ * stops it reloading is the pause bits changing, not the slot being occupied,
+ * which is why the slot can be freed immediately without the next frame
+ * fetching it again. Reproduced as written, since holding it would be faster
+ * and would also be a different program.
+ *
+ * UNEXERCISED, and it was picked expecting the opposite. "Runs every frame
+ * while the game is paused" is true and useless: Boot Camp's opening dialogs
+ * do not put the game in sub-state 33, they have arms of their own, so the
+ * combination this arm needs -- sub-state 33 AND a pause -- does not arise on
+ * any drive here. Its counter reads 0 with both dialogs up and 0 again in
+ * play. The map-wait bitmap wants the four loading bits as well, which is
+ * narrower still. Verified by reading; the A/B compares nothing here.
+ *
+ * The mistake is the same one CommDrainMsgs recorded: reading the condition a
+ * caller calls under is not the same as OBSERVING that it holds. */
+void __cdecl MissionPausedFrame(void)
+{
+    void *bmp;
+
+    if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
+        RequestState(1);
+        UnPauseGame(*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS);
+        return;
+    }
+
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+    orig_paused_frame_step();
+
+    if (!(*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS & AM2_PAUSE_MAP_WAIT))
+        return;
+    if (g_currentBitmap)
+        return;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    FreeBitmap(&g_currentBitmap);
+    g_currentBitmap = orig_load_bitmap(
+        (const char *)AM2_IMAGE(ADDR_STR_MAPWAIT_BMP), 0);
+
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+
+    bmp = g_currentBitmap;
+    DrawSprite((AM2_Sprite *)bmp,
+               (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+                - *(const int32_t *)((const uint8_t *)bmp + SPR_OFF_W)) >> 1,
+               (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+                - *(const int32_t *)((const uint8_t *)bmp + SPR_OFF_H)) >> 1,
+               0);
+
+    FreeBitmap(&g_currentBitmap);
+}
 
 /* ---- the pause mask ----------------------------------------------------
  *
@@ -249,7 +328,7 @@ void __cdecl State2Frame(void)
     } else if (arm == 11) {
         /* 33 -- ordinary play, and the arm Boot Camp sits in the whole time. */
         if (GetPauseFlags())
-            call0(ADDR_SUBSTATE33_ALT);
+            MissionPausedFrame();
         else
             call0(ADDR_TAKE_MENU_REQUEST);
     } else if (arm == 12) {
@@ -317,6 +396,9 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_MISSION_PAUSED_FRAME,
+                        (const void *)MissionPausedFrame,
+                        "MissionPausedFrame", 0);
     rc |= patch_replace(ADDR_UNPAUSE_GAME, (const void *)UnPauseGame,
                         "UnPauseGame", 19);
     return rc;
