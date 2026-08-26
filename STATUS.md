@@ -3050,7 +3050,29 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`HudUpdate` (`0x00414370`) completes the HUD pair** -- the same three widgets
+**`SeqRunBoth` (`0x00461930`) is the per-frame seq step** -- 19,066 calls
+against `ComposeFrame`'s 19,144. It runs the walker at `0x00461870` over two
+contexts; that walker stays original. Its records are 48 bytes with a kind at
+`+0x00` dispatched through an eight-arm jump table, a gate at `+0x08`, and a
+next index at `+0x2C` -- and every arm RETURNS the next index, so the walk is
+index-chained rather than sequential.
+
+**"Seq" is the program's word, not mine.** It comes from `"Couldn't Blt Seq
+Pixels"` a few hundred bytes further on in the same band, which is what makes
+the name evidence rather than invention. What a seq IS remains unestablished
+and the comment says so.
+
+**And it was very nearly a reconstruction that never ran.** My edit adding the
+`patch_replace` did not match `misc_install`'s opening line and silently
+changed nothing, so the function compiled, linked, and was never reached.
+`counts` answered `(nothing traced)` -- which reads exactly like a full trace
+table -- and the game's own log settled it: **853 patch lines where
+checkpatches counts 854.** CLAUDE.md already records four reconstructions that
+had never been installed, found the same way; this is a fifth, by a different
+mechanism, and the lesson holds unchanged. **A patch list is a list of
+intentions; the log is the list of installs.**
+
+**`HudUpdate` (`0x00414370`) completes the HUD pair****`HudUpdate` (`0x00414370`) completes the HUD pair** -- the same three widgets
 in the same order with the same null test on the third, but through vtable slot
 2 rather than slot 1. 19,324 calls beside `HudPaint`'s 19,406 and
 `ComposeFrame`'s 19,492.

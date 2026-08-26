@@ -1095,6 +1095,38 @@ int32_t __cdecl ActionKeyPressed(int32_t action)
 typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
 #define orig_atoi ((AM2_AtoiFn)AM2_IMAGE(ADDR_CRT_ATOI))
 
+typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
+#define orig_seq_run ((AM2_SeqRunFn)(uintptr_t)ADDR_SEQ_RUN)
+
+/* 0x00461930, one caller -- the per-frame path. Run the seq walker over both
+ * contexts, in this order.
+ *
+ * That is the whole function. The walker itself stays original: see
+ * ADDR_SEQ_RUN for its record layout, and note that "seq" is the program's own
+ * word for this band rather than one of ours -- it comes from "Couldn't Blt Seq
+ * Pixels" a few hundred bytes further on. What a seq IS remains unestablished,
+ * so the name says where the vocabulary came from and stops there.
+ *
+ * The original pushes both context pointers and cleans eight bytes once at the
+ * end rather than four after each call, which is ordinary cdecl bookkeeping and
+ * leaves nothing to reproduce.
+ *
+ * Measured at 19,066 calls against ComposeFrame's 19,144 -- once a frame.
+ *
+ * That measurement is also how this was caught being NOT INSTALLED. The first
+ * attempt at adding its patch_replace did not match misc_install's opening
+ * line and silently changed nothing, so the function compiled, linked, and was
+ * never reached. `counts` answered "(nothing traced)" -- which reads exactly
+ * like a full trace table -- and the game's own log settled it: 853 patch
+ * lines where checkpatches counts 854. A reconstruction nothing calls is
+ * invisible to every static check there is, and the log is the list of
+ * installs. */
+void __cdecl SeqRunBoth(void)
+{
+    orig_seq_run((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    orig_seq_run((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+}
+
 /* 0x0042E310, one caller -- read a sprite's identity back out of its FILENAME.
  *
  * The loader turns three integers into "%02d_%03d_%02d_*.bmp"; this is the
@@ -1124,6 +1156,8 @@ int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
 
 int misc_install(void)
 {
+    patch_replace(ADDR_SEQ_RUN_BOTH, (const void *)SeqRunBoth,
+                  "SeqRunBoth", 0);
     patch_replace(ADDR_COLOUR_DISTANCE, (const void *)ColourDistance,
                   "ColourDistance", 2);
     patch_replace(ADDR_PTR_LIST_GROW, (const void *)PtrListGrow,

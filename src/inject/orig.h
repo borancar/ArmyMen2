@@ -680,6 +680,21 @@
  * pixel format. */
 #define ADDR_BACKGROUND_COLOUR   0x00502AD9u  /* uint8_t */
 #define ADDR_STR_SEQ_BLT_FAIL    0x0048CBE8u  /* "Couldn't Blt Seq Pixels\n" */
+/* SEQ is the program's own word for this band, and that string is where it
+ * comes from -- so the record walker below is named with it rather than with
+ * something invented. What a "seq" IS remains unestablished.
+ *
+ * 0x00461870 walks one context's table: 48-byte records, a kind at +0x00
+ * dispatched through an eight-arm jump table, a gate at +0x08 that skips the
+ * record when it is not positive, and a next index at +0x2C. Every arm RETURNS
+ * the next index, so the walk is index-chained rather than sequential, and a
+ * skipped record supplies its own successor. Arm 1 does nothing but continue.
+ *
+ * 0x00461930 is the whole of the per-frame step: run it over two contexts. */
+#define ADDR_SEQ_RUN             0x00461870u  /* void(void *ctx) */
+#define ADDR_SEQ_RUN_BOTH        0x00461930u  /* void(void) */
+#define ADDR_SEQ_CTX_A           0x00664580u
+#define ADDR_SEQ_CTX_B           0x006640B0u
 #define ADDR_RELEASE_SPRITE      0x00445D80u  /* void(AM2_Sprite *) */
 #define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
 #define ADDR_SPRITE_SLOT_OF      0x00445990u  /* int32(uint32 id); <0 when absent */

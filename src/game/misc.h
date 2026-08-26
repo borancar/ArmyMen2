@@ -675,4 +675,7 @@ int misc_install(void);
 }
 #endif
 
+/* Original: 0x00461930. Run the seq walker over both contexts. */
+void __cdecl SeqRunBoth(void);
+
 #endif /* AM2_MISC_H */
