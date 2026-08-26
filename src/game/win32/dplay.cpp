@@ -34,6 +34,7 @@
 #include "../objtable.h"
 #include "../../inject/patch.h"
 #include "winmain.h"   /* Ticks */
+#include "../image.h"  /* AM2_IMAGE */
 
 #include <stdint.h>
 
@@ -1489,6 +1490,111 @@ void __cdecl CommMarkLobbied(void)
     *(int32_t *)(g_commObject + COMM_OFF_MSGS_ENABLED) = 1;
 }
 
+typedef void (__cdecl *AM2_StatLogFn)(const char *fmt, ...);
+#define orig_stat_log ((AM2_StatLogFn)(uintptr_t)ADDR_LOG)
+
+/* 0x0040F400, thiscall, three callers. Prints the traffic statistics
+ * CommResetStats clears -- four lines, each of which prints nothing at all
+ * when its own denominator is zero.
+ *
+ * That guarding is the substance of the function, not decoration: every one of
+ * the seven divisions here is an unsigned `div`, which faults rather than
+ * returning an infinity, so each line's `if` is what makes the division below
+ * it safe. The two bandwidth lines are gated on their sample count and the two
+ * packet lines on their packet count, and the elapsed seconds are CLAMPED UP
+ * to 1 for the same reason -- a report taken inside the first second would
+ * otherwise divide by zero.
+ *
+ * The percentages are computed, never stored: `over * 100 / samples`. The
+ * design spec is the literal 2880 the format string prints back as
+ * "design spec(%d)", so it is a constant here rather than a field.
+ *
+ * The elapsed division is the compiler's usual reciprocal for /1000 --
+ * `mul 0x10624DD3` then `shr 6` -- reproduced as an ordinary unsigned divide,
+ * which is the same function of the same inputs and lets the compiler pick
+ * its own reciprocal.
+ *
+ * The line texts name every field this reads, which is where the seven
+ * COMM_OFF_*_BW_* offsets got their names -- from the reporter rather than
+ * from the reset that clears them.
+ *
+ * THIS ONE IS VERIFIED BY READING, and the reason is worth stating rather than
+ * leaving as a zero counter. Its three callers are RecvFlowControl, the
+ * multiplayer result screen and the dialog behind it, and every one of them
+ * needs a live or finished session with a second player -- which DirectPlay
+ * will not open on this machine. A probe confirms it: the counter is 0 and the
+ * function is not entered once on the mpoptions drive, which is as far into
+ * multiplayer as this project can currently get.
+ *
+ * So it is weaker evidence than the rest of this file, in the same way as the
+ * five WM_ messages only a real session can post. What can be said is that the
+ * function has NO side effects at all -- it reads fields and logs -- so its
+ * entire observable output is those four lines, and a session that reached
+ * them would compare them exactly through the harness's log capture. */
+void __attribute__((thiscall)) CommReportStats(void *comm)
+{
+    const uint8_t *c = (const uint8_t *)comm;
+    uint32_t       secs;
+
+    {
+        uint32_t samples = *(const uint32_t *)(c + COMM_OFF_STAT_BW_SAMPLES);
+
+        if (samples) {
+            uint32_t over = *(const uint32_t *)(c + COMM_OFF_STAT_BW_OVER);
+
+            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_SEND_BANDWIDTH),
+                          samples,
+                          *(const uint32_t *)(c + COMM_OFF_STAT_BW_MAX),
+                          over, over * 100u / samples,
+                          AM2_COMM_BW_DESIGN_SPEC);
+        }
+    }
+
+    {
+        uint32_t samples = *(const uint32_t *)(c + COMM_OFF_RX_BW_SAMPLES);
+
+        if (samples) {
+            uint32_t over = *(const uint32_t *)(c + COMM_OFF_RX_BW_OVER);
+
+            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_RECV_BANDWIDTH),
+                          samples,
+                          *(const uint32_t *)(c + COMM_OFF_RX_BW_MAX),
+                          over, over * 100u / samples,
+                          AM2_COMM_BW_DESIGN_SPEC);
+        }
+    }
+
+    secs = (Ticks() - *(const uint32_t *)(c + COMM_OFF_STATS_SINCE)) / 1000u;
+    if (secs < 1u)
+        secs = 1u;
+
+    {
+        uint32_t packets = *(const uint32_t *)(c + COMM_OFF_STAT_PACKETS);
+
+        if (packets) {
+            uint32_t bytes = *(const uint32_t *)(c + COMM_OFF_STAT_BYTES);
+
+            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_SENT_PACKETS),
+                          packets,
+                          *(const uint32_t *)(c + COMM_OFF_STAT_MAX),
+                          bytes / packets, packets / secs, bytes / secs, secs);
+        }
+    }
+
+    {
+        uint32_t packets = *(const uint32_t *)(c + COMM_OFF_RX_PACKETS);
+
+        if (packets) {
+            uint32_t bytes = *(const uint32_t *)(c + COMM_OFF_RX_BYTES);
+
+            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_RECV_PACKETS),
+                          packets,
+                          *(const uint32_t *)(c + COMM_OFF_RX_MAX),
+                          bytes / packets, packets / secs, bytes / secs, secs);
+        }
+    }
+}
+
 /* 0x0040F380, thiscall, three callers. Clears the traffic statistics and
  * restarts the window they are measured over. Nothing here affects a packet;
  * it is all bookkeeping the report below prints.
@@ -1635,6 +1741,8 @@ int dplay_install(void)
                         "CommSessionOver", 1);
     rc |= patch_replace(ADDR_COMM_RESET_STATE, (const void *)CommResetStats,
                         "CommResetStats", 3);
+    rc |= patch_replace(ADDR_COMM_REPORT_STATS, (const void *)CommReportStats,
+                        "CommReportStats", 3);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;

@@ -4470,6 +4470,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * exactly where COMM_OFF_RX_MAX begins. A layout that tiles is the check that
  * no base is off. */
 #define AM2_COMM_STAT_SAMPLES    30
+/* 0x0040F400, thiscall, three callers. Prints the four statistics lines the
+ * reset above clears. Each line is gated on its own denominator, which is what
+ * makes the seven unsigned divisions below it safe, and the elapsed seconds
+ * are clamped UP to 1 for the same reason. */
+#define ADDR_COMM_REPORT_STATS   0x0040F400u  /* thiscall void(this) */
+#define ADDR_STR_SEND_BANDWIDTH  0x00475808u
+#define ADDR_STR_RECV_BANDWIDTH  0x004757B0u
+#define ADDR_STR_SENT_PACKETS    0x00475740u
+#define ADDR_STR_RECV_PACKETS    0x004756D0u
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
 #define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */
