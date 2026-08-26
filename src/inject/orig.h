@@ -66,6 +66,31 @@
  * no key and is tested anyway. 26 callers, so this is how the game asks about
  * a control rather than about a key. The names are ours. */
 #define ADDR_KEY_BINDINGS       0x004854BCu /* uint8_t[][2], scancode pairs */
+/* 0x004275B0, four callers, and the THIRD member of the binding-aware key
+ * family: 0x004274F0 is "either bound key is down", 0x00427530 is "just
+ * pressed", and this one is "just RELEASED" -- for each of the two bound
+ * scancodes it wants the key NOT down and its bit changed between the two poll
+ * buffers.
+ *
+ * It nearly went in as ADDR_ACTION_KEY_DOWN, which is already the name of
+ * 0x004274F0. Grepping the ADDRESS is not enough; the NAME has to be grepped
+ * too, or two different functions end up under one name -- which is worse than
+ * an alias, and which no ratchet here would have caught. */
+#define ADDR_ACTION_KEY_RELEASED 0x004275B0u /* int32_t(int32_t action) */
+/* The action that shows the mission's info bitmap. The Boot Camp dialog names
+ * it on screen: "HIT F1 DURING GAME FOR MORE INFO". */
+#define AM2_ACTION_SHOW_INFO    0x14
+/* 0x00424CA0, one caller -- the per-frame path. In-mission input: escape, the
+ * info bitmap, and mouse edge scrolling. */
+#define ADDR_MISSION_INPUT      0x00424CA0u /* void(void) */
+/* Set while something else owns the input; the mission handler gives way to it
+ * exactly as it does to g_charHandler. */
+#define ADDR_INPUT_SUPPRESS     0x00511E44u /* int32_t */
+/* What the info action does in a network game instead of pausing. */
+#define ADDR_SHOW_INFO_MP       0x00462A40u /* void(void) */
+#define AM2_SCROLL_MARGIN       3           /* pixels from the edge */
+#define AM2_STATE_ESCAPE_MENU   0x17
+#define AM2_SUBSTATE_INFO_BITMAP 0x16
 /* The built-in bindings, one scancode per row and no second column, which is
  * why DEFAULT writes only the first byte of each pair -- as does OK. */
 #define ADDR_KEY_DEFAULTS       0x0048AE80u /* uint8_t[21] */

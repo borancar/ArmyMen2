@@ -21,6 +21,8 @@
 #include "../image.h"     /* AM2_IMAGE */
 #include "../gamedir.h"   /* SetGameDir -- reconstructed */
 #include "winmain.h"      /* Ticks -- reconstructed */
+#include "audio.h"       /* PlayDynamicSound, StopNamedSound */
+#include "sprite.h"      /* FreeBitmap -- reconstructed */
 
 /* ---- what stays in the original image --------------------------------- */
 
@@ -37,6 +39,134 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 #define g_stateEntered (*(int32_t *)(uintptr_t)ADDR_STATE_ENTERED)
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+
+typedef int32_t (__cdecl *AM2_ActionKeyFn)(int32_t action);
+typedef void    (__cdecl *AM2_VoidFn0b)(void);
+typedef void   *(__cdecl *AM2_LoadBitmapFn2)(const char *name, int32_t flag);
+typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
+#define orig_action_released ((AM2_ActionKeyFn)(uintptr_t)ADDR_ACTION_KEY_RELEASED)
+/* The camera pair, reached by cast for the same reason mapdraw.cpp does it:
+ * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
+#define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+#define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
+#define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
+#define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
+#define orig_show_info_mp    ((AM2_VoidFn0b)(uintptr_t)ADDR_SHOW_INFO_MP)
+#define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
+#define orig_event_flag8     ((AM2_EventFlag8Fn)(uintptr_t)ADDR_EVENT_FLAG_8_TEST)
+
+/* 0x00424CA0, one caller -- the per-frame path. In-mission input: three
+ * separate jobs that share a function because they share the mouse.
+ *
+ * ESCAPE first, tested RELEASED as everywhere else here, which asks for the
+ * escape menu and marks the overlay dirty.
+ *
+ * Then the info bitmap. The action is 0x14 and the Boot Camp dialog names it
+ * on screen -- "HIT F1 DURING GAME FOR MORE INFO". Outside a network game it
+ * loads the level's bitmap, puts the sub-state into 0x16, pauses, and plays the
+ * level's sound if it has one; inside a network game it calls
+ * ADDR_SHOW_INFO_MP instead and pauses nothing, since one player must not stop
+ * everyone else's clock.
+ *
+ * Then dismissal and scrolling, and both give way to whoever owns the input:
+ * if g_charHandler is installed or ADDR_INPUT_SUPPRESS is set, this returns
+ * without reading the mouse at all.
+ *
+ * The edge scroll is the interesting half. Within three pixels of any edge it
+ * moves ADDR_VIEW_TARGET by `speed * frame delta in seconds` -- the same step
+ * ViewUpdate glides the eye with, so the two agree by construction -- and
+ * clears ADDR_OBJ_CTX_SET, which is what stops the camera snapping back to the
+ * followed object the moment you scroll away from it.
+ *
+ * Note the asymmetry in what each edge reads: the right and bottom tests take
+ * the eye's coordinate and ADD, while the left and top take the same
+ * coordinate and SUBTRACT, so all four scroll from the EYE rather than from the
+ * current target. A held scroll therefore advances one step per frame from
+ * where the view actually is, not from where it was already heading. */
+void __cdecl MissionInput(void)
+{
+    int32_t step;
+    int16_t cx, cy;
+
+    if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
+        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+        *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_STATE_ESCAPE_MENU;
+        return;
+    }
+
+    if (!g_mpSession) {
+        if (orig_action_released(AM2_ACTION_SHOW_INFO)) {
+            if (*(const char *)(uintptr_t)ADDR_LEVEL_STR_C) {
+                SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+                FreeBitmap(&g_currentBitmap);
+                g_currentBitmap = orig_load_bitmap2(
+                    (const char *)(uintptr_t)ADDR_LEVEL_STR_C, 0);
+                *(int32_t *)(uintptr_t)ADDR_MENU_MODE =
+                    AM2_SUBSTATE_INFO_BITMAP;
+                *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+                SendGamePause(1, 8);
+            }
+            if (*(const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME)
+                PlayDynamicSound(
+                    (const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME,
+                    0, 0, 0, 0, 1, 0, 0);
+            LatchKeyState();
+        }
+    } else if (orig_action_released(AM2_ACTION_SHOW_INFO)) {
+        orig_show_info_mp();
+    }
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER)
+        return;
+    if (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+        return;
+
+    /* flag8 OR (button AND changed) -- the mouse pair is an AND, which is what
+     * makes this "a click just happened" rather than "the mouse did anything".
+     * Getting it wrong dismisses the sign on the first mouse MOVE. */
+    if (g_currentBitmap
+        && (orig_event_flag8()
+            || (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED))) {
+        *(int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED = 1;
+        FreeBitmap(&g_currentBitmap);
+        if (*(const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME)
+            StopNamedSound((const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME, 0);
+    }
+
+    /* Both set means give up: something is being followed AND the button is
+     * held, so a drag must not fight the follow. Not `!button` -- that
+     * inversion scrolls exactly when it should not, and is what the frame
+     * counts caught. */
+    if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+        return;
+
+    step = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
+                     * (double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+
+    cx = *(const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
+    cy = *(const int16_t *)((uintptr_t)ADDR_CURSOR_POINT + 2);
+
+    if (cx > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+              - AM2_SCROLL_MARGIN) {
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x + step);
+    }
+    if (cx < AM2_SCROLL_MARGIN) {
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        VIEW_TARGET->x = (int16_t)(VIEW_EYE2->x - step);
+    }
+    if (cy > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+              - AM2_SCROLL_MARGIN) {
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y + step);
+    }
+    if (cy < AM2_SCROLL_MARGIN) {
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+        VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y - step);
+    }
+}
 
 /* 0x00424B20, one caller, on the per-frame path -- and it is THE GAME CLOCK.
  * Measure how long the last frame took, clamp it, add it to
@@ -468,6 +598,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_MISSION_INPUT, (const void *)MissionInput,
+                        "MissionInput", 0);
     rc |= patch_replace(ADDR_FRAME_CLOCK_STEP, (const void *)FrameClockStep,
                         "FrameClockStep", 0);
     rc |= patch_replace(ADDR_MISSION_PAUSED_FRAME,

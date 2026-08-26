@@ -897,6 +897,30 @@ compare() {
     vr=$(cat "$WORK/$cfg-recon.volatile" 2>/dev/null || echo 0)
     if [ "$vo" -gt 0 ] || [ "$vr" -gt 0 ]; then
         echo "  frames  $vo/$vr per-frame markers dropped as volatile"
+        # And the counts are CHECKED, not just printed. `mission` has no pixel
+        # budget -- two unsynchronised scrolling runs differ by a quarter of
+        # the frame -- so for a while the only thing standing between a real
+        # defect and a green run was somebody reading this line. One was
+        # missed exactly that way: an inverted guard in MissionInput scrolled
+        # the view every frame, the suite said A/B clean twice, and what gave
+        # it away was 4771/18641 sitting above the verdict.
+        #
+        # The legitimate spread is small. Across a session of runs the widest
+        # honest ratio seen was about 1.25; the defect was 3.9. Two is well
+        # clear of the noise and well under the signal. AM2_AB_FRAME_RATIO
+        # overrides it, mainly so this check can be tested.
+        if [ "$vo" -gt 100 ] && [ "$vr" -gt 100 ]; then
+            local lo hi ratio_x100
+            if [ "$vo" -le "$vr" ]; then lo=$vo; hi=$vr; else lo=$vr; hi=$vo; fi
+            ratio_x100=$(( hi * 100 / lo ))
+            if [ "$ratio_x100" -gt "${AM2_AB_FRAME_RATIO:-200}" ]; then
+                echo "  frames  FAIL: the two sides composed wildly different"
+                echo "          numbers of frames (${ratio_x100}% of each other)."
+                echo "          That is behaviour, not timing -- read it before"
+                echo "          believing any verdict below."
+                rc=1
+            fi
+        fi
     fi
 
     # The widget tree, where a configuration captured one. Compared as an exact

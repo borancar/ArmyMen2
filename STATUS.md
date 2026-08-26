@@ -3050,7 +3050,48 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`ViewUpdate` (`0x0042B5A0`) is THE CAMERA**, 15,534 calls a mission. Clamp
+**`MissionInput` (`0x00424CA0`) is in-mission input -- escape, the F1 info
+bitmap, and mouse edge scrolling** -- 16,086 calls a mission. The action is
+`0x14` and the Boot Camp dialog names it on screen: "HIT F1 DURING GAME FOR
+MORE INFO". Outside a network game it pauses; inside one it does not, since one
+player must not stop everyone else's clock. The edge scroll moves
+`ADDR_VIEW_TARGET` by the same `speed * frame delta` step `ViewUpdate` glides
+the eye with, so the pair agrees by construction.
+
+**It shipped two inverted conditions and the A/B called it CLEAN twice.**
+`mission` has no pixel budget -- two unsynchronised scrolling runs differ by a
+quarter of the frame -- so the only signal was a line the suite prints and
+never acts on: `frames 4771/18641`, where every other run this session was
+about 5,000 on both sides. Reverting to the previous commit gave 5,587/5,572
+and 290 pixels, which is what turned a suspicion into a measurement.
+
+The defects: dismissal is `flag8 || (button AND changed)` and I wrote the pair
+as an OR, so the sign went away on the first mouse MOVE; and the scroll guard
+is `following AND button` and I wrote `AND NOT button`, so it edge-scrolled
+exactly when it should not. Fixed, and `mission` is back to 4,948/5,633 at 302
+pixels.
+
+**`ab.sh` now CHECKS the frame counts instead of only printing them.** More
+than a factor of two between the two sides fails the run and says to read the
+number before believing the verdict. The honest spread across this session is
+1.00 to 1.14; the defect was 3.9. Tested in the failing direction with
+`AM2_AB_FRAME_RATIO=99`, which flips the verdict from "A/B clean" to "A/B found
+differences".
+
+**`ADDR_ACTION_KEY_RELEASED` nearly went in under a name already in use.** It is
+the third of a family -- `0x004274F0` is "down", `0x00427530` is "just
+pressed", `0x004275B0` is "just RELEASED" -- and I had typed
+`ADDR_ACTION_KEY_DOWN`, which already names the first. **Grepping the address is
+not enough; the NAME has to be grepped too**, or two different functions end up
+under one name, which is worse than an alias and which no ratchet here catches.
+
+**And my own "is this named?" one-liner was unreliable all session.** It took
+the FIRST grep hit, which is often a comment mentioning the address rather than
+the `#define`, and my `sed` then stripped the line to nothing and reported
+`UNNAMED`. The ratchets caught every consequence -- `checkpatches` held at 21
+aliases throughout -- but the method was wrong. Match `^#define.*0xADDR`.
+
+**`ViewUpdate` (`0x0042B5A0`) is THE CAMERA****`ViewUpdate` (`0x0042B5A0`) is THE CAMERA**, 15,534 calls a mission. Clamp
 the target so half a screen either side of it is still on the map; move the eye
 toward it by at most `speed * frame delta in seconds`; clamp the eye the same
 way; then derive three rectangles -- the view in world coordinates, that
