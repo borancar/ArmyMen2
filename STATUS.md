@@ -3050,7 +3050,25 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`HudPaint` (`0x004143A0`) -- the function declined last commit, now settled
+**`HudUpdate` (`0x00414370`) completes the HUD pair** -- the same three widgets
+in the same order with the same null test on the third, but through vtable slot
+2 rather than slot 1. 19,324 calls beside `HudPaint`'s 19,406 and
+`ComposeFrame`'s 19,492.
+
+Slot 2 takes no arguments at all, which is why the two functions look so
+different in the disassembly despite doing the same walk: the paint pass pushes
+a rectangle by value and the update pass is a plain thiscall.
+
+Two further steps follow the widgets and both stay original, each with exactly
+one caller -- this one -- so their names cannot be wrong about anything else.
+They are still ROLES rather than recovered names, and are labelled as such:
+neither pushes a string. A little is established about the second, which is the
+tail JUMP: it walks 0x64-byte records at `0x004FC8E0`, clears those whose
+deadline at `+0x30` has passed, and stamps the cursor position into the live
+ones. What they are FOR is not established, and the comment says so rather than
+guessing a name that would read as knowledge.
+
+**`HudPaint` (`0x004143A0`) -- the function declined last commit**`HudPaint` (`0x004143A0`) -- the function declined last commit, now settled
 and reconstructed.** 19,177 calls against `ComposeFrame`'s 19,257, and the HUD
 it produces is correct by eye: minimap, both panels, the portrait and its
 stats, the command bar.

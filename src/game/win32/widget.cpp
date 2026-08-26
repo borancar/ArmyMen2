@@ -5655,6 +5655,39 @@ uint8_t __cdecl MpNamePaper(int32_t row)
 #define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
 #define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
 
+typedef void (__cdecl *AM2_HudStepFn)(void);
+#define orig_hud_post_update ((AM2_HudStepFn)(uintptr_t)ADDR_HUD_POST_UPDATE)
+#define orig_hud_marker_age  ((AM2_HudStepFn)(uintptr_t)ADDR_HUD_MARKER_AGE)
+
+/* 0x00414370, one caller -- the per-frame path. HudPaint's twin: the same
+ * three top-level widgets, in the same order and with the same null test on
+ * the third, but through vtable slot 2 rather than slot 1.
+ *
+ * Slot 2 takes no arguments at all, so this is the plain thiscall the paint
+ * pass is not -- which is why the two functions look so different in the
+ * disassembly despite doing the same walk.
+ *
+ * Two more steps follow the widgets, and the second is a tail JUMP rather than
+ * a call, so it inherits this function's return. Both stay original; see
+ * ADDR_HUD_MARKER_AGE for the little that is established about the second.
+ *
+ * Measured at 19,324 calls, beside HudPaint's 19,406 and ComposeFrame's
+ * 19,492 -- the two HUD passes run once a frame each, as the pair suggests. */
+void __cdecl HudUpdate(void)
+{
+    ((AM2_WidgetUpdateFn *)g_hudWidgetA->vtable)[WIDGET_VSLOT_UPDATE](
+        g_hudWidgetA);
+    ((AM2_WidgetUpdateFn *)g_hudWidgetB->vtable)[WIDGET_VSLOT_UPDATE](
+        g_hudWidgetB);
+
+    if (g_hudWidgetC)
+        ((AM2_WidgetUpdateFn *)g_hudWidgetC->vtable)[WIDGET_VSLOT_UPDATE](
+            g_hudWidgetC);
+
+    orig_hud_post_update();
+    orig_hud_marker_age();
+}
+
 /* 0x004143A0, two callers, one of them the per-frame path. Point the drawing
  * at the back buffer and paint the three top-level HUD widgets through vtable
  * slot 1, each with its own absolute rectangle.
@@ -5704,6 +5737,8 @@ int widget_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_HUD_UPDATE, (const void *)HudUpdate,
+                        "HudUpdate", 0);
     rc |= patch_replace(ADDR_HUD_PAINT, (const void *)HudPaint,
                         "HudPaint", 0);
 

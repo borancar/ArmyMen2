@@ -1440,6 +1440,10 @@ int widget_install(void);
 }
 #endif
 
+/* Original: 0x00414370. Update the three top-level HUD widgets through vtable
+ * slot 2, then run two further steps. */
+void __cdecl HudUpdate(void);
+
 /* Original: 0x004143A0. Paint the three top-level HUD widgets to the back
  * buffer through vtable slot 1. */
 void __cdecl HudPaint(void);

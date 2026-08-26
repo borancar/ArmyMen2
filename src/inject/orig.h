@@ -336,6 +336,21 @@
 #define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
 /* 0x004143A0, two callers. Paint all three through vtable slot 1. */
 #define ADDR_HUD_PAINT     0x004143A0u  /* void(void) */
+/* 0x00414370, one caller -- the per-frame path. The same three widgets through
+ * vtable slot 2, then two further steps. */
+#define ADDR_HUD_UPDATE    0x00414370u  /* void(void) */
+/* The two steps ADDR_HUD_UPDATE runs after the widgets, each with exactly one
+ * caller -- this one -- so these names cannot be wrong about anything else.
+ * They are still roles rather than recovered names: neither says what it is,
+ * and neither pushes a string.
+ *
+ * The second is the tail JUMP, and a little is established about it: it walks
+ * records of 0x64 bytes at 0x004FC8E0, clearing those whose deadline at +0x30
+ * has passed and stamping ADDR_CURSOR_X/Y into +0x10 and +0x12 of the live
+ * ones. So it ages a table of cursor-anchored, time-limited entries. What they
+ * are FOR is not established. */
+#define ADDR_HUD_POST_UPDATE 0x00413E70u  /* void(void), 1280 bytes */
+#define ADDR_HUD_MARKER_AGE  0x00412190u  /* void(void), the tail jump */
 /* One record per font, 524 bytes apart -- BuildFont computes the stride as
  * ((f<<6)+f)*2+f then <<2, which is 131 dwords and not the 133 this said
  * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
