@@ -4913,6 +4913,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_CLEAR_FOOTPRINT   0x0045A770u  /* void(void *obj) */
 #define OBJ_FLAG_FOOTPRINT_ON      0x00200000u
 #define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */
+/* 0x0043CA00, 304 bytes, three callers -- the ROACH twin of
+ * ADDR_OBJ_CLEAR_FOOTPRINT. Instruction for instruction the same function with
+ * one table swapped: ADDR_ROACH_MASK instead of ADDR_VEHICLE_MASK, its own
+ * stamp and mark array, and no kind multiplier on the index because a roach
+ * has one kind where a vehicle has six. Same 0xA4 record stride, same gate on
+ * OBJ_FLAG_FOOTPRINT_ON, same subtract-15-per-cell.
+ *
+ * And it says the same kind of thing about TYPE 8 that its twin said about
+ * type 3: the type-8 destroy handler calls this, and this indexes the roach
+ * mask. So type 8 is a roach, on the same evidence and with the same caveat --
+ * three callers, one of them that handler. Types 2, 3 and 8 were all three
+ * listed as unidentified; two now have a reading. */
+#define ADDR_OBJ_CLEAR_ROACH_FOOTPRINT 0x0043CA00u  /* void(void *obj) */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
 #define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
 /* What DestroyObjCommon iterates before it marks anything. Each record goes to

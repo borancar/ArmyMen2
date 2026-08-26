@@ -139,6 +139,7 @@ void __cdecl DestroyObjCommon(void *obj);
 /* 0x00449460 and 0x0045A9C0. DestroyByType's type-2 and type-3 arms. */
 void __cdecl DestroyType2(void *obj);
 void __cdecl DestroyType3(void *obj);
+void __cdecl DestroyType8(void *obj);
 
 void item_install(void);
 

@@ -569,7 +569,6 @@ void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
 
 /* The four teardowns and the broadcast test, all still the original's. */
 typedef void (__cdecl *am2_destroy_fn)(void *obj);
-#define orig_destroy_type8      ((am2_destroy_fn)AM2_IMAGE(ADDR_DESTROY_TYPE8))
 #define kItemComm  (*(void *const *)(uintptr_t)ADDR_COMM_OBJECT)
 
 /* 0x00428DA0, 22 callers. Destroy an object, then tell the others.
@@ -602,7 +601,7 @@ void __cdecl DestroyByType(void *obj)
     switch (type) {
     case 2:  DestroyType2(obj); break;
     case 3:  DestroyType3(obj); break;
-    case 8:  orig_destroy_type8(obj); break;
+    case 8:  DestroyType8(obj); break;
     default: DestroyObjCommon(obj); break;
     }
 
@@ -619,6 +618,9 @@ typedef void (__cdecl *am2_row_unregister_fn)(void *row, int32_t a, void *desc);
 
 #define orig_obj_attach_to \
             ((void (__cdecl *)(void *, void *))AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
+
+#define orig_obj_clear_roach_footprint \
+            ((am2_destroy_fn)AM2_IMAGE(ADDR_OBJ_CLEAR_ROACH_FOOTPRINT))
 
 #define orig_obj_clear_footprint \
             ((am2_destroy_fn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
@@ -675,6 +677,29 @@ void __cdecl DestroyType3(void *obj)
     uint8_t *o = (uint8_t *)obj;
 
     orig_obj_clear_footprint(obj);
+
+    *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
+    *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
+    *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
+
+    orig_obj_attach_to(obj, 0);
+    DestroyObjCommon(obj);
+}
+
+/* 0x0043CF30, one caller -- DestroyByType's type-8 arm, and DestroyType3 with
+ * the roach footprint clearer in place of the vehicle one. The two callees are
+ * the same function with one table swapped; see
+ * ADDR_OBJ_CLEAR_ROACH_FOOTPRINT.
+ *
+ * That callee is the evidence that type 8 is a ROACH, exactly as its twin is
+ * the evidence that type 3 is a vehicle. Both readings carry the same caveat,
+ * recorded in orig.h: the clearer has other callers. */
+void __cdecl DestroyType8(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    orig_obj_clear_roach_footprint(obj);
 
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
@@ -832,6 +857,8 @@ void item_install(void)
                   "DestroyType2", 1);
     patch_replace(ADDR_DESTROY_TYPE3, (const void *)DestroyType3,
                   "DestroyType3", 1);
+    patch_replace(ADDR_DESTROY_TYPE8, (const void *)DestroyType8,
+                  "DestroyType8", 1);
     patch_replace(ADDR_DESTROY_OBJ_COMMON, (const void *)DestroyObjCommon,
                   "DestroyObjCommon", 5);
     patch_replace(ADDR_FREE_OVERDUE_ITEMS, (const void *)FreeOverdueItems,

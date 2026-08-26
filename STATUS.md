@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `5eff8f7`. Working tree clean.
+Last updated: **2026-08-26**, at `d9b0627`. Working tree clean.
 
 ## In flight
 
@@ -2882,12 +2882,20 @@ in the event only ONE callee was unnamed, because `FindSlot`, `g_objTable`,
 there. **Check what is already named before estimating what a function will
 cost.**
 
-**The immediate next unit is three 64-byte functions and one 640-byte one, and
-the order matters.** `0x00449460`, `0x0045A9C0` and `0x0043CF30` are the three
-per-type destroy handlers `DestroyByType` dispatches to, 64 bytes each, and
-they share one shape: zero the dword at `OBJ_OFF_SCRIPT_ID` and another at
-`+0xC0`, call `0x00458070(obj, 0)`, then tail into `DestroyObjCommon`. Two of
-them run a type-specific step first (`0x0045A770`, `0x0043CA00`).
+**The destroy dispatch is COMPLETE** -- `DestroyByType`, its shared tail
+`DestroyObjCommon`, and all three per-type arms are ours, along with the two
+senders beneath them and the overdue sweep beside them.
+
+**And reading each arm's callee before naming it identified two object types
+the project had listed as unknown.** `0x0045A770` and `0x0043CA00` are the same
+function with one table swapped -- they take an object's footprint back out of
+the map's cell weights, gated on a flag they then clear, subtracting 15 per
+cell with a stamp so a cell touched twice is only decremented once. One indexes
+`ADDR_VEHICLE_MASK` with a kind multiplier, the other `ADDR_ROACH_MASK` with
+none, because a roach has one kind where a vehicle has six. The type-3 handler
+calls the first and the type-8 handler the second, so **type 3 is a vehicle and
+type 8 is a roach** -- evidence rather than proof, since each clearer has other
+callers, and both comments say so. Type 2 is still unread.
 
 `0x00458070` is now READ -- 191 instructions, five returns -- and named from
 the whole body: `ADDR_OBJ_ATTACH_TO`. It detaches an object from whatever it
@@ -2914,10 +2922,10 @@ documented, then let its callers tell you what the field is.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 817 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 817 | each patched exactly once |
+| `patch_replace` sites | 821 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 821 | each patched exactly once |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 149,792 / 372,816 B (**40.2%**) | `tools/reconstructed.py`, split at referenced starts |
+| sub-CRT code reconstructed | 150,240 / 372,816 B (**40.3%**) | `tools/reconstructed.py`, split at referenced starts |
 | the same, crediting whole entries | 164,000 / 372,816 B (44.0%) | what every earlier session quoted, and an over-count |
 | modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
