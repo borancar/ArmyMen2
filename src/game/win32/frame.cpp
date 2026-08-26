@@ -400,6 +400,11 @@ void __cdecl FramePost(void)
         CommNoBuffers();
 }
 
+/* Defined below, beside the rest of the per-frame chain. */
+void __cdecl TakeMenuRequest(void);
+void __cdecl StateEnter3(void);
+void __cdecl StateEnter0(void);
+
 /* 0x004266B0. State 0 -- the intro. Leaving wins over entering, and the entry
  * action stamps the tick count that the rest of the state measures against. */
 void __cdecl State0Frame(void)
@@ -410,7 +415,7 @@ void __cdecl State0Frame(void)
     }
 
     if (g_stateEntered) {
-        call0(ADDR_STATE0_ENTER);
+        StateEnter0();
         *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK = GetTickCount();
     }
 
@@ -489,9 +494,6 @@ static const uint32_t kSubStatePainter[] = {
     0x004506A0u,           /* 31 */
 };
 
-/* Defined below, beside the rest of the per-frame chain. */
-void __cdecl TakeMenuRequest(void);
-void __cdecl StateEnter3(void);
 
 /* 0x004260C0. State 2 -- a live mission.
  *
@@ -725,7 +727,6 @@ typedef void (__cdecl *AM2_MovieNameFn)(char *dst, const char *name);
 typedef void (__cdecl *AM2_PlayMovieFn)(const char *name, int32_t arg);
 #define orig_movie_build_name ((AM2_MovieNameFn)(uintptr_t)ADDR_MOVIE_BUILD_NAME)
 #define orig_play_movie       ((AM2_PlayMovieFn)(uintptr_t)ADDR_PLAY_MOVIE)
-#define orig_clear_both       ((AM2_NoArgFn)(uintptr_t)ADDR_CLEAR_BOTH_SURFACES)
 
 /* 0x004266F0, one caller -- RunFrame, on entering state 3. State 3 is the
  * MOVIE state, and the body is what settles that: it loads a GREYSCALE palette
@@ -756,7 +757,7 @@ void __cdecl StateEnter3(void)
     LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_GREYSCALE_BMP),
                     (void *)g_activePalette);
     SetGamePalette((uint8_t *)(uintptr_t)g_activePalette);
-    orig_clear_both();
+    ClearBothSurfaces();
     RefreshGate(0);
 
     orig_movie_build_name(name, (const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY);
@@ -766,6 +767,60 @@ void __cdecl StateEnter3(void)
 
     *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK   = Ticks();
     *(int32_t  *)(uintptr_t)ADDR_STATE_ENTERED = 0;
+}
+
+
+/* 0x004265F0, one caller -- RunFrame, on entering state 0. Its first four
+ * calls are IDENTICAL to StateEnter3's, and the shared part is the point: both
+ * states show a film, so both put the greyscale palette up, make it the game
+ * palette, clear both surfaces in it and open the refresh gate.
+ *
+ * Where they differ is what comes next. State 3 knows which film to play and
+ * builds its name; state 0 DISPATCHES on the GAME OVER state instead, through
+ * ADDR_STATE_ACTIONS -- one 12-byte record per state, whose first field is
+ * what to do on entering.
+ *
+ * That table is SHARED with WndProc, which reads the second field of the same
+ * record under a guard that the game state is 0 -- the very state being
+ * entered here. So one record holds both halves: what state 0 does on entry
+ * and what it does when a message arrives while in it. Finding that is what
+ * moved the table's base back one column; see ADDR_STATE_ACTIONS in orig.h.
+ *
+ * The index is not range-checked and the original does not check it either.
+ * The states any caller sets are 0, 1, 4 and -1, and -1 must never arrive
+ * here: it would read twelve bytes before the table, where a bitmask table's
+ * tail sits, and call 0x7FFFFFFF. Reproduced unguarded, and recorded rather
+ * than quietly fixed -- adding a check would be inventing behaviour, and
+ * hiding the hazard would be worse than either.
+ *
+ * The last line clears ADDR_STATE_ENTERED so the transition is consumed, which
+ * is the one thing every entry action in this family does.
+ *
+ * WHAT VERIFIED THE BASE, since a table's base is exactly what an A/B cannot
+ * check. A probe printed the state and the pointer it was about to call:
+ * `over=0 fn=0042E8E0` and `over=1 fn=0042E930`, which are the column-0
+ * entries of the table read straight out of the image. A base one column late
+ * would have printed 0x0042E910 and 0x0042E960 -- the neighbouring column --
+ * and nothing on screen would have differed for it.
+ *
+ * The counter is blind and a plain startup does not reach this at all: the
+ * game BEGINS in state 0 rather than transitioning into it, so g_stateEntered
+ * is never set for it there. ab.sh state3 is what reaches it, on the way back
+ * out of the movie state, and it covers two different game-over states. */
+void __cdecl StateEnter0(void)
+{
+    int32_t over;
+
+    LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_GREYSCALE_BMP),
+                    (void *)g_activePalette);
+    SetGamePalette((uint8_t *)(uintptr_t)g_activePalette);
+    ClearBothSurfaces();
+    RefreshGate(0);
+
+    over = GameOverState();
+    ((const AM2_StateAction *)(uintptr_t)ADDR_STATE_ACTIONS)[over].onEnter();
+
+    *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED = 0;
 }
 
 
@@ -806,6 +861,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_STATE0_ENTER, (const void *)StateEnter0,
+                        "StateEnter0", 0);
     rc |= patch_replace(ADDR_STATE3_ENTER, (const void *)StateEnter3,
                         "StateEnter3", 0);
     rc |= patch_replace(ADDR_TAKE_MENU_REQUEST, (const void *)TakeMenuRequest,

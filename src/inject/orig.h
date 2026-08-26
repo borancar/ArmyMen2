@@ -1703,7 +1703,33 @@
 #define AM2_STATE_MENU           1
 #define AM2_STATE_MISSION        2
 #define ADDR_GAME_STATE_ARG      0x00511DB4u  /* int32_t */
-#define ADDR_STATE_DISPATCH      0x00486550u  /* 12-byte records; +0 is a function */
+/* The per-game-over-state ACTION TABLE, and the base is 0x0048654C rather than
+ * the 0x00486550 this used to carry. Both are real: the record is 12 bytes and
+ * TWO of its three fields are function pointers, so the two call sites in the
+ * image read different COLUMNS of one table.
+ *
+ *   0x0040A9F0, in WndProc:      call [eax*4 + 0x486550]   -- column 1
+ *   0x00426623, in StateEnter0:  call [edx*4 + 0x48654C]   -- column 0
+ *
+ * Both scale the index the same way, `lea eax,[eax+eax*2]` then `*4`, so the
+ * stride is 12 and the difference is exactly one field. Naming 0x00486550 the
+ * table and calling its first dword "a function" worked only because winproc
+ * never read any other field; it put the base one column late, which is the
+ * same shape of error as a mis-centred trig table.
+ *
+ * And the two callers are not independent: WndProc's arm is guarded on the
+ * game state being 0, which is the very state StateEnter0 is entering. So one
+ * record holds what to do on entering state 0 and what to do when a message
+ * arrives while in it. */
+#define ADDR_STATE_ACTIONS       0x0048654Cu  /* AM2_StateAction[] */
+/* One definition, because BOTH readers were reaching this table and only one
+ * of them had a struct for it. */
+typedef void (__cdecl *am2_state_action_fn)(void);
+typedef struct {
+    am2_state_action_fn onEnter;    /* StateEnter0 calls this */
+    am2_state_action_fn onMessage;  /* WndProc calls this, while state == 0 */
+    uint32_t            id;
+} AM2_StateAction;
 #define ADDR_ON_APP_ACTIVATED    0x004269B0u  /* void(void) */
 /* Three of the four functions in the 96-byte run around ADDR_GAME_OVER_STATE
  * were already named -- ADDR_CLEAR_GAME_OVER at 0x0042E580, reconstructed as
@@ -1711,7 +1737,7 @@
  * getter here is GameOverState and not, as it nearly went in, CurrentEndState.
  *
  * The one thing not settled is what the index MEANS: winproc.cpp uses this
- * answer to select an entry of ADDR_STATE_DISPATCH, while the family calls it
+ * answer to select an entry of ADDR_STATE_ACTIONS, while the family calls it
  * game over. An end-of-mission outcome that picks an end screen would be both;
  * nothing here decides it, and the names describe the record rather than what
  * it is for. */

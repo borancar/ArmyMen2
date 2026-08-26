@@ -63,6 +63,10 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
  * windows. */
 int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour);
 
+/* 0x0041ADB0. Clears the primary and the back buffer to the background colour.
+ * The colour is a byte, zero-extended. */
+void __cdecl ClearBothSurfaces(void);
+
 /* 0x00422FF0 and 0x00423200. Read one bitmap out of a stream that may hold
  * several -- the seek is relative to where the chunk began -- and the loader
  * that opens a file, reads one, and flips its rows. */

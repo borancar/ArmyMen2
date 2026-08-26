@@ -47,7 +47,7 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp);
  * true when it was set.
  *
  * What the index MEANS is not settled. winproc.cpp uses GameOverState's answer
- * to select an entry of ADDR_STATE_DISPATCH, while the rest of the family
+ * to select an entry of ADDR_STATE_ACTIONS, while the rest of the family
  * calls it game over; an end-of-mission outcome that picks an end screen would
  * be both. The names describe the record, not what it is for.
  *

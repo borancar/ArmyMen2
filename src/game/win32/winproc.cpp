@@ -110,8 +110,10 @@ typedef struct { am2_repaint_fn *slots; } AM2_PaintObject;
 /* 0x00486550. Records of three dwords, the first a function to run for the
  * current state. Indexed by whatever 0x0042E5D0 answers. */
 typedef void (__cdecl *am2_state_fn)(void);
-typedef struct { am2_state_fn fn; uint32_t rest[2]; } AM2_StateEntry;
-#define g_stateDispatch ((const AM2_StateEntry *)(uintptr_t)ADDR_STATE_DISPATCH)
+/* AM2_StateAction is orig.h's, so frame.cpp and this file share one layout.
+ * It used to be based one column late here -- see ADDR_STATE_ACTIONS -- which
+ * read correctly only because `fn` was the single field anything touched. */
+#define g_stateActions ((const AM2_StateAction *)(uintptr_t)ADDR_STATE_ACTIONS)
 
 /* 0x005125B8. Null until the game installs a keyboard consumer. */
 typedef void (__cdecl *am2_char_fn)(uint32_t ch, uint32_t lo, uint32_t hi);
@@ -442,7 +444,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case AM2_WM_STATE_ADVANCE:
     case AM2_WM_STATE_ABORT:
         if (g_gameState == 0)
-            g_stateDispatch[GameOverState()].fn();
+            g_stateActions[GameOverState()].onMessage();
         else {
             StateLeave();
             RequestState(g_stateArg);

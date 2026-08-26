@@ -1472,6 +1472,20 @@ void __cdecl ProgressBar(int32_t percent)
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
     ClearRegion(&bar, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
 }
+/* 0x0041ADB0, four callers -- both state entry actions among them. Clears the
+ * PRIMARY and the BACK BUFFER to ADDR_BACKGROUND_COLOUR and nothing else.
+ *
+ * The colour is a BYTE zero-extended to 32 bits -- `xor eax,eax; mov al,[..]`
+ * on both calls -- so a reconstruction that read it as an int32 would agree
+ * only while the byte above it happened to be zero. It is read twice rather
+ * than once and cached, which is what the original does; nothing between the
+ * two calls can change it, so this is transcription rather than a claim. */
+void __cdecl ClearBothSurfaces(void)
+{
+    ClearSurface(g_primarySurface, g_backgroundColour);
+    ClearSurface(g_backBuffer, g_backgroundColour);
+}
+
 
 int surface_install(void)
 {
@@ -1490,6 +1504,8 @@ int surface_install(void)
     rc |= patch_replace(ADDR_UNLOCK_SURFACE, (const void *)UnlockSurface, "UnlockSurface", 0);
     rc |= patch_replace(ADDR_CREATE_OFFSCREEN, (const void *)CreateOffscreenSurface,
                         "CreateOffscreenSurface", 4);
+    rc |= patch_replace(ADDR_CLEAR_BOTH_SURFACES, (const void *)ClearBothSurfaces,
+                        "ClearBothSurfaces", 4);
     rc |= patch_replace(ADDR_CLEAR_SURFACE, (const void *)ClearSurface,
                         "ClearSurface", 2);
     rc |= patch_replace(ADDR_PRESENT_FRAME, (const void *)PresentFrame,
