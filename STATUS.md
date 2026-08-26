@@ -2911,6 +2911,22 @@ It is still not WRITTEN, and that is the remaining judgement call: doing so
 needs names for nine fields, three comm methods and four 0x100-byte blocks.
 The three handlers need none of that and can go first.
 
+**The one to pick up first, and it is a READ rather than a write.**
+`0x00429650` raises `OBJ_FLAG_ON_MAP` and lowers `OBJ_FLAG_OFF_MAP`, the clean
+inverse of the already-reconstructed `TakeOffMap` -- and then sets bit 1 on
+every row, which is what makes `ADDR_ROW_UPDATE` REMOVE rather than re-link.
+An object going back onto the map unregistering its own rows does not read
+right, and the answer is in one of three unread places: the row's bit 0,
+`ADDR_ROW_UNREGISTER_ALL`, or `0x0041DD90`. Read those before writing
+`0x00429650`, and re-read `TakeOffMap`'s own "unregister" comment against the
+answer -- by this reading it re-links.
+
+Worth saying why this is the recommendation rather than "write the function":
+the name `ADDR_ROW_UNREGISTER` was wrong for 37 callers until it was read, and
+`TakeOffMap` was reconstructed on top of it. A second function built on the
+same misunderstanding would compile, pass, and be wrong in the same invisible
+way.
+
 What is still true of the rest: `0x00449570`, `0x00405050` and `0x004582F0`
 would each need a dozen invented names -- `AM2_Object` fields at `0xB0`,
 `0xE4`, `0xEC`, `0xF4`, `0x104`, `0x544`, `0x568`, plus tables at `0x00473DD0`,

@@ -4619,7 +4619,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_TAKE_OFF_MAP  0x004296E0u  /* void(obj *) */
 #define OBJ_FLAG_OFF_MAP       0x0800u
 /* The bit that says the object's rows are REGISTERED with the map descriptor.
- * Taking one off the map lowers it and unregisters; nothing raises it here. */
+ * Taking one off the map lowers it and unregisters; nothing raises it here.
+ *
+ * 0x00429650 is what raises it -- the counterpart this comment says is absent
+ * -- and reading it leaves one question open that is worth stating rather than
+ * guessing at. It lowers OBJ_FLAG_OFF_MAP and raises this one, which is the
+ * clean inverse of TakeOffMap, and 0x0800's meaning is not in doubt:
+ * TakeNearbyOffMap SKIPS an object that already carries it and stamps a
+ * return-at time after calling TakeOffMap, so a caller's guard confirms it.
+ *
+ * But 0x00429650 also sets bit 1 on every row before calling ADDR_ROW_UPDATE,
+ * and bit 1 is precisely what makes that function REMOVE rather than re-link.
+ * An object being put back on the map removing its own rows does not read
+ * right. Three things could explain it and only reading settles which: the
+ * row's bit 0, which ADDR_ROW_UPDATE tests first and which sends it to the
+ * unregister regardless; ADDR_ROW_UNREGISTER_ALL, which is unread; or
+ * 0x0041DD90, called just before the branch and also unread. Do those first. */
 #define OBJ_FLAG_ON_MAP        0x0200u
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
