@@ -1453,6 +1453,110 @@ void __cdecl ResetDrawCounts(void)
     *(uint16_t *)(uintptr_t)ADDR_DRAW_COUNT_A = 0;
 }
 
+#define DEPTH_OBJ(n)  (*(void **)((uint8_t *)(n) + DEPTH_OFF_OBJ))
+#define DEPTH_PREV(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_PREV))
+#define DEPTH_NEXT(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_NEXT))
+
+/* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Put one node back into depth
+ * order after the thing it points at has moved.
+ *
+ * The list is doubly linked and kept sorted by ADDR_DEPTH_COMPARE over the
+ * OBJECT each node holds, not over the node. Only one node is out of place, so
+ * this walks outward from it in whichever direction the first comparison
+ * indicates and re-links it once -- an insertion sort's inner loop, run alone.
+ *
+ * Four exits and they are not symmetric, which is the part worth stating.
+ * Walking toward the tail ends either before some node or after the LAST one;
+ * walking toward the head ends either after some node or at the head itself,
+ * and only that last case writes `*head`. The two middle cases do not, because
+ * a node inserted between two others cannot become the head.
+ *
+ * Note also that the unlink differs between the two directions. Going forward,
+ * `n->next` is known non-null -- that is why we are here -- so its back
+ * pointer is written unconditionally; going backward, `n->prev` is the known
+ * one and `n->next` has to be tested. The original writes each accordingly and
+ * this reproduces the asymmetry rather than guarding both.
+ *
+ * It lives here rather than in flat map.cpp only because DepthCompare does:
+ * this function names no platform type, but a flat module may not reach a
+ * win32/ header even transitively, and splitting a two-function list across
+ * the boundary to satisfy a rule about API contact would be worse.
+ *
+ * Measured: 3,922 calls in a Boot Camp mission, with DepthCompare at 12,661 on
+ * the same run -- about 3.2 comparisons per call, which is the walk loops
+ * doing real work rather than every node landing on the first test. This is
+ * the hottest function reconstructed in this run of work, and it is pointer
+ * surgery, so a wrong re-link would corrupt the draw order and show. Which of
+ * the four exits each call takes is NOT measured. */
+void __cdecl DepthResort(void *node, void **head)
+{
+    uint8_t *n = (uint8_t *)node;
+    uint8_t *e;
+
+    if (DEPTH_NEXT(n)
+        && DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_NEXT(n))) > 0) {
+        for (e = DEPTH_NEXT(n); DEPTH_NEXT(e); ) {
+            e = DEPTH_NEXT(e);
+            if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
+                /* Unlink, then insert before `e`. */
+                if (DEPTH_PREV(n))
+                    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
+                else
+                    *head = DEPTH_NEXT(n);
+                DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+
+                DEPTH_PREV(n) = DEPTH_PREV(e);
+                DEPTH_NEXT(n) = e;
+                DEPTH_NEXT(DEPTH_PREV(e)) = n;
+                DEPTH_PREV(e) = n;
+                return;
+            }
+        }
+
+        /* Ran off the end: unlink and append after `e`, the last node. */
+        if (DEPTH_PREV(n))
+            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
+        else
+            *head = DEPTH_NEXT(n);
+        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+
+        DEPTH_PREV(n) = e;
+        DEPTH_NEXT(n) = (uint8_t *)0;
+        DEPTH_NEXT(e) = n;
+        return;
+    }
+
+    if (!DEPTH_PREV(n)
+        || DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(DEPTH_PREV(n))) >= 0)
+        return;
+
+    for (e = DEPTH_PREV(n); DEPTH_PREV(e); ) {
+        e = DEPTH_PREV(e);
+        if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) >= 0) {
+            /* Unlink, then insert after `e`. */
+            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
+            if (DEPTH_NEXT(n))
+                DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+
+            DEPTH_PREV(n) = e;
+            DEPTH_NEXT(n) = DEPTH_NEXT(e);
+            DEPTH_PREV(DEPTH_NEXT(e)) = n;
+            DEPTH_NEXT(e) = n;
+            return;
+        }
+    }
+
+    /* Ran off the front: unlink and make `n` the head, before `e`. */
+    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
+    if (DEPTH_NEXT(n))
+        DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
+
+    DEPTH_PREV(n) = (uint8_t *)0;
+    DEPTH_NEXT(n) = e;
+    DEPTH_PREV(e) = n;
+    *head = n;
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_RESET_DRAW_COUNTS, (const void *)ResetDrawCounts,
@@ -1479,6 +1583,8 @@ int mapdraw_install(void)
                         "DrawMapObjects", 3);
     rc |= patch_replace(ADDR_DEPTH_INSERT, (const void *)DepthInsert,
                         "DepthInsert", 1);
+    rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
+                        "DepthResort", 2);
     rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
                         "DepthCompare", 9);
     rc |= patch_replace(ADDR_DRAW_MAP_OBJECT, (const void *)DrawMapObject,

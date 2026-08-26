@@ -3035,7 +3035,26 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`RowUnregisterAll` (`0x0041DB20`) is reconstructed, and the corrected rule
+**`DepthResort` (`0x0041DB90`) is reconstructed and it is the hottest thing
+here: 3,922 calls in a Boot Camp mission**, with `DepthCompare` at 12,661 on
+the same run -- about 3.2 comparisons per call, so the walk loops are doing
+real work rather than every node landing on the first test.
+
+It puts one node back into depth order after the object it points at has moved:
+an insertion sort's inner loop run alone, walking outward in whichever
+direction the first comparison indicates. Four exits, and they are not
+symmetric -- only the walk-to-the-front case writes `*head`, because a node
+inserted between two others cannot become the head. The unlink differs by
+direction too: going forward `n->next` is known non-null, going backward
+`n->prev` is, and the original writes each accordingly rather than guarding
+both.
+
+It sits in `win32/mapdraw.cpp` despite naming no platform type, because
+`DepthCompare` does and a flat module may not reach a `win32/` header even
+transitively. Splitting a two-function list across that boundary to satisfy a
+rule about API contact would be worse than the impurity.
+
+**`RowUnregisterAll` (`0x0041DB20`) is reconstructed, and the corrected rule**`RowUnregisterAll` (`0x0041DB20`) is reconstructed, and the corrected rule
 worked.** Three of its four callers are inside `ADDR_ROW_UPDATE`, which has 37
 call sites and runs whenever a row joins or leaves the map's cell lists -- so
 the condition was checked before the work, not after. Its counter reads **74**

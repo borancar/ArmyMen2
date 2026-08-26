@@ -107,4 +107,8 @@ int mapdraw_install(void);
 }
 #endif
 
+/* Original: 0x0041DB90. Put one node back into depth order after the object it
+ * points at has moved. Walks outward in one direction and re-links once. */
+void __cdecl DepthResort(void *node, void **head);
+
 #endif /* AM2_MAPDRAW_H */

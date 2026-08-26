@@ -832,6 +832,10 @@
 #define DEPTH_OFF_NEXT           0x08u
 #define ADDR_DEPTH_CURSOR        0x00507348u  /* the last node inserted */
 #define ADDR_DEPTH_COMPARE       0x0041D740u  /* int32_t(void *a, void *b) */
+/* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Move one node back into depth
+ * order after its object's depth has changed, by walking outward in whichever
+ * direction the comparison says and re-linking it there. */
+#define ADDR_DEPTH_RESORT        0x0041DB90u  /* void(node *, node **head) */
 /* What the comparator reads. The bounds at OBJ_OFF_BOUNDS end at +0x1B and
  * these follow: a screen position, a LAYER that only counts when both objects
  * have a positive one, and a per-object SLOPE that projects a horizontal
