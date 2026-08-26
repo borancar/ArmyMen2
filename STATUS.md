@@ -5,11 +5,59 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `6f65ce7`. Working tree clean.
+Last updated: **2026-08-26**, at `8ae67dd`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **Three comm methods reconstructed, and seven struct offsets named from the
+  right function.** `CommSetArmyColour` (`0x0040F280`), `CommResetStats`
+  (`0x0040F380`) and `CommReportStats` (`0x0040F400`).
+
+  The offsets came from the REPORTER's own format strings rather than from the
+  reset that clears them -- `" SEND BANDWIDTH (%6d samples) MAX was %6d; %6d
+  (%3d%%) exceeded design spec(%d)"`. So each direction has a sample count, the
+  largest seen, and how many went over; the percentage is computed and the spec
+  is the literal 2880. Naming them off the reset would have got "six dwords
+  that are zeroed together" and nothing more.
+
+- **A guard that reads as a bounds check and is not one.** `CommSetArmyColour`
+  ends with an UNSIGNED compare against the slot `CommSlotForArmy` answers for
+  the incoming colour, and its safety comes entirely from that callee: the miss
+  answer is **0**, so an unheld colour gives `slot >= 0`, always true unsigned,
+  and the swap is skipped. Had the miss answered -1 the comparison would pass
+  for every ordinary slot and the write would land 112 bytes before the array.
+
+- **The four stat rings TILE, which is the check that no base is off.**
+  `0x00C`, `0x084`, `0x0FC` and `0x174` are `0x78` apart -- thirty dwords -- and
+  the last ends exactly where `COMM_OFF_RX_MAX` begins. The two TIME rings are
+  stamped with the current tick and the two SIZE rings zeroed, not all four
+  alike; a zero timestamp would read as a sample from 1970 rather than an empty
+  slot.
+
+- **I misread `blindspots.py` and briefly believed a blind counter was live.**
+  It only prints names under `--blind`; grepping its default output found
+  nothing and I read that as "not blind". `CommSetArmyColour` has both callers
+  reconstructed, so its counter is 0 by construction. A probe settled what the
+  counter could not: one call on the mpoptions drive, `slot=0 colour=1 held=1`,
+  which takes the guard and performs the SWAP rather than skipping it.
+
+- **`ab.sh mpoptions` can see a defect in that swap, measured not assumed.**
+  With it suppressed, the 128-node widget tree differs on the colour toggle's
+  **sprite id** -- 1574528 against 1574530, which is the real datum carried
+  beside the renumbered pointer for exactly this purpose -- and the frame goes
+  to **826** pixels against a budget of 300. Two independent detectors, neither
+  of them the log.
+
+- **`CommReportStats` is verified by READING, and the zero is honest.** Its
+  three callers are `RecvFlowControl`, the multiplayer result screen and the
+  dialog behind it, and every one needs a live or finished session with a
+  second player that DirectPlay will not open here. A probe shows the function
+  is not entered once on the mpoptions drive, so this is the code not running
+  rather than the usual reconstructed-caller blind spot -- `blindspots.py`
+  agrees it is not blind. It has no side effects at all, so its whole
+  observable output is four log lines a real session would compare exactly.
 
 - **`TakeMenuRequest` is reconstructed and the in-mission frame chain is now
   closed.** `0x00425EE0`, 480 bytes, is what RunFrame's state 2 runs on every
