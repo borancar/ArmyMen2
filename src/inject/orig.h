@@ -498,6 +498,22 @@
 #define ADDR_ENCODE_SMALL    0x0041BD20u
 #define AM2_ENCODE_SCRATCH   0x30D58u     /* the encoders' stack buffer */
 #define ADDR_ACTIVE_PALETTE  0x00477A58u  /* NULL means no remapping */
+/* The state 3 entry action and the three things below it that had no names.
+ * State 3 is the MOVIE state, which is what the greyscale palette, the movie
+ * filename and the Smacker object below settle between them. */
+#define ADDR_STR_GREYSCALE_BMP   0x0048523Cu  /* "avi\\greyscale.bmp" */
+/* 0x0041ADB0, four callers. Clears the PRIMARY and the BACK BUFFER to
+ * ADDR_BACKGROUND_COLOUR -- two ClearSurface calls and nothing else. */
+#define ADDR_CLEAR_BOTH_SURFACES 0x0041ADB0u  /* void(void) */
+/* 0x0042E770, four callers. Builds a movie filename into the caller's buffer
+ * from a short name -- it knows "sml", "act1", "act2", "portal" and appends
+ * ".smk". Named from those literals, not from a call site. */
+#define ADDR_MOVIE_BUILD_NAME    0x0042E770u  /* void(char *dst, const char *) */
+/* 0x0042E5E0, four callers. Plays one: it picks the directory ("3do" and
+ * "credits" go somewhere different from everything else), then `operator new`s
+ * 0xC4 bytes and constructs the Smacker class at 0x00444FC0 into
+ * ADDR_CURRENT_MOVIE. The `new` and that constructor are what identify it. */
+#define ADDR_PLAY_MOVIE          0x0042E5E0u  /* void(const char *, int32_t) */
 /* The record MakeBitmap fills in. Not an AM2_Sprite despite the resemblance. */
 #define BMP_OFF_SURFACE      0x00u
 #define BMP_OFF_WIDTH        0x04u

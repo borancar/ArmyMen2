@@ -8,6 +8,7 @@
 #   tools/ab.sh df           -df, so sprites come off disk rather than the .dat
 #   tools/ab.sh audio        Boot Camp again, with a silent sound device
 #   tools/ab.sh mission      past both dialogs into live play, and scrolling
+#   tools/ab.sh state3       the movie state, entered by poking a transition
 #   tools/ab.sh campaign     SINGLE PLAYER into MAP 01, the only `variable` path
 #   tools/ab.sh quit         out through the menu, so the teardown runs
 #   tools/ab.sh all          all seven
@@ -256,6 +257,18 @@ play() {
         # ZERO: the screen then builds ONE thumbnail and a BACK button, and
         # three of its four buttons plus the page button are unreachable.
         movies)   args="-nointro -dbg"   ; wait=25 ;;
+        # STATE 3, the movie state, which NOTHING else in this suite enters.
+        # The intro is not it: three films play during `intro` and the game
+        # sits in state 0 the whole time -- sampled, not assumed -- so
+        # State3Frame and StateEnter3 had never executed once.
+        #
+        # It is reached by poking the game's own transition, the same way
+        # mpoptions reaches the host panel: ADDR_STATE_WANTED and the pending
+        # flag are exactly what RequestState writes, and ADDR_MOVIE_TO_PLAY is
+        # given a real name so the state has something to do. Both sides get
+        # identical pokes, and they are the GAME's globals, so this works
+        # unchanged under AM2_NOPATCH=1 -- which is the whole point.
+        state3)   args="-nointro -dbg"   ; wait=25 ;;
         # -df, which the flag at 0x0047894C reads BACKWARDS from its name: the
         # image ships it as 1 and the switch CLEARS it, so the default is the
         # packed .dat and -df is what selects loose files on disk. Nothing else
@@ -395,6 +408,34 @@ play() {
         # pixels, which no budget catches; it is one changed line here.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             > "$WORK/$cfg-$side.widgets" || true
+    fi
+
+    if [ "$cfg" = state3 ]; then
+        # "3do" as a dword -- '3','d','o',NUL little-endian. The name buffer is
+        # a char[], and poke writes four bytes, which is exactly enough for the
+        # shortest movie name the builder knows.
+        drive ctl "poke 511B08 006F6433" >/dev/null 2>&1
+        # The transition itself: wanted = 3, pending = 1.
+        drive ctl "poke 511DB0 3" >/dev/null 2>&1
+        drive ctl "poke 511DAC 1" >/dev/null 2>&1
+        # Sampled at ONE second, not eight. State 3 does not last: with no film
+        # actually running it falls through to state 0 within a couple of
+        # seconds, and a dump taken late reads 0 on both sides and proves
+        # nothing -- which is what the first version of this did.
+        sleep 1
+        # GLOBALS, not pixels, and they are the reason this configuration is
+        # worth anything. A film is never on the same frame twice, so the shot
+        # cannot discriminate -- and the harness trace that names the resolved
+        # file does not exist on the orig side at all, which is exactly the
+        # trap of a test that cannot fail.
+        #
+        # So the evidence is dumped: the game state, which must read 3 or the
+        # poke did not land, and the movie name the builder resolved. Both are
+        # the game's own memory and both sides are read the same way.
+        { drive ctl "dump 511DA4 4"; drive ctl "dump 511B08 16"; } 2>/dev/null \
+            > "$WORK/$cfg-$side.state" || true
+        drive shot "ab-$cfg-mid-$side" >/dev/null 2>&1
+        sleep 6
     fi
 
     if [ "$cfg" = movies ]; then
@@ -1025,6 +1066,20 @@ compare() {
         controls) budget=200 ;;
         # A static splash with the cursor on it, same as the dialogs.
         df)       budget=200 ;;
+        # 500, and it started at -1 on the assumption that a film is never on
+        # the same frame twice. That was wrong twice over. The frame IS stable
+        # here -- three clean runs give 0 on both shots -- and disabling the
+        # budget made the configuration report "A/B clean" while 28% of the
+        # screen differed, which is the tile-painter trap exactly.
+        #
+        # Measured in the failing direction: dropping the PlayMovie call gives
+        # 224,390 on the final frame and 32,713 on the mid one, so 500 leaves
+        # a margin of 65x against the smaller of the two.
+        #
+        # Say what it does NOT catch, because that was measured too: clearing
+        # the surfaces BEFORE the palette is set instead of after changes not a
+        # pixel. That ordering stays verified by reading.
+        state3)   budget=500 ;;
         # A static dialog like controls, and the cursor moves the same way.
         difficulty) budget=200 ;;
         # 200, and measured in both directions rather than assumed. Two clean
@@ -1153,7 +1208,7 @@ PY
 # printed "A/B clean" -- which reads as both configurations passing and is the
 # same failure mode as the two missing files that once diffed as identical.
 cfgs="${*:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens movies multi mpoptions df quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens movies multi mpoptions df state3 quit"
 
 fail=0
 for cfg in $cfgs; do

@@ -491,6 +491,7 @@ static const uint32_t kSubStatePainter[] = {
 
 /* Defined below, beside the rest of the per-frame chain. */
 void __cdecl TakeMenuRequest(void);
+void __cdecl StateEnter3(void);
 
 /* 0x004260C0. State 2 -- a live mission.
  *
@@ -560,7 +561,7 @@ void __cdecl State2Frame(void)
 void __cdecl State3Frame(void)
 {
     if (g_stateEntered)
-        call0(ADDR_STATE3_ENTER);
+        StateEnter3();
 
     if (g_statePending) {
         call0(ADDR_STATE_LEAVE_COMMON);
@@ -716,6 +717,58 @@ void __cdecl TakeMenuRequest(void)
     orig_refresh_draw2();
 }
 
+/* Spelled exactly as surface.cpp, mapdraw.cpp and palette.cpp spell it, so the
+ * four stay one definition; checkglobals enforces that. */
+#define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+
+typedef void (__cdecl *AM2_MovieNameFn)(char *dst, const char *name);
+typedef void (__cdecl *AM2_PlayMovieFn)(const char *name, int32_t arg);
+#define orig_movie_build_name ((AM2_MovieNameFn)(uintptr_t)ADDR_MOVIE_BUILD_NAME)
+#define orig_play_movie       ((AM2_PlayMovieFn)(uintptr_t)ADDR_PLAY_MOVIE)
+#define orig_clear_both       ((AM2_NoArgFn)(uintptr_t)ADDR_CLEAR_BOTH_SURFACES)
+
+/* 0x004266F0, one caller -- RunFrame, on entering state 3. State 3 is the
+ * MOVIE state, and the body is what settles that: it loads a GREYSCALE palette
+ * off disk, builds a filename from ADDR_MOVIE_TO_PLAY and hands it to the
+ * function that constructs the Smacker object.
+ *
+ * The palette is the giveaway and the order matters. "avi\greyscale.bmp" is
+ * read into ADDR_ACTIVE_PALETTE and then made the game palette BEFORE both
+ * surfaces are cleared, so the clear happens in the palette the film will play
+ * in -- doing it the other way round would flash the menu's colours.
+ *
+ * Four of the six calls are already ours -- LoadPaletteFile, SetGamePalette,
+ * RefreshGate and LatchKeyState -- so only the two movie helpers still reach
+ * the image, and they stay original because the Smacker class layout is not
+ * reconstructed yet.
+ *
+ * The name buffer is 0x40 bytes because that is the frame the original
+ * reserves, and the builder writes into it unchecked. Reproduced at that size
+ * rather than widened: a longer path would overflow here exactly as it does
+ * there, and this is not the place to decide that is a bug.
+ *
+ * The last two lines are the state bookkeeping RunFrame reads back -- the
+ * entry tick, and clearing ADDR_STATE_ENTERED so the transition is consumed. */
+void __cdecl StateEnter3(void)
+{
+    char name[0x40];
+
+    LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_GREYSCALE_BMP),
+                    (void *)g_activePalette);
+    SetGamePalette((uint8_t *)(uintptr_t)g_activePalette);
+    orig_clear_both();
+    RefreshGate(0);
+
+    orig_movie_build_name(name, (const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY);
+    orig_play_movie(name, 0);
+
+    LatchKeyState();
+
+    *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK   = Ticks();
+    *(int32_t  *)(uintptr_t)ADDR_STATE_ENTERED = 0;
+}
+
+
 /* 0x00426790. State 4 -- leaving. Posts WM_CLOSE to the game's own window and
  * clears the entered flag so it happens once, and there is nothing else in it:
  * the shutdown proper runs from WndProc. */
@@ -753,6 +806,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_STATE3_ENTER, (const void *)StateEnter3,
+                        "StateEnter3", 0);
     rc |= patch_replace(ADDR_TAKE_MENU_REQUEST, (const void *)TakeMenuRequest,
                         "TakeMenuRequest", 0);
     rc |= patch_replace(ADDR_MISSION_INPUT, (const void *)MissionInput,
