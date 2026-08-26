@@ -3665,6 +3665,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */
 #define UNIT_OFF_INVENTORY_LAST   0x560u  /* the sixth entry */
 #define UNIT_OFF_INVENTORY_SEL    0x568u  /* int32_t, which slot is in hand */
+/* The weapon HANDLER table and the four globals SelectInventorySlot installs
+ * out of it. Each record is 16 bytes and every field is a FUNCTION POINTER --
+ * established by the readers, which do `mov eax,[global]; test eax,eax;
+ * call eax`, not by the shape of the table. The index is the first dword of
+ * the weapon's OBJ_OFF_FIELD_C0, so that field is a pointer to a type record
+ * rather than the scalar its structural name suggests.
+ *
+ * THE MAPPING IS NOT SEQUENTIAL, which is the one thing worth getting right
+ * here: slot 2 goes to 0x005122F0 and slot 3 to 0x005122DC. The globals are
+ * not contiguous -- 0x005122E0..EC sit between them, and at least 0x005122E0
+ * is another handler this function does not write -- so reading the four
+ * stores as "in order" swaps the last two. Named by SLOT so the swap is
+ * visible at the use site. */
+#define ADDR_WEAPON_HANDLERS     0x00489880u  /* 16-byte records, 4 fns each */
+#define ADDR_WEAPON_FN_SLOT0     0x005122D4u
+#define ADDR_WEAPON_FN_SLOT1     0x005122D8u
+#define ADDR_WEAPON_FN_SLOT2     0x005122F0u
+#define ADDR_WEAPON_FN_SLOT3     0x005122DCu
+/* Who selected, and which slot. Written here and by 0x00424F20, read by the
+ * HUD and the two 0x458xxx sites. */
+#define ADDR_WEAPON_OWNER_ID     0x00511E58u  /* uint32_t, the unit's uid */
+#define ADDR_WEAPON_SLOT         0x00511E5Cu  /* int32_t */
 #define AM2_INVENTORY_SLOTS       6
 #define AM2_OBJ_KIND_WEAPON       4
 
@@ -5491,7 +5513,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Zeroed by every per-type destroy handler, in a pair of 16-bit stores, right
  * beside the script id. It sits immediately after the four script dwords at
  * 0xB0..0xBC, which is suggestive and not evidence, so it is named the way
- * OBJ_OFF_FIELD_540 already is -- structurally, until something reads it. */
+ * OBJ_OFF_FIELD_540 already is -- structurally, until something reads it.
+ *
+ * Something reads it now. SelectInventorySlot does `mov ecx,[obj+0xC0]; mov
+ * ecx,[ecx]` and uses that first dword to index ADDR_WEAPON_HANDLERS, so this
+ * is a POINTER to a type record, not a scalar -- which also explains a
+ * destroy handler clearing it. The name is left alone until the record itself
+ * is read; what has changed is that it is no longer unread. */
 #define OBJ_OFF_FIELD_C0           0xC0u
 #define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
 /* 0x0045A770, 336 bytes, seven callers -- READ, and it identifies its own

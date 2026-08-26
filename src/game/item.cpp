@@ -542,8 +542,6 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
  * and looks the weapon up; the rest of it is unread, so it stays original and
  * keeps a role name rather than a claim. */
 typedef void (__cdecl *AM2_SelectSlotFn)(void *unit, int32_t slot);
-#define orig_select_inventory_slot \
-    (*(AM2_SelectSlotFn)AM2_IMAGE(ADDR_SELECT_INVENTORY_SLOT))
 
 void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
 {
@@ -571,13 +569,16 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
      * leaving a duplicate at the top. */
     *(int32_t *)(u + UNIT_OFF_INVENTORY_LAST) = 0;
 
+/* Defined below, beside WeaponByUid. */
+void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+
     sel = *(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL);
     if (sel == slot) {
         /* What was in hand has gone: reset and re-select, if the object
          * agrees it should. */
         *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = 0;
         if (ObjType2Field548((const AM2_Object *)unit))
-            orig_select_inventory_slot(unit, 0);
+            SelectInventorySlot(unit, 0);
         return;
     }
     /* Above the hole slides down; below is left alone. Equal was handled
@@ -1711,6 +1712,75 @@ void __cdecl Type2ActionB(void *obj)
     orig_unit_action(o, 0);
 }
 
+/* 0x00449860, eight callers. Puts an inventory slot in the unit's hand: it
+ * records the slot, installs the weapon's four HANDLERS into the globals the
+ * HUD and the input layer call through, and tells the network.
+ *
+ * The handlers are the substance. Each record of ADDR_WEAPON_HANDLERS is four
+ * function pointers, indexed by the first dword of the weapon's
+ * OBJ_OFF_FIELD_C0 -- so that field is a pointer to a type record, which is
+ * something no reader had established before. The readers settle that these
+ * are functions rather than data: they all do `test eax,eax; call eax`.
+ *
+ * THE FOUR STORES ARE NOT IN ORDER. Slot 2 goes to ADDR_WEAPON_FN_SLOT2 at
+ * 0x005122F0 and slot 3 to ADDR_WEAPON_FN_SLOT3 at 0x005122DC, because the
+ * globals are not contiguous -- 0x005122E0..EC sit between them, and at least
+ * 0x005122E0 is a fifth handler this function never writes. Transcribing the
+ * four stores in address order swaps the last two, and nothing about the
+ * result would look wrong. Named by SLOT so the swap cannot happen silently.
+ *
+ * A missing weapon is not an error: the slot is still recorded and everything
+ * below the lookup is skipped, so selecting an empty slot empties the hand
+ * rather than refusing.
+ *
+ * THE SWAP IS CHECKED AGAINST THE ORIGINAL, not just asserted. Every record in
+ * the image reads {0, 0, -1, 0}, so the only datum that distinguishes the two
+ * mappings is WHICH global ends up holding the -1 -- which is exactly the
+ * thing a slot-2/slot-3 swap changes. Driving into a Boot Camp mission and
+ * reading the globals over the control socket:
+ *
+ *   ours    D4=0 D8=0 DC=0 F0=ffffffff
+ *   orig    D4=0 D8=0 DC=0 F0=ffffffff
+ *
+ * byte for byte, under AM2_NOPATCH=1 for the second. Transcribed in address
+ * order the two would read DC=ffffffff and F0=0, and the sides would differ.
+ * No pixel could have shown this; the globals are the evidence, the same way
+ * they are for the multiplayer checksums.
+ *
+ * 0x005122E0 reads 0x00459420 on both sides and neither this function nor the
+ * order question touches it -- it is the fifth handler, written elsewhere.
+ *
+ * The counter reads 2 on that drive, so the coverage is small but real. */
+void __cdecl SelectInventorySlot(void *unit, int32_t slot)
+{
+    uint8_t *u = (uint8_t *)unit;
+    void    *w;
+    int32_t  kind;
+    const uint32_t *rec;
+
+    *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = slot;
+
+    w = WeaponByUid(*(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                        + (uint32_t)slot * 4));
+    if (!w)
+        return;
+
+    kind = **(int32_t *const *)((uint8_t *)w + OBJ_OFF_FIELD_C0);
+    rec  = (const uint32_t *)(uintptr_t)ADDR_WEAPON_HANDLERS + kind * 4;
+
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT0 = rec[0];
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT1 = rec[1];
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2 = rec[2];
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3 = rec[3];
+
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID =
+        ((const AM2_Object *)unit)->uid;
+    *(int32_t *)(uintptr_t)ADDR_WEAPON_SLOT = slot;
+
+    orig_unit_action(unit, kind);
+    SendTrooperSetWeapon(unit, ((const AM2_Object *)w)->uid, slot);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -1719,6 +1789,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_SELECT_INVENTORY_SLOT, (const void *)SelectInventorySlot,
+                  "SelectInventorySlot", 8);
     patch_replace(ADDR_TYPE2_ACTION_B, (const void *)Type2ActionB,
                   "Type2ActionB", 2);
     patch_replace(ADDR_WEAPON_BY_UID, (const void *)WeaponByUid,
