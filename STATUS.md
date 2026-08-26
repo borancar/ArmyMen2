@@ -5,11 +5,46 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `81c8e6b`. Working tree clean.
+Last updated: **2026-08-26**, at `02825e4`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`SelectInventorySlot` is reconstructed, and four stores are not in address
+  order.** `0x00449860` puts an inventory slot in the unit's hand: records the
+  slot, installs the weapon's four HANDLERS into the globals the HUD and input
+  layer call through, and tells the network.
+
+- **They are functions, established by the readers and not by the table's
+  shape.** Every reader does `mov eax,[global]; test eax,eax; call eax`. The
+  index is the first dword of the weapon's `OBJ_OFF_FIELD_C0`, which makes
+  that field a POINTER to a type record -- `orig.h` had it named structurally
+  "until something reads it", and this reads it.
+
+- **Slot 2 goes to `0x005122F0` and slot 3 to `0x005122DC`.** The globals are
+  not contiguous: `0x005122E0..EC` sit between them, and `0x005122E0` is a
+  fifth handler this function never writes. Transcribing the stores in address
+  order swaps the last two and nothing about the result looks wrong. They are
+  named by SLOT so the swap cannot happen silently.
+
+- **Checked against the original rather than asserted, and it was nearly not
+  checkable at all.** Every record in the image reads `{0, 0, -1, 0}`, so the
+  only datum that distinguishes the two mappings is which global ends up
+  holding the `-1` -- which happens to be exactly what the swap changes.
+  Driving into a Boot Camp mission and reading over the control socket:
+
+  | | D4 | D8 | DC | F0 |
+  |---|---|---|---|---|
+  | ours | 0 | 0 | 0 | `ffffffff` |
+  | orig | 0 | 0 | 0 | `ffffffff` |
+
+  byte for byte, the second under `AM2_NOPATCH=1`. In address order the two
+  would read `DC=ffffffff` and `F0=0`. **No pixel could have shown this** --
+  the globals are the evidence, as with the multiplayer checksums.
+
+- **Not behind the DirectPlay wall**, unlike the three before it. The counter
+  reads 2 on a Boot Camp drive: small coverage, but real.
 
 - **`SetFogOfWar` is reconstructed, and one missing line is why it is not a
   call to `RevealObj`.** `0x004295C0`: the argument is INVERTED against the
