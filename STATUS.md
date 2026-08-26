@@ -3035,7 +3035,28 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`DeployItem` (`0x00428CA0`, seven callers) is reconstructed**, and it names
+**`checkseams` was green over a real seam, and the bug was in its own
+continuation joiner.** `join_continuations` folded exactly ONE `\`-continued
+line: after each fold it appended a blank, so the next line saw `out[-1] == ""`
+rather than the line it had just extended. A macro continued TWICE therefore
+kept its tail on a line of its own -- with the joined half still ending in a
+backslash and containing no `ADDR_` name at all.
+
+CLAUDE.md already records this check being fixed once for exactly this class of
+miss ("six real seams the gate had been green over"). This is the same failure
+one level deeper: the fix then handled one continuation, and nobody asked about
+two.
+
+It was hiding `orig_comm_army_of_slot`, which has been reaching our own
+reconstructed `CommArmyOfSlot` through the image for as long as both existed --
+two call sites, in `msgslot.cpp` and `widget.cpp`. Both now call it directly.
+
+Fixed by folding until the accumulated line no longer ends in a backslash, and
+**tested in the failing direction**: with a three-line seam macro restored the
+tool exits 1, without it 0. Only one such seam existed, but a gate that cannot
+see a whole spelling is worth more than the one thing it was hiding.
+
+**`DeployItem` (`0x00428CA0`, seven callers) is reconstructed****`DeployItem` (`0x00428CA0`, seven callers) is reconstructed**, and it names
 itself in its own resurrection log. Put an object into the world and tell the
 other machines; `resurrect` takes a revive path that is unusually suspicious of
 its caller -- it logs the uid and health, and if the health is NOT zero it logs

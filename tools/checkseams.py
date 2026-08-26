@@ -65,14 +65,32 @@ ALLOWED = {
 
 
 def join_continuations(text):
-    """Fold `\\`-continued lines onto the first, leaving blanks behind."""
+    """Fold `\\`-continued lines onto the first, leaving blanks behind.
+
+    The first version folded exactly ONE continuation. It appended a blank
+    after each fold, so the next line saw `out[-1] == ""` rather than the
+    line it had just extended, and a macro continued TWICE kept its tail on
+    a line of its own -- with the joined half still ending in a backslash and
+    holding no ADDR_ name at all. The gate was therefore green over every
+    three-line seam macro in the tree. `orig_comm_army_of_slot` was one, and
+    it had been reaching our own reconstructed CommArmyOfSlot through the
+    image for as long as both existed.
+
+    Folding until the accumulated line no longer ends in a backslash is the
+    fix; the blanks still hold the line numbering steady.
+    """
     out = []
+    target = None
     for line in text.split("\n"):
-        if out and out[-1].endswith("\\"):
-            out[-1] = out[-1][:-1] + " " + line.strip()
+        if target is not None:
+            out[target] = out[target][:-1] + " " + line.strip()
             out.append("")
+            if not out[target].endswith("\\"):
+                target = None
         else:
             out.append(line)
+            if line.endswith("\\"):
+                target = len(out) - 1
     return "\n".join(out)
 
 

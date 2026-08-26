@@ -3949,9 +3949,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MSG_CHAT            0x004FA910u
 #define AM2_MSG_CHAT_SENDER      8u
 #define AM2_MSG_CHAT_TEXT        9u
-#define orig_comm_army_of_slot \
-            ((int32_t (__attribute__((thiscall)) *)(void *, int32_t)) \
-             (uintptr_t)ADDR_COMM_ARMY_OF_SLOT)
+/* No orig_ macro for ADDR_COMM_ARMY_OF_SLOT: it is reconstructed, so call
+ * misc.h's CommArmyOfSlot. There WAS one, spread over three lines, and
+ * checkseams could not see it -- see join_continuations there. */
 
 /* The two senders themselves. */
 #define ADDR_SEND_COLOR_MSG      0x004119C0u  /* void(int32_t colour) */

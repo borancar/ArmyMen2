@@ -9,6 +9,7 @@
 #include "crt.h"        /* am2_log */
 #include "image.h"      /* AM2_IMAGE */
 #include "../inject/patch.h"
+#include "misc.h"   /* CommArmyOfSlot -- reconstructed */
 
 /* The null check comes first in every one of the six, before the division, so
  * a null comm object costs nothing and never divides. */
@@ -255,7 +256,7 @@ void __cdecl SendChatMsg(char *text, int32_t system)
     if (system)
         sender = 4;
     else
-        sender = (uint8_t)orig_comm_army_of_slot((void *)kMsgCommObj,
+        sender = (uint8_t)CommArmyOfSlot((void *)kMsgCommObj,
                                                  (int32_t)g_defaultOwner);
 
     record[AM2_MSG_CHAT_SENDER] = sender;

@@ -5574,7 +5574,7 @@ void __cdecl OnChatEnter(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
     char    *text = *(char **)(self + EDIT_OFF_TEXT);
-    int32_t  army = orig_comm_army_of_slot((void *)g_commObject,
+    int32_t  army = CommArmyOfSlot((void *)g_commObject,
                                            (int32_t)g_defaultOwner);
 
     MenuMessage(text, (int32_t)(uint8_t)army, 0);
