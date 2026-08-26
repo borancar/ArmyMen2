@@ -5,11 +5,46 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `d9a6229`. Working tree clean.
+Last updated: **2026-08-27**, at `8f1c688`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`PointActionA` is reconstructed, and its point makes a ROUND TRIP.**
+  `0x004582F0`: the argument goes to `TileOfPoint` by value to get a tile,
+  then the caller's own argument SLOT is passed to
+  `ADDR_RESOLVE_POINT_FOR_TILE` by ADDRESS, and what comes back **out of that
+  slot** is what gets stored -- not the point that came in. Reading the store
+  as "save the argument" is wrong whenever the resolver snaps it.
+
+- **`map.cpp` is now in `SELFTEST_SRC`**, which was the better half of a
+  choice. The new `TileOfPoint` call broke `selftest-link`, and the
+  established fix beside it is a stub -- but every stub there is for a
+  **win32** symbol, and `map.cpp` is flat. Stubbing a flat function would have
+  said "this module cannot be linked" when the truth was "this module was not
+  listed". It links clean and the selftest still passes: 9,062 spine cases,
+  198 variable cases.
+
+- **`OBJ_OFF_SCRIPT_STATE` is probably misnamed** -- recorded, not renamed.
+  Two functions WRITE a POINT into `0xB4` (`Type2ActionB` the zero point, this
+  one the resolved point) while two READ it as an `int32` and compare it to a
+  script value. Both cannot describe the same field. Two independent writers
+  is the stronger half, but the readers are not obviously wrong and nothing
+  here settles it; the bytes are identical either way.
+
+- **Verified by reading, and not on a blind counter.** `blindspots.py` does
+  not list it, so its **0** means the code did not run -- while `TileOfPoint`
+  reads **2,312,945** on the same drive. Two attempts to reach it are recorded
+  so they are not repeated (clicking the map; selecting then right-clicking a
+  destination), and it was checked on the **campaign** map too. Also 0.
+
+- **My own frame-ratio gate tripped on noise.** `campaign` came out 203%
+  against its 200% threshold; the re-run gave 131% and clean, and the counter
+  check above rules out this commit changing campaign behaviour. Six campaign
+  samples this session span **1.10 to 2.03**, so that gate will trip about one
+  run in six on this configuration. Recorded rather than retuned on a single
+  observation -- which is exactly the mistake the `state3` budget made.
 
 - **The combat question is now MEASURED, not assumed.** Four functions in a
   row landed "verified by reading" because nothing takes damage on any drive,
