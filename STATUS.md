@@ -3035,7 +3035,28 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`PadAdvanceDeadlines` (`0x00437A50`) and `RefreshObjCtx` (`0x00425E70`)**,
+**`FlameTick` (`0x00417810`) is the "Flame On!" cheat's per-frame effect**, and
+that is what identifies every global in it -- the two cheat arms that write
+`ADDR_FLAME_ON` and its clock are at `0x00417E20` and `0x00417EF0`. Every 200 ms
+it points the army leader's weapon field at `ADDR_FLAME_RECORD` and fires
+effect `0x14A` one tile ABOVE the leader, not at its feet. The clock advances
+from NOW rather than from the previous deadline, so bursts drift with frame
+timing instead of keeping cadence.
+
+**Its null test is in the wrong place, and that is the original's.** The leader
+is dereferenced for its position twice and only THEN tested against zero -- so a
+run with no leader faults before reaching the guard, and the guard protects
+nothing it is placed to protect. Reproduced in order, the same class of latent
+fault as `LookupOwnerObj`'s untested result in `DamageObject`.
+
+**19,893 calls, and every one returns at the first line.** It tracks
+`ComposeFrame`'s 19,970, so it really is per-frame -- but the cheat is off, so
+nothing past the flag is exercised, including that misplaced test. **A high
+call count is coverage of the ENTRY, not of the body**, and the two are worth
+separating whenever a function opens on a flag. The previous four commits could
+all claim body coverage; this one cannot, and says so.
+
+**`PadAdvanceDeadlines` (`0x00437A50`) and `RefreshObjCtx` (`0x00425E70`)****`PadAdvanceDeadlines` (`0x00437A50`) and `RefreshObjCtx` (`0x00425E70`)**,
 two more per-frame steps at 18,546 and 18,617 against `ComposeFrame`'s 18,699 --
 predicted from the caller again, before either was written.
 

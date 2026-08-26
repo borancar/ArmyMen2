@@ -49,6 +49,10 @@ void __cdecl ObjFrameSweep(void);
  * clock has passed it, one period per frame. */
 void __cdecl PadAdvanceDeadlines(void);
 
+/* Original: 0x00417810. The "Flame On!" cheat's per-frame effect: every 200 ms
+ * it re-arms the army leader and fires an effect just above it. */
+void __cdecl FlameTick(void);
+
 /* Original: 0x00425E70. Re-resolve the three object context slots from their
  * uids, so a slot whose object has gone becomes null rather than stale. */
 void __cdecl RefreshObjCtx(void);

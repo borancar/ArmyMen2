@@ -4790,6 +4790,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ROW_OFF_RECT           0x0Cu
 #define ADDR_REMAP_BYTES       0x0041BB60u  /* void(dst, src, table, count) */
 #define ADDR_SET_FIELD_IN_ALL  0x00434E90u  /* int32_t(void *record, void *v) */
+/* The "Flame On!" cheat's three globals, named from the two cheat arms that
+ * write them -- 0x00417E20 sets the flag and clears the clock, 0x00417EF0
+ * clears the flag. The record is what SetFieldInAll points the leader's
+ * weapon field at; "Flame Off!" restores what the object had saved at +0x52C,
+ * which is what says the two are the same kind of thing. */
+#define ADDR_FLAME_ON          0x004FCFA0u  /* int32_t */
+#define ADDR_FLAME_NEXT_MS     0x004FCFA4u  /* uint32_t, game-clock ms */
+#define ADDR_FLAME_RECORD      0x004FCDF8u
+#define AM2_FLAME_PERIOD_MS    0xC8         /* 200 ms between bursts */
+#define AM2_FLAME_EFFECT       0x14A
+/* 0x00417810, one caller -- the per-frame path. The cheat's actual effect. */
+#define ADDR_FLAME_TICK        0x00417810u  /* void(void) */
 #define ADDR_FIELD51_MEETS_MIN 0x0040A490u  /* int32_t(const void *p) */
 #define ADDR_OBJ_KIND538_10_17 0x0040D860u  /* int32_t(const void *obj) */
 #define ADDR_FILTER_MATCHES    0x0041EF20u  /* int32_t(wantA,wantB,haveA,haveB,maskA,maskB) */

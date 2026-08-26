@@ -950,6 +950,68 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
     orig_item_deploy_msg(obj, resurrect);
 }
 
+typedef void (__cdecl *AM2_ByRefBFn2)(int32_t *slot, int32_t b, int32_t c,
+                                      int32_t d, int32_t e);
+#define orig_by_ref_b2 ((AM2_ByRefBFn2)(uintptr_t)ADDR_BY_REF_ACTION_B)
+
+/* 0x00417810, one caller, on the per-frame path -- and it is the "Flame On!"
+ * cheat's actual effect, which is what identifies every global in it. The
+ * cheat arm at 0x00417E20 sets ADDR_FLAME_ON and zeroes the clock; the one at
+ * 0x00417EF0 clears the flag.
+ *
+ * Every 200 ms while the flag is up it points the army leader's weapon field
+ * at ADDR_FLAME_RECORD and fires effect 0x14A one tile ABOVE the leader --
+ * `y - 1`, not at its feet.
+ *
+ * The null test is in the wrong place and that is the original's. The leader
+ * is dereferenced for its position TWICE, at +0x12 and +0x14, and only then is
+ * the pointer tested against zero. So a run with no leader faults before it
+ * ever reaches the guard, and the guard protects nothing it is placed to
+ * protect. Reproduced exactly, including the order: this reads like the same
+ * class of latent fault as LookupOwnerObj's untested result in DamageObject,
+ * and neither is ours to fix.
+ *
+ * The clock advances by 200 from NOW rather than from the previous deadline,
+ * so bursts drift with frame timing instead of keeping a fixed cadence.
+ *
+ * Measured, and the number is misleading on its own: 19,893 calls against
+ * ComposeFrame's 19,970, so it runs once a frame -- and EVERY ONE of those
+ * returns at the first line, because the cheat is off. Nothing past
+ * ADDR_FLAME_ON is exercised, including the misplaced null test. A high call
+ * count is coverage of the entry, not of the body, and the two are worth
+ * separating whenever a function opens on a flag. */
+void __cdecl FlameTick(void)
+{
+    uint8_t *leader;
+    int32_t  pt;
+    uint32_t now;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_FLAME_ON)
+        return;
+
+    now = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    if (now <= *(const uint32_t *)(uintptr_t)ADDR_FLAME_NEXT_MS)
+        return;
+
+    *(uint32_t *)(uintptr_t)ADDR_FLAME_NEXT_MS = now + AM2_FLAME_PERIOD_MS;
+
+    leader = (uint8_t *)LookupOwnerObj(
+        *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+    /* Dereferenced before the test below -- see the note above. */
+    *(int16_t *)&pt = *(const int16_t *)(leader + OBJ_OFF_POS);
+    *((int16_t *)&pt + 1) =
+        (int16_t)(*(const int16_t *)(leader + OBJ_OFF_POS + 2) - 1);
+
+    if (!leader)
+        return;
+
+    SetFieldInAll(leader + 0x6C,
+                          (void *)(uintptr_t)ADDR_FLAME_RECORD);
+    orig_by_ref_b2(&pt, (int32_t)((const AM2_Object *)leader)->uid, 0, 0,
+                   AM2_FLAME_EFFECT);
+}
+
 /* 0x00437A50, one caller, on the per-frame path. Push every repeating pad's
  * deadline forward once the game clock has passed it.
  *
@@ -1628,6 +1690,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_FLAME_TICK, (const void *)FlameTick,
+                  "FlameTick", 0);
     patch_replace(ADDR_PAD_ADVANCE_DEADLINES,
                   (const void *)PadAdvanceDeadlines,
                   "PadAdvanceDeadlines", 0);
