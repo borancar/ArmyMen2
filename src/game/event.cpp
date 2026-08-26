@@ -809,6 +809,68 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
 }
 
 
+typedef int32_t (__cdecl *AM2_SaveGameFn)(const char *name);
+#define orig_save_game      ((AM2_SaveGameFn)(uintptr_t)ADDR_SAVE_GAME)
+
+/* 0x00444EF0, two callers. Raise the level's own "startupN" script event, then
+ * autosave the mission.
+ *
+ * The event name is built rather than looked up: "startup" and the level
+ * index, with the index forced to 1 when it is not positive -- so a level that
+ * never set one still fires `startup1`. If the script declares no such name,
+ * ScriptNameUid answers zero or less and nothing is raised; a mission with no
+ * startup block is silent rather than an error.
+ *
+ * The autosave has three separate guards and any of them cancels it: a level
+ * id that is not positive, a zero first byte of ADDR_GAMEPROC_BLOCK, and
+ * ADDR_WIN_ENABLED being set. That last is the interesting one -- the game
+ * does not autosave once winning is enabled.
+ *
+ * The filename is copied into ADDR_GAMEPROC_STR_B afterwards, which is inside
+ * the block the savegame itself writes out, so the name of the last autosave
+ * survives into the next save. The original does that copy with `repne scasb`
+ * and `rep movsd`, which is just strcpy after strlen and is written as one.
+ *
+ * Measured, and the autosave is attributed rather than assumed. The counter
+ * reads 1 per mission on either drive. On Boot Camp no .sav is written at all,
+ * so one of the three guards cancels it there and WHICH one is not
+ * established. On the campaign it is written -- and to be sure that was ours
+ * rather than the A/B's other half, the existing file was backdated to the
+ * year 2020 and a single patched run started: it came back stamped with the
+ * current minute at the same 176,850 bytes.
+ *
+ * Backdating an artefact and running one side is worth remembering. A file
+ * mtime moving during a two-sided A/B says only that somebody wrote it. */
+void __cdecl MissionStartup(void)
+{
+    char    name[AM2_MISSION_NAME_BYTES];
+    int32_t level = *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX;
+    int32_t id;
+
+    if (level <= 0)
+        level = 1;
+
+    sprintf(name, (const char *)AM2_IMAGE(ADDR_STR_STARTUP_FMT), level);
+    id = ScriptNameUid(name);
+    if (id > 0)
+        EventNotify(0, id, 0, 0, 0, 0, 0, 0, 1, 0);
+
+    *(int32_t *)(uintptr_t)ADDR_SCRIPT_STATE_FLAG = 1;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_LEVEL_ID <= 0)
+        return;
+    if (!*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
+        return;
+    if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED)
+        return;
+
+    sprintf(name, (const char *)AM2_IMAGE(ADDR_STR_MISSION_SAV_FMT),
+            *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID,
+            *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX);
+    orig_save_game(name);
+    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, name);
+}
+
 /* 0x0041E950, one caller, on the per-frame path. Fire every timer that has
  * come due, and no more often than once every 100 ms.
  *
@@ -2189,6 +2251,8 @@ int event_install(void)
                         "AdvanceMission", 2);
     rc |= patch_replace(ADDR_ACTION_POINT, (const void *)ActionPoint,
                         "ActionPoint", 14);
+    rc |= patch_replace(ADDR_MISSION_STARTUP, (const void *)MissionStartup,
+                        "MissionStartup", 0);
     rc |= patch_replace(ADDR_TIMER_TICK, (const void *)TimerTick,
                         "TimerTick", 0);
     rc |= patch_replace(ADDR_EVENT_NOTIFY, (const void *)EventNotify,

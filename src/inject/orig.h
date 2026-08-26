@@ -2771,7 +2771,13 @@
  * ADDR_ATTEMPT_COUNT and logs "Attempt# %d". */
 #define ADDR_MISSION_RETRY       0x0051232Cu  /* int32_t */
 #define ADDR_ATTEMPT_COUNT       0x00512330u  /* int32_t */
-#define ADDR_SAVE_GAME           0x00425790u  /* int32_t(const char *) */
+#define ADDR_SAVE_GAME           0x00425790u
+/* 0x00444EF0, two callers, one of them the per-frame path. Raise the level's
+ * "startupN" script event and then autosave. */
+#define ADDR_MISSION_STARTUP     0x00444EF0u  /* void(void) */
+#define ADDR_STR_STARTUP_FMT     0x00489540u  /* "startup%d" */
+#define ADDR_STR_MISSION_SAV_FMT 0x0048952Cu  /* "map%d_mission%d.sav" */
+#define AM2_MISSION_NAME_BYTES   0x50  /* int32_t(const char *) */
 #define ADDR_GAMEPROC_BLOCK      0x00511A68u  /* also a string; see below */
 #define AM2_GAMEPROC_SAVE_SIZE   0x438u       /* 1080 bytes, and its own tag */
 #define ADDR_GAMEPROC_STR_B      0x00511B88u  /* a second string inside it */

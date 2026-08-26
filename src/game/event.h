@@ -32,6 +32,10 @@ typedef struct AM2_Timer {
     int32_t  id;       /* zero means the slot is free */
 } AM2_Timer;
 
+/* Original: 0x00444EF0. Raise the level's "startupN" script event, then
+ * autosave the mission unless any of three guards cancels it. */
+void __cdecl MissionStartup(void);
+
 /* Original: 0x0041E950. Fire every timer that has come due, at most once every
  * 100 ms. Sets `removeevent` on a timer's final tick. */
 void __cdecl TimerTick(void);

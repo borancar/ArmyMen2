@@ -3050,7 +3050,28 @@ with no writer; this is both at once. Whatever the per-frame block once did, a
 good deal of it was cut and the scaffolding left standing -- which is worth
 knowing before reading any of it as meaningful.
 
-**`SeqRunBoth` (`0x00461930`) is the per-frame seq step** -- 19,066 calls
+**`MissionStartup` (`0x00444EF0`) raises the level's `startupN` script event
+and then autosaves.** The event name is BUILT rather than looked up -- the
+level index forced to 1 when not positive, so a level that set none still fires
+`startup1` -- and a script declaring no such name simply raises nothing.
+
+The autosave has three guards and any one cancels it; the interesting one is
+`ADDR_WIN_ENABLED`, so the game stops autosaving once winning is enabled. The
+filename is then copied into `ADDR_GAMEPROC_STR_B`, which lives inside the
+block the savegame itself writes -- so the name of the last autosave survives
+into the next save.
+
+**The autosave is attributed, not assumed.** The counter reads 1 per mission on
+either drive, but Boot Camp writes no `.sav` at all, so a guard cancels it
+there and which one is not established. On the campaign a file appears -- and
+to be sure that was OURS rather than the A/B's original half, I backdated the
+existing file to 2020 and ran a single patched build: it came back stamped with
+the current minute at the same 176,850 bytes.
+
+**A file mtime moving during a two-sided A/B says only that somebody wrote it.**
+Backdating the artefact and running one side is what turns it into evidence.
+
+**`SeqRunBoth` (`0x00461930`) is the per-frame seq step****`SeqRunBoth` (`0x00461930`) is the per-frame seq step** -- 19,066 calls
 against `ComposeFrame`'s 19,144. It runs the walker at `0x00461870` over two
 contexts; that walker stays original. Its records are 48 bytes with a kind at
 `+0x00` dispatched through an eight-arm jump table, a gate at `+0x08`, and a
