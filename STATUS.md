@@ -3035,7 +3035,21 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`RowUpdate` (`0x0041D480`, THIRTY-SEVEN callers) is reconstructed at
+**`RowRegisterAll` (`0x0041D980`, 1,587 calls a mission) is reconstructed**,
+the counterpart of `RowUnregisterAll`. It shares `RowUpdate`'s cell arithmetic
+exactly -- including the COLS-for-ROWS clamp -- which is what makes that quirk
+convincing as a deliberate copy in the original rather than a slip in one of
+them. No unlink and no re-sort, because nothing it handles is placed yet; and
+it clears surplus entries harder, both list links as well as the cell.
+
+**With it the subsystem is CLOSED, and every counter in the file now reads 0
+except `RowUpdate`.** `DepthLink` went 2,758 to 0 because this was its last
+original caller; `DepthCompare`, `DepthResort` and `RowUnregisterAll` went the
+same way in earlier commits. That is what a finished subsystem looks like from
+the outside -- and it is indistinguishable from a broken one unless the numbers
+before it are on record. They are, in each commit that took one to zero.
+
+**`RowUpdate` (`0x0041D480`, THIRTY-SEVEN callers) is reconstructed at**`RowUpdate` (`0x0041D480`, THIRTY-SEVEN callers) is reconstructed at
 242,936 calls a mission** -- the hottest thing here by two orders of magnitude,
 and the centre of the row/cell subsystem. It brings one row's membership of the
 map's cell grid up to date: four early exits, then the sprite rectangle placed

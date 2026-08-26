@@ -130,6 +130,84 @@ int32_t __cdecl DepthCompare(void *a, void *b)
     return (pb < pa) ? 1 : -1;
 }
 
+/* 0x0041D980, one caller. The counterpart of RowUnregisterAll: link every cell
+ * the row's CURRENT rectangle covers, from entries that are assumed not to be
+ * in any list yet.
+ *
+ * It shares RowUpdate's cell arithmetic exactly -- including the clamp of the
+ * BOTTOM edge against COLS-1 rather than ROWS-1, which is the same quirk in the
+ * same shape and is what makes it convincing as a deliberate copy in the
+ * original rather than a slip in one of them.
+ *
+ * Two differences from RowUpdate and both follow from the assumption. There is
+ * no unlink and no re-sort, because nothing here is already placed; and the
+ * surplus entries at the end are cleared harder -- cell to -1 AND both list
+ * links to zero -- where RowUpdate only marks the cell, because RowUpdate has
+ * just unlinked them and this has not.
+ *
+ * Measured: 1,587 calls in a Boot Camp mission. Reconstructing it also closed
+ * the subsystem: DepthLink's counter went from 2,758 to 0, because this was
+ * its last caller that was still the original's. Every counter inside this
+ * file now reads 0 except RowUpdate, which is the only member of the family
+ * with callers outside it. That is what a finished subsystem looks like from
+ * the counters, and it is indistinguishable from a broken one unless the
+ * numbers before it are on record -- which is why they are, here and in the
+ * commit. */
+void __cdecl RowRegisterAll(void *row, void *desc)
+{
+    uint8_t *r = (uint8_t *)row;
+    int32_t  cl, ct, cr, cb;
+    int32_t  cols, rows, cell, stride, used;
+
+    if (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED)
+        return;
+
+    cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
+    ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
+    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
+    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
+
+    cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
+    rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
+
+    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1)
+        return;
+
+    if (cl <= 0)
+        cl = 0;
+    if (ct <= 0)
+        ct = 0;
+    if (cr >= cols - 1)
+        cr = cols - 1;
+    if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowUpdate */
+        cb = cols - 1;
+
+    used   = 0;
+    cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
+    stride = cols - cr + cl - 1;
+
+    for (; ct <= cb; ct++, cell += stride) {
+        int32_t x;
+
+        for (x = cl; x <= cr; x++, cell++, used++) {
+            uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
+                             + (uint32_t)used * ROW_ENTRY_BYTES;
+
+            ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = cell;
+            DepthLink(entry, MAPDESC_CELL(desc, cell));
+        }
+    }
+
+    for (; used < (int32_t)r[ROW_OFF_OWNS]; used++) {
+        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
+                         + (uint32_t)used * ROW_ENTRY_BYTES;
+
+        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
+        ROW_FLD(entry, DEPTH_OFF_NEXT, uint32_t)    = 0;
+        ROW_FLD(entry, DEPTH_OFF_PREV, uint32_t)    = 0;
+    }
+}
+
 /* 0x0041D480, THIRTY-SEVEN callers -- the centre of this subsystem. Bring one
  * row's membership of the map's cell grid up to date with where it now is.
  *
@@ -466,6 +544,8 @@ int maprow_install(void)
                         "DepthLink", 2);
     rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
                         "DepthResort", 2);
+    rc |= patch_replace(ADDR_ROW_REGISTER_ALL, (const void *)RowRegisterAll,
+                        "RowRegisterAll", 2);
     rc |= patch_replace(ADDR_ROW_UPDATE, (const void *)RowUpdate,
                         "RowUpdate", 3);
     return rc;

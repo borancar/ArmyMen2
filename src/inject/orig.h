@@ -842,6 +842,11 @@
  * and is the layer above -- the names are close because the two really are one
  * operation split in two, and the address had to be grepped to notice. */
 #define ADDR_DEPTH_LINK          0x0041D8F0u  /* void(node *, node **head) */
+/* 0x0041D980, one caller. The counterpart of ADDR_ROW_UNREGISTER_ALL: put
+ * every cell the row's CURRENT rectangle covers into the grid, from entries
+ * assumed not to be linked anywhere. Shares its cell arithmetic, and its
+ * COLS-for-ROWS clamp, with ADDR_ROW_UPDATE. */
+#define ADDR_ROW_REGISTER_ALL    0x0041D980u  /* void(row *, desc *) */
 /* What the comparator reads. The bounds at OBJ_OFF_BOUNDS end at +0x1B and
  * these follow: a screen position, a LAYER that only counts when both objects
  * have a positive one, and a per-object SLOPE that projects a horizontal

@@ -21,6 +21,10 @@ void __cdecl DepthLink(void *node, void **head);
  * points at has moved. Walks outward in one direction and re-links once. */
 void __cdecl DepthResort(void *node, void **head);
 
+/* Original: 0x0041D980. Link every cell the row's current rectangle covers,
+ * from entries assumed not to be in any list yet. */
+void __cdecl RowRegisterAll(void *row, void *desc);
+
 /* Original: 0x0041D480, thirty-seven callers. Bring one row's membership of
  * the map's cell grid up to date with where it now is. */
 void __cdecl RowUpdate(void *row, int32_t force, void *desc);
