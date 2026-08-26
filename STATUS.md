@@ -5,11 +5,44 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `7629759`. Working tree clean.
+Last updated: **2026-08-26**, at `87aaa94`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`ActionKeyReleased` is reconstructed, and the verification is the
+  interesting part.** `0x004275B0` is the exact mirror of `ActionKeyPressed`,
+  which sat a few lines above it already: PRESSED wants the key down and
+  changed, RELEASED wants it up and changed. Written as the same loop, so the
+  pair differs in exactly one operator.
+
+- **An A/B can NEVER check this**, and that is not a limitation of the budget.
+  Both sides get the same keystroke and would agree about ignoring it, so a
+  pressed/released mix-up produces identical frames and identical logs on both
+  halves. The evidence has to come from driving.
+
+- **Driving the two edges apart is what does it.** F1 is action `0x14` and
+  `MissionInput` is one of the four callers, so in a live mission, reading the
+  sub-state over the control socket:
+
+  | | sub-state |
+  |---|---|
+  | before | `0x21` ordinary play |
+  | F1 **held** | `0x21` still ordinary play |
+  | F1 **released** | `0x16` the info bitmap |
+
+- **A tap would have proved nothing, and that was the first attempt.**
+  `key F1 tap` has both edges, so it reaches `0x16` whichever semantics the
+  function has. `key F1 down` and `key F1 up` are what separate them.
+
+- **Tested in the failing direction**, with the first test inverted -- i.e.
+  spelled exactly like `ActionKeyPressed`. The HELD reading becomes `0x16`. So
+  the check discriminates the only thing that distinguishes this function from
+  its sibling, which is the whole point of writing it.
+
+- It runs **11,419** times in a Boot Camp mission, so the coverage is real and
+  not a blind counter.
 
 - **`Type2ActionB` is reconstructed, and its ordering is the whole function.**
   `0x00448220`: soldier kind 8, AI mode 2 -- `ignore`, per the action-parser
