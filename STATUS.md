@@ -5,11 +5,41 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `75a3659`. Working tree clean.
+Last updated: **2026-08-26**, at `799de06`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`DismissKeyReleased` is reconstructed, and its old name described its
+  callers instead of itself.** `0x00424900` asks whether any of SPACE, F1,
+  ESCAPE or RETURN has just been RELEASED -- the same `!IsKeyDown &&
+  KeyChanged` idiom `ActionKeyReleased` uses, over a fixed set rather than a
+  bound action -- and CONSUMES the one that had.
+
+- **It is destructive, and the old name hid that completely.** `ConsumeKey`
+  runs on the key that matched, so asking twice in one frame answers yes then
+  no. The name it replaces is `ADDR_EVENT_FLAG_8_TEST`, taken from what two of
+  its four callers do with the answer. Renamed rather than aliased -- four use
+  sites, all in `frame.cpp`. **Fifth** call-site name this project has had to
+  correct.
+
+- **Driven, on the info bitmap.** F1 puts the sub-state to `0x16` and each of
+  these takes it back to `0x21`, checked on separate runs: a click, SPACE,
+  ESCAPE. The counter is blind, so the sub-state is the evidence.
+
+- **Stubbing it changes the outcome, and I stopped short of claiming why.**
+  With it always answering no, F1 never reaches `0x16` at all -- which says the
+  drive exercises this function rather than something else doing the
+  dismissing. It does NOT say why the *raise* is affected; the three call sites
+  interact through the pause flag and the bitmap slot and I did not trace that
+  chain. Recorded in the source as an observation and explicitly not as a
+  mechanism.
+
+- **The consume itself is verified by READING**, and that is stated in the
+  source rather than left implied: nothing in these drives asks twice in one
+  frame, so a build without `ConsumeKey` would behave identically on every
+  configuration this project has.
 
 - **`Substate22` is reconstructed** -- `0x00425C10`, the INFO BITMAP F1 raises
   in a mission. Three parts, and the order between the first two is what makes
