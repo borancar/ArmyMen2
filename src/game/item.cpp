@@ -845,9 +845,61 @@ void __cdecl DestroyObjCommon(void *obj)
 
 /* orig_change_object_frame is orig.h's, shared with event.cpp and
  * objscript.cpp -- one definition, not a fourth private copy. */
-typedef void (__cdecl *AM2_NotifyHealedFn)(void *obj, void *src);
-#define orig_notify_healed \
-    ((AM2_NotifyHealedFn)(uintptr_t)ADDR_NOTIFY_HEALED)
+
+/* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
+ * belongs to a different structure, as air.cpp already records. */
+#define AM2_OBJ_OWNER_OFF  0x10u
+/* The dword EventNotify takes as `num1`. Not an OBJ_OFF_ name on purpose:
+ * orig.h already has OBJ_OFF_BOUNDS on 0x0C for a different structure, and a
+ * second one there would be a family alias the ratchet is right to refuse. */
+#define AM2_OBJ_EVENT_NUM_OFF  0x0Cu
+
+/* 0x00427E80, and its only caller is HealObject. Event kind 6 -- healed -- and
+ * the last of the three notifiers: identical in shape to NotifyDamaged and
+ * TriggerItemDestroyed above, differing only in the literal.
+ *
+ * That the three are the same shape is worth stating, because it is what makes
+ * the family readable at all. Each raises one event for the object and, when
+ * there is a second party, for that party too; each passes num1, uid and event
+ * mask per party; each passes zero for the delay, so none of them can take
+ * EventNotify's delayed path, which is the one that would drop the masks. The
+ * kinds are 4 killed, 5 damaged, 6 healed.
+ *
+ * Its counter is 0 and always will be: HealObject is the only caller and calls
+ * it by name. Coverage is transitive from HealObject's own probe -- one call
+ * in a Boot Camp mission, on the non-item path, which reaches this
+ * unconditionally, and with a null `src`, so the two-party arm above does not
+ * run.
+ *
+ * Reconstructing it also took ObjEventMask's counter from 1 to 0, and the
+ * cause is exactly this function: that single call came THROUGH the original
+ * 0x00427E80, which is now ours and calls ObjEventMask by name. Worth writing
+ * down because a counter dropping to zero in the same run as an unrelated-
+ * looking change is the shape that gets misread as a regression. */
+static void __cdecl NotifyHealed(void *obj, void *src)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (src) {
+        const uint8_t *a = (const uint8_t *)src;
+
+        EventNotify(AM2_EVENT_HEALED,
+                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)obj)->uid,
+                    ObjEventMask((const AM2_Object *)obj),
+                    *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)src)->uid,
+                    ObjEventMask((const AM2_Object *)src),
+                    0, 0, 0);
+        return;
+    }
+
+    EventNotify(AM2_EVENT_HEALED,
+                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                ((const AM2_Object *)obj)->uid,
+                ObjEventMask((const AM2_Object *)obj),
+                0, 0, 0, 0, 0, 0);
+}
 
 /* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
  * health and notify. `src` is the other party, passed straight through to the
@@ -905,7 +957,7 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) > 0) {
             orig_change_object_frame(obj, 0, 0);
             *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
-            orig_notify_healed(obj, src);
+            NotifyHealed(obj, src);
             return;
         }
 
@@ -914,7 +966,7 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
             return;
 
         *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
-        orig_notify_healed(obj, src);
+        NotifyHealed(obj, src);
         return;
     }
 
@@ -929,7 +981,7 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
         if (next > maxHp)
             *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
     }
-    orig_notify_healed(obj, src);
+    NotifyHealed(obj, src);
 }
 
 typedef void (__cdecl *AM2_DamageTypeFn)(void *obj, int32_t amount,
@@ -953,13 +1005,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_damage_broadcast \
     ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
 
-/* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
- * belongs to a different structure, as air.cpp already records. */
-#define AM2_OBJ_OWNER_OFF  0x10u
-/* The dword EventNotify takes as `num1`. Not an OBJ_OFF_ name on purpose:
- * orig.h already has OBJ_OFF_BOUNDS on 0x0C for a different structure, and a
- * second one there would be a family alias the ratchet is right to refuse. */
-#define AM2_OBJ_EVENT_NUM_OFF  0x0Cu
 #define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
@@ -1352,6 +1397,8 @@ void item_install(void)
     patch_replace(ADDR_DESTROY_ITEM_OBJECT, (const void *)DestroyItemObject,
                   "DestroyItemObject", 5);
     patch_replace(ADDR_UID_ON_WIRE, (const void *)UidOnWire, "UidOnWire", 1);
+    patch_replace(ADDR_NOTIFY_HEALED, (const void *)NotifyHealed,
+                  "NotifyHealed", 2);
     patch_replace(ADDR_ROW_UNREGISTER_ALL, (const void *)RowUnregisterAll,
                   "RowUnregisterAll", 2);
     patch_replace(ADDR_SEND_DEATH_MESSAGE, (const void *)SendDeathMessage,

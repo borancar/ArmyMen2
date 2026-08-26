@@ -3035,7 +3035,24 @@ largest piece of unexercised arithmetic in the tree and it is verified by
 reading alone; the A/B being clean says nothing about it either way, and is
 reported as no-regression rather than as coverage.
 
-**`RowAlloc` (`0x0041D2B0`, six callers, 2,512 calls a mission) is
+**`NotifyHealed` (`0x00427E80`) completes the notifier family** -- kinds 4
+killed, 5 damaged, 6 healed, all three now ours and all three the same shape:
+one event for the object, a second party's triple when there is one, and a zero
+delay so none can take `EventNotify`'s delayed path. That they are identical is
+what made the family readable; the only thing separating them is the literal.
+
+Its counter is 0 and always will be -- `HealObject` is the only caller and
+calls it by name -- so coverage is transitive from `HealObject`'s earlier
+probe: one call, non-item path, null `src`, so the two-party arm does not run.
+
+**And it explains a counter that fell to 0 in the same run.** `ObjEventMask`
+read 1 last commit and reads 0 now. The cause is this very function: that one
+call arrived THROUGH the original `0x00427E80`, which is now ours and calls
+`ObjEventMask` by name. A counter dropping to zero alongside a change that
+looks unrelated is exactly the shape that gets misread as a regression, so the
+chain is written down rather than left to be re-derived.
+
+**`RowAlloc` (`0x0041D2B0`, six callers, 2,512 calls a mission) is**`RowAlloc` (`0x0041D2B0`, six callers, 2,512 calls a mission) is
 reconstructed** -- the row's constructor: size the entry buffer, fill it in,
 work out the rectangle and register.
 
