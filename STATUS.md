@@ -5,11 +5,33 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-26**, at `87aaa94`. Working tree clean.
+Last updated: **2026-08-26**, at `81c8e6b`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`SetFogOfWar` is reconstructed, and one missing line is why it is not a
+  call to `RevealObj`.** `0x004295C0`: the argument is INVERTED against the
+  flag it sets -- non-zero turns fog OFF and returns at once. Only turning fog
+  ON does work, and what it does is reveal every type 2/3/8 object first, so
+  the fog starts from a clean slate rather than from whatever the previous
+  mission left.
+
+- **The inner body is `RevealObj`'s minus `OBJ_FLAG_REVEALED`.** Collapsing
+  the two -- which is exactly what a tidy reading would do, since every other
+  line matches -- would leave every object on the map carrying a revealed flag
+  it never had. `RevealNearby` skips an object already carrying it, so the fog
+  would stop working, and no frame comparison would attribute that to this
+  function. The original inlines the shared part and drops the one write;
+  reproduced the same way, and the difference is called out in the source
+  because a reader comparing them will otherwise assume they are one function.
+
+- **Verified by reading, against a known wall.** Its single call site is
+  WndProc's `AM2_WM_SETUP_DONE` arm, and that message comes from the
+  ready/end-setup handshake -- one of the five this project can only reach
+  with a live DirectPlay session and a second player. Same standing as those
+  five, and weaker than the rest of `air.cpp`.
 
 - **`ActionKeyReleased` is reconstructed, and the verification is the
   interesting part.** `0x004275B0` is the exact mirror of `ActionKeyPressed`,
