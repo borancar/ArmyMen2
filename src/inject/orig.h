@@ -5508,6 +5508,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * with 0x0042DEB0 and masks it to a byte, and the message's own trace line
  * calls it "dir". It is clamped up to 1 on the way in, so 0 is never stored.
  *
+ * CAVEAT, added after reading the SENDER. Every sender of that message passes
+ * the VICTIM's own position, not the attacker's, so the angle the receiver
+ * computes is between two views of one object and is near zero when the two
+ * sides agree. The field is angle-SHAPED and the game's own trace line calls
+ * it "dir"; what it means is less settled than this comment first claimed. 
+ *
  * The time is the game clock, so a reader can age the hit. */
 #define OBJ_OFF_HIT_DIR        0x104u       /* uint8_t, >= 1 */
 #define OBJ_OFF_HIT_TIME       0x108u       /* uint32_t, ADDR_GAME_CLOCK_MS */
@@ -5627,15 +5633,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_DEPLOY_OFF_FACING    0x0Cu /* uint8_t */
 #define MSG_DEPLOY_OFF_RESURRECT 0x0Du /* uint8_t */
 #define ADDR_STR_RECV_DAMAGE     0x00485EB0u
-/* The damage message. The receiver does NOT carry a direction -- it carries
- * the attacker's POSITION and computes the direction with ADDR_ANGLE_BETWEEN
- * against the victim's own, masking to a byte. That is what makes the third
- * argument of the damage family a direction; see OBJ_OFF_HIT_DIR. */
+/* The damage message. It carries no direction: the receiver computes one with
+ * ADDR_ANGLE_BETWEEN from the position at MSG_DAMAGE_OFF_POS to the victim's
+ * own, masked to a byte.
+ *
+ * WHOSE POSITION THAT IS, CORRECTED. This said "the attacker's", which was an
+ * inference from the receiver's use and is wrong. All FOUR senders --
+ * 0x0042A880's callers at 0x00406219, 0x00428215, 0x004282BC and 0x0045AF4B
+ * -- pass `victim + OBJ_OFF_POS`. It is the VICTIM's position as the SENDER
+ * saw it.
+ *
+ * Which makes the angle one between two views of the same object, near zero
+ * whenever the two sides agree. What it is FOR is therefore not established;
+ * see OBJ_OFF_HIT_DIR, where the name rests on this call and now carries the
+ * same caveat. */
 #define MSG_DAMAGE_OFF_UID       4u
 #define MSG_DAMAGE_OFF_ATTACKER  8u
 #define MSG_DAMAGE_OFF_POS       0x0Cu /* two int16, the ATTACKER's position */
 #define MSG_DAMAGE_OFF_AMOUNT    0x10u /* int16_t */
 #define MSG_DAMAGE_OFF_KIND      0x12u /* uint8_t */
+#define AM2_MSG_DAMAGE_LEN       0x14u
+#define ADDR_STR_SEND_DAMAGE     0x00485DB0u
 #define ADDR_STR_RECV_ITEM_CREATE 0x00485F78u
 /* The item-create message and the four creators it dispatches to. The switch
  * is on MSG_CREATE_OFF_TYPE and the four arms map onto the object types this

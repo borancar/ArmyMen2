@@ -1297,9 +1297,6 @@ typedef void (__cdecl *AM2_DamageItemFn)(void *obj, int32_t amount, int32_t d,
                                          int32_t kind, uint32_t attacker,
                                          int32_t f);
 typedef void (__cdecl *AM2_ObjAttackerFn)(void *obj, void *attacker);
-typedef void (__cdecl *AM2_DamageBroadcastFn)(void *obj, uint32_t attacker,
-                                              int32_t amount, int32_t kind,
-                                              const void *where, int32_t f);
 typedef void (__cdecl *AM2_SendDeathMsgFn)(void *obj, uint32_t attacker,
                                             int32_t kind);
 typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
@@ -1307,8 +1304,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_damage_item      ((AM2_DamageItemFn)(uintptr_t)ADDR_DAMAGE_ITEM)
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 #define orig_damage_vehicle   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_VEHICLE)
-#define orig_damage_broadcast \
-    ((AM2_DamageBroadcastFn)(uintptr_t)ADDR_DAMAGE_BROADCAST)
 
 #define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
@@ -1558,7 +1553,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         NotifyDamaged(obj, attacker);
         if (g_mpSession && suppress == 0
             && CommMustBroadcast(kItemComm, attackerOwner))
-            orig_damage_broadcast(obj, attackerUid, amount, kind,
+            DamageBroadcast(obj, attackerUid, amount, kind,
                                   o + OBJ_OFF_POS, 0);
         return;
     }
@@ -1584,7 +1579,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
 
     if (g_mpSession && suppress == 0
         && CommMustBroadcast(kItemComm, attackerOwner))
-        orig_damage_broadcast(obj, attackerUid, amount, kind,
+        DamageBroadcast(obj, attackerUid, amount, kind,
                               o + OBJ_OFF_POS, 0);
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0)

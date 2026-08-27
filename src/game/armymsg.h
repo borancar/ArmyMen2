@@ -63,6 +63,12 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army);
  * order. Guarded on the SESSION pointer, not COMM_OFF_DPLAY. */
 void __cdecl SendItemDeploy(const void *item, int32_t arg);
 
+/* 0x0042A880. The only sender of the damage message. The position it carries
+ * is the VICTIM's own -- every caller passes that -- and the sixth argument
+ * is never read. */
+void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
+                             int32_t kind, const void *where, int32_t unused);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

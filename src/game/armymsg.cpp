@@ -488,16 +488,19 @@ void __cdecl RecvItemDeploy(void *msg)
 /* 0x0042ADA0, the last of the six receivers and the one that settles a
  * question the whole damage family depends on.
  *
- * THE MESSAGE CARRIES NO DIRECTION. It carries the ATTACKER's position, and
- * the receiver computes the direction here with AngleBetween against the
- * victim's own position, masked to a byte. That is what makes the third
- * argument of DamageObject and its four type handlers a DIRECTION rather than
- * a second amount -- decoded here rather than inferred, which is how
- * OBJ_OFF_HIT_DIR got its name.
+ * THE MESSAGE CARRIES NO DIRECTION. The receiver computes one with
+ * AngleBetween from the position in the message to the victim's own, masked
+ * to a byte, and that is what reaches DamageObject's third argument.
  *
- * The order of the two positions matters and is easy to reverse: the ATTACKER
- * is the `from` and the victim the `to`, so the direction points at the
- * victim. Reversing it would flip every recoil and hit animation by 128.
+ * WHOSE POSITION IS IN THE MESSAGE -- CORRECTED. This comment first said the
+ * ATTACKER's, inferred from the arithmetic right here, and it is wrong.
+ * DamageBroadcast is the only sender and all FOUR of its callers pass
+ * `victim + OBJ_OFF_POS`: it is the VICTIM's position as the SENDER saw it.
+ * The angle is therefore between two views of one object, near zero whenever
+ * the two sides agree, and what it is FOR is not established.
+ *
+ * The argument order is still worth stating because it is reversible: the
+ * message's position is the `from` and the local one the `to`.
  *
  * The log is gated on COMM_OFF_VERBOSE and prints the ATTACKER's army through
  * UidArmy while printing the VICTIM's uid -- two different objects on one
@@ -670,12 +673,75 @@ void __cdecl RecvItemCreate(void *msg)
     }
 }
 
+/* 0x0042A880, four callers -- the only sender of the damage message, and the
+ * far end of RecvDamage above. Twenty bytes.
+ *
+ * READING IT IS WHAT CORRECTED RecvDamage'S COMMENT. The position field is
+ * filled from the caller's fifth argument, and all four callers pass the
+ * VICTIM's own position, so what travels is where the SENDER thinks the
+ * victim is -- not where the attacker is, which is what the receiver's
+ * arithmetic had led me to write.
+ *
+ * The SIXTH argument is never read. The two callers in item.cpp pass 0 and
+ * the two in the image pass their own value; nothing in these 176 bytes
+ * touches it. Kept in the signature because every call site has it.
+ *
+ * Both uids go through UidOnWire and the position is copied FIELD BY FIELD
+ * from the caller's point rather than as a dword -- two int16 loads and two
+ * int16 stores. Reproduced that way; it is the same bytes, but a dword copy
+ * would assume an alignment the original does not.
+ *
+ * The trailing log is gated on COMM_OFF_VERBOSE and prints the victim's
+ * HEALTH, which is in neither the message nor the arguments -- it is read
+ * back off the object, so it is the health AFTER whatever the caller already
+ * did to it. */
+void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
+                             int32_t kind, const void *where, int32_t unused)
+{
+    uint8_t        msg[AM2_MSG_DAMAGE_LEN];
+    const uint8_t *o = (const uint8_t *)obj;
+    const uint8_t *comm;
+
+    (void)unused;
+
+    if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_DAMAGE_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_DAMAGE;
+    *(uint32_t *)(msg + MSG_DAMAGE_OFF_UID) =
+        UidOnWire(*(const uint32_t *)(o + 4));
+
+    *(int16_t *)(msg + MSG_DAMAGE_OFF_AMOUNT) = (int16_t)amount;
+    *(uint8_t *)(msg + MSG_DAMAGE_OFF_KIND)   = (uint8_t)kind;
+
+    *(int16_t *)(msg + MSG_DAMAGE_OFF_POS)     =
+        *(const int16_t *)where;
+    *(int16_t *)(msg + MSG_DAMAGE_OFF_POS + 2) =
+        *(const int16_t *)((const uint8_t *)where + 2);
+
+    *(uint32_t *)(msg + MSG_DAMAGE_OFF_ATTACKER) = UidOnWire(attacker);
+
+    ArmyMessageSend(msg);
+
+    comm = kComm;
+    if (!*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        return;
+
+    orig_log((const char *)(uintptr_t)ADDR_STR_SEND_DAMAGE,
+             *(const uint32_t *)(o + 4), amount,
+             (int32_t)*(const int16_t *)(o + OBJ_OFF_HEALTH),
+             UidArmy(attacker));
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_DAMAGE_BROADCAST, (const void *)DamageBroadcast,
+                        "DamageBroadcast", 4);
     rc |= patch_replace(ADDR_RECV_ITEM_CREATE, (const void *)RecvItemCreate,
                         "RecvItemCreate", 1);
     rc |= patch_replace(ADDR_RECV_DAMAGE, (const void *)RecvDamage,

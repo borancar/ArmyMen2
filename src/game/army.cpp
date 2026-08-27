@@ -11,6 +11,7 @@
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "armymsg.h"  /* DamageBroadcast */
 
 #define g_allyMatrix   ((int32_t *)(uintptr_t)ADDR_ALLY_MATRIX)
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
@@ -191,9 +192,6 @@ uint32_t __cdecl ListFirstField548(const void *obj)
 
 typedef int32_t (__cdecl *AM2_SeatBlockedFn)(int32_t seat, void *vehicle);
 typedef void (__cdecl *AM2_DropOccupantFn)(void *vehicle, void *occupant);
-typedef void (__cdecl *AM2_DamageBroadcastFn)(void *obj, uint32_t uid,
-                                              int32_t amount, int32_t kind,
-                                              const void *at, int32_t flag);
 typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
                                              int32_t kind, uint32_t uid,
                                              int32_t a, int32_t b);
@@ -201,8 +199,6 @@ typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
     (*(AM2_SeatBlockedFn)AM2_IMAGE(ADDR_VEHICLE_SEAT_BLOCKED))
 #define orig_drop_occupant \
     (*(AM2_DropOccupantFn)AM2_IMAGE(ADDR_VEHICLE_DROP_OCCUPANT))
-#define orig_damage_broadcast \
-    (*(AM2_DamageBroadcastFn)AM2_IMAGE(ADDR_DAMAGE_BROADCAST))
 
 void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 {
@@ -248,7 +244,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
                                       (int16_t)army)) {
                 am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
                         "damage owner not me\n");
-                orig_damage_broadcast(rider, damageOwner,
+                DamageBroadcast(rider, damageOwner,
                                       AM2_VEHICLE_DEATH_DAMAGE,
                                       AM2_VEHICLE_DEATH_KIND,
                                       (const uint8_t *)rider + OBJ_OFF_POS, 0);
