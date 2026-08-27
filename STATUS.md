@@ -5,32 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `e408512`. Working tree clean.
+Last updated: **2026-08-27**, at `dd9bc19`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`MpPreviewSetBitmap`** (`0x00454AD0`, three callers, thiscall) -- give the
-  multiplayer map preview a new bitmap. 930 patches.
+- **Five of the save family**: `SaveItemHeader`, `LoadItemHeader`, `SaveType1`,
+  `SaveType6`, `SaveType8`. 935 patches, five `orig_` seams closed.
 
-- **The pointer goes in two places and both matter.** `PREVIEW_OFF_SPRITE` is
-  the class's own slot, which is what the release at the top of the *next*
-  call finds; `AM2_Widget::sprite` is the base's, which is what `WidgetPaint`
-  draws. Storing only one would either leak or draw nothing, and which of the
-  two you would get is not obvious from either line alone.
+- **`OBJ_OFF_FIELD_94` is the type-specific record.** `orig.h` carried it as
+  "type-dependent, nothing read so far explains it" -- and all three per-type
+  savers write from exactly that offset, each with its own size: `0x2C` for
+  type 1, `0x28` for type 6, `0x4CC` for type 8. Literals in the savers rather
+  than a table.
 
-- The release is unconditional -- `ReleaseSprite` tolerates a null, which makes
-  the first call safe -- and the load is unchecked, so a missing bitmap leaves
-  both slots null and the widget paints nothing. `ADDR_SHOW_BAD_PREVIEW` is the
-  caller-side answer, which is why this function does not need one.
+- **The header size is a global, not a constant**: `0x00427640` sets
+  `0x0051307C` to `0x68` and both halves read it. That is what makes the two
+  sides agree by construction rather than by both spelling one literal. It also
+  exposes a gap -- the header is `0x68` and the type record starts at `0x94`,
+  so `0x68..0x93` is saved by neither half.
 
-- It was already **named** in `orig.h` and reached through
-  `orig_mp_preview_setbitmap`, so this is a seam closing rather than a name
-  arriving; `checkseams` asked for the direct call the moment the patch landed.
+- **Type 1 writes a second tag** and the other two do not: its record *opens*
+  with a pointer, and the tag is that pointee's `+8`. So the file carries a raw
+  pointer and a value read through it -- which is why the savefile is an oracle
+  only once it can ignore pointers.
 
-- `ab.sh mpoptions` is the configuration that opens the map browser, so this
-  one is compared rather than read.
+- **Type 8 is the only one that checks its object**, answering 0 for a null
+  where the other two would fault. And only the *save* half of the header
+  writes a tag; the load half does not check one.
+
+- **Two runs failed before one passed, on different sides** -- once the recon
+  side and once the ORIG side, which installs none of this. `ab.sh` refused
+  both rather than calling an empty log a match. A failure that moves between
+  sides is the drive, not the code.
 
 ## Next
 
