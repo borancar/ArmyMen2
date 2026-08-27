@@ -5,39 +5,38 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `8f70323`. Working tree clean.
+Last updated: **2026-08-27**, at `9de8ff8`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`RegionHops` and `RegionsNear`** (`0x00406460`, `0x004066B0`). 957 patches.
+- **`ThingCode`** (`0x00406550`, two callers) -- a thing's own code to one of a
+  dozen result codes. 958 patches, and the `AtFlagBase` wrappers from the
+  previous commit turn out to be four of its seventeen arms.
 
-- **The first makes two globals legible.** Both are square byte matrices of one
-  stride, indexed `m[from * stride + to]`; one is tested against a sentinel and
-  the other walked a hop at a time. So `0x00514EFC` records whether a pair has
-  been **solved** and `0x00514EF4` is a **next-hop** table -- all-pairs routing
-  stored as bytes, which is why a map has fewer than 256 regions.
+- The original dispatches through a 39-entry byte table indexed by `code - 2`
+  and a 17-arm jump table. Written out as a switch on the **code itself**, so
+  the numbers in the source are the ones a data file would carry rather than
+  offsets into a table nobody can see.
 
-- **Three answers, not two**: same region is 0, reachable is the hop count, and
-  −1 means *either* unsolved-and-not-allowed-to-solve *or* the walk stepped
-  into region 0. Both share an exit and no caller can tell them apart.
+- **Most arms are a property of the thing and a few are the owner's** --
+  thirteen constants, four flag-base tests, and one comparing the *owner's*
+  health against half its maximum. The same code answers differently for the
+  same thing depending on who holds it, which the shape of a lookup table does
+  not suggest.
 
-- The stride is **re-read after solving** -- the only hint anywhere that
-  solving does more than fill one cell, and the sort of thing a reconstruction
-  hoists out without noticing.
+- **Two arms answer zero by different routes** -- an explicit `xor` and the
+  out-of-range default falling out of the entry `xor` seventy bytes earlier.
+  Kept as two cases: the table distinguishes them even though the answer does
+  not.
 
-- `RegionsNear` **reads its arguments in the opposite order to the call**: the
-  second object's region becomes `from`. A next-hop table need not agree in
-  both directions, so that is reproduced rather than tidied.
-
-- **`combat`'s pixel figure is bimodal, and this run settled it.** Two
-  consecutive runs at 172,352 and 177,163 looked like a regression after four
-  earlier ones at ~700. Stashing the *whole* change gave 177,113 on HEAD.
-  Eleven runs now split into two tight clusters -- 692..709 and 172k..177k --
-  with nothing between, both reproducing on the same build. `ab.sh` says so
-  where the budget is set. Second time this session that backing the whole
-  change out settled what two half-measures could not.
+- **And I corrected the division twice.** The original spells
+  `health >= max / 2` as `cdq; sub; sar 1`, MSVC's signed divide-by-two; I
+  transcribed the correction by hand *and* wrote `/ 2`, applying it twice and
+  getting a wrong answer for a negative maximum. No object ships with one,
+  which is exactly why it would have gone unnoticed. **Recognise a compiler
+  idiom as the operation it implements rather than transcribing its steps.**
 
 ## Next
 
