@@ -5,85 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `36b402e`. Working tree clean.
+Last updated: **2026-08-27**, at `d8bc941`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`place.cpp` is a new module** -- `FreePlacements`, `AddPlacement`,
-  `CanAffordUnit`, `BuildPlacementPath` and `LoadArmyPlacement`. 910 patches.
+- **Three warm helpers**: `TileToXY` (`0x0042B210`), `RowAnimFinished`
+  (`0x0040A2D0`) and `StepObjRows` (`0x00428E00`). 914 patches.
 
-- **The file is not an `.aai`**, which `orig.h` claimed for as long as
-  `ADDR_LOAD_ARMY_AI` existed. It formats `"%s_%s_place.txt"`, and thirty-six
-  such files ship under the multiplayer map directories -- the map's unit
-  PLACEMENT list for one army colour. Sixth instance of naming a function from
-  the layer above it rather than its own body.
+- **`AM2_AnimCell`'s first field is a hold in milliseconds.** `anim.h` said of
+  `field0` that the loader only ever copies it -- true, and a statement about
+  what had been reconstructed rather than about the field. `RowAnimFinished`
+  adds it to `ROW_OFF_STAMP_54` and compares the sum against
+  `ADDR_GAME_CLOCK_MS`. It is `hold` now.
 
-- **The record is confirmed from both ends.** The line parser fills a
-  0x30-byte block on its stack and hands its base to `AddPlacement`;
-  `LoadArmyPlacement` reads the same block back. Every field lands at the same
-  offset in both, and two corroborate their type independently -- `+0x00` goes
-  to `TileOfPoint`, which takes a packed point, and `+0x08` indexes the
-  unit-type table.
+- Two more row fields, both established by `SetAnimFrame`: `+0x44` is the
+  `AM2_Anim` *playing*, chosen out of the table four bytes below it, and
+  `+0x51` is how far into its cells the row has got. An object's `+0x44` and a
+  row's `+0x44` are different fields of different structures.
 
-- **And that table's base was 0x20 bytes late.** It went in as twelve records
-  at `0x004878B8` with names starting at `bazookaman`. Every field in that
-  reading is a real field and the record was still wrong: it straddles TWO real
-  records, so the flags and the name in each row belong to the unit *after* the
-  cost and mask beside them. Internally consistent, which is why it survived --
-  `rifleman` was simply missing from the front. The base is `0x00487898`, the
-  name is at `+0x0C`, and there are **eighteen** records; `medtent`, `garage`,
-  `radar`, `aagun` and `mine` were past the end of the old reading.
+- **A counter of 0 because I clicked the wrong button.** The first probe read 0
+  for all three, and none of them is blind -- which reads exactly like dead
+  code. BOOT CAMP is at `(306,143)` and I had clicked `(306,250)`, so the run
+  never left the title screen. Driven properly they are 32,693, 446 and 63,504
+  in one mission. The rule about resolving a 0 with a probe assumes the probe
+  reached the code.
 
-  The bound is its own check, the way CLAUDE.md means a layout that must tile:
-  the table ends exactly where `"%s_%s_place.txt"` begins, and the parser's
-  stop address is that string's `"txt"` read as a nineteenth name.
-
-- **`ADDR_ARMY_SETTING` is a points budget**, renamed `ADDR_ARMY_POINTS`. Its
-  comment said the meaning was not established; the slot's entry is what
-  `CanAffordUnit` compares a unit's cost against and what the creator subtracts
-  that cost from as each unit goes down.
-
-- One open question closed by the callee arriving: `AiTakeAbandoned` asked
-  whether loading clears `COMM_ARMY_OFF_WAS_HERE`. It does not, so the
-  every-frame reparse is real.
-
-- Verified by reading -- this runs only in a network game, which this project
-  cannot start. What the A/B covers is `UnitTypeCost`, whose arithmetic is
-  unchanged by the base moving.
-
-- **`ParsePlaceLine` is reconstructed too, and its last field restarts the
-  tokeniser.** Every other column continues with `strtok(NULL)`; the name
-  passes the LINE again, so `strtok` begins afresh and hands back the first
-  token -- the type. All 1,264 lines the game ships end up with the type name
-  in the name field, and the `-` those files write in that column is never
-  seen. The first reading had it as an ordinary sixth field: `push ebx` beside
-  a `strtok` looks like every other continuation until you notice the
-  continuations push 0.
-
-- **`tools/placecheck.py` is what settled it** -- the original parser under
-  Unicorn over every line of all thirty-six shipped files, with `AddPlacement`
-  hooked so the record is read at the call. 1,264 distinct lines into
-  `tests/placevec.h` for `selftest` to replay. It also confirms the corrected
-  unit-type base from the other end: rifleman 0, jeep 6, mortarman 2 are only
-  right with the table at `0x00487898`.
-
-- **What the corpus does not catch:** deleting the `-` test passes all 1,264
-  lines -- not a gap so much as a consequence of the defect, since the token
-  can never be `-`. Swapping x and y, moving the facing by one, and
-  "correcting" the restart each fail every line.
-
-- **An uninitialised field cannot be part of an exact oracle**, which this file
-  already records about the widget dump and which cost a round anyway. Three
-  padding bytes and the tail of `name` hold stack; Unicorn's is zero and
-  Wine's is not, so all 1,264 rows failed with every defined byte agreeing.
-
-- Four CRT seams now, three so this runs offline at all: `strtok` moved into
-  `crt.h` under one name (`defparse.cpp` and `definfo.cpp` reached it by
-  address for the same shared-cursor reason), `strtol` joined it as the one
-  thing stopping `DefParseNumber` running without the game, and `sprintf` came
-  with `BuildPlacementPath`.
+- **And the suite does not discriminate any of them.** Swapping x for y in
+  `TileToXY` -- 63,504 calls -- leaves `bootcamp` at its usual 22 pixels and
+  `mission` at 287, inside the 281..302 band clean runs give. Inverting
+  `RowAnimFinished`'s cell test leaves `mission` at 281. The calls happen,
+  warmly, and the answers go somewhere the frame does not show: the same
+  standing the trig tables had before `tools/trigdump.py`.
 
 ## A correction: two functions were not unexercised
 
