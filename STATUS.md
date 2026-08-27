@@ -5,11 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `d9e63bf`. Working tree clean.
+Last updated: **2026-08-27**, at `37d2bed`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **CORRECTION, found by reading the other end.** `RecvDamage`'s comment said
+  the damage message carries **the attacker's position**, and `orig.h` said the
+  same beside `MSG_DAMAGE_OFF_POS`. Both were inferences from the receiver's
+  arithmetic -- `AngleBetween(messagePos, victimPos)` reads exactly like
+  attacker-to-victim -- and both were **wrong**.
+
+  All four senders pass `victim + OBJ_OFF_POS`. What travels is the **victim's
+  position as the sender saw it**, so the angle is between two views of one
+  object, near zero whenever the two sides agree. Both comments are corrected
+  and the `OBJ_OFF_HIT_DIR` note now carries the same caveat: the field is
+  angle-SHAPED and the game's trace line calls it `"dir"`, but its meaning is
+  less settled than I claimed.
+
+  **That claim was made from one end of a two-ended thing** -- which is the
+  whole argument for reconstructing senders and receivers as pairs.
+
+- **`DamageBroadcast` is reconstructed** (`0x0042A880`), the only sender of
+  that message. Its **sixth argument is never read** -- two callers pass 0 and
+  two pass their own value. The position is copied **field by field**, two
+  int16 loads and two int16 stores, not as a dword: same bytes, but a dword
+  copy assumes an alignment the original does not.
+
+- The trailing log prints the victim's **health**, which is in neither the
+  message nor the arguments -- read back off the object, so it is the health
+  AFTER whatever the caller already did to it.
 
 - **`Type2ActionA` completes the family** -- `0x00448170`. Where **B** disarms
   and **C** hands the selection on, **A re-arms**: soldier kind 7, the old
