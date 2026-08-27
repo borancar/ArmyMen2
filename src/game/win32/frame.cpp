@@ -405,6 +405,7 @@ void __cdecl FramePost(void)
 void __cdecl TakeMenuRequest(void);
 void __cdecl Substate22(void);
 void __cdecl RefreshDraw(void);
+void __cdecl Substate34Escape(void);
 void __cdecl StateEnter3(void);
 void __cdecl StateEnter0(void);
 
@@ -550,7 +551,7 @@ void __cdecl State2Frame(void)
         else
             TakeMenuRequest();
     } else if (arm == 12) {
-        call0(ADDR_SUBSTATE34_ESCAPE);
+        Substate34Escape();
     }
 
     if ((GetPauseFlags() & AM2_EVENT_FLAG_8)
@@ -1039,6 +1040,87 @@ void __cdecl RefreshDraw(void)
 }
 
 
+/* 0x00425DA0, one caller -- the sub-state table, arm 34. The in-mission
+ * ESCAPE screen, and the only arm ordinary play never enters: CLAUDE.md
+ * records the sub-state sitting at 33 for a whole mission, which is why
+ * pressing ESCAPE in Boot Camp does nothing.
+ *
+ * Same three-part shape as Substate22 -- consume a request, paint once, then
+ * test for dismissal -- but each part differs.
+ *
+ * THE CONSUME LEAVES THE MISSION. It frees the bitmap, asks for state 1, and
+ * then chooses the menu request BRANCHLESSLY: `neg; sbb; and -2; add 9`,
+ * which is 7 when COMM_OFF_IS_HOST is set and 9 when it is not. Those are the
+ * multiplayer HOST and JOIN panels -- tools/ab.sh reaches both by poking
+ * exactly those codes, which is independent corroboration rather than a
+ * reading of this one site.
+ *
+ * The dismissal writes MENU_REQUEST = 0 and raises the flag, and that 0 is
+ * OVERWRITTEN by the 7 or 9 above on the very next frame. Reproduced: nothing
+ * reads it in between, but the write is the original's and dropping it would
+ * be a guess about what nothing reads.
+ *
+ * The bitmap is centred against ADDR_BITMAP_AREA_W/H, as RefreshDraw does and
+ * Substate22 does not -- two of the three sites use this pair and one uses
+ * ADDR_SCREEN_W/H. Taken from the operands, as at the other two.
+ *
+ * DRIVEN, BOTH ARMS, which CLAUDE.md says is impossible for this handler --
+ * and it is, by playing: ordinary play sits in sub-state 33 and never enters
+ * 34. Poking ADDR_MENU_MODE to 0x22 puts the dispatcher on this arm, and
+ * pressing and releasing ESCAPE then does the rest. In a live Boot Camp
+ * mission, reading the sub-state back afterwards:
+ *
+ *   not host                     -> 9    the JOIN panel
+ *   COMM_OFF_IS_HOST poked to 1  -> 7    the HOST panel
+ *
+ * So the branchless select is exercised in both directions, not merely
+ * transcribed. It also confirms from the inside what tools/ab.sh had been
+ * assuming from the outside when it poked those two codes to reach those two
+ * screens.
+ *
+ * The counter stays 0 -- the dispatcher is ours -- so the sub-state is the
+ * evidence, as it was for Substate22.
+ *
+ * CLAUDE.md's account was written from a probe rather than the body: it says
+ * the handler tests `!IsKeyDown(ESC) && KeyChanged(ESC)` and raises a menu
+ * request. It does. */
+void __cdecl Substate34Escape(void)
+{
+    if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
+        const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+        FreeBitmap(&g_currentBitmap);
+        RequestState(1);
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST =
+            *(const int32_t *)(comm + COMM_OFF_IS_HOST) ? AM2_MENU_REQ_MP_HOST
+                                                        : AM2_MENU_REQ_MP_JOIN;
+        return;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+        void *bmp = g_currentBitmap;
+
+        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+        if (bmp) {
+            int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
+            int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
+
+            SetDrawTarget(g_primarySurface);
+            DrawSprite((AM2_Sprite *)bmp,
+                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w) >> 1,
+                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - h) >> 1,
+                       0);
+        }
+    }
+
+    if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST     = 0;
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+    }
+}
+
+
 /* 0x00426790. State 4 -- leaving. Posts WM_CLOSE to the game's own window and
  * clears the entered flag so it happens once, and there is nothing else in it:
  * the shutdown proper runs from WndProc. */
@@ -1076,6 +1158,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_SUBSTATE34_ESCAPE, (const void *)Substate34Escape,
+                        "Substate34Escape", 0);
     rc |= patch_replace(ADDR_REFRESH_DRAW, (const void *)RefreshDraw,
                         "RefreshDraw", 2);
     rc |= patch_replace(ADDR_SHOW_MP_RESULT, (const void *)ShowMpResult,

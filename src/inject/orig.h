@@ -4236,6 +4236,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * codes seen so far are 1 (refused), 0xA (joined a session) and 0xB (start a
  * local game). */
 #define ADDR_MENU_REQUEST        0x00511DC8u  /* int32_t, the code */
+/* Two of the codes it takes, and the project already knew both from the other
+ * end: tools/ab.sh reaches the host panel by poking 7 and the join panel by
+ * poking 9, and says so in its own comment. Substate34Escape picks between
+ * exactly those two on COMM_OFF_IS_HOST, which is independent corroboration
+ * of what that suite had been assuming. */
+#define AM2_MENU_REQ_MP_HOST     7
+#define AM2_MENU_REQ_MP_JOIN     9
 /* The in-mission SUB-STATE, which frame.cpp dispatches its thirteen-arm table
  * on: 0x21 is ordinary play and 0x22 is the ESCAPE arm. It carried a second
  * name, ADDR_MENU_REQUEST_TAKEN, taken from the function that WRITES it after
