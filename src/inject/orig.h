@@ -4552,6 +4552,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * pool means the game has run out of message buffers and an empty ordinary
  * queue is unremarkable. */
 #define ADDR_MSG_LIST_REM_HEAD     0x004010C0u /* void *(void *list) */
+/* 0x00401240, five callers. Walk the same list under the same mutex, find the
+ * node whose PACKET_REC_OFF_KEY matches, set or clear bits in its
+ * PACKET_REC_OFF_FLAGS, and answer the node -- or null, having released the
+ * mutex either way.
+ *
+ * The bits argument is used BOTH WAYS from one register: `not esi` is computed
+ * before the walk, so the clear arm ands with the complement. One argument,
+ * two masks, decided by the third.
+ *
+ * The name is structural. It is the third member of this family and the only
+ * one that searches; what the key and the flags MEAN is not established. */
+#define ADDR_MSG_LIST_SET_FLAG     0x00401240u /* void *(list, key, set, bits) */
+#define PACKET_REC_OFF_KEY         0x14u
+#define PACKET_REC_OFF_FLAGS       0x18u
 /* Both DirectPlay enumerations pass this same handle as their lpContext, and
  * CommSend posts to it -- so an "lpContext" in this game is the window. */
 #define ADDR_APP_MUTEX           0x004FA034u  /* HANDLE "ArmyMenMutex" */

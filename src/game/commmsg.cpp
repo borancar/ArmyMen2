@@ -123,6 +123,49 @@ typedef int32_t (__attribute__((stdcall)) *AM2_PostMessageFn)(void *hwnd,
 #define orig_post_message \
     (**(AM2_PostMessageFn *)(uintptr_t)IAT_POST_MESSAGE_A)
 
+/* 0x00401240, five callers. Find the node with a given key and set or clear
+ * bits in its flags, under the list's mutex. Answers the node, or null.
+ *
+ * THE BITS ARGUMENT IS USED BOTH WAYS FROM ONE REGISTER. `not esi` is computed
+ * before the walk even begins, so the clear arm ands with a complement the
+ * function has been carrying since entry. One argument, two masks, chosen by
+ * the third -- and reproduced as one parameter rather than split into a set
+ * and a clear, which would read better and be a different function.
+ *
+ * EVERY EXIT RELEASES THE MUTEX, including the two that answer null, and there
+ * are four of them. That is worth counting rather than assuming: a search
+ * under a lock is exactly where an early return leaks one.
+ *
+ * The name is structural, as the rest of this family's are. It is the only
+ * member that searches, and what the key and the flags MEAN is not
+ * established.
+ */
+void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
+                             uint32_t bits)
+{
+    uint8_t *l = (uint8_t *)list;
+    uint8_t *node;
+
+    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+
+    for (node = *(uint8_t **)(l + MSGLIST_OFF_HEAD); node;
+         node = *(uint8_t **)(node + MSGNODE_OFF_NEXT)) {
+        if (*(const int32_t *)(node + PACKET_REC_OFF_KEY) != key)
+            continue;
+
+        if (set)
+            *(uint32_t *)(node + PACKET_REC_OFF_FLAGS) |= bits;
+        else
+            *(uint32_t *)(node + PACKET_REC_OFF_FLAGS) &= ~bits;
+
+        orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+        return node;
+    }
+
+    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+    return (void *)0;
+}
+
 /* 0x00401050. Append a node to the tail of a mutex-guarded list.
  *
  * The list is {mutex, head, tail, count} and a node is {prev, next}. Twelve
@@ -1425,6 +1468,8 @@ int commmsg_install(void)
                   "CommDrainMsgs", 0);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
                   "MsgListRemHead", 10);
+    patch_replace(ADDR_MSG_LIST_SET_FLAG, (const void *)MsgListSetFlag,
+                  "MsgListSetFlag", 5);
     patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,
                   "MsgListAdd", 12);
     patch_replace(ADDR_SEND_READY_TO_LOAD,

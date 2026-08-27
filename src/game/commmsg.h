@@ -50,6 +50,12 @@ void __cdecl TrooperFireSend(void *trooper, void *target);
 void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
 void __cdecl Announce(const char *text);
 
+/* 0x00401240, five callers. Find the node with a given key and set or clear
+ * bits in its flags, under the list's mutex. Structural name; see
+ * commmsg.cpp. */
+void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
+                             uint32_t bits);
+
 int commmsg_install(void);
 
 #ifdef __cplusplus
