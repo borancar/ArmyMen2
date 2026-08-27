@@ -5,34 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `fb57b32`. Working tree clean.
+Last updated: **2026-08-27**, at `a0f23bb`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`GetArmyScore`** (`0x0040F960`, thiscall, three callers). 925 patches. The
-  slot's army colour picks one of the four `ADDR_SVAR_*SCORE` name-table
-  indices and `GetVarValue` resolves it -- so a script's `greenscore` variable
-  and this accessor are the same storage, which is what makes the score
-  scriptable at all.
+- **`RowFaceSprite`** (`0x0040A310`, three callers -- the type 2, 3 and 8 frame
+  steppers, so once per unit per frame). Point the row's sprite at the
+  animation cell for the heading it is facing. 926 patches.
 
-- **The local is zeroed before the call and that is load-bearing.**
-  `GetVarValue` writes through its out-pointer for a non-positive index and
-  for a variable, and *not* for a name that is not one -- that path complains
-  and leaves the caller's memory alone. Without the zero this returns stack.
+- **The cell is the last of its direction**, not the first: the index is
+  `(dir + 1) * frames - 1`. The two heading bytes are added *as bytes* and
+  masked to eight bits before `RoundTo8` sees them, so a bias carrying past
+  255 wraps rather than saturating.
 
-- **I also wrote `GetVarValue` and `SetVarValue`, and both have been in
-  `script.cpp` for some time** -- reconstructed, installed, and named from the
-  same self-naming strings I rediscovered. I reached them by following this
-  function's callee, checked `orig.h` for the address of *this* function, and
-  went ahead; the macros were there under exactly the names I invented.
+- **It went in with one dereference too few.** `ADDR_SPRITE_LIST` is a pointer
+  *to* the array and I indexed the global itself, so every unit took its
+  sprite from whatever the pointer's own bytes decoded to. Exactly the
+  `obj -> table -> slot` shape CLAUDE.md warns about -- and the argument for
+  spelling a global the way the file that already reaches it spells it.
 
-  The compiler caught it on the conflicting definition. Fifth near-miss of
-  this class, fourth mechanism to catch one. CLAUDE.md's rule is "grep the
-  tree for the address as well as for the name" -- the case it does not cover
-  is a callee reached by reading, whose address you never type. **Grep for
-  what you are about to write, not only for what you set out to find.**
+- **The A/B caught it, at 293,671 of 786,432 pixels** against a budget of 500.
+  Worth saying plainly: three of the last four functions were invisible to the
+  pixels, and that run of notes could start to read as the check being
+  useless. It is not. A wrong sprite per unit per frame is the most visible
+  thing reconstructed lately and the number said so on the first run.
+
+  Bisected by disabling that one `patch_replace`, which put `bootcamp` back to
+  22 -- the cheapest way to tell "my new function is wrong" from "the run is
+  flaky", and worth doing before re-reading the disassembly a third time.
+
+- The globals ratchet then refused the fix's spelling, which needed the same
+  incomplete-type `struct AM2_Sprite;` declaration `air.cpp` and `script.cpp`
+  use -- it has an `LPDIRECTDRAWSURFACE` in it and this module is flat.
 
 ## Next
 
