@@ -5,11 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `84414bb`. Working tree clean.
+Last updated: **2026-08-27**, at `18b08f7`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **CORRECTION.** The previous entry said all six of `ArmyMsgFilter`'s routes
+  were ours. They were **five** -- `RecvItemCreate` (`0x0042AFA0`) was still
+  original and I wrote the claim down without checking. It is reconstructed
+  now, so the statement is true, but it was wrong when made.
+
+- **`RecvItemCreate` completes the family.** It dispatches on
+  `MSG_CREATE_OFF_TYPE`, whose four values are this project's own object
+  types: **1 item, 2 trooper, 3 vehicle, 4 weapon**. Not positional
+  guesswork -- two creators name themselves (`"CreateWeapon"`, and
+  `"Vehicle aai entry not found for type %d"`), and fixing those two fixes the
+  other two by elimination.
+
+- **The arms read one field at DIFFERENT WIDTHS.** Types 2 and 3 take
+  `MSG_CREATE_OFF_A` as a signed WORD; types 1 and 4 take the full DWORD. A
+  uniform reading would be wrong for two arms of four -- and silently, for any
+  value fitting in sixteen bits.
+
+- **Each arm's argument count was checked against its own `add esp`**, which
+  is the only self-check a function this shape offers: 7 item, 10 trooper, 10
+  vehicle, 8 weapon. All four agree.
+
+- **A created item is CONCEALED only when the player is not allied to it**, so
+  what you can see of it depends on whose side it is on. And `ebx` holds the
+  uid before the item arm's creator call and the CREATED OBJECT after --
+  conflating them passes a uid to `ObjConceal` and nothing would say so.
+
+- The log is **unconditional** here, and runs before anything is created. That
+  is the **third** different logging discipline among six siblings.
 
 - **The army-message receiver family is complete** -- `RecvItemDeploy`
   (`0x0042AF30`) and `RecvDamage` (`0x0042ADA0`) join the three from the last
