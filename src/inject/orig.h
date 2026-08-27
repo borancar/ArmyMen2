@@ -3338,6 +3338,33 @@ typedef struct {
 /* 0x0041FC40. A fourth of the "look it up and act if the type fits" twins, and
  * the only one that admits types 2, 3 AND 8 rather than type 2 alone. */
 #define ADDR_EVT_TYPE238_ACTION   0x0041FC40u  /* void(uint32_t, int32_t) */
+/* The RANK table and the two steps around it. Records are 28 bytes and the
+ * base is 0x00473DD4, not the 0x00473DD8 the threshold is read through: the
+ * function loads `[rank*28 + 0x473DD8]` for the experience needed and
+ * `[rank*28 + 0x473DD4]` for what it hands the second step, which is the same
+ * record's first two fields. Taking the higher address as the base would put
+ * the whole table one field late with every value still looking sensible.
+ *
+ * 0x00457BC0 reaches ADDR_COMM_MUST_BROADCAST, so promoting is a thing the
+ * network hears about. The second step already had a name and a better one --
+ * ADDR_SET_MAX_HEALTH -- which the alias ratchet pointed out. That is what
+ * makes the promotion block coherent: it raises the ceiling from the rank
+ * record and only then grows the current health toward it.
+ *
+ * The counter it accumulates is OBJ_OFF_REPAIR_FRAME, and that name is right
+ * for the type it was read on. This is the third field that is TYPE-DEPENDENT,
+ * after 0xA0 and 0x94: HealObject reads 0x9C on an ITEM (types 1 and 4) as a
+ * repair frame, and Type238Action accumulates experience in it on a TROOPER
+ * (type 2). Both readings are of live code and neither is wrong; the object is
+ * a union past its header. Recorded rather than aliased, as with the other
+ * two. */
+#define ADDR_RANK_TABLE          0x00473DD4u  /* 28-byte records */
+#define RANK_REC_BYTES           28u
+#define RANK_REC_OFF_SCALE       0u    /* handed to ADDR_RANK_APPLY */
+#define RANK_REC_OFF_XP          4u    /* experience needed for this rank */
+#define ADDR_RANK_PROMOTE        0x00457BC0u  /* void(obj) */
+#define OBJ_OFF_RANK             0x98u  /* int32_t, 0..7 */
+#define AM2_RANK_MAX             7
 #define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
 /* 0x0044BBD0, two callers: put 1 in the dword at +0x548 and then run the line
  * above with 0x2710. Both names are ours. */

@@ -165,13 +165,11 @@ void __cdecl SetMaxHealth(void *obj, int32_t amount)
 }
 
 typedef void (__cdecl *AM2_Type238ActionFn)(void *obj, int32_t arg);
-#define orig_type238_action \
-    (*(AM2_Type238ActionFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
 
 void __cdecl SetLeadsAndAct(void *obj)
 {
     *(int32_t *)((uint8_t *)obj + OBJ_OFF_LEADS) = 1;
-    orig_type238_action(obj, AM2_LEADS_ACTION_ARG);
+    Type238Action(obj, AM2_LEADS_ACTION_ARG);
 }
 
 void *__cdecl ListFirstObj(const void *obj)

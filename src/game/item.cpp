@@ -2540,6 +2540,106 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
     return any;
 }
 
+typedef void (__cdecl *AM2_RankPromoteFn)(void *obj);
+#define orig_rank_promote ((AM2_RankPromoteFn)(uintptr_t)ADDR_RANK_PROMOTE)
+
+/* 0x00457CD0, two callers. Awards experience and promotes when it is enough.
+ *
+ * IT LOOPS. One award can carry a unit through more than one rank: after each
+ * promotion it re-reads the rank and the total and tests the NEXT threshold,
+ * stopping at AM2_RANK_MAX. A single large award skipping two ranks is
+ * behaviour, not an edge case.
+ *
+ * Six refusals before any of that, and the order is the original's. The
+ * multiplayer one comes FIRST and is the odd one: outside a session it is
+ * skipped entirely, but inside one the unit's army must be one this side
+ * broadcasts for -- so experience is awarded by whoever owns the unit, not by
+ * whoever caused it.
+ *
+ * Then rank below 7, a POSITIVE award only, type 2 only, and soldier kind
+ * below 6. Note the type test is written as `sete` into a register and then
+ * tested, rather than as a branch -- the same value either way.
+ *
+ * THE TABLE BASE IS 0x00473DD4, not the 0x00473DD8 the threshold comes
+ * through. The function reads two fields of one 28-byte record: `+4` for the
+ * experience needed and `+0` for what it hands ADDR_RANK_APPLY. Reading the
+ * threshold's address as the base would put the table one field late with
+ * every value still looking plausible -- the trig-table mistake in another
+ * costume.
+ *
+ * PROMOTION RAISES THE CEILING FIRST. ADDR_SET_MAX_HEALTH is handed the rank
+ * record's first field, and only then is current health grown toward the new
+ * maximum -- so the cap in the next paragraph is the value this call just set,
+ * not the one the unit had a moment ago.
+ *
+ * The counter is OBJ_OFF_REPAIR_FRAME, which is what that offset is called
+ * from the reading HealObject made of it on an ITEM. On a TROOPER it is
+ * experience; the object is a union past its header, and this is the third
+ * such field after 0xA0 and 0x94. The name is kept rather than aliased.
+ *
+ * Promotion adds a QUARTER of current health, capped at the maximum:
+ * `h + (h >> 2)`, an arithmetic shift, so it is health * 1.25 rounded toward
+ * negative infinity rather than toward zero. Health is never negative here,
+ * so the two agree; written as the shift regardless.
+ *
+ * VERIFIED BY READING. Both callers are event handlers, and the multiplayer
+ * guard means the whole function is skipped in a session this side does not
+ * broadcast for. */
+void __cdecl Type238Action(void *obj, int32_t award)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (!o)
+        return;
+
+    if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        return;
+
+    if (*(const int32_t *)(o + OBJ_OFF_RANK) >= AM2_RANK_MAX)
+        return;
+    if (award <= 0)
+        return;
+    if (*(const int32_t *)o != 2)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 6)
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) += award;
+
+    for (;;) {
+        const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_RANK_TABLE
+                             + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+                               * RANK_REC_BYTES;
+        int16_t health;
+        int16_t maxHealth;
+
+        if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME)
+            < *(const int32_t *)(rec + RANK_REC_OFF_XP))
+            return;
+
+        orig_rank_promote(obj);
+
+        rec = (const uint8_t *)(uintptr_t)ADDR_RANK_TABLE
+              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES;
+        SetMaxHealth(obj, *(const int32_t *)(rec + RANK_REC_OFF_SCALE));
+
+        health    = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+        maxHealth = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        {
+            int32_t grown = (int32_t)health + ((int32_t)health >> 2);
+
+            if (grown >= (int32_t)maxHealth)
+                grown = (int32_t)maxHealth;
+            *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)grown;
+        }
+
+        if (*(const int32_t *)(o + OBJ_OFF_RANK) >= AM2_RANK_MAX)
+            return;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2550,6 +2650,8 @@ void item_install(void)
                   "ItemsReset", 0);
     patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
                   "StepType1And4", 1);
+    patch_replace(ADDR_TYPE238_ACTION, (const void *)Type238Action,
+                  "Type238Action", 2);
     patch_replace(ADDR_CHANGE_OBJECT_FRAME, (const void *)ChangeObjectFrame,
                   "ChangeObjectFrame", 1);
     patch_replace(ADDR_SET_SOLDIER_KIND, (const void *)SetSoldierKind,

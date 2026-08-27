@@ -935,8 +935,6 @@ void __cdecl TimerTick(void)
 
 typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
-#define orig_type238_action \
-    (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
 typedef void (__cdecl *AM2_ObjAttachFn)(void *a, void *b);
 #define orig_obj_attach_to \
     (*(AM2_ObjAttachFn)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
@@ -1638,7 +1636,7 @@ void __cdecl EvtType238Action(uint32_t uid, int32_t arg)
     if (!ObjIsTypeIn238((const AM2_Object *)obj))
         return;
 
-    orig_type238_action(obj, arg);
+    Type238Action(obj, arg);
 }
 
 /* 0x0041FFD0. Push a one-deep "current object" context.
