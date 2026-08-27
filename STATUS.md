@@ -5,11 +5,34 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `2085c32`. Working tree clean.
+Last updated: **2026-08-27**, at `f9d9693`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`OnAppActivated` is reconstructed** (`0x004269B0`), WndProc's activation
+  handler -- **and it paints everything TWICE.** The dialog's paint slot is
+  called twice with the same rectangle, and the bitmap drawn twice with the
+  same arguments, back to back, with **no change of draw target between**. Not
+  front-then-back; the same surface twice.
+
+  **Reproduced and not explained.** A repaint that is idempotent loses nothing
+  by running twice, so this costs only time, and nothing read says why.
+  Collapsing it would almost certainly look identical -- which is exactly why
+  it stays: *"probably redundant" is not a reason to remove something from a
+  reconstruction*, and this session has already produced two corrections that
+  came from being confident about what nothing reads.
+
+- Its `ADDR_REFRESH_SCREEN` call happens only in game state 2 -- one of the
+  seven call sites of a function CLAUDE.md lists as never observed executing,
+  and it stays unexecuted for the same reason this does.
+
+- **Two checks earned their keep.** `checkglobals` refused
+  `g_primarySurfaceW`/`g_currentBitmapW` as second names on addresses that
+  already had one, the fix being to spell them as `surface.cpp` and
+  `frame.cpp` do. And `checkseams` caught `RestoreLostSurfaces` and
+  `RefreshScreen` being reached through the image when both are ours.
 
 - **`LoadOneItem` closes the save/load pair** (`0x004289E0`), and **`orig.h`
   said `void` where it returns an OBJECT.** Every exit answers the created
