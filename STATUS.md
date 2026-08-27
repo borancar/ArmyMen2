@@ -5,11 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `4f78da3`. Working tree clean.
+Last updated: **2026-08-27**, at `577c03e`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **CORRECTION: `ADDR_FOG_OF_WAR`'s polarity is the opposite of its name.**
+  `orig.h` had it as "1 = fog on". Three independent readers say otherwise:
+
+  | reader | says |
+  |---|---|
+  | `ADDR_TOGGLE_FOG_OF_WAR` | flips the flag, then REVEALS when non-zero and CONCEALS when zero |
+  | `ObjConceal` | declines unless the flag is zero, or forced |
+  | `SetFogOfWar` | stores 0 for a non-zero argument |
+
+  So **zero is fog ON**, and `SetFogOfWar`'s argument is `fogOn`, not `noFog`.
+
+- **I already had the tell and misread it.** I wrote `SetFogOfWar`'s comment
+  saying it reveals every object while turning fog **on**, and recorded that as
+  *counter-intuitive* rather than as a sign the polarity was wrong. With the
+  flag the right way round it is not counter-intuitive at all: turning fog off
+  reveals the map. **"That's odd" is worth treating as a hypothesis under
+  test, not a footnote.**
+
+  No behaviour changes -- the code always matched the branches; only the
+  description of what they meant was inverted.
+
+- **`ObjConceal` is reconstructed** (`0x00429650`) and is NOT a mirror of
+  `RevealObj`. It CLEARS `OBJ_FLAG_REVEALED` on the way in -- except when the
+  object carries flag `0x10` AND is a type 2 AND its `+0x530` is 5, three deep
+  with a call in the middle. And it has a **force** argument `RevealObj` has
+  no equivalent of, letting a caller conceal something while the cheat has
+  everything revealed; the cheat's own sweep passes 0, so it cannot.
 
 - **`ClearMenuMsgs`** (`0x00431D70`) is **fifteen bytes**: a null check and a
   thiscall tail-jump into `ADDR_RECORD_RESET` with the menu message list in
