@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `8326e76`. Working tree clean.
+Last updated: **2026-08-27**, at `f49bf85`. Working tree clean.
 
 ## In flight
 
@@ -37,11 +37,30 @@ Nothing uncommitted.
   The final shot is of a settled scene and every stale region has been painted
   over by then.
 
-  That is the **third undiscriminated function in a row**. The only live-play
-  configuration has its pixel check off by construction, so its evidence is a
-  log of thirteen fixed messages -- live-play rendering behaviour is
-  essentially uncompared, and something like a mid-scroll oracle is what would
-  close it.
+  That was the **third undiscriminated function in a row**, and it is now
+  closed for these two rather than merely noted.
+
+- **`dirty.cpp` is a flat module and `tools/dirtycheck.py` is a third kind of
+  oracle.** Neither dirty-list function names a Win32 type -- they are index
+  arithmetic over an array in the image -- so they moved out of
+  `win32/mapdraw.cpp` and link into `selftest.exe`. `RepaintDirtyList` stays
+  behind; it reaches `IntersectRect` and the surface.
+
+  `scriptcheck.py` compares a return against a corpus and `placecheck.py` a
+  record built from one line. This one compares **state**: the vector is a
+  sequence of calls and the recording is the whole 10,004-byte span they leave
+  behind. Eight sequences, three of them around the 500-record bound and one
+  40 past it, so the overflow arm is covered on demand rather than never.
+
+  It earns its keep at once. Dropping the prev link fails 6 of 8; never
+  linking the record fails 7 of 8; moving the overflow bound by one fails 2.
+  All three are clean A/Bs.
+
+- **The state is seeded, not zeroed**, and the first version was not. With
+  zeros, deleting one of `ResetDirtyList`'s three stores passed all eight
+  sequences -- clearing something already zero cannot be observed. Seeded, it
+  fails all eight. The same trap as `ScriptVariable`'s duplicate-name check:
+  ask what state a check needs before believing it is covered.
 
 ## A correction: two functions were not unexercised
 
