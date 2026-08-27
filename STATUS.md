@@ -5,11 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `a740bce`. Working tree clean.
+Last updated: **2026-08-27**, at `4f78da3`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`ClearMenuMsgs`** (`0x00431D70`) is **fifteen bytes**: a null check and a
+  thiscall tail-jump into `ADDR_RECORD_RESET` with the menu message list in
+  `ecx`. It empties the log and does nothing else.
+
+  It was `ADDR_DROP_OBJ_51612C` -- a placeholder named after the address it
+  reads, from when neither the global nor the callee had a name. Both do now,
+  so the placeholder is **retired** rather than left to be re-derived.
+
+- **`docs/functions.tsv` gives that entry 160 bytes, which is a MERGE.** The
+  function ends at `0x00431D7F`; `0x00431D80` is a different one. Ranking by
+  size would have filed a fifteen-byte function among the mid-sized ones --
+  worth remembering when picking targets that way.
+
+- **`PacketSlotReset`** (`0x00402750`) puts one of the six player records back
+  to empty: eighteen dwords cleared, **one** field set, one list initialised.
+  That field gets `1 << slot`, so each record carries a one-bit mask naming
+  itself -- the only thing in the function that depends on which slot it is.
+
+- **Its stride is computed, not multiplied**: `slot << 6` minus slot, then
+  `<< 5`, which is `slot * 0x7E0` and matches the record size `orig.h` already
+  records. Written as the multiply -- the shift-subtract-shift is the compiler
+  avoiding an `imul` and says nothing about the structure.
+
+- The original writes `+0x8C` **out of order**, between `+0x34` and `+0x38`.
+  Immaterial -- every one of those stores is the same zero -- so it is written
+  in address order and the difference **noted rather than reproduced**. There
+  is nothing to reproduce: no reader can tell.
 
 - **`RefreshDraw` is reconstructed** (`0x00424BF0`) after being deferred four
   times. The reason each time was that three of its painters had no names; two
