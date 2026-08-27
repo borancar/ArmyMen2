@@ -872,6 +872,33 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
     return 0;
 }
 
+/* 0x0040F1C0, thiscall, one caller. The same walk as CommSlotForArmy above
+ * and a different answer: the matching slot's COMM_ARMY_OFF_WAS_HERE rather
+ * than its index.
+ *
+ * NO `army == 4` SHORTCUT here, which is the one structural difference and
+ * not an oversight to tidy: CommSlotForArmy has it because 4 is the neutral
+ * army and answers slot 4, and there is no fifth record to read a field out
+ * of. Colour 4 simply finds nothing here and answers 0.
+ *
+ * No match and a slot whose field is 0 are indistinguishable, exactly as in
+ * CommSlotForArmy. Reproduced. */
+int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army)
+{
+    const uint8_t *p = (const uint8_t *)comm + COMM_ARMY_OFF_COLOUR;
+    int32_t        i;
+
+    for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+        if (*(const int32_t *)p == army)
+            return *(const int32_t *)((const uint8_t *)comm
+                                      + (uint32_t)i * AM2_PLAYER_STRIDE
+                                      + COMM_ARMY_OFF_WAS_HERE);
+        p += AM2_PLAYER_STRIDE;
+    }
+
+    return 0;
+}
+
 /* 0x0040F280, thiscall, two callers. Gives a slot an army colour, moving
  * whoever already had that colour into the slot it displaces -- a SWAP, not an
  * assignment, so no two players end up the same colour.
@@ -1485,6 +1512,8 @@ int misc_install(void)
                   "MissionNetworked", 1);
     patch_replace(ADDR_COMM_SLOT_FOR_ARMY, (const void *)CommSlotForArmy,
                   "CommSlotForArmy", 20);
+    patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
+                  "CommWasHereForArmy", 1);
     patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
                   "CommSlotHasPlayer", 5);
     patch_replace(ADDR_COMM_SET_ARMY_COLOUR, (const void *)CommSetArmyColour,

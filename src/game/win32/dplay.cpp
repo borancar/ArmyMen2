@@ -1768,6 +1768,46 @@ void __attribute__((thiscall)) CommPublishResult(void *comm)
 
 
 
+/* 0x0040F520, thiscall, one caller. Bytes sent in the last 100 ms.
+ *
+ * The loop gives the layout rather than the other way round: `ecx` starts at
+ * this+0x84 and steps 4, and the timestamp it pairs with is read at
+ * `[ecx - 0x78]`. Those two arrays are CommSend's, filled a slot per packet
+ * round the ring at COMM_OFF_STAT_INDEX -- so this is a sliding window over
+ * the send rate and the sum is in bytes.
+ *
+ * I wrote it up first as "a windowed sum of counters whose meaning is not
+ * established", which was wrong twice over: both arrays were already named,
+ * thirty lines apart in orig.h, and CommSend three hundred lines up this file
+ * writes GetTickCount and the packet size into them. The offset ratchet
+ * refused the second pair of names and that is the only reason it was caught.
+ * Grep the offset as well as the address.
+ *
+ * The comparison is UNSIGNED on `now - stamp`, so a stamp in the FUTURE lands
+ * enormous and is skipped rather than counted. Reproduced; it takes 49 days of
+ * uptime to reach.
+ *
+ * Verified by reading, and behind the same wall as CommReportStats: its one
+ * caller needs a live session with a peer. */
+int32_t __attribute__((thiscall)) CommRecentTotal(void *comm)
+{
+    const uint8_t *c     = (const uint8_t *)comm;
+    uint32_t       now   = GetTickCount();
+    int32_t        total = 0;
+    int32_t        i;
+
+    for (i = 0; i < AM2_STAT_SLOTS; i++) {
+        uint32_t stamp = *(const uint32_t *)(c + COMM_OFF_STAT_TIMES
+                                             + (uint32_t)i * 4);
+
+        if (now - stamp < AM2_RATE_WINDOW_MS)
+            total += *(const int32_t *)(c + COMM_OFF_STAT_SIZES
+                                        + (uint32_t)i * 4);
+    }
+
+    return total;
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1840,5 +1880,7 @@ int dplay_install(void)
                         "CommPublishResult", 1);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
+    rc |= patch_replace(ADDR_COMM_RECENT_TOTAL, (const void *)CommRecentTotal,
+                        "CommRecentTotal", 1);
     return rc;
 }

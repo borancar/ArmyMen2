@@ -1397,6 +1397,24 @@
 #define ADDR_COMM_CLEAR_REMOTE   0x0040F620u /* thiscall void(this, int32 slot) */
 #define COMM_ARMY_OFF_REMOTE     0x20Cu
 #define COMM_ARMY_OFF_WAS_HERE   0x25Cu   /* what the query falls back to */
+/* 0x0040F1C0, thiscall, one caller. CommSlotForArmy's shape with a different
+ * answer: find the slot holding an army colour and return that slot's
+ * COMM_ARMY_OFF_WAS_HERE rather than its index. No match answers 0, which is
+ * also what an empty slot's field holds -- so the two are indistinguishable,
+ * as they are in CommSlotForArmy. Name ours. */
+#define ADDR_COMM_WAS_HERE_FOR_ARMY 0x0040F1C0u /* thiscall int32(this, army) */
+/* 0x0040F520, thiscall, one caller. BYTES SENT IN THE LAST 100 MS: sum
+ * COMM_OFF_STAT_SIZES over the slots whose COMM_OFF_STAT_TIMES is that
+ * recent. CommSend fills both, one slot per packet round a 30-entry ring at
+ * COMM_OFF_STAT_INDEX, so the pair is a sliding window over the send rate.
+ *
+ * Written up first as "a windowed sum of counters whose meaning is not
+ * established" -- and both arrays were ALREADY NAMED, thirty lines apart in
+ * this file, by the reporter that prints them. The offset ratchet is what
+ * said so. Grep the offset as well as the address. */
+#define ADDR_COMM_RECENT_TOTAL   0x0040F520u  /* thiscall int32(this) */
+#define AM2_STAT_SLOTS           30
+#define AM2_RATE_WINDOW_MS       100
 /* 0x0043B7C0, one caller -- the per-frame path, and only in a network game.
  * Walk the four army records; any that WAS here but now has no player has its
  * units laid out again, which is the AI taking the abandoned army over. The

@@ -210,6 +210,9 @@ int32_t __attribute__((thiscall)) CommDropSession(void *comm);
  * Not found and slot 0 share an answer, as they do in CommSlotForArmy. */
 int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
 
+/* 0x0040F520, thiscall. A windowed sum over the thirty rate slots. */
+int32_t __attribute__((thiscall)) CommRecentTotal(void *comm);
+
 int dplay_install(void);
 
 #ifdef __cplusplus
