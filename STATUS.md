@@ -5,39 +5,34 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `bb671dd`. Working tree clean.
+Last updated: **2026-08-27**, at `fb57b32`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`ObjTileChanged`** (`0x004294C0`, fifteen callers) -- recompute an object's
-  tile from its position and, if anything moved, put it back on the map and
-  re-apply its height. 924 patches.
+- **`GetArmyScore`** (`0x0040F960`, thiscall, three callers). 925 patches. The
+  slot's army colour picks one of the four `ADDR_SVAR_*SCORE` name-table
+  indices and `GetVarValue` resolves it -- so a script's `greenscore` variable
+  and this accessor are the same storage, which is what makes the score
+  scriptable at all.
 
-- **Three things have to be true to skip the work**: the position equal to
-  `OBJ_OFF_PREV_POS`, the tile equal to what it was, and `force` zero. The tile
-  hook runs before the early exit, so it is not part of the "something moved"
-  path however much its position in the body suggests it.
+- **The local is zeroed before the call and that is load-bearing.**
+  `GetVarValue` writes through its out-pointer for a non-positive index and
+  for a variable, and *not* for a name that is not one -- that path complains
+  and leaves the caller's memory alone. Without the zero this returns stack.
 
-- **`OBJ_OFF_ 0x1C` had a name already and it was the wrong struct's.**
-  `OBJ_OFF_SCREEN_X`/`_Y` sat on `0x1C`/`0x1E` describing a *map object's*
-  screen position -- which is `ROW_OFF_X`/`ROW_OFF_Y`: same offsets, same
-  struct, same meaning, different prefix. The offset ratchet cannot see that,
-  because it groups by prefix. Retired in favour of the `ROW_` pair, which
-  frees `OBJ_OFF_ 0x1C` for the game object's own field there. Net ratchet
-  change: zero.
+- **I also wrote `GetVarValue` and `SetVarValue`, and both have been in
+  `script.cpp` for some time** -- reconstructed, installed, and named from the
+  same self-naming strings I rediscovered. I reached them by following this
+  function's callee, checked `orig.h` for the address of *this* function, and
+  went ahead; the macros were there under exactly the names I invented.
 
-- **Checked with `objdump.py`, which is what it is for.** 146 calls before the
-  briefing and 24,938 in one live mission, and the pixels still see nothing --
-  adding 1 to the tile leaves `bootcamp` at 76. Reading the field is exact:
-  the leader's tile is `0x407C` correct and `0x407D` mutated, with
-  `OBJ_OFF_PREV_TILE` following as `0x0000407C` against `0x0000407D`, which
-  confirms the dword width as a bonus.
-
-  Third function in a row that the pixels cannot discriminate and that got a
-  real check anyway, after the dirty list's stateful oracle and the place
-  corpus. The `force` arm is the exception and says so in the source.
+  The compiler caught it on the conflicting definition. Fifth near-miss of
+  this class, fourth mechanism to catch one. CLAUDE.md's rule is "grep the
+  tree for the address as well as for the name" -- the case it does not cover
+  is a callee reached by reading, whose address you never type. **Grep for
+  what you are about to write, not only for what you set out to find.**
 
 ## Next
 
