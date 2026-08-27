@@ -2078,6 +2078,15 @@ typedef struct {
 #define AM2_NAME_TYPE_PAD        1   /* `pad`                         */
 #define AM2_NAME_TYPE_REF        2   /* a name used before declaring  */
 #define AM2_NAME_TYPE_INTEGER    3   /* `variable`                    */
+/* 0x0040F960, thiscall, three callers. One army's score: the slot's army
+ * colour picks one of the four ADDR_SVAR_*SCORE name indices and GetVarValue
+ * resolves it. Name ours; the four globals it indexes already had theirs.
+ *
+ * It zeroes its local BEFORE calling, and that is load-bearing: GetVarValue
+ * writes through the pointer for a non-positive index and for a variable, and
+ * NOT for a name that is not a variable -- that path complains and leaves the
+ * caller's memory alone. */
+#define ADDR_GET_ARMY_SCORE      0x0040F960u  /* thiscall int32(this, slot) */
 
 /* Whether this is a multiplayer session, and which end of it. Zero is single
  * player; four places write it and only ever 1 or 2 -- the MULTI-PLAYER host

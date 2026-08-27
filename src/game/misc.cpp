@@ -5,6 +5,7 @@
 
 #include "misc.h"
 #include "place.h"   /* LoadArmyPlacement */
+#include "script.h"  /* GetVarValue */
 #include "crt.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -872,6 +873,30 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
     return 0;
 }
 
+/* 0x0040F960, thiscall, three callers. One army's score.
+ *
+ * The slot's army colour picks one of the four ADDR_SVAR_*SCORE name-table
+ * indices and GetVarValue resolves it -- so a script's `greenscore` variable
+ * and this accessor are the same storage, which is what makes the score
+ * scriptable at all.
+ *
+ * THE LOCAL IS ZEROED BEFORE THE CALL AND THAT IS LOAD-BEARING. GetVarValue
+ * writes through the pointer for a non-positive index and for a variable, and
+ * NOT for a name that is not one: that path complains and leaves the caller's
+ * memory alone. Without the zero this would return stack.
+ *
+ * The original reuses its own incoming argument slot as that local, which is
+ * the same MSVC idiom ParsePlaceLine turned out to use. Nothing observes the
+ * difference; written as an ordinary local here. */
+int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot)
+{
+    const int32_t *vars = (const int32_t *)(uintptr_t)ADDR_SVAR_GREENSCORE;
+    int32_t        out  = 0;
+
+    GetVarValue(vars[CommSlotForArmy(comm, slot)], &out);
+    return out;
+}
+
 /* 0x0040F1C0, thiscall, one caller. The same walk as CommSlotForArmy above
  * and a different answer: the matching slot's COMM_ARMY_OFF_WAS_HERE rather
  * than its index.
@@ -1514,6 +1539,8 @@ int misc_install(void)
                   "CommSlotForArmy", 20);
     patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
                   "CommWasHereForArmy", 1);
+    patch_replace(ADDR_GET_ARMY_SCORE, (const void *)GetArmyScore,
+                  "GetArmyScore", 3);
     patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
                   "CommSlotHasPlayer", 5);
     patch_replace(ADDR_COMM_SET_ARMY_COLOUR, (const void *)CommSetArmyColour,

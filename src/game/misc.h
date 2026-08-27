@@ -561,6 +561,9 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
  * COMM_ARMY_OFF_WAS_HERE rather than its index. */
 int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army);
 
+/* 0x0040F960, thiscall. One army's score, out of the script name table. */
+int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot);
+
 /* 0x00421800. Decides whether a multiplayer mission was won and shows the end
  * screen. The argument it passes on is "LOST", not "won" -- both arms invert
  * a `sete` before the call. */
