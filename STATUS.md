@@ -5,35 +5,35 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `17db9dd`. Working tree clean.
+Last updated: **2026-08-27**, at `7486096`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`PointActionC`** (`0x00428F80`, two callers) -- move an object to a point
-  and take every one of its rows with it. 945 patches.
+- **`ScriptRunLine`** (`0x00444C40`, three callers -- the cheat table's
+  fallback). 946 patches.
 
-- **A sprite's `fileA`/`fileB` are an attach point.** `sprite.h` has carried
-  them as unexplained since the loader went in -- the loader only *copies*
-  them, exactly the shape `AM2_AnimCell::hold` was in before `RowAnimFinished`
-  turned up. This adds them to rows 1..n as an X and a Y, so they are where an
-  attached row sits relative to the one carrying the sprite: a turret on its
-  body. Renamed `attachX` / `attachY`.
+- **An unrecognised cheat is a script action.** That is why the cheat table has
+  an unrecognised-word path at all: the word is handed here, tokenised, parsed
+  as an action and run, so anything a mission script can express can be typed.
+  The name is ours and makes it sound like part of `ReadScript`, which `orig.h`
+  already warns it is not.
 
-  One reader, but an unambiguous one -- and a field explained by a single
-  caller is weaker evidence than one explained by two, which is why the note
-  says which caller.
+- **One token, not a line.** `ScriptNextToken` is called *once* and
+  `ScriptParseAction` pulls what else it needs itself. A reconstruction that
+  ran the tokeniser to exhaustion first would agree on everything a cheat can
+  express and diverge on the first line that ends mid-action -- it would pass
+  every test available and still be wrong.
 
-- **A null sprite on row 0 abandons the whole function**, not just the row
-  loop: the branch goes to the epilogue, so `ObjTileChanged` and the after-move
-  notify are skipped too. The object has already been moved by then, so it ends
-  up at the new position with its map registration not brought up to date. The
-  kind of half-done state a tidier `break` would hide.
+- Both exits reset the context and neither frees anything else, so the token
+  list belongs to the reset; the success path is run-then-reset, so the action
+  record is consumed before the tokens it names are dropped. The owner passed
+  to the action runtime is NULL, where a mission's own actions carry the
+  object they belong to.
 
-- The attach offsets are added as **16-bit** arithmetic on top of a position
-  just written as a dword, so an offset that carries out of the low half lands
-  in the row's Y rather than wrapping its X.
+- Verified by reading -- the same wall `ToggleFogOfWar` is behind, and the same
+  configuration would lift both.
 
 ## Next
 
