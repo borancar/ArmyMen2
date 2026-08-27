@@ -6673,8 +6673,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * argument shape comes from LoadType7, which passes a saved header's fields
  * straight in: position, 1, army, OBJ_OFF_FACING as a BYTE, 1, and the
  * header's +4. */
-#define ADDR_MAKE_KIND7            0x00435550u  /* void *(pt,int32,army,b,
+/* 0x00435550, five callers -- the one that refuses a thirty-third. The
+ * argument shape comes from LoadType7, which passes a saved header's fields
+ * straight in, and MakeKind7's own body confirms it: the fourth argument ends
+ * up at OBJ_OFF_FACING, which is exactly the field LoadType7 reads for it.
+ *
+ * THE COUNT IS INCREMENTED BEFORE THE CHECK AND NOT PUT BACK. A refused
+ * attempt leaves ADDR_KIND7_COUNT one higher than the number alive, so once
+ * the limit is reached every further attempt pushes it further out and the
+ * only way back is ADDR_FREE_ITEM_KIND7's decrements, which clamp at zero.
+ * The pair is bounded at both ends and is NOT symmetric in between.
+ *
+ * Its second argument is unused. */
+#define ADDR_MAKE_KIND7            0x00435550u  /* void *(pt,int32,army,facing,
                                                  *        int32,int32) */
+#define ADDR_OBJ_INIT_COMMON       0x00429940u  /* void(obj,dir,type,pt,name,
+                                                 *      int32,int32), 8 callers */
+#define ADDR_STR_EMPTY             0x00487420u  /* "" */
+#define AM2_KIND7_FUSE_MS          0x3E8   /* clock + this into OBJ_OFF_DEADLINE_58 */
+#define AM2_KIND7_MAX              0x20
+/* The 0x94 MakeKind7 allocates is AM2_ITEM_HEADER_BYTES, further down and
+ * already named -- the object header and nothing else, which is what a kind 7
+ * is. */
 #define ADDR_KIND7_COUNT           0x0051616Cu  /* int32_t, at most 32 */
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */

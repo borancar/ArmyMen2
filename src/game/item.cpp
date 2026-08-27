@@ -7,6 +7,7 @@
  * %d" -- so the fields have real names to be read off rather than invented.
  */
 #include <stdint.h>
+#include <string.h>
 
 #include "item.h"
 #include "misc.h"      /* ClearPtrList */
@@ -657,6 +658,59 @@ typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
 typedef void (__cdecl *AM2_ObjOnlyFn2)(void *obj);
 #define orig_item_teardown_early \
             ((AM2_ObjOnlyFn2)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
+
+/* Still original: the common object initialiser, eight callers across the
+ * type makers. */
+typedef void (__cdecl *AM2_ObjInitFn)(void *obj, void *dir, int32_t type,
+                                      uint32_t pt, const char *name,
+                                      int32_t e, int32_t f);
+#define orig_obj_init_common ((AM2_ObjInitFn)(uintptr_t)ADDR_OBJ_INIT_COMMON)
+
+/* 0x00435550, five callers -- the maker LoadType7 uses, and the one that
+ * refuses a thirty-third kind-7 object.
+ *
+ * THE COUNT IS INCREMENTED BEFORE THE CHECK AND NOT PUT BACK. A refused
+ * attempt leaves ADDR_KIND7_COUNT one higher than the number alive, so once
+ * the limit is reached every further attempt pushes it further out and only
+ * ADDR_FREE_ITEM_KIND7's decrements -- which clamp at zero -- bring it down.
+ * Bounded at both ends and not symmetric in between; reproduced, because a
+ * reconstruction that decremented on refusal would be tidier and would let a
+ * thirty-third through after enough failures.
+ *
+ * ITS FOURTH ARGUMENT ENDS UP AT OBJ_OFF_FACING, which is exactly the field
+ * LoadType7 reads to fill it -- so the two agree about the shape from opposite
+ * sides, and that is better than either alone. Its SECOND argument is read
+ * nowhere.
+ *
+ * The object is 0x94 bytes -- the header and nothing else -- cleared whole,
+ * then given its army, a flags word of 1, and a deadline of one second from
+ * now. The name handed to the initialiser is the empty string.
+ */
+void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
+                        int32_t facing, int32_t e, int32_t f)
+{
+    int32_t *count = (int32_t *)(uintptr_t)ADDR_KIND7_COUNT;
+    uint8_t *o;
+
+    (void)unused;
+
+    if (++*count > AM2_KIND7_MAX)
+        return (void *)0;
+
+    o = (uint8_t *)am2_malloc(AM2_ITEM_HEADER_BYTES);
+    memset(o, 0, AM2_ITEM_HEADER_BYTES);
+
+    *(o + OBJ_OFF_ARMY)             = (uint8_t)army;
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) = 1;
+
+    orig_obj_init_common(o, (void *)(uintptr_t)ADDR_DIR_SCRATCH, 7, pt,
+                         (const char *)AM2_IMAGE(ADDR_STR_EMPTY), e, f);
+
+    *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_KIND7_FUSE_MS;
+    *(o + OBJ_OFF_FACING) = (uint8_t)facing;
+    return o;
+}
 
 /* 0x00428F80, two callers -- adjacent sites in one function. Move an object to
  * a point and take every one of its rows with it.
@@ -3225,6 +3279,7 @@ void item_install(void)
                   "ApplyObjHeight", 4);
     patch_replace(ADDR_POINT_ACTION_C, (const void *)PointActionC,
                   "PointActionC", 2);
+    patch_replace(ADDR_MAKE_KIND7, (const void *)MakeKind7, "MakeKind7", 5);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

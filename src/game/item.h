@@ -177,6 +177,10 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height);
  * it. The secondary rows are offset by the first sprite's attach point. */
 void __cdecl PointActionC(void *obj, uint32_t point);
 
+/* 0x00435550. Make a kind-7 object, or refuse a thirty-third. */
+void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
+                        int32_t facing, int32_t e, int32_t f);
+
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
 void *__cdecl UnitByUid(uint32_t uid);
 

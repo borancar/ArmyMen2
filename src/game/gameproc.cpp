@@ -457,10 +457,6 @@ int32_t __cdecl SaveType5(am2_FILE *fp, void *obj)
     return 1;
 }
 
-typedef void *(__cdecl *AM2_MakeKind7Fn)(uint32_t pt, int32_t a, int32_t army,
-                                         int32_t b, int32_t c, int32_t d);
-#define orig_make_kind7 ((AM2_MakeKind7Fn)(uintptr_t)ADDR_MAKE_KIND7)
-
 /* Still original: the ten-argument maker, declared here as item.cpp declares
  * it -- same address, same shape, and the two modules are not each other's
  * headers. */
@@ -536,7 +532,7 @@ void *__cdecl LoadType7(am2_FILE *fp, const void *hdr)
 
     (void)fp;
 
-    made = (uint8_t *)orig_make_kind7(*(const uint32_t *)(h + OBJ_OFF_POS), 1,
+    made = (uint8_t *)MakeKind7(*(const uint32_t *)(h + OBJ_OFF_POS), 1,
                                       *(const int8_t *)(h + OBJ_OFF_ARMY),
                                       *(const uint8_t *)(h + OBJ_OFF_FACING),
                                       1,
