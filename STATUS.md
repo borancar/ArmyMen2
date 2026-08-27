@@ -5,33 +5,32 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `e0849a0`. Working tree clean.
+Last updated: **2026-08-27**, at `a8e90e6`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`SendPairMessage`** (`0x0044C0F0`, five callers, all in the trooper band) --
-  a 28-byte army message of kind `0x18` naming two objects. 953 patches.
+- **`MsgListSetFlag`** (`0x00401240`, five callers) -- walk the mutex-guarded
+  message list, find the node whose key matches, set or clear bits in its
+  flags, answer the node or null. 954 patches, and `docs/boundary.md` moves
+  with it: four more KERNEL32 sites become reconstructed.
 
-- **There is a hole at `+0x10`.** Every other dword of the `0x1C` is written
-  and that one is not, so four bytes of the sender's own stack go out on the
-  wire. Reproduced rather than zeroed -- a `memset` would be tidier and would
-  change what the far end sees. Same class as the placement record's padding,
-  except this one leaves the machine.
+- **The bits argument is used both ways from one register.** `not esi` is
+  computed before the walk begins, so the clear arm ands with a complement the
+  function has carried since entry. One argument, two masks, chosen by the
+  third -- reproduced as one parameter rather than split into a set and a
+  clear, which would read better and be a different function.
 
-- **Unlike `SendItemDeploy` it does not check `ADDR_MP_SESSION`**, so it builds
-  and sends in single player too; `ArmyMessageSend` is where that ends. Two
-  senders in one family differing on the guard is worth writing down rather
-  than levelling.
+- **Every exit releases the mutex, and there are four**: found-and-set,
+  found-and-cleared, walked-off-the-end, and empty-list. Counted rather than
+  assumed -- a search under a lock is exactly where an early return leaks one,
+  and this is the file CLAUDE.md warns is multi-threaded, where a mistake is a
+  race rather than a crash.
 
-- The byte argument is **sign-extended** into a dword, so a caller passing
-  `0x80` puts −128 on the wire, not 128.
-
-- **The name is structural and says so.** Kind `0x18` has no receiver
-  reconstructed yet and nothing says what the pair means. Naming it from the
-  band it sits in would be naming a function from its neighbours -- the same
-  mistake as naming one from its call site.
+- It also names two fields of the packet record: `+0x14` is the key it matches
+  and `+0x18` the flags it edits, filling part of the gap between
+  `PACKET_REC_OFF_SIZE` and `PACKET_REC_OFF_DATA`.
 
 ## Next
 
