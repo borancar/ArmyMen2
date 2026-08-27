@@ -620,13 +620,20 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
 typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 #define orig_objects_at_point ((AM2_ObjectsAtFn)(uintptr_t)ADDR_OBJECTS_AT_POINT)
 
-/* 0x0042A1B0, five callers -- the mouse pick.
+/* 0x0042A1B0, five callers -- the precise hit test at a world point.
  *
  * Every object in the cell the point falls in whose own OBJ_OFF_HIT_RECT
  * contains it, chained through OBJ_OFF_QUERY_NEXT and returned newest-first.
- * The sibling ADDR_OBJECTS_AT_POINT asks a different question of the same
- * cell -- it builds a box from four offsets at +0x7C -- so these two are not
+ * The sibling ADDR_OBJECTS_AT_POINT asks a looser question of the same cell --
+ * it builds a box from four offsets at +0x7C -- so these two are not
  * duplicates however alike the shapes look.
+ *
+ * IT WENT IN AS "the mouse pick" AND IT IS NOT ONE. That came from three of
+ * its callers sitting in the HUD band, which is naming a function from its
+ * call site -- and the comment that said so cited the callers as evidence
+ * while doing it. Reading them settles it: two build the point from a world
+ * origin plus a table offset, one from PointOfTile, one from a float
+ * projection. Not one passes a cursor.
  *
  * BOTH BOUNDS ARE COLS. The row coordinate is checked against `cols - 1` and
  * not `rows - 1`, which reads as a slip until MapDescInit is read: the grid is
@@ -641,12 +648,11 @@ typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
  *
  * 3,872 CALLS AND NOTHING WATCHES THE ANSWER. Returning null unconditionally
  * -- checked that the edit landed before believing the result -- leaves
- * `mission` at 281 and `bootcamp` at 22, both at their floors. The drives
- * move the mouse and never select anything with it, so the whole point of
- * this function is untested. A configuration that clicks on a unit and reads
- * OBJ_FLAG_SELECTED back out would close it, and would be the same drive the
- * combat path has been waiting for. Verified by reading until then. */
-void *__cdecl PickObjectsAt(const uint32_t *pt, const void *desc)
+ * `mission` at 281 and `bootcamp` at 22, both at their floors. That stands
+ * whatever the function is for; what changed is the fix. Clicking on a unit
+ * would not have closed it, because no caller here reads the cursor.
+ * Verified by reading. */
+void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc)
 {
     const uint8_t *d = (const uint8_t *)desc;
     int32_t  cols    = *(const int32_t *)(d + MAPDESC_OFF_COLS);
@@ -2916,8 +2922,8 @@ void item_install(void)
     patch_replace(ADDR_OBJ_HEIGHT, (const void *)ObjHeight, "ObjHeight", 1);
     patch_replace(ADDR_HEIGHT_AT_POINT, (const void *)HeightAtPoint,
                   "HeightAtPoint", 5);
-    patch_replace(ADDR_PICK_OBJECTS_AT, (const void *)PickObjectsAt,
-                  "PickObjectsAt", 5);
+    patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
+                  "ObjectsHitByPoint", 5);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

@@ -601,17 +601,23 @@
  * next call. */
 #define ADDR_HEIGHT_AT_POINT   0x0042A820u /* uint8_t(uint32_t packedPoint) */
 #define ADDR_OBJECTS_AT_POINT  0x0042A550u /* void *(const AM2_Point*, desc) */
-/* 0x0042A1B0, five callers -- the simpler sibling, and it is the MOUSE PICK.
- * Three of its callers are in the 0x0041xxxx HUD band, which is what suggests
- * that, and the filter is what confirms it: an object qualifies when the point
- * is inside its own OBJ_OFF_HIT_RECT, where ADDR_OBJECTS_AT_POINT builds a box
- * out of four offsets at +0x7C..+0x88 instead. This one asks "is the cursor on
- * it", that one asks "does its footprint cover this".
+/* 0x0042A1B0, five callers -- the precise hit test. An object qualifies when
+ * the point is inside its own OBJ_OFF_HIT_RECT and, if it has one, inside its
+ * per-pixel OBJ_OFF_HIT_MASK. ADDR_OBJECTS_AT_POINT asks a looser question of
+ * the same cell, building a box out of four offsets at +0x7C..+0x88.
+ *
+ * IT WENT IN AS "the mouse pick" AND IT IS NOT ONE. That came from three of
+ * its callers sitting in the 0x0041xxxx HUD band -- naming a function from
+ * its call site, the mistake this file warns about six times over, made while
+ * quoting the warning. Not one of the five passes a cursor: two build the
+ * point from a world origin at 0x00514E14 plus a table offset, one from
+ * PointOfTile, and one from a float projection. It answers "what is at this
+ * world point", and nothing about it knows where the pointer is.
  *
  * Both chain their answers through OBJ_OFF_QUERY_NEXT and both walk the cell
  * with the descriptor's COLS as the bound in each direction -- see
  * MapDescInit, which sizes the grid that way. */
-#define ADDR_PICK_OBJECTS_AT   0x0042A1B0u /* void *(const AM2_Point*, desc) */
+#define ADDR_OBJECTS_HIT_BY_POINT 0x0042A1B0u /* void *(const AM2_Point*, desc) */
 #define OBJ_OFF_HIT_RECT       0x30u  /* AM2_Rect, in world units */
 #define OBJ_OFF_HIT_MASK       0x78u  /* non-null means test the bitmask too */
 /* The mask test itself is ADDR_OBJ_MASK_BIT_AT, further down and already

@@ -156,7 +156,7 @@ uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
 
 /* 0x0042A1B0. The mouse pick: every object in a cell whose own hit rectangle
  * contains the point, chained through OBJ_OFF_QUERY_NEXT. */
-void *__cdecl PickObjectsAt(const uint32_t *pt, const void *desc);
+void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc);
 
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
 void *__cdecl UnitByUid(uint32_t uid);

@@ -43,25 +43,24 @@ Nothing uncommitted.
   configuration, which blocks `FreeItem`, `RemoveFromItemList`,
   `Type2ActionB`, `DamageRoach` and `PointActionA`.
 
-  **`OBJ_FLAG_SELECTED` is NOT the oracle**, which this file proposed and
-  which one probe disproved. The leader's flags read `0x00000C01` the moment
-  Boot Camp goes live -- bit 0, `OBJ_FLAG_SELECTED` and `OBJ_FLAG_REVEALED`
-  all already set -- and a sweep of 40x40 clicks across the whole screen never
-  changed them. The player's own unit is selected at mission start and Boot
-  Camp's opening has nothing else to select, so a click cannot move that bit.
+  **Two proposals died here, and the second killed the first.**
 
-  (The sweep "found" a hit on its first click, which was the probe being
-  wrong rather than the game: it tested `flags & 0x400` instead of comparing
-  against the value before the click. Ask what the state was BEFORE, not just
-  whether the bit is set.)
+  `OBJ_FLAG_SELECTED` is not the oracle. The leader's flags read `0x00000C01`
+  the moment Boot Camp goes live -- bit 0, SELECTED and REVEALED all already
+  set -- and a 40x40 sweep of clicks never moved them. (The sweep "found" a
+  hit on its first click, which was the probe being wrong: it tested
+  `flags & 0x400` instead of comparing against the value before the click.)
 
-  What is left to try is a HOVER: `cursor` places the pointer absolutely and
-  identically on both sides of an A/B, so parking it on the leader and
-  shooting a settled frame would compare whatever the pick draws. That needs
-  its own configuration with its own budget, and the budget has to be measured
-  against a real defect rather than against three clean runs -- see the
-  `controls` budget, which was 0 for exactly as long as it took a fourth run
-  to disagree.
+  Then the reason that did not matter: **`ObjectsHitByPoint` is not the mouse
+  pick at all.** It went in under that name because three of its five callers
+  sit in the HUD band -- naming a function from its call site, in a comment
+  that cited the callers as evidence while doing it. Not one passes a cursor:
+  two build the point from a world origin plus a table offset, one from
+  `PointOfTile`, one from a float projection. Renamed.
+
+  So the mouse pick is still unfound, and the "3,872 calls nothing watches"
+  measurement stands on its own -- it is about a world-point query, not about
+  clicking.
 ## A correction: two functions were not unexercised
 
 **A hand-written probe clicked BOOT CAMP at the wrong Y and never entered a
