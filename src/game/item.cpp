@@ -1463,7 +1463,7 @@ static void __cdecl ObjDeathCleanup(void *obj)
 
     if (ObjIsType2((const AM2_Object *)obj)
         && (g_gameOverFlags & 0x200000u)
-        && *(const int32_t *)(o + OBJ_OFF_MP_ROLE) != AM2_MP_ROLE_SEVEN
+        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != AM2_MP_ROLE_SEVEN
         && *(const int32_t *)(o + OBJ_OFF_FIELD_94) == 0)
         EventNotify(0, *(const int32_t *)(uintptr_t)ADDR_RULE_UID_B,
                     ((const AM2_Object *)obj)->uid,
@@ -1660,10 +1660,11 @@ void __cdecl FreeOverdueItems(void)
     } while (obj);
 }
 
-typedef void (__cdecl *AM2_SetKindFn)(void *obj, int32_t kind);
 typedef void (__cdecl *AM2_UnitActionFn)(void *obj, int32_t action);
-#define orig_set_soldier_kind ((AM2_SetKindFn)(uintptr_t)ADDR_SET_SOLDIER_KIND)
 #define orig_unit_action      ((AM2_UnitActionFn)(uintptr_t)ADDR_UNIT_ACTION)
+
+/* Defined below, beside the rest of the object family. */
+void __cdecl SetSoldierKind(void *obj, int32_t kind);
 
 /* 0x00448220, two callers. Three effects, and together they are what a unit
  * giving up looks like: it changes to soldier kind 8, its AI mode goes to 2 --
@@ -1683,7 +1684,7 @@ typedef void (__cdecl *AM2_UnitActionFn)(void *obj, int32_t action);
  * it would hide that.
  *
  * The guard is on the same field ADDR_SET_SOLDIER_KIND writes, refusing at 6
- * and above. What that field IS is not settled -- see OBJ_OFF_MP_ROLE in
+ * and above. What that field IS is not settled -- see OBJ_OFF_SOLDIER_KIND in
  * orig.h, where the evidence that it is a soldier kind is recorded along with
  * what stops that being a rename yet.
  *
@@ -1704,14 +1705,14 @@ void __cdecl Type2ActionB(void *obj)
 
     if (!o)
         return;
-    if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 6)
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 6)
         return;
 
     *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
     *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 2;
 
-    orig_set_soldier_kind(o, 8);
+    SetSoldierKind(o, 8);
 
     weapon = WeaponByUid(*(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
     if (weapon)
@@ -2025,7 +2026,7 @@ void __cdecl PointActionA(void *obj, uint32_t point)
 }
 
 /* 0x004480E0, three callers. Type2ActionB's sibling and the same shape: the
- * same guard on OBJ_OFF_MP_ROLE, refusing at 7 here rather than at 6, then a
+ * same guard on OBJ_OFF_SOLDIER_KIND, refusing at 7 here rather than at 6, then a
  * set of writes and a change of soldier kind -- 6 rather than 8.
  *
  * What is new is the SELECTION handover, and it is a two-step. If the object
@@ -2051,7 +2052,7 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
 
     if (!o)
         return;
-    if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 7)
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 7)
         return;
 
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
@@ -2076,7 +2077,7 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
     *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    orig_set_soldier_kind(obj, 6);
+    SetSoldierKind(obj, 6);
 }
 
 typedef void (__cdecl *AM2_MoveFacingFn)(void *obj, int32_t a, int32_t b,
@@ -2250,7 +2251,7 @@ typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
  * created weapon which it then holds.
  *
  * The three guards are not the same as its siblings'. It refuses at
- * OBJ_OFF_MP_ROLE >= 6, as B does and C does not, and it has one they do not:
+ * OBJ_OFF_SOLDIER_KIND >= 6, as B does and C does not, and it has one they do not:
  * ADDR_TYPE2_FIELD5A4_SET, which is false unless the object is a type 2 with
  * a positive OBJ_OFF_FIELD_5A4. So whatever that counter tracks is a reason
  * NOT to re-arm.
@@ -2280,12 +2281,12 @@ void __cdecl Type2ActionA(void *obj)
 
     if (!o)
         return;
-    if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 6)
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 6)
         return;
     if (Type2Field5A4Set((const AM2_Object *)obj))
         return;
 
-    orig_set_soldier_kind(obj, 7);
+    SetSoldierKind(obj, 7);
 
     old = WeaponByUid(*(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
     if (old)
@@ -2361,6 +2362,103 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
     ObjDeathCleanup(obj);
 }
 
+typedef void (__cdecl *AM2_SetFrameFn)(void *row, int16_t frame, int32_t force);
+typedef int32_t (__cdecl *AM2_PoseIndexFn)(void *obj, void *weapon);
+#define orig_set_anim_frame  ((AM2_SetFrameFn)(uintptr_t)ADDR_SET_ANIM_FRAME)
+#define orig_weapon_pose     ((AM2_PoseIndexFn)(uintptr_t)ADDR_WEAPON_POSE_INDEX)
+/* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
+ * because it is CRT code the offline test maps as data. */
+typedef int32_t (__cdecl *AM2_RandFn)(void);
+#define orig_rand ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* 0x00449570, ten callers -- the only writer of OBJ_OFF_SOLDIER_KIND, and the
+ * function that settles what that field is. The value it stores is the same
+ * value it uses to index ADDR_SOLDIER_ANIMS, whose entry it hangs off the
+ * object's first row. A kind, not a role; see the note in orig.h.
+ *
+ * THE ANIMATION SWAP IS SKIPPED WHEN THE SET IS ALREADY CURRENT -- and the
+ * test is against ROW_OFF_ANIM_CUR while the write goes to ROW_OFF_ANIM_NEXT.
+ * Two different fields, four bytes apart, and reading them as one would make
+ * the guard compare against what it had just written.
+ *
+ * The frame chosen depends on what the soldier is holding, and there are
+ * three cases rather than two: a live soldier with a weapon takes the pose
+ * table's entry for that weapon, a live soldier WITHOUT one takes frame 1, and
+ * a dead one takes whatever frame the row already had. The last is a
+ * no-change that still goes through the setter, so the force flag is what
+ * makes it do anything at all.
+ *
+ * KIND 7 IS A SPECIAL UNIT and gets three things nothing else does: flag
+ * 0x8000, a random name, and one and a half times its MAXIMUM health -- the
+ * scale is applied to OBJ_OFF_MAX_HEALTH, not to what the unit currently has. The random index is MSVC's signed
+ * modulo -- `and 0x8000003F` with a fixup for negatives -- then +1, so it is
+ * 1..64 and never 0. The health scale is a double in the image and it is
+ * exactly 1.5, read rather than guessed.
+ *
+ * OBJ_OFF_FIELD_578 is cleared for EVERY kind, before the kind 7 test, so it
+ * is not part of that special case however much it looks like it.
+ *
+ * VERIFIED BY READING. Its counter is blind -- every caller that runs here is
+ * ours -- and the Type2Action siblings that call it are event handlers no
+ * drive fires. */
+void __cdecl SetSoldierKind(void *obj, int32_t kind)
+{
+    uint8_t *o    = (uint8_t *)obj;
+    uint8_t *row  = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    uint8_t *anim = (uint8_t *)(uintptr_t)ADDR_SOLDIER_ANIMS
+                    + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
+
+    *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = kind;
+
+    if (anim != *(uint8_t **)(row + ROW_OFF_ANIM_CUR)) {
+        *(uint8_t **)(row + ROW_OFF_ANIM_NEXT) = anim;
+
+        if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+            void *w = WeaponByUid(
+                *(const uint32_t *)(o + UNIT_OFF_INVENTORY
+                                    + (uint32_t)*(const int32_t *)
+                                          (o + UNIT_OFF_INVENTORY_SEL) * 4));
+
+            if (w) {
+                int32_t pose = orig_weapon_pose(obj, w);
+
+                orig_set_anim_frame(*(uint8_t **)(o + OBJ_OFF_ROWS),
+                                    (int16_t)((const int32_t *)(uintptr_t)
+                                        ADDR_WEAPON_POSE_FRAMES)[pose], 1);
+            } else {
+                orig_set_anim_frame(*(uint8_t **)(o + OBJ_OFF_ROWS), 1, 1);
+            }
+        } else {
+            uint8_t *r = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+            orig_set_anim_frame(r, *(const int16_t *)(r + ROW_OFF_FRAME), 1);
+        }
+    }
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
+    if (kind != 7)
+        return;
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
+
+    {
+        int32_t n = orig_rand() % AM2_KIND7_NAME_COUNT + 1;
+
+        *(int32_t *)(o + OBJ_OFF_FIELD_5A8) = n;
+        *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+        if (n > 0)
+            SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                                  ((void *const *)(uintptr_t)
+                                       ADDR_KIND7_NAMES)[n]);
+    }
+
+    *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)
+        ((double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
+         * *(const double *)(uintptr_t)AM2_KIND7_HEALTH_SCALE);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2371,6 +2469,8 @@ void item_install(void)
                   "ItemsReset", 0);
     patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
                   "StepType1And4", 1);
+    patch_replace(ADDR_SET_SOLDIER_KIND, (const void *)SetSoldierKind,
+                  "SetSoldierKind", 10);
     patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);
     patch_replace(ADDR_TYPE2_ACTION_A, (const void *)Type2ActionA,
                   "Type2ActionA", 5);

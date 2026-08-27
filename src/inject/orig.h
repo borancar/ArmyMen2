@@ -2810,24 +2810,46 @@ typedef struct {
  * same one rather than a second copy that could drift. 7 is the only value
  * anything compares it against, and army.h records what that means: a type 2
  * carrying 7 is never friendly in a multiplayer session. NOT the AI mode --
- * that is +0xE4, per ADDR_EVT_SET_AI_MODE. */
-#define OBJ_OFF_MP_ROLE          0x544u
-/* UNRESOLVED, and recorded rather than renamed on a hunch. 0x00449570 is the
- * only writer, and what it does is index ADDR_SOLDIER_ANIMS with the value it
- * stores -- `lea eax,[edi*8 + 0x659F00]` -- then hang that table off the
- * object's 0x74 sub-object. So the field looks like a SOLDIER KIND, an index
- * into the nine animation tables, and "MP role" would then be one consequence
- * of one value rather than the field's meaning.
+ * that is +0xE4, per ADDR_EVT_SET_AI_MODE.
  *
- * What stops that being a rename today: only 7 and 8 are pushed to the setter
- * directly, the rest arrive through the 44-arm dispatcher at 0x00449660, and
- * ADDR_SOLDIER_ANIMS is .bss so the file says nothing about the nine entries.
- * Two guards elsewhere read it as an ordinal (`>= 6`, `>= 7`), which fits a
- * kind index and does not fit a role.
+ * (That paragraph is still accurate; what it was WRONG about was the field's
+ * name, which the note below settles.) */
+/* RESOLVED. This was OBJ_OFF_MP_ROLE, recorded as probably a soldier kind and
+ * left alone for want of a witness. ADDR_SET_SOLDIER_KIND is that witness and
+ * it is unambiguous: the value it stores here is the same value it uses to
+ * index ADDR_SOLDIER_ANIMS -- `lea eax,[kind*8 + 0x659F00]` -- and hangs off
+ * the object's first row as the animation set. It is a KIND.
  *
- * Strong, not conclusive. Resolving it means reading the dispatcher's arms. */
+ * "MP role" came from the one comparison anything makes against it, `== 7`,
+ * plus army.h's note that a type 2 carrying 7 is never friendly in
+ * multiplayer. That is still true; 7 is simply one kind of soldier, and
+ * SetSoldierKind gives it 1.5x health and a random name from a 64-entry
+ * table, which is what a special unit looks like.
+ *
+ * Renamed rather than aliased: ten use sites outside this file. */
+#define OBJ_OFF_SOLDIER_KIND     0x544u
 #define ADDR_SET_SOLDIER_KIND    0x00449570u  /* void(obj, kind) -- the writer */
 #define ADDR_UNIT_ACTION         0x00449660u  /* void(obj, action) -- 44 arms */
+/* What SetSoldierKind reaches. The frame setter compares against the row's
+ * current frame and returns early unless forced; the pose table is int32 and
+ * ships {1, 1, 5, 3, ...}. */
+#define ADDR_SET_ANIM_FRAME      0x0040A1A0u  /* void(row, int16 frame, int32) */
+#define ADDR_WEAPON_POSE_INDEX   0x004494A0u  /* int32(obj, weapon) */
+#define ADDR_WEAPON_POSE_FRAMES  0x00474FE0u  /* int32[] */
+/* Kind 7's two extras, both read out of the image: a 64-entry table of names
+ * filled at runtime, and a health multiplier that is exactly 1.5. */
+#define ADDR_KIND7_NAMES         0x0050712Cu  /* char *[] */
+#define AM2_KIND7_HEALTH_SCALE   0x0046FA98u  /* double, 1.5 */
+#define AM2_KIND7_NAME_COUNT     64
+/* Fields of the object's FIRST ROW that carry its animation. */
+#define ROW_OFF_ANIM_CUR         0x40u   /* AM2_AnimTable * */
+#define ROW_OFF_ANIM_NEXT        0x48u   /* AM2_AnimTable *, taken up next */
+#define ROW_OFF_FRAME            0x4Cu   /* int16_t */
+/* Four fields SetSoldierKind writes and nothing read so far explains. 0x578 is
+ * cleared for EVERY kind; the other three belong to kind 7. */
+#define OBJ_OFF_FIELD_578        0x578u  /* int32_t, cleared unconditionally */
+#define OBJ_OFF_FIELD_5A8        0x5A8u  /* int32_t, the random name index */
+#define AM2_ANIM_TABLE_BYTES     8u      /* ADDR_SOLDIER_ANIMS' stride */
 #define AM2_MP_ROLE_SEVEN        7
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
  * the field gates the first delayed event, the flag suppresses the second. */

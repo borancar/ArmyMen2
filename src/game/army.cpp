@@ -26,7 +26,7 @@
 /* `type` and `owner` come from objtable.h's AM2_Object; only the two far
  * fields need offsets. OBJ_OFF_OWNER is NOT reused -- orig.h already has that
  * name on 0x04 of a different record. */
-/* OBJ_OFF_MP_ROLE now lives in orig.h -- item.cpp needs it too. */
+/* OBJ_OFF_SOLDIER_KIND now lives in orig.h -- item.cpp needs it too. */
 #define OBJ_OFF_LEADS    0x548u   /* ObjType2Field548 reads the same dword */
 #define OBJ_FLAG_SKIP    0x04u
 #define AM2_ARMY_ALL     4        /* the value that is allied with everybody */
@@ -53,7 +53,7 @@ int32_t __cdecl ObjIsFriendly(const void *obj)
     int32_t           owner;
 
     if (g_mpSession && obj && o->type == AM2_OBJ_TYPE_2
-        && *(const int32_t *)((const uint8_t *)o + OBJ_OFF_MP_ROLE) == 7)
+        && *(const int32_t *)((const uint8_t *)o + OBJ_OFF_SOLDIER_KIND) == 7)
         return 0;
 
     /* The null test above guards only the block, and this read is on the path
@@ -117,7 +117,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
         }
         if (!(*(uint8_t *)(raw + OBJ_OFF_FLAGS) & OBJ_FLAG_SKIP)
             && !(g_mpSession && obj->type == AM2_OBJ_TYPE_2
-                 && *(int32_t *)(raw + OBJ_OFF_MP_ROLE) == 7))
+                 && *(int32_t *)(raw + OBJ_OFF_SOLDIER_KIND) == 7))
             fn(obj);
         i++;
         list = g_armyObjLists[army];
