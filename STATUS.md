@@ -5,36 +5,33 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `0a95939`. Working tree clean.
+Last updated: **2026-08-27**, at `fc03883`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`ScriptListFind`** (`0x0043E900`, five callers). 942 patches. Its return is
-  the **record**, not an index or a boolean -- the old macro typed it `int32_t`,
-  which worked only because its one reconstructed caller tests it for truth.
-  The first search is also the load.
+- **`ApplyObjHeight`** (`0x004278E0`, four callers -- `ObjTileChanged`'s tail
+  among them). 943 patches, two `orig_` seams closed.
 
-- **I nearly renamed it `FindLevelByName`.** `orig.h` says the table is "loaded
-  from the same `.txt` by the same reader" as the level records, which reads
-  like one table under two names -- and the compiler refused the rename,
-  because `AM2_LEVEL_RECORD_SIZE` already existed as `0x30C` where these
-  records are `0xCC`. Same file, same reader, **two** tables, two strides.
+- **A zero height means "take the tile's own"**, read through
+  `ADDR_TILE_ATTRS`. So 0 is not a height, it is a request -- and a caller that
+  genuinely wants zero cannot say so. The sort of thing transcribing preserves
+  and tidying the guard into a null check would lose.
 
-- **Backing the rename out is what broke the campaign.** A blanket replace of
-  `AM2_LEVEL_RECORD_SIZE` across `map.cpp` also rewrote `FindLevelRecord`'s
-  bsearch stride from `0x30C` to `0xCC`, so the map never loaded: 5 log lines
-  against 14, and 297,855 differing pixels. Second time this session a
-  whole-file string replace has damaged something outside the edit's intent.
+- Four arms over `type - 1` and only three distinct bodies: the jump table
+  holds `0x0042790C` **twice**, for types 1 and 4 -- the same pairing
+  `SaveType4` and `ADDR_STEP_TYPE1_4` already show.
 
-- **And the first two bisects blamed the wrong function.** Disabling
-  `ScriptListFind`'s `patch_replace` left `MpScriptChecksum`'s *direct call*
-  pointing at it, so "with the patch off it still fails" proved nothing.
-  What localised it was `git stash`: HEAD alone was clean, so the fault was in
-  the diff rather than in the function I had spent two runs suspecting.
-  **Disabling a patch does not disable a call** -- when a bisect has to be
-  right, back the whole change out rather than the half you think matters.
+- **Type 3 is the one with two rows** -- it writes the second row's depth layer
+  as well, the same second row `VehicleDied` hides. **Type 2 is the one that
+  does not check**: the default arm tests the row count before touching a row
+  and the type-2 arm jumps into the same tail without testing, so a type 2 with
+  no rows writes through a null. Reproduced.
+
+- `ScaleBy32Blocks` was already reconstructed under that name; the compiler
+  offered it when I wrote `ScaleTo32Blocks`. That is the cheapest of the five
+  mechanisms that have caught a second name this session.
 
 ## Next
 
