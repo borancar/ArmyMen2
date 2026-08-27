@@ -94,7 +94,11 @@ void __cdecl ScrollMapCache(void);
 /* 0x0041DCE0, one caller -- ComposeFrame, at the top of every frame. Three
  * uint16 counters beside the dirty list, cleared as a set. What each counts is
  * not established; that they are 16 bits and reset together is. */
-void __cdecl ResetDrawCounts(void);
+void __cdecl ResetDirtyList(void);
+
+/* 0x0041DD00. Append one rectangle to the dirty list. */
+void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
+                          int32_t bottom);
 
 /* 0x0042B5A0, one caller -- TakeMenuRequest, once a frame. The camera: glides
  * the eye toward ADDR_VIEW_TARGET at a limited speed, honours the two one-shot

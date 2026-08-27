@@ -1035,23 +1035,36 @@
 #define AM2_CELL_SHIFT           8    /* world units per cell, as a shift */
 #define AM2_SUBDIVIDE_FLOOR      0x20 /* below this a split stops recursing */
 #define OBJ_OFF_BOUNDS           0x0Cu /* AM2_Rect; +0x0C left, +0x10 top */
-/* The dirty list is 20-byte records: a RECT and, at +0x12, the index of the
- * next one. Record ZERO is the head sentinel -- its `next` field is the list
- * head, which is why the head address is the array base plus 0x12. */
+/* The dirty list is 20-byte records: a RECT, then the index of the PREVIOUS
+ * record and the index of the next. Record ZERO is the sentinel, so both of
+ * its links are addressed as globals -- base + 0x10 and base + 0x12.
+ *
+ * NONE OF THE THREE IS A COUNTER, and this comment said two of them were.
+ * 0x00508AD6 fell first: it is records[0].next, the list head, which the walk
+ * in ADDR_REPAINT_DIRTY_LIST makes plain and a reset-them-together sweep could
+ * not. 0x00508AD4 is the same trick one field earlier -- records[0].prev --
+ * and the unlink inside 0x0041DF00 is what settles it, writing
+ * `records[rec.next].prev = rec.prev` through exactly that address.
+ *
+ * That leaves 0x00508AC0, which really is a global and really is not a count:
+ * the same unlink assigns it `rec.prev` when it removes the LAST record, so
+ * it is the TAIL index. It doubles as the allocator -- AddDirtyRect takes
+ * tail + 1 -- which is why it looked like a count, and why a record freed
+ * from the end is handed straight back out.
+ *
+ * All three renamed rather than aliased. */
 #define AM2_DIRTY_RECORD_SIZE    20u
+#define DIRTY_OFF_PREV           0x10u
 #define DIRTY_OFF_NEXT           0x12u
 #define ADDR_DIRTY_RECTS         0x00508AC4u  /* the records */
-/* Two uint16 counters beside the list, cleared with it at the top of a frame.
- * The names are ours and what each counts is not established.
- *
- * There were THREE. The third, at 0x00508AD6, is not a counter at all: it is
- * `ADDR_DIRTY_RECTS + 0x12`, the head sentinel's `next` -- which the walk in
- * ADDR_REPAINT_DIRTY_LIST makes plain and a reset-them-together sweep could
- * not. It is ADDR_DIRTY_HEAD now. */
-#define ADDR_DRAW_COUNT_A        0x00508AC0u  /* uint16_t */
-#define ADDR_DRAW_COUNT_B        0x00508AD4u  /* uint16_t */
+#define ADDR_DIRTY_TAIL          0x00508AC0u  /* uint16_t, and the allocator */
+#define ADDR_DIRTY_PREV_HEAD     0x00508AD4u  /* uint16_t, records[0].prev */
 #define ADDR_DIRTY_HEAD          0x00508AD6u  /* uint16_t, records[0].next */
-#define ADDR_RESET_DRAW_COUNTS   0x0041DCE0u  /* void(void) */
+#define ADDR_RESET_DIRTY_LIST    0x0041DCE0u  /* void(void) */
+/* 0x0041DD00, seven callers. Append one rectangle. Overflow at
+ * AM2_DEPTH_MAX sets ADDR_FULL_REDRAW instead of growing anything, so the
+ * frame repaints whole rather than losing a rectangle. */
+#define ADDR_ADD_DIRTY_RECT      0x0041DD00u  /* void(l, t, r, b) */
 #define ADDR_CAMERA_X            0x00514EA8u  /* int32_t */
 #define ADDR_CAMERA_Y            0x00514EACu  /* int32_t */
 
