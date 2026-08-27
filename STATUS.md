@@ -5,42 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `8ff3310`. Working tree clean.
+Last updated: **2026-08-27**, at `1bc084d`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`SetPointRule`** (`0x00437E00`, four callers -- one of them
-  `ADDR_SETTLE_POINT_IN_REGION` itself, which installs the rule and dispatches
-  through it in the same breath). 927 patches.
+- **`MiddleRegionLink`** (`0x0042B7F0`, three callers). 928 patches.
 
-- **The boat has a rule of its own**, and that comes from the tests rather than
-  from reading the handlers: `ObjIsType3` with `VEHICLE_OFF_KIND` 5 --
-  `ptboat` in the unit-type table -- takes one; any other vehicle and any roach
-  take another; a null object or anything else takes the third.
+- **Two regions usually touch along a run of cells**, so a caller that wants to
+  get from one to the other has a choice of crossings and this makes it -- the
+  middle of the run rather than the first cell listed. That is the whole
+  content of the function and the reason for the name.
 
-- Two things the shape hides, both reproduced: the non-vehicle path stores the
-  vehicle rule *first* and only then asks whether the object is a roach, so
-  that store happens twice; and a null object skips the army store entirely,
-  leaving `ADDR_POINT_RULE_ARMY` holding the previous object's.
+- It walks the list *twice*, and the second walk is not a search for the same
+  thing: the first counts matches, the second stops at the `(count + 1) / 2`-th.
+  Left as two passes because that is what the original does, and one pass would
+  have to decide what "middle" means before it knows the count.
 
-- **It was never installed, for about ten minutes.** `region_install` was a
-  single `return patch_replace(...)` and my addition went in above it, so the
-  file compiled, every check passed, and nothing was patched. Same defect
-  CLAUDE.md records four instances of -- and `checkpatches` cannot see this
-  variant, because there is no `patch_replace` after a return, there is simply
-  one missing.
-
-  What caught it was **the patch count not moving**: 926 before, 926 after.
-  "A patch list is a list of intentions; the log is the list of installs" has
-  a cheaper cousin -- read the count after adding one. Both installs go through
-  `rc |=` now.
+- **Unexercised, and not for the usual reason -- it is not blind.** Its callers
+  sit inside `0x004049C0` and `0x00407190`, the unit movement code, and a Boot
+  Camp drive that walks nobody anywhere never reaches them: the counter reads 0
+  while `AddRegionLink` beside it reads 2,109 from the map load.
 
 ## Next
 
-- **A drive that observes the mouse pick** is the single most useful thing
-  missing. It would close `PickObjectsAt`, and it is close to the drive the
+- **A drive that moves and fights** is now three things waiting on one
+  configuration: `MiddleRegionLink` and the rest of the movement code, the
+  combat path (`DamageObject` is 0 everywhere, blocking `FreeItem`,
+  `RemoveFromItemList`, `Type2ActionB`, `DamageRoach`, `PointActionA`), and
+  whatever eventually observes the real mouse pick. Boot Camp's opening has
+  nothing to shoot and nowhere anyone needs to walk; a different mission, not
+  a longer one, is what this wants.
+
+- **A drive that observes the mouse pick** is the older half of that. It would close `PickObjectsAt`, and it is close to the drive the
   combat path has been waiting for -- `DamageObject` is 0 on every
   configuration, which blocks `FreeItem`, `RemoveFromItemList`,
   `Type2ActionB`, `DamageRoach` and `PointActionA`.
