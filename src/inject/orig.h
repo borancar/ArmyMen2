@@ -3044,6 +3044,17 @@ typedef struct {
  * that direction rather than the first. The sprite is only swapped when it
  * differs from the one the row already has. */
 #define ADDR_ROW_FACE_SPRITE     0x0040A310u  /* void(void *row) */
+/* 0x0041D3D0, three callers. Put a new sprite on a row, rebuilding its cell
+ * buffer only when the new sprite needs MORE cells than the old one did.
+ *
+ * The cell count is the arithmetic RowAlloc uses -- and NOT the same types.
+ * RowAlloc multiplies two int8 and stores a byte; this multiplies two int32
+ * and compares the result against that byte. A sprite big enough to overflow
+ * the byte therefore looks larger here than the row can ever record, so it
+ * rebuilds every time. Both are the original's; see maprow.cpp.
+ *
+ * A NULL sprite returns without touching anything, which is what makes its
+ * callers' unguarded use safe. */
 #define ADDR_ROW_SET_SPRITE      0x0041D3D0u  /* void(row, sprite, desc) */
 /* 0x0040A2D0, six callers. Whether the row's animation has reached its last
  * cell AND that cell's hold has elapsed -- so it is a "the animation is over"
@@ -5756,6 +5767,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * takes the row and the descriptor and no index. */
 #define ADDR_ROW_RELEASE       0x0041D3A0u /* void(row *, void *desc) */
 #define ADDR_ROW_UNREGISTER_ALL 0x0041DB20u /* void(row *, void *desc) */
+/* 0x0041D3D0, three callers. Put a new sprite on a row, rebuilding its cell
+ * buffer only when the new sprite needs more cells than the old one did.
+ *
+ * The cell count is the same arithmetic RowAlloc uses -- and NOT the same
+ * types. RowAlloc multiplies two int8 and stores a byte; this multiplies two
+ * int32 and compares the result against that byte. A sprite big enough to
+ * overflow the byte therefore looks bigger here than the row can ever record,
+ * so it rebuilds every time. Both are the original's; see maprow.cpp.
+ *
+ * A NULL sprite returns without touching anything, which is what makes the
+ * three callers' unguarded use of it safe. */
+/* The sprite's bounds, as a rect at +0x14; this family reads the right and
+ * bottom out of it and hands them to RowAlloc as a width and a height. Spelled
+ * as an offset because maprow.cpp is flat and cannot name AM2_Sprite. */
+#define SPRITE_OFF_BOUNDS       0x14u
 /* The row's sprite slot and the copy of it ADDR_ROW_UPDATE last registered.
  * That function needs +0x04 non-null to do anything and compares it against
  * +0x08 alongside the current and previous rectangles, which is the shape of a

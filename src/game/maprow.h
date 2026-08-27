@@ -43,6 +43,10 @@ void __cdecl MapDescInit(void *desc, int32_t w, int32_t h);
  * and the default palette. See maprow.cpp for why it is filed here. */
 void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y);
 
+/* Original: 0x0041D3D0, three callers. Put a new sprite on a row, rebuilding
+ * its cell buffer only when the new one needs more cells. */
+void __cdecl RowSetSprite(void *row, void *sprite, void *desc);
+
 int maprow_install(void);
 
 #ifdef __cplusplus

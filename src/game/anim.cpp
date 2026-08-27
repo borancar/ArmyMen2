@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "anim.h"
+#include "maprow.h"  /* RowSetSprite -- reconstructed */
 #include "crt.h"
 #include "dist.h"   /* Log2Mask, RoundTo8 */
 #include "image.h"
@@ -387,11 +388,6 @@ int32_t __cdecl RowAnimFinished(const void *row)
                          + *(const int32_t *)(r + ROW_OFF_STAMP_54));
 }
 
-/* Still original: 176 bytes of re-registration, not a store. */
-typedef void (__cdecl *AM2_SetRowSpriteFn)(void *row, AM2_Sprite *sprite,
-                                           void *desc);
-#define orig_row_set_sprite ((AM2_SetRowSpriteFn)(uintptr_t)ADDR_ROW_SET_SPRITE)
-
 /* 0x0040A310, three callers -- the type 2, 3 and 8 frame steppers, so this
  * runs once per unit per frame. Point the row's sprite at the animation cell
  * for the heading it is facing.
@@ -406,9 +402,9 @@ typedef void (__cdecl *AM2_SetRowSpriteFn)(void *row, AM2_Sprite *sprite,
  * bits before RoundTo8 sees it, so a bias that carries past 255 wraps rather
  * than saturating -- which is what an 8-bit heading should do.
  *
- * The swap is CONDITIONAL. ADDR_ROW_SET_SPRITE is called only when the sprite
- * differs from the one the row already holds, and that matters because it is
- * 176 bytes of re-registration rather than a store.
+ * The swap is CONDITIONAL. RowSetSprite is called only when the sprite differs
+ * from the one the row already holds, and that matters because it is 176 bytes
+ * of re-registration rather than a store.
  *
  * IT WENT IN WITH ONE DEREFERENCE TOO FEW and the A/B caught it: 293,671 of
  * 786,432 pixels on `bootcamp`, against a budget of 500. ADDR_SPRITE_LIST is
@@ -444,7 +440,7 @@ void __cdecl RowFaceSprite(void *row)
     sprite  = g_spriteList[a->cells[cell].sprite];
 
     if (*(AM2_Sprite *const *)(r + ROW_OFF_SPRITE) != sprite)
-        orig_row_set_sprite(r, sprite, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowSetSprite(r, sprite, (void *)(uintptr_t)ADDR_MAP_DESC);
 }
 
 int anim_install(void)

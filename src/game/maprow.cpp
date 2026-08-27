@@ -711,6 +711,68 @@ void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
         *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
 }
 
+/* 0x0041D3D0, three callers. Put a new sprite on a row.
+ *
+ * IT REBUILDS ONLY WHEN THE NEW SPRITE NEEDS MORE CELLS. The count is the
+ * arithmetic RowAlloc uses on the sprite's bounds -- and NOT the same types.
+ * RowAlloc multiplies two int8 and stores a byte in ROW_OFF_OWNS; this
+ * multiplies two int32 and compares against that byte. A sprite big enough to
+ * overflow the byte looks larger here than the row can ever record, so it
+ * takes the rebuild arm every time. Both halves are the original's, and
+ * reconciling them would change one.
+ *
+ * THE REBUILD ARM SWAPS THE SPRITE IN THE MIDDLE. It clears bit 0, updates,
+ * releases the row, THEN stores the new sprite, sets bit 0 again, and calls
+ * RowAlloc with the bounds read back out of the row rather than out of the
+ * argument -- so the order matters and a reconstruction that stored the
+ * sprite first would size the buffer from the same sprite by accident and
+ * agree until something else changed the field between.
+ *
+ * Both arms keep the OLD sprite in ROW_OFF_PREV_SPRITE, which is what
+ * RowUpdate compares against, and both end in a RowUpdate. A null sprite
+ * returns having touched nothing.
+ */
+void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
+{
+    uint8_t *r = (uint8_t *)row;
+    uint8_t *spr = (uint8_t *)sprite;
+    int32_t  w, h, need;
+
+    if (!spr)
+        return;
+
+    w = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 8);
+    h = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 12);
+    if (w > 2)
+        w -= 2;
+    if (h > 2)
+        h -= 2;
+    need = ((h >> 8) + 2) * ((w >> 8) + 2);
+
+    if (need > (int32_t)r[ROW_OFF_OWNS]) {
+        uint8_t *now;
+
+        ObjFlagClear0(r);
+        RowUpdate(r, 0, desc);
+        RowRelease(r, desc);
+
+        ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) =
+            ROW_FLD(r, ROW_OFF_SPRITE, void *);
+        ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
+        ObjFlagSet0(r);
+
+        now = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
+        RowAlloc(*(const int32_t *)(now + SPRITE_OFF_BOUNDS + 8),
+                 *(const int32_t *)(now + SPRITE_OFF_BOUNDS + 12), r, desc);
+        RowUpdate(r, 0, desc);
+        return;
+    }
+
+    ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) = ROW_FLD(r, ROW_OFF_SPRITE, void *);
+    ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
+    RowUpdate(r, 0, desc);
+}
+
 int maprow_install(void)
 {
     int rc = 0;
@@ -732,5 +794,7 @@ int maprow_install(void)
     rc |= patch_replace(ADDR_MAP_DESC_INIT, (const void *)MapDescInit,
                         "MapDescInit", 2);
     rc |= patch_replace(ADDR_ROW_INIT, (const void *)RowInit, "RowInit", 2);
+    rc |= patch_replace(ADDR_ROW_SET_SPRITE, (const void *)RowSetSprite,
+                        "RowSetSprite", 3);
     return rc;
 }
