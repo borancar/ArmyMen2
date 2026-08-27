@@ -124,6 +124,65 @@ void __cdecl SetPointRule(void *obj)
     *(uint32_t *)(uintptr_t)ADDR_POINT_RULE = ADDR_POINT_RULE_DEFAULT;
 }
 
+/* 0x0042B7F0, three callers. Of all the links `region` has to `to`, the index
+ * of the MIDDLE one; -1 when there are none.
+ *
+ * Two regions usually touch along a RUN of cells, so a caller that wants to
+ * get from one to the other has a choice of crossings and this makes it --
+ * the middle of the run rather than the first cell that happens to be listed.
+ * That is the whole content of the function and the reason for the name.
+ *
+ * IT WALKS THE LIST TWICE and the second walk is not a search for the same
+ * thing: the first counts matches, the second stops at the
+ * `(count + 1) / 2`-th. Written out that way rather than collapsed into one
+ * pass with a saved index, because the original really does make two passes
+ * and a single pass would have to decide what "middle" means before it knows
+ * the count.
+ *
+ * The halving is an arithmetic shift of `count + 1`, so an odd run takes the
+ * upper middle and an even one the lower -- 3 links give the 2nd, 4 give the
+ * 2nd as well.
+ *
+ * A region with a link count of zero returns -1 from the SECOND guard, having
+ * already computed a half of zero from the first. Both exits are the same
+ * answer by different routes and both are reproduced.
+ *
+ * UNEXERCISED, and not for the usual reason -- it is not blind. Its three
+ * callers sit inside 0x004049C0 and 0x00407190, the unit movement code, and
+ * a Boot Camp drive that walks nobody anywhere never reaches them: the
+ * counter reads 0 while AddRegionLink beside it reads 2,109 from the map
+ * load. Verified by reading. It needs the same thing the combat path does,
+ * which is a drive that gives a unit somewhere to go.
+ */
+int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to)
+{
+    const AM2_RegionLink *links;
+    int32_t               n     = kNLinks(region);
+    int32_t               count = 0;
+    int32_t               half, i;
+
+    if (n > 0) {
+        links = kLinks(region);
+        for (i = 0; i < n; i++)
+            if (links[i].to == (int16_t)to)
+                count++;
+    }
+
+    half = (count + 1) >> 1;
+    if (half <= 0)
+        return -1;
+    if (n <= 0)
+        return -1;
+
+    links = kLinks(region);
+    for (i = 0; i < n; i++) {
+        if (links[i].to == (int16_t)to && --half <= 0)
+            return i;
+    }
+
+    return -1;
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -134,6 +193,8 @@ int region_install(void)
 
     rc |= patch_replace(ADDR_SET_POINT_RULE, (const void *)SetPointRule,
                         "SetPointRule", 4);
+    rc |= patch_replace(ADDR_MIDDLE_REGION_LINK, (const void *)MiddleRegionLink,
+                        "MiddleRegionLink", 3);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
     return rc;

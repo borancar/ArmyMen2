@@ -4468,6 +4468,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define REGION_OFF_NLINKS          8u   /* uint8_t */
 #define REGION_OFF_LINKS           0x0Cu
 #define ADDR_ADD_REGION_LINK       0x0042B860u  /* void(int32_t, int32_t) */
+/* 0x0042B7F0, three callers. Of all the links `region` has to `to`, the index
+ * of the MIDDLE one -- count them, then walk again and stop at the
+ * ceiling-halfth. -1 when there are none.
+ *
+ * Two regions usually touch along a run of cells, so this is choosing where to
+ * cross rather than merely whether a crossing exists. The name is ours; the
+ * middle is the whole content of the function. */
+#define ADDR_MIDDLE_REGION_LINK    0x0042B7F0u  /* int32(int32 region, int32 to) */
 #define ADDR_OPT_TRACE_VEH       0x0050C360u  /* -traceVEH */
 #define ADDR_OPT_TRACE_WIN       0x0050C354u  /* -tracewin */
 #define ADDR_OPT_DBG             0x0050C358u  /* -dbg */

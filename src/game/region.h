@@ -31,6 +31,10 @@ typedef struct {
  * either cell has no region, or if this exact edge is already present. */
 void __cdecl AddRegionLink(int32_t cell, int32_t neighbour);
 
+/* 0x0042B7F0. Of all the links a region has to another, the index of the
+ * middle one; -1 when there are none. */
+int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to);
+
 /* 0x00437E00. Choose which of three rules a point gets settled under, from
  * the object asking. See region.cpp for why it lives here. */
 void __cdecl SetPointRule(void *obj);
