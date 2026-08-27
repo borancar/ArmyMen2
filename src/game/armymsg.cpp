@@ -8,6 +8,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "objtable.h" /* LookupByUID */
+#include "dist.h"     /* AngleBetween */
 
 /* ArmyMessageFlush stays original and is reached by address. It empties the
  * packet and resets the cursor to AM2_ARMY_PACKET_HDR, returning zero when it
@@ -259,14 +260,14 @@ void __cdecl ItemGoneMessageSend(const void *obj)
 }
 
 typedef int32_t (__cdecl *AM2_RecvFn)(void *msg);
-#define orig_recv_item_deploy   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_DEPLOY)
-#define orig_recv_damage        ((AM2_RecvFn)(uintptr_t)ADDR_RECV_DAMAGE)
 #define orig_recv_item_create   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_CREATE)
 
 /* The three receivers, defined below beside the senders they pair with. */
 void __cdecl RecvObjDestroyed(void *msg);
 void __cdecl RecvItemGone(void *msg);
 void __cdecl RecvDeath(void *msg);
+void __cdecl RecvItemDeploy(void *msg);
+void __cdecl RecvDamage(void *msg);
 
 /* 0x0042ACE0, one caller. Routes an incoming army message to its receiver and
  * answers whether it took it -- 1 for the six codes it knows, 0 otherwise, so
@@ -312,9 +313,9 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
 
     switch (code) {
     case AM2_MSG_ITEM_GONE:      RecvItemGone(msg);     return 1;
-    case AM2_MSG_ITEM_DEPLOY:    orig_recv_item_deploy(msg);   return 1;
+    case AM2_MSG_ITEM_DEPLOY:    RecvItemDeploy(msg);   return 1;
     case AM2_MSG_OBJ_DESTROYED:  RecvObjDestroyed(msg); return 1;
-    case AM2_MSG_DAMAGE:         orig_recv_damage(msg);        return 1;
+    case AM2_MSG_DAMAGE:         RecvDamage(msg);        return 1;
     case AM2_MSG_ITEM_CREATE:    orig_recv_item_create(msg);   return 1;
     case AM2_MSG_DEATH:          RecvDeath(msg);         return 1;
     default:                                                   return 0;
@@ -443,12 +444,107 @@ void __cdecl RecvDeath(void *msg)
     orig_obj_die(obj, (int32_t)*(const uint8_t *)(m + 0x0C), by);
 }
 
+/* 0x0042AF30, the far end of SendItemDeploy above -- and the pair is what
+ * confirms the layout, because each names the same four offsets independently.
+ * The byte at MSG_DEPLOY_OFF_RESURRECT reaches DeployItem's `resurrect`
+ * parameter, which is what finally names the argument the sender is handed.
+ *
+ * THE LOG COMES FIRST, before the lookup, so a message for an object this
+ * side does not have is still traced and then silently dropped. It also
+ * prints the RAW wire uid rather than putting it through UidOnWire -- which
+ * is the identity here, so the two agree, but the asymmetry with the lookup
+ * below is the original's and is reproduced.
+ *
+ * The position is read twice and two different ways: as two int16 halves for
+ * the log, and as the packed dword for DeployItem. That is what the sender
+ * writes, so both readings are of one field. */
+void __cdecl RecvItemDeploy(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    const uint8_t *comm = kComm;
+    void          *obj;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_RECV_ITEM_DEPLOY,
+                 *(const uint32_t *)(m + MSG_DEPLOY_OFF_UID),
+                 (int32_t)*(const int16_t *)(m + MSG_DEPLOY_OFF_POS),
+                 (int32_t)*(const int16_t *)(m + MSG_DEPLOY_OFF_POS + 2),
+                 (int32_t)*(const uint8_t *)(m + MSG_DEPLOY_OFF_FACING));
+
+    obj = LookupByUID(UidOnWire(*(const uint32_t *)(m + MSG_DEPLOY_OFF_UID)));
+    if (!obj)
+        return;
+
+    *(uint8_t *)((uint8_t *)obj + OBJ_OFF_FACING) =
+        *(const uint8_t *)(m + MSG_DEPLOY_OFF_FACING);
+
+    DeployItem(obj, *(const uint32_t *)(m + MSG_DEPLOY_OFF_POS),
+               (int32_t)*(const uint8_t *)(m + MSG_DEPLOY_OFF_RESURRECT), 1);
+}
+
+/* 0x0042ADA0, the last of the six receivers and the one that settles a
+ * question the whole damage family depends on.
+ *
+ * THE MESSAGE CARRIES NO DIRECTION. It carries the ATTACKER's position, and
+ * the receiver computes the direction here with AngleBetween against the
+ * victim's own position, masked to a byte. That is what makes the third
+ * argument of DamageObject and its four type handlers a DIRECTION rather than
+ * a second amount -- decoded here rather than inferred, which is how
+ * OBJ_OFF_HIT_DIR got its name.
+ *
+ * The order of the two positions matters and is easy to reverse: the ATTACKER
+ * is the `from` and the victim the `to`, so the direction points at the
+ * victim. Reversing it would flip every recoil and hit animation by 128.
+ *
+ * The log is gated on COMM_OFF_VERBOSE and prints the ATTACKER's army through
+ * UidArmy while printing the VICTIM's uid -- two different objects on one
+ * line, in that order.
+ *
+ * The last argument to DamageObject is a literal 1, so damage arriving over
+ * the wire suppresses whatever the local path would otherwise do with it --
+ * which is what stops a hit being broadcast back. */
+void __cdecl RecvDamage(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    const uint8_t *comm;
+    void          *obj;
+    uint32_t       attacker;
+    AM2_Point      from;
+    int32_t        dir;
+
+    attacker = UidOnWire(*(const uint32_t *)(m + MSG_DAMAGE_OFF_ATTACKER));
+    obj      = LookupByUID(UidOnWire(*(const uint32_t *)(m + MSG_DAMAGE_OFF_UID)));
+    if (!obj)
+        return;
+
+    from.x = *(const int16_t *)(m + MSG_DAMAGE_OFF_POS);
+    from.y = *(const int16_t *)(m + MSG_DAMAGE_OFF_POS + 2);
+    dir    = AngleBetween(&from,
+                          (const AM2_Point *)((uint8_t *)obj + OBJ_OFF_POS));
+
+    comm = kComm;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log((const char *)(uintptr_t)ADDR_STR_RECV_DAMAGE,
+                 ((const AM2_Object *)obj)->uid,
+                 (int32_t)*(const int16_t *)(m + MSG_DAMAGE_OFF_AMOUNT),
+                 UidArmy(attacker), dir);
+
+    DamageObject(obj,
+                 (int32_t)*(const int16_t *)(m + MSG_DAMAGE_OFF_AMOUNT),
+                 (int32_t)*(const uint8_t *)(m + MSG_DAMAGE_OFF_KIND),
+                 attacker, dir, 1);
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_RECV_DAMAGE, (const void *)RecvDamage,
+                        "RecvDamage", 1);
+    rc |= patch_replace(ADDR_RECV_ITEM_DEPLOY, (const void *)RecvItemDeploy,
+                        "RecvItemDeploy", 1);
     rc |= patch_replace(ADDR_RECV_OBJ_DESTROYED, (const void *)RecvObjDestroyed,
                         "RecvObjDestroyed", 1);
     rc |= patch_replace(ADDR_RECV_ITEM_GONE, (const void *)RecvItemGone,

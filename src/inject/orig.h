@@ -5610,6 +5610,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_DIE             0x00428450u  /* void(obj, int32 kind, uint32 by) */
 #define ADDR_STR_RECV_ITEM_GONE  0x00485F20u
 #define ADDR_STR_RECV_DEATH      0x00485EF0u
+#define ADDR_STR_RECV_ITEM_DEPLOY 0x00485F3Cu
+/* The deploy message's own layout, confirmed from BOTH ends: SendItemDeploy
+ * packs these offsets and RecvItemDeploy reads the same ones. The byte at
+ * 0x0D reaches DeployItem's `resurrect` parameter, which is what finally
+ * names the second argument the sender was given. */
+#define MSG_DEPLOY_OFF_UID       4u
+#define MSG_DEPLOY_OFF_POS       8u    /* packed point; x at +8, y at +0x0A */
+#define MSG_DEPLOY_OFF_FACING    0x0Cu /* uint8_t */
+#define MSG_DEPLOY_OFF_RESURRECT 0x0Du /* uint8_t */
+#define ADDR_STR_RECV_DAMAGE     0x00485EB0u
+/* The damage message. The receiver does NOT carry a direction -- it carries
+ * the attacker's POSITION and computes the direction with ADDR_ANGLE_BETWEEN
+ * against the victim's own, masking to a byte. That is what makes the third
+ * argument of the damage family a direction; see OBJ_OFF_HIT_DIR. */
+#define MSG_DAMAGE_OFF_UID       4u
+#define MSG_DAMAGE_OFF_ATTACKER  8u
+#define MSG_DAMAGE_OFF_POS       0x0Cu /* two int16, the ATTACKER's position */
+#define MSG_DAMAGE_OFF_AMOUNT    0x10u /* int16_t */
+#define MSG_DAMAGE_OFF_KIND      0x12u /* uint8_t */
 #define ADDR_STR_ITEM_GONE_SEND  0x00485E10u
 #define AM2_MSG_OBJ_DESTROYED    0x10u
 #define AM2_MSG_OBJ_DESTROYED_LEN 8u
