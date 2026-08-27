@@ -5,35 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `e7cd901`. Working tree clean.
+Last updated: **2026-08-27**, at `bb671dd`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`CommWasHereForArmy` and `CommRecentTotal`** (`0x0040F1C0`, `0x0040F520`),
-  both thiscall, one caller each. 923 patches, and `docs/boundary.md` moves
-  with them -- the second holds a `GetTickCount`, so KERNEL32 goes 55
-  reconstructed to 56. A generated number moving is the tool being honest.
+- **`ObjTileChanged`** (`0x004294C0`, fifteen callers) -- recompute an object's
+  tile from its position and, if anything moved, put it back on the map and
+  re-apply its height. 924 patches.
 
-- `CommWasHereForArmy` is `CommSlotForArmy`'s walk with a different answer.
-  It has **no `army == 4` shortcut**, which is the one structural difference
-  and not an oversight to tidy: 4 is the neutral army and answers slot 4
-  there, and there is no fifth record to read a field out of here.
+- **Three things have to be true to skip the work**: the position equal to
+  `OBJ_OFF_PREV_POS`, the tile equal to what it was, and `force` zero. The tile
+  hook runs before the early exit, so it is not part of the "something moved"
+  path however much its position in the body suggests it.
 
-- **`CommRecentTotal` is bytes sent in the last 100 ms.** The loop gives the
-  layout rather than the other way round, and the two arrays are `CommSend`'s
-  `COMM_OFF_STAT_TIMES` and `COMM_OFF_STAT_SIZES`, filled a slot per packet
-  round a 30-entry ring.
+- **`OBJ_OFF_ 0x1C` had a name already and it was the wrong struct's.**
+  `OBJ_OFF_SCREEN_X`/`_Y` sat on `0x1C`/`0x1E` describing a *map object's*
+  screen position -- which is `ROW_OFF_X`/`ROW_OFF_Y`: same offsets, same
+  struct, same meaning, different prefix. The offset ratchet cannot see that,
+  because it groups by prefix. Retired in favour of the `ROW_` pair, which
+  frees `OBJ_OFF_ 0x1C` for the game object's own field there. Net ratchet
+  change: zero.
 
-- **I wrote it up first as "counters whose meaning is not established"**, with
-  a paragraph explaining why naming them from the one caller would be unsafe.
-  Wrong twice over: both arrays were already named, thirty lines apart in
-  `orig.h`, and `CommSend` writes `GetTickCount` and the packet size into them
-  three hundred lines up its own file. **The offset ratchet refused my second
-  pair of names and that is the only reason it was caught.** Grep the *offset*
-  as well as the address -- the rule this tree already has for globals, one
-  level in.
+- **Checked with `objdump.py`, which is what it is for.** 146 calls before the
+  briefing and 24,938 in one live mission, and the pixels still see nothing --
+  adding 1 to the tile leaves `bootcamp` at 76. Reading the field is exact:
+  the leader's tile is `0x407C` correct and `0x407D` mutated, with
+  `OBJ_OFF_PREV_TILE` following as `0x0000407C` against `0x0000407D`, which
+  confirms the dword width as a bonus.
+
+  Third function in a row that the pixels cannot discriminate and that got a
+  real check anyway, after the dirty list's stateful oracle and the place
+  corpus. The `force` arm is the exception and says so in the source.
 
 ## Next
 
