@@ -34,6 +34,15 @@ void __cdecl RowRegisterAll(void *row, void *desc);
  * the map's cell grid up to date with where it now is. */
 void __cdecl RowUpdate(void *row, int32_t force, void *desc);
 
+/* Original: 0x0041D270 and 0x0041D210. The map descriptor's grid, freed and
+ * rebuilt. Both are called on both descriptors when a map loads. */
+void __cdecl MapDescFree(void *desc);
+void __cdecl MapDescInit(void *desc, int32_t w, int32_t h);
+
+/* Original: 0x0040A050. Clear a map object and give it a sprite, a position
+ * and the default palette. See maprow.cpp for why it is filed here. */
+void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y);
+
 int maprow_install(void);
 
 #ifdef __cplusplus

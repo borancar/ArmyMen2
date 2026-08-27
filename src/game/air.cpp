@@ -75,7 +75,7 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     box.bottom = y + AM2_AIR_ENEMY_RADIUS;
 
     o = (uint8_t *)orig_objects_in_rect(&box,
-                                        (void *)(uintptr_t)ADDR_OBJ_TABLE_ARG,
+                                        (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
                                         (const void *)MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's

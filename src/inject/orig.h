@@ -807,6 +807,21 @@
  * renamed now. RedrawMapRegion locks [0x00503100], which is what settles it. */
 #define ADDR_OFFSCREEN_SURFACE   0x00503100u  /* IDirectDrawSurface *, offscreen */
 #define ADDR_MAP_DESC            0x00514F20u  /* map descriptor; +4 is a row count */
+/* The descriptor's own two, and the row initialiser beside them.
+ *
+ * MapDescInit sizes the grid `cols << shift` entries where `shift` is
+ * Log2Mask(cols) -- so the grid is SQUARE IN COLS and MAPDESC_OFF_ROWS is
+ * only the early reject's bound. That is why RowRegisterAll clamps its bottom
+ * edge to cols - 1 and not to rows - 1, which maprow.cpp already flags as
+ * looking like a mistake. Sized exactly: the largest cell RowRegisterAll can
+ * reach is ((cols-1) << shift) + cols - 1, one short of the allocation.
+ *
+ * RowInit's 0x60 bytes are AM2_OBJ_ROW_STRIDE, and the three fields it writes
+ * afterwards are the sprite, the packed position and the palette -- which is
+ * what says its argument is a map object rather than anything else that size. */
+#define ADDR_MAP_DESC_INIT       0x0041D210u  /* void(desc, int32 w, int32 h) */
+#define ADDR_MAP_DESC_FREE       0x0041D270u  /* void(desc) */
+#define ADDR_ROW_INIT            0x0040A050u  /* void(row, sprite, x, y) */
 /* The left and top of the visible-area rectangle -- these are its first two
  * fields, not two loose globals: RedrawMapRegion is called with 0x00514E14
  * itself as its AM2_Rect *, which the trace shows plainly, so the four edges
@@ -6151,7 +6166,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * simply forwarded to ADDR_ITEM_PRE_DESTROY. What it holds is not established;
  * what is, is that it is one of the two things every object call carries.
  * Named for position, as AM2_COMM_CONNECTED is. */
-#define ADDR_OBJ_TABLE_ARG         0x00514F10u
+/* The OTHER map descriptor. 0x0042C8C0 builds both from the map's world
+ * extent in the same breath, this one first, and 0x0042D540 frees both -- so
+ * ADDR_OBJ_MAP_DESC was a name for what it is passed AS rather than what it
+ * is. Renamed rather than aliased. */
+#define ADDR_OBJ_MAP_DESC          0x00514F10u
 /* 0x00434EC0. Free a subrecord's row array: unregister each 0x60-byte row from
  * the map descriptor, then give the array back. The name is ours. */
 #define ADDR_FREE_SUBRECORD_ROWS   0x00434EC0u  /* void(void *subrecord) */

@@ -391,7 +391,7 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
         am2_free(alloc);
 
     FreeSubrecordRows(t + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(trooper, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
+    DestroyItemObject(trooper, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC,
                       unlink);
     am2_free(trooper);
 }
@@ -419,7 +419,7 @@ void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
     ClearPtrList(v + VEHICLE_OFF_PTR_LIST);
 
     FreeSubrecordRows(v + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(vehicle, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG,
+    DestroyItemObject(vehicle, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC,
                       unlink);
     am2_free(vehicle);
 }
@@ -430,7 +430,7 @@ void __cdecl DestroyItemCommon(void *item, int32_t unlink)
         return;
 
     FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
+    DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC, unlink);
     am2_free(item);
 }
 
@@ -447,7 +447,7 @@ void __cdecl DestroyKind7(void *item, int32_t unlink)
         *live = 0;
 
     FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
+    DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC, unlink);
     am2_free(item);
 }
 
@@ -462,7 +462,7 @@ void __cdecl DestroyWeapon(void *weapon, int32_t unlink)
     orig_log("DestroyWeapon, %x\n", *(const int32_t *)(w + 4));
 
     FreeSubrecordRows(w + OBJ_OFF_SUBRECORD);
-    DestroyItemObject(weapon, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG, unlink);
+    DestroyItemObject(weapon, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC, unlink);
     am2_free(weapon);
 }
 
@@ -834,7 +834,7 @@ void __cdecl DestroyObjCommon(void *obj)
         orig_item_teardown(obj);
 
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & 1u)
-        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG);
+        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BLOCKED;
 
@@ -1950,7 +1950,7 @@ void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
                 (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2));
 
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0) {
-        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_TABLE_ARG);
+        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
         *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT0;
     }
 }

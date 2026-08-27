@@ -14,10 +14,14 @@
  * naming convention, and selftest-link is what says so.
  */
 #include <stdint.h>
+#include <string.h>
 
 #include "maprow.h"
 #include "objtable.h"
 #include "objflag.h"   /* ObjFlagBit0 -- reconstructed */
+#include "rect.h"      /* MakePoint */
+#include "dist.h"      /* Log2Mask */
+#include "crt.h"       /* the game's allocator owns the grid */
 #include "item.h"      /* RowUnregisterAll -- reconstructed */
 #include "misc.h"      /* ListUnlink -- reconstructed */
 #include "crt.h"       /* am2_malloc -- the game's own */
@@ -614,6 +618,99 @@ void __cdecl DepthResort(void *node, void **head)
     *head = n;
 }
 
+/* 0x0041D270, three callers. Drop the descriptor's grid and zero its shape.
+ *
+ * The three shape fields are cleared AFTER the free and the pointer is
+ * cleared between them, which is the original's order and observable by
+ * nothing. */
+void __cdecl MapDescFree(void *desc)
+{
+    uint8_t *d     = (uint8_t *)desc;
+    void    *cells = *(void **)(d + MAPDESC_OFF_CELLS);
+
+    if (cells) {
+        am2_free(cells);
+        *(void **)(d + MAPDESC_OFF_CELLS) = (void *)0;
+    }
+
+    *(int32_t *)(d + MAPDESC_OFF_COLS)  = 0;
+    *(int32_t *)(d + MAPDESC_OFF_ROWS)  = 0;
+    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = 0;
+}
+
+/* 0x0041D210, two callers -- 0x0042C8C0 builds both descriptors here, from
+ * the map's world extent, one after the other.
+ *
+ * THE GRID IS SQUARE IN COLS. The allocation is `cols << shift` entries with
+ * `shift` = Log2Mask(cols), so it is cols * cols when cols is a power of two;
+ * MAPDESC_OFF_ROWS never enters the sizing at all. That settles something
+ * RowRegisterAll already had a comment about: clamping its bottom edge to
+ * cols - 1 rather than rows - 1 is not a slip, it is the bound the grid
+ * actually has. The largest cell that clamp can produce is
+ * ((cols-1) << shift) + cols - 1, exactly one short of the allocation.
+ *
+ * Log2Mask answers 0 for anything that is not a power of two, which would
+ * make the grid one row of `cols` and the indexing fold into it. No map ships
+ * that way; the extents are read from the map file and the game divides them
+ * by 256 to get here.
+ *
+ * SHARPLY CHECKED, unlike most of what has landed lately. One added to the
+ * shift puts `bootcamp` at 10,097 differing pixels against a budget of 500 --
+ * every object registers in the wrong cell and the frame says so. Measured,
+ * because a clean A/B over code that turns out to be undiscriminated is worth
+ * nothing and this file has just had two of those. */
+void __cdecl MapDescInit(void *desc, int32_t w, int32_t h)
+{
+    uint8_t *d = (uint8_t *)desc;
+    int32_t  cols, shift, bytes;
+    void    *cells;
+
+    MapDescFree(d);
+
+    cols = w >> AM2_CELL_SHIFT;
+    *(int32_t *)(d + MAPDESC_OFF_COLS) = cols;
+    *(int32_t *)(d + MAPDESC_OFF_ROWS) = h >> AM2_CELL_SHIFT;
+
+    shift = Log2Mask(cols);
+    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = shift;
+
+    bytes = (cols << shift) << 2;
+    cells = am2_malloc((size_t)bytes);
+    *(void **)(d + MAPDESC_OFF_CELLS) = cells;
+    memset(cells, 0, (size_t)bytes);
+}
+
+/* 0x0040A050, two callers. Clear a map object and give it a sprite, a
+ * position and the default palette.
+ *
+ * FILED HERE RATHER THAN BY BAND. It sits in air.cpp..audio.cpp, which is a
+ * different translation unit from this file's 0x0041Dxxx -- but its 0x60
+ * bytes are AM2_OBJ_ROW_STRIDE and the three fields it writes are the row's
+ * sprite, packed position and palette, so it is the row family's constructor
+ * and nothing else. That TU is already split three ways in this tree
+ * (objflag.cpp, anim.cpp, win32/mapdraw.cpp), so one more split costs
+ * nothing and filing it away from its family would.
+ *
+ * The clear is the whole 0x60 and the writes follow it, so every other field
+ * really is zero on the way out -- including the flags, which means bit 0 is
+ * CLEAR and the object is not drawn until somebody sets it.
+ *
+ * It runs 1,612 times in one Boot Camp mission and the palette line is still
+ * NOT checked: nulling it leaves `bootcamp` at 76 pixels, inside the band.
+ * Every object that reaches the screen has had its own palette written in by
+ * then -- which is what MAPOBJ_OFF_PALETTE's note in orig.h already says
+ * happens immediately before a draw. Warm code, undiscriminated line. */
+void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
+{
+    uint8_t *r = (uint8_t *)row;
+
+    memset(r, 0, AM2_OBJ_ROW_STRIDE);
+    *(void **)(r + ROW_OFF_SPRITE) = sprite;
+    *(uint32_t *)(r + ROW_OFF_X)   = MakePoint((uint32_t)x, (uint32_t)y);
+    *(void **)(r + MAPOBJ_OFF_PALETTE) =
+        *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+}
+
 int maprow_install(void)
 {
     int rc = 0;
@@ -630,5 +727,10 @@ int maprow_install(void)
                         "RowRegisterAll", 2);
     rc |= patch_replace(ADDR_ROW_UPDATE, (const void *)RowUpdate,
                         "RowUpdate", 3);
+    rc |= patch_replace(ADDR_MAP_DESC_FREE, (const void *)MapDescFree,
+                        "MapDescFree", 3);
+    rc |= patch_replace(ADDR_MAP_DESC_INIT, (const void *)MapDescInit,
+                        "MapDescInit", 2);
+    rc |= patch_replace(ADDR_ROW_INIT, (const void *)RowInit, "RowInit", 2);
     return rc;
 }
