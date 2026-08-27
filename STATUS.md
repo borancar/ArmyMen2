@@ -5,11 +5,36 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `6530f09`. Working tree clean.
+Last updated: **2026-08-27**, at `a740bce`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`RefreshDraw` is reconstructed** (`0x00424BF0`) after being deferred four
+  times. The reason each time was that three of its painters had no names; two
+  are now named from their own bodies and the third from what it touches, so
+  the reason expired rather than being overruled.
+
+- **The draw target is set THREE times, always to the back buffer, and that is
+  not redundancy.** `ComposeFrame` and the effect layer both retarget it, so
+  each group of painters has to put it back. Dropping the repeats works until
+  one of those two changes -- exactly the coupling worth leaving alone.
+
+- **The two bitmap-centring sites disagree.** This one divides by
+  `ADDR_BITMAP_AREA_W/H` where `Substate22` uses `ADDR_SCREEN_W/H` for the same
+  kind of bitmap. Two screen-size pairs live in the image and the two sites
+  pick differently; taken from the operands at each rather than made
+  consistent.
+
+- Its bitmap guard is four tests deep and **every one is a refusal** -- no
+  bitmap, or the menu request is the info or escape screen, or the overlay is
+  already dirty -- so it draws only when nothing else is about to paint over
+  it. And two more **no-argument log calls** bracket `HudPaint`, the third and
+  fourth in the tree.
+
+- `DrawViewRect` was `static` in `mapdraw.cpp` and is not any more, because
+  `RefreshDraw` has to call it by name rather than through the image.
 
 - **`ShowMpResult` is reconstructed** (`0x00426A90`), and reading it sharpens
   the previous entry. **Its argument is a RESULT CODE, not a boolean**: 0 won,
