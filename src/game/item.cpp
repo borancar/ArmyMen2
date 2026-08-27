@@ -616,8 +616,70 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
 }
 
 /* Still original: the cell query HeightAtPoint walks. */
+
 typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 #define orig_objects_at_point ((AM2_ObjectsAtFn)(uintptr_t)ADDR_OBJECTS_AT_POINT)
+
+/* 0x0042A1B0, five callers -- the mouse pick.
+ *
+ * Every object in the cell the point falls in whose own OBJ_OFF_HIT_RECT
+ * contains it, chained through OBJ_OFF_QUERY_NEXT and returned newest-first.
+ * The sibling ADDR_OBJECTS_AT_POINT asks a different question of the same
+ * cell -- it builds a box from four offsets at +0x7C -- so these two are not
+ * duplicates however alike the shapes look.
+ *
+ * BOTH BOUNDS ARE COLS. The row coordinate is checked against `cols - 1` and
+ * not `rows - 1`, which reads as a slip until MapDescInit is read: the grid is
+ * allocated `cols << shift` entries and this is the bound it actually has.
+ * Third place in the tree that has to say so.
+ *
+ * The bitmask test is CONDITIONAL on the object having a mask at all. A null
+ * OBJ_OFF_HIT_MASK means the rectangle was the whole question, which is what
+ * lets a plain item be picked without one. ObjMaskBitAt is misc.cpp's and was
+ * about to be reached through the image under a second name -- the alias
+ * ratchet and checkseams both said so, on the same address, in one run.
+ *
+ * 3,872 CALLS AND NOTHING WATCHES THE ANSWER. Returning null unconditionally
+ * -- checked that the edit landed before believing the result -- leaves
+ * `mission` at 281 and `bootcamp` at 22, both at their floors. The drives
+ * move the mouse and never select anything with it, so the whole point of
+ * this function is untested. A configuration that clicks on a unit and reads
+ * OBJ_FLAG_SELECTED back out would close it, and would be the same drive the
+ * combat path has been waiting for. Verified by reading until then. */
+void *__cdecl PickObjectsAt(const uint32_t *pt, const void *desc)
+{
+    const uint8_t *d = (const uint8_t *)desc;
+    int32_t  cols    = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
+    int32_t  cy      = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
+    uint8_t *head    = (uint8_t *)0;
+    uint8_t *node;
+
+    if (cx < 0 || cx > cols - 1 || cy < 0 || cy > cols - 1)
+        return (void *)0;
+
+    node = ((uint8_t *const *)(*(const uint8_t *const *)
+                (d + MAPDESC_OFF_CELLS)))
+           [(cy << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + cx];
+
+    for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
+        uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+
+        if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            continue;
+        if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
+                         (const AM2_Point *)pt))
+            continue;
+        if (*(void *const *)(o + OBJ_OFF_HIT_MASK)
+            && !ObjMaskBitAt(o, (const AM2_Point *)pt))
+            continue;
+
+        *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+        head = o;
+    }
+
+    return head;
+}
 
 /* 0x0042A820, five callers. The ground height at a point, raised by anything
  * standing on it.
@@ -663,6 +725,35 @@ uint8_t __cdecl HeightAtPoint(uint32_t packedPoint)
     }
 
     return (uint8_t)best;
+}
+
+/* 0x00459FB0, four callers. A uid to a UNIT.
+ *
+ * The accepted set is types 2, 3 and 8 -- trooper, vehicle, roach -- which is
+ * exactly what ObjIsType2, ObjIsType3 and ObjIsType8 answer for, so `unit` is
+ * the word rather than something structural. Written as the original's two
+ * comparisons rather than as three: `t >= 2 && t <= 3` then `t == 8`, because
+ * that is one branch fewer and it is what is there.
+ *
+ * Uid 0 is refused before the lookup and the test is UNSIGNED, so a uid with
+ * the top bit set still reaches LookupByUID. */
+void *__cdecl UnitByUid(uint32_t uid)
+{
+    const int32_t *o;
+
+    if (uid == 0)
+        return (void *)0;
+
+    o = (const int32_t *)LookupByUID(uid);
+    if (!o)
+        return (void *)0;
+
+    if (*o < 2)
+        return (void *)0;
+    if (*o <= 3 || *o == 8)
+        return (void *)o;
+
+    return (void *)0;
 }
 
 int32_t __cdecl ObjHeight(const void *obj)
@@ -2825,6 +2916,9 @@ void item_install(void)
     patch_replace(ADDR_OBJ_HEIGHT, (const void *)ObjHeight, "ObjHeight", 1);
     patch_replace(ADDR_HEIGHT_AT_POINT, (const void *)HeightAtPoint,
                   "HeightAtPoint", 5);
+    patch_replace(ADDR_PICK_OBJECTS_AT, (const void *)PickObjectsAt,
+                  "PickObjectsAt", 5);
+    patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
     patch_replace(ADDR_ROW_RELEASE, (const void *)RowRelease, "RowRelease", 5);

@@ -154,6 +154,13 @@ int32_t __cdecl TileAttrAt(uint32_t tile);
  * it. A byte return -- see item.cpp. */
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
 
+/* 0x0042A1B0. The mouse pick: every object in a cell whose own hit rectangle
+ * contains the point, chained through OBJ_OFF_QUERY_NEXT. */
+void *__cdecl PickObjectsAt(const uint32_t *pt, const void *desc);
+
+/* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
+void *__cdecl UnitByUid(uint32_t uid);
+
 /* 0x004355D0, one caller. A second deadline on the mission clock, at +0x58:
  * once the clock is PAST it, bit 1 of the object's flags goes on. Unsigned
  * compare, and nothing clears the bit here. Both names are ours. */

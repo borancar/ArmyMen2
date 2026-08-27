@@ -601,6 +601,28 @@
  * next call. */
 #define ADDR_HEIGHT_AT_POINT   0x0042A820u /* uint8_t(uint32_t packedPoint) */
 #define ADDR_OBJECTS_AT_POINT  0x0042A550u /* void *(const AM2_Point*, desc) */
+/* 0x0042A1B0, five callers -- the simpler sibling, and it is the MOUSE PICK.
+ * Three of its callers are in the 0x0041xxxx HUD band, which is what suggests
+ * that, and the filter is what confirms it: an object qualifies when the point
+ * is inside its own OBJ_OFF_HIT_RECT, where ADDR_OBJECTS_AT_POINT builds a box
+ * out of four offsets at +0x7C..+0x88 instead. This one asks "is the cursor on
+ * it", that one asks "does its footprint cover this".
+ *
+ * Both chain their answers through OBJ_OFF_QUERY_NEXT and both walk the cell
+ * with the descriptor's COLS as the bound in each direction -- see
+ * MapDescInit, which sizes the grid that way. */
+#define ADDR_PICK_OBJECTS_AT   0x0042A1B0u /* void *(const AM2_Point*, desc) */
+#define OBJ_OFF_HIT_RECT       0x30u  /* AM2_Rect, in world units */
+#define OBJ_OFF_HIT_MASK       0x78u  /* non-null means test the bitmask too */
+/* The mask test itself is ADDR_OBJ_MASK_BIT_AT, further down and already
+ * reconstructed -- a second name went on it here and both the alias ratchet
+ * and checkseams said so in the same run. */
+/* 0x00459FB0, four callers. A uid to a UNIT: the lookup, then types 2, 3 and
+ * 8 accepted and everything else refused. That set is exactly ObjIsType2,
+ * ObjIsType3 and ObjIsType8 -- trooper, vehicle, roach -- which is why the
+ * name is `unit` rather than something structural. Uid 0 is refused before
+ * the lookup, unsigned. */
+#define ADDR_UNIT_BY_UID       0x00459FB0u /* void *(uint32_t uid) */
 #define OBJ_OFF_HEIGHT_ADJ     0x64u       /* int8_t, always added */
 #define OBJ_OFF_HEIGHT_SET     0x65u       /* uint8_t, replaces the tile's */
 #define ADDR_OBJ_TILE_ATTR     0x00429570u /* int32_t(const void *obj) */
