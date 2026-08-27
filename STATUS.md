@@ -5,11 +5,38 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `0f702d5`. Working tree clean.
+Last updated: **2026-08-27**, at `5493250`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`merges.py` was run BEFORE choosing the target this time** -- which is what
+  the last two commits' corrections were about. None of the current candidates
+  is a merged entry, so their sizes are real and `ObjDie` is genuinely 128
+  bytes. Cheap, and it removes the failure mode entirely rather than
+  documenting it a third time.
+
+- **`ObjDie` is reconstructed** (`0x00428450`). Health is zeroed **first**, so
+  no per-type handler can see the object as alive. Only types 2 and 3 have one
+  -- trooper and vehicle, per the mapping `RecvItemCreate` established -- and
+  every other type falls straight through to the common tail, which always
+  runs.
+
+- **The attacker lookup has a trap in it.** `FindSlot`'s second parameter is an
+  out-pointer, and the original passes the address of **its own third
+  argument**, the attacker uid, so the call may overwrite it. That is safe only
+  because the value was copied into a register on the line before, and it is
+  that copy every later use reads.
+
+  Written with a separate local for the scratch. Sharing the argument slot
+  would work here too -- but only by accident of that copy, and **nothing in
+  the source would say so**.
+
+- A slot below zero gives a **NULL attacker rather than an error**, so a death
+  attributed to a uid this side has never seen still cleans up. And the
+  original emits the two-call tail **twice**, once per exit; one copy in C is
+  the same function.
 
 - **CORRECTION: a merged entry produced a wrong comment.** `orig.h` described
   `0x0040FB80` as "formats a string and hands it to `ADDR_COMM_SEND_PROPERTY`
