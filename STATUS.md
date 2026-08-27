@@ -5,31 +5,35 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `bcbb92c`. Working tree clean.
+Last updated: **2026-08-27**, at `17db9dd`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`RowSetSprite`** (`0x0041D3D0`, three callers). 944 patches, and the seam
-  `RowFaceSprite` opened closes with it -- every callee here was already ours,
-  so this goes from a 176-byte hole in the middle of our code to the last piece
-  of that path.
+- **`PointActionC`** (`0x00428F80`, two callers) -- move an object to a point
+  and take every one of its rows with it. 945 patches.
 
-- **It rebuilds only when the new sprite needs more cells**, and the count is
-  the arithmetic `RowAlloc` already uses -- with **different types**.
-  `RowAlloc` multiplies two `int8` and stores a byte in `ROW_OFF_OWNS`; this
-  multiplies two `int32` and compares against that byte. A sprite big enough to
-  overflow the byte looks larger here than the row can ever record, so it takes
-  the rebuild arm every time. Both halves are the original's and reconciling
-  them would change one.
+- **A sprite's `fileA`/`fileB` are an attach point.** `sprite.h` has carried
+  them as unexplained since the loader went in -- the loader only *copies*
+  them, exactly the shape `AM2_AnimCell::hold` was in before `RowAnimFinished`
+  turned up. This adds them to rows 1..n as an X and a Y, so they are where an
+  attached row sits relative to the one carrying the sprite: a turret on its
+  body. Renamed `attachX` / `attachY`.
 
-- **The rebuild arm swaps the sprite in the middle.** It clears bit 0, updates,
-  releases the row, *then* stores the new sprite, sets bit 0 again, and calls
-  `RowAlloc` with bounds read back out of the **row** rather than the argument.
-  A reconstruction that stored the sprite first would size the buffer from the
-  same sprite by accident and agree until something else touched the field in
-  between -- the kind of agreement that survives every test and is still wrong.
+  One reader, but an unambiguous one -- and a field explained by a single
+  caller is weaker evidence than one explained by two, which is why the note
+  says which caller.
+
+- **A null sprite on row 0 abandons the whole function**, not just the row
+  loop: the branch goes to the epilogue, so `ObjTileChanged` and the after-move
+  notify are skipped too. The object has already been moved by then, so it ends
+  up at the new position with its map registration not brought up to date. The
+  kind of half-done state a tidier `break` would hide.
+
+- The attach offsets are added as **16-bit** arithmetic on top of a position
+  just written as a dword, so an offset that carries out of the low half lands
+  in the row's Y rather than wrapping its X.
 
 ## Next
 
