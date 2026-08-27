@@ -1442,6 +1442,10 @@ void __cdecl ClearMenuMsgs(void);
  * bitmap, each TWICE with no change of draw target between. */
 void __cdecl OnAppActivated(void);
 
+/* 0x00454AD0, thiscall. Give the multiplayer map preview a new bitmap; the
+ * pointer goes in the class's own slot AND the base's sprite. */
+void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name);
+
 int widget_install(void);
 
 #ifdef __cplusplus

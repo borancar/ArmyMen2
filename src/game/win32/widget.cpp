@@ -5481,7 +5481,7 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview)
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
     strcpy(name, (const char *)AM2_IMAGE(ADDR_STR_BAD_MP_PREV));
 
-    orig_mp_preview_setbitmap(preview, name);
+    MpPreviewSetBitmap(preview, name);
     ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
         preview, preview->rect);
 }
@@ -5538,7 +5538,7 @@ void __cdecl RefreshMapSelection(void)
     if (preview) {
         orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_PREV_BMP),
                      (const char *)AM2_IMAGE(ADDR_MAP_NAME));
-        orig_mp_preview_setbitmap(preview, path);
+        MpPreviewSetBitmap(preview, path);
         ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
             preview, preview->rect);
     }
@@ -5807,6 +5807,33 @@ void __cdecl OnAppActivated(void)
 void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink)
 {
     ((uint8_t *)w)[MPNAME_OFF_INK] = ink;
+}
+
+/* 0x00454AD0, three callers, thiscall. Give the multiplayer map preview a new
+ * bitmap.
+ *
+ * THE POINTER GOES IN TWO PLACES and both matter. PREVIEW_OFF_SPRITE is the
+ * class's own slot, which is what the release at the top of the next call
+ * finds; AM2_Widget::sprite is the base's, which is what WidgetPaint draws.
+ * Storing only one would either leak or draw nothing, and which of the two is
+ * not obvious from either line alone.
+ *
+ * The release comes FIRST and is unconditional -- ReleaseSprite tolerates a
+ * null, which is what makes the first call safe. The load is not checked
+ * either, so a missing bitmap leaves both slots null and the widget paints
+ * nothing; ADDR_SHOW_BAD_PREVIEW is the caller-side answer to that.
+ */
+void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name)
+{
+    uint8_t    *w = (uint8_t *)self;
+    AM2_Sprite *spr;
+
+    ReleaseSprite(*(AM2_Sprite **)(w + PREVIEW_OFF_SPRITE));
+
+    spr = PreloadSpriteName(name, *(const int32_t *)(w + PREVIEW_OFF_FLAGS), 1);
+
+    *(AM2_Sprite **)(w + PREVIEW_OFF_SPRITE) = spr;
+    ((AM2_Widget *)w)->sprite = spr;
 }
 
 int widget_install(void)
@@ -6316,5 +6343,8 @@ int widget_install(void)
                         "WidgetScreenRect", 33);
     rc |= patch_replace(ADDR_LABEL_DRAW, (const void *)LabelDraw,
                         "LabelDraw", 2);
+    rc |= patch_replace(ADDR_MP_PREVIEW_SETBITMAP,
+                        (const void *)MpPreviewSetBitmap,
+                        "MpPreviewSetBitmap", 3);
     return rc;
 }

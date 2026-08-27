@@ -4211,12 +4211,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_RULES_CHECKSUM_VAL  0x00511CD4u  /* uint32_t, the rules total */
 #define ADDR_MP_SCRIPT_CHKSUM_VAL 0x00511CD0u /* uint32_t */
 #define ADDR_MAP_CHECKSUM_VAL    0x00511CCCu  /* uint32_t */
-#define ADDR_MP_PREVIEW_SETBITMAP 0x00454AD0u /* thiscall(const char *) */
+/* 0x00454AD0, three callers, thiscall. Give the multiplayer map preview a new
+ * bitmap: release whatever it is holding, load the named one, and store it in
+ * BOTH its own slot and the widget base's sprite -- the second is what makes
+ * WidgetPaint draw it, the first is what the release above finds next time.
+ * Two fields, one pointer, and the class owns it. */
+#define ADDR_MP_PREVIEW_SETBITMAP 0x00454AD0u /* thiscall(void *, const char *) */
+#define PREVIEW_OFF_SPRITE       0x58   /* AM2_Sprite *, the class's own copy */
+#define PREVIEW_OFF_FLAGS        0x5C   /* int32_t, passed to the loader */
 #define ADDR_SHOW_BAD_PREVIEW    0x00430330u  /* void(AM2_Widget *) */
 #define ADDR_STR_BAD_MP_PREV     0x004870B4u  /* "bad_mp_prev.bmp" */
-#define orig_mp_preview_setbitmap \
-            ((void (__attribute__((thiscall)) *)(void *, const char *)) \
-             (uintptr_t)ADDR_MP_PREVIEW_SETBITMAP)
 /* Was ADDR_MP_PANEL_REFRESH, which is where OpenMpHost calls it and not what
  * it does: three of its four callers have no panel at all. Renamed, not
  * aliased. */
