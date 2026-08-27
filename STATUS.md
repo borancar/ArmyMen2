@@ -47,9 +47,18 @@ Nothing uncommitted.
   reached when something is *pathfound* rather than driven, so holding a key
   does not do it.
 
-- **A drive that types a cheat.** `ctl "type ..."` already works and the cheat
-  runner is `0x00444C40`, so the fog pair and anything else the cheat table
-  reaches is one configuration away from being compared rather than read.
+- **A drive that types a cheat -- half solved.** The console key is **binding
+  index `0x13`, scancode `0x0E`, BACKSPACE**: `key 0x0e tap` in a live mission
+  puts `0x004185C0` into `ADDR_CHAR_HANDLER`, verified by reading the global
+  back. What still does not work is typing into it -- `type ...` posts the
+  WM_CHARs and `\r` posts the `0x0D` the submit tests for, and
+  `ScriptRunLine`'s counter stays at 0. The characters are dropped between the
+  handler and the submit, and that is where the next attempt starts rather
+  than at the key.
+
+  Finding the key needed the bindings table, not a scancode search: the push
+  is `0x13` and that is an *index* into `ADDR_KEY_BINDINGS`, whose twentieth
+  pair is `0x0E`. Read as a scancode it gives R, which is wrong and plausible.
 
 - **A drive that observes the mouse pick** is the older half of that. It would close `PickObjectsAt`, and it is close to the drive the
   combat path has been waiting for -- `DamageObject` is 0 on every
