@@ -350,6 +350,48 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
  * What the reconstruction rests on is the message LAYOUT, and that has a
  * second witness: ADDR_RECV_ITEM_DEPLOY unpacks the same sixteen bytes at the
  * other end and prints the same four fields in the same order. */
+/* 0x0044C0F0, five callers -- all in the trooper band. A 28-byte message of
+ * kind 0x18 naming two objects: each one's uid through UidOnWire, the SECOND
+ * one's position, and two values the caller supplies.
+ *
+ * THERE IS A HOLE AT MSG_PAIR_OFF_HOLE. Every other dword of the 0x1C is
+ * written and that one is not, so four bytes of this function's own stack go
+ * out on the wire. Reproduced rather than zeroed: a memset would be tidier and
+ * would change what the far end sees, and nothing here says the receiver
+ * ignores it.
+ *
+ * UNLIKE SendItemDeploy IT DOES NOT CHECK ADDR_MP_SESSION, so it builds and
+ * sends even in single player -- ArmyMessageSend is where that ends. The two
+ * senders sit in the same family and differ on that; the difference is the
+ * original's.
+ *
+ * The byte argument is SIGN-EXTENDED into a dword, so a caller passing 0x80
+ * puts -128 on the wire and not 128.
+ *
+ * The name is structural. Kind 0x18 has no receiver reconstructed yet and
+ * nothing read so far says what the pair means. */
+void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
+                             int32_t arg)
+{
+    uint8_t        msg[AM2_MSG_PAIR_LEN];
+    const uint8_t *pa = (const uint8_t *)a;
+    const uint8_t *pb = (const uint8_t *)b;
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_PAIR_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_PAIR;
+
+    *(uint32_t *)(msg + MSG_PAIR_OFF_A) =
+        UidOnWire(*(const uint32_t *)(pa + 4));
+    *(uint32_t *)(msg + MSG_PAIR_OFF_B) =
+        UidOnWire(*(const uint32_t *)(pb + 4));
+    *(uint32_t *)(msg + MSG_PAIR_OFF_POS) =
+        *(const uint32_t *)(pb + OBJ_OFF_POS);
+    *(int32_t *)(msg + MSG_PAIR_OFF_ARG)  = arg;
+    *(int32_t *)(msg + MSG_PAIR_OFF_BYTE) = (int8_t)byteArg;
+
+    ArmyMessageSend(msg);
+}
+
 void __cdecl SendItemDeploy(const void *item, int32_t arg)
 {
     uint8_t        msg[AM2_MSG_ITEM_DEPLOY_LEN];
@@ -764,5 +806,7 @@ int armymsg_install(void)
                         "ItemGoneMessageSend", 1);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,
                         "SendGamePause", 2);
+    rc |= patch_replace(ADDR_SEND_PAIR_MSG, (const void *)SendPairMessage,
+                        "SendPairMessage", 5);
     return rc;
 }

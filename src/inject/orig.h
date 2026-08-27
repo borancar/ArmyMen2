@@ -3513,6 +3513,27 @@ typedef struct {
  * kind, and a uid. ArmyMessageSend reads the third as one -- it logs
  * UidArmy(UidOnWire(msg->uid)) -- which is how the field is known to be a uid
  * and not the padding EventMessageSend's always-zero write suggested. */
+/* 0x0044C0F0, five callers. A 28-byte army message of kind 0x18 carrying two
+ * objects: each one's uid through UidOnWire, the SECOND one's position, a byte
+ * and a dword the caller supplies.
+ *
+ * THERE IS A HOLE AT +0x10. Every other dword of the 0x1C bytes is written and
+ * that one is not, so four bytes of the sender's stack go out on the wire.
+ * Reproduced; a memset would be tidier and would change what the receiver sees
+ * on a machine where the stack held something else.
+ *
+ * The name is structural. Kind 0x18 has no receiver reconstructed yet and
+ * nothing read so far says what the pair means -- the callers are all in the
+ * trooper band and pass an object, another object, a byte and a field. */
+#define ADDR_SEND_PAIR_MSG         0x0044C0F0u  /* void(a, b, int8, int32) */
+#define AM2_MSG_PAIR               0x18
+#define AM2_MSG_PAIR_LEN           0x1C
+#define MSG_PAIR_OFF_A             0x04u  /* UidOnWire(a->uid) */
+#define MSG_PAIR_OFF_B             0x08u  /* UidOnWire(b->uid) */
+#define MSG_PAIR_OFF_POS           0x0Cu  /* b's OBJ_OFF_POS */
+#define MSG_PAIR_OFF_HOLE          0x10u  /* never written */
+#define MSG_PAIR_OFF_ARG           0x14u
+#define MSG_PAIR_OFF_BYTE          0x18u  /* int32, sign-extended from int8 */
 #define AM2_ARMY_MSG_HDR           8u
 #define AM2_ARMY_MSG_EVENT         0x0020u   /* the kind word EventMessageSend
                                               * stamps at offset 2 */

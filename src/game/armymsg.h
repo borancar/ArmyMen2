@@ -69,6 +69,11 @@ void __cdecl SendItemDeploy(const void *item, int32_t arg);
 void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
                              int32_t kind, const void *where, int32_t unused);
 
+/* 0x0044C0F0, five callers. A 28-byte kind-0x18 message naming two objects.
+ * Structural name; see armymsg.cpp, and note the hole at +0x10. */
+void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
+                             int32_t arg);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus
