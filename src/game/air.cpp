@@ -134,13 +134,79 @@ void __cdecl RevealObj(void *obj)
     }
 }
 
+
+/* 0x00429650, thirteen callers. RevealObj's inverse: sets OBJ_FLAG_CONCEALED
+ * and takes the object's rows OUT of the map's cell lists.
+ *
+ * It is not a mirror image, though, and the two places it differs are the
+ * whole of its extra behaviour.
+ *
+ * FIRST, IT CLEARS OBJ_FLAG_REVEALED ON THE WAY IN -- but not always. The
+ * clear is skipped when the object carries flag 0x10 AND is a type 2 AND its
+ * +0x530 is 5. Three conditions deep, and the middle one costs a call. What
+ * that combination means is not established; what it does is leave the
+ * revealed flag standing while the object is concealed, which the reveal side
+ * has no equivalent of.
+ *
+ * SECOND, IT HAS A FORCE ARGUMENT and RevealObj does not. Without it the
+ * function declines unless ADDR_FOG_OF_WAR is ZERO, which is the fog-ON state
+ * -- see the note on that global, whose polarity is the opposite of its name.
+ * So a caller can conceal something while the fog cheat has everything
+ * revealed, and the cheat's own sweep passes 0 so it cannot.
+ *
+ * The row loop is RevealObj's with both bits the other way: ROW_FLAG_REMOVED
+ * is SET rather than cleared before RowUpdate, which is what makes that
+ * function unlink the row instead of re-linking it.
+ *
+ * VERIFIED BY READING. Thirteen callers and the fog cheat is the reachable
+ * one, which needs a typed cheat code this project does not drive. */
+void __cdecl ObjConceal(void *obj, int32_t force)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t flags;
+    int32_t  i;
+
+    if (!obj)
+        return;
+
+    flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+    if (flags & OBJ_FLAG_CONCEALED)
+        return;
+
+    if (!(flags & OBJ_FLAG_BIT4)
+        || !ObjIsType2((const AM2_Object *)obj)
+        || *(const int32_t *)(o + OBJ_OFF_FIELD_530) != 5) {
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) =
+            *(const uint32_t *)(o + OBJ_OFF_FLAGS)
+            & ~(uint32_t)OBJ_FLAG_REVEALED;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_FOG_OF_WAR && !force)
+        return;
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_CONCEALED;
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+
+        *(uint32_t *)row |= (uint32_t)ROW_FLAG_REMOVED;
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+}
+
 /* 0x004295C0, one caller -- WndProc's setup-done handler, which passes bit 18
  * of the game flags, so fog is a negotiated multiplayer option.
  *
- * The argument is INVERTED against the flag it sets: a non-zero argument turns
- * fog OFF and returns at once. Only turning fog ON does any work, and what it
- * does is reveal every type 2/3/8 object first, so the fog starts from a clean
- * slate rather than from whatever the previous mission left behind.
+ * CORRECTED: this said "a non-zero argument turns fog OFF", which had the
+ * flag's polarity backwards. ADDR_FOG_OF_WAR is ZERO when fog is on -- see the
+ * note there, where the cheat toggle settles it -- so a non-zero argument
+ * turns fog ON and returns at once.
+ *
+ * The work is therefore done when fog is turned OFF, and what it does is
+ * reveal every type 2/3/8 object, which is exactly what turning fog off should
+ * mean. The old reading had it revealing everything while enabling fog, and
+ * that was written down as "counter-intuitive" instead of as a warning.
  *
  * The inner body is RevealObj's MINUS ONE LINE, and the missing line is the
  * point: RevealObj also sets OBJ_FLAG_REVEALED, and this does not. So it
@@ -163,11 +229,11 @@ void __cdecl RevealObj(void *obj)
  * RevealObj's, which is exercised, and the one line that differs is called out
  * above precisely because a reader comparing them would otherwise assume they
  * are the same code. */
-void __cdecl SetFogOfWar(int32_t noFog)
+void __cdecl SetFogOfWar(int32_t fogOn)
 {
     void *obj;
 
-    if (noFog) {
+    if (fogOn) {
         *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 0;
         return;
     }
@@ -652,6 +718,8 @@ void air_install(void)
                   "SaveAirSection", 1);
     patch_replace(ADDR_LOAD_AIR_SECTION, (const void *)LoadAirSection,
                   "LoadAirSection", 1);
+    patch_replace(ADDR_OBJ_CONCEAL, (const void *)ObjConceal,
+                  "ObjConceal", 13);
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
 }

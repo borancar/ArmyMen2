@@ -12,6 +12,7 @@
 #include "army.h"     /* AllyFlag, SetLeadsAndAct */
 #include "packkey.h"
 #include "misc.h"
+#include "air.h"      /* ObjConceal */
 
 /* ArmyMessageFlush stays original and is reached by address. It empties the
  * packet and resets the cursor to AM2_ARMY_PACKET_HDR, returning zero when it
@@ -560,8 +561,6 @@ typedef void (__cdecl *AM2_PostCreateFn)(void *obj, int32_t a);
 #define orig_create_vehicle  ((AM2_CreateVehicleFn)(uintptr_t)ADDR_CREATE_VEHICLE)
 #define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 #define orig_post_create     ((AM2_PostCreateFn)(uintptr_t)ADDR_ITEM_POST_CREATE)
-typedef void (__cdecl *AM2_ConcealFn)(void *obj, int32_t force);
-#define orig_obj_conceal     ((AM2_ConcealFn)(uintptr_t)ADDR_OBJ_CONCEAL)
 
 /* 0x0042AFA0, the SIXTH receiver and the one that completes the family. It
  * makes an object the other side has made, dispatching on
@@ -621,7 +620,7 @@ void __cdecl RecvItemCreate(void *msg)
             return;
         orig_post_create(made, *(const int32_t *)(m + MSG_CREATE_OFF_A));
         if (!AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, army))
-            orig_obj_conceal(made, 1);
+            ObjConceal(made, 1);
         return;
 
     case 2:

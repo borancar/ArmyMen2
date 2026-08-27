@@ -140,10 +140,14 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj);
 void __cdecl RevealObj(void *obj);
 
 /* 0x004295C0. Sets the fog flag from an INVERTED argument -- non-zero turns
- * fog off -- and, when turning it on, reveals every type 2/3/8 object so the
- * fog starts from a clean slate. Not a call to RevealObj: it omits that
- * function's OBJ_FLAG_REVEALED write, deliberately. */
-void __cdecl SetFogOfWar(int32_t noFog);
+ * fog ON -- and, when turning it OFF, reveals every type 2/3/8 object. Not a
+ * call to RevealObj: it omits that function's OBJ_FLAG_REVEALED write,
+ * deliberately. */
+void __cdecl SetFogOfWar(int32_t fogOn);
+
+/* 0x00429650. RevealObj's inverse -- sets OBJ_FLAG_CONCEALED and unlinks the
+ * rows. Declines unless ADDR_FOG_OF_WAR is zero (fog ON) or `force` is set. */
+void __cdecl ObjConceal(void *obj, int32_t force);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded

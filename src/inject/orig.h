@@ -1423,7 +1423,20 @@
 /* Non-zero means fog is ON -- objects get concealed. It was ADDR_AI_CONTROLLED,
  * a name taken from a call site; the cheat strings that drive it are about
  * seeing, not about who is playing. */
-#define ADDR_FOG_OF_WAR       0x00476FB0u  /* int32_t, 1 = fog on */
+/* ITS POLARITY IS INVERTED AGAINST ITS NAME, and this said "1 = fog on".
+ * ADDR_TOGGLE_FOG_OF_WAR settles it: it flips this flag and then, for every
+ * enemy object, calls ADDR_OBJ_REVEAL when the flag is NON-ZERO and
+ * ADDR_OBJ_CONCEAL when it is ZERO. So non-zero is the REVEALED state -- fog
+ * OFF -- and zero is fog on.
+ *
+ * ObjConceal agrees: it declines unless the flag is zero or its caller forces
+ * it. SetFogOfWar agrees too, once its own argument is read the right way
+ * round: a non-zero argument stores 0 here, which is fog ON.
+ *
+ * Three readers, one answer. The old comment made SetFogOfWar look like it
+ * revealed everything while turning fog on, which was recorded at the time as
+ * "counter-intuitive" rather than as a sign the polarity was wrong. */
+#define ADDR_FOG_OF_WAR       0x00476FB0u  /* int32_t, 0 = fog ON */
 #define ADDR_PAUSE_FLAGS         0x005122FCu  /* uint32_t, one bit per reason */
 /* Raised by 0x00411000 and lowered by the 0x046E handler, and read from 21
  * places -- the lobby, the overlay, TakeMenuRequest and the mission code. The
@@ -5317,6 +5330,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TOGGLE_FOG_OF_WAR 0x0041A1B0u  /* void(void) */
 #define OBJ_FLAG_REVEALED      0x0800u
 #define OBJ_FLAG_CONCEALED     0x0200u
+/* Bit 4 of OBJ_OFF_FLAGS, and the field beside it that ObjConceal tests with
+ * it. Both structural: the three-deep condition they form is what decides
+ * whether OBJ_FLAG_REVEALED is cleared, and nothing read so far says why. */
+#define OBJ_FLAG_BIT4            0x10u
+#define OBJ_OFF_FIELD_530        0x530u  /* int32_t; ObjConceal compares to 5 */
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
  * which registers itself with the map. */
