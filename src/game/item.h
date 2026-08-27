@@ -158,6 +158,10 @@ uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
  * contains the point, chained through OBJ_OFF_QUERY_NEXT. */
 void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc);
 
+/* 0x004294C0, fifteen callers. Recompute an object's tile from its position
+ * and, if anything moved, put it back on the map. */
+void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force);
+
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
 void *__cdecl UnitByUid(uint32_t uid);
 

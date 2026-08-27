@@ -95,10 +95,10 @@ int32_t __cdecl DepthCompare(void *a, void *b)
 
     sa = *(const float *)(pa + OBJ_OFF_DEPTH_SLOPE);
     sb = *(const float *)(pb + OBJ_OFF_DEPTH_SLOPE);
-    ax = *(const int16_t *)(pa + OBJ_OFF_SCREEN_X);
-    ay = *(const int16_t *)(pa + OBJ_OFF_SCREEN_Y);
-    bx = *(const int16_t *)(pb + OBJ_OFF_SCREEN_X);
-    by = *(const int16_t *)(pb + OBJ_OFF_SCREEN_Y);
+    ax = *(const int16_t *)(pa + ROW_OFF_X);
+    ay = *(const int16_t *)(pa + ROW_OFF_Y);
+    bx = *(const int16_t *)(pb + ROW_OFF_X);
+    by = *(const int16_t *)(pb + ROW_OFF_Y);
 
     if (sa != 0.0f && sb != 0.0f) {
         int32_t fromA = DepthProject(bx - ax, sa, ay);

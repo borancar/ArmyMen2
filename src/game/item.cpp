@@ -615,10 +615,68 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
     return *(const int8_t *)(g_tileAttrs + (tile & 0xFFFFu));
 }
 
-/* Still original: the cell query HeightAtPoint walks. */
+/* Still original: the cell query HeightAtPoint walks, and the two halves of
+ * ObjTileChanged's "something moved" path. */
+typedef void (__cdecl *AM2_ObjHookFn)(void *obj);
+typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
+#define orig_apply_obj_height ((AM2_ApplyHeightFn)(uintptr_t)ADDR_APPLY_OBJ_HEIGHT)
+typedef void (__cdecl *AM2_ObjRemapFn)(void *obj, void *desc, int32_t force);
+#define orig_obj_tile_hook ((AM2_ObjHookFn)(uintptr_t)ADDR_OBJ_TILE_HOOK)
+#define orig_obj_remap     ((AM2_ObjRemapFn)(uintptr_t)ADDR_OBJ_REMAP)
+
 
 typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 #define orig_objects_at_point ((AM2_ObjectsAtFn)(uintptr_t)ADDR_OBJECTS_AT_POINT)
+
+/* 0x004294C0, fifteen callers. Recompute an object's tile from its position
+ * and, if anything moved, put it back on the map and re-apply its height.
+ *
+ * THREE THINGS HAVE TO BE TRUE TO SKIP THE WORK -- the position equal to
+ * OBJ_OFF_PREV_POS, the tile equal to what it was, and `force` zero. Written
+ * as the original's three-branch chain rather than as one `if`, because the
+ * middle test reads the tile the first half of this function has just saved
+ * and the order is what makes that safe.
+ *
+ * The hook runs whenever OBJ_OFF_FLAGS bit 3 is CLEAR, and it runs BEFORE the
+ * early exit -- so it is not part of the "something moved" path however much
+ * its position in the body suggests it. Reproduced in place.
+ *
+ * OBJ_OFF_PREV_TILE is written as a dword from a zero-extended uint16 and
+ * compared as one, which is why it is not `int16_t` here. It is also not the
+ * map object's ROW_OFF_X: the same offset in a different structure, and the
+ * two had a name each under different prefixes until this arrived.
+ *
+ * CHECKED WITH objdump.py, WHICH IS WHAT IT IS FOR. 146 calls before the
+ * briefing and 24,938 in one live mission, and the pixels still see nothing:
+ * adding 1 to the tile leaves `bootcamp` at 76. Reading the field instead is
+ * exact -- the leader's OBJ_OFF_TILE is 0x407C on a correct build and 0x407D
+ * with that mutation, and OBJ_OFF_PREV_TILE follows it as 0x0000407C against
+ * 0x0000407D, which also confirms the dword width.
+ *
+ * The `force` arm has no such check. Ignoring it entirely leaves `mission` at
+ * 281 and `bootcamp` at 76, and it writes no field to read back, so that one
+ * stays verified by reading. */
+void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    *(uint32_t *)(o + OBJ_OFF_PREV_TILE) = *(const uint16_t *)(o + OBJ_OFF_TILE);
+    *(uint16_t *)(o + OBJ_OFF_TILE) =
+        (uint16_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+
+    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_NO_TILE_HOOK))
+        orig_obj_tile_hook(o);
+
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_PREV_POS),
+                    *(const uint32_t *)(o + OBJ_OFF_POS))
+        && *(const uint32_t *)(o + OBJ_OFF_PREV_TILE)
+               == (uint32_t)*(const uint16_t *)(o + OBJ_OFF_TILE)
+        && force == 0)
+        return;
+
+    orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), force);
+    orig_apply_obj_height(o, height);
+}
 
 /* 0x0042A1B0, five callers -- the precise hit test at a world point.
  *
@@ -2924,6 +2982,8 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_OBJ_TILE_CHANGED, (const void *)ObjTileChanged,
+                  "ObjTileChanged", 15);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

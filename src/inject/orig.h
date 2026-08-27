@@ -577,6 +577,11 @@
  * sites read it and nothing here writes it. The name is ours. */
 #define ADDR_TILE_ATTRS        0x00514EBCu /* uint8_t *, one per tile index */
 #define OBJ_OFF_TILE           0x1Au       /* uint16_t, indexes the above */
+/* Scratch, and only ObjTileChanged writes it: the tile the object was in
+ * before that function recomputed OBJ_OFF_TILE from its position. Stored as a
+ * DWORD from a zero-extended uint16, and compared as one. Not the map
+ * object's ROW_OFF_X, which is the same offset in a different structure. */
+#define OBJ_OFF_PREV_TILE      0x1Cu       /* uint32_t */
 /* 0x00429570, six callers: that byte for the tile an object stands on, sign
  * extended. 0x00429CE0 next door is a plain cdecl forwarder for
  * ADDR_ITEM_PRE_DESTROY. Both names are ours. */
@@ -1048,8 +1053,13 @@
  * have a positive one, and a per-object SLOPE that projects a horizontal
  * distance onto the vertical axis -- which is how two objects at different x
  * are ordered by which is in front rather than by y alone. */
-#define OBJ_OFF_SCREEN_X         0x1Cu  /* int16_t */
-#define OBJ_OFF_SCREEN_Y         0x1Eu  /* int16_t */
+/* The screen position is ROW_OFF_X and ROW_OFF_Y, further down. It had a
+ * second pair of names here -- OBJ_OFF_SCREEN_X/Y, same offsets, same struct,
+ * same meaning -- and the offset ratchet could not see the duplication
+ * because the two prefixes differ. Retired in favour of the ROW_ pair, which
+ * is what the rest of the tree calls them, and which frees OBJ_OFF_ 0x1C for
+ * the GAME object's own field at that offset. Two structs overlap here and
+ * only one of them is a map object. */
 #define OBJ_OFF_DEPTH_LAYER      0x26u  /* int16_t, only when > 0 on both */
 #define OBJ_OFF_DEPTH_SLOPE      0x28u  /* float */
 /* The rest of a map object, as the drawer reads it. The lut and the palette
@@ -5959,6 +5969,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_LOAD_TYPE6       0x00422780u
 #define ADDR_LOAD_TYPE7       0x00435500u
 #define ADDR_LOAD_TYPE8       0x0043CB60u
+/* 0x004294C0, FIFTEEN callers -- the most-called thing still original in its
+ * band. Recompute an object's tile from its position and, if anything moved,
+ * put it back on the map and re-apply its height.
+ *
+ * The early exit needs all three to be true: the position equal to
+ * OBJ_OFF_PREV_POS, the tile equal to what it was, and `force` zero. So the
+ * third argument overrides both tests, which is what a caller that has
+ * changed something else about the object wants.
+ *
+ * ADDR_OBJ_TILE_CHANGED_HOOK runs whenever OBJ_OFF_FLAGS bit 3 is CLEAR, and
+ * it runs before the early exit -- so it is not part of the "something moved"
+ * path however much its position in the body suggests it. */
+#define ADDR_OBJ_TILE_CHANGED    0x004294C0u /* void(obj, int32 h, int32 force) */
+#define ADDR_OBJ_TILE_HOOK       0x00437860u /* void(obj), when bit 3 is clear */
+#define ADDR_OBJ_REMAP           0x00429D00u /* void(obj, desc, int32 force) */
+#define OBJ_FLAG_NO_TILE_HOOK    0x08u
 /* 0x004278E0, given the object and its OBJ_OFF_HEIGHT_SET byte. */
 #define ADDR_APPLY_OBJ_HEIGHT 0x004278E0u  /* void(obj, int32_t height) */
 #define AM2_ITEM_HEADER_BYTES 0x94u
