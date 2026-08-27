@@ -160,7 +160,7 @@ uint32_t __cdecl MpScriptChecksum(void)
 {
     char path[0x100];
 
-    if (!orig_script_list_find((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME)))
+    if (!ScriptListFind((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME)))
         return 0;
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_RULES_DIR));
@@ -298,8 +298,66 @@ void __cdecl ReadBootcampLevels(void)
     ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_BOOTCAMP_TXT));
 }
 
+/* Still original: the CRT lower-caser. ReadMpMapList beside it is ours, and
+ * declared above. */
+typedef char *(__cdecl *AM2_StrlwrFn)(char *);
+#define orig_strlwr       ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+
+/* 0x0043E900, five callers. Find a record by name in the name registry --
+ * the SECOND of the two triples FreeLevelTables owns, whose records are 0xCC
+ * bytes where the level records are 0x30C.
+ *
+ * I renamed this `FindLevelByName` on the strength of "loaded from the same
+ * .txt by the same reader" and the compiler refused it: AM2_LEVEL_RECORD_SIZE
+ * already existed as 0x30C. Same file, same reader, two tables, two strides --
+ * and the name stays what it was until something says what these records are.
+ *
+ * THAT NEAR-RENAME COST AN HOUR IN A WAY WORTH RECORDING. Backing it out with
+ * a blanket replace of AM2_LEVEL_RECORD_SIZE across this file also rewrote
+ * FindLevelRecord's bsearch stride from 0x30C to 0xCC, which broke the whole
+ * campaign load -- and the first two bisects blamed this function, because
+ * disabling its patch_replace leaves the DIRECT CALL in MpScriptChecksum
+ * pointing at it either way. Disabling a patch does not disable a call.
+ *
+ * THE FIRST SEARCH IS ALSO THE LOAD. A zero count calls ADDR_READ_MP_MAPS
+ * before searching, so nothing has to arrange for the table to exist -- and a
+ * caller that searches an empty table twice pays for the parse once.
+ *
+ * It lower-cases its argument IN PLACE. Every caller passes a buffer, which is
+ * what makes that safe; a string literal would be written to.
+ *
+ * The count is re-read every iteration, as it is in ObjTileChanged and
+ * StepObjRows -- three functions in this tree now, so it is the compiler's
+ * habit rather than any of them allowing the body to change it.
+ */
+void *__cdecl ScriptListFind(char *name)
+{
+    char   *base;
+    int32_t i;
+
+    if (!name)
+        return (void *)0;
+
+    if (!*(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT))
+        ReadMpMapList();
+
+    orig_strlwr(name);
+
+    base = *(char **)AM2_IMAGE(ADDR_NAME_TABLE_BASE);
+    for (i = 0; i < *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT); i++) {
+        char *rec = base + (uint32_t)i * AM2_NAME_RECORD_SIZE;
+
+        if (!strcmp(rec, name))
+            return rec;
+    }
+
+    return (void *)0;
+}
+
 void map_install(void)
 {
+    patch_replace(ADDR_SCRIPT_LIST_FIND, (const void *)ScriptListFind,
+                  "ScriptListFind", 5);
     patch_replace(ADDR_TILE_TO_XY, (const void *)TileToXY,
                   "TileToXY", 5);
     patch_replace(ADDR_POINT_OF_TILE, (const void *)PointOfTile,

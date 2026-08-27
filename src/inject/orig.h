@@ -1229,7 +1229,7 @@
 /* The DirectPlay lobby launch, reached when another application starts the
  * game through DirectPlay rather than the user starting it. */
 #define ADDR_COMM_LOBBY_START    0x0040ED10u  /* thiscall int32(this) */
-#define ADDR_READ_MP_MAPS        0x0043ECC0u  /* void(void), stays original */
+#define ADDR_READ_MP_MAPS        0x0043ECC0u  /* void(void) -- ReadMpMapList */
 #define ADDR_COMM_CREATE_PLAYER  0x0040DE10u  /* thiscall int32(this,name,evt,data,len) */
 #define ADDR_COMM_REGISTER_SELF  0x004027F0u  /* void(DPID), stays original */
 #define ADDR_DEFAULT_PLAYER_EVT  0x004F48C0u  /* HANDLE, used when none is given */
@@ -4186,12 +4186,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MAP_CHECKSUM        0x00430450u  /* uint32_t(void) */
 #define ADDR_AMM_CHECKSUM        0x0042C350u  /* uint32_t(const char *map) */
 /* NOT ADDR_SCRIPT_FIND_NAME, which is 0x0043F670 over a different table.
- * This one lower-cases its argument IN PLACE and searches the list at
- * 0x00656344/0x00656348 -- a registry this reconstruction has not identified,
- * built lazily by 0x0043ECC0 on the first call. Named from what it does. */
-#define ADDR_SCRIPT_LIST_FIND    0x0043E900u  /* int32_t(char *) */
-#define orig_script_list_find \
-            ((int32_t (__cdecl *)(char *))(uintptr_t)ADDR_SCRIPT_LIST_FIND)
+ * This one lower-cases its argument IN PLACE and searches the second of the
+ * two triples FreeLevelTables owns -- the one at ADDR_NAME_TABLE_BASE, loaded
+ * from the same `.txt` as the level records by the same reader.
+ *
+ * ITS RECORDS ARE 0xCC BYTES and the LEVEL records are 0x30C, which is what
+ * stops the two tables being one thing under two names -- I renamed this to
+ * `FindLevelByName` on the strength of the "same reader" note and the
+ * redefinition of AM2_LEVEL_RECORD_SIZE is what caught it. Two tables, two
+ * strides, one file.
+ *
+ * ITS RETURN IS THE RECORD, not an index or a boolean: the tail computes
+ * `base + i * 0xCC`. The old macro typed it `int32_t`, which worked only
+ * because its one reconstructed caller tests it for truth.
+ *
+ * It builds the table lazily -- a zero count calls ADDR_READ_MP_MAPS first,
+ * so the first search is also the load. */
+#define ADDR_SCRIPT_LIST_FIND    0x0043E900u  /* void *(char *name) */
+#define AM2_NAME_RECORD_SIZE     0xCCu
 #define orig_amm_checksum \
             ((uint32_t (__cdecl *)(const char *, const char *)) \
              (uintptr_t)ADDR_AMM_CHECKSUM)

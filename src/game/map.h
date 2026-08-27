@@ -58,6 +58,10 @@ uint32_t __cdecl PointOfTile(int32_t tile);
  * rather than packed into one dword. */
 void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y);
 
+/* 0x0043E900. Find a record by name in the name registry; the first search is
+ * also the load. */
+void *__cdecl ScriptListFind(char *name);
+
 void map_install(void);
 
 #ifdef __cplusplus
