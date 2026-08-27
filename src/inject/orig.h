@@ -5654,11 +5654,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *
  * 0x0041A1B0 walks the whole registry and, for every enemy object of type 2,
  * 3 or 8 that is not already destroyed, calls one of these two -- chosen by
- * ADDR_FOG_OF_WAR, which it flips on entry. Its two callers are arms of the
+ * ADDR_FOG_OF_WAR, which it INVERTS on entry. Its two callers are arms of the
  * cheat table at 0x00417B80, and they name the pair outright:
  *
- *   "I see everything!"                 clears the flag -> ADDR_OBJ_REVEAL
- *   "I bury my head 'neath the sand."   sets it         -> ADDR_OBJ_CONCEAL
+ *   "I see everything!"                 stores 0 -> becomes 1 -> ObjReveal
+ *   "I bury my head 'neath the sand."   stores 1 -> becomes 0 -> ObjConceal
+ *
+ * THE FLAG IS WRITTEN TWICE ON THE WAY THROUGH and which write you look at
+ * decides which polarity you conclude. The cheat arm stores what it wants;
+ * 0x0041A1B0 opens with `sete al` on the old value and stores the COMPLEMENT,
+ * and the sweep below it reads that. This paragraph used to say the cheat
+ * "clears the flag -> ADDR_OBJ_REVEAL", which is true of the cheat's own store
+ * and the opposite of what the sweep then sees -- and it sat two hundred lines
+ * from the ADDR_FOG_OF_WAR comment saying the other thing. One inversion, two
+ * comments, three commits of puzzle.
  *
  * So 0x0200 is CONCEALED and 0x0800 is REVEALED, established by the game's own
  * strings rather than by inference. The two functions are exact inverses --
@@ -5666,11 +5675,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 1 the other way -- which is why every reading of them in isolation came out
  * self-consistent and contradictory with its neighbour.
  *
- * With that, the last piece falls out. RevealNearby skips an object already
- * carrying 0x0800 because it is already revealed, and stamps
- * OBJ_OFF_REVEALED_UNTIL so it stays that way; the sweep's other arm reads
- * exactly that stamp and declines to conceal an object whose window is still
- * open. Nothing is asymmetric and nothing needs explaining away.
+ * RevealNearby skips an object already carrying 0x0800 because it is already
+ * revealed, and stamps OBJ_OFF_REVEALED_UNTIL so it stays that way.
+ *
+ * THE SWEEP READS THAT STAMP THE OTHER WAY ROUND from what this used to say.
+ * It conceals when the stamp is 0 or when the clock has NOT yet reached it,
+ * and skips when it HAS -- `jae` on `cmp clock, stamp`, jumping to the loop
+ * tail. So the cheat overrides a live reveal window rather than respecting it,
+ * and the objects it leaves alone are the ones whose window has expired and
+ * which the ordinary sweep will conceal anyway. Read off the branch rather
+ * than from the shape.
  *
  * The names this replaces were OBJ_FLAG_ON_MAP, OBJ_FLAG_OFF_MAP, TakeOffMap
  * and TakeNearbyOffMap, and every one of them meant the opposite of what it

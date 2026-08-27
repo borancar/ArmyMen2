@@ -1098,7 +1098,11 @@ compare() {
         # Measured, not guessed -- see the note below the case.
         mission)  budget=-1 ;;
         # Live play with the player walking, so the two sides are not even in
-        # the same place. Meaningless by construction, more so than mission.
+        # the same place. Meaningless by construction, more so than mission --
+        # and measured: four runs sat at 692..704 and the fifth came out at
+        # 177,115, which is 22% of the frame and is the two players having
+        # ended up somewhere different. The tight cluster was luck, not
+        # reproducibility, so do not be tempted to give this one a budget.
         combat)   budget=-1 ;;
         # Live play again: two runs of a mission never sit on the same frame,
         # so the pixel figure is meaningless by construction. The log is the

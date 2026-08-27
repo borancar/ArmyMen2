@@ -148,6 +148,10 @@ void __cdecl SetFogOfWar(int32_t fogOn);
 /* 0x00429650. RevealObj's inverse -- sets OBJ_FLAG_CONCEALED and unlinks the
  * rows. Declines unless ADDR_FOG_OF_WAR is zero (fog ON) or `force` is set. */
 void __cdecl ObjConceal(void *obj, int32_t force);
+
+/* 0x0041A1B0, two callers -- both cheat arms. Invert the fog flag and bring
+ * every enemy object into line with it. See air.cpp for the double write. */
+void __cdecl ToggleFogOfWar(void);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded

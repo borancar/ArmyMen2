@@ -13,6 +13,7 @@
 #include "savetag.h"
 #include "image.h"
 #include "misc.h"   /* MeetsAllThree -- reconstructed */
+#include "army.h"   /* ObjIsFriendly -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "maprow.h"   /* RowUpdate -- reconstructed */
@@ -682,6 +683,58 @@ void __cdecl AirSupportPop(void)
         AirSupportClear();
 }
 
+/* 0x0041A1B0, two callers -- both arms of the cheat table at 0x00417B80.
+ * Invert the fog flag and bring every enemy object into line with it.
+ *
+ * THE FLAG IS WRITTEN TWICE PER CHEAT. The arm stores what it wants, this
+ * opens by storing the COMPLEMENT, and only then does the sweep read it. So
+ * "I see everything!" stores 0, the flag becomes 1, and the sweep reveals;
+ * "I bury my head 'neath the sand." stores 1, the flag becomes 0, and the
+ * sweep conceals. Reading either write alone gives the opposite polarity to
+ * the other, which is how orig.h came to carry both answers at once.
+ *
+ * THE CONCEAL ARM OVERRIDES A LIVE REVEAL WINDOW. It conceals when
+ * OBJ_OFF_REVEALED_UNTIL is 0 or the clock has NOT reached it, and SKIPS when
+ * the clock has -- `jae` on `cmp clock, stamp`, jumping to the loop tail. The
+ * objects it leaves alone are the ones whose window has already expired, which
+ * the ordinary sweep conceals anyway; the ones it acts on include those a
+ * RevealNearby has just lit up. That is the opposite of what this tree said
+ * and it is read off the branch rather than off the shape.
+ *
+ * Three filters before either arm, and all three are needed: not already
+ * destroyed, one of types 2, 3 and 8, and NOT friendly -- so the cheat moves
+ * the enemy only, and your own units are visible either way.
+ */
+void __cdecl ToggleFogOfWar(void)
+{
+    void *o;
+
+    int32_t *fog = (int32_t *)(uintptr_t)ADDR_FOG_OF_WAR;
+
+    *fog = (*fog == 0);
+
+    for (o = FirstItem(); o; o = NextItem()) {
+        uint8_t *p = (uint8_t *)o;
+
+        if (*(const uint8_t *)(p + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            continue;
+        if (!ObjIsTypeIn238((const AM2_Object *)p))
+            continue;
+        if (ObjIsFriendly(p))
+            continue;
+
+        if (*fog) {
+            RevealObj(p);
+        } else {
+            uint32_t until = *(const uint32_t *)(p + OBJ_OFF_REVEALED_UNTIL);
+
+            if (until == 0
+                || *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS < until)
+                ObjConceal(p, 0);
+        }
+    }
+}
+
 void air_install(void)
 {
     patch_replace(ADDR_FORMATION_POINT, (const void *)FormationPoint,
@@ -720,6 +773,8 @@ void air_install(void)
                   "LoadAirSection", 1);
     patch_replace(ADDR_OBJ_CONCEAL, (const void *)ObjConceal,
                   "ObjConceal", 13);
+    patch_replace(ADDR_TOGGLE_FOG_OF_WAR, (const void *)ToggleFogOfWar,
+                  "ToggleFogOfWar", 2);
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
 }
