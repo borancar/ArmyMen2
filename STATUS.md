@@ -5,11 +5,35 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `577c03e`. Working tree clean.
+Last updated: **2026-08-27**, at `0f702d5`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **CORRECTION: a merged entry produced a wrong comment.** `orig.h` described
+  `0x0040FB80` as "formats a string and hands it to `ADDR_COMM_SEND_PROPERTY`
+  -- 48 bytes and nothing else in it". The function is **eight bytes**:
+  `push 2; call; ret`. The 48 are `docs/functions.tsv`'s, and that entry is a
+  **merge** -- the sprintf belongs to `0x0040FB90`, a different function.
+
+  I found it by sweeping the byte range the table gives, which works elsewhere
+  and is **only safe once the range is known to be one function**.
+  `ClearMenuMsgs` hit the same trap last commit and it merely mis-ranked a
+  candidate; here it wrote a description of one function out of a neighbour's
+  body. **`tools/merges.py` exists for exactly this and I did not run it.**
+
+- **`CommPublishResult`** forwards to `CommSendLobbyProperty` with id 2. The
+  send itself declines unless the comm object is lobbied, is the host, and has
+  a lobby interface -- three tests, all in the callee -- so this forwards
+  unconditionally and lets that decide.
+
+- **`Type2Field5A4Set`** (`0x0044BBA0`) is true only for a type 2 whose
+  `OBJ_OFF_FIELD_5A4` is positive. The type test comes **first** and
+  short-circuits, so the field is never read on another type -- which matters,
+  because `0x5A4` is far enough into the record that other types may not have
+  it. `Type2ActionA` is the only reader that says what it *means*: it refuses
+  to re-arm a unit when this is true.
 
 - **CORRECTION: `ADDR_FOG_OF_WAR`'s polarity is the opposite of its name.**
   `orig.h` had it as "1 = fog on". Three independent readers say otherwise:
