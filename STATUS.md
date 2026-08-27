@@ -5,38 +5,31 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `9de8ff8`. Working tree clean.
+Last updated: **2026-08-27**, at `7d414f7`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`ThingCode`** (`0x00406550`, two callers) -- a thing's own code to one of a
-  dozen result codes. 958 patches, and the `AtFlagBase` wrappers from the
-  previous commit turn out to be four of its seventeen arms.
+- **`HudRepaintOne`** (`0x00413A30`, four callers) -- repaint one HUD widget if
+  it has been marked, and unmark it. 959 patches.
 
-- The original dispatches through a 39-entry byte table indexed by `code - 2`
-  and a 17-arm jump table. Written out as a switch on the **code itself**, so
-  the numbers in the source are the ones a data file would carry rather than
-  offsets into a table nobody can see.
+- **The flag is cleared before the paint, not after.** A painter that marked
+  the HUD again would keep its mark, where clearing afterwards would lose it --
+  and with four callers at least one is in a frame loop, so the difference is a
+  dropped repaint per frame rather than a one-off.
 
-- **Most arms are a property of the thing and a few are the owner's** --
-  thirteen constants, four flag-base tests, and one comparing the *owner's*
-  health against half its maximum. The same code answers differently for the
-  same thing depending on who holds it, which the shape of a lookup table does
-  not suggest.
+- **Three globals, and this is the only thing that ties them together**: a flag
+  at `0x004FCF84`, an index at `0x004FCF50`, and a table of widget pointers at
+  `0x004FCF04`. `ADDR_HUD_WIDGET_A` is `0x004FCF00`, four bytes before that
+  table -- so either the HUD widgets are one array with the three already-named
+  singles as entries, or they are scattered and this reads past one of them.
+  **Not established**, and neither is the index's range; both said plainly
+  rather than resolved by the more convenient reading.
 
-- **Two arms answer zero by different routes** -- an explicit `xor` and the
-  out-of-range default falling out of the entry `xor` seventy bytes earlier.
-  Kept as two cases: the table distinguishes them even though the answer does
-  not.
-
-- **And I corrected the division twice.** The original spells
-  `health >= max / 2` as `cdq; sub; sar 1`, MSVC's signed divide-by-two; I
-  transcribed the correction by hand *and* wrote `/ 2`, applying it twice and
-  getting a wrong answer for a negative maximum. No object ships with one,
-  which is exactly why it would have gone unnoticed. **Recognise a compiler
-  idiom as the operation it implements rather than transcribing its steps.**
+- It also clears a **byte** at the widget's `+0x70`. The base `AM2_Widget` has
+  nothing named there and the subclasses that use the offset hold an `int32`,
+  so it is neither of those.
 
 ## Next
 
