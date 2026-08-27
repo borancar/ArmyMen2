@@ -244,8 +244,6 @@ void __cdecl ShowInfoMp(void)
 typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
 #define orig_save_type2       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE2)
 #define orig_save_type3       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE3)
-#define orig_save_type4       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE4)
-#define orig_save_type5       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE5)
 
 /* 0x00428730 and 0x004289B0 -- the two halves of the object HEADER, and the
  * pair that makes the whole family agree with itself.
@@ -322,6 +320,48 @@ int32_t __cdecl SaveType8(am2_FILE *fp, void *obj)
     return 1;
 }
 
+/* 0x0045EF00 and 0x0043B800 -- two more per-type savers, and neither is a
+ * plain write like the three above.
+ *
+ * TYPE 4 IS TYPE 1 PLUS THREE TAGS. It calls SaveType1 outright and gives up
+ * if that fails -- the only saver in the family that delegates to another --
+ * then writes three more tags out of its own record. So types 1 and 4 share a
+ * layout for the first 0x2C bytes, which is the same pairing ADDR_STEP_TYPE1_4
+ * shows on the frame-stepping side: one arm for both.
+ *
+ * TYPE 5 WRITES FIVE FIELDS AND SKIPS TWO. It tags the dword its record's
+ * first field POINTS AT, tags the second field by value, and then writes
+ * exactly three 4-byte fields -- at +0x08, +0x10 and +0x18 of the record --
+ * leaving +0x0C and +0x14 out. Three separate four-byte fwrites where one of
+ * twenty bytes would do, so the gaps are deliberate rather than a stride;
+ * what is in them is not established.
+ */
+int32_t __cdecl SaveType4(am2_FILE *fp, void *obj)
+{
+    const uint8_t *rec = (const uint8_t *)obj + OBJ_OFF_FIELD_94;
+
+    if (!SaveType1(fp, obj))
+        return 0;
+
+    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x30));
+    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x34));
+    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x38));
+    return 1;
+}
+
+int32_t __cdecl SaveType5(am2_FILE *fp, void *obj)
+{
+    const uint8_t *rec = (const uint8_t *)obj + OBJ_OFF_FIELD_94;
+
+    WriteSaveTag(fp, **(const uint32_t *const *)rec);
+    WriteSaveTag(fp, *(const uint32_t *)(rec + 0x04));
+
+    orig_fwrite(rec + 0x08, 4, 1, fp);
+    orig_fwrite(rec + 0x10, 4, 1, fp);
+    orig_fwrite(rec + 0x18, 4, 1, fp);
+    return 1;
+}
+
 /* 0x00428870, one caller -- SaveItems, once per registered object. Writes the
  * common header and then whatever the object's type adds.
  *
@@ -359,8 +399,8 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
     case 1:  if (!SaveType1(fp, obj)) return 0; break;
     case 2:  if (!orig_save_type2(fp, obj)) return 0; break;
     case 3:  if (!orig_save_type3(fp, obj)) return 0; break;
-    case 4:  if (!orig_save_type4(fp, obj)) return 0; break;
-    case 5:  if (!orig_save_type5(fp, obj)) return 0; break;
+    case 4:  if (!SaveType4(fp, obj)) return 0; break;
+    case 5:  if (!SaveType5(fp, obj)) return 0; break;
     case 6:  if (!SaveType6(fp, obj)) return 0; break;
     case 7:  if (!ReturnOne()) return 0; break;   /* the stub; see above */
     case 8:  if (!SaveType8(fp, obj)) return 0; break;
@@ -486,4 +526,6 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE1, (const void *)SaveType1, "SaveType1", 2);
     patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
+    patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);
+    patch_replace(ADDR_SAVE_TYPE5, (const void *)SaveType5, "SaveType5", 1);
 }

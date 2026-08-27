@@ -89,6 +89,8 @@ int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
 int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType6(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType8(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType4(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType5(am2_FILE *fp, void *obj);
 
 void gameproc_install(void);
 

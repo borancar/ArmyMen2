@@ -6052,12 +6052,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SAVE_TYPE1       0x00433D20u
 #define ADDR_SAVE_TYPE2       0x00447130u
 #define ADDR_SAVE_TYPE3       0x0045A070u
-#define ADDR_SAVE_TYPE4       0x0045EF00u
+#define ADDR_SAVE_TYPE4       0x0045EF00u  /* SaveType1 plus three tags */
 #define ADDR_SAVE_TYPE5       0x0043B800u
 #define ADDR_SAVE_TYPE6       0x00422750u
 #define ADDR_SAVE_TYPE8       0x0043CB30u
 #define ADDR_SAVE_ONE_ITEM  0x00428870u  /* int32_t(FILE *, void *obj) */
-/* The load side's own nine, adjacent to their savers -- see the table above.
+/* TWO OF THE SAVERS NORMALISE A POINTER BEFORE WRITING IT, and it is worth
+ * knowing before reading the file. ADDR_SAVE_TYPE2 turns its record's +0x498
+ * from a pointer into `(p - ADDR_OBJ_TABLE_RECORDS) >> 8` -- an index into the
+ * four 256-byte records there -- and ADDR_SAVE_TYPE3 does the same with its
+ * +0x4A0. Both convert IN PLACE and neither converts back, so a saved object
+ * is left holding an index rather than a pointer.
+ *
+ * That is the answer to "the savefile is an oracle once it can ignore
+ * pointers" being only half true: some types already resolve theirs, and only
+ * types 1, 4 and 5 write a raw one.
+ *
+ * The load side's own nine, adjacent to their savers -- see the table above.
  * ADDR_LOAD_ITEM_HEADER fills a 0x94-byte object header on the caller's stack
  * and each loader turns that into a real object, RETURNING it. */
 #define ADDR_LOAD_ITEM_HEADER 0x004289B0u  /* int32_t(FILE *, void *hdr) */
