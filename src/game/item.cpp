@@ -634,6 +634,60 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 #define orig_obj_clear_footprint \
             ((AM2_ObjOnlyFn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
 
+/* Still original: the tail both death handlers share, and the ten-argument
+ * maker. The second was already declared further down this file, so it moved
+ * up here rather than being written a second time -- its fifth argument is a
+ * uid at that other site, which is why it is uint32_t and why this caller
+ * passes a plain 0 rather than inventing a name for it. */
+typedef void (__cdecl *AM2_DiedTailFn)(void *obj, int32_t a);
+typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
+                                      int32_t army, uint32_t uid, int32_t extra,
+                                      int32_t e, int32_t f, int32_t g,
+                                      int32_t h);
+#define orig_trooper_died_tail ((AM2_DiedTailFn)(uintptr_t)ADDR_TROOPER_DIED_TAIL)
+#define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
+
+/* 0x00447E50, one caller -- VehicleDied's twin, and the same first move: take
+ * the object off the map if flag bit 0 is set, then clear it.
+ *
+ * WHAT IT SPAWNS BELONGS TO THE KILLER. `by` is a uid; the army the spawn gets
+ * is that object's OBJ_OFF_ARMY, or AM2_ARMY_NEUTRAL when the uid no longer
+ * resolves. So a kill by someone who has since died is credited to nobody
+ * rather than to the victim -- which is the sort of thing a reconstruction
+ * would quietly get wrong by defaulting to the victim's own army.
+ *
+ * The spawn is gated on OBJ_OFF_FIELD_5A4 being non-zero. orig.h has that
+ * field as "structural until something says what it counts"; this does not
+ * settle it either, but it adds a second reader to ADDR_TYPE2_FIELD5A4_SET's
+ * and both treat it as a permission rather than a quantity.
+ *
+ * The middle argument is read nowhere here and passed straight to the tail --
+ * unlike VehicleDied's, which is read nowhere at all. */
+void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE) {
+        ItemPreDestroyAlias(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
+        const uint8_t *killer = (const uint8_t *)LookupByUID(by);
+        int32_t        army   = killer
+                                ? *(const int8_t *)(killer + OBJ_OFF_ARMY)
+                                : AM2_ARMY_NEUTRAL;
+
+        orig_spawn_at(*(const int16_t *)(o + OBJ_OFF_X),
+                      *(const int16_t *)(o + OBJ_OFF_Y),
+                      AM2_SPAWN_KIND_95, army, 0,
+                      *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4,
+                      0, 0, 0, 0);
+    }
+
+    orig_trooper_died_tail(o, a);
+}
+
 /* 0x0045B630, one caller. A vehicle has died: mark it, hide its second row,
  * clear its footprint and take it off the map.
  *
@@ -2328,12 +2382,7 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
 
 typedef void (__cdecl *AM2_MoveFacingFn)(void *obj, int32_t a, int32_t b,
                                          int32_t c);
-typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
-                                      int32_t army, uint32_t uid, int32_t extra,
-                                      int32_t e, int32_t f, int32_t g,
-                                      int32_t h);
 #define orig_move_along_facing ((AM2_MoveFacingFn)(uintptr_t)ADDR_OBJ_MOVE_ALONG_FACING)
-#define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
 
 /* 0x00433EC0, and the jump table gives it to types 1 AND 4 -- 24.8 million
  * calls between them in one Boot Camp mission, which makes this the
@@ -2555,7 +2604,6 @@ void __cdecl Type2ActionA(void *obj)
 
 typedef void (__cdecl *AM2_TrooperDiedFn)(void *obj, int32_t kind, uint32_t by);
 typedef void (__cdecl *AM2_VehicleDiedFn)(void *obj, uint32_t by);
-#define orig_trooper_died ((AM2_TrooperDiedFn)(uintptr_t)ADDR_TROOPER_DIED)
 
 /* 0x00428450, one caller -- RecvDeath, when the wire says an object died.
  *
@@ -2595,7 +2643,7 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
     *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
 
     switch (*(const int32_t *)o) {
-    case 2:  orig_trooper_died(obj, kind, by); break;
+    case 2:  TrooperDied(obj, kind, by);       break;
     case 3:  VehicleDied(obj, by);             break;
     default:                                   break;
     }
@@ -3025,6 +3073,7 @@ void item_install(void)
     patch_replace(ADDR_OBJ_TILE_CHANGED, (const void *)ObjTileChanged,
                   "ObjTileChanged", 15);
     patch_replace(ADDR_VEHICLE_DIED, (const void *)VehicleDied, "VehicleDied", 1);
+    patch_replace(ADDR_TROOPER_DIED, (const void *)TrooperDied, "TrooperDied", 1);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

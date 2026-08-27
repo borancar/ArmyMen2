@@ -6165,7 +6165,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * establish as trooper and vehicle -- because neither names itself and
  * neither carries a string. Types other than those two get no handler at all;
  * the common tail runs for every type. */
+/* 0x00447E50, one caller. A trooper has died: take it off the map, drop
+ * whatever OBJ_OFF_FIELD_5A4 gates, and hand the rest to the shared tail.
+ *
+ * THE THING IT SPAWNS BELONGS TO THE KILLER. `by` is a uid, and the army the
+ * spawn gets is that object's OBJ_OFF_ARMY -- or 4, the neutral army, when
+ * the uid no longer resolves. So a kill by someone who has since died is
+ * credited to nobody rather than to the victim.
+ *
+ * Its middle argument is passed straight through to the tail at 0x00447EE0
+ * and read nowhere here. */
 #define ADDR_TROOPER_DIED        0x00447E50u  /* void(obj, int32, uint32 by) */
+#define ADDR_TROOPER_DIED_TAIL   0x00447EE0u  /* void(obj, int32), 2 callers */
+#define AM2_SPAWN_KIND_95        0x95     /* what a dead trooper leaves */
+#define AM2_ARMY_NEUTRAL         4
+/* Read at three sites in the trooper band and passed straight through as an
+ * argument, never tested. Same shape and same standing as
+ * ADDR_SPAWN_EXTRA_6622BC. */
+#define ADDR_SPAWN_EXTRA_6628D4  0x006628D4u /* int32_t */
 /* 0x0045B630, one caller. ITS SECOND ARGUMENT IS UNUSED -- the body never
  * reads [esp+0xc] -- and the name kept it because the trooper twin beside it
  * does use one. Reproduced with the parameter present and ignored, since

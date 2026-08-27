@@ -166,6 +166,9 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force);
  * item.cpp. */
 void __cdecl VehicleDied(void *obj, uint32_t by);
 
+/* 0x00447E50. A trooper has died; what it leaves belongs to the KILLER. */
+void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by);
+
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
 void *__cdecl UnitByUid(uint32_t uid);
 
