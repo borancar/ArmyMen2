@@ -5,11 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `74f40f0`. Working tree clean.
+Last updated: **2026-08-27**, at `6530f09`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`ShowMpResult` is reconstructed** (`0x00426A90`), and reading it sharpens
+  the previous entry. **Its argument is a RESULT CODE, not a boolean**: 0 won,
+  1 lost, 2 the host left, and **any other value** leaves the bitmap alone
+  while still doing everything else. `MissionNetworked` only ever passes 0 or
+  1, which is why its inverted flag reads as "lost" there -- it is one value
+  of three.
+
+- Each arm frees the current bitmap **before** loading, so a caller passing an
+  unknown code keeps whatever was on screen rather than being left with
+  nothing. And order matters at the top: pause bits cleared, data directory
+  moved to `"bitmaps"`, and only then the draw target -- the load is relative
+  to that directory.
+
+- **It TAIL-JUMPS to the session reopen**, which makes the end screen also the
+  place the session is handed back. `0x0040FA00` says so itself (`"Set Session
+  Failed to reopen Session"`) and `0x0040FB80` is 48 bytes of `sprintf` into
+  `ADDR_COMM_SEND_PROPERTY`. Both named from their own bodies.
+
+- **The split needed care in both directions.** `MissionNetworked` is flat and
+  `ShowMpResult` is `win32`, so `misc.cpp` declares it locally the way
+  `air.cpp` declares `PlaySoundAt` -- legal because the *signature* names no
+  Win32 type; only the definition is across the split. It needs `extern "C"`,
+  because `frame.h` opens such a block and this is inside it, where
+  `gameproc.cpp`'s `LoadAudioSection` is the opposite case. A selftest stub
+  follows, `misc.cpp` being in that link.
 
 - **`MissionNetworked` is reconstructed** (`0x00421800`), and **the argument it
   passes on is LOST, not won**. Both arms compute a win with `sete` and then
