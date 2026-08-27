@@ -618,7 +618,7 @@ static int16_t ClampHotSpot(int16_t v)
  * path.
  *
  * The hot spot and the two file fields share two dwords, split by AXIS rather
- * than in struct order: x carries {hotX, fileA} and y carries {hotY, fileB}.
+ * than in struct order: x carries {hotX, attachX} and y carries {hotY, attachY}.
  * That is not how the data file packs the same four values -- see sprite.h --
  * and it is a consequence of having only the two resolution fields to put them
  * in. All four are clamped; the archive's are not, because the archive is the
@@ -650,8 +650,8 @@ int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
 
     spr->hotX  = ClampHotSpot((int16_t)x);
     spr->hotY  = ClampHotSpot((int16_t)y);
-    spr->fileA = ClampHotSpot((int16_t)(x >> 16));
-    spr->fileB = ClampHotSpot((int16_t)(y >> 16));
+    spr->attachX = ClampHotSpot((int16_t)(x >> 16));
+    spr->attachY = ClampHotSpot((int16_t)(y >> 16));
 
     merged = (*(const uint32_t *)(rec + BMP_OFF_FLAGS) & 0x1Cu)
              | ((uint32_t)flags & 1u);
@@ -1028,7 +1028,7 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
     /* Both halves of each pair in one four-byte read, as the file stores
      * them and as the original reads them. */
     orig_fread(&spr->hotX, 4, 1, fp);
-    orig_fread(&spr->fileA, 4, 1, fp);
+    orig_fread(&spr->attachX, 4, 1, fp);
 
     orig_fread(&len, 4, 1, fp);
     if (len > 0) {
@@ -1297,9 +1297,9 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
         spr->hotY = w;
 
         orig_fread(&w, 2, 1, fp);
-        spr->fileA = w;
+        spr->attachX = w;
         orig_fread(&w, 2, 1, fp);
-        spr->fileB = w;
+        spr->attachY = w;
 
         /* The image, then the overlay -- each a size and that many bytes, and
          * the overlay only if its size is positive. Neither malloc nor either

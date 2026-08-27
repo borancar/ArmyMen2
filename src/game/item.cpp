@@ -650,6 +650,87 @@ typedef void (__cdecl *AM2_ApplyHeight14Fn)(void *obj, int32_t height);
 #define orig_apply_height_1_4 \
             ((AM2_ApplyHeight14Fn)(uintptr_t)ADDR_APPLY_HEIGHT_1_4)
 
+/* Still original: the teardown PointActionC opens with, and the notify it
+ * ends on. */
+typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
+#define orig_obj_after_move ((AM2_AfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
+typedef void (__cdecl *AM2_ObjOnlyFn2)(void *obj);
+#define orig_item_teardown_early \
+            ((AM2_ObjOnlyFn2)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
+
+/* 0x00428F80, two callers -- adjacent sites in one function. Move an object to
+ * a point and take every one of its rows with it.
+ *
+ * THE SECONDARY ROWS ARE OFFSET BY THE FIRST SPRITE'S attachX AND attachY, and
+ * that is what identifies those two fields. sprite.h had them as fileA and
+ * fileB with "what they MEAN is still not established"; this adds them to rows
+ * 1..n as an X and a Y, so they are where an attached row sits relative to the
+ * one carrying the sprite. A turret on its body. One reader, but an
+ * unambiguous one, and the fields are renamed for it.
+ *
+ * A NULL SPRITE ON ROW 0 ABANDONS THE WHOLE FUNCTION rather than just the row
+ * loop -- the branch goes to the epilogue, so ObjTileChanged and the notify
+ * are skipped as well. The object has already been moved by then, so it ends
+ * up at the new position with its map registration not brought up to date.
+ * Reproduced.
+ *
+ * The row count is re-read at every one of the four places it is tested, and
+ * the first sprite is re-read inside the loop through a held pointer to the
+ * field rather than a copy of it. Both are the original's shape.
+ *
+ * The row-1 offsets are added as 16-BIT arithmetic, on top of a position that
+ * was just written as a dword -- so an attach offset that carries out of the
+ * low half lands in the row's Y rather than wrapping its X. */
+void __cdecl PointActionC(void *obj, uint32_t point)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *rows;
+    int32_t  i;
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 0)
+        return;
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    orig_item_teardown_early(o);
+
+    *(uint32_t *)(o + OBJ_OFF_POS)      = point;
+    *(uint32_t *)(rows + ROW_OFF_X)     = point;
+    RowUpdate(rows, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 1)
+        goto done;
+
+    if (!*(void *const *)(rows + ROW_OFF_SPRITE))
+        return;                    /* the whole function, not just the loop */
+
+    *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    *(int16_t *)(rows + ROW_OFF_Y_ADJUST) =
+        *(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST);
+
+    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t *r   = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+        uint8_t *spr;
+
+        *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+        spr = *(uint8_t **)(rows + ROW_OFF_SPRITE);
+        *(int16_t *)(r + ROW_OFF_X) =
+            (int16_t)(*(const int16_t *)(r + ROW_OFF_X)
+                      + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));
+        spr = *(uint8_t **)(rows + ROW_OFF_SPRITE);
+        *(int16_t *)(r + ROW_OFF_Y) =
+            (int16_t)(*(const int16_t *)(r + ROW_OFF_Y)
+                      + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
+
+        RowUpdate(r, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+done:
+    ObjTileChanged(o, 0, 0);
+    orig_obj_after_move(o, 1, 0);
+}
+
 /* 0x004278E0, four callers -- ObjTileChanged's tail among them. Give an object
  * a height and push it into the depth sort.
  *
@@ -3142,6 +3223,8 @@ void item_install(void)
     patch_replace(ADDR_TROOPER_DIED, (const void *)TrooperDied, "TrooperDied", 1);
     patch_replace(ADDR_APPLY_OBJ_HEIGHT, (const void *)ApplyObjHeight,
                   "ApplyObjHeight", 4);
+    patch_replace(ADDR_POINT_ACTION_C, (const void *)PointActionC,
+                  "PointActionC", 2);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

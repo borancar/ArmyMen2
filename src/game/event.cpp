@@ -944,7 +944,6 @@ typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
 typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
                                                              int32_t i);
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
-#define orig_point_action_c (*(AM2_PointActionFn)AM2_IMAGE(ADDR_POINT_ACTION_C))
 typedef void (__cdecl *AM2_ByRefAFn)(int32_t *slot, int32_t b, int32_t c);
 typedef void (__cdecl *AM2_ByRefBFn)(int32_t *slot, int32_t b, int32_t c,
                                      int32_t d, int32_t e);
@@ -1208,7 +1207,7 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
         uint16_t y = *(const uint16_t *)(obj + OBJ_OFF_Y)
                    + (uint16_t)(point >> 16);
 
-        orig_point_action_c(obj, (uint32_t)x | ((uint32_t)y << 16));
+        PointActionC(obj, (uint32_t)x | ((uint32_t)y << 16));
         return;
     }
 
@@ -1216,7 +1215,7 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
         && *(const uint16_t *)(obj + OBJ_OFF_Y) == (uint16_t)(point >> 16))
         return;
 
-    orig_point_action_c(obj, point);
+    PointActionC(obj, point);
 }
 
 /* 0x0041F7F0. The "On" wrapper for EvtAtPointC, and the third of that shape:

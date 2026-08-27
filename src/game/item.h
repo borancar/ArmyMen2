@@ -173,6 +173,10 @@ void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by);
  * height means "take the tile's own"; see item.cpp. */
 void __cdecl ApplyObjHeight(void *obj, int32_t height);
 
+/* 0x00428F80. Move an object to a point, taking every one of its rows with
+ * it. The secondary rows are offset by the first sprite's attach point. */
+void __cdecl PointActionC(void *obj, uint32_t point);
+
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
 void *__cdecl UnitByUid(uint32_t uid);
 

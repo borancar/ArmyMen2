@@ -45,13 +45,20 @@ typedef struct AM2_Sprite {
     AM2_Rect bounds;             /* +0x14 .. +0x23 */
     int16_t  hotX;               /* +0x24, subtracted from the draw position */
     int16_t  hotY;               /* +0x26 */
-    /* fileA and fileB are the OTHER half of the same two dwords the hot spot
-     * comes out of. The data file stores {hotX, hotY} then {fileA, fileB};
-     * the bitmap path stores {hotX, fileA} and {hotY, fileB}, because it has
-     * only biXPelsPerMeter and biYPelsPerMeter to smuggle them through and
-     * splits them by axis. What they MEAN is still not established. */
-    int16_t  fileA;              /* +0x28 */
-    int16_t  fileB;              /* +0x2A */
+    /* attachX and attachY are the OTHER half of the same two dwords the hot
+     * spot comes out of. The data file stores {hotX, hotY} then this pair;
+     * the bitmap path stores {hotX, attachX} and {hotY, attachY}, because it
+     * has only biXPelsPerMeter and biYPelsPerMeter to smuggle them through
+     * and splits them by axis.
+     *
+     * They were fileA and fileB, "what they MEAN is still not established",
+     * until PointActionC turned up as a reader: it moves an object to a point
+     * and then offsets every row AFTER the first by exactly these two, as an
+     * X and a Y. So they are where an attached row sits relative to the one
+     * carrying this sprite -- a turret on its body. One reader, but an
+     * unambiguous one. */
+    int16_t  attachX;            /* +0x28 */
+    int16_t  attachY;            /* +0x2A */
     uint8_t  keyIndex;           /* +0x2C  the transparent palette index, out
                                   *        of the bitmap record's BMP_OFF_KEY.
                                   *        Was called pad2C; it is not pad. */

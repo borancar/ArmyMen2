@@ -546,14 +546,14 @@
 /* The two dwords MakeBitmap copies straight out of the DIB header, from
  * biXPelsPerMeter and biYPelsPerMeter -- which is where this game's tools
  * smuggle the hot spot. Each packs two int16: the low half is the hot spot and
- * the high half is the field AM2_Sprite calls fileA/fileB. Confirmed against
+ * the high half is the field AM2_Sprite calls attachX/attachY. Confirmed against
  * the shipped bitmaps, which carry a REAL resolution there (2834 for 72 dpi,
  * 5038 for 128), so the +/-2048 clamp in SpriteReloadNamed fires on every one
  * of them and the hot spot comes out (0,0). Firing is measured; MATTERING is
  * not -- deleting the clamp changes no pixel of the one configuration that
  * runs the code. See the note there. */
-#define BMP_OFF_HOT_X        0x0Cu   /* {hotX, fileA} */
-#define BMP_OFF_HOT_Y        0x10u   /* {hotY, fileB} */
+#define BMP_OFF_HOT_X        0x0Cu   /* {hotX, attachX} */
+#define BMP_OFF_HOT_Y        0x10u   /* {hotY, attachY} */
 #define BMP_OFF_FLAGS        0x14u
 #define BMP_OFF_KEY          0x18u   /* in: byte count, out: transparent index */
 #define AM2_BMP_RECORD_SIZE  0x1Cu
@@ -3145,7 +3145,22 @@ typedef struct {
 #define ADDR_BY_REF_ACTION_A     0x00462000u  /* void(int32_t *, int32, int32) */
 #define ADDR_BY_REF_ACTION_B     0x00462080u  /* void(int32_t *,0,0,0,int32) */
 #define ADDR_POINT_ACTION_A      0x004582F0u  /* void(obj, point) */
-#define ADDR_POINT_ACTION_C      0x00428F80u  /* void(obj, point) */
+/* 0x00428F80, two callers -- adjacent sites in one function. Move an object
+ * to a point, taking every one of its rows with it.
+ *
+ * THE SECONDARY ROWS ARE OFFSET BY THE FIRST SPRITE'S +0x28 AND +0x2A, which
+ * is what those two fields are for: sprite.h had them as fileA and fileB,
+ * "what they MEAN is still not established", and this adds them to rows 1..n
+ * as an X and a Y. An attachment offset -- where a turret sits on its body.
+ *
+ * A NULL SPRITE ON ROW 0 ABANDONS THE WHOLE FUNCTION, not just the row loop:
+ * the branch goes to the epilogue, so ObjTileChanged and the notify below it
+ * are skipped too. The object has already been moved by then. */
+#define ADDR_POINT_ACTION_C      0x00428F80u  /* void(obj, AM2_Point) */
+#define ADDR_OBJ_AFTER_MOVE      0x00439000u  /* void(obj, int32, int32) */
+#define OBJ_OFF_ROW0_Y_ADJUST    0x42u  /* int16, copied to ROW_OFF_Y_ADJUST */
+#define SPRITE_OFF_ATTACH_X      0x28u  /* int16, AM2_Sprite::attachX */
+#define SPRITE_OFF_ATTACH_Y      0x2Au  /* int16, AM2_Sprite::attachY */
 #define OBJ_OFF_X                0x12u
 #define OBJ_OFF_Y                0x14u
 /* 26 callers, and suppressed when the multiplayer session flag is set and the
