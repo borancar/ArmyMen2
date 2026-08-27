@@ -239,15 +239,88 @@ void __cdecl ShowInfoMp(void)
     *on = (*on == 0) ? 1 : 0;
 }
 
+#define kItemHeaderSize (*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE)
+
 typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
-#define orig_save_item_header ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_ITEM_HEADER)
-#define orig_save_type1       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE1)
 #define orig_save_type2       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE2)
 #define orig_save_type3       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE3)
 #define orig_save_type4       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE4)
 #define orig_save_type5       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE5)
-#define orig_save_type6       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE6)
-#define orig_save_type8       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE8)
+
+/* 0x00428730 and 0x004289B0 -- the two halves of the object HEADER, and the
+ * pair that makes the whole family agree with itself.
+ *
+ * The size is ADDR_ITEM_HEADER_SIZE, a global set to 0x68 by 0x00427640 and
+ * written nowhere else. Both sides read it, so neither can be given a literal
+ * that drifts from the other. Every per-type saver and loader below reads the
+ * same global for its own header step.
+ *
+ * ONLY THE SAVE SIDE WRITES A TAG. The load side does not check one, so the
+ * tag before an item header is a marker for a reader walking the file rather
+ * than something the game verifies -- unlike the lengths CheckSaveTag guards.
+ *
+ * Neither checks fwrite or fread. Both return 1 unconditionally, so a
+ * truncated file reads as a successful load of whatever was in the buffer;
+ * SaveOneItem's careful per-step checking has nothing to check here.
+ */
+int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj)
+{
+    WriteSaveTag(fp, AM2_ITEM_HEADER_TAG);
+    orig_fwrite(obj, (size_t)kItemHeaderSize, 1, fp);
+    return 1;
+}
+
+int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr)
+{
+    orig_fread(hdr, (size_t)kItemHeaderSize, 1, fp);
+    return 1;
+}
+
+/* 0x00433D20, 0x00422750 and 0x0043CB30 -- three of the eight per-type
+ * savers, and the three that are nothing but a write.
+ *
+ * All three write from OBJ_OFF_FIELD_94, which is what settles what that
+ * field is: the object's TYPE-SPECIFIC RECORD, saved whole. The sizes are
+ * literals in the savers rather than a table -- 0x2C for type 1, 0x28 for
+ * type 6, 0x4CC for type 8 -- so the record grows by an order of magnitude
+ * between an item and a roach.
+ *
+ * TYPE 1 WRITES A SECOND TAG and the other two do not. Its record opens with
+ * a POINTER -- ADDR_STEP_TYPE1_4 dereferences the same field -- and the tag
+ * is that pointee's +8, written after the record that contains the pointer.
+ * So the file carries a raw pointer AND a value read through it, which is
+ * exactly why CLAUDE.md calls the savefile an oracle only once it can ignore
+ * pointers.
+ *
+ * TYPE 8 IS THE ONLY ONE THAT CHECKS ITS OBJECT, and it answers 0 for a null
+ * where the other two would fault. Reproduced; nothing says why it is the one
+ * that guards.
+ */
+int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
+{
+    uint8_t *rec = (uint8_t *)obj + OBJ_OFF_FIELD_94;
+
+    orig_fwrite(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
+    WriteSaveTag(fp, *(const uint32_t *)(*(uint8_t *const *)rec + 8));
+    return 1;
+}
+
+int32_t __cdecl SaveType6(am2_FILE *fp, void *obj)
+{
+    orig_fwrite((uint8_t *)obj + OBJ_OFF_FIELD_94,
+                AM2_TYPE6_RECORD_SIZE, 1, fp);
+    return 1;
+}
+
+int32_t __cdecl SaveType8(am2_FILE *fp, void *obj)
+{
+    if (!obj)
+        return 0;
+
+    orig_fwrite((uint8_t *)obj + OBJ_OFF_FIELD_94,
+                AM2_TYPE8_RECORD_SIZE, 1, fp);
+    return 1;
+}
 
 /* 0x00428870, one caller -- SaveItems, once per registered object. Writes the
  * common header and then whatever the object's type adds.
@@ -279,18 +352,18 @@ typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
  * suite saves. */
 int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
 {
-    if (!orig_save_item_header(fp, obj))
+    if (!SaveItemHeader(fp, obj))
         return 0;
 
     switch (*(const int32_t *)obj) {
-    case 1:  if (!orig_save_type1(fp, obj)) return 0; break;
+    case 1:  if (!SaveType1(fp, obj)) return 0; break;
     case 2:  if (!orig_save_type2(fp, obj)) return 0; break;
     case 3:  if (!orig_save_type3(fp, obj)) return 0; break;
     case 4:  if (!orig_save_type4(fp, obj)) return 0; break;
     case 5:  if (!orig_save_type5(fp, obj)) return 0; break;
-    case 6:  if (!orig_save_type6(fp, obj)) return 0; break;
+    case 6:  if (!SaveType6(fp, obj)) return 0; break;
     case 7:  if (!ReturnOne()) return 0; break;   /* the stub; see above */
-    case 8:  if (!orig_save_type8(fp, obj)) return 0; break;
+    case 8:  if (!SaveType8(fp, obj)) return 0; break;
     default: break;          /* unknown type: header only, and NOT an error */
     }
     return 1;
@@ -300,7 +373,6 @@ typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
 typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
-#define orig_load_item_header ((AM2_LoadHdrFn)(uintptr_t)ADDR_LOAD_ITEM_HEADER)
 #define orig_load_type1  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE1)
 #define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
 #define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
@@ -347,7 +419,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     uint8_t *made = NULL;
     uint32_t footprint;
 
-    if (!orig_load_item_header(fp, hdr))
+    if (!LoadItemHeader(fp, hdr))
         return NULL;
 
     footprint = *(const uint32_t *)(hdr + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON;
@@ -407,4 +479,11 @@ void gameproc_install(void)
     patch_replace(ADDR_SHOW_INFO_MP, (const void *)ShowInfoMp, "ShowInfoMp", 0);
     patch_replace(ADDR_SAVE_ONE_ITEM, (const void *)SaveOneItem, "SaveOneItem", 1);
     patch_replace(ADDR_LOAD_ONE_ITEM, (const void *)LoadOneItem, "LoadOneItem", 1);
+    patch_replace(ADDR_SAVE_ITEM_HEADER, (const void *)SaveItemHeader,
+                  "SaveItemHeader", 1);
+    patch_replace(ADDR_LOAD_ITEM_HEADER, (const void *)LoadItemHeader,
+                  "LoadItemHeader", 1);
+    patch_replace(ADDR_SAVE_TYPE1, (const void *)SaveType1, "SaveType1", 2);
+    patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);
+    patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
 }

@@ -6031,6 +6031,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * TYPE 7 SAVES NOTHING. Its arm calls ADDR_RETURN_ONE -- a shared `return 1`
  * -- rather than being special-cased out of the switch, which is why there
  * are eight arms and not seven. */
+/* How many bytes of an object the header is, and it is a GLOBAL rather than a
+ * constant: 0x00427640 sets it to 0x68 and nothing else writes it. Every saver
+ * and loader in the family below reads it, which is what makes the two sides
+ * agree by construction rather than by both spelling the same literal.
+ *
+ * The type-specific record starts at OBJ_OFF_FIELD_94, so 0x68..0x93 is saved
+ * by neither half. Stated rather than smoothed over; what lives there is not
+ * established. */
+#define ADDR_ITEM_HEADER_SIZE 0x0051307Cu  /* int32_t, 0x68 */
+#define ADDR_SET_ITEM_HEADER_SIZE 0x00427640u /* void(void) */
+/* The per-type records, all at OBJ_OFF_FIELD_94 and each saved whole. The
+ * sizes are literals in their own savers -- there is no table -- so this is
+ * where they are collected. */
+#define AM2_TYPE1_RECORD_SIZE 0x2Cu
+#define AM2_TYPE6_RECORD_SIZE 0x28u
+#define AM2_TYPE8_RECORD_SIZE 0x4CCu
+#define AM2_ITEM_HEADER_TAG   0x6660000u
 #define ADDR_SAVE_ITEM_HEADER 0x00428730u  /* int32_t(FILE *, obj) */
 #define ADDR_SAVE_TYPE1       0x00433D20u
 #define ADDR_SAVE_TYPE2       0x00447130u

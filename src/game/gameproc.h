@@ -82,6 +82,14 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj);
  * bit is cleared unconditionally. */
 void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
 
+/* The object header's two halves and three of the eight per-type savers, all
+ * writing from OBJ_OFF_FIELD_94. See gameproc.cpp. */
+int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj);
+int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
+int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType6(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType8(am2_FILE *fp, void *obj);
+
 void gameproc_install(void);
 
 #ifdef __cplusplus
