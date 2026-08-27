@@ -5740,7 +5740,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SAVE_TYPE6       0x00422750u
 #define ADDR_SAVE_TYPE8       0x0043CB30u
 #define ADDR_SAVE_ONE_ITEM  0x00428870u  /* int32_t(FILE *, void *obj) */
-#define ADDR_LOAD_ONE_ITEM  0x004289E0u  /* void(FILE *, int32_t) */
+/* The load side's own nine, adjacent to their savers -- see the table above.
+ * ADDR_LOAD_ITEM_HEADER fills a 0x94-byte object header on the caller's stack
+ * and each loader turns that into a real object, RETURNING it. */
+#define ADDR_LOAD_ITEM_HEADER 0x004289B0u  /* int32_t(FILE *, void *hdr) */
+#define ADDR_LOAD_TYPE1       0x00433D60u
+#define ADDR_LOAD_TYPE2       0x004471D0u  /* takes a THIRD argument */
+#define ADDR_LOAD_TYPE3       0x0045A120u
+#define ADDR_LOAD_TYPE4       0x0045EF50u
+#define ADDR_LOAD_TYPE5       0x0043B870u
+#define ADDR_LOAD_TYPE6       0x00422780u
+#define ADDR_LOAD_TYPE7       0x00435500u
+#define ADDR_LOAD_TYPE8       0x0043CB60u
+/* 0x004278E0, given the object and its OBJ_OFF_HEIGHT_SET byte. */
+#define ADDR_APPLY_OBJ_HEIGHT 0x004278E0u  /* void(obj, int32_t height) */
+#define AM2_ITEM_HEADER_BYTES 0x94u
+/* It RETURNS THE OBJECT, not a flag -- this said void. */
+#define ADDR_LOAD_ONE_ITEM  0x004289E0u  /* void *(FILE *, int32_t) */
 #define ADDR_ITEMS_RESET    0x00429450u  /* void(void) */
 
 #define AM2_SAVE_TAG_ITEMS  0x06660007u  /* opens the section */

@@ -296,6 +296,95 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
     return 1;
 }
 
+typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
+typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
+typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
+typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
+#define orig_load_item_header ((AM2_LoadHdrFn)(uintptr_t)ADDR_LOAD_ITEM_HEADER)
+#define orig_load_type1  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE1)
+#define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
+#define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
+#define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
+#define orig_load_type5  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE5)
+#define orig_load_type6  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE6)
+#define orig_load_type7  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE7)
+#define orig_load_type8  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE8)
+#define orig_apply_obj_height ((AM2_ApplyHeightFn)(uintptr_t)ADDR_APPLY_OBJ_HEIGHT)
+
+/* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
+ * hands it to the type's loader, which builds the object and RETURNS it.
+ *
+ * IT RETURNS THE OBJECT, NOT A FLAG. orig.h said `void`; every exit answers
+ * either the created object or NULL, and the failure exits get their NULL by
+ * falling out with the loader's own return value still in place.
+ *
+ * THE FOOTPRINT BIT MAKES A ROUND TRIP AROUND CONSTRUCTION. Bit 0x200000 is
+ * taken out of the header's flags and CLEARED before the loader sees them,
+ * then put back on the finished object -- set or cleared to match what was
+ * saved. Constructing with it set would presumably stamp a footprint into the
+ * map that the load has not placed yet; whatever the reason, the order is the
+ * point and a reconstruction that simply copied the flags through would be
+ * wrong only for objects that have it.
+ *
+ * THEN THE SELECTED BIT IS CLEARED UNCONDITIONALLY, in a second write to the
+ * same field. A loaded object never comes back selected, however it was saved.
+ * Two writes to flags in three instructions, and they are doing different
+ * jobs.
+ *
+ * TYPE 2 TAKES A THIRD ARGUMENT and the other seven do not -- the caller's own
+ * second parameter, passed through. That asymmetry is in the dispatch, not in
+ * the loaders, so it cannot be tidied into a common signature.
+ *
+ * An unknown type falls through to the common tail like SaveOneItem does, but
+ * with no object made -- so it dereferences NULL. SaveOneItem's equivalent
+ * path is harmless; this one is not. The original does not guard it and
+ * neither does this: LoadItems only ever feeds it types it has just written.
+ *
+ * VERIFIED BY READING. Nothing in the suite loads a savegame. */
+void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
+{
+    uint8_t  hdr[AM2_ITEM_HEADER_BYTES];
+    uint8_t *made = NULL;
+    uint32_t footprint;
+
+    if (!orig_load_item_header(fp, hdr))
+        return NULL;
+
+    footprint = *(const uint32_t *)(hdr + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON;
+    *(uint32_t *)(hdr + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+
+    switch (*(const int32_t *)hdr) {
+    case 1:  made = (uint8_t *)orig_load_type1(fp, hdr);      break;
+    case 2:  made = (uint8_t *)orig_load_type2(fp, hdr, arg); break;
+    case 3:  made = (uint8_t *)orig_load_type3(fp, hdr);      break;
+    case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
+    case 5:  made = (uint8_t *)orig_load_type5(fp, hdr);      break;
+    case 6:  made = (uint8_t *)orig_load_type6(fp, hdr);      break;
+    case 7:  made = (uint8_t *)orig_load_type7(fp, hdr);      break;
+    case 8:  made = (uint8_t *)orig_load_type8(fp, hdr);      break;
+    default: break;
+    }
+    if (!made)
+        return NULL;
+
+    {
+        uint32_t flags = *(const uint32_t *)(made + OBJ_OFF_FLAGS);
+
+        if (footprint)
+            flags |= OBJ_FLAG_FOOTPRINT_ON;
+        else
+            flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+        *(uint32_t *)(made + OBJ_OFF_FLAGS) = flags;
+
+        *(uint32_t *)(made + OBJ_OFF_FLAGS) =
+            flags & ~(uint32_t)OBJ_FLAG_SELECTED;
+    }
+
+    orig_apply_obj_height(made,
+                          (int32_t)*(const int8_t *)(made + OBJ_OFF_HEIGHT_SET));
+    return made;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
@@ -317,4 +406,5 @@ void gameproc_install(void)
                   "StateLeaveAlias", 0);
     patch_replace(ADDR_SHOW_INFO_MP, (const void *)ShowInfoMp, "ShowInfoMp", 0);
     patch_replace(ADDR_SAVE_ONE_ITEM, (const void *)SaveOneItem, "SaveOneItem", 1);
+    patch_replace(ADDR_LOAD_ONE_ITEM, (const void *)LoadOneItem, "LoadOneItem", 1);
 }

@@ -110,7 +110,6 @@ typedef void (__cdecl *am2_save_one_fn)(am2_FILE *fp, void *obj);
 typedef void (__cdecl *am2_load_one_fn)(am2_FILE *fp, int32_t flag);
 typedef void (__cdecl *am2_void_fn)(void);
 
-#define orig_load_one_item (*(am2_load_one_fn)ADDR_LOAD_ONE_ITEM)
 
 /* 0x00429450. The object registry's teardown: FreeItem every entry, free the
  * array, and clear all three fields of the {capacity, count, table} record.
@@ -183,7 +182,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
 
     orig_fread(&mark, 4, 1, fp);
     while (mark == AM2_SAVE_RECORD_MARK) {
-        orig_load_one_item(fp, 0);
+        LoadOneItem(fp, 0);
         count++;
         orig_fread(&mark, 4, 1, fp);
     }

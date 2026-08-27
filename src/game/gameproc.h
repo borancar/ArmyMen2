@@ -77,6 +77,11 @@ void __cdecl ShowInfoMp(void);
  * header-only and NOT an error; type 7 saves nothing type-specific. */
 int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj);
 
+/* 0x004289E0. Reads a header and builds the object, RETURNING it -- not a
+ * flag. The footprint bit round-trips around construction and the selected
+ * bit is cleared unconditionally. */
+void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
+
 void gameproc_install(void);
 
 #ifdef __cplusplus
