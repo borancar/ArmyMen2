@@ -461,6 +461,59 @@ typedef void *(__cdecl *AM2_MakeKind7Fn)(uint32_t pt, int32_t a, int32_t army,
                                          int32_t b, int32_t c, int32_t d);
 #define orig_make_kind7 ((AM2_MakeKind7Fn)(uintptr_t)ADDR_MAKE_KIND7)
 
+/* Still original: the ten-argument maker, declared here as item.cpp declares
+ * it -- same address, same shape, and the two modules are not each other's
+ * headers. */
+typedef void *(__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
+                                       int32_t army, uint32_t uid,
+                                       int32_t extra, int32_t e, int32_t f,
+                                       int32_t g, int32_t h);
+#define orig_spawn_at ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
+
+/* 0x00422780, one caller. The type 6 loader.
+ *
+ * IT MAKES THE OBJECT OUT OF THE RECORD AND THEN OVERWRITES IT WITH THE SAME
+ * RECORD. The 0x28 bytes are read onto the stack, three of their fields go to
+ * ADDR_SPAWN_AT as the kind, the uid and one more, and the whole record is
+ * then copied to OBJ_OFF_FIELD_94 -- so whatever the maker derived from those
+ * three is replaced by the saved values a moment later. Reproduced; the two
+ * are the same numbers unless the maker changes them.
+ *
+ * The POSITION and the ARMY come from the header rather than the record, as
+ * they do in LoadType7 -- the header is the part every type shares.
+ *
+ * The header copy happens BEFORE the record copy and they do not overlap: the
+ * header is ADDR_ITEM_HEADER_SIZE bytes at 0x68 and the record starts at 0x94.
+ * The 0x68..0x93 gap the save side leaves unwritten is left untouched here
+ * too, so a loaded object carries whatever the maker put there.
+ *
+ * NO ERROR CHECKING ANYWHERE. The fread is unchecked and so is the maker's
+ * answer, so a truncated file or an exhausted object table walks straight into
+ * a null dereference. That is the original's, and SaveOneItem's careful
+ * per-step checking has no counterpart on this side of the format.
+ */
+void *__cdecl LoadType6(am2_FILE *fp, const void *hdr)
+{
+    const uint8_t *h = (const uint8_t *)hdr;
+    uint8_t        rec[AM2_TYPE6_RECORD_SIZE];
+    uint8_t       *made;
+
+    orig_fread(rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
+
+    made = (uint8_t *)orig_spawn_at(
+               *(const int16_t *)(h + OBJ_OFF_POS),
+               *(const int16_t *)(h + OBJ_OFF_POS + 2),
+               *(const int32_t *)(rec + TYPE6_REC_OFF_KIND),
+               *(const int8_t *)(h + OBJ_OFF_ARMY),
+               *(const uint32_t *)(rec + TYPE6_REC_OFF_UID),
+               *(const int32_t *)(rec + TYPE6_REC_OFF_EXTRA),
+               0, 1, *(const int32_t *)(h + 4), 0);
+
+    memcpy(made, h, (size_t)kItemHeaderSize);
+    memcpy(made + OBJ_OFF_FIELD_94, rec, AM2_TYPE6_RECORD_SIZE);
+    return made;
+}
+
 /* 0x00435500, one caller. The type 7 loader, and the shortest of the nine.
  *
  * IT DOES NOT READ THE FILE AT ALL. Every other loader in the family starts
@@ -550,7 +603,6 @@ typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
 #define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
 #define orig_load_type5  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE5)
-#define orig_load_type6  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE6)
 #define orig_load_type8  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE8)
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
@@ -601,7 +653,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     case 3:  made = (uint8_t *)orig_load_type3(fp, hdr);      break;
     case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
     case 5:  made = (uint8_t *)orig_load_type5(fp, hdr);      break;
-    case 6:  made = (uint8_t *)orig_load_type6(fp, hdr);      break;
+    case 6:  made = (uint8_t *)LoadType6(fp, hdr);      break;
     case 7:  made = (uint8_t *)LoadType7(fp, hdr);            break;
     case 8:  made = (uint8_t *)orig_load_type8(fp, hdr);      break;
     default: break;
@@ -661,4 +713,5 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE2, (const void *)SaveType2, "SaveType2", 1);
     patch_replace(ADDR_SAVE_TYPE3, (const void *)SaveType3, "SaveType3", 1);
     patch_replace(ADDR_LOAD_TYPE7, (const void *)LoadType7, "LoadType7", 1);
+    patch_replace(ADDR_LOAD_TYPE6, (const void *)LoadType6, "LoadType6", 1);
 }

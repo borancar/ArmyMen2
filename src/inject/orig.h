@@ -6131,6 +6131,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_TYPE8_RECORD_SIZE 0x4CCu
 #define AM2_TYPE2_RECORD_SIZE 0x53Cu
 #define AM2_TYPE3_RECORD_SIZE 0x548u
+/* Three fields of the type 6 record that LoadType6 hands to ADDR_SPAWN_AT
+ * before it copies the record in -- so the object is MADE from them and then
+ * overwritten by them. Named for the argument each becomes. */
+#define TYPE6_REC_OFF_KIND    0x00u
+#define TYPE6_REC_OFF_EXTRA   0x04u
+#define TYPE6_REC_OFF_UID     0x24u
 #define AM2_ITEM_HEADER_TAG   0x6660000u
 #define ADDR_SAVE_ITEM_HEADER 0x00428730u  /* int32_t(FILE *, obj) */
 #define ADDR_SAVE_TYPE1       0x00433D20u
