@@ -5,11 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `4f0e5e3`. Working tree clean.
+Last updated: **2026-08-27**, at `557a7be`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **RESOLVED: `OBJ_OFF_MP_ROLE` is a SOLDIER KIND.** It was recorded three
+  commits ago as "probably" one, with the evidence and with what stopped it
+  being a rename. `SetSoldierKind` (`0x00449570`) is the witness that removes
+  the doubt: the value it stores is the same value it uses to index
+  `ADDR_SOLDIER_ANIMS`, and it hangs that entry off the object's first row as
+  the animation set. Renamed across ten sites to `OBJ_OFF_SOLDIER_KIND`.
+
+  "MP role" came from the one comparison anything makes, `== 7`. That reading
+  is still true -- 7 is simply one *kind* of soldier, and this function gives
+  it a random name and half again its maximum health, which is what a special
+  unit looks like.
+
+- **The animation guard reads one field and writes another**, four bytes
+  apart: it compares `ROW_OFF_ANIM_CUR` and stores into `ROW_OFF_ANIM_NEXT`.
+  Reading them as one field would make the guard compare against what it had
+  just written, and the swap would never be skipped.
+
+- **The frame has THREE cases, not two.** Live with a weapon takes the pose
+  table's entry; live *without* one takes frame 1; **dead** takes the frame
+  the row already had -- a no-change that still goes through the setter, so
+  the force flag is the only reason it does anything.
+
+- **The alias ratchet improved the result.** Two offsets I was about to name
+  structurally already had better names -- `OBJ_OFF_MAX_HEALTH` and
+  `OBJ_OFF_SUBRECORD` -- and `checkoffsets` refused the second spelling. The
+  first is what makes the kind 7 line legible: the 1.5x applies to the unit's
+  **maximum** health, not to what it currently has.
 
 - **`Substate34Escape` is reconstructed AND DRIVEN IN BOTH ARMS** --
   `0x00425DA0`, the sub-state table's arm 34, which CLAUDE.md records ordinary
