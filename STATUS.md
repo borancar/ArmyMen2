@@ -5,35 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `bc04178`. Working tree clean.
+Last updated: **2026-08-27**, at `6924f57`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`SaveType4` and `SaveType5`** (`0x0045EF00`, `0x0043B800`). 937 patches;
-  seven of the save family are ours.
+- **`LoadType7` and `VehicleDied`** (`0x00435500`, `0x0045B630`). 939 patches;
+  eight of the save/load family are ours.
 
-- **Type 4 is type 1 plus three tags** -- it calls `SaveType1` outright and
-  gives up if that fails, the only saver that delegates to another. So types 1
-  and 4 share a layout for the first `0x2C` bytes, the same pairing
-  `ADDR_STEP_TYPE1_4` shows on the frame-stepping side.
+- **Type 7's loader does not read the file at all.** Every other loader starts
+  with an `fread` of its type's record; this one takes what it needs from the
+  header `LoadItemHeader` already read. Type 7 is also the only type whose
+  *save* side writes nothing -- its arm is the shared `return 1`. The pair is
+  consistent, which is worth checking rather than assuming when a saver looks
+  like a stub.
 
-- **Type 5 writes five fields and skips two**: three separate four-byte
-  `fwrite`s at `+0x08`, `+0x10` and `+0x18` where one of twenty bytes would do,
-  so the gaps at `+0x0C` and `+0x14` are deliberate rather than a stride.
+- **`VehicleDied`'s second argument is unused.** Reproduced with the parameter
+  present and ignored; the trooper twin does use one. The row it hides is the
+  *second*, and only when `rowCount > 1`. The unregister is conditional on flag
+  bit 0 and clears it, so a vehicle that dies twice comes off the map once --
+  the idempotence is the flag's, not the caller's.
 
-- **Reading the two I did not take changed something this project believes.**
-  `SaveType2` and `SaveType3` **normalise a pointer before writing it** --
-  each turns one record field into `(p - ADDR_OBJ_TABLE_RECORDS) >> 8`, an
-  index into the four 256-byte records there. Both convert *in place* and
-  neither converts back, so a saved object is left holding an index.
+- **Three ratchets fired on one commit and every one was right.** `0x00429CE0`
+  and `0x0045A770` already had names and I invented a second for each in the
+  same edit; `+0x40` already had `OBJ_OFF_FACING`, which is better than the
+  `OBJ_OFF_FIELD_40` I was about to add; and `checkseams` asked for the direct
+  call to `VehicleDied` the moment it was patched.
 
-  That makes "the savefile is an oracle once it can ignore pointers" only half
-  true, and the half it gets wrong is the useful one: some types already
-  resolve theirs, and only 1, 4 and 5 write a raw pointer. Recorded in `orig.h`
-  beside the family rather than left for whoever writes the oracle to
-  rediscover.
+- Recorded rather than explained: the footprint clear is also `SaveType3`'s
+  opening call. A *save* function clearing a footprint is not what either name
+  suggests, and nothing read so far says why.
 
 ## Next
 
