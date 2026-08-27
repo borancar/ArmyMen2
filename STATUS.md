@@ -5,33 +5,31 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `fc03883`. Working tree clean.
+Last updated: **2026-08-27**, at `bcbb92c`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`ApplyObjHeight`** (`0x004278E0`, four callers -- `ObjTileChanged`'s tail
-  among them). 943 patches, two `orig_` seams closed.
+- **`RowSetSprite`** (`0x0041D3D0`, three callers). 944 patches, and the seam
+  `RowFaceSprite` opened closes with it -- every callee here was already ours,
+  so this goes from a 176-byte hole in the middle of our code to the last piece
+  of that path.
 
-- **A zero height means "take the tile's own"**, read through
-  `ADDR_TILE_ATTRS`. So 0 is not a height, it is a request -- and a caller that
-  genuinely wants zero cannot say so. The sort of thing transcribing preserves
-  and tidying the guard into a null check would lose.
+- **It rebuilds only when the new sprite needs more cells**, and the count is
+  the arithmetic `RowAlloc` already uses -- with **different types**.
+  `RowAlloc` multiplies two `int8` and stores a byte in `ROW_OFF_OWNS`; this
+  multiplies two `int32` and compares against that byte. A sprite big enough to
+  overflow the byte looks larger here than the row can ever record, so it takes
+  the rebuild arm every time. Both halves are the original's and reconciling
+  them would change one.
 
-- Four arms over `type - 1` and only three distinct bodies: the jump table
-  holds `0x0042790C` **twice**, for types 1 and 4 -- the same pairing
-  `SaveType4` and `ADDR_STEP_TYPE1_4` already show.
-
-- **Type 3 is the one with two rows** -- it writes the second row's depth layer
-  as well, the same second row `VehicleDied` hides. **Type 2 is the one that
-  does not check**: the default arm tests the row count before touching a row
-  and the type-2 arm jumps into the same tail without testing, so a type 2 with
-  no rows writes through a null. Reproduced.
-
-- `ScaleBy32Blocks` was already reconstructed under that name; the compiler
-  offered it when I wrote `ScaleTo32Blocks`. That is the cheapest of the five
-  mechanisms that have caught a second name this session.
+- **The rebuild arm swaps the sprite in the middle.** It clears bit 0, updates,
+  releases the row, *then* stores the new sprite, sets bit 0 again, and calls
+  `RowAlloc` with bounds read back out of the **row** rather than the argument.
+  A reconstruction that stored the sprite first would size the buffer from the
+  same sprite by accident and agree until something else touched the field in
+  between -- the kind of agreement that survives every test and is still wrong.
 
 ## Next
 
