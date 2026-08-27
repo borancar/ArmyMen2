@@ -31,6 +31,10 @@ extern "C" {
 void __cdecl DrawText(int32_t x, int32_t y, const char *str,
                       int32_t font, int32_t arg4, int32_t colour);
 
+/* 0x00446E00. TextExtent's vertical twin -- the height of a string stacked
+ * one character per line. See text.cpp. */
+int32_t __cdecl TextStackHeight(const char *text, int32_t font);
+
 int text_install(void);
 
 #ifdef __cplusplus

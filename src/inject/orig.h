@@ -384,6 +384,12 @@
  * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
  * each of the 256 characters, +0x204 the pointer to the encoded glyphs. */
 #define ADDR_FONT_STRIDE    524u
+/* The same stride in the units each table is indexed in: 262 uint16 for the
+ * offsets and 131 dwords for the bases. text.cpp had the second as 133 for as
+ * long as it existed -- see the note there for the three things that settle
+ * it. Named so the two cannot drift apart again. */
+#define AM2_FONT_OFFSET_STEP  262u
+#define AM2_FONT_BASE_STEP    131u
 #define ADDR_GLYPH_SIZE     0x006598D0u  /* uint32_t, total encoded bytes */
 #define ADDR_GLYPH_OFFSETS  0x006598D4u  /* uint16_t[256] */
 /* The entry for ' ' inside that table -- 0x006598D4 + 0x20 * 2 -- which is
@@ -395,6 +401,25 @@
  * not depend on the string at all -- it is the height of the SPACE glyph. */
 #define ADDR_TEXT_EXTENT    0x004468A0u  /* void(const char *, int32, int32[2]) */
 #define ADDR_FONT_BASES     0x00659AD4u  /* uint8_t *, the encoded glyphs */
+/* 0x00446E00, three callers, all in the HUD. TextExtent's vertical twin: the
+ * same walk over the string, summing the glyph record's SECOND uint16 minus
+ * three instead of its first.
+ *
+ * That field is the HEIGHT, and a probe of the running game settles it rather
+ * than a reading -- across "SARGE" the first field is 7, 7, 8, 9, 7 and the
+ * second is 12 for every one of them, 14 for every one in font 1. A per-glyph
+ * width varies with the glyph; a line height does not. TextExtent already
+ * treats the same field as a line height, for the space glyph alone.
+ *
+ * So the answer is a stack of characters rather than a run of them, and the
+ * one caller read confirms it: the result feeds a running VERTICAL coordinate
+ * in a HUD panel.
+ *
+ * ITS ESCAPE HANDLING DIFFERS FROM TextExtent'S. Here `^` consumes the
+ * character after it as well; there the character after it counts. Two
+ * functions over the same strings disagreeing about the escape is worth
+ * knowing before assuming either is the other's shape. */
+#define ADDR_TEXT_STACK_HEIGHT 0x00446E00u  /* int32(const char *, int32 font) */
 #define ADDR_FONT_DESCS     0x004897E8u  /* {const char *face; int32 h; uint16 style}[] */
 #define ADDR_BUILD_FONT     0x004466E0u  /* int32_t(int32_t fontIndex) */
 /* 0x00446840 and 0x00446880: give one font's glyph bytes back and clear its

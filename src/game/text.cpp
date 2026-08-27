@@ -9,7 +9,7 @@
  * original computes them rather than tidied:
  *
  *     offset = glyphOffsets[(int8_t)ch + font * 262]      uint16
- *     base   = fontBases[font * 133]                      uint8_t *
+ *     base   = fontBases[font * 131]                      uint8_t *
  *     glyph  = base + offset
  *     width  = *(uint16 *)(glyph + 0)
  *     height = *(uint16 *)(glyph + 2)
@@ -17,6 +17,18 @@
  * The character index is sign-extended (movsx), so bytes above 0x7F index
  * backwards from the font's base. That is what the original does; whether any
  * caller relies on it is unknown.
+ *
+ * THE BASE INDEX WAS 133 AND IT IS 131. Both strides are 524 bytes -- 262
+ * uint16 and 131 dwords -- and this file had one of them right and the other
+ * eight bytes long, which is the tell: two indexes into parallel tables that
+ * disagree about the record size cannot both be correct. Confirmed three
+ * ways: orig.h says 131, DrawTextClipped at 0x00446AB0 computes `edi*131`
+ * through the same `shl 6 / add / lea` chain, and the running game has the
+ * font bases at 0x02B621D8, 0x02B58028 and 0x02B5C890, exactly 524 apart --
+ * where 133 dwords reads 0x00005936, a size field rather than a pointer.
+ *
+ * Nothing had caught it because font 0 is the only font these drives reach
+ * through here; font 1 would have dereferenced 0x5936.
  *
  * Two behaviours worth knowing before calling it:
  *
@@ -82,8 +94,9 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
             continue;
         }
 
-        offset = g_glyphOffset[(int8_t)ch + font * 262];
-        glyph  = (const AM2_Rle16 *)(g_fontBase[font * 133] + offset);
+        offset = g_glyphOffset[(int8_t)ch + font * AM2_FONT_OFFSET_STEP];
+        glyph  = (const AM2_Rle16 *)(g_fontBase[font * AM2_FONT_BASE_STEP]
+                                     + offset);
         gw     = glyph->width;
         gh     = glyph->height;
 
@@ -114,7 +127,63 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
     }
 }
 
+/* 0x00446E00, three callers, all in the HUD. TextExtent's vertical twin: the
+ * same walk, summing the glyph record's SECOND uint16 minus three instead of
+ * its first.
+ *
+ * THE FIELD IS THE HEIGHT, and a probe settles that rather than a reading.
+ * Across "SARGE" the first field is 7, 7, 8, 9, 7 and the second is 12 for
+ * every one of them -- 14 for every one in font 1. A per-glyph width varies
+ * with the glyph; a line height does not. TextExtent already treats the same
+ * field as a line height, for the space glyph alone. And the caller confirms
+ * it: the result feeds a running vertical coordinate in a HUD panel.
+ *
+ * ITS ESCAPE HANDLING DIFFERS FROM TextExtent'S, which is the thing most
+ * likely to be tidied away by someone writing the two from one template.
+ * Here `^` consumes the character after it as well; there the character after
+ * it counts.
+ *
+ * The loop tests the NEXT byte and then advances, so a string ending in `^`
+ * reads one byte past its terminator -- the escape has already advanced once
+ * and the tail advances again. Reproduced; the value is only tested against
+ * zero, and no caller passes a string ending that way. */
+int32_t __cdecl TextStackHeight(const char *text, int32_t font)
+{
+    const uint8_t  *base  = g_fontBase[font * AM2_FONT_BASE_STEP];
+    const uint16_t *table = &g_glyphOffset[font * AM2_FONT_OFFSET_STEP];
+    const uint8_t  *p     = (const uint8_t *)text;
+    int32_t         total = 0;
+
+    if (!*p)
+        return 0;
+
+    for (;;) {
+        uint8_t ch = *p;
+
+        if (ch == 0x5E) {                     /* '^', and its argument */
+            p++;
+        } else if ((int8_t)ch >= 0x1F) {
+            total += *(const uint16_t *)(base + table[ch] + 2) - 3;
+        }
+
+        ch = p[1];
+        p++;
+        if (!ch)
+            break;
+    }
+
+    return total;
+}
+
 int text_install(void)
 {
-    return patch_replace(ADDR_DRAW_TEXT, (const void *)DrawText, "DrawText", 6);
+    /* Two now, so not a bare `return patch_replace` any more -- that shape is
+     * how an addition ends up compiling, passing every check and patching
+     * nothing. See region_install. */
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_DRAW_TEXT, (const void *)DrawText, "DrawText", 6);
+    rc |= patch_replace(ADDR_TEXT_STACK_HEIGHT, (const void *)TextStackHeight,
+                        "TextStackHeight", 3);
+    return rc;
 }
