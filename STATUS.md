@@ -5,40 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `a0f23bb`. Working tree clean.
+Last updated: **2026-08-27**, at `8ff3310`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`RowFaceSprite`** (`0x0040A310`, three callers -- the type 2, 3 and 8 frame
-  steppers, so once per unit per frame). Point the row's sprite at the
-  animation cell for the heading it is facing. 926 patches.
+- **`SetPointRule`** (`0x00437E00`, four callers -- one of them
+  `ADDR_SETTLE_POINT_IN_REGION` itself, which installs the rule and dispatches
+  through it in the same breath). 927 patches.
 
-- **The cell is the last of its direction**, not the first: the index is
-  `(dir + 1) * frames - 1`. The two heading bytes are added *as bytes* and
-  masked to eight bits before `RoundTo8` sees them, so a bias carrying past
-  255 wraps rather than saturating.
+- **The boat has a rule of its own**, and that comes from the tests rather than
+  from reading the handlers: `ObjIsType3` with `VEHICLE_OFF_KIND` 5 --
+  `ptboat` in the unit-type table -- takes one; any other vehicle and any roach
+  take another; a null object or anything else takes the third.
 
-- **It went in with one dereference too few.** `ADDR_SPRITE_LIST` is a pointer
-  *to* the array and I indexed the global itself, so every unit took its
-  sprite from whatever the pointer's own bytes decoded to. Exactly the
-  `obj -> table -> slot` shape CLAUDE.md warns about -- and the argument for
-  spelling a global the way the file that already reaches it spells it.
+- Two things the shape hides, both reproduced: the non-vehicle path stores the
+  vehicle rule *first* and only then asks whether the object is a roach, so
+  that store happens twice; and a null object skips the army store entirely,
+  leaving `ADDR_POINT_RULE_ARMY` holding the previous object's.
 
-- **The A/B caught it, at 293,671 of 786,432 pixels** against a budget of 500.
-  Worth saying plainly: three of the last four functions were invisible to the
-  pixels, and that run of notes could start to read as the check being
-  useless. It is not. A wrong sprite per unit per frame is the most visible
-  thing reconstructed lately and the number said so on the first run.
+- **It was never installed, for about ten minutes.** `region_install` was a
+  single `return patch_replace(...)` and my addition went in above it, so the
+  file compiled, every check passed, and nothing was patched. Same defect
+  CLAUDE.md records four instances of -- and `checkpatches` cannot see this
+  variant, because there is no `patch_replace` after a return, there is simply
+  one missing.
 
-  Bisected by disabling that one `patch_replace`, which put `bootcamp` back to
-  22 -- the cheapest way to tell "my new function is wrong" from "the run is
-  flaky", and worth doing before re-reading the disassembly a third time.
-
-- The globals ratchet then refused the fix's spelling, which needed the same
-  incomplete-type `struct AM2_Sprite;` declaration `air.cpp` and `script.cpp`
-  use -- it has an `LPDIRECTDRAWSURFACE` in it and this module is flat.
+  What caught it was **the patch count not moving**: 926 before, 926 after.
+  "A patch list is a list of intentions; the log is the list of installs" has
+  a cheaper cousin -- read the count after adding one. Both installs go through
+  `rc |=` now.
 
 ## Next
 
