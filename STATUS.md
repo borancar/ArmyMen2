@@ -5,11 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `ceb3a57`. Working tree clean.
+Last updated: **2026-08-27**, at `2085c32`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`LoadOneItem` closes the save/load pair** (`0x004289E0`), and **`orig.h`
+  said `void` where it returns an OBJECT.** Every exit answers the created
+  object or NULL, and the failure exits get their NULL by falling out with the
+  loader's own return value still in `eax` -- which is why the signature is
+  easy to misread from any single path. Corrected.
+
+- **The footprint bit makes a round trip around construction.** Bit `0x200000`
+  is taken out of the header's flags and CLEARED before the loader sees them,
+  then restored on the finished object to match what was saved. Copying the
+  flags straight through would be wrong **only for objects that have it** --
+  the failure mode this project keeps meeting: correct almost always.
+
+- **Then the selected bit is cleared unconditionally**, in a second write to
+  the same field three instructions later. A loaded object never comes back
+  selected however it was saved. Two writes doing different jobs; merging them
+  loses one.
+
+- **Type 2 takes a third argument and the other seven do not.** The asymmetry
+  is in the dispatch rather than the loaders, so it cannot be tidied into a
+  common signature.
+
+- An unknown type falls through with no object made and **dereferences NULL**
+  -- where `SaveOneItem`'s equivalent path is harmless. The original does not
+  guard it and neither does this: `LoadItems` only feeds it types it has just
+  written, and inventing a guard would be inventing behaviour.
 
 - **`SaveOneItem` is reconstructed** (`0x00428870`), and its type mapping is
   corroborated **by LAYOUT** -- better evidence than two readings agreeing.
