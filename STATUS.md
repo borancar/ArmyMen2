@@ -5,40 +5,35 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `dd9bc19`. Working tree clean.
+Last updated: **2026-08-27**, at `bc04178`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **Five of the save family**: `SaveItemHeader`, `LoadItemHeader`, `SaveType1`,
-  `SaveType6`, `SaveType8`. 935 patches, five `orig_` seams closed.
+- **`SaveType4` and `SaveType5`** (`0x0045EF00`, `0x0043B800`). 937 patches;
+  seven of the save family are ours.
 
-- **`OBJ_OFF_FIELD_94` is the type-specific record.** `orig.h` carried it as
-  "type-dependent, nothing read so far explains it" -- and all three per-type
-  savers write from exactly that offset, each with its own size: `0x2C` for
-  type 1, `0x28` for type 6, `0x4CC` for type 8. Literals in the savers rather
-  than a table.
+- **Type 4 is type 1 plus three tags** -- it calls `SaveType1` outright and
+  gives up if that fails, the only saver that delegates to another. So types 1
+  and 4 share a layout for the first `0x2C` bytes, the same pairing
+  `ADDR_STEP_TYPE1_4` shows on the frame-stepping side.
 
-- **The header size is a global, not a constant**: `0x00427640` sets
-  `0x0051307C` to `0x68` and both halves read it. That is what makes the two
-  sides agree by construction rather than by both spelling one literal. It also
-  exposes a gap -- the header is `0x68` and the type record starts at `0x94`,
-  so `0x68..0x93` is saved by neither half.
+- **Type 5 writes five fields and skips two**: three separate four-byte
+  `fwrite`s at `+0x08`, `+0x10` and `+0x18` where one of twenty bytes would do,
+  so the gaps at `+0x0C` and `+0x14` are deliberate rather than a stride.
 
-- **Type 1 writes a second tag** and the other two do not: its record *opens*
-  with a pointer, and the tag is that pointee's `+8`. So the file carries a raw
-  pointer and a value read through it -- which is why the savefile is an oracle
-  only once it can ignore pointers.
+- **Reading the two I did not take changed something this project believes.**
+  `SaveType2` and `SaveType3` **normalise a pointer before writing it** --
+  each turns one record field into `(p - ADDR_OBJ_TABLE_RECORDS) >> 8`, an
+  index into the four 256-byte records there. Both convert *in place* and
+  neither converts back, so a saved object is left holding an index.
 
-- **Type 8 is the only one that checks its object**, answering 0 for a null
-  where the other two would fault. And only the *save* half of the header
-  writes a tag; the load half does not check one.
-
-- **Two runs failed before one passed, on different sides** -- once the recon
-  side and once the ORIG side, which installs none of this. `ab.sh` refused
-  both rather than calling an empty log a match. A failure that moves between
-  sides is the drive, not the code.
+  That makes "the savefile is an oracle once it can ignore pointers" only half
+  true, and the half it gets wrong is the useful one: some types already
+  resolve theirs, and only 1, 4 and 5 write a raw pointer. Recorded in `orig.h`
+  beside the family rather than left for whoever writes the oracle to
+  rediscover.
 
 ## Next
 
