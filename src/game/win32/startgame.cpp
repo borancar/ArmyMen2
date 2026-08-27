@@ -168,7 +168,6 @@ typedef void (__attribute__((thiscall)) *am2_session_ctor_fn)(void *, int32_t);
 typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *);
 
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
-#define orig_drop_obj      (*(am2_void_fn)ADDR_DROP_OBJ_51612C)
 
 #define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 #define g_sessionObject  (*(void **)(uintptr_t)ADDR_SESSION_OBJECT)
@@ -198,7 +197,7 @@ void __cdecl StartMultiplayerGame(void)
     g_menuRequest    = REQUEST_MULTIPLAYER;
     g_menuRequestSet = 1;
     orig_apply_game_settings();
-    orig_drop_obj();
+    ClearMenuMsgs();
 
     comm = g_commObject;
     *(int32_t *)(comm + COMM_OFF_IS_HOST) = 0;

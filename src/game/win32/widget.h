@@ -1434,6 +1434,10 @@ void __attribute__((thiscall)) ListDropOldest(void *list);
 void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
 void __attribute__((thiscall)) RecordResetAlias(void *rec);
 
+/* 0x00431D70. Empties the menu message log -- a null check and a thiscall
+ * tail-jump into RecordReset, and nothing else. */
+void __cdecl ClearMenuMsgs(void);
+
 int widget_install(void);
 
 #ifdef __cplusplus

@@ -4352,6 +4352,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MP_NAME_PAPER       0x00432CE0u  /* uint8_t(int32_t row) */
 #define ADDR_MP_NAME_SET_INK     0x00432D40u  /* thiscall void(this, uint8_t) */
 #define ADDR_PLAYER_RECORDS      0x004F1980u  /* six of them, 0x7E0 apart */
+#define AM2_PLAYER_RECORD_BYTES  0x7E0u
+/* The two fields of a player record ADDR_PACKET_SLOT_RESET does anything with
+ * beyond zeroing. Everything else it touches it simply clears. */
+#define PLAYER_REC_OFF_OWN_BIT   0x14u  /* uint32_t, set to 1 << slot */
+#define PLAYER_REC_OFF_MSGS      0x78u  /* the list ADDR_MSG_LIST_INIT takes */
 
 /* Two masks out of that record, each named by its own error message. */
 #define ADDR_GET_PLAYER_MASK     0x00402BD0u  /* uint32_t(uint32_t id) -- +0x14 */
@@ -4714,7 +4719,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SESSION_LIST        0x004FA908u  /* void *, what the callback fills */
 #define COMM_OFF_APP_GUID        0x3D4u       /* GUID *, set by CommConstruct */
 /* Calls ADDR_RECORD_RESET on the object at 0x0051612C when there is one. */
-#define ADDR_DROP_OBJ_51612C     0x00431D70u  /* void(void) */
+/* Fifteen bytes: if ADDR_MENU_MSG_LIST is non-null, tail-jump to
+ * ADDR_RECORD_RESET with it in ecx. That is a thiscall on the list, so this
+ * empties the menu message log and does nothing else.
+ *
+ * It was ADDR_DROP_OBJ_51612C -- a placeholder named after the address it
+ * reads, from a time when neither the global nor the callee had a name. Both
+ * do now, so the placeholder is retired rather than left to be re-derived.
+ * Two use sites.
+ *
+ * Note docs/functions.tsv gives this entry 160 bytes, which is a MERGE: the
+ * function ends at 0x00431D7F and 0x00431D80 is a different one. */
+#define ADDR_CLEAR_MENU_MSGS     0x00431D70u  /* void(void) */
 #define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
 #define ADDR_START_MULTIPLAYER   0x0042F310u  /* void(void), a button handler */
 #define ADDR_MP_DATA_PROBE       0x0048700Cu  /* "data\\mpalpine" */

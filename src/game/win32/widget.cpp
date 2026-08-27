@@ -5723,6 +5723,25 @@ void __cdecl HudPaint(void)
             g_hudWidgetC, g_hudWidgetC->rect);
 }
 
+/* 0x00431D70, two callers. Empties the menu message log.
+ *
+ * Fifteen bytes, and the whole of it is a null check and a TAIL-JUMP into
+ * ADDR_RECORD_RESET with the list in ecx -- a thiscall, so the list is the
+ * `this`. Written as an ordinary guarded call, which is equivalent because
+ * nothing follows it.
+ *
+ * VERIFIED BY READING. Both callers are ours, so the counter cannot move; one
+ * is the start-game path and the other the session reopen, and neither runs
+ * on any drive here. */
+void __cdecl ClearMenuMsgs(void)
+{
+    void *list = *(void **)(uintptr_t)ADDR_MENU_MSG_LIST;
+
+    if (list)
+        RecordReset(list);
+}
+
+
 /* 0x00432D40, thiscall, two instructions: the row name's ink setter. It is a
  * separate function rather than a store at the call site because the caller
  * computes the colour with MpNameInk and hands it straight over. */
@@ -5931,6 +5950,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_EDIT_CHAR_HANDLER, (const void *)EditCharHandler,
                         "EditCharHandler", 0);
 
+    rc |= patch_replace(ADDR_CLEAR_MENU_MSGS, (const void *)ClearMenuMsgs,
+                        "ClearMenuMsgs", 2);
     rc |= patch_replace(ADDR_RECORD_RESET, (const void *)RecordReset,
                         "RecordReset", 1);
     rc |= patch_replace(ADDR_SELECT_PLAYER_ROW, (const void *)SelectPlayerRow,

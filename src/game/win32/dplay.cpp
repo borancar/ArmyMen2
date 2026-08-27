@@ -1336,7 +1336,6 @@ typedef void (__cdecl *am2_slot_reset_fn)(int32_t slot);
 typedef void (__cdecl *am2_srand_fn)(uint32_t seed);
 typedef int32_t (__cdecl *am2_rand_fn)(void);
 
-#define orig_slot_reset (*(am2_slot_reset_fn)ADDR_PACKET_SLOT_RESET)
 #define orig_srand      (*(am2_srand_fn)ADDR_GAME_SRAND)
 #define orig_rand       (*(am2_rand_fn)ADDR_GAME_RAND)
 
@@ -1378,6 +1377,9 @@ int32_t __cdecl StartPacketThread(void)
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_C))    return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_D))    return 0;
 
+/* Defined below, beside MsgListInit. */
+void __cdecl PacketSlotReset(uint32_t slot);
+
     /* A fixed seed, so every run fills the buffers identically. */
     orig_srand(0);
 
@@ -1404,7 +1406,7 @@ int32_t __cdecl StartPacketThread(void)
 
     g_packetState = 2;
     for (i = 0; i < 6; i++)
-        orig_slot_reset(i);
+        PacketSlotReset(i);
 
     g_packetThread = CreateThread(NULL, 0,
                                   (LPTHREAD_START_ROUTINE)
@@ -1702,12 +1704,52 @@ int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id)
     int32_t        n = *(const int32_t *)(g_commObject + COMM_OFF_PLAYER_COUNT);
     int32_t        i;
 
-    (void)comm;   /* the original ignores `this` and uses the global */
+    (void)comm;   
+
+/* the original ignores `this` and uses the global */
     for (i = 0; i < n; i++, p += AM2_PLAYER_STRIDE)
         if (*(const uint32_t *)p == id)
             return i;
     return 0;
 }
+/* 0x00402750, one caller. Puts one of the six player records back to its
+ * empty state.
+ *
+ * Eighteen dwords cleared, ONE field set, and one list initialised. The field
+ * is PLAYER_REC_OFF_OWN_BIT and it gets `1 << slot` -- so each record carries
+ * a one-bit mask naming itself, which is the only thing here that depends on
+ * WHICH slot is being reset.
+ *
+ * THE STRIDE IS COMPUTED, NOT MULTIPLIED: `slot << 6` minus slot, then `<< 5`,
+ * which is slot * 63 * 32 = slot * 0x7E0. Written as the multiply it is; the
+ * shift-subtract-shift is the compiler avoiding an imul and says nothing about
+ * the structure.
+ *
+ * The original writes +0x8C in the middle of the run, between +0x34 and +0x38,
+ * which is out of order and immaterial -- every one of those stores is the
+ * same zero. Written in address order here, and the difference noted rather
+ * than reproduced, because there is nothing to reproduce: no reader can tell.
+ *
+ * VERIFIED BY READING. Its one caller is the comm setup path, which needs a
+ * session. */
+void __cdecl PacketSlotReset(uint32_t slot)
+{
+    uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS
+                   + slot * AM2_PLAYER_RECORD_BYTES;
+    static const uint32_t kZeroed[] = {
+        0x00, 0x04, 0x08, 0x0C, 0x10, 0x1C, 0x20, 0x28, 0x30, 0x34,
+        0x38, 0x40, 0x44, 0x48, 0x4C, 0x5C, 0x8C
+    };
+    uint32_t i;
+
+    for (i = 0; i < sizeof kZeroed / sizeof kZeroed[0]; i++)
+        *(uint32_t *)(rec + kZeroed[i]) = 0;
+
+    *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = 1u << slot;
+
+    MsgListInit(rec + PLAYER_REC_OFF_MSGS);
+}
+
 
 int dplay_install(void)
 {
@@ -1728,6 +1770,8 @@ int dplay_install(void)
                         "CommGetSessionDesc", 0);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
+    rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,
+                        "PacketSlotReset", 1);
     rc |= patch_replace(ADDR_MSG_LIST_INIT, (const void *)MsgListInit,
                         "MsgListInit", 1);
     rc |= patch_replace(ADDR_EVENT_CLOSE, (const void *)EventClose,
