@@ -1358,6 +1358,7 @@
 #define ADDR_STR_BLUE            0x00485140u
 #define ADDR_STR_GREY            0x00485138u
 #define ADDR_FMT_PLACE_FILE      0x00487B68u  /* "%s_%s_place.txt" */
+#define ADDR_STR_PLACE_NO_NAME   0x00485B00u  /* "-", the files own placeholder */
 /* The placement table: the records, how many, and how many fit. Freed and
  * rebuilt for each army. The grow is 32 to start and +8 a time. */
 #define ADDR_PLACEMENTS          0x00654C7Cu  /* AM2_Placement * */

@@ -64,6 +64,12 @@ char *__cdecl BuildPlacementPath(char *dest, int32_t slot);
 /* 0x0043B700. Read one slot's placement file and lay its units out. */
 void __cdecl LoadArmyPlacement(int32_t slot);
 
+/* 0x0043B490. One `place` line, from the keyword table's handler slot rather
+ * than by name -- nothing in the image calls it directly. Returns 0 on a
+ * record made, and 2..7 naming the column that would not read: 2 the type,
+ * 3 x, 4 y, 5 the facing, 6 the group, 7 the name. */
+int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line);
+
 int place_install(void);
 
 #ifdef __cplusplus

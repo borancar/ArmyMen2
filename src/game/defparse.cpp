@@ -10,12 +10,8 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-/* All four still original and reached by address. strtok in particular MUST be
- * the game's: DefObjParse below tokenises from the same state, and libc's
- * would be a second, unrelated cursor. */
-typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
-
-#define orig_strtok        (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
+/* strtok now comes through crt.h, which is the same seam under one name
+ * -- see there for why the cursor has to be shared. */
 
 #define kSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 
@@ -36,12 +32,12 @@ typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
  * line; the rest continue from strtok's own state. */
 static int32_t NextType(char *line)
 {
-    return DefObjParse(DefFindKeyword(orig_strtok(line, kSep)));
+    return DefObjParse(DefFindKeyword(am2_strtok(line, kSep)));
 }
 
 static int32_t NextNumber(int32_t *out)
 {
-    return DefParseNumber(out, orig_strtok((char *)0, kSep));
+    return DefParseNumber(out, am2_strtok((char *)0, kSep));
 }
 
 /* 0x004360C0. See defparse.h for the line's shape.
@@ -214,19 +210,19 @@ int32_t __cdecl DefObjLine(int32_t cmd, char *line)
         return 1;
     }
 
-    if (!DefParseNumber(&rec[1], orig_strtok(line, kSep)))
+    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
         return 2;
 
     for (int32_t i = 2; i <= 11; i++) {
-        if (!DefParseNumber(&rec[i], orig_strtok((char *)0, kSep)))
+        if (!DefParseNumber(&rec[i], am2_strtok((char *)0, kSep)))
             return i + 1;
 
         if (i == 3)
             rec[3] = 0;      /* parsed, checked, discarded -- see above */
     }
 
-    if (DefParseNumber(&rec[12], orig_strtok((char *)0, kSep)))
-        (void)DefParseNumber(&rec[13], orig_strtok((char *)0, kSep));
+    if (DefParseNumber(&rec[12], am2_strtok((char *)0, kSep)))
+        (void)DefParseNumber(&rec[13], am2_strtok((char *)0, kSep));
 
     DefAddObjRec(rec);
     return 0;

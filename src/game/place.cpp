@@ -1,5 +1,6 @@
 /* place.cpp -- see place.h. */
 #include <stdint.h>
+#include <string.h>
 
 #include "place.h"
 #include "image.h"
@@ -19,6 +20,8 @@
  * these two -- g_mapName is taken, on a DIFFERENT address. */
 #define kMapName      ((const char *)AM2_IMAGE(ADDR_MAP_NAME))
 #define kMapFolder    ((const char *)AM2_IMAGE(ADDR_MAP_FOLDER))
+
+#define kSep         ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 
 #define kUnitType(i) ((const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES) \
                       + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
@@ -144,6 +147,91 @@ void __cdecl LoadArmyPlacement(int32_t slot)
     }
 }
 
+/* 0x0043B490. One `place` line: a unit type by name, x, y, a facing, a group
+ * and a name, into the record AddPlacement copies.
+ *
+ * THE LAST TOKEN RESTARTS THE TOKENISER, and that is the original's. Every
+ * other field continues with strtok(NULL); the name passes `line` again, so
+ * strtok begins the line afresh and hands back the FIRST token -- the type.
+ * Every one of the 1,264 lines the game ships therefore ends up with its type
+ * name in the name field, and the `-` the files actually write in that column
+ * is never seen. Reproduced, not corrected.
+ *
+ * Measured rather than argued: reading this I first wrote it up as an
+ * ordinary sixth field, because `push ebx` next to a strtok looks like every
+ * other continuation until you notice that the continuations push 0.
+ * tools/placecheck.py runs the original over the whole corpus and every
+ * recorded name is a unit type. See tests/placevec.h.
+ *
+ * SAY WHAT THE CORPUS DOES NOT CATCH. The three mutations that matter all
+ * fail all 1,264 lines -- continuing the tokeniser instead of restarting it,
+ * swapping x and y, and moving the facing by one. Deleting the `-` test
+ * PASSES every line, and that is not a gap in the corpus so much as a
+ * consequence of the defect above: the token can never be `-`, so the test
+ * can never fire. It stays because the original has it.
+ *
+ * Two more things left as they are. The type name and the final name are
+ * copied into 0x20-byte buffers with no length check, so a long enough token
+ * runs into the record; nothing the game ships comes close. And the
+ * not-found test after the type search compares the index against -1, which
+ * it cannot be -- the search either matches or falls out of its own loop with
+ * a return. That is an inlined lookup's `== -1` left behind.
+ */
+int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line)
+{
+    AM2_Placement rec;
+    char          typeName[0x20];
+    char         *tok;
+    int32_t       type;
+    int32_t       x, y, facing;
+
+    (void)cmd;
+
+    tok = am2_strtok(line, kSep);
+    if (!tok)
+        return 2;
+    strcpy(typeName, tok);
+
+    for (type = 0; type < AM2_UNIT_TYPE_COUNT; type++)
+        if (!strcmp(typeName, (const char *)(kUnitType(type)
+                                             + UNIT_TYPE_OFF_NAME)))
+            break;
+    if (type == AM2_UNIT_TYPE_COUNT)
+        return 2;
+    if (type == -1)                       /* cannot happen -- see above */
+        return 2;
+    rec.type = type;
+
+    tok = am2_strtok((char *)0, kSep);
+    if (!tok || !DefParseNumber(&x, tok))
+        return 3;
+
+    tok = am2_strtok((char *)0, kSep);
+    if (!tok || !DefParseNumber(&y, tok))
+        return 4;
+
+    rec.where = ((uint32_t)(uint16_t)y << 16) | (uint16_t)x;
+
+    tok = am2_strtok((char *)0, kSep);
+    if (!tok || !DefParseNumber(&facing, tok))
+        return 5;
+    rec.facing = (uint8_t)facing;
+
+    tok = am2_strtok((char *)0, kSep);
+    if (!tok || !DefParseNumber(&rec.group, tok))
+        return 6;
+
+    tok = am2_strtok(line, kSep);        /* NOT (char *)0 -- see above */
+    if (!tok)
+        return 7;
+    strcpy(rec.name, tok);
+    if (!strcmp(rec.name, (const char *)AM2_IMAGE(ADDR_STR_PLACE_NO_NAME)))
+        rec.name[0] = '\0';
+
+    AddPlacement(&rec);
+    return 0;
+}
+
 int place_install(void)
 {
     int rc = 0;
@@ -158,5 +246,7 @@ int place_install(void)
                         "BuildPlacementPath", 1);
     rc |= patch_replace(ADDR_LOAD_ARMY_PLACEMENT, (const void *)LoadArmyPlacement,
                         "LoadArmyPlacement", 1);
+    rc |= patch_replace(ADDR_PARSE_PLACE_LINE, (const void *)ParsePlaceLine,
+                        "ParsePlaceLine", 0);
     return rc;
 }

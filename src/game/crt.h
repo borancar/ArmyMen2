@@ -35,6 +35,20 @@ extern void  (__cdecl *am2_free)(void *);
  * to point it somewhere else. Defaults to dropping the message. */
 extern void (__cdecl *am2_log)(const char *, ...);
 
+/* The game's own strtol. Not a shared-state seam like the two below -- this
+ * one is here so ParsePlaceLine's whole chain is callable offline, which is
+ * the only reason DefParseNumber could not run without the game. Base 0, so
+ * "0x" and a leading "0" mean what C says they mean. */
+extern int32_t (__cdecl *am2_strtol)(const char *, char **, int32_t);
+
+/* The game's own strtok, and the state is the point: DefParseInfoFile reads a
+ * line and the handlers below it tokenise from the SAME static cursor, so a
+ * second implementation would be a second cursor and the handlers would parse
+ * a line nobody had advanced. Offline there is no original to share with, and
+ * host strtok has a cursor of its own that is equally consistent -- which is
+ * what makes ParsePlaceLine testable without the game. */
+extern char *(__cdecl *am2_strtok)(char *, const char *);
+
 /* The game's own sprintf. Same seam again: BuildPlacementPath formats a
  * filename with it, and it has to be the CRT the rest of the image uses --
  * a NULL passed to %s is the one place the two could disagree, and both this

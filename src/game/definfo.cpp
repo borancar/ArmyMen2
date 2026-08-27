@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "definfo.h"
+#include "crt.h"      /* am2_strtok -- the shared tokeniser cursor */
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -20,11 +21,9 @@ typedef double (__cdecl *AM2_StrtodFn)(const char *s, char **end);
 typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);
 typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 typedef char *(__cdecl *AM2_StrlwrFn)(char *s);
-typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 #define orig_def_fopen  (*(AM2_FopenFn)AM2_IMAGE(ADDR_FOPEN))
 #define orig_fgets      (*(AM2_FgetsFn)AM2_IMAGE(ADDR_CRT_FGETS))
 #define orig_strlwr     (*(AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
-#define orig_strtok     (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
 #define kSep            ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 #define kFileMode       ((const char *)AM2_IMAGE(ADDR_STR_DEF_FILE_MODE))
 
@@ -45,7 +44,7 @@ int32_t __cdecl DefParseNumber(int32_t *out, const char *tok)
     if (tok == (const char *)0)
         return 0;
 
-    *out = orig_strtol(tok, &end, 0);
+    *out = am2_strtol(tok, &end, 0);
 
     if (end == tok) {
         orig_log("Bad or missing number\n");
@@ -151,7 +150,7 @@ int32_t __cdecl DefDispatchFile(am2_FILE *fp)
         if (work[0] == '\0')
             continue;
 
-        tok = orig_strtok(work, kSep);
+        tok = am2_strtok(work, kSep);
         if (tok == (char *)0 || tok[0] == '\0' || tok[0] == '#')
             continue;
 

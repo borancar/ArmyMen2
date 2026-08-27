@@ -239,7 +239,7 @@ selftest: $(BUILD)/selftest.exe
 # removing a module from the list leaves a stale binary that make happily
 # calls up to date, and the link guard in `check` reports ok on a list that
 # no longer links. Verified by removing gamedir.cpp and watching it fail.
-$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h Makefile
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h Makefile
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
 	    -o $@ $(SELFTEST_SRC)
@@ -252,6 +252,13 @@ $(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h Makefil
 .PHONY: scriptvec
 scriptvec:
 	./.venv/bin/python tools/scriptcheck.py
+
+# The same idea one layer up: the ORIGINAL `place` line parser run over every
+# line the thirty-six shipped placement files contain, recorded into
+# tests/placevec.h for `selftest` to replay.
+.PHONY: placevec
+placevec:
+	./.venv/bin/python tools/placecheck.py
 
 .PHONY: vectors
 vectors:

@@ -25,11 +25,14 @@
 #include "../src/game/objtype.h"
 
 #include "../src/game/script.h"
+#include "../src/game/place.h"
+#include "../src/game/image.h"
 #include "../src/game/crt.h"
 
 #include "loadimage.h"
 #include "vectors.h"
 #include "scriptvec.h"
+#include "placevec.h"
 
 static uint8_t g_scratch[AM2_SCRATCH_LEN];
 
@@ -66,6 +69,7 @@ static void FillScratch(uint32_t salt)
 }
 
 static int ScriptTokens(int *passed);
+static int PlaceLines(int *passed);
 static int ScriptLines(int *passed);
 static int ScriptSpine(int *passed);
 static int ScriptVariables(int *passed);
@@ -172,6 +176,7 @@ int main(void)
     printf("\n  %d vectors: %d pass, %d fail\n", pass + fail, pass, fail);
 
     fail += ScriptTokens(&pass);
+    fail += PlaceLines(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);
     fail += ScriptVariables(&pass);
@@ -435,6 +440,90 @@ static int ScriptTokens(int *passed)
     }
     printf("  %d script words (%d keywords): %d pass, %d fail\n",
            pass + fail, keywords, pass, fail);
+    *passed += pass;
+    return fail;
+}
+
+/* The `place` line parser, against every line the thirty-six shipped
+ * placement files contain.
+ *
+ * The same argument as the script tokeniser above, one layer up: this
+ * function's whole job is turning six text columns into a record, and a
+ * random argument says nothing about it. The expected records come from the
+ * ORIGINAL under Unicorn (tools/placecheck.py).
+ *
+ * It runs offline because everything it reaches is either ours or DATA. The
+ * unit-type names, the separators and the "-" placeholder are all in the
+ * mapped image; DefParseNumber and AddPlacement are reconstructed; and strtok
+ * comes through crt.h, which points at the host's when there is no game. That
+ * last one is why this is a test rather than a note saying it could not be.
+ */
+/* NOT a whole-record memcmp, and the reason is the one CLAUDE.md already
+ * records about the widget dump: an uninitialised field cannot be part of an
+ * exact oracle. Three bytes of padding after `facing` are never written, and
+ * `name` is filled by a strcpy that stops at the NUL -- so both hold whatever
+ * was on the stack. Unicorn's stack is zero and Wine's is not, which is
+ * exactly how this was found: every one of the 1,264 rows failed with the
+ * return code and every defined byte already agreeing.
+ *
+ * So the comparison is the defined span: where, facing, type, group, and the
+ * name as a string. */
+static int PlaceRecordMatches(const AM2_Placement *got,
+                              const unsigned char *want)
+{
+    const AM2_Placement *w = (const AM2_Placement *)want;
+
+    return got->where == w->where
+        && got->facing == w->facing
+        && got->type == w->type
+        && got->group == w->group
+        && strcmp(got->name, w->name) == 0;
+}
+
+#define kPlacements     (*(AM2_Placement **)AM2_IMAGE(0x00654C7Cu))
+#define kPlacementCount (*(int32_t *)AM2_IMAGE(0x00654C80u))
+
+static int PlaceLines(int *passed)
+{
+    if (am2_load_image(".wine/drive_c/GOG Games/Army Men II/ArmyMen2.exe")
+        != 0) {
+        printf("\n  place lines: SKIPPED (no image)\n");
+        return 1;
+    }
+
+    int pass = 0, fail = 0;
+    for (uint32_t i = 0; i < sizeof am2_place_vectors /
+                             sizeof am2_place_vectors[0]; i++) {
+        const AM2_PlaceVector *v = &am2_place_vectors[i];
+        char line[256];
+        int  bad = 0;
+
+        /* The parser writes NULs into the line, so each run needs its own
+         * copy -- and strtok's cursor points into it, which is the other
+         * reason a shared buffer would not do. */
+        strncpy(line, v->line, sizeof line - 1);
+        line[sizeof line - 1] = '\0';
+
+        FreePlacements();
+        int32_t rc = ParsePlaceLine(0x63, line);
+        if (rc != v->rc)
+            bad = 1;
+        else if (v->added != (kPlacementCount != 0))
+            bad = 1;
+        else if (v->added && !PlaceRecordMatches(kPlacements, v->rec))
+            bad = 1;
+
+        if (bad) {
+            if (fail < 10)
+                printf("  FAIL ParsePlaceLine(\"%s\") -> %d, want %d\n",
+                       v->line, (int)rc, (int)v->rc);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+    FreePlacements();
+    printf("  %d place lines: %d pass, %d fail\n", pass + fail, pass, fail);
     *passed += pass;
     return fail;
 }

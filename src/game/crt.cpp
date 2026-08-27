@@ -1,5 +1,6 @@
 /* See crt.h. */
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -19,6 +20,11 @@ static void __cdecl DropLog(const char *, ...)
 }
 
 void (__cdecl *am2_log)(const char *, ...) = DropLog;
+
+int32_t (__cdecl *am2_strtol)(const char *, char **, int32_t) =
+    (int32_t (__cdecl *)(const char *, char **, int32_t))strtol;
+
+char *(__cdecl *am2_strtok)(char *, const char *) = strtok;
 
 int32_t (__cdecl *am2_sprintf)(char *, const char *, ...) =
     (int32_t (__cdecl *)(char *, const char *, ...))sprintf;
@@ -43,6 +49,10 @@ void am2_crt_use_game(void)
     am2_realloc = (void *(__cdecl *)(void *, size_t))(uintptr_t)ADDR_CRT_REALLOC;
     am2_free    = (void (__cdecl *)(void *))(uintptr_t)ADDR_CRT_FREE;
     am2_log     = (void (__cdecl *)(const char *, ...))(uintptr_t)ADDR_LOG;
+    am2_strtol  = (int32_t (__cdecl *)(const char *, char **, int32_t))
+                  (uintptr_t)ADDR_CRT_STRTOL;
+    am2_strtok  = (char *(__cdecl *)(char *, const char *))
+                  (uintptr_t)ADDR_CRT_STRTOK;
     am2_sprintf = (int32_t (__cdecl *)(char *, const char *, ...))
                   (uintptr_t)ADDR_GAME_SPRINTF;
     am2_chdir   = (int32_t (__cdecl *)(const char *))(uintptr_t)ADDR_CRT_CHDIR;
@@ -55,6 +65,8 @@ void am2_crt_use_host(void)
     am2_realloc = realloc;
     am2_free    = free;
     am2_log     = DropLog;
+    am2_strtol  = (int32_t (__cdecl *)(const char *, char **, int32_t))strtol;
+    am2_strtok  = strtok;
     am2_sprintf = (int32_t (__cdecl *)(char *, const char *, ...))sprintf;
     am2_chdir   = HostChdir;
     am2_getcwd  = HostGetcwd;
