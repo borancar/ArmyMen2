@@ -834,7 +834,6 @@ static_assert(sizeof(DPLCONNECTION) <= LOBBY_CONN_BUF_SIZE, "the 0x800 buffer");
 
 typedef void (__cdecl *am2_lobby_void_fn)(void);
 /* CommCreatePlayer is reconstructed; called directly below. */
-#define orig_on_lobby_slave  (*(am2_lobby_void_fn)ADDR_ON_LOBBY_SLAVE)
 #define orig_apply_settings  (*(am2_lobby_void_fn)ADDR_APPLY_GAME_SETTINGS)
 
 /* Release the lobby interface and the connection buffer, in that order. Used
@@ -974,7 +973,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
     CommMarkLobbied();
 
     if (!comm_u32(g_commObject, COMM_OFF_IS_HOST)) {
-        orig_on_lobby_slave();
+        OnLobbySlave();
     } else {
         /* The host records its own name in the slot it occupies. */
         char *slotName = (char *)(g_commObject + COMM_SLOT_BASE
@@ -1808,6 +1807,57 @@ int32_t __attribute__((thiscall)) CommRecentTotal(void *comm)
     return total;
 }
 
+/* 0x00410F70, two callers. Fetch the session description, log three of its
+ * fields when the comm object is verbose, publish the current player count,
+ * and enumerate the players.
+ *
+ * THE THREE LOGGED FIELDS ARE DPSESSIONDESC2'S OWN. dwMaxPlayers,
+ * dwCurrentPlayers and lpszSessionNameA sit at +0x28, +0x2C and +0x30, and the
+ * original reads exactly those three -- which is what confirms
+ * COMM_OFF_SESSION_DESC holds that structure rather than something shaped like
+ * it. Three offsets agreeing with the SDK is better evidence than one, and it
+ * is why this reads through LPDPSESSIONDESC2 rather than through offsets of
+ * our own.
+ *
+ * IT ENDS IN A TAIL JUMP, so CommEnumPlayers' return value is this function's.
+ * Neither caller reads it, which is what makes `void` honest here rather than
+ * a guess; both were checked.
+ *
+ * The comm object is re-read from the global after the fetch and after each
+ * log, five times in all. Kept: the fetch can reallocate nothing here today,
+ * but the original does not assume that and neither should this. */
+void __cdecl OnLobbySlave(void)
+{
+    uint8_t         *comm = g_commObject;
+    LPDPSESSIONDESC2 sd;
+
+    CommGetSessionDesc(comm);
+
+    comm = g_commObject;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
+        sd = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_SESSION_MAX),
+                (int32_t)sd->dwMaxPlayers);
+
+        comm = g_commObject;
+        sd   = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_SESSION_CUR),
+                (int32_t)sd->dwCurrentPlayers);
+
+        comm = g_commObject;
+        sd   = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_SESSION_NAME),
+                sd->lpszSessionNameA);
+
+        comm = g_commObject;
+    }
+
+    sd = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
+    *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) = (int32_t)sd->dwCurrentPlayers;
+
+    CommEnumPlayers();
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1882,5 +1932,7 @@ int dplay_install(void)
                         "CommSendLobbyProperty", 1);
     rc |= patch_replace(ADDR_COMM_RECENT_TOTAL, (const void *)CommRecentTotal,
                         "CommRecentTotal", 1);
+    rc |= patch_replace(ADDR_ON_LOBBY_SLAVE, (const void *)OnLobbySlave,
+                        "OnLobbySlave", 2);
     return rc;
 }

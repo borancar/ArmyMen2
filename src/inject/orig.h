@@ -1242,7 +1242,19 @@
  * object first -- and the store still goes through the global rather than
  * through `this`, which is reproduced. */
 #define ADDR_COMM_DROP_SESSION   0x0040F140u  /* thiscall int32(this) */
-#define ADDR_ON_LOBBY_SLAVE      0x00410F70u  /* void(void), stays original */
+/* 0x00410F70, two callers, neither of which reads a result -- so `void` is
+ * right even though the body ends in a TAIL JUMP to CommEnumPlayers, which
+ * does return one. Fetch the session description, log three of its fields when
+ * COMM_OFF_VERBOSE is set, publish the current player count, and enumerate.
+ *
+ * The three fields are DPSESSIONDESC2's dwMaxPlayers, dwCurrentPlayers and
+ * lpszSessionNameA at +0x28, +0x2C and +0x30 -- which is what confirms
+ * COMM_OFF_SESSION_DESC really is that structure and not something shaped like
+ * it. Three offsets agreeing with the SDK is better than one. */
+#define ADDR_ON_LOBBY_SLAVE      0x00410F70u  /* void(void) */
+#define ADDR_FMT_SESSION_MAX     0x00475DACu  /* "Session Max Players: %d\n" */
+#define ADDR_FMT_SESSION_CUR     0x00475D90u  /* "Session Cur Players: %d\n" */
+#define ADDR_FMT_SESSION_NAME    0x00475D7Cu  /* "Session Name: %s\n" */
 #define COMM_OFF_LOBBY_BUF       0x3F0u   /* DPLCONNECTION, 0x800 bytes */
 #define COMM_OFF_IS_HOST         0x3D8u   /* from DPCAPS_ISHOST */
 #define COMM_OFF_SESSION_DESC    0x3E8u   /* the fetched DPSESSIONDESC2 */

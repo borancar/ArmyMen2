@@ -213,6 +213,10 @@ int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
 /* 0x0040F520, thiscall. A windowed sum over the thirty rate slots. */
 int32_t __attribute__((thiscall)) CommRecentTotal(void *comm);
 
+/* 0x00410F70, two callers. Fetch the session description, log it when the comm
+ * object is verbose, publish the player count and enumerate. */
+void __cdecl OnLobbySlave(void);
+
 int dplay_install(void);
 
 #ifdef __cplusplus
