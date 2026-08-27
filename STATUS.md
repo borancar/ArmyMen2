@@ -5,33 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `cc93db1`. Working tree clean.
+Last updated: **2026-08-27**, at `3d31fe5`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`tools/ab.sh combat` exists, and `DamageObject` is no longer 0.** It read 0
-  on every configuration this project had; it reads 6 here.
+- **`TextStackHeight`** (`0x00446E00`, three callers, all in the HUD). 929
+  patches.
 
-- **What was missing was the key binding table, not a different mission.**
-  `0x004854BC` is pairs of scancodes and its first four are W/UP, S/DOWN,
-  A/LEFT, D/RIGHT with SPACE as the trigger -- so
-  `drive.sh ctl "key UP down 2500"` walks the player and `key SPACE down 2500`
-  fires. Measured before building anything: the leader goes from
-  `(1985,1026)` to `(2207,1003)` on one held UP.
+- **A live defect found on the way.** `text.cpp`'s `DrawText` indexed the font
+  bases as `fontBases[font * 133]` and the offsets as
+  `glyphOffsets[font * 262]`. Both tables have a 524-byte stride -- 262 uint16
+  and **131** dwords -- so one index was right and the other eight bytes long.
+  That is the tell: two indexes into parallel tables that disagree about the
+  record size cannot both be correct.
 
-- Its evidence is the **log**, which gains eight lines nothing else in the
-  suite produces -- `FIRE  trooper: 3e8  weapon: 3e9  ammo: -1`, one per round,
-  deterministic in count and content across two runs, carrying the trooper uid,
-  the weapon uid and the ammo. 21 game messages against `mission`'s 13. The
-  pixel check is off: the player is somewhere different on each side by the
-  time the shot lands.
+  Settled three ways. `orig.h` already said 131; `DrawTextClipped` computes
+  `edi*131` through the same `shl 6 / add / lea` chain; and the running game
+  has the three font bases at `0x02B621D8`, `0x02B58028` and `0x02B5C890`,
+  exactly 524 apart -- where 133 dwords reads `0x00005936`, a size field
+  rather than a pointer. Nothing had caught it because font 0 is the only font
+  these drives reach through here; font 1 would have dereferenced `0x5936`.
+  Both steps are named constants now.
 
-- **Say what it still does not reach.** Nothing dies -- `FreeItem`,
-  `RemoveFromItemList`, `DamageRoach` and `ObjDie` all stay at 0 through eight
-  rounds. `MiddleRegionLink` stays at 0 too: the player is *driven* rather than
-  pathfound, so walking him does not exercise the region walk.
+- **The function is `TextExtent`'s vertical twin** -- the same walk, summing
+  the glyph record's *second* uint16 minus three. A probe settles that the
+  field is a height: across "SARGE" the first field is 7, 7, 8, 9, 7 and the
+  second is 12 for every one of them, 14 in font 1. A per-glyph width varies
+  with the glyph; a line height does not.
+
+- Its escape handling **differs** from `TextExtent`'s -- here `^` consumes the
+  character after it as well; there that character counts. Worth knowing
+  before writing either from the other's template.
 
 ## Next
 
