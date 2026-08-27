@@ -5,11 +5,43 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `06c140c`. Working tree clean.
+Last updated: **2026-08-27**, at `84414bb`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **The army-message receiver family is complete** -- `RecvItemDeploy`
+  (`0x0042AF30`) and `RecvDamage` (`0x0042ADA0`) join the three from the last
+  commit, so all six of `ArmyMsgFilter`'s routes are ours.
+
+- **`RecvItemDeploy` names an argument its own sender could not.** The pair
+  confirms the layout from both ends, and the byte at `+0x0D` reaches
+  `DeployItem`'s **`resurrect`** parameter -- so the second argument
+  `SendItemDeploy` is handed, which went in as `arg` because nothing at the
+  sending end said what it was, now has a name.
+
+- **`RecvDamage` settles what the whole damage family rests on.** The message
+  carries **no direction**: it carries the ATTACKER'S POSITION, and the
+  direction is computed here with `AngleBetween` against the victim's own,
+  masked to a byte. That is why `DamageObject`'s third argument and
+  `OBJ_OFF_HIT_DIR` are a direction -- decoded now, where `DamageRoach` had to
+  infer it from a trace line.
+
+  The reversible part is the order: the ATTACKER is the `from` and the victim
+  the `to`. Reversing it flips every hit direction by 128 and nothing about
+  the result looks wrong.
+
+- Its last argument to `DamageObject` is a literal **1**, so damage arriving
+  over the wire suppresses what the local path would do with it -- which is
+  what stops a received hit being broadcast back out.
+
+- **One A/B run flagged, and it was the harness.** The suite reported
+  differences with the whole `mission` section missing. The artifacts say why:
+  that run's **orig** half produced 1441 log lines against the recon half's
+  5238, so the original side terminated early. Re-run alone, `mission` is
+  clean at a frame ratio of 1.01. The gate did its job -- a short run is
+  exactly what it should refuse to score.
 
 - **Three army-message receivers reconstructed**, each the far end of a sender
   already in `armymsg.cpp`: `RecvObjDestroyed` (`0x0042AF00`), `RecvItemGone`
