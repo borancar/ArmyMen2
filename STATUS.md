@@ -5,32 +5,33 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `a8e90e6`. Working tree clean.
+Last updated: **2026-08-27**, at `a1d1e34`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`MsgListSetFlag`** (`0x00401240`, five callers) -- walk the mutex-guarded
-  message list, find the node whose key matches, set or clear bits in its
-  flags, answer the node or null. 954 patches, and `docs/boundary.md` moves
-  with it: four more KERNEL32 sites become reconstructed.
+- **`AtFlagBase`** (`0x004064E0`, four callers). 955 patches.
 
-- **The bits argument is used both ways from one register.** `not esi` is
-  computed before the walk begins, so the clear arm ands with a complement the
-  function has carried since entry. One argument, two masks, chosen by the
-  third -- reproduced as one parameter rather than split into a set and a
-  clear, which would read better and be a different function.
+- **The four callers are what name it.** Each is a one-line wrapper passing an
+  army 0..3 and one of `"gflagbase"`, `"tflagbase"`, `"bflagbase"`,
+  `"grflagbase"` -- so this is capture-the-flag proximity, not something
+  generic. Naming a function from its call site is what this tree warns about
+  six times over, but four call sites differing only in a colour and a literal
+  are a different thing from one, and the literals are the game's own
+  vocabulary.
 
-- **Every exit releases the mutex, and there are four**: found-and-set,
-  found-and-cleared, walked-off-the-end, and empty-list. Counted rather than
-  assumed -- a search under a lock is exactly where an early return leaks one,
-  and this is the file CLAUDE.md warns is multi-threaded, where a mistake is a
-  race rather than a crash.
+- **It answers 0 for yes.** `0x80` is the failure code, shared with the three
+  functions immediately above it, which answer `0x1E`, `0x60` and `0x80`. These
+  are **codes**, not booleans -- a reconstruction returning 1 and 0 would be
+  wrong in a way no `if` on the result would ever show, and the neighbours are
+  what make that visible.
 
-- It also names two fields of the packet record: `+0x14` is the key it matches
-  and `+0x18` the flags it edits, filling part of the gap between
-  `PACKET_REC_OFF_SIZE` and `PACKET_REC_OFF_DATA`.
+- **A name not in the table resolves to entry 0 rather than failing.**
+  `ScriptFindName` answers 0 for "not found" and index 0 is a real entry, so a
+  misspelled flag base measures the distance to whatever entry 0 holds. The
+  four callers all pass literals, which makes it harmless *here* -- and stops
+  being harmless the moment a fifth caller passes a variable.
 
 ## Next
 
