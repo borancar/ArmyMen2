@@ -5,11 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `5493250`. Working tree clean.
+Last updated: **2026-08-27**, at `4f0e5e3`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`Substate34Escape` is reconstructed AND DRIVEN IN BOTH ARMS** --
+  `0x00425DA0`, the sub-state table's arm 34, which CLAUDE.md records ordinary
+  play as never entering. That is why pressing ESCAPE in Boot Camp does
+  nothing.
+
+- **The consume leaves the mission**, and picks the menu request
+  **branchlessly**: `neg; sbb; and -2; add 9` is 7 when `COMM_OFF_IS_HOST` is
+  set and 9 when it is not.
+
+- **Poking `ADDR_MENU_MODE` to `0x22` puts the dispatcher on the arm**, and
+  ESCAPE does the rest. Reading the sub-state back in a live mission:
+
+  | | sub-state |
+  |---|---|
+  | not host | **9** the JOIN panel |
+  | `COMM_OFF_IS_HOST` poked to 1 | **7** the HOST panel |
+
+  So the select is exercised in both directions rather than transcribed and
+  hoped for. It also confirms **from the inside** what `tools/ab.sh` had been
+  assuming from the outside -- that suite reaches those two screens by poking
+  exactly those two codes, and now the game's own code is on record picking
+  them.
+
+- The dismissal writes `MENU_REQUEST = 0` and that 0 is overwritten by the 7
+  or 9 on the next frame. Reproduced: nothing reads it in between, but
+  **dropping a write because nothing appears to read it is a guess, not a
+  simplification**.
 
 - **`merges.py` was run BEFORE choosing the target this time** -- which is what
   the last two commits' corrections were about. None of the current candidates
