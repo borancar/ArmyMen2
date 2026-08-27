@@ -5,37 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `6924f57`. Working tree clean.
+Last updated: **2026-08-27**, at `a84d768`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`LoadType7` and `VehicleDied`** (`0x00435500`, `0x0045B630`). 939 patches;
-  eight of the save/load family are ours.
+- **`TrooperDied`** (`0x00447E50`) -- `VehicleDied`'s twin, and the two now sit
+  next to each other under the same dispatch. 940 patches.
 
-- **Type 7's loader does not read the file at all.** Every other loader starts
-  with an `fread` of its type's record; this one takes what it needs from the
-  header `LoadItemHeader` already read. Type 7 is also the only type whose
-  *save* side writes nothing -- its arm is the shared `return 1`. The pair is
-  consistent, which is worth checking rather than assuming when a saver looks
-  like a stub.
+- **What it spawns belongs to the killer.** `by` is a uid, and the army the
+  spawn gets is that object's `OBJ_OFF_ARMY` -- or `AM2_ARMY_NEUTRAL` when the
+  uid no longer resolves. A kill by someone who has since died is credited to
+  nobody rather than to the victim, which is exactly the sort of thing a
+  reconstruction gets quietly wrong by defaulting to the object already in
+  hand.
 
-- **`VehicleDied`'s second argument is unused.** Reproduced with the parameter
-  present and ignored; the trooper twin does use one. The row it hides is the
-  *second*, and only when `rowCount > 1`. The unregister is conditional on flag
-  bit 0 and clears it, so a vehicle that dies twice comes off the map once --
-  the idempotence is the flag's, not the caller's.
+- The spawn is gated on `OBJ_OFF_FIELD_5A4`. That field is still "structural
+  until something says what it counts", but this is a second reader beside
+  `ADDR_TYPE2_FIELD5A4_SET`'s and both treat it as a **permission** rather than
+  a quantity, which narrows it.
 
-- **Three ratchets fired on one commit and every one was right.** `0x00429CE0`
-  and `0x0045A770` already had names and I invented a second for each in the
-  same edit; `+0x40` already had `OBJ_OFF_FACING`, which is better than the
-  `OBJ_OFF_FIELD_40` I was about to add; and `checkseams` asked for the direct
-  call to `VehicleDied` the moment it was patched.
+- Two adjacent functions with an unused parameter each, for different reasons:
+  `TrooperDied`'s middle argument goes straight to the shared tail;
+  `VehicleDied`'s is read nowhere at all.
 
-- Recorded rather than explained: the footprint clear is also `SaveType3`'s
-  opening call. A *save* function clearing a footprint is not what either name
-  suggests, and nothing read so far says why.
+- **The spawn typedef was already in the file**, seventeen hundred lines
+  further down, with a `uint32_t` where I had written `int32_t` for the fifth
+  argument. The compiler caught the conflict. One declaration now -- and the
+  `uint32_t` is the informative half: that argument is a uid at the other call
+  site, which is why this one passes a plain 0 rather than a name I would have
+  had to invent.
 
 ## Next
 
