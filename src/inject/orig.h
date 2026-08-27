@@ -2047,6 +2047,21 @@ typedef struct {
  * naming what its handler does is the strongest kind of evidence in this
  * image, and it is worth checking this table before inventing a name for
  * anything it reaches. */
+/* HOW TO REACH IT, half-solved. Binding index 0x13 -- scancode 0x0E,
+ * BACKSPACE by default -- opens the console: 0x004186B3 tests that key and,
+ * when it is newly pressed, installs 0x004185C0 as ADDR_CHAR_HANDLER.
+ * Verified in a live Boot Camp mission by tapping `key 0x0e tap` and reading
+ * the global back: it holds 0x004185C0 afterwards and 0 before.
+ *
+ * What does NOT work yet is typing into it. `ctl "type ..."` posts the
+ * WM_CHARs the handler should accumulate and `\r` posts the 0x0D that
+ * 0x0041864C tests for, and ScriptRunLine's counter stays at 0 -- so the line
+ * never reaches ADDR_SCRIPT_RUN_LINE and the cheat table is still undriven.
+ * Somewhere between the handler and the submit the characters are being
+ * dropped; that is where to look next.
+ *
+ * The cheats are also gated on ADDR_MP_SESSION being zero, so they are
+ * single-player only -- 0x0041859F is inside that test. */
 #define ADDR_CHEAT_ENTRY         0x00417B80u
 #define ADDR_CHEAT_ENABLED       0x004FCF94u  /* int32_t, "when all else fails..." */
 #define ADDR_CHEAT_WORDS         0x00476704u  /* const char *[41] */
