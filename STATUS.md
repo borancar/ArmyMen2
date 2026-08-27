@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `1bbb7f6`. Working tree clean.
+Last updated: **2026-08-27**, at `36b402e`. Working tree clean.
 
 ## In flight
 
@@ -52,6 +52,38 @@ Nothing uncommitted.
 - Verified by reading -- this runs only in a network game, which this project
   cannot start. What the A/B covers is `UnitTypeCost`, whose arithmetic is
   unchanged by the base moving.
+
+- **`ParsePlaceLine` is reconstructed too, and its last field restarts the
+  tokeniser.** Every other column continues with `strtok(NULL)`; the name
+  passes the LINE again, so `strtok` begins afresh and hands back the first
+  token -- the type. All 1,264 lines the game ships end up with the type name
+  in the name field, and the `-` those files write in that column is never
+  seen. The first reading had it as an ordinary sixth field: `push ebx` beside
+  a `strtok` looks like every other continuation until you notice the
+  continuations push 0.
+
+- **`tools/placecheck.py` is what settled it** -- the original parser under
+  Unicorn over every line of all thirty-six shipped files, with `AddPlacement`
+  hooked so the record is read at the call. 1,264 distinct lines into
+  `tests/placevec.h` for `selftest` to replay. It also confirms the corrected
+  unit-type base from the other end: rifleman 0, jeep 6, mortarman 2 are only
+  right with the table at `0x00487898`.
+
+- **What the corpus does not catch:** deleting the `-` test passes all 1,264
+  lines -- not a gap so much as a consequence of the defect, since the token
+  can never be `-`. Swapping x and y, moving the facing by one, and
+  "correcting" the restart each fail every line.
+
+- **An uninitialised field cannot be part of an exact oracle**, which this file
+  already records about the widget dump and which cost a round anyway. Three
+  padding bytes and the tail of `name` hold stack; Unicorn's is zero and
+  Wine's is not, so all 1,264 rows failed with every defined byte agreeing.
+
+- Four CRT seams now, three so this runs offline at all: `strtok` moved into
+  `crt.h` under one name (`defparse.cpp` and `definfo.cpp` reached it by
+  address for the same shared-cursor reason), `strtol` joined it as the one
+  thing stopping `DefParseNumber` running without the game, and `sprintf` came
+  with `BuildPlacementPath`.
 
 ## A correction: two functions were not unexercised
 
