@@ -5757,6 +5757,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * what the dispatch actually does is not established here. Stays original. */
 #define ADDR_SETTLE_POINT_IN_REGION 0x00439F40u /* int32_t(int32 tile,
                                                  *         AM2_Point *) */
+/* 0x00437E00, four callers -- and one of them is 0x00439F40 itself, which
+ * installs the rule and then dispatches through it in the same breath. Choose
+ * which of three rules a point gets settled under, from the object doing the
+ * asking, and record that object's army beside it.
+ *
+ * The three arms are established by the tests rather than by reading the
+ * handlers: ObjIsType3 with VEHICLE_OFF_KIND 5 -- which the unit-type
+ * table calls `ptboat` -- takes one; any other vehicle and any roach take
+ * another; a null object or anything else takes the third. So the boat has a
+ * rule of its own, which is what a unit that moves on water needs.
+ *
+ * All three handlers read ADDR_POINT_RULE_ARMY, so the rules are army-aware.
+ * A NULL object leaves it holding the previous object's army, because the
+ * null path jumps past the store; reproduced. */
+#define ADDR_SET_POINT_RULE      0x00437E00u  /* void(void *obj) */
+#define ADDR_POINT_RULE_ARMY     0x00523DD8u  /* int32_t, from OBJ_OFF_ARMY */
+#define ADDR_POINT_RULE          0x00523DDCu  /* the installed handler */
+#define ADDR_POINT_RULE_BOAT     0x00437D60u  /* vehicle kind 5 */
+#define ADDR_POINT_RULE_VEHICLE  0x00437D10u  /* other vehicles, and roaches */
+#define ADDR_POINT_RULE_DEFAULT  0x00437DB0u  /* everything else, and null */
+/* The kind is VEHICLE_OFF_KIND, further down and already named. */
+#define AM2_VEHICLE_KIND_BOAT    5
 /* The map's bounds in pixels, four int32 read as one 16-byte block out of the
  * map file by 0x0042C440 and written nowhere else. Distinct from
  * ADDR_MAP_EXTENT_X/Y, which are a different pair at 0x00514DD0. */

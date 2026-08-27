@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "region.h"
+#include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "image.h"
 #include "crt.h"
 #include "../inject/orig.h"
@@ -75,8 +76,65 @@ void __cdecl AddRegionLink(int32_t cell, int32_t neighbour)
         orig_log("Added Region link from %d to %d\n", a, b);
 }
 
+/* 0x00437E00, four callers -- and one of them is ADDR_SETTLE_POINT_IN_REGION
+ * itself, which installs the rule and then dispatches through it in the same
+ * breath. Choose which of three rules a point gets settled under, from the
+ * object doing the asking.
+ *
+ * FILED HERE RATHER THAN BY BAND, the same call RowInit needed. It sits in
+ * pad.cpp..script.cpp, a different translation unit from this file's
+ * 0x0042B860 -- but its only consumers are the region walkers, and the
+ * settle function it feeds reads ADDR_REGION_OF_CELL. Filing it away from
+ * them would cost more than the split does.
+ *
+ * The three arms come from the tests, not from reading the handlers. A
+ * vehicle of kind 5 -- `ptboat` in the unit-type table -- takes one rule; any
+ * other vehicle and any roach take another; a null object or anything else
+ * takes the third. A unit that moves on water having a rule of its own is
+ * exactly what one would expect, and here it is a fact rather than a guess.
+ *
+ * TWO THINGS THE SHAPE HIDES. The non-vehicle path stores the vehicle rule
+ * FIRST and only then asks whether the object is a roach, overwriting with
+ * the default when it is not -- so the store happens twice on that path and
+ * the intermediate value is observable by nothing. And a NULL object skips
+ * the army store entirely, jumping straight to the default rule, so
+ * ADDR_POINT_RULE_ARMY keeps whatever the previous object left. Both
+ * reproduced.
+ */
+void __cdecl SetPointRule(void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (o) {
+        *(int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY =
+            *(const int8_t *)(o + OBJ_OFF_ARMY);
+
+        if (ObjIsType3((const AM2_Object *)o)) {
+            *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+                *(const int32_t *)(o + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
+                    ? ADDR_POINT_RULE_BOAT : ADDR_POINT_RULE_VEHICLE;
+            return;
+        }
+
+        *(uint32_t *)(uintptr_t)ADDR_POINT_RULE = ADDR_POINT_RULE_VEHICLE;
+        if (ObjIsType8((const AM2_Object *)o))
+            return;
+    }
+
+    *(uint32_t *)(uintptr_t)ADDR_POINT_RULE = ADDR_POINT_RULE_DEFAULT;
+}
+
 int region_install(void)
 {
-    return patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
-                         "AddRegionLink", 2);
+    /* Two now, so this is no longer a single `return patch_replace`. That
+     * shape is exactly how four reconstructions once ended up never being
+     * installed, and adding to one without noticing is how it happens -- this
+     * one did, and the patch count not moving is what said so. */
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_SET_POINT_RULE, (const void *)SetPointRule,
+                        "SetPointRule", 4);
+    rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
+                        "AddRegionLink", 2);
+    return rc;
 }
