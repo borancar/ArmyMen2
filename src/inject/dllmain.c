@@ -34,6 +34,7 @@
 #include "../game/defparse.h"
 #include "../game/definfo.h"
 #include "../game/place.h"
+#include "../game/dirty.h"
 #include "../game/region.h"
 #include "../game/objflag.h"
 #include "../game/event.h"
@@ -451,6 +452,7 @@ static void install(void)
     defparse_install();
     definfo_install();
     place_install();
+    dirty_install();
     region_install();
     objflag_install();
     misc_install();

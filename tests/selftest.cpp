@@ -26,6 +26,7 @@
 
 #include "../src/game/script.h"
 #include "../src/game/place.h"
+#include "../src/game/dirty.h"
 #include "../src/game/image.h"
 #include "../src/game/crt.h"
 
@@ -33,6 +34,7 @@
 #include "vectors.h"
 #include "scriptvec.h"
 #include "placevec.h"
+#include "dirtyvec.h"
 
 static uint8_t g_scratch[AM2_SCRATCH_LEN];
 
@@ -70,6 +72,7 @@ static void FillScratch(uint32_t salt)
 
 static int ScriptTokens(int *passed);
 static int PlaceLines(int *passed);
+static int DirtyList(int *passed);
 static int ScriptLines(int *passed);
 static int ScriptSpine(int *passed);
 static int ScriptVariables(int *passed);
@@ -177,6 +180,7 @@ int main(void)
 
     fail += ScriptTokens(&pass);
     fail += PlaceLines(&pass);
+    fail += DirtyList(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);
     fail += ScriptVariables(&pass);
@@ -524,6 +528,69 @@ static int PlaceLines(int *passed)
     }
     FreePlacements();
     printf("  %d place lines: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
+}
+
+/* The dirty-rectangle list, against the ORIGINAL run over the same sequences.
+ *
+ * A THIRD KIND OF ORACLE, and the reason for it is that the other two cannot
+ * reach this. AddDirtyRect's answer is not a return value, it is the array
+ * afterwards -- so the vector is a sequence of calls and the recording is the
+ * whole 10,004-byte span, tail index included. Compared byte for byte with no
+ * masking, because unlike the place records there is nothing uninitialised in
+ * it: the region is zeroed before the sequence starts on both sides.
+ *
+ * The rectangles are generated from the step index rather than stored, which
+ * is the same trade tools/vectors.py makes with its salt -- the formula below
+ * has to match rects() in tools/dirtycheck.py or every row fails at once.
+ *
+ * THE STATE IS SEEDED, NOT ZEROED, and that is not tidiness. With zeros,
+ * deleting one of ResetDirtyList's three stores passed all eight sequences,
+ * because clearing something already zero cannot be observed. ADDR_FULL_REDRAW
+ * is seeded with a value neither function writes for the same reason.
+ */
+static int DirtyList(int *passed)
+{
+    if (am2_load_image(".wine/drive_c/GOG Games/Army Men II/ArmyMen2.exe")
+        != 0) {
+        printf("\n  dirty list: SKIPPED (no image)\n");
+        return 1;
+    }
+
+    unsigned char *region = (unsigned char *)AM2_IMAGE(ADDR_DIRTY_TAIL);
+    int32_t       *full   = (int32_t *)AM2_IMAGE(ADDR_FULL_REDRAW);
+    int            pass = 0, fail = 0;
+
+    for (uint32_t v = 0; v < sizeof am2_dirty_vectors /
+                             sizeof am2_dirty_vectors[0]; v++) {
+        const AM2_DirtyVector *d = &am2_dirty_vectors[v];
+
+        for (int32_t i = 0; i < AM2_DIRTY_REGION_LEN; i++)
+            region[i] = (unsigned char)((i * 7 + 13) & 0xFF);
+        *full = 0x5A5A5A5A;
+        ResetDirtyList();
+
+        for (int32_t i = 0; i < d->adds; i++) {
+            int32_t l = (i * 37) % 640 - 64;
+            int32_t t = (i * 53) % 480 - 32;
+
+            AddDirtyRect(l, t, l + i % 7, t + i % 5);
+        }
+
+        if (*full != d->full
+            || memcmp(region, d->region, AM2_DIRTY_REGION_LEN) != 0) {
+            if (fail < 10)
+                printf("  FAIL dirty list after %d add(s)\n", (int)d->adds);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+
+    memset(region, 0, AM2_DIRTY_REGION_LEN);
+    *full = 0;
+    printf("  %d dirty sequences: %d pass, %d fail\n", pass + fail, pass, fail);
     *passed += pass;
     return fail;
 }

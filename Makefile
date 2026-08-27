@@ -53,6 +53,7 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/maprow.cpp \
             src/game/pad.cpp \
             src/game/place.cpp \
+            src/game/dirty.cpp \
             src/game/air.cpp \
             src/game/anim.cpp \
             src/game/army.cpp \
@@ -229,7 +230,7 @@ endif
 # reads a global needs that global mapped, and mapping it means starting the
 # game, which is the thing this avoids.
 SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
-                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/armymsg.cpp src/game/defparse.cpp src/game/definfo.cpp src/game/region.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp src/game/savetag.cpp src/game/army.cpp src/game/maprow.cpp src/game/map.cpp src/game/air.cpp src/game/trig.cpp src/game/gameproc.cpp src/game/pad.cpp src/game/place.cpp
+                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/armymsg.cpp src/game/defparse.cpp src/game/definfo.cpp src/game/region.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp src/game/savetag.cpp src/game/army.cpp src/game/maprow.cpp src/game/map.cpp src/game/air.cpp src/game/trig.cpp src/game/gameproc.cpp src/game/pad.cpp src/game/place.cpp src/game/dirty.cpp
 
 .PHONY: selftest
 selftest: $(BUILD)/selftest.exe
@@ -239,7 +240,7 @@ selftest: $(BUILD)/selftest.exe
 # removing a module from the list leaves a stale binary that make happily
 # calls up to date, and the link guard in `check` reports ok on a list that
 # no longer links. Verified by removing gamedir.cpp and watching it fail.
-$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h Makefile
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h tests/dirtyvec.h Makefile
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
 	    -o $@ $(SELFTEST_SRC)
@@ -259,6 +260,14 @@ scriptvec:
 .PHONY: placevec
 placevec:
 	./.venv/bin/python tools/placecheck.py
+
+# A STATEFUL oracle, and the only check either dirty-list function has: the
+# ORIGINAL run over a sequence of appends under Unicorn, with the whole record
+# array recorded rather than a return value. See tools/dirtycheck.py for why
+# neither ab.sh configuration can see them.
+.PHONY: dirtyvec
+dirtyvec:
+	./.venv/bin/python tools/dirtycheck.py
 
 .PHONY: vectors
 vectors:
