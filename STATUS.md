@@ -5,38 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `1bc084d`. Working tree clean.
+Last updated: **2026-08-27**, at `cc93db1`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`MiddleRegionLink`** (`0x0042B7F0`, three callers). 928 patches.
+- **`tools/ab.sh combat` exists, and `DamageObject` is no longer 0.** It read 0
+  on every configuration this project had; it reads 6 here.
 
-- **Two regions usually touch along a run of cells**, so a caller that wants to
-  get from one to the other has a choice of crossings and this makes it -- the
-  middle of the run rather than the first cell listed. That is the whole
-  content of the function and the reason for the name.
+- **What was missing was the key binding table, not a different mission.**
+  `0x004854BC` is pairs of scancodes and its first four are W/UP, S/DOWN,
+  A/LEFT, D/RIGHT with SPACE as the trigger -- so
+  `drive.sh ctl "key UP down 2500"` walks the player and `key SPACE down 2500`
+  fires. Measured before building anything: the leader goes from
+  `(1985,1026)` to `(2207,1003)` on one held UP.
 
-- It walks the list *twice*, and the second walk is not a search for the same
-  thing: the first counts matches, the second stops at the `(count + 1) / 2`-th.
-  Left as two passes because that is what the original does, and one pass would
-  have to decide what "middle" means before it knows the count.
+- Its evidence is the **log**, which gains eight lines nothing else in the
+  suite produces -- `FIRE  trooper: 3e8  weapon: 3e9  ammo: -1`, one per round,
+  deterministic in count and content across two runs, carrying the trooper uid,
+  the weapon uid and the ammo. 21 game messages against `mission`'s 13. The
+  pixel check is off: the player is somewhere different on each side by the
+  time the shot lands.
 
-- **Unexercised, and not for the usual reason -- it is not blind.** Its callers
-  sit inside `0x004049C0` and `0x00407190`, the unit movement code, and a Boot
-  Camp drive that walks nobody anywhere never reaches them: the counter reads 0
-  while `AddRegionLink` beside it reads 2,109 from the map load.
+- **Say what it still does not reach.** Nothing dies -- `FreeItem`,
+  `RemoveFromItemList`, `DamageRoach` and `ObjDie` all stay at 0 through eight
+  rounds. `MiddleRegionLink` stays at 0 too: the player is *driven* rather than
+  pathfound, so walking him does not exercise the region walk.
 
 ## Next
 
-- **A drive that moves and fights** is now three things waiting on one
-  configuration: `MiddleRegionLink` and the rest of the movement code, the
-  combat path (`DamageObject` is 0 everywhere, blocking `FreeItem`,
-  `RemoveFromItemList`, `Type2ActionB`, `DamageRoach`, `PointActionA`), and
-  whatever eventually observes the real mouse pick. Boot Camp's opening has
-  nothing to shoot and nowhere anyone needs to walk; a different mission, not
-  a longer one, is what this wants.
+- **A mission with something in it to kill.** `ab.sh combat` reaches the
+  damage path but nothing dies, so `FreeItem`, `RemoveFromItemList`,
+  `DamageRoach` and `ObjDie` are still unexercised. Boot Camp's opening has no
+  target that can be destroyed; this is the "different mission, not a longer
+  one" ask, now narrowed to exactly what it needs.
+
+- **AI movement**, separately: `MiddleRegionLink` and the region walk are only
+  reached when something is *pathfound* rather than driven, so holding a key
+  does not do it.
 
 - **A drive that observes the mouse pick** is the older half of that. It would close `PickObjectsAt`, and it is close to the drive the
   combat path has been waiting for -- `DamageObject` is 0 on every
