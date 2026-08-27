@@ -8,6 +8,8 @@
 #   tools/ab.sh df           -df, so sprites come off disk rather than the .dat
 #   tools/ab.sh audio        Boot Camp again, with a silent sound device
 #   tools/ab.sh mission      past both dialogs into live play, and scrolling
+#   tools/ab.sh combat       the same, then walking and firing -- the only
+#                            configuration where DamageObject is not 0
 #   tools/ab.sh state3       the movie state, entered by poking a transition
 #   tools/ab.sh campaign     SINGLE PLAYER into MAP 01, the only `variable` path
 #   tools/ab.sh quit         out through the menu, so the teardown runs
@@ -155,6 +157,17 @@ play() {
         # long as the instruction sign was on screen, and the scroll merge at
         # 0x0041D060 never ran once.
         mission)  args="-nointro -dbg"    ; wait=20 ;;
+        # Deeper still: past both dialogs, then WALK and FIRE. This is the only
+        # configuration that reaches combat at all -- DamageObject read 0 on
+        # every other one, and reads 6 here. The keys come from the binding
+        # table at 0x004854BC, whose first four pairs are W/UP, S/DOWN, A/LEFT
+        # and D/RIGHT, and whose SPACE is the trigger.
+        #
+        # Its pixel check is off for mission's reason and one more: the player
+        # is somewhere different on each side by the time the shot lands,
+        # because movement is driven by held keys and the two runs do not tick
+        # identically. The log and the counters are the evidence.
+        combat)   args="-nointro -dbg"    ; wait=20 ;;
         # Leaving through the menu, which is the only way the teardown runs at
         # all: drive.sh stop kills the tree, so ShutdownDirectDraw,
         # ShutdownInput, ReleaseSoundBuffers and the sprite and sound frees
@@ -306,7 +319,8 @@ play() {
         >/dev/null 2>&1
 
     # Boot Camp needs driving; the other two show what they show.
-    if [ "$cfg" = bootcamp ] || [ "$cfg" = audio ] || [ "$cfg" = mission ]; then
+    if [ "$cfg" = bootcamp ] || [ "$cfg" = audio ] || [ "$cfg" = mission ] \
+       || [ "$cfg" = combat ]; then
         "$REPO/tools/point.py" 306 143 --click >/dev/null 2>&1
         sleep 25
         drive ctl "key RETURN tap" >/dev/null 2>&1
@@ -847,6 +861,29 @@ play() {
         sleep 5
     fi
 
+    if [ "$cfg" = combat ]; then
+        # Both opening dialogs, exactly as `mission` clears them.
+        "$REPO/tools/point.py" 476 224 --click >/dev/null 2>&1
+        sleep 6
+        drive ctl "mouse left tap" >/dev/null 2>&1
+        sleep 6
+        # Then walk and shoot. Eight rounds is what it took for DamageObject to
+        # move at all: four gave 3 and eight gave 6, so the rate is low and the
+        # count is the thing to watch rather than the pixels.
+        #
+        # NOTHING DIES on this stretch of Boot Camp -- FreeItem and
+        # RemoveFromItemList stay at 0 through all of it -- so the item
+        # teardown is still waiting on a mission with something in it. What
+        # this does reach is the damage path itself, which nothing reached
+        # before.
+        for _ in 1 2 3 4 5 6 7 8; do
+            drive ctl "key UP down 2500" >/dev/null 2>&1
+            sleep 3
+            drive ctl "key SPACE down 2500" >/dev/null 2>&1
+            sleep 3
+        done
+    fi
+
     if [ "$cfg" = mission ]; then
         # MESSAGE FROM HQ.
         "$REPO/tools/point.py" 476 224 --click >/dev/null 2>&1
@@ -1012,7 +1049,8 @@ compare() {
         echo "          tools/ab.sh audio to compare the audio path itself."
     fi
 
-    if [ "$cfg" = mission ] && { [ "$vo" -lt "$MIN_FRAMES" ] || [ "$vr" -lt "$MIN_FRAMES" ]; }; then
+    if { [ "$cfg" = mission ] || [ "$cfg" = combat ]; } \
+       && { [ "$vo" -lt "$MIN_FRAMES" ] || [ "$vr" -lt "$MIN_FRAMES" ]; }; then
         echo "  frames  TOO FEW -- $cfg is supposed to reach live gameplay and"
         echo "          at least one side did not ($vo/$vr, want $MIN_FRAMES+)."
         echo "          Comparing these logs would compare the two ways of not"
@@ -1059,6 +1097,9 @@ compare() {
         intro)    budget=-1 ;;      # -1 disables the check
         # Measured, not guessed -- see the note below the case.
         mission)  budget=-1 ;;
+        # Live play with the player walking, so the two sides are not even in
+        # the same place. Meaningless by construction, more so than mission.
+        combat)   budget=-1 ;;
         # Live play again: two runs of a mission never sit on the same frame,
         # so the pixel figure is meaningless by construction. The log is the
         # evidence, as with intro and mission.
@@ -1219,7 +1260,7 @@ PY
 # printed "A/B clean" -- which reads as both configurations passing and is the
 # same failure mode as the two missing files that once diffed as identical.
 cfgs="${*:-bootcamp}"
-[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission campaign controls difficulty audiovol menuscreens movies multi mpoptions df state3 quit"
+[ "$cfgs" = all ] && cfgs="bootcamp windowed intro audio mission combat campaign controls difficulty audiovol menuscreens movies multi mpoptions df state3 quit"
 
 fail=0
 for cfg in $cfgs; do
