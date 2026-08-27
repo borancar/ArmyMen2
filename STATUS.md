@@ -5,37 +5,34 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `157d484`. Working tree clean.
+Last updated: **2026-08-27**, at `05d5741`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`SaveType2` and `SaveType3`** (`0x00447130`, `0x0045A070`) -- the last two
-  per-type savers, so all eight arms of `SaveOneItem` are ours. 948 patches.
+- **`LoadType6`** (`0x00422780`). 949 patches -- all nine savers and three of
+  the nine loaders are ours.
 
-- **I wrote these two up two commits ago without reconstructing them**, from
-  their heads, and got the important half wrong. `orig.h` has said since then
-  that each normalises a pointer "in place and neither converts back, so a
-  saved object is left holding an index". Each **restores the original as its
-  last act**. The file carries an index and the object is unchanged -- the
-  format claim was right and the object claim came from stopping at the first
-  interesting instruction.
+- **It makes the object out of the record and then overwrites it with the same
+  record.** Three fields go to `SpawnAt` as the kind, the uid and one more, and
+  the whole record is then copied to `OBJ_OFF_FIELD_94`, so whatever the maker
+  derived from those three is replaced a moment later. The same numbers unless
+  the maker changes them -- the sort of redundancy that only matters when it
+  stops being redundant.
 
-- **And it answers the question `SaveType4` left open.** That commit recorded,
-  without explaining, that a *save* function calling `ObjClearFootprint` "is
-  not what either name suggests". `SaveType3` brackets its write with the pair
-  -- clear first, `ObjSetFootprint` last. The saved record is the object with
-  its footprint lifted out of the map's cell weights.
+- The **position and army come from the header**, not the record, as in
+  `LoadType7`. The header is the part every type shares.
 
-- **Type 2's tag comes from its weapon**, or is 1 when it has none, so a
-  trooper who dropped his weapon saves a different tag from an armed one and a
-  reader cannot skip that field.
+- **The `0x68..0x93` gap is untouched on this side too.** The header copy is
+  `ADDR_ITEM_HEADER_SIZE` bytes and the record copy starts at `0x94`, so the
+  bytes the save side never wrote are the bytes the load side never restores.
+  Both halves agreeing about the hole is better evidence that it is deliberate
+  than either alone.
 
-- The new field names are a `SAVED_OFF_` family rather than `TROOPER_` or
-  `VEHICLE_`, because `0xA8` and `0xAC` already carry other names for other
-  readings of the same bytes -- the union again, and a third family is honest
-  where a second name in an existing one would not be.
+- **No error checking anywhere** -- the `fread` is unchecked and so is the
+  maker's answer, so a truncated file walks into a null dereference.
+  `SaveOneItem`'s per-step checking has no counterpart on this side.
 
 ## Next
 
