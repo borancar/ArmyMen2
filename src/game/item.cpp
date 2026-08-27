@@ -618,8 +618,6 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
 /* Still original: the cell query HeightAtPoint walks, and the two halves of
  * ObjTileChanged's "something moved" path. */
 typedef void (__cdecl *AM2_ObjHookFn)(void *obj);
-typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
-#define orig_apply_obj_height ((AM2_ApplyHeightFn)(uintptr_t)ADDR_APPLY_OBJ_HEIGHT)
 typedef void (__cdecl *AM2_ObjRemapFn)(void *obj, void *desc, int32_t force);
 #define orig_obj_tile_hook ((AM2_ObjHookFn)(uintptr_t)ADDR_OBJ_TILE_HOOK)
 #define orig_obj_remap     ((AM2_ObjRemapFn)(uintptr_t)ADDR_OBJ_REMAP)
@@ -646,6 +644,74 @@ typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
                                       int32_t h);
 #define orig_trooper_died_tail ((AM2_DiedTailFn)(uintptr_t)ADDR_TROOPER_DIED_TAIL)
 #define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
+
+/* Still original: types 1 and 4 have their own height handler. */
+typedef void (__cdecl *AM2_ApplyHeight14Fn)(void *obj, int32_t height);
+#define orig_apply_height_1_4 \
+            ((AM2_ApplyHeight14Fn)(uintptr_t)ADDR_APPLY_HEIGHT_1_4)
+
+/* 0x004278E0, four callers -- ObjTileChanged's tail among them. Give an object
+ * a height and push it into the depth sort.
+ *
+ * A ZERO HEIGHT MEANS "TAKE THE TILE'S OWN", read through ADDR_TILE_ATTRS at
+ * OBJ_OFF_TILE. So 0 is not a height, it is a request -- and a caller that
+ * genuinely wants a height of zero cannot say so.
+ *
+ * Four arms over `type - 1` and only three distinct bodies: the jump table has
+ * 0x0042790C twice, for types 1 and 4, which is the same pairing SaveType4 and
+ * ADDR_STEP_TYPE1_4 show. Those two do not touch a row at all.
+ *
+ * TYPE 3 IS THE ONE WITH TWO ROWS. It writes the first row's depth layer and
+ * then the SECOND's when the count is above one -- the same second row
+ * VehicleDied hides. Everything else writes the first only.
+ *
+ * TYPE 2 IS THE ONE THAT DOES NOT CHECK. The default arm tests the row count
+ * before touching a row; the type-2 arm jumps into the same tail without
+ * testing, so a type 2 with no rows writes through a null. Reproduced, because
+ * it is the original's and every type 2 in a mission has a row.
+ *
+ * The second call re-reads OBJ_OFF_HEIGHT_SET rather than reusing the value it
+ * just stored. Same number either way; written as the original has it. */
+void __cdecl ApplyObjHeight(void *obj, int32_t height)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *rows;
+
+    if (height == 0)
+        height = TileAttrAt(*(const uint16_t *)(o + OBJ_OFF_TILE));
+
+    switch (*(const int32_t *)o) {
+    case 1:
+    case 4:
+        orig_apply_height_1_4(o, height);
+        return;
+
+    case 2:
+        *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+        break;
+
+    case 3:
+        *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+        rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+        *(int16_t *)(rows + OBJ_OFF_DEPTH_LAYER) =
+            (int16_t)ScaleBy32Blocks((int8_t)height);
+        if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+            *(int16_t *)(rows + AM2_OBJ_ROW_STRIDE + OBJ_OFF_DEPTH_LAYER) =
+                (int16_t)ScaleBy32Blocks(
+                    *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+        return;
+
+    default:
+        *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+        if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 0)
+            return;
+        break;
+    }
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(int16_t *)(rows + OBJ_OFF_DEPTH_LAYER) =
+        (int16_t)ScaleBy32Blocks((int8_t)height);
+}
 
 /* 0x00447E50, one caller -- VehicleDied's twin, and the same first move: take
  * the object off the map if flag bit 0 is set, then clear it.
@@ -772,7 +838,7 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
         return;
 
     orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), force);
-    orig_apply_obj_height(o, height);
+    ApplyObjHeight(o, height);
 }
 
 /* 0x0042A1B0, five callers -- the precise hit test at a world point.
@@ -3074,6 +3140,8 @@ void item_install(void)
                   "ObjTileChanged", 15);
     patch_replace(ADDR_VEHICLE_DIED, (const void *)VehicleDied, "VehicleDied", 1);
     patch_replace(ADDR_TROOPER_DIED, (const void *)TrooperDied, "TrooperDied", 1);
+    patch_replace(ADDR_APPLY_OBJ_HEIGHT, (const void *)ApplyObjHeight,
+                  "ApplyObjHeight", 4);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

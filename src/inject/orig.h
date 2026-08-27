@@ -6122,8 +6122,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_TILE_HOOK       0x00437860u /* void(obj), when bit 3 is clear */
 #define ADDR_OBJ_REMAP           0x00429D00u /* void(obj, desc, int32 force) */
 #define OBJ_FLAG_NO_TILE_HOOK    0x08u
-/* 0x004278E0, given the object and its OBJ_OFF_HEIGHT_SET byte. */
+/* 0x004278E0, four callers. Give an object a height and push it into the
+ * depth sort. A ZERO height means "take the tile's own", read through
+ * ADDR_TILE_ATTRS -- so 0 is not a height here, it is a request.
+ *
+ * Four arms over `type - 1` and only three distinct: types 1 and 4 share the
+ * table slot for 0x00433C20 and do not touch the row at all, type 2 writes the
+ * byte and the first row's depth layer, type 3 writes the SECOND row's as well
+ * when there is one, and everything else checks the row count first.
+ *
+ * TYPE 2 IS THE ONE THAT DOES NOT CHECK. The default arm tests
+ * OBJ_OFF_ROW_COUNT before touching a row and the type-2 arm jumps straight
+ * into the same tail, so an object of type 2 with no rows writes through a
+ * null. Reproduced; every type 2 in a mission has one. */
 #define ADDR_APPLY_OBJ_HEIGHT 0x004278E0u  /* void(obj, int32_t height) */
+#define ADDR_APPLY_HEIGHT_1_4 0x00433C20u  /* void(obj, int32_t), 3 callers */
 #define AM2_ITEM_HEADER_BYTES 0x94u
 /* It RETURNS THE OBJECT, not a flag -- this said void. */
 #define ADDR_LOAD_ONE_ITEM  0x004289E0u  /* void *(FILE *, int32_t) */

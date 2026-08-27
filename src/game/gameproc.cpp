@@ -450,7 +450,6 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
 typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
-typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
 #define orig_load_type1  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE1)
 #define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
 #define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
@@ -458,7 +457,6 @@ typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
 #define orig_load_type5  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE5)
 #define orig_load_type6  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE6)
 #define orig_load_type8  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE8)
-#define orig_apply_obj_height ((AM2_ApplyHeightFn)(uintptr_t)ADDR_APPLY_OBJ_HEIGHT)
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
  * hands it to the type's loader, which builds the object and RETURNS it.
@@ -529,7 +527,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
             flags & ~(uint32_t)OBJ_FLAG_SELECTED;
     }
 
-    orig_apply_obj_height(made,
+    ApplyObjHeight(made,
                           (int32_t)*(const int8_t *)(made + OBJ_OFF_HEIGHT_SET));
     return made;
 }
