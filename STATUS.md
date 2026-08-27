@@ -5,11 +5,32 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `37d2bed`. Working tree clean.
+Last updated: **2026-08-27**, at `74f40f0`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`MissionNetworked` is reconstructed** (`0x00421800`), and **the argument it
+  passes on is LOST, not won**. Both arms compute a win with `sete` and then
+  invert it with a second `sete` before pushing, so `ADDR_SHOW_MP_RESULT` takes
+  **0 for a win**. Two inversions in four instructions is exactly the shape
+  that gets transcribed once instead of twice -- and the result would be an end
+  screen right about everything except which one it is.
+
+- The team arm needs **both** the caller's flag and a non-zero team of our own:
+  a player with no team falls through to the solo test even in a team game.
+  The fallback compares the winning army's SLOT against `ADDR_DEFAULT_OWNER`,
+  which reads oddly until you notice `CommSlotForArmy` answers the identity for
+  every army a script can write. Reproduced as the comparison the original
+  makes, not the one it means.
+
+- **The death pair was cross-checked and AGREES.** After last commit's
+  correction -- a message misread from one end -- I checked
+  `SendDeathMessage` against `RecvDeath`: victim uid at `+4`, attacker at
+  `+8`, kind byte at `+0x0C`, and the receiver reads exactly those. No
+  correction needed, which is worth recording, because **a check only reported
+  when it fails is not a check**.
 
 - **CORRECTION, found by reading the other end.** `RecvDamage`'s comment said
   the damage message carries **the attacker's position**, and `orig.h` said the
