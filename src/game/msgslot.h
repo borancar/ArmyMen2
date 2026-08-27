@@ -320,7 +320,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid);
  * the player count, every slot's id, colour, team and name, the map and level
  * names, and the version pair.
  *
- * Its loop bound is the ADDRESS OF THE NEXT GLOBAL. It fills ADDR_ARMY_SETTING
+ * Its loop bound is the ADDRESS OF THE NEXT GLOBAL. It fills ADDR_ARMY_POINTS
  * and stops when the cursor reaches ADDR_SCORE_LIMIT, which sits immediately
  * after it -- so there are exactly four slots, whatever the message says the
  * count is. The same shape as the registration table walking up to

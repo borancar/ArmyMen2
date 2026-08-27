@@ -1333,12 +1333,52 @@
 #define COMM_ARMY_OFF_WAS_HERE   0x25Cu   /* what the query falls back to */
 /* 0x0043B7C0, one caller -- the per-frame path, and only in a network game.
  * Walk the four army records; any that WAS here but now has no player has its
- * .aai loaded, which is the AI taking the abandoned army over. The stride is
- * AM2_PLAYER_STRIDE and the records begin at the comm object itself. */
+ * units laid out again, which is the AI taking the abandoned army over. The
+ * stride is AM2_PLAYER_STRIDE and the records begin at the comm object. */
 #define ADDR_AI_TAKE_ABANDONED   0x0043B7C0u  /* void(void) */
-/* 0x0043B700, one caller. Load one army's .aai through DefParseInfoFile and
- * complain with "Couldn't parse %s!" if it will not read. */
-#define ADDR_LOAD_ARMY_AI        0x0043B700u  /* void(int32_t army) */
+/* 0x0043B700, one caller. THE FILE IS NOT AN .aai, which is what this comment
+ * claimed for as long as it existed. BuildPlacementPath below formats
+ * "%s_%s_place.txt", and thirty-six such files ship under the multiplayer map
+ * directories -- so what is read here is the map's unit PLACEMENT list for one
+ * army colour, through DefParseInfoFile, with "Couldn't parse %s!" if it will
+ * not read. Named from the callee rather than from the layer above it, which
+ * is the rule this file already carries and which was not applied here. */
+#define ADDR_LOAD_ARMY_PLACEMENT 0x0043B700u  /* void(int32_t slot) */
+/* 0x0043A560, one caller. sprintf(dest, "%s_%s_place.txt", map, colour) where
+ * colour is green/tan/blue/grey chosen from the comm slot's own army index --
+ * the COMM_ARMY_OFF_COLOUR field read inline, WITHOUT CommArmyOfSlot's
+ * `slot == 4` special case. Anything above 3 leaves the colour NULL and the
+ * CRT writes "(null)". Returns dest. */
+#define ADDR_PLACEMENT_PATH      0x0043A560u  /* char *(char *dest, int32 slot) */
+/* The four army colours, in the order the jump table at 0x0043A5C4 puts them:
+ * 0 green, 1 tan, 2 blue, 3 grey. "green" lives with the other early strings
+ * and the other three sit together; that split is the linker's. */
+#define ADDR_STR_GREEN           0x00476A68u
+#define ADDR_STR_TAN             0x00485148u
+#define ADDR_STR_BLUE            0x00485140u
+#define ADDR_STR_GREY            0x00485138u
+#define ADDR_FMT_PLACE_FILE      0x00487B68u  /* "%s_%s_place.txt" */
+/* The placement table: the records, how many, and how many fit. Freed and
+ * rebuilt for each army. The grow is 32 to start and +8 a time. */
+#define ADDR_PLACEMENTS          0x00654C7Cu  /* AM2_Placement * */
+#define ADDR_PLACEMENT_COUNT     0x00654C80u  /* int32_t */
+#define ADDR_PLACEMENT_CAP       0x00654C84u  /* int32_t */
+#define ADDR_FREE_PLACEMENTS     0x0043B3D0u  /* void(void) */
+#define ADDR_ADD_PLACEMENT       0x0043B410u  /* void(const AM2_Placement *) */
+/* 0x0043B490 -- the `place` line parser, still original. It is not called by
+ * name anywhere: the .aai keyword table at 0x00477484 holds its address
+ * against "place", id 0x63, so the only reference to it in the image is that
+ * data slot. It is also what settles the record's layout, since it fills the
+ * block AddPlacement copies. */
+#define ADDR_PARSE_PLACE_LINE    0x0043B490u  /* int32(?, char *line) */
+#define ADDR_CAN_AFFORD_UNIT     0x0043A690u  /* int32(int32 type, int32 pts) */
+/* The two halves of laying one record down, both still original and both
+ * shared with the manual placement screen at 0x00413BC0. The first answers
+ * whether the unit may go there; the second puts it there and takes the cost
+ * out of the points, which is why it gets the budget BY ADDRESS. */
+#define ADDR_PLACEMENT_ALLOWED   0x0043A810u  /* int32(where,type,slot,pts,facing) */
+#define ADDR_MAKE_PLACED_UNIT    0x0043ACF0u  /* void(where,type,slot,&pts,facing,
+                                               * group,name) */
 #define AM2_COMM_ARMY_COUNT      4
 #define ADDR_COMM_FIND_PLAYER    0x0040F330u  /* thiscall int32(this,id), -1 if absent */
 #define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
@@ -4567,10 +4607,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_SCORE_LIMIT -- the NEXT global -- rather than on a count. The same
  * shape as the registration table walking up to ADDR_SCRIPT_CONDITIONS.
  *
- * What the value MEANS is not established. What is: 0x00431E10 sets it from a
- * lobby field's text through atoi, ReceivePlayerMsg carries it across for
- * every player, and 0x00413480 reads our own entry through ADDR_OUR_SLOT. */
-#define ADDR_ARMY_SETTING        0x00515FE0u  /* int32_t[4] */
+ * IT IS A POINTS BUDGET, which this comment used to say was unestablished.
+ * LoadArmyPlacement settles it and needs nothing else to: the slot's entry is
+ * what CanAffordUnit compares a unit type's cost against, and what
+ * ADDR_MAKE_PLACED_UNIT subtracts that cost from as each unit goes down. That
+ * agrees with the two facts already recorded -- 0x00431E10 sets it from a
+ * lobby field through atoi, and ReceivePlayerMsg carries it to every player,
+ * which is what a per-army army-size setting has to do. Renamed rather than
+ * aliased. */
+#define ADDR_ARMY_POINTS         0x00515FE0u  /* int32_t[4] */
+/* An options bitmask, carried in the player message beside ADDR_GAME_OVER_FLAGS
+ * and set from the OPTIONS checkboxes. One use of it is now known: CanAffordUnit
+ * ANDs it with a unit type's UNIT_TYPE_OFF_GAME_MASK, so a type declares which
+ * game types it may be placed in. That is one use of seven and not enough to
+ * rename on. */
 #define ADDR_GAME_SETTING_22C    0x00515FDCu  /* int32_t, beside ADDR_GAME_OVER_FLAGS */
 /* The OPTIONS dialog is DECLARED rather than built: a 43-record table at
  * 0x004865B8, 0x24 bytes each, is the whole screen. Every record is one
@@ -5221,14 +5271,42 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00430120, 12 callers: put a line on the menu and append it to the chat
  * log, in that order. The name is ours. */
 #define ADDR_ANNOUNCE            0x00430120u  /* void(const char *) */
-/* The unit-type table: 12 records of 40 bytes, {value, bit, isTrooper,
- * isVehicle, index, char name[20]}, and the names are IN it -- bazookaman,
- * mortarman, grenadier, flamerman, tank, jeep, halftrack, truck, ptboat,
- * riflepill, bazookapill, mgpill. That identity is certain; what the first
- * field means is not. It runs 100 to 500 and 0x0043A5E0 is the only reader,
- * from the two mission-start screens, which is what suggests a cost. */
-#define ADDR_UNIT_TYPES     0x004878B8u  /* 12 records */
-#define AM2_UNIT_TYPE_STRIDE 40
+/* THE UNIT-TYPE TABLE, AND ITS BASE WAS 0x20 BYTES LATE. It went in here as
+ * twelve records at 0x004878B8, `{value, bit, isTrooper, isVehicle, index,
+ * char name[20]}`, with the name list starting at bazookaman. Every one of
+ * those fields is a real field and the record was still wrong: it straddles
+ * TWO real records, so the three flags and the name in each row belong to the
+ * unit AFTER the cost and the mask beside them. The reading was internally
+ * consistent, which is why it survived -- rifleman was simply missing from the
+ * front and nothing looked odd.
+ *
+ * What settles it is the `place` line parser at 0x0043B490, which walks the
+ * names itself: it starts at 0x004878A4 with "rifleman", steps 0x28 and stops
+ * at 0x00487B74. So the base is 0x00487898, the name is at +0x0C, and there
+ * are EIGHTEEN records rather than twelve -- medtent, garage, radar, aagun and
+ * mine were past the end of the old reading. The bound is its own check: the
+ * table ends exactly where "%s_%s_place.txt" begins, and 0x00487B74 is that
+ * string's "txt" read as a nineteenth name.
+ *
+ *   +0x00 int32   trooper, 1 for the five soldiers
+ *   +0x04 int32   vehicle, 1 for tank/jeep/halftrack/truck/ptboat
+ *   +0x08 int32   kind within that class -- OBJ_OFF_SOLDIER_KIND's numbering,
+ *                 rifleman 1, grenadier 2, flamerman 3, bazookaman 4,
+ *                 mortarman 5
+ *   +0x0C char[20] name
+ *   +0x20 int32   cost in ADDR_ARMY_POINTS, 10 (mine) to 500 (tank). The old
+ *                 comment guessed this correctly from its range alone
+ *   +0x24 int32   game-type mask, one distinct bit per type
+ */
+#define ADDR_UNIT_TYPES         0x00487898u  /* 18 records */
+#define AM2_UNIT_TYPE_STRIDE    0x28u
+#define AM2_UNIT_TYPE_COUNT     18
+#define UNIT_TYPE_OFF_TROOPER   0x00u
+#define UNIT_TYPE_OFF_VEHICLE   0x04u
+#define UNIT_TYPE_OFF_KIND      0x08u
+#define UNIT_TYPE_OFF_NAME      0x0Cu
+#define UNIT_TYPE_OFF_COST      0x20u
+#define UNIT_TYPE_OFF_GAME_MASK 0x24u
 #define ADDR_UNIT_TYPE_COST 0x0043A5E0u  /* uint32_t(int32_t type) */
 #define ADDR_PACK_KEY       0x00433810u
 #define ADDR_KEY_FIELD_A    0x00433830u

@@ -906,7 +906,6 @@ void __cdecl Substate22(void)
 
 typedef void (__attribute__((thiscall)) *AM2_CommVoidFn)(void *comm);
 #define orig_comm_reopen_session ((AM2_CommVoidFn)(uintptr_t)ADDR_COMM_REOPEN_SESSION)
-#define orig_paused_frame_step   ((AM2_NoArgFn)(uintptr_t)ADDR_PAUSED_FRAME_STEP)
 
 /* 0x00426A90, three callers. The multiplayer end screen.
  *

@@ -1955,9 +1955,7 @@ void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
     }
 }
 
-typedef void (__cdecl *AM2_AttachFn)(void *subject, void *target);
 typedef void (__cdecl *AM2_ResolvePtFn)(void *obj, int32_t tile, uint32_t *pt);
-#define orig_obj_attach_to  ((AM2_AttachFn)(uintptr_t)ADDR_OBJ_ATTACH_TO)
 #define orig_resolve_point  ((AM2_ResolvePtFn)(uintptr_t)ADDR_RESOLVE_POINT_FOR_TILE)
 
 /* 0x004582F0, nine callers. Points an object at a place: detach it from

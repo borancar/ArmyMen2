@@ -151,8 +151,6 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 
 /* DirectInput scancodes, which is what every query here is indexed by. */
 #define AM2_DIK_TAB    0x0F
-#define AM2_DIK_RETURN 0x1C
-#define AM2_DIK_SPACE  0x39
 #define AM2_DIK_UP     0xC8
 #define AM2_DIK_DOWN   0xD0
 
@@ -5399,7 +5397,7 @@ void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w)
     AM2_Widget **colours = (AM2_Widget **)(self + MP_PANEL_OFF_COLOURS);
     AM2_Widget **teams   = (AM2_Widget **)(self + MP_PANEL_OFF_TEAMS);
     AM2_Widget **rows    = (AM2_Widget **)(self + MP_PANEL_OFF_ARMY_ROWS);
-    const int32_t *setting = (const int32_t *)(uintptr_t)ADDR_ARMY_SETTING;
+    const int32_t *setting = (const int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
     int32_t      i;
 
     WidgetUpdateCancel(w);

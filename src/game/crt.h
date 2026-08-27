@@ -35,6 +35,12 @@ extern void  (__cdecl *am2_free)(void *);
  * to point it somewhere else. Defaults to dropping the message. */
 extern void (__cdecl *am2_log)(const char *, ...);
 
+/* The game's own sprintf. Same seam again: BuildPlacementPath formats a
+ * filename with it, and it has to be the CRT the rest of the image uses --
+ * a NULL passed to %s is the one place the two could disagree, and both this
+ * one and glibc write "(null)". The offline test points it at the host's. */
+extern int32_t (__cdecl *am2_sprintf)(char *, const char *, ...);
+
 /* The game's own _chdir -- SetCurrentDirectoryA with the CRT's drive-relative
  * bookkeeping behind it. Same seam again: SetGameDir is the one reconstructed
  * function that changes the process's directory, and the process it has to

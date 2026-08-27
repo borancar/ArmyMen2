@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "misc.h"
+#include "place.h"   /* LoadArmyPlacement */
 #include "crt.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -996,10 +997,15 @@ void __cdecl LatchKeyState(void)
     memcpy(g_prevKeys, g_curKeys, 256);
 }
 
+/* The original addresses this as `[type*40 + 0x004878B8]`, which is the cost
+ * field of record `type` -- written out from the table's real base here. See
+ * ADDR_UNIT_TYPES: the constant in the instruction is the base plus the
+ * field, and taking it for the base is what put that table 0x20 bytes late. */
 uint32_t __cdecl UnitTypeCost(int32_t type)
 {
     return *(const uint32_t *)((uintptr_t)ADDR_UNIT_TYPES
-                               + (uint32_t)type * AM2_UNIT_TYPE_STRIDE);
+                               + (uint32_t)type * AM2_UNIT_TYPE_STRIDE
+                               + UNIT_TYPE_OFF_COST);
 }
 
 #define g_keyBindings ((const uint8_t *)(uintptr_t)ADDR_KEY_BINDINGS)
@@ -1253,9 +1259,6 @@ typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
 typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
 #define orig_seq_run ((AM2_SeqRunFn)(uintptr_t)ADDR_SEQ_RUN)
 
-typedef void (__cdecl *AM2_LoadArmyAiFn)(int32_t army);
-#define orig_load_army_ai ((AM2_LoadArmyAiFn)(uintptr_t)ADDR_LOAD_ARMY_AI)
-
 /* 0x0043B7C0, one caller -- the per-frame path, and reached only in a network
  * game. The AI taking over armies whose players have gone.
  *
@@ -1264,10 +1267,12 @@ typedef void (__cdecl *AM2_LoadArmyAiFn)(int32_t army);
  * An army that was never occupied is left alone, which is what stops the AI
  * being handed every empty slot at the start of a session.
  *
- * There is no "already done" flag. This runs every frame and will reload the
- * .aai on each one for as long as the army stays abandoned -- unless loading
- * it clears WAS_HERE, which is 0x0043B700's business and is not established
- * here. Worth knowing before reading a repeated parse as a fault.
+ * There is no "already done" flag, and reconstructing the callee has settled
+ * what that means. LoadArmyPlacement reads a file, walks its records and
+ * writes NOTHING back to the comm record -- so this really does re-read the
+ * army's placement file every frame for as long as the slot stays abandoned.
+ * That was left open here as "unless loading it clears WAS_HERE"; it does not.
+ * Worth knowing before reading a repeated parse as a fault.
  *
  * Reached only in a network game and this project cannot start one, so it is
  * verified by reading. Its counter reads 0 on a Boot Camp mission, which is
@@ -1287,7 +1292,7 @@ void __cdecl AiTakeAbandoned(void)
         if (CommSlotHasPlayer((void *)(uintptr_t)comm, army))
             continue;
 
-        orig_load_army_ai(army);
+        LoadArmyPlacement(army);
     }
 }
 

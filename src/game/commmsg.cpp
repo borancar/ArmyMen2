@@ -945,7 +945,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
     uint8_t       *comm = (uint8_t *)kCommObj;
-    int32_t       *slotSetting = (int32_t *)(uintptr_t)ADDR_ARMY_SETTING;
+    int32_t       *slotSetting = (int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
     const int32_t *settingEnd  = (const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT;
     const uint8_t *rec;
     uint8_t       *ours;
