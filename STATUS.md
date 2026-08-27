@@ -5,42 +5,30 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `f55b580`. Working tree clean.
+Last updated: **2026-08-27**, at `a587c40`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`MakeKind7`** (`0x00435550`, five callers) -- the maker `LoadType7` uses.
-  951 patches, one more `orig_` seam closed.
+- **`MakeRecordList`** (`0x00434060`, eight callers) -- a 0x30-byte header with
+  an owner, a count and a pointer, plus a copy of `count` twelve-byte records.
+  952 patches.
 
-- **The count is incremented before the check and not put back.** A refused
-  attempt leaves `ADDR_KIND7_COUNT` one higher than the number alive, so once
-  the limit is reached every further attempt pushes it further out; only
-  `FreeItemKind7`'s decrements, which clamp at zero, bring it down. Bounded at
-  both ends and **not symmetric in between**.
+- **The copy is field by field** -- int32, int16, int16, int32 -- rather than
+  twelve bytes at a time, and that is the **only** evidence anywhere for the
+  record's shape: nothing here reads a field, so the compiler had a struct
+  assignment to work from and left its outline in the instructions. Kept as
+  four moves rather than collapsed into a `memcpy`, which would agree on every
+  byte and say nothing to whoever reads it next.
 
-  Reproduced deliberately: a version that decremented on refusal would be
-  tidier and would let a thirty-third through after enough failures -- exactly
-  the kind of difference no test here would catch, since the limit is only
-  reachable with thirty-two alive.
+- A count of zero or less answers NULL having allocated nothing, so the
+  header's existence implies at least one record. Neither allocation is
+  checked, and only three of the header's twelve dwords are written.
 
-- **Its fourth argument ends up at `OBJ_OFF_FACING`**, which is exactly the
-  field `LoadType7` reads to fill it. The two agree about the argument shape
-  from opposite sides -- one writing the call, one receiving it -- the same
-  two-ended check the placement record got. Its *second* argument is read
-  nowhere.
-
-- The object is `AM2_ITEM_HEADER_BYTES` -- the header and nothing else, which
-  is what a kind 7 *is*. That size already had a name two hundred lines away
-  and I gave it a second; `checkoffsets` refused the identical redefinition,
-  the fourth duplicate this session caught by a tool rather than by looking.
-
-- **A function declined:** `ChatboxReflow` (`0x00455D60`). Its `this` class
-  cannot be pinned -- `+0x74`, `+0x70` and `+0x64` match `SCROLLBAR_OFF_*`
-  while `+0x58` matches no scrollbar field, and the two readings contradict.
-  Transcribing it would mean guessing which class it belongs to, which is the
-  one thing this tree is built not to do.
+- The name is **structural and says so**. The records are not identified, and
+  the band is the only evidence for the home -- `ObjIsItem` at `0x00433860` is
+  its nearest reconstructed neighbour.
 
 ## Next
 
