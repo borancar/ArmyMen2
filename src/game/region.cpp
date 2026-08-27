@@ -3,6 +3,7 @@
 
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
+#include "map.h"      /* TileOfPoint -- reconstructed */
 #include "image.h"
 #include "crt.h"
 #include "../inject/orig.h"
@@ -183,6 +184,96 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to)
     return -1;
 }
 
+/* Still original: solving one pair of the routing tables. */
+typedef void (__cdecl *AM2_SolvePairFn)(int32_t from, int32_t to);
+#define orig_region_solve_pair \
+            ((AM2_SolvePairFn)AM2_IMAGE(ADDR_REGION_SOLVE_PAIR))
+
+/* 0x00406460, one caller. How many hops from one region to another.
+ *
+ * THIS FUNCTION IS WHAT MAKES THE TWO MATRICES LEGIBLE. Both are indexed
+ * `m[from * stride + to]`; the first is tested against a sentinel byte and the
+ * second is walked one hop at a time until it arrives. So ADDR_REGION_COST
+ * records whether a pair has been solved and ADDR_REGION_NEXT is a next-hop
+ * table -- all-pairs routing stored as bytes, which is why a map has fewer
+ * than 256 regions.
+ *
+ * THREE ANSWERS, NOT TWO. Same region is 0, a reachable one is the hop count,
+ * and -1 means either that the pair is unsolved and `solve` was clear, or that
+ * the walk stepped into region 0. Both -1 paths share an exit and a caller
+ * cannot tell them apart -- which is worth knowing before reading -1 as
+ * "unreachable".
+ *
+ * The stride is RE-READ after solving, because solving can rebuild the tables
+ * and the caller's copy would be stale. Reproduced; that reload is the only
+ * hint here that ADDR_REGION_SOLVE_PAIR does more than fill one cell.
+ */
+int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
+{
+    const uint8_t *next;
+    int32_t        stride;
+    int32_t        hops;
+    int32_t        at;
+
+    if (from == to)
+        return 0;
+
+    stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+
+    if ((*(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_COST))
+            [from * stride + to]
+        != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_UNSET)) {
+        /* already solved */
+    } else if (!solve) {
+        return -1;
+    } else {
+        orig_region_solve_pair(from, to);
+        stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+    }
+
+    next = *(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_NEXT);
+    at   = from;
+    hops = 0;
+
+    for (;;) {
+        hops++;
+        if (at == 0)
+            return -1;
+        at = next[at * stride + to];
+        if (at == to)
+            return hops;
+    }
+}
+
+/* 0x004066B0, two callers. Whether two objects are in the same region or in
+ * neighbouring ones.
+ *
+ * THE ARGUMENTS ARE READ IN THE OPPOSITE ORDER TO THE CALL. The second
+ * object's region is computed first and becomes RegionHops' `from`; the
+ * first's becomes `to`. Nothing here is symmetric enough for that to be
+ * harmless -- a next-hop table need not agree in both directions -- so the
+ * order is reproduced rather than tidied.
+ *
+ * True for a hop count of 0 or 1, and false for -1, which folds "unreachable"
+ * and "unsolved" together with "far away". */
+int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
+{
+    const uint8_t *cells = *(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_OF_CELL);
+    int32_t        rb, ra, hops;
+
+    rb = cells[(uint32_t)TileOfPoint(
+                   *(const uint32_t *)((const uint8_t *)b + OBJ_OFF_POS))
+               & 0xFFFFu];
+    ra = cells[(uint32_t)TileOfPoint(
+                   *(const uint32_t *)((const uint8_t *)a + OBJ_OFF_POS))
+               & 0xFFFFu];
+
+    hops = RegionHops(rb, ra, solve);
+    if (hops == -1 || hops > 1)
+        return 0;
+    return 1;
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -195,6 +286,10 @@ int region_install(void)
                         "SetPointRule", 4);
     rc |= patch_replace(ADDR_MIDDLE_REGION_LINK, (const void *)MiddleRegionLink,
                         "MiddleRegionLink", 3);
+    rc |= patch_replace(ADDR_REGION_HOPS, (const void *)RegionHops,
+                        "RegionHops", 1);
+    rc |= patch_replace(ADDR_REGIONS_NEAR, (const void *)RegionsNear,
+                        "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
     return rc;

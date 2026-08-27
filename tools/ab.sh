@@ -1099,10 +1099,18 @@ compare() {
         mission)  budget=-1 ;;
         # Live play with the player walking, so the two sides are not even in
         # the same place. Meaningless by construction, more so than mission --
-        # and measured: four runs sat at 692..704 and the fifth came out at
-        # 177,115, which is 22% of the frame and is the two players having
-        # ended up somewhere different. The tight cluster was luck, not
-        # reproducibility, so do not be tempted to give this one a budget.
+        # and the shape of it is worth knowing, because it is not noise.
+        #
+        # The figure is BIMODAL. Seven runs have come out at 692, 695, 696,
+        # 702, 704, 706, 709 and four at 172,352, 177,113, 177,115, 177,163 --
+        # two tight clusters and nothing between them. Both modes reproduce on
+        # the SAME build, HEAD included, so a high reading is not evidence of
+        # anything: it is the two sides having forked early and the player
+        # ending up somewhere else. Confirmed by stashing a change and getting
+        # 177,113 without it.
+        #
+        # So do not give this one a budget, and do not read a jump into the
+        # high mode as a regression. Its evidence is the log.
         combat)   budget=-1 ;;
         # Live play again: two runs of a mission never sit on the same frame,
         # so the pixel figure is meaningless by construction. The log is the

@@ -4597,6 +4597,29 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define REGION_OFF_NLINKS          8u   /* uint8_t */
 #define REGION_OFF_LINKS           0x0Cu
 #define ADDR_ADD_REGION_LINK       0x0042B860u  /* void(int32_t, int32_t) */
+/* THE REGION ROUTING TABLES. Two square byte matrices of the same stride, and
+ * 0x00406460 is what makes them legible: it indexes both as
+ * `m[from * stride + to]`, tests the first against a sentinel byte, and walks
+ * the second one hop at a time until it arrives.
+ *
+ * So ADDR_REGION_COST records whether a pair has been solved -- the sentinel
+ * means "not yet" -- and ADDR_REGION_NEXT is a next-hop table: the region to
+ * step to when you are in `from` and want `to`. Classic all-pairs routing,
+ * stored as bytes because a map has fewer than 256 regions. */
+#define ADDR_REGION_STRIDE         0x00514EECu  /* int16_t, both matrices' */
+#define ADDR_REGION_NEXT           0x00514EF4u  /* uint8_t *, the next hop */
+#define ADDR_REGION_UNSET          0x00514EF8u  /* uint8_t, "not solved yet" */
+#define ADDR_REGION_COST           0x00514EFCu  /* uint8_t * */
+#define ADDR_REGION_SOLVE_PAIR     0x00438300u  /* void(from, to) */
+/* 0x00406460, one caller. How many hops from one region to another, 0 when
+ * they are the same and -1 when the walk falls off. Its third argument says
+ * whether an unsolved pair may be solved on the spot: with it clear, an
+ * unknown pair is -1 rather than an answer. */
+#define ADDR_REGION_HOPS           0x00406460u  /* int32(from, to, solve) */
+/* 0x004066B0, two callers. Whether two OBJECTS are in the same region or in
+ * neighbouring ones -- their tiles' regions, through ADDR_REGION_HOPS, and
+ * true for a hop count of 0 or 1. */
+#define ADDR_REGIONS_NEAR          0x004066B0u  /* int32(a, b, solve) */
 /* 0x0042B7F0, three callers. Of all the links `region` has to `to`, the index
  * of the MIDDLE one -- count them, then walk again and stop at the
  * ceiling-halfth. -1 when there are none.

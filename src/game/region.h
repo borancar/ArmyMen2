@@ -39,6 +39,11 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to);
  * the object asking. See region.cpp for why it lives here. */
 void __cdecl SetPointRule(void *obj);
 
+/* 0x00406460 and 0x004066B0. Hops between two regions, and whether two objects
+ * are in the same region or neighbouring ones. See region.cpp. */
+int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve);
+int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve);
+
 int region_install(void);
 
 #ifdef __cplusplus
