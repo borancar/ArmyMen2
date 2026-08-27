@@ -3479,6 +3479,22 @@ typedef struct {
  * second is 0x004351C0, reached from nine places. */
 #define ADDR_UPDATE_OBJECT_SCRIPT  0x004371A0u  /* int32_t(void *obj) */
 #define ADDR_CHANGE_OBJECT_FRAME   0x004351C0u  /* int32_t(obj, frame, int32) */
+/* What it does the work through: 0x00434F20 reaches ADDR_DEF_FIND_OBJ_REC,
+ * ADDR_ITEM_TEARDOWN and ADDR_PRELOAD_SPRITE, so it re-resolves the object's
+ * record and loads the sprite for the new frame. Named for that; nothing in
+ * it names itself.
+ *
+ * The two fields ChangeObjectFrame unpacks out of the type record's +8 and
+ * hands it. The same dword StepType1And4 compares whole against
+ * ADDR_WATCHED_TYPE_ID, so it is packed rather than scalar. */
+#define ADDR_APPLY_OBJ_FRAME     0x00434F20u  /* int32(obj, a, b, frame, int32) */
+#define AM2_OBJREC_SHIFT_A       7u
+#define AM2_OBJREC_MASK_A        0x3FFu
+#define AM2_OBJREC_SHIFT_B       0x13u
+#define AM2_OBJREC_MASK_B        0x7Fu
+/* Bit 23 of OBJ_OFF_FLAGS. A chained object carrying it is SKIPPED by
+ * ChangeObjectFrame -- but the walk continues past it. */
+#define OBJ_FLAG_NO_FRAME        0x800000u
 /* 0x00427E80, and its ONLY caller is ADDR_HEAL_OBJECT below -- all three call
  * sites are inside it -- so the name cannot be wrong about anything else. It
  * raises event kind 6 through ADDR_EVENT_NOTIFY for the object that was
@@ -6157,8 +6173,6 @@ typedef int32_t (__cdecl *am2_ftell_fn)(am2_FILE *fp);
  * the seam lives here rather than being declared twice. */
 typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
                                                       int32_t flag);
-#define orig_change_object_frame \
-    (*(am2_change_object_frame_fn)ADDR_CHANGE_OBJECT_FRAME)
 #define orig_blit_bitmap_in (*(am2_blit_bitmap_in_fn)ADDR_BLIT_BITMAP_IN)
 /* The object table was allocated by the game's CRT, so it must be grown by the
  * game's CRT -- our msvcrt has a different heap entirely. */

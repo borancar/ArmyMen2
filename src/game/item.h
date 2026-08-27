@@ -234,6 +234,11 @@ void __cdecl Type2ActionA(void *obj);
  * zero gives a NULL attacker rather than an error. */
 void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by);
 
+/* 0x004351C0. Changes an object's frame and every object chained to it.
+ * Returns whether ANY changed -- but a broken chain returns 0 even when the
+ * first one did; see the body. */
+int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag);
+
 /* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
  * ahead of every guard -- then dispatches to the object's type stepper. Types
  * 1 and 4 share one; type 2 is the only arm with no destroyed check. */

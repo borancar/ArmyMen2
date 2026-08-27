@@ -26,6 +26,7 @@
 #include "objtype.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "item.h"    /* ChangeObjectFrame */
 
 /* ------------------------------------------------- object script ---- */
 
@@ -374,7 +375,7 @@ int32_t __cdecl UpdateObjectScript(void *obj)
 
     AM2_ObjFrame *frame = &state->frames[fr];
 
-    if (!orig_change_object_frame(obj, frame->b, 1))
+    if (!ChangeObjectFrame(obj, frame->b, 1))
         orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
 
     *(int32_t *)(o + OBJ_OFF_SCRIPT_NEXT) = frame->a + (int32_t)kScriptTiming;

@@ -721,7 +721,7 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
         return;
     }
 
-    if (!orig_change_object_frame(obj, frame, 1))
+    if (!ChangeObjectFrame(obj, frame, 1))
         orig_log("Error: ChangeObjectFrame returned false when passed %s "
                  "with index %d\n", e->name, frame);
 }

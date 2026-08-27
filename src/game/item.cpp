@@ -860,7 +860,7 @@ void __cdecl DestroyObjCommon(void *obj)
     }
 }
 
-/* orig_change_object_frame is orig.h's, shared with event.cpp and
+/* ChangeObjectFrame is ours now, shared with event.cpp and
  * objscript.cpp -- one definition, not a fourth private copy. */
 
 /* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
@@ -1207,6 +1207,9 @@ static void __cdecl NotifyHealed(void *obj, void *src)
                 0, 0, 0, 0, 0, 0);
 }
 
+/* Defined below, beside the rest of the animation family. */
+int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag);
+
 /* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
  * health and notify. `src` is the other party, passed straight through to the
  * event and allowed to be null.
@@ -1261,7 +1264,7 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
 
     if (ObjIsItem((const AM2_Object *)obj)) {
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) > 0) {
-            orig_change_object_frame(obj, 0, 0);
+            ChangeObjectFrame(obj, 0, 0);
             *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
             NotifyHealed(obj, src);
             return;
@@ -2086,11 +2089,8 @@ typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
                                       int32_t army, uint32_t uid, int32_t extra,
                                       int32_t e, int32_t f, int32_t g,
                                       int32_t h);
-typedef int32_t (__cdecl *AM2_ChangeFrameFn)(void *obj, int32_t frame,
-                                             int32_t flag);
 #define orig_move_along_facing ((AM2_MoveFacingFn)(uintptr_t)ADDR_OBJ_MOVE_ALONG_FACING)
 #define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
-#define orig_change_obj_frame  ((AM2_ChangeFrameFn)(uintptr_t)ADDR_CHANGE_OBJECT_FRAME)
 
 /* 0x00433EC0, and the jump table gives it to types 1 AND 4 -- 24.8 million
  * calls between them in one Boot Camp mission, which makes this the
@@ -2193,7 +2193,7 @@ void __cdecl StepType1And4(void *obj)
                 else if (n > 0x10)
                     n = 0;
 
-                orig_change_obj_frame(obj, n, 1);
+                ChangeObjectFrame(obj, n, 1);
                 *(uint32_t *)(row + ROW_OFF_STAMP_54) =
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
             }
@@ -2210,7 +2210,7 @@ void __cdecl StepType1And4(void *obj)
 
         if (secs >= 9u)
             secs = 9u;
-        orig_change_obj_frame(obj, (int32_t)(9u - secs), 1);
+        ChangeObjectFrame(obj, (int32_t)(9u - secs), 1);
     }
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -2459,6 +2459,87 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
          * *(const double *)(uintptr_t)AM2_KIND7_HEALTH_SCALE);
 }
 
+typedef int32_t (__cdecl *AM2_ApplyFrameFn)(void *obj, int32_t b, int32_t a,
+                                            int32_t frame, int32_t flag);
+#define orig_apply_obj_frame ((AM2_ApplyFrameFn)(uintptr_t)ADDR_APPLY_OBJ_FRAME)
+
+/* 0x004351C0, and the name is the image's own. Changes an object's frame and
+ * then every object CHAINED to it -- OBJ_OFF_CHAIN_UID to the first, then
+ * OBJ_OFF_CHAIN_NEXT_UID from each to the next.
+ *
+ * The two numbers it passes down are BITFIELDS unpacked from the type
+ * record's +8: bits 7..16 and bits 19..25. That is the same dword
+ * StepType1And4 compares whole against ADDR_WATCHED_TYPE_ID, so the field is
+ * packed and neither reader is wrong about it.
+ *
+ * IT HAS TWO EXITS AND THEY DO NOT RETURN THE SAME THING. The normal exit
+ * answers whether ANY object's frame actually changed. But both ways of
+ * stopping the chain early -- a uid that resolves to nothing, or a link whose
+ * type is neither 1 nor 4 -- fall into the DESTROYED exit, which does
+ * `xor eax,eax`. So a broken chain answers 0 even when the first object's
+ * frame did change.
+ *
+ * That is deliberate code, not a compiler artefact: the zeroing instruction
+ * is there in the epilogue and the two `j` instructions target it. Reproduced,
+ * and worth stating, because "return whether anything changed" is what the
+ * function looks like it does and is only true when the chain is intact.
+ *
+ * A chained object carrying OBJ_FLAG_NO_FRAME is SKIPPED -- but the walk goes
+ * on past it, so one unchangeable link does not stop the rest.
+ *
+ * VERIFIED BY READING. Its counter is blind: the callers that reach it here
+ * are StepType1And4 and SetSoldierKind, both ours. */
+int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
+{
+    uint8_t *o   = (uint8_t *)obj;
+    int32_t  any = 0;
+    uint32_t uid;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return 0;
+
+    {
+        uint32_t v = *(const uint32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8);
+
+        if (orig_apply_obj_frame(obj,
+                                 (int32_t)((v >> AM2_OBJREC_SHIFT_B)
+                                           & AM2_OBJREC_MASK_B),
+                                 (int32_t)((v >> AM2_OBJREC_SHIFT_A)
+                                           & AM2_OBJREC_MASK_A),
+                                 frame, flag))
+            any = 1;
+    }
+
+    for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid; ) {
+        uint8_t *link = (uint8_t *)LookupByUID(uid);
+        int32_t  type;
+
+        /* Both of these return 0, not `any` -- see above. */
+        if (!link)
+            return 0;
+        type = *(const int32_t *)link;
+        if (type != 1 && type != 4)
+            return 0;
+
+        if (!(*(const uint32_t *)(link + OBJ_OFF_FLAGS) & OBJ_FLAG_NO_FRAME)) {
+            uint32_t v =
+                *(const uint32_t *)(*(uint8_t **)(link + OBJ_OFF_FIELD_94) + 8);
+
+            if (orig_apply_obj_frame(link,
+                                     (int32_t)((v >> AM2_OBJREC_SHIFT_B)
+                                               & AM2_OBJREC_MASK_B),
+                                     (int32_t)((v >> AM2_OBJREC_SHIFT_A)
+                                               & AM2_OBJREC_MASK_A),
+                                     frame, flag))
+                any = 1;
+        }
+
+        uid = *(const uint32_t *)(link + OBJ_OFF_CHAIN_NEXT_UID);
+    }
+
+    return any;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2469,6 +2550,8 @@ void item_install(void)
                   "ItemsReset", 0);
     patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
                   "StepType1And4", 1);
+    patch_replace(ADDR_CHANGE_OBJECT_FRAME, (const void *)ChangeObjectFrame,
+                  "ChangeObjectFrame", 1);
     patch_replace(ADDR_SET_SOLDIER_KIND, (const void *)SetSoldierKind,
                   "SetSoldierKind", 10);
     patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);
