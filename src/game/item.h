@@ -224,6 +224,11 @@ void __cdecl Type2ActionB(void *obj);
  * the player's own object instead. `prev` is incremented before storing. */
 void __cdecl Type2ActionC(void *obj, int32_t prev);
 
+/* 0x00448170. The third sibling: soldier kind 7, the old weapon abandoned as
+ * OBJ_FLAG_OVERDUE, and a NEW one created and handed over. Refuses when
+ * ADDR_TYPE2_FIELD5A4_SET says so, which B and C do not check. */
+void __cdecl Type2ActionA(void *obj);
+
 /* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
  * ahead of every guard -- then dispatches to the object's type stepper. Types
  * 1 and 4 share one; type 2 is the only arm with no destroyed check. */

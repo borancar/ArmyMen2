@@ -934,7 +934,6 @@ void __cdecl TimerTick(void)
 /* --------------------------------------------- object shims ---- */
 
 typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
-#define orig_type2_action_a  (*(AM2_Type2ActionFn)AM2_IMAGE(ADDR_TYPE2_ACTION_A))
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
 #define orig_type238_action \
     (*(AM2_Type2ActionArgFn)AM2_IMAGE(ADDR_TYPE238_ACTION))
@@ -1000,7 +999,7 @@ void __cdecl EvtType2ActionA(uint32_t uid)
     if (!ObjIsType2((const AM2_Object *)obj))
         return;
 
-    orig_type2_action_a(obj);
+    Type2ActionA(obj);
 }
 
 void __cdecl EvtType2ActionB(uint32_t uid)

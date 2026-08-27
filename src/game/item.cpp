@@ -28,6 +28,7 @@
 #include "air.h"      /* RevealNearby */
 #include "objscript.h" /* UpdateObjectScript */
 #include "msgslot.h"   /* CommMustBroadcast */
+#include "packkey.h"  /* KeyLookupTriple */
 
 /* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
  * by including that header because this module is on the flat side of the
@@ -2242,6 +2243,79 @@ void __cdecl StepType1And4(void *obj)
     }
 }
 
+typedef int32_t (__cdecl *AM2_Field5A4Fn)(const void *obj);
+typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
+                                          int32_t kind, uint32_t where,
+                                          int32_t a, int32_t b, int32_t c,
+                                          uint32_t uid);
+#define orig_field5a4_set ((AM2_Field5A4Fn)(uintptr_t)ADDR_TYPE2_FIELD5A4_SET)
+#define orig_make_weapon  ((AM2_MakeWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
+
+/* 0x00448170, five callers, and the last of the three Type2Action siblings.
+ * Where B disarms and C hands the selection on, A RE-ARMS: the unit becomes
+ * soldier kind 7, loses whatever it was holding, and is given a freshly
+ * created weapon which it then holds.
+ *
+ * The three guards are not the same as its siblings'. It refuses at
+ * OBJ_OFF_MP_ROLE >= 6, as B does and C does not, and it has one they do not:
+ * ADDR_TYPE2_FIELD5A4_SET, which is false unless the object is a type 2 with
+ * a positive OBJ_OFF_FIELD_5A4. So whatever that counter tracks is a reason
+ * NOT to re-arm.
+ *
+ * The old weapon is marked OBJ_FLAG_OVERDUE and simply abandoned -- unlike
+ * Type2ActionB, the uid field is not cleared first, because the very next
+ * thing overwrites it with the new weapon's. Same two writes, opposite order,
+ * and both are correct for what their own function is doing.
+ *
+ * 0x2B APPEARS TWICE and that is what ties the two halves together: it
+ * selects the weapon through KeyLookupTriple and it is the action code run
+ * afterwards. Reading either as a coincidence would let them drift.
+ *
+ * The new weapon is created with an EMPTY name -- ADDR_DIR_SCRATCH, which is
+ * a scratch buffer, not a literal -- and its army is copied from the unit
+ * AFTER creation rather than passed in, even though the creator takes an
+ * army. Reproduced; the creator is given the unit's army too, so the second
+ * write is redundant unless the creator ignores it.
+ *
+ * VERIFIED BY READING. Same wall as its siblings: the callers are event
+ * handlers no drive fires. */
+void __cdecl Type2ActionA(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    void    *old;
+    void    *made;
+
+    if (!o)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 6)
+        return;
+    if (orig_field5a4_set(obj))
+        return;
+
+    orig_set_soldier_kind(obj, 7);
+
+    old = WeaponByUid(*(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
+    if (old)
+        *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+
+    made = orig_make_weapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                            (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                            KeyLookupTriple(AM2_WEAPON_KEY_KIND,
+                                            AM2_WEAPON_KEY_2B, 0),
+                            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                            4, -1, 0, 0);
+    if (!made)
+        return;
+
+    *(uint8_t *)((uint8_t *)made + OBJ_OFF_ARMY) =
+        *(const uint8_t *)(o + OBJ_OFF_ARMY);
+    *(uint32_t *)(o + TROOPER_OFF_WEAPON_UID) =
+        ((const AM2_Object *)made)->uid;
+
+    orig_unit_action(obj, AM2_WEAPON_KEY_2B);
+    SendTrooperSetWeapon(obj, ((const AM2_Object *)made)->uid, 0);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2252,6 +2326,8 @@ void item_install(void)
                   "ItemsReset", 0);
     patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
                   "StepType1And4", 1);
+    patch_replace(ADDR_TYPE2_ACTION_A, (const void *)Type2ActionA,
+                  "Type2ActionA", 5);
     patch_replace(ADDR_TYPE2_ACTION_C, (const void *)Type2ActionC,
                   "Type2ActionC", 3);
     patch_replace(ADDR_POINT_ACTION_A, (const void *)PointActionA,

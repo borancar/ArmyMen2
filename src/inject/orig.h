@@ -2785,6 +2785,13 @@ typedef struct {
 /* Incremented from Type2ActionC's argument and stored; 0x0044BBA0 answers
  * whether it is positive. Structural until something says what it counts. */
 #define OBJ_OFF_FIELD_5A4        0x5A4u  /* int32_t */
+/* 0x0044BBA0, four callers: false unless the object is a type 2 AND its
+ * OBJ_OFF_FIELD_5A4 is positive. Type2ActionA refuses when it is true, so
+ * whatever that counter tracks is a reason not to re-arm. */
+#define ADDR_TYPE2_FIELD5A4_SET  0x0044BBA0u /* int32_t(const void *obj) */
+/* The weapon Type2ActionA gives out, and the action code it then runs -- the
+ * same 0x2B in both places, which is what ties the two together. */
+#define AM2_WEAPON_KEY_2B        0x2B
 #define OBJ_FLAG_8000            0x8000u
 /* The two delays that cleanup schedules, in game-clock milliseconds. */
 #define AM2_DEATH_DELAY_SHORT    0xBB8      /* 3,000 ms */
