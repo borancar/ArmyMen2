@@ -5,39 +5,32 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `3d31fe5`. Working tree clean.
+Last updated: **2026-08-27**, at `e408512`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`TextStackHeight`** (`0x00446E00`, three callers, all in the HUD). 929
-  patches.
+- **`MpPreviewSetBitmap`** (`0x00454AD0`, three callers, thiscall) -- give the
+  multiplayer map preview a new bitmap. 930 patches.
 
-- **A live defect found on the way.** `text.cpp`'s `DrawText` indexed the font
-  bases as `fontBases[font * 133]` and the offsets as
-  `glyphOffsets[font * 262]`. Both tables have a 524-byte stride -- 262 uint16
-  and **131** dwords -- so one index was right and the other eight bytes long.
-  That is the tell: two indexes into parallel tables that disagree about the
-  record size cannot both be correct.
+- **The pointer goes in two places and both matter.** `PREVIEW_OFF_SPRITE` is
+  the class's own slot, which is what the release at the top of the *next*
+  call finds; `AM2_Widget::sprite` is the base's, which is what `WidgetPaint`
+  draws. Storing only one would either leak or draw nothing, and which of the
+  two you would get is not obvious from either line alone.
 
-  Settled three ways. `orig.h` already said 131; `DrawTextClipped` computes
-  `edi*131` through the same `shl 6 / add / lea` chain; and the running game
-  has the three font bases at `0x02B621D8`, `0x02B58028` and `0x02B5C890`,
-  exactly 524 apart -- where 133 dwords reads `0x00005936`, a size field
-  rather than a pointer. Nothing had caught it because font 0 is the only font
-  these drives reach through here; font 1 would have dereferenced `0x5936`.
-  Both steps are named constants now.
+- The release is unconditional -- `ReleaseSprite` tolerates a null, which makes
+  the first call safe -- and the load is unchecked, so a missing bitmap leaves
+  both slots null and the widget paints nothing. `ADDR_SHOW_BAD_PREVIEW` is the
+  caller-side answer, which is why this function does not need one.
 
-- **The function is `TextExtent`'s vertical twin** -- the same walk, summing
-  the glyph record's *second* uint16 minus three. A probe settles that the
-  field is a height: across "SARGE" the first field is 7, 7, 8, 9, 7 and the
-  second is 12 for every one of them, 14 in font 1. A per-glyph width varies
-  with the glyph; a line height does not.
+- It was already **named** in `orig.h` and reached through
+  `orig_mp_preview_setbitmap`, so this is a seam closing rather than a name
+  arriving; `checkseams` asked for the direct call the moment the patch landed.
 
-- Its escape handling **differs** from `TextExtent`'s -- here `^` consumes the
-  character after it as well; there that character counts. Worth knowing
-  before writing either from the other's template.
+- `ab.sh mpoptions` is the configuration that opens the map browser, so this
+  one is compared rather than read.
 
 ## Next
 
