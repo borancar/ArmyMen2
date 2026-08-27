@@ -3224,6 +3224,59 @@ static void ScriptParseAll(void)
     am2_log("PARSEALL done: %d files\n", files);
 }
 
+/* Still original: the action runtime. ScriptRunLine hands it a NULL owner,
+ * where a mission's own actions carry the object they belong to. */
+typedef void (__cdecl *AM2_RunActionFn)(AM2_ScriptAction *act, void *owner);
+#define orig_run_script_action \
+            ((AM2_RunActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
+
+/* 0x00444C40, three callers -- the cheat table's fallback. Tokenise one typed
+ * line, parse it as an ACTION, and run it.
+ *
+ * It is the reason ADDR_CHEAT_ENTRY has an unrecognised-word path at all: a
+ * cheat the table does not know is handed here and treated as a script action,
+ * so anything a mission script can do can be typed. That is the whole content
+ * of the function and it is worth stating, because the name -- which is ours,
+ * the function carries no string -- makes it sound like part of ReadScript.
+ * It is not; ReadScript tokenises with ScriptNextToken directly.
+ *
+ * ONE TOKEN, NOT A LINE. ScriptNextToken is called ONCE, so what is parsed is
+ * whatever the first call leaves in the context -- and ScriptParseAction then
+ * pulls more tokens itself as it needs them. A reconstruction that looped the
+ * tokeniser to exhaustion first would agree on everything a cheat can express
+ * and diverge on the first line that ends mid-action.
+ *
+ * BOTH EXITS RESET THE CONTEXT and neither frees anything else, so the token
+ * list belongs to the reset. The failure path resets and answers 0 without
+ * running anything; the success path runs the action, THEN resets, so the
+ * action record is consumed before the tokens it names are dropped.
+ *
+ * The line number handed to the tokeniser is 0 -- there is no line, and any
+ * complaint about a typed cheat reports line zero.
+ */
+int32_t __cdecl ScriptRunLine(const char *line)
+{
+    AM2_ScriptCtx    ctx;
+    AM2_ScriptAction act;
+    int32_t          at = 0;
+
+    ctx.capacity = 0;
+    ctx.count    = 0;
+    ctx.tokens   = 0;
+
+    ScriptResetTokens(&ctx);
+    ScriptNextToken(line, &ctx, 0);
+
+    if (!ScriptParseAction(&ctx, &at, &act)) {
+        ScriptResetTokens(&ctx);
+        return 0;
+    }
+
+    orig_run_script_action(&act, (void *)0);
+    ScriptResetTokens(&ctx);
+    return 1;
+}
+
 int script_install(void)
 {
     int rc = 0;
@@ -3293,6 +3346,8 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_ALLOC_UID,
                         (const void *)AllocUid,
                         "AllocUid", 1);
+    rc |= patch_replace(ADDR_SCRIPT_RUN_LINE, (const void *)ScriptRunLine,
+                        "ScriptRunLine", 3);
     rc |= patch_replace(ADDR_SCRIPT_ADD_NAME,
                         (const void *)AddNameTableName,
                         "AddNameTableName", 1);

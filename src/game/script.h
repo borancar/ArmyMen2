@@ -79,6 +79,11 @@ void __cdecl ScriptAddToken(AM2_ScriptCtx *ctx, int32_t kind,
 /* 0x0043F2F0. Release every token and the array, and zero the context. */
 void __cdecl ScriptResetTokens(AM2_ScriptCtx *ctx);
 
+/* 0x00444C40, three callers -- the cheat table's fallback. Tokenise one typed
+ * line, parse it as an action and run it, so an unrecognised cheat word is
+ * treated as a script action. See script.cpp. */
+int32_t __cdecl ScriptRunLine(const char *line);
+
 /* 0x0043EF70. Is this word a number? 0 no, 1 integer, 2 float.
  *
  * The first character must be `-` or a digit; every character after it must be
