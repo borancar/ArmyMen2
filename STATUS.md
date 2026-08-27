@@ -5,30 +5,33 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `a587c40`. Working tree clean.
+Last updated: **2026-08-27**, at `e0849a0`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`MakeRecordList`** (`0x00434060`, eight callers) -- a 0x30-byte header with
-  an owner, a count and a pointer, plus a copy of `count` twelve-byte records.
-  952 patches.
+- **`SendPairMessage`** (`0x0044C0F0`, five callers, all in the trooper band) --
+  a 28-byte army message of kind `0x18` naming two objects. 953 patches.
 
-- **The copy is field by field** -- int32, int16, int16, int32 -- rather than
-  twelve bytes at a time, and that is the **only** evidence anywhere for the
-  record's shape: nothing here reads a field, so the compiler had a struct
-  assignment to work from and left its outline in the instructions. Kept as
-  four moves rather than collapsed into a `memcpy`, which would agree on every
-  byte and say nothing to whoever reads it next.
+- **There is a hole at `+0x10`.** Every other dword of the `0x1C` is written
+  and that one is not, so four bytes of the sender's own stack go out on the
+  wire. Reproduced rather than zeroed -- a `memset` would be tidier and would
+  change what the far end sees. Same class as the placement record's padding,
+  except this one leaves the machine.
 
-- A count of zero or less answers NULL having allocated nothing, so the
-  header's existence implies at least one record. Neither allocation is
-  checked, and only three of the header's twelve dwords are written.
+- **Unlike `SendItemDeploy` it does not check `ADDR_MP_SESSION`**, so it builds
+  and sends in single player too; `ArmyMessageSend` is where that ends. Two
+  senders in one family differing on the guard is worth writing down rather
+  than levelling.
 
-- The name is **structural and says so**. The records are not identified, and
-  the band is the only evidence for the home -- `ObjIsItem` at `0x00433860` is
-  its nearest reconstructed neighbour.
+- The byte argument is **sign-extended** into a dword, so a caller passing
+  `0x80` puts −128 on the wire, not 128.
+
+- **The name is structural and says so.** Kind `0x18` has no receiver
+  reconstructed yet and nothing says what the pair means. Naming it from the
+  band it sits in would be naming a function from its neighbours -- the same
+  mistake as naming one from its call site.
 
 ## Next
 
