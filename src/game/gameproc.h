@@ -91,6 +91,8 @@ int32_t __cdecl SaveType6(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType8(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType4(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType5(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType2(am2_FILE *fp, void *obj);
+int32_t __cdecl SaveType3(am2_FILE *fp, void *obj);
 
 /* 0x00435500. The type 7 loader, and the only one that reads no file. */
 void *__cdecl LoadType7(am2_FILE *fp, const void *hdr);

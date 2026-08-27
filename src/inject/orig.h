@@ -6129,6 +6129,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_TYPE1_RECORD_SIZE 0x2Cu
 #define AM2_TYPE6_RECORD_SIZE 0x28u
 #define AM2_TYPE8_RECORD_SIZE 0x4CCu
+#define AM2_TYPE2_RECORD_SIZE 0x53Cu
+#define AM2_TYPE3_RECORD_SIZE 0x548u
 #define AM2_ITEM_HEADER_TAG   0x6660000u
 #define ADDR_SAVE_ITEM_HEADER 0x00428730u  /* int32_t(FILE *, obj) */
 #define ADDR_SAVE_TYPE1       0x00433D20u
@@ -6139,16 +6141,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SAVE_TYPE6       0x00422750u
 #define ADDR_SAVE_TYPE8       0x0043CB30u
 #define ADDR_SAVE_ONE_ITEM  0x00428870u  /* int32_t(FILE *, void *obj) */
-/* TWO OF THE SAVERS NORMALISE A POINTER BEFORE WRITING IT, and it is worth
- * knowing before reading the file. ADDR_SAVE_TYPE2 turns its record's +0x498
- * from a pointer into `(p - ADDR_OBJ_TABLE_RECORDS) >> 8` -- an index into the
- * four 256-byte records there -- and ADDR_SAVE_TYPE3 does the same with its
- * +0x4A0. Both convert IN PLACE and neither converts back, so a saved object
- * is left holding an index rather than a pointer.
+/* TWO OF THE SAVERS NORMALISE A POINTER BEFORE WRITING IT. ADDR_SAVE_TYPE2
+ * turns SAVED_OFF_TABLE_REC2 from a pointer into
+ * `(p - ADDR_OBJ_TABLE_RECORDS) >> 8` -- an index into the four 256-byte
+ * records there -- and ADDR_SAVE_TYPE3 does the same with SAVED_OFF_TABLE_REC3.
  *
- * That is the answer to "the savefile is an oracle once it can ignore
- * pointers" being only half true: some types already resolve theirs, and only
- * types 1, 4 and 5 write a raw one.
+ * AND BOTH PUT THE POINTER BACK. This said "neither converts back, so a saved
+ * object is left holding an index", which was written from the heads of the
+ * two functions; each restores the saved original as its last act before
+ * returning. Reading half a function and writing down what it does is how that
+ * happens, and the file is the same either way -- the correction is about the
+ * OBJECT, not the format.
+ *
+ * The format half stands: some types resolve their pointers and only 1, 4 and
+ * 5 write a raw one.
+ *
+ * SAVE_TYPE3 ALSO TAKES ITS FOOTPRINT OUT OF THE MAP AND PUTS IT BACK, around
+ * the same write -- ADDR_OBJ_CLEAR_FOOTPRINT first and ADDR_OBJ_SET_FOOTPRINT
+ * last. That is what a save function was doing calling a footprint clear, a
+ * question left open when SaveType4 landed: the saved record is the object
+ * with its footprint lifted.
  *
  * The load side's own nine, adjacent to their savers -- see the table above.
  * ADDR_LOAD_ITEM_HEADER fills a 0x94-byte object header on the caller's stack
@@ -6433,6 +6445,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * footprint. Evidence, not proof: the function has seven callers and only one
  * of them is that handler. */
 #define ADDR_OBJ_CLEAR_FOOTPRINT   0x0045A770u  /* void(void *obj) */
+/* 0x0045A620, six callers -- the counterpart, and gated on the same flag the
+ * other way round: it does nothing when OBJ_FLAG_FOOTPRINT_ON is already set,
+ * bumps the same stamp at 0x00662020, and adds where the other subtracts.
+ * SaveType3 brackets its record write with the pair. */
+#define ADDR_OBJ_SET_FOOTPRINT     0x0045A620u  /* void(void *obj) */
+/* What the two big savers write beside their records. The prefix is the thing
+ * that reads them rather than a type, because 0xA8 and 0xAC already carry
+ * OBJ_OFF_ and TROOPER_OFF_ names for other readings of the same bytes. */
+#define SAVED_OFF_LIST_COUNT       0x0A8u  /* int32_t, dwords in the list */
+#define SAVED_OFF_LIST             0x0ACu  /* int32_t * */
+#define SAVED_OFF_LIST2_COUNT      0x53Cu  /* type 3 only */
+#define SAVED_OFF_LIST2            0x540u
+#define SAVED_OFF_TABLE_REC2       0x52Cu  /* type 2's normalised pointer */
+#define SAVED_OFF_TABLE_REC3       0x534u  /* type 3's */
 #define OBJ_FLAG_FOOTPRINT_ON      0x00200000u
 #define ADDR_DESTROY_TYPE3         0x0045A9C0u  /* void(void *obj) */
 /* 0x0043CA00, 304 bytes, three callers -- the ROACH twin of

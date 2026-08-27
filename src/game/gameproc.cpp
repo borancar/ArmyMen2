@@ -242,8 +242,6 @@ void __cdecl ShowInfoMp(void)
 #define kItemHeaderSize (*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE)
 
 typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
-#define orig_save_type2       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE2)
-#define orig_save_type3       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE3)
 
 /* 0x00428730 and 0x004289B0 -- the two halves of the object HEADER, and the
  * pair that makes the whole family agree with itself.
@@ -317,6 +315,103 @@ int32_t __cdecl SaveType8(am2_FILE *fp, void *obj)
 
     orig_fwrite((uint8_t *)obj + OBJ_OFF_FIELD_94,
                 AM2_TYPE8_RECORD_SIZE, 1, fp);
+    return 1;
+}
+
+/* Still original: the footprint pair SaveType3 brackets its write with, and
+ * the weapon lookup SaveType2 tags through. */
+typedef void (__cdecl *AM2_FootprintFn)(void *obj);
+#define orig_clear_footprint ((AM2_FootprintFn)(uintptr_t)ADDR_OBJ_CLEAR_FOOTPRINT)
+#define orig_set_footprint   ((AM2_FootprintFn)(uintptr_t)ADDR_OBJ_SET_FOOTPRINT)
+
+/* 0x00447130 and 0x0045A070 -- the two big per-type savers, and the two that
+ * do more than write.
+ *
+ * EACH NORMALISES A POINTER AND PUTS IT BACK. The field holds a pointer to one
+ * of the four 256-byte records at ADDR_OBJ_TABLE_RECORDS; the saver turns it
+ * into `(p - base) >> 8`, writes the record, and restores the original as its
+ * last act. So the FILE carries an index and the object is unchanged -- and
+ * this file said the object was left holding the index for two commits,
+ * because that was written from the heads of these two functions and the
+ * restore is at the tail.
+ *
+ * TYPE 3 ALSO LIFTS ITS FOOTPRINT out of the map's cell weights before the
+ * write and puts it back after. That is what a save function was doing calling
+ * ADDR_OBJ_CLEAR_FOOTPRINT, which was recorded as an open question when
+ * SaveType4 landed: the saved record is the object with its footprint lifted.
+ *
+ * TYPE 2'S TAG COMES FROM ITS WEAPON, or is 1 when it has none -- WeaponByUid
+ * on the uid at TROOPER_OFF_WEAPON_UID, then a pointer at OBJ_OFF_FIELD_C0 and
+ * the dword it points at. A trooper who has dropped his weapon saves a 1 where
+ * an armed one saves the weapon's own code, so the tag is not a constant and a
+ * reader cannot skip it.
+ *
+ * Both write a trailing list of dwords when its count is positive, and type 3
+ * writes a second such list. Neither length goes through WriteSaveTag, unlike
+ * every other length in this format.
+ */
+int32_t __cdecl SaveType2(am2_FILE *fp, void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  rec, n;
+    uint8_t *weapon;
+    uint32_t tag;
+
+    if (!o)
+        return 0;
+
+    rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC2);
+    if (rec)
+        *(int32_t *)(o + SAVED_OFF_TABLE_REC2) =
+            (int32_t)(((uint32_t)rec - ADDR_OBJ_TABLE_RECORDS) >> 8);
+
+    orig_fwrite(o + OBJ_OFF_FIELD_94, AM2_TYPE2_RECORD_SIZE, 1, fp);
+
+    weapon = (uint8_t *)WeaponByUid(
+                 *(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
+    tag = weapon
+          ? **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+          : 1u;
+    WriteSaveTag(fp, tag);
+
+    n = *(const int32_t *)(o + SAVED_OFF_LIST_COUNT);
+    if (n > 0)
+        orig_fwrite(*(void *const *)(o + SAVED_OFF_LIST),
+                    (size_t)n * 4, 1, fp);
+
+    *(int32_t *)(o + SAVED_OFF_TABLE_REC2) = rec;
+    return 1;
+}
+
+int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  rec, n;
+
+    if (!o)
+        return 0;
+
+    orig_clear_footprint(o);
+
+    rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC3);
+    if (rec)
+        *(int32_t *)(o + SAVED_OFF_TABLE_REC3) =
+            (int32_t)(((uint32_t)rec - ADDR_OBJ_TABLE_RECORDS) >> 8);
+
+    orig_fwrite(o + OBJ_OFF_FIELD_94, AM2_TYPE3_RECORD_SIZE, 1, fp);
+
+    n = *(const int32_t *)(o + SAVED_OFF_LIST_COUNT);
+    if (n > 0)
+        orig_fwrite(*(void *const *)(o + SAVED_OFF_LIST),
+                    (size_t)n * 4, 1, fp);
+
+    n = *(const int32_t *)(o + SAVED_OFF_LIST2_COUNT);
+    if (n > 0)
+        orig_fwrite(*(void *const *)(o + SAVED_OFF_LIST2),
+                    (size_t)n * 4, 1, fp);
+
+    *(int32_t *)(o + SAVED_OFF_TABLE_REC3) = rec;
+    orig_set_footprint(o);
     return 1;
 }
 
@@ -435,8 +530,8 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
 
     switch (*(const int32_t *)obj) {
     case 1:  if (!SaveType1(fp, obj)) return 0; break;
-    case 2:  if (!orig_save_type2(fp, obj)) return 0; break;
-    case 3:  if (!orig_save_type3(fp, obj)) return 0; break;
+    case 2:  if (!SaveType2(fp, obj)) return 0; break;
+    case 3:  if (!SaveType3(fp, obj)) return 0; break;
     case 4:  if (!SaveType4(fp, obj)) return 0; break;
     case 5:  if (!SaveType5(fp, obj)) return 0; break;
     case 6:  if (!SaveType6(fp, obj)) return 0; break;
@@ -563,5 +658,7 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
     patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);
     patch_replace(ADDR_SAVE_TYPE5, (const void *)SaveType5, "SaveType5", 1);
+    patch_replace(ADDR_SAVE_TYPE2, (const void *)SaveType2, "SaveType2", 1);
+    patch_replace(ADDR_SAVE_TYPE3, (const void *)SaveType3, "SaveType3", 1);
     patch_replace(ADDR_LOAD_TYPE7, (const void *)LoadType7, "LoadType7", 1);
 }
