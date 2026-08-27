@@ -5,37 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `a84d768`. Working tree clean.
+Last updated: **2026-08-27**, at `0784093`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`TrooperDied`** (`0x00447E50`) -- `VehicleDied`'s twin, and the two now sit
-  next to each other under the same dispatch. 940 patches.
+- **`ToggleFogOfWar`** (`0x0041A1B0`, two callers -- both cheat arms). 941
+  patches.
 
-- **What it spawns belongs to the killer.** `by` is a uid, and the army the
-  spawn gets is that object's `OBJ_OFF_ARMY` -- or `AM2_ARMY_NEUTRAL` when the
-  uid no longer resolves. A kill by someone who has since died is credited to
-  nobody rather than to the victim, which is exactly the sort of thing a
-  reconstruction gets quietly wrong by defaulting to the object already in
-  hand.
+- **The flag is written twice per cheat**, and which write you look at decides
+  which polarity you conclude. The cheat arm stores what it wants; this
+  function opens with `sete al` on the *old* value and stores the complement;
+  the sweep below reads that. `orig.h` has been carrying **both** answers --
+  its fog block described the cheat's store, its `ADDR_FOG_OF_WAR` comment two
+  hundred lines away described the post-inversion value. Both corrected, with
+  the double write named as the reason.
 
-- The spawn is gated on `OBJ_OFF_FIELD_5A4`. That field is still "structural
-  until something says what it counts", but this is a second reader beside
-  `ADDR_TYPE2_FIELD5A4_SET`'s and both treat it as a **permission** rather than
-  a quantity, which narrows it.
+- **The conceal arm reads the reveal stamp the other way round** from what this
+  tree said. It conceals when `OBJ_OFF_REVEALED_UNTIL` is 0 or the clock has
+  *not* reached it, and skips when it has -- `jae` on `cmp clock, stamp`. So
+  the cheat overrides a live reveal window rather than respecting it, and the
+  objects it leaves alone are the ones the ordinary sweep conceals anyway.
 
-- Two adjacent functions with an unused parameter each, for different reasons:
-  `TrooperDied`'s middle argument goes straight to the shared tail;
-  `VehicleDied`'s is read nowhere at all.
+- Verified by reading, and what that costs: both callers are cheat arms and no
+  drive types a cheat. The cheat runner at `0x00444C40` *is* reachable through
+  `ctl "type ..."`, so this is a configuration away from being compared rather
+  than out of reach.
 
-- **The spawn typedef was already in the file**, seventeen hundred lines
-  further down, with a `uint32_t` where I had written `int32_t` for the fifth
-  argument. The compiler caught the conflict. One declaration now -- and the
-  `uint32_t` is the informative half: that argument is a uid at the other call
-  site, which is why this one passes a plain 0 rather than a name I would have
-  had to invent.
+- **`combat`'s pixel figure can be 177,115.** Four runs sat at 692..704 and the
+  fifth came out at 22% of the frame -- the two players having ended up
+  somewhere different, which is what that configuration's disabled budget
+  anticipates. The tight cluster was luck, not reproducibility, and `ab.sh` now
+  says so where the budget is set.
 
 ## Next
 
@@ -48,6 +50,10 @@ Nothing uncommitted.
 - **AI movement**, separately: `MiddleRegionLink` and the region walk are only
   reached when something is *pathfound* rather than driven, so holding a key
   does not do it.
+
+- **A drive that types a cheat.** `ctl "type ..."` already works and the cheat
+  runner is `0x00444C40`, so the fog pair and anything else the cheat table
+  reaches is one configuration away from being compared rather than read.
 
 - **A drive that observes the mouse pick** is the older half of that. It would close `PickObjectsAt`, and it is close to the drive the
   combat path has been waiting for -- `DamageObject` is 0 on every
