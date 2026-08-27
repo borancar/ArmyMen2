@@ -157,6 +157,10 @@ void __cdecl ToggleFogOfWar(void);
  * Answers 0 for YES -- see air.cpp. */
 int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
                            const char *name);
+
+/* 0x00406550, two callers. A thing's own code to a result code -- mostly a
+ * constant, four flag-base tests and one health comparison. See air.cpp. */
+int32_t __cdecl ThingCode(const void *who, const void *owner);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded

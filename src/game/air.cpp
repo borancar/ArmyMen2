@@ -732,6 +732,69 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
     return 0;
 }
 
+/* 0x00406550, two callers. Turn a thing's own code -- the dword its
+ * OBJ_OFF_FIELD_C0 pointer points at -- into one of about a dozen result
+ * codes.
+ *
+ * The original does it with a 39-entry byte table indexed by `code - 2` and a
+ * 17-arm jump table; written out as a switch on the CODE itself, so the
+ * numbers in the source are the ones a script or a data file would carry
+ * rather than an offset into a table nobody can see. The mapping is
+ * transcribed from those two tables and nothing else.
+ *
+ * MOST ARMS ARE A PROPERTY OF THE THING AND A FEW ARE THE OWNER'S. Thirteen
+ * return a constant; four are the flag-base tests, one per army colour; and
+ * one compares `owner`'s health against half its maximum. So the same code can
+ * answer differently for the same thing depending on who holds it, which is
+ * not something the shape of a lookup table suggests.
+ *
+ * TWO ARMS ANSWER ZERO BY DIFFERENT ROUTES -- one an explicit zero, the other
+ * the out-of-range default falling out of the entry `xor`. Kept as two cases,
+ * because the table distinguishes them even though the answer does not.
+ *
+ * The health test is `health >= max / 2`. The original spells that division as
+ * `cdq; sub; sar 1` -- MSVC's signed divide-by-two, which rounds towards zero
+ * -- so plain C `/ 2` is the same function and not an approximation of it.
+ * Writing the correction out by hand as well, which was the first attempt,
+ * applies it twice and is wrong for a negative maximum. No object ships with
+ * one, which is exactly why that would have gone unnoticed.
+ */
+int32_t __cdecl ThingCode(const void *who, const void *owner)
+{
+    const uint8_t *w = (const uint8_t *)who;
+    const uint8_t *o = (const uint8_t *)owner;
+    int32_t        code = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+    switch (code) {
+    case 2:               return 8;
+    case 3: case 4: case 5:  return 0x10;
+    case 6: case 7:       return 0x20;
+    case 8: case 25: case 30: return 0x30;
+    case 10: case 28:     return 0x1E;
+    case 15:              return AM2_NOT_AT_FLAG_BASE;
+    case 16: return AtFlagBase(w, o, 0,
+                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_GREEN));
+    case 17: return AtFlagBase(w, o, 1,
+                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_TAN));
+    case 18: return AtFlagBase(w, o, 2,
+                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_BLUE));
+    case 19: return AtFlagBase(w, o, 3,
+                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_GREY));
+    case 21:              return 0x21;
+    case 22: {
+        int32_t max    = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        int32_t health = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+
+        return health >= max / 2 ? 8 : 0x20;
+    }
+    case 23:              return 0;   /* explicit, unlike the default below */
+    case 24: case 39: case 40: return 0x60;
+    case 26:              return 1;
+    case 29:              return 0x40;
+    default:              return 0;
+    }
+}
+
 /* 0x0041A1B0, two callers -- both arms of the cheat table at 0x00417B80.
  * Invert the fog flag and bring every enemy object into line with it.
  *
@@ -825,6 +888,7 @@ void air_install(void)
     patch_replace(ADDR_TOGGLE_FOG_OF_WAR, (const void *)ToggleFogOfWar,
                   "ToggleFogOfWar", 2);
     patch_replace(ADDR_AT_FLAG_BASE, (const void *)AtFlagBase, "AtFlagBase", 4);
+    patch_replace(ADDR_THING_CODE, (const void *)ThingCode, "ThingCode", 2);
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
 }

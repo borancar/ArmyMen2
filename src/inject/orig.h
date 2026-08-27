@@ -6167,6 +6167,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * codes rather than a boolean, so a reconstruction that answered 1 and 0
  * would be wrong in a way no compare against zero would show. */
 #define ADDR_AT_FLAG_BASE        0x004064E0u  /* int32(who, owner, army, name) */
+/* 0x00406550, two callers. Turn a thing's own code -- the dword its
+ * OBJ_OFF_FIELD_C0 pointer points at -- into one of about a dozen result
+ * codes, through a 39-entry index table at 0x00406688 and a 17-arm jump table
+ * at 0x00406644.
+ *
+ * Thirteen of the arms are a constant. Four are the flag-base wrappers, one
+ * per army colour, and one compares `owner`'s health against half its maximum
+ * and answers 8 or 0x20 -- so most of the answer is a property of the THING
+ * and a few arms are a property of the OWNER.
+ *
+ * TWO ARMS ANSWER ZERO BY DIFFERENT ROUTES. Arm 12 is an explicit
+ * `xor eax, eax` and the out-of-range default falls out of the entry `xor`
+ * seventy bytes earlier. Same answer, and worth reproducing as two arms
+ * rather than one because the table really does distinguish them. */
+#define ADDR_THING_CODE          0x00406550u  /* int32(who, owner) */
 #define AM2_FLAG_BASE_RANGE      100
 #define AM2_NOT_AT_FLAG_BASE     0x80
 #define ADDR_STR_FLAGBASE_GREEN  0x00473F0Cu  /* "gflagbase"  */
