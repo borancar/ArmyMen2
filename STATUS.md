@@ -5,38 +5,43 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `b3a1d08`. Working tree clean.
+Last updated: **2026-08-27**, at `8326e76`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`MapDescFree`, `MapDescInit` and `RowInit`** (`0x0041D270`, `0x0041D210`,
-  `0x0040A050`). 917 patches.
+- **`AddDirtyRect`** (`0x0041DD00`, seven callers). 918 patches.
 
-- **The cell grid is square in COLS.** `MapDescInit` allocates
-  `cols << Log2Mask(cols)` entries, so `MAPDESC_OFF_ROWS` never enters the
-  sizing. That settles something `maprow.cpp` already had a comment about:
-  `RowRegisterAll` clamping its bottom edge to `cols - 1` rather than
-  `rows - 1` is not a slip, it is the bound the grid actually has. Sized
-  exactly -- the largest cell that clamp can produce is one short of the
-  allocation.
+- **None of the three globals beside the dirty list is a counter**, and
+  `orig.h` said two of them were. `0x00508AD6` fell some time ago -- it is
+  `records[0].next`, the list head. `0x00508AD4` is the same trick one field
+  earlier, `records[0].prev`, settled by the unlink inside `0x0041DF00`
+  writing `records[rec.next].prev = rec.prev` through exactly that address. So
+  `DIRTY_OFF_PREV` is `0x10` and the list is doubly linked through indices.
 
-- **`ADDR_OBJ_TABLE_ARG` is the other map descriptor**, renamed
-  `ADDR_OBJ_MAP_DESC`. `0x0042C8C0` builds both from the map's world extent in
-  the same breath and `0x0042D540` frees both; the old name said what it was
-  passed *as*.
+  That leaves `0x00508AC0`, which is a global and still not a count: the same
+  unlink assigns it `rec.prev` when it removes the last record. It is the
+  **tail** index, doubling as the allocator -- `AddDirtyRect` takes `tail + 1`
+  -- which is why it looked like a count and why a record unlinked from the
+  end is handed straight back out.
 
-- **Measured in both directions**, because a clean A/B over undiscriminated
-  code is worth nothing and the previous commit produced two of those. One
-  added to `MapDescInit`'s shift puts `bootcamp` at **10,097** pixels against a
-  budget of 500. `RowInit`'s palette line is the opposite -- 1,612 calls a
-  mission, and nulling it leaves `bootcamp` at 76, inside the band, because
-  every object that reaches the screen has had its own palette written in by
-  then.
+  Three globals cleared together look like three counters. That is what the
+  sweep that named them saw, and it has now been wrong about all three.
 
-- `MapDescFree` reads 0 and that is explained: `MapDescInit` calls it directly,
-  the usual blind spot, and its other two callers are the level teardown.
+- **A gap in the harness, named rather than papered over.** `AddDirtyRect`
+  runs 618 times in live play and zero at the briefing, so `bootcamp` cannot
+  see it: dropping the prev link, and then never linking the record at all,
+  both left it at the usual 22 pixels. Against `mission`, where it does
+  execute, the never-link build comes out at 293 -- inside the 281..308 band.
+  The final shot is of a settled scene and every stale region has been painted
+  over by then.
+
+  That is the **third undiscriminated function in a row**. The only live-play
+  configuration has its pixel check off by construction, so its evidence is a
+  log of thirteen fixed messages -- live-play rendering behaviour is
+  essentially uncompared, and something like a mid-scroll oracle is what would
+  close it.
 
 ## A correction: two functions were not unexercised
 
