@@ -5,33 +5,39 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `a1d1e34`. Working tree clean.
+Last updated: **2026-08-27**, at `8f70323`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`AtFlagBase`** (`0x004064E0`, four callers). 955 patches.
+- **`RegionHops` and `RegionsNear`** (`0x00406460`, `0x004066B0`). 957 patches.
 
-- **The four callers are what name it.** Each is a one-line wrapper passing an
-  army 0..3 and one of `"gflagbase"`, `"tflagbase"`, `"bflagbase"`,
-  `"grflagbase"` -- so this is capture-the-flag proximity, not something
-  generic. Naming a function from its call site is what this tree warns about
-  six times over, but four call sites differing only in a colour and a literal
-  are a different thing from one, and the literals are the game's own
-  vocabulary.
+- **The first makes two globals legible.** Both are square byte matrices of one
+  stride, indexed `m[from * stride + to]`; one is tested against a sentinel and
+  the other walked a hop at a time. So `0x00514EFC` records whether a pair has
+  been **solved** and `0x00514EF4` is a **next-hop** table -- all-pairs routing
+  stored as bytes, which is why a map has fewer than 256 regions.
 
-- **It answers 0 for yes.** `0x80` is the failure code, shared with the three
-  functions immediately above it, which answer `0x1E`, `0x60` and `0x80`. These
-  are **codes**, not booleans -- a reconstruction returning 1 and 0 would be
-  wrong in a way no `if` on the result would ever show, and the neighbours are
-  what make that visible.
+- **Three answers, not two**: same region is 0, reachable is the hop count, and
+  −1 means *either* unsolved-and-not-allowed-to-solve *or* the walk stepped
+  into region 0. Both share an exit and no caller can tell them apart.
 
-- **A name not in the table resolves to entry 0 rather than failing.**
-  `ScriptFindName` answers 0 for "not found" and index 0 is a real entry, so a
-  misspelled flag base measures the distance to whatever entry 0 holds. The
-  four callers all pass literals, which makes it harmless *here* -- and stops
-  being harmless the moment a fifth caller passes a variable.
+- The stride is **re-read after solving** -- the only hint anywhere that
+  solving does more than fill one cell, and the sort of thing a reconstruction
+  hoists out without noticing.
+
+- `RegionsNear` **reads its arguments in the opposite order to the call**: the
+  second object's region becomes `from`. A next-hop table need not agree in
+  both directions, so that is reproduced rather than tidied.
+
+- **`combat`'s pixel figure is bimodal, and this run settled it.** Two
+  consecutive runs at 172,352 and 177,163 looked like a regression after four
+  earlier ones at ~700. Stashing the *whole* change gave 177,113 on HEAD.
+  Eleven runs now split into two tight clusters -- 692..709 and 172k..177k --
+  with nothing between, both reproducing on the same build. `ab.sh` says so
+  where the budget is set. Second time this session that backing the whole
+  change out settled what two half-measures could not.
 
 ## Next
 
