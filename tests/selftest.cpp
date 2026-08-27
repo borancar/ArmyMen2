@@ -515,3 +515,23 @@ extern "C" void __cdecl ReleaseSprite(AM2_Sprite *)
 extern "C" void __cdecl ShowMpResult(int32_t)
 {
 }
+
+/* gameproc.cpp joined SELFTEST_SRC when item.cpp gained a call to SaveOneItem,
+ * and it brought pad.cpp with it -- both flat, both added rather than stubbed,
+ * for the reason map.cpp and air.cpp were. These two are the only things it
+ * reaches that are NOT flat: StateLeave clears the primary surface and
+ * LoadAudioSection is in win32/audio.cpp with the rest of the sound code.
+ *
+ * LoadAudioSection is deliberately NOT `extern "C"`: audio.h's block ends
+ * before it, so gameproc.cpp declares it with C++ linkage and this must match.
+ * StateLeave is the opposite case. Getting either wrong fails at link time
+ * with a mangled name, which is how the distinction was checked rather than
+ * assumed. */
+extern "C" void __cdecl StateLeave(void)
+{
+}
+
+int32_t __cdecl LoadAudioSection(am2_FILE *)
+{
+    return 1;
+}

@@ -5709,7 +5709,37 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_ITEM_CPP    0x00485C58u  /* "C:\\ArmyMen2\\source\\item.cpp" */
 #define ADDR_SAVE_ITEMS     0x00428950u  /* int32_t(FILE *) */
 #define ADDR_LOAD_ITEMS     0x00428BB0u  /* int32_t(FILE *) */
-#define ADDR_SAVE_ONE_ITEM  0x00428870u  /* void(FILE *, void *obj) */
+/* The nine functions ADDR_SAVE_ONE_ITEM dispatches to -- a header and one per
+ * object type -- named by the arm that reaches them, none naming itself.
+ *
+ * THE LOAD SIDE CORROBORATES THE MAPPING, and structurally rather than by
+ * agreement of two readings: every loader ADDR_LOAD_ONE_ITEM calls sits
+ * IMMEDIATELY AFTER its saver in the image.
+ *
+ *   type 1  save 0x00433D20   load 0x00433D60
+ *   type 2  save 0x00447130   load 0x004471D0
+ *   type 3  save 0x0045A070   load 0x0045A120
+ *   type 4  save 0x0045EF00   load 0x0045EF50
+ *   type 5  save 0x0043B800   load 0x0043B870
+ *   type 6  save 0x00422750   load 0x00422780
+ *   type 7  save 0x004354F0   load 0x00435500
+ *   type 8  save 0x0043CB30   load 0x0043CB60
+ *
+ * Eight pairs, each adjacent, in the same order in both dispatch tables. The
+ * source wrote them together and the linker kept them together.
+ *
+ * TYPE 7 SAVES NOTHING. Its arm calls ADDR_RETURN_ONE -- a shared `return 1`
+ * -- rather than being special-cased out of the switch, which is why there
+ * are eight arms and not seven. */
+#define ADDR_SAVE_ITEM_HEADER 0x00428730u  /* int32_t(FILE *, obj) */
+#define ADDR_SAVE_TYPE1       0x00433D20u
+#define ADDR_SAVE_TYPE2       0x00447130u
+#define ADDR_SAVE_TYPE3       0x0045A070u
+#define ADDR_SAVE_TYPE4       0x0045EF00u
+#define ADDR_SAVE_TYPE5       0x0043B800u
+#define ADDR_SAVE_TYPE6       0x00422750u
+#define ADDR_SAVE_TYPE8       0x0043CB30u
+#define ADDR_SAVE_ONE_ITEM  0x00428870u  /* int32_t(FILE *, void *obj) */
 #define ADDR_LOAD_ONE_ITEM  0x004289E0u  /* void(FILE *, int32_t) */
 #define ADDR_ITEMS_RESET    0x00429450u  /* void(void) */
 

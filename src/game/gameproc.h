@@ -73,6 +73,10 @@ void __cdecl StateLeaveAlias(void);
  * network game, where pausing is not allowed. Strictly 0 or 1. */
 void __cdecl ShowInfoMp(void);
 
+/* 0x00428870. Header then one of eight per-type savers. An unknown type is
+ * header-only and NOT an error; type 7 saves nothing type-specific. */
+int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj);
+
 void gameproc_install(void);
 
 #ifdef __cplusplus

@@ -29,6 +29,7 @@
 #include "objscript.h" /* UpdateObjectScript */
 #include "msgslot.h"   /* CommMustBroadcast */
 #include "packkey.h"  /* KeyLookupTriple */
+#include "gameproc.h"  /* SaveOneItem */
 
 /* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
  * by including that header because this module is on the flat side of the
@@ -109,7 +110,6 @@ typedef void (__cdecl *am2_save_one_fn)(am2_FILE *fp, void *obj);
 typedef void (__cdecl *am2_load_one_fn)(am2_FILE *fp, int32_t flag);
 typedef void (__cdecl *am2_void_fn)(void);
 
-#define orig_save_one_item (*(am2_save_one_fn)ADDR_SAVE_ONE_ITEM)
 #define orig_load_one_item (*(am2_load_one_fn)ADDR_LOAD_ONE_ITEM)
 
 /* 0x00429450. The object registry's teardown: FreeItem every entry, free the
@@ -160,7 +160,7 @@ int32_t __cdecl SaveItems(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVE_TAG_ITEMS);
 
     for (obj = FirstItem(); obj; obj = NextItem()) {
-        orig_save_one_item(fp, obj);
+        SaveOneItem(fp, obj);
         count++;
     }
 

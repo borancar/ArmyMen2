@@ -15,6 +15,7 @@
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "misc.h"      /* ReturnOne */
 
 #define kBlock  ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
 #define kStrB   ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_STR_B))
@@ -238,6 +239,63 @@ void __cdecl ShowInfoMp(void)
     *on = (*on == 0) ? 1 : 0;
 }
 
+typedef int32_t (__cdecl *AM2_SaveObjFn)(am2_FILE *fp, void *obj);
+#define orig_save_item_header ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_ITEM_HEADER)
+#define orig_save_type1       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE1)
+#define orig_save_type2       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE2)
+#define orig_save_type3       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE3)
+#define orig_save_type4       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE4)
+#define orig_save_type5       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE5)
+#define orig_save_type6       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE6)
+#define orig_save_type8       ((AM2_SaveObjFn)(uintptr_t)ADDR_SAVE_TYPE8)
+
+/* 0x00428870, one caller -- SaveItems, once per registered object. Writes the
+ * common header and then whatever the object's type adds.
+ *
+ * EVERY STEP IS CHECKED AND ANY FAILURE ANSWERS 0. The header first: if that
+ * fails nothing type-specific is attempted. Then one of eight arms, and an
+ * out-of-range type answers 1 -- so an object of an unknown type is saved as
+ * a header and NOT treated as an error, which is the opposite of what the
+ * per-step checks suggest.
+ *
+ * TYPE 7 SAVES NOTHING TYPE-SPECIFIC. Its arm calls ADDR_RETURN_ONE, a shared
+ * `return 1`, rather than being special-cased out of the switch. That is why
+ * there are eight arms and not seven, and it is worth reproducing as the call
+ * it is: a reconstruction that dropped the arm would agree today and diverge
+ * the moment that stub stopped returning 1.
+ *
+ * The original hands that stub the file and the object like every other arm,
+ * and it takes no arguments -- cdecl, so the two extra pushes are harmless and
+ * ReturnOne is called here with none. The pushes are the compiler emitting one
+ * arm shape eight times, not a signature.
+ *
+ * THE MAPPING IS CORROBORATED BY THE LOAD SIDE, structurally. Every loader
+ * ADDR_LOAD_ONE_ITEM calls sits IMMEDIATELY AFTER its saver in the image --
+ * eight adjacent pairs, in the same order in both dispatch tables. That is
+ * better evidence than two readings agreeing, because it is a fact about the
+ * layout rather than about my reading of either.
+ *
+ * VERIFIED BY READING. Its caller is the savegame writer; nothing in the
+ * suite saves. */
+int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
+{
+    if (!orig_save_item_header(fp, obj))
+        return 0;
+
+    switch (*(const int32_t *)obj) {
+    case 1:  if (!orig_save_type1(fp, obj)) return 0; break;
+    case 2:  if (!orig_save_type2(fp, obj)) return 0; break;
+    case 3:  if (!orig_save_type3(fp, obj)) return 0; break;
+    case 4:  if (!orig_save_type4(fp, obj)) return 0; break;
+    case 5:  if (!orig_save_type5(fp, obj)) return 0; break;
+    case 6:  if (!orig_save_type6(fp, obj)) return 0; break;
+    case 7:  if (!ReturnOne()) return 0; break;   /* the stub; see above */
+    case 8:  if (!orig_save_type8(fp, obj)) return 0; break;
+    default: break;          /* unknown type: header only, and NOT an error */
+    }
+    return 1;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
@@ -258,4 +316,5 @@ void gameproc_install(void)
     patch_replace(ADDR_STATE_LEAVE_ALIAS, (const void *)StateLeaveAlias,
                   "StateLeaveAlias", 0);
     patch_replace(ADDR_SHOW_INFO_MP, (const void *)ShowInfoMp, "ShowInfoMp", 0);
+    patch_replace(ADDR_SAVE_ONE_ITEM, (const void *)SaveOneItem, "SaveOneItem", 1);
 }
