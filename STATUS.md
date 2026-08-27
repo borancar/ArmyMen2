@@ -5,35 +5,37 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `7486096`. Working tree clean.
+Last updated: **2026-08-27**, at `157d484`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`ScriptRunLine`** (`0x00444C40`, three callers -- the cheat table's
-  fallback). 946 patches.
+- **`SaveType2` and `SaveType3`** (`0x00447130`, `0x0045A070`) -- the last two
+  per-type savers, so all eight arms of `SaveOneItem` are ours. 948 patches.
 
-- **An unrecognised cheat is a script action.** That is why the cheat table has
-  an unrecognised-word path at all: the word is handed here, tokenised, parsed
-  as an action and run, so anything a mission script can express can be typed.
-  The name is ours and makes it sound like part of `ReadScript`, which `orig.h`
-  already warns it is not.
+- **I wrote these two up two commits ago without reconstructing them**, from
+  their heads, and got the important half wrong. `orig.h` has said since then
+  that each normalises a pointer "in place and neither converts back, so a
+  saved object is left holding an index". Each **restores the original as its
+  last act**. The file carries an index and the object is unchanged -- the
+  format claim was right and the object claim came from stopping at the first
+  interesting instruction.
 
-- **One token, not a line.** `ScriptNextToken` is called *once* and
-  `ScriptParseAction` pulls what else it needs itself. A reconstruction that
-  ran the tokeniser to exhaustion first would agree on everything a cheat can
-  express and diverge on the first line that ends mid-action -- it would pass
-  every test available and still be wrong.
+- **And it answers the question `SaveType4` left open.** That commit recorded,
+  without explaining, that a *save* function calling `ObjClearFootprint` "is
+  not what either name suggests". `SaveType3` brackets its write with the pair
+  -- clear first, `ObjSetFootprint` last. The saved record is the object with
+  its footprint lifted out of the map's cell weights.
 
-- Both exits reset the context and neither frees anything else, so the token
-  list belongs to the reset; the success path is run-then-reset, so the action
-  record is consumed before the tokens it names are dropped. The owner passed
-  to the action runtime is NULL, where a mission's own actions carry the
-  object they belong to.
+- **Type 2's tag comes from its weapon**, or is 1 when it has none, so a
+  trooper who dropped his weapon saves a different tag from an armed one and a
+  reader cannot skip that field.
 
-- Verified by reading -- the same wall `ToggleFogOfWar` is behind, and the same
-  configuration would lift both.
+- The new field names are a `SAVED_OFF_` family rather than `TROOPER_` or
+  `VEHICLE_`, because `0xA8` and `0xAC` already carry other names for other
+  readings of the same bytes -- the union again, and a third family is honest
+  where a second name in an existing one would not be.
 
 ## Next
 
