@@ -185,6 +185,9 @@ void __attribute__((thiscall)) CommResetStats(void *comm);
  * line is gated on its own denominator; nothing prints when nothing moved. */
 void __attribute__((thiscall)) CommReportStats(void *comm);
 
+/* 0x0040FB80. Eight bytes: forwards to CommSendLobbyProperty with id 2. */
+void __attribute__((thiscall)) CommPublishResult(void *comm);
+
 /* 0x0040F320, six callers, sixteen bytes: a thiscall that pushes its one
  * argument and tail-calls 0x0040F160, which is thiscall too and so already has
  * the object in ecx. A pass-through under a second name. */

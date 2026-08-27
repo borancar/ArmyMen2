@@ -1361,9 +1361,17 @@
 #define ADDR_STR_MP_WON          0x004852A8u  /* "mpwon.bmp" */
 #define ADDR_STR_MP_LOST         0x0048529Cu  /* "mplost.bmp" */
 #define ADDR_STR_MP_HOST_LEFT    0x0048528Cu  /* "mphostleft.bmp" */
-/* 0x0040FB80, thiscall. Formats a string and hands it to
- * ADDR_COMM_SEND_PROPERTY -- 48 bytes and nothing else in it. */
+/* 0x0040FB80, thiscall, and CORRECTED. This said "formats a string and hands
+ * it to ADDR_COMM_SEND_PROPERTY -- 48 bytes and nothing else in it". The
+ * function is EIGHT bytes: `push 2; call ADDR_COMM_SEND_PROPERTY; ret`. The
+ * sprintf belongs to 0x0040FB90, which is a different function.
+ *
+ * That reading came from sweeping the size docs/functions.tsv gives the entry,
+ * which is a MERGE -- the same trap ClearMenuMsgs turned up, and this time it
+ * produced a wrong comment rather than only a mis-ranked candidate. Sweeping a
+ * byte range is only safe once the range is known to be one function. */
 #define ADDR_COMM_PUBLISH_RESULT 0x0040FB80u  /* thiscall void(this) */
+#define AM2_COMM_PROPERTY_RESULT 2
 /* 0x0040FA00, thiscall. Removes our player and reopens the session, and says
  * so itself: "Set Session Failed to reopen Session". ShowMpResult TAIL-JUMPS
  * to it, so it is the last thing the end screen does. */

@@ -1749,6 +1749,23 @@ void __cdecl PacketSlotReset(uint32_t slot)
 
     MsgListInit(rec + PLAYER_REC_OFF_MSGS);
 }
+/* 0x0040FB80, one caller -- ShowMpResult. EIGHT bytes: it forwards to
+ * CommSendLobbyProperty with the property id 2 and returns.
+ *
+ * Worth stating what it is NOT. docs/functions.tsv gives this entry 48 bytes,
+ * which is a merge: 0x0040FB90 is a separate function and the sprintf in it
+ * belongs there. An earlier note in orig.h described this one as doing that
+ * formatting, which came from sweeping the merged range; corrected.
+ *
+ * The property send itself declines unless the comm object is lobbied, is the
+ * host, and has a lobby interface -- three tests, all inside the callee -- so
+ * this forwards unconditionally and lets that decide. */
+void __attribute__((thiscall)) CommPublishResult(void *comm)
+{
+    CommSendLobbyProperty(comm, AM2_COMM_PROPERTY_RESULT);
+}
+
+
 
 
 int dplay_install(void)
@@ -1819,6 +1836,8 @@ int dplay_install(void)
                         "CommReportStats", 3);
     rc |= patch_replace(ADDR_COMM_NO_BUFFERS, (const void *)CommNoBuffers,
                         "CommNoBuffers", 2);
+    rc |= patch_replace(ADDR_COMM_PUBLISH_RESULT, (const void *)CommPublishResult,
+                        "CommPublishResult", 1);
     rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
                         "CommSendLobbyProperty", 1);
     return rc;

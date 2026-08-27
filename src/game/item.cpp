@@ -2238,12 +2238,10 @@ void __cdecl StepType1And4(void *obj)
     }
 }
 
-typedef int32_t (__cdecl *AM2_Field5A4Fn)(const void *obj);
 typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
                                           int32_t kind, uint32_t where,
                                           int32_t a, int32_t b, int32_t c,
                                           uint32_t uid);
-#define orig_field5a4_set ((AM2_Field5A4Fn)(uintptr_t)ADDR_TYPE2_FIELD5A4_SET)
 #define orig_make_weapon  ((AM2_MakeWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 
 /* 0x00448170, five callers, and the last of the three Type2Action siblings.
@@ -2284,7 +2282,7 @@ void __cdecl Type2ActionA(void *obj)
         return;
     if (*(const int32_t *)(o + OBJ_OFF_MP_ROLE) >= 6)
         return;
-    if (orig_field5a4_set(obj))
+    if (Type2Field5A4Set((const AM2_Object *)obj))
         return;
 
     orig_set_soldier_kind(obj, 7);

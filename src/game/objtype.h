@@ -41,6 +41,10 @@ int32_t __cdecl ObjIsItem(const AM2_Object *obj);
 /* Original: 0x00457470. */
 int32_t __cdecl ObjIsType2(const AM2_Object *obj);
 
+/* 0x0044BBA0. True only for a TYPE 2 whose OBJ_OFF_FIELD_5A4 is positive.
+ * Type2ActionA refuses to re-arm a unit when this is true. */
+int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj);
+
 /* Original: 0x00457490. */
 int32_t __cdecl ObjIsType3(const AM2_Object *obj);
 

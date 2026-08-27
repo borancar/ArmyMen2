@@ -904,7 +904,6 @@ void __cdecl Substate22(void)
 
 
 typedef void (__attribute__((thiscall)) *AM2_CommVoidFn)(void *comm);
-#define orig_comm_publish_result ((AM2_CommVoidFn)(uintptr_t)ADDR_COMM_PUBLISH_RESULT)
 #define orig_comm_reopen_session ((AM2_CommVoidFn)(uintptr_t)ADDR_COMM_REOPEN_SESSION)
 #define orig_paused_frame_step   ((AM2_NoArgFn)(uintptr_t)ADDR_PAUSED_FRAME_STEP)
 
@@ -944,7 +943,7 @@ void __cdecl ShowMpResult(int32_t result)
 
     orig_paused_frame_step();
     CommReportStats(comm);
-    orig_comm_publish_result(comm);
+    CommPublishResult(comm);
 
     if (result == AM2_MP_RESULT_WON) {
         FreeBitmap(&g_currentBitmap);
