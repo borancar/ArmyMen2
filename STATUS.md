@@ -5,35 +5,35 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `d12ec5c`. Working tree clean.
+Last updated: **2026-08-27**, at `e7cd901`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`PickObjectsAt` and `UnitByUid`** (`0x0042A1B0`, `0x00459FB0`). 921 patches.
+- **`CommWasHereForArmy` and `CommRecentTotal`** (`0x0040F1C0`, `0x0040F520`),
+  both thiscall, one caller each. 923 patches, and `docs/boundary.md` moves
+  with them -- the second holds a `GetTickCount`, so KERNEL32 goes 55
+  reconstructed to 56. A generated number moving is the tool being honest.
 
-- `PickObjectsAt` is the **mouse pick** -- every object in a cell whose own
-  `OBJ_OFF_HIT_RECT` contains the point. Three of its five callers are in the
-  `0x0041xxxx` HUD band, and the filter confirms it: the sibling
-  `ADDR_OBJECTS_AT_POINT` builds a box from four offsets at `+0x7C` instead.
-  One asks "is the cursor on it", the other "does its footprint cover this".
+- `CommWasHereForArmy` is `CommSlotForArmy`'s walk with a different answer.
+  It has **no `army == 4` shortcut**, which is the one structural difference
+  and not an oversight to tidy: 4 is the neutral army and answers slot 4
+  there, and there is no fifth record to read a field out of here.
 
-- `UnitByUid` filters the uid lookup to types 2, 3 and 8 -- trooper, vehicle,
-  roach, exactly what `ObjIsType2/3/8` answer for. `0x0045EE80` is its sibling
-  for type 4 and is already `WeaponByUid` here, so the family was half-named.
+- **`CommRecentTotal` is bytes sent in the last 100 ms.** The loop gives the
+  layout rather than the other way round, and the two arrays are `CommSend`'s
+  `COMM_OFF_STAT_TIMES` and `COMM_OFF_STAT_SIZES`, filled a slot per packet
+  round a 30-entry ring.
 
-- **Two checks fired on one address in one run.** I gave `0x00435390` a new
-  name and called it through the image; it is `ADDR_OBJ_MASK_BIT_AT`, it is
-  `misc.cpp`'s `ObjMaskBitAt`, and it has been reconstructed for some time.
-  Neither check would have caught it alone -- a first-time name reached by
-  address trips only `checkseams`, a second name on a call we already make
-  trips only the ratchet.
-
-- **3,872 calls and nothing watches the answer.** Returning null
-  unconditionally -- with the edit verified as landed first -- leaves
-  `mission` at 281 and `bootcamp` at 22, both at their floors. The drives move
-  the mouse and never *select* anything with it.
+- **I wrote it up first as "counters whose meaning is not established"**, with
+  a paragraph explaining why naming them from the one caller would be unsafe.
+  Wrong twice over: both arrays were already named, thirty lines apart in
+  `orig.h`, and `CommSend` writes `GetTickCount` and the packet size into them
+  three hundred lines up its own file. **The offset ratchet refused my second
+  pair of names and that is the only reason it was caught.** Grep the *offset*
+  as well as the address -- the rule this tree already has for globals, one
+  level in.
 
 ## Next
 
