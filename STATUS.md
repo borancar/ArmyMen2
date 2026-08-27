@@ -37,13 +37,31 @@ Nothing uncommitted.
 
 ## Next
 
-- **A drive that selects a unit** is the single most useful thing missing.
-  It would close `PickObjectsAt`, and it is the same drive the combat path has
-  been waiting for -- `DamageObject` is 0 on every configuration, which blocks
-  `FreeItem`, `RemoveFromItemList`, `Type2ActionB`, `DamageRoach` and
-  `PointActionA`. Clicking a unit in a live mission and reading
-  `OBJ_FLAG_SELECTED` back out through `tools/objdump.py` is an exact oracle,
-  unlike the pixels.
+- **A drive that observes the mouse pick** is the single most useful thing
+  missing. It would close `PickObjectsAt`, and it is close to the drive the
+  combat path has been waiting for -- `DamageObject` is 0 on every
+  configuration, which blocks `FreeItem`, `RemoveFromItemList`,
+  `Type2ActionB`, `DamageRoach` and `PointActionA`.
+
+  **`OBJ_FLAG_SELECTED` is NOT the oracle**, which this file proposed and
+  which one probe disproved. The leader's flags read `0x00000C01` the moment
+  Boot Camp goes live -- bit 0, `OBJ_FLAG_SELECTED` and `OBJ_FLAG_REVEALED`
+  all already set -- and a sweep of 40x40 clicks across the whole screen never
+  changed them. The player's own unit is selected at mission start and Boot
+  Camp's opening has nothing else to select, so a click cannot move that bit.
+
+  (The sweep "found" a hit on its first click, which was the probe being
+  wrong rather than the game: it tested `flags & 0x400` instead of comparing
+  against the value before the click. Ask what the state was BEFORE, not just
+  whether the bit is set.)
+
+  What is left to try is a HOVER: `cursor` places the pointer absolutely and
+  identically on both sides of an A/B, so parking it on the leader and
+  shooting a settled frame would compare whatever the pick draws. That needs
+  its own configuration with its own budget, and the budget has to be measured
+  against a real defect rather than against three clean runs -- see the
+  `controls` budget, which was 0 for exactly as long as it took a fourth run
+  to disagree.
 ## A correction: two functions were not unexercised
 
 **A hand-written probe clicked BOOT CAMP at the wrong Y and never entered a
