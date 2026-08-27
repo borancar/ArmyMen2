@@ -5,62 +5,36 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `f49bf85`. Working tree clean.
+Last updated: **2026-08-27**, at `8a03457`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`AddDirtyRect`** (`0x0041DD00`, seven callers). 918 patches.
+- **`HeightAtPoint`** (`0x0042A820`, five callers) -- the ground height at a
+  point, raised by anything standing on it. 919 patches.
 
-- **None of the three globals beside the dirty list is a counter**, and
-  `orig.h` said two of them were. `0x00508AD6` fell some time ago -- it is
-  `records[0].next`, the list head. `0x00508AD4` is the same trick one field
-  earlier, `records[0].prev`, settled by the unlink inside `0x0041DF00`
-  writing `records[rec.next].prev = rec.prev` through exactly that address. So
-  `DIRTY_OFF_PREV` is `0x10` and the list is doubly linked through indices.
+- **`0x98` is type-dependent**, the same way `0x94` and `0xA0` are. For a
+  trooper it is `OBJ_OFF_RANK`, an int32 in 0..7. For an item -- types 1 and 4,
+  exactly what `ObjIsItem` gates the loop on -- only the low byte's *sign* is
+  read, as "this raises the ground you stand on". A rank could never make that
+  byte negative.
 
-  That leaves `0x00508AC0`, which is a global and still not a count: the same
-  unlink assigns it `rec.prev` when it removes the last record. It is the
-  **tail** index, doubling as the allocator -- `AddDirtyRect` takes `tail + 1`
-  -- which is why it looked like a count and why a record unlinked from the
-  end is handed straight back out.
+  I gave it a second name and the offset ratchet refused it, which is the right
+  answer: `OBJ_OFF_FIELD_94` already carries two readings under one name, and a
+  second name on an offset is how a union turns into two half-truths.
 
-  Three globals cleared together look like three counters. That is what the
-  sweep that named them saw, and it has now been wrong about all three.
+- The same check fired twice in one function: `OBJ_OFF_QUERY_NEXT` was also
+  invented a second time, on the same offset with an identical value. An
+  identical redefinition is legal C and says nothing, which is why the tool
+  fails on it.
 
-- **A gap in the harness, named rather than papered over.** `AddDirtyRect`
-  runs 618 times in live play and zero at the briefing, so `bootcamp` cannot
-  see it: dropping the prev link, and then never linking the record at all,
-  both left it at the usual 22 pixels. Against `mission`, where it does
-  execute, the never-link build comes out at 293 -- inside the 281..308 band.
-  The final shot is of a settled scene and every stale region has been painted
-  over by then.
+- **It returns a byte and only a byte** -- the original ends `mov al, bl` over
+  an `eax` still holding the masked tile index. `Log2Mask`'s problem exactly.
 
-  That was the **third undiscriminated function in a row**, and it is now
-  closed for these two rather than merely noted.
-
-- **`dirty.cpp` is a flat module and `tools/dirtycheck.py` is a third kind of
-  oracle.** Neither dirty-list function names a Win32 type -- they are index
-  arithmetic over an array in the image -- so they moved out of
-  `win32/mapdraw.cpp` and link into `selftest.exe`. `RepaintDirtyList` stays
-  behind; it reaches `IntersectRect` and the surface.
-
-  `scriptcheck.py` compares a return against a corpus and `placecheck.py` a
-  record built from one line. This one compares **state**: the vector is a
-  sequence of calls and the recording is the whole 10,004-byte span they leave
-  behind. Eight sequences, three of them around the 500-record bound and one
-  40 past it, so the overflow arm is covered on demand rather than never.
-
-  It earns its keep at once. Dropping the prev link fails 6 of 8; never
-  linking the record fails 7 of 8; moving the overflow bound by one fails 2.
-  All three are clean A/Bs.
-
-- **The state is seeded, not zeroed**, and the first version was not. With
-  zeros, deleting one of `ResetDirtyList`'s three stores passed all eight
-  sequences -- clearing something already zero cannot be observed. Seeded, it
-  fails all eight. The same trap as `ScriptVariable`'s duplicate-name check:
-  ask what state a check needs before believing it is covered.
+- Verified by reading, and the measurement is in the source rather than implied
+  by a clean run: 12 calls in one live mission, and adding 40 to the answer
+  leaves `mission` at 299 and `bootcamp` at 76, both inside their bands.
 
 ## A correction: two functions were not unexercised
 
