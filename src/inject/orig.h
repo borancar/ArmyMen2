@@ -2886,6 +2886,38 @@ typedef struct {
 #define ROW_OFF_ANIM_CUR         0x40u   /* AM2_AnimTable * */
 #define ROW_OFF_ANIM_NEXT        0x48u   /* AM2_AnimTable *, taken up next */
 #define ROW_OFF_FRAME            0x4Cu   /* int16_t */
+/* Two more, and SetAnimFrame is what establishes both: it searches the table
+ * at ROW_OFF_ANIM_CUR for an entry whose id is ROW_OFF_FRAME, stores that
+ * entry's AM2_Anim here, and resets the cell index to 0. So +0x44 is the
+ * animation actually PLAYING, chosen out of the table four bytes below it,
+ * and +0x51 is how far into its cells the row has got.
+ *
+ * RowAnimFinished reads both back and agrees: it compares +0x51 against
+ * anim->frames - 1 and indexes anim->cells with it. */
+#define ROW_OFF_ANIM_PLAYING     0x44u   /* AM2_Anim * */
+#define ROW_OFF_CELL             0x51u   /* uint8_t, index into anim->cells */
+/* 0x0040A2D0, six callers. Whether the row's animation has reached its last
+ * cell AND that cell's hold has elapsed -- so it is a "the animation is over"
+ * test rather than a per-cell tick. Three ways out and all of them 0: bit 0
+ * of the row's flags clear, no animation playing, or the cell index short of
+ * the last. The name is ours.
+ *
+ * IT IDENTIFIES AM2_AnimCell's FIRST FIELD. anim.h says of `field0` that the
+ * loader only ever copies it; this adds it to ROW_OFF_STAMP_54 and compares
+ * the sum against ADDR_GAME_CLOCK_MS, so it is a hold in milliseconds. */
+#define ADDR_ROW_ANIM_FINISHED   0x0040A2D0u  /* int32_t(const void *row) */
+/* 0x00428E00, seven callers. Step every one of the object's rows, then copy
+ * the FIRST row's +0x3C into the object's +0x44 -- an int16 sign-extended
+ * into a dword. Note the object's +0x44 and a row's +0x44 are different
+ * fields of different structures; only the row's is an animation. */
+#define ADDR_STEP_OBJ_ROWS       0x00428E00u  /* void(void *obj) */
+#define ADDR_STEP_ROW_ANIM       0x0040A380u  /* void(void *row) */
+#define ROW_OFF_FIELD_3C         0x3Cu   /* int16_t -> OBJ_OFF_FIELD_44 */
+#define OBJ_OFF_FIELD_44         0x44u   /* int32_t, from the row above */
+/* 0x0042B210, five callers. ADDR_POINT_OF_TILE's two-pointer twin: the same
+ * arithmetic, written back as a pair of int32 rather than packed into one
+ * dword. Both add 8, which is the centre of a 16-pixel tile. */
+#define ADDR_TILE_TO_XY          0x0042B210u  /* void(int32 tile,int32*,int32*) */
 /* Four fields SetSoldierKind writes and nothing read so far explains. 0x578 is
  * cleared for EVERY kind; the other three belong to kind 7. */
 #define OBJ_OFF_FIELD_578        0x578u  /* int32_t, cleared unconditionally */

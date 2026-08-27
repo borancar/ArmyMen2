@@ -2362,6 +2362,10 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
 typedef void (__cdecl *AM2_SetFrameFn)(void *row, int16_t frame, int32_t force);
 typedef int32_t (__cdecl *AM2_PoseIndexFn)(void *obj, void *weapon);
 #define orig_set_anim_frame  ((AM2_SetFrameFn)(uintptr_t)ADDR_SET_ANIM_FRAME)
+/* Still original: 272 bytes of per-row animation advance, one caller and that
+ * caller is StepObjRows below. */
+typedef void (__cdecl *AM2_StepRowFn)(void *row);
+#define orig_step_row_anim   ((AM2_StepRowFn)(uintptr_t)ADDR_STEP_ROW_ANIM)
 #define orig_weapon_pose     ((AM2_PoseIndexFn)(uintptr_t)ADDR_WEAPON_POSE_INDEX)
 /* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
  * because it is CRT code the offline test maps as data. */
@@ -2637,6 +2641,34 @@ void __cdecl Type238Action(void *obj, int32_t award)
     }
 }
 
+/* 0x00428E00, seven callers. Step every one of the object's rows, then take
+ * the FIRST row's +0x3C into the object's +0x44, sign-extended from int16.
+ *
+ * THE COUNT IS RE-READ EVERY ITERATION and again after the loop, so the
+ * original really does allow the stepper below to change it -- the second
+ * test is not a redundant copy of the first. Reproduced; nothing read says a
+ * stepper does change it.
+ *
+ * The object's +0x44 and a row's +0x44 are DIFFERENT FIELDS of different
+ * structures, and only the row's is an animation. Worth saying because
+ * RowAnimFinished, in anim.cpp, reads a row's +0x44 as an AM2_Anim * and the
+ * two would otherwise look like one field with two readings.
+ */
+void __cdecl StepObjRows(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  i;
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
+        orig_step_row_anim(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
+        *(int32_t *)(o + OBJ_OFF_FIELD_44) =
+            *(const int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                               + ROW_OFF_FIELD_3C);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2744,4 +2776,6 @@ void item_install(void)
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
     patch_replace(ADDR_ROW_RELEASE, (const void *)RowRelease, "RowRelease", 5);
+    patch_replace(ADDR_STEP_OBJ_ROWS, (const void *)StepObjRows,
+                  "StepObjRows", 7);
 }

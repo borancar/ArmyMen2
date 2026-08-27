@@ -70,7 +70,7 @@ static void DumpAnimTable(const AM2_AnimTable *t)
                          a->frames, a->directions, a->directionBits, a->field4,
                          a->field6, cells);
             for (j = 0; j < cells && j < 6; j++)
-                n += sprintf(buf + n, " (%d,%d)", a->cells[j].field0,
+                n += sprintf(buf + n, " (%d,%d)", a->cells[j].hold,
                              a->cells[j].sprite);
         }
         sprintf(buf + n, "\n");
@@ -134,7 +134,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
 
             for (j = 0; j < cells; j++) {
                 orig_fread(&w, 2, 1, fp);
-                a->cells[j].field0 = w;
+                a->cells[j].hold = w;
                 orig_fread(&w, 2, 1, fp);
                 /* The original reads this scratch back as a DWORD, so the top
                  * half is stale -- it is the file pointer's own argument slot,
@@ -338,6 +338,45 @@ void __cdecl FreeVehicleAnims(void)
     }
 }
 
+/* 0x0040A2D0, six callers -- and this is what named AM2_AnimCell::hold.
+ *
+ * Three ways out and all of them 0: bit 0 of the row's flags clear, no
+ * animation playing, or the cell index short of the last one. Only on the
+ * LAST cell does it look at the clock, so the question is "is the animation
+ * over", not "is it time for the next cell". Its one caller in the type-6
+ * stepper sets OBJ_FLAG_OVERDUE when it answers yes.
+ *
+ * The clock comparison is UNSIGNED -- `jb`, not `jl` -- so a hold that pushed
+ * the sum past 2^31 would read as still running. The clock is mission
+ * milliseconds and a mission would have to last 24 days.
+ *
+ * VERIFIED BY READING, and say so with the measurement. It runs 446 times in
+ * one live mission, so the path is warm -- and returning 1 where it returns 0
+ * leaves `mission` at 281 pixels, inside the band clean runs give. Neither
+ * this nor TileToXY beside it is discriminated by anything in the suite.
+ */
+int32_t __cdecl RowAnimFinished(const void *row)
+{
+    const uint8_t  *r = (const uint8_t *)row;
+    const AM2_Anim *a;
+    uint8_t         cell;
+
+    if (!(*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE))
+        return 0;
+
+    a = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    if (!a)
+        return 0;
+
+    cell = *(const uint8_t *)(r + ROW_OFF_CELL);
+    if ((int32_t)cell < (int32_t)a->frames - 1)
+        return 0;
+
+    return *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+           >= (uint32_t)(a->cells[cell].hold
+                         + *(const int32_t *)(r + ROW_OFF_STAMP_54));
+}
+
 int anim_install(void)
 {
     int rc = 0;
@@ -357,6 +396,8 @@ int anim_install(void)
                         (const void *)LoadVehicleAnims, "LoadVehicleAnims", 0);
     rc |= patch_replace(ADDR_FREE_ANIM_TABLE, (const void *)FreeAnimTable,
                         "FreeAnimTable", 1);
+    rc |= patch_replace(ADDR_ROW_ANIM_FINISHED, (const void *)RowAnimFinished,
+                        "RowAnimFinished", 6);
     rc |= patch_replace(ADDR_FREE_EXPLOSION_ANIMS,
                         (const void *)FreeExplosionAnims,
                         "FreeExplosionAnims", 0);

@@ -22,12 +22,18 @@
 extern "C" {
 #endif
 
-/* One cell of an animation: a sprite index and a value the loader only ever
- * copies. The index is stored RELATIVE to the file in the file itself and made
- * absolute here by adding the sprite list's length from before the load. */
+/* One cell of an animation: how long to hold it and which sprite to show. The
+ * index is stored RELATIVE to the file in the file itself and made absolute
+ * here by adding the sprite list's length from before the load.
+ *
+ * `hold` was `field0`, "a value the loader only ever copies", until
+ * RowAnimFinished turned up as a reader: it adds this to ROW_OFF_STAMP_54 and
+ * compares the sum against ADDR_GAME_CLOCK_MS. Milliseconds, then -- and the
+ * loader really does only copy it, which is why the field went unexplained
+ * for as long as only the loader was reconstructed. */
 typedef struct AM2_AnimCell {
-    int16_t field0;
-    int16_t sprite;
+    int16_t hold;      /* +0x00, milliseconds */
+    int16_t sprite;    /* +0x02 */
 } AM2_AnimCell;
 
 /* An animation: `frames * directions` cells, laid out direction-major -- the
@@ -107,6 +113,11 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
  * LoadRoachAnims tests the count BEFORE the chdir where the other two singles
  * test it after, LoadSoldierAnims cuts one animation's `next` link when it is
  * done, and LoadVehicleAnims skips a pair whose path is empty. */
+/* 0x0040A2D0. Whether the row's animation has reached its last cell and that
+ * cell's hold has elapsed -- "the animation is over", not a per-cell tick.
+ * See ADDR_ROW_ANIM_FINISHED in orig.h. */
+int32_t __cdecl RowAnimFinished(const void *row);
+
 void __cdecl LoadExplosionAnims(void);   /* 0x00422820 */
 void __cdecl LoadMissileAnims(void);     /* 0x0043C6F0 */
 void __cdecl LoadRoachAnims(void);       /* 0x0043CCF0, then the roach mask */

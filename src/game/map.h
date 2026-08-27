@@ -54,6 +54,10 @@ int32_t __cdecl TileOfPoint(uint32_t packed);
  * 0x00514DDC is. */
 uint32_t __cdecl PointOfTile(int32_t tile);
 
+/* 0x0042B210. The same answer as PointOfTile, written back as two int32
+ * rather than packed into one dword. */
+void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y);
+
 void map_install(void);
 
 #ifdef __cplusplus

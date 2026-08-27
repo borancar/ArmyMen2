@@ -96,6 +96,38 @@ uint32_t __cdecl PointOfTile(int32_t tile)
     return (uint32_t)x | ((uint32_t)y << 16);
 }
 
+/* 0x0042B210, five callers -- PointOfTile's two-pointer twin.
+ *
+ * The same arithmetic and NOT quite the same code. PointOfTile shifts a
+ * 16-bit register for the row (`shr ax, cl`) and packs the result into one
+ * dword; this masks the tile to 16 bits first and then shifts 32-bit, and
+ * writes two int32 out. The answers agree for every tile a map can hold --
+ * the mask is what makes them agree -- and both add 8, which is the centre of
+ * a 16-pixel tile.
+ *
+ * The x mask is `(w << 4) - 16`, which is only a mask at all because the
+ * map's width is a power of two; ADDR_MAP_ROW_SHIFT is its log and the y half
+ * uses that instead. If the two ever disagreed the x would wrap and the y
+ * would not.
+ *
+ * VERIFIED BY READING, and measured rather than assumed. It runs 63,504 times
+ * in one live Boot Camp mission -- so this is not a cold path -- and swapping
+ * x for y is invisible anyway: `bootcamp` stays at its usual 22 pixels and
+ * `mission` at 287, inside the 281..302 band four clean runs give. The calls
+ * happen and the answer goes somewhere the frame does not show. Same standing
+ * as the trig tables had before tools/trigdump.py.
+ */
+void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y)
+{
+    int32_t  w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    uint8_t  shift = *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    uint32_t t     = (uint32_t)tile & 0xFFFFu;
+
+    *x = (int32_t)(((t << AM2_TILE_SHIFT)
+                    & (uint32_t)((w << AM2_TILE_SHIFT) - 16)) + 8);
+    *y = (int32_t)(((t >> shift) << AM2_TILE_SHIFT) + 8);
+}
+
 /* The three data checksums a multiplayer session compares, 0x004303B0,
  * 0x00430400 and 0x00430450.
  *
@@ -268,6 +300,8 @@ void __cdecl ReadBootcampLevels(void)
 
 void map_install(void)
 {
+    patch_replace(ADDR_TILE_TO_XY, (const void *)TileToXY,
+                  "TileToXY", 5);
     patch_replace(ADDR_POINT_OF_TILE, (const void *)PointOfTile,
                   "PointOfTile", 1);
     patch_replace(ADDR_TILE_OF_POINT, (const void *)TileOfPoint,

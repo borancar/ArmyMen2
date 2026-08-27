@@ -184,6 +184,9 @@ void __cdecl DestroyType2(void *obj);
 void __cdecl DestroyType3(void *obj);
 void __cdecl DestroyType8(void *obj);
 
+/* 0x00428E00. Step every row of an object's row list. */
+void __cdecl StepObjRows(void *obj);
+
 void item_install(void);
 
 #ifdef __cplusplus

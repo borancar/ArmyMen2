@@ -156,7 +156,7 @@ def compare(table, ref):
                 bad.append(f"[{i}] id {ident}: {name} {a} vs {b}")
         want = grid[:len(got[6])]
         if [c[0] for c in want] != [c[0] for c in got[6]]:
-            bad.append(f"[{i}] id {ident}: cell field0 differs")
+            bad.append(f"[{i}] id {ident}: cell hold differs")
         deltas = [b[1] - a[1] for a, b in zip(want, want[1:])]
         if deltas != [b[1] - a[1] for a, b in zip(got[6], got[6][1:])]:
             bad.append(f"[{i}] id {ident}: sprite deltas differ")
