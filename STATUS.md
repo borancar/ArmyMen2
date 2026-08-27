@@ -5,39 +5,36 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `0784093`. Working tree clean.
+Last updated: **2026-08-27**, at `0a95939`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`ToggleFogOfWar`** (`0x0041A1B0`, two callers -- both cheat arms). 941
-  patches.
+- **`ScriptListFind`** (`0x0043E900`, five callers). 942 patches. Its return is
+  the **record**, not an index or a boolean -- the old macro typed it `int32_t`,
+  which worked only because its one reconstructed caller tests it for truth.
+  The first search is also the load.
 
-- **The flag is written twice per cheat**, and which write you look at decides
-  which polarity you conclude. The cheat arm stores what it wants; this
-  function opens with `sete al` on the *old* value and stores the complement;
-  the sweep below reads that. `orig.h` has been carrying **both** answers --
-  its fog block described the cheat's store, its `ADDR_FOG_OF_WAR` comment two
-  hundred lines away described the post-inversion value. Both corrected, with
-  the double write named as the reason.
+- **I nearly renamed it `FindLevelByName`.** `orig.h` says the table is "loaded
+  from the same `.txt` by the same reader" as the level records, which reads
+  like one table under two names -- and the compiler refused the rename,
+  because `AM2_LEVEL_RECORD_SIZE` already existed as `0x30C` where these
+  records are `0xCC`. Same file, same reader, **two** tables, two strides.
 
-- **The conceal arm reads the reveal stamp the other way round** from what this
-  tree said. It conceals when `OBJ_OFF_REVEALED_UNTIL` is 0 or the clock has
-  *not* reached it, and skips when it has -- `jae` on `cmp clock, stamp`. So
-  the cheat overrides a live reveal window rather than respecting it, and the
-  objects it leaves alone are the ones the ordinary sweep conceals anyway.
+- **Backing the rename out is what broke the campaign.** A blanket replace of
+  `AM2_LEVEL_RECORD_SIZE` across `map.cpp` also rewrote `FindLevelRecord`'s
+  bsearch stride from `0x30C` to `0xCC`, so the map never loaded: 5 log lines
+  against 14, and 297,855 differing pixels. Second time this session a
+  whole-file string replace has damaged something outside the edit's intent.
 
-- Verified by reading, and what that costs: both callers are cheat arms and no
-  drive types a cheat. The cheat runner at `0x00444C40` *is* reachable through
-  `ctl "type ..."`, so this is a configuration away from being compared rather
-  than out of reach.
-
-- **`combat`'s pixel figure can be 177,115.** Four runs sat at 692..704 and the
-  fifth came out at 22% of the frame -- the two players having ended up
-  somewhere different, which is what that configuration's disabled budget
-  anticipates. The tight cluster was luck, not reproducibility, and `ab.sh` now
-  says so where the budget is set.
+- **And the first two bisects blamed the wrong function.** Disabling
+  `ScriptListFind`'s `patch_replace` left `MpScriptChecksum`'s *direct call*
+  pointing at it, so "with the patch off it still fails" proved nothing.
+  What localised it was `git stash`: HEAD alone was clean, so the fault was in
+  the diff rather than in the function I had spent two runs suspecting.
+  **Disabling a patch does not disable a call** -- when a bisect has to be
+  right, back the whole change out rather than the half you think matters.
 
 ## Next
 
