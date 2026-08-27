@@ -5,29 +5,42 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `bb76fb9`. Working tree clean.
+Last updated: **2026-08-27**, at `f55b580`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`OnLobbySlave`** (`0x00410F70`, two callers). 950 patches, one more `orig_`
-  seam closed -- both callees were already ours, so this was a 144-byte hole in
-  the middle of `dplay.cpp`.
+- **`MakeKind7`** (`0x00435550`, five callers) -- the maker `LoadType7` uses.
+  951 patches, one more `orig_` seam closed.
 
-- **Three offsets confirm a struct.** The fields it logs are
-  `DPSESSIONDESC2`'s `dwMaxPlayers`, `dwCurrentPlayers` and
-  `lpszSessionNameA` at `+0x28`, `+0x2C` and `+0x30` -- so
-  `COMM_OFF_SESSION_DESC` really holds that structure rather than something
-  shaped like it. Three offsets agreeing with the SDK is better evidence than
-  the one `CommGetSessionDesc` already gave, and it is why this reads through
-  `LPDPSESSIONDESC2` rather than offsets of our own.
+- **The count is incremented before the check and not put back.** A refused
+  attempt leaves `ADDR_KIND7_COUNT` one higher than the number alive, so once
+  the limit is reached every further attempt pushes it further out; only
+  `FreeItemKind7`'s decrements, which clamp at zero, bring it down. Bounded at
+  both ends and **not symmetric in between**.
 
-- **It ends in a tail jump**, so `CommEnumPlayers`' return is this function's --
-  and `orig.h` has typed it `void` all along. Both callers were checked rather
-  than assumed: one discards `eax` immediately, the other starts pushing
-  arguments for something else. `void` is honest, and the comment says which
-  two sites make it so.
+  Reproduced deliberately: a version that decremented on refusal would be
+  tidier and would let a thirty-third through after enough failures -- exactly
+  the kind of difference no test here would catch, since the limit is only
+  reachable with thirty-two alive.
+
+- **Its fourth argument ends up at `OBJ_OFF_FACING`**, which is exactly the
+  field `LoadType7` reads to fill it. The two agree about the argument shape
+  from opposite sides -- one writing the call, one receiving it -- the same
+  two-ended check the placement record got. Its *second* argument is read
+  nowhere.
+
+- The object is `AM2_ITEM_HEADER_BYTES` -- the header and nothing else, which
+  is what a kind 7 *is*. That size already had a name two hundred lines away
+  and I gave it a second; `checkoffsets` refused the identical redefinition,
+  the fourth duplicate this session caught by a tool rather than by looking.
+
+- **A function declined:** `ChatboxReflow` (`0x00455D60`). Its `this` class
+  cannot be pinned -- `+0x74`, `+0x70` and `+0x64` match `SCROLLBAR_OFF_*`
+  while `+0x58` matches no scrollbar field, and the two readings contradict.
+  Transcribing it would mean guessing which class it belongs to, which is the
+  one thing this tree is built not to do.
 
 ## Next
 
