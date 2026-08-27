@@ -5,11 +5,33 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `557a7be`. Working tree clean.
+Last updated: **2026-08-27**, at `1a158ab`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`ChangeObjectFrame` is reconstructed** (`0x004351C0`, a name from the
+  image), and **its two exits do not return the same thing.** The normal one
+  answers whether ANY object's frame changed. But both ways of stopping the
+  chain early -- a uid resolving to nothing, or a link whose type is neither 1
+  nor 4 -- jump into the **destroyed** exit, which does `xor eax,eax`. A broken
+  chain answers **0 even when the first object's frame did change**.
+
+  That is deliberate code, not a compiler artefact: the zeroing instruction
+  sits in that epilogue and both branches target it. Called out because
+  "returns whether anything changed" is what the function *looks* like it
+  does, and is only true while the chain is intact.
+
+- **The two numbers it passes down are BITFIELDS** out of the type record's
+  `+8` -- bits 7..16 and 19..25. That is the same dword `StepType1And4`
+  compares *whole* against `ADDR_WATCHED_TYPE_ID`, so the field is packed and
+  neither reader is wrong; they read different parts of it.
+
+- A chained object carrying `OBJ_FLAG_NO_FRAME` is **skipped but not fatal** --
+  the walk continues past it, which is the opposite of what the two early
+  exits do. Three ways to encounter a bad link, two of which abandon the
+  result and one of which does not.
 
 - **RESOLVED: `OBJ_OFF_MP_ROLE` is a SOLDIER KIND.** It was recorded three
   commits ago as "probably" one, with the evidence and with what stopped it
