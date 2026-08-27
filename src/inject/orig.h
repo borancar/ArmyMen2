@@ -362,6 +362,24 @@
 #define ADDR_HUD_WIDGET_A  0x004FCF00u  /* AM2_Widget * */
 #define ADDR_HUD_WIDGET_B  0x004FCF54u
 #define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
+/* 0x00413A30, four callers. Repaint one HUD widget if it has been marked, and
+ * unmark it.
+ *
+ * Three globals and the function is the only thing that ties them together: a
+ * flag at 0x004FCF84, an index at 0x004FCF50, and a table of widget pointers
+ * at 0x004FCF04 that the index reaches into. ADDR_HUD_WIDGET_A is 0x004FCF00,
+ * four bytes before the table, so either the widgets are one array and the
+ * three named singles are entries in it, or they are scattered and this reads
+ * past one of them. Not established, and the index's range is not either.
+ *
+ * It also clears a BYTE at the widget's +0x70 before painting. The base
+ * AM2_Widget has nothing named there and the subclasses that do use the offset
+ * are int32; this writes one byte and only ever zero. */
+#define ADDR_HUD_REPAINT_ONE   0x00413A30u  /* void(void) */
+#define ADDR_HUD_DIRTY         0x004FCF84u  /* int32_t */
+#define ADDR_HUD_INDEX         0x004FCF50u  /* int32_t, into the table below */
+#define ADDR_HUD_WIDGET_TABLE  0x004FCF04u  /* AM2_Widget *[] */
+#define HUDWIDGET_OFF_FLAG70   0x70u        /* uint8_t, cleared before paint */
 /* 0x004143A0, two callers. Paint all three through vtable slot 1. */
 #define ADDR_HUD_PAINT     0x004143A0u  /* void(void) */
 /* 0x00414370, one caller -- the per-frame path. The same three widgets through

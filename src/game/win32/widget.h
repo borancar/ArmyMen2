@@ -1446,6 +1446,9 @@ void __cdecl OnAppActivated(void);
  * pointer goes in the class's own slot AND the base's sprite. */
 void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name);
 
+/* 0x00413A30, four callers. Repaint one HUD widget if it has been marked. */
+void __cdecl HudRepaintOne(void);
+
 int widget_install(void);
 
 #ifdef __cplusplus

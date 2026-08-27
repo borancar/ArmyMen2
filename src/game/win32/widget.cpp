@@ -5836,6 +5836,41 @@ void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name)
     ((AM2_Widget *)w)->sprite = spr;
 }
 
+/* 0x00413A30, four callers. Repaint one HUD widget if it has been marked, and
+ * unmark it.
+ *
+ * THE FLAG IS CLEARED BEFORE THE PAINT, not after. A painter that marked the
+ * HUD again would therefore keep its mark, where clearing afterwards would
+ * lose it -- and with four callers, at least one of them is in a frame loop.
+ * Order reproduced; nothing read so far says a painter does that.
+ *
+ * The widget is `table[index]`, and the three globals involved are tied
+ * together by this function and nothing else -- see ADDR_HUD_REPAINT_ONE in
+ * orig.h for what is and is not established about them.
+ *
+ * The byte at HUDWIDGET_OFF_FLAG70 is cleared too. The base AM2_Widget has
+ * nothing named at that offset and the subclasses that use it hold an int32
+ * there; this writes one BYTE and only ever zero, so it is not those.
+ *
+ * The rect goes into the paint slot BY VALUE, which is what
+ * WidgetRepaintSelf's call does too. */
+void __cdecl HudRepaintOne(void)
+{
+    AM2_Widget *w;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY == 0)
+        return;
+
+    *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY = 0;
+
+    w = ((AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_TABLE)
+            [*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX];
+
+    *((uint8_t *)w + HUDWIDGET_OFF_FLAG70) = 0;
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -6346,5 +6381,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_MP_PREVIEW_SETBITMAP,
                         (const void *)MpPreviewSetBitmap,
                         "MpPreviewSetBitmap", 3);
+    rc |= patch_replace(ADDR_HUD_REPAINT_ONE, (const void *)HudRepaintOne,
+                        "HudRepaintOne", 4);
     return rc;
 }
