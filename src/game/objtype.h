@@ -38,6 +38,10 @@ extern "C" {
 /* Original: 0x00433860. Types 1 and 4. */
 int32_t __cdecl ObjIsItem(const AM2_Object *obj);
 
+/* 0x00434060, eight callers. Make a list header and a copy of `count`
+ * twelve-byte records. Structural name; see objtype.cpp. */
+void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner);
+
 /* Original: 0x00457470. */
 int32_t __cdecl ObjIsType2(const AM2_Object *obj);
 

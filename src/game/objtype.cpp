@@ -15,11 +15,13 @@
  */
 
 #include "objtype.h"
+#include "crt.h"           /* am2_malloc -- the game's own heap */
 #include "objtable.h"
 #include "misc.h"          /* CommArmyOfSlot -- reconstructed */
 #include "../inject/patch.h"
 
 #include <stdint.h>
+#include <string.h>
 
 int32_t __cdecl ObjIsItem(const AM2_Object *obj)
 {
@@ -171,6 +173,61 @@ int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
 
 
 
+/* 0x00434060, eight callers. Make a list: a 0x30-byte header carrying an
+ * owner, a count and a pointer, plus a copy of `count` twelve-byte records.
+ *
+ * THE COPY IS FIELD BY FIELD -- int32, int16, int16, int32 -- rather than
+ * twelve bytes at a time, and that is the only evidence anywhere for the
+ * record's shape: nothing in this function reads a field, so the compiler had
+ * a struct assignment to work from and left its outline in the instructions.
+ * Kept as four moves rather than collapsed into a memcpy, which would agree
+ * on every byte and say nothing about the layout.
+ *
+ * A count of zero or less answers NULL having allocated nothing, so the
+ * header's existence implies at least one record. Neither allocation is
+ * checked. Only three of the header's twelve dwords are written; the rest are
+ * zeroed and unexplained.
+ *
+ * Filed here because 0x00433860 -- ObjIsItem, already in this file -- is its
+ * nearest reconstructed neighbour. The band is the only evidence for the home
+ * and the records are not identified, so the name is structural.
+ */
+void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
+{
+    const uint8_t *in;
+    uint8_t       *hdr;
+    uint8_t       *recs;
+    int32_t        i;
+
+    if (count <= 0)
+        return (void *)0;
+
+    hdr = (uint8_t *)am2_malloc(AM2_LISTHDR_BYTES);
+    memset(hdr, 0, AM2_LISTHDR_BYTES);
+
+    *(int32_t *)(hdr + LISTHDR_OFF_COUNT) = count;
+    *(void **)(hdr + LISTHDR_OFF_OWNER)   = owner;
+
+    recs = (uint8_t *)am2_malloc((size_t)count * AM2_LIST_RECORD_BYTES);
+    *(void **)(hdr + LISTHDR_OFF_RECORDS) = recs;
+    memset(recs, 0, (size_t)count * AM2_LIST_RECORD_BYTES);
+
+    in = (const uint8_t *)src;
+    for (i = 0; i < count; i++) {
+        uint8_t *out = *(uint8_t **)(hdr + LISTHDR_OFF_RECORDS)
+                       + (uint32_t)i * AM2_LIST_RECORD_BYTES;
+
+        *(int32_t *)(out + 0) = *(const int32_t *)(in + 0);
+        *(int16_t *)(out + 4) = *(const int16_t *)(in + 4);
+        *(int16_t *)(out + 6) = *(const int16_t *)(in + 6);
+        *(int32_t *)(out + 8) = *(const int32_t *)(in + 8);
+
+        in += AM2_LIST_RECORD_BYTES;
+    }
+
+    return hdr;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -179,6 +236,8 @@ int objtype_install(void)
                         "ObjEventMask", 1);
 
     rc |= patch_replace(ADDR_OBJ_IS_ITEM, (const void *)ObjIsItem, "ObjIsItem", 1);
+    rc |= patch_replace(ADDR_MAKE_RECORD_LIST, (const void *)MakeRecordList,
+                        "MakeRecordList", 8);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);
     rc |= patch_replace(ADDR_TYPE2_FIELD5A4_SET, (const void *)Type2Field5A4Set,
                         "Type2Field5A4Set", 4);

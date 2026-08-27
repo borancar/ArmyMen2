@@ -5529,6 +5529,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * three-argument one packs its key with exactly PackKey's arithmetic and hands
  * it straight over, which is what ties the two families together. Both names
  * are ours; -1 means no such key. */
+/* 0x00434060, eight callers. Make a list: a 0x30-byte header with an owner, a
+ * count and a pointer, plus a copy of `count` twelve-byte records.
+ *
+ * The copy is done FIELD BY FIELD -- int32, int16, int16, int32 -- rather than
+ * as twelve bytes, so the record's shape is visible in the instructions even
+ * though nothing here reads a field. That is the only evidence for the layout
+ * and it is worth keeping in the reconstruction rather than collapsing to a
+ * memcpy that would agree and say nothing.
+ *
+ * A count of zero or less answers NULL having allocated nothing. Neither
+ * allocation is checked. The header is 0x30 bytes and only three of its twelve
+ * dwords are written; the rest are zeroed and unexplained. */
+#define ADDR_MAKE_RECORD_LIST    0x00434060u  /* void *(count, src, owner) */
+#define LISTHDR_OFF_OWNER        0x00u
+#define LISTHDR_OFF_COUNT        0x08u
+#define LISTHDR_OFF_RECORDS      0x0Cu
+#define AM2_LISTHDR_BYTES        0x30u
+#define AM2_LIST_RECORD_BYTES    0x0Cu
 #define ADDR_KEY_LOOKUP          0x00434290u  /* int32_t(uint32_t key) */
 #define ADDR_KEY_LOOKUP_TRIPLE   0x004346E0u  /* int32_t(a, b, c) */
 #define ADDR_KEY_TABLE_COUNT     0x00516148u  /* int32_t */
