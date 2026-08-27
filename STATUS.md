@@ -5,11 +5,36 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `18b08f7`. Working tree clean.
+Last updated: **2026-08-27**, at `d9e63bf`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`Type2ActionA` completes the family** -- `0x00448170`. Where **B** disarms
+  and **C** hands the selection on, **A re-arms**: soldier kind 7, the old
+  weapon abandoned, a freshly created one handed over.
+
+- **Its guards are not its siblings'.** It refuses at `OBJ_OFF_MP_ROLE >= 6`,
+  as B does and C does not, and it has one neither has:
+  `ADDR_TYPE2_FIELD5A4_SET`, false unless the object is a type 2 with a
+  positive `OBJ_OFF_FIELD_5A4`. So that counter being set is a reason **not**
+  to re-arm -- the first thing read so far that says anything about what the
+  field is for.
+
+- **Two writes, opposite order, and each is right.** A marks the old weapon
+  `OBJ_FLAG_OVERDUE` and does NOT clear the uid first, because the next line
+  overwrites it with the new weapon's; B clears it. That looks like an
+  inconsistency until you see what follows each.
+
+- **`0x2B` appears twice** and that is what ties the halves together: it
+  selects the weapon through `KeyLookupTriple` and it is the action code run
+  afterwards. Reading either as a coincidence would let them drift.
+
+- The new weapon is created with an **empty** name (`ADDR_DIR_SCRATCH` is a
+  scratch buffer, not a literal), and its army is copied from the unit AFTER
+  creation even though the creator is handed the same army -- redundant unless
+  the creator ignores its argument, and nothing read so far says which.
 
 - **CORRECTION.** The previous entry said all six of `ArmyMsgFilter`'s routes
   were ours. They were **five** -- `RecvItemCreate` (`0x0042AFA0`) was still
