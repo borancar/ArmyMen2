@@ -628,6 +628,49 @@ typedef void (__cdecl *AM2_ObjRemapFn)(void *obj, void *desc, int32_t force);
 typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 #define orig_objects_at_point ((AM2_ObjectsAtFn)(uintptr_t)ADDR_OBJECTS_AT_POINT)
 
+/* Still original. Declared here rather than with the other teardown seams
+ * further down, because VehicleDied is above them. */
+typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
+#define orig_obj_clear_footprint \
+            ((AM2_ObjOnlyFn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
+
+/* 0x0045B630, one caller. A vehicle has died: mark it, hide its second row,
+ * clear its footprint and take it off the map.
+ *
+ * ITS SECOND ARGUMENT IS UNUSED. The body never reads it, and the name kept it
+ * because the trooper twin at ADDR_TROOPER_DIED does use one. Reproduced with
+ * the parameter present and ignored -- dropping it would change the shape the
+ * one caller uses, and a `(void)` says more than a missing argument would.
+ *
+ * THE ROW IT HIDES IS THE SECOND, and only when there is one: the guard is
+ * `rowCount > 1` and the row it clears is `rows + AM2_OBJ_ROW_STRIDE`. A
+ * vehicle carries two map objects and this puts out the second; nothing read
+ * so far says which is which, only that the first survives.
+ *
+ * The unregister is conditional on flag bit 0 and clears it afterwards, so a
+ * vehicle that dies twice is taken off the map once. That idempotence is the
+ * flag's, not the caller's.
+ */
+void __cdecl VehicleDied(void *obj, uint32_t by)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    (void)by;
+
+    *(int32_t *)(o + VEHICLE_OFF_DEATH_STATE) = 5;
+    *(int32_t *)(o + VEHICLE_OFF_DEAD)        = 1;
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+        ObjFlagClear0(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE);
+
+    orig_obj_clear_footprint(o);
+
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE) {
+        ItemPreDestroyAlias(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)MAPOBJ_FLAG_VISIBLE;
+    }
+}
+
 /* 0x004294C0, fifteen callers. Recompute an object's tile from its position
  * and, if anything moved, put it back on the map and re-apply its height.
  *
@@ -897,8 +940,6 @@ void __cdecl DestroyByType(void *obj)
 #define orig_obj_clear_roach_footprint \
             ((am2_destroy_fn)AM2_IMAGE(ADDR_OBJ_CLEAR_ROACH_FOOTPRINT))
 
-#define orig_obj_clear_footprint \
-            ((am2_destroy_fn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
 
 /* 0x00449460, one caller -- DestroyByType's type-2 arm.
  *
@@ -2515,7 +2556,6 @@ void __cdecl Type2ActionA(void *obj)
 typedef void (__cdecl *AM2_TrooperDiedFn)(void *obj, int32_t kind, uint32_t by);
 typedef void (__cdecl *AM2_VehicleDiedFn)(void *obj, uint32_t by);
 #define orig_trooper_died ((AM2_TrooperDiedFn)(uintptr_t)ADDR_TROOPER_DIED)
-#define orig_vehicle_died ((AM2_VehicleDiedFn)(uintptr_t)ADDR_VEHICLE_DIED)
 
 /* 0x00428450, one caller -- RecvDeath, when the wire says an object died.
  *
@@ -2556,7 +2596,7 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
 
     switch (*(const int32_t *)o) {
     case 2:  orig_trooper_died(obj, kind, by); break;
-    case 3:  orig_vehicle_died(obj, by);       break;
+    case 3:  VehicleDied(obj, by);             break;
     default:                                   break;
     }
 
@@ -2984,6 +3024,7 @@ void item_install(void)
                   "ObjectsHitByPoint", 5);
     patch_replace(ADDR_OBJ_TILE_CHANGED, (const void *)ObjTileChanged,
                   "ObjTileChanged", 15);
+    patch_replace(ADDR_VEHICLE_DIED, (const void *)VehicleDied, "VehicleDied", 1);
     patch_replace(ADDR_UNIT_BY_UID, (const void *)UnitByUid, "UnitByUid", 4);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);

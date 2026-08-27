@@ -162,6 +162,10 @@ void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc);
  * and, if anything moved, put it back on the map. */
 void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force);
 
+/* 0x0045B630. A vehicle has died. Its second argument is unused; see
+ * item.cpp. */
+void __cdecl VehicleDied(void *obj, uint32_t by);
+
 /* 0x00459FB0. A uid to a unit -- types 2, 3 and 8 only. */
 void *__cdecl UnitByUid(uint32_t uid);
 

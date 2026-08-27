@@ -6166,7 +6166,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * neither carries a string. Types other than those two get no handler at all;
  * the common tail runs for every type. */
 #define ADDR_TROOPER_DIED        0x00447E50u  /* void(obj, int32, uint32 by) */
+/* 0x0045B630, one caller. ITS SECOND ARGUMENT IS UNUSED -- the body never
+ * reads [esp+0xc] -- and the name kept it because the trooper twin beside it
+ * does use one. Reproduced with the parameter present and ignored, since
+ * dropping it would change the calling convention the one caller uses. */
 #define ADDR_VEHICLE_DIED        0x0045B630u  /* void(obj, uint32 by) */
+#define VEHICLE_OFF_DEATH_STATE  0x580u  /* int32_t, set to 5 */
+#define VEHICLE_OFF_DEAD         0x59Cu  /* int32_t, set to 1 */
+/* The two it calls are ADDR_OBJ_CLEAR_FOOTPRINT and
+ * ADDR_ITEM_PRE_DESTROY_ALIAS, both already named -- I gave each a second name
+ * and the alias ratchet refused both in one run. The first is also SaveType3's
+ * opening call, which is worth knowing: a SAVE function clearing a footprint
+ * is not what the name suggests either function is for. */
 #define ADDR_STR_RECV_ITEM_GONE  0x00485F20u
 #define ADDR_STR_RECV_DEATH      0x00485EF0u
 #define ADDR_STR_RECV_ITEM_DEPLOY 0x00485F3Cu
@@ -6502,6 +6513,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ends. What a kind-7 object IS is not established; it is 0x94 bytes and there
  * are at most 32 of them. */
 #define ADDR_FREE_ITEM_KIND7       0x004355F0u
+/* 0x00435550, five callers -- the one that refuses a thirty-third. The
+ * argument shape comes from LoadType7, which passes a saved header's fields
+ * straight in: position, 1, army, OBJ_OFF_FACING as a BYTE, 1, and the
+ * header's +4. */
+#define ADDR_MAKE_KIND7            0x00435550u  /* void *(pt,int32,army,b,
+                                                 *        int32,int32) */
 #define ADDR_KIND7_COUNT           0x0051616Cu  /* int32_t, at most 32 */
 #define ADDR_FIRST_ITEM     0x00427850u  /* void *(void) */
 #define ADDR_NEXT_ITEM      0x00427880u  /* void *(void) */

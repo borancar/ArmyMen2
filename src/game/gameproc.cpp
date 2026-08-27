@@ -362,6 +362,44 @@ int32_t __cdecl SaveType5(am2_FILE *fp, void *obj)
     return 1;
 }
 
+typedef void *(__cdecl *AM2_MakeKind7Fn)(uint32_t pt, int32_t a, int32_t army,
+                                         int32_t b, int32_t c, int32_t d);
+#define orig_make_kind7 ((AM2_MakeKind7Fn)(uintptr_t)ADDR_MAKE_KIND7)
+
+/* 0x00435500, one caller. The type 7 loader, and the shortest of the nine.
+ *
+ * IT DOES NOT READ THE FILE AT ALL. Every other loader in the family starts
+ * with an fread of its type's record; this one takes what it needs from the
+ * HEADER LoadItemHeader has already read and builds the object from that. So
+ * type 7 is the only type whose save side writes nothing (its arm is the
+ * shared `return 1`) and whose load side reads nothing -- the pair is
+ * consistent, which is worth checking rather than assuming when a saver looks
+ * like a stub.
+ *
+ * The object is made by ADDR_MAKE_KIND7, which refuses a thirty-third, and
+ * the WHOLE HEADER is then copied over it -- ADDR_ITEM_HEADER_SIZE bytes,
+ * including the fields the creator was just given. A failed creation answers
+ * 0 and copies nothing.
+ */
+void *__cdecl LoadType7(am2_FILE *fp, const void *hdr)
+{
+    const uint8_t *h = (const uint8_t *)hdr;
+    uint8_t       *made;
+
+    (void)fp;
+
+    made = (uint8_t *)orig_make_kind7(*(const uint32_t *)(h + OBJ_OFF_POS), 1,
+                                      *(const int8_t *)(h + OBJ_OFF_ARMY),
+                                      *(const uint8_t *)(h + OBJ_OFF_FACING),
+                                      1,
+                                      *(const int32_t *)(h + 4));
+    if (!made)
+        return (void *)0;
+
+    memcpy(made, h, (size_t)kItemHeaderSize);
+    return made;
+}
+
 /* 0x00428870, one caller -- SaveItems, once per registered object. Writes the
  * common header and then whatever the object's type adds.
  *
@@ -419,7 +457,6 @@ typedef void (__cdecl *AM2_ApplyHeightFn)(void *obj, int32_t height);
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
 #define orig_load_type5  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE5)
 #define orig_load_type6  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE6)
-#define orig_load_type7  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE7)
 #define orig_load_type8  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE8)
 #define orig_apply_obj_height ((AM2_ApplyHeightFn)(uintptr_t)ADDR_APPLY_OBJ_HEIGHT)
 
@@ -472,7 +509,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
     case 5:  made = (uint8_t *)orig_load_type5(fp, hdr);      break;
     case 6:  made = (uint8_t *)orig_load_type6(fp, hdr);      break;
-    case 7:  made = (uint8_t *)orig_load_type7(fp, hdr);      break;
+    case 7:  made = (uint8_t *)LoadType7(fp, hdr);            break;
     case 8:  made = (uint8_t *)orig_load_type8(fp, hdr);      break;
     default: break;
     }
@@ -528,4 +565,5 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
     patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);
     patch_replace(ADDR_SAVE_TYPE5, (const void *)SaveType5, "SaveType5", 1);
+    patch_replace(ADDR_LOAD_TYPE7, (const void *)LoadType7, "LoadType7", 1);
 }
