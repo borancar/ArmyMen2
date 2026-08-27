@@ -5,34 +5,29 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `05d5741`. Working tree clean.
+Last updated: **2026-08-27**, at `bb76fb9`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`LoadType6`** (`0x00422780`). 949 patches -- all nine savers and three of
-  the nine loaders are ours.
+- **`OnLobbySlave`** (`0x00410F70`, two callers). 950 patches, one more `orig_`
+  seam closed -- both callees were already ours, so this was a 144-byte hole in
+  the middle of `dplay.cpp`.
 
-- **It makes the object out of the record and then overwrites it with the same
-  record.** Three fields go to `SpawnAt` as the kind, the uid and one more, and
-  the whole record is then copied to `OBJ_OFF_FIELD_94`, so whatever the maker
-  derived from those three is replaced a moment later. The same numbers unless
-  the maker changes them -- the sort of redundancy that only matters when it
-  stops being redundant.
+- **Three offsets confirm a struct.** The fields it logs are
+  `DPSESSIONDESC2`'s `dwMaxPlayers`, `dwCurrentPlayers` and
+  `lpszSessionNameA` at `+0x28`, `+0x2C` and `+0x30` -- so
+  `COMM_OFF_SESSION_DESC` really holds that structure rather than something
+  shaped like it. Three offsets agreeing with the SDK is better evidence than
+  the one `CommGetSessionDesc` already gave, and it is why this reads through
+  `LPDPSESSIONDESC2` rather than offsets of our own.
 
-- The **position and army come from the header**, not the record, as in
-  `LoadType7`. The header is the part every type shares.
-
-- **The `0x68..0x93` gap is untouched on this side too.** The header copy is
-  `ADDR_ITEM_HEADER_SIZE` bytes and the record copy starts at `0x94`, so the
-  bytes the save side never wrote are the bytes the load side never restores.
-  Both halves agreeing about the hole is better evidence that it is deliberate
-  than either alone.
-
-- **No error checking anywhere** -- the `fread` is unchecked and so is the
-  maker's answer, so a truncated file walks into a null dereference.
-  `SaveOneItem`'s per-step checking has no counterpart on this side.
+- **It ends in a tail jump**, so `CommEnumPlayers`' return is this function's --
+  and `orig.h` has typed it `void` all along. Both callers were checked rather
+  than assumed: one discards `eax` immediately, the other starts pushing
+  arguments for something else. `void` is honest, and the comment says which
+  two sites make it so.
 
 ## Next
 
