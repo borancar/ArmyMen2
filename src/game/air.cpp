@@ -13,6 +13,8 @@
 #include "savetag.h"
 #include "image.h"
 #include "misc.h"   /* MeetsAllThree -- reconstructed */
+#include "script.h"     /* ScriptFindName -- reconstructed */
+#include "scriptint.h"  /* kScriptNames */
 #include "army.h"   /* ObjIsFriendly -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -683,6 +685,53 @@ void __cdecl AirSupportPop(void)
         AirSupportClear();
 }
 
+/* 0x004064E0, four callers -- and the four are what name it. Each is a
+ * one-line wrapper passing an army 0..3 and one of "gflagbase", "tflagbase",
+ * "bflagbase" and "grflagbase", so this is the capture-the-flag proximity
+ * test: is `who` standing at the named army's flag base.
+ *
+ * IT ANSWERS 0 FOR YES. AM2_NOT_AT_FLAG_BASE is the failure code, and it is
+ * shared with the three functions immediately above it, which answer 0x1E,
+ * 0x60 and 0x80 -- so these are CODES rather than booleans, and a
+ * reconstruction that returned 1 and 0 would be wrong in a way no `if` on the
+ * result would show.
+ *
+ * Two conditions and both are required: `owner`'s army has to map through
+ * CommArmyOfSlot to the army asked for, and `who` has to be within
+ * AM2_FLAG_BASE_RANGE of whatever the script name resolves to. The name goes
+ * through ScriptFindName and the entry's VALUE is a uid, which is the same
+ * two-step the script layer uses everywhere.
+ *
+ * A name that is not in the table resolves to entry 0 rather than failing --
+ * ScriptFindName answers 0 for "not found" and index 0 is a real entry -- so a
+ * misspelled flag base measures the distance to whatever entry 0 holds. The
+ * four callers all pass literals, which is what makes that harmless here.
+ *
+ * The distance is ApproxDist's diamond metric, not a circle. */
+int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
+                           const char *name)
+{
+    const uint8_t *w = (const uint8_t *)who;
+    const uint8_t *o = (const uint8_t *)owner;
+    const uint8_t *base;
+
+    if (CommArmyOfSlot(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                       *(const int8_t *)(o + OBJ_OFF_ARMY)) != army)
+        return AM2_NOT_AT_FLAG_BASE;
+
+    base = (const uint8_t *)LookupByUID(
+               (uint32_t)kScriptNames[ScriptFindName(name)].value);
+    if (!base)
+        return AM2_NOT_AT_FLAG_BASE;
+
+    if (ApproxDist((const AM2_Point *)(base + OBJ_OFF_POS),
+                   (const AM2_Point *)(w + OBJ_OFF_POS))
+        >= AM2_FLAG_BASE_RANGE)
+        return AM2_NOT_AT_FLAG_BASE;
+
+    return 0;
+}
+
 /* 0x0041A1B0, two callers -- both arms of the cheat table at 0x00417B80.
  * Invert the fog flag and bring every enemy object into line with it.
  *
@@ -775,6 +824,7 @@ void air_install(void)
                   "ObjConceal", 13);
     patch_replace(ADDR_TOGGLE_FOG_OF_WAR, (const void *)ToggleFogOfWar,
                   "ToggleFogOfWar", 2);
+    patch_replace(ADDR_AT_FLAG_BASE, (const void *)AtFlagBase, "AtFlagBase", 4);
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
 }

@@ -6130,6 +6130,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_POINTS_DIFFER     0x0042E110u
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
+/* 0x004064E0, four callers -- and the four are what name it. Each is a
+ * one-line wrapper passing an army 0..3 and one of "gflagbase", "tflagbase",
+ * "bflagbase" and "grflagbase", so this is the capture-the-flag proximity
+ * test: is `who` standing at the named army's flag base.
+ *
+ * Two conditions, both required. `owner`'s army has to map through
+ * CommArmyOfSlot to the army asked for, and `who` has to be within
+ * AM2_FLAG_BASE_RANGE of the object the script name resolves to.
+ *
+ * IT ANSWERS 0 FOR YES. 0x80 is the failure code and it is shared with the
+ * three neighbours above it, which return 0x1E, 0x60 and 0x80 -- a set of
+ * codes rather than a boolean, so a reconstruction that answered 1 and 0
+ * would be wrong in a way no compare against zero would show. */
+#define ADDR_AT_FLAG_BASE        0x004064E0u  /* int32(who, owner, army, name) */
+#define AM2_FLAG_BASE_RANGE      100
+#define AM2_NOT_AT_FLAG_BASE     0x80
+#define ADDR_STR_FLAGBASE_GREEN  0x00473F0Cu  /* "gflagbase"  */
+#define ADDR_STR_FLAGBASE_TAN    0x00473F00u  /* "tflagbase"  */
+#define ADDR_STR_FLAGBASE_BLUE   0x00473EF4u  /* "bflagbase"  */
+#define ADDR_STR_FLAGBASE_GREY   0x00473EE8u  /* "grflagbase" */
 #define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */
 #define ADDR_ANGLE_DELTA    0x0042DD90u  /* int32_t(from, to), 8-bit headings */
 #define ADDR_ROUND_TO_8     0x0042DFB0u  /* int32_t(value, bits) */

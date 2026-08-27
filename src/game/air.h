@@ -152,6 +152,11 @@ void __cdecl ObjConceal(void *obj, int32_t force);
 /* 0x0041A1B0, two callers -- both cheat arms. Invert the fog flag and bring
  * every enemy object into line with it. See air.cpp for the double write. */
 void __cdecl ToggleFogOfWar(void);
+
+/* 0x004064E0, four callers. Is `who` standing at the named army's flag base?
+ * Answers 0 for YES -- see air.cpp. */
+int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
+                           const char *name);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded
