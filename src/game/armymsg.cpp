@@ -380,8 +380,6 @@ void __cdecl SendItemDeploy(const void *item, int32_t arg)
                  (int32_t)*(const uint8_t *)(it + OBJ_OFF_FACING));
 }
 
-typedef void (__cdecl *AM2_ObjDieFn)(void *obj, int32_t kind, uint32_t by);
-#define orig_obj_die ((AM2_ObjDieFn)(uintptr_t)ADDR_OBJ_DIE)
 
 /* 0x0042AF00, 0x0042AEB0 and 0x0042AE50 -- three of the six receivers
  * ArmyMsgFilter routes to, and each is the far end of a sender in this file.
@@ -445,7 +443,7 @@ void __cdecl RecvDeath(void *msg)
     orig_log((const char *)(uintptr_t)ADDR_STR_RECV_DEATH,
              ((const AM2_Object *)obj)->uid, UidArmy(by));
 
-    orig_obj_die(obj, (int32_t)*(const uint8_t *)(m + 0x0C), by);
+    ObjDie(obj, (int32_t)*(const uint8_t *)(m + 0x0C), by);
 }
 
 /* 0x0042AF30, the far end of SendItemDeploy above -- and the pair is what

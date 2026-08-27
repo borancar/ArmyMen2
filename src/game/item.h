@@ -229,6 +229,11 @@ void __cdecl Type2ActionC(void *obj, int32_t prev);
  * ADDR_TYPE2_FIELD5A4_SET says so, which B and C do not check. */
 void __cdecl Type2ActionA(void *obj);
 
+/* 0x00428450. An object died: health zeroed FIRST, then a per-type handler
+ * for types 2 and 3 only, then the common tail that always runs. A slot below
+ * zero gives a NULL attacker rather than an error. */
+void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by);
+
 /* 0x004284D0. Copies OBJ_OFF_POS aside into OBJ_OFF_PREV_POS -- first, and
  * ahead of every guard -- then dispatches to the object's type stepper. Types
  * 1 and 4 share one; type 2 is the only arm with no destroyed check. */

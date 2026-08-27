@@ -2309,6 +2309,58 @@ void __cdecl Type2ActionA(void *obj)
     SendTrooperSetWeapon(obj, ((const AM2_Object *)made)->uid, 0);
 }
 
+typedef void (__cdecl *AM2_TrooperDiedFn)(void *obj, int32_t kind, uint32_t by);
+typedef void (__cdecl *AM2_VehicleDiedFn)(void *obj, uint32_t by);
+#define orig_trooper_died ((AM2_TrooperDiedFn)(uintptr_t)ADDR_TROOPER_DIED)
+#define orig_vehicle_died ((AM2_VehicleDiedFn)(uintptr_t)ADDR_VEHICLE_DIED)
+
+/* 0x00428450, one caller -- RecvDeath, when the wire says an object died.
+ *
+ * Health is zeroed FIRST, before any handler runs, so a per-type handler
+ * cannot see the object as alive. Only types 2 and 3 have one; every other
+ * type falls straight through to the common tail, which always runs.
+ *
+ * THE ATTACKER IS LOOKED UP BEFORE THE TYPE IS EVEN READ, and the lookup has
+ * a trap in it. FindSlot's second parameter is an out-pointer, and the
+ * original passes the address of ITS OWN THIRD ARGUMENT -- the attacker uid --
+ * so the call may overwrite it. That is safe only because the value was
+ * already copied into a register on the line before, and it is that copy
+ * every later use reads.
+ *
+ * Written with a separate local for the scratch, which is what the original
+ * means; sharing the argument slot the way it does would work here too, but
+ * only by accident of the copy, and nothing would say so.
+ *
+ * A slot below zero gives a NULL attacker rather than an error, so a death
+ * attributed to a uid this side has never seen still cleans up.
+ *
+ * The original emits the two-call tail TWICE, once per exit; one copy in C is
+ * the same function.
+ *
+ * VERIFIED BY READING. Its one caller needs a peer to send a death message. */
+void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  insertAt = 0;
+    int32_t  slot     = FindSlot(by, &insertAt);
+    void    *attacker = NULL;
+
+    if (slot >= 0)
+        attacker = ((AM2_ObjEntry *)(uintptr_t)
+                        *(void *const *)(uintptr_t)ADDR_OBJ_TABLE)[slot].obj;
+
+    *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
+
+    switch (*(const int32_t *)o) {
+    case 2:  orig_trooper_died(obj, kind, by); break;
+    case 3:  orig_vehicle_died(obj, by);       break;
+    default:                                   break;
+    }
+
+    TriggerItemDestroyed(obj, attacker);
+    ObjDeathCleanup(obj);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -2319,6 +2371,7 @@ void item_install(void)
                   "ItemsReset", 0);
     patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
                   "StepType1And4", 1);
+    patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);
     patch_replace(ADDR_TYPE2_ACTION_A, (const void *)Type2ActionA,
                   "Type2ActionA", 5);
     patch_replace(ADDR_TYPE2_ACTION_C, (const void *)Type2ActionC,

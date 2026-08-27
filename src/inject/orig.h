@@ -5698,6 +5698,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_TRIGGER_ITEM_DESTROYED and ADDR_OBJ_DEATH_CLEANUP, which between them
  * are what happens when an object dies rather than merely being removed. */
 #define ADDR_OBJ_DIE             0x00428450u  /* void(obj, int32 kind, uint32 by) */
+/* The two per-type death handlers ADDR_OBJ_DIE dispatches to. Named by the
+ * type that reaches them -- 2 and 3, which RecvItemCreate's four arms
+ * establish as trooper and vehicle -- because neither names itself and
+ * neither carries a string. Types other than those two get no handler at all;
+ * the common tail runs for every type. */
+#define ADDR_TROOPER_DIED        0x00447E50u  /* void(obj, int32, uint32 by) */
+#define ADDR_VEHICLE_DIED        0x0045B630u  /* void(obj, uint32 by) */
 #define ADDR_STR_RECV_ITEM_GONE  0x00485F20u
 #define ADDR_STR_RECV_DEATH      0x00485EF0u
 #define ADDR_STR_RECV_ITEM_DEPLOY 0x00485F3Cu
