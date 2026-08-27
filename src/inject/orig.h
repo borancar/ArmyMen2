@@ -5629,6 +5629,31 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_DAMAGE_OFF_POS       0x0Cu /* two int16, the ATTACKER's position */
 #define MSG_DAMAGE_OFF_AMOUNT    0x10u /* int16_t */
 #define MSG_DAMAGE_OFF_KIND      0x12u /* uint8_t */
+#define ADDR_STR_RECV_ITEM_CREATE 0x00485F78u
+/* The item-create message and the four creators it dispatches to. The switch
+ * is on MSG_CREATE_OFF_TYPE and the four arms map onto the object types this
+ * project already knows: 1 item, 2 trooper, 3 vehicle, 4 weapon.
+ *
+ * Two of the four creators name themselves -- 0x0045F0C0 logs "CreateWeapon"
+ * outright, and 0x0045B090 logs "Vehicle aai entry not found for type %d" --
+ * which is what fixes the mapping and, with it, the other two. */
+#define ADDR_CREATE_ITEM         0x00433980u  /* type 1 */
+#define ADDR_CREATE_TROOPER      0x00447620u  /* type 2 */
+#define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */
+#define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
+#define ADDR_ITEM_POST_CREATE    0x0043A210u  /* void(obj, int32) */
+#define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
+#define MSG_CREATE_OFF_UID       4u
+#define MSG_CREATE_OFF_NAME      8u    /* char[]; empty means none */
+#define MSG_CREATE_OFF_TYPE      0x48u /* int16_t, 1..4 */
+#define MSG_CREATE_OFF_A         0x4Au /* WORD to types 2 and 3, DWORD to 1 and 4 */
+#define MSG_CREATE_OFF_B         0x4Cu /* int16_t, types 2 and 3 only */
+#define MSG_CREATE_OFF_C         0x60u
+#define MSG_CREATE_OFF_SUBTYPE   0x64u /* int16_t */
+#define MSG_CREATE_OFF_D         0x68u
+#define MSG_CREATE_OFF_E         0x6Cu /* uint8_t */
+#define AM2_TROOPER_SUBTYPE_LEADS 0xA  /* then SetLeadsAndAct runs */
+#define AM2_WEAPON_KEY_KIND      0x2D  /* KeyLookupTriple's first argument */
 #define ADDR_STR_ITEM_GONE_SEND  0x00485E10u
 #define AM2_MSG_OBJ_DESTROYED    0x10u
 #define AM2_MSG_OBJ_DESTROYED_LEN 8u

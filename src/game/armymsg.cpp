@@ -9,6 +9,9 @@
 #include "../inject/patch.h"
 #include "objtable.h" /* LookupByUID */
 #include "dist.h"     /* AngleBetween */
+#include "army.h"     /* AllyFlag, SetLeadsAndAct */
+#include "packkey.h"
+#include "misc.h"
 
 /* ArmyMessageFlush stays original and is reached by address. It empties the
  * packet and resets the cursor to AM2_ARMY_PACKET_HDR, returning zero when it
@@ -260,7 +263,6 @@ void __cdecl ItemGoneMessageSend(const void *obj)
 }
 
 typedef int32_t (__cdecl *AM2_RecvFn)(void *msg);
-#define orig_recv_item_create   ((AM2_RecvFn)(uintptr_t)ADDR_RECV_ITEM_CREATE)
 
 /* The three receivers, defined below beside the senders they pair with. */
 void __cdecl RecvObjDestroyed(void *msg);
@@ -268,6 +270,7 @@ void __cdecl RecvItemGone(void *msg);
 void __cdecl RecvDeath(void *msg);
 void __cdecl RecvItemDeploy(void *msg);
 void __cdecl RecvDamage(void *msg);
+void __cdecl RecvItemCreate(void *msg);
 
 /* 0x0042ACE0, one caller. Routes an incoming army message to its receiver and
  * answers whether it took it -- 1 for the six codes it knows, 0 otherwise, so
@@ -316,7 +319,7 @@ int32_t __cdecl ArmyMsgFilter(void *msg, int32_t army)
     case AM2_MSG_ITEM_DEPLOY:    RecvItemDeploy(msg);   return 1;
     case AM2_MSG_OBJ_DESTROYED:  RecvObjDestroyed(msg); return 1;
     case AM2_MSG_DAMAGE:         RecvDamage(msg);        return 1;
-    case AM2_MSG_ITEM_CREATE:    orig_recv_item_create(msg);   return 1;
+    case AM2_MSG_ITEM_CREATE:    RecvItemCreate(msg);   return 1;
     case AM2_MSG_DEATH:          RecvDeath(msg);         return 1;
     default:                                                   return 0;
     }
@@ -535,12 +538,146 @@ void __cdecl RecvDamage(void *msg)
                  attacker, dir, 1);
 }
 
+typedef void *(__cdecl *AM2_CreateItemFn)(const char *, int32_t, int32_t,
+                                          int32_t, int32_t, int32_t, uint32_t);
+typedef void *(__cdecl *AM2_CreateTrooperFn)(const char *, int32_t, int32_t,
+                                             int32_t, int32_t, int32_t,
+                                             int32_t, uint32_t, int32_t,
+                                             int32_t);
+typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t, const char *, int32_t,
+                                             int32_t, int32_t, int32_t,
+                                             int32_t, int32_t, uint32_t,
+                                             int32_t);
+typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *, int32_t, int32_t,
+                                            int32_t, int32_t, int32_t,
+                                            int32_t, uint32_t);
+typedef void (__cdecl *AM2_PostCreateFn)(void *obj, int32_t a);
+#define orig_create_item     ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
+#define orig_create_trooper  ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
+#define orig_create_vehicle  ((AM2_CreateVehicleFn)(uintptr_t)ADDR_CREATE_VEHICLE)
+#define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
+#define orig_post_create     ((AM2_PostCreateFn)(uintptr_t)ADDR_ITEM_POST_CREATE)
+typedef void (__cdecl *AM2_ConcealFn)(void *obj, int32_t force);
+#define orig_obj_conceal     ((AM2_ConcealFn)(uintptr_t)ADDR_OBJ_CONCEAL)
+
+/* 0x0042AFA0, the SIXTH receiver and the one that completes the family. It
+ * makes an object the other side has made, dispatching on
+ * MSG_CREATE_OFF_TYPE, whose four values are this project's object types:
+ * 1 item, 2 trooper, 3 vehicle, 4 weapon.
+ *
+ * That mapping is not a guess. Two of the four creators name themselves --
+ * 0x0045F0C0 logs "CreateWeapon" and 0x0045B090 logs "Vehicle aai entry not
+ * found for type %d" -- and fixing those two fixes the other two by position.
+ *
+ * THE ARMS READ MSG_CREATE_OFF_A AT DIFFERENT WIDTHS. Types 2 and 3 take it
+ * as a signed WORD; types 1 and 4 take the full DWORD. Reproduced, because
+ * that is what the arms do and a uniform reading would be wrong for two of
+ * the four -- silently, for any value that fits in 16 bits.
+ *
+ * Each arm's argument count was checked against its own `add esp`, which is
+ * the one self-check available in a function this shape: 10 for the trooper,
+ * 10 for the vehicle, 8 for the weapon, 7 for the item.
+ *
+ * Three arms have a tail the others do not. A trooper whose subtype is 10
+ * gets SetLeadsAndAct. A vehicle stores a uid at +0x550. An item whose
+ * MSG_CREATE_OFF_D matches ADDR_CREATE_WATCHED_KIND gets a post-create step
+ * and is then CONCEALED -- but only if the player is not allied to it, so
+ * what you can see depends on whose side it is on.
+ *
+ * The log is UNCONDITIONAL, unlike ItemGone's and ItemDeploy's. It also runs
+ * before anything is created, so a message that creates nothing still traces.
+ *
+ * `ebx` is the uid up to the item arm's creator call and the CREATED OBJECT
+ * after it -- the original reuses the register. Written as two named locals
+ * here; conflating them would pass a uid to ObjConceal. */
+void __cdecl RecvItemCreate(void *msg)
+{
+    const uint8_t *m    = (const uint8_t *)msg;
+    uint32_t       uid  = UidOnWire(*(const uint32_t *)(m + MSG_CREATE_OFF_UID));
+    int32_t        army = (int32_t)UidArmy(uid);
+    const char    *name = NULL;
+    void          *made;
+
+    orig_log((const char *)(uintptr_t)ADDR_STR_RECV_ITEM_CREATE, uid,
+             (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_TYPE),
+             (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE));
+
+    /* An empty first byte means the message carries no name. */
+    if (*(const char *)(m + MSG_CREATE_OFF_NAME))
+        name = (const char *)(m + MSG_CREATE_OFF_NAME);
+
+    switch (*(const int16_t *)(m + MSG_CREATE_OFF_TYPE)) {
+    case 1:
+        made = orig_create_item(name, army,
+                                *(const int32_t *)(m + MSG_CREATE_OFF_D),
+                                *(const int32_t *)(m + MSG_CREATE_OFF_A),
+                                *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                                1, uid);
+        if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
+            != *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
+            return;
+        orig_post_create(made, *(const int32_t *)(m + MSG_CREATE_OFF_A));
+        if (!AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, army))
+            orig_obj_conceal(made, 1);
+        return;
+
+    case 2:
+        made = orig_create_trooper(
+                   name,
+                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
+                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
+                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                     army),
+                   army,
+                   *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                   1, uid, 1,
+                   (int32_t)*(const uint8_t *)(m + MSG_CREATE_OFF_E));
+        if (*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE)
+            == AM2_TROOPER_SUBTYPE_LEADS)
+            SetLeadsAndAct(made);
+        return;
+
+    case 3:
+        made = orig_create_vehicle(
+                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE),
+                   name,
+                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
+                   (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
+                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                     army),
+                   army,
+                   *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                   1, uid,
+                   (int32_t)*(const uint8_t *)(m + MSG_CREATE_OFF_E));
+        *(uint32_t *)((uint8_t *)made + 0x550) =
+            UidOnWire(*(const uint32_t *)(m + MSG_CREATE_OFF_D));
+        return;
+
+    case 4:
+        orig_create_weapon(
+            name, army,
+            KeyLookupTriple(AM2_WEAPON_KEY_KIND,
+                            (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_SUBTYPE),
+                            0),
+            *(const int32_t *)(m + MSG_CREATE_OFF_A),
+            *(const int32_t *)(m + MSG_CREATE_OFF_C),
+            *(const int32_t *)(m + MSG_CREATE_OFF_D),
+            1, uid);
+        return;
+
+    default:
+        return;
+    }
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_RECV_ITEM_CREATE, (const void *)RecvItemCreate,
+                        "RecvItemCreate", 1);
     rc |= patch_replace(ADDR_RECV_DAMAGE, (const void *)RecvDamage,
                         "RecvDamage", 1);
     rc |= patch_replace(ADDR_RECV_ITEM_DEPLOY, (const void *)RecvItemDeploy,
