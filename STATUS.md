@@ -5,11 +5,46 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `28b0bae`. Working tree clean.
+Last updated: **2026-08-27**, at `ceb3a57`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`SaveOneItem` is reconstructed** (`0x00428870`), and its type mapping is
+  corroborated **by LAYOUT** -- better evidence than two readings agreeing.
+  Every loader `ADDR_LOAD_ONE_ITEM` calls sits **immediately after** its saver
+  in the image:
+
+  | type | save | load |
+  |---|---|---|
+  | 1 | `0x00433D20` | `0x00433D60` |
+  | 2 | `0x00447130` | `0x004471D0` |
+  | 3 | `0x0045A070` | `0x0045A120` |
+  | 4 | `0x0045EF00` | `0x0045EF50` |
+  | 5 | `0x0043B800` | `0x0043B870` |
+  | 6 | `0x00422750` | `0x00422780` |
+  | 7 | `0x004354F0` | `0x00435500` |
+  | 8 | `0x0043CB30` | `0x0043CB60` |
+
+  Eight adjacent pairs, same order in both dispatch tables. The source wrote
+  each pair together and the linker kept them together -- a fact about the
+  layout rather than about my reading of either side.
+
+- **An unknown type is NOT an error.** Every step is checked and any failure
+  answers 0 -- but an out-of-range type falls through the switch and answers
+  **1**, so such an object is saved as a header and the write continues. The
+  opposite of what the per-step checks lead you to expect.
+
+- **Type 7 saves nothing type-specific**: its arm calls `ADDR_RETURN_ONE`
+  rather than being lifted out of the switch, which is why there are eight
+  arms and not seven. Reproduced as the call it is -- dropping the arm would
+  agree today and diverge the moment that stub changed.
+
+- `gameproc.cpp` and `pad.cpp` join `SELFTEST_SRC`, both flat, added rather
+  than stubbed. Only `StateLeave` and `LoadAudioSection` cross into `win32`;
+  the second is deliberately **not** `extern "C"`, because audio.h's block ends
+  before it.
 
 - **`Type238Action` is reconstructed** (`0x00457CD0`) -- experience and
   promotion -- **and it LOOPS.** One award can carry a unit through more than
