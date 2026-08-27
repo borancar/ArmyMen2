@@ -5,37 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `8a03457`. Working tree clean.
+Last updated: **2026-08-27**, at `d12ec5c`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`HeightAtPoint`** (`0x0042A820`, five callers) -- the ground height at a
-  point, raised by anything standing on it. 919 patches.
+- **`PickObjectsAt` and `UnitByUid`** (`0x0042A1B0`, `0x00459FB0`). 921 patches.
 
-- **`0x98` is type-dependent**, the same way `0x94` and `0xA0` are. For a
-  trooper it is `OBJ_OFF_RANK`, an int32 in 0..7. For an item -- types 1 and 4,
-  exactly what `ObjIsItem` gates the loop on -- only the low byte's *sign* is
-  read, as "this raises the ground you stand on". A rank could never make that
-  byte negative.
+- `PickObjectsAt` is the **mouse pick** -- every object in a cell whose own
+  `OBJ_OFF_HIT_RECT` contains the point. Three of its five callers are in the
+  `0x0041xxxx` HUD band, and the filter confirms it: the sibling
+  `ADDR_OBJECTS_AT_POINT` builds a box from four offsets at `+0x7C` instead.
+  One asks "is the cursor on it", the other "does its footprint cover this".
 
-  I gave it a second name and the offset ratchet refused it, which is the right
-  answer: `OBJ_OFF_FIELD_94` already carries two readings under one name, and a
-  second name on an offset is how a union turns into two half-truths.
+- `UnitByUid` filters the uid lookup to types 2, 3 and 8 -- trooper, vehicle,
+  roach, exactly what `ObjIsType2/3/8` answer for. `0x0045EE80` is its sibling
+  for type 4 and is already `WeaponByUid` here, so the family was half-named.
 
-- The same check fired twice in one function: `OBJ_OFF_QUERY_NEXT` was also
-  invented a second time, on the same offset with an identical value. An
-  identical redefinition is legal C and says nothing, which is why the tool
-  fails on it.
+- **Two checks fired on one address in one run.** I gave `0x00435390` a new
+  name and called it through the image; it is `ADDR_OBJ_MASK_BIT_AT`, it is
+  `misc.cpp`'s `ObjMaskBitAt`, and it has been reconstructed for some time.
+  Neither check would have caught it alone -- a first-time name reached by
+  address trips only `checkseams`, a second name on a call we already make
+  trips only the ratchet.
 
-- **It returns a byte and only a byte** -- the original ends `mov al, bl` over
-  an `eax` still holding the masked tile index. `Log2Mask`'s problem exactly.
+- **3,872 calls and nothing watches the answer.** Returning null
+  unconditionally -- with the edit verified as landed first -- leaves
+  `mission` at 281 and `bootcamp` at 22, both at their floors. The drives move
+  the mouse and never *select* anything with it.
 
-- Verified by reading, and the measurement is in the source rather than implied
-  by a clean run: 12 calls in one live mission, and adding 40 to the answer
-  leaves `mission` at 299 and `bootcamp` at 76, both inside their bands.
+## Next
 
+- **A drive that selects a unit** is the single most useful thing missing.
+  It would close `PickObjectsAt`, and it is the same drive the combat path has
+  been waiting for -- `DamageObject` is 0 on every configuration, which blocks
+  `FreeItem`, `RemoveFromItemList`, `Type2ActionB`, `DamageRoach` and
+  `PointActionA`. Clicking a unit in a live mission and reading
+  `OBJ_FLAG_SELECTED` back out through `tools/objdump.py` is an exact oracle,
+  unlike the pixels.
 ## A correction: two functions were not unexercised
 
 **A hand-written probe clicked BOOT CAMP at the wrong Y and never entered a
