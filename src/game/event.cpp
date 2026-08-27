@@ -1912,7 +1912,6 @@ typedef void (__cdecl *AM2_MissionLocalFn)(int32_t a);
 typedef void (__cdecl *AM2_MissionNetFn)(int32_t a, int32_t b);
 #define orig_eval_operand   (*(AM2_EvalOperandFn)AM2_IMAGE(ADDR_EVAL_OPERAND))
 #define orig_mission_local  (*(AM2_MissionLocalFn)AM2_IMAGE(ADDR_SCRIPT_FIND_FILE))
-#define orig_mission_net    (*(AM2_MissionNetFn)AM2_IMAGE(ADDR_MISSION_NETWORKED))
 
 /* 0x00421750. Evaluate an `if`'s testvar comparisons. All must pass; a
  * condition with none passes trivially.
@@ -1968,7 +1967,7 @@ void __cdecl AdvanceMission(int32_t a, int32_t b)
         return;
     }
 
-    orig_mission_net(a, b);
+    MissionNetworked(a, b);
 }
 
 /* ---------------------------------------------- action point ---- */

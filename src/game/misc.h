@@ -556,6 +556,11 @@ int32_t __cdecl MeetsAllThree(const void *p);
  * DirectPlay id the find-by-id search matches on. See ADDR_COMM_SLOT_HAS_PLAYER
  * in orig.h for why it is not the "is AI" it was first taken for. */
 int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
+
+/* 0x00421800. Decides whether a multiplayer mission was won and shows the end
+ * screen. The argument it passes on is "LOST", not "won" -- both arms invert
+ * a `sete` before the call. */
+void __cdecl MissionNetworked(int32_t army, int32_t teamGame);
 int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot);
 
 /* 0x0040F280, thiscall. Gives a slot an army colour, SWAPPING with whoever

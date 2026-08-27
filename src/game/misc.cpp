@@ -1347,6 +1347,57 @@ int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
     return 1;
 }
 
+typedef void (__cdecl *AM2_ShowResultFn)(int32_t lost);
+#define orig_show_mp_result ((AM2_ShowResultFn)(uintptr_t)ADDR_SHOW_MP_RESULT)
+
+/* 0x00421800, one caller. Decides whether the mission was WON and shows the
+ * matching end screen. Two ways of deciding, and which one is used depends on
+ * whether teams are in play.
+ *
+ * THE ARGUMENT IT PASSES ON IS "LOST", NOT "WON". Both arms compute a win with
+ * `sete` and then invert it with a second `sete` before the push, so
+ * ADDR_SHOW_MP_RESULT takes 0 for a win. Two inversions in four instructions
+ * is exactly the shape that gets transcribed once instead of twice.
+ *
+ * The team arm needs BOTH the caller's flag and a non-zero team of our own;
+ * a player with no team falls through to the solo test even in a team game.
+ * Then the win is "the winning army is on my team".
+ *
+ * The fallback is "the winning army's SLOT is my owner id" -- a slot compared
+ * against ADDR_DEFAULT_OWNER, which reads oddly until you notice
+ * CommSlotForArmy answers the identity for every army a script can write, so
+ * the two are the same number in practice. Reproduced as the comparison the
+ * original makes rather than as the one it means.
+ *
+ * VERIFIED BY READING. Its one caller is the end-of-mission path in a
+ * multiplayer game, which no drive reaches. */
+void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
+{
+    const uint8_t *comm  = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint32_t       mine  = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    int32_t        slot  = CommSlotForArmy((void *)(uintptr_t)comm, army);
+    int32_t        won;
+
+    if (teamGame) {
+        int32_t myTeam = *(const int32_t *)(comm + (size_t)mine
+                                            * AM2_PLAYER_STRIDE
+                                            + COMM_ARMY_OFF_TEAM);
+
+        if (myTeam) {
+            int32_t theirTeam =
+                *(const int32_t *)(comm + (size_t)slot * AM2_PLAYER_STRIDE
+                                   + COMM_ARMY_OFF_TEAM);
+
+            won = (myTeam == theirTeam);
+            orig_show_mp_result(won ? 0 : 1);
+            return;
+        }
+    }
+
+    won = (slot == (int32_t)mine);
+    orig_show_mp_result(won ? 0 : 1);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -1417,6 +1468,8 @@ int misc_install(void)
                   "MapCode18To28", 1);
     patch_replace(ADDR_MEETS_ALL_THREE, (const void *)MeetsAllThree,
                   "MeetsAllThree", 1);
+    patch_replace(ADDR_MISSION_NETWORKED, (const void *)MissionNetworked,
+                  "MissionNetworked", 1);
     patch_replace(ADDR_COMM_SLOT_FOR_ARMY, (const void *)CommSlotForArmy,
                   "CommSlotForArmy", 20);
     patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
