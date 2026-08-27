@@ -5,11 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `1a158ab`. Working tree clean.
+Last updated: **2026-08-27**, at `28b0bae`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
+
+- **`Type238Action` is reconstructed** (`0x00457CD0`) -- experience and
+  promotion -- **and it LOOPS.** One award can carry a unit through more than
+  one rank: after each promotion it re-reads the rank and total and tests the
+  NEXT threshold. A reconstruction that promoted once would be wrong only
+  *occasionally*, which is the worst way to be wrong.
+
+- **The table base is `0x00473DD4`, not the `0x00473DD8` the threshold is read
+  through.** The function reads two fields of ONE 28-byte record: `+4` for the
+  experience needed, `+0` for what it hands the next step. Taking the
+  threshold's address as the base would put the table one field late with every
+  value still looking plausible -- the mis-centred trig table in another
+  costume.
+
+- **Promotion raises the ceiling FIRST**, and the alias ratchet is what
+  revealed it: the second step already had a better name,
+  `ADDR_SET_MAX_HEALTH`. So the rank record sets a new maximum and only then is
+  current health grown a quarter toward it -- the cap is the value just set,
+  not the one the unit had a moment ago.
+
+- **A third type-dependent field.** The counter is `0x9C`, which `orig.h` calls
+  `OBJ_OFF_REPAIR_FRAME` after `HealObject`'s reading of it on an ITEM. On a
+  TROOPER it is experience. Both are live code and neither is wrong -- the
+  object is a union past its header, as `0xA0` and `0x94` already showed.
+
+- The multiplayer guard is the odd refusal: outside a session it is skipped
+  entirely, but inside one the unit's army must be one this side broadcasts
+  for -- so experience is awarded by whoever **owns** the unit, not by whoever
+  caused it.
 
 - **`ChangeObjectFrame` is reconstructed** (`0x004351C0`, a name from the
   image), and **its two exits do not return the same thing.** The normal one
