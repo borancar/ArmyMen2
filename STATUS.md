@@ -5,39 +5,38 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `d8bc941`. Working tree clean.
+Last updated: **2026-08-27**, at `b3a1d08`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **Three warm helpers**: `TileToXY` (`0x0042B210`), `RowAnimFinished`
-  (`0x0040A2D0`) and `StepObjRows` (`0x00428E00`). 914 patches.
+- **`MapDescFree`, `MapDescInit` and `RowInit`** (`0x0041D270`, `0x0041D210`,
+  `0x0040A050`). 917 patches.
 
-- **`AM2_AnimCell`'s first field is a hold in milliseconds.** `anim.h` said of
-  `field0` that the loader only ever copies it -- true, and a statement about
-  what had been reconstructed rather than about the field. `RowAnimFinished`
-  adds it to `ROW_OFF_STAMP_54` and compares the sum against
-  `ADDR_GAME_CLOCK_MS`. It is `hold` now.
+- **The cell grid is square in COLS.** `MapDescInit` allocates
+  `cols << Log2Mask(cols)` entries, so `MAPDESC_OFF_ROWS` never enters the
+  sizing. That settles something `maprow.cpp` already had a comment about:
+  `RowRegisterAll` clamping its bottom edge to `cols - 1` rather than
+  `rows - 1` is not a slip, it is the bound the grid actually has. Sized
+  exactly -- the largest cell that clamp can produce is one short of the
+  allocation.
 
-- Two more row fields, both established by `SetAnimFrame`: `+0x44` is the
-  `AM2_Anim` *playing*, chosen out of the table four bytes below it, and
-  `+0x51` is how far into its cells the row has got. An object's `+0x44` and a
-  row's `+0x44` are different fields of different structures.
+- **`ADDR_OBJ_TABLE_ARG` is the other map descriptor**, renamed
+  `ADDR_OBJ_MAP_DESC`. `0x0042C8C0` builds both from the map's world extent in
+  the same breath and `0x0042D540` frees both; the old name said what it was
+  passed *as*.
 
-- **A counter of 0 because I clicked the wrong button.** The first probe read 0
-  for all three, and none of them is blind -- which reads exactly like dead
-  code. BOOT CAMP is at `(306,143)` and I had clicked `(306,250)`, so the run
-  never left the title screen. Driven properly they are 32,693, 446 and 63,504
-  in one mission. The rule about resolving a 0 with a probe assumes the probe
-  reached the code.
+- **Measured in both directions**, because a clean A/B over undiscriminated
+  code is worth nothing and the previous commit produced two of those. One
+  added to `MapDescInit`'s shift puts `bootcamp` at **10,097** pixels against a
+  budget of 500. `RowInit`'s palette line is the opposite -- 1,612 calls a
+  mission, and nulling it leaves `bootcamp` at 76, inside the band, because
+  every object that reaches the screen has had its own palette written in by
+  then.
 
-- **And the suite does not discriminate any of them.** Swapping x for y in
-  `TileToXY` -- 63,504 calls -- leaves `bootcamp` at its usual 22 pixels and
-  `mission` at 287, inside the 281..302 band clean runs give. Inverting
-  `RowAnimFinished`'s cell test leaves `mission` at 281. The calls happen,
-  warmly, and the answers go somewhere the frame does not show: the same
-  standing the trig tables had before `tools/trigdump.py`.
+- `MapDescFree` reads 0 and that is explained: `MapDescInit` calls it directly,
+  the usual blind spot, and its other two callers are the level teardown.
 
 ## A correction: two functions were not unexercised
 
