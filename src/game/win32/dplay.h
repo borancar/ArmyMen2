@@ -181,6 +181,10 @@ void __cdecl CommNoBuffers(void);
 
 void __attribute__((thiscall)) CommResetStats(void *comm);
 
+/* 0x0040F400. Prints the four statistics lines CommResetStats clears. Each
+ * line is gated on its own denominator; nothing prints when nothing moved. */
+void __attribute__((thiscall)) CommReportStats(void *comm);
+
 /* 0x0040F320, six callers, sixteen bytes: a thiscall that pushes its one
  * argument and tail-calls 0x0040F160, which is thiscall too and so already has
  * the object in ecx. A pass-through under a second name. */

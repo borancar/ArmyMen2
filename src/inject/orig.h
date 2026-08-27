@@ -1334,7 +1334,25 @@
 #define ADDR_COMM_END_SETUP      0x00410CE0u
 #define ADDR_COMM_SEND_PLAYERS   0x00411270u  /* void(int32) -- "SendPlayerMsg for %d" */
 #define ADDR_COMM_SESSION_OVER   0x0040FB70u  /* thiscall void(this), tail-calls 0x40FAA0 */
-#define ADDR_SHOW_MP_RESULT      0x00426A90u  /* void(int32) -- loads bitmaps/mpwon.bmp */
+/* 0x00426A90. Shows the multiplayer end screen. Its argument is a RESULT
+ * CODE, not a boolean: 0 won, 1 lost, 2 the host left, and anything else
+ * leaves the bitmap alone. MissionNetworked only ever passes 0 or 1. */
+#define ADDR_SHOW_MP_RESULT      0x00426A90u  /* void(int32 result) */
+#define AM2_MP_RESULT_WON        0
+#define AM2_MP_RESULT_LOST       1
+#define AM2_MP_RESULT_HOST_LEFT  2
+#define ADDR_STR_MP_WON          0x004852A8u  /* "mpwon.bmp" */
+#define ADDR_STR_MP_LOST         0x0048529Cu  /* "mplost.bmp" */
+#define ADDR_STR_MP_HOST_LEFT    0x0048528Cu  /* "mphostleft.bmp" */
+/* 0x0040FB80, thiscall. Formats a string and hands it to
+ * ADDR_COMM_SEND_PROPERTY -- 48 bytes and nothing else in it. */
+#define ADDR_COMM_PUBLISH_RESULT 0x0040FB80u  /* thiscall void(this) */
+/* 0x0040FA00, thiscall. Removes our player and reopens the session, and says
+ * so itself: "Set Session Failed to reopen Session". ShowMpResult TAIL-JUMPS
+ * to it, so it is the last thing the end screen does. */
+#define ADDR_COMM_REOPEN_SESSION 0x0040FA00u  /* thiscall void(this) */
+/* The bits ShowMpResult clears on the way in. */
+#define AM2_MP_RESULT_UNPAUSE    0x1E78F0u
 /* Sets the fog flag, and its argument is INVERTED against it: a non-zero
  * argument turns fog OFF. It also reveals every type 2/3/8 object on the way
  * in, so turning fog on starts from a clean slate rather than from whatever

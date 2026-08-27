@@ -50,6 +50,7 @@
 #include "../gameproc.h" /* GameOverState indexes the dispatch table */
 #include "../army.h"     /* ForEachArmyObject, and the callback is not a sprite */
 #include "../air.h"    /* SetFogOfWar */
+#include "frame.h"    /* ShowMpResult */
 
 #include <stdint.h>
 #include <string.h>
@@ -181,7 +182,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_player_left    (*(am2_comm_id_fn)ADDR_COMM_PLAYER_LEFT)
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
 #define orig_remove_player  (*(am2_int_fn2)ADDR_REMOVE_PLAYER)
-#define orig_show_mp_result (*(am2_int_fn2)ADDR_SHOW_MP_RESULT)
 #define orig_lobby_reset    (*(am2_void_fn2)ADDR_LOBBY_RESET)
 #define orig_hud_message    (*(am2_str_int_fn)ADDR_HUD_MESSAGE)
 
@@ -264,7 +264,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
         /* It was us. Leave and show the multiplayer result screen. */
         orig_player_left(comm, id);
         orig_remove_player(id);
-        orig_show_mp_result(2);
+        ShowMpResult(2);
         return 1;
     }
 

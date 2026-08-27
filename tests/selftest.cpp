@@ -506,3 +506,12 @@ extern "C" void __cdecl PlaySoundAt(int32_t, int32_t, int32_t, int32_t,
 extern "C" void __cdecl ReleaseSprite(AM2_Sprite *)
 {
 }
+
+/* misc.cpp's MissionNetworked shows the multiplayer end screen, and
+ * ShowMpResult is in win32/frame.cpp. Same reasoning as the stubs above, and
+ * the same route in -- a seam closed rather than a call added. Its signature
+ * names no Win32 type, which is what lets misc.cpp declare it at all; only
+ * the definition is on the other side of the split. */
+extern "C" void __cdecl ShowMpResult(int32_t)
+{
+}

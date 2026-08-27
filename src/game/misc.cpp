@@ -1347,8 +1347,16 @@ int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
     return 1;
 }
 
-typedef void (__cdecl *AM2_ShowResultFn)(int32_t lost);
-#define orig_show_mp_result ((AM2_ShowResultFn)(uintptr_t)ADDR_SHOW_MP_RESULT)
+
+/* ShowMpResult is reconstructed, in win32/frame.cpp. Declared here rather than
+ * by including that header, because misc.cpp is on the flat side of the split
+ * and frame.h names Win32 types -- the same reason air.cpp declares
+ * PlaySoundAt. Its own signature names none, which is what makes this legal.
+ *
+ * `extern "C"` is correct here: frame.h opens an extern "C" block at line 25
+ * and ShowMpResult is inside it. gameproc.cpp's LoadAudioSection is the
+ * opposite case, so the two spellings differ for a reason. */
+extern "C" void __cdecl ShowMpResult(int32_t result);
 
 /* 0x00421800, one caller. Decides whether the mission was WON and shows the
  * matching end screen. Two ways of deciding, and which one is used depends on
@@ -1389,13 +1397,13 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
                                    + COMM_ARMY_OFF_TEAM);
 
             won = (myTeam == theirTeam);
-            orig_show_mp_result(won ? 0 : 1);
+            ShowMpResult(won ? 0 : 1);
             return;
         }
     }
 
     won = (slot == (int32_t)mine);
-    orig_show_mp_result(won ? 0 : 1);
+    ShowMpResult(won ? 0 : 1);
 }
 
 int misc_install(void)

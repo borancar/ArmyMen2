@@ -901,6 +901,71 @@ void __cdecl Substate22(void)
 }
 
 
+typedef void (__attribute__((thiscall)) *AM2_CommVoidFn)(void *comm);
+#define orig_comm_publish_result ((AM2_CommVoidFn)(uintptr_t)ADDR_COMM_PUBLISH_RESULT)
+#define orig_comm_reopen_session ((AM2_CommVoidFn)(uintptr_t)ADDR_COMM_REOPEN_SESSION)
+#define orig_paused_frame_step   ((AM2_NoArgFn)(uintptr_t)ADDR_PAUSED_FRAME_STEP)
+
+/* 0x00426A90, three callers. The multiplayer end screen.
+ *
+ * ITS ARGUMENT IS A RESULT CODE, NOT A BOOLEAN. 0 won, 1 lost, 2 the host
+ * left -- and ANY OTHER VALUE leaves the bitmap alone while still doing
+ * everything else. MissionNetworked only ever passes 0 or 1, which is why
+ * that function's inverted flag reads as "lost"; it is one value of three.
+ *
+ * The three arms are identical but for the filename, and each frees the
+ * current bitmap BEFORE loading -- so a caller that passes an unknown code
+ * keeps whatever was on screen rather than being left with nothing.
+ *
+ * Order matters at the top: the pause bits are cleared, the data directory is
+ * moved to "bitmaps", and only then is the draw target set. Loading happens
+ * relative to that directory, so moving it after the load would find nothing.
+ *
+ * Two comm methods run before any of that -- the statistics report and the
+ * property publish -- and the function TAIL-JUMPS to a third that removes our
+ * player and reopens the session. So the end screen is also where the session
+ * is handed back, and reproducing the tail call as an ordinary call at the end
+ * is equivalent here only because nothing follows it.
+ *
+ * The log call takes NO ARGUMENTS, like TakeMenuRequest's. Reproduced through
+ * a no-argument pointer rather than as Log(""), which is a different call.
+ *
+ * VERIFIED BY READING. All three callers are multiplayer end-of-mission
+ * paths. */
+void __cdecl ShowMpResult(int32_t result)
+{
+    void *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+
+    UnPauseGame(AM2_MP_RESULT_UNPAUSE);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    SetDrawTarget(g_primarySurface);
+
+    orig_paused_frame_step();
+    CommReportStats(comm);
+    orig_comm_publish_result(comm);
+
+    if (result == AM2_MP_RESULT_WON) {
+        FreeBitmap(&g_currentBitmap);
+        g_currentBitmap =
+            orig_load_bitmap2((const char *)AM2_IMAGE(ADDR_STR_MP_WON), 0);
+    } else if (result == AM2_MP_RESULT_LOST) {
+        FreeBitmap(&g_currentBitmap);
+        g_currentBitmap =
+            orig_load_bitmap2((const char *)AM2_IMAGE(ADDR_STR_MP_LOST), 0);
+    } else if (result == AM2_MP_RESULT_HOST_LEFT) {
+        FreeBitmap(&g_currentBitmap);
+        g_currentBitmap =
+            orig_load_bitmap2((const char *)AM2_IMAGE(ADDR_STR_MP_HOST_LEFT), 0);
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_SUBSTATE_ESCAPE;
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+
+    orig_log_noargs();
+    orig_comm_reopen_session(comm);
+}
+
+
 /* 0x00426790. State 4 -- leaving. Posts WM_CLOSE to the game's own window and
  * clears the entered flag so it happens once, and there is nothing else in it:
  * the shutdown proper runs from WndProc. */
@@ -938,6 +1003,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_SHOW_MP_RESULT, (const void *)ShowMpResult,
+                        "ShowMpResult", 3);
     rc |= patch_replace(ADDR_SUBSTATE22, (const void *)Substate22,
                         "Substate22", 0);
     rc |= patch_replace(ADDR_STATE0_ENTER, (const void *)StateEnter0,

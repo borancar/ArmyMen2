@@ -41,6 +41,10 @@ void __cdecl State2Frame(void);
 void __cdecl State3Frame(void);
 void __cdecl State4Frame(void);
 
+/* 0x00426A90. The multiplayer end screen. Its argument is a RESULT CODE --
+ * 0 won, 1 lost, 2 host left -- and anything else leaves the bitmap alone. */
+void __cdecl ShowMpResult(int32_t result);
+
 int frame_install(void);
 
 #ifdef __cplusplus
