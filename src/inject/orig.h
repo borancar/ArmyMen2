@@ -3005,6 +3005,21 @@ typedef struct {
  * anim->frames - 1 and indexes anim->cells with it. */
 #define ROW_OFF_ANIM_PLAYING     0x44u   /* AM2_Anim * */
 #define ROW_OFF_CELL             0x51u   /* uint8_t, index into anim->cells */
+/* Two bytes ADDR_ROW_FACE_SPRITE adds together and hands to RoundTo8 with the
+ * animation's directionBits, so their sum is an 8-BIT HEADING. Which is which
+ * is not established -- the step at ADDR_STEP_ROW_ANIM reads both as well and
+ * neither is written here -- so they are named for the pair they form. */
+#define ROW_OFF_HEADING          0x50u   /* uint8_t */
+#define ROW_OFF_HEADING_BIAS     0x5Cu   /* uint8_t, added to the above */
+/* 0x0040A310, three callers -- and they are the type 2, 3 and 8 frame
+ * steppers, so this runs per unit per frame. Point the row's sprite at the
+ * animation cell for the heading it is facing.
+ *
+ * The cell chosen is `(dir + 1) * frames - 1`, which is the LAST frame of
+ * that direction rather than the first. The sprite is only swapped when it
+ * differs from the one the row already has. */
+#define ADDR_ROW_FACE_SPRITE     0x0040A310u  /* void(void *row) */
+#define ADDR_ROW_SET_SPRITE      0x0041D3D0u  /* void(row, sprite, desc) */
 /* 0x0040A2D0, six callers. Whether the row's animation has reached its last
  * cell AND that cell's hold has elapsed -- so it is a "the animation is over"
  * test rather than a per-cell tick. Three ways out and all of them 0: bit 0

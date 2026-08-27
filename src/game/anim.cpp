@@ -12,12 +12,22 @@
 
 #include "anim.h"
 #include "crt.h"
-#include "dist.h"   /* Log2Mask */
+#include "dist.h"   /* Log2Mask, RoundTo8 */
+#include "image.h"
 #include "gamedir.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
 #define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
+/* TWO dereferences: the global holds the array, it is not the array. Spelled
+ * as air.cpp spells it. Getting this wrong is what CLAUDE.md's
+ * `obj -> table -> slot` note is about, and it cost an A/B here -- 293,671
+ * differing pixels on `bootcamp`, which is the whole map drawn with whatever
+ * the sprite-list pointer's own bytes indexed to. */
+struct AM2_Sprite;   /* incomplete: it has an LPDIRECTDRAWSURFACE in it and
+                      * this module is flat, the same reason air.cpp and
+                      * script.cpp declare it rather than including the header */
+#define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)
 
 /* Forward-declared rather than including win32/sprite.h, the same reason
  * script.cpp forward-declares PreloadSprite: that header names
@@ -377,6 +387,66 @@ int32_t __cdecl RowAnimFinished(const void *row)
                          + *(const int32_t *)(r + ROW_OFF_STAMP_54));
 }
 
+/* Still original: 176 bytes of re-registration, not a store. */
+typedef void (__cdecl *AM2_SetRowSpriteFn)(void *row, AM2_Sprite *sprite,
+                                           void *desc);
+#define orig_row_set_sprite ((AM2_SetRowSpriteFn)(uintptr_t)ADDR_ROW_SET_SPRITE)
+
+/* 0x0040A310, three callers -- the type 2, 3 and 8 frame steppers, so this
+ * runs once per unit per frame. Point the row's sprite at the animation cell
+ * for the heading it is facing.
+ *
+ * THE CELL IS THE LAST OF ITS DIRECTION, not the first: the index is
+ * `(dir + 1) * frames - 1`, and the original reaches it as
+ * `[cells + eax*4 - 2]` with eax already `(dir + 1) * frames` -- the -2
+ * landing on the cell's `sprite` field rather than its `hold`. Written out as
+ * an ordinary index here; the arithmetic is the same.
+ *
+ * The two heading bytes are ADDED as bytes and the sum is masked to eight
+ * bits before RoundTo8 sees it, so a bias that carries past 255 wraps rather
+ * than saturating -- which is what an 8-bit heading should do.
+ *
+ * The swap is CONDITIONAL. ADDR_ROW_SET_SPRITE is called only when the sprite
+ * differs from the one the row already holds, and that matters because it is
+ * 176 bytes of re-registration rather than a store.
+ *
+ * IT WENT IN WITH ONE DEREFERENCE TOO FEW and the A/B caught it: 293,671 of
+ * 786,432 pixels on `bootcamp`, against a budget of 500. ADDR_SPRITE_LIST is
+ * a pointer TO the array and the first version indexed the global itself, so
+ * every unit on the map took its sprite from whatever the pointer's own bytes
+ * decoded to. Exactly the `obj -> table -> slot` shape CLAUDE.md warns about,
+ * and the reason to spell it as air.cpp already did rather than write a fresh
+ * cast. Bisected by disabling this one patch_replace, which put the run back
+ * to its usual 22.
+ *
+ * Worth saying which check found it, because three of the last four functions
+ * were invisible to the pixels: this one is not, and dramatically so. A wrong
+ * sprite per unit per frame is the most visible thing reconstructed lately. */
+void __cdecl RowFaceSprite(void *row)
+{
+    uint8_t         *r = (uint8_t *)row;
+    const AM2_Anim  *a;
+    uint8_t          heading;
+    int32_t          dir, cell;
+    AM2_Sprite      *sprite;
+
+    if (!(*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE))
+        return;
+
+    a = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    if (!a)
+        return;
+
+    heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
+                        + *(const uint8_t *)(r + ROW_OFF_HEADING));
+    dir     = RoundTo8(heading, a->directionBits) & 0xFF;
+    cell    = (dir + 1) * a->frames - 1;
+    sprite  = g_spriteList[a->cells[cell].sprite];
+
+    if (*(AM2_Sprite *const *)(r + ROW_OFF_SPRITE) != sprite)
+        orig_row_set_sprite(r, sprite, (void *)(uintptr_t)ADDR_MAP_DESC);
+}
+
 int anim_install(void)
 {
     int rc = 0;
@@ -398,6 +468,8 @@ int anim_install(void)
                         "FreeAnimTable", 1);
     rc |= patch_replace(ADDR_ROW_ANIM_FINISHED, (const void *)RowAnimFinished,
                         "RowAnimFinished", 6);
+    rc |= patch_replace(ADDR_ROW_FACE_SPRITE, (const void *)RowFaceSprite,
+                        "RowFaceSprite", 3);
     rc |= patch_replace(ADDR_FREE_EXPLOSION_ANIMS,
                         (const void *)FreeExplosionAnims,
                         "FreeExplosionAnims", 0);
