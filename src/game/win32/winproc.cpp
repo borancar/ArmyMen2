@@ -51,6 +51,7 @@
 #include "../army.h"     /* ForEachArmyObject, and the callback is not a sprite */
 #include "../air.h"    /* SetFogOfWar */
 #include "frame.h"    /* ShowMpResult */
+#include "widget.h"   /* OnAppActivated */
 
 #include <stdint.h>
 #include <string.h>
@@ -125,7 +126,6 @@ typedef void    (__cdecl *am2_void_fn)(void);
 typedef int32_t (__cdecl *am2_int_fn)(void);
 typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 
-#define orig_on_app_activated  (*(am2_void_fn)ADDR_ON_APP_ACTIVATED)
 
 /* ---- comm traffic -------------------------------------------------------
  *
@@ -410,7 +410,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         g_appActive = (int32_t)wParam;
         if (!wParam)
             break;
-        orig_on_app_activated();
+        OnAppActivated();
         break;
 
     case WM_SETCURSOR:

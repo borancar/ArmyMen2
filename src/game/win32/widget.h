@@ -1438,6 +1438,10 @@ void __attribute__((thiscall)) RecordResetAlias(void *rec);
  * tail-jump into RecordReset, and nothing else. */
 void __cdecl ClearMenuMsgs(void);
 
+/* 0x004269B0. WndProc's activation handler: repaints the dialog and the
+ * bitmap, each TWICE with no change of draw target between. */
+void __cdecl OnAppActivated(void);
+
 int widget_install(void);
 
 #ifdef __cplusplus

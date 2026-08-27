@@ -1678,6 +1678,10 @@ void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w)
  * would be a third thing for tools/checkglobals.py to report. */
 #define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
 #define g_mpSession   (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
+/* Spelled exactly as surface.cpp and frame.cpp spell them -- checkglobals
+ * refused a second name on either address, which is the rule working. */
+#define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_currentBitmap  (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 
 typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
 typedef void *(__attribute__((thiscall)) *AM2_ScreenCtorFn)(void *obj,
@@ -5742,6 +5746,63 @@ void __cdecl ClearMenuMsgs(void)
 }
 
 
+
+/* 0x004269B0, one caller -- WndProc, when the application is activated.
+ * Repaints whatever is on screen, because the surfaces may have been lost
+ * while the game was in the background.
+ *
+ * IT PAINTS EVERYTHING TWICE, and that is the thing worth stating. The
+ * dialog's paint slot is called twice with the same rectangle, and the bitmap
+ * is drawn twice with the same arguments -- back to back, with NO change of
+ * draw target between them. So it is not front-buffer-then-back; it is the
+ * same surface twice.
+ *
+ * Reproduced, and NOT explained. A repaint that is idempotent loses nothing by
+ * running twice, so this costs only time and no reading here says why the
+ * author wanted it. Collapsing it to one call would very likely look
+ * identical, which is exactly why it is left alone: "probably redundant" is
+ * not a reason to remove something from a reconstruction.
+ *
+ * The refresh at ADDR_REFRESH_SCREEN happens only in game state 2 -- CLAUDE.md
+ * lists that function as never having executed, and this is one of its seven
+ * call sites.
+ *
+ * The dialog's rectangle is passed BY VALUE into vtable slot 1, which is the
+ * same call WidgetRepaintSelf makes; AM2_WidgetPaintFn already spells it.
+ *
+ * VERIFIED BY READING. Its one caller is WndProc's activation message, and
+ * nothing under Xvfb alt-tabs -- CLAUDE.md says as much where it explains why
+ * RestoreTileSet is unreachable. */
+void __cdecl OnAppActivated(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_APP_ACTIVE = 1;
+    RestoreLostSurfaces();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
+        RefreshScreen();
+
+    if (g_paintObject) {
+        AM2_Widget *w = (AM2_Widget *)g_paintObject;
+
+        SetDrawTarget(g_primarySurface);
+        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    }
+
+    if (g_currentBitmap) {
+        void   *bmp = g_currentBitmap;
+        int32_t w   = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
+        int32_t h   = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
+        int32_t x   = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w) >> 1;
+        int32_t y   = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - h) >> 1;
+
+        SetDrawTarget(g_primarySurface);
+        DrawSprite((AM2_Sprite *)bmp, x, y, 0);
+        DrawSprite((AM2_Sprite *)bmp, x, y, 0);
+    }
+}
+
+
 /* 0x00432D40, thiscall, two instructions: the row name's ink setter. It is a
  * separate function rather than a store at the call site because the caller
  * computes the colour with MpNameInk and hands it straight over. */
@@ -5950,6 +6011,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_EDIT_CHAR_HANDLER, (const void *)EditCharHandler,
                         "EditCharHandler", 0);
 
+    rc |= patch_replace(ADDR_ON_APP_ACTIVATED, (const void *)OnAppActivated,
+                        "OnAppActivated", 1);
     rc |= patch_replace(ADDR_CLEAR_MENU_MSGS, (const void *)ClearMenuMsgs,
                         "ClearMenuMsgs", 2);
     rc |= patch_replace(ADDR_RECORD_RESET, (const void *)RecordReset,
