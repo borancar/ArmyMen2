@@ -36,6 +36,7 @@
 #include "palette.h"
 #include "../misc.h"
 #include "../../inject/patch.h"
+#include "frame.h"     /* RefreshDraw */
 
 #include <stdint.h>
 
@@ -339,7 +340,6 @@ void __cdecl RestoreLostSurfaces(void)
 }
 
 typedef void (__cdecl *am2_gate_fn)(int32_t);
-#define orig_refresh_draw (*(am2_void_fn)ADDR_REFRESH_DRAW)
 #define g_presentEnabledRW (*(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED)
 
 void __cdecl RefreshScreen(void)
@@ -352,8 +352,8 @@ void __cdecl RefreshScreen(void)
 
     /* Twice, because the scene is double buffered and one pass would leave the
      * other buffer holding whatever was there before. */
-    orig_refresh_draw();
-    orig_refresh_draw();
+    RefreshDraw();
+    RefreshDraw();
 
     IDirectDrawSurface_BltFast(g_primarySurface,
                                (DWORD)g_screenRect.left,

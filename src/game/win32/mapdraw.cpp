@@ -1447,7 +1447,7 @@ clamp_eye:
  * bracket" finds halves -- the pairing is per FEATURE, not per function.
  *
  * The colour is a byte read from its own global rather than passed in. */
-static void __cdecl DrawViewRect(void)
+void __cdecl DrawViewRect(void)
 {
     const AM2_Rect *box = (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
     const int32_t   ox  = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;

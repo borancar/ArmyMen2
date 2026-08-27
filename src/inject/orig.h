@@ -552,6 +552,23 @@
  * ADDR_MENU_ENABLED. It said "stays original" with no reason beside it, which
  * turned out to mean "not yet" rather than a decision. */
 #define ADDR_REFRESH_GATE   0x00412DE0u  /* void(int32) */
+/* The three painters ADDR_REFRESH_DRAW reaches that had no names. All three
+ * Lock and Unlock a surface and draw sprites; what distinguishes them is what
+ * else they touch, which is all these names claim.
+ *
+ * 0x00409070 is the AIR layer -- it logs "Air frame %d, pt %d,%d" and reaches
+ * ADDR_AIR_POP and ADDR_REVEAL_NEARBY, so it steps and draws air units rather
+ * than only drawing them.
+ *
+ * 0x004123D0 reserves 0x3144 bytes of stack, reads ADDR_GAME_RAND and the
+ * framebuffer directly, and draws from a table at 0x004FC8C8. Randomised
+ * full-screen drawing on a timer; what the effect IS is not established.
+ *
+ * 0x00462120 reads ADDR_SELECTED_COUNT, the view origins and four HUD
+ * colours, and prunes a list with ADDR_LIST_REMOVE_AT while drawing. */
+#define ADDR_AIR_FRAME_DRAW      0x00409070u  /* void(void) */
+#define ADDR_DRAW_EFFECT_LAYER   0x004123D0u  /* void(void) */
+#define ADDR_DRAW_SELECTION      0x00462120u  /* void(void) */
 #define ADDR_REFRESH_DRAW   0x00424BF0u  /* void(void), stays original */
 #define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
 #define ADDR_PAINT_MAP_TILES   0x0042D580u /* void(const AM2_Rect *tiles) */

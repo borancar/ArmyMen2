@@ -102,6 +102,11 @@ void __cdecl ResetDrawCounts(void);
  * both read. See the body for what separates snap from hold. */
 void __cdecl ViewUpdate(void);
 
+/* 0x00413610. Locks once, draws the whole view outline, unlocks once -- the
+ * matching half for the three line drawers, which each Lock and never Unlock.
+ * De-static'd when RefreshDraw needed to call it by name. */
+void __cdecl DrawViewRect(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

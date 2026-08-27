@@ -45,6 +45,11 @@ void __cdecl State4Frame(void);
  * 0 won, 1 lost, 2 host left -- and anything else leaves the bitmap alone. */
 void __cdecl ShowMpResult(int32_t result);
 
+/* 0x00424BF0. Repaints the whole screen -- what TakeMenuRequest does instead
+ * of the ordinary present. Sets the draw target three times, because two of
+ * the painters it calls retarget it. */
+void __cdecl RefreshDraw(void);
+
 int frame_install(void);
 
 #ifdef __cplusplus

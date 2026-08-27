@@ -52,8 +52,9 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
  * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
-/* Spelled exactly as surface.cpp spells it; checkglobals enforces that. */
+/* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
 #define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 #define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 #define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
 #define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
@@ -250,8 +251,9 @@ typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
 #define orig_load_bitmap  ((AM2_LoadBitmapFn)(uintptr_t)ADDR_LOAD_BITMAP)
 
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
-/* Spelled exactly as surface.cpp spells it; checkglobals enforces that. */
+/* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
 #define g_primarySurface (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE)
+#define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
 /* 0x00425CD0. Sub-state 33's PAUSED arm -- what an in-mission frame does while
  * something has the game stopped, where TakeMenuRequest runs when nothing has.
@@ -402,6 +404,7 @@ void __cdecl FramePost(void)
 /* Defined below, beside the rest of the per-frame chain. */
 void __cdecl TakeMenuRequest(void);
 void __cdecl Substate22(void);
+void __cdecl RefreshDraw(void);
 void __cdecl StateEnter3(void);
 void __cdecl StateEnter0(void);
 
@@ -577,7 +580,6 @@ void __cdecl State3Frame(void)
 typedef void (__cdecl *AM2_NoArgFn)(void);
 typedef void (__attribute__((thiscall)) *AM2_PaintUpdateFn)(void *self);
 #define orig_log_noargs   ((AM2_NoArgFn)(uintptr_t)ADDR_LOG)
-#define orig_refresh_draw2 ((AM2_NoArgFn)(uintptr_t)ADDR_REFRESH_DRAW)
 
 /* 0x00425EE0, one caller -- RunFrame's state 2, on every unpaused frame. The
  * in-mission driver, and the last piece of this chain: every one of its
@@ -716,7 +718,7 @@ void __cdecl TakeMenuRequest(void)
         PresentFrame();
         return;
     }
-    orig_refresh_draw2();
+    RefreshDraw();
 }
 
 /* Spelled exactly as surface.cpp, mapdraw.cpp and palette.cpp spell it, so the
@@ -966,6 +968,78 @@ void __cdecl ShowMpResult(int32_t result)
 }
 
 
+#define orig_air_frame_draw    ((AM2_NoArgFn)(uintptr_t)ADDR_AIR_FRAME_DRAW)
+#define orig_draw_effect_layer ((AM2_NoArgFn)(uintptr_t)ADDR_DRAW_EFFECT_LAYER)
+#define orig_draw_selection    ((AM2_NoArgFn)(uintptr_t)ADDR_DRAW_SELECTION)
+
+/* 0x00424BF0, two callers. Repaints the whole screen from scratch -- what
+ * TakeMenuRequest does instead of the ordinary present when the state has not
+ * been entered this frame.
+ *
+ * THE DRAW TARGET IS SET THREE TIMES, always to the back buffer, and that is
+ * not redundancy: ComposeFrame and the effect layer both retarget, so each
+ * group of painters has to put it back. Dropping the repeats would work until
+ * one of those two changed, which is precisely the kind of coupling worth
+ * leaving alone. The original also defers all three pushes to one `add esp`,
+ * which is the compiler's, not the function's.
+ *
+ * TWO LOG CALLS, BOTH WITH NO ARGUMENTS, bracketing HudPaint. Reproduced
+ * through a no-argument pointer, as in TakeMenuRequest and ShowMpResult -- a
+ * varargs call with none is not Log("").
+ *
+ * THE BITMAP IS CENTRED AGAINST ADDR_BITMAP_AREA_W/H, where Substate22 centres
+ * the same kind of bitmap against ADDR_SCREEN_W/H. Two screen-size pairs live
+ * in this image and the two sites disagree about which to use; taken from the
+ * operands at each site rather than made consistent.
+ *
+ * Its guard is four tests deep and every one is a REFUSAL: no bitmap, or the
+ * menu request is the info screen or the escape screen, or the overlay is
+ * already dirty. So the bitmap is drawn only when nothing else is about to
+ * repaint over it.
+ *
+ * VERIFIED BY READING. Its counter is blind -- both callers are ours -- and
+ * the arm of TakeMenuRequest that reaches it needs ADDR_STATE_ENTER_ONCE
+ * clear, which no drive here produces. */
+void __cdecl RefreshDraw(void)
+{
+    void *bmp;
+
+    SetDrawTarget(g_backBuffer);
+    CyclePalette();
+    ComposeFrame();
+
+    SetDrawTarget(g_backBuffer);
+    orig_air_frame_draw();
+    orig_draw_effect_layer();
+    orig_paused_frame_step();
+
+    SetDrawTarget(g_backBuffer);
+    orig_draw_selection();
+    DrawViewRect();
+
+    orig_log_noargs();
+    HudPaint();
+    orig_log_noargs();
+
+    bmp = g_currentBitmap;
+    if (bmp
+        && *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST != AM2_SUBSTATE_BITMAP
+        && *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST != AM2_SUBSTATE_ESCAPE
+        && !*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
+        int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
+        int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
+
+        DrawSprite((AM2_Sprite *)bmp,
+                   (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w) >> 1,
+                   (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - h) >> 1,
+                   0);
+    }
+
+    DrawMenuCursor();
+    PresentFrame();
+}
+
+
 /* 0x00426790. State 4 -- leaving. Posts WM_CLOSE to the game's own window and
  * clears the entered flag so it happens once, and there is nothing else in it:
  * the shutdown proper runs from WndProc. */
@@ -1003,6 +1077,8 @@ int frame_install(void)
                         "GetPauseFlags", 13);
     rc |= patch_replace(ADDR_PAUSE_GAME, (const void *)PauseGame,
                         "PauseGame", 8);
+    rc |= patch_replace(ADDR_REFRESH_DRAW, (const void *)RefreshDraw,
+                        "RefreshDraw", 2);
     rc |= patch_replace(ADDR_SHOW_MP_RESULT, (const void *)ShowMpResult,
                         "ShowMpResult", 3);
     rc |= patch_replace(ADDR_SUBSTATE22, (const void *)Substate22,
