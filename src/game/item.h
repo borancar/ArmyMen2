@@ -150,6 +150,10 @@ int32_t __cdecl ObjTileAttr(const void *obj);
  * the same value arrived at differently. */
 int32_t __cdecl TileAttrAt(uint32_t tile);
 
+/* 0x0042A820. The ground height at a point, raised by any ITEM standing on
+ * it. A byte return -- see item.cpp. */
+uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
+
 /* 0x004355D0, one caller. A second deadline on the mission clock, at +0x58:
  * once the clock is PAST it, bit 1 of the object's flags goes on. Unsigned
  * compare, and nothing clears the bit here. Both names are ours. */

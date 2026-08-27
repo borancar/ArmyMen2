@@ -615,6 +615,56 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
     return *(const int8_t *)(g_tileAttrs + (tile & 0xFFFFu));
 }
 
+/* Still original: the cell query HeightAtPoint walks. */
+typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
+#define orig_objects_at_point ((AM2_ObjectsAtFn)(uintptr_t)ADDR_OBJECTS_AT_POINT)
+
+/* 0x0042A820, five callers. The ground height at a point, raised by anything
+ * standing on it.
+ *
+ * The walk is ObjectsAtPoint's, still original: it collects every object in
+ * the cell the point falls in and chains them through OBJ_OFF_QUERY_NEXT. The
+ * chain is scratch and lives only until the next such query, which is why
+ * this reads it out in one pass and keeps nothing.
+ *
+ * Three conditions and all three are needed. ObjIsItem, so types 1 and 4 --
+ * a soldier standing on a tile does not raise it. The SIGN of the low byte at
+ * OBJ_OFF_RANK, which for those types is not a rank at all: 0..7 could never
+ * make it negative, and the object is a union past its header. And the height
+ * being higher than what is already there, compared
+ * SIGNED as a byte, which is the same int8 the rest of the height family
+ * uses.
+ *
+ * IT RETURNS A BYTE AND ONLY A BYTE. The original ends `mov al, bl` over an
+ * eax still holding the masked tile index, so the upper bits carry the tile
+ * rather than an answer. Log2Mask's problem exactly.
+ *
+ * Verified by reading, with the measurement said out loud: 12 calls in one
+ * live mission, and adding 40 to the answer leaves `mission` at 299 and
+ * `bootcamp` at 76 -- both inside their bands. Twelve calls over a whole
+ * mission is a thin path and the frame does not show what they decide. */
+uint8_t __cdecl HeightAtPoint(uint32_t packedPoint)
+{
+    int8_t  best = (int8_t)TileAttrAt((uint32_t)TileOfPoint(packedPoint));
+    uint8_t *o   = (uint8_t *)orig_objects_at_point(
+                       &packedPoint, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        int8_t h;
+
+        if (!ObjIsItem((const AM2_Object *)o))
+            continue;
+        if (*(const int8_t *)(o + OBJ_OFF_RANK) >= 0)
+            continue;
+
+        h = *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET);
+        if (h > best)
+            best = h;
+    }
+
+    return (uint8_t)best;
+}
+
 int32_t __cdecl ObjHeight(const void *obj)
 {
     const uint8_t *o   = (const uint8_t *)obj;
@@ -2773,6 +2823,8 @@ void item_install(void)
     patch_replace(ADDR_OBJ_MARK_IF_OVERDUE, (const void *)ObjMarkIfOverdue,
                   "ObjMarkIfOverdue", 1);
     patch_replace(ADDR_OBJ_HEIGHT, (const void *)ObjHeight, "ObjHeight", 1);
+    patch_replace(ADDR_HEIGHT_AT_POINT, (const void *)HeightAtPoint,
+                  "HeightAtPoint", 5);
     patch_replace(ADDR_ITEM_PRE_DESTROY_ALIAS, (const void *)ItemPreDestroyAlias,
                   "ItemPreDestroyAlias", 2);
     patch_replace(ADDR_ROW_RELEASE, (const void *)RowRelease, "RowRelease", 5);

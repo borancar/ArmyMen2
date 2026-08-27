@@ -585,6 +585,22 @@
  * byte is used; either way the signed byte at +0x64 is added. So +0x64 is an
  * offset and +0x65 an override, and neither name is the program's. */
 #define ADDR_OBJ_HEIGHT        0x00429590u /* int32_t(const void *obj) */
+/* 0x0042A820, five callers. The ground height at a point, raised by anything
+ * standing on it: the tile's own attribute, then every ITEM in that cell whose
+ * +0x65 is higher. The name is ours.
+ *
+ * It RETURNS A BYTE and only a byte -- the last instruction is `mov al, bl`
+ * over an eax that still holds the masked tile index, so the upper bits are
+ * not an answer. Log2Mask's problem, and the same rule: read `al`.
+ *
+ * 0x0042A550 is what it walks with, still original: it collects every object
+ * in the cell a point falls in and chains them through OBJ_OFF_QUERY_NEXT --
+ * a name that was already in this file, on the same offset, and which the
+ * ratchet caught being invented a second time with an identical value. The
+ * field is scratch: a query overwrites it, so the chain lives only until the
+ * next call. */
+#define ADDR_HEIGHT_AT_POINT   0x0042A820u /* uint8_t(uint32_t packedPoint) */
+#define ADDR_OBJECTS_AT_POINT  0x0042A550u /* void *(const AM2_Point*, desc) */
 #define OBJ_OFF_HEIGHT_ADJ     0x64u       /* int8_t, always added */
 #define OBJ_OFF_HEIGHT_SET     0x65u       /* uint8_t, replaces the tile's */
 #define ADDR_OBJ_TILE_ATTR     0x00429570u /* int32_t(const void *obj) */
@@ -3464,7 +3480,13 @@ typedef struct {
 #define RANK_REC_OFF_SCALE       0u    /* handed to ADDR_RANK_APPLY */
 #define RANK_REC_OFF_XP          4u    /* experience needed for this rank */
 #define ADDR_RANK_PROMOTE        0x00457BC0u  /* void(obj) */
-#define OBJ_OFF_RANK             0x98u  /* int32_t, 0..7 */
+/* 0x98 IS TYPE-DEPENDENT, the same way 0x94 and 0xA0 are. For a trooper it is
+ * the rank, an int32 in 0..7. For an ITEM -- types 1 and 4 -- HeightAtPoint
+ * reads its low byte and uses only the SIGN, as "this thing raises the ground
+ * you stand on"; a rank could never make that byte negative. One name, both
+ * readings, which is what OBJ_OFF_FIELD_94 already does rather than putting a
+ * second name on the offset. */
+#define OBJ_OFF_RANK             0x98u  /* int32_t 0..7, or an item's flag byte */
 #define AM2_RANK_MAX             7
 #define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
 /* 0x0044BBD0, two callers: put 1 in the dword at +0x548 and then run the line
