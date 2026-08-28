@@ -166,6 +166,10 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
 int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
                                   uint32_t ref);
 
+/* 0x0045BBB0. Sum the block weight over a vehicle mask's points for a heading.
+ * Kind 5 uses BlockWeightChain and every other kind BlockWeightTroops. */
+int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at);
+
 /* 0x0042A820. The ground height at a point, raised by any ITEM standing on
  * it. A byte return -- see item.cpp. */
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);

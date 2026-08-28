@@ -1359,6 +1359,82 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
     return total;
 }
 
+/* 0x0045BBB0, five callers. Sum the block weight over a vehicle mask's points.
+ *
+ * The heading is rounded to one of AM2_VEHICLE_MASK_DIRS with RoundTo8, the
+ * kind and that direction index one 0xA4-byte record, and every point in it is
+ * offset from the caller's base and weighed. The record's count sits in the
+ * dword BELOW ADDR_VEHICLE_MASK, which is how that table was already
+ * documented from the builder's side.
+ *
+ * KIND 5 TAKES BlockWeightChain AND EVERY OTHER KIND TAKES BlockWeightTroops.
+ * That is the "value being 5" BlockWeightChain's own comment records without
+ * knowing what it was: it is a vehicle kind. So the variant with no trooper
+ * arm and the inverted tile bit exists for one kind of vehicle, and the
+ * question of which is the odd one out has an answer -- it is whatever kind 5
+ * is, and that is still unread.
+ *
+ * THE CHAIN IS COLLECTED AT THE BASE POINT, NOT AT THE OFFSET ONE, and this is
+ * the part to read twice. ObjectsAtPoint is handed the address of the base
+ * argument, unchanged, on every iteration -- while the SUMMED point goes into
+ * a different slot and is passed as the weigher's `at`. So the objects are the
+ * same set every time round and only the terrain term moves with the mask.
+ * The query is also repeated rather than hoisted, returning the same chain.
+ *
+ * Whether that is deliberate is not established and it is not called a bug
+ * here. What is certain is the two addresses: `lea edx,[esp+0x1c]` names the
+ * base slot and the summed point is written four bytes below it, which is the
+ * argument slot the direction byte was parked in earlier. The original reuses
+ * both incoming argument slots as scratch, which is why the two are adjacent
+ * and easy to conflate.
+ *
+ * The count is re-read from the record every iteration. It cannot change.
+ *
+ * MEASURED AT 0. All five call sites sit in one function, 0x0043A860, and
+ * that function does not run on any drive here -- BlockWeightTroops reads
+ * 1,045,353 on the same run, all of it from its other two callers. So the
+ * counter is not blind and this is verified by reading: the mask indexing,
+ * the kind-5 split, and the base-versus-offset point above are all
+ * unchecked by any test in this project.
+ *
+ * That last one is the reason to say so loudly. If the chain really should
+ * come from the offset point, this reconstruction reproduces a defect
+ * exactly, which is the correct outcome -- and if I have misread the two
+ * adjacent stack slots, nothing here would tell me.
+ */
+int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
+{
+    const uint8_t *rec;
+    int32_t        dir   = (uint8_t)RoundTo8(heading & 0xFF, 5);
+    int32_t        total = 0;
+    int32_t        i;
+
+    rec = (const uint8_t *)AM2_IMAGE(ADDR_VEHICLE_MASK - 4)
+          + (size_t)(kind * AM2_VEHICLE_MASK_DIRS + dir)
+            * AM2_VEHICLE_MASK_STRIDE;
+
+    for (i = 0; i < *(const int32_t *)rec; i++) {
+        const int16_t *pt = (const int16_t *)(rec + 4) + i * 2;
+        uint32_t       here;
+        void          *chain;
+
+        /* Both halves of the packed base, summed with the mask offset. */
+        here = (uint32_t)(uint16_t)(int16_t)((int16_t)(at & 0xFFFFu) + pt[0])
+             | ((uint32_t)(uint16_t)(int16_t)((int16_t)(at >> 16) + pt[1])
+                << 16);
+
+        /* NOTE: the BASE point, not `here`. */
+        chain = orig_objects_at_point(&at,
+                                      (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+
+        total += (kind == AM2_MASK_CHAIN_KIND)
+                 ? BlockWeightChain((void *)0, here, chain, at)
+                 : BlockWeightTroops((void *)0, here, chain, at);
+    }
+
+    return total;
+}
+
 /* 0x0042A820, five callers. The ground height at a point, raised by anything
  * standing on it.
  *
@@ -4045,6 +4121,8 @@ void item_install(void)
                   "BlockWeightChain", 2);
     patch_replace(ADDR_BLOCK_WEIGHT_TROOPS, (const void *)BlockWeightTroops,
                   "BlockWeightTroops", 3);
+    patch_replace(ADDR_MASK_BLOCK_WEIGHT, (const void *)MaskBlockWeight,
+                  "MaskBlockWeight", 5);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

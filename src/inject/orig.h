@@ -6580,6 +6580,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_VEHICLE_MASK_KINDS     6
 #define AM2_VEHICLE_MASK_DIRS      32  /* the stride of the kind index */
 #define AM2_VEHICLE_MASK_MIN_SOLID 12  /* of the 64 samples -- NOT the roach's 16 */
+#define AM2_VEHICLE_MASK_STRIDE    0xA4u  /* one record, count then points */
+/* 0x0045BBB0, five callers. Sum the block weight over a vehicle mask's points:
+ * round the heading to one of AM2_VEHICLE_MASK_DIRS, take that kind's record,
+ * and add up ADDR_BLOCK_WEIGHT_CHAIN or ADDR_BLOCK_WEIGHT_TROOPS over every
+ * point offset from a base. KIND 5 IS THE ONE THAT TAKES THE CHAIN VARIANT --
+ * that is the "value being 5" ADDR_BLOCK_WEIGHT_CHAIN's comment records
+ * without knowing what it was. Reconstructed, and measured at 0: all five call
+ * sites are in 0x0043A860, which no drive here reaches. */
+#define ADDR_MASK_BLOCK_WEIGHT     0x0045BBB0u /* int32(kind, heading, uint32) */
+#define AM2_MASK_CHAIN_KIND        5
 /* 0x00446290, two callers. Is this sprite opaque at this point: the run-length
  * mask for a software format, the bounding box for anything else. */
 #define ADDR_SPRITE_SOLID_AT     0x00446290u  /* int32_t(AM2_Sprite *, AM2_Point) */
