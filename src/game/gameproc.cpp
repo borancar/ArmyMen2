@@ -16,6 +16,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "misc.h"      /* ReturnOne */
+#include "crt.h"       /* am2_realloc, am2_free -- the game's own */
 
 #define kBlock  ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
 #define kStrB   ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_STR_B))
@@ -675,8 +676,86 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     return made;
 }
 
+/* ---------------------------------------------- the uid remap table ---- */
+
+#define g_uidRemapCap   (*(int32_t *)(uintptr_t)ADDR_UID_REMAP_CAP)
+#define g_uidRemapCount (*(int32_t *)(uintptr_t)ADDR_UID_REMAP_COUNT)
+#define g_uidRemap      (*(uint32_t **)(uintptr_t)ADDR_UID_REMAP)
+
+/* 0x00427650 and 0x00427680, two callers each: the two halves of a growable
+ * array of (from, to) uid pairs.
+ *
+ * WHAT THE TABLE IS COMES FROM THE ONE FUNCTION THAT READS IT, which is still
+ * original. 0x004276F0 walks a unit's six UNIT_OFF_INVENTORY slots and, for
+ * each, scans this table for a record whose first dword equals the uid in the
+ * slot, then writes that record's SECOND dword back. So the pairs are a rename
+ * map, which is what a load needs: a saved uid means nothing in the new
+ * session. Neither of these two functions would say that on its own -- an
+ * append and a free are the same shape whatever the records mean.
+ *
+ * THE THREE GLOBALS ARE capacity, count, pointer, IN THAT ORDER, and getting
+ * that backwards would be invisible until the first grow. The compare at
+ * 0x0042768B is `count < capacity` and it decides whether to grow, which is
+ * what settles which is which; the alternative reading makes a full table look
+ * empty and an empty one look full, and both still append correctly to
+ * whatever memory is there.
+ *
+ * NEITHER CHECKS ITS ALLOCATOR. The capacity is raised BEFORE the realloc and
+ * kept whether or not the realloc succeeded, so a failure leaves the table
+ * claiming space it does not have and the very next append writes past the
+ * end. Reproduced; it is the original's, and a load that cannot allocate 80
+ * bytes has lost already.
+ *
+ * The grow is ten records, and the first append reallocs from a NULL pointer,
+ * which is a malloc. Both are the original's spelling and neither needs a
+ * special case here for the same reason it does not there.
+ *
+ * BOTH APPEND SITES CONFIRM THE PAIR ORDER INDEPENDENTLY OF THE READER, which
+ * is worth more than the reader alone. 0x00447278 and 0x0045F013 each build a
+ * REPLACEMENT object, call this with (old->uid, new->uid), and then write the
+ * new uid into the old object's own field. So a record is (from, to) and the
+ * table exists because an object was recreated, not only because a file was
+ * loaded -- three sites agreeing beats one.
+ *
+ * MEASURED AT 0 ON BOTH DRIVES. All four callers are the original's and reach
+ * these by address, so the counters are not blind; Boot Camp with movement and
+ * fire, and the campaign through SELECT PLAYER into MAP 01, leave both at 0
+ * while BlockWeightAt reads 8 and 6 on those same two runs. Verified by
+ * reading, and the reading is the three-site agreement above rather than the
+ * bodies, which are an append and a free and say nothing on their own.
+ */
+void __cdecl UidRemapClear(void)
+{
+    if (g_uidRemap)
+        am2_free(g_uidRemap);
+
+    g_uidRemapCap   = 0;
+    g_uidRemapCount = 0;
+    g_uidRemap      = (uint32_t *)0;
+}
+
+void __cdecl UidRemapAdd(uint32_t from, uint32_t to)
+{
+    int32_t n;
+
+    if (g_uidRemapCount >= g_uidRemapCap) {
+        g_uidRemapCap += AM2_UID_REMAP_GROW;
+        g_uidRemap = (uint32_t *)am2_realloc(
+                         g_uidRemap, (size_t)(g_uidRemapCap * 8));
+    }
+
+    n = g_uidRemapCount;
+    g_uidRemap[n * 2]     = from;
+    g_uidRemap[n * 2 + 1] = to;
+    g_uidRemapCount       = n + 1;
+}
+
 void gameproc_install(void)
 {
+    patch_replace(ADDR_UID_REMAP_CLEAR, (const void *)UidRemapClear,
+                  "UidRemapClear", 2);
+    patch_replace(ADDR_UID_REMAP_ADD, (const void *)UidRemapAdd,
+                  "UidRemapAdd", 2);
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
     patch_replace(ADDR_DEF_GAME_PARSE, (const void *)DefGameParse,
                   "DefGameParse", 1);

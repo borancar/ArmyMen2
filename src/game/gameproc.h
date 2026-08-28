@@ -100,6 +100,12 @@ void *__cdecl LoadType7(am2_FILE *fp, const void *hdr);
 
 void gameproc_install(void);
 
+
+/* 0x00427650 and 0x00427680. The uid remap table a load builds: clear it, and
+ * append one (from, to) pair. See ADDR_UID_REMAP in orig.h for what reads it. */
+void __cdecl UidRemapClear(void);
+void __cdecl UidRemapAdd(uint32_t from, uint32_t to);
+
 #ifdef __cplusplus
 }
 #endif

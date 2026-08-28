@@ -4303,6 +4303,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * other picks between this and 0x0045B7E0 on a value being 5. Counter measured
  * at 0 -- not blind, just unreached -- so it is verified by reading. */
 #define ADDR_BLOCK_WEIGHT_CHAIN    0x0045B690u /* int32_t(void*,uint32,void*,uint32) */
+/* The UID REMAP TABLE, and what it is comes from the one function that READS
+ * it. 0x004276F0 walks a unit's six UNIT_OFF_INVENTORY slots and, for each,
+ * scans this table for a record whose first dword equals the uid the slot
+ * holds, then writes the record's SECOND dword back into the slot. So the
+ * records are (from, to) pairs of uids and the table is a rename map -- which
+ * is what a load needs, since a saved uid means nothing in the new session.
+ *
+ * A growable array in the shape this image uses everywhere: capacity, count,
+ * and a pointer to `capacity` records of eight bytes, grown ten records at a
+ * time. Reading it as {count, capacity, data} instead would be invisible until
+ * the first realloc; the compare at 0x0042768B is `count < capacity`, which is
+ * what settles the order. Both halves reconstructed. */
+#define ADDR_UID_REMAP_CAP         0x00513080u  /* int32_t, records allocated */
+#define ADDR_UID_REMAP_COUNT       0x00513084u  /* int32_t, records used */
+#define ADDR_UID_REMAP             0x00513088u  /* uint32_t (*)[2] */
+#define AM2_UID_REMAP_GROW         10   /* records added per grow */
+/* 0x00427650, two callers -- both in 0x00457370's band, which is where a load
+ * puts the table back. Free the records and zero all three globals. */
+#define ADDR_UID_REMAP_CLEAR       0x00427650u  /* void(void) */
+/* 0x00427680, two callers. Append one (from, to) pair, growing first when the
+ * table is full. Both call sites build a replacement object and pass
+ * (old->uid, new->uid), which is what fixes the pair order. Counters measured
+ * at 0 on Boot Camp and on the campaign -- not blind, just unreached. */
+#define ADDR_UID_REMAP_ADD         0x00427680u  /* void(uint32 from, uint32 to) */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
  * removal always clears. */
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */
