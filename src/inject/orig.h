@@ -1056,6 +1056,16 @@
  * by the height gives the right answer anyway. ADDR_MAP_HEIGHT and
  * ADDR_MAP_WIDTH are gone; the TILES_W/TILES_H pair is what is left. */
 #define ADDR_TILE_OF_POINT       0x0042B290u  /* int32_t(AM2_Point) */
+/* 0x0042E390, seven callers. The TILES A LINE CROSSES: a Bresenham walk from
+ * one packed point to another, in tile space, writing each tile index into a
+ * uint16 array and a count. Reconstructed.
+ *
+ * The step is +/- 1 across and +/- ADDR_MAP_TILES_W down, added to the tile
+ * index directly rather than recomputed from coordinates -- so the walk never
+ * calls TileOfPoint again after the first point, and an index that runs off
+ * the row wraps into the next one rather than being clipped. Nothing bounds
+ * the output array either. 35 calls on a driven Boot Camp mission. */
+#define ADDR_TRACE_TILE_LINE     0x0042E390u  /* void(uint32,uint32,uint16*,int32*) */
 #define AM2_TILE_SHIFT           4
 /* 0x0042B250, six callers: the inverse, and it CENTRES -- the point it returns
  * is the middle of the tile, eight pixels in on each axis. The column comes

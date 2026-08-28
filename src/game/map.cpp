@@ -354,8 +354,108 @@ void *__cdecl ScriptListFind(char *name)
     return (void *)0;
 }
 
+/* 0x0042E390, seven callers. The tiles a line crosses, from one packed point
+ * to another: a Bresenham walk in TILE space writing each tile index into the
+ * caller's uint16 array and counting them.
+ *
+ * THE WALK NEVER RECOMPUTES A TILE. TileOfPoint runs once, for the starting
+ * point, and after that the index is stepped by +/-1 across and by
+ * +/-ADDR_MAP_TILES_W down. That is the whole reason it is cheap enough to run
+ * per line -- and it also means an index that runs off the end of a row wraps
+ * into the next one rather than being clipped. Nothing here checks the bounds
+ * of the map, and nothing bounds the output array; both are the caller's.
+ *
+ * BOTH POINT ARGUMENTS' STACK SLOTS BECOME SCRATCH once they are decoded --
+ * the original keeps the running output index in the first and the Bresenham
+ * error in the second. Written as locals; there is nothing to reproduce in
+ * where a value happens to live.
+ *
+ * THE TWO LOOPS ARE THE SAME LOOP with x and y exchanged, chosen on
+ * 2|dx| > 2|dy|, and the doubling is done ONCE before the choice rather than
+ * inside either. The error starts at 2|minor| - |major|, which is the ordinary
+ * form; what is worth noticing is that the major axis is compared for EQUALITY
+ * with its target, not for having passed it. With the steps derived from the
+ * sign of the difference that always terminates, but it is why a zero-length
+ * line writes one tile and stops: the y-major arm is chosen when both deltas
+ * are zero, and its equality test fires before the first step.
+ *
+ * The starting tile is written before either loop and the count set to 1, so
+ * the array always holds at least one entry and the count is never zero.
+ *
+ * The sign of each step is computed as `setge; dec; and 0xFE; inc`, which is
+ * +1 for a non-negative difference and -1 otherwise. Written as the sign it
+ * is; the four instructions are what MSVC makes of a ternary.
+ *
+ * MEASURED AT 35 CALLS on a driven Boot Camp mission, with TileOfPoint at
+ * 3.9 million on the same run -- so this is not on a hot path and the 35 are
+ * whatever asked for a line. That is enough for the A/B to compare it and not
+ * enough to claim either arm: which of the two loops those 35 took is not
+ * established, and neither is whether any of them had a zero-length line.
+ * Said as the gap it is rather than argued away as likely.
+ */
+void __cdecl TraceTileLine(uint32_t from, uint32_t to,
+                           uint16_t *tiles, int32_t *count)
+{
+    /* Both points are packed: x in the low half, y in the high, each signed.
+       The original reads them with `movsx`, so the shift is arithmetic. */
+    int32_t tx0 = (int32_t)(int16_t)(from & 0xFFFFu) >> 4;
+    int32_t ty0 = (int32_t)(int16_t)(from >> 16) >> 4;
+    int32_t tx1 = (int32_t)(int16_t)(to & 0xFFFFu) >> 4;
+    int32_t ty1 = (int32_t)(int16_t)(to >> 16) >> 4;
+    int32_t dx  = tx1 - tx0;
+    int32_t dy  = ty1 - ty0;
+    int32_t adx = (dx < 0 ? -dx : dx) * 2;
+    int32_t ady = (dy < 0 ? -dy : dy) * 2;
+    int32_t stepX = dx >= 0 ? 1 : -1;
+    int32_t stepY = dy >= 0 ? 1 : -1;
+    int32_t stepDown = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * stepY;
+    int32_t tile = TileOfPoint(from);
+    int32_t err;
+    int32_t i;
+
+    *count   = 0;
+    tiles[0] = (uint16_t)tile;
+    *count   = 1;
+    i        = 1;
+
+    if (adx > ady) {
+        err = ady - adx / 2;
+        while (tx0 != tx1) {
+            if (err >= 0) {
+                tile += stepDown;
+                err  -= adx;
+            }
+            err  += ady;
+            tx0  += stepX;
+            tile += stepX;
+
+            tiles[i] = (uint16_t)tile;
+            *count   = i + 1;
+            i        = *count;
+        }
+        return;
+    }
+
+    err = adx - ady / 2;
+    while (ty0 != ty1) {
+        if (err >= 0) {
+            tile += stepX;
+            err  -= ady;
+        }
+        tile += stepDown;
+        ty0  += stepY;
+        err  += adx;
+
+        tiles[i] = (uint16_t)tile;
+        *count   = i + 1;
+        i        = *count;
+    }
+}
+
 void map_install(void)
 {
+    patch_replace(ADDR_TRACE_TILE_LINE, (const void *)TraceTileLine,
+                        "TraceTileLine", 7);
     patch_replace(ADDR_SCRIPT_LIST_FIND, (const void *)ScriptListFind,
                   "ScriptListFind", 5);
     patch_replace(ADDR_TILE_TO_XY, (const void *)TileToXY,
