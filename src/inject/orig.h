@@ -6125,6 +6125,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_RECORD_LISTS -- so this is ADDR_MAKE_RECORD_LIST's counterpart. Free
  * the header's two pointers and then the header. Reconstructed. */
 #define ADDR_FREE_RECORD_LIST    0x00434C40u  /* void(void *list) */
+/* 0x00434100, one caller -- the READ half of ADDR_ADD_RECORD_LIST, and the
+ * same halving search over ADDR_RECORD_LIST_INDEX with the same unsigned
+ * compare. The slot for an owner, or -1. Reconstructed. */
+#define ADDR_FIND_RECORD_LIST    0x00434100u  /* int32_t(uint32_t owner) */
 /* 0x00434150, eight callers: register one of ADDR_MAKE_RECORD_LIST's headers
  * under its LISTHDR_OFF_OWNER, and hand back the slot it went into.
  *
@@ -6423,6 +6427,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * whether OBJ_FLAG_REVEALED is cleared, and nothing read so far says why. */
 #define OBJ_FLAG_BIT4            0x10u
 #define OBJ_OFF_FIELD_530        0x530u  /* int32_t; ObjConceal compares to 5 */
+/* 0x00449200, one caller. Put an object into state 5 and give up its
+ * ALTERNATE table record: SAVED_OFF_TABLE_REC3 moves into
+ * SAVED_OFF_TABLE_REC2, the alternate is cleared, and the value goes through
+ * ADDR_SET_FIELD_IN_ALL. Refuses if the object is already in state 5.
+ *
+ * That state is what ObjsAreAllied tests: it chooses REC3 only when its third
+ * argument is set AND this field is not 5, so once this has run the alternate
+ * is never chosen again -- which is consistent, since it has been cleared.
+ * ObjConceal tests the same 5.
+ *
+ * Its one caller reaches it when BOTH the object's health fields are at or
+ * below zero and it is a type 2, so "the unit is finished" is the occasion.
+ * The name is the mechanism rather than the occasion, because one call site is
+ * thin ground for the second. Reconstructed. */
+#define ADDR_OBJ_DROP_ALT_RECORD 0x00449200u  /* void(void *obj) */
+#define AM2_OBJ_STATE_5          5
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
  * which registers itself with the map. */

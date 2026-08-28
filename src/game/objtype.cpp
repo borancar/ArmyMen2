@@ -375,6 +375,48 @@ int32_t __cdecl AddRecordList(void *list)
     return slot;
 }
 
+/* 0x00434100, one caller -- the READ half of AddRecordList above, and the
+ * fourth member of that family after the maker, the adder and the free.
+ *
+ * It is AddRecordList's search with the insertion arms removed: the same
+ * halving over ADDR_RECORD_LIST_INDEX, the same UNSIGNED compare, and the same
+ * `hi > lo` bottom test. A hit returns the pair's second dword -- the SLOT --
+ * and a miss returns -1, where the adder returned -1 for a hit instead.
+ *
+ * So the two disagree about what -1 means and agree about everything else,
+ * which is worth stating: the adder refuses a duplicate with -1 and this
+ * reports a miss with -1. Reading one to write the other and carrying the
+ * return convention across would invert both.
+ *
+ * Measured at 0 on a driven Boot Camp mission, where the maker, the adder and
+ * the free run 151, 151 and 0 -- so 151 lists are registered and nothing looks
+ * one up. Its counter is not blind; the one caller is the original's.
+ */
+int32_t __cdecl FindRecordList(uint32_t owner)
+{
+    int32_t   lo = 0;
+    int32_t   hi = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+    uint32_t *ix;
+
+    if (hi <= 0)
+        return -1;
+
+    ix = *(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX;
+
+    do {
+        int32_t mid = lo + (hi - lo) / 2;
+
+        if (ix[mid * 2] == owner)
+            return (int32_t)ix[mid * 2 + 1];
+        if (ix[mid * 2] > owner)
+            hi = mid;
+        else
+            lo = mid + 1;
+    } while (hi > lo);
+
+    return -1;
+}
+
 /* 0x00434C40, one caller -- and that caller walks every entry of
  * ADDR_RECORD_LISTS, so this is MakeRecordList's counterpart.
  *
@@ -624,6 +666,8 @@ int objtype_install(void)
                         "AddRecordList", 8);
     rc |= patch_replace(ADDR_FREE_RECORD_LIST, (const void *)FreeRecordList,
                         "FreeRecordList", 1);
+    rc |= patch_replace(ADDR_FIND_RECORD_LIST, (const void *)FindRecordList,
+                        "FindRecordList", 1);
     rc |= patch_replace(ADDR_MAKE_AAI_RECORD, (const void *)MakeAaiRecord,
                         "MakeAaiRecord", 7);
     rc |= patch_replace(ADDR_ADD_AAI_RECORD, (const void *)AddAaiRecord,

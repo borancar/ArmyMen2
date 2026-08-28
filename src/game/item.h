@@ -283,6 +283,10 @@ const char *__cdecl UnitClassName(void *unit);
  * OBJ_OFF_PICKUP_AFTER, with a code of 0x1F, 0x20 or 0x21. */
 int32_t __cdecl CanPickUp(void *obj);
 
+/* 0x00449200. Put an object into state 5 and give up its alternate table
+ * record; idempotent, and what stops ObjsAreAllied choosing REC3 again. */
+void __cdecl ObjDropAltRecord(void *obj);
+
 /* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);

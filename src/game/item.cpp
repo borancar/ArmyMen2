@@ -286,6 +286,50 @@ int32_t __cdecl CanPickUp(void *obj)
     return code == 0x1F || code == 0x20 || code == 0x21;
 }
 
+/* 0x00449200, one caller. Put an object into state 5 and give up its ALTERNATE
+ * table record.
+ *
+ * SAVED_OFF_TABLE_REC3 moves into SAVED_OFF_TABLE_REC2, the alternate is
+ * cleared, and the value is handed to SetFieldInAll on the object's
+ * OBJ_OFF_SUBRECORD. An object already in state 5 is left alone, so this is
+ * idempotent.
+ *
+ * THE STATE IS WHAT ObjsAreAllied TESTS. That function chooses REC3 only when
+ * its third argument is set AND this field is not 5 -- so once this has run,
+ * the alternate is never chosen again, which is consistent, because it has
+ * just been cleared. Two functions written a dozen commits apart, and the
+ * agreement is what makes either reading safe. ObjConceal tests the same 5.
+ *
+ * ITS ONE CALLER REACHES IT WHEN THE UNIT IS FINISHED -- both OBJ_OFF_HEALTH
+ * and OBJ_OFF_MAX_HEALTH at or below zero, and the object a type 2. That is a
+ * good description of the occasion and a poor one of the function, so the name
+ * is the mechanism. One call site is thin ground for the other kind of name,
+ * which is the mistake ADDR_UNIT_ACTION and ADDR_SPRITE_DROP_NAMED both were.
+ *
+ * MEASURED AT 0, which fits the occasion: nothing dies on a Boot Camp drive,
+ * and that is the same wall FreeItem, RemoveFromItemList and ObjDie are behind
+ * -- STATUS.md's standing ask for "a mission with something in it to kill".
+ * One more function waiting on it.
+ */
+void __cdecl ObjDropAltRecord(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    void    *rec;
+
+    if (!obj)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) == AM2_OBJ_STATE_5)
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_OBJ_STATE_5;
+
+    rec = *(void *const *)(o + SAVED_OFF_TABLE_REC3);
+    *(void **)(o + SAVED_OFF_TABLE_REC2) = rec;
+    *(void **)(o + SAVED_OFF_TABLE_REC3) = (void *)0;
+
+    SetFieldInAll(o + OBJ_OFF_SUBRECORD, rec);
+}
+
 void *__cdecl WeaponByUid(uint32_t uid)
 {
     uint32_t *obj;
@@ -4292,6 +4336,8 @@ void item_install(void)
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,
                   "UnitClassName", 1);
     patch_replace(ADDR_CAN_PICK_UP, (const void *)CanPickUp, "CanPickUp", 1);
+    patch_replace(ADDR_OBJ_DROP_ALT_RECORD, (const void *)ObjDropAltRecord,
+                  "ObjDropAltRecord", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,

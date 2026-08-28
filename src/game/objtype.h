@@ -51,6 +51,10 @@ int32_t __cdecl AddRecordList(void *list);
  * and then the header. */
 void __cdecl FreeRecordList(void *list);
 
+/* 0x00434100. The slot registered for an owner, or -1. AddRecordList's search
+ * without the insertion -- note the two disagree about what -1 means. */
+int32_t __cdecl FindRecordList(uint32_t owner);
+
 /* 0x004344A0. A 0x40-byte record from seven arguments, seeded from the
  * object.aai record for its (type, key) when the type is not negative. */
 void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
