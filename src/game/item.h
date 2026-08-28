@@ -160,6 +160,12 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref);
 int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
                                  uint32_t ref);
 
+/* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
+ * height step, and one extra arm -- a trooper blocks only if it is an enemy,
+ * and not even then for the unit the player is driving. */
+int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
+                                  uint32_t ref);
+
 /* 0x0042A820. The ground height at a point, raised by any ITEM standing on
  * it. A byte return -- see item.cpp. */
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);

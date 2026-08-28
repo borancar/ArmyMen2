@@ -1246,6 +1246,119 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
     return total;
 }
 
+/* 0x0045B7E0, three callers, 336 bytes -- the THIRD variant, and the one the
+ * other two are simplifications of.
+ *
+ * Same walk as BlockWeightChain above, over a chain the caller supplies, with
+ * the same stop at AM2_BLOCK_FULL and the same AM2_TILE_BLOCKS terrain term
+ * that BlockWeightAt uses. What differs is the per-object test: instead of
+ * calling ObjBlockWeight it INLINES it, drops the height step entirely, and
+ * inserts one arm for a type 2 -- a trooper -- between the item case and the
+ * type 3/8 case. That arm is the whole reason this function exists.
+ *
+ * A TROOPER BLOCKS ONLY IF IT IS AN ENEMY. The inlined arm asks
+ * ObjsAreAllied(from, obj, 0) and contributes AM2_BLOCK_FULL when the answer
+ * is no and nothing when it is yes -- so friendly troopers are walked through
+ * and hostile ones are not. Neither of the other two variants has this; they
+ * treat every object the same way whoever owns it.
+ *
+ * WITH ONE EXCEPTION, AND IT IS THE PLAYER'S OWN UNIT. Before the alliance
+ * question, three things are checked together: the viewer's army is the
+ * player's ADDR_DEFAULT_OWNER, the owner object for that army is RIDING the
+ * viewer -- LookupOwnerObj(owner)->OBJ_OFF_RIDING equals the viewer's uid --
+ * and the viewer's OBJ_OFF_FIELD_10C is zero. All three together mean the
+ * trooper contributes nothing whatever the alliance says. Any one of them
+ * failing falls through to the alliance question. So the unit the player is
+ * driving is the only one for which a trooper is never an obstacle.
+ *
+ * That LookupOwnerObj result is dereferenced without a null check, and it is a
+ * function documented to return null when the army is out of range or nothing
+ * qualifies. Reproduced; the army has already been compared equal to
+ * ADDR_DEFAULT_OWNER, which is what makes it safe in practice.
+ *
+ * The type 3/8 distance test is ObjBlockWeight's, unchanged: the reference
+ * point being closer to the obstacle than the viewer is means it blocks. The
+ * original passes that point by copying its own third argument's stack slot
+ * over its second and taking the address; written here as a local.
+ *
+ * ITS TERRAIN BIT IS AM2_TILE_BLOCKS, NOT AM2_TILE_OPEN. So of the three
+ * variants, two ask 0x80-is-set and one asks 0x01-is-clear, and this is not
+ * the odd one out -- BlockWeightChain is. Worth stating because the three
+ * bodies are otherwise close enough to copy from each other.
+ *
+ * MEASURED AT 2,039,745 CALLS on a driven Boot Camp mission, which settles
+ * which of the three the game actually uses: BlockWeightAt reads 8 and
+ * BlockWeightChain 0 on the same run. The two cold ones were reconstructed
+ * first and read as the general case; this is the general case.
+ *
+ * What that does NOT tell us is how often the trooper arm fires, and the
+ * reason is the usual one: ObjsAreAllied is called from here BY NAME, so its
+ * counter cannot see these calls. It reads 2 on the same run and those two are
+ * its other callers. The arm is compared by the A/B and counted by nothing.
+ */
+int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
+                                  uint32_t ref)
+{
+    uint8_t *o     = (uint8_t *)chain;
+    uint8_t *f     = (uint8_t *)from;
+    int32_t  total = 0;
+    uint32_t tile;
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        int32_t w = AM2_BLOCK_FULL;
+
+        if (o == f) {
+            w = 0;
+        } else if (ObjIsItem((const AM2_Object *)o)) {
+            w = *(const int8_t *)(o + OBJ_OFF_RANK);
+        } else if (ObjIsType2((const AM2_Object *)o)) {
+            int32_t skip = 0;
+
+            if (!f) {
+                w = 0;
+            } else {
+                if (*(const int8_t *)(f + OBJ_OFF_ARMY)
+                    == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+                    const uint8_t *owner = (const uint8_t *)LookupOwnerObj(
+                        *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+                    if (*(const uint32_t *)(owner + OBJ_OFF_RIDING)
+                            == ((const AM2_Object *)f)->uid
+                        && *(const int32_t *)(f + OBJ_OFF_FIELD_10C) == 0)
+                        skip = 1;
+                }
+                if (skip)
+                    w = 0;
+                else
+                    w = ObjsAreAllied(f, o, 0) ? 0 : AM2_BLOCK_FULL;
+            }
+        } else if (f
+                   && (ObjIsType3((const AM2_Object *)o)
+                       || ObjIsType8((const AM2_Object *)o))) {
+            if (ApproxDist((const AM2_Point *)&ref,
+                           (const AM2_Point *)(o + OBJ_OFF_POS))
+                >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                              (const AM2_Point *)(o + OBJ_OFF_POS)))
+                w = 0;
+        }
+
+        total += w;
+        if (total >= AM2_BLOCK_FULL)
+            return total;
+    }
+
+    tile = (uint32_t)TileOfPoint(at);
+    /* The same vacuous guard BlockWeightChain carries, spelled the same way. */
+    if ((tile & 0xFFFFu) > 0xFFFFu)
+        return 0xFF;
+    tile &= 0xFFFFu;
+
+    if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
+        total += AM2_BLOCK_FULL;
+
+    return total;
+}
+
 /* 0x0042A820, five callers. The ground height at a point, raised by anything
  * standing on it.
  *
@@ -3746,6 +3859,8 @@ void item_install(void)
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,
                   "BlockWeightChain", 2);
+    patch_replace(ADDR_BLOCK_WEIGHT_TROOPS, (const void *)BlockWeightTroops,
+                  "BlockWeightTroops", 3);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

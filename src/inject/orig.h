@@ -3734,6 +3734,18 @@ typedef struct {
  * Two calls on a driven Boot Camp mission; its two multiplayer arms are
  * unreachable here, since ADDR_MP_SESSION is 0 on every drive. */
 #define ADDR_OBJS_ARE_ALLIED     0x004574D0u  /* int32(void*, void*, int32) */
+/* Read by 0x0045B7E0 and by 0x0044AE68, both as a plain non-zero test on the
+ * VIEWER rather than on the object being judged, and nothing here writes it.
+ * Structural name; what it means is not established. */
+#define OBJ_OFF_FIELD_10C        0x10Cu
+/* 0x0045B7E0, three callers, 336 bytes -- the third BlockWeight variant. Same
+ * accumulate-to-15 walk as ADDR_BLOCK_WEIGHT_CHAIN over a chain the caller
+ * supplies, with ADDR_OBJ_BLOCK_WEIGHT's per-object test INLINED and one extra
+ * arm for a type 2. The terrain term is AM2_TILE_BLOCKS, as
+ * ADDR_BLOCK_WEIGHT_AT's is, and there is no height step. Reconstructed, and
+ * it is the one the game uses: 2,039,745 calls on a driven Boot Camp mission
+ * against BlockWeightAt's 8 and BlockWeightChain's 0. */
+#define ADDR_BLOCK_WEIGHT_TROOPS 0x0045B7E0u /* int32(void*,uint32,void*,uint32) */
 #define ADDR_ARMIES_ALLIED       0x00457720u  /* int32_t(a, b), 4 means all */
 #define ADDR_OBJ_IS_FRIENDLY     0x004577C0u  /* int32_t(const void *obj) */
 /* The uid of OUR army's leader; 0x00424E80 clears it and three others set it.
