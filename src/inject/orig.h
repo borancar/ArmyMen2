@@ -2470,6 +2470,11 @@ typedef struct {
 /* COMM. CHANNEL SELECT, 0x0042E9C0 -- the connection list. */
 #define VTABLE_COMM_PANEL        0x0046F9D0u
 #define ADDR_STR_COMMPANEL_BMP   0x00486EACu /* "02_001_00_commpanel.bmp" */
+/* Its destructor pair, the same two instructions as the fifteen dialogs --
+ * stamp my own vtable, jump to the dialog base's. Reached whenever the
+ * channel list closes, which the `multi` and `mpoptions` drives both do. */
+#define ADDR_COMM_PANEL_DELETE   0x0042ECC0u /* thiscall obj *(obj, flags) */
+#define ADDR_COMM_PANEL_DESTRUCT 0x0042ECE0u /* thiscall void(obj) */
 /* The scroll bar WITH arrows, as against the bare one the volume sliders use.
  * `ret 0x24` is 36: rectangle, the list it drives, two bitmaps, a maximum and
  * a zero. */
@@ -2815,6 +2820,9 @@ typedef struct {
 #define ADDR_OPEN_BATTLE_JOIN    0x0042F880u  /* void(void) */
 #define ADDR_BATTLE_JOIN_CTOR    0x0042F4C0u  /* thiscall obj *(obj, bmp) */
 #define AM2_BATTLE_JOIN_SIZE     0x88u
+#define VTABLE_BATTLE_JOIN       0x0046F9F8u
+#define ADDR_BATTLE_JOIN_DELETE  0x0042F850u /* thiscall obj *(obj, flags) */
+#define ADDR_BATTLE_JOIN_DESTRUCT 0x0042F870u /* thiscall void(obj) */
 #define ADDR_OPEN_MOVIES         0x0044E6A0u  /* void(void) */
 #define ADDR_MOVIES_CTOR         0x0044DFA0u  /* thiscall obj *(obj, bmp) */
 #define VTABLE_MOVIES            0x0046FACCu
@@ -5558,6 +5566,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MP_NAME_CTOR      0x004329A0u /* thiscall, ret 0x24 */
 #define VTABLE_MP_NAME         0x0046FA48u
 #define ADDR_ON_MP_NAME        0x00432D50u
+/* The name button's own destructor pair. It derives from the BASE WIDGET and
+ * not from the dialog, so this one jumps to ADDR_WIDGET_DESTRUCT -- which is
+ * what says the three row buttons are widgets in a panel rather than dialogs
+ * of their own. */
+#define ADDR_MP_NAME_DELETE    0x00432A40u /* thiscall obj *(obj, flags) */
+#define ADDR_MP_NAME_DESTRUCT  0x00432A60u /* thiscall void(obj) */
 #define AM2_MP_NAME_SIZE       0x74u
 #define MPBTN_OFF_ROW          0x58u   /* which player row, in every one */
 #define MPNAME_OFF_TEXT        0x68u   /* const char *, the name shown */

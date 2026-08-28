@@ -1043,12 +1043,14 @@ AM2_Widget *__attribute__((thiscall)) DialogDelete(AM2_Widget *w, int32_t flags)
     return w;
 }
 
-/* One per dialog class. See widget.h for why this is a macro. */
-#define AM2_DIALOG_DTOR(name, vt)                                        \
+/* One per class. See widget.h for why this is a macro. The BASE is a
+ * parameter because the shape is not the dialogs' alone: the multiplayer name
+ * button has the identical pair and jumps to WidgetDestruct instead. */
+#define AM2_CLASS_DTOR(name, vt, base)                                   \
     void __attribute__((thiscall)) name##Destruct(AM2_Widget *w)             \
     {                                                                        \
         w->vtable = (void *)AM2_IMAGE(vt);                                   \
-        DialogDestruct(w);                                                   \
+        base(w);                                                             \
     }                                                                        \
     AM2_Widget *__attribute__((thiscall)) name##Delete(AM2_Widget *w,        \
                                                        int32_t flags)        \
@@ -1058,6 +1060,8 @@ AM2_Widget *__attribute__((thiscall)) DialogDelete(AM2_Widget *w, int32_t flags)
             am2_free(w);                                                     \
         return w;                                                            \
     }
+
+#define AM2_DIALOG_DTOR(name, vt) AM2_CLASS_DTOR(name, vt, DialogDestruct)
 
 AM2_DIALOG_DTOR(DlgSelectMap, VTABLE_DLG_SELECTMAP)
 AM2_DIALOG_DTOR(DlgDifficulty, VTABLE_DLG_DIFFICULTY)
@@ -1074,6 +1078,10 @@ AM2_DIALOG_DTOR(DlgNameEntry, VTABLE_DLG_NAMEENTRY)
 AM2_DIALOG_DTOR(DlgLoadGame, VTABLE_DLG_LOADGAME)
 AM2_DIALOG_DTOR(DlgMessage, VTABLE_DLG_MESSAGE)
 AM2_DIALOG_DTOR(DlgGameMenu, VTABLE_DLG_GAMEMENU)
+
+AM2_DIALOG_DTOR(CommPanel, VTABLE_COMM_PANEL)
+AM2_DIALOG_DTOR(BattleJoin, VTABLE_BATTLE_JOIN)
+AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
 
 void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w)
 {
@@ -6487,6 +6495,21 @@ int widget_install(void)
                         "DialogDestruct", 1);
     rc |= patch_replace(ADDR_DIALOG_DELETE, (const void *)DialogDelete,
                         "DialogDelete", 1);
+    rc |= patch_replace(ADDR_COMM_PANEL_DESTRUCT,
+                        (const void *)CommPanelDestruct,
+                        "CommPanelDestruct", 1);
+    rc |= patch_replace(ADDR_COMM_PANEL_DELETE, (const void *)CommPanelDelete,
+                        "CommPanelDelete", 1);
+    rc |= patch_replace(ADDR_BATTLE_JOIN_DESTRUCT,
+                        (const void *)BattleJoinDestruct,
+                        "BattleJoinDestruct", 1);
+    rc |= patch_replace(ADDR_BATTLE_JOIN_DELETE,
+                        (const void *)BattleJoinDelete,
+                        "BattleJoinDelete", 1);
+    rc |= patch_replace(ADDR_MP_NAME_DESTRUCT, (const void *)MpNameDestruct,
+                        "MpNameDestruct", 1);
+    rc |= patch_replace(ADDR_MP_NAME_DELETE, (const void *)MpNameDelete,
+                        "MpNameDelete", 1);
     rc |= patch_replace(ADDR_DLG_SELECTMAP_DESTRUCT,
                         (const void *)DlgSelectMapDestruct,
                         "DlgSelectMapDestruct", 1);

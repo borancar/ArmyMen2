@@ -607,27 +607,40 @@ AM2_Widget *__attribute__((thiscall)) DialogDelete(AM2_Widget *w,
  * They are written as a macro rather than fifteen transcriptions for the
  * reason CommEndSetup is written once: fifteen chances to mistype a vtable
  * address is not fifteen pieces of evidence. The names come from the bitmap
- * each constructor loads, which is the only thing that distinguishes them. */
-#define AM2_DECLARE_DIALOG_DTOR(name)                                        \
+ * each constructor loads, which is the only thing that distinguishes them.
+ *
+ * Three more classes have the identical pair and are declared with the same
+ * macro below, which is why it is named for the SHAPE and not for the dialog:
+ * the comm channel panel, the battle-join screen, and the multiplayer name
+ * button -- and that last one jumps to WidgetDestruct rather than to
+ * DialogDestruct, so the base is a parameter on the definition side. */
+#define AM2_DECLARE_CLASS_DTOR(name)                                         \
     void __attribute__((thiscall)) name##Destruct(AM2_Widget *w);            \
     AM2_Widget *__attribute__((thiscall)) name##Delete(AM2_Widget *w,        \
                                                        int32_t flags)
 
-AM2_DECLARE_DIALOG_DTOR(DlgSelectMap);
-AM2_DECLARE_DIALOG_DTOR(DlgDifficulty);
-AM2_DECLARE_DIALOG_DTOR(DlgQuitGame);
-AM2_DECLARE_DIALOG_DTOR(DlgReplay);
-AM2_DECLARE_DIALOG_DTOR(DlgAudio);
-AM2_DECLARE_DIALOG_DTOR(DlgOptions);
-AM2_DECLARE_DIALOG_DTOR(DlgDelGame);
-AM2_DECLARE_DIALOG_DTOR(DlgOverwrite);
-AM2_DECLARE_DIALOG_DTOR(DlgDelPlayer);
-AM2_DECLARE_DIALOG_DTOR(DlgControls);
-AM2_DECLARE_DIALOG_DTOR(DlgSelectPlayer);
-AM2_DECLARE_DIALOG_DTOR(DlgNameEntry);
-AM2_DECLARE_DIALOG_DTOR(DlgLoadGame);
-AM2_DECLARE_DIALOG_DTOR(DlgMessage);
-AM2_DECLARE_DIALOG_DTOR(DlgGameMenu);
+AM2_DECLARE_CLASS_DTOR(DlgSelectMap);
+AM2_DECLARE_CLASS_DTOR(DlgDifficulty);
+AM2_DECLARE_CLASS_DTOR(DlgQuitGame);
+AM2_DECLARE_CLASS_DTOR(DlgReplay);
+AM2_DECLARE_CLASS_DTOR(DlgAudio);
+AM2_DECLARE_CLASS_DTOR(DlgOptions);
+AM2_DECLARE_CLASS_DTOR(DlgDelGame);
+AM2_DECLARE_CLASS_DTOR(DlgOverwrite);
+AM2_DECLARE_CLASS_DTOR(DlgDelPlayer);
+AM2_DECLARE_CLASS_DTOR(DlgControls);
+AM2_DECLARE_CLASS_DTOR(DlgSelectPlayer);
+AM2_DECLARE_CLASS_DTOR(DlgNameEntry);
+AM2_DECLARE_CLASS_DTOR(DlgLoadGame);
+AM2_DECLARE_CLASS_DTOR(DlgMessage);
+AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
+
+/* Original: 0x0042ECC0/0x0042ECE0, 0x0042F850/0x0042F870 and
+ * 0x00432A40/0x00432A60 -- the same pair for the COMM. CHANNEL SELECT panel,
+ * the battle-join screen and one multiplayer row's name button. */
+AM2_DECLARE_CLASS_DTOR(CommPanel);
+AM2_DECLARE_CLASS_DTOR(BattleJoin);
+AM2_DECLARE_CLASS_DTOR(MpName);
 
 /* Original: 0x004569A0, slot 1 of the typewriter label. Draw the revealed
  * prefix of the wrapped text, one call per `|`-separated line, each twelve
