@@ -5946,6 +5946,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define SUBREC_OFF_COUNT       0x04u
 #define SUBREC_OFF_ROWS        0x08u
 #define SUBREC_OFF_CAPACITY    0x0Cu
+/* 0x00434E60, three callers. Clear bit 0 on every row the sub-list holds, so
+ * none of them draws. Two of the three call it right after testing
+ * OBJ_FLAG_DESTROYED, so this is what taking a destroyed object off the screen
+ * looks like from the sub-list's side. Name ours. */
+#define ADDR_SUBREC_HIDE_ROWS  0x00434E60u  /* void(void *subrec) */
 /* The object's REGISTRATION table -- a byte count and an array of 0x10-byte
  * entries, each holding the index of the cell list it is linked into. -1 is
  * "not linked", which is what the teardown writes back. */

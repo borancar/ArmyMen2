@@ -17,6 +17,7 @@
 #include "objtype.h"
 #include "crt.h"           /* am2_malloc -- the game's own heap */
 #include "objtable.h"
+#include "objflag.h"       /* ObjFlagClear0 -- reconstructed */
 #include "misc.h"          /* CommArmyOfSlot -- reconstructed */
 #include "../inject/patch.h"
 
@@ -173,6 +174,36 @@ int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
 
 
 
+/* 0x00434E60, three callers. Clear bit 0 on every row the sub-list holds, so
+ * none of them draws.
+ *
+ * ITS ARGUMENT IS THE SUB-LIST HEADER, not the object. The count it reads is
+ * at +0x04 and the rows at +0x08, which are SUBREC_OFF_COUNT and
+ * SUBREC_OFF_ROWS -- the same two dwords the object reaches as
+ * OBJ_OFF_ROW_COUNT and OBJ_OFF_ROWS at +0x70 and +0x74, seen from
+ * OBJ_OFF_SUBRECORD instead. That pair of names was already in orig.h, which
+ * is what turned "a struct with a count at +4" into a certainty rather than a
+ * guess; the callers hand it a pointer they are already holding.
+ *
+ * The count is RE-READ every iteration, as it is in StepObjRows and
+ * ObjTileChanged -- four functions in this tree now, so it is the compiler's
+ * habit and not any of them allowing the body to change it.
+ *
+ * Two of the three callers test OBJ_FLAG_DESTROYED immediately before, so this
+ * is what taking a destroyed object off the screen looks like from the
+ * sub-list's side. The third does not, which is why the name says what it does
+ * rather than why.
+ */
+void __cdecl SubrecHideRows(void *subrec)
+{
+    uint8_t *sr = (uint8_t *)subrec;
+    int32_t  i;
+
+    for (i = 0; i < *(const int32_t *)(sr + SUBREC_OFF_COUNT); i++)
+        ObjFlagClear0(*(uint8_t **)(sr + SUBREC_OFF_ROWS)
+                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
+}
+
 /* 0x00434060, eight callers. Make a list: a 0x30-byte header carrying an
  * owner, a count and a pointer, plus a copy of `count` twelve-byte records.
  *
@@ -238,6 +269,8 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_OBJ_IS_ITEM, (const void *)ObjIsItem, "ObjIsItem", 1);
     rc |= patch_replace(ADDR_MAKE_RECORD_LIST, (const void *)MakeRecordList,
                         "MakeRecordList", 8);
+    rc |= patch_replace(ADDR_SUBREC_HIDE_ROWS, (const void *)SubrecHideRows,
+                        "SubrecHideRows", 3);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);
     rc |= patch_replace(ADDR_TYPE2_FIELD5A4_SET, (const void *)Type2Field5A4Set,
                         "Type2Field5A4Set", 4);
