@@ -5,80 +5,71 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `e6243ed`. Working tree clean.
+Last updated: **2026-08-28**, at `64f7295`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-Four functions and one comment-only commit since the last snapshot, 973 to
-977 patches. **Three `orig.h` names were wrong and a fourth was better than
-the one I invented**, which is the thread running through all of it.
+Five functions since the last snapshot, 977 to 982 patches, and the BlockWeight
+family is finished.
 
-- **`SoldierKindForWeapon`** (`0x00449660`, sixteen callers) was
-  `ADDR_UNIT_ACTION`, "void(obj, action) -- 44 arms". Neither half was right.
-  The argument is a WEAPON CODE -- what `HeldWeaponCode` returns and what
-  `SelectInventorySlot` already indexes `ADDR_WEAPON_HANDLERS` with. And
-  there are SEVEN arms: the 44 is the length of a dense switch's byte index
-  table. The same mistake would make `ThingCode` 39 behaviours instead of 17.
+- **`HudMessage`** (`0x004144A0`) -- the most-called thing left. Its second
+  argument is a COLOUR and it becomes part of the string: a non-zero colour
+  writes `'^'` and the byte ahead of the text. The width is measured on the
+  TEXT, not on what was stored. The x position chains off the previous row,
+  floored at 640, so a burst of messages steps rightwards from the edge.
 
-- Code 0 is the one arm that writes nothing and it is **not dead**:
-  `0x00448220` sets the kind to 8 by hand and then calls this with 0, so "no
-  weapon" must leave the kind alone or that sequence undoes itself.
+- **46 callers and not one of them runs.** 0 on Boot Camp and 0 on the
+  campaign, and the counter is not blind -- forty-four callers are still the
+  original's. So the log is for events no drive here produces.
 
-- **`SetPointerMode`** (`0x00414430`, ten callers) -- seven 40-byte records,
-  five fields each installed into fixed globals. The name is OURS and is
-  grounded in the three readers, none of which is in the function: a pick
-  predicate called per object down `OBJ_OFF_QUERY_NEXT`, an action called
-  only when `ADDR_MOUSE_BUTTON` is clear, and an overlay row handed to
-  `OverlayPrepare`.
+- **`ObjsAreAllied`** (`0x004574D0`) -- AllyFlag with four exceptions. A
+  multiplayer kind 7 is allied only to another kind 7; army 4 is allied to
+  everything; sharing an object-table record is alliance. **Both null tests
+  are useless and both are reproduced**: each jumps to code that dereferences
+  the pointer it just tested.
 
-- **The five stores are not in record order** -- E0, E4, E8, EC, F4 take
-  fields +0, +4, +0x10, +0x14, +0x0C, so the overlay is written last and
-  comes from the middle. Same trap the weapon handler slots carry. Two of the
-  seven modes fire their action once and revert to 0, so "set the mode" and
-  "do it now" are one entry point and which happens is a property of the
-  TABLE. The table is seven records because the eighth slot is where the
-  string `"Rifleman"` begins.
+- **`BlockWeightTroops`** (`0x0045B7E0`) -- the third variant, blocked on the
+  above. A trooper blocks only if it is an ENEMY, and not even then for the
+  unit the player is driving (army is the default owner, the owner object is
+  riding the viewer, and `OBJ_OFF_FIELD_10C` is zero).
 
-- **`SetAnimFrame`** (`0x0040A1A0`, eleven callers) -- **four of its frame
-  values are not frames.** -2 returns, -1 means the frame already set, 0
-  clears bit 0 of the row and returns, and only then is it an id. A
-  range-check on the id would swallow three of the four. The search falls
-  back to entry 0 rather than failing, and the row is still told it is on the
-  frame that was asked for.
+- **It is the one the game uses: 2,039,745 calls** against `BlockWeightAt`'s
+  8 and `BlockWeightChain`'s 0 on the same run. The two cold ones were
+  reconstructed first and written up as the general case. This is the general
+  case, and its terrain bit is `AM2_TILE_BLOCKS` -- so `BlockWeightChain`,
+  not this, is the odd one out on that bit.
 
-- `checkseams` earned its keep here: `item.cpp` had an `orig_set_anim_frame`
-  on the address, and the check failed the build rather than letting three
-  call sites detour into our own code under a name saying the opposite.
+- **`LoadBitmap`** (`0x004462F0`) -- makes a sprite and fills
+  `AM2_Sprite::source` with an ABSOLUTE path, which is the point: the game
+  chdirs into the map directory during a load, so a relative name would stop
+  resolving and a lost surface could not be rebuilt.
 
-- **`SetUnitPose`** (`0x0040D930`, nine callers) -- and **the alias ratchet
-  found a better name than the one I gave it.** It went in calling the
-  argument a state, with a fresh name on the table it indexes; the build
-  failed at 22 aliases against a baseline of 21, because `0x00474FE0` was
-  already `ADDR_WEAPON_POSE_FRAMES`. Everything then agreed: the three
-  `OBJ_OFF_HEIGHT_ADJ` values are 8, 0x10 and 0x18, three heights, and
-  stand/kneel/prone are the three words `setaipose` takes.
+- **`windows.h` renamed it twice.** `winuser.h` defines `LoadBitmap` as
+  `LoadBitmapA`, so the definition silently became `LoadBitmapA` and the link
+  failed -- then the selftest stub did it again through `loadimage.h`. Undone
+  in `win32.h` beside the `DrawText` undef that exists for the same reason.
 
-- Its first switch does not choose the pose, it chooses how to get there --
-  six poses interrupt, nine QUEUE and fall through, the rest do nothing. The
-  interrupt flag starts as "the pose we are leaving is 1" and no arm clears
-  it. The queue is what survives the wait.
+- **`TraceTileLine`** (`0x0042E390`) -- the tiles a line crosses.
+  `TileOfPoint` runs ONCE; after that the index is stepped by ±1 and by
+  ±`ADDR_MAP_TILES_W`, so an index running off a row wraps into the next
+  rather than being clipped. The major axis is compared for EQUALITY with its
+  target, which is why a zero-length line writes one tile and stops.
 
-- **Coverage was measured every time and it is uneven, which is the point of
-  measuring.** `SetUnitPose` 26,057 and `SetAnimFrame` 12,399 on one driven
-  mission -- so more than half of the poses stop at a guard, which is the
-  first direct evidence either fires. `SoldierKindForWeapon` 6.
-  `SetPointerMode` **1**, mode 0 at mission start, and the source says so:
-  its store order, its fire-once modes and every mode above 0 are verified by
-  reading.
+- **Coverage, measured every time and honest about the gaps.**
+  `BlockWeightTroops` 2,039,745. `TraceTileLine` 35 -- enough to compare, not
+  enough to claim which of its two loops ran. `LoadBitmap` 2, and its source
+  path is unread until DirectDraw takes a surface back, which nothing under
+  Xvfb does. `ObjsAreAllied` 2, with both multiplayer arms unreachable since
+  `ADDR_MP_SESSION` is 0 on every drive. `HudMessage` 0.
 
-- **`SolvePair` is a second witness** to the region fix two snapshots back
-  (comments only). It writes the stamp into `cost[][]` on BOTH exits, so
-  "stamped" can only mean "answered", and its first act reads
-  `regions[to] + 4`, which is `REGION_OFF_ACTIVE` read by a third function
-  that never says the word. It is left original: 416 bytes, two nested loops
-  over a 258-entry path buffer, and nothing here would catch an error in it.
+- **Three seams crossed the flat/win32 split**, and the pattern is now
+  settled: a flat module forward-declares the win32-side function the way
+  `script.cpp` declares `PreloadSprite`, with `extern "C"` because every
+  header here is one. `event.cpp`'s declaration returns `void *` where the
+  definition returns `AM2_Sprite *`; C linkage hides that from the linker, so
+  it is written down in both places and in the selftest stub.
 
 ## Next
 
