@@ -5,28 +5,26 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `5d723b9`. Working tree clean.
+Last updated: **2026-08-27**, at `c23f9ea`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`SubrecHideRows`** (`0x00434E60`, three callers) -- clear bit 0 on every row
-  the sub-list holds, so none of them draws. 960 patches.
+- **`HudPanelWidth`** (`0x0041A170`, three callers) -- the width of the HUD
+  panel, or 0 when there is none. 961 patches.
 
-- **Its argument is the sub-list header, not the object**, and that is the
-  whole difficulty of a 48-byte function. It reads a count at `+0x04` and rows
-  at `+0x08`, which look like nothing until you notice they are
-  `SUBREC_OFF_COUNT` and `SUBREC_OFF_ROWS` -- the same two dwords the object
-  reaches as `OBJ_OFF_ROW_COUNT` and `OBJ_OFF_ROWS`, seen from
-  `OBJ_OFF_SUBRECORD` instead. That pair was already in `orig.h` with a comment
-  saying exactly that. **Reading a small function is often a matter of
-  recognising which struct the offsets belong to, and this file already knew.**
+- **The callers are what make it a width.** On its own it is a subtraction of
+  two fields of a rect, which could as easily be a coordinate; each of the
+  three computes `ADDR_SCREEN_W` minus it and clamps a horizontal position to
+  the result -- "keep the thing left of the HUD panel". Three sites doing the
+  same thing with the answer is what settles the reading; one would not have.
 
-- Two of the three callers test `OBJ_FLAG_DESTROYED` immediately before, so
-  this is what taking a destroyed object off the screen looks like from the
-  sub-list's side. The third does not, which is why the name says what it does
-  and not why.
+- **The null answer of 0 is load-bearing.** It makes that clamp the whole
+  screen, so a missing panel needs no special case at any of the three sites. A
+  reconstruction answering the screen width for a null -- which would look more
+  careful -- would clamp everything to zero. The tidier version of a two-line
+  function is the one to be suspicious of.
 
 ## Next
 
