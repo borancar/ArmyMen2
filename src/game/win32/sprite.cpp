@@ -1723,6 +1723,76 @@ AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags)
     return spr;
 }
 
+/* 0x00414AD0, two callers. The sprite-index offset for the player's own army.
+ *
+ * It is CommArmyOfSlot on ADDR_DEFAULT_OWNER, clamped, times a hundred -- and
+ * the original writes that multiply as two `lea eax,[eax+eax*4]` and a shift,
+ * which is 25 then 4. Written as the hundred it is.
+ *
+ * ANYTHING ABOVE 3 BECOMES 0, so army 4 -- the neutral army -- shares army
+ * zero's block rather than reading past the table. The compare is signed, so a
+ * negative army would pass it and index backwards; no army is negative.
+ */
+int32_t __cdecl ArmySpriteBase(void)
+{
+    int32_t army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                  (int32_t)*(const uint32_t *)
+                                      (uintptr_t)ADDR_DEFAULT_OWNER);
+
+    if (army > 3)
+        army = 0;
+
+    return army * AM2_ARMY_SPRITE_BLOCK;
+}
+
+/* 0x00414B00, sixteen callers. PreloadSprite with the army's block added to
+ * the index, and a fallback to the shared one.
+ *
+ * So the sprite table is a hundred indices per army over a shared block
+ * beneath: the coloured sprite is tried first, and if it is not there the
+ * uncoloured one is. That is the whole design and neither function says it
+ * alone -- the offset function has no idea what it is an offset into, and this
+ * one would look like a plain wrapper without it.
+ *
+ * ARMY 0 NEVER RETRIES, and not by a special case: its offset is already zero,
+ * so the retry is guarded on the offset being non-zero and the two calls would
+ * be identical. Reproduced as the guard it is rather than as a comparison
+ * against army 0, which is what it means but not what it tests.
+ *
+ * `addref` is 1 on both calls, so every hit counts another holder. The
+ * fallback's result is returned as it comes; a second failure answers NULL and
+ * nothing here says so to the log.
+ *
+ * functions.tsv runs this together with its neighbour and reports 752 bytes
+ * with sixteen callers. The function is 74 bytes; the sixteen are its own,
+ * functions.tsv runs this together with its neighbour and reports 752 bytes
+ * with sixteen callers. The function is 74 bytes; the sixteen are its own,
+ * every one of them a call to this exact address.
+ *
+ * MEASURED AT 70 CALLS on a driven Boot Camp mission, with ArmySpriteBase
+ * at 1 -- the other caller is this one, by name, so that runs 71 times.
+ * PreloadSprite reads 597 from its other callers.
+ *
+ * WHAT THOSE 70 DO NOT COVER IS THE POINT OF THE FUNCTION. The player is
+ * army 0 on this drive, so ArmySpriteBase returns 0, the index is passed
+ * through unchanged and the retry is guarded off entirely. Every one of the
+ * seventy exercised a plain forward to PreloadSprite. The offset, the clamp
+ * and the fallback all need a player who is not army 0 -- which means a
+ * multiplayer session, and no drive here has one. Said plainly rather than
+ * left to read as seventy calls of coverage. */
+void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
+                                int32_t flags)
+{
+    int32_t base = ArmySpriteBase();
+    void   *spr;
+
+    spr = PreloadSprite(set, index + base, frame, flags, 1);
+    if (spr || base <= 0)
+        return spr;
+
+    return PreloadSprite(set, index, frame, flags, 1);
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -1770,6 +1840,11 @@ int sprite_install(void)
                         "SpriteReloadNamed", 4);
     rc |= patch_replace(ADDR_LOAD_BITMAP, (const void *)LoadBitmap,
                         "LoadBitmap", 9);
+    rc |= patch_replace(ADDR_ARMY_SPRITE_BASE, (const void *)ArmySpriteBase,
+                        "ArmySpriteBase", 2);
+    rc |= patch_replace(ADDR_PRELOAD_ARMY_SPRITE,
+                        (const void *)PreloadArmySprite,
+                        "PreloadArmySprite", 16);
     rc |= patch_replace(ADDR_SPRITE_REBUILD_DF, (const void *)SpriteRebuildDf,
                         "SpriteRebuildDf", 1);
     rc |= patch_replace(ADDR_SPRITE_REBUILD_ALT, (const void *)SpriteRebuildAlt,

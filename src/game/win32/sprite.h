@@ -199,6 +199,14 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
                                   int32_t flags, int32_t addref);
 void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
+/* 0x00414AD0 and 0x00414B00. The sprite table has a hundred indices per army
+ * over a shared block: the first gives the player's own army's offset, and the
+ * second preloads with it, falling back to the shared index when the coloured
+ * one is not there. */
+int32_t __cdecl ArmySpriteBase(void);
+void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
+                                int32_t flags);
+
 /* Original: 0x00445990. A sprite id to its SLOT in the sprite table, or -1.
  * A binary search over a SECOND table of {id, slot} pairs kept sorted by id,
  * with an UNSIGNED comparison. */

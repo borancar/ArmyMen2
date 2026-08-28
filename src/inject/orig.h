@@ -2918,6 +2918,18 @@ typedef struct {
 /* What the preloadsprite statement drives. Named from the filenames its
  * callee at 0x004457E0 builds -- "%02d_%03d_%02d_*.bmp" and the matching
  * ".sha" -- so the statement's three integers are a sprite identity triple. */
+/* 0x00414AD0 and 0x00414B00, and the pair only makes sense together. The
+ * first turns the player's own army into a SPRITE INDEX offset -- army times
+ * 100, with anything above 3 clamped to 0, so army 4 shares army 0's block.
+ * The second adds that offset to an index and calls PreloadSprite, retrying
+ * with the raw index when the load failed AND the offset was non-zero. So the
+ * sprite table has a hundred indices per army and a shared block beneath, and
+ * army 0 never retries because its offset is already zero. Reconstructed --
+ * and 70 calls on a driven Boot Camp mission cover none of that, because the
+ * player is army 0 there and the offset is 0. */
+#define ADDR_ARMY_SPRITE_BASE     0x00414AD0u  /* int32_t(void) */
+#define ADDR_PRELOAD_ARMY_SPRITE  0x00414B00u  /* void *(set,index,frame,flags) */
+#define AM2_ARMY_SPRITE_BLOCK     100
 #define ADDR_PRELOAD_SPRITE       0x00445B00u
 /* 0x00445AD0, 15 callers: the same thing addressed by a PACKED KEY. It splits
  * the key into PackKey's three fields and passes them as the first three
