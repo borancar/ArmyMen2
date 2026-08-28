@@ -287,6 +287,10 @@ int32_t __cdecl CanPickUp(void *obj);
  * record; idempotent, and what stops ObjsAreAllied choosing REC3 again. */
 void __cdecl ObjDropAltRecord(void *obj);
 
+/* 0x00447570. An unused index into ADDR_SOLDIER_NAMES, marked taken. Returns
+ * the random starting index unmarked when every name is gone. */
+int32_t __cdecl TakeSoldierName(void);
+
 /* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);

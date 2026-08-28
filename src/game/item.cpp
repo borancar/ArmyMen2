@@ -330,6 +330,56 @@ void __cdecl ObjDropAltRecord(void *obj)
     SetFieldInAll(o + OBJ_OFF_SUBRECORD, rec);
 }
 
+/* 0x00447570, one caller. Take an unused soldier name.
+ *
+ * ADDR_SOLDIER_NAMES is 62 records of {taken, const char *} holding
+ * "R. Pavey", "D. Lee", "D. Fruin", "A. Muolic", "J. Wildblood" and the rest
+ * of the team -- so a trooper is named after whoever made the game. The index
+ * this returns goes into OBJ_OFF_NAME_INDEX.
+ *
+ * It starts at `rand() % 62` and walks FORWARD to the first free entry,
+ * wrapping once. So the names are handed out in table order from a random
+ * start, not randomly -- two troopers made in the same moment get adjacent
+ * names, which is a different thing from what "random name" suggests.
+ *
+ * IF EVERY NAME IS TAKEN IT RETURNS THE STARTING INDEX WITHOUT MARKING IT, so
+ * the caller gets a name already in use rather than a failure. That is the arm
+ * the wrap test reaches, and it is the only exit that does not set the flag --
+ * which also means the table's taken-count cannot exceed 62 however many
+ * troopers are made.
+ *
+ * Nothing here ever CLEARS a taken flag, and nothing else in the image writes
+ * that column either. So the supply is not returned when a trooper dies: the
+ * sixty-third name is a repeat for the rest of the session.
+ *
+ * The modulo is an unsigned `div`, which matters not at all -- ADDR_GAME_RAND
+ * answers 0..0x7FFF -- and is written as the unsigned remainder it is.
+ *
+ * Measured at 0 on a driven Boot Camp mission: its one caller makes a trooper,
+ * and that mission's troopers are placed during load by a different path. The
+ * counter is not blind. Verified by reading, and by a table whose contents say
+ * unambiguously what it hands out.
+ */
+int32_t __cdecl TakeSoldierName(void)
+{
+    uint8_t *tab   = (uint8_t *)AM2_IMAGE(ADDR_SOLDIER_NAMES);
+    /* orig_rand's macro is defined further down this file, past here. */
+    int32_t  start = (int32_t)((uint32_t)
+        ((int32_t (__cdecl *)(void))AM2_IMAGE(ADDR_GAME_RAND))()
+        % AM2_SOLDIER_NAMES);
+    int32_t  i     = start;
+
+    while (*(const int32_t *)(tab + (size_t)i * 8)) {
+        if (++i >= AM2_SOLDIER_NAMES)
+            i = 0;
+        if (i == start)
+            return start;               /* all taken; not marked */
+    }
+
+    *(int32_t *)(tab + (size_t)i * 8) = 1;
+    return i;
+}
+
 void *__cdecl WeaponByUid(uint32_t uid)
 {
     uint32_t *obj;
@@ -4338,6 +4388,8 @@ void item_install(void)
     patch_replace(ADDR_CAN_PICK_UP, (const void *)CanPickUp, "CanPickUp", 1);
     patch_replace(ADDR_OBJ_DROP_ALT_RECORD, (const void *)ObjDropAltRecord,
                   "ObjDropAltRecord", 1);
+    patch_replace(ADDR_TAKE_SOLDIER_NAME, (const void *)TakeSoldierName,
+                  "TakeSoldierName", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,

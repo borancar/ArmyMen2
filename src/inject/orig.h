@@ -3311,7 +3311,20 @@ typedef struct {
 /* Four fields SetSoldierKind writes and nothing read so far explains. 0x578 is
  * cleared for EVERY kind; the other three belong to kind 7. */
 #define OBJ_OFF_FIELD_578        0x578u  /* int32_t, cleared unconditionally */
+/* TWO name indices, four bytes apart, and both live -- ten sites each. +0x5A8
+ * is the kind-7 one, into ADDR_KIND7_NAMES, which SetSoldierKind writes. +0x5AC
+ * is a different table entirely: ADDR_SOLDIER_NAMES, 62 records of
+ * {taken, const char *} holding "R. Pavey", "D. Lee", "J. Wildblood" and the
+ * rest of the team. ADDR_TAKE_SOLDIER_NAME hands out an index into it. */
 #define OBJ_OFF_FIELD_5A8        0x5A8u  /* int32_t, the random name index */
+#define OBJ_OFF_NAME_INDEX       0x5ACu  /* into ADDR_SOLDIER_NAMES */
+#define ADDR_SOLDIER_NAMES       0x00489BFCu  /* {int32 taken; const char *} */
+#define AM2_SOLDIER_NAMES        0x3E         /* 62 of them */
+/* 0x00447570, one caller. Take an unused soldier name: start at a random
+ * index, walk forward to the first free one, mark it and return it. If every
+ * name is taken it returns the STARTING index without marking, so the caller
+ * gets a name already in use rather than a failure. Reconstructed. */
+#define ADDR_TAKE_SOLDIER_NAME   0x00447570u  /* int32_t(void) */
 #define AM2_ANIM_TABLE_BYTES     8u      /* ADDR_SOLDIER_ANIMS' stride */
 #define AM2_MP_ROLE_SEVEN        7
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
