@@ -1886,10 +1886,15 @@
 /* The HUD's message LOG, inside ADDR_HUD_WIDGET_A. Twelve rows of 88 bytes at
  * +0x6C, a live count at +0x594, and a running total of characters at +0x59C.
  * A row is text at +0, an x position as a FLOAT at +0x50, and the text's width
- * at +0x54 -- so the text has 80 bytes and nothing checks that. */
+ * at +0x54 -- so the text has 80 bytes and nothing checks that.
+ *
+ * +0x59C went in as a "running total of characters" because that is what
+ * HudMessage adds to it. HudTopUpdate is what says why: it DRAINS it, one a
+ * frame at AM2_HUD_BLIP_MS with a sound each, so it is a budget of radio
+ * blips and a longer message chatters for longer. Renamed accordingly. */
 #define HUDLOG_OFF_ROWS          0x6Cu
 #define HUDLOG_OFF_COUNT         0x594u
-#define HUDLOG_OFF_TOTAL         0x59Cu
+#define HUDLOG_OFF_BLIPS         0x59Cu  /* int32_t, chatter still owed */
 #define AM2_HUD_MSG_SIZE         0x58u   /* 88 */
 #define AM2_HUD_MSG_ROWS         12
 #define HUDMSG_OFF_X             0x50u   /* float */
@@ -1910,6 +1915,51 @@
 #define HUDLOG_OFF_TYPED_X       0x5A8u  /* int32_t, relative to the widget */
 #define HUDLOG_OFF_TYPED_Y       0x5ACu
 #define AM2_HUD_CARET            '_'
+/* The REWIND BUTTON, an 18x21 box at the strip's left + HUDLOG_OFF_BUTTON_X.
+ * Its sprite slot is the one HudTopPaint draws, and the paint reached both
+ * through bare literals until the update named them.
+ *
+ * The hit box is a CONSTANT 18x21 while the drawing is the sprite's own
+ * bounds, so the two agree only because the art matches; nothing enforces it.
+ *
+ * The slot is cleared every frame and re-filled from HOT while the cursor is
+ * over it, or from DOWN while the press is ours -- so a frame that neither
+ * hovers nor holds draws no button at all, including the release frame. */
+#define HUDLOG_OFF_SPRITE_HOT    0x5Cu   /* AM2_Sprite *, cursor over it */
+#define HUDLOG_OFF_SPRITE_DOWN   0x60u   /* AM2_Sprite *, and held */
+#define HUDLOG_OFF_BUTTON_SPRITE 0x64u   /* AM2_Sprite *, what paint draws */
+#define HUDLOG_OFF_BUTTON_X      0x68u   /* int32_t, from the strip's left */
+#define AM2_HUD_BUTTON_W         0x12    /* 18 */
+#define AM2_HUD_BUTTON_H         0x15    /* 21, the strip's own height */
+/* Set by HudChatSend and consumed by the update, which skips its whole input
+ * section for that one frame -- so the release that sent the line cannot also
+ * be read as a press on the strip. */
+#define HUDLOG_OFF_JUST_SENT     0x490u  /* int32_t, one frame only */
+#define HUDLOG_OFF_BLIP_AT       0x5A0u  /* uint32_t, ADDR_TICKS deadline */
+/* While this is a live deadline the scroll offset eases back to 0, so the
+ * button REWINDS the log. A press sets it 100 ms out and is renewed every
+ * frame the button is held; the release sets it 2,000 ms out, which is the
+ * whole of how long the rewind coasts after letting go. */
+#define HUDLOG_OFF_REWIND_AT     0x5A4u  /* uint32_t */
+#define HUDLOG_OFF_VIEW_W        0x5B0u  /* int32_t, past which it scrolls */
+#define AM2_HUD_SCROLL_PPS       230.0f  /* pixels a second, both directions */
+#define AM2_HUD_BLIP_MS          0x78    /* 120, plus 0..31 of jitter */
+#define AM2_HUD_BLIP_JITTER      0x1F
+#define AM2_HUD_REWIND_TAP_MS    0x64    /* 100, while the button is held */
+#define AM2_HUD_REWIND_HOLD_MS   0x7D0   /* 2000, after it is released */
+/* Binding 0x13 -- scancode 0x0E, BACKSPACE by default. It opens the strip's
+ * console, which is the MULTIPLAYER CHAT line and not the cheat entry: what
+ * the send at ADDR_HUD_CHAT_SEND does with the finished line is HudMessage it
+ * locally and broadcast it to the other players. The cheat runner is a
+ * separate path at ADDR_CHEAT_ENTRY. */
+#define AM2_ACTION_CONSOLE       0x13
+/* thiscall. Ends chat entry: clears the typing flag and ADDR_CHAR_HANDLER,
+ * raises HUDLOG_OFF_JUST_SENT, posts the line to the log and sends it to every
+ * comm player. Reached from the update on a mouse RELEASE while typing; the
+ * char handler has its own RETURN path at 0x0041864C. */
+#define ADDR_HUD_CHAT_SEND       0x00418480u  /* void(obj) */
+#define ADDR_HUD_CHAT_CHAR       0x004185C0u  /* the ADDR_CHAR_HANDLER slot */
+#define ADDR_HUD_TOP_UPDATE      0x00418660u  /* thiscall void(obj) */
 #define ADDR_HUD_TOP_PAINT       0x00418A20u  /* thiscall void(obj, RECT) */
 /* Reconstructed. 46 callers and NONE of them runs on any drive here -- 0 on
  * Boot Camp and 0 on the campaign -- so it is verified by reading. */
@@ -6130,8 +6180,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MOUSE_PRESS         0x00485498u
 #define ADDR_MOUSE_ACTIVITY      0x004854B0u  /* set from ADDR_GAME_CLOCK_MS on
                                                * any movement or button change */
-#define ADDR_MOUSE_B0_EXTRA      0x004854B4u  /* zeroed when button 0 goes down;
-                                               * nothing here reads it */
+/* The click ARBITER, and "nothing here reads it" was wrong -- 32 sites do.
+ * PollMouse zeroes it as button 0 goes down, so every press starts unowned;
+ * each HUD panel's update then does `if (!grab && mouseChanged) grab = me`
+ * and acts only while `grab == me`. The first widget to look at a press owns
+ * it and everyone downstream sees a grab that is not theirs and stays quiet,
+ * which is how one click reaches one panel and not the map underneath.
+ *
+ * The token is an ADDRESS and not always the widget's: HudTopUpdate stores
+ * `this + HUDLOG_OFF_BUTTON_SPRITE` when the press is on its rewind button
+ * and plain `this` when it is anywhere else on the strip, so one widget
+ * arbitrates two targets through one global. */
+#define ADDR_MOUSE_GRAB          0x004854B4u  /* AM2_Widget *, or a field of one */
 /* Read from 157 places and written from three, all of them in the state
  * machine -- ADDR_TAKE_MENU_REQUEST is one. What it MEANS is not established;
  * this records only that the mouse stamps it whenever there is input.

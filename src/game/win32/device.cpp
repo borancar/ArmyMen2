@@ -392,7 +392,7 @@ void __cdecl UpdateMouseState(void)
         g_mousePress[n].point = point;
         g_mousePress[n].tick  = tick;
         if (n == 0)
-            *(int32_t *)(uintptr_t)ADDR_MOUSE_B0_EXTRA = 0;
+            *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = 0;
     }
 
     if (g_mouseChanged[0] || g_mouseChanged[1])

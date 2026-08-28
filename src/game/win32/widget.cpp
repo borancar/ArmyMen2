@@ -26,6 +26,7 @@
 #include "startgame.h"
 #include "../../inject/restore.h"
 #include "mapdraw.h"   /* SetDrawTarget -- reconstructed */
+#include "winmain.h"   /* Ticks -- reconstructed */
 
 #include <stdint.h>
 #include <stddef.h>
@@ -215,6 +216,14 @@ typedef void (__cdecl *am2_log_fn)(const char *fmt, ...);
  * which had it as a bare void *. */
 typedef void (__cdecl *am2_char_fn)(uint32_t ch, uint32_t lo, uint32_t hi);
 #define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
+/* The game's own rand, and it has to be: the LCG state at 0x0048CC1C is the
+ * image's, so drawing from ours would leave it untouched. */
+typedef int32_t (__cdecl *am2_rand_fn)(void);
+#define orig_rand         (*(am2_rand_fn)ADDR_GAME_RAND)
+/* The chat send, still the original's: it reaches the comm layer and the name
+ * table below it, neither of which is ours. */
+typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
+#define orig_hud_chat_send (*(am2_chat_send_fn)ADDR_HUD_CHAT_SEND)
 
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
@@ -1410,7 +1419,7 @@ void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w)
  *
  * The gates are the family's: no character handler, no input suppression, and
  * the panel open. Then the shared click arbitration -- claim
- * ADDR_MOUSE_B0_EXTRA if it is free and a button changed, and act only if we
+ * ADDR_MOUSE_GRAB if it is free and a button changed, and act only if we
  * are the claimant.
  */
 void __cdecl HudRadarUpdateBody(AM2_Widget *w);
@@ -1599,13 +1608,15 @@ void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip)
     WidgetPaint(w, clip);
 
     {
-        AM2_Sprite *spr = *(AM2_Sprite *const *)(self + 0x64);
+        AM2_Sprite *spr =
+            *(AM2_Sprite *const *)(self + HUDLOG_OFF_BUTTON_SPRITE);
         AM2_Rect    box, part;
 
         if (!spr)
             return;
 
-        box.left   = *(const int32_t *)(self + 0x68) + w->rect.left;
+        box.left   = *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X)
+                     + w->rect.left;
         box.top    = w->rect.top;
         box.right  = spr->bounds.right + box.left;
         box.bottom = spr->bounds.bottom + box.top;
@@ -1621,6 +1632,207 @@ void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip)
 
         DrawSpriteClipped(spr, box.left, box.top, &part, 0);
     }
+}
+
+/* 0x00418660. The top strip's own update, and the counterpart to the paint
+ * above: everything the paint READS, this is what moves.
+ *
+ * Four things share the function and only the first is obvious.
+ *
+ * THE BLIP BUDGET. HudMessage adds min(len, 10) to HUDLOG_OFF_BLIPS for every
+ * line it posts; this drains it one at a time, roughly every 136 ms, playing
+ * sound 0 each time. So the radio chatter is per CHARACTER and a longer
+ * message chatters for longer. That is what settled the field's name -- from
+ * the writer alone it read as a statistic nothing consumed.
+ *
+ * THE ROW EASE. Row i's target x is the running sum of the widths and gaps of
+ * the rows before it, and each row slides left toward its target at
+ * AM2_HUD_SCROLL_PPS, clamped so it cannot overshoot. The accumulator is also
+ * the total width, which the scroll step below needs, so the two are one loop
+ * in the original and are kept as one here.
+ *
+ * THE SCROLL, which has two modes and they are mutually exclusive:
+ *
+ *   with HUDLOG_OFF_REWIND_AT live, the offset eases to 0 -- the rewind. The
+ *   deadline is cleared once it passes, but the ease runs on that frame
+ *   anyway, which is the original's order and not a tidy-up opportunity;
+ *
+ *   otherwise, and only if the rows are wider than HUDLOG_OFF_VIEW_W, it eases
+ *   toward the x of the oldest row that still fits. That row is found by
+ *   walking BACK from the newest subtracting widths, so the newest message is
+ *   the one guaranteed to be on screen.
+ *
+ * THE REWIND BUTTON, which is where ADDR_MOUSE_GRAB earns its comment. The
+ * strip claims a press on the button as `this + HUDLOG_OFF_BUTTON_SPRITE` and
+ * a press anywhere else on itself as `this`, so one widget arbitrates two
+ * targets through one global -- and the entry test at the very top, which
+ * fires the frame AFTER a release, is how the button's grab is given back.
+ *
+ * Two things are reproduced rather than tidied. The typing branch re-tests
+ * HUDLOG_OFF_TYPING after having already branched on it, which cannot fail.
+ * And the sprite slot is cleared before the hit tests and refilled only on the
+ * hover and held paths, so the release frame draws no button at all.
+ *
+ * The hit box is a constant AM2_HUD_BUTTON_W x AM2_HUD_BUTTON_H at the same
+ * origin the paint draws the sprite from -- so the two agree only because the
+ * art is that size. Naming both from here is what made that visible; the paint
+ * had reached the pair through bare literals.
+ */
+void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w)
+{
+    uint8_t    *self    = (uint8_t *)w;
+    AM2_Widget *button  = (AM2_Widget *)(self + HUDLOG_OFF_BUTTON_SPRITE);
+    AM2_Widget *grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+    float      *scroll  = (float *)(self + HUDLOG_OFF_SCROLL);
+    float       step    = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                          * AM2_HUD_SCROLL_PPS;
+    RECT        hot;
+    int32_t     i, n;
+    float       acc;
+
+    /* The frame after a press on the button was released. */
+    if (grab == button) {
+        *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
+            Ticks() + AM2_HUD_REWIND_HOLD_MS;
+        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = NULL;
+    }
+
+    WidgetUpdate(w);
+
+    if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
+        if (PointInRect((const AM2_Rect *)&w->rect,
+                        (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+        else
+            w->focusedChild = NULL;
+
+        /* A RELEASE anywhere sends the line. The typing test below is the
+         * original's and is already known true. */
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+            && *(const int32_t *)(self + HUDLOG_OFF_TYPING))
+            orig_hud_chat_send(w);
+        return;
+    }
+
+    if (*(const int32_t *)(self + HUDLOG_OFF_JUST_SENT)) {
+        *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
+    } else if (ActionKeyPressed(AM2_ACTION_CONSOLE)) {
+        PlaySoundAt(0, 0, 0, 0, 0);
+        g_charHandler = (am2_char_fn)(uintptr_t)ADDR_HUD_CHAT_CHAR;
+        *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
+    } else {
+        if (*(const int32_t *)(self + HUDLOG_OFF_BLIPS) > 0
+            && Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_BLIP_AT)) {
+            uint32_t jitter;
+
+            PlaySoundAt(0, 0, 0, 0, 0);
+            /* rand first, then the clock: the original's order, and the LCG
+             * state is the image's, so the sequence is shared. */
+            jitter = (uint32_t)orig_rand() & AM2_HUD_BLIP_JITTER;
+            *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT) =
+                jitter + Ticks() + AM2_HUD_BLIP_MS;
+            *(int32_t *)(self + HUDLOG_OFF_BLIPS) -= 1;
+        }
+
+        acc = 0.0f;
+        n   = *(const int32_t *)(self + HUDLOG_OFF_COUNT);
+        for (i = 0; i < n; i++) {
+            uint8_t *row = self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE;
+            float   *x   = (float *)(row + HUDMSG_OFF_X);
+
+            if (*x > acc) {
+                *x -= step;
+                if (*x < acc)
+                    *x = acc;
+            }
+            acc += (float)(*(const int32_t *)(row + HUDMSG_OFF_WIDTH)
+                           + AM2_HUD_MSG_GAP);
+        }
+
+        if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT)) {
+            if (Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT))
+                *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = 0;
+
+            *scroll -= step;
+            if (*scroll < 0.0f)
+                *scroll = 0.0f;
+        } else if (acc > (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W)) {
+            float target = (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W);
+            float first;
+
+            for (i = n - 1; i >= 0; i--) {
+                int32_t width = *(const int32_t *)
+                    (self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE
+                     + HUDMSG_OFF_WIDTH);
+
+                if (target - (float)width < 0.0)
+                    break;
+                target -= (float)(width + AM2_HUD_MSG_GAP);
+            }
+            if (++i < 0)
+                i = 0;
+
+            first = *(const float *)(self + HUDLOG_OFF_ROWS
+                                     + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
+            if (*scroll > first) {
+                float v = *scroll - step;
+                *scroll = first > v ? first : v;
+            } else if (*scroll < first) {
+                float v = *scroll + step;
+                *scroll = first < v ? first : v;
+            }
+        }
+    }
+
+    *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) = NULL;
+
+    if (!PointInRect((const AM2_Rect *)&w->rect,
+                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+        w->focusedChild = NULL;
+        return;
+    }
+
+    {
+        int32_t left = w->rect.left + *(const int32_t *)(self
+                                                 + HUDLOG_OFF_BUTTON_X);
+        int32_t top  = w->rect.top;
+
+        RectSet((AM2_Rect *)&hot, left, top,
+                left + AM2_HUD_BUTTON_W, top + AM2_HUD_BUTTON_H);
+    }
+
+    grab = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+
+    if (!PointInRect((const AM2_Rect *)&hot,
+                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+        /* On the strip but not on the button: swallow the press anyway, so
+         * the map underneath does not also see it. */
+        if (!grab && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+        return;
+    }
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON) {
+        if (grab == button)
+            *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) =
+                Ticks() + AM2_HUD_REWIND_HOLD_MS;
+        else
+            *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) =
+                *(AM2_Sprite **)(self + HUDLOG_OFF_SPRITE_HOT);
+        return;
+    }
+
+    if (!grab && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
+        grab = button;
+        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = button;
+    }
+    if (grab != button)
+        return;
+
+    *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = Ticks() + AM2_HUD_REWIND_TAP_MS;
+    *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) =
+        *(AM2_Sprite **)(self + HUDLOG_OFF_SPRITE_DOWN);
 }
 
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
@@ -1813,12 +2025,12 @@ void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w)
     if (!PointInRect((const AM2_Rect *)&w->rect, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
         return;
 
-    claim   = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_B0_EXTRA;
+    claim   = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
     changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
 
     if (!claim && changed) {
         claim = w;
-        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_B0_EXTRA = w;
+        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
     }
 
     if ((*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON || changed)
@@ -2399,10 +2611,6 @@ void __attribute__((thiscall)) ListDropOldest(void *list)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 typedef void (__cdecl *am2_void_fn)(void);
 #define orig_save_options (*(am2_void_fn)ADDR_SAVE_OPTIONS)
-/* The game's own rand, and it has to be: the LCG state at 0x0048CC1C is the
- * image's, so drawing from ours would leave it untouched. */
-typedef int32_t (__cdecl *am2_rand_fn)(void);
-#define orig_rand         (*(am2_rand_fn)ADDR_GAME_RAND)
 #define g_menuRequestSet  (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
 #define g_commObject      (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 
@@ -6933,7 +7141,7 @@ void __cdecl HudMessage(const char *text, int32_t colour)
     len = strlen(text);
     if (len > AM2_HUD_TOTAL_CAP)
         len = AM2_HUD_TOTAL_CAP;
-    *(int32_t *)(h + HUDLOG_OFF_TOTAL) += (int32_t)len;
+    *(int32_t *)(h + HUDLOG_OFF_BLIPS) += (int32_t)len;
 }
 
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
@@ -7421,6 +7629,8 @@ int widget_install(void)
                         "DrawTooltip", 2);
     rc |= patch_replace(ADDR_HUD_TOP_PAINT, (const void *)HudTopPaint,
                         "HudTopPaint", 1);
+    rc |= patch_replace(ADDR_HUD_TOP_UPDATE, (const void *)HudTopUpdate,
+                        "HudTopUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_PAINT, (const void *)HudSargePaint,
                         "HudSargePaint", 1);
     rc |= patch_replace(ADDR_HUD_CMD_PAINT, (const void *)HudCommandsPaint,
