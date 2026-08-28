@@ -1083,6 +1083,152 @@ AM2_DIALOG_DTOR(CommPanel, VTABLE_COMM_PANEL)
 AM2_DIALOG_DTOR(BattleJoin, VTABLE_BATTLE_JOIN)
 AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
 
+/* The HUD's own classes. Every name is from the widget dump: `ctl widgets` in
+ * a live mission prints a rectangle per node and the screenshot says what is
+ * in it. That is why these could not be written for most of a session -- the
+ * geometry was readable from the constructors all along, and geometry alone
+ * does not say what a box IS.
+ *
+ * All five chain to WidgetDestruct rather than DialogDestruct: this family is
+ * not the menu's. Each carries the MSVC SEH prologue, which is deliberately
+ * not reproduced -- see CLAUDE.md on destructor frames.
+ */
+
+/* 0x00417790. The strip across the top, and it CLEARS g_charHandler.
+ *
+ * NOT because the strip owns a text field, which is what I first wrote. orig.h
+ * already records what installs a handler in this band: binding 0x13 --
+ * BACKSPACE by default -- opens a CONSOLE, and 0x004186B3 puts 0x004185C0 in
+ * that slot, verified live by tapping the key and reading the global back.
+ *
+ * So this is teardown hygiene for the console rather than a clue about the
+ * strip. It still has to be reproduced, and the reason is sharper than
+ * tidiness: leave the slot set and a handler inside freed memory is what
+ * WndProc calls on the next keystroke. */
+void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_TOP_STRIP);
+
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
+
+    *(void **)(uintptr_t)ADDR_CHAR_HANDLER = (void *)0;
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
+{
+    HudTopDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00419360. The right-hand panel -- HUD widget B, the one whose constructor
+ * builds the radar, Sarge, squad and commands children. One sprite. */
+void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
+{
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_PANEL);
+    ReleaseSprite(*(AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0));
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudPanelDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    HudPanelDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00414830. The radar, and it is the one that frees a BITMAP rather than
+ * releasing a sprite -- FreeBitmap on the slot, then the slot cleared.
+ *
+ * The dump agrees from the other end: the radar node prints sid=0 where every
+ * other node prints a real sprite id, because what it holds at +0x58 is not a
+ * sprite at all. Two independent readings of the same field. */
+void __attribute__((thiscall)) HudRadarDestruct(AM2_Widget *w)
+{
+    void **slot = (void **)((uint8_t *)w + HUD_OFF_SPRITE0);
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_RADAR);
+    FreeBitmap(slot);
+    *slot = (void *)0;
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudRadarDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    HudRadarDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00415850. The squad panel: twelve PAIRS and then one sprite of its own.
+ *
+ * The pair walk is the film archive's shape with the halves apart rather than
+ * adjacent -- one pointer steps four bytes at a time and reads 0x30 below
+ * itself as well, so the two arrays are 0x5C.. and 0x8C.. and the loop covers
+ * both in twelve turns. Twelve is the squad. */
+void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  i;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SQUAD);
+
+    for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
+        ReleaseSprite(*(AM2_Sprite **)(self + HUD_SQUAD_PAIR_LO + i * 4));
+        ReleaseSprite(*(AM2_Sprite **)(self + HUD_SQUAD_PAIR_HI + i * 4));
+    }
+
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudSquadDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    HudSquadDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00419670. The strip down the right edge. Same three slots as the top
+ * strip and no character handler -- which is what says that clearing it up
+ * there is the top strip's own business rather than something every strip
+ * does. */
+void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_EDGE_STRIP);
+
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
+    ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w,
+                                                    int32_t flags)
+{
+    HudEdgeDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 /* 0x0044E510. The film archive's destructor: give back the twelve thumbnail
  * PAIRS and chain to the dialog base.
  *
@@ -6654,6 +6800,29 @@ int widget_install(void)
                         "OpenGameMenu", 0);
     rc |= patch_replace(ADDR_OPEN_MESSAGE, (const void *)OpenMessage,
                         "OpenMessage", 0);
+    rc |= patch_replace(ADDR_HUD_TOP_DESTRUCT, (const void *)HudTopDestruct,
+                        "HudTopDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_TOP_DELETE, (const void *)HudTopDelete,
+                        "HudTopDelete", 1);
+    rc |= patch_replace(ADDR_HUD_PANEL_DESTRUCT,
+                        (const void *)HudPanelDestruct,
+                        "HudPanelDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_PANEL_DELETE, (const void *)HudPanelDelete,
+                        "HudPanelDelete", 1);
+    rc |= patch_replace(ADDR_HUD_RADAR_DESTRUCT,
+                        (const void *)HudRadarDestruct,
+                        "HudRadarDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_RADAR_DELETE, (const void *)HudRadarDelete,
+                        "HudRadarDelete", 1);
+    rc |= patch_replace(ADDR_HUD_SQUAD_DESTRUCT,
+                        (const void *)HudSquadDestruct,
+                        "HudSquadDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_SQUAD_DELETE, (const void *)HudSquadDelete,
+                        "HudSquadDelete", 1);
+    rc |= patch_replace(ADDR_HUD_EDGE_DESTRUCT, (const void *)HudEdgeDestruct,
+                        "HudEdgeDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_EDGE_DELETE, (const void *)HudEdgeDelete,
+                        "HudEdgeDelete", 1);
     rc |= patch_replace(ADDR_MOVIES_DESTRUCT, (const void *)MoviesDestruct,
                         "MoviesDestruct", 1);
     rc |= patch_replace(ADDR_MOVIES_DELETE, (const void *)MoviesDelete,

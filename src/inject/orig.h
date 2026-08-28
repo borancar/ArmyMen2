@@ -384,6 +384,47 @@
 #define ADDR_HUD_WIDGET_A  0x004FCF00u  /* AM2_Widget * */
 #define ADDR_HUD_WIDGET_B  0x004FCF54u
 #define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
+/* THE SEVEN HUD CLASSES, and every name here comes from what the widget dump
+ * shows the node DRAWING -- not from its constructor, its geometry alone, or
+ * the class next to it. `ctl widgets` in a live mission prints one line per
+ * node with its rectangle, and the screenshot says what is in that rectangle;
+ * COMMANDS is the game's own caption on the box at 480,430.
+ *
+ * They are their own family, NOT the thirty-three menu vtables at
+ * 0x0046FAB8..0x0046FD38: slot 3 is 0x004170E0 across this group where the
+ * menu classes share 0x00454070. Two of the eight in the band never appear in
+ * either Boot Camp's tree or MAP 01's, so 0x0046F930 stays unnamed.
+ *
+ * MAP 01's HUD is identical to Boot Camp's -- same vtables, rectangles and
+ * sprite ids -- so this layout is not per-map. */
+#define VTABLE_HUD_TOP_STRIP   0x0046F908u  /* 0,0,640,21 */
+#define VTABLE_HUD_PANEL       0x0046F944u  /* 480,21,624,480 -- HUD_WIDGET_B */
+#define VTABLE_HUD_RADAR       0x0046F8B8u  /* 486,31,618,163 */
+#define VTABLE_HUD_SARGE       0x0046F8CCu  /* 480,169,624,249 */
+#define VTABLE_HUD_SQUAD       0x0046F8E0u  /* 480,251,624,481 */
+#define VTABLE_HUD_COMMANDS    0x0046F8F4u  /* 480,430,624,478 */
+#define VTABLE_HUD_EDGE_STRIP  0x0046F960u  /* 624,21,640,480 */
+/* Their destructor pairs. Five distinct bodies, which is why they are written
+ * out rather than made from the AM2_CLASS_DTOR macro. */
+#define ADDR_HUD_TOP_DELETE    0x00417770u  /* thiscall obj *(obj, flags) */
+#define ADDR_HUD_TOP_DESTRUCT  0x00417790u  /* thiscall void(obj) */
+#define ADDR_HUD_PANEL_DELETE  0x00419340u
+#define ADDR_HUD_PANEL_DESTRUCT 0x00419360u
+#define ADDR_HUD_RADAR_DELETE  0x00414810u
+#define ADDR_HUD_RADAR_DESTRUCT 0x00414830u
+#define ADDR_HUD_SQUAD_DELETE  0x00415830u
+#define ADDR_HUD_SQUAD_DESTRUCT 0x00415850u
+#define ADDR_HUD_EDGE_DELETE   0x00419650u
+#define ADDR_HUD_EDGE_DESTRUCT 0x00419670u
+/* Three sprite slots, shared by the top and edge strips. */
+#define HUD_OFF_SPRITE0        0x58u
+#define HUD_OFF_SPRITE1        0x5Cu
+#define HUD_OFF_SPRITE2        0x60u
+/* The squad panel's twelve PAIRS -- a slot each side of 0x30 apart, walked
+ * together -- plus one sprite of its own at HUD_OFF_SPRITE0. */
+#define HUD_SQUAD_PAIR_LO      0x5Cu
+#define HUD_SQUAD_PAIR_HI      0x8Cu
+#define AM2_HUD_SQUAD_SLOTS    12
 /* 0x004135C0, two callers. Delete all three of those through vtable slot 0
  * with the scalar-delete flag and clear each global -- the same shape
  * ADDR_CLOSE_SCREEN has for the screen, three times over. Reconstructed. */

@@ -642,6 +642,15 @@ AM2_DECLARE_CLASS_DTOR(CommPanel);
 AM2_DECLARE_CLASS_DTOR(BattleJoin);
 AM2_DECLARE_CLASS_DTOR(MpName);
 
+/* The HUD classes' destructor pairs. Named from what `ctl widgets` shows each
+ * node drawing in a live mission; see orig.h. Five distinct bodies, so the
+ * macro declares them and each is written out. */
+AM2_DECLARE_CLASS_DTOR(HudTop);
+AM2_DECLARE_CLASS_DTOR(HudPanel);
+AM2_DECLARE_CLASS_DTOR(HudRadar);
+AM2_DECLARE_CLASS_DTOR(HudSquad);
+AM2_DECLARE_CLASS_DTOR(HudEdge);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made
