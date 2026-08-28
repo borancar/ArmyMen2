@@ -280,6 +280,11 @@ void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
  * if the unit does not resolve, is not a type 2, or holds no weapon. */
 void __cdecl SetWeaponTarget(void *target, uint32_t at);
 
+/* 0x00427BA0. Deselect everything: clear OBJ_FLAG_SELECTED on each selected
+ * object that still resolves, drop the ones that do not, empty the list and
+ * report the change. */
+void __cdecl DeselectAll(void);
+
 /* 0x0040D930. Put a unit into a pose. Idempotent; nine poses queue rather
  * than switch, and most wait for the current animation's last cell. */
 void __cdecl SetUnitPose(void *obj, int32_t pose);

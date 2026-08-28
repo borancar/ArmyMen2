@@ -3117,6 +3117,11 @@ typedef struct {
 #define ADDR_SEND_DEATH_MESSAGE  0x0042A930u  /* void(obj, uid, int32) */
 #define ADDR_OBJ_DEATH_CLEANUP   0x00428070u  /* void(obj) */
 /* The counterpart of ADDR_SELECT_UNIT, which sits 0x60 above it. */
+/* 0x00427BA0, nine callers. Deselect EVERYTHING: walk ADDR_SELECTED_UIDS,
+ * clear OBJ_FLAG_SELECTED on each object that still resolves, drop the ones
+ * that do not, then empty the list and tell ADDR_ON_SELECTION_CHANGED.
+ * Reconstructed; 2 calls on a driven Boot Camp mission. */
+#define ADDR_DESELECT_ALL        0x00427BA0u  /* void(void) */
 #define ADDR_DESELECT_UNIT       0x00427C80u  /* void(obj) */
 /* The count word of ADDR_SELECTED_UIDS, which is {capacity, count, items}. */
 #define ADDR_SELECTED_COUNT      0x0051230Cu  /* int32_t */

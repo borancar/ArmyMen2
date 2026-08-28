@@ -3851,6 +3851,91 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
     SetAnimFrame(row, (int16_t)frame, 0);
 }
 
+/* orig_on_selection_changed is orig.h's; objtable.cpp uses the same one. */
+
+/* 0x00427BA0, nine callers. Deselect everything.
+ *
+ * It walks ADDR_SELECTED_UIDS, and each uid takes one of two paths. One that
+ * no longer resolves to an object is REMOVED from the list and the index is
+ * NOT advanced, because the list has shifted under it -- the same walk-and-
+ * sweep idiom ObjAttachToArmy uses. One that does resolve has
+ * OBJ_FLAG_SELECTED cleared and, if it is a type 2, 3 or 8, gets one more
+ * step: its OBJ_OFF_FOLLOW_UID is looked up, and if that object exists and is
+ * allied with the player's army, ObjAttachTo is called on the pair.
+ *
+ * THE REMOVAL IS POINTLESS FOR THE LIST AND NOT FOR THE LOOP. Everything the
+ * walk leaves is cleared wholesale by ClearPtrList afterwards, so removing an
+ * entry cannot change the final state. What it changes is the BOUND: the count
+ * is re-read every iteration and ListRemoveAt decrements it, so a dead uid
+ * shortens the walk instead of being visited. Written as the original has it
+ * rather than simplified away, because the two are only equivalent while
+ * nothing else observes the list mid-walk, and ObjAttachTo is called from
+ * inside it.
+ *
+ * THE SELECTED BIT IS CLEARED WITH A BYTE STORE. The original does
+ * `and ch, 0xFB` on the flags dword, which is bit 10 -- OBJ_FLAG_SELECTED --
+ * and leaves the other three bytes untouched by not writing them. Written as
+ * the mask on the whole dword, which is the same result; the byte width is a
+ * register allocation, not a claim about which bits are safe to disturb.
+ *
+ * The tail runs whether or not the walk did: an empty list still clears the
+ * record and still reports the change, with ADDR_ZERO_POINT as the position.
+ *
+ * MEASURED AT 2 CALLS on a driven Boot Camp mission, with SelectUnit at 3
+ * on the same run -- so something really was selected and then dropped, and
+ * the walk, the flag clear and the tail are compared. What those two
+ * cannot have covered is either of the interesting branches: a uid that
+ * fails to resolve, which is the one that removes without advancing, and
+ * the type-2/3/8 arm reaching ObjAttachTo. Both stay verified by reading,
+ * and the first is exactly the branch a walk-and-sweep gets wrong.
+ */
+void __cdecl DeselectAll(void)
+{
+    uint8_t *sel = (uint8_t *)(uintptr_t)ADDR_SELECTED_UIDS;
+    int32_t  i   = 0;
+
+    while (i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT) {
+        int32_t   at;
+        int32_t   slot;
+        uint8_t  *obj;
+
+        slot = FindSlot((*(const uint32_t *const *)(sel + 8))[i], &at);
+        obj  = slot >= 0
+               ? (uint8_t *)(*(AM2_ObjEntry *const *)
+                                 (uintptr_t)ADDR_OBJ_TABLE)[slot].obj
+               : (uint8_t *)0;
+
+        if (!obj) {
+            ListRemoveAt(sel, i);       /* and do NOT advance i */
+            continue;
+        }
+
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+
+        if (ObjIsTypeIn238((const AM2_Object *)obj)) {
+            int32_t s2 = FindSlot(*(const uint32_t *)(obj + OBJ_OFF_FOLLOW_UID),
+                                  &at);
+
+            if (s2 >= 0) {
+                void *other = (*(AM2_ObjEntry *const *)
+                                   (uintptr_t)ADDR_OBJ_TABLE)[s2].obj;
+
+                if (other
+                    && ArmyAlliedWithObj(
+                           (int32_t)*(const uint32_t *)
+                               (uintptr_t)ADDR_DEFAULT_OWNER, other, 0))
+                    ((void (__cdecl *)(void *, void *))
+                         AM2_IMAGE(ADDR_OBJ_ATTACH_TO))(obj, (void *)0);
+            }
+        }
+
+        i++;
+    }
+
+    ClearPtrList(sel);
+    orig_on_selection_changed(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -3872,6 +3957,8 @@ void item_install(void)
                   "SoldierKindForWeapon", 13);
     patch_replace(ADDR_SET_WEAPON_TARGET, (const void *)SetWeaponTarget,
                   "SetWeaponTarget", 6);
+    patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,
+                  "DeselectAll", 9);
     patch_replace(ADDR_SET_UNIT_POSE, (const void *)SetUnitPose,
                   "SetUnitPose", 9);
     patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);
