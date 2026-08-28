@@ -1793,6 +1793,84 @@ void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
     return PreloadSprite(set, index, frame, flags, 1);
 }
 
+/* 0x00408D20 and 0x00408DA0, with 0x00408E40 the alias. Load and free sprite
+ * SET 19 as a block: one from index 2, twenty from index 3, eleven from
+ * index 6, all with flags 0x1000 and addref 1.
+ *
+ * WHAT SET 19 IS IS NOT ESTABLISHED. The names say which set and index each
+ * array holds, which is all the two functions show; the only other clue is
+ * that 0x00408E00 takes the first sprite's bounds.right, doubles it and adds
+ * ADDR_BITMAP_AREA_W, which is a layout number and not an identity.
+ *
+ * THE FREE ZEROES FAR MORE THAN THE LOAD FILLED. It releases exactly the
+ * thirty-two sprites the load created, and then memsets 179 DWORDS from the
+ * first array -- 716 bytes, running well past the eleven-entry array and up to
+ * 0x004F96A4. So something else keeps sprite pointers in the same block and
+ * this clears them too. Reproduced with the count the original uses rather
+ * than the count it walks, because those are different numbers and the
+ * difference is the interesting part.
+ *
+ * The alias is one `jmp`, the same shape as FreeSpriteListAlias, and it is the
+ * ONLY way in: the free itself has no other reference in the image. So both
+ * callers -- the reloader at 0x00408E00 and the teardown at 0x00425732 -- go
+ * through it, and patching the free alone would leave the alias jumping into
+ * our detour, which is why both are patched.
+ *
+ * ReleaseSprite is given each pointer without a null test. It handles null
+ * itself, which is what makes the load's failure path harmless here.
+ *
+ * MEASURED, AND THE THREE COUNTS CONFIRM THE ALIAS CLAIM. On a driven Boot
+ * Camp mission LoadSprites19 reads 1, FreeSprites19Alias reads 1, and
+ * FreeSprites19 reads 0 -- which is what "the alias is the only way in"
+ * predicts, since the alias is ours and calls it by name. A second reference
+ * to the free would have shown up as a non-zero count here.
+ *
+ * These sprites reach the screen, so a wrong index or a wrong count would move
+ * the A/B's pixels rather than hiding; bootcamp's twenty-two is the check.
+ */
+void __cdecl LoadSprites19(void)
+{
+    AM2_Sprite **p;
+    int32_t      i;
+
+    *(AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_2 =
+        PreloadSprite(AM2_SPRITE_SET_19, 2, 0, 0x1000, 1);
+
+    i = 0;
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_3;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6; p++, i++)
+        *p = PreloadSprite(AM2_SPRITE_SET_19, 3, i, 0x1000, 1);
+
+    i = 0;
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_EDGE; p++, i++)
+        *p = PreloadSprite(AM2_SPRITE_SET_19, 6, i, 0x1000, 1);
+}
+
+void __cdecl FreeSprites19(void)
+{
+    AM2_Sprite **p;
+
+    ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_2);
+
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_3;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6; p++)
+        ReleaseSprite(*p);
+
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_EDGE; p++)
+        ReleaseSprite(*p);
+
+    /* 179 dwords, not the 32 released above -- see the note. */
+    memset((void *)(uintptr_t)ADDR_SPRITES_19_2, 0,
+           AM2_SPRITES_19_CLEAR * 4);
+}
+
+void __cdecl FreeSprites19Alias(void)
+{
+    FreeSprites19();
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -1842,6 +1920,13 @@ int sprite_install(void)
                         "LoadBitmap", 9);
     rc |= patch_replace(ADDR_ARMY_SPRITE_BASE, (const void *)ArmySpriteBase,
                         "ArmySpriteBase", 2);
+    rc |= patch_replace(ADDR_LOAD_SPRITES_19, (const void *)LoadSprites19,
+                        "LoadSprites19", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITES_19, (const void *)FreeSprites19,
+                        "FreeSprites19", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITES_19_ALIAS,
+                        (const void *)FreeSprites19Alias,
+                        "FreeSprites19Alias", 2);
     rc |= patch_replace(ADDR_PRELOAD_ARMY_SPRITE,
                         (const void *)PreloadArmySprite,
                         "PreloadArmySprite", 16);

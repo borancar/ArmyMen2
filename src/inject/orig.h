@@ -3959,6 +3959,26 @@ typedef struct {
  * addresses -- so nothing available here distinguishes the two pairs. Named
  * for the use rather than merged with the other pair on a guess. */
 #define ADDR_BITMAP_AREA_W        0x00485318u  /* int32_t, 640 */
+/* Sprite SET 19, loaded and freed as a block by 0x00408D20 and 0x00408DA0.
+ * One sprite from index 2, twenty from index 3, eleven from index 6. What set
+ * 19 IS is not established -- the names say only which set and index each
+ * array holds, which is all the two functions show.
+ *
+ * ADDR_SPRITES_19_EDGE is not part of the arrays: it sits immediately past
+ * them and 0x00408E00 computes it as ADDR_BITMAP_AREA_W plus twice the first
+ * sprite's bounds.right. */
+#define ADDR_SPRITES_19_2        0x004F93D8u  /* AM2_Sprite * */
+#define ADDR_SPRITES_19_3        0x004F93DCu  /* AM2_Sprite *[20] */
+#define ADDR_SPRITES_19_6        0x004F942Cu  /* AM2_Sprite *[11] */
+#define ADDR_SPRITES_19_EDGE     0x004F9458u  /* int32_t */
+#define AM2_SPRITE_SET_19        0x13
+#define AM2_SPRITES_19_CLEAR     0xB3  /* dwords the free zeroes: 179, not 32 */
+/* 0x00408D20 loads them and 0x00408DA0 frees them; 0x00408E40 is one `jmp` to
+ * the free, the same shape as ADDR_FREE_SPRITE_LIST_ALIAS, and is the ONLY way
+ * in -- the free itself has no other reference. Reconstructed, all three. */
+#define ADDR_LOAD_SPRITES_19     0x00408D20u  /* void(void) */
+#define ADDR_FREE_SPRITES_19     0x00408DA0u  /* void(void) */
+#define ADDR_FREE_SPRITES_19_ALIAS 0x00408E40u  /* void(void), one jmp */
 #define ADDR_BITMAP_AREA_H        0x0048531Cu  /* int32_t, 480 */
 /* The pause bits that mean "the map is still loading", which is what puts the
  * wait bitmap up. Four bits, 17 through 20, tested as a group. */

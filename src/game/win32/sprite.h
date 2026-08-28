@@ -204,6 +204,13 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr);
  * second preloads with it, falling back to the shared index when the coloured
  * one is not there. */
 int32_t __cdecl ArmySpriteBase(void);
+
+/* 0x00408D20, 0x00408DA0 and its alias 0x00408E40. Load and free sprite set
+ * 19 as a block -- 1 + 20 + 11 sprites. The free zeroes 179 dwords, far more
+ * than the 32 it releases. */
+void __cdecl LoadSprites19(void);
+void __cdecl FreeSprites19(void);
+void __cdecl FreeSprites19Alias(void);
 void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
                                 int32_t flags);
 
