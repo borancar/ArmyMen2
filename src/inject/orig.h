@@ -318,6 +318,13 @@
 /* Overwrite -- "Are you sure you want to overwrite savefile '%s'?" */
 #define ADDR_DLG_OVERWRITE_DELETE         0x004505B0u
 #define ADDR_DLG_OVERWRITE_DESTRUCT       0x004505D0u
+/* Its screen, and its constructor -- which is what identifies BOTH, since the
+ * constructor installs VTABLE_DLG_OVERWRITE. Sitting next to the destructor in
+ * the image is not evidence and is not what was used. */
+#define ADDR_OVERWRITE_CTOR      0x00450320u /* thiscall, ret 8 */
+#define ADDR_OPEN_OVERWRITE_GAME 0x004506A0u /* void(void) */
+#define AM2_OVERWRITE_SIZE       0x64u
+#define ADDR_STR_OVRGAME_BMP     0x0048B96Cu /* "02_018_00_ovrgame.bmp" */
 /* DelPlayer -- 02_010_00_delplayer */
 #define ADDR_DLG_DELPLAYER_DELETE         0x004509E0u
 #define ADDR_DLG_DELPLAYER_DESTRUCT       0x00450A00u
@@ -336,9 +343,24 @@
 /* Message -- 03_029 red, and an OK -- a plain message box */
 #define ADDR_DLG_MESSAGE_DELETE           0x00452960u
 #define ADDR_DLG_MESSAGE_DESTRUCT         0x00452980u
+#define ADDR_MESSAGE_CTOR        0x00452750u /* thiscall, ret 8 */
+#define ADDR_OPEN_MESSAGE        0x00452990u /* void(void) */
+#define AM2_MESSAGE_SIZE         0x64u
+/* The only one of the five whose bitmap is a GLOBAL rather than a literal --
+ * whoever raises the message writes the name here first. */
+#define ADDR_MESSAGE_BMP_NAME    0x005122A4u /* char[] */
 /* GameMenu -- 03_123/124/125 load, return, save and abort */
 #define ADDR_DLG_GAMEMENU_DELETE          0x00452E20u
 #define ADDR_DLG_GAMEMENU_DESTRUCT        0x00452E40u
+/* Its screen. THE BITMAP IS "00_999_99_blank.bmp" AND THE SCREEN IS NOT BLANK:
+ * the name describes the BACKDROP the dialog is built on, and the class is the
+ * in-mission game menu -- ADDR_GAMEMENU_CTOR installs VTABLE_DLG_GAMEMENU.
+ * Naming this one from the string it pushes would have been the call-site
+ * mistake exactly. */
+#define ADDR_GAMEMENU_CTOR       0x00452AA0u /* thiscall, ret 8 */
+#define ADDR_OPEN_GAME_MENU      0x00452F50u /* void(void) */
+#define AM2_GAMEMENU_SIZE        0x68u
+#define ADDR_STR_BLANK_BMP       0x00486F90u /* "00_999_99_blank.bmp" */
 /* 0x00454F00, thiscall, vtable slot 1 of the vtable at 0x0046FCAC. The static
  * label's painter -- reached BOTH through that slot and by one direct call
  * from the panel that owns the label. */
@@ -504,6 +526,9 @@
  * font it was not seen to build is recorded as what the code does and not
  * explained away -- the constructor's font handling has not been read. */
 #define VTABLE_SAVE_LIST         0x0046FC0Cu
+#define ADDR_OPEN_SAVE_GAME      0x00453890u /* void(void) */
+#define AM2_SAVE_LIST_SIZE       0xACu
+#define ADDR_STR_SAVEGAME_BMP    0x0048BC98u /* "02_008_00_savegame.bmp" */
 #define ADDR_SAVE_LIST_CTOR      0x00453280u /* thiscall, two arguments */
 #define ADDR_SAVE_LIST_DELETE    0x00453810u /* thiscall obj *(obj, flags) */
 #define ADDR_SAVE_LIST_DESTRUCT  0x00453830u /* thiscall void(obj) */

@@ -1045,6 +1045,14 @@ void __cdecl OpenDeleteGame(void);
  * where its two siblings put it before the allocation; see widget.cpp. */
 void __cdecl OpenLoadGame(void);
 
+/* Original: 0x00453890, 0x004506A0, 0x00452F50 and 0x00452990 -- the last four
+ * arms of frame.cpp's sub-state painter table. Each closes whatever screen is
+ * up and builds one dialog on a backdrop. */
+void __cdecl OpenSaveGame(void);
+void __cdecl OpenOverwriteGame(void);
+void __cdecl OpenGameMenu(void);
+void __cdecl OpenMessage(void);
+
 /* Original: 0x0044FAB0, thiscall. The OPTIONS menu's constructor: a backdrop
  * and four buttons, AUDIO / CONTROLS / DIFFICULTY / BACK. See widget.cpp for
  * why the rectangle is passed by value in the middle of the argument list and

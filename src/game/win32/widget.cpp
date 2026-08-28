@@ -2077,6 +2077,58 @@ void __cdecl OpenDeleteGame(void)
  * it is written rather than made to match its two siblings -- whether that
  * ordering matters is not something reading settles, and the screen is
  * reachable, so it can be measured rather than argued about. */
+/* The last four arms of the sub-state painter table, and the four screens that
+ * were still reached as bare addresses when that table was a list of integers.
+ *
+ * EVERY ONE IS NAMED FROM THE VTABLE ITS CONSTRUCTOR INSTALLS, not from the
+ * bitmap it loads and not from the destructor it sits beside. The bitmap is
+ * the trap: 0x00452F50 pushes "00_999_99_blank.bmp" and builds the GAME MENU,
+ * because the name describes the backdrop rather than the dialog. Adjacency is
+ * no better -- the linker's layout is not a fact about meaning.
+ *
+ * THE REFRESH IS NOT IN THE SAME PLACE IN ALL FOUR, and that is the whole
+ * reason they are written out rather than made from one template. Overwrite
+ * refreshes BEFORE it allocates, save game and the game menu refresh AFTER,
+ * and the message screen does not refresh at all. OpenAudioOptions' own
+ * comment already records this as a per-screen distinction someone was caught
+ * by once; flattening it here would be the same mistake with four chances.
+ *
+ * RefreshScreen is ours, so none of these can move its counter -- the usual
+ * blind spot, and one that gets deeper here: it goes from three of seven
+ * callers reconstructed to six of seven. CLAUDE.md still lists it as
+ * unexercised, which is that blind spot rather than a function that never
+ * runs; ab.sh audiovol opens one of these screens every run. */
+void __cdecl OpenSaveGame(void)
+{
+    CloseCurrentScreen();
+    OpenScreen2(AM2_SAVE_LIST_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_SAVE_LIST_CTOR),
+                (const char *)AM2_IMAGE(ADDR_STR_SAVEGAME_BMP), 0);
+    RefreshScreen();
+}
+
+void __cdecl OpenOverwriteGame(void)
+{
+    CloseCurrentScreen();
+    RefreshScreen();
+    OpenScreen2(AM2_OVERWRITE_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_OVERWRITE_CTOR),
+                (const char *)AM2_IMAGE(ADDR_STR_OVRGAME_BMP), 0);
+}
+
+void __cdecl OpenGameMenu(void)
+{
+    CloseCurrentScreen();
+    OpenScreen2(AM2_GAMEMENU_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_GAMEMENU_CTOR),
+                (const char *)AM2_IMAGE(ADDR_STR_BLANK_BMP), 0);
+    RefreshScreen();
+}
+
+void __cdecl OpenMessage(void)
+{
+    CloseCurrentScreen();
+    OpenScreen2(AM2_MESSAGE_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_MESSAGE_CTOR),
+                (const char *)AM2_IMAGE(ADDR_MESSAGE_BMP_NAME), 0);
+}
+
 void __cdecl OpenLoadGame(void)
 {
     CloseCurrentScreen();
@@ -6593,6 +6645,15 @@ int widget_install(void)
                         "DialogDestruct", 1);
     rc |= patch_replace(ADDR_DIALOG_DELETE, (const void *)DialogDelete,
                         "DialogDelete", 1);
+    rc |= patch_replace(ADDR_OPEN_SAVE_GAME, (const void *)OpenSaveGame,
+                        "OpenSaveGame", 0);
+    rc |= patch_replace(ADDR_OPEN_OVERWRITE_GAME,
+                        (const void *)OpenOverwriteGame,
+                        "OpenOverwriteGame", 0);
+    rc |= patch_replace(ADDR_OPEN_GAME_MENU, (const void *)OpenGameMenu,
+                        "OpenGameMenu", 0);
+    rc |= patch_replace(ADDR_OPEN_MESSAGE, (const void *)OpenMessage,
+                        "OpenMessage", 0);
     rc |= patch_replace(ADDR_MOVIES_DESTRUCT, (const void *)MoviesDestruct,
                         "MoviesDestruct", 1);
     rc |= patch_replace(ADDR_MOVIES_DELETE, (const void *)MoviesDelete,

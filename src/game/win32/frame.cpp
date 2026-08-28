@@ -489,22 +489,23 @@ void __cdecl State1Frame(void)
  * walked straight past all five. It has a rule for the literal now, and this
  * table is why.
  *
- * Mixed on purpose: the four still-original arms keep an address, cast through
- * AM2_IMAGE like any other image pointer, and the five reconstructed ones are
- * named. The shape says which is which, which is what winmain.cpp's teardown
- * table claimed and could not deliver. */
+ * ALL NINE ARE NAMED, so nothing here reaches the image and the shape says
+ * nothing -- there is no mixed case left to read. The rule is for the future:
+ * if an arm ever goes back to being the original's, write it as an ADDR_ name
+ * cast through AM2_IMAGE and never as a bare integer, because that is the one
+ * spelling checkseams could not see and it is how five of these hid. */
 typedef void (__cdecl *AM2_SubStatePainter)(void);
 
 static const AM2_SubStatePainter kSubStatePainter[] = {
-    (AM2_SubStatePainter)AM2_IMAGE(0x00452F50u),  /* 23 */
-    (AM2_SubStatePainter)AM2_IMAGE(0x00452990u),  /* 24 */
-    (AM2_SubStatePainter)AM2_IMAGE(0x00453890u),  /* 25 */
+    OpenGameMenu,                                 /* 23 */
+    OpenMessage,                                  /* 24 */
+    OpenSaveGame,                                 /* 25 */
     OpenLoadGame,                                 /* 26 */
     OpenAudioOptions,                             /* 27 */
     OpenControls,                                 /* 28 */
     OpenDeleteGame,                               /* 29 */
     OpenDeleteGame,                               /* 30 */
-    (AM2_SubStatePainter)AM2_IMAGE(0x004506A0u),  /* 31 */
+    OpenOverwriteGame,                            /* 31 */
 };
 
 
