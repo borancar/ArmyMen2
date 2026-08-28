@@ -9,7 +9,8 @@
 #include "font.h"    /* TextExtent -- reconstructed */
 #include "../rect.h"
 #include "../commmsg.h" /* Announce -- reconstructed */
-#include "../misc.h"   /* IsKeyDown, KeyChanged */
+#include "../misc.h"   /* IsKeyDown, KeyChanged, TitleCaseName */
+#include "../text.h"   /* DrawText -- reconstructed */
 #include "../msgslot.h" /* SendColorMsg, SendTeamMsg -- reconstructed */
 #include "sprite.h"
 #include "frame.h"
@@ -1413,6 +1414,114 @@ void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w)
  * are the claimant.
  */
 void __cdecl HudRadarUpdateBody(AM2_Widget *w);
+
+/* 0x00414620. A tooltip at the cursor, and the ORDER OF THE THREE STEPS IS THE
+ * WHOLE THING TO GET RIGHT.
+ *
+ * ClearRegion runs BEFORE LockSurface, not inside it. Its own comment in
+ * surface.h says why: it refuses to run while a lock is held, because Blt
+ * needs the surface back first, and it is a NO-OP in that case rather than a
+ * failure. Written in the intuitive lock-fill-draw-unlock order the fill would
+ * silently do nothing and the text would land on whatever was underneath --
+ * on a path no drive exercises, so nothing would catch it.
+ *
+ * TextExtent is called with a null `out` and its RETURN used, which font.h
+ * records as the form that surfaced its signature: it went in as `void`,
+ * every caller then passed a real `out` and ignored eax, and the typewriter's
+ * word-wrap was the first to notice. This is the second caller of that form.
+ *
+ * Placement. The box is centred on the cursor and 6 wider than the text, then
+ * pushed left if it would leave the bitmap area. It sits BELOW the cursor
+ * normally and ABOVE it when the cursor is within 100 of the bottom -- the
+ * comparison is `cursorY <= H - 100`, so "near the bottom" is the ELSE.
+ */
+void __cdecl DrawTooltip(const char *text, uint8_t colour)
+{
+    const int16_t *cur = (const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
+    int32_t        w   = TextExtent(text, 0, (int32_t *)0);
+    int32_t        x   = cur[0] - w / 2;
+    int32_t        y;
+    AM2_Rect       box;
+
+    if (x + w + AM2_TIP_PAD > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
+        x = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w - AM2_TIP_PAD;
+
+    if (cur[1] > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+                 - AM2_TIP_BOTTOM_MARGIN)
+        y = cur[1] - AM2_TIP_ABOVE;
+    else
+        y = cur[1] + AM2_TIP_BELOW;
+
+    RectSet(&box, x, y, x + w + AM2_TIP_PAD, y + AM2_TIP_HEIGHT);
+
+    /* Outside the lock, and that is not a style choice -- see above. */
+    ClearRegion((const RECT *)&box,
+                *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID);
+
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+        return;
+
+    DrawText(x + AM2_TIP_TEXT_DX, y - AM2_TIP_TEXT_DY, text, 0, 0, colour);
+
+    UnlockSurface();
+}
+
+/* 0x004194E0. The panel's painter: the base, then at most one tooltip.
+ *
+ * In a NETWORK GAME it walks the build menu looking for the record whose
+ * rectangle contains the cursor and shows that unit's name. Otherwise -- and
+ * also when nothing is hovered -- it shows the panel's own caption if one is
+ * set, title-cased in place first.
+ *
+ * IT WALKS THE SAME EIGHTEEN RECORDS AS THE GREYING LOOP FROM A DIFFERENT
+ * FIELD. HudPanelUpdate reads BUILD_MENU_OFF_ID at +0x00 and steps from
+ * ADDR_BUILD_MENU; this reads the rectangle at +0x28 and steps from 0x0C lower
+ * so that its own +0 lands on it. Same table, same stride, two offsets.
+ *
+ * The caption is the one-frame buffer HudPanelUpdate empties at the top of
+ * every update -- so what this draws is whatever was set THIS frame, by the
+ * radar or by nothing.
+ */
+void __attribute__((thiscall)) HudPanelPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t *self = (uint8_t *)w;
+    char    *cap;
+
+    WidgetPaint(w, clip);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        const uint8_t *rec;
+
+        for (rec = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU)
+                   + BUILD_MENU_OFF_RECT;
+             rec < (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_END)
+                   + BUILD_MENU_OFF_RECT - AM2_BUILD_MENU_STRIDE;
+             rec += AM2_BUILD_MENU_STRIDE) {
+            AM2_Rect box;
+
+            RectSet(&box,
+                    ((const int32_t *)rec)[0] + w->rect.left,
+                    ((const int32_t *)rec)[1] + w->rect.top,
+                    ((const int32_t *)rec)[2] + ((const int32_t *)rec)[0]
+                        + w->rect.left,
+                    ((const int32_t *)rec)[3] + ((const int32_t *)rec)[1]
+                        + w->rect.top);
+
+            if (PointInRect(&box,
+                            (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                DrawTooltip((const char *)(rec - BUILD_MENU_OFF_RECT
+                                           + BUILD_MENU_OFF_NAME),
+                            *(const uint8_t *)(uintptr_t)
+                                ADDR_BACKGROUND_COLOUR);
+        }
+    }
+
+    cap = (char *)(self + HUDPANEL_OFF_CAPTION);
+    if (*cap) {
+        TitleCaseName(cap);
+        DrawTooltip(cap, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+    }
+}
 
 void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w)
 {
@@ -7037,6 +7146,10 @@ int widget_install(void)
                         "OpenGameMenu", 0);
     rc |= patch_replace(ADDR_OPEN_MESSAGE, (const void *)OpenMessage,
                         "OpenMessage", 0);
+    rc |= patch_replace(ADDR_DRAW_TOOLTIP, (const void *)DrawTooltip,
+                        "DrawTooltip", 2);
+    rc |= patch_replace(ADDR_HUD_PANEL_PAINT, (const void *)HudPanelPaint,
+                        "HudPanelPaint", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_UPDATE, (const void *)HudRadarUpdate,
                         "HudRadarUpdate", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,

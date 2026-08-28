@@ -483,6 +483,23 @@
 #define HUDPANEL_OFF_CAPTION   0x8Cu  /* char[], emptied every update */
 #define ADDR_HUD_PANEL_UPDATE  0x004193C0u  /* thiscall void(obj) */
 #define ADDR_HUD_RADAR_UPDATE  0x00414890u  /* thiscall void(obj) */
+#define ADDR_HUD_PANEL_PAINT   0x004194E0u  /* thiscall void(obj, RECT) */
+/* 0x00414620, two callers and both are that paint. A TOOLTIP: measure the
+ * text, centre it on the cursor, clamp it to the bitmap area, fill a box and
+ * draw the string in it. One of the 29 functions that bracket LockSurface --
+ * and a whole one, unlike the line drawers, which lock and leave the unlock to
+ * their caller. */
+#define ADDR_DRAW_TOOLTIP      0x00414620u  /* void(const char *, uint8_t) */
+/* 0x00446930, cdecl, six arguments and `ret 0`. NOT DrawTextClipped, which is
+ * 0x00446AB0 and reconstructed -- the names are close and the functions are
+ * not. This one stays in the image. */
+#define AM2_TIP_PAD            6   /* box is text + 6 wide */
+#define AM2_TIP_HEIGHT         12
+#define AM2_TIP_ABOVE          10  /* cursor - 10 when near the bottom */
+#define AM2_TIP_BELOW          18  /* cursor + 18 otherwise */
+#define AM2_TIP_BOTTOM_MARGIN  100 /* "near the bottom" is within this */
+#define AM2_TIP_TEXT_DX        3
+#define AM2_TIP_TEXT_DY        1
 /* What the radar writes into the panel's caption when the mouse goes quiet. */
 #define ADDR_STR_STRATMAP      0x00476A10u  /* "Stratmap" */
 #define AM2_MOUSE_IDLE_MS      0x3E8        /* one second */
