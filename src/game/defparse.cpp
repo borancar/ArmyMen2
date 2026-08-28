@@ -23,6 +23,9 @@ typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
 #define orig_bsearch (*(AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
 #define kDefLinkCap    (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_CAP))
 #define kDefObjRecs      (*(void **)AM2_IMAGE(ADDR_DEF_OBJ_RECS))
+#define kDefTrooperRecs  (*(void **)AM2_IMAGE(ADDR_DEF_TROOPER_RECS))
+#define kDefTrooperCount (*(int32_t *)AM2_IMAGE(ADDR_DEF_TROOPER_COUNT))
+#define kDefTrooperCap   (*(int32_t *)AM2_IMAGE(ADDR_DEF_TROOPER_CAP))
 #define kDefObjRecCount  (*(int32_t *)AM2_IMAGE(ADDR_DEF_OBJ_REC_COUNT))
 
 #define kDefLinks      (*(AM2_DefLink **)AM2_IMAGE(ADDR_DEF_LINKS))
@@ -149,6 +152,94 @@ void __cdecl DefAddObjRec(const int32_t *rec)
         tab[n * AM2_DEF_OBJ_REC_DWORDS + i] = rec[i];
 
     kDefObjRecCount = n + 1;
+}
+
+/* 0x0044CCC0 and 0x0044CF70, the append and the free of a THIRD def table.
+ *
+ * It is the same machinery as DefAddObjRec above and the same two constants --
+ * fifty records to begin with, 0x640 being 50 * 32, then twenty more at a time
+ * -- over 32-byte records instead of 56. What identifies it is the parser that
+ * fills it, 0x0044CD70, which is still original: it splits lines on
+ * ADDR_DEF_SEPARATORS, reads fields with DefParseNumber, writes a small
+ * integer into the record's first dword, and rejects a line it cannot classify
+ * with "Bad Trooper Type". That first dword is also the whole key -- the table
+ * is sorted and searched with ADDR_COMPARE_DWORD, which subtracts one dword
+ * from one dword and looks no further.
+ *
+ * THE THREE GLOBALS ARE data, count, capacity, WHICH IS NOT THE ORDER THE UID
+ * REMAP TABLE USES. That one is capacity, count, data at 0x00513080. Two
+ * growable arrays in one image with the fields the other way round is the sort
+ * of thing that reads as a transcription slip when it is the original; the
+ * order here is fixed by `cmp [0x659F50], ecx` deciding the grow, exactly as
+ * it was fixed there by the opposite compare.
+ *
+ * UNLIKE DefAddObjRec THERE IS NO DUPLICATE SCAN. It appends whatever it is
+ * given. The parser does the searching instead -- it bsearches the table for
+ * the key before deciding to append -- so the refusal lives one level up, in
+ * code that is still original.
+ *
+ * Neither checks its allocator, and the capacity is raised before the realloc
+ * and kept either way, which is the same accepted hazard as the uid remap
+ * pair. The free zeroes count and capacity BEFORE releasing the pointer, which
+ * is DefFreeTables' order below rather than the uid remap's.
+ *
+ * THE SORT IS DELIBERATELY LEFT ORIGINAL. 0x0044CD40 qsorts this table and
+ * then TAIL-JUMPS to 0x0045CAA0, which is ADDR_LOG -- an address
+ * src/inject/gamelog.c patches, so naming it here is a seam checkseams
+ * refuses. It is a bare `ret` that identical-COMDAT folding has merged with
+ * the stubbed logger, the same case CLAUDE.md records for a widget vtable's
+ * slot 2, and reproducing the jump would mean deciding what the folded
+ * function was. Not decided, so not written.
+ *
+ * BOTH RUN AT STARTUP, unlike the other two tables' halves. A Boot Camp drive
+ * reads DefAddTrooperRec 8 and DefFreeTrooperRecs 1, while DefAddObjRec and
+ * DefAddLink beside them read 0 for the usual reason -- their callers are
+ * ours. So these two are compared by the A/B rather than verified by reading,
+ * and the eight appends exercise the initial malloc but not the grow: fifty
+ * records is the initial capacity and eight is well inside it.
+ */
+void __cdecl DefAddTrooperRec(const void *rec)
+{
+    uint8_t *tab = (uint8_t *)kDefTrooperRecs;
+    int32_t  cap;
+    int32_t  n;
+
+    if (tab == (uint8_t *)0) {
+        tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                    * AM2_DEF_TROOPER_REC_SIZE);
+        cap = AM2_DEF_LINK_INITIAL;
+        kDefTrooperRecs = tab;
+        kDefTrooperCap  = cap;
+    } else {
+        cap = kDefTrooperCap;
+    }
+
+    if (kDefTrooperCount >= cap) {
+        cap += AM2_DEF_LINK_GROW;
+        kDefTrooperCap = cap;
+        tab = (uint8_t *)am2_realloc(
+                  tab, (size_t)cap * AM2_DEF_TROOPER_REC_SIZE);
+        kDefTrooperRecs = tab;
+    }
+
+    n = kDefTrooperCount;
+    for (int32_t i = 0; i < (int32_t)(AM2_DEF_TROOPER_REC_SIZE / 4); i++)
+        ((int32_t *)(tab + n * AM2_DEF_TROOPER_REC_SIZE))[i] =
+            ((const int32_t *)rec)[i];
+
+    kDefTrooperCount = n + 1;
+}
+
+void __cdecl DefFreeTrooperRecs(void)
+{
+    uint8_t *recs = (uint8_t *)kDefTrooperRecs;
+
+    kDefTrooperCount = 0;
+    kDefTrooperCap   = 0;
+
+    if (recs != (uint8_t *)0)
+        am2_free(recs);
+    kDefTrooperRecs = (void *)0;
 }
 
 /* 0x00435E60. Drop both def tables. Role name.
@@ -476,6 +567,11 @@ int defparse_install(void)
                         "DefObjLine", 1);
     rc |= patch_replace(ADDR_DEF_ADD_OBJ_REC, (const void *)DefAddObjRec,
                         "DefAddObjRec", 1);
+    rc |= patch_replace(ADDR_DEF_ADD_TROOPER_REC,
+                        (const void *)DefAddTrooperRec, "DefAddTrooperRec", 1);
+    rc |= patch_replace(ADDR_DEF_FREE_TROOPER_RECS,
+                        (const void *)DefFreeTrooperRecs,
+                        "DefFreeTrooperRecs", 2);
     rc |= patch_replace(ADDR_DEF_FREE_TABLES, (const void *)DefFreeTables,
                         "DefFreeTables", 3);
     return rc;

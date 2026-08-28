@@ -78,6 +78,13 @@ AM2_DefLink *__cdecl DefFindLink(int32_t parent, int32_t siblings);
 
 int defparse_install(void);
 
+
+/* 0x0044CCC0 and 0x0044CF70. The third def table -- 32-byte records keyed on
+ * their first dword, filled by the still-original parser at 0x0044CD70 whose
+ * rejection message is "Bad Trooper Type". Append one, and drop the lot. */
+void __cdecl DefAddTrooperRec(const void *rec);
+void __cdecl DefFreeTrooperRecs(void);
+
 #ifdef __cplusplus
 }
 #endif

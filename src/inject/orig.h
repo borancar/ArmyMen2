@@ -4114,6 +4114,34 @@ typedef struct {
 #define ADDR_DEF_OBJ_RECS          0x00516170u
 #define ADDR_DEF_OBJ_REC_COUNT     0x00516174u
 #define AM2_DEF_OBJ_REC_SIZE       0x38u
+/* A THIRD def table, in the same shape as the two above and parsed with the
+ * same machinery -- ADDR_DEF_SEPARATORS and ADDR_DEF_PARSE_NUMBER -- by
+ * 0x0044CD70, whose rejection message is "Bad Trooper Type". Its records are
+ * 32 bytes, keyed on their FIRST dword alone, which is what
+ * ADDR_COMPARE_DWORD compares and what 0x0044CD70 bsearches with before it
+ * appends. That parser writes small integers (6, 7, ...) into that first
+ * dword, so the key is the trooper type its own message names.
+ *
+ * Fifty records to begin with -- 0x640 is 50 * 32 -- then twenty more at a
+ * time, which is AM2_DEF_LINK_INITIAL and AM2_DEF_LINK_GROW exactly. The
+ * three globals are data, count, capacity, the same order as
+ * ADDR_DEF_OBJ_RECS and NOT the order the uid remap table uses. Two halves
+ * reconstructed and both run at startup -- 8 appends and 1 free on a Boot Camp
+ * drive, so the A/B compares them; see below for the third. */
+#define ADDR_DEF_TROOPER_RECS      0x00659F4Cu
+#define ADDR_DEF_TROOPER_COUNT     0x00659F50u
+#define ADDR_DEF_TROOPER_CAP       0x00659F54u
+#define AM2_DEF_TROOPER_REC_SIZE   0x20u
+#define ADDR_DEF_ADD_TROOPER_REC   0x0044CCC0u  /* void(const void *rec) */
+#define ADDR_DEF_FREE_TROOPER_RECS 0x0044CF70u  /* void(void) */
+/* 0x0044CD40 is the third: qsort the table with ADDR_COMPARE_DWORD and then
+ * TAIL-JUMP to 0x0045CAA0. That address is ADDR_LOG, which src/inject/gamelog.c
+ * patches -- so naming it in src/game would be a seam checkseams refuses, and
+ * rightly: the jump is to a bare `ret` that identical-COMDAT folding has merged
+ * with the stubbed logger, exactly the case CLAUDE.md describes for vtable slot
+ * 2. Left original rather than reconstructed around, since reproducing it needs
+ * a decision about what that folded function WAS. */
+#define ADDR_DEF_SORT_TROOPER_RECS 0x0044CD40u  /* void(void), left original */
 #define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
 #define ADDR_CRT_QSORT             0x004660B2u
 #define ADDR_CRT_BSEARCH           0x00466280u
