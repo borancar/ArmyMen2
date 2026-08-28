@@ -1180,6 +1180,71 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
     return total;
 }
 
+/* 0x0045B690, two callers, 112 bytes. The sibling of BlockWeightAt above, and
+ * the two differences are the whole of it.
+ *
+ * THE CHAIN IS GIVEN, NOT QUERIED. Both callers run ObjectsAtPoint themselves
+ * and hand the head in, so this does no lookup; it still walks
+ * OBJ_OFF_QUERY_NEXT and still stops the moment the total reaches
+ * AM2_BLOCK_FULL. That is why it is 112 bytes where its sibling is 176.
+ *
+ * THE TERRAIN TERM IS THE OTHER BIT, AND THE OTHER WAY ROUND. BlockWeightAt
+ * penalises AM2_TILE_BLOCKS being SET; this penalises AM2_TILE_OPEN being
+ * CLEAR. Two bits of one table asked opposite questions, which is worth
+ * transcribing carefully rather than reading as a copy of the sibling -- a
+ * `jne` where the sibling has a `je` is one character in a disassembly and
+ * inverts the whole terrain contribution. There is no height step here at all.
+ *
+ * The argument shuffle is the sibling's: this function's point goes into
+ * ObjBlockWeight's unused third parameter and `ref` into its fourth.
+ *
+ * One caller passes a LITERAL 0 as the object, so ObjBlockWeight's no-viewer
+ * arm -- the one that skips the height test and returns AM2_BLOCK_FULL for
+ * anything that is not an item -- is genuinely reachable and not merely
+ * defensive. The same caller picks between this and 0x0045B7E0 on a value
+ * being 5, so there is at least a third member of this family unread.
+ *
+ * ITS DEAD GUARD IS SPELLED DIFFERENTLY FROM THE SIBLING'S, which is the
+ * reason to write it out twice rather than once. BlockWeightAt masks and then
+ * tests signed 32-bit; this tests `ax` UNSIGNED against 0xFFFF first and masks
+ * afterwards. Neither can fire and both reach a `return 0xFF`. Two spellings
+ * of one vacuous check is evidence the compiler produced them from different
+ * source, not that one is a transcription slip.
+ *
+ * MEASURED AT 0, and here that matters more than usual. Both callers are the
+ * original's and reach this by address, so the counter is not blind -- they
+ * simply do not run on any drive this project has, while BlockWeightAt beside
+ * it reads 8 on the same run. So every word above is verified by reading and
+ * by nothing else, and the inverted terrain term is precisely the kind of
+ * one-character error no A/B here could ever report. That is why the polarity
+ * is spelled out rather than left to the code.
+ */
+int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
+                                 uint32_t ref)
+{
+    uint8_t *o     = (uint8_t *)chain;
+    int32_t  total = 0;
+    uint32_t tile;
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        total += ObjBlockWeight(from, o, (int32_t)at, ref);
+        if (total >= AM2_BLOCK_FULL)
+            return total;
+    }
+
+    tile = (uint32_t)TileOfPoint(at);
+    /* The original's guard, on the low 16 bits and before the mask below.
+       Vacuous; see above. */
+    if ((tile & 0xFFFFu) > 0xFFFFu)
+        return 0xFF;
+    tile &= 0xFFFFu;
+
+    if (!(g_tileFlags[tile] & AM2_TILE_OPEN))
+        total += AM2_BLOCK_FULL;
+
+    return total;
+}
+
 /* 0x0042A820, five callers. The ground height at a point, raised by anything
  * standing on it.
  *
@@ -3502,6 +3567,8 @@ void item_install(void)
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
                   "BlockWeightAt", 3);
+    patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,
+                  "BlockWeightChain", 2);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

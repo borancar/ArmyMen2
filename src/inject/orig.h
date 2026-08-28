@@ -4286,6 +4286,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * name is ours and says only what the table is indexed by. */
 #define ADDR_TILE_FLAGS            0x00514ED0u /* uint8_t *, one per tile index */
 #define AM2_TILE_BLOCKS            0x80u  /* the bit BlockWeightAt reads */
+/* Bit 0, and its polarity is the OPPOSITE of AM2_TILE_BLOCKS: BlockWeightChain
+ * penalises a tile whose bit 0 is CLEAR. So the two bits are asked different
+ * questions -- 0x80 set blocks, 0x01 clear blocks -- and the reading that bit
+ * 0 means "open" follows from that polarity and from nothing else. Eleven of
+ * the 23 sites on ADDR_TILE_FLAGS test this bit. */
+#define AM2_TILE_OPEN              0x01u
+/* 0x0045B690, two callers, 112 bytes. The same accumulation as
+ * ADDR_BLOCK_WEIGHT_AT with two differences: the object chain is GIVEN rather
+ * than queried -- both callers run ADDR_OBJECTS_AT_POINT themselves -- and the
+ * terrain term is AM2_TILE_OPEN rather than AM2_TILE_BLOCKS, with no height
+ * step at all. Reconstructed.
+ *
+ * One caller passes a literal 0 as the object, so the no-viewer arm of
+ * ADDR_OBJ_BLOCK_WEIGHT is reached from here and not only in principle. The
+ * other picks between this and 0x0045B7E0 on a value being 5. Counter measured
+ * at 0 -- not blind, just unreached -- so it is verified by reading. */
+#define ADDR_BLOCK_WEIGHT_CHAIN    0x0045B690u /* int32_t(void*,uint32,void*,uint32) */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
  * removal always clears. */
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */

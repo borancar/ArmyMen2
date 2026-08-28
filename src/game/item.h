@@ -155,6 +155,11 @@ int32_t __cdecl TileAttrAt(uint32_t tile);
  * `ref` is the reference point ObjBlockWeight compares distances against. */
 int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref);
 
+/* 0x0045B690. The same total for a chain the caller has already collected,
+ * with the tile term on AM2_TILE_OPEN and no height step. */
+int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
+                                 uint32_t ref);
+
 /* 0x0042A820. The ground height at a point, raised by any ITEM standing on
  * it. A byte return -- see item.cpp. */
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
