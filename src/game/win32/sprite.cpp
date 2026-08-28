@@ -1802,13 +1802,16 @@ void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
  * that 0x00408E00 takes the first sprite's bounds.right, doubles it and adds
  * ADDR_BITMAP_AREA_W, which is a layout number and not an identity.
  *
- * THE FREE ZEROES FAR MORE THAN THE LOAD FILLED. It releases exactly the
- * thirty-two sprites the load created, and then memsets 179 DWORDS from the
- * first array -- 716 bytes, running well past the eleven-entry array and up to
- * 0x004F96A4. So something else keeps sprite pointers in the same block and
- * this clears them too. Reproduced with the count the original uses rather
- * than the count it walks, because those are different numbers and the
- * difference is the interesting part.
+ * THE FREE ZEROES FAR MORE THAN THE LOAD FILLED, AND THE EXTRA IS NOT SPRITES.
+ * It releases exactly the thirty-two sprites the load created, then memsets
+ * 179 DWORDS from the first array -- 716 bytes, ending at 0x004F96A4. That
+ * address is ADDR_AIR_SAVE_BLOCK + 0x248, the last byte of the air-support
+ * state, so the sweep takes the sprite arrays and the whole queue with them
+ * and stops exactly there.
+ *
+ * This entry first read "something else keeps sprite pointers in the same
+ * block", which was a guess standing in for the arithmetic. Doing the
+ * arithmetic named the set: these are the AIR SUPPORT sprites.
  *
  * The alias is one `jmp`, the same shape as FreeSpriteListAlias, and it is the
  * ONLY way in: the free itself has no other reference in the image. So both
@@ -1820,55 +1823,92 @@ void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
  * itself, which is what makes the load's failure path harmless here.
  *
  * MEASURED, AND THE THREE COUNTS CONFIRM THE ALIAS CLAIM. On a driven Boot
- * Camp mission LoadSprites19 reads 1, FreeSprites19Alias reads 1, and
- * FreeSprites19 reads 0 -- which is what "the alias is the only way in"
+ * Camp mission LoadAirSprites reads 1, FreeAirSpritesAlias reads 1, and
+ * FreeAirSprites reads 0 -- which is what "the alias is the only way in"
  * predicts, since the alias is ours and calls it by name. A second reference
  * to the free would have shown up as a non-zero count here.
  *
  * These sprites reach the screen, so a wrong index or a wrong count would move
  * the A/B's pixels rather than hiding; bootcamp's twenty-two is the check.
  */
-void __cdecl LoadSprites19(void)
+void __cdecl LoadAirSprites(void)
 {
     AM2_Sprite **p;
     int32_t      i;
 
-    *(AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_2 =
-        PreloadSprite(AM2_SPRITE_SET_19, 2, 0, 0x1000, 1);
+    *(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2 =
+        PreloadSprite(AM2_AIR_SPRITE_SET, 2, 0, 0x1000, 1);
 
     i = 0;
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_3;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6; p++, i++)
-        *p = PreloadSprite(AM2_SPRITE_SET_19, 3, i, 0x1000, 1);
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6; p++, i++)
+        *p = PreloadSprite(AM2_AIR_SPRITE_SET, 3, i, 0x1000, 1);
 
     i = 0;
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_EDGE; p++, i++)
-        *p = PreloadSprite(AM2_SPRITE_SET_19, 6, i, 0x1000, 1);
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_EDGE; p++, i++)
+        *p = PreloadSprite(AM2_AIR_SPRITE_SET, 6, i, 0x1000, 1);
 }
 
-void __cdecl FreeSprites19(void)
+void __cdecl FreeAirSprites(void)
 {
     AM2_Sprite **p;
 
-    ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_2);
+    ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2);
 
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_3;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6; p++)
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6; p++)
         ReleaseSprite(*p);
 
-    for (p = (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_6;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_SPRITES_19_EDGE; p++)
+    for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6;
+         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_EDGE; p++)
         ReleaseSprite(*p);
 
     /* 179 dwords, not the 32 released above -- see the note. */
-    memset((void *)(uintptr_t)ADDR_SPRITES_19_2, 0,
-           AM2_SPRITES_19_CLEAR * 4);
+    memset((void *)(uintptr_t)ADDR_AIR_SPRITES_2, 0,
+           AM2_AIR_SPRITES_CLEAR * 4);
 }
 
-void __cdecl FreeSprites19Alias(void)
+void __cdecl FreeAirSpritesAlias(void)
 {
-    FreeSprites19();
+    FreeAirSprites();
+}
+
+/* 0x00408E00. The air-support reset, and the only caller of the load. Free the
+ * sprites through the alias, put both queue lengths back to zero, load the
+ * sprites again, and measure the gauge track.
+ *
+ * IT FREES BEFORE IT LOADS, which is what makes it a reset rather than a
+ * loader: the free's memset is what clears the rest of the air block, so the
+ * two stores here are the only state it has to clear by hand -- and they are
+ * the two the memset would clear anyway. The original writes them regardless.
+ * Reproduced, because a reset that depends on the free's overreach for its
+ * correctness is worth being able to see.
+ *
+ * THE TRACK IS COMPUTED FROM THE SPRITE AND SKIPPED WHEN THERE IS NONE. A
+ * failed load leaves ADDR_AIR_SPRITES_2 null and the original simply does not
+ * write ADDR_AIR_SPRITES_EDGE -- so it keeps whatever the memset left, which
+ * is zero. The null test is the original's and not defensive tidying.
+ *
+ * 640 + 2 * bounds.right is the length 0x00409166 slides that sprite along,
+ * scaling it by AIR_OFF_ACTIVE over the constant at 0x00473F30. Twice the
+ * width, so the sprite is off both ends at the extremes.
+ */
+void __cdecl ResetAirSupport(void)
+{
+    AM2_Sprite *first;
+
+    FreeAirSpritesAlias();
+
+    *(int32_t *)(uintptr_t)(ADDR_AIR_SAVE_BLOCK + AIR_OFF_COUNT) = 0;
+    *(int32_t *)(uintptr_t)(ADDR_AIR_SAVE_BLOCK + AIR_OFF_PASS_COUNT) = 0;
+
+    LoadAirSprites();
+
+    first = *(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2;
+    if (first)
+        *(int32_t *)(uintptr_t)ADDR_AIR_SPRITES_EDGE =
+            *(int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W + first->bounds.right * 2;
 }
 
 int sprite_install(void)
@@ -1920,13 +1960,15 @@ int sprite_install(void)
                         "LoadBitmap", 9);
     rc |= patch_replace(ADDR_ARMY_SPRITE_BASE, (const void *)ArmySpriteBase,
                         "ArmySpriteBase", 2);
-    rc |= patch_replace(ADDR_LOAD_SPRITES_19, (const void *)LoadSprites19,
-                        "LoadSprites19", 1);
-    rc |= patch_replace(ADDR_FREE_SPRITES_19, (const void *)FreeSprites19,
-                        "FreeSprites19", 1);
-    rc |= patch_replace(ADDR_FREE_SPRITES_19_ALIAS,
-                        (const void *)FreeSprites19Alias,
-                        "FreeSprites19Alias", 2);
+    rc |= patch_replace(ADDR_LOAD_AIR_SPRITES, (const void *)LoadAirSprites,
+                        "LoadAirSprites", 1);
+    rc |= patch_replace(ADDR_FREE_AIR_SPRITES, (const void *)FreeAirSprites,
+                        "FreeAirSprites", 1);
+    rc |= patch_replace(ADDR_RESET_AIR_SUPPORT, (const void *)ResetAirSupport,
+                        "ResetAirSupport", 0);
+    rc |= patch_replace(ADDR_FREE_AIR_SPRITES_ALIAS,
+                        (const void *)FreeAirSpritesAlias,
+                        "FreeAirSpritesAlias", 2);
     rc |= patch_replace(ADDR_PRELOAD_ARMY_SPRITE,
                         (const void *)PreloadArmySprite,
                         "PreloadArmySprite", 16);

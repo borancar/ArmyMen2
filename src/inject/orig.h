@@ -1529,8 +1529,20 @@
  * what checkpatches refused.
  *
  * Four parallel arrays of thirty, filled by DoAirSupport (0x00409710, which
- * refuses at thirty) and drained from the head. The layout closes the block
- * exactly: 0x0244 is the last dword of 584. */
+ * refuses at thirty) and drained from the head.
+ *
+ * IT DID NOT CLOSE THE BLOCK, WHICH THIS COMMENT USED TO CLAIM. AIR_OFF_EXTRA
+ * ends at 0x01EC and AIR_OFF_FLAG_A begins at 0x0240, leaving 84 bytes the
+ * layout said nothing about. They are a SECOND queue, and 0x004093E7 gives its
+ * bound outright as `cmp eax, 8; jge` -- eight dwords, eight dwords, eight
+ * words, and then the two flags, which tiles the span exactly. The push at
+ * 0x004093F0 fills it from the head of the main queue: the point out of
+ * AIR_OFF_WHERE, a 1, and a word from 0x0042A7A0. 0x00408EC0 drains it the
+ * same way AIR_POP drains the main one.
+ *
+ * A layout that does not tile is one where a base is wrong -- the rule the
+ * trig tables taught. Here it was not a wrong base but a missing field, and
+ * the comment asserting closure is what hid it. */
 #define AIR_OFF_ACTIVE           0x000u  /* int32_t, 1 while one is running */
 #define AIR_OFF_PENDING          0x004u  /* int32_t, cleared as one retires */
 #define AIR_OFF_COUNT            0x008u  /* int32_t, at most 30 */
@@ -1538,6 +1550,11 @@
 #define AIR_OFF_KIND             0x084u  /* int32_t[30], 2 or 3 */
 #define AIR_OFF_FROM             0x0FCu  /* uint32_t[30], the uid asking */
 #define AIR_OFF_EXTRA            0x174u  /* int32_t[30], what 0x00409680 found */
+#define AIR_OFF_PASS_COUNT       0x1ECu  /* int32_t, at most 8 */
+#define AIR_OFF_PASS_LIVE        0x1F0u  /* int32_t[8], written 1 */
+#define AIR_OFF_PASS_WHERE       0x210u  /* int32_t[8], from AIR_OFF_WHERE */
+#define AIR_OFF_PASS_TAG         0x230u  /* int16_t[8], from 0x0042A7A0 */
+#define AM2_AIR_PASS_MAX         8
 #define AIR_OFF_FLAG_A           0x240u  /* int32_t, set and cleared together */
 #define AIR_OFF_FLAG_B           0x244u  /* int32_t, with the above */
 #define AM2_AIR_MAX              30
@@ -3976,26 +3993,40 @@ typedef struct {
  * addresses -- so nothing available here distinguishes the two pairs. Named
  * for the use rather than merged with the other pair on a guess. */
 #define ADDR_BITMAP_AREA_W        0x00485318u  /* int32_t, 640 */
-/* Sprite SET 19, loaded and freed as a block by 0x00408D20 and 0x00408DA0.
- * One sprite from index 2, twenty from index 3, eleven from index 6. What set
- * 19 IS is not established -- the names say only which set and index each
- * array holds, which is all the two functions show.
+/* Sprite SET 19 is the AIR SUPPORT set, and three independent things say so.
+ * ADDR_AIR_FRAME_DRAW draws ADDR_AIR_SPRITES_2 at 0x004091A4 and reads the
+ * air block two instructions later; the reset below zeroes AIR_OFF_COUNT and
+ * the eight-slot sub-queue while reloading exactly these sprites; and the
+ * free's memset ends at 0x004F96A4, which is ADDR_AIR_SAVE_BLOCK + 0x248, the
+ * block's last byte. That last one is arithmetic rather than reading, and it
+ * is what turns "something else lives in this block" into a fact.
  *
- * ADDR_SPRITES_19_EDGE is not part of the arrays: it sits immediately past
- * them and 0x00408E00 computes it as ADDR_BITMAP_AREA_W plus twice the first
- * sprite's bounds.right. */
-#define ADDR_SPRITES_19_2        0x004F93D8u  /* AM2_Sprite * */
-#define ADDR_SPRITES_19_3        0x004F93DCu  /* AM2_Sprite *[20] */
-#define ADDR_SPRITES_19_6        0x004F942Cu  /* AM2_Sprite *[11] */
-#define ADDR_SPRITES_19_EDGE     0x004F9458u  /* int32_t */
-#define AM2_SPRITE_SET_19        0x13
-#define AM2_SPRITES_19_CLEAR     0xB3  /* dwords the free zeroes: 179, not 32 */
+ * The names were ADDR_SPRITES_19_*, recorded when the set was unidentified.
+ * The set and index each array holds are still in the comment because they are
+ * what the loader passes; what changed is that the family now has a name.
+ *
+ * ADDR_AIR_SPRITES_EDGE is NOT part of the arrays. It sits immediately past
+ * them and one below the air block, and 0x00408E00 computes it as
+ * ADDR_BITMAP_AREA_W plus twice the first sprite's bounds.right -- the length
+ * of the track the gauge at 0x00409166 slides that sprite along. */
+#define ADDR_AIR_SPRITES_2       0x004F93D8u  /* AM2_Sprite *, set 19 index 2 */
+#define ADDR_AIR_SPRITES_3       0x004F93DCu  /* AM2_Sprite *[20], index 3 */
+#define ADDR_AIR_SPRITES_6       0x004F942Cu  /* AM2_Sprite *[11], index 6 */
+#define ADDR_AIR_SPRITES_EDGE    0x004F9458u  /* int32_t, the gauge track */
+#define AM2_AIR_SPRITE_SET       0x13
+/* Dwords the free zeroes: 179, where it releases 32. 0x004F93D8 + 179*4 is
+ * 0x004F96A4, and ADDR_AIR_SAVE_BLOCK + 0x248 is 0x004F96A4 -- so the sweep
+ * takes the sprite arrays AND the whole air-support state, exactly, with
+ * nothing over either end. */
+#define AM2_AIR_SPRITES_CLEAR    0xB3
 /* 0x00408D20 loads them and 0x00408DA0 frees them; 0x00408E40 is one `jmp` to
  * the free, the same shape as ADDR_FREE_SPRITE_LIST_ALIAS, and is the ONLY way
- * in -- the free itself has no other reference. Reconstructed, all three. */
-#define ADDR_LOAD_SPRITES_19     0x00408D20u  /* void(void) */
-#define ADDR_FREE_SPRITES_19     0x00408DA0u  /* void(void) */
-#define ADDR_FREE_SPRITES_19_ALIAS 0x00408E40u  /* void(void), one jmp */
+ * in -- the free itself has no other reference. 0x00408E00 is the reset that
+ * drives both. Reconstructed, all four. */
+#define ADDR_LOAD_AIR_SPRITES    0x00408D20u  /* void(void) */
+#define ADDR_FREE_AIR_SPRITES    0x00408DA0u  /* void(void) */
+#define ADDR_FREE_AIR_SPRITES_ALIAS 0x00408E40u /* void(void), one jmp */
+#define ADDR_RESET_AIR_SUPPORT   0x00408E00u  /* void(void) */
 #define ADDR_BITMAP_AREA_H        0x0048531Cu  /* int32_t, 480 */
 /* The pause bits that mean "the map is still loading", which is what puts the
  * wait bitmap up. Four bits, 17 through 20, tested as a group. */

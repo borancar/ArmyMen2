@@ -208,9 +208,13 @@ int32_t __cdecl ArmySpriteBase(void);
 /* 0x00408D20, 0x00408DA0 and its alias 0x00408E40. Load and free sprite set
  * 19 as a block -- 1 + 20 + 11 sprites. The free zeroes 179 dwords, far more
  * than the 32 it releases. */
-void __cdecl LoadSprites19(void);
-void __cdecl FreeSprites19(void);
-void __cdecl FreeSprites19Alias(void);
+void __cdecl LoadAirSprites(void);
+void __cdecl FreeAirSprites(void);
+void __cdecl FreeAirSpritesAlias(void);
+
+/* Original: 0x00408E00. Reload the air-support sprites and put the queue back
+ * to empty -- the level-load reset for the whole subsystem. */
+void __cdecl ResetAirSupport(void);
 void *__cdecl PreloadArmySprite(int32_t set, int32_t index, int32_t frame,
                                 int32_t flags);
 
