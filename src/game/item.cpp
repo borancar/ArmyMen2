@@ -1870,8 +1870,8 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
  * costs. The call sites decide it instead: all three callers of this address
  * are the pickup family, and each names itself in a log line --
  * "TrooperPickupItem %x", "TrooperHostApprovedPickupItem %x" and
- * "TrooperRemotePickupItem %x". Kind 8 is then `dropped` by elimination, which
- * is weaker, so 0x00427F60 is left alone rather than named on it.
+ * "TrooperRemotePickupItem %x". Kind 8 is settled the same way rather than by
+ * elimination -- see NotifyDropped below.
  *
  * The two objects go in the order the template fixes -- first argument first
  * -- which for `pickedup <a> by <b>` makes the first the item and the second
@@ -1907,6 +1907,54 @@ static void __cdecl NotifyPickedUp(void *item, void *taker)
     }
 
     EventNotify(AM2_EVENT_PICKED_UP,
+                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                ((const AM2_Object *)item)->uid,
+                ObjEventMask((const AM2_Object *)item),
+                0, 0, 0, 0, 0, 0);
+}
+
+/* 0x00427F60, the fifth and last member of the template, and the same body as
+ * NotifyPickedUp above with 8 where the 7 is. Nothing else differs -- the two
+ * disassemble identically instruction for instruction.
+ *
+ * Kind 8 is `dropped`, and it is evidenced rather than inferred: the address
+ * has exactly one caller and that caller names itself, "TrooperDropItem  %x"
+ * and "TrooperDropItem  %x  ammo: %d" (the double space is the original's).
+ * Having a real call site here matters, because the alternative was to take
+ * `dropped` as the keyword left over once `pickedup` was assigned -- true, and
+ * true for a reason that would not have survived either keyword moving.
+ *
+ * That caller is also what fixes the argument order for the pair, and it is
+ * clearer here than on the pickup side: the object passed first is the one
+ * whose uid it logs, and the last thing it does after this call is write army
+ * 4 -- neutral -- into that object's OBJ_OFF_ARMY. An item going ownerless as
+ * it leaves the trooper's hands. So first is the item and second the trooper,
+ * `dropped <a> by <b>`, matching NotifyDamaged's victim-then-attacker.
+ *
+ * Counter 0 on every drive here, for the same reason as NotifyPickedUp: the
+ * caller is the original's and calls by address, so the patched entry would be
+ * crossed, but nothing in this project drops anything. Verified by reading and
+ * by being the fifth copy of a checked template.
+ */
+static void __cdecl NotifyDropped(void *item, void *dropper)
+{
+    const uint8_t *o = (const uint8_t *)item;
+
+    if (dropper) {
+        const uint8_t *d = (const uint8_t *)dropper;
+
+        EventNotify(AM2_EVENT_DROPPED,
+                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)item)->uid,
+                    ObjEventMask((const AM2_Object *)item),
+                    *(const int32_t *)(d + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)dropper)->uid,
+                    ObjEventMask((const AM2_Object *)dropper),
+                    0, 0, 0);
+        return;
+    }
+
+    EventNotify(AM2_EVENT_DROPPED,
                 *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
                 ((const AM2_Object *)item)->uid,
                 ObjEventMask((const AM2_Object *)item),
@@ -3311,6 +3359,8 @@ void item_install(void)
                   "NotifyDamaged", 2);
     patch_replace(ADDR_NOTIFY_PICKED_UP, (const void *)NotifyPickedUp,
                   "NotifyPickedUp", 1);
+    patch_replace(ADDR_NOTIFY_DROPPED, (const void *)NotifyDropped,
+                  "NotifyDropped", 1);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

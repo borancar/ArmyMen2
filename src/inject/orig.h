@@ -3021,12 +3021,13 @@ typedef struct {
  * kinds 5, 6, 7 and 8, with kind 4 at 0x00427FD0. Kinds 4, 5 and 6 are already
  * killed/hit/healed, so 7 and 8 are the remaining two keywords in order.
  *
- * The three call sites settle which is which rather than leaving it to the
- * ordering: every caller of 0x00427EF0 is a pickup, and each names itself --
+ * The call sites settle both rather than leaving either to the ordering.
+ * Every caller of 0x00427EF0 is a pickup and each names itself --
  * "TrooperPickupItem %x", "TrooperHostApprovedPickupItem %x" and
- * "TrooperRemotePickupItem %x". By elimination kind 8 is `dropped`, which is
- * an inference and not a call site, so 0x00427F60 stays unnamed here. */
+ * "TrooperRemotePickupItem %x" -- and the ONE caller of 0x00427F60 names
+ * itself "TrooperDropItem  %x". So kind 8 is not an elimination either. */
 #define AM2_EVENT_PICKED_UP      7
+#define AM2_EVENT_DROPPED        8
 /* Called twice by ADDR_DAMAGE_OBJECT and by nothing else. Reconstructed. */
 #define ADDR_NOTIFY_DAMAGED      0x00427E10u  /* void(obj, void *attacker) */
 /* 0x00427D40, fifteen callers. The event MASK for an object: one bit per army,
@@ -3885,6 +3886,17 @@ typedef struct {
  * at +0xC8 -- and the second is the trooper, whose army is what the AI sweep
  * beside the call is given. */
 #define ADDR_NOTIFY_PICKED_UP    0x00427EF0u  /* void(void *item, void *taker) */
+/* 0x00427F60, ONE caller, and the same template again with the literal 8 --
+ * the two bodies differ in that byte and in nothing else.
+ *
+ * That caller is TrooperDropItem, off its own two log lines, and it is what
+ * confirms the argument order for BOTH halves of the pair rather than only
+ * this one. The object it passes first is the one whose uid it logs, and its
+ * last act after the notify is to write army 4 -- the neutral army -- into
+ * that object's OBJ_OFF_ARMY -- an item going ownerless as it leaves the
+ * trooper's hands. So first is the item and second the trooper here too,
+ * which is `dropped <a> by <b>`. */
+#define ADDR_NOTIFY_DROPPED      0x00427F60u  /* void(void *item, void *dropper) */
 /* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
  * health, then notify. The percentage is clamped to 0..100 first, and the
  * result to the maximum, and an object already at or below zero health is
