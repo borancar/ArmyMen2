@@ -34,5 +34,9 @@
 #include <dplobby.h>
 
 #undef DrawText
+/* And winuser.h defines LoadBitmap as LoadBitmapA, which collides with the
+ * game's own LoadBitmap -- 0x004462F0, the sprite loader that records an
+ * absolute source path. Same wrinkle, same fix. */
+#undef LoadBitmap
 
 #endif /* AM2_WIN32_H */

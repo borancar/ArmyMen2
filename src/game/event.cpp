@@ -1809,8 +1809,13 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 /* --------------------------------------------------- bitmaps ---- */
 
 typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
-typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
-#define orig_load_bitmap (*(AM2_LoadBitmapFn)AM2_IMAGE(ADDR_LOAD_BITMAP))
+/* Forward-declared rather than reached through win32/sprite.h, the same way
+   commmsg.cpp declares HudMessage: this module is flat and that header names
+   Win32 types. `extern "C"` because every header in this tree is -- and note
+   the definition returns AM2_Sprite *, which cannot be spelled here, so this
+   says void *. The two agree on a 32-bit pointer ABI and nothing checks it;
+   said plainly rather than left for someone to find. */
+extern "C" void *__cdecl LoadBitmap(const char *name, int32_t flags);
 
 /* 0x0041F600 and 0x0041F650. Put a full-screen bitmap up, pausing or not.
  *
@@ -1841,7 +1846,7 @@ void __cdecl EvtShowBitmap(const char *name)
     SendGamePause(1, AM2_EVENT_FLAG_8);
 
     FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
-    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = orig_load_bitmap(name, 0);
+    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = LoadBitmap(name, 0);
 }
 
 void __cdecl EvtShowBitmapNoPause(const char *name)
@@ -1849,7 +1854,7 @@ void __cdecl EvtShowBitmapNoPause(const char *name)
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
 
     FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
-    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = orig_load_bitmap(name, 0);
+    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = LoadBitmap(name, 0);
 }
 
 /* ------------------------------------------- object table record ---- */

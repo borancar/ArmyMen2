@@ -110,6 +110,11 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out);
 int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
                                   int32_t flags);
 
+/* 0x004462F0. Make a sprite from a file and record an ABSOLUTE path in its
+ * `source`, which is what RestoreSpriteSurface reloads through. A failed load
+ * is logged and the sprite returned anyway. */
+AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags);
+
 /* 0x004236A0. Point `set` at the record a set name means and `id` at the file
  * id its archive must carry. Nonzero when the record is already pointing at
  * that file and there is nothing to open. */

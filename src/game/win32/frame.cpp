@@ -46,7 +46,6 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 
 typedef int32_t (__cdecl *AM2_ActionKeyFn)(int32_t action);
 typedef void    (__cdecl *AM2_VoidFn0b)(void);
-typedef void   *(__cdecl *AM2_LoadBitmapFn2)(const char *name, int32_t flag);
 typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 /* The camera pair, reached by cast for the same reason mapdraw.cpp does it:
  * audio.cpp already owns the g_ name on ADDR_LISTENER_POS. */
@@ -57,7 +56,6 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 #define g_backBuffer     (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 #define VIEW_TARGET ((AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 #define VIEW_EYE2   ((const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS)
-#define orig_load_bitmap2    ((AM2_LoadBitmapFn2)(uintptr_t)ADDR_LOAD_BITMAP)
 
 
 /* 0x00424CA0, one caller -- the per-frame path. In-mission input: three
@@ -104,7 +102,7 @@ void __cdecl MissionInput(void)
             if (*(const char *)(uintptr_t)ADDR_LEVEL_STR_C) {
                 SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
                 FreeBitmap(&g_currentBitmap);
-                g_currentBitmap = orig_load_bitmap2(
+                g_currentBitmap = LoadBitmap(
                     (const char *)(uintptr_t)ADDR_LEVEL_STR_C, 0);
                 *(int32_t *)(uintptr_t)ADDR_MENU_MODE =
                     AM2_SUBSTATE_INFO_BITMAP;
@@ -245,10 +243,8 @@ void __cdecl FrameClockStep(void)
 }
 
 typedef void  (__cdecl *AM2_VoidFn0)(void);
-typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flag);
 #define orig_paused_frame_step \
     ((AM2_VoidFn0)(uintptr_t)ADDR_PAUSED_FRAME_STEP)
-#define orig_load_bitmap  ((AM2_LoadBitmapFn)(uintptr_t)ADDR_LOAD_BITMAP)
 
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 /* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
@@ -304,7 +300,7 @@ void __cdecl MissionPausedFrame(void)
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
     FreeBitmap(&g_currentBitmap);
-    g_currentBitmap = orig_load_bitmap(
+    g_currentBitmap = LoadBitmap(
         (const char *)AM2_IMAGE(ADDR_STR_MAPWAIT_BMP), 0);
 
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
@@ -948,15 +944,15 @@ void __cdecl ShowMpResult(int32_t result)
     if (result == AM2_MP_RESULT_WON) {
         FreeBitmap(&g_currentBitmap);
         g_currentBitmap =
-            orig_load_bitmap2((const char *)AM2_IMAGE(ADDR_STR_MP_WON), 0);
+            LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_MP_WON), 0);
     } else if (result == AM2_MP_RESULT_LOST) {
         FreeBitmap(&g_currentBitmap);
         g_currentBitmap =
-            orig_load_bitmap2((const char *)AM2_IMAGE(ADDR_STR_MP_LOST), 0);
+            LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_MP_LOST), 0);
     } else if (result == AM2_MP_RESULT_HOST_LEFT) {
         FreeBitmap(&g_currentBitmap);
         g_currentBitmap =
-            orig_load_bitmap2((const char *)AM2_IMAGE(ADDR_STR_MP_HOST_LEFT), 0);
+            LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_MP_HOST_LEFT), 0);
     }
 
     *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_SUBSTATE_ESCAPE;

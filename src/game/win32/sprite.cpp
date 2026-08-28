@@ -354,8 +354,9 @@ void __cdecl FreeMenuSprites(void)
     }
 }
 
-typedef void *(__cdecl *AM2_LoadBitmapFn)(const char *name, int32_t flags);
-#define orig_load_bitmap_named ((AM2_LoadBitmapFn)AM2_IMAGE(ADDR_LOAD_BITMAP))
+/* LoadBitmap is defined below; the image seam that stood here went with the
+   reconstruction. */
+AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags);
 
 /* 0x00445CF0, fourteen callers -- get a sprite by NAME rather than by number.
  *
@@ -390,7 +391,7 @@ AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
     id  = (uint32_t)(((AM2_SPRITE_SET_BY_NAME << 12)
                       + *(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT + 1)
                      << 7);
-    spr = (AM2_Sprite *)orig_load_bitmap_named(name, flags);
+    spr = LoadBitmap(name, flags);
     if (!spr)
         return (AM2_Sprite *)0;
 
@@ -1662,6 +1663,66 @@ AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a, int32_t b)
                          (int32_t)KeyFieldC(key), a, b);
 }
 
+/* 0x004462F0, nine callers. Make a sprite from a file: allocate one, zero it,
+ * load it by name, and remember where it came from.
+ *
+ * THE POINT OF THE FUNCTION IS THE LAST STEP. AM2_Sprite::source is what
+ * RestoreSpriteSurface reloads through when DirectDraw takes a surface back,
+ * and this is where it gets filled -- with an ABSOLUTE path, built as the
+ * current directory, a backslash, and the name. That matters because the game
+ * chdirs into the map directory during a load: a relative name would stop
+ * resolving as soon as the directory moved, and a surface lost after that
+ * could not be rebuilt.
+ *
+ * A FAILED LOAD IS LOGGED AND KEPT. "Unable to load sprite %s" goes to the log
+ * and the sprite is returned anyway, zeroed except for its source. So a caller
+ * cannot tell failure from success by the return value, and none of the nine
+ * tries -- each stores it straight into a slot.
+ *
+ * NEITHER ALLOCATION IS CHECKED, and the getcwd is not checked either. A
+ * failing getcwd leaves the buffer as it was, which here is whatever the stack
+ * held, and the two strcats then run off it. Reproduced.
+ *
+ * The original open-codes strlen, strcpy and both strcats as `repne scasb` and
+ * `rep movs`, and leaves the getcwd arguments on the stack to be cleaned by a
+ * later `add esp, 0xc` that also covers the malloc. Written as the string
+ * operations they are; the stack accounting has nothing to reproduce.
+ *
+ * MEASURED AT TWO CALLS on a driven Boot Camp mission -- the briefing bitmap
+ * and the instruction sign -- and both of those reach the screen, so the A/B's
+ * pixels compare the load itself. What they do NOT compare is the source path,
+ * because nothing reads it until DirectDraw takes a surface back, and nothing
+ * under Xvfb does that; CLAUDE.md records the same gap for RestoreTileSet.
+ * So the absolute-path construction, which is the point of the function, is
+ * verified by reading.
+ *
+ * Landing it took SpriteReloadNamed to 0 on the same run: it is called by name
+ * from here now.
+ */
+AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags)
+{
+    AM2_Sprite *spr;
+    char        path[0x100];
+
+    if (!name || !name[0])
+        return (AM2_Sprite *)0;
+
+    spr = (AM2_Sprite *)am2_malloc(sizeof(AM2_Sprite));
+    memset(spr, 0, sizeof(AM2_Sprite));
+
+    if (!SpriteReloadNamed(spr, name, flags))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_LOAD_SPRITE_FAIL), name);
+
+    am2_getcwd(path, (int32_t)sizeof(path));
+    strcat(path, (const char *)AM2_IMAGE(ADDR_STR_PATH_SEP));
+    strcat(path, name);
+
+    spr->source = (char *)am2_malloc(strlen(path) + 1);
+    strcpy(spr->source, path);
+
+    return spr;
+}
+
 int sprite_install(void)
 {
     int rc = 0;
@@ -1707,6 +1768,8 @@ int sprite_install(void)
                         "LoadBitmapDescriptor", 1);
     rc |= patch_replace(ADDR_SPRITE_RELOAD_NAMED, (const void *)SpriteReloadNamed,
                         "SpriteReloadNamed", 4);
+    rc |= patch_replace(ADDR_LOAD_BITMAP, (const void *)LoadBitmap,
+                        "LoadBitmap", 9);
     rc |= patch_replace(ADDR_SPRITE_REBUILD_DF, (const void *)SpriteRebuildDf,
                         "SpriteRebuildDf", 1);
     rc |= patch_replace(ADDR_SPRITE_REBUILD_ALT, (const void *)SpriteRebuildAlt,

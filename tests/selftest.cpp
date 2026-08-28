@@ -672,6 +672,26 @@ extern "C" void __cdecl ShowMpResult(int32_t)
 {
 }
 
+/* event.cpp's two showbitmap handlers reached LoadBitmap through the image
+ * until it was reconstructed; now they call it, and it is in win32/sprite.cpp
+ * with the rest of the sprite code. Stubbed for the same reason as the two
+ * above -- adding that module would drag DirectDraw into a test that runs
+ * without a display.
+ *
+ * It returns void * here and AM2_Sprite * there, which is what event.cpp
+ * declares too: the struct cannot be named on the flat side. C linkage makes
+ * the mismatch invisible to the linker, so it is written down in both places
+ * rather than left to be discovered. */
+/* loadimage.h pulls in windows.h, whose LoadBitmap macro would rename this
+   stub to LoadBitmapA and leave the real symbol undefined. Same wrinkle
+   src/inject/win32.h undoes for DrawText and now for this. */
+#undef LoadBitmap
+
+extern "C" void *__cdecl LoadBitmap(const char *, int32_t)
+{
+    return (void *)0;
+}
+
 /* gameproc.cpp joined SELFTEST_SRC when item.cpp gained a call to SaveOneItem,
  * and it brought pad.cpp with it -- both flat, both added rather than stubbed,
  * for the reason map.cpp and air.cpp were. These two are the only things it

@@ -3874,7 +3874,11 @@ typedef struct {
 #define ADDR_PAUSED_FRAME_STEP    0x00462600u  /* void(void) */
 
 #define ADDR_FREE_BITMAP          0x00446410u  /* void(void **slot) */
+/* Reconstructed. Its point is AM2_Sprite::source: an ABSOLUTE path, built from
+ * the current directory, so a surface lost after the game has chdir'd into a
+ * map directory can still be rebuilt. */
 #define ADDR_LOAD_BITMAP          0x004462F0u  /* void *(const char *, int32) */
+#define ADDR_STR_LOAD_SPRITE_FAIL 0x004897CCu  /* "Unable to load sprite %s\n" */
 #define ADDR_CRT_ATOI             0x004660A7u  /* int32_t(const char *) */
 #define ADDR_PARSE_SPRITE_NAME    0x0042E310u  /* int32_t(name, int32*x3) */
 /* The pseudo-SET a bitmap loaded by plain filename is registered under. The
