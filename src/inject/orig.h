@@ -4599,6 +4599,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * set, otherwise the name for the code of the weapon it holds, and entry 0
  * when it holds none. Reconstructed. */
 #define ADDR_UNIT_CLASS_NAME     0x0044BAF0u  /* const char *(void *unit) */
+/* The moment an item may be picked up again, stamped by the pickup path --
+ * TrooperPickupItem writes ADDR_GAME_CLOCK_MS plus two seconds here. It is
+ * read by exactly one thing, ADDR_CAN_PICK_UP, which refuses until it has
+ * passed. Two functions, one field, and the pair is what names it. */
+#define OBJ_OFF_PICKUP_AFTER     0xC8u
+/* 0x004337C0, one caller. Whether an item can be picked up: it must be a
+ * weapon, its OBJ_OFF_PICKUP_AFTER must have passed, and the code its
+ * OBJ_OFF_FIELD_C0 record holds must be 0x1F, 0x20 or 0x21. Reconstructed. */
+#define ADDR_CAN_PICK_UP         0x004337C0u  /* int32_t(void *obj) */
+/* 0x00402F00, one caller. A random value that AVERAGES its first argument:
+ * `100 - spread` draws of `rand() % (centre * 2)`, divided by that count. A
+ * spread of 0 short-circuits and returns the centre unchanged; a spread of 100
+ * or more clamps the count to one draw, which is the noisiest it gets. So the
+ * argument is an inverse tightness and not a range. Reconstructed. */
+#define ADDR_RANDOM_AROUND       0x00402F00u  /* int32(centre, spread) */
 #define ADDR_WEAPON_FN_SLOT0     0x005122D4u
 #define ADDR_WEAPON_FN_SLOT1     0x005122D8u
 #define ADDR_WEAPON_FN_SLOT2     0x005122F0u  /* int32_t, -1 by default */

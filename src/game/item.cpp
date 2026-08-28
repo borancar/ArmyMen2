@@ -242,6 +242,50 @@ const char *__cdecl UnitClassName(void *unit)
     return names[**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)];
 }
 
+/* 0x004337C0, one caller. Whether an item can be picked up.
+ *
+ * Three conditions and all three must hold: it is a weapon (type 4), its
+ * OBJ_OFF_PICKUP_AFTER has passed, and the code its OBJ_OFF_FIELD_C0 record
+ * holds is 0x1F, 0x20 or 0x21.
+ *
+ * THAT SECOND CONDITION CLOSES A FIELD FROM THE OTHER SIDE. +0xC8 was
+ * identified while reading NotifyPickedUp's callers, where TrooperPickupItem
+ * stamps it with the clock plus two seconds and nothing said what read it.
+ * This is the reader, and it refuses until the stamp has passed -- so the
+ * field is a re-pickup cooldown and the two functions together say so. Neither
+ * would have alone.
+ *
+ * The comparison is UNSIGNED, so a stamp far in the future -- which cannot
+ * arise from clock-plus-two-seconds, but the field is a plain dword -- refuses
+ * rather than wrapping into the past. Reproduced.
+ *
+ * The three codes are written by the original as `sub 0x1F` and two `dec`s
+ * against zero, which is a three-arm equality chain; written as the three
+ * cases it is.
+ *
+ * MEASURED AT 111,650 CALLS on a driven Boot Camp mission -- something asks
+ * this constantly, and the A/B compares it thoroughly. What those calls do not
+ * establish is which EXIT they took: a walk over every object would fail the
+ * type test on nearly all of them, so the cooldown comparison and the
+ * three-code chain may be reached far less often than the count suggests.
+ */
+int32_t __cdecl CanPickUp(void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    int32_t        code;
+
+    if (!ObjIsType4((const AM2_Object *)obj))
+        return 0;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_PICKUP_AFTER)
+        > *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
+        return 0;
+
+    code = **(const int32_t *const *)(o + OBJ_OFF_FIELD_C0);
+
+    return code == 0x1F || code == 0x20 || code == 0x21;
+}
+
 void *__cdecl WeaponByUid(uint32_t uid)
 {
     uint32_t *obj;
@@ -2322,6 +2366,12 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
  * OBJ_OFF_FLAGS gains bit 1, and which is stamped with a two-second deadline
  * at +0xC8, while the second is the one whose army the AI sweep beside the
  * call is handed.
+ * THAT DEADLINE HAS A READER NOW. It went in unexplained -- a field the
+ * pickup path stamps and nothing was known to consult. CanPickUp below is
+ * the consultant: it refuses an item until OBJ_OFF_PICKUP_AFTER has passed.
+ * So the two seconds are a re-pickup cooldown, which neither function says
+ * on its own.
+ *
  *
  * Its counter will read 0 whichever way the pickup path is driven: the three
  * callers are the original's and call by address, so they cross the patched
@@ -4241,6 +4291,7 @@ void item_install(void)
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,
                   "UnitClassName", 1);
+    patch_replace(ADDR_CAN_PICK_UP, (const void *)CanPickUp, "CanPickUp", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,

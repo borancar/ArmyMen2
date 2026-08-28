@@ -1550,6 +1550,49 @@ int32_t __attribute__((thiscall)) CommAllPlayersReady(void *comm)
     return CommAllPlayersFlagged(comm, AM2_PLAYER_READY);
 }
 
+typedef int32_t (__cdecl *AM2_RandFn)(void);
+
+/* 0x00402F00, one caller. A random value that AVERAGES its first argument.
+ *
+ * `100 - spread` draws of `rand() % (centre * 2)`, summed and divided by that
+ * count. Each draw averages the centre, so the mean is the centre whatever the
+ * spread is -- what the spread changes is how many draws are averaged, and so
+ * how far a single answer strays. A spread of 0 short-circuits and returns the
+ * centre unchanged; 99 leaves one draw; 100 or more clamps to one as well.
+ *
+ * SO THE ARGUMENT IS AN INVERSE TIGHTNESS AND NOT A RANGE, which is the thing
+ * to get right: a bigger `spread` gives a noisier answer by taking FEWER
+ * samples, not by widening any of them. The width is fixed at twice the
+ * centre.
+ *
+ * It draws from ADDR_GAME_RAND, the image's own LCG, and must -- libc's would
+ * leave the game's sequence standing still.
+ *
+ * The division is signed and the count is at least one, so there is no divide
+ * by zero; the sum can overflow with a large centre and ninety-nine draws, and
+ * the original does not guard it either.
+ *
+ * Measured at 0: its one caller does not run on any drive here, and that
+ * caller is the original's, so the counter is not blind. Verified by reading.
+ */
+int32_t __cdecl RandomAround(int32_t centre, int32_t spread)
+{
+    int32_t n     = 100 - spread;
+    int32_t total = 0;
+    int32_t i;
+
+    if (spread == 0)
+        return centre;
+
+    if (n < 1)
+        n = 1;
+
+    for (i = 0; i < n; i++)
+        total += ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))() % (centre * 2);
+
+    return total / n;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -1626,6 +1669,8 @@ int misc_install(void)
                   "CommSlotForArmy", 20);
     patch_replace(ADDR_COMM_PLAYER_ID, (const void *)CommPlayerId,
                   "CommPlayerId", 1);
+    patch_replace(ADDR_RANDOM_AROUND, (const void *)RandomAround,
+                  "RandomAround", 1);
     patch_replace(ADDR_ALL_PLAYERS_AGREED, (const void *)CommAllPlayersAgreed,
                   "CommAllPlayersAgreed", 1);
     patch_replace(ADDR_ALL_PLAYERS_READY, (const void *)CommAllPlayersReady,

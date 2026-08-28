@@ -561,6 +561,11 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
  * is no upper bound. */
 int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot);
 
+/* 0x00402F00. A random value averaging `centre`: `100 - spread` draws of
+ * rand() % (centre * 2), divided by that count. `spread` is an inverse
+ * tightness, not a range -- more spread means fewer samples. */
+int32_t __cdecl RandomAround(int32_t centre, int32_t spread);
+
 /* 0x0040F8A0 and 0x0040F8E0. Does every player with a real AM2_PLAYER_ID have
  * AM2_PLAYER_AGREED, and AM2_PLAYER_READY, set? An empty table answers yes. */
 int32_t __attribute__((thiscall)) CommAllPlayersAgreed(void *comm);

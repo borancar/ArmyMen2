@@ -279,6 +279,10 @@ int32_t __cdecl HeldWeaponCode(void *unit);
  * the name for its weapon's code, else entry 0. */
 const char *__cdecl UnitClassName(void *unit);
 
+/* 0x004337C0. Can this item be picked up: a weapon, past its
+ * OBJ_OFF_PICKUP_AFTER, with a code of 0x1F, 0x20 or 0x21. */
+int32_t __cdecl CanPickUp(void *obj);
+
 /* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
