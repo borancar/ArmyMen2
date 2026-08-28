@@ -4051,6 +4051,39 @@ void __cdecl DeselectAll(void)
     orig_on_selection_changed(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+/* 0x0045AAC0, one caller. Put a unit aboard a vehicle.
+ *
+ * TWO HALVES OF ONE RELATIONSHIP IN ONE FUNCTION, which is what makes the two
+ * field names agree rather than each being a guess: the unit's OBJ_OFF_RIDING
+ * takes the vehicle's uid, and the unit's uid is pushed onto the vehicle's
+ * VEHICLE_OFF_PTR_LIST. Both names were already in orig.h from separate
+ * readings -- BlockWeightTroops reads RIDING to decide whether a trooper
+ * blocks the unit the player is driving -- and this is the writer that ties
+ * them together.
+ *
+ * The unit is looked up by uid and the result is dereferenced WITHOUT a null
+ * test, so a uid that no longer resolves faults here. Reproduced; its one
+ * caller has the object in hand already.
+ *
+ * The list push is PtrListPush on the vehicle's own record, addressed as
+ * `vehicle + 0x538` -- the vehicle IS the record, not a pointer to one.
+ *
+ * MEASURED AT 0. Nothing boards a vehicle on any drive here -- Boot Camp has
+ * none to board -- and its one caller is the original's, so the counter is not
+ * blind. Verified by reading, and the reading is stronger than most because
+ * both field names came from elsewhere and this is where they meet.
+ */
+void __cdecl BoardVehicle(uint32_t uid, void *vehicle)
+{
+    uint8_t *unit = (uint8_t *)LookupByUID(uid);
+
+    *(uint32_t *)(unit + OBJ_OFF_RIDING) =
+        ((const AM2_Object *)vehicle)->uid;
+
+    PtrListPush((uint8_t *)vehicle + VEHICLE_OFF_PTR_LIST,
+                (void *)(uintptr_t)uid);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -4074,6 +4107,8 @@ void item_install(void)
                   "SetWeaponTarget", 6);
     patch_replace(ADDR_PICK_FIRE_MODE, (const void *)PickFireMode,
                   "PickFireMode", 1);
+    patch_replace(ADDR_BOARD_VEHICLE, (const void *)BoardVehicle,
+                  "BoardVehicle", 1);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,
                   "DeselectAll", 9);
     patch_replace(ADDR_SET_UNIT_POSE, (const void *)SetUnitPose,

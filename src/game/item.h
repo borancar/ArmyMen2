@@ -289,6 +289,10 @@ void __cdecl SetWeaponTarget(void *target, uint32_t at);
  * and to 1 otherwise. */
 void __cdecl PickFireMode(void *obj);
 
+/* 0x0045AAC0. Put a unit aboard a vehicle: OBJ_OFF_RIDING takes the vehicle's
+ * uid and the unit's uid goes onto the vehicle's VEHICLE_OFF_PTR_LIST. */
+void __cdecl BoardVehicle(uint32_t uid, void *vehicle);
+
 /* 0x00427BA0. Deselect everything: clear OBJ_FLAG_SELECTED on each selected
  * object that still resolves, drop the ones that do not, empty the list and
  * report the change. */

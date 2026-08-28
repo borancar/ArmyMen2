@@ -1466,6 +1466,9 @@ void __cdecl HudMessage(const char *text, int32_t colour);
  * three instructions the five factories open with, as a function. */
 void __cdecl CloseScreen(void);
 
+/* 0x004135C0. Delete all three HUD widgets and clear their globals. */
+void __cdecl FreeHudWidgets(void);
+
 int widget_install(void);
 
 #ifdef __cplusplus

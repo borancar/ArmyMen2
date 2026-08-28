@@ -362,6 +362,10 @@
 #define ADDR_HUD_WIDGET_A  0x004FCF00u  /* AM2_Widget * */
 #define ADDR_HUD_WIDGET_B  0x004FCF54u
 #define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
+/* 0x004135C0, two callers. Delete all three of those through vtable slot 0
+ * with the scalar-delete flag and clear each global -- the same shape
+ * ADDR_CLOSE_SCREEN has for the screen, three times over. Reconstructed. */
+#define ADDR_FREE_HUD_WIDGETS    0x004135C0u  /* void(void) */
 /* 0x0041A170, three callers. The WIDTH of ADDR_HUD_WIDGET_C -- its screen
  * rect's right less its left -- or 0 when there is no such widget.
  *
@@ -7261,6 +7265,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FREE_SUBRECORD_ROWS   0x00434EC0u  /* void(void *subrecord) */
 #define TROOPER_OFF_WEAPON_UID     0x54Cu
 #define VEHICLE_OFF_WEAPON_UID     0x550u
+/* 0x0045AAC0, one caller. Put a unit aboard a vehicle: the unit's
+ * OBJ_OFF_RIDING takes the vehicle's uid, and the unit's uid is pushed onto
+ * the vehicle's VEHICLE_OFF_PTR_LIST. Two halves of one relationship, written
+ * in one function, which is what makes the two field names agree.
+ * Reconstructed. */
+#define ADDR_BOARD_VEHICLE         0x0045AAC0u  /* void(uint32 uid, void *veh) */
 #define VEHICLE_OFF_PTR_LIST       0x538u
 /* 0x0045AE30, one caller, and it names itself twice over: "ExitAllFromVehicle:
  * I was killed in a vehicle, damage owner is me" and "... not me". Empty a

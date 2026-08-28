@@ -1717,6 +1717,46 @@ void __cdecl CloseScreen(void)
     CloseCurrentScreen();
 }
 
+/* 0x004135C0, two callers. Delete all three HUD widgets and clear the three
+ * globals -- CloseScreen's shape three times over, on A, B and C in that
+ * order.
+ *
+ * EACH IS TESTED SEPARATELY and each global is cleared INSIDE its own test, so
+ * a null one is left alone rather than written. That matters for C, which
+ * ADDR_HUD_WIDGET_C's own comment records as the optional one -- HudPaint and
+ * HudUpdate both test it and neither tests the other two. Here all three are
+ * tested, which is the safer thing and not what those two do.
+ *
+ * The order is A, B, C, which is the order they are painted and updated in,
+ * not the order of their addresses -- C is at 0x004FCF4C and B at 0x004FCF54.
+ * Written in the original's order.
+ *
+ * Runs once on a driven Boot Camp mission. Whether all three were non-null
+ * that once is not established, so the C branch specifically is not claimed.
+ */
+void __cdecl FreeHudWidgets(void)
+{
+    AM2_Widget *w;
+
+    w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
+    if (w) {
+        ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, 1);
+        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A = (AM2_Widget *)0;
+    }
+
+    w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B;
+    if (w) {
+        ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, 1);
+        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B = (AM2_Widget *)0;
+    }
+
+    w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C;
+    if (w) {
+        ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, 1);
+        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C = (AM2_Widget *)0;
+    }
+}
+
 /* And the half they close with. `new` answering null is checked at every one
  * of these sites -- VC6's does answer null rather than throwing, and the game
  * tests it -- so the global ends up null rather than holding a constructor's
@@ -6606,5 +6646,7 @@ int widget_install(void)
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,
                         "CloseScreen", 1);
+    rc |= patch_replace(ADDR_FREE_HUD_WIDGETS, (const void *)FreeHudWidgets,
+                        "FreeHudWidgets", 2);
     return rc;
 }
