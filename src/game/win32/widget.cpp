@@ -1083,6 +1083,104 @@ AM2_DIALOG_DTOR(CommPanel, VTABLE_COMM_PANEL)
 AM2_DIALOG_DTOR(BattleJoin, VTABLE_BATTLE_JOIN)
 AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
 
+/* 0x0044E510. The film archive's destructor: give back the twelve thumbnail
+ * PAIRS and chain to the dialog base.
+ *
+ * It walks pair[0] then pair[1] with a single pointer stepping eight, which is
+ * the layout MOVIES_OFF_SPRITES already describes -- so this confirms that
+ * reading from the other end rather than being a second guess at it. Twelve
+ * pairs is three pages of four, and the destructor frees all three pages
+ * whichever one is showing.
+ *
+ * The buttons that display them do NOT own them: MakeMovieButton writes
+ * BUTTON_OFF_OWNS_SPRITES as 0 for exactly this reason. The screen owns all
+ * 24 and this is where they go back. */
+void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
+{
+    AM2_Sprite **pair;
+    int32_t      i;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_MOVIES);
+
+    pair = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
+    for (i = 0; i < AM2_MOVIE_PAGE_SIZE * 3; i++, pair += 2) {
+        ReleaseSprite(pair[0]);
+        ReleaseSprite(pair[1]);
+    }
+
+    DialogDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
+{
+    MoviesDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00455BA0. The arrow scroll bar's destructor: both bitmaps back, then the
+ * base widget.
+ *
+ * ONE SPRITE IS NULL-TESTED AND THE OTHER IS NOT, and that is the original's
+ * asymmetry rather than a transcription slip. ReleaseSprite tests for null
+ * itself -- ab.sh quit is where that was established -- so both paths are
+ * safe and the difference changes no behaviour at all. It is reproduced
+ * because which field a writer thought could be null is evidence about the
+ * class, and making the two agree would quietly throw it away. */
+void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Sprite *spr;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_ARROWBAR);
+
+    spr = *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0);
+    if (spr)
+        ReleaseSprite(spr);
+
+    ReleaseSprite(*(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE1));
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    ArrowBarDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00453830. The savegame list's destructor: give font 2 back, then the
+ * dialog base.
+ *
+ * The class is named from its CONSTRUCTOR, which is the only place that says
+ * what it is -- 0x00453280 sets the data directory to `save`, formats
+ * `save\%s` and globs `*.sav`. Nothing in the destructor would have named it,
+ * and naming it "the font-2 dialog" from what is in front of you is the
+ * mistake this project keeps writing down.
+ *
+ * It frees a font without having been seen to build one. That is what the code
+ * does; the constructor's font handling is not read yet, and a guess about it
+ * would be worth less than the gap. */
+void __attribute__((thiscall)) SaveListDestruct(AM2_Widget *w)
+{
+    w->vtable = (void *)AM2_IMAGE(VTABLE_SAVE_LIST);
+    FreeFont(AM2_SAVE_LIST_FONT);
+    DialogDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) SaveListDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    SaveListDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w)
 {
     WidgetRepaint(w);
@@ -6495,6 +6593,18 @@ int widget_install(void)
                         "DialogDestruct", 1);
     rc |= patch_replace(ADDR_DIALOG_DELETE, (const void *)DialogDelete,
                         "DialogDelete", 1);
+    rc |= patch_replace(ADDR_MOVIES_DESTRUCT, (const void *)MoviesDestruct,
+                        "MoviesDestruct", 1);
+    rc |= patch_replace(ADDR_MOVIES_DELETE, (const void *)MoviesDelete,
+                        "MoviesDelete", 1);
+    rc |= patch_replace(ADDR_ARROWBAR_DESTRUCT, (const void *)ArrowBarDestruct,
+                        "ArrowBarDestruct", 1);
+    rc |= patch_replace(ADDR_ARROWBAR_DELETE, (const void *)ArrowBarDelete,
+                        "ArrowBarDelete", 1);
+    rc |= patch_replace(ADDR_SAVE_LIST_DESTRUCT, (const void *)SaveListDestruct,
+                        "SaveListDestruct", 1);
+    rc |= patch_replace(ADDR_SAVE_LIST_DELETE, (const void *)SaveListDelete,
+                        "SaveListDelete", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_DESTRUCT,
                         (const void *)CommPanelDestruct,
                         "CommPanelDestruct", 1);

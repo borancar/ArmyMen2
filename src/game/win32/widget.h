@@ -642,6 +642,15 @@ AM2_DECLARE_CLASS_DTOR(CommPanel);
 AM2_DECLARE_CLASS_DTOR(BattleJoin);
 AM2_DECLARE_CLASS_DTOR(MpName);
 
+/* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
+ * 0x00453810/0x00453830 -- three destructors that do real work between the
+ * vtable stamp and the base call, so they are written out rather than made
+ * with the macro. The MSVC SEH prologue each carries is deliberately not
+ * reproduced; see the note on destructor frames in CLAUDE.md. */
+AM2_DECLARE_CLASS_DTOR(Movies);
+AM2_DECLARE_CLASS_DTOR(ArrowBar);
+AM2_DECLARE_CLASS_DTOR(SaveList);
+
 /* Original: 0x004569A0, slot 1 of the typewriter label. Draw the revealed
  * prefix of the wrapped text, one call per `|`-separated line, each twelve
  * pixels below the last.

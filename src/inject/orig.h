@@ -494,6 +494,20 @@
  * out of the "a name per entry would be a guess per entry" bucket. */
 #define ADDR_FREE_FONT      0x00446840u  /* void(int32_t fontIndex) */
 #define ADDR_FREE_ALL_FONTS 0x00446880u  /* void(void), three of them */
+/* THE SAVEGAME LIST, and it names itself in its constructor rather than in its
+ * destructor. 0x00453280 sets the data directory to `save`, formats `save\%s`
+ * and globs `*.sav` -- so the class is the list of savegame FILES, which is a
+ * different thing from the DLG_LOADGAME, DLG_DELGAME and DLG_OVERWRITE dialogs
+ * already here, and a much larger one: 0x340 of stack and two arguments.
+ *
+ * Its destructor frees FONT 2 and chains to the dialog base. That it frees a
+ * font it was not seen to build is recorded as what the code does and not
+ * explained away -- the constructor's font handling has not been read. */
+#define VTABLE_SAVE_LIST         0x0046FC0Cu
+#define ADDR_SAVE_LIST_CTOR      0x00453280u /* thiscall, two arguments */
+#define ADDR_SAVE_LIST_DELETE    0x00453810u /* thiscall obj *(obj, flags) */
+#define ADDR_SAVE_LIST_DESTRUCT  0x00453830u /* thiscall void(obj) */
+#define AM2_SAVE_LIST_FONT       2
 #define AM2_FONT_COUNT      3
 /* 0x00446830, four callers. A cdecl wrapper for the line above and nothing
  * else -- both take one argument and it is passed straight through. */
@@ -2612,6 +2626,13 @@ typedef struct {
 #define ARROWBAR_OFF_FLAG50      0x50u /* the arrows get the same value */
 #define ARROWBAR_OFF_SPRITE0     0x64u
 #define ARROWBAR_OFF_SPRITE1     0x68u
+/* The bar's destructor pair. It releases both sprites and chains to the base
+ * widget -- and it null-tests SPRITE0 and NOT SPRITE1. ReleaseSprite handles
+ * null itself, so both are safe and the asymmetry is the original's. It is
+ * reproduced rather than smoothed: which of two fields a writer thought could
+ * be null is evidence about the class, and making them agree destroys it. */
+#define ADDR_ARROWBAR_DELETE     0x00455B80u /* thiscall obj *(obj, flags) */
+#define ADDR_ARROWBAR_DESTRUCT   0x00455BA0u /* thiscall void(obj) */
 #define ARROWBAR_OFF_SHIFT       0x70u /* int32_t, where the thumb sits */
 #define ARROWBAR_OFF_SPAN        0x74u
 /* 0x00455C10, thiscall `ret 0x10`: repaint a widget through the nearest
@@ -2852,6 +2873,14 @@ typedef struct {
 #define ADDR_OPEN_MOVIES         0x0044E6A0u  /* void(void) */
 #define ADDR_MOVIES_CTOR         0x0044DFA0u  /* thiscall obj *(obj, bmp) */
 #define VTABLE_MOVIES            0x0046FACCu
+/* Its destructor pair, and one of the four this file used to list as "an SEH
+ * frame and real work" without saying what the work was. It releases the
+ * twelve thumbnail PAIRS at MOVIES_OFF_SPRITES -- 24 sprites, pair[0] then
+ * pair[1], stepping eight -- and then chains to the dialog base. The layout it
+ * walks is the one MOVIES_OFF_SPRITES already recorded, which is what makes
+ * this a confirmation rather than a second reading. */
+#define ADDR_MOVIES_DELETE       0x0044E4F0u /* thiscall obj *(obj, flags) */
+#define ADDR_MOVIES_DESTRUCT     0x0044E510u /* thiscall void(obj) */
 #define ADDR_STR_MOVIES_BMP      0x0048B6F8u /* "02_012_00_movies.bmp" */
 /* Twelve thumbnail PAIRS at 0x0064, three pages of four, and the four button
  * pointers after them at 0x00C4. The sprite ids are set 3, indices 0xC8..0xCB
