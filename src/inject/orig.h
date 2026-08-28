@@ -1897,6 +1897,20 @@
 #define AM2_HUD_MSG_X_MIN        0x280   /* 640: never further left than this */
 #define AM2_HUD_MSG_GAP          0x20    /* added between one row and the next */
 #define AM2_HUD_TOTAL_CAP        10      /* per message, whatever its length */
+/* The TYPED line, in the same widget as the log above it. When the flag is set
+ * the strip shows what is being typed rather than the scrolling messages, with
+ * a '_' appended as a caret -- which is where the console's characters land,
+ * and why this class's destructor clears g_charHandler.
+ *
+ * The scroll offset is subtracted from every row's HUDMSG_OFF_X, so it is the
+ * whole of the sideways crawl. */
+#define HUDLOG_OFF_TYPING        0x48Cu  /* int32_t, non-zero while typing */
+#define HUDLOG_OFF_TYPED         0x494u  /* char[], the line so far */
+#define HUDLOG_OFF_SCROLL        0x598u  /* float, taken off each row's x */
+#define HUDLOG_OFF_TYPED_X       0x5A8u  /* int32_t, relative to the widget */
+#define HUDLOG_OFF_TYPED_Y       0x5ACu
+#define AM2_HUD_CARET            '_'
+#define ADDR_HUD_TOP_PAINT       0x00418A20u  /* thiscall void(obj, RECT) */
 /* Reconstructed. 46 callers and NONE of them runs on any drive here -- 0 on
  * Boot Camp and 0 on the campaign -- so it is verified by reading. */
 #define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */

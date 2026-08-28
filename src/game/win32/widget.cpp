@@ -1524,6 +1524,105 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
  * AM2_HUD_SARGE_CELL_W wide -- x is the cell's right edge minus the text
  * width, not the slot's left. Font 1, ink 0xCE.
  */
+/* 0x00418A20. The top strip: the message line, then the base paint, then one
+ * sprite. Three parts that share nothing but the widget.
+ *
+ * THE TEXT IS INSIDE A LOCK BRACKET AND THE FILL IS OUTSIDE IT -- ClearRegion
+ * first, then LockSurface -- for the reason surface.h gives: it refuses to run
+ * while a lock is held and is a NO-OP in that case rather than a failure.
+ *
+ * Two mutually exclusive things can be shown. While HUDLOG_OFF_TYPING is set
+ * the strip shows the line being typed, with a '_' appended as a caret and
+ * drawn in white; that is where the console's characters land, and it is why
+ * this class's destructor clears g_charHandler. Otherwise it walks the message
+ * log -- HUDLOG_OFF_COUNT rows of AM2_HUD_MSG_SIZE at HUDLOG_OFF_ROWS, each
+ * with its own float x -- and draws them in ADDR_COLOUR_STALE, the same
+ * latency-colour family the tooltip's background comes from.
+ *
+ * THAT LOOP WILL NOT RUN ON ANY DRIVE HERE, and orig.h says why: HudMessage
+ * has 46 callers and none of them fires on a configuration this project can
+ * drive. So a clean A/B is evidence about the typed line and the sprite, and
+ * about the message rows only by reading.
+ *
+ * The float is done in double and cast, which air.cpp's FormationPoint
+ * established for the original's _ftol: a C cast truncates toward zero exactly
+ * as _ftol does.
+ */
+void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t *self = (uint8_t *)w;
+    RECT     hit;
+    int32_t  x, y;
+
+    ClearRegion(&clip, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+
+    if (LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) {
+        if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
+            char        line[96];
+            const char *typed = (const char *)(self + HUDLOG_OFF_TYPED);
+            size_t      n;
+
+            strcpy(line, typed);
+            n = strlen(line);
+            line[n]     = AM2_HUD_CARET;
+            line[n + 1] = '\0';
+
+            DrawText(*(const int32_t *)(self + HUDLOG_OFF_TYPED_X)
+                         + w->rect.left,
+                     *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
+                         + w->rect.top,
+                     line, 1, 0,
+                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+        } else {
+            int32_t rows = *(const int32_t *)(self + HUDLOG_OFF_COUNT);
+            int32_t i;
+
+            for (i = 0; i < rows; i++) {
+                const uint8_t *row = self + HUDLOG_OFF_ROWS
+                                     + i * AM2_HUD_MSG_SIZE;
+
+                DrawText((int32_t)((double)
+                             *(const float *)(row + HUDMSG_OFF_X)
+                             - *(const float *)(self + HUDLOG_OFF_SCROLL))
+                             + w->rect.left
+                             + *(const int32_t *)(self + HUDLOG_OFF_TYPED_X),
+                         *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
+                             + w->rect.top,
+                         (const char *)row, 1, 0,
+                         *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE);
+            }
+        }
+
+        UnlockSurface();
+    }
+
+    WidgetPaint(w, clip);
+
+    {
+        AM2_Sprite *spr = *(AM2_Sprite *const *)(self + 0x64);
+        AM2_Rect    box, part;
+
+        if (!spr)
+            return;
+
+        box.left   = *(const int32_t *)(self + 0x68) + w->rect.left;
+        box.top    = w->rect.top;
+        box.right  = spr->bounds.right + box.left;
+        box.bottom = spr->bounds.bottom + box.top;
+
+        if (!IntersectRect(&hit, (const RECT *)&box, &clip))
+            return;
+
+        x = box.left;
+        y = box.top;
+
+        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&clip, &x, &y, &part))
+            return;
+
+        DrawSpriteClipped(spr, box.left, box.top, &part, 0);
+    }
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -7320,6 +7419,8 @@ int widget_install(void)
                         "OpenMessage", 0);
     rc |= patch_replace(ADDR_DRAW_TOOLTIP, (const void *)DrawTooltip,
                         "DrawTooltip", 2);
+    rc |= patch_replace(ADDR_HUD_TOP_PAINT, (const void *)HudTopPaint,
+                        "HudTopPaint", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_PAINT, (const void *)HudSargePaint,
                         "HudSargePaint", 1);
     rc |= patch_replace(ADDR_HUD_CMD_PAINT, (const void *)HudCommandsPaint,

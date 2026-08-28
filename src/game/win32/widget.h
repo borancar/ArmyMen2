@@ -673,6 +673,9 @@ void __attribute__((thiscall)) HudCommandsPaint(AM2_Widget *w, RECT clip);
 /* Original: 0x004155A0, vtable slot 1 of the SARGE panel. */
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip);
 
+/* Original: 0x00418A20, vtable slot 1 of the top strip. */
+void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made
