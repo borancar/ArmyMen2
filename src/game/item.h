@@ -265,6 +265,10 @@ void *__cdecl WeaponByUid(uint32_t uid);
  * when the slot is empty or does not hold a weapon. */
 int32_t __cdecl HeldWeaponCode(void *unit);
 
+/* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
+ * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
+void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
+
 /* 0x00448220. A unit gives up: soldier kind 8, AI mode 2 (ignore), and its
  * weapon marked OBJ_FLAG_OVERDUE before the uid is cleared -- in that order,
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */

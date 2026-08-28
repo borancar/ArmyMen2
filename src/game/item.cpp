@@ -2471,11 +2471,11 @@ void __cdecl FreeOverdueItems(void)
     } while (obj);
 }
 
-typedef void (__cdecl *AM2_UnitActionFn)(void *obj, int32_t action);
-#define orig_unit_action      ((AM2_UnitActionFn)(uintptr_t)ADDR_UNIT_ACTION)
-
-/* Defined below, beside the rest of the object family. */
+/* Both defined below, beside the rest of the object family. The image seam
+   that used to stand here, on the address this file now patches, is gone
+   with the reconstruction. */
 void __cdecl SetSoldierKind(void *obj, int32_t kind);
+void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
 
 /* 0x00448220, two callers. Three effects, and together they are what a unit
  * giving up looks like: it changes to soldier kind 8, its AI mode goes to 2 --
@@ -2530,7 +2530,7 @@ void __cdecl Type2ActionB(void *obj)
         *(uint32_t *)((uint8_t *)weapon + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
 
     *(int32_t *)(o + TROOPER_OFF_WEAPON_UID) = 0;
-    orig_unit_action(o, 0);
+    SoldierKindForWeapon(o, 0);
 }
 
 /* 0x00449860, eight callers. Puts an inventory slot in the unit's hand: it
@@ -2598,7 +2598,7 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
         ((const AM2_Object *)unit)->uid;
     *(int32_t *)(uintptr_t)ADDR_WEAPON_SLOT = slot;
 
-    orig_unit_action(unit, kind);
+    SoldierKindForWeapon(unit, (uint32_t)kind);
     SendTrooperSetWeapon(unit, ((const AM2_Object *)w)->uid, slot);
 }
 
@@ -3107,7 +3107,7 @@ void __cdecl Type2ActionA(void *obj)
     *(uint32_t *)(o + TROOPER_OFF_WEAPON_UID) =
         ((const AM2_Object *)made)->uid;
 
-    orig_unit_action(obj, AM2_WEAPON_KEY_2B);
+    SoldierKindForWeapon(obj, AM2_WEAPON_KEY_2B);
     SendTrooperSetWeapon(obj, ((const AM2_Object *)made)->uid, 0);
 }
 
@@ -3260,6 +3260,59 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
     *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)
         ((double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
          * *(const double *)(uintptr_t)AM2_KIND7_HEALTH_SCALE);
+}
+
+/* 0x00449660, sixteen callers. Set a unit's soldier kind from the code of the
+ * weapon now in its hands.
+ *
+ * IT WAS NAMED FOR NEITHER OF THOSE THINGS. orig.h called it ADDR_UNIT_ACTION,
+ * "void(obj, action) -- 44 arms", and both halves were wrong. The argument is
+ * the dword an item's OBJ_OFF_FIELD_C0 record points at -- the same value
+ * HeldWeaponCode returns, and the same one SelectInventorySlot in this file
+ * already computes and indexes ADDR_WEAPON_HANDLERS with before passing it
+ * here. Sixteen callers and every one does the same three steps: put a weapon
+ * in the hand, read its code, call this.
+ *
+ * AND THERE ARE SEVEN ARMS, NOT 44. The 44 is the length of a byte index table
+ * at 0x00449728 that collapses the code into one of eight jump-table slots at
+ * 0x00449708. Six of those differ only in the constant they hand
+ * SetSoldierKind, one is the default, and one is a bare `ret`. Counting a
+ * dense switch's index table as arms is how 44 was written down; the same
+ * mistake would make ThingCode 39 behaviours instead of the seventeen it has.
+ *
+ * Written as a switch on the CODE, the way air.cpp writes ThingCode, so the
+ * numbers here are the ones a data file carries rather than offsets into a
+ * table nobody can see. Both tables were read out of the image and the mapping
+ * is transcribed from them and nothing else.
+ *
+ * CODE 0 IS THE ONE ARM THAT WRITES NOTHING, and it is not dead. 0x00448220
+ * sets the kind to 8 by hand, clears the weapon uid, and then calls this with
+ * 0 -- so "no weapon" has to leave the kind alone, or that sequence would undo
+ * itself one line later. A default that fell through to kind 0 would look
+ * tidier and would be wrong.
+ *
+ * Kind 6 is never produced by any code. The bound is UNSIGNED (`cmp eax, 0x2b;
+ * ja`), so a negative code takes the default rather than indexing backwards.
+ *
+ * MEASURED: 6 calls on a Boot Camp mission driven with movement and fire, so
+ * the A/B compares it. Note what landing it did to the counter BELOW it --
+ * SetSoldierKind now reads 0 on the same run, because its remaining caller is
+ * this function and this function calls by name. The reconstruction swallowed
+ * a counter, which is the ordinary cost recorded in CLAUDE.md and worth
+ * naming here so a later reader does not read that 0 as a regression.
+ */
+void __cdecl SoldierKindForWeapon(void *unit, uint32_t code)
+{
+    switch (code) {
+    case 0:  return;                        /* writes nothing; see above */
+    case 2:  SetSoldierKind(unit, 2); return;
+    case 3:  SetSoldierKind(unit, 3); return;
+    case 4:  SetSoldierKind(unit, 1); return;
+    case 5:  SetSoldierKind(unit, 4); return;
+    case 20: SetSoldierKind(unit, 5); return;
+    case 43: SetSoldierKind(unit, 7); return;
+    default: SetSoldierKind(unit, 0); return;
+    }
 }
 
 typedef int32_t (__cdecl *AM2_ApplyFrameFn)(void *obj, int32_t b, int32_t a,
@@ -3487,6 +3540,9 @@ void item_install(void)
                   "ChangeObjectFrame", 1);
     patch_replace(ADDR_SET_SOLDIER_KIND, (const void *)SetSoldierKind,
                   "SetSoldierKind", 10);
+    patch_replace(ADDR_SOLDIER_KIND_FOR_WEAPON,
+                  (const void *)SoldierKindForWeapon,
+                  "SoldierKindForWeapon", 13);
     patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);
     patch_replace(ADDR_TYPE2_ACTION_A, (const void *)Type2ActionA,
                   "Type2ActionA", 5);

@@ -3072,7 +3072,29 @@ typedef struct {
  * Renamed rather than aliased: ten use sites outside this file. */
 #define OBJ_OFF_SOLDIER_KIND     0x544u
 #define ADDR_SET_SOLDIER_KIND    0x00449570u  /* void(obj, kind) -- the writer */
-#define ADDR_UNIT_ACTION         0x00449660u  /* void(obj, action) -- 44 arms */
+/* 0x00449660, sixteen callers. It was ADDR_UNIT_ACTION, "void(obj, action) --
+ * 44 arms", and that was wrong about the argument and about the arms.
+ *
+ * The argument is a WEAPON CODE -- the dword an item's OBJ_OFF_FIELD_C0 record
+ * points at, the same value HeldWeaponCode returns and the same one
+ * SelectInventorySlot already indexes ADDR_WEAPON_HANDLERS with. Every caller
+ * computes it the same way: put a weapon in the unit's hand, read the code,
+ * call this.
+ *
+ * And there are SEVEN arms, not 44. The 44 is the size of a byte index table
+ * at 0x00449728 which collapses `code` into one of eight jump-table slots at
+ * 0x00449708; six of those slots differ only in the constant they hand
+ * ADDR_SET_SOLDIER_KIND, one is the default, and one is a bare `ret`. Counting
+ * a dense switch's index table as arms is how 44 got written down.
+ *
+ * The mapping is code 2->2, 3->3, 4->1, 5->4, 20->5, 43->7, code 0 writes
+ * NOTHING at all, and everything else -- including anything above 43, since
+ * the bound is unsigned -- gives kind 0. Kind 6 is never produced.
+ *
+ * Reconstructed, 6 calls on a driven Boot Camp mission. It takes
+ * ADDR_SET_SOLDIER_KIND's counter to 0 with it: that is now called by name
+ * from here and nowhere else. */
+#define ADDR_SOLDIER_KIND_FOR_WEAPON 0x00449660u /* void(unit, int32 code) */
 /* What SetSoldierKind reaches. The frame setter compares against the row's
  * current frame and returns early unless forced; the pose table is int32 and
  * ships {1, 1, 5, 3, ...}. */
