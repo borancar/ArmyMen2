@@ -394,6 +394,41 @@
 /* 0x00414370, one caller -- the per-frame path. The same three widgets through
  * vtable slot 2, then two further steps. */
 #define ADDR_HUD_UPDATE    0x00414370u  /* void(void) */
+/* 0x00414430, ten callers: the POINTER MODE table and the six globals it
+ * installs out of it. Seven 40-byte records at 0x004761B8 -- the eighth slot
+ * is where the string "Rifleman" starts, which is what bounds the table.
+ *
+ * "Pointer" is a ROLE NAME and is ours. What grounds it is the three readers
+ * of what this installs, none of which is in this function: ADDR_POINTER_PICK
+ * is called per object while walking OBJ_OFF_QUERY_NEXT, so it decides what
+ * the pointer may pick; ADDR_POINTER_ACTION is called with (object, point)
+ * only when ADDR_MOUSE_BUTTON is clear, so it is what a release does; and
+ * ADDR_POINTER_OVERLAY is handed straight to OverlayPrepare, whose own bound
+ * is 0..0x12 and whose seven values here are 3, 0, 3, 0, 5, 6, 7.
+ *
+ * THE FIVE STORES ARE NOT IN RECORD ORDER, which is the same trap
+ * ADDR_WEAPON_FN_SLOT2 and SLOT3 carry twenty lines up. Globals E0, E4, E8,
+ * EC, F4 take record fields +0, +4, +0x10, +0x14, +0x0C. Reading the stores
+ * top to bottom and numbering as you go puts the overlay in the wrong global
+ * and swaps the two unread fields. Named by what they RECEIVE.
+ *
+ * Reconstructed, and reached exactly ONCE on a driven Boot Camp mission --
+ * mode 0 at mission start. Every mode above 0 is verified by reading. */
+#define ADDR_POINTER_MODES     0x004761B8u  /* 7 records of 40 bytes */
+#define AM2_POINTER_MODE_SIZE  40
+#define AM2_POINTER_MODES      7
+#define MODE_OFF_PICK          0x00u  /* int32(obj) -- may the pointer take it */
+#define MODE_OFF_ACTION        0x04u  /* void(obj, packed point) on release */
+#define MODE_OFF_OVERLAY       0x0Cu  /* OverlayPrepare's row, 0..0x12 */
+#define MODE_OFF_F10           0x10u  /* installed, unread here */
+#define MODE_OFF_F14           0x14u  /* installed, and part of the guard */
+#define ADDR_POINTER_MODE      0x004FCF80u  /* int32_t, the current index */
+#define ADDR_POINTER_PICK      0x005122E0u
+#define ADDR_POINTER_ACTION    0x005122E4u
+#define ADDR_POINTER_F10       0x005122E8u
+#define ADDR_POINTER_F14       0x005122ECu
+#define ADDR_POINTER_OVERLAY   0x005122F4u
+#define ADDR_SET_POINTER_MODE  0x00414430u  /* void(int32_t mode) */
 /* The two steps ADDR_HUD_UPDATE runs after the widgets, each with exactly one
  * caller -- this one -- so these names cannot be wrong about anything else.
  * They are still roles rather than recovered names: neither says what it is,

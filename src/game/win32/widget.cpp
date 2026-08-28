@@ -5860,6 +5860,82 @@ int32_t __cdecl HudPanelWidth(void)
     return w->rect.right - w->rect.left;
 }
 
+typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
+typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
+
+/* 0x00414430, ten callers. Put the pointer into one of seven modes: store the
+ * index, then copy five fields out of that mode's 40-byte record into five
+ * fixed globals.
+ *
+ * "Pointer mode" is a role name and it is OURS -- nothing in the image says
+ * it. What grounds it is the three readers of what this installs, none of
+ * which is in this function. ADDR_POINTER_PICK is called once per object
+ * while walking OBJ_OFF_QUERY_NEXT, so it decides what may be picked;
+ * ADDR_POINTER_ACTION is called with (object, point) only when
+ * ADDR_MOUSE_BUTTON is clear, so it is what a release does; and
+ * ADDR_POINTER_OVERLAY is handed straight to OverlayPrepare. Three different
+ * users of three different fields, which is better than any one of them.
+ *
+ * THE FIVE STORES ARE NOT IN RECORD ORDER. Globals E0, E4, E8, EC, F4 take
+ * record fields +0, +4, +0x10, +0x14, +0x0C -- so the overlay, which is the
+ * LAST global written, comes from the field in the MIDDLE. Reading the stores
+ * top to bottom and numbering as you go puts the overlay index into the wrong
+ * global and swaps the two fields nothing here reads. This is the same trap
+ * the weapon handler slots carry, and orig.h already had to record it once.
+ *
+ * TWO OF THE SEVEN MODES FIRE ONCE AND REVERT, which is the whole of the tail.
+ * When a record has no pick function and no F14 but does have an action, the
+ * action runs immediately with (NULL, ADDR_ZERO_POINT) and the mode goes back
+ * to 0. Records 1 and 3 are shaped that way; record 2 has neither, so it
+ * installs nothing callable and stays; 0, 4, 5 and 6 have a pick function and
+ * persist. So "set the mode" and "do the thing now" are the same entry point,
+ * and which one happens is a property of the TABLE rather than of the caller.
+ *
+ * The table is seven records because the eighth slot is where the string
+ * "Rifleman" begins -- that is what bounds it, not a terminator.
+ *
+ * The zero it passes as the point is read from ADDR_ZERO_POINT rather than
+ * written as an immediate, which is what the original does and what item.cpp
+ * already reproduces elsewhere for the same global.
+ *
+ * MEASURED AT ONE CALL, and the coverage that buys is worth stating rather
+ * than rounding up. A driven Boot Camp mission -- through both dialogs, then
+ * movement and clicks on the map and on the COMMANDS panel -- reaches this
+ * exactly once, which is mode 0 at mission start. So the A/B compares the
+ * index store, the five copies and the guard NOT firing, and nothing else.
+ * The two fire-once modes, the non-sequential store order, and every mode
+ * above 0 are verified by reading. Reaching the rest needs the order-giving UI
+ * that the callers at 0x00427B53, 0x00427B61 and 0x00427B6F sit behind, and no
+ * drive here gets there.
+ */
+void __cdecl SetPointerMode(int32_t mode)
+{
+    const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_POINTER_MODES)
+                         + (size_t)mode * AM2_POINTER_MODE_SIZE;
+    AM2_PointerPickFn   pick;
+    AM2_PointerActionFn act;
+    int32_t             f14;
+
+    *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = mode;
+
+    pick = *(AM2_PointerPickFn const *)(rec + MODE_OFF_PICK);
+    act  = *(AM2_PointerActionFn const *)(rec + MODE_OFF_ACTION);
+    f14  = *(const int32_t *)(rec + MODE_OFF_F14);
+
+    *(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK    = pick;
+    *(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION = act;
+    *(int32_t *)(uintptr_t)ADDR_POINTER_F10 =
+        *(const int32_t *)(rec + MODE_OFF_F10);
+    *(int32_t *)(uintptr_t)ADDR_POINTER_F14 = f14;
+    *(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY =
+        *(const int32_t *)(rec + MODE_OFF_OVERLAY);
+
+    if (!pick && !f14 && act) {
+        act((void *)0, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+        *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = 0;
+    }
+}
+
 /* 0x00413A30, four callers. Repaint one HUD widget if it has been marked, and
  * unmark it.
  *
@@ -6409,5 +6485,7 @@ int widget_install(void)
                         "HudRepaintOne", 4);
     rc |= patch_replace(ADDR_HUD_PANEL_WIDTH, (const void *)HudPanelWidth,
                         "HudPanelWidth", 3);
+    rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
+                        "SetPointerMode", 10);
     return rc;
 }

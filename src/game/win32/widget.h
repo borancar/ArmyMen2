@@ -1453,6 +1453,11 @@ void __cdecl HudRepaintOne(void);
  * none -- and the 0 is what lets the callers clamp without a special case. */
 int32_t __cdecl HudPanelWidth(void);
 
+/* 0x00414430. Put the pointer into one of seven modes, installing that mode's
+ * pick predicate, release action and overlay row. Two of the seven run their
+ * action at once and revert to mode 0. */
+void __cdecl SetPointerMode(int32_t mode);
+
 int widget_install(void);
 
 #ifdef __cplusplus
