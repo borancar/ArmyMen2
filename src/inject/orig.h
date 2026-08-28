@@ -3014,6 +3014,19 @@ typedef struct {
 #define AM2_EVENT_KILLED         4
 #define AM2_EVENT_DAMAGED        5
 #define AM2_EVENT_HEALED         6
+/* Kind 7, and the script's own vocabulary is what names it. The five two-party
+ * event keywords are `killed` (57), `hit` (58), `healed` (59), `pickedup` (61)
+ * and `dropped` (62), and four notifier bodies of one template sit
+ * consecutively at 0x00427E10, 0x00427E80, 0x00427EF0 and 0x00427F60 raising
+ * kinds 5, 6, 7 and 8, with kind 4 at 0x00427FD0. Kinds 4, 5 and 6 are already
+ * killed/hit/healed, so 7 and 8 are the remaining two keywords in order.
+ *
+ * The three call sites settle which is which rather than leaving it to the
+ * ordering: every caller of 0x00427EF0 is a pickup, and each names itself --
+ * "TrooperPickupItem %x", "TrooperHostApprovedPickupItem %x" and
+ * "TrooperRemotePickupItem %x". By elimination kind 8 is `dropped`, which is
+ * an inference and not a call site, so 0x00427F60 stays unnamed here. */
+#define AM2_EVENT_PICKED_UP      7
 /* Called twice by ADDR_DAMAGE_OBJECT and by nothing else. Reconstructed. */
 #define ADDR_NOTIFY_DAMAGED      0x00427E10u  /* void(obj, void *attacker) */
 /* 0x00427D40, fifteen callers. The event MASK for an object: one bit per army,
@@ -3857,6 +3870,21 @@ typedef struct {
  * healed, and for a second object too when one is supplied; a null second
  * argument takes the shorter arm and names only the first. */
 #define ADDR_NOTIFY_HEALED       0x00427E80u  /* void(void *obj, void *src) */
+/* 0x00427EF0, three callers, all of them the pickup family above. The fourth
+ * member of the notifier template: it raises AM2_EVENT_PICKED_UP for the first
+ * argument, and for the second as well when one is supplied.
+ *
+ * The argument order is the template's -- the first becomes the event's first
+ * (num, uid, mask) triple and the second the second, the same way
+ * ADDR_NOTIFY_DAMAGED puts the victim first and the attacker second, which is
+ * what `hit <a> by <b>` and `pickedup <a> by <b>` read as. Note the callers
+ * pass them in the OPPOSITE order from their own parameter list: each pushes
+ * its second argument first. Reading those callers, the object that arrives
+ * here first is the ITEM -- it is the one whose uid is logged, whose
+ * OBJ_OFF_FLAGS gains bit 1, and which is stamped with a two-second deadline
+ * at +0xC8 -- and the second is the trooper, whose army is what the AI sweep
+ * beside the call is given. */
+#define ADDR_NOTIFY_PICKED_UP    0x00427EF0u  /* void(void *item, void *taker) */
 /* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
  * health, then notify. The percentage is clamped to 0..100 first, and the
  * result to the maximum, and an object already at or below zero health is

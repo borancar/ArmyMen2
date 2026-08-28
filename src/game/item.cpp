@@ -1855,6 +1855,64 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
                 0, 0, 0, 0, 0, 0);
 }
 
+/* 0x00427EF0, the fourth member of the same template and the same two-party
+ * shape as NotifyDamaged above -- three zeros pushed before the branch, both
+ * arms sharing them, no delay so the masks always survive. What is new here is
+ * only the literal.
+ *
+ * Kind 7 is `pickedup`. The evidence is the script's vocabulary and the call
+ * sites together, and neither alone would do. The five two-party event
+ * keywords are `killed`, `hit`, `healed`, `pickedup` and `dropped`; the
+ * notifier bodies for kinds 5, 6, 7 and 8 sit consecutively at 0x00427E10,
+ * 0x00427E80, 0x00427EF0 and 0x00427F60, so ordering alone would give 7 and 8
+ * to `pickedup` and `dropped` in that order -- which is an argument from
+ * layout, and CLAUDE.md records what taking a jump table in address order
+ * costs. The call sites decide it instead: all three callers of this address
+ * are the pickup family, and each names itself in a log line --
+ * "TrooperPickupItem %x", "TrooperHostApprovedPickupItem %x" and
+ * "TrooperRemotePickupItem %x". Kind 8 is then `dropped` by elimination, which
+ * is weaker, so 0x00427F60 is left alone rather than named on it.
+ *
+ * The two objects go in the order the template fixes -- first argument first
+ * -- which for `pickedup <a> by <b>` makes the first the item and the second
+ * whoever took it. The callers pass them the other way round from their own
+ * parameter lists, each pushing its second argument first; the one that
+ * arrives here first is the object whose uid the caller logs, whose
+ * OBJ_OFF_FLAGS gains bit 1, and which is stamped with a two-second deadline
+ * at +0xC8, while the second is the one whose army the AI sweep beside the
+ * call is handed.
+ *
+ * Its counter will read 0 whichever way the pickup path is driven: the three
+ * callers are the original's and call by address, so they cross the patched
+ * entry -- but this project has no drive that picks anything up. Verified by
+ * reading and by being the fourth copy of a template whose other three are
+ * already checked, and said plainly rather than left to be assumed.
+ */
+static void __cdecl NotifyPickedUp(void *item, void *taker)
+{
+    const uint8_t *o = (const uint8_t *)item;
+
+    if (taker) {
+        const uint8_t *t = (const uint8_t *)taker;
+
+        EventNotify(AM2_EVENT_PICKED_UP,
+                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)item)->uid,
+                    ObjEventMask((const AM2_Object *)item),
+                    *(const int32_t *)(t + AM2_OBJ_EVENT_NUM_OFF),
+                    ((const AM2_Object *)taker)->uid,
+                    ObjEventMask((const AM2_Object *)taker),
+                    0, 0, 0);
+        return;
+    }
+
+    EventNotify(AM2_EVENT_PICKED_UP,
+                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                ((const AM2_Object *)item)->uid,
+                ObjEventMask((const AM2_Object *)item),
+                0, 0, 0, 0, 0, 0);
+}
+
 /* 0x00427FD0, and the name is the ORIGINAL's, off its own log line. Event kind
  * 4 -- killed -- and the third member of the family: the same two-party shape
  * as NotifyDamaged above and as the kind-6 heal notify, differing only in the
@@ -3251,6 +3309,8 @@ void item_install(void)
                   "TriggerItemDestroyed", 2);
     patch_replace(ADDR_NOTIFY_DAMAGED, (const void *)NotifyDamaged,
                   "NotifyDamaged", 2);
+    patch_replace(ADDR_NOTIFY_PICKED_UP, (const void *)NotifyPickedUp,
+                  "NotifyPickedUp", 1);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,
