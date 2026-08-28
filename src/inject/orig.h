@@ -4769,6 +4769,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_REGION_OF_CELL        0x00514ECCu  /* uint8_t * */
 #define ADDR_REGIONS               0x00514EF0u
 #define AM2_REGION_SIZE            44
+#define REGION_OFF_ACTIVE          4u   /* int32_t; 0x0042BAD4 sets it to 1 */
 #define REGION_OFF_NLINKS          8u   /* uint8_t */
 #define REGION_OFF_LINKS           0x0Cu
 #define ADDR_ADD_REGION_LINK       0x0042B860u  /* void(int32_t, int32_t) */
@@ -4777,15 +4778,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * `m[from * stride + to]`, tests the first against a sentinel byte, and walks
  * the second one hop at a time until it arrives.
  *
- * So ADDR_REGION_COST records whether a pair has been solved -- the sentinel
- * means "not yet" -- and ADDR_REGION_NEXT is a next-hop table: the region to
- * step to when you are in `from` and want `to`. Classic all-pairs routing,
- * stored as bytes because a map has fewer than 256 regions. */
+ * So ADDR_REGION_COST records whether a pair has been solved and
+ * ADDR_REGION_NEXT is a next-hop table: the region to step to when you are in
+ * `from` and want `to`. Classic all-pairs routing, stored as bytes because a
+ * map has fewer than 256 regions.
+ *
+ * ADDR_REGION_STAMP WAS CALLED ADDR_REGION_UNSET AND MEANT THE OPPOSITE. A
+ * cost entry EQUAL to it is the solved one: 0x00406492 is `cmp cl, al; je`
+ * past the solve, and ADDR_REGION_SOLVE_PAIR writes the byte into the entry at
+ * 0x00438389 and 0x004383A5 as its last act. It is a GENERATION counter, not a
+ * sentinel value -- ActivateRegion and InactivateRegion increment it whenever
+ * a region's REGION_OFF_ACTIVE actually changes, which invalidates every
+ * previously stamped pair in one byte write instead of clearing the matrix.
+ * The old name described how RegionHops reads it and got the polarity
+ * backwards; the reconstruction had the comparison inverted with it. */
 #define ADDR_REGION_STRIDE         0x00514EECu  /* int16_t, both matrices' */
 #define ADDR_REGION_NEXT           0x00514EF4u  /* uint8_t *, the next hop */
-#define ADDR_REGION_UNSET          0x00514EF8u  /* uint8_t, "not solved yet" */
+#define ADDR_REGION_STAMP          0x00514EF8u  /* uint8_t, the solved generation */
 #define ADDR_REGION_COST           0x00514EFCu  /* uint8_t * */
 #define ADDR_REGION_SOLVE_PAIR     0x00438300u  /* void(from, to) */
+/* 0x0042BC70 and 0x0042BCB0, one caller each and adjacent: the script's
+ * `activateregion` (token 149) and `inactivateregion` (150). Each range-checks
+ * the id against ADDR_REGION_STRIDE, writes REGION_OFF_ACTIVE, and bumps
+ * ADDR_REGION_STAMP -- but ONLY when the flag actually changed. The name is
+ * the game's own twice over: the token table, and "Activating Region %d" which
+ * 0x0042BAFB logs beside the very same store. Reconstructed. */
+#define ADDR_ACTIVATE_REGION       0x0042BC70u  /* void(int32_t region) */
+#define ADDR_INACTIVATE_REGION     0x0042BCB0u  /* void(int32_t region) */
 /* 0x00406460, one caller. How many hops from one region to another, 0 when
  * they are the same and -1 when the walk falls off. Its third argument says
  * whether an unsolved pair may be solved on the spot: with it clear, an

@@ -44,6 +44,12 @@ void __cdecl SetPointRule(void *obj);
 int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve);
 int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve);
 
+/* 0x0042BC70 and 0x0042BCB0. The script's `activateregion` and
+ * `inactivateregion`: set or clear REGION_OFF_ACTIVE, and bump the routing
+ * cache's generation stamp when -- and only when -- the flag changed. */
+void __cdecl ActivateRegion(int32_t region);
+void __cdecl InactivateRegion(int32_t region);
+
 int region_install(void);
 
 #ifdef __cplusplus

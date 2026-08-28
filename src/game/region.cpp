@@ -220,9 +220,16 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
 
     stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
 
+    /* CORRECTED. This compared `!=` and called that "already solved", which is
+       the original's test inverted: 0x00406492 is `cmp cl, al; je` PAST the
+       solve, so a pair whose cost byte EQUALS the stamp is the solved one.
+       SolvePair confirms it from the other side -- 0x00438389 and 0x004383A5
+       write the stamp byte into the cost entry as the last thing they do. The
+       inverted version re-solved every solved pair and skipped every unsolved
+       one; see ActivateRegion for why nothing here caught it. */
     if ((*(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_COST))
             [from * stride + to]
-        != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_UNSET)) {
+        == *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP)) {
         /* already solved */
     } else if (!solve) {
         return -1;
@@ -274,6 +281,74 @@ int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
     return 1;
 }
 
+/* 0x0042BC70 and 0x0042BCB0, one caller each and adjacent in the image: the
+ * script's `activateregion` (token 149) and `inactivateregion` (150). That one
+ * caller is an action handler which picks between them on a boolean in the
+ * action record.
+ *
+ * The name is the game's own twice over -- the token table has both words, and
+ * 0x0042BAFB logs "Activating Region %d" immediately after storing 1 into the
+ * same REGION_OFF_ACTIVE these write. Neither alone would do: the log line
+ * names the field and the tokens name the pair.
+ *
+ * WHAT MAKES THEM MORE THAN FLAG SETTERS is the last two instructions. Each
+ * increments ADDR_REGION_STAMP, and only when the flag ACTUALLY CHANGED --
+ * activating an already-active region writes nothing and bumps nothing. That
+ * byte is the generation the all-pairs routing cache is stamped with, so one
+ * increment invalidates every solved pair without touching the matrix, and a
+ * redundant activate does not throw the cache away. It wraps at 256, which is
+ * fine: what matters is that the new stamp differs from the one already
+ * stored, not that it is monotonic.
+ *
+ * THAT IS ALSO HOW A DEFECT IN RegionHops ABOVE WAS FOUND, and it is worth
+ * being plain about how badly the evidence was arranged. ADDR_REGION_STAMP was
+ * called ADDR_REGION_UNSET and glossed "not solved yet"; RegionHops was
+ * written from that name and tested `cost != stamp` for "already solved",
+ * which is the original's `cmp cl, al; je` inverted. SolvePair settles it from
+ * the far side -- it WRITES the stamp into the cost entry as its last act --
+ * so equal means solved and the reconstruction had it exactly backwards.
+ *
+ * Nothing here caught it and nothing here could have. RegionHops is reached
+ * only when something is pathfound rather than driven, which no drive in this
+ * project does; its counter and MiddleRegionLink's read 0 on every
+ * configuration. The A/B passed because the code never ran. A wrong name
+ * propagated into a comparison, and what found it was reading the two
+ * functions that write the byte.
+ */
+void __cdecl ActivateRegion(int32_t region)
+{
+    uint8_t *rec;
+
+    if (region >= *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE))
+        return;
+
+    rec = *(uint8_t *const *)AM2_IMAGE(ADDR_REGIONS)
+          + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
+
+    if (*(const int32_t *)rec != 0)
+        return;
+
+    *(int32_t *)rec = 1;
+    (*(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))++;
+}
+
+void __cdecl InactivateRegion(int32_t region)
+{
+    uint8_t *rec;
+
+    if (region >= *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE))
+        return;
+
+    rec = *(uint8_t *const *)AM2_IMAGE(ADDR_REGIONS)
+          + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
+
+    if (*(const int32_t *)rec == 0)
+        return;
+
+    *(int32_t *)rec = 0;
+    (*(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))++;
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -292,5 +367,9 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_ACTIVATE_REGION, (const void *)ActivateRegion,
+                        "ActivateRegion", 1);
+    rc |= patch_replace(ADDR_INACTIVATE_REGION, (const void *)InactivateRegion,
+                        "InactivateRegion", 1);
     return rc;
 }
