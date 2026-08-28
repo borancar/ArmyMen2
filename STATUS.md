@@ -5,59 +5,125 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `6d1be28`. Working tree clean.
+Last updated: **2026-08-28**, at `c0994d2`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,012 patches.**
+Nothing uncommitted. **1,033 patches.**
 
-Six functions since the last snapshot, and one correction to `tools/ab.sh`.
+Eight commits since the last snapshot: twenty-one functions, one new
+`checkseams` rule, and one generated table that had been wrong in four rows.
 
-- **`FindRecordList`** (`0x00434100`) completes the record-list family --
-  maker, adder, free, find. **The adder and the finder disagree about what -1
-  means**: the adder refuses a DUPLICATE with it, this reports a MISS. Writing
-  the second from the first and carrying the convention across inverts both.
+- **The air-support set.** `LoadAirSprites`, `FreeAirSprites` and its alias
+  (`0x00408D20`, `0x00408DA0`, `0x00408E40`), then `ResetAirSupport`
+  (`0x00408E00`). The free releases 32 sprites and then memsets **179 dwords**,
+  and the arithmetic is what names the set: `0x004F93D8 + 179*4` is
+  `0x004F96A4`, which is `ADDR_AIR_SAVE_BLOCK + 0x248`, the block's last byte.
+  So the sweep takes the sprite arrays AND the whole air-support queue,
+  exactly, and **sprite set 19 is the air support set**. The first commit said
+  "something else keeps sprite pointers in the same block", which was a guess
+  standing in for a sum.
 
-- **`ObjDropAltRecord`** (`0x00449200`) puts an object into state 5 and clears
-  its alternate table record -- and `ObjsAreAllied`, written a dozen commits
-  earlier from an unrelated call site, chooses that record only when the field
-  is NOT 5. The two agree without ever having met, which is what makes either
-  reading safe.
+- **The air block's layout had an 84-byte hole its own comment denied.**
+  `orig.h` said "the layout closes the block exactly"; `AIR_OFF_EXTRA` ends at
+  `0x01EC` and `AIR_OFF_FLAG_A` starts at `0x0240`. The span is a second queue
+  and `0x004093E7` gives its bound outright as `cmp eax, 8; jge` -- eight
+  dwords, eight dwords, eight words, then the two flags, which tiles it
+  exactly. Now `AIR_OFF_PASS_*`.
 
-- **`FreeWaveSounds`** (`0x0040C7A0`) walks the same array `StopAllSounds`
-  does and frees where that one merely stops. Both are right -- a level change
-  wants stopping, a shutdown wants freeing -- and the two loops are otherwise
-  identical, so reading one as the other makes this a leak or that a
-  use-after-free.
+- **Six delete/destruct pairs.** The comm channel panel, the battle-join
+  screen and a multiplayer row's name button; then the film archive, the arrow
+  scroll bar and the savegame list, which are the three CLAUDE.md listed as
+  "an SEH frame and real work" without saying what the work was.
 
-- **It was measured through the LOG**, a first this session: it runs during
-  shutdown, so the control socket is gone before the counter can be read, and
-  the number reaches `trace_report()` on `DLL_PROCESS_DETACH` and nowhere
-  else -- exactly as `CLAUDE.md` records.
+  `SaveList` is named from its CONSTRUCTOR -- `save\%s`, `*.sav` -- because
+  nothing in its destructor says what the class is. A second route agrees: the
+  screen that builds it loads `02_008_00_savegame.bmp`.
 
-- **`TakeSoldierName`** (`0x00447570`) hands out one of 62 developer names --
-  "R. Pavey", "D. Lee", "J. Wildblood". It walks FORWARD from a random start,
-  so names come out in table order from a random offset; when all are taken it
-  returns the start unmarked; and **nothing in the image ever clears a taken
-  flag**, so the sixty-third name is a repeat for the session.
+- **`ShutdownAudio`** (`0x0040C9F0`), the tenth entry of `ShutdownSubsystems`'
+  teardown table and `InitAudio`'s mirror.
 
-- Two name indices sit four bytes apart and both are live -- `+0x5A8` into
-  `ADDR_KIND7_NAMES`, `+0x5AC` into this table. `orig.h` described the first
-  as "the random name index" not knowing there was a second.
+- **Four screen openers** -- save game, overwrite, the in-mission game menu and
+  the message screen -- which makes `frame.cpp`'s sub-state painter table nine
+  named functions with nothing reaching the image. Each named from the vtable
+  its CONSTRUCTOR installs: `0x00452F50` pushes `00_999_99_blank.bmp` and
+  builds the GAME MENU, so the bitmap names the backdrop and not the dialog.
 
-- **`ResetItemsAndUids`** (`0x00429420`) seeds FIVE of the eight uid counters
-  to 1000 -- the four armies plus the neutral one, leaving 5..7 alone. So no
-  uid a level hands out has a counter below 1000.
+- **A fifth spelling of the seam, with eight live instances.**
+  `tools/checkseams.py`'s by-address rule claimed to cover "a table of plain
+  integers that are function pointers" and only ever did while the integers
+  were `ADDR_` names. A bare hex literal is not one, so both tables of
+  addresses in the tree were invisible: five sub-state painters, two teardown
+  entries, and `ShutdownSubsystems`' own opening thiscall. The teardown table's
+  comment said "the shape says which is which" -- it did not, and I had edited
+  that same sentence one commit earlier without checking whether it was true.
 
-- **`ab.sh` said something too strong and now does not.** One `quit` run
-  reported an extra " Receive thread got event 0"; two further runs of the
-  same build were clean. The failure message said "compared as a set, so this
-  is real" -- but a sorted set absorbs ORDER, not a missing or extra line, and
-  that thread does not always see an event before it is told to stop. The
-  check is left FAILING rather than filtered, with a note not to tighten it
-  without a mutation showing what that would miss.
+- **`coverage.py`'s By library table skipped `owner_of`**, so `docs/boundary.md`
+  held two generated tables disagreeing about ADVAPI32 -- **complete** in one
+  and 2 sites, 0 reconstructed in the other. Four rows were wrong. Five
+  `GetTickCount` sites had been credited because a NEIGHBOUR inside the same
+  merged entry was patched, one of them by a function landed the same day.
+
+### Measured, and where a measurement was not available
+
+`ShutdownAudio` is the clean case: the same quit drive on this commit and its
+parent moves `StopAudioStream` 2 to 1, `ReleaseSoundObjects` 1 to 0 and
+`FreeWaveSounds` 1 to 0 -- one call each crossing the patched entry before and
+reached by name after. **I had predicted the wrong evidence**: the source note
+said `FreeWaveSounds` going to 0 would show the new code ran, and on its own it
+shows nothing, because a function that never runs leaves its callee at 0 too.
+
+`ResetAirSupport` reads 1 with both callees dropping to 0. `MoviesDelete`
+reads 1 and `MoviesDestruct` 0 -- vtable dispatch reaches the delete through
+the patched slot, and our delete calls the destructor by name.
+
+The four openers **cannot be measured at all**, and that is a consequence of
+closing the seam: their only caller is the painter table, which is now ours, so
+`blindspots.py` files all four "all 1 caller(s) reconstructed". Before the seam
+fix those calls crossed the patched entries. A counter is the measuring device
+rather than the thing measured, but "OpenControls reads 0" will read as a
+regression to whoever meets it next.
+
+`ArrowBar` and `SaveList` are unexercised: no drive here closes a list-bearing
+screen or a campaign save dialog. Those zeros are REAL, not blind --
+`blindspots.py` files them under "reached by address".
+
+### What this cost, and the one habit behind it
+
+Five self-corrections in one session, every one from reading disassembly before
+checking whether the address was already named or already ours: the air-support
+block, `blindspots.py`'s ENTRY section, `ADDR_OVERLAY_DIRTY`,
+`ADDR_GET_PAUSE_FLAGS`, and `0x00426209`, which is interior to
+`ADDR_STATE2_FRAME` and reconstructed. A grep of `orig.h` costs one command;
+resolving an address through `merges.real_functions` to its owning function and
+testing THAT against the patch list is the reliable form, because grepping for
+the literal fails whenever the address is interior to a function.
+
+Twice more I predicted a measurement and the measurement disagreed --
+`OpenControls` dropping (it did not; the painter fires only on a dirty
+overlay), and KERNEL32's coverage falling (it rose; my probe reimplemented the
+tool with a smaller `done_fns` than the tool builds). Running the tool was one
+command in both cases.
+
+And three drives were wasted guessing menu coordinates from memory when
+`tools/ab.sh` has them: BOOT CAMP is `(306,143)`, OPTIONS `(306,262)`,
+CONTROLS `(306,212)`, MOVIES `(307,302)`. A drive that never leaves the title
+screen reads exactly like a dead reconstruction; `ComposeFrame` at 0 is what
+catches it.
 
 ## Next
+
+- **This file has grown past being readable and that is now an item.** Two
+  sections hold 81% of it -- "The next target, read but not written" at ~2,290
+  lines and "Leads" at ~2,790 -- while the four sections that answer "where is
+  this" are about 5%. A heading in the singular covering two thousand lines is
+  an archive, not a target. Triage is deliberately NOT being done as a side
+  effect of a status update; it wants its own pass.
+
+  A second `## Next` was found in there and has been renamed rather than
+  merged: it was a status-of-the-front summary under a heading promising a
+  queue, and folding it would have destroyed something useful on the strength
+  of its title.
 
 - **A mission with something in it to kill.** `ab.sh combat` reaches the
   damage path but nothing dies, so `FreeItem`, `RemoveFromItemList`,
@@ -3429,7 +3495,7 @@ A clean A/B is not evidence about a function the run never calls. Check with a
 counts probe before reading one as coverage -- that is what turned the
 `EvtSetByte530` result from "verified" into "verified by reading", above.
 
-## Next
+## The menu widget layer, and how well it is covered
 
 1. **The menu widget layer is the current front and the best-verified part of
    the tree.** All five vtable slots have a reconstructed base, plus the
