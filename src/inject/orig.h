@@ -422,6 +422,44 @@
 #define ADDR_HUD_SQUAD_DESTRUCT 0x00415850u
 #define ADDR_HUD_EDGE_DELETE   0x00419650u
 #define ADDR_HUD_EDGE_DESTRUCT 0x00419670u
+/* The EDGE STRIP is the selected trooper's status line, and its update is what
+ * says so: it looks the local army's object up, fills a health percentage, and
+ * then shows EITHER the vehicle he is riding or the item in his hand.
+ *
+ * A click anywhere on it TOGGLES ADDR_HUD_WIDGET_B's HUDPANEL_OFF_OPEN, so the
+ * strip is also the panel's tab. It arbitrates that press through
+ * ADDR_MOUSE_GRAB exactly as the top strip does. */
+#define ADDR_HUD_EDGE_UPDATE   0x004196E0u  /* thiscall void(obj) */
+#define EDGE_OFF_HEALTH_PCT    0x64u   /* int32_t, the trooper's own bar */
+#define EDGE_OFF_CAPTION_A     0x68u   /* char[], the vehicle or ARMOR */
+#define EDGE_OFF_SECOND_PCT    0x88u   /* int32_t, whatever A names */
+#define EDGE_OFF_CAPTION_B     0x8Cu   /* char[], the item in hand */
+#define EDGE_OFF_AMMO          0xACu   /* int32_t, -1 when there is none */
+/* Every bar is a percentage of ninety, which is the drawn width: the original
+ * computes it as `value * 90 / max` with one `idiv` and no float. */
+#define AM2_HUD_BAR_WIDTH      90
+/* OBJ_OFF_FIELD_C0's record, two fields of it. The first dword is the one that
+ * block already describes as indexing ADDR_WEAPON_HANDLERS; it is also what
+ * picks the caption here, which is what names 41 of its values. */
+#define ITEMTYPE_OFF_KIND      0x00u
+#define ITEMTYPE_OFF_CAPACITY  0x18u  /* denominator for the ARMOR bar */
+#define ITEM_OFF_AMMO          0xCCu  /* int32_t, numerator for both */
+#define AM2_ITEM_TYPE_ARMOR    0x1Cu
+/* The vehicle captions, and THE JUMP TABLE'S ORDER IS NOT THE ARMS' ORDER.
+ * Laid out top to bottom the arms read JEEP, TANK, H|T, CONV, BOAT, ???; the
+ * table at 0x00419A18 says kind 4 is ??? and kind 5 is BOAT. Reading the
+ * bodies and numbering as you go gets the last two backwards, which is the
+ * trap CLAUDE.md already records for the sub-state table. */
+#define AM2_VEHICLE_KINDS      6
+/* The item captions: a 25-entry jump table at 0x00419A30 reached through a
+ * 41-BYTE index table at 0x00419A94, covering object type 2 through 42 with
+ * entry 24 as the ??? default. The two tile exactly -- 0x419A30 + 25*4 is
+ * 0x419A94 -- which is the check that neither base is off by one.
+ *
+ * Several types share a caption: 15..19 are all FLAG and 35..38 all DISG, and
+ * types 6, 7, 13, 14, 21, 22 and 31..34 map to the default. */
+#define AM2_ITEM_TYPE_FIRST    2
+#define AM2_ITEM_TYPE_LAST     42
 /* The other two, whose destructors do more than release a fixed set of slots
  * and which carry the MSVC SEH frame for it. */
 #define ADDR_HUD_SARGE_DELETE  0x00414E90u

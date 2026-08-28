@@ -679,6 +679,9 @@ void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip);
 /* Original: 0x00418660, vtable slot 2 of the same class. */
 void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w);
 
+/* Original: 0x004196E0, vtable slot 2 of the edge strip. */
+void __attribute__((thiscall)) HudEdgeUpdate(AM2_Widget *w);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made

@@ -27,6 +27,9 @@
 #include "../../inject/restore.h"
 #include "mapdraw.h"   /* SetDrawTarget -- reconstructed */
 #include "winmain.h"   /* Ticks -- reconstructed */
+#include "../army.h"    /* LookupOwnerObj -- reconstructed */
+#include "../objtype.h" /* LookupType3ByUID -- reconstructed */
+#include "../item.h"    /* WeaponByUid -- reconstructed */
 
 #include <stdint.h>
 #include <stddef.h>
@@ -1833,6 +1836,177 @@ void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w)
     *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = Ticks() + AM2_HUD_REWIND_TAP_MS;
     *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) =
         *(AM2_Sprite **)(self + HUDLOG_OFF_SPRITE_DOWN);
+}
+
+/* The two caption tables, written out rather than read from the image, which
+ * is what game/scripttokens.h already does for the keyword table.
+ *
+ * THE ORDER OF THE VEHICLE ONE IS THE JUMP TABLE'S, NOT THE ARMS'. Read top to
+ * bottom the arms give JEEP, TANK, H|T, CONV, BOAT, ???; the table at
+ * 0x00419A18 puts ??? at 4 and BOAT at 5. Taking the layout would have swapped
+ * the last two silently, and no drive here rides a boat. */
+static const char *const kEdgeVehicle[AM2_VEHICLE_KINDS] = {
+    "JEEP", "TANK", "H|T", "CONV", "???", "BOAT"
+};
+
+/* The item captions, indexed by the byte table below rather than by type.
+ * Entry 24 is the default and is what an out-of-range type reaches too. */
+static const char *const kEdgeItem[] = {
+    "GREN", "FLAM", "BAZ",  "MORT", "HvMG", "RIFLE", "AUTO", "MINE",
+    "EXPL", "FLAG", "MSWP", "MEDI", "AIRS", "PARA",  "RECO", "NOTE",
+    "FLAK", "VULC", "SNIP", "DISG", "MAG",  "AERO",  "WREN", "M80",
+    "???"
+};
+
+/* One byte per object type from AM2_ITEM_TYPE_FIRST to AM2_ITEM_TYPE_LAST.
+ * The repeats are the original's: 15..19 all point at FLAG and 35..38 at DISG,
+ * and 24 is the default for the types with no caption at all. */
+static const uint8_t kEdgeItemIndex[AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST + 1] = {
+     0,  1,  2,  3, 24, 24,  4,  5,  6,  7,
+     8, 24, 24,  9,  9,  9,  9,  9, 10, 24,
+    24, 11, 12, 13, 14, 15, 16, 17, 18, 24,
+    24, 24, 24, 19, 19, 19, 19, 20, 21, 22,
+    23
+};
+
+/* Every bar in this widget is `value * 90 / max` with one integer divide. The
+ * guard is the original's and it is on the DENOMINATOR being positive, not on
+ * the numerator -- an object with zero max health would divide by zero and the
+ * game would take the fault, so the check has to stay where it is. */
+static int32_t EdgeBar(int32_t value, int32_t max)
+{
+    return value * AM2_HUD_BAR_WIDTH / max;
+}
+
+/* 0x004196E0. The edge strip's update: the selected trooper's status line, and
+ * the panel's tab.
+ *
+ * It places itself with WidgetScreenRect FIRST, because everything below tests
+ * the cursor against the rectangle that call produces -- the base update at
+ * the tail does it again for the children.
+ *
+ * A click toggles ADDR_HUD_WIDGET_B's HUDPANEL_OFF_OPEN, arbitrated through
+ * ADDR_MOUSE_GRAB the same way HudTopUpdate arbitrates its rewind button: claim
+ * it if it is free and a button changed, act only while it is ours.
+ *
+ * Then the display. Five fields are reset unconditionally -- before the null
+ * test, so an army with no object clears the strip rather than leaving the last
+ * trooper's numbers on screen -- and then either:
+ *
+ *   RIDING: the vehicle's kind picks a caption and its health fills the second
+ *   bar. Note the caption goes to A while the item path writes B, so a soldier
+ *   in a jeep and a soldier holding a rifle light up different halves.
+ *
+ *   ON FOOT: walk the six inventory slots, stopping at the first empty one.
+ *   The slot that matches UNIT_OFF_INVENTORY_SEL supplies caption B and the
+ *   ammo; and then, FALLING THROUGH rather than as an else, any slot holding
+ *   type 0x1C supplies caption A as "ARMOR" and the second bar. The
+ *   fall-through is the original's -- the selected slot is tested for armour
+ *   too -- and writing it as an else would quietly stop armour showing while
+ *   it is the thing in hand.
+ */
+void __attribute__((thiscall)) HudEdgeUpdate(AM2_Widget *w)
+{
+    uint8_t       *self = (uint8_t *)w;
+    const uint8_t *obj;
+    int32_t        i;
+
+    WidgetScreenRect(w);
+
+    if (PointInRect((const AM2_Rect *)&w->rect,
+                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+        AM2_Widget *grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+        int32_t     changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+
+        if (!grab && changed) {
+            grab = w;
+            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+        }
+
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            && changed && grab == w) {
+            uint8_t *panel = (uint8_t *)*(AM2_Widget *const *)
+                                 (uintptr_t)ADDR_HUD_WIDGET_B;
+
+            PlaySoundAt(0, 0, 0, 0, 0);
+            *(int32_t *)(panel + HUDPANEL_OFF_OPEN) =
+                *(const int32_t *)(panel + HUDPANEL_OFF_OPEN) == 0;
+        }
+    }
+
+    obj = (const uint8_t *)LookupOwnerObj(
+              *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+    *(int32_t *)(self + EDGE_OFF_HEALTH_PCT) = 0;
+    *(char *)(self + EDGE_OFF_CAPTION_A)     = '\0';
+    *(int32_t *)(self + EDGE_OFF_SECOND_PCT) = 0;
+    *(char *)(self + EDGE_OFF_CAPTION_B)     = '\0';
+    *(int32_t *)(self + EDGE_OFF_AMMO)       = -1;
+
+    if (!obj) {
+        WidgetUpdate(w);
+        return;
+    }
+
+    if (*(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) > 0)
+        *(int32_t *)(self + EDGE_OFF_HEALTH_PCT) =
+            EdgeBar(*(const int16_t *)(obj + OBJ_OFF_HEALTH),
+                    *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH));
+
+    if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
+        const uint8_t *veh = (const uint8_t *)LookupType3ByUID(
+                                 *(const uint32_t *)(obj + OBJ_OFF_RIDING));
+        uint32_t       kind;
+
+        if (veh) {
+            kind = *(const uint32_t *)(veh + VEHICLE_OFF_KIND);
+            strcpy((char *)(self + EDGE_OFF_CAPTION_A),
+                   kind < AM2_VEHICLE_KINDS ? kEdgeVehicle[kind] : "???");
+            *(int32_t *)(self + EDGE_OFF_SECOND_PCT) =
+                EdgeBar(*(const int16_t *)(veh + OBJ_OFF_HEALTH),
+                        *(const int16_t *)(veh + OBJ_OFF_MAX_HEALTH));
+        }
+        WidgetUpdate(w);
+        return;
+    }
+
+    for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
+        uint32_t       uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
+        const uint8_t *item;
+        const uint8_t *type;
+
+        if (!uid)
+            break;
+
+        item = (const uint8_t *)WeaponByUid(uid);
+        if (!item)
+            continue;
+
+        type = *(const uint8_t *const *)(item + OBJ_OFF_FIELD_C0);
+
+        if (i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)) {
+            uint32_t kind = *(const uint32_t *)(type + ITEMTYPE_OFF_KIND);
+
+            *(int32_t *)(self + EDGE_OFF_AMMO) =
+                *(const int32_t *)(item + ITEM_OFF_AMMO);
+
+            strcpy((char *)(self + EDGE_OFF_CAPTION_B),
+                   kind - AM2_ITEM_TYPE_FIRST
+                       <= (uint32_t)(AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST)
+                   ? kEdgeItem[kEdgeItemIndex[kind - AM2_ITEM_TYPE_FIRST]]
+                   : "???");
+        }
+
+        /* Falls through from the branch above, deliberately. */
+        if (*(const uint32_t *)(type + ITEMTYPE_OFF_KIND) == AM2_ITEM_TYPE_ARMOR) {
+            strcpy((char *)(self + EDGE_OFF_CAPTION_A), "ARMOR");
+            *(int32_t *)(self + EDGE_OFF_SECOND_PCT) =
+                EdgeBar(*(const int32_t *)(item + ITEM_OFF_AMMO),
+                        *(const int32_t *)(type + ITEMTYPE_OFF_CAPACITY));
+        }
+    }
+
+    WidgetUpdate(w);
 }
 
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
@@ -7631,6 +7805,8 @@ int widget_install(void)
                         "HudTopPaint", 1);
     rc |= patch_replace(ADDR_HUD_TOP_UPDATE, (const void *)HudTopUpdate,
                         "HudTopUpdate", 1);
+    rc |= patch_replace(ADDR_HUD_EDGE_UPDATE, (const void *)HudEdgeUpdate,
+                        "HudEdgeUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_PAINT, (const void *)HudSargePaint,
                         "HudSargePaint", 1);
     rc |= patch_replace(ADDR_HUD_CMD_PAINT, (const void *)HudCommandsPaint,
