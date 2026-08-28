@@ -362,6 +362,15 @@
 #define ADDR_HUD_WIDGET_A  0x004FCF00u  /* AM2_Widget * */
 #define ADDR_HUD_WIDGET_B  0x004FCF54u
 #define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
+/* 0x0041A170, three callers. The WIDTH of ADDR_HUD_WIDGET_C -- its screen
+ * rect's right less its left -- or 0 when there is no such widget.
+ *
+ * The callers are what say it is a width rather than a coordinate: each
+ * computes ADDR_SCREEN_W minus this and clamps a horizontal position to it,
+ * which is "keep the thing left of the HUD panel". The null answer of 0 makes
+ * that clamp the whole screen, so a missing panel is not a special case
+ * anywhere else. */
+#define ADDR_HUD_PANEL_WIDTH   0x0041A170u  /* int32_t(void) */
 /* 0x00413A30, four callers. Repaint one HUD widget if it has been marked, and
  * unmark it.
  *

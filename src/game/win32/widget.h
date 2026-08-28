@@ -1449,6 +1449,10 @@ void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name);
 /* 0x00413A30, four callers. Repaint one HUD widget if it has been marked. */
 void __cdecl HudRepaintOne(void);
 
+/* 0x0041A170, three callers. The width of the HUD panel, or 0 when there is
+ * none -- and the 0 is what lets the callers clamp without a special case. */
+int32_t __cdecl HudPanelWidth(void);
+
 int widget_install(void);
 
 #ifdef __cplusplus

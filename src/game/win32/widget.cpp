@@ -5836,6 +5836,30 @@ void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name)
     ((AM2_Widget *)w)->sprite = spr;
 }
 
+/* 0x0041A170, three callers. The width of ADDR_HUD_WIDGET_C, or 0 when there
+ * is none.
+ *
+ * THE CALLERS ARE WHAT MAKE IT A WIDTH. On its own it is a subtraction of two
+ * fields of a rect -- right less left -- which could as easily be a
+ * coordinate; each caller computes ADDR_SCREEN_W minus this and clamps a
+ * horizontal position to the result, which is "keep the thing left of the HUD
+ * panel".
+ *
+ * THE NULL ANSWER OF 0 IS LOAD-BEARING. It makes that clamp the whole screen,
+ * so a missing panel needs no special case at any of the three sites. A
+ * reconstruction that returned the screen width for a null, which would look
+ * more careful, would clamp to zero instead. */
+int32_t __cdecl HudPanelWidth(void)
+{
+    const AM2_Widget *w =
+        *(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_C;
+
+    if (!w)
+        return 0;
+
+    return w->rect.right - w->rect.left;
+}
+
 /* 0x00413A30, four callers. Repaint one HUD widget if it has been marked, and
  * unmark it.
  *
@@ -6383,5 +6407,7 @@ int widget_install(void)
                         "MpPreviewSetBitmap", 3);
     rc |= patch_replace(ADDR_HUD_REPAINT_ONE, (const void *)HudRepaintOne,
                         "HudRepaintOne", 4);
+    rc |= patch_replace(ADDR_HUD_PANEL_WIDTH, (const void *)HudPanelWidth,
+                        "HudPanelWidth", 3);
     return rc;
 }
