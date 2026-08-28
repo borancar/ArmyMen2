@@ -150,6 +150,11 @@ int32_t __cdecl ObjTileAttr(const void *obj);
  * the same value arrived at differently. */
 int32_t __cdecl TileAttrAt(uint32_t tile);
 
+/* 0x00448F00. The total obstruction between `from` and the map point `at`:
+ * the objects standing there, the tile's own blocking bit, and a height step.
+ * `ref` is the reference point ObjBlockWeight compares distances against. */
+int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref);
+
 /* 0x0042A820. The ground height at a point, raised by any ITEM standing on
  * it. A byte return -- see item.cpp. */
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);

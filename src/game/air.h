@@ -166,7 +166,7 @@ int32_t __cdecl ThingCode(const void *who, const void *owner);
  * against `at`. 0, an item's own byte, or AM2_BLOCK_FULL. The third argument
  * is not read; it is in the signature because the callers pass it. */
 int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
-                               AM2_Point at);
+                               uint32_t at);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded

@@ -658,6 +658,7 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot);
 }
 
 #define g_tileAttrs (*(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS)
+#define g_tileFlags (*(const uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)
 
 int32_t __cdecl ObjTileAttr(const void *obj)
 {
@@ -1096,6 +1097,87 @@ void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc)
     }
 
     return head;
+}
+
+/* 0x00448F00, three callers, 176 bytes. The TOTAL obstruction between an
+ * object and a map point, in three parts and in the original's order: every
+ * object standing at the point, then the tile's own blocking bit, then a
+ * height step between the object's tile and the point's.
+ *
+ * It walks with ObjectsAtPoint through OBJ_OFF_QUERY_NEXT, the same scratch
+ * chain HeightAtPoint below reads, and accumulates ObjBlockWeight per object.
+ * REACHING AM2_BLOCK_FULL ENDS IT THERE -- the tile checks are skipped
+ * entirely, not merely added to, so a point already blocked by an object never
+ * consults the terrain at all. Written as the early return it is.
+ *
+ * The three arguments it passes down are not the three it was given. Its own
+ * point goes into ObjBlockWeight's UNUSED third parameter and the reference
+ * point into the fourth, which is the one that gets read; that is why this
+ * function has two points and why swapping them would be invisible to a
+ * compiler and fatal to the answer.
+ *
+ * THE OUT-OF-RANGE GUARD CANNOT FIRE, and it is reproduced anyway. The
+ * original masks TileOfPoint's answer to 16 bits and then branches on it being
+ * negative or above 0xFFFF -- `25 ff ff 00 00` followed by `7c 44` and
+ * `3d ff ff 00 00 / 7f 3d`. After the mask neither can be true, so the
+ * `return 0xFF` those two branches reach is dead code. It is written out here
+ * because a reader comparing against the disassembly should find it, and
+ * because "the original checks and the check is vacuous" is a different fact
+ * from "the original does not check".
+ *
+ * The height step is skipped when there is no object, since it needs that
+ * object's OBJ_OFF_TILE. Both heights are signed bytes out of ADDR_TILE_ATTRS,
+ * which is the table item.cpp already calls a height everywhere else.
+ *
+ * MEASURED, and it explains the zero underneath it. This runs EIGHT times on
+ * a driven Boot Camp mission -- title, briefing, both dialogs, then four
+ * rounds of walking and firing -- while ObjBlockWeight stays at 0 on the same
+ * run. Both counters were 0 before this landed, and the obvious reading of
+ * that pair was that neither ran. It was wrong: the caller ran and its loop
+ * body did not, because ObjectsAtPoint found nothing standing at those eight
+ * points. So ObjBlockWeight is reached-but-empty rather than unreached, which
+ * is a third thing a counter of 0 can mean and is not the blind spot.
+ *
+ * Eight calls is thin, and worth saying so rather than calling it covered:
+ * the tile arm and the height arm are compared by the A/B, the object loop is
+ * not entered at all, and the vacuous guard is unreachable by construction.
+ */
+int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
+{
+    uint8_t *o;
+    int32_t  total = 0;
+    uint32_t tile;
+
+    o = (uint8_t *)orig_objects_at_point(
+            &at, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        total += ObjBlockWeight(from, o, (int32_t)at, ref);
+        if (total >= AM2_BLOCK_FULL)
+            return total;
+    }
+
+    tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
+    /* The original's range check, kept and vacuous; see above. */
+    if ((int32_t)tile < 0 || (int32_t)tile > 0xFFFF)
+        return 0xFF;
+
+    if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
+        total += AM2_BLOCK_FULL;
+
+    if (from) {
+        int32_t d = (int32_t)(int8_t)TileAttrAt(tile)
+                  - (int32_t)(int8_t)TileAttrAt(
+                        *(const uint16_t *)((const uint8_t *)from
+                                            + OBJ_OFF_TILE));
+
+        if (d < 0)
+            d = -d;
+        if (d > AM2_BLOCK_HEIGHT_STEP)
+            total += AM2_BLOCK_FULL;
+    }
+
+    return total;
 }
 
 /* 0x0042A820, five callers. The ground height at a point, raised by anything
@@ -3418,6 +3500,8 @@ void item_install(void)
                   "NotifyDropped", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
+    patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
+                  "BlockWeightAt", 3);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

@@ -763,7 +763,9 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
  * four is the signature; the original simply does not use one of them. It is
  * named `unused` rather than dropped, because dropping it would silently
  * change the stack layout of the fourth, which IS read -- by address, since
- * ApproxDist takes a pointer and the point arrives by value.
+ * ApproxDist takes a pointer and the point arrives by value. It is spelled
+ * uint32_t rather than AM2_Point for the same reason HeightAtPoint and
+ * TileOfPoint are -- a packed point is what the callers hold.
  *
  * The height field is declared uint8_t in orig.h and read here with `movsx`,
  * so the difference is a signed one. Transcribed as the original spells it
@@ -779,7 +781,7 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
  * wrong in the other direction.
  */
 int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
-                               AM2_Point at)
+                               uint32_t at)
 {
     const uint8_t *o = (const uint8_t *)obj;
     const uint8_t *f = (const uint8_t *)from;
@@ -809,7 +811,7 @@ int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
         && !ObjIsType8((const AM2_Object *)obj))
         return AM2_BLOCK_FULL;
 
-    if (ApproxDist(&at, (const AM2_Point *)(o + OBJ_OFF_POS))
+    if (ApproxDist((const AM2_Point *)&at, (const AM2_Point *)(o + OBJ_OFF_POS))
         < ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
                      (const AM2_Point *)(o + OBJ_OFF_POS)))
         return AM2_BLOCK_FULL;

@@ -4267,9 +4267,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * dwords, so the signature is four; the unused one is the original's.
  * Counter measured at 0 on a driven Boot Camp mission -- not blind, just not
  * reached, so it is verified by reading. */
-#define ADDR_OBJ_BLOCK_WEIGHT      0x00448E60u /* int32_t(void*,void*,int32,AM2_Point) */
+#define ADDR_OBJ_BLOCK_WEIGHT      0x00448E60u /* int32_t(void*,void*,int32,uint32) */
 #define AM2_BLOCK_FULL             15   /* the callers' own threshold */
 #define AM2_BLOCK_HEIGHT_STEP      0x10 /* a step this size stops it blocking */
+/* 0x00448F00, three callers, 176 bytes. The TOTAL obstruction between an
+ * object and a map point: every object standing at that point through
+ * ADDR_OBJ_BLOCK_WEIGHT, then the tile's own blocking bit, then a height step
+ * between the two tiles. Reconstructed.
+ *
+ * The two tile-indexed byte tables it consults are ADDR_TILE_ATTRS, which is
+ * the height, and ADDR_TILE_FLAGS below. Runs eight times on a driven Boot
+ * Camp mission, with the object loop never entered. */
+#define ADDR_BLOCK_WEIGHT_AT       0x00448F00u /* int32_t(void*,uint32,uint32) */
+/* The byte table beside ADDR_TILE_ATTRS and indexed the same way, by tile
+ * index. 23 sites; one allocates it, width times height, and the rest read or
+ * OR into it. Bits 0x01, 0x04, 0x08 and 0x80 are in use, and 0x80 is set by
+ * 0x0042BD9E for a tile whose ADDR_MAP_TILES neighbour reads 15 or more. The
+ * name is ours and says only what the table is indexed by. */
+#define ADDR_TILE_FLAGS            0x00514ED0u /* uint8_t *, one per tile index */
+#define AM2_TILE_BLOCKS            0x80u  /* the bit BlockWeightAt reads */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
  * removal always clears. */
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */
