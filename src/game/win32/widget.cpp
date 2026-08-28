@@ -16,6 +16,7 @@
 #include "audio.h"
 #include "dplay.h"   /* CommCreateDirectPlay -- reconstructed */
 #include "../gamedir.h" /* SetGameDir -- reconstructed */
+#include "../place.h"  /* CanAffordUnit -- reconstructed */
 #include "../map.h"     /* Checksum and the three totals -- reconstructed */
 #include "../gameproc.h"  /* RequestState -- reconstructed */
 #include "../image.h"
@@ -1288,6 +1289,95 @@ AM2_Widget *__attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w,
     if (flags & 1)
         am2_free(w);
     return w;
+}
+
+/* 0x004193C0. The right-hand panel's per-frame update, and it does three
+ * things rather than one.
+ *
+ * THE SLIDE RESIZES THE WORLD. x moves toward its stop at 320 pixels a second
+ * -- FRAME_DELTA_SEC times a float constant whose SIGN carries the direction,
+ * +320 opening and -320 closing -- and the result is published into
+ * ADDR_BLIT_RECT.right, which ComposeFrame reads every frame to know where the
+ * map goes. So the panel is not animating over the view, it is changing the
+ * view's extent as it moves. 320 is exactly its travel: it sits at x 480 on a
+ * 640 screen and crosses in one second.
+ *
+ * The arithmetic is done in DOUBLE and cast, which is what air.cpp's
+ * FormationPoint established for the original's _ftol: a C cast truncates
+ * toward zero exactly as _ftol does, and the precision is provably enough --
+ * FRAME_DELTA_SEC times 320 is under a hundred at any frame rate this runs at.
+ * It has to stay floating point either way; an integer approximation would
+ * drift against the original at a different frame rate, and no A/B here would
+ * see it, because both sides run at the same rate.
+ *
+ * The closing arm re-evaluates SCREEN_W - HudPanelWidth() three times -- once
+ * to test, once to clamp, once to store. Reproduced as written; the original
+ * calls it three times and the value can change between them only if the
+ * widget moved, which it did.
+ *
+ * THE SECOND LOOP IS THE BUILD MENU AND IT ONLY RUNS IN A NETWORK GAME. For
+ * each of the eighteen records it asks CanAffordUnit -- which tests the game
+ * type mask AND the price against our points, both in one ADDR_UNIT_TYPES
+ * record -- and sets the matching HUD widget's flag to 0 when affordable and 1
+ * when not. Greyed out is 1.
+ *
+ * The field it writes is the BASE WIDGET'S `disabled`, already named in
+ * widget.h as "set disqualifies from focus" -- so this is not merely greying,
+ * it takes unaffordable units out of the focus order and the grey is a
+ * consequence. I nearly added HUDBTN_OFF_GREYED for it, which would have put a
+ * HUD name on a field the whole widget tree shares.
+ *
+ * IT PASSES THE RECORD'S ID, NEVER THE LOOP COUNTER. The menu and the type
+ * table are ordered differently in five of eighteen places, so indexing by
+ * position would price Grenadier as Bazookaman and look perfectly fine doing
+ * it. Nothing in a single-player drive reaches this loop at all.
+ */
+void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    self[HUDPANEL_OFF_FLAG8C] = 0;
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
+        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+        return;
+
+    if (*(const int32_t *)(self + HUDPANEL_OFF_OPEN)) {
+        int32_t stop = *(const int32_t *)(self + HUDPANEL_OFF_STOP);
+
+        if (w->x > stop) {
+            w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                              * *(const float *)AM2_IMAGE(ADDR_HUD_SLIDE_OPEN));
+            if (w->x < stop)
+                w->x = stop;
+            *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
+        }
+    } else if (w->x < *(const int32_t *)(uintptr_t)ADDR_SCREEN_W
+                       - HudPanelWidth()) {
+        w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                          * *(const float *)AM2_IMAGE(ADDR_HUD_SLIDE_SHUT));
+        if (w->x > *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth())
+            w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth();
+        *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        AM2_Widget *const *slot =
+            (AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
+        const uint8_t     *rec = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU);
+
+        for (; rec < (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_END);
+             rec += AM2_BUILD_MENU_STRIDE, slot++) {
+            int32_t id = *(const int32_t *)(rec + BUILD_MENU_OFF_ID);
+
+            (*slot)->disabled =
+                CanAffordUnit(id, *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS)
+                ? 0 : 1;
+        }
+    }
+
+    WidgetScreenRect(w);
+    WidgetUpdate(w);
 }
 
 /* 0x0044E510. The film archive's destructor: give back the twelve thumbnail
@@ -6861,6 +6951,8 @@ int widget_install(void)
                         "OpenGameMenu", 0);
     rc |= patch_replace(ADDR_OPEN_MESSAGE, (const void *)OpenMessage,
                         "OpenMessage", 0);
+    rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
+                        "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
                         (const void *)HudSargeDestruct,
                         "HudSargeDestruct", 1);

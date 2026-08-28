@@ -429,6 +429,40 @@
  * mode fields, and are walked to the table's end rather than by a count. */
 #define ADDR_HUD_CMD_SPRITES     0x004761B4u
 #define ADDR_HUD_CMD_SPRITES_END 0x004762CCu
+/* THE BUILD MENU, declared rather than built -- the same idiom as the OPTIONS
+ * dialog's 43-record table. Eighteen records of 0x38: an id into
+ * ADDR_UNIT_TYPES, a kind, a name, and the button's rectangle.
+ *
+ * THE ID IS NOT THE INDEX and that is the trap. This table is in MENU order
+ * and ADDR_UNIT_TYPES is in DATA order, and five of the eighteen differ --
+ * grenadier and flamethrower are promoted, bazooka demoted, jeep and halftrack
+ * swapped. Indexing the type table by position gets those five wrong and
+ * produces a menu that looks entirely right while greying the wrong buttons.
+ * The original passes the id field for exactly this reason.
+ *
+ * RECORD 17 (Mine) HAS A VALID ID AND NAME AND A TAIL THAT IS NOT A RECTANGLE:
+ * where 0..16 hold {50,190,43,27} and so on, it holds 16-bit pairs of the same
+ * column values. The loop below reads only the id, so it does not care; noted
+ * because whoever builds buttons from these rectangles will. */
+#define ADDR_BUILD_MENU        0x004762D0u  /* 18 records of 0x38 */
+#define ADDR_BUILD_MENU_END    0x004766C0u
+#define AM2_BUILD_MENU_STRIDE  0x38u
+#define BUILD_MENU_OFF_ID      0x00u  /* into ADDR_UNIT_TYPES, NOT the index */
+#define BUILD_MENU_OFF_KIND    0x04u
+#define BUILD_MENU_OFF_NAME    0x08u  /* char[0x18] */
+#define BUILD_MENU_OFF_RECT    0x28u  /* int32 x, y, w, h -- 43x27 throughout */
+/* ARMY_POINTS[OUR_SLOT], cached when the HUD is built rather than re-derived
+ * eighteen times a frame. */
+#define ADDR_OUR_POINTS        0x004FCF9Cu  /* int32_t */
+/* The panel slides at 320 pixels a second, the sign carried in the constant
+ * rather than in the code: +320 opening, -320 closing. FRAME_DELTA_SEC scales
+ * it, so this is frame-rate independent and has to stay float. */
+#define ADDR_HUD_SLIDE_OPEN    0x0046F95Cu  /* float, +320.0 */
+#define ADDR_HUD_SLIDE_SHUT    0x0046F958u  /* float, -320.0 */
+#define HUDPANEL_OFF_OPEN      0x5Cu  /* int32, which direction to slide */
+#define HUDPANEL_OFF_STOP      0x64u  /* int32, the open position */
+#define HUDPANEL_OFF_FLAG8C    0x8Cu  /* uint8, cleared every update */
+#define ADDR_HUD_PANEL_UPDATE  0x004193C0u  /* thiscall void(obj) */
 /* Three sprite slots, shared by the top and edge strips. */
 #define HUD_OFF_SPRITE0        0x58u
 #define HUD_OFF_SPRITE1        0x5Cu
