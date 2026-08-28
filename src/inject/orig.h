@@ -5965,7 +5965,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_AAI_RECORD_BYTES     0x40u
 #define AAIREC_OFF_TYPE          0x00u   /* 0x2E when the argument is negative */
 #define AAIREC_OFF_KEY           0x08u
-#define AAIREC_OFF_MINUS_ONE     0x0Cu   /* always -1 */
+/* Seeded to -1 by ADDR_MAKE_AAI_RECORD and OVERWRITTEN with the slot by
+ * ADDR_ADD_AAI_RECORD. It went in as MINUS_ONE, named from the maker alone,
+ * which is naming a field from one of its two writers -- the same failure as
+ * naming a function from one call site. */
+#define AAIREC_OFF_SLOT          0x0Cu
 #define AAIREC_OFF_LIST_SLOT     0x10u   /* into ADDR_RECORD_LISTS, 0 for none */
 #define ADDR_RECORD_LIST_CAP     0x00516138u  /* int32_t, slots allocated */
 #define ADDR_RECORD_LIST_COUNT   0x0051613Cu  /* int32_t, slots used */
@@ -5976,6 +5980,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_KEY_LOOKUP_TRIPLE   0x004346E0u  /* int32_t(a, b, c) */
 #define ADDR_KEY_TABLE_COUNT     0x00516148u  /* int32_t */
 #define ADDR_KEY_TABLE           0x00516150u  /* {uint32 key, int32 value}[] */
+/* 0x004345A0, seven callers -- the register half of ADDR_MAKE_AAI_RECORD, and
+ * structurally the same function as ADDR_ADD_RECORD_LIST on a different pair
+ * of tables. It keys on the record's AAIREC_OFF_KEY rather than on an owner,
+ * writes the slot back into AAIREC_OFF_SLOT, and grows by 19 rather than 17.
+ *
+ * ADDR_KEY_TABLE is the sorted half, which is what ADDR_KEY_LOOKUP and
+ * ADDR_KEY_LOOKUP_TRIPLE search -- so this is where the entries they find come
+ * from, and ADDR_AAI_RECORDS is what a found value indexes. Reconstructed. */
+#define ADDR_ADD_AAI_RECORD      0x004345A0u  /* int32_t(void *rec) */
+#define ADDR_AAI_RECORD_CAP      0x00516144u  /* int32_t, slots allocated */
+#define ADDR_AAI_RECORDS         0x0051614Cu  /* void **, one per slot */
+#define AM2_AAI_RECORD_GROW      0x13         /* 19 slots per grow */
 /* 0x00430120, 12 callers: put a line on the menu and append it to the chat
  * log, in that order. The name is ours. */
 #define ADDR_ANNOUNCE            0x00430120u  /* void(const char *) */

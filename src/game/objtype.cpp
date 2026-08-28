@@ -426,7 +426,7 @@ void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
 
     *(int32_t *)(rec + AAIREC_OFF_TYPE)      = type >= 0 ? type : 0x2E;
     *(int32_t *)(rec + AAIREC_OFF_KEY)       = key;
-    *(int32_t *)(rec + AAIREC_OFF_MINUS_ONE) = -1;
+    *(int32_t *)(rec + AAIREC_OFF_SLOT)      = -1;  /* AddAaiRecord fills it */
     *(int32_t *)(rec + AAIREC_OFF_LIST_SLOT) = slot;
     *(int32_t *)(rec + 0x14)                 = a;
     *(int32_t *)(rec + 0x18)                 = b;
@@ -467,6 +467,106 @@ void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
     return rec;
 }
 
+/* 0x004345A0, seven callers -- the register half of MakeAaiRecord above, and
+ * structurally the SAME FUNCTION as AddRecordList: null in, -1 out; a halving
+ * search that doubles as the duplicate check; a grow of both arrays together;
+ * a memmove to open the gap; the same `(lo << 29) - lo + count` shifted left
+ * by three, which is (count - lo) * 8 after the overflow.
+ *
+ * Three differences and they are all it takes to make it a second function.
+ * It keys on the record's AAIREC_OFF_KEY rather than on a header's owner. It
+ * writes the slot back into AAIREC_OFF_SLOT, which MakeAaiRecord seeded to -1
+ * -- so an unregistered record is distinguishable from a registered one, which
+ * the record-list header has no equivalent of. And it grows by NINETEEN where
+ * the other grows by seventeen. Two nearby tables with different growth
+ * constants is exactly the sort of thing a reader assumes is one constant.
+ *
+ * ADDR_KEY_TABLE is the sorted half, and that is the table KeyLookup and
+ * KeyLookupTriple search -- so this is where the entries they find come from,
+ * and ADDR_AAI_RECORDS is what a found value indexes. That makes the naming of
+ * this pair evidenced from three sides rather than from its own body: the
+ * maker seeds from object.aai, the readers were already named, and this is the
+ * only writer between them.
+ *
+ * The same two unchecked reallocs, and the same zeroing from the OLD capacity
+ * for exactly one grow's worth of entries.
+ *
+ * MEASURED AT 151 CALLS, and so are the other three: MakeRecordList,
+ * AddRecordList, MakeAaiRecord and this all read exactly 151 on one driven
+ * Boot Camp mission. So each of the 151 things gets a record list AND an
+ * AAI record, and both are registered -- the two pairs run in lockstep,
+ * which no single function's body says and four counters do.
+ *
+ * None of the 151 returned -1, so the duplicate-key exit is the one arm
+ * unexercised here, as it is in AddRecordList. 151 slots at nineteen per
+ * grow puts both reallocs at about eight runs.
+ */
+int32_t __cdecl AddAaiRecord(void *rec)
+{
+    uint8_t   *r = (uint8_t *)rec;
+    uint32_t   key;
+    int32_t    lo = 0, hi;
+    int32_t    n, slot;
+    uint32_t **pairs;
+
+    if (!rec)
+        return -1;
+
+    n   = *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT;
+    key = *(const uint32_t *)(r + AAIREC_OFF_KEY);
+    hi  = n;
+
+    if (hi > 0) {
+        uint32_t *ix = *(uint32_t **)(uintptr_t)ADDR_KEY_TABLE;
+
+        do {
+            int32_t mid = lo + (hi - lo) / 2;
+
+            if (ix[mid * 2] == key)
+                return -1;
+            if (ix[mid * 2] > key)
+                hi = mid;
+            else
+                lo = mid + 1;
+        } while (hi > lo);
+    }
+
+    if (n + 1 > *(const int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP) {
+        int32_t   cap   = *(const int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP;
+        int32_t   grown = n + AM2_AAI_RECORD_GROW;
+        void    **recs;
+        uint32_t *ix;
+
+        recs = (void **)am2_realloc(*(void **)(uintptr_t)ADDR_AAI_RECORDS,
+                                    (size_t)grown * 4);
+        *(void ***)(uintptr_t)ADDR_AAI_RECORDS = recs;
+        memset(recs + cap, 0, AM2_AAI_RECORD_GROW * 4);
+
+        ix = (uint32_t *)am2_realloc(*(void **)(uintptr_t)ADDR_KEY_TABLE,
+                                     (size_t)grown * 8);
+        *(uint32_t **)(uintptr_t)ADDR_KEY_TABLE = ix;
+        memset(ix + cap * 2, 0, AM2_AAI_RECORD_GROW * 8);
+
+        *(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP = grown;
+        n = *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT;
+    }
+
+    *(int32_t *)(r + AAIREC_OFF_SLOT) = n;
+    (*(void ***)(uintptr_t)ADDR_AAI_RECORDS)[n] = rec;
+
+    pairs = (uint32_t **)(uintptr_t)ADDR_KEY_TABLE;
+    if (lo < n)
+        orig_memmove(*pairs + (lo + 1) * 2, *pairs + lo * 2,
+                     (size_t)(n - lo) * 8);
+
+    (*pairs)[lo * 2]     = key;
+    (*pairs)[lo * 2 + 1] = (uint32_t)n;
+
+    slot = n;
+    *(int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT = n + 1;
+    return slot;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -481,6 +581,8 @@ int objtype_install(void)
                         "AddRecordList", 8);
     rc |= patch_replace(ADDR_MAKE_AAI_RECORD, (const void *)MakeAaiRecord,
                         "MakeAaiRecord", 7);
+    rc |= patch_replace(ADDR_ADD_AAI_RECORD, (const void *)AddAaiRecord,
+                        "AddAaiRecord", 7);
     rc |= patch_replace(ADDR_SUBREC_HIDE_ROWS, (const void *)SubrecHideRows,
                         "SubrecHideRows", 3);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);
