@@ -406,16 +406,27 @@ play() {
         sleep 25
         drive ctl "mouse left tap" >/dev/null 2>&1
         sleep 8
-        # The HUD of MAP 01, appended to the two menu trees above. campaign
-        # drives all the way into a mission and then compared NOTHING about it:
-        # its pixel budget is -1 because it ends in live play, and the comment
-        # on the LOAD GAME dump above already says the tree is the evidence
-        # here. It was the evidence for two menu screens and for none of the
-        # mission.
-        #
-        # A different map from Boot Camp, so the node count need not match
-        # mission's seven -- what matters is that the two SIDES agree.
+        # MAP 01's briefing dialog, which nothing compared before.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            >> "$WORK/$cfg-$side.widgets" || true
+        # AND THE HUD BEHIND IT, without dismissing anything. campaign drove
+        # all the way into a mission and compared NOTHING about it: its pixel
+        # budget is -1 because it ends in live play, and the comment on the
+        # LOAD GAME dump above already says the tree is the evidence here.
+        #
+        # `widgets hud` rather than clearing the briefing first, and the
+        # difference is the whole point. Dismissing it works -- the OK is at
+        # 477,224, read off the dialog's own button node in the dump above --
+        # but MAP 01 is hostile the moment it clears, and the troopers that
+        # start shooting put 24 FIRE lines into a 38-line log whose ORDER
+        # differs between two unsynchronised runs. That failed the A/B on
+        # combat noise. Shortening the wait got it down to one line moving
+        # position, which is chasing a symptom; the HUD is already built while
+        # the dialog is up, so asking for it directly costs nothing at all.
+        #
+        # Seven nodes, and identical to Boot Camp's: same vtables, same
+        # rectangles, same sprite ids. The HUD does not vary by map.
+        drive ctl "widgets hud" 2>/dev/null | tr '|' '\n' \
             >> "$WORK/$cfg-$side.widgets" || true
     fi
 

@@ -165,7 +165,7 @@ static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
  * here. wd_node's range check on the sprite id is what makes that safe to
  * print, and it is there because the first version of it faulted and closed
  * the socket mid-reply. */
-static void widget_describe(char *out, uint32_t cap)
+static void widget_describe(char *out, uint32_t cap, int hud_only)
 {
     static const uintptr_t kHudRoots[] = {
         ADDR_HUD_WIDGET_A, ADDR_HUD_WIDGET_B, ADDR_HUD_WIDGET_C
@@ -177,7 +177,18 @@ static void widget_describe(char *out, uint32_t cap)
     wd_nseen = 0;
     out[0] = '\0';
 
-    if (root) {
+    /* `widgets hud` forces the HUD roots even when a dialog is up, and it
+     * exists because the alternative was driving the game somewhere it should
+     * not go. campaign has to dismiss MAP 01's briefing to see the HUD, and
+     * MAP 01 is hostile the moment that dialog clears -- so the dump cost the
+     * configuration its deterministic log, 24 FIRE lines of a 38-line log
+     * whose order differs between two unsynchronised runs. Shortening the wait
+     * got that to one line moving position, which is chasing the symptom.
+     *
+     * The HUD is BUILT while the briefing is up; `widgets` simply prefers the
+     * dialog root. Asking for it directly means campaign never has to clear
+     * the dialog, never reaches combat, and keeps the log it had. */
+    if (root && !hud_only) {
         at = (uint32_t)_snprintf(out, cap, "dialog: ");
         wd_node(out, at, cap, root, 0);
         out[cap - 1] = '\0';
@@ -399,7 +410,8 @@ static void handle_line(SOCKET s, char *line)
     if (!strcmp(argv[0], "widgets")) {
         char out[MAX_LINE];
 
-        widget_describe(out, sizeof out);
+        widget_describe(out, sizeof out,
+                        argc >= 2 && !strcmp(argv[1], "hud"));
         reply(s, "ok %s", out);
         return;
     }
