@@ -732,6 +732,91 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
     return 0;
 }
 
+/* 0x00448E60, three callers, 160 bytes. How much one object obstructs.
+ *
+ * Nothing in the body says "obstruct"; the callers do, and they say it three
+ * ways. All three walk the chain of objects standing at a map point,
+ * accumulate this per object, and stop the walk once the total reaches 15.
+ * 0x0043CF70 then keeps going on the terrain: it adds 15 for a tile whose flag
+ * byte has 0x80 set, and 15 again when two tile heights differ by more than
+ * 16 -- the same 15 and the same 16 this function uses on objects. A function
+ * and its caller agreeing on two constants is better evidence for the reading
+ * than either alone, and it is the whole of the evidence here.
+ *
+ * The five exits, in the order the original takes them:
+ *
+ *   - an object never obstructs ITSELF, tested by pointer;
+ *   - nor does one more than 16 above or below the viewer, which is the
+ *     height test, and note it is skipped entirely when there is no viewer;
+ *   - an ITEM contributes its own OBJ_OFF_RANK byte, read SIGNED, so an item
+ *     can carry any weight the data gives it including none;
+ *   - with no viewer, or for anything that is not type 3 or type 8, the
+ *     contribution is total;
+ *   - and a type 3 or 8 obstructs only when the reference point is CLOSER to
+ *     it than the viewer is.
+ *
+ * That last comparison is the one worth spelling out, because both distances
+ * are measured to the obstacle and it is easy to read them as being between
+ * viewer and point. ApproxDist(at, obj) < ApproxDist(from, obj) blocks.
+ *
+ * THE THIRD ARGUMENT IS NEVER READ. All three callers push four dwords, so
+ * four is the signature; the original simply does not use one of them. It is
+ * named `unused` rather than dropped, because dropping it would silently
+ * change the stack layout of the fourth, which IS read -- by address, since
+ * ApproxDist takes a pointer and the point arrives by value.
+ *
+ * The height field is declared uint8_t in orig.h and read here with `movsx`,
+ * so the difference is a signed one. Transcribed as the original spells it
+ * rather than as the declaration suggests.
+ *
+ * MEASURED, and it reads 0. All three callers are the original's and reach
+ * this by address, so the counter is not blind -- a Boot Camp mission driven
+ * standing still and then with four rounds of walking and firing leaves it at
+ * 0 while HeldWeaponCode, patched in the same batch, climbs to 12,293 on the
+ * same run. So the callers themselves are not reached, and this is verified by
+ * reading and by nothing else. Said as a measurement rather than as the guess
+ * it would otherwise have been; the sibling commit got exactly that guess
+ * wrong in the other direction.
+ */
+int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
+                               AM2_Point at)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    const uint8_t *f = (const uint8_t *)from;
+
+    (void)unused;
+
+    if (o == f)
+        return 0;
+
+    if (f) {
+        int32_t d = (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+                  - (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET);
+
+        if (d < 0)
+            d = -d;
+        if (d > AM2_BLOCK_HEIGHT_STEP)
+            return 0;
+    }
+
+    if (ObjIsItem((const AM2_Object *)obj))
+        return *(const int8_t *)(o + OBJ_OFF_RANK);
+
+    if (!f)
+        return AM2_BLOCK_FULL;
+
+    if (!ObjIsType3((const AM2_Object *)obj)
+        && !ObjIsType8((const AM2_Object *)obj))
+        return AM2_BLOCK_FULL;
+
+    if (ApproxDist(&at, (const AM2_Point *)(o + OBJ_OFF_POS))
+        < ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                     (const AM2_Point *)(o + OBJ_OFF_POS)))
+        return AM2_BLOCK_FULL;
+
+    return 0;
+}
+
 /* 0x00406550, two callers. Turn a thing's own code -- the dword its
  * OBJ_OFF_FIELD_C0 pointer points at -- into one of about a dozen result
  * codes.
@@ -889,6 +974,8 @@ void air_install(void)
                   "ToggleFogOfWar", 2);
     patch_replace(ADDR_AT_FLAG_BASE, (const void *)AtFlagBase, "AtFlagBase", 4);
     patch_replace(ADDR_THING_CODE, (const void *)ThingCode, "ThingCode", 2);
+    patch_replace(ADDR_OBJ_BLOCK_WEIGHT, (const void *)ObjBlockWeight,
+                  "ObjBlockWeight", 3);
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
 }

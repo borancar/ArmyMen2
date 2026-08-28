@@ -161,6 +161,12 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
 /* 0x00406550, two callers. A thing's own code to a result code -- mostly a
  * constant, four flag-base tests and one health comparison. See air.cpp. */
 int32_t __cdecl ThingCode(const void *who, const void *owner);
+
+/* 0x00448E60. How much `obj` obstructs, as seen from `from` and measured
+ * against `at`. 0, an item's own byte, or AM2_BLOCK_FULL. The third argument
+ * is not read; it is in the signature because the callers pass it. */
+int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
+                               AM2_Point at);
 void __cdecl GrowSpriteList(void);
 
 /* Original: 0x00409960, and the name is ours. Remap a run-length-encoded

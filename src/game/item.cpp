@@ -161,9 +161,16 @@ void __cdecl ItemsReset(void)
  * and neither is reconstructed, so what 20 is stays for whoever reads them.
  * The name claims only what the body computes.
  *
- * Its counter can move: both callers are the original's and reach this by
- * address. Nothing in this project puts a weapon in hand and asks, so it is
- * expected to read 0 on the drives here.
+ * MEASURED, and the guess made when this landed was wrong. Both callers are
+ * the original's and reach this by address, so the counter can move -- and it
+ * was written up as "expected to read 0, nothing here puts a weapon in hand
+ * and asks". It reads 2,642 on a Boot Camp mission standing still and 12,293
+ * after four rounds of walking and firing. So this is not verified by reading
+ * at all: the A/B that passed it ran it thousands of times.
+ *
+ * The lesson is the one already in CLAUDE.md about counts of 0, one step
+ * earlier: predicting a counter is not measuring it, and a prediction costs
+ * nothing to check.
  */
 int32_t __cdecl HeldWeaponCode(void *unit)
 {

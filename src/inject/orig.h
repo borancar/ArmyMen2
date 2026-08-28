@@ -4250,8 +4250,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value
  * SaveType2 writes as its tag and ThingCode switches on. Reconstructed. Both
- * callers compare it against 20 and neither is read yet. */
+ * callers compare it against 20 and neither is read yet. Runs 12,293 times in
+ * a Boot Camp mission driven with movement and fire, so it is A/B covered. */
 #define ADDR_HELD_WEAPON_CODE      0x00448880u /* int32_t(void *unit) */
+/* 0x00448E60, three callers, 160 bytes. How much one object obstructs, for a
+ * viewer and a reference point. Reconstructed.
+ *
+ * The blocking reading is the CALLERS', not a guess about the body: all three
+ * walk the object chain at a map point, accumulate this, and stop once the
+ * total reaches 15. 0x0043CF70 goes further and settles the vocabulary --
+ * after the chain it adds 15 more for a tile whose ADDR_TILE_FLAGS byte has
+ * 0x80 set, and 15 more again when two tile HEIGHTS differ by more than 16.
+ * The same 15 and the same 16 this function uses, applied to the terrain.
+ *
+ * Its third argument is never read. Three independent callers push four
+ * dwords, so the signature is four; the unused one is the original's.
+ * Counter measured at 0 on a driven Boot Camp mission -- not blind, just not
+ * reached, so it is verified by reading. */
+#define ADDR_OBJ_BLOCK_WEIGHT      0x00448E60u /* int32_t(void*,void*,int32,AM2_Point) */
+#define AM2_BLOCK_FULL             15   /* the callers' own threshold */
+#define AM2_BLOCK_HEIGHT_STEP      0x10 /* a step this size stops it blocking */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
  * removal always clears. */
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */
