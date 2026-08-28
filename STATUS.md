@@ -5,75 +5,79 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `dcd6dd0`. Working tree clean.
+Last updated: **2026-08-28**, at `2d6f5ae`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-Four functions, 961 to 965 patches. Three of them are one family and the
-fourth came out of reading its callers.
+Nine functions since the last snapshot, 965 to 973 patches, in four units.
+The unit that matters is the last one, and it is not a reconstruction.
 
-- **`NotifyPickedUp`** (`0x00427EF0`) and **`NotifyDropped`** (`0x00427F60`)
-  finish the notifier template -- five bodies of one shape at 0x00427E10,
-  E80, EF0, F60 and FD0, raising event kinds 5, 6, 7, 8 and 4. Only the
-  literal differs; the two new ones disassemble identically to each other.
+- **`BlockWeightAt`** (`0x00448F00`) and **`BlockWeightChain`**
+  (`0x0045B690`) -- the total obstruction between an object and a map point:
+  the objects standing there, the tile's own bit, and a height step. The
+  second takes the chain already collected and has no height step.
 
-- **The script's own vocabulary names the kinds, and the call sites confirm
-  it.** The five two-party event keywords are `killed` (57), `hit` (58),
-  `healed` (59), `pickedup` (61) and `dropped` (62). Address order alone would
-  hand 7 and 8 to the last two -- an argument from layout, which this project
-  has been burned by before. Every caller of EF0 is a pickup and names itself
-  (`TrooperPickupItem %x` and two more), and the one caller of F60 names
-  itself `TrooperDropItem  %x`. So neither is an elimination.
+- **Two bits of one table asked opposite questions.** `BlockWeightAt`
+  penalises `AM2_TILE_BLOCKS` (0x80) being SET; `BlockWeightChain` penalises
+  `AM2_TILE_OPEN` (0x01) being CLEAR. That inversion is a `jne` where the
+  sibling has a `je` -- one character -- and `BlockWeightChain`'s counter is
+  0 on every drive, so it is exactly the error no A/B here could report. The
+  polarity is spelled out in the comment for that reason.
 
-- **The drop caller states the argument order in one line.** The object it
-  passes first is the one whose uid it logs, and the last thing it does after
-  the notify is write army 4 -- neutral -- into that object's `OBJ_OFF_ARMY`:
-  an item going ownerless. First is the item, second the trooper, which is
-  `dropped <a> by <b>` and matches `NotifyDamaged`'s victim-then-attacker. The
-  pickup side had to be read for the same fact through a flag bit and a
-  deadline field, so the two together are better than either.
+- **Both carry a dead range guard, spelled differently.** One masks to 16
+  bits and tests signed 32-bit; the other tests `ax` unsigned against 0xFFFF
+  and masks after. Neither can fire; both reach a `return 0xFF`. Two
+  spellings of one vacuous check is evidence the compiler made them from
+  different source, not that one is a transcription slip.
 
-- **`HeldWeaponCode`** (`0x00448880`, two callers) -- the code of the weapon
-  in a unit's hand: the selected inventory slot's uid, looked up, checked, and
-  the dword its `OBJ_OFF_FIELD_C0` record points at. The same three steps
-  `SaveType2` takes for its tag and the same dword `ThingCode` switches on.
+- **`UidRemapClear`/`UidRemapAdd`** (`0x00427650`, `0x00427680`) and
+  **`DefAddTrooperRec`/`DefFreeTrooperRecs`** (`0x0044CCC0`, `0x0044CF70`) --
+  two growable arrays, each an append and a free. Neither pair says what its
+  records are; **the function that READS the table does.** `0x004276F0`
+  rewrites a unit's inventory uids through the first, so its records are
+  (from, to) renames; `0x0044CD70` fills the second and rejects a line with
+  "Bad Trooper Type", so its key is a trooper type.
 
-- **One check, two spellings.** This uses `ObjIsType4` where `SaveType2` uses
-  `WeaponByUid`, so a non-weapon answers 0 in silence here and writes "not a
-  weapon" to the log there. Four things go unguarded -- the unit, the slot
-  index, `LookupByUID`'s answer, the `C0` pointer -- and all four are the
-  original's, safe only because of tests that live in the callees.
+- **The two lay their fields out in opposite orders** -- capacity, count,
+  data at `0x00513080`, and data, count, capacity at `0x00659F4C`. Both were
+  settled by which compare decides the grow, not by assuming one matched the
+  other.
 
-- **`ObjBlockWeight`** (`0x00448E60`, three callers) -- how much one object
-  obstructs, for a viewer and a reference point. Nothing in the body says
-  "obstruct"; all three callers walk the object chain at a map point,
-  accumulate this, and stop at 15, and `0x0043CF70` then adds 15 for a tile
-  flagged 0x80 and 15 for a height step over 16 -- **the same two constants
-  this function applies to objects.** A function and its caller agreeing on
-  two numbers is the whole of the evidence for the reading.
+- The trooper table's SORT is deliberately left original: `0x0044CD40`
+  qsorts and then tail-jumps to `0x0045CAA0`, which is `ADDR_LOG` -- an
+  address `gamelog.c` patches, so naming it in `src/game` is a seam
+  `checkseams` refuses. It is a bare `ret` that ICF merged with the stubbed
+  logger. Reproducing it means deciding what the folded function was.
 
-- Its third argument is never read. Three callers push four dwords, so four
-  is the signature; the parameter is kept and named rather than dropped,
-  because dropping it moves the fourth, which *is* read -- by address, since
-  the point arrives by value and `ApproxDist` takes a pointer.
+- **`ActivateRegion`/`InactivateRegion`** (`0x0042BC70`, `0x0042BCB0`) --
+  the script's `activateregion` and `inactivateregion`. Each bumps a byte,
+  and only when the flag actually changed; that byte is the generation the
+  all-pairs routing cache is stamped with, so one increment invalidates every
+  solved pair without touching the matrix.
 
-- **A counter predicted is not a counter measured, and this pair proves it
-  both ways.** Both are reached by address from original code, so neither is
-  blind. `HeldWeaponCode` was written up as "expected to read 0, nothing here
-  puts a weapon in hand and asks" -- it reads **2,642** on a Boot Camp mission
-  standing still and **12,293** after four rounds of walking and firing, so
-  the A/B had been exercising it thousands of times. `ObjBlockWeight` reads
-  **0** on the same run, so its callers really are unreached and it is
-  verified by reading and nothing else. One prediction wrong, one right, and
-  the check cost one drive.
+- **That byte was named `ADDR_REGION_UNSET` and meant the opposite, and the
+  wrong name had already reached a comparison.** `RegionHops` was written
+  from it and tested `cost != stamp` for "already solved". The original is
+  `cmp cl, al; je` PAST the solve at `0x00406492`, and `SolvePair` writes the
+  stamp INTO the entry as its last act -- so equal means solved and the
+  reconstruction was backwards, re-solving every solved pair and skipping
+  every unsolved one. Fixed, and renamed to `ADDR_REGION_STAMP` at both ends.
+  A rename, not an alias: 21 `ADDR_` aliases and 31/15 globals, unmoved.
 
-- **`combat` showed its high mode and was re-run rather than believed.** The
-  first run of the last A/B gave 177,146 differing pixels; the second gave
-  698. The figure is bimodal on that configuration and its budget is disabled
-  for that reason, which is recorded below -- and it could not have been the
-  change either way, since `ObjBlockWeight` is measured at 0 on that drive.
+- **Nothing here caught it and nothing could have.** Measured on that build:
+  `RegionHops` 0, `MiddleRegionLink` 0, `RegionsNear` 0, both new functions
+  0, while `AddRegionLink` reads 2,109 on the same map load. The A/B passed
+  because the code never ran. **A wrong name in `orig.h` is worse than a
+  wrong comment -- it gets transcribed into an expression.**
+
+- **Counters were measured every time, and were wrong twice when predicted.**
+  `HeldWeaponCode` was written up as expected-0 and runs 12,293 times;
+  `BlockWeightAt` runs 8 while `ObjBlockWeight` beneath it stays 0 -- the
+  caller ran and its loop body did not, because nothing was standing at those
+  points. *Reached-but-empty* is a third thing a 0 can mean, alongside
+  "caller is ours" and "never runs", and it looks exactly like the others.
 
 ## Next
 
