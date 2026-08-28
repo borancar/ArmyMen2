@@ -140,17 +140,61 @@ static uint32_t wd_node(char *out, uint32_t at, uint32_t cap,
                    *(const uint8_t *const *)(w + WD_OFF_SIBLING), depth);
 }
 
+/* The dialog if one is up, and the HUD otherwise.
+ *
+ * The dialog root was the only one for as long as this existed, and it left
+ * the widget oracle unavailable for exactly the configurations where the most
+ * game code runs: a live mission has no dialog, so `mission` and `campaign`
+ * had a log and a pixel count that ab.sh itself calls meaningless. Every menu
+ * configuration got an exact comparison and the two gameplay ones got none.
+ *
+ * The three HUD roots are walked in sequence with ONE first-seen sequence
+ * across all three, so a pointer shared between them takes the same index in
+ * both places and the dump still survives the heap moving.
+ *
+ * THE DUMP SAYS WHICH ROOT IT CAME FROM, and that is not decoration. ab.sh
+ * diffs these exactly; a menu configuration that sampled between dialogs would
+ * quietly fall through to the HUD, and the two sides could then compare
+ * different trees and report a widget defect that is nothing of the kind. The
+ * label makes that read as "one side had a dialog and the other did not",
+ * which is a different bug and an obvious one. Same lesson as two files that
+ * are both missing diffing clean.
+ *
+ * The HUD classes are NOT the 33 menu vtables -- they are their own family at
+ * 0x0046F8B8..0x0046F944 -- so what they keep at WD_OFF_SPRITE is unverified
+ * here. wd_node's range check on the sprite id is what makes that safe to
+ * print, and it is there because the first version of it faulted and closed
+ * the socket mid-reply. */
 static void widget_describe(char *out, uint32_t cap)
 {
+    static const uintptr_t kHudRoots[] = {
+        ADDR_HUD_WIDGET_A, ADDR_HUD_WIDGET_B, ADDR_HUD_WIDGET_C
+    };
     const uint8_t *root = *(const uint8_t *const *)(uintptr_t)WD_ROOT;
+    uint32_t       at   = 0;
+    int            i, any = 0;
 
     wd_nseen = 0;
     out[0] = '\0';
-    if (!root) {
-        _snprintf(out, cap, "(no dialog open)");
+
+    if (root) {
+        at = (uint32_t)_snprintf(out, cap, "dialog: ");
+        wd_node(out, at, cap, root, 0);
+        out[cap - 1] = '\0';
         return;
     }
-    wd_node(out, 0, cap, root, 0);
+
+    at = (uint32_t)_snprintf(out, cap, "hud: ");
+    for (i = 0; i < 3; i++) {
+        const uint8_t *w = *(const uint8_t *const *)kHudRoots[i];
+
+        if (!w)
+            continue;
+        any = 1;
+        at  = wd_node(out, at, cap, w, 0);
+    }
+    if (!any)
+        _snprintf(out, cap, "(no dialog open and no HUD)");
     out[cap - 1] = '\0';
 }
 

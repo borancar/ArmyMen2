@@ -406,6 +406,17 @@ play() {
         sleep 25
         drive ctl "mouse left tap" >/dev/null 2>&1
         sleep 8
+        # The HUD of MAP 01, appended to the two menu trees above. campaign
+        # drives all the way into a mission and then compared NOTHING about it:
+        # its pixel budget is -1 because it ends in live play, and the comment
+        # on the LOAD GAME dump above already says the tree is the evidence
+        # here. It was the evidence for two menu screens and for none of the
+        # mission.
+        #
+        # A different map from Boot Camp, so the node count need not match
+        # mission's seven -- what matters is that the two SIDES agree.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            >> "$WORK/$cfg-$side.widgets" || true
     fi
 
     if [ "$cfg" = multi ]; then
@@ -911,6 +922,22 @@ play() {
         # tap because "anywhere" is still what this click means.
         drive ctl "mouse left tap" >/dev/null 2>&1
         sleep 6
+        # THE HUD TREE, which is the first exact oracle this configuration has
+        # ever had. mission's pixel check is disabled by construction -- two
+        # unsynchronised runs of a scrolling mission differ by ~22% of the
+        # frame -- so until now the log was its only evidence, and a log cannot
+        # see a HUD widget in the wrong place.
+        #
+        # `ctl widgets` used to answer "(no dialog open)" here, because it
+        # walked only the dialog root and a live mission has no dialog. It
+        # falls back to the three HUD roots now. Seven nodes: the top strip,
+        # the right panel, the radar, SARGE, SQUAD, COMMANDS and the edge.
+        #
+        # Taken BEFORE the scroll and again after, because the two ask
+        # different questions -- that the HUD was built right, and that it
+        # survived the view moving.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            > "$WORK/$cfg-$side.widgets" || true
         # Now the mission is live and the view can scroll, which is what brings
         # the dirty-rectangle merge and the whole live frame path into play.
         for _ in 1 2 3 4 5 6; do
@@ -921,6 +948,15 @@ play() {
             drive ctl "mouse move 0 200" >/dev/null 2>&1
         done
         sleep 6
+        # And again with the view moved. The dump is STRUCTURAL -- rectangles,
+        # vtables, sprite ids, focus and three flags -- so it stays byte for
+        # byte identical while the game composes frames: measured, three
+        # samples two seconds apart in a live mission, all the same hash. That
+        # is what makes an exact diff the right check here rather than a
+        # budget, and it is why field 0x0040 is still excluded, being the one
+        # the constructor never writes.
+        drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
+            >> "$WORK/$cfg-$side.widgets" || true
     fi
 
     if [ "$cfg" = quit ]; then
