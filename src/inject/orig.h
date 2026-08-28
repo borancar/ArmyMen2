@@ -800,6 +800,18 @@
  * Another half-bracket: it Locks and never Unlocks, exactly as DrawVLine and
  * DrawHLine do, so the pairing belongs to whoever called it. */
 #define ADDR_DRAW_RECT_FAST 0x0041CCE0u  /* void(const AM2_Rect *, colour) */
+/* 0x0041C7F0, one caller -- the radar's paint, for a stationary blip. A 3x3
+ * block of one colour straight into the locked framebuffer.
+ *
+ * It DECREMENTS both coordinates first, so the caller's point is the block's
+ * CENTRE rather than its top left, and then bounds-tests the decremented pair
+ * against the bitmap area less two. That pair of facts is the whole function:
+ * a blip one pixel from the right edge is rejected outright rather than
+ * clipped, because there is no clipping here at all.
+ *
+ * Another half-bracket -- Locks, never Unlocks. */
+#define ADDR_DRAW_BLIP3     0x0041C7F0u  /* void(x, y, colour) */
+#define AM2_BLIP3_SIZE      3
 /* 0x00413610. The one caller of DrawRect: it takes a rectangle stored in the
  * SAME space as ADDR_VIEW_ORIGIN, subtracts that origin to get screen
  * coordinates, and outlines it. A full Lock/Unlock bracket, unlike the two line

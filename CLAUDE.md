@@ -1707,7 +1707,7 @@ and grep the run's own log for `bind/listen`, which says so outright.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **16** are reconstructed
+  all. Measured: **29 functions** call the bracket and **17** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates, and the menu-widget painters that
   have landed since.
@@ -1867,8 +1867,18 @@ exact oracle**, however meaningful it is when it is set.
   count of "functions calling the bracket" will keep finding halves. Worth knowing too that none of the
   three executes on any drive this project has -- being a rasteriser does not
   make a function reachable.
-  Smallest first: `0x00454F00` (144 B),
-  (160 B), `0x0041CC40` (160 B), `0x0041C7F0` (176 B).
+  **That shortlist listed functions that were already done**, which is what a
+  hand-kept queue beside a ratchet always comes to: it named `0x0041CC40`,
+  which is `DrawHLine` and had been reconstructed for some time, and
+  `0x0041C7F0`, which is `DrawBlip3` and went in the same day this sentence
+  was corrected. A count that only goes up cannot tell you a candidate has
+  been taken; only re-reading the list against the patch list can.
+
+  The radar's three drawing primitives were the ones behind it:
+  `DrawRectFast` (`0x0041CCE0`, its view box) and `DrawBlip3` (`0x0041C7F0`,
+  a stationary blip) are done. Still outstanding there are `0x0041C8A0`
+  (432 B) and `0x0041CA50` (336 B), the two blinking-blip drawers, and
+  `0x004149B0` (288 B), which classifies an object into a colour.
 - **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
   COM method takes the interface as an explicit first argument, so it goes on
   the stack; an i386 MSVC C++ virtual is thiscall and keeps `this` in `ecx`.

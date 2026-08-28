@@ -1372,6 +1372,50 @@ static void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
     }
 }
 
+/* 0x0041C7F0, one caller -- the radar's paint, for a blip that is not
+ * blinking. Three by three pixels of one colour, written straight into the
+ * locked framebuffer with no clipping whatsoever.
+ *
+ * TWO THINGS DECIDE WHAT THIS FUNCTION IS, and both are in its first four
+ * instructions. It decrements x and y before anything else, so the caller's
+ * point is the block's CENTRE and not its top left. And it then bounds-tests
+ * the DECREMENTED pair against the bitmap area less two -- which is a
+ * rejection, not a clip: a blip near an edge is dropped whole rather than
+ * drawn partly. There is no partial-blip path in this function to get wrong.
+ *
+ * A half-bracket like the line drawers above: it Locks and never Unlocks, so
+ * the pairing is the radar paint's.
+ *
+ * The original writes the nine bytes as nine stores, re-reading the pitch
+ * global before each row. Written as a loop; the pitch cannot change under it,
+ * since nothing between the stores can call anything.
+ */
+static void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour)
+{
+    uint8_t *p;
+    int32_t  row;
+    int32_t  col;
+
+    x--;
+    y--;
+
+    if (x < 0 || y < 0)
+        return;
+    if (x >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - (AM2_BLIP3_SIZE - 1))
+        return;
+    if (y >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - (AM2_BLIP3_SIZE - 1))
+        return;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    p = g_framebuffer + (int32_t)g_pitch * y + x;
+
+    for (row = 0; row < AM2_BLIP3_SIZE; row++)
+        for (col = 0; col < AM2_BLIP3_SIZE; col++)
+            p[(int32_t)g_pitch * row + col] = (uint8_t)colour;
+}
+
 #define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 /* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
  * g_listenerPos and a second name would be an alias, while a non-const twin of
@@ -1539,6 +1583,7 @@ int mapdraw_install(void)
     patch_replace(ADDR_DRAW_RECT, (const void *)DrawRect, "DrawRect", 2);
     patch_replace(ADDR_DRAW_RECT_FAST, (const void *)DrawRectFast,
                   "DrawRectFast", 1);
+    patch_replace(ADDR_DRAW_BLIP3, (const void *)DrawBlip3, "DrawBlip3", 1);
     patch_replace(ADDR_DRAW_VIEW_RECT, (const void *)DrawViewRect,
                   "DrawViewRect", 2);
     int rc = 0;
