@@ -632,7 +632,23 @@
 #define ADDR_STR_BMP_NO_VIDMEM 0x00478280u
 #define ADDR_STR_BMP_NO_SURF   0x00478304u
 #define ADDR_STR_BMP_NO_LOCK   0x004782E4u
-#define ADDR_BLIT_BITMAP_IN  0x0041BA90u
+/* 0x0041BA90, four callers, seven arguments. Copy a DIB's pixels into a
+ * locked surface, optionally through a 256-byte remap table, and hand back the
+ * transparent index.
+ *
+ * The source stride is `(width + 3) & ~3` -- DIB rows are dword-aligned -- and
+ * the sign of `height` is the DIB convention: POSITIVE means bottom-up, so the
+ * walk starts at the last row and steps backwards, and negative means top-down
+ * and steps forwards. That pair is what identifies the format.
+ *
+ * The key byte is written only when ADDR_ACTIVE_PALETTE is set, and it is the
+ * FIRST destination pixel -- so the transparent index is whatever ended up in
+ * the top-left corner. Its seventh argument is BMP_OFF_KEY of the caller's
+ * record, which that field's own comment already describes as "out: the
+ * transparent index" -- and the store is a BYTE, so the rest of that field
+ * survives. Reconstructed; its counter is 0 because all four callers are ours
+ * and call by name. */
+#define ADDR_BLIT_BITMAP_IN  0x0041BA90u  /* int32(dst,stride,src,w,h,lut,key*) */
 #define ADDR_CREATE_BITMAP   0x00423D90u  /* surface *(FILE*, ...) */
 #define ADDR_RELOAD_BITMAP   0x00424280u  /* int32(surface*, FILE*, ...) */
 /* Two stores: clear ADDR_MENU_SAVED_VALID and put the argument in
@@ -7352,7 +7368,8 @@ typedef int32_t (__cdecl *am2_ftell_fn)(am2_FILE *fp);
  * the seam lives here rather than being declared twice. */
 typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
                                                       int32_t flag);
-#define orig_blit_bitmap_in (*(am2_blit_bitmap_in_fn)ADDR_BLIT_BITMAP_IN)
+/* orig_blit_bitmap_in is gone: BlitBitmapIn is blit.cpp's now and both its
+ * callers are in the win32 half, which can include the flat header directly. */
 /* The object table was allocated by the game's CRT, so it must be grown by the
  * game's CRT -- our msvcrt has a different heap entirely. */
 #define orig_realloc (*(am2_realloc_fn)ADDR_REALLOC)

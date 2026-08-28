@@ -27,6 +27,7 @@
  */
 
 #include "surface.h"
+#include "../blit.h"   /* BlitBitmapIn -- reconstructed */
 #include "../image.h"  /* AM2_IMAGE, for the clock global's one spelling */
 #include "sprite.h"
 #include "mapdraw.h"   /* SetDrawTarget */
@@ -455,7 +456,7 @@ LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
         return surf;
     }
 
-    if (!orig_blit_bitmap_in(ddsd.lpSurface, ddsd.lPitch, pixels,
+    if (!BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
                              width, height, remap, &nbytes)) {
         IDirectDrawSurface_Release(surf);
         orig_log("Error on Lock in CreateBitmapSurface()");
@@ -518,7 +519,7 @@ int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
      * transparent index, so it has to be passed by address and re-read -- see
      * ADDR_BLIT_BITMAP_IN. Caching it across this call would silently key the
      * surface on the wrong colour. */
-    if (!orig_blit_bitmap_in(ddsd.lpSurface, ddsd.lPitch, pixels,
+    if (!BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
                              width, height, remap, &nbytes)) {
         IDirectDrawSurface_Release(surf);
         orig_log("Error on Lock in ReloadBitmapSurface()");
@@ -1071,7 +1072,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             return 0;
         }
 
-        copied = orig_blit_bitmap_in(ddsd.lpSurface, ddsd.lPitch, pixels, w, h,
+        copied = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels, w, h,
                                      remap, (uint32_t *)(dest + BMP_OFF_KEY));
         if (!copied) {
             IDirectDrawSurface_Release(surf);

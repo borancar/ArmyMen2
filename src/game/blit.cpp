@@ -197,9 +197,106 @@ void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
     blit_core(x, y, (const uint8_t *)data, src, 0, FILL_DESTLUT, 0);
 }
 
+/* 0x0041BA90, four callers. Copy a DIB's pixels into a locked surface,
+ * optionally through a remap table, and report the transparent index.
+ *
+ * THE SIGN OF `height` IS THE DIB CONVENTION and it is the whole of the row
+ * ordering. Positive means bottom-up: the walk starts at the LAST source row
+ * and steps backwards while the destination steps forwards. Negative means
+ * top-down and both step forwards. The row count is the magnitude either way.
+ * With `(width + 3) & ~3` for the source stride -- dword-aligned rows -- that
+ * pair is what says this reads a DIB rather than some private format.
+ *
+ * The remap is optional and the two loops are separate in the original rather
+ * than one loop with a test inside; kept that way, because the difference is a
+ * per-pixel branch and folding them would be a performance claim.
+ *
+ * THE KEY BYTE IS THE TOP-LEFT DESTINATION PIXEL, read after the copy from the
+ * ORIGINAL destination pointer rather than the advanced one, and written only
+ * when ADDR_ACTIVE_PALETTE is set. So a bitmap loaded with no active palette
+ * leaves the caller's BMP_OFF_KEY untouched -- not zeroed, untouched.
+ *
+ * AND IT IS ONE BYTE, not a dword. orig.h's seam typedef declared that
+ * argument `uint32_t *`, which is what the callers pass, but the store is
+ * `mov byte ptr [ecx], al`. So the upper three bytes of BMP_OFF_KEY survive --
+ * which matters, because that field's own comment says it arrives holding a
+ * byte COUNT. The parameter is void * here so the call sites need no cast and
+ * the width is stated once, in the store.
+ *
+ * THE RETURN VALUE IS NOT SIMPLY stride * rows, and this is the part that
+ * would be easy to tidy into a bug. The original multiplies the destination
+ * stride by whatever is in edx, and edx is reloaded from the raw `height`
+ * ARGUMENT only inside the two copy loops -- which run only when the width is
+ * positive. So a width of zero or less returns stride * the row COUNT, and any
+ * other call returns stride * the SIGNED height. The two differ exactly when
+ * the height is negative, which is the top-down case. Written as the two
+ * cases it is.
+ *
+ * ITS COUNTER READS 0 AND THAT IS THE BLIND SPOT, not a cold path. All
+ * four callers are ours -- three in win32/surface.cpp and one in
+ * win32/mapdraw.cpp -- and closing the seam turned every one into a call
+ * by name, so nothing crosses the patched entry any more. What says it
+ * runs is the screen: the HUD panels, the Sarge portrait and the mini-map
+ * are all bitmaps this loads, and they render. A wrong stride, a wrong row
+ * direction or a wrong remap would be visible immediately and would move
+ * the A/B pixel count by tens of thousands rather than by twenty-two.
+ */
+int32_t __cdecl BlitBitmapIn(void *dest, int32_t dstStride, const void *src,
+                             int32_t w, int32_t h, const uint8_t *lut,
+                             void *keyOut)
+{
+    int32_t        srcStride = (w + 3) & ~3;
+    int32_t        step;
+    int32_t        rows;
+    int32_t        scale;
+    const uint8_t *s;
+    uint8_t       *d    = (uint8_t *)dest;
+    uint8_t       *dst0 = (uint8_t *)dest;
+
+    if (h > 0) {
+        s    = (const uint8_t *)src + (h - 1) * srcStride;  /* bottom-up */
+        step = -srcStride;
+        rows = h;
+    } else {
+        s    = (const uint8_t *)src;         /* top-down */
+        step = srcStride;
+        rows = -h;
+    }
+
+    scale = rows;               /* what the original's edx holds on entry */
+
+    while (rows > 0) {
+        if (w > 0) {
+            int32_t i;
+
+            if (lut)
+                for (i = 0; i < w; i++)
+                    d[i] = lut[s[i]];
+            else
+                for (i = 0; i < w; i++)
+                    d[i] = s[i];
+
+            scale = h;          /* the reload, and only on this path */
+        }
+
+        s   += step;
+        d   += dstStride;
+        rows--;
+    }
+
+    if (*(void *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
+        *(uint8_t *)keyOut = dst0[0];
+
+    return dstStride * scale;
+}
+
 int blit_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_BLIT_BITMAP_IN, (const void *)BlitBitmapIn,
+
+                        "BlitBitmapIn", 4);
 
     rc |= patch_replace(ADDR_BLIT_GLYPH,   (const void *)BlitGlyph,   "BlitGlyph", 6);
     rc |= patch_replace(ADDR_BLIT_COPY16,  (const void *)BlitCopy16,  "BlitCopy16", 5);

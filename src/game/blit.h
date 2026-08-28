@@ -82,6 +82,16 @@ void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
 
 int blit_install(void);
 
+
+/* 0x0041BA90. Copy a DIB's pixels into a locked surface, optionally through a
+ * 256-byte remap. A POSITIVE height is bottom-up, negative is top-down; the
+ * source stride is the width rounded up to four. Writes the top-left
+ * destination pixel to `keyOut` -- ONE BYTE, not a dword -- and only when a
+ * palette is active. */
+int32_t __cdecl BlitBitmapIn(void *dest, int32_t dstStride, const void *src,
+                             int32_t w, int32_t h, const uint8_t *lut,
+                             void *keyOut);
+
 #ifdef __cplusplus
 }
 #endif

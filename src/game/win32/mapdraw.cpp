@@ -20,6 +20,7 @@
  */
 
 #include "mapdraw.h"
+#include "../blit.h"   /* BlitBitmapIn -- reconstructed */
 #include "../dirty.h"   /* the list RepaintDirtyList walks */
 #include "../objflag.h"  /* ObjFlagBit1 -- reconstructed */
 #include "surface.h"
@@ -347,7 +348,7 @@ void __cdecl RestoreTileSet(void)
             int32_t width  = *(int32_t *)(g_mapSprite + MAPSPR_OFF_WIDTH);
             int32_t height = *(int32_t *)(g_mapSprite + MAPSPR_OFF_HEIGHT);
 
-            if (orig_blit_bitmap_in(desc.lpSurface, desc.lPitch, pixels,
+            if (BlitBitmapIn(desc.lpSurface, desc.lPitch, pixels,
                                     width, height, remap, &scratch))
                 IDirectDrawSurface_Unlock(surf, desc.lpSurface);
             else
