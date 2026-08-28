@@ -1463,6 +1463,31 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
     ShowMpResult(won ? 0 : 1);
 }
 
+/* 0x0040F2F0, one caller, thiscall. The DirectPlay id of a comm slot.
+ *
+ * SLOT -1 ANSWERS 0 RATHER THAN INDEXING BACKWARDS, which is the whole of the
+ * guard -- there is no upper bound, so a slot above three reads past the four
+ * player records and nothing here stops it. Reproduced.
+ *
+ * The stride is written `(slot * 8 - slot) << 4` in the original, which is
+ * 112 and is AM2_PLAYER_STRIDE. Written as the multiplication it is; the
+ * shift-and-subtract is MSVC's, not a fact about the layout.
+ *
+ * MEASURED AT 0. Its one caller is on the multiplayer path, which no drive
+ * here reaches with a live session, so the -1 guard and the stride are
+ * verified by reading. The counter is not blind -- that caller is the
+ * original's.
+ */
+int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot)
+{
+    if (slot == -1)
+        return 0;
+
+    return *(const int32_t *)((const uint8_t *)comm
+                              + (size_t)slot * AM2_PLAYER_STRIDE
+                              + AM2_PLAYER_ID);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -1537,6 +1562,8 @@ int misc_install(void)
                   "MissionNetworked", 1);
     patch_replace(ADDR_COMM_SLOT_FOR_ARMY, (const void *)CommSlotForArmy,
                   "CommSlotForArmy", 20);
+    patch_replace(ADDR_COMM_PLAYER_ID, (const void *)CommPlayerId,
+                  "CommPlayerId", 1);
     patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
                   "CommWasHereForArmy", 1);
     patch_replace(ADDR_GET_ARMY_SCORE, (const void *)GetArmyScore,

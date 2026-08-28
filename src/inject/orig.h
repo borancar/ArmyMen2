@@ -2043,6 +2043,12 @@
 /* State the window procedure reads. */
 #define ADDR_DIRECTDRAW          0x004FDF78u  /* IDirectDraw * */
 #define ADDR_PAINT_OBJECT        0x0065A058u  /* see winproc.cpp -- not COM */
+/* 0x0044DB90, one caller. The same three instructions widget.cpp's five screen
+ * factories open with, as a function of its own: delete whatever is in
+ * ADDR_PAINT_OBJECT through vtable slot 0 with the scalar-delete flag, and
+ * clear the global -- inside the test, so a null one is left alone rather than
+ * written. Reconstructed. */
+#define ADDR_CLOSE_SCREEN        0x0044DB90u  /* void(void) */
 /* The two text fields of the ENTER BATTLE NAME dialog, inside the paint
  * object: the session's name and the hosting player's. */
 #define DLG_OFF_BATTLE_NAME      0x064u
@@ -4578,6 +4584,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_FIRE_ACTIVE     0x57Cu
 #define UNIT_OFF_FIRE_F40        0x580u   /* uint8_t, a copy of the unit's +0x40 */
 #define UNIT_OFF_FIRE_MODE       0x584u   /* the pose, or 0x1F for a point */
+/* 0x00447950, one caller. Choose a unit's UNIT_OFF_FIRE_MODE between two more
+ * values: 0x25 when it has OBJ_OFF_FIELD_5A4 and its OBJ_OFF_DEADLINE_58 is
+ * more than fifteen seconds behind the game clock, and 1 otherwise. So that
+ * field carries at least four different things -- a pose, 0x1F for a point,
+ * and these two -- which is why it is named for the field and not for a
+ * meaning. Reconstructed. */
+#define ADDR_PICK_FIRE_MODE      0x00447950u  /* void(void *obj) */
+#define AM2_FIRE_MODE_STALE      0x25
+#define AM2_FIRE_MODE_FRESH      1
+#define AM2_FIRE_STALE_MS        0x3A98   /* 15000 */
 #define UNIT_OFF_FIRE_F588       0x588u
 #define UNIT_OFF_FIRE_F58C       0x58Cu
 #define UNIT_OFF_FIRE_X          0x590u   /* int16_t */
@@ -4720,6 +4736,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * AM2_PLAYER_ARMY out of that slot's record. */
 #define ADDR_COMM_ARMY_OF_SLOT   0x0040F190u /* thiscall int32(this, slot) */
 #define AM2_PLAYER_ID            0x214u   /* the DirectPlay id; 0 or -1 is none */
+/* 0x0040F2F0, one caller, thiscall and `ret 4`. AM2_PLAYER_ID of a slot, with
+ * slot -1 answering 0 rather than indexing backwards. The stride comes out as
+ * `(slot * 8 - slot) << 4`, which is AM2_PLAYER_STRIDE. Reconstructed. */
+#define ADDR_COMM_PLAYER_ID      0x0040F2F0u  /* thiscall int32(comm, slot) */
 #define AM2_PLAYER_ACTIVE        0x25Cu
 /* Slot i's own index field, four bytes before its army. What
  * ADDR_COMM_FIND_PLAYER hands back rather than the loop counter. */

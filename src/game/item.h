@@ -284,6 +284,11 @@ void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
  * if the unit does not resolve, is not a type 2, or holds no weapon. */
 void __cdecl SetWeaponTarget(void *target, uint32_t at);
 
+/* 0x00447950. Set UNIT_OFF_FIRE_MODE to 0x25 when the unit has
+ * OBJ_OFF_FIELD_5A4 and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
+ * and to 1 otherwise. */
+void __cdecl PickFireMode(void *obj);
+
 /* 0x00427BA0. Deselect everything: clear OBJ_FLAG_SELECTED on each selected
  * object that still resolves, drop the ones that do not, empty the list and
  * report the change. */

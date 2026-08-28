@@ -1462,6 +1462,10 @@ void __cdecl SetPointerMode(int32_t mode);
  * written as a '^' escape ahead of the text. */
 void __cdecl HudMessage(const char *text, int32_t colour);
 
+/* 0x0044DB90. Delete whatever screen is up and clear the global -- the same
+ * three instructions the five factories open with, as a function. */
+void __cdecl CloseScreen(void);
+
 int widget_install(void);
 
 #ifdef __cplusplus

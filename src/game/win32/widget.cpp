@@ -1705,6 +1705,18 @@ static void CloseCurrentScreen(void)
     }
 }
 
+/* 0x0044DB90, one caller. The image has those same three instructions as a
+ * FUNCTION as well as inline in the five factories, so it is patched and
+ * simply calls the helper. Whether the original's source had one function that
+ * MSVC inlined at five sites and left standing at a sixth, or six copies, is
+ * not decidable from here -- what is decidable is that the bytes agree.
+ *
+ * Runs once on a driven Boot Camp mission: leaving the title screen. */
+void __cdecl CloseScreen(void)
+{
+    CloseCurrentScreen();
+}
+
 /* And the half they close with. `new` answering null is checked at every one
  * of these sites -- VC6's does answer null rather than throwing, and the game
  * tests it -- so the global ends up null rather than holding a constructor's
@@ -6592,5 +6604,7 @@ int widget_install(void)
                         "SetPointerMode", 10);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
+    rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,
+                        "CloseScreen", 1);
     return rc;
 }

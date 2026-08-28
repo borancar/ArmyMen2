@@ -2819,6 +2819,44 @@ void __cdecl SetWeaponTarget(void *target, uint32_t at)
     *(int32_t *)(u + UNIT_OFF_FIRE_MODE) = AM2_FIRE_MODE_POINT;
 }
 
+/* 0x00447950, one caller. Choose a unit's UNIT_OFF_FIRE_MODE between two more
+ * values than SetWeaponTarget above writes.
+ *
+ * The mode is 0x25 when the unit has OBJ_OFF_FIELD_5A4 AND its
+ * OBJ_OFF_DEADLINE_58 is more than fifteen seconds behind the game clock, and
+ * 1 in every other case -- including a unit with no field at all, which takes
+ * the same 1 as one whose deadline is recent. Two different reasons, one
+ * answer, and the function cannot be asked which applied.
+ *
+ * SO THAT FIELD CARRIES AT LEAST FOUR THINGS: a pose, 0x1F for a point target,
+ * and these two. That is why it is named for its offset rather than for a
+ * meaning -- any name taken from one writer would be wrong at the other three.
+ *
+ * The comparison is UNSIGNED (`jbe`), so a deadline in the FUTURE -- which
+ * makes the subtraction wrap -- reads as enormously stale and takes the 0x25
+ * arm. Whether that can happen is not established; OBJ_OFF_DEADLINE_58 is a
+ * stamp of clock-plus-fuse, so it can. Reproduced as unsigned.
+ *
+ * MEASURED AT 0, and for the reason already recorded twice in this file: its
+ * one caller is behind the weapon path, and SetPointerMode installs mode 0 and
+ * nothing else on every drive here. Third function blocked on the same missing
+ * drive.
+ */
+void __cdecl PickFireMode(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)
+        && (uint32_t)(*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                      - *(const int32_t *)(o + OBJ_OFF_DEADLINE_58))
+               > AM2_FIRE_STALE_MS) {
+        *(int32_t *)(o + UNIT_OFF_FIRE_MODE) = AM2_FIRE_MODE_STALE;
+        return;
+    }
+
+    *(int32_t *)(o + UNIT_OFF_FIRE_MODE) = AM2_FIRE_MODE_FRESH;
+}
+
 /* 0x00449860, eight callers. Puts an inventory slot in the unit's hand: it
  * records the slot, installs the weapon's four HANDLERS into the globals the
  * HUD and the input layer call through, and tells the network.
@@ -4034,6 +4072,8 @@ void item_install(void)
                   "SoldierKindForWeapon", 13);
     patch_replace(ADDR_SET_WEAPON_TARGET, (const void *)SetWeaponTarget,
                   "SetWeaponTarget", 6);
+    patch_replace(ADDR_PICK_FIRE_MODE, (const void *)PickFireMode,
+                  "PickFireMode", 1);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,
                   "DeselectAll", 9);
     patch_replace(ADDR_SET_UNIT_POSE, (const void *)SetUnitPose,
