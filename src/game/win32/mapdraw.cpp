@@ -1491,6 +1491,105 @@ static int32_t __cdecl RadarBlipColour(const AM2_Object *obj, int32_t *blink)
     return colour;
 }
 
+/* The two shapes the pulse below is built from, as offsets around its centre.
+ * The centre itself is written directly, since it is a single point and two of
+ * the three phases treat it differently. */
+static const int8_t kBlipPlus[4][2] = {
+    { 0, -1}, {-1,  0}, { 1,  0}, { 0,  1}
+};
+static const int8_t kBlipRing[8][2] = {
+    { 0, -2}, {-1, -1}, { 1, -1}, {-2,  0},
+    { 2,  0}, {-1,  1}, { 1,  1}, { 0,  2}
+};
+
+static void BlipPoints(uint8_t *centre, int32_t pitch, const int8_t (*pts)[2],
+                       int32_t n, uint8_t colour)
+{
+    int32_t i;
+
+    for (i = 0; i < n; i++)
+        centre[pitch * pts[i][1] + pts[i][0]] = colour;
+}
+
+/* 0x0041CA50, one caller -- the radar's paint, for an object with flag 0x10
+ * that is not blinking. A THREE-FRAME PULSE built from two colours:
+ *
+ *   phase 0   centre in A, the radius-2 ring in B
+ *   phase 1   the radius-1 plus in A, centre in B
+ *   phase 2   the ring in A, the plus in B, and NO centre at all
+ *
+ * A travels outward -- centre, plus, ring -- with B one step behind, and the
+ * centre goes dark on the last frame. A phase outside 0..2 draws nothing,
+ * which the original reaches by falling off the end of a `dec`/`je` chain.
+ *
+ * Unlike DrawBlip3 it does NOT decrement its arguments: the caller's point is
+ * already the centre, and the bounds test is the matching one. Still a
+ * rejection rather than a clip, and still a half-bracket.
+ *
+ * THE ARGUMENT OFFSETS ARE WHAT THIS FUNCTION IS EASY TO GET WRONG ON. The
+ * compiler interleaves `pop edi` and `pop esi` into the MIDDLE of two arms, so
+ * the same `[esp+0x10]` names arg3 before them and arg4 after. Read at face
+ * value the two colours come out swapped on exactly those two phases -- which
+ * would be a wrong animation that still animates.
+ *
+ * AND THAT IS NOT CHECKED BY ANYTHING HERE, which was measured rather than
+ * assumed. The path runs only for an object carrying OBJ_FLAG_BIT4, and no
+ * drive in this tree has one -- DrawBlip3 and RadarBlipColour both read 29,980
+ * on a Boot Camp mission while this read 0, and exactly equal counters are how
+ * you know every object took the other branch. Poking the flag onto the
+ * leader's object makes it run, 2,288 calls.
+ *
+ * With it running, the radar region's colour SET matches the original exactly
+ * (173 colours, none unique to either side over six frames each) and the
+ * per-colour counts agree to 0.05%. NEITHER FIGURE DISCRIMINATES. Swapping the
+ * two colours on this very arm scores 62 against the original where the
+ * correct code scores 54, which is noise: the region is genuinely
+ * non-deterministic -- six shots gave four distinct frames -- and with one
+ * flagged object the pulse writes at most 72 pixels across those frames, the
+ * same size as the map's own animation between runs.
+ *
+ * So the colour assignment is verified by READING and by nothing else. What is
+ * established by running is that the function executes and draws inside the
+ * radar. Discriminating the colours would need many objects flagged at once,
+ * or a static scene.
+ */
+static void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
+                                  int32_t colourB, int32_t phase)
+{
+    uint8_t *p;
+    int32_t  pitch;
+
+    if (x - 2 < 0 || y - 2 < 0)
+        return;
+    if (x + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
+        return;
+    if (y + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H)
+        return;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    pitch = (int32_t)g_pitch;
+    p     = g_framebuffer + pitch * y + x;
+
+    switch (phase) {
+    case 0:
+        *p = (uint8_t)colourA;
+        BlipPoints(p, pitch, kBlipRing, 8, (uint8_t)colourB);
+        break;
+    case 1:
+        BlipPoints(p, pitch, kBlipPlus, 4, (uint8_t)colourA);
+        *p = (uint8_t)colourB;
+        break;
+    case 2:
+        BlipPoints(p, pitch, kBlipRing, 8, (uint8_t)colourA);
+        BlipPoints(p, pitch, kBlipPlus, 4, (uint8_t)colourB);
+        break;
+    default:
+        break;
+    }
+}
+
 #define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 /* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
  * g_listenerPos and a second name would be an alias, while a non-const twin of
@@ -1661,6 +1760,8 @@ int mapdraw_install(void)
     patch_replace(ADDR_DRAW_BLIP3, (const void *)DrawBlip3, "DrawBlip3", 1);
     patch_replace(ADDR_RADAR_BLIP_COLOUR, (const void *)RadarBlipColour,
                   "RadarBlipColour", 1);
+    patch_replace(ADDR_DRAW_BLIP_PULSE, (const void *)DrawBlipPulse,
+                  "DrawBlipPulse", 1);
     patch_replace(ADDR_DRAW_VIEW_RECT, (const void *)DrawViewRect,
                   "DrawViewRect", 2);
     int rc = 0;

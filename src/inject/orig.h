@@ -840,6 +840,30 @@
 #define AM2_RADAR_COLOUR_MP7 4    /* soldier kind 7 in a network game */
 #define AM2_RADAR_FIELD530_NONE 5 /* the value that means "no override" */
 #define AM2_BLIP3_SIZE      3
+/* 0x0041CA50, one caller -- the radar's paint, for an object whose flag 0x10
+ * is set and which is not blinking. A THREE-FRAME PULSE, the frame chosen by
+ * the caller from the game clock, drawn from two colours:
+ *
+ *   phase 0   centre in A, the radius-2 ring in B
+ *   phase 1   the radius-1 plus in A, centre in B
+ *   phase 2   the ring in A, the plus in B, and NO centre at all
+ *
+ * So A travels outward -- centre, plus, ring -- with B one step behind it, and
+ * the centre goes dark on the last frame. Any phase outside 0..2 draws
+ * nothing.
+ *
+ * Unlike ADDR_DRAW_BLIP3 it does NOT decrement: the caller's point is already
+ * the centre. Its bounds test is the matching one, x-2 and y+2 against the
+ * bitmap area, and it is a rejection rather than a clip.
+ *
+ * READ ITS ARGUMENT OFFSETS WITH THE EPILOGUE IN MIND. The compiler
+ * interleaves `pop edi` and `pop esi` into the middle of two of the three
+ * arms, so the same `[esp+0x10]` means arg3 before them and arg4 after. Taken
+ * at face value the two colours come out swapped on exactly those arms.
+ *
+ * Another half-bracket -- Locks, never Unlocks. */
+#define ADDR_DRAW_BLIP_PULSE 0x0041CA50u /* void(x,y,colourA,colourB,phase) */
+#define AM2_BLIP_PULSE_PHASES 3
 /* 0x00413610. The one caller of DrawRect: it takes a rectangle stored in the
  * SAME space as ADDR_VIEW_ORIGIN, subtracts that origin to get screen
  * coordinates, and outlines it. A full Lock/Unlock bracket, unlike the two line
