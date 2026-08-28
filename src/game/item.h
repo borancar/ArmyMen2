@@ -269,6 +269,10 @@ int32_t __cdecl HeldWeaponCode(void *unit);
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
 
+/* 0x0040D930. Put a unit into a pose. Idempotent; nine poses queue rather
+ * than switch, and most wait for the current animation's last cell. */
+void __cdecl SetUnitPose(void *obj, int32_t pose);
+
 /* 0x00448220. A unit gives up: soldier kind 8, AI mode 2 (ignore), and its
  * weapon marked OBJ_FLAG_OVERDUE before the uid is cleared -- in that order,
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */

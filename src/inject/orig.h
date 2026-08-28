@@ -6124,6 +6124,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * which registers itself with the map. */
 #define OBJ_OFF_ROW_COUNT      0x70u
 #define OBJ_OFF_ROWS           0x74u
+/* The POSE a unit is in and the one queued behind it. Both int32, both written
+ * only by ADDR_SET_UNIT_POSE, and the pending one is consumed there too -- so a
+ * queued pose waits for the current animation to finish and for nothing else.
+ *
+ * "Pose" rather than "state" because of the table: ADDR_SET_UNIT_POSE indexes
+ * ADDR_WEAPON_POSE_FRAMES with this field, and that table was already named
+ * from the other side, where ADDR_WEAPON_POSE_INDEX computes an index into it
+ * from (object, weapon). Same table, same index, two callers -- and the three
+ * OBJ_OFF_HEIGHT_ADJ values it selects, 8, 0x10 and 0x18, are three heights,
+ * which is what stand/kneel/prone look like. The alias ratchet is what found
+ * this: naming the table a second time failed the build. */
+#define OBJ_OFF_POSE               0x538u
+#define OBJ_OFF_POSE_PENDING       0x53Cu
+/* 0x0040D930, nine callers. Put a unit into a pose: refuse if it is already
+ * there, queue instead of switching for some poses, wait for the current
+ * animation's last cell for others, then set OBJ_OFF_HEIGHT_ADJ from the frame
+ * and call SetAnimFrame. Reconstructed, and heavily exercised: 26,057 calls on
+ * a driven Boot Camp mission against SetAnimFrame's 12,399, so more than half
+ * stop at the early-out or the wait. */
+#define ADDR_SET_UNIT_POSE         0x0040D930u  /* void(void *obj, int32 pose) */
 #define AM2_OBJ_ROW_STRIDE     0x60u
 /* 0x0041D480, 37 callers. It was ADDR_ROW_UNREGISTER, "take one row out of the
  * map descriptor's cell lists", and that is only one of its two outcomes.

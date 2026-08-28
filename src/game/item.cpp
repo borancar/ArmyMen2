@@ -23,7 +23,8 @@
 #include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
-#include "maprow.h"   /* RowUpdate -- reconstructed */
+#include "maprow.h"   /* RowUpdate, SetAnimFrame -- reconstructed */
+#include "anim.h"     /* AM2_Anim -- the frame count SetUnitPose waits on */
 #include "script.h"   /* AM2_Pad */
 #include "map.h"      /* TileOfPoint */
 #include "air.h"      /* RevealNearby */
@@ -3524,6 +3525,124 @@ void __cdecl StepObjRows(void *obj)
                                + ROW_OFF_FIELD_3C);
 }
 
+/* 0x0040D930, nine callers. Put a unit into a POSE.
+ *
+ * Two dense switches and a wait, and the order they run in is the whole of it.
+ *
+ * THE WORD "POSE" IS NOT A GUESS AND IT WAS NOT MINE. This went in calling the
+ * argument a state, and the alias ratchet refused the build: the table it
+ * indexes, 0x00474FE0, was already ADDR_WEAPON_POSE_FRAMES, named from the
+ * other side where ADDR_WEAPON_POSE_INDEX computes an index into it from
+ * (object, weapon). Same table, same index, two unrelated callers. The three
+ * OBJ_OFF_HEIGHT_ADJ values it goes on to select -- 8, 0x10, 0x18 -- are three
+ * heights, which is what stand, kneel and prone look like, and those are the
+ * three words the script's `setaipose` takes. A check that exists to stop
+ * duplicate names found a better name instead.
+ *
+ * ASKING FOR THE POSE IT IS ALREADY IN RETURNS AT ONCE, before anything else
+ * -- so this is idempotent and callers lean on that.
+ *
+ * THE FIRST SWITCH DOES NOT CHOOSE THE POSE, it chooses how to get there. Its
+ * 37-entry index table collapses to three behaviours: six poses set an
+ * "interrupt" flag, nine QUEUE themselves in OBJ_OFF_POSE_PENDING and fall
+ * through, and the rest do nothing. A pose above 0x24 skips the switch
+ * entirely and lands in that third group. The flag starts as "the pose we are
+ * leaving is 1", so the switch can only ever SET it -- there is no arm that
+ * clears it, and reading the table as a plain pose-to-action map misses that.
+ *
+ * THE WAIT IS WHAT THE FLAG IS FOR. Without it, a unit whose current animation
+ * has not reached its last cell returns and the new state is dropped -- except
+ * that the nine queueing states have already stored themselves, so they are
+ * the ones that survive the wait. That is the mechanism: queue, return, and be
+ * picked up by the next call that gets past the wait. The pending field is
+ * consumed here and nowhere else.
+ *
+ * THE SECOND SWITCH IS INDEXED BY THE FRAME, NOT THE POSE. The pose picks a
+ * frame id out of ADDR_WEAPON_POSE_FRAMES, and that frame id -- offset by ten
+ * and bounded to fifty -- picks one of three OBJ_OFF_HEIGHT_ADJ values: 8,
+ * 0x10 or 0x18, with 0x18 also the out-of-range default. Written as a switch
+ * on the frame id so the numbers are the ones the data carries.
+ *
+ * NEITHER TABLE READ IS BOUNDED THE WAY IT LOOKS. The first switch bounds the
+ * ARGUMENT at 0x24, but ADDR_WEAPON_POSE_FRAMES is indexed AFTER a pending
+ * pose may have replaced it, and nothing rechecks. Reproduced.
+ *
+ * The original reads that table entry twice, once as a dword for the range
+ * test and once as a word for SetAnimFrame. Same number; written once here.
+ *
+ * MEASURED AT 26,057 CALLS on a driven Boot Camp mission, with SetAnimFrame
+ * beneath it at 12,399 on the same run -- so rather more than half of these
+ * stop at the early-out or the wait, which is what the two guards are for and
+ * is the first direct evidence that either fires. Both switches, both guards
+ * and the frame lookup are on the compared path; what a run cannot be assumed
+ * to cover is any particular ARM of either switch.
+ */
+void __cdecl SetUnitPose(void *obj, int32_t pose)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *row;
+    int32_t  cur = *(const int32_t *)(o + OBJ_OFF_POSE);
+    int32_t  interrupt;
+    int32_t  pending;
+    int32_t  frame;
+
+    if (cur == pose)
+        return;
+
+    interrupt = (cur == 1);
+
+    switch (pose) {
+    case 0:
+    case 32: case 33: case 34: case 35: case 36:
+        interrupt = 1;
+        break;
+    case 5:
+    case 8:  case 9:  case 10: case 11:
+    case 12: case 13: case 14: case 15:
+        *(int32_t *)(o + OBJ_OFF_POSE_PENDING) = pose;
+        break;
+    default:
+        break;                          /* includes every pose above 0x24 */
+    }
+
+    row = *(uint8_t *const *)(o + OBJ_OFF_ROWS);
+
+    if (!interrupt) {
+        const AM2_Anim *anim =
+            *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
+
+        if (anim
+            && *(const uint8_t *)(row + ROW_OFF_CELL) < anim->frames - 1)
+            return;                     /* not on the last cell yet */
+    }
+
+    pending = *(const int32_t *)(o + OBJ_OFF_POSE_PENDING);
+    if (pending) {
+        pose = pending;
+        *(int32_t *)(o + OBJ_OFF_POSE_PENDING) = 0;
+    }
+
+    *(int32_t *)(o + OBJ_OFF_POSE) = pose;
+
+    frame = ((const int32_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES))[pose];
+
+    switch (frame) {
+    case 10: case 12: case 14: case 19:
+    case 49: case 50: case 51:
+        *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = 0x10;
+        break;
+    case 11: case 13: case 15: case 20:
+    case 52: case 53: case 59:
+        *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = 8;
+        break;
+    default:
+        *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = 0x18;
+        break;
+    }
+
+    SetAnimFrame(row, (int16_t)frame, 0);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -3543,6 +3662,8 @@ void item_install(void)
     patch_replace(ADDR_SOLDIER_KIND_FOR_WEAPON,
                   (const void *)SoldierKindForWeapon,
                   "SoldierKindForWeapon", 13);
+    patch_replace(ADDR_SET_UNIT_POSE, (const void *)SetUnitPose,
+                  "SetUnitPose", 9);
     patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);
     patch_replace(ADDR_TYPE2_ACTION_A, (const void *)Type2ActionA,
                   "Type2ActionA", 5);
