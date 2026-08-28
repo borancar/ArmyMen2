@@ -667,6 +667,9 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour);
 /* Original: 0x004194E0, vtable slot 1 of the right-hand HUD panel. */
 void __attribute__((thiscall)) HudPanelPaint(AM2_Widget *w, RECT clip);
 
+/* Original: 0x00417440, vtable slot 1 of the COMMANDS panel. */
+void __attribute__((thiscall)) HudCommandsPaint(AM2_Widget *w, RECT clip);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made

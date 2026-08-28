@@ -1482,6 +1482,92 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
  * every update -- so what this draws is whatever was set THIS frame, by the
  * radar or by nothing.
  */
+/* 0x00417440. The COMMANDS panel's painter: up to three icons in a row, the
+ * selected one on a highlight.
+ *
+ * TWO OF THE FIVE FAILURE PATHS EXIT AND THREE CONTINUE, which the shape does
+ * not show. A negative slot index, a null sprite and a failed inner
+ * IntersectRect all skip to the next slot; the outer IntersectRect and --
+ * surprisingly -- ClipRect END THE PAINT. So a slot that clips away entirely
+ * drops the remaining ones, and writing all three as `continue` would look
+ * right and silently lose them. Branch targets, not structure.
+ *
+ * ClipRect's own comment is why the second one is an exit rather than a skip:
+ * "returns 0 when nothing is visible, in which case the outputs are only
+ * partially written and must not be used". Nothing visible here means nothing
+ * visible at all.
+ *
+ * The offsets are three int16 PAIRS and the loop begins INSIDE the first
+ * record -- 0x004766FA, reading [esi-2] and [esi] -- so the table's base is
+ * two bytes lower than the pointer the original starts with. Same trap as the
+ * trig tables being indexed from their centres.
+ *
+ * The record's sprite is at +0x0C of ADDR_POINTER_MODES-minus-0x0C, which is
+ * ADDR_HUD_CMD_SPRITES: the same seven records the commands destructor frees,
+ * and the index in a slot selects one of them.
+ */
+void __attribute__((thiscall)) HudCommandsPaint(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    RECT           vis;
+    int32_t        i;
+
+    if (!IntersectRect(&vis, &clip, (const RECT *)AM2_IMAGE(ADDR_SCREEN_CLIP)))
+        return;
+
+    for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
+        const int16_t *off = (const int16_t *)AM2_IMAGE(ADDR_HUD_CMD_OFFSETS)
+                             + i * 2;
+        int32_t        slot = *(const int32_t *)(self + HUDCMD_OFF_SLOTS
+                                                 + i * 4);
+        AM2_Sprite    *spr;
+        AM2_Rect       box, part;
+        RECT           hit;
+        int32_t        x, y;
+
+        if (slot < 0)
+            continue;
+
+        spr = *(AM2_Sprite **)((uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPRITES)
+                               + slot * AM2_POINTER_MODE_SIZE);
+        if (!spr)
+            continue;
+
+        box.left   = off[0] + w->rect.left;
+        box.top    = off[1] + w->rect.top;
+        box.right  = spr->bounds.right + box.left;
+        box.bottom = spr->bounds.bottom + box.top;
+
+        if (!IntersectRect(&hit, (const RECT *)&box, &vis))
+            continue;
+
+        /* Exits rather than continues -- see above. */
+        /* CLIPRECT TAKES x AND y AS INPUTS AS WELL AS OUTPUTS, and missing
+         * that is what cost four rounds here. It offsets the origin-anchored
+         * source by them, clips in SCREEN space against `vis`, and writes back
+         * coordinates adjusted for whatever it trimmed. Leaving them
+         * uninitialised -- which is what I did -- adds garbage to
+         * spr->bounds, puts the sprite nowhere near the clip, and returns 0:
+         * the icons never drew at all, in every variant I tried.
+         *
+         * The original makes this visible by writing the origin into TWO
+         * frame slots each (0x34/0x38 and 0x30/0x3c): one copy feeds ClipRect
+         * and is modified, the other survives as the draw position. */
+        x = box.left;
+        y = box.top;
+
+        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&vis, &x, &y, &part))
+            return;
+
+        if (i == *(const int32_t *)(self + HUDCMD_OFF_SELECTED))
+            ClearRegion((const RECT *)&hit, AM2_HUD_CMD_HIGHLIGHT);
+
+        /* The SAVED origin, not ClipRect's adjusted x/y -- the original
+         * pushes frame 0x34 and 0x30, the copies it kept back. */
+        DrawSpriteClipped(spr, box.left, box.top, &part, 0);
+    }
+}
+
 void __attribute__((thiscall)) HudPanelPaint(AM2_Widget *w, RECT clip)
 {
     uint8_t *self = (uint8_t *)w;
@@ -7148,6 +7234,8 @@ int widget_install(void)
                         "OpenMessage", 0);
     rc |= patch_replace(ADDR_DRAW_TOOLTIP, (const void *)DrawTooltip,
                         "DrawTooltip", 2);
+    rc |= patch_replace(ADDR_HUD_CMD_PAINT, (const void *)HudCommandsPaint,
+                        "HudCommandsPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_PAINT, (const void *)HudPanelPaint,
                         "HudPanelPaint", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_UPDATE, (const void *)HudRadarUpdate,

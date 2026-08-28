@@ -484,6 +484,18 @@
 #define ADDR_HUD_PANEL_UPDATE  0x004193C0u  /* thiscall void(obj) */
 #define ADDR_HUD_RADAR_UPDATE  0x00414890u  /* thiscall void(obj) */
 #define ADDR_HUD_PANEL_PAINT   0x004194E0u  /* thiscall void(obj, RECT) */
+#define ADDR_HUD_CMD_PAINT     0x00417440u  /* thiscall void(obj, RECT) */
+/* Where the three command icons sit inside the panel: three int16 PAIRS, x
+ * then y, at 6/50/94 across one row at y=22 -- the same three columns the
+ * build menu uses. The loop pointer starts at 0x004766FA and reads [esi-2] and
+ * [esi], so it begins INSIDE the first record rather than at its base, which
+ * is the trig-table trap in miniature. */
+#define ADDR_HUD_CMD_OFFSETS   0x004766F8u  /* int16 x,y [3] */
+#define ADDR_HUD_CMD_OFF_END   0x00476706u
+#define HUDCMD_OFF_SLOTS       0x58u  /* int32[3], -1 for an empty slot */
+#define HUDCMD_OFF_SELECTED    0x64u  /* int32, which slot is highlighted */
+#define AM2_HUD_CMD_SLOTS      3
+#define AM2_HUD_CMD_HIGHLIGHT  0xEE
 /* 0x00414620, two callers and both are that paint. A TOOLTIP: measure the
  * text, centre it on the cursor, clamp it to the bitmap area, fill a box and
  * draw the string in it. One of the 29 functions that bracket LockSurface --
