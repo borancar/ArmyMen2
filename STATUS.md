@@ -5,79 +5,80 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `2d6f5ae`. Working tree clean.
+Last updated: **2026-08-28**, at `e6243ed`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-Nine functions since the last snapshot, 965 to 973 patches, in four units.
-The unit that matters is the last one, and it is not a reconstruction.
+Four functions and one comment-only commit since the last snapshot, 973 to
+977 patches. **Three `orig.h` names were wrong and a fourth was better than
+the one I invented**, which is the thread running through all of it.
 
-- **`BlockWeightAt`** (`0x00448F00`) and **`BlockWeightChain`**
-  (`0x0045B690`) -- the total obstruction between an object and a map point:
-  the objects standing there, the tile's own bit, and a height step. The
-  second takes the chain already collected and has no height step.
+- **`SoldierKindForWeapon`** (`0x00449660`, sixteen callers) was
+  `ADDR_UNIT_ACTION`, "void(obj, action) -- 44 arms". Neither half was right.
+  The argument is a WEAPON CODE -- what `HeldWeaponCode` returns and what
+  `SelectInventorySlot` already indexes `ADDR_WEAPON_HANDLERS` with. And
+  there are SEVEN arms: the 44 is the length of a dense switch's byte index
+  table. The same mistake would make `ThingCode` 39 behaviours instead of 17.
 
-- **Two bits of one table asked opposite questions.** `BlockWeightAt`
-  penalises `AM2_TILE_BLOCKS` (0x80) being SET; `BlockWeightChain` penalises
-  `AM2_TILE_OPEN` (0x01) being CLEAR. That inversion is a `jne` where the
-  sibling has a `je` -- one character -- and `BlockWeightChain`'s counter is
-  0 on every drive, so it is exactly the error no A/B here could report. The
-  polarity is spelled out in the comment for that reason.
+- Code 0 is the one arm that writes nothing and it is **not dead**:
+  `0x00448220` sets the kind to 8 by hand and then calls this with 0, so "no
+  weapon" must leave the kind alone or that sequence undoes itself.
 
-- **Both carry a dead range guard, spelled differently.** One masks to 16
-  bits and tests signed 32-bit; the other tests `ax` unsigned against 0xFFFF
-  and masks after. Neither can fire; both reach a `return 0xFF`. Two
-  spellings of one vacuous check is evidence the compiler made them from
-  different source, not that one is a transcription slip.
+- **`SetPointerMode`** (`0x00414430`, ten callers) -- seven 40-byte records,
+  five fields each installed into fixed globals. The name is OURS and is
+  grounded in the three readers, none of which is in the function: a pick
+  predicate called per object down `OBJ_OFF_QUERY_NEXT`, an action called
+  only when `ADDR_MOUSE_BUTTON` is clear, and an overlay row handed to
+  `OverlayPrepare`.
 
-- **`UidRemapClear`/`UidRemapAdd`** (`0x00427650`, `0x00427680`) and
-  **`DefAddTrooperRec`/`DefFreeTrooperRecs`** (`0x0044CCC0`, `0x0044CF70`) --
-  two growable arrays, each an append and a free. Neither pair says what its
-  records are; **the function that READS the table does.** `0x004276F0`
-  rewrites a unit's inventory uids through the first, so its records are
-  (from, to) renames; `0x0044CD70` fills the second and rejects a line with
-  "Bad Trooper Type", so its key is a trooper type.
+- **The five stores are not in record order** -- E0, E4, E8, EC, F4 take
+  fields +0, +4, +0x10, +0x14, +0x0C, so the overlay is written last and
+  comes from the middle. Same trap the weapon handler slots carry. Two of the
+  seven modes fire their action once and revert to 0, so "set the mode" and
+  "do it now" are one entry point and which happens is a property of the
+  TABLE. The table is seven records because the eighth slot is where the
+  string `"Rifleman"` begins.
 
-- **The two lay their fields out in opposite orders** -- capacity, count,
-  data at `0x00513080`, and data, count, capacity at `0x00659F4C`. Both were
-  settled by which compare decides the grow, not by assuming one matched the
-  other.
+- **`SetAnimFrame`** (`0x0040A1A0`, eleven callers) -- **four of its frame
+  values are not frames.** -2 returns, -1 means the frame already set, 0
+  clears bit 0 of the row and returns, and only then is it an id. A
+  range-check on the id would swallow three of the four. The search falls
+  back to entry 0 rather than failing, and the row is still told it is on the
+  frame that was asked for.
 
-- The trooper table's SORT is deliberately left original: `0x0044CD40`
-  qsorts and then tail-jumps to `0x0045CAA0`, which is `ADDR_LOG` -- an
-  address `gamelog.c` patches, so naming it in `src/game` is a seam
-  `checkseams` refuses. It is a bare `ret` that ICF merged with the stubbed
-  logger. Reproducing it means deciding what the folded function was.
+- `checkseams` earned its keep here: `item.cpp` had an `orig_set_anim_frame`
+  on the address, and the check failed the build rather than letting three
+  call sites detour into our own code under a name saying the opposite.
 
-- **`ActivateRegion`/`InactivateRegion`** (`0x0042BC70`, `0x0042BCB0`) --
-  the script's `activateregion` and `inactivateregion`. Each bumps a byte,
-  and only when the flag actually changed; that byte is the generation the
-  all-pairs routing cache is stamped with, so one increment invalidates every
-  solved pair without touching the matrix.
+- **`SetUnitPose`** (`0x0040D930`, nine callers) -- and **the alias ratchet
+  found a better name than the one I gave it.** It went in calling the
+  argument a state, with a fresh name on the table it indexes; the build
+  failed at 22 aliases against a baseline of 21, because `0x00474FE0` was
+  already `ADDR_WEAPON_POSE_FRAMES`. Everything then agreed: the three
+  `OBJ_OFF_HEIGHT_ADJ` values are 8, 0x10 and 0x18, three heights, and
+  stand/kneel/prone are the three words `setaipose` takes.
 
-- **That byte was named `ADDR_REGION_UNSET` and meant the opposite, and the
-  wrong name had already reached a comparison.** `RegionHops` was written
-  from it and tested `cost != stamp` for "already solved". The original is
-  `cmp cl, al; je` PAST the solve at `0x00406492`, and `SolvePair` writes the
-  stamp INTO the entry as its last act -- so equal means solved and the
-  reconstruction was backwards, re-solving every solved pair and skipping
-  every unsolved one. Fixed, and renamed to `ADDR_REGION_STAMP` at both ends.
-  A rename, not an alias: 21 `ADDR_` aliases and 31/15 globals, unmoved.
+- Its first switch does not choose the pose, it chooses how to get there --
+  six poses interrupt, nine QUEUE and fall through, the rest do nothing. The
+  interrupt flag starts as "the pose we are leaving is 1" and no arm clears
+  it. The queue is what survives the wait.
 
-- **Nothing here caught it and nothing could have.** Measured on that build:
-  `RegionHops` 0, `MiddleRegionLink` 0, `RegionsNear` 0, both new functions
-  0, while `AddRegionLink` reads 2,109 on the same map load. The A/B passed
-  because the code never ran. **A wrong name in `orig.h` is worse than a
-  wrong comment -- it gets transcribed into an expression.**
+- **Coverage was measured every time and it is uneven, which is the point of
+  measuring.** `SetUnitPose` 26,057 and `SetAnimFrame` 12,399 on one driven
+  mission -- so more than half of the poses stop at a guard, which is the
+  first direct evidence either fires. `SoldierKindForWeapon` 6.
+  `SetPointerMode` **1**, mode 0 at mission start, and the source says so:
+  its store order, its fire-once modes and every mode above 0 are verified by
+  reading.
 
-- **Counters were measured every time, and were wrong twice when predicted.**
-  `HeldWeaponCode` was written up as expected-0 and runs 12,293 times;
-  `BlockWeightAt` runs 8 while `ObjBlockWeight` beneath it stays 0 -- the
-  caller ran and its loop body did not, because nothing was standing at those
-  points. *Reached-but-empty* is a third thing a 0 can mean, alongside
-  "caller is ours" and "never runs", and it looks exactly like the others.
+- **`SolvePair` is a second witness** to the region fix two snapshots back
+  (comments only). It writes the stamp into `cost[][]` on BOTH exits, so
+  "stamped" can only mean "answered", and its first act reads
+  `regions[to] + 4`, which is `REGION_OFF_ACTIVE` read by a third function
+  that never says the word. It is left original: 416 bytes, two nested loops
+  over a 258-entry path buffer, and nothing here would catch an error in it.
 
 ## Next
 
