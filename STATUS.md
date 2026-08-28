@@ -5,111 +5,86 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `c0994d2`. Working tree clean.
+Last updated: **2026-08-29**, at `a8ff654`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,033 patches.**
+Nothing uncommitted. **1,055 patches.**
 
-Eight commits since the last snapshot: twenty-one functions, one new
-`checkseams` rule, and one generated table that had been wrong in four rows.
+Two commits since the last snapshot, both halves of one HUD class -- the top
+strip, which is the message log, the chat console and a rewind button in one
+640x21 widget.
 
-- **The air-support set.** `LoadAirSprites`, `FreeAirSprites` and its alias
-  (`0x00408D20`, `0x00408DA0`, `0x00408E40`), then `ResetAirSupport`
-  (`0x00408E00`). The free releases 32 sprites and then memsets **179 dwords**,
-  and the arithmetic is what names the set: `0x004F93D8 + 179*4` is
-  `0x004F96A4`, which is `ADDR_AIR_SAVE_BLOCK + 0x248`, the block's last byte.
-  So the sweep takes the sprite arrays AND the whole air-support queue,
-  exactly, and **sprite set 19 is the air support set**. The first commit said
-  "something else keeps sprite pointers in the same block", which was a guess
-  standing in for a sum.
+- **`HudTopPaint`** (`0x00418A20`), vtable slot 1. Three parts: the text inside
+  a Lock/Unlock bracket, `WidgetPaint` for the children, then one sprite via
+  `IntersectRect` -> `ClipRect` -> `DrawSpriteClipped`. `ClearRegion` runs
+  OUTSIDE the lock, which `surface.h` already explains and which is the only
+  ordering here not free to change.
 
-- **The air block's layout had an 84-byte hole its own comment denied.**
-  `orig.h` said "the layout closes the block exactly"; `AIR_OFF_EXTRA` ends at
-  `0x01EC` and `AIR_OFF_FLAG_A` starts at `0x0240`. The span is a second queue
-  and `0x004093E7` gives its bound outright as `cmp eax, 8; jge` -- eight
-  dwords, eight dwords, eight words, then the two flags, which tiles it
-  exactly. Now `AIR_OFF_PASS_*`.
+  The message record layout did not have to be read: `orig.h` had every field
+  of it named from the `HudMessage` work. Grep the STRUCTURE, not just the
+  address.
 
-- **Six delete/destruct pairs.** The comm channel panel, the battle-join
-  screen and a multiplayer row's name button; then the film archive, the arrow
-  scroll bar and the savegame list, which are the three CLAUDE.md listed as
-  "an SEH frame and real work" without saying what the work was.
+- **`HudTopUpdate`** (`0x00418660`), slot 2, and everything the paint reads is
+  what this moves -- the blip budget, the row ease, the scroll and the button.
 
-  `SaveList` is named from its CONSTRUCTOR -- `save\%s`, `*.sav` -- because
-  nothing in its destructor says what the class is. A second route agrees: the
-  screen that builds it loads `02_008_00_savegame.bmp`.
+Two names in `orig.h` were wrong and are corrected rather than aliased:
 
-- **`ShutdownAudio`** (`0x0040C9F0`), the tenth entry of `ShutdownSubsystems`'
-  teardown table and `InitAudio`'s mirror.
+- `ADDR_MOUSE_B0_EXTRA` -> **`ADDR_MOUSE_GRAB`**. Its comment said "nothing
+  here reads it" and 32 sites do. It is the click ARBITER: `PollMouse` zeroes
+  it as button 0 goes down so every press starts unowned, and the first widget
+  to claim it owns that press while everyone downstream stays quiet. The token
+  is an ADDRESS and not always the widget's -- this class claims `this + 0x64`
+  for its button and plain `this` for the rest of the strip, arbitrating two
+  targets through one global.
 
-- **Four screen openers** -- save game, overwrite, the in-mission game menu and
-  the message screen -- which makes `frame.cpp`'s sub-state painter table nine
-  named functions with nothing reaching the image. Each named from the vtable
-  its CONSTRUCTOR installs: `0x00452F50` pushes `00_999_99_blank.bmp` and
-  builds the GAME MENU, so the bitmap names the backdrop and not the dialog.
+- `HUDLOG_OFF_TOTAL` -> **`HUDLOG_OFF_BLIPS`**. It went in as "a running total
+  of characters" because that is what `HudMessage` adds to it. The update is
+  what says why: it DRAINS it, one every ~136 ms with a sound each, so the
+  radio chatter is per character and a longer message chatters for longer. A
+  field named from its writer alone reads as a statistic nothing consumes.
 
-- **A fifth spelling of the seam, with eight live instances.**
-  `tools/checkseams.py`'s by-address rule claimed to cover "a table of plain
-  integers that are function pointers" and only ever did while the integers
-  were `ADDR_` names. A bare hex literal is not one, so both tables of
-  addresses in the tree were invisible: five sub-state painters, two teardown
-  entries, and `ShutdownSubsystems`' own opening thiscall. The teardown table's
-  comment said "the shape says which is which" -- it did not, and I had edited
-  that same sentence one commit earlier without checking whether it was true.
+### Measured, and one open item corrected
 
-- **`coverage.py`'s By library table skipped `owner_of`**, so `docs/boundary.md`
-  held two generated tables disagreeing about ADVAPI32 -- **complete** in one
-  and 2 sites, 0 reconstructed in the other. Four rows were wrong. Five
-  `GetTickCount` sites had been credited because a NEIGHBOUR inside the same
-  merged entry was patched, one of them by a function landed the same day.
+`HudTopPaint` runs 3,186 times in a Boot Camp mission with **zero** differing
+pixels inside the strip's own rectangle -- which is an empty log compared
+against an empty log, and proves nothing about the scrolling, the rewind or the
+console. That was stated as a prediction before it was measured.
 
-### Measured, and where a measurement was not available
+So the update got **`tools/hudstrip.sh`**, which drives the strip and reads the
+game's own memory over the control socket. It therefore runs identically under
+`AM2_NOPATCH=1`, and the two sides come back line-for-line identical on: the
+three hover states, the console open, the twelve-message fill, the count cap
+and view width, ALL TWELVE rows sitting exactly on their running sum, the
+overflow condition, and the settled scroll landing on the row the walk-back
+picks.
 
-`ShutdownAudio` is the clean case: the same quit drive on this commit and its
-parent moves `StopAudioStream` 2 to 1, `ReleaseSoundObjects` 1 to 0 and
-`FreeWaveSounds` 1 to 0 -- one call each crossing the patched entry before and
-reached by name after. **I had predicted the wrong evidence**: the source note
-said `FreeWaveSounds` going to 0 would show the new code ran, and on its own it
-shows nothing, because a function that never runs leaves its callee at 0 too.
+Live numbers rather than reasoning: the scroll converged on exactly **2238.00**,
+which is row 10's x and what walking back from a 598-pixel view predicts by
+hand; a click then pulled it down at ~230 px/s for 2 s and the other branch
+pulled it back. Both scroll modes, the deadline and the ease in both directions,
+observed.
 
-`ResetAirSupport` reads 1 with both callees dropping to 0. `MoviesDelete`
-reads 1 and `MoviesDestruct` 0 -- vtable dispatch reaches the delete through
-the patched slot, and our delete calls the destructor by name.
+The tool compares the INVARIANT and not the absolute row positions on purpose.
+Row widths come from `TextExtent` of the text that actually arrived, and `type`
+drops a character often enough that the first attempt diffed 191 against 192
+and read exactly like a defect.
 
-The four openers **cannot be measured at all**, and that is a consequence of
-closing the seam: their only caller is the painter table, which is now ours, so
-`blindspots.py` files all four "all 1 caller(s) reconstructed". Before the seam
-fix those calls crossed the patched entries. A counter is the measuring device
-rather than the thing measured, but "OpenControls reads 0" will read as a
-regression to whoever meets it next.
+**The console is the multiplayer CHAT line, not the cheat entry** -- the send
+at `0x00418480` posts the line to the log and broadcasts it to every comm
+player. And `orig.h`'s open item, "somewhere between the handler and the submit
+the characters are being dropped", is **wrong**: row 0 came back holding
+`5e d2 5a 75 6c 75`, a colour escape then `Zulu`, intact. What is still
+unreached is the RETURN exit inside the char handler, where the cheat table
+sits. That is a different exit and stays open.
 
-`ArrowBar` and `SaveList` are unexercised: no drive here closes a list-bearing
-screen or a campaign save dialog. Those zeros are REAL, not blind --
-`blindspots.py` files them under "reached by address".
+### One A/B failure that was not one
 
-### What this cost, and the one habit behind it
-
-Five self-corrections in one session, every one from reading disassembly before
-checking whether the address was already named or already ours: the air-support
-block, `blindspots.py`'s ENTRY section, `ADDR_OVERLAY_DIRTY`,
-`ADDR_GET_PAUSE_FLAGS`, and `0x00426209`, which is interior to
-`ADDR_STATE2_FRAME` and reconstructed. A grep of `orig.h` costs one command;
-resolving an address through `merges.real_functions` to its owning function and
-testing THAT against the patch list is the reliable form, because grepping for
-the literal fails whenever the address is interior to a function.
-
-Twice more I predicted a measurement and the measurement disagreed --
-`OpenControls` dropping (it did not; the painter fires only on a dirty
-overlay), and KERNEL32's coverage falling (it rose; my probe reimplemented the
-tool with a smaller `done_fns` than the tool builds). Running the tool was one
-command in both cases.
-
-And three drives were wasted guessing menu coordinates from memory when
-`tools/ab.sh` has them: BOOT CAMP is `(306,143)`, OPTIONS `(306,262)`,
-CONTROLS `(306,212)`, MOVIES `(307,302)`. A drive that never leaves the title
-screen reads exactly like a dead reconstruction; `ComposeFrame` at 0 is what
-catches it.
+`mission`'s first suite reported `frames 4004/1958` and FAILED on the ratio,
+with widgets, log and pixels all identical. In the same suite `campaign` was
+anomalously low on the OTHER side. The re-run gave 4763/5477 and A/B clean, so
+it was wall-clock. The counter-evidence was in the same output as the failure:
+a systematic slowdown does not change sign between configurations.
 
 ## Next
 
