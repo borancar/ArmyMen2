@@ -4796,6 +4796,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_REGION_NEXT           0x00514EF4u  /* uint8_t *, the next hop */
 #define ADDR_REGION_STAMP          0x00514EF8u  /* uint8_t, the solved generation */
 #define ADDR_REGION_COST           0x00514EFCu  /* uint8_t * */
+/* It writes ADDR_REGION_STAMP into cost[from][to] and cost[to][from] on BOTH
+ * exits -- path found and no path -- which is what makes "stamped" mean
+ * "answered" rather than "pending", and it opens by reading REGION_OFF_ACTIVE
+ * of `to` and returning when that is clear. Two independent confirmations of
+ * names settled elsewhere; still original, and 416 bytes with two nested
+ * loops over a 258-entry path buffer. */
 #define ADDR_REGION_SOLVE_PAIR     0x00438300u  /* void(from, to) */
 /* 0x0042BC70 and 0x0042BCB0, one caller each and adjacent: the script's
  * `activateregion` (token 149) and `inactivateregion` (150). Each range-checks

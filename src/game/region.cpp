@@ -314,6 +314,14 @@ int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
  * configuration. The A/B passed because the code never ran. A wrong name
  * propagated into a comparison, and what found it was reading the two
  * functions that write the byte.
+ *
+ * SolvePair is a SECOND, INDEPENDENT WITNESS to both halves of that, and it
+ * was read afterwards rather than assumed. It writes the stamp into
+ * cost[from][to] and cost[to][from] on BOTH of its exits -- the one that
+ * found a path and the one that did not -- so "stamped" cannot mean anything
+ * but "answered". And its first act is to read regions[to] + 4 and return at
+ * once when that is zero, which is REGION_OFF_ACTIVE being read by a third
+ * function that never mentions the word. Neither fact needed a drive.
  */
 void __cdecl ActivateRegion(int32_t region)
 {
