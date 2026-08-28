@@ -127,6 +127,20 @@ MIN_FRAMES="${AM2_AB_MIN_FRAMES:-500}"
 # is compared in sequence exactly as before. Sorting the WHOLE log instead
 # would hide a genuine ordering change anywhere in it, which is a real thing to
 # want to catch -- the map loader and the palette have to happen in order.
+#
+# THE SET COMPARISON IS NOT ENOUGH EITHER, and the failure message above says
+# "compared as a set, so this is real", which is now known to be too strong.
+# One `quit` run reported an EXTRA " Receive thread got event 0" on one side --
+# a count difference, which sorting cannot absorb. Two further runs of the same
+# build were clean, so the line is not always emitted: whether that thread sees
+# an event before it is told to stop depends on the scheduler, exactly as its
+# position does.
+#
+# So a threads difference is worth READING and not worth believing on one run.
+# It is left failing rather than filtered away, because a real change here --
+# a thread that stops logging altogether -- is worth catching, and one flaky
+# line an hour is a cheap price for it. Do not tighten this into a filter
+# without a mutation showing what it would then miss.
 THREADED='(Packet Thread|Receive thread)'
 
 drive() { AM2_DISPLAY="$DISP" "$REPO/tools/drive.sh" "$@"; }

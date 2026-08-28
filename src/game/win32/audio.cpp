@@ -327,6 +327,50 @@ void __cdecl StopAllSounds(void)
     StopAudioStream();
 }
 
+/* 0x0040C7A0, one caller. Free every fixed sound slot and then the dynamic
+ * ones.
+ *
+ * IT WALKS THE SAME ARRAY StopAllSounds DOES AND TREATS IT DIFFERENTLY. That
+ * function's comment says the fixed slots are "borrowed, not owned -- stop
+ * them and leave them"; this one frees each through FreeSound and clears it.
+ * Both are right: stopping is what a level change wants and freeing is what a
+ * shutdown wants, and the array is the same either way. Worth saying because
+ * the two loops are otherwise identical and reading one as the other would
+ * make this a leak or that a use-after-free.
+ *
+ * The slot is cleared AFTER the free and only when it was non-null, so calling
+ * this twice is safe -- which matters, since its caller is on the shutdown
+ * path where things get called twice.
+ *
+ * It ends with FreeDynamicSounds rather than open-coding it, unlike
+ * StopAllSounds, which writes FreeSound's body out for the dynamic array. The
+ * original makes the same two choices in the same two places.
+ *
+ * MEASURED AT 1, AND ONLY THROUGH THE LOG. It runs on the shutdown path, so
+ * the control socket is gone by the time it has -- the counter reaches the
+ * game log through trace_report() on DLL_PROCESS_DETACH and nowhere else,
+ * which is exactly what CLAUDE.md records as the only way a teardown's count
+ * is ever visible. `ab.sh quit` is the configuration that compares it.
+ *
+ * FreeSound and FreeDynamicSounds both read 0 on that same exit, which is the
+ * ordinary blind spot: this calls them by name.
+ */
+void __cdecl FreeWaveSounds(void)
+{
+    uint8_t **slot;
+
+    for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS;
+         slot < (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS_END;
+         slot = (uint8_t **)((uint8_t *)slot + SOUND_SLOT_STRIDE)) {
+        if (*slot) {
+            FreeSound(*slot);
+            *slot = (uint8_t *)0;
+        }
+    }
+
+    FreeDynamicSounds();
+}
+
 /* 8-bit PCM is unsigned, so its silence is 0x80; 16-bit is signed and silence
  * is 0. The original derives this branchlessly and then smears the byte across
  * a dword to fill with `rep stosd`. */
@@ -1703,6 +1747,8 @@ int audio_install(void)
                         "LoadWaveSound", 3);
     rc |= patch_replace(ADDR_FREE_DYN_SOUNDS, (const void *)FreeDynamicSounds,
                         "FreeDynamicSounds", 0);
+    rc |= patch_replace(ADDR_FREE_WAVE_SOUNDS, (const void *)FreeWaveSounds,
+                        "FreeWaveSounds", 1);
     rc |= patch_replace(ADDR_UPDATE_3D_AUDIO, (const void *)Update3DAudioVolumes,
                         "Update3DAudioVolumes", 0);
     rc |= patch_replace(ADDR_STOP_NAMED_SOUND, (const void *)StopNamedSound,

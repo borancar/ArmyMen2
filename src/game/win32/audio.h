@@ -92,6 +92,10 @@ void __cdecl StopAllSounds(void);
  * back to it, not ours. */
 void __cdecl FreeSound(void *snd);
 
+/* 0x0040C7A0. Free every fixed sound slot -- the same array StopAllSounds
+ * merely stops -- and then the dynamic ones. */
+void __cdecl FreeWaveSounds(void);
+
 /* Original: 0x0040C440, 2 call sites. Write sample data into a DirectSound
  * buffer through the Lock/Unlock bracket.
  *

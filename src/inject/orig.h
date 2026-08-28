@@ -1806,6 +1806,12 @@
 #define ADDR_SOUND_DYNAMIC_LAST  0x004FA400u
 /* Bulk operations over those two tables. */
 #define ADDR_FREE_DYN_SOUNDS     0x0040B800u  /* void(void) */
+/* 0x0040C7A0, one caller. Free every FIXED sound slot -- ADDR_SOUND_SLOTS to
+ * ADDR_SOUND_SLOTS_END at SOUND_SLOT_STRIDE, each through ADDR_FREE_SOUND and
+ * then cleared -- and finish by calling ADDR_FREE_DYN_SOUNDS for the dynamic
+ * ones. So it is the half of the audio teardown that owns its slots, where
+ * StopAllSounds treats the same array as borrowed. Reconstructed. */
+#define ADDR_FREE_WAVE_SOUNDS    0x0040C7A0u  /* void(void) */
 #define ADDR_UPDATE_3D_AUDIO     0x0040BCF0u  /* void(void) */
 #define ADDR_STOP_NAMED_SOUND    0x0040B860u  /* void(const char *, int32) */
 #define SOUND_DYNAMIC_MAX_INDEX  0x10         /* inclusive; 17 slots */
