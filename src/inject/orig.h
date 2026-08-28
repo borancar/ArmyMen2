@@ -4247,6 +4247,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define COMM_ARMY_OFF_READY_TO_LOAD 0x270u
 #define ADDR_REMOVE_INVENTORY_ITEM 0x00447990u /* void(AM2_Object *, int32_t) */
 #define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
+/* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
+ * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value
+ * SaveType2 writes as its tag and ThingCode switches on. Reconstructed. Both
+ * callers compare it against 20 and neither is read yet. */
+#define ADDR_HELD_WEAPON_CODE      0x00448880u /* int32_t(void *unit) */
 /* A unit's weapon inventory: six uids, the one in hand, and a spare field the
  * removal always clears. */
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */

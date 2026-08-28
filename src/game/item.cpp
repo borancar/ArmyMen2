@@ -137,6 +137,54 @@ void __cdecl ItemsReset(void)
  * weapon!" and returns null, while a uid of zero or one that resolves to
  * nothing returns null in silence. Three ways to fail and only one of them is
  * worth a line. */
+/* 0x00448880, two callers, 64 bytes. The CODE of whatever weapon is in a
+ * unit's hand -- the selected inventory slot's uid, looked up, checked to be a
+ * weapon, and the dword its OBJ_OFF_FIELD_C0 record points at. Zero when the
+ * slot is empty or holds something that is not a weapon.
+ *
+ * It is the same three steps SaveType2 takes to build its tag and the same
+ * dword ThingCode switches on, so the return is the code a data file carries
+ * and not an index into anything. What differs is the middle step: this uses
+ * ObjIsType4 where SaveType2 uses WeaponByUid, so a non-weapon here answers 0
+ * in silence where WeaponByUid would complain to the log. Two spellings of one
+ * check, and the quiet one is the one on this path.
+ *
+ * FOUR THINGS ARE UNGUARDED and all four are the original's. The unit is
+ * dereferenced without a null test; the slot index is used without a range
+ * test, so a selection outside 0..5 reads past the array; LookupByUID's answer
+ * goes straight into ObjIsType4, which is safe only because that accessor
+ * opens on a null test of its own; and the OBJ_OFF_FIELD_C0 pointer is
+ * dereferenced without one, which is safe only because a weapon always has the
+ * record. Reproduced rather than tidied.
+ *
+ * Both callers do the same thing with the answer -- compare it against 20 --
+ * and neither is reconstructed, so what 20 is stays for whoever reads them.
+ * The name claims only what the body computes.
+ *
+ * Its counter can move: both callers are the original's and reach this by
+ * address. Nothing in this project puts a weapon in hand and asks, so it is
+ * expected to read 0 on the drives here.
+ */
+int32_t __cdecl HeldWeaponCode(void *unit)
+{
+    const uint8_t *u = (const uint8_t *)unit;
+    uint32_t       uid;
+    AM2_Object    *obj;
+
+    uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                              + (size_t)*(const int32_t *)
+                                    (u + UNIT_OFF_INVENTORY_SEL) * 4);
+    if (!uid)
+        return 0;
+
+    obj = (AM2_Object *)LookupByUID(uid);
+    if (!ObjIsType4(obj))
+        return 0;
+
+    return **(const int32_t *const *)((const uint8_t *)obj
+                                      + OBJ_OFF_FIELD_C0);
+}
+
 void *__cdecl WeaponByUid(uint32_t uid)
 {
     uint32_t *obj;
@@ -3361,6 +3409,8 @@ void item_install(void)
                   "NotifyPickedUp", 1);
     patch_replace(ADDR_NOTIFY_DROPPED, (const void *)NotifyDropped,
                   "NotifyDropped", 1);
+    patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
+                  "HeldWeaponCode", 1);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,

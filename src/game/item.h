@@ -251,6 +251,10 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells);
  * nothing, and null WITH a log line for one that resolves to a non-weapon. */
 void *__cdecl WeaponByUid(uint32_t uid);
 
+/* 0x00448880. The code of the weapon in a unit's selected inventory slot, or 0
+ * when the slot is empty or does not hold a weapon. */
+int32_t __cdecl HeldWeaponCode(void *unit);
+
 /* 0x00448220. A unit gives up: soldier kind 8, AI mode 2 (ignore), and its
  * weapon marked OBJ_FLAG_OVERDUE before the uid is cleared -- in that order,
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */
