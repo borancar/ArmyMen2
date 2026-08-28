@@ -496,6 +496,25 @@
 #define HUDCMD_OFF_SELECTED    0x64u  /* int32, which slot is highlighted */
 #define AM2_HUD_CMD_SLOTS      3
 #define AM2_HUD_CMD_HIGHLIGHT  0xEE
+#define ADDR_HUD_SARGE_PAINT   0x004155A0u  /* thiscall void(obj, RECT) */
+/* SIX slots in a 3x2 grid: x at 6/50/94, y at 21 and 49 -- the same three
+ * columns the build menu and the command row use. int16 PAIRS, and the loop
+ * pointer starts at 0x004766B2 reading [ebx-2] and [ebx], so the table BASE is
+ * two bytes lower. Named for the base, not for where the loop begins. */
+#define ADDR_HUD_SARGE_OFFSETS 0x004766B0u  /* int16 x,y [6] */
+#define ADDR_HUD_SARGE_OFF_END 0x004766CAu
+#define AM2_HUD_SARGE_ROWS     6
+/* One record per slot, 0x10 apart, from HUDSARGE_OFF_SLOTS. */
+#define HUDSARGE_OFF_SLOTS     0xD4u  /* {index, ?, count, flag}[6] */
+#define HUDSARGE_REC_STRIDE    0x10u
+#define HUDSARGE_REC_INDEX     0x00u  /* into the 31 sprites at +0x58; -1 empty */
+#define HUDSARGE_REC_COUNT     0x08u  /* printed over the icon when >= 0 */
+#define HUDSARGE_REC_HIGHLIGHT 0x0Cu  /* > 0 fills the cell first */
+#define ADDR_STR_PCT_D         0x00476A1Cu /* "%d" */
+#define AM2_HUD_SARGE_FONT     1
+#define AM2_HUD_SARGE_INK      0xCE
+#define AM2_HUD_SARGE_CELL_W   0x2B  /* the count is right-aligned in this */
+#define AM2_HUD_SARGE_TEXT_DY  15
 /* 0x00414620, two callers and both are that paint. A TOOLTIP: measure the
  * text, centre it on the cursor, clamp it to the bitmap area, fill a box and
  * draw the string in it. One of the 29 functions that bracket LockSurface --

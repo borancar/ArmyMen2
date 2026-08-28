@@ -1506,6 +1506,92 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
  * ADDR_HUD_CMD_SPRITES: the same seven records the commands destructor frees,
  * and the index in a slot selects one of them.
  */
+/* 0x004155A0. The SARGE panel: six unit slots in a 3x2 grid, each an icon with
+ * a count printed over it and a highlight when its flag is set.
+ *
+ * The same shape as HudCommandsPaint with three differences. Six records at
+ * HUDSARGE_OFF_SLOTS rather than three at +0x58, stride 0x10 rather than 4;
+ * ALL FIVE failure paths continue to the next slot, where the commands paint
+ * exits on two of them; and each icon carries a number.
+ *
+ * ClipRect's x and y are INPUTS as well as outputs -- see HudCommandsPaint,
+ * which cost four rounds to establish. Initialised from the origin here, and
+ * the draw uses the SAVED origin. The original shows the same duplication:
+ * frames 0x74/0x6c and 0x78/0x68, one copy of each per purpose.
+ *
+ * THE COUNT IS A SECOND LOCK/UNLOCK BRACKET. sprintf the number, measure it
+ * with TextExtent's null-`out` form, and draw it RIGHT-ALIGNED in a cell
+ * AM2_HUD_SARGE_CELL_W wide -- x is the cell's right edge minus the text
+ * width, not the slot's left. Font 1, ink 0xCE.
+ */
+void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    RECT           vis;
+    int32_t        i;
+
+    if (!IntersectRect(&vis, &clip, (const RECT *)AM2_IMAGE(ADDR_SCREEN_CLIP)))
+        return;
+
+    for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
+        const int16_t *off = (const int16_t *)AM2_IMAGE(ADDR_HUD_SARGE_OFFSETS)
+                             + i * 2;
+        const uint8_t *rec = self + HUDSARGE_OFF_SLOTS
+                             + i * HUDSARGE_REC_STRIDE;
+        int32_t        idx = *(const int32_t *)(rec + HUDSARGE_REC_INDEX);
+        AM2_Sprite    *spr;
+        AM2_Rect       box, part;
+        RECT           hit;
+        int32_t        x, y, count;
+        char           text[16];
+
+        if (idx < 0)
+            continue;
+
+        spr = *(AM2_Sprite *const *)(self + HUD_OFF_SPRITE0 + idx * 4);
+        if (!spr)
+            continue;
+
+        box.left   = off[0] + w->rect.left;
+        box.top    = off[1] + w->rect.top;
+        box.right  = spr->bounds.right + box.left;
+        box.bottom = spr->bounds.bottom + box.top;
+
+        if (!IntersectRect(&hit, (const RECT *)&box, &vis))
+            continue;
+
+        x = box.left;
+        y = box.top;
+
+        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&vis, &x, &y, &part))
+            continue;
+
+        if (*(const int32_t *)(rec + HUDSARGE_REC_HIGHLIGHT) > 0)
+            ClearRegion((const RECT *)&hit, AM2_HUD_CMD_HIGHLIGHT);
+
+        DrawSpriteClipped(spr, box.left, box.top, &part, 0);
+
+        count = *(const int32_t *)(rec + HUDSARGE_REC_COUNT);
+        if (count < 0)
+            continue;
+
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+            return;
+
+        ((int32_t (__cdecl *)(char *, const char *, ...))
+            AM2_IMAGE(ADDR_GAME_SPRINTF))(
+                text, (const char *)AM2_IMAGE(ADDR_STR_PCT_D), count);
+
+        DrawText(AM2_HUD_SARGE_CELL_W
+                 - TextExtent(text, AM2_HUD_SARGE_FONT, (int32_t *)0)
+                 + box.left,
+                 box.top + AM2_HUD_SARGE_TEXT_DY,
+                 text, AM2_HUD_SARGE_FONT, 0, AM2_HUD_SARGE_INK);
+
+        UnlockSurface();
+    }
+}
+
 void __attribute__((thiscall)) HudCommandsPaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -7234,6 +7320,8 @@ int widget_install(void)
                         "OpenMessage", 0);
     rc |= patch_replace(ADDR_DRAW_TOOLTIP, (const void *)DrawTooltip,
                         "DrawTooltip", 2);
+    rc |= patch_replace(ADDR_HUD_SARGE_PAINT, (const void *)HudSargePaint,
+                        "HudSargePaint", 1);
     rc |= patch_replace(ADDR_HUD_CMD_PAINT, (const void *)HudCommandsPaint,
                         "HudCommandsPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_PAINT, (const void *)HudPanelPaint,
