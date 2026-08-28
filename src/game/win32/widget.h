@@ -657,6 +657,10 @@ AM2_DECLARE_CLASS_DTOR(HudCommands);
  * panel, grey the build menu in a network game, then the base update. */
 void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w);
 
+/* Original: 0x00414890, vtable slot 2 of the radar. Click it to jump the view;
+ * after a second of mouse silence, caption the panel "Stratmap". */
+void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made

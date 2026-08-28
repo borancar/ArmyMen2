@@ -476,6 +476,10 @@
  * than to the family. HUD_SQUAD_PAIR_HI is 0x8C on a different class. */
 #define HUDPANEL_OFF_CAPTION   0x8Cu  /* char[], emptied every update */
 #define ADDR_HUD_PANEL_UPDATE  0x004193C0u  /* thiscall void(obj) */
+#define ADDR_HUD_RADAR_UPDATE  0x00414890u  /* thiscall void(obj) */
+/* What the radar writes into the panel's caption when the mouse goes quiet. */
+#define ADDR_STR_STRATMAP      0x00476A10u  /* "Stratmap" */
+#define AM2_MOUSE_IDLE_MS      0x3E8        /* one second */
 /* Three sprite slots, shared by the top and edge strips. */
 #define HUD_OFF_SPRITE0        0x58u
 #define HUD_OFF_SPRITE1        0x5Cu

@@ -1385,6 +1385,87 @@ void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w)
     WidgetUpdate(w);
 }
 
+/* 0x00414890. The radar's per-frame update: a click jumps the camera, and a
+ * second of mouse silence captions the panel.
+ *
+ * CLICKING IT MOVES THE EYE. The cursor's offset inside the radar is scaled by
+ * the map extent over the widget's own width and height, and the result goes
+ * into ADDR_VIEW_TARGET with ADDR_VIEW_HOLD raised -- and HOLD is documented
+ * as "skip the glide once", so the camera JUMPS rather than sliding. The
+ * radar is a jump-to-here control, not a scrub.
+ *
+ * THE CURSOR IS A PACKED POINT and has to be read as two int16. MakePoint's
+ * own comment gives the layout -- x in the low half, y in the high -- and the
+ * original reads it back with `movsx` from +0 and +2. Signed, because a cursor
+ * clamped at an edge can be negative. Reading it as two int32 would compile,
+ * run, and put the view at a multiple of where it belongs, and no A/B here
+ * would see it: no drive clicks the radar.
+ *
+ * THE CAPTION IS THE PANEL'S, NOT THE RADAR'S. It writes ADDR_HUD_WIDGET_B +
+ * HUDPANEL_OFF_CAPTION, and the panel empties that buffer at the top of its
+ * own update every frame -- so "Stratmap" is a one-frame string that this
+ * function re-asserts for as long as the mouse stays still. That is why the
+ * two of them have to be read together; either alone reads as a bug.
+ *
+ * The gates are the family's: no character handler, no input suppression, and
+ * the panel open. Then the shared click arbitration -- claim
+ * ADDR_MOUSE_B0_EXTRA if it is free and a button changed, and act only if we
+ * are the claimant.
+ */
+void __cdecl HudRadarUpdateBody(AM2_Widget *w);
+
+void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w)
+{
+    const AM2_Widget *panel =
+        *(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
+    AM2_Widget *claim;
+    int32_t     changed;
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
+        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+        return;
+
+    WidgetUpdate(w);
+
+    if (!*(const int32_t *)((const uint8_t *)panel + HUDPANEL_OFF_OPEN))
+        return;
+
+    if (!PointInRect((const AM2_Rect *)&w->rect, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+        return;
+
+    claim   = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_B0_EXTRA;
+    changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+
+    if (!claim && changed) {
+        claim = w;
+        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_B0_EXTRA = w;
+    }
+
+    if ((*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON || changed)
+        && claim == w
+        && !*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS) {
+        const int16_t *cur = (const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
+        int32_t       *tgt = (int32_t *)(uintptr_t)ADDR_VIEW_TARGET;
+
+        ((int16_t *)tgt)[0] = (int16_t)
+            ((cur[0] - w->rect.left)
+             * *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X / w->w);
+        ((int16_t *)tgt)[1] = (int16_t)
+            ((cur[1] - w->y)
+             * *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y / w->h);
+
+        *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD    = 1;
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET  = 0;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        - *(const int32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY > AM2_MOUSE_IDLE_MS)
+        strcpy((char *)((uint8_t *)*(AM2_Widget **)
+                            (uintptr_t)ADDR_HUD_WIDGET_B
+                            + HUDPANEL_OFF_CAPTION),
+                   (const char *)AM2_IMAGE(ADDR_STR_STRATMAP));
+}
+
 /* 0x0044E510. The film archive's destructor: give back the twelve thumbnail
  * PAIRS and chain to the dialog base.
  *
@@ -6956,6 +7037,8 @@ int widget_install(void)
                         "OpenGameMenu", 0);
     rc |= patch_replace(ADDR_OPEN_MESSAGE, (const void *)OpenMessage,
                         "OpenMessage", 0);
+    rc |= patch_replace(ADDR_HUD_RADAR_UPDATE, (const void *)HudRadarUpdate,
+                        "HudRadarUpdate", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
