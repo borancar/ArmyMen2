@@ -786,6 +786,20 @@
  * horizontal ones, all four INCLUSIVE of `right` and `bottom` -- which the
  * clipping inside the line drawers treats as exclusive. One caller. */
 #define ADDR_DRAW_RECT      0x0041CDC0u  /* void(const AM2_Rect *, colour) */
+/* 0x0041CCE0, one caller -- the radar's paint. The SAME outline as DrawRect
+ * above and a completely different implementation: where that one calls the
+ * two line drawers four times, this one clips once against ADDR_SCREEN_CLIP
+ * and writes the framebuffer directly, `rep stosd` along the top and bottom
+ * rows and then a stride loop down the two sides.
+ *
+ * Its edges are INCLUSIVE, the same as DrawRect's, but arrived at differently:
+ * the run length is `right - left + 1` and the side loop is `<=`, where
+ * DrawRect gets there by handing the exclusive-clipping line drawers a bumped
+ * bound. Two ways to the same rectangle.
+ *
+ * Another half-bracket: it Locks and never Unlocks, exactly as DrawVLine and
+ * DrawHLine do, so the pairing belongs to whoever called it. */
+#define ADDR_DRAW_RECT_FAST 0x0041CCE0u  /* void(const AM2_Rect *, colour) */
 /* 0x00413610. The one caller of DrawRect: it takes a rectangle stored in the
  * SAME space as ADDR_VIEW_ORIGIN, subtracts that origin to get screen
  * coordinates, and outlines it. A full Lock/Unlock bracket, unlike the two line

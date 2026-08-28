@@ -1315,6 +1315,63 @@ static void __cdecl DrawRect(const AM2_Rect *r, int32_t colour)
     DrawHLine(r->bottom, r->left, r->right, colour);
 }
 
+/* 0x0041CCE0, one caller -- the radar's paint. The SAME outline as DrawRect
+ * above, written a completely different way: that one calls the two line
+ * drawers four times, this one clips ONCE against the screen and writes the
+ * framebuffer directly -- a run along the top and bottom rows, then a stride
+ * loop down the two sides.
+ *
+ * Both are inclusive of `right` and `bottom` and they get there differently.
+ * Here the run length is `right - left + 1` and the side loop tests `<=`;
+ * DrawRect gets the same result by handing bumped bounds to line drawers whose
+ * own clipping treats those edges as exclusive. Worth stating, because two
+ * functions agreeing by different routes is easy to misread as one of them
+ * being off by one.
+ *
+ * A HALF-BRACKET, like DrawVLine and DrawHLine: it Locks and never Unlocks, so
+ * the pairing belongs to whoever called it. CLAUDE.md already records that
+ * several of the 29 are halves; this is another.
+ *
+ * The original replicates the colour byte into a dword and uses `rep stosd`
+ * with a `rep stosb` tail. memset is the same operation and the compiler picks
+ * its own instructions, exactly as DrawHLine above already does.
+ *
+ * ITS RIGHT EDGE OVERHANGS BY ONE and that is the original's. The horizontal
+ * runs are `width` bytes from `left`, so they cover left..right; the side loop
+ * writes `p[width]`, which is column right+1. The two disagree by a pixel.
+ * Reproduced rather than squared up: it is either a real off-by-one in the
+ * game or a sign that the rectangle is meant exclusive on the right and the
+ * runs are the short ones, and nothing here settles which. The radar's view
+ * box is the only thing drawn by it.
+ */
+static void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
+{
+    AM2_Rect  vis;
+    uint8_t  *top;
+    uint8_t  *bottom;
+    uint8_t  *p;
+    int32_t   width;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    if (!IntersectRect((RECT *)&vis, (const RECT *)r,
+                       (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP))
+        return;
+
+    top    = g_framebuffer + (int32_t)g_pitch * vis.top    + vis.left;
+    bottom = g_framebuffer + (int32_t)g_pitch * vis.bottom + vis.left;
+    width  = vis.right - vis.left + 1;
+
+    memset(top,    (uint8_t)colour, (size_t)width);
+    memset(bottom, (uint8_t)colour, (size_t)width);
+
+    for (p = top; p <= bottom; p += (int32_t)g_pitch) {
+        p[0]     = (uint8_t)colour;
+        p[width] = (uint8_t)colour;
+    }
+}
+
 #define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 /* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
  * g_listenerPos and a second name would be an alias, while a non-const twin of
@@ -1480,6 +1537,8 @@ int mapdraw_install(void)
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
     patch_replace(ADDR_DRAW_HLINE, (const void *)DrawHLine, "DrawHLine", 2);
     patch_replace(ADDR_DRAW_RECT, (const void *)DrawRect, "DrawRect", 2);
+    patch_replace(ADDR_DRAW_RECT_FAST, (const void *)DrawRectFast,
+                  "DrawRectFast", 1);
     patch_replace(ADDR_DRAW_VIEW_RECT, (const void *)DrawViewRect,
                   "DrawViewRect", 2);
     int rc = 0;
