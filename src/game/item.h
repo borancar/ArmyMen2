@@ -328,7 +328,7 @@ void __cdecl Type238Action(void *obj, int32_t award);
 void __cdecl ObjFrameStep(void *obj);
 
 /* 0x004582F0. Points an object at a place: detach, clear the script id, and
- * store the point ADDR_RESOLVE_POINT_FOR_TILE snaps it to -- NOT the point
+ * store the point ADDR_NEAREST_ALLOWED_TILE snaps it to -- NOT the point
  * passed in. Types 2, 3 and 8 only. */
 void __cdecl PointActionA(void *obj, uint32_t point);
 

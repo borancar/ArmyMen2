@@ -19,6 +19,7 @@
 #include "crt.h"
 #include "armymsg.h"  /* SendObjDestroyed -- reconstructed */
 #include "army.h"     /* LookupOwnerObj -- reconstructed */
+#include "region.h"   /* NearestAllowedTile -- reconstructed */
 #include "event.h"    /* EventNotify -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
@@ -3049,8 +3050,8 @@ void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
     }
 }
 
-typedef void (__cdecl *AM2_ResolvePtFn)(void *obj, int32_t tile, uint32_t *pt);
-#define orig_resolve_point  ((AM2_ResolvePtFn)(uintptr_t)ADDR_RESOLVE_POINT_FOR_TILE)
+/* NearestAllowedTile is region.cpp's now; the image seam that stood here
+   went with the reconstruction. */
 
 /* 0x004582F0, nine callers. Points an object at a place: detach it from
  * whatever it was attached to, clear its script id, resolve the tile the
@@ -3064,7 +3065,7 @@ typedef void (__cdecl *AM2_ResolvePtFn)(void *obj, int32_t tile, uint32_t *pt);
  *
  * THE POINT MAKES A ROUND TRIP. It goes to TileOfPoint by VALUE to get a tile,
  * then the caller's own argument slot is passed to
- * ADDR_RESOLVE_POINT_FOR_TILE by ADDRESS, and what comes back out of that slot
+ * ADDR_NEAREST_ALLOWED_TILE by ADDRESS, and what comes back out of that slot
  * is what gets stored -- not the point that came in. So a caller's point is
  * snapped to whatever that resolver decides, and reading the store as "save
  * the argument" would be wrong whenever the two differ.
@@ -3109,7 +3110,7 @@ void __cdecl PointActionA(void *obj, uint32_t point)
     *(uint16_t *)(o + OBJ_OFF_FIELD_B2)  = 0;
 
     tile = TileOfPoint(point);
-    orig_resolve_point(obj, tile, &point);
+    NearestAllowedTile(obj, tile, &point);
 
     *(int32_t *)(o + OBJ_OFF_FIELD_EC) =
         (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0) ? 1 : 0;

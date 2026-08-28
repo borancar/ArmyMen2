@@ -4086,7 +4086,7 @@ typedef struct {
 #define OBJ_OFF_SCRIPT_STATE     0xB4u
 /* UNRESOLVED, and recorded rather than renamed. Two functions WRITE a POINT
  * into this field -- Type2ActionB puts ADDR_ZERO_POINT there and PointActionA
- * puts the point ADDR_RESOLVE_POINT_FOR_TILE hands back -- while two READ it
+ * puts the point ADDR_NEAREST_ALLOWED_TILE hands back -- while two READ it
  * as an int32 and compare it against a script value (objscript.cpp's state
  * compare and event.cpp's testvar). Both cannot be describing the same thing.
  *
@@ -4100,11 +4100,24 @@ typedef struct {
 #define OBJ_OFF_FIELD_B2         0xB2u   /* uint16_t */
 #define OBJ_OFF_FIELD_EC         0xECu   /* int32_t, 0 or 1 */
 #define OBJ_OFF_FIELD_F4         0xF4u   /* int32_t; only its sign is read */
-/* 0x0043A0A0, six callers. Takes an object, a TILE and a point by ADDRESS,
- * consults ADDR_POINT_OF_TILE and writes a point back through that pointer.
- * Named for what it does with its arguments; what it is FOR is not
- * established, and the object argument's role least of all. */
-#define ADDR_RESOLVE_POINT_FOR_TILE 0x0043A0A0u /* void(obj, tile, AM2_Point*) */
+/* 0x0043A0A0, six callers. The nearest tile the object's POINT RULE will
+ * accept, starting from one it is given, with the point written back through
+ * the caller's pointer.
+ *
+ * The old comment said "what it is FOR is not established, and the object
+ * argument's role least of all". Both are settled now: the object chooses the
+ * rule through ADDR_SET_POINT_RULE, and when the given tile is already
+ * acceptable the function is a no-op that only fills in the point. When it is
+ * not, a four-direction SPIRAL walks outward until the rule accepts, refusing
+ * candidates that are off the map or in a different region.
+ *
+ * IT RETURNS THE TILE, in ax, and the old signature said void. Callers ignore
+ * it, which is why nobody noticed. Reconstructed; its counter reads 1 because
+ * four of the six callers are ours, and whether the spiral ever runs is not
+ * established. */
+#define ADDR_NEAREST_ALLOWED_TILE 0x0043A0A0u /* uint16(obj, tile, uint32 *) */
+#define ADDR_SPIRAL_DX           0x0048782Cu  /* int32_t[4]: 0, 1, 0, -1 */
+#define ADDR_SPIRAL_DY           0x0048783Cu  /* int32_t[4]: -1, 0, 1, 0 */
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
 /* A second deadline on the same clock, at +0x58, and 0x004355D0 is the only

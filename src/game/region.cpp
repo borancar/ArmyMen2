@@ -357,9 +357,129 @@ void __cdecl InactivateRegion(int32_t region)
     (*(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))++;
 }
 
-typedef void (__cdecl *AM2_ResolvePointFn)(void *obj, int32_t tile,
-                                           uint32_t *pt);
 typedef int32_t (__cdecl *AM2_PointRuleFn)(int32_t tile);
+
+/* 0x0043A0A0, six callers. The nearest tile the object's point rule will
+ * accept, with the corresponding point written back through the caller's
+ * pointer.
+ *
+ * THE COMMON CASE IS A NO-OP. The given tile is put to the rule first, and
+ * when it passes the function only fills in the point -- and even that is
+ * conditional: the point is written ONLY if its low word is already zero. So
+ * a caller that arrives with a point set keeps it, which is why the two
+ * readers in item.cpp see a point that is sometimes snapped and sometimes not.
+ *
+ * WHEN THE TILE IS REFUSED IT SPIRALS. Four directions from ADDR_SPIRAL_DX and
+ * ADDR_SPIRAL_DY -- up, right, down, left -- with the leg length starting at
+ * one and growing every SECOND direction, which is the ordinary square spiral.
+ * The origin tile is never retried: the first step is taken before the first
+ * test, and it has already failed.
+ *
+ * A CANDIDATE MUST PASS THREE THINGS. It must be strictly inside the map --
+ * `x > 0`, `x < width`, `y > 0`, `y < height`, so the whole outer border is
+ * excluded rather than clamped. It must be in the same REGION as the starting
+ * tile, unless the start has no region (0) or the candidate has none, either
+ * of which waives the test. Only then is the rule asked.
+ *
+ * THE GIVE-UP IS AT THE END OF A FULL RING and it is not a distance limit. At
+ * the end of direction 3, if no candidate was PUT TO THE RULE during that ring
+ * and the starting tile had a region, it returns 0. So a ring that was
+ * entirely out of bounds or entirely in other regions ends the search, and a
+ * search from a region-less tile never gives up at all -- it spirals until the
+ * bounds test stops producing candidates, which for a tile near the middle of
+ * the map means a very long walk. Reproduced; it is the original's.
+ *
+ * The x and y are recovered from the tile with `& (width - 1)` and a shift by
+ * ADDR_MAP_ROW_SHIFT, which is a modulo only because the width is a power of
+ * two -- the same pair PointOfTile uses in the other direction.
+ *
+ * It returns the tile as a UINT16, which the old signature had as void.
+ * Every caller ignores it, which is why nobody noticed.
+ *
+ * MEASURED AT 1, AND THAT 1 IS NOT THE COUNT. Four of its six callers are
+ * ours now -- BeginMoveTo above and one in item.cpp among them -- and they
+ * call by name, so only the remaining original caller crosses the patched
+ * entry. BeginMoveTo alone reads 51 on the same run, so this runs at least
+ * fifty-two times and the counter can see one of them.
+ *
+ * WHETHER THE SPIRAL EVER RUNS IS NOT ESTABLISHED, and it is most of the
+ * function. The common path is the first rule test passing and returning
+ * at once; nothing measured here distinguishes that from a search. So the
+ * bounds test, the region waiver, the leg growth and the give-up rule are
+ * all verified by reading, and the A/B covers them only if some call was
+ * refused -- which is exactly what is not known.
+ */
+uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt)
+{
+    AM2_PointRuleFn rule;
+    const uint8_t  *cells;
+    int32_t         region;
+    int32_t         w, h, shift;
+    int32_t         x, y, dir, step, leg, tried;
+
+    SetPointRule(obj);
+
+    cells  = *(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL;
+    region = cells[tile & 0xFFFF];
+
+    rule = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
+    if (!rule(tile)) {
+        if (*(const uint16_t *)pt == 0)
+            *pt = PointOfTile(tile);
+        return (uint16_t)tile;
+    }
+
+    w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    h     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
+    shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+
+    x     = (tile & 0xFFFF) & (w - 1);
+    y     = (int32_t)((uint32_t)(tile & 0xFFFF) >> shift);
+    dir   = 0;
+    step  = 0;
+    leg   = 1;
+    tried = 0;
+
+    for (;;) {
+        x += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DX))[dir];
+        y += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DY))[dir];
+
+        if (x > 0 && x < w && y > 0 && y < h) {
+            int32_t cand = (y << shift) + x;
+            int32_t ok   = 1;
+
+            if (region != 0) {
+                int32_t r = cells[cand & 0xFFFF];
+
+                if (r != 0 && r != region)
+                    ok = 0;
+            }
+
+            if (ok) {
+                tried = 1;
+                rule  = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
+                if (!rule(cand)) {
+                    *pt = PointOfTile(cand);
+                    return (uint16_t)cand;
+                }
+            }
+        }
+
+        if (++step < leg)
+            continue;
+
+        if (dir == 3) {
+            if (!tried && region > 0)
+                return 0;
+            tried = 0;
+        }
+
+        if (dir & 1)
+            leg++;
+        dir  = (dir + 1) & 3;
+        step = 0;
+    }
+}
 
 /* 0x00439E90, four callers. Can this object reach that point in a straight
  * line, and if so, record the move on it.
@@ -413,8 +533,7 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
 
     SetPointRule(obj);
 
-    ((AM2_ResolvePointFn)(uintptr_t)ADDR_RESOLVE_POINT_FOR_TILE)(
-        obj, TileOfPoint(*to), to);
+    NearestAllowedTile(obj, TileOfPoint(*to), to);
 
     TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS), *to,
                   (uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF, &count);
@@ -460,6 +579,9 @@ int region_install(void)
                         "ActivateRegion", 1);
     rc |= patch_replace(ADDR_BEGIN_MOVE_TO, (const void *)BeginMoveTo,
                         "BeginMoveTo", 4);
+    rc |= patch_replace(ADDR_NEAREST_ALLOWED_TILE,
+                        (const void *)NearestAllowedTile,
+                        "NearestAllowedTile", 6);
     rc |= patch_replace(ADDR_INACTIVATE_REGION, (const void *)InactivateRegion,
                         "InactivateRegion", 1);
     return rc;
