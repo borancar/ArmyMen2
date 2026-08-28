@@ -5,31 +5,28 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `7d414f7`. Working tree clean.
+Last updated: **2026-08-27**, at `5d723b9`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`HudRepaintOne`** (`0x00413A30`, four callers) -- repaint one HUD widget if
-  it has been marked, and unmark it. 959 patches.
+- **`SubrecHideRows`** (`0x00434E60`, three callers) -- clear bit 0 on every row
+  the sub-list holds, so none of them draws. 960 patches.
 
-- **The flag is cleared before the paint, not after.** A painter that marked
-  the HUD again would keep its mark, where clearing afterwards would lose it --
-  and with four callers at least one is in a frame loop, so the difference is a
-  dropped repaint per frame rather than a one-off.
+- **Its argument is the sub-list header, not the object**, and that is the
+  whole difficulty of a 48-byte function. It reads a count at `+0x04` and rows
+  at `+0x08`, which look like nothing until you notice they are
+  `SUBREC_OFF_COUNT` and `SUBREC_OFF_ROWS` -- the same two dwords the object
+  reaches as `OBJ_OFF_ROW_COUNT` and `OBJ_OFF_ROWS`, seen from
+  `OBJ_OFF_SUBRECORD` instead. That pair was already in `orig.h` with a comment
+  saying exactly that. **Reading a small function is often a matter of
+  recognising which struct the offsets belong to, and this file already knew.**
 
-- **Three globals, and this is the only thing that ties them together**: a flag
-  at `0x004FCF84`, an index at `0x004FCF50`, and a table of widget pointers at
-  `0x004FCF04`. `ADDR_HUD_WIDGET_A` is `0x004FCF00`, four bytes before that
-  table -- so either the HUD widgets are one array with the three already-named
-  singles as entries, or they are scattered and this reads past one of them.
-  **Not established**, and neither is the index's range; both said plainly
-  rather than resolved by the more convenient reading.
-
-- It also clears a **byte** at the widget's `+0x70`. The base `AM2_Widget` has
-  nothing named there and the subclasses that use the offset hold an `int32`,
-  so it is neither of those.
+- Two of the three callers test `OBJ_FLAG_DESTROYED` immediately before, so
+  this is what taking a destroyed object off the screen looks like from the
+  sub-list's side. The third does not, which is why the name says what it does
+  and not why.
 
 ## Next
 
