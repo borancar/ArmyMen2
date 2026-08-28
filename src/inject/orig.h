@@ -3744,6 +3744,13 @@ typedef struct {
  * Two calls on a driven Boot Camp mission; its two multiplayer arms are
  * unreachable here, since ADDR_MP_SESSION is 0 on every drive. */
 #define ADDR_OBJS_ARE_ALLIED     0x004574D0u  /* int32(void*, void*, int32) */
+/* 0x00457620, six callers. The same question with an ARMY on the left instead
+ * of an object: identical to ADDR_OBJS_ARE_ALLIED from its `army == 4` test
+ * onward, and differing only in where the army comes from. The image holds two
+ * bodies rather than a call, so both are reconstructed; a change to one is a
+ * change to the other. Reconstructed, and 80 calls on a driven Boot Camp
+ * mission against ADDR_OBJS_ARE_ALLIED's 1. */
+#define ADDR_ARMY_ALLIED_WITH_OBJ 0x00457620u /* int32(int32 army, void*, int32) */
 /* Read by 0x0045B7E0 and by 0x0044AE68, both as a plain non-zero test on the
  * VIEWER rather than on the object being judged, and nothing here writes it.
  * Structural name; what it means is not established. */

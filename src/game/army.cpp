@@ -359,6 +359,81 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
     return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
 }
 
+/* 0x00457620, six callers. The same question as ObjsAreAllied with an ARMY on
+ * the left instead of an object.
+ *
+ * IT IS ObjsAreAllied FROM THE `army == 4` TEST ONWARD, instruction for
+ * instruction: the neutral-army pair, the type-2 block with its multiplayer
+ * kind-7 refusal, the record comparison, the four-way decode, and the same
+ * AllyFlag tail. The only difference is that the army arrives as an argument
+ * rather than being read out of a first object -- and as an int32 rather than
+ * sign-extended from a byte, which is the one place the two bodies could
+ * disagree and do not for any army a game ships.
+ *
+ * So ObjsAreAllied is this function with the kind-7 PAIR rule in front of it.
+ * The image holds two bodies and not a call, so this reconstruction holds two
+ * as well; the alternative -- having ObjsAreAllied call this -- would produce
+ * the same answers and hide a duplication the original has. What that costs is
+ * that a correction to one must be made to the other, and no check here would
+ * notice. Said in both comments for that reason.
+ *
+ * Its own null test is the same useless one: `if (!b)` jumps to a tail whose
+ * first act is to read b's army, and b has already been dereferenced above it.
+ * Reproduced.
+ *
+ * MEASURED AT 80 CALLS on a driven Boot Camp mission against ObjsAreAllied's
+ * 1, so the shared logic is far better exercised through this door than
+ * through that one. Be careful what that buys: it catches a transcription
+ * error made in ONE of the two bodies, which is the likely kind, and it
+ * cannot catch one made in both -- and since the second was written by reading
+ * the first, both is exactly how a misreading would land. The multiplayer
+ * kind-7 refusal is unreachable here as it is there, ADDR_MP_SESSION being 0
+ * on every drive.
+ */
+int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
+{
+    const uint8_t *ob   = (const uint8_t *)b;
+    void          *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        mp   = *(const int32_t *)(uintptr_t)ADDR_MP_SESSION;
+    const uint8_t *rec;
+    int32_t        idx;
+
+    if (army == 4)
+        return 1;
+    if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
+        return 1;
+
+    if (b && *(const int32_t *)ob == 2) {
+        if (mp && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            return 0;
+
+        rec = (useRec3
+               && *(const int32_t *)(ob + OBJ_OFF_FIELD_530) != 5)
+              ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
+              : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
+
+        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
+                + (uint32_t)(CommArmyOfSlot(comm, army) << 8)) == rec)
+            return 1;
+
+        if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
+            idx = 0;
+        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
+            idx = 1;
+        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
+            idx = 2;
+        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
+            idx = 3;
+        else
+            return 0;
+
+        if (AllyFlag(army, CommSlotForArmy(comm, idx)))
+            return 1;
+    }
+
+    return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+}
+
 int army_install(void)
 {
     int rc = 0;
@@ -375,6 +450,9 @@ int army_install(void)
     rc |= patch_replace(ADDR_ALLY_FLAG, (const void *)AllyFlag, "AllyFlag", 2);
     rc |= patch_replace(ADDR_OBJS_ARE_ALLIED, (const void *)ObjsAreAllied,
                         "ObjsAreAllied", 11);
+    rc |= patch_replace(ADDR_ARMY_ALLIED_WITH_OBJ,
+                        (const void *)ArmyAlliedWithObj,
+                        "ArmyAlliedWithObj", 6);
     rc |= patch_replace(ADDR_ARMIES_ALLIED, (const void *)ArmiesAllied,
                         "ArmiesAllied", 2);
     rc |= patch_replace(ADDR_OBJ_IS_FRIENDLY, (const void *)ObjIsFriendly,

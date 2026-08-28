@@ -50,6 +50,10 @@ int32_t __cdecl ObjIsFriendly(const void *obj);
  * `useRec3` chooses which of the second object's two record pointers to use. */
 int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3);
 
+/* 0x00457620. The same question with an army on the left: ObjsAreAllied from
+ * its `army == 4` test onward, held as a separate body in the image. */
+int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3);
+
 /* 0x00457750, twenty-one callers, and the name was already in orig.h -- kept,
  * because it is the more careful of the two readings.
  *
