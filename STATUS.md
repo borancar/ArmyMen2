@@ -5,26 +5,75 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-27**, at `c23f9ea`. Working tree clean.
+Last updated: **2026-08-28**, at `dcd6dd0`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-- **`HudPanelWidth`** (`0x0041A170`, three callers) -- the width of the HUD
-  panel, or 0 when there is none. 961 patches.
+Four functions, 961 to 965 patches. Three of them are one family and the
+fourth came out of reading its callers.
 
-- **The callers are what make it a width.** On its own it is a subtraction of
-  two fields of a rect, which could as easily be a coordinate; each of the
-  three computes `ADDR_SCREEN_W` minus it and clamps a horizontal position to
-  the result -- "keep the thing left of the HUD panel". Three sites doing the
-  same thing with the answer is what settles the reading; one would not have.
+- **`NotifyPickedUp`** (`0x00427EF0`) and **`NotifyDropped`** (`0x00427F60`)
+  finish the notifier template -- five bodies of one shape at 0x00427E10,
+  E80, EF0, F60 and FD0, raising event kinds 5, 6, 7, 8 and 4. Only the
+  literal differs; the two new ones disassemble identically to each other.
 
-- **The null answer of 0 is load-bearing.** It makes that clamp the whole
-  screen, so a missing panel needs no special case at any of the three sites. A
-  reconstruction answering the screen width for a null -- which would look more
-  careful -- would clamp everything to zero. The tidier version of a two-line
-  function is the one to be suspicious of.
+- **The script's own vocabulary names the kinds, and the call sites confirm
+  it.** The five two-party event keywords are `killed` (57), `hit` (58),
+  `healed` (59), `pickedup` (61) and `dropped` (62). Address order alone would
+  hand 7 and 8 to the last two -- an argument from layout, which this project
+  has been burned by before. Every caller of EF0 is a pickup and names itself
+  (`TrooperPickupItem %x` and two more), and the one caller of F60 names
+  itself `TrooperDropItem  %x`. So neither is an elimination.
+
+- **The drop caller states the argument order in one line.** The object it
+  passes first is the one whose uid it logs, and the last thing it does after
+  the notify is write army 4 -- neutral -- into that object's `OBJ_OFF_ARMY`:
+  an item going ownerless. First is the item, second the trooper, which is
+  `dropped <a> by <b>` and matches `NotifyDamaged`'s victim-then-attacker. The
+  pickup side had to be read for the same fact through a flag bit and a
+  deadline field, so the two together are better than either.
+
+- **`HeldWeaponCode`** (`0x00448880`, two callers) -- the code of the weapon
+  in a unit's hand: the selected inventory slot's uid, looked up, checked, and
+  the dword its `OBJ_OFF_FIELD_C0` record points at. The same three steps
+  `SaveType2` takes for its tag and the same dword `ThingCode` switches on.
+
+- **One check, two spellings.** This uses `ObjIsType4` where `SaveType2` uses
+  `WeaponByUid`, so a non-weapon answers 0 in silence here and writes "not a
+  weapon" to the log there. Four things go unguarded -- the unit, the slot
+  index, `LookupByUID`'s answer, the `C0` pointer -- and all four are the
+  original's, safe only because of tests that live in the callees.
+
+- **`ObjBlockWeight`** (`0x00448E60`, three callers) -- how much one object
+  obstructs, for a viewer and a reference point. Nothing in the body says
+  "obstruct"; all three callers walk the object chain at a map point,
+  accumulate this, and stop at 15, and `0x0043CF70` then adds 15 for a tile
+  flagged 0x80 and 15 for a height step over 16 -- **the same two constants
+  this function applies to objects.** A function and its caller agreeing on
+  two numbers is the whole of the evidence for the reading.
+
+- Its third argument is never read. Three callers push four dwords, so four
+  is the signature; the parameter is kept and named rather than dropped,
+  because dropping it moves the fourth, which *is* read -- by address, since
+  the point arrives by value and `ApproxDist` takes a pointer.
+
+- **A counter predicted is not a counter measured, and this pair proves it
+  both ways.** Both are reached by address from original code, so neither is
+  blind. `HeldWeaponCode` was written up as "expected to read 0, nothing here
+  puts a weapon in hand and asks" -- it reads **2,642** on a Boot Camp mission
+  standing still and **12,293** after four rounds of walking and firing, so
+  the A/B had been exercising it thousands of times. `ObjBlockWeight` reads
+  **0** on the same run, so its callers really are unreached and it is
+  verified by reading and nothing else. One prediction wrong, one right, and
+  the check cost one drive.
+
+- **`combat` showed its high mode and was re-run rather than believed.** The
+  first run of the last A/B gave 177,146 differing pixels; the second gave
+  698. The figure is bimodal on that configuration and its budget is disabled
+  for that reason, which is recorded below -- and it could not have been the
+  change either way, since `ObjBlockWeight` is measured at 0 on that drive.
 
 ## Next
 
