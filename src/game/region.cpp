@@ -357,6 +357,87 @@ void __cdecl InactivateRegion(int32_t region)
     (*(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))++;
 }
 
+typedef void (__cdecl *AM2_ResolvePointFn)(void *obj, int32_t tile,
+                                           uint32_t *pt);
+typedef int32_t (__cdecl *AM2_PointRuleFn)(int32_t tile);
+
+/* 0x00439E90, four callers. Can this object reach that point in a straight
+ * line, and if so, record the move on it.
+ *
+ * Four steps and the order is the whole of it. SetPointRule installs the arm
+ * that suits this object -- boat, other vehicle, or the default.
+ * ResolvePointForTile is given the target's tile and may rewrite the target.
+ * TraceTileLine fills ADDR_TILE_LINE_BUF with every tile between the object's
+ * position and that point. Then each tile is put to the installed rule, and
+ * ANY refusal ends it: the function answers 0 and writes nothing at all.
+ *
+ * THE RULE IS ASKED THROUGH A POINTER AND THE ARGUMENT IS HALF JUNK. The
+ * original loads the tile into `cx` alone, leaving the upper half of ecx
+ * holding whatever the previous call left there, and pushes the whole dword.
+ * That is safe only because every handler opens with `and eax, 0xFFFF` --
+ * checked in 0x00437D10 and 0x00437D60 rather than assumed -- so the tile is
+ * passed zero-extended here and the two agree. A handler that read all 32 bits
+ * would not be reproducible at all.
+ *
+ * THE BOAT RULE CONFIRMS SOMETHING FROM ANOTHER SUBSYSTEM. ADDR_POINT_RULE_BOAT
+ * is vehicle kind 5, which the unit-type table calls `ptboat`, and it refuses a
+ * tile whose AM2_TILE_OPEN bit is CLEAR. That is exactly the terrain test
+ * BlockWeightChain makes -- and BlockWeightChain is the variant MaskBlockWeight
+ * selects for kind 5 and no other. So the bit polarity that looked like the odd
+ * one out among three blocking variants is the boat's rule, asked the same way
+ * in two places that share no code. Three sides agreeing beats any of them.
+ *
+ * On success the object gets its CURRENT position as the from, the resolved
+ * point as the to, and three small fields seeded 0, 1 and 2. The 1 is the
+ * return value reused -- the original sets eax before the stores and writes it
+ * as a word into +0x520 -- which is register allocation and not a claim that
+ * the two are the same thing, so they are written separately here.
+ *
+ * MEASURED AT 41 CALLS on a driven Boot Camp mission, and landing it
+ * explains a number recorded two commits ago. TraceTileLine read 35 there
+ * and reads 0 now: this was its caller, and it calls by name. So the two
+ * figures are one drive apart and the same work -- and TraceTileLine is
+ * blind from here on, which its own comment should be read against.
+ * SetPointRule reads 92 on the same run, all of it from its other callers.
+ *
+ * What 41 calls cover is the trace, the rule loop and the success stores.
+ * Whether any of them was REFUSED -- the early exit that writes nothing --
+ * is not established, and neither is which of the three rule arms was
+ * installed. Boot Camp has no boats.
+ */
+int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  count = 0;
+    int32_t  i;
+
+    SetPointRule(obj);
+
+    ((AM2_ResolvePointFn)(uintptr_t)ADDR_RESOLVE_POINT_FOR_TILE)(
+        obj, TileOfPoint(*to), to);
+
+    TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS), *to,
+                  (uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF, &count);
+
+    for (i = 0; i < count; i++) {
+        AM2_PointRuleFn rule =
+            *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
+
+        if (rule((int32_t)((const uint16_t *)
+                     (uintptr_t)ADDR_TILE_LINE_BUF)[i]))
+            return 0;                   /* the rule refused this tile */
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
+        *(const uint32_t *)(o + OBJ_OFF_POS);
+    *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *to;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_F128) = 0;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_F520) = 1;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_F522) = 2;
+
+    return 1;
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -377,6 +458,8 @@ int region_install(void)
                         "AddRegionLink", 2);
     rc |= patch_replace(ADDR_ACTIVATE_REGION, (const void *)ActivateRegion,
                         "ActivateRegion", 1);
+    rc |= patch_replace(ADDR_BEGIN_MOVE_TO, (const void *)BeginMoveTo,
+                        "BeginMoveTo", 4);
     rc |= patch_replace(ADDR_INACTIVATE_REGION, (const void *)InactivateRegion,
                         "InactivateRegion", 1);
     return rc;

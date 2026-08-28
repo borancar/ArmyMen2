@@ -50,6 +50,11 @@ int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve);
 void __cdecl ActivateRegion(int32_t region);
 void __cdecl InactivateRegion(int32_t region);
 
+/* 0x00439E90. Can this object reach that point in a straight line? Traces the
+ * tiles between and puts each to the object's installed point rule; on success
+ * records the move on the object and returns 1. */
+int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to);
+
 int region_install(void);
 
 #ifdef __cplusplus

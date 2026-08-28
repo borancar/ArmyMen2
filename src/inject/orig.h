@@ -1092,7 +1092,8 @@
  * index directly rather than recomputed from coordinates -- so the walk never
  * calls TileOfPoint again after the first point, and an index that runs off
  * the row wraps into the next one rather than being clipped. Nothing bounds
- * the output array either. 35 calls on a driven Boot Camp mission. */
+ * the output array either. 35 calls on a driven Boot Camp mission -- measured
+ * before ADDR_BEGIN_MOVE_TO was reconstructed; it is blind now. */
 #define ADDR_TRACE_TILE_LINE     0x0042E390u  /* void(uint32,uint32,uint16*,int32*) */
 #define AM2_TILE_SHIFT           4
 /* 0x0042B250, six callers: the inverse, and it CENTRES -- the point it returns
@@ -6451,6 +6452,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SET_POINT_RULE      0x00437E00u  /* void(void *obj) */
 #define ADDR_POINT_RULE_ARMY     0x00523DD8u  /* int32_t, from OBJ_OFF_ARMY */
 #define ADDR_POINT_RULE          0x00523DDCu  /* the installed handler */
+/* The tile buffer ADDR_TRACE_TILE_LINE fills for ADDR_BEGIN_MOVE_TO -- one
+ * uint16 per tile the line crosses, with the count in a local. */
+#define ADDR_TILE_LINE_BUF       0x00523DE0u  /* uint16_t[] */
+/* 0x00439E90, four callers. Can this object reach that point in a straight
+ * line -- and if so, record the move on it.
+ *
+ * It installs the object's point rule, resolves the target's tile, traces the
+ * tiles between the object and the point, and asks the rule about each. Any
+ * refusal answers 0 and writes nothing; otherwise the from and to points go
+ * into the object at +0x120 and +0x124 and three small fields are seeded.
+ * Reconstructed. */
+#define ADDR_BEGIN_MOVE_TO       0x00439E90u  /* int32_t(void *obj, uint32 *to) */
+#define OBJ_OFF_MOVE_FROM        0x120u   /* packed point */
+#define OBJ_OFF_MOVE_TO          0x124u   /* packed point */
+#define OBJ_OFF_MOVE_F128        0x128u   /* uint16_t, seeded 0 */
+#define OBJ_OFF_MOVE_F520        0x520u   /* uint16_t, seeded 1 */
+#define OBJ_OFF_MOVE_F522        0x522u   /* uint16_t, seeded 2 */
 #define ADDR_POINT_RULE_BOAT     0x00437D60u  /* vehicle kind 5 */
 #define ADDR_POINT_RULE_VEHICLE  0x00437D10u  /* other vehicles, and roaches */
 #define ADDR_POINT_RULE_DEFAULT  0x00437DB0u  /* everything else, and null */

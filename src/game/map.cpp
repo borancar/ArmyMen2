@@ -386,6 +386,10 @@ void *__cdecl ScriptListFind(char *name)
  * +1 for a non-negative difference and -1 otherwise. Written as the sign it
  * is; the four instructions are what MSVC makes of a ternary.
  *
+ * SUPERSEDED: those 35 came from BeginMoveTo, which is reconstructed now and
+ * calls this BY NAME -- so the counter reads 0 from here on and the figure
+ * below is the last measurement taken through the patched entry.
+ *
  * MEASURED AT 35 CALLS on a driven Boot Camp mission, with TileOfPoint at
  * 3.9 million on the same run -- so this is not on a hot path and the 35 are
  * whatever asked for a line. That is enough for the A/B to compare it and not
