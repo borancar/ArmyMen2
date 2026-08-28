@@ -5,58 +5,53 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `c6e66ff`. Working tree clean.
+Last updated: **2026-08-28**, at `febeb9f`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,000 patches.**
+Nothing uncommitted. **1,007 patches.**
 
-Seven functions and two documentation commits since the last snapshot, 993 to
-1,000. Most of them read 0, and each commit says why -- which is the shape the
-work has taken as the boundary closes.
+Seven functions since the last snapshot. **Three object fields were settled by
+finding the OTHER function that touches them** -- which is the thread, and it
+is the same move each time: a field that one reader could only describe
+structurally becomes legible the moment its writer, or a table it indexes, is
+read.
 
-- **`CloseScreen`** (`0x0044DB90`) is three instructions the image ALSO has
-  inline in widget.cpp's five screen factories, so the reconstruction calls
-  the helper that was already there. Whether the original had one function
-  MSVC inlined five times and left standing at a sixth, or six copies, is not
-  decidable from here.
+- **`OBJ_OFF_SARGE` (+0x548)**, from a string table. `ObjType2Field548` said
+  only "the dword at +0x548, but only for a type 2", and `LookupOwnerObj` said
+  "`ArmyLeader` was the name I nearly gave it. What the +0x548 test means is
+  not established." `UnitClassName` (`0x0044BAF0`) reads it and answers
+  **"Sarge"** from the entry before the class-name table -- so the leader
+  reading was right all along. Both comments updated.
 
-- **`CommPlayerId`** (`0x0040F2F0`) -- thiscall, `ret 4`. Slot -1 answers 0,
-  but there is NO upper bound, so a slot above three reads past the four
-  player records.
+- **`OBJ_OFF_RIDING` and `VEHICLE_OFF_PTR_LIST`**, from `BoardVehicle`
+  (`0x0045AAC0`). Both names came from separate readings; this is the single
+  function that writes both halves of the relationship, which turns two
+  plausible guesses into an evidenced pair.
 
-- **`PickFireMode`** (`0x00447950`) writes `UNIT_OFF_FIRE_MODE`, which now
-  demonstrably carries **at least four different things** -- a pose, `0x1F`
-  for a point target, and this function's two. Which is why it stays named for
-  its offset: a name from any one writer is wrong at the other three.
+- **`OBJ_OFF_PICKUP_AFTER` (+0xC8)**, from `CanPickUp` (`0x004337C0`). The
+  pickup path stamps it with the clock plus two seconds and nothing was known
+  to read it; this refuses an item until it has passed. **A re-pickup
+  cooldown**, which neither function says alone.
 
-- **`CommAllPlayersAgreed`/`CommAllPlayersReady`** (`0x0040F8A0`,
-  `0x0040F8E0`) -- one loop, two flags, and **their caller is the only thing
-  that names them**: one guards "Not everybody has the same version/map/rules",
-  the other is called right after our own slot's flag is set. An empty table
-  answers yes to both.
+- **`ArmySpriteBase`/`PreloadArmySprite`** (`0x00414AD0`, `0x00414B00`) -- the
+  sprite table is a hundred indices per army over a shared block. **Seventy
+  calls cover none of that**: the player is army 0 on every drive, so the
+  offset is 0, the index passes through and the retry is guarded off.
 
-- **`LevelCount`** (`0x0043ED40`) and **`FreeRecordList`** (`0x00434C40`) --
-  the second is `MakeRecordList`'s counterpart, and its caller walking every
-  entry of `ADDR_RECORD_LISTS` is what says so. It frees a SECOND pointer at
-  `+0x1C` that the maker never writes, and this is the only reader of that
-  field in the image.
+- **`FreeHudWidgets`** (`0x004135C0`) tests all three HUD widgets, where
+  `HudPaint` and `HudUpdate` test only the optional third.
 
-- **A drive investigation that did not produce a drive.** Three reconstructed
-  functions sit behind the weapon path, so I read `0x00427990`, the thing that
-  chooses a pointer mode. **Four of its eight jump-table arms are dead**: all
-  eight callers pass `ADDR_ZERO_POINT`, so the index is always 0. And the mode
-  is set only when the selected units AGREE on their AI mode -- which is why a
-  drive that selects three units still leaves `SetPointerMode` at 1.
+- **`RandomAround`** (`0x00402F00`) -- `spread` is an inverse TIGHTNESS, not a
+  range: more spread means fewer samples averaged, never a wider draw.
 
-- **I committed over a failing `make check`.** That documentation commit gave
-  `0x00427990` a second name and `checkpatches.py` failed on 22 aliases
-  against 21 -- but the check and the commit were chained with `;`, so the
-  non-zero exit stopped nothing and I read the tail rather than the status.
-  The address is `ADDR_ON_SELECTION_CHANGED`, which I had used myself two
-  commits earlier. **Third time this session the grep-the-address-first rule
-  was skipped; the ratchet caught it every time, and the thing that failed was
-  my own chaining.** Fixed in `ad6215c`.
+- **Coverage ranged over five orders of magnitude and each commit says which:**
+  `CanPickUp` 111,650 -- though which exit those took is not established --
+  `PreloadArmySprite` 70, `FreeHudWidgets` 1, and `BoardVehicle`,
+  `UnitClassName`, `RandomAround` and `LevelCount` all 0 with a stated reason.
+  `UnitClassName`'s 0 was worth a second look, since the HUD plainly shows
+  "Sarge": it does not come from there, and the identification rests on the
+  table rather than on the function running.
 
 ## Next
 
