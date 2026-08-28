@@ -258,6 +258,107 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
     }
 }
 
+/* 0x004574D0, eleven callers. Whether two objects are on the same side.
+ *
+ * It is AllyFlag above with four exceptions layered over it, and the layering
+ * order is the function: each exception answers outright rather than adjusting
+ * what comes after.
+ *
+ * KIND 7 IS ALLIED ONLY TO KIND 7, and only in a multiplayer session. If the
+ * FIRST object is a type 2 whose OBJ_OFF_SOLDIER_KIND is 7, the answer is
+ * whether the second is one too -- nothing else is consulted, not even the
+ * neutral army. That is the same exception ObjIsFriendly makes one object at a
+ * time, but with the opposite sense for a pair: ObjIsFriendly says a kind 7 is
+ * never friendly, and this says two of them are friendly to each other.
+ *
+ * ARMY 4 IS ALLIED TO EVERYTHING, tested on both objects. Note the two reads
+ * are not the same width: the first object's army is sign-extended and the
+ * second's is compared as a plain byte. Transcribed as written; for the values
+ * a game ships it makes no difference, and inventing the symmetry would hide
+ * that the original does not have it.
+ *
+ * SHARING AN OBJECT-TABLE RECORD IS ALLIANCE. The second object's record
+ * pointer -- one of two fields, chosen by the third argument and by its
+ * OBJ_OFF_FIELD_530 not being 5, which is the same 5 ObjConceal tests -- is
+ * compared against the record for the FIRST object's army. Equal means allied.
+ * Otherwise the pointer is decoded back to an index by matching it against the
+ * four record addresses in turn, and that index goes through CommSlotForArmy
+ * into AllyFlag. A pointer that is none of the four ends it: not allied.
+ *
+ * The decode is written as the four comparisons the original makes rather than
+ * as a subtract and shift. A division would accept records 4 through 255 as
+ * well, and the original accepts exactly four.
+ *
+ * BOTH NULL TESTS ARE USELESS AND BOTH ARE REPRODUCED. `if (!a)` jumps to code
+ * whose first act is to read a's army; `if (!b)` jumps past the type-2 block
+ * to a tail that reads b's army. So neither test decides whether a null is
+ * dereferenced, only which dereference happens first. No caller passes null,
+ * and the shape is worth leaving visible rather than tidying into a guard the
+ * original does not have.
+ *
+ * The original loads the comm object into ecx before each AllyFlag call, which
+ * is stdcall and reads two stack arguments and no `this` -- so those loads are
+ * dead. Not written; there is nothing to reproduce.
+ *
+ * MEASURED AT TWO CALLS on a driven Boot Camp mission, and the two exceptions
+ * that matter most are NOT among what those two cover: ADDR_MP_SESSION is 0 on
+ * every drive this project has, so both kind-7 arms are unreachable here and
+ * are verified by reading. What the two calls do reach is the army-4 pair, the
+ * record comparison and the tail. Landing this also took AllyFlag's counter to
+ * 0, since it is now called by name from here and from ArmiesAllied, which
+ * reads 104 on the same run.
+ */
+int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
+{
+    const uint8_t *oa   = (const uint8_t *)a;
+    const uint8_t *ob   = (const uint8_t *)b;
+    void          *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        mp   = *(const int32_t *)(uintptr_t)ADDR_MP_SESSION;
+    const uint8_t *rec;
+    int32_t        army, idx;
+
+    if (mp && a && *(const int32_t *)oa == 2
+        && *(const int32_t *)(oa + OBJ_OFF_SOLDIER_KIND) == 7)
+        return (b && *(const int32_t *)ob == 2
+                && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7);
+
+    army = *(const int8_t *)(oa + OBJ_OFF_ARMY);
+    if (army == 4)
+        return 1;
+    if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
+        return 1;
+
+    if (b && *(const int32_t *)ob == 2) {
+        if (mp && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            return 0;
+
+        rec = (useRec3
+               && *(const int32_t *)(ob + OBJ_OFF_FIELD_530) != 5)
+              ? *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC3)
+              : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
+
+        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
+                + (uint32_t)(CommArmyOfSlot(comm, army) << 8)) == rec)
+            return 1;
+
+        if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
+            idx = 0;
+        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
+            idx = 1;
+        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
+            idx = 2;
+        else if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
+            idx = 3;
+        else
+            return 0;
+
+        if (AllyFlag(army, CommSlotForArmy(comm, idx)))
+            return 1;
+    }
+
+    return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+}
+
 int army_install(void)
 {
     int rc = 0;
@@ -272,6 +373,8 @@ int army_install(void)
     rc |= patch_replace(ADDR_LIST_FIRST_FIELD548, (const void *)ListFirstField548,
                         "ListFirstField548", 1);
     rc |= patch_replace(ADDR_ALLY_FLAG, (const void *)AllyFlag, "AllyFlag", 2);
+    rc |= patch_replace(ADDR_OBJS_ARE_ALLIED, (const void *)ObjsAreAllied,
+                        "ObjsAreAllied", 11);
     rc |= patch_replace(ADDR_ARMIES_ALLIED, (const void *)ArmiesAllied,
                         "ArmiesAllied", 2);
     rc |= patch_replace(ADDR_OBJ_IS_FRIENDLY, (const void *)ObjIsFriendly,

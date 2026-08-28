@@ -44,6 +44,12 @@ int32_t __cdecl ArmiesAllied(int32_t a, int32_t b);
  * Reproduced; no caller passes null. */
 int32_t __cdecl ObjIsFriendly(const void *obj);
 
+/* 0x004574D0. Whether two objects are on the same side: AllyFlag with four
+ * exceptions -- a multiplayer kind 7 is allied only to another kind 7, army 4
+ * is allied to everything, and sharing an object-table record is alliance.
+ * `useRec3` chooses which of the second object's two record pointers to use. */
+int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3);
+
 /* 0x00457750, twenty-one callers, and the name was already in orig.h -- kept,
  * because it is the more careful of the two readings.
  *

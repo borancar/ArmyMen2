@@ -3727,6 +3727,13 @@ typedef struct {
 #define AM2_MAX_HEALTH_CAP       0x190        /* 400: above this, leave alone */
 #define AM2_HEALTH_PER_ATTEMPT   5
 #define ADDR_ALLY_FLAG           0x0040F230u  /* stdcall int32_t(a, b) */
+/* 0x004574D0, eleven callers. Whether two objects are on the same side, which
+ * is AllyFlag above with four exceptions layered over it. Reconstructed. Its
+ * third argument chooses which of the second object's two OBJ_TABLE_RECORDS
+ * pointers to consult -- SAVED_OFF_TABLE_REC3 or SAVED_OFF_TABLE_REC2.
+ * Two calls on a driven Boot Camp mission; its two multiplayer arms are
+ * unreachable here, since ADDR_MP_SESSION is 0 on every drive. */
+#define ADDR_OBJS_ARE_ALLIED     0x004574D0u  /* int32(void*, void*, int32) */
 #define ADDR_ARMIES_ALLIED       0x00457720u  /* int32_t(a, b), 4 means all */
 #define ADDR_OBJ_IS_FRIENDLY     0x004577C0u  /* int32_t(const void *obj) */
 /* The uid of OUR army's leader; 0x00424E80 clears it and three others set it.
