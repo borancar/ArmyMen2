@@ -429,6 +429,29 @@
 #define ADDR_POINTER_F14       0x005122ECu
 #define ADDR_POINTER_OVERLAY   0x005122F4u
 #define ADDR_SET_POINTER_MODE  0x00414430u  /* void(int32_t mode) */
+/* 0x00427990, 528 bytes, eight callers -- the thing that CHOOSES a pointer
+ * mode after the selection changes. SelectUnit, DeselectUnit and five HUD
+ * sites all call it.
+ *
+ * FOUR OF ITS EIGHT JUMP-TABLE ARMS ARE DEAD, and it takes reading every
+ * caller to see it. The dispatch is `cmp eax, 7; ja; jmp [eax*4 + 0x427B7C]`
+ * on its single argument -- and all EIGHT callers pass ADDR_ZERO_POINT, which
+ * is .bss that nothing in the image writes. So the index is always 0, always
+ * takes ADDR_SET_POINTER_MODE(4), and the arms for modes 5 and 6 cannot be
+ * reached through this function at all.
+ *
+ * That does NOT make modes 5 and 6 unreachable: three of SetPointerMode's own
+ * ten callers push a variable rather than a constant. It narrows where they
+ * could come from, which is the useful half.
+ *
+ * The mode is set only when a GATE survives the walk. It starts at 1 and is
+ * cleared when two selected units disagree on OBJ_OFF_FIELD_E4, their AI mode,
+ * with 8 acting as the initial wildcard that the first unit replaces. An empty
+ * selection returns before the dispatch. So "the pointer mode follows the
+ * selection" is really "the pointer mode follows a selection that agrees with
+ * itself". Still original; this is why three reconstructed functions behind
+ * the weapon path read 0. */
+#define ADDR_CHOOSE_POINTER_MODE 0x00427990u  /* void(uint32_t packedPoint) */
 /* The two steps ADDR_HUD_UPDATE runs after the widgets, each with exactly one
  * caller -- this one -- so these names cannot be wrong about anything else.
  * They are still roles rather than recovered names: neither says what it is,
