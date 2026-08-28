@@ -902,9 +902,70 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
         *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
 }
 
+/* 0x00434DA0, six callers. Build a ROW SET: one block of `count` rows, each
+ * placed at its spec's offset from a base position and given an entry buffer
+ * sized from the spec, with a bounding rect copied into the header.
+ *
+ * A SPEC IS FOUR int32 -- x, y, w, h -- and the two halves go to different
+ * places: x and y are OFFSETS, added to the base the caller passes, and w and
+ * h are a size handed straight to RowAlloc. Nothing in the spec is a sprite;
+ * RowInit is given a null one, so every row starts blank and whatever draws it
+ * sets the sprite later.
+ *
+ * The header is 0x20 bytes and only four things go in it: a zeroed dword at
+ * +0, the count, the block, another zeroed dword at +0x0C, and sixteen bytes
+ * of rect at +0x10. The two zeroed dwords are written explicitly rather than
+ * left over from an allocation, so they are the caller's to read.
+ *
+ * THE ALLOCATION IS NOT CHECKED and neither is RowAlloc's answer, which is an
+ * int32 the original discards. A count of zero allocates zero bytes, skips the
+ * loop and still writes the header, so an empty set is a legal thing to build.
+ *
+ * The loop re-reads BOTH the count and the block pointer from the header every
+ * iteration. Neither can change -- RowAlloc allocates the row's own buffer,
+ * not this block -- and both re-reads are kept, because writing them as
+ * loop-invariant reads would be asserting that rather than transcribing it.
+ *
+ * MEASURED AT 11 CALLS on a driven Boot Camp mission. RowAlloc reads 2,498
+ * on the same run, which is its OTHER callers -- ours reaches it by name --
+ * so nothing here says how many rows those eleven sets held, and whether
+ * any of them had a count of zero is not established either. The header
+ * writes and the loop are compared; the empty-set case is not claimed.
+ */
+void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
+                         int32_t dx, int32_t dy, const void *rect)
+{
+    uint8_t *h = (uint8_t *)set;
+    int32_t  i;
+
+    *(int32_t *)h = 0;
+    *(int32_t *)(h + ROWSET_OFF_COUNT) = count;
+    *(void **)(h + ROWSET_OFF_ROWS) =
+        am2_malloc((size_t)count * AM2_OBJ_ROW_STRIDE);
+
+    for (i = 0; i < *(const int32_t *)(h + ROWSET_OFF_COUNT); i++) {
+        const int32_t *spec =
+            (const int32_t *)((const uint8_t *)specs
+                              + (size_t)i * AM2_ROW_SPEC_BYTES);
+        uint8_t *row = *(uint8_t *const *)(h + ROWSET_OFF_ROWS)
+                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
+
+        RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
+        ObjFlagSet0(row);
+        RowAlloc(spec[2], spec[3], row, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+    }
+
+    *(int32_t *)(h + 0x0C) = 0;
+    memcpy(h + ROWSET_OFF_RECT, rect, 16);
+}
+
 int maprow_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_BUILD_ROW_SET, (const void *)BuildRowSet,
+
+                        "BuildRowSet", 6);
 
     rc |= patch_replace(ADDR_SET_ANIM_FRAME, (const void *)SetAnimFrame,
 

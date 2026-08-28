@@ -958,6 +958,18 @@
 #define ADDR_MAP_DESC_INIT       0x0041D210u  /* void(desc, int32 w, int32 h) */
 #define ADDR_MAP_DESC_FREE       0x0041D270u  /* void(desc) */
 #define ADDR_ROW_INIT            0x0040A050u  /* void(row, sprite, x, y) */
+/* 0x00434DA0, six callers. Build a ROW SET: allocate `count` rows in one
+ * block, place each at a spec's offset from a base, size its entry buffer from
+ * the spec, and copy a bounding rect in. Reconstructed.
+ *
+ * The set header is 0x20 bytes -- a zeroed dword, the count, the block, a
+ * second zeroed dword, and the rect. A spec is four int32: x, y, w, h.
+ * 11 calls on a driven Boot Camp mission. */
+#define ADDR_BUILD_ROW_SET       0x00434DA0u  /* void(set,count,specs,dx,dy,rect) */
+#define ROWSET_OFF_COUNT         0x04u
+#define ROWSET_OFF_ROWS          0x08u
+#define ROWSET_OFF_RECT          0x10u
+#define AM2_ROW_SPEC_BYTES       0x10u
 /* The left and top of the visible-area rectangle -- these are its first two
  * fields, not two loose globals: RedrawMapRegion is called with 0x00514E14
  * itself as its AM2_Rect *, which the trace shows plainly, so the four edges
