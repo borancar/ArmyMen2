@@ -5,61 +5,58 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `d665d90`. Working tree clean.
+Last updated: **2026-08-28**, at `c6e66ff`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted.
+Nothing uncommitted. **1,000 patches.**
 
-Five functions since the last snapshot, 988 to 993 patches. **One bit polarity
-got confirmed from three unrelated places**, which is the result worth keeping.
+Seven functions and two documentation commits since the last snapshot, 993 to
+1,000. Most of them read 0, and each commit says why -- which is the shape the
+work has taken as the boundary closes.
 
-- **`DeselectAll`** (`0x00427BA0`) -- walks the selected list, clearing
-  `OBJ_FLAG_SELECTED` and dropping uids that no longer resolve without
-  advancing the index. **That removal is pointless for the list and not for
-  the loop**: everything is cleared wholesale afterwards, but the count is
-  re-read each pass, so a dead uid shortens the walk.
+- **`CloseScreen`** (`0x0044DB90`) is three instructions the image ALSO has
+  inline in widget.cpp's five screen factories, so the reconstruction calls
+  the helper that was already there. Whether the original had one function
+  MSVC inlined five times and left standing at a sixth, or six copies, is not
+  decidable from here.
 
-- **`BlitBitmapIn`** (`0x0041BA90`) -- the DIB blit. A POSITIVE height is
-  bottom-up, negative top-down; the stride is the width rounded to four. Its
-  key byte is ONE byte where orig.h's seam typedef had `uint32_t *`, so the
-  rest of `BMP_OFF_KEY` survives -- and that field arrives holding a count.
+- **`CommPlayerId`** (`0x0040F2F0`) -- thiscall, `ret 4`. Slot -1 answers 0,
+  but there is NO upper bound, so a slot above three reads past the four
+  player records.
 
-- Its return is not `stride * rows`: `edx` is reloaded from the raw height
-  only inside the copy loops, so a width of zero or less returns
-  `stride * count` and everything else `stride * signed height`.
+- **`PickFireMode`** (`0x00447950`) writes `UNIT_OFF_FIRE_MODE`, which now
+  demonstrably carries **at least four different things** -- a pose, `0x1F`
+  for a point target, and this function's two. Which is why it stays named for
+  its offset: a name from any one writer is wrong at the other three.
 
-- **`MaskBlockWeight`** (`0x0045BBB0`) -- sums block weight over a vehicle
-  mask's points. **Kind 5 takes `BlockWeightChain` and every other kind takes
-  `BlockWeightTroops`** -- the "value being 5" recorded two commits earlier
-  without knowing what it was.
+- **`CommAllPlayersAgreed`/`CommAllPlayersReady`** (`0x0040F8A0`,
+  `0x0040F8E0`) -- one loop, two flags, and **their caller is the only thing
+  that names them**: one guards "Not everybody has the same version/map/rules",
+  the other is called right after our own slot's flag is set. An empty table
+  answers yes to both.
 
-- **`BeginMoveTo`** (`0x00439E90`) and **`NearestAllowedTile`**
-  (`0x0043A0A0`) -- the straight-line move test and the spiral search under
-  it. The second's orig.h comment said "what it is FOR is not established";
-  it is a search for a tile the object's point rule accepts, and it returns
-  that tile where the signature said void.
+- **`LevelCount`** (`0x0043ED40`) and **`FreeRecordList`** (`0x00434C40`) --
+  the second is `MakeRecordList`'s counterpart, and its caller walking every
+  entry of `ADDR_RECORD_LISTS` is what says so. It frees a SECOND pointer at
+  `+0x1C` that the maker never writes, and this is the only reader of that
+  field in the image.
 
-- **THE THREE-SIDED CONFIRMATION.** `ADDR_POINT_RULE_BOAT` is vehicle kind 5,
-  which the unit-type table calls `ptboat`, and it refuses a tile whose
-  `AM2_TILE_OPEN` bit is CLEAR -- exactly the terrain test `BlockWeightChain`
-  makes, and `BlockWeightChain` is what `MaskBlockWeight` picks for kind 5.
-  So the polarity that looked like the odd one out among three blocking
-  variants is the boat's rule, asked the same way in two places sharing no
-  code. The mask selector said "kind 5", the type table said "ptboat", and
-  the point rule said what a boat cannot cross.
+- **A drive investigation that did not produce a drive.** Three reconstructed
+  functions sit behind the weapon path, so I read `0x00427990`, the thing that
+  chooses a pointer mode. **Four of its eight jump-table arms are dead**: all
+  eight callers pass `ADDR_ZERO_POINT`, so the index is always 0. And the mode
+  is set only when the selected units AGREE on their AI mode -- which is why a
+  drive that selects three units still leaves `SetPointerMode` at 1.
 
-- **Counters are getting less informative as the boundary closes, and the
-  commits say so each time.** `BlitBitmapIn` 0 because all four callers are
-  ours -- the pixels are its evidence, since the HUD panels and the Sarge
-  portrait are bitmaps it loads. `NearestAllowedTile` 1 while `BeginMoveTo`
-  alone calls it 51 times. `TraceTileLine` went 35 to 0 when `BeginMoveTo`
-  landed, and its own comment is marked superseded rather than left to read
-  as current. `MaskBlockWeight` 0, genuinely unreached.
-
-- **What no drive here covers**, stated rather than left implicit: the spiral
-  in `NearestAllowedTile` (most of the function), `MaskBlockWeight`'s
-  base-versus-offset chain point, and `DeselectAll`'s unresolvable-uid branch.
+- **I committed over a failing `make check`.** That documentation commit gave
+  `0x00427990` a second name and `checkpatches.py` failed on 22 aliases
+  against 21 -- but the check and the commit were chained with `;`, so the
+  non-zero exit stopped nothing and I read the tail rather than the status.
+  The address is `ADDR_ON_SELECTION_CHANGED`, which I had used myself two
+  commits earlier. **Third time this session the grep-the-address-first rule
+  was skipped; the ratchet caught it every time, and the thing that failed was
+  my own chaining.** Fixed in `ad6215c`.
 
 ## Next
 
