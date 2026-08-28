@@ -275,6 +275,11 @@ int32_t __cdecl HeldWeaponCode(void *unit);
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
 
+/* 0x00446E70. A weapon handler: record a fire request on the current unit, at
+ * a target object or at a bare point. Writes nothing if a menu row is up, or
+ * if the unit does not resolve, is not a type 2, or holds no weapon. */
+void __cdecl SetWeaponTarget(void *target, uint32_t at);
+
 /* 0x0040D930. Put a unit into a pose. Idempotent; nine poses queue rather
  * than switch, and most wait for the current animation's last cell. */
 void __cdecl SetUnitPose(void *obj, int32_t pose);

@@ -2647,6 +2647,101 @@ void __cdecl Type2ActionB(void *obj)
     SoldierKindForWeapon(o, 0);
 }
 
+/* 0x00446E70. Record a fire request on the unit the weapon globals name --
+ * at a target OBJECT when one is given, and at a bare POINT otherwise.
+ *
+ * IT IS A WEAPON HANDLER, and that is what the name rests on. The address is
+ * column 1 of FIVE records in ADDR_WEAPON_HANDLERS -- 0x00489A00, A10, A20,
+ * AF0 and B00 -- so several weapon kinds share one implementation. Column 1 is
+ * what ADDR_WEAPON_FN_SLOT1 receives, and that global is called as
+ * (object, packed point), which is exactly this signature and exactly the
+ * shape SetPointerMode's release action has.
+ *
+ * The weapon lookup here is WeaponByUid, the COMPLAINING one -- an empty slot
+ * or a non-weapon writes "uid wasn't a weapon!" to the log on the way out.
+ * HeldWeaponCode reaches the same object through ObjIsType4 and says nothing.
+ * Two spellings of one check again, and this path is the loud one.
+ *
+ * Reading that table also corrects orig.h. It said every field of a record is
+ * a function pointer; only the first two are. Column 2 defaults to -1 and
+ * column 3 to 0, and the readers settle it -- SLOT2 is tested with `jl`, a
+ * SIGNED comparison nobody asks of a function pointer, and SLOT3 is a flag.
+ * The old claim was generalised from the two readers that had been looked at,
+ * which is the same failure as naming a function from one call site.
+ *
+ * IT REFUSES ON TWO MENU ROWS AND NOWHERE ELSE. GetMenuRow being 3 or 8 ends
+ * it -- two separate calls to the same five-byte accessor, not one result
+ * compared twice -- so whatever those rows are, the weapon does not aim while
+ * they are up. Then the unit must resolve, be a type 2, and hold a weapon in
+ * the selected slot; any of those failing returns silently having written
+ * nothing.
+ *
+ * THE TWO ARMS DIFFER IN MORE THAN THE TARGET. Firing at an object zeroes the
+ * three coordinate words, stores the target's uid, and puts the unit's own
+ * OBJ_OFF_POSE into the mode field. Firing at a point stores the coordinates,
+ * zeroes the uid, and puts 0x1F there instead. So the mode field is a pose for
+ * one and a constant for the other, which is not a distinction the field's
+ * position suggests.
+ *
+ * The point arrives packed and is unpacked into two separate int16 stores; the
+ * third coordinate is always zero. Written as the two stores the original
+ * makes rather than as one dword, because the field after them is written
+ * separately and a dword store would cover it.
+ *
+ * MEASURED AT 0, and the reason is one already recorded. Its six call sites
+ * are the pointer-mode action paths, and SetPointerMode reads exactly ONE
+ * call on every drive here -- mode 0 at mission start. A weapon action is
+ * only reachable once a mode above 0 is installed, which needs the
+ * order-giving UI no drive reaches. Same wall, measured twice from two
+ * sides.
+ *
+ * The counter is not blind: all six callers are the original's. So every
+ * claim above -- the two menu rows, the two arms, the mode field being a
+ * pose for one and 0x1F for the other -- is verified by reading.
+ * WeaponByUid reads 247,958 on the same run, all of it other callers.
+ */
+void __cdecl SetWeaponTarget(void *target, uint32_t at)
+{
+    uint8_t *u;
+
+    if (GetMenuRow() == 3)
+        return;
+    if (GetMenuRow() == 8)
+        return;
+
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!ObjIsType2((const AM2_Object *)u))
+        return;
+
+    if (!WeaponByUid(
+            *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4)))
+        return;
+
+    *(int32_t *)(u + UNIT_OFF_FIRE_ACTIVE) = 1;
+    *(uint8_t *)(u + UNIT_OFF_FIRE_F40)    = *(const uint8_t *)(u + 0x40);
+    *(int32_t *)(u + UNIT_OFF_FIRE_F588)   = 1;
+    *(int32_t *)(u + UNIT_OFF_FIRE_F58C)   = 1;
+
+    if (target) {
+        *(int16_t *)(u + UNIT_OFF_FIRE_X)   = 0;
+        *(int16_t *)(u + UNIT_OFF_FIRE_Y)   = 0;
+        *(int16_t *)(u + UNIT_OFF_FIRE_Z)   = 0;
+        *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
+            ((const AM2_Object *)target)->uid;
+        *(int32_t *)(u + UNIT_OFF_FIRE_MODE) =
+            *(const int32_t *)(u + OBJ_OFF_POSE);
+        return;
+    }
+
+    *(int16_t *)(u + UNIT_OFF_FIRE_X)    = (int16_t)(at & 0xFFFFu);
+    *(int16_t *)(u + UNIT_OFF_FIRE_Y)    = (int16_t)(at >> 16);
+    *(int16_t *)(u + UNIT_OFF_FIRE_Z)    = 0;
+    *(uint32_t *)(u + UNIT_OFF_FIRE_UID) = 0;
+    *(int32_t *)(u + UNIT_OFF_FIRE_MODE) = AM2_FIRE_MODE_POINT;
+}
+
 /* 0x00449860, eight callers. Puts an inventory slot in the unit's hand: it
  * records the slot, installs the weapon's four HANDLERS into the globals the
  * HUD and the input layer call through, and tells the network.
@@ -3775,6 +3870,8 @@ void item_install(void)
     patch_replace(ADDR_SOLDIER_KIND_FOR_WEAPON,
                   (const void *)SoldierKindForWeapon,
                   "SoldierKindForWeapon", 13);
+    patch_replace(ADDR_SET_WEAPON_TARGET, (const void *)SetWeaponTarget,
+                  "SetWeaponTarget", 6);
     patch_replace(ADDR_SET_UNIT_POSE, (const void *)SetUnitPose,
                   "SetUnitPose", 9);
     patch_replace(ADDR_OBJ_DIE, (const void *)ObjDie, "ObjDie", 1);

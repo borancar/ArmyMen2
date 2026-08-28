@@ -4500,11 +4500,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_INVENTORY_LAST   0x560u  /* the sixth entry */
 #define UNIT_OFF_INVENTORY_SEL    0x568u  /* int32_t, which slot is in hand */
 /* The weapon HANDLER table and the four globals SelectInventorySlot installs
- * out of it. Each record is 16 bytes and every field is a FUNCTION POINTER --
- * established by the readers, which do `mov eax,[global]; test eax,eax;
- * call eax`, not by the shape of the table. The index is the first dword of
- * the weapon's OBJ_OFF_FIELD_C0, so that field is a pointer to a type record
+ * out of it. Each record is 16 bytes and the index is the first dword of the
+ * weapon's OBJ_OFF_FIELD_C0, so that field is a pointer to a type record
  * rather than the scalar its structural name suggests.
+ *
+ * ONLY THE FIRST TWO FIELDS ARE FUNCTION POINTERS, and this said all four were
+ * -- "established by the readers, which do `mov eax,[global]; test eax,eax;
+ * call eax`". That is true of SLOT0 and SLOT1 and of neither of the others.
+ * SLOT2's readers do `test eax,eax; jl`, which is a SIGNED test and is not a
+ * question you can ask a function pointer; SLOT3's treat it as a flag. The
+ * table agrees: columns 2 and 3 hold small integers, column 2 defaulting to -1
+ * and column 3 to 0, with values like 3, 0x0E, 0x0F, 0x10 and 1. Two of the
+ * four names were generalised from the two readers that were looked at.
  *
  * THE MAPPING IS NOT SEQUENTIAL, which is the one thing worth getting right
  * here: slot 2 goes to 0x005122F0 and slot 3 to 0x005122DC. The globals are
@@ -4515,12 +4522,34 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_WEAPON_HANDLERS     0x00489880u  /* 16-byte records, 4 fns each */
 #define ADDR_WEAPON_FN_SLOT0     0x005122D4u
 #define ADDR_WEAPON_FN_SLOT1     0x005122D8u
-#define ADDR_WEAPON_FN_SLOT2     0x005122F0u
-#define ADDR_WEAPON_FN_SLOT3     0x005122DCu
+#define ADDR_WEAPON_FN_SLOT2     0x005122F0u  /* int32_t, -1 by default */
+#define ADDR_WEAPON_FN_SLOT3     0x005122DCu  /* int32_t, a 0/1 flag */
 /* Who selected, and which slot. Written here and by 0x00424F20, read by the
  * HUD and the two 0x458xxx sites. */
 #define ADDR_WEAPON_OWNER_ID     0x00511E58u  /* uint32_t, the unit's uid */
 #define ADDR_WEAPON_SLOT         0x00511E5Cu  /* int32_t */
+/* 0x00446E70, six call sites and FIVE TABLE SLOTS -- it is column 1 of the
+ * weapon handler records at 0x00489A00, A10, A20, AF0 and B00, so several
+ * weapon kinds share it. Column 1 is what ADDR_WEAPON_FN_SLOT1 receives, and
+ * that global is called as `(object, packed point)` -- the same shape
+ * ADDR_POINTER_ACTION has.
+ *
+ * It records a fire request on the unit ADDR_WEAPON_OWNER_ID names: a block of
+ * fields at +0x57C..+0x598, filled one way for a target OBJECT and another for
+ * a bare POINT. Nothing here fires anything; the block is for whoever reads it
+ * next. Reconstructed, and measured at 0: its six call sites are the
+ * pointer-mode action paths, and no drive here installs a mode above 0. */
+#define ADDR_SET_WEAPON_TARGET   0x00446E70u  /* void(void *obj, uint32 at) */
+#define UNIT_OFF_FIRE_ACTIVE     0x57Cu
+#define UNIT_OFF_FIRE_F40        0x580u   /* uint8_t, a copy of the unit's +0x40 */
+#define UNIT_OFF_FIRE_MODE       0x584u   /* the pose, or 0x1F for a point */
+#define UNIT_OFF_FIRE_F588       0x588u
+#define UNIT_OFF_FIRE_F58C       0x58Cu
+#define UNIT_OFF_FIRE_X          0x590u   /* int16_t */
+#define UNIT_OFF_FIRE_Y          0x592u   /* int16_t */
+#define UNIT_OFF_FIRE_Z          0x594u   /* int16_t, always written zero */
+#define UNIT_OFF_FIRE_UID        0x598u   /* the target's uid, or 0 */
+#define AM2_FIRE_MODE_POINT      0x1F
 #define AM2_INVENTORY_SLOTS       6
 #define AM2_OBJ_KIND_WEAPON       4
 
