@@ -5,71 +5,68 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `64f7295`. Working tree clean.
+Last updated: **2026-08-28**, at `a1f38ea`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-Five functions since the last snapshot, 977 to 982 patches, and the BlockWeight
-family is finished.
+Six functions since the last snapshot, 982 to 988 patches. **Four of them
+corrected a name or a claim that was already in the tree**, which is the
+thread worth carrying.
 
-- **`HudMessage`** (`0x004144A0`) -- the most-called thing left. Its second
-  argument is a COLOUR and it becomes part of the string: a non-zero colour
-  writes `'^'` and the byte ahead of the text. The width is measured on the
-  TEXT, not on what was stored. The x position chains off the previous row,
-  floored at 640, so a burst of messages steps rightwards from the edge.
+- **`AddRecordList`** (`0x00434150`) -- I declined this an hour before writing
+  it, because the records had no name I could justify. The name was already in
+  `orig.h`: `0x00434060` is `ADDR_MAKE_RECORD_LIST` with `LISTHDR_OFF_OWNER`
+  as its first dword, which is what this sorts on. **Grepping the callee is
+  the rule, and doing it late cost the detour.**
 
-- **46 callers and not one of them runs.** 0 on Boot Camp and 0 on the
-  campaign, and the counter is not blind -- forty-four callers are still the
-  original's. So the log is for events no drive here produces.
+- It keeps two parallel structures -- an unsorted array of headers with the
+  slot written back, and a sorted `{owner, slot}` index binary-searched on the
+  way in. **The search is also the duplicate check**: not finding the owner
+  leaves the low bound exactly where the pair belongs.
 
-- **`ObjsAreAllied`** (`0x004574D0`) -- AllyFlag with four exceptions. A
-  multiplayer kind 7 is allied only to another kind 7; army 4 is allied to
-  everything; sharing an object-table record is alliance. **Both null tests
-  are useless and both are reproduced**: each jumps to code that dereferences
-  the pointer it just tested.
+- **`MakeAaiRecord`/`AddAaiRecord`** (`0x004344A0`, `0x004345A0`) -- the second
+  make-then-register pair, on the table `KeyLookup` searches. Structurally the
+  same insert, with three differences: keyed on `+8` not `+0`, the slot
+  written back into the record, and **a grow of nineteen where the other
+  grows by seventeen** -- two nearby tables a reader assumes share a constant.
 
-- **`BlockWeightTroops`** (`0x0045B7E0`) -- the third variant, blocked on the
-  above. A trooper blocks only if it is an ENEMY, and not even then for the
-  unit the player is driving (army is the default owner, the owner object is
-  riding the viewer, and `OBJ_OFF_FIELD_10C` is zero).
+- **The register half corrected a field I had named one commit earlier.** I
+  called `+0x0C` `AAIREC_OFF_MINUS_ONE`, having seen only the maker seed it to
+  -1. It is the SLOT, and -1 means "not registered". Naming a field from one
+  of its two writers is the same failure as naming a function from one call
+  site.
 
-- **It is the one the game uses: 2,039,745 calls** against `BlockWeightAt`'s
-  8 and `BlockWeightChain`'s 0 on the same run. The two cold ones were
-  reconstructed first and written up as the general case. This is the general
-  case, and its terrain bit is `AM2_TILE_BLOCKS` -- so `BlockWeightChain`,
-  not this, is the odd one out on that bit.
+- **All four run exactly 151 times** on one driven mission, so the two pairs
+  are in lockstep -- which no single body says and four counters do.
 
-- **`LoadBitmap`** (`0x004462F0`) -- makes a sprite and fills
-  `AM2_Sprite::source` with an ABSOLUTE path, which is the point: the game
-  chdirs into the map directory during a load, so a relative name would stop
-  resolving and a lost surface could not be rebuilt.
+- **`ArmyAlliedWithObj`** (`0x00457620`) is `ObjsAreAllied` from its
+  `army == 4` test onward, instruction for instruction. The image holds two
+  bodies and not a call, so the reconstruction does too. **80 calls against
+  its twin's 1** -- which catches an error made in ONE body and cannot catch
+  one made in both, and the second was written by reading the first.
 
-- **`windows.h` renamed it twice.** `winuser.h` defines `LoadBitmap` as
-  `LoadBitmapA`, so the definition silently became `LoadBitmapA` and the link
-  failed -- then the selftest stub did it again through `loadimage.h`. Undone
-  in `win32.h` beside the `DrawText` undef that exists for the same reason.
+- **`BuildRowSet`** (`0x00434DA0`) -- a spec is four int32 whose halves go to
+  different places: x and y are OFFSETS added to a base, w and h a SIZE handed
+  to `RowAlloc`. Nothing in it is a sprite; `RowInit` gets a null one.
 
-- **`TraceTileLine`** (`0x0042E390`) -- the tiles a line crosses.
-  `TileOfPoint` runs ONCE; after that the index is stepped by ±1 and by
-  ±`ADDR_MAP_TILES_W`, so an index running off a row wraps into the next
-  rather than being clipped. The major axis is compared for EQUALITY with its
-  target, which is why a zero-length line writes one tile and stops.
+- **`SetWeaponTarget`** (`0x00446E70`) -- column 1 of five `ADDR_WEAPON_HANDLERS`
+  records. Its two arms differ in more than the target: an object puts the
+  unit's `OBJ_OFF_POSE` in the mode field, a point puts `0x1F`.
 
-- **Coverage, measured every time and honest about the gaps.**
-  `BlockWeightTroops` 2,039,745. `TraceTileLine` 35 -- enough to compare, not
-  enough to claim which of its two loops ran. `LoadBitmap` 2, and its source
-  path is unread until DirectDraw takes a surface back, which nothing under
-  Xvfb does. `ObjsAreAllied` 2, with both multiplayer arms unreachable since
-  `ADDR_MP_SESSION` is 0 on every drive. `HudMessage` 0.
+- **Reading that table corrected `orig.h` again.** It said every field of a
+  handler record is a function pointer. Only the first two are: SLOT2's
+  readers do `test eax,eax; jl`, a SIGNED comparison nobody asks of a pointer,
+  and SLOT3 is a flag. The claim had been generalised from the two readers
+  that had been looked at.
 
-- **Three seams crossed the flat/win32 split**, and the pattern is now
-  settled: a flat module forward-declares the win32-side function the way
-  `script.cpp` declares `PreloadSprite`, with `extern "C"` because every
-  header here is one. `event.cpp`'s declaration returns `void *` where the
-  definition returns `AM2_Sprite *`; C linkage hides that from the linker, so
-  it is written down in both places and in the selftest stub.
+- **Coverage, and one wall measured from two sides.** `AddRecordList`,
+  `MakeAaiRecord`, `AddAaiRecord` 151 each; `ArmyAlliedWithObj` 80;
+  `BuildRowSet` 11; `SetWeaponTarget` **0** -- and that 0 has the same cause
+  as `SetPointerMode`'s 1: a weapon action needs a pointer mode above 0, and
+  no drive here installs one. Two functions, two commits apart, blocked on the
+  same missing drive.
 
 ## Next
 
