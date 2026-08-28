@@ -416,6 +416,19 @@
 #define ADDR_HUD_SQUAD_DESTRUCT 0x00415850u
 #define ADDR_HUD_EDGE_DELETE   0x00419650u
 #define ADDR_HUD_EDGE_DESTRUCT 0x00419670u
+/* The other two, whose destructors do more than release a fixed set of slots
+ * and which carry the MSVC SEH frame for it. */
+#define ADDR_HUD_SARGE_DELETE  0x00414E90u
+#define ADDR_HUD_SARGE_DESTRUCT 0x00414EB0u
+#define ADDR_HUD_CMD_DELETE    0x004170F0u
+#define ADDR_HUD_CMD_DESTRUCT  0x00417110u
+/* The Sarge panel's own sprites: 31 slots from HUD_OFF_SPRITE0, filled by its
+ * constructor from sprite set 13 indices 0..30. */
+#define AM2_HUD_SARGE_SLOTS    31
+/* The commands panel's sprites live in the pointer-mode table, 0x0C below the
+ * mode fields, and are walked to the table's end rather than by a count. */
+#define ADDR_HUD_CMD_SPRITES     0x004761B4u
+#define ADDR_HUD_CMD_SPRITES_END 0x004762CCu
 /* Three sprite slots, shared by the top and edge strips. */
 #define HUD_OFF_SPRITE0        0x58u
 #define HUD_OFF_SPRITE1        0x5Cu

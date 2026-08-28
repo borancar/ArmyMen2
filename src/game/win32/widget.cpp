@@ -1229,6 +1229,67 @@ AM2_Widget *__attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w,
     return w;
 }
 
+/* 0x00414EB0. The SARGE panel: 31 sprites of its own, from the 31 slots its
+ * constructor fills with set 13 indices 0..30. Ordinary per-object state. */
+void __attribute__((thiscall)) HudSargeDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  i;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SARGE);
+
+    for (i = 0; i < AM2_HUD_SARGE_SLOTS; i++)
+        ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0 + i * 4));
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudSargeDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    HudSargeDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+/* 0x00417110. The COMMANDS panel, and it frees sprites that are NOT ITS OWN.
+ *
+ * The other six release slots inside the object; this one walks the GLOBAL
+ * pointer-mode table -- seven records of 40 bytes from ADDR_POINTER_MODES,
+ * whose sprite sits 0x0C below the mode fields at ADDR_HUD_CMD_SPRITES -- and
+ * releases each. Every commands panel would read that same table, so this is
+ * only safe because exactly ONE exists: it is built as a child of HUD widget B
+ * and nothing else constructs the class. A second instance turns this into a
+ * double free, silently, and nothing in the code says so.
+ *
+ * Recorded because it is a constraint the program depends on and does not
+ * state. The bound is the table's end and not a count, which is how the
+ * original writes it.
+ */
+void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
+{
+    AM2_Sprite **spr;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_COMMANDS);
+
+    for (spr = (AM2_Sprite **)AM2_IMAGE(ADDR_HUD_CMD_SPRITES);
+         spr < (AM2_Sprite **)AM2_IMAGE(ADDR_HUD_CMD_SPRITES_END);
+         spr = (AM2_Sprite **)((uint8_t *)spr + AM2_POINTER_MODE_SIZE))
+        ReleaseSprite(*spr);
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w,
+                                                        int32_t flags)
+{
+    HudCommandsDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 /* 0x0044E510. The film archive's destructor: give back the twelve thumbnail
  * PAIRS and chain to the dialog base.
  *
@@ -6800,6 +6861,16 @@ int widget_install(void)
                         "OpenGameMenu", 0);
     rc |= patch_replace(ADDR_OPEN_MESSAGE, (const void *)OpenMessage,
                         "OpenMessage", 0);
+    rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
+                        (const void *)HudSargeDestruct,
+                        "HudSargeDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_SARGE_DELETE, (const void *)HudSargeDelete,
+                        "HudSargeDelete", 1);
+    rc |= patch_replace(ADDR_HUD_CMD_DESTRUCT,
+                        (const void *)HudCommandsDestruct,
+                        "HudCommandsDestruct", 1);
+    rc |= patch_replace(ADDR_HUD_CMD_DELETE, (const void *)HudCommandsDelete,
+                        "HudCommandsDelete", 1);
     rc |= patch_replace(ADDR_HUD_TOP_DESTRUCT, (const void *)HudTopDestruct,
                         "HudTopDestruct", 1);
     rc |= patch_replace(ADDR_HUD_TOP_DELETE, (const void *)HudTopDelete,
