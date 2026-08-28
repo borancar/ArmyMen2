@@ -539,12 +539,28 @@ def main():
 
         w("\n## By library\n\n")
         w("| dll | sites | reconstructed |\n|---|---:|---:|\n")
+        # THROUGH owner_of, like the other four call sites in this function.
+        # This one tested the raw `func` column for as long as it existed, so
+        # it disagreed with the summary table above wherever a site sits in a
+        # merged entry -- and it was wrong in BOTH directions. ADVAPI32 read
+        # 2 | 0 against the summary's "complete", because imports.tsv files
+        # both registry sites under 0x0040DB50 while the real functions are
+        # CommConstruct and CommDestruct, which are ours. KERNEL32 read FOUR
+        # TOO HIGH, which is the direction that flatters: five GetTickCount
+        # sites were credited because a NEIGHBOUR inside the same entry had
+        # been patched -- one of them by MpNameDestruct, landed the same day.
+        #
+        # The denominator does not need it. Measured rather than assumed: no
+        # import site changes side of CRT_START when resolved, so the filter
+        # below stays on the listed address.
         by_dll = collections.Counter(r["dll"] for r in rows
                                      if int(r["func"], 16) and
                                      int(r["func"], 16) < CRT_START)
         for dll, n in by_dll.most_common():
             got = sum(1 for r in rows
-                      if r["dll"] == dll and int(r["func"], 16) in done_fns)
+                      if r["dll"] == dll
+                      and owner_of(int(r["func"], 16),
+                                   int(r["site"], 16)) in done_fns)
             w(f"| {dll} | {n} | {got} |\n")
 
         w("\n## The filesystem\n\n")

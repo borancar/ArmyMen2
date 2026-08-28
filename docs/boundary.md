@@ -208,13 +208,13 @@ function from game logic with a call in it.
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 83 |
-| KERNEL32.dll | 99 | 49 |
+| USER32.dll | 130 | 99 |
+| KERNEL32.dll | 99 | 60 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |
-| smackw32.dll | 9 | 8 |
+| smackw32.dll | 9 | 9 |
 | ole32.dll | 3 | 3 |
-| ADVAPI32.dll | 2 | 0 |
+| ADVAPI32.dll | 2 | 2 |
 
 ## The filesystem
 
