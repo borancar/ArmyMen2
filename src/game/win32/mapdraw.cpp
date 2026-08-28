@@ -30,6 +30,8 @@
 #include "../misc.h"
 #include "../../inject/patch.h"
 #include "../maprow.h"  /* the flat declaration of RowUpdate */
+#include "../objtype.h"  /* ObjIsType2/4, ObjIsItem -- reconstructed */
+#include "../packkey.h"  /* KeyFieldA/B -- reconstructed */
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
@@ -1416,6 +1418,79 @@ static void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour)
             p[(int32_t)g_pitch * row + col] = (uint8_t)colour;
 }
 
+/* 0x004149B0, one caller -- the radar's paint. WHAT COLOUR IS THIS BLIP, and
+ * does it blink. The return indexes ADDR_RADAR_COLOURS and `blink` picks which
+ * of the caller's two drawing paths runs.
+ *
+ * It starts from the object's ARMY and then overrides that three ways, in
+ * order, each narrower than the last:
+ *
+ *   a type-4 object whose type record's first dword is 16..19 takes 0..3 --
+ *   the same four values the armies use, so those four item kinds are drawn as
+ *   if they were armies;
+ *
+ *   an item whose packed key carries field A == 0x2B takes field B - 994,
+ *   again 0..3;
+ *
+ *   and a type-2 object short-circuits both: kind 7 in a network game returns
+ *   AM2_RADAR_COLOUR_MP7 outright, and otherwise a FIELD_530 that is not 5
+ *   becomes the answer and raises `blink`.
+ *
+ * Two things reproduced rather than tidied. ObjIsType2 is called TWICE in a
+ * row on the same object inside the same branch, and the second call cannot
+ * answer differently. And `blink` is cleared partway down rather than on
+ * entry, after the two overrides above have already run -- which does not
+ * matter here because neither writes it, but it is the original's order and
+ * moving it would be a guess that nothing checks.
+ *
+ * Both jump tables are in layout order. Worth recording only because the edge
+ * strip's vehicle table is not, so the trap is real and not universal; the
+ * tables still have to be read either way, which is how this was established.
+ */
+static int32_t __cdecl RadarBlipColour(const AM2_Object *obj, int32_t *blink)
+{
+    const uint8_t *self = (const uint8_t *)obj;
+    int32_t        colour;
+
+    colour = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                            *(const int8_t *)(self + OBJ_OFF_ARMY));
+
+    if (ObjIsType4(obj)) {
+        uint32_t kind = **(const uint32_t *const *)(self + OBJ_OFF_FIELD_C0)
+                        - AM2_RADAR_KIND_FIRST;
+
+        if (kind <= 3)
+            colour = (int32_t)kind;
+    } else if (ObjIsItem(obj)) {
+        uint32_t key = *(const uint32_t *)
+            (*(const uint8_t *const *)(self + OBJ_OFF_FIELD_94) + 8);
+
+        if (KeyFieldA(key) == AM2_RADAR_KEY_TAG) {
+            uint32_t slot = KeyFieldB(key) - AM2_RADAR_KEY_FIRST;
+
+            if (slot <= 3)
+                colour = (int32_t)slot;
+        }
+    }
+
+    *blink = 0;
+
+    if (ObjIsType2(obj)) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            && ObjIsType2(obj)
+            && *(const int32_t *)(self + OBJ_OFF_SOLDIER_KIND) == 7)
+            return AM2_RADAR_COLOUR_MP7;
+
+        if (*(const int32_t *)(self + OBJ_OFF_FIELD_530)
+            != AM2_RADAR_FIELD530_NONE) {
+            *blink = 1;
+            return *(const int32_t *)(self + OBJ_OFF_FIELD_530);
+        }
+    }
+
+    return colour;
+}
+
 #define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)
 /* No g_ macro for the eye: audio.cpp already names ADDR_LISTENER_POS as
  * g_listenerPos and a second name would be an alias, while a non-const twin of
@@ -1584,6 +1659,8 @@ int mapdraw_install(void)
     patch_replace(ADDR_DRAW_RECT_FAST, (const void *)DrawRectFast,
                   "DrawRectFast", 1);
     patch_replace(ADDR_DRAW_BLIP3, (const void *)DrawBlip3, "DrawBlip3", 1);
+    patch_replace(ADDR_RADAR_BLIP_COLOUR, (const void *)RadarBlipColour,
+                  "RadarBlipColour", 1);
     patch_replace(ADDR_DRAW_VIEW_RECT, (const void *)DrawViewRect,
                   "DrawViewRect", 2);
     int rc = 0;

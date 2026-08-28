@@ -811,6 +811,34 @@
  *
  * Another half-bracket -- Locks, never Unlocks. */
 #define ADDR_DRAW_BLIP3     0x0041C7F0u  /* void(x, y, colour) */
+/* 0x004149B0, one caller -- the radar's paint. WHAT COLOUR IS THIS BLIP, and
+ * does it blink. The return indexes ADDR_RADAR_COLOURS; the out parameter says
+ * which of the caller's two drawing paths to take.
+ *
+ * It starts from the object's ARMY through CommArmyOfSlot and then overrides
+ * that in three ways, in this order:
+ *
+ *   a type-4 object whose type record's first dword is 16..19 takes 0..3 --
+ *   the same four values, so those four item kinds are drawn as if they were
+ *   armies;
+ *   an item whose key's field A is 0x2B takes field B minus 994, again 0..3;
+ *   a type-2 object in a multiplayer session with soldier kind 7 returns 4
+ *   outright, and otherwise, if OBJ_OFF_FIELD_530 is not 5, returns THAT and
+ *   raises the out flag.
+ *
+ * Both of its jump tables are in layout order, which is worth recording only
+ * because the edge strip's vehicle table two files away is not -- the trap is
+ * real but it is not universal, so the table still has to be read either way.
+ *
+ * It calls ObjIsType2 twice in a row on the same object inside the same
+ * branch, the second call unable to answer differently. Reproduced. */
+#define ADDR_RADAR_BLIP_COLOUR 0x004149B0u /* int32(const obj *, int32 *out) */
+#define ADDR_RADAR_COLOURS   0x004FCF5Cu  /* uint8_t[][2], indexed by that */
+#define AM2_RADAR_KIND_FIRST 16   /* type-4 kinds 16..19 map to armies 0..3 */
+#define AM2_RADAR_KEY_FIRST  994  /* item key field B, likewise */
+#define AM2_RADAR_KEY_TAG    0x2B /* the field A an item must carry first */
+#define AM2_RADAR_COLOUR_MP7 4    /* soldier kind 7 in a network game */
+#define AM2_RADAR_FIELD530_NONE 5 /* the value that means "no override" */
 #define AM2_BLIP3_SIZE      3
 /* 0x00413610. The one caller of DrawRect: it takes a rectangle stored in the
  * SAME space as ADDR_VIEW_ORIGIN, subtracts that origin to get screen
