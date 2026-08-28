@@ -259,6 +259,121 @@ void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
     return hdr;
 }
 
+/* 0x00434150, eight callers. Register one of MakeRecordList's headers under
+ * its owner and hand back the slot it went into, or -1 if that owner already
+ * has one.
+ *
+ * IT MAINTAINS TWO PARALLEL STRUCTURES and that is the whole design.
+ * ADDR_RECORD_LISTS is an unsorted array of header pointers, appended to, and
+ * the new slot index is written back into the header at LISTHDR_OFF_INDEX.
+ * ADDR_RECORD_LIST_INDEX is a SORTED array of {owner, slot} pairs, binary
+ * searched on the way in and memmove'd open to keep it sorted. So a lookup by
+ * owner is a halving search and an iteration is a walk of the unsorted array,
+ * and neither invalidates the other.
+ *
+ * THE SEARCH IS ALSO THE DUPLICATE CHECK. Finding the owner returns -1 without
+ * inserting anything; not finding it leaves the low bound sitting exactly
+ * where the pair belongs, which is where the memmove opens the gap. One walk
+ * does both jobs.
+ *
+ * The owner keys are compared UNSIGNED -- the branch is `jae` -- so a header
+ * whose owner pointer has the top bit set still sorts correctly. Reproduced as
+ * unsigned; signed would put such a list at the wrong end and the halving
+ * search would then miss it.
+ *
+ * BOTH ARRAYS GROW TOGETHER TO count + 17, not to a multiple of anything, and
+ * both are realloc'd without checking. The zeroing after each realloc starts
+ * at the OLD capacity and writes 17 entries, which fits because the grow only
+ * happens when the count has caught the capacity. Neither result is checked.
+ *
+ * The original computes the memmove length as `(lo << 29) - lo + count` then
+ * shifts left by three. The first term is lo * 2^29, and shifting by three
+ * makes it lo * 2^32, which is zero in 32 bits -- so the whole expression is
+ * (count - lo) * 8, which is what it is written as here. Strength reduction
+ * that relies on the overflow, and worth naming rather than transcribing.
+ *
+ * MEASURED AT 151 CALLS on a driven Boot Camp mission, exactly matching
+ * MakeRecordList on the same run -- so every list made is registered and none
+ * is registered twice. 151 slots at 17 per grow means both reallocs ran about
+ * nine times and the memmove ran on most insertions, so the grow, the search
+ * and the shift are all on the compared path. The duplicate-owner exit is the
+ * one arm those 151 cannot have taken, since none of them returned -1.
+ *
+ * THIS FUNCTION WAS DECLINED ONCE, an hour before it was written, because the
+ * records had no name and inventing one for a sorted insert would have said
+ * nothing true. What unblocked it was already in orig.h: 0x00434060 is
+ * ADDR_MAKE_RECORD_LIST and its header's first dword is LISTHDR_OFF_OWNER.
+ * Grepping the callee rather than the caller is what CLAUDE.md says to do, and
+ * doing it late cost the detour.
+ */
+int32_t __cdecl AddRecordList(void *list)
+{
+    uint8_t   *hdr = (uint8_t *)list;
+    uint32_t   owner;
+    int32_t    lo = 0, hi;
+    int32_t    n, slot;
+    uint32_t **pairs;
+
+    if (!list)
+        return -1;
+
+    n     = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+    owner = *(const uint32_t *)(hdr + LISTHDR_OFF_OWNER);
+    hi    = n;
+
+    if (hi > 0) {
+        uint32_t *ix = *(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX;
+
+        do {
+            int32_t mid = lo + (hi - lo) / 2;
+
+            if (ix[mid * 2] == owner)
+                return -1;                  /* already registered */
+            if (ix[mid * 2] > owner)
+                hi = mid;
+            else
+                lo = mid + 1;
+        } while (hi > lo);
+    }
+
+    if (n + 1 > *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP) {
+        int32_t cap = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP;
+        int32_t grown = n + AM2_RECORD_LIST_GROW;
+        void  **lists;
+        uint32_t *ix;
+
+        lists = (void **)am2_realloc(
+                    *(void **)(uintptr_t)ADDR_RECORD_LISTS,
+                    (size_t)grown * 4);
+        *(void ***)(uintptr_t)ADDR_RECORD_LISTS = lists;
+        memset(lists + cap, 0, AM2_RECORD_LIST_GROW * 4);
+
+        ix = (uint32_t *)am2_realloc(
+                 *(void **)(uintptr_t)ADDR_RECORD_LIST_INDEX,
+                 (size_t)grown * 8);
+        *(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX = ix;
+        memset(ix + cap * 2, 0, AM2_RECORD_LIST_GROW * 8);
+
+        *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP = grown;
+        n = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+    }
+
+    *(int32_t *)(hdr + LISTHDR_OFF_INDEX) = n;
+    (*(void ***)(uintptr_t)ADDR_RECORD_LISTS)[n] = list;
+
+    pairs = (uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX;
+    if (lo < n)
+        orig_memmove(*pairs + (lo + 1) * 2, *pairs + lo * 2,
+                     (size_t)(n - lo) * 8);
+
+    (*pairs)[lo * 2]     = owner;
+    (*pairs)[lo * 2 + 1] = (uint32_t)n;
+
+    slot = n;
+    *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT = n + 1;
+    return slot;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -269,6 +384,8 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_OBJ_IS_ITEM, (const void *)ObjIsItem, "ObjIsItem", 1);
     rc |= patch_replace(ADDR_MAKE_RECORD_LIST, (const void *)MakeRecordList,
                         "MakeRecordList", 8);
+    rc |= patch_replace(ADDR_ADD_RECORD_LIST, (const void *)AddRecordList,
+                        "AddRecordList", 8);
     rc |= patch_replace(ADDR_SUBREC_HIDE_ROWS, (const void *)SubrecHideRows,
                         "SubrecHideRows", 3);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);

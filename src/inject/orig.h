@@ -5925,6 +5925,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define LISTHDR_OFF_RECORDS      0x0Cu
 #define AM2_LISTHDR_BYTES        0x30u
 #define AM2_LIST_RECORD_BYTES    0x0Cu
+#define LISTHDR_OFF_INDEX        0x04u   /* its slot in ADDR_RECORD_LISTS */
+/* 0x00434150, eight callers: register one of ADDR_MAKE_RECORD_LIST's headers
+ * under its LISTHDR_OFF_OWNER, and hand back the slot it went into.
+ *
+ * Two parallel structures, which is what makes it worth a name of its own.
+ * ADDR_RECORD_LISTS is an unsorted array of the headers, appended to, and the
+ * slot index is written back into the header. ADDR_RECORD_LIST_INDEX is a
+ * SORTED array of {owner, slot} pairs, binary-searched on entry so a duplicate
+ * owner is refused with -1, and memmove'd open to keep it sorted. So lookups
+ * are by owner and iteration is by slot, and both stay valid.
+ *
+ * The owner keys are compared UNSIGNED -- the search uses `jae`.
+ * 151 calls on a driven Boot Camp mission, one per ADDR_MAKE_RECORD_LIST. */
+#define ADDR_ADD_RECORD_LIST     0x00434150u  /* int32_t(void *list) */
+#define ADDR_RECORD_LIST_CAP     0x00516138u  /* int32_t, slots allocated */
+#define ADDR_RECORD_LIST_COUNT   0x0051613Cu  /* int32_t, slots used */
+#define ADDR_RECORD_LISTS        0x00516140u  /* void **, one per slot */
+#define ADDR_RECORD_LIST_INDEX   0x00516154u  /* {owner, slot} pairs, sorted */
+#define AM2_RECORD_LIST_GROW     0x11         /* 17 slots per grow */
 #define ADDR_KEY_LOOKUP          0x00434290u  /* int32_t(uint32_t key) */
 #define ADDR_KEY_LOOKUP_TRIPLE   0x004346E0u  /* int32_t(a, b, c) */
 #define ADDR_KEY_TABLE_COUNT     0x00516148u  /* int32_t */

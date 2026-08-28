@@ -42,6 +42,11 @@ int32_t __cdecl ObjIsItem(const AM2_Object *obj);
  * twelve-byte records. Structural name; see objtype.cpp. */
 void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner);
 
+/* 0x00434150. Register one of those headers under its owner, keeping an
+ * unsorted array of slots and a sorted {owner, slot} index in step. Returns
+ * the slot, or -1 when that owner already has one. */
+int32_t __cdecl AddRecordList(void *list);
+
 /* 0x00434E60, three callers. Clear bit 0 on every row the sub-list holds. Its
  * argument is the sub-list header, not the object. */
 void __cdecl SubrecHideRows(void *subrec);
