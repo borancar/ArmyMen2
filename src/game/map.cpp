@@ -456,8 +456,22 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
     }
 }
 
+/* 0x0043ED40, two callers, five bytes of body: the number of records in
+ * ADDR_LEVEL_TABLE. Both callers are in the menu band beside CloseScreen,
+ * which is what makes it the level COUNT rather than some other total sharing
+ * the address -- the global was already named from FindLevelRecord's side.
+ *
+ * Measured at 0 on a driven Boot Camp mission: its two callers are menu code
+ * that path does not reach. The counter is not blind. */
+int32_t __cdecl LevelCount(void)
+{
+    return *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
+}
+
 void map_install(void)
 {
+    patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
+                        "LevelCount", 2);
     patch_replace(ADDR_TRACE_TILE_LINE, (const void *)TraceTileLine,
                         "TraceTileLine", 7);
     patch_replace(ADDR_SCRIPT_LIST_FIND, (const void *)ScriptListFind,

@@ -44,6 +44,9 @@ int32_t __cdecl LoadMapSection(am2_FILE *fp);
  * sixteen bits; every caller stores it as one. */
 int32_t __cdecl TileOfPoint(uint32_t packed);
 
+/* 0x0043ED40. How many records ADDR_LEVEL_TABLE holds. */
+int32_t __cdecl LevelCount(void);
+
 /* 0x0042E390. The tiles a line crosses, stepped in tile space from the first
  * point's tile. Writes `tiles` and `count`; neither is bounds-checked. */
 void __cdecl TraceTileLine(uint32_t from, uint32_t to,

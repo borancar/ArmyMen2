@@ -47,6 +47,10 @@ void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner);
  * the slot, or -1 when that owner already has one. */
 int32_t __cdecl AddRecordList(void *list);
 
+/* 0x00434C40. MakeRecordList's counterpart: free the header's two pointers
+ * and then the header. */
+void __cdecl FreeRecordList(void *list);
+
 /* 0x004344A0. A 0x40-byte record from seven arguments, seeded from the
  * object.aai record for its (type, key) when the type is not negative. */
 void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,

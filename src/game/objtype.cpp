@@ -375,6 +375,49 @@ int32_t __cdecl AddRecordList(void *list)
     return slot;
 }
 
+/* 0x00434C40, one caller -- and that caller walks every entry of
+ * ADDR_RECORD_LISTS, so this is MakeRecordList's counterpart.
+ *
+ * Free the header's records array, free a SECOND pointer at
+ * LISTHDR_OFF_EXTRA, then free the header. Each is tested first, so a header
+ * with either pointer null is fine.
+ *
+ * THAT SECOND POINTER IS NOT MakeRecordList'S. The maker zeroes the 0x30 bytes
+ * and writes only the owner, the count and the records -- nothing there
+ * touches +0x1C. So something between the make and the free fills it in, and
+ * this is the only reader of it in the whole image. What it points at is not
+ * established and the name says only that the free releases it.
+ *
+ * THE ORDER IS EXTRA, RECORDS, HEADER -- the header last, which is the only
+ * order that works, and worth noticing because the two pointers are freed in
+ * the opposite order from the offsets. Nothing is nulled on the way out: the
+ * caller is walking a table it is about to discard.
+ *
+ * MEASURED AT 0 on a driven Boot Camp mission, which does not tear the level
+ * down -- CLAUDE.md records that the state-2 teardown runs on LEAVING a level
+ * and that entering one does not trigger it. Its counter is not blind, so
+ * this is verified by reading and by being the exact inverse of a maker whose
+ * 151 calls are compared.
+ */
+void __cdecl FreeRecordList(void *list)
+{
+    uint8_t *h = (uint8_t *)list;
+    void    *p;
+
+    if (!list)
+        return;
+
+    p = *(void *const *)(h + LISTHDR_OFF_EXTRA);
+    if (p)
+        am2_free(p);
+
+    p = *(void *const *)(h + LISTHDR_OFF_RECORDS);
+    if (p)
+        am2_free(p);
+
+    am2_free(list);
+}
+
 /* 0x004344A0, seven callers, and every one of them hands the result straight
  * to 0x004345A0 -- the same make-then-register shape MakeRecordList and
  * AddRecordList have above.
@@ -579,6 +622,8 @@ int objtype_install(void)
                         "MakeRecordList", 8);
     rc |= patch_replace(ADDR_ADD_RECORD_LIST, (const void *)AddRecordList,
                         "AddRecordList", 8);
+    rc |= patch_replace(ADDR_FREE_RECORD_LIST, (const void *)FreeRecordList,
+                        "FreeRecordList", 1);
     rc |= patch_replace(ADDR_MAKE_AAI_RECORD, (const void *)MakeAaiRecord,
                         "MakeAaiRecord", 7);
     rc |= patch_replace(ADDR_ADD_AAI_RECORD, (const void *)AddAaiRecord,

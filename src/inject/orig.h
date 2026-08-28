@@ -2649,6 +2649,9 @@ typedef struct {
 #define ADDR_FIND_LEVEL_RECORD    0x0043E1F0u  /* void *(int32_t id) */
 #define ADDR_LEVEL_TABLE          0x00656338u  /* the 0x30C-byte records */
 #define ADDR_LEVEL_TABLE_COUNT    0x0065633Cu  /* int32_t */
+/* 0x0043ED40, two callers, five bytes of body: read that count and return it.
+ * Both callers are in the menu band beside CloseScreen. Reconstructed. */
+#define ADDR_LEVEL_COUNT         0x0043ED40u  /* int32_t(void) */
 #define AM2_LEVEL_RECORD_SIZE     0x30Cu
 /* 0x0043ED50: copy the names out of a level record into the globals the
  * loader reads -- ADDR_MAP_NAME, ADDR_MAP_FOLDER and two more. */
@@ -6062,6 +6065,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_LISTHDR_BYTES        0x30u
 #define AM2_LIST_RECORD_BYTES    0x0Cu
 #define LISTHDR_OFF_INDEX        0x04u   /* its slot in ADDR_RECORD_LISTS */
+/* A second pointer in the header, at +0x1C. ADDR_MAKE_RECORD_LIST does not
+ * write it -- it zeroes the 0x30 bytes and fills only +0, +8 and +0x0C -- and
+ * ADDR_FREE_RECORD_LIST is the only thing here that reads it. So something
+ * else fills it in between, and what it points at is not established; the name
+ * says only that the free releases it. */
+#define LISTHDR_OFF_EXTRA        0x1Cu
+/* 0x00434C40, one caller, and that caller walks every entry of
+ * ADDR_RECORD_LISTS -- so this is ADDR_MAKE_RECORD_LIST's counterpart. Free
+ * the header's two pointers and then the header. Reconstructed. */
+#define ADDR_FREE_RECORD_LIST    0x00434C40u  /* void(void *list) */
 /* 0x00434150, eight callers: register one of ADDR_MAKE_RECORD_LIST's headers
  * under its LISTHDR_OFF_OWNER, and hand back the slot it went into.
  *
