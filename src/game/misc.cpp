@@ -1488,6 +1488,68 @@ int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot)
                               + AM2_PLAYER_ID);
 }
 
+/* 0x0040F8A0 and 0x0040F8E0, one caller each and both in 0x00431850. The same
+ * loop over the comm object's players, differing only in which flag it tests.
+ *
+ * THEIR CALLER IS WHAT NAMES THEM, since the two fields say nothing. When the
+ * first answers no, 0x00431850 shows "Not everybody has the same
+ * version/map/rules." -- so AM2_PLAYER_AGREED is the checksum handshake's
+ * answer. The second is called immediately after that same function sets
+ * AM2_PLAYER_READY on ADDR_DEFAULT_OWNER's own slot, which is what a
+ * ready-check looks like from the outside.
+ *
+ * A SLOT WITH NO PLAYER IS SKIPPED, not failed: an AM2_PLAYER_ID of 0 or -1
+ * means empty, and the flag under it is never read. So four slots with one
+ * player answer yes on that player alone.
+ *
+ * AN EMPTY TABLE ANSWERS YES. COMM_OFF_PLAYER_COUNT being zero or less returns
+ * 1 without looking at anything, so "everyone agrees" and "everyone is ready"
+ * are both vacuously true with nobody present. Reproduced; the caller guards
+ * that separately by refusing a count of one or less before it calls.
+ *
+ * BOTH READ THE COUNT FROM THE GLOBAL COMM OBJECT AND THE RECORDS FROM `this`.
+ * The two are the same object at every call site -- the caller loads ecx from
+ * the same global -- so the redundancy is invisible. Reproduced as written
+ * rather than folded, because folding it would assert they must agree.
+ *
+ * BOTH MEASURED AT 0. Their one caller is 0x00431850, which is on the
+ * multiplayer start path, and no drive here reaches a live session -- the
+ * suite gets as far as ENTER BATTLE NAME and DirectPlay will not open a
+ * TCP/IP session on this machine. The counters are not blind; that caller
+ * is the original's. So both are verified by reading, and the caller is
+ * where the names come from, so the naming is no better verified than the
+ * bodies are.
+ */
+static int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
+{
+    const uint8_t *rec  = (const uint8_t *)comm + AM2_PLAYER_ID;
+    int32_t        n    = *(const int32_t *)
+                              ((const uint8_t *)*(void *const *)
+                                   (uintptr_t)ADDR_COMM_OBJECT
+                               + COMM_OFF_PLAYER_COUNT);
+    int32_t        i;
+
+    for (i = 0; i < n; i++, rec += AM2_PLAYER_STRIDE) {
+        int32_t id = *(const int32_t *)rec;
+
+        if (id == 0 || id == -1)
+            continue;                   /* no player in this slot */
+        if (*(const int32_t *)(rec + (flag - AM2_PLAYER_ID)) == 0)
+            return 0;
+    }
+    return 1;
+}
+
+int32_t __attribute__((thiscall)) CommAllPlayersAgreed(void *comm)
+{
+    return CommAllPlayersFlagged(comm, AM2_PLAYER_AGREED);
+}
+
+int32_t __attribute__((thiscall)) CommAllPlayersReady(void *comm)
+{
+    return CommAllPlayersFlagged(comm, AM2_PLAYER_READY);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -1564,6 +1626,10 @@ int misc_install(void)
                   "CommSlotForArmy", 20);
     patch_replace(ADDR_COMM_PLAYER_ID, (const void *)CommPlayerId,
                   "CommPlayerId", 1);
+    patch_replace(ADDR_ALL_PLAYERS_AGREED, (const void *)CommAllPlayersAgreed,
+                  "CommAllPlayersAgreed", 1);
+    patch_replace(ADDR_ALL_PLAYERS_READY, (const void *)CommAllPlayersReady,
+                  "CommAllPlayersReady", 1);
     patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
                   "CommWasHereForArmy", 1);
     patch_replace(ADDR_GET_ARMY_SCORE, (const void *)GetArmyScore,

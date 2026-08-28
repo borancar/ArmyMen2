@@ -4740,6 +4740,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * slot -1 answering 0 rather than indexing backwards. The stride comes out as
  * `(slot * 8 - slot) << 4`, which is AM2_PLAYER_STRIDE. Reconstructed. */
 #define ADDR_COMM_PLAYER_ID      0x0040F2F0u  /* thiscall int32(comm, slot) */
+/* Two per-player flags past AM2_PLAYER_ACTIVE, and their CALLER is what names
+ * them. 0x00431850 tests AM2_PLAYER_AGREED across every player and, when one
+ * says no, shows "Not everybody has the same version/map/rules." -- so that
+ * flag is the checksum handshake's answer. Then it sets AM2_PLAYER_READY on
+ * ADDR_DEFAULT_OWNER's own slot and tests it across every player, which is
+ * what a ready-check is. Neither name comes from the fields themselves. */
+#define AM2_PLAYER_READY         0x270u
+#define AM2_PLAYER_AGREED        0x278u
+/* 0x0040F8A0 and 0x0040F8E0, one caller each, thiscall and no stack argument.
+ * The same loop over COMM_OFF_PLAYER_COUNT slots differing only in which flag
+ * it tests: every player whose AM2_PLAYER_ID is neither 0 nor -1 must have it
+ * set, and an empty table answers yes. Reconstructed; both measured at 0,
+ * since their caller is on the multiplayer start path. */
+#define ADDR_ALL_PLAYERS_AGREED  0x0040F8A0u  /* thiscall int32(comm) */
+#define ADDR_ALL_PLAYERS_READY   0x0040F8E0u  /* thiscall int32(comm) */
 #define AM2_PLAYER_ACTIVE        0x25Cu
 /* Slot i's own index field, four bytes before its army. What
  * ADDR_COMM_FIND_PLAYER hands back rather than the loop counter. */

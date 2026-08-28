@@ -561,6 +561,11 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
  * is no upper bound. */
 int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot);
 
+/* 0x0040F8A0 and 0x0040F8E0. Does every player with a real AM2_PLAYER_ID have
+ * AM2_PLAYER_AGREED, and AM2_PLAYER_READY, set? An empty table answers yes. */
+int32_t __attribute__((thiscall)) CommAllPlayersAgreed(void *comm);
+int32_t __attribute__((thiscall)) CommAllPlayersReady(void *comm);
+
 /* 0x0040F1C0, thiscall. The same walk, answering the matching slot's
  * COMM_ARMY_OFF_WAS_HERE rather than its index. */
 int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army);
