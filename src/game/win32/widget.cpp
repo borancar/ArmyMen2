@@ -1336,7 +1336,12 @@ void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
 
-    self[HUDPANEL_OFF_FLAG8C] = 0;
+    /* Empty the caption. It is a one-frame buffer: the radar's update refills
+     * it with "Stratmap" when the mouse has been idle a second, and two paint
+     * paths test its first byte before drawing. Clearing byte zero is
+     * emptying a string, not clearing a flag, which is what this looked like
+     * with only this line in view. */
+    self[HUDPANEL_OFF_CAPTION] = 0;
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
         || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)

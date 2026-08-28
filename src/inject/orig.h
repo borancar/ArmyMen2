@@ -461,7 +461,20 @@
 #define ADDR_HUD_SLIDE_SHUT    0x0046F958u  /* float, -320.0 */
 #define HUDPANEL_OFF_OPEN      0x5Cu  /* int32, which direction to slide */
 #define HUDPANEL_OFF_STOP      0x64u  /* int32, the open position */
-#define HUDPANEL_OFF_FLAG8C    0x8Cu  /* uint8, cleared every update */
+/* NOT A FLAG, which is what this was called when HudPanelUpdate was written
+ * from seeing `self[0x8C] = 0` and nothing else. It is a CAPTION BUFFER, and
+ * three other sites say so: 0x00419576 and 0x00419EC5 test its first byte for
+ * emptiness -- the "is this string set" idiom -- and 0x0041957C, 0x00419F7F
+ * and 0x00419F95 take its ADDRESS with `lea`, which is what you do with a
+ * buffer and never with a flag.
+ *
+ * Its lifetime is ONE FRAME. HudPanelUpdate empties it as its first action, so
+ * a caption survives only if something re-sets it the same frame; the radar's
+ * update writes "Stratmap" into it after a second of mouse inactivity. Note
+ * the radar writes the PANEL's field -- ADDR_HUD_WIDGET_B + 0x8C -- and not
+ * its own, which is what settles that this offset belongs to one class rather
+ * than to the family. HUD_SQUAD_PAIR_HI is 0x8C on a different class. */
+#define HUDPANEL_OFF_CAPTION   0x8Cu  /* char[], emptied every update */
 #define ADDR_HUD_PANEL_UPDATE  0x004193C0u  /* thiscall void(obj) */
 /* Three sprite slots, shared by the top and edge strips. */
 #define HUD_OFF_SPRITE0        0x58u
