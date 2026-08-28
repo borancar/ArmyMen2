@@ -5,53 +5,57 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `febeb9f`. Working tree clean.
+Last updated: **2026-08-28**, at `6d1be28`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,007 patches.**
+Nothing uncommitted. **1,012 patches.**
 
-Seven functions since the last snapshot. **Three object fields were settled by
-finding the OTHER function that touches them** -- which is the thread, and it
-is the same move each time: a field that one reader could only describe
-structurally becomes legible the moment its writer, or a table it indexes, is
-read.
+Six functions since the last snapshot, and one correction to `tools/ab.sh`.
 
-- **`OBJ_OFF_SARGE` (+0x548)**, from a string table. `ObjType2Field548` said
-  only "the dword at +0x548, but only for a type 2", and `LookupOwnerObj` said
-  "`ArmyLeader` was the name I nearly gave it. What the +0x548 test means is
-  not established." `UnitClassName` (`0x0044BAF0`) reads it and answers
-  **"Sarge"** from the entry before the class-name table -- so the leader
-  reading was right all along. Both comments updated.
+- **`FindRecordList`** (`0x00434100`) completes the record-list family --
+  maker, adder, free, find. **The adder and the finder disagree about what -1
+  means**: the adder refuses a DUPLICATE with it, this reports a MISS. Writing
+  the second from the first and carrying the convention across inverts both.
 
-- **`OBJ_OFF_RIDING` and `VEHICLE_OFF_PTR_LIST`**, from `BoardVehicle`
-  (`0x0045AAC0`). Both names came from separate readings; this is the single
-  function that writes both halves of the relationship, which turns two
-  plausible guesses into an evidenced pair.
+- **`ObjDropAltRecord`** (`0x00449200`) puts an object into state 5 and clears
+  its alternate table record -- and `ObjsAreAllied`, written a dozen commits
+  earlier from an unrelated call site, chooses that record only when the field
+  is NOT 5. The two agree without ever having met, which is what makes either
+  reading safe.
 
-- **`OBJ_OFF_PICKUP_AFTER` (+0xC8)**, from `CanPickUp` (`0x004337C0`). The
-  pickup path stamps it with the clock plus two seconds and nothing was known
-  to read it; this refuses an item until it has passed. **A re-pickup
-  cooldown**, which neither function says alone.
+- **`FreeWaveSounds`** (`0x0040C7A0`) walks the same array `StopAllSounds`
+  does and frees where that one merely stops. Both are right -- a level change
+  wants stopping, a shutdown wants freeing -- and the two loops are otherwise
+  identical, so reading one as the other makes this a leak or that a
+  use-after-free.
 
-- **`ArmySpriteBase`/`PreloadArmySprite`** (`0x00414AD0`, `0x00414B00`) -- the
-  sprite table is a hundred indices per army over a shared block. **Seventy
-  calls cover none of that**: the player is army 0 on every drive, so the
-  offset is 0, the index passes through and the retry is guarded off.
+- **It was measured through the LOG**, a first this session: it runs during
+  shutdown, so the control socket is gone before the counter can be read, and
+  the number reaches `trace_report()` on `DLL_PROCESS_DETACH` and nowhere
+  else -- exactly as `CLAUDE.md` records.
 
-- **`FreeHudWidgets`** (`0x004135C0`) tests all three HUD widgets, where
-  `HudPaint` and `HudUpdate` test only the optional third.
+- **`TakeSoldierName`** (`0x00447570`) hands out one of 62 developer names --
+  "R. Pavey", "D. Lee", "J. Wildblood". It walks FORWARD from a random start,
+  so names come out in table order from a random offset; when all are taken it
+  returns the start unmarked; and **nothing in the image ever clears a taken
+  flag**, so the sixty-third name is a repeat for the session.
 
-- **`RandomAround`** (`0x00402F00`) -- `spread` is an inverse TIGHTNESS, not a
-  range: more spread means fewer samples averaged, never a wider draw.
+- Two name indices sit four bytes apart and both are live -- `+0x5A8` into
+  `ADDR_KIND7_NAMES`, `+0x5AC` into this table. `orig.h` described the first
+  as "the random name index" not knowing there was a second.
 
-- **Coverage ranged over five orders of magnitude and each commit says which:**
-  `CanPickUp` 111,650 -- though which exit those took is not established --
-  `PreloadArmySprite` 70, `FreeHudWidgets` 1, and `BoardVehicle`,
-  `UnitClassName`, `RandomAround` and `LevelCount` all 0 with a stated reason.
-  `UnitClassName`'s 0 was worth a second look, since the HUD plainly shows
-  "Sarge": it does not come from there, and the identification rests on the
-  table rather than on the function running.
+- **`ResetItemsAndUids`** (`0x00429420`) seeds FIVE of the eight uid counters
+  to 1000 -- the four armies plus the neutral one, leaving 5..7 alone. So no
+  uid a level hands out has a counter below 1000.
+
+- **`ab.sh` said something too strong and now does not.** One `quit` run
+  reported an extra " Receive thread got event 0"; two further runs of the
+  same build were clean. The failure message said "compared as a set, so this
+  is real" -- but a sorted set absorbs ORDER, not a missing or extra line, and
+  that thread does not always see an event before it is told to stop. The
+  check is left FAILING rather than filtered, with a note not to tighten it
+  without a mutation showing what that would miss.
 
 ## Next
 
