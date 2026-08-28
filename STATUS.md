@@ -5,68 +5,61 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-28**, at `a1f38ea`. Working tree clean.
+Last updated: **2026-08-28**, at `d665d90`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted.
 
-Six functions since the last snapshot, 982 to 988 patches. **Four of them
-corrected a name or a claim that was already in the tree**, which is the
-thread worth carrying.
+Five functions since the last snapshot, 988 to 993 patches. **One bit polarity
+got confirmed from three unrelated places**, which is the result worth keeping.
 
-- **`AddRecordList`** (`0x00434150`) -- I declined this an hour before writing
-  it, because the records had no name I could justify. The name was already in
-  `orig.h`: `0x00434060` is `ADDR_MAKE_RECORD_LIST` with `LISTHDR_OFF_OWNER`
-  as its first dword, which is what this sorts on. **Grepping the callee is
-  the rule, and doing it late cost the detour.**
+- **`DeselectAll`** (`0x00427BA0`) -- walks the selected list, clearing
+  `OBJ_FLAG_SELECTED` and dropping uids that no longer resolve without
+  advancing the index. **That removal is pointless for the list and not for
+  the loop**: everything is cleared wholesale afterwards, but the count is
+  re-read each pass, so a dead uid shortens the walk.
 
-- It keeps two parallel structures -- an unsorted array of headers with the
-  slot written back, and a sorted `{owner, slot}` index binary-searched on the
-  way in. **The search is also the duplicate check**: not finding the owner
-  leaves the low bound exactly where the pair belongs.
+- **`BlitBitmapIn`** (`0x0041BA90`) -- the DIB blit. A POSITIVE height is
+  bottom-up, negative top-down; the stride is the width rounded to four. Its
+  key byte is ONE byte where orig.h's seam typedef had `uint32_t *`, so the
+  rest of `BMP_OFF_KEY` survives -- and that field arrives holding a count.
 
-- **`MakeAaiRecord`/`AddAaiRecord`** (`0x004344A0`, `0x004345A0`) -- the second
-  make-then-register pair, on the table `KeyLookup` searches. Structurally the
-  same insert, with three differences: keyed on `+8` not `+0`, the slot
-  written back into the record, and **a grow of nineteen where the other
-  grows by seventeen** -- two nearby tables a reader assumes share a constant.
+- Its return is not `stride * rows`: `edx` is reloaded from the raw height
+  only inside the copy loops, so a width of zero or less returns
+  `stride * count` and everything else `stride * signed height`.
 
-- **The register half corrected a field I had named one commit earlier.** I
-  called `+0x0C` `AAIREC_OFF_MINUS_ONE`, having seen only the maker seed it to
-  -1. It is the SLOT, and -1 means "not registered". Naming a field from one
-  of its two writers is the same failure as naming a function from one call
-  site.
+- **`MaskBlockWeight`** (`0x0045BBB0`) -- sums block weight over a vehicle
+  mask's points. **Kind 5 takes `BlockWeightChain` and every other kind takes
+  `BlockWeightTroops`** -- the "value being 5" recorded two commits earlier
+  without knowing what it was.
 
-- **All four run exactly 151 times** on one driven mission, so the two pairs
-  are in lockstep -- which no single body says and four counters do.
+- **`BeginMoveTo`** (`0x00439E90`) and **`NearestAllowedTile`**
+  (`0x0043A0A0`) -- the straight-line move test and the spiral search under
+  it. The second's orig.h comment said "what it is FOR is not established";
+  it is a search for a tile the object's point rule accepts, and it returns
+  that tile where the signature said void.
 
-- **`ArmyAlliedWithObj`** (`0x00457620`) is `ObjsAreAllied` from its
-  `army == 4` test onward, instruction for instruction. The image holds two
-  bodies and not a call, so the reconstruction does too. **80 calls against
-  its twin's 1** -- which catches an error made in ONE body and cannot catch
-  one made in both, and the second was written by reading the first.
+- **THE THREE-SIDED CONFIRMATION.** `ADDR_POINT_RULE_BOAT` is vehicle kind 5,
+  which the unit-type table calls `ptboat`, and it refuses a tile whose
+  `AM2_TILE_OPEN` bit is CLEAR -- exactly the terrain test `BlockWeightChain`
+  makes, and `BlockWeightChain` is what `MaskBlockWeight` picks for kind 5.
+  So the polarity that looked like the odd one out among three blocking
+  variants is the boat's rule, asked the same way in two places sharing no
+  code. The mask selector said "kind 5", the type table said "ptboat", and
+  the point rule said what a boat cannot cross.
 
-- **`BuildRowSet`** (`0x00434DA0`) -- a spec is four int32 whose halves go to
-  different places: x and y are OFFSETS added to a base, w and h a SIZE handed
-  to `RowAlloc`. Nothing in it is a sprite; `RowInit` gets a null one.
+- **Counters are getting less informative as the boundary closes, and the
+  commits say so each time.** `BlitBitmapIn` 0 because all four callers are
+  ours -- the pixels are its evidence, since the HUD panels and the Sarge
+  portrait are bitmaps it loads. `NearestAllowedTile` 1 while `BeginMoveTo`
+  alone calls it 51 times. `TraceTileLine` went 35 to 0 when `BeginMoveTo`
+  landed, and its own comment is marked superseded rather than left to read
+  as current. `MaskBlockWeight` 0, genuinely unreached.
 
-- **`SetWeaponTarget`** (`0x00446E70`) -- column 1 of five `ADDR_WEAPON_HANDLERS`
-  records. Its two arms differ in more than the target: an object puts the
-  unit's `OBJ_OFF_POSE` in the mode field, a point puts `0x1F`.
-
-- **Reading that table corrected `orig.h` again.** It said every field of a
-  handler record is a function pointer. Only the first two are: SLOT2's
-  readers do `test eax,eax; jl`, a SIGNED comparison nobody asks of a pointer,
-  and SLOT3 is a flag. The claim had been generalised from the two readers
-  that had been looked at.
-
-- **Coverage, and one wall measured from two sides.** `AddRecordList`,
-  `MakeAaiRecord`, `AddAaiRecord` 151 each; `ArmyAlliedWithObj` 80;
-  `BuildRowSet` 11; `SetWeaponTarget` **0** -- and that 0 has the same cause
-  as `SetPointerMode`'s 1: a weapon action needs a pointer mode above 0, and
-  no drive here installs one. Two functions, two commits apart, blocked on the
-  same missing drive.
+- **What no drive here covers**, stated rather than left implicit: the spiral
+  in `NearestAllowedTile` (most of the function), `MaskBlockWeight`'s
+  base-versus-offset chain point, and `DeselectAll`'s unresolvable-uid branch.
 
 ## Next
 
