@@ -7506,6 +7506,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* A UID is (owner << 29) | counter, so eight owners each with a 29-bit
  * counter. These are the per-owner counters, indexed 0..7. */
 #define ADDR_UID_COUNTERS   0x00511DE0u  /* uint32_t[8] */
+/* 0x00429420, one caller on the level-load path. ItemsReset, then seed the
+ * first FIVE uid counters to 1000 -- owners 0..4, which is the four armies
+ * plus the neutral one, leaving 5..7 alone. Reconstructed. */
+#define ADDR_RESET_ITEMS_AND_UIDS 0x00429420u  /* void(void) */
+#define AM2_UID_COUNTER_START     0x3E8        /* 1000 */
+#define AM2_UID_ARMY_OWNERS       5
 /* Owner used for the object types that do not carry their own. */
 #define ADDR_DEFAULT_OWNER  0x004F9FDCu  /* uint32_t */
 /* Non-zero enables the AddToItemList commentary. */

@@ -291,6 +291,10 @@ void __cdecl ObjDropAltRecord(void *obj);
  * the random starting index unmarked when every name is gone. */
 int32_t __cdecl TakeSoldierName(void);
 
+/* 0x00429420. ItemsReset, then seed the first five uid counters to 1000 --
+ * the four armies plus the neutral one; owners 5..7 are left alone. */
+void __cdecl ResetItemsAndUids(void);
+
 /* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);

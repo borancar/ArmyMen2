@@ -4276,6 +4276,37 @@ void __cdecl BoardVehicle(uint32_t uid, void *vehicle)
                 (void *)(uintptr_t)uid);
 }
 
+/* 0x00429420, one caller and it is on the level-load path. Reset the item
+ * registry, then seed uid counters.
+ *
+ * IT SEEDS FIVE OF THE EIGHT. ADDR_UID_COUNTERS is uint32_t[8] -- a uid is
+ * (owner << 29) | counter, so eight owners -- and this writes 1000 into the
+ * first five and leaves 5, 6 and 7 untouched. Five is the four armies plus the
+ * neutral one, which is the same five ObjsAreAllied and CommArmyOfSlot treat
+ * as real; whatever owners 5..7 are for, a level load does not reset them.
+ *
+ * The 1000 is written once into a register and stored five times, which is
+ * what makes it obvious the five are the same value rather than a coincidence
+ * of five separate constants.
+ *
+ * STARTING AT 1000 RATHER THAN 0 is worth noticing: it means no uid a level
+ * ever hands out has a counter below 1000, so a low uid in a save or a packet
+ * did not come from here.
+ *
+ * Runs once on a driven Boot Camp mission, at the level load. ItemsReset drops
+ * to 0 on the same run, which is the ordinary blind spot -- this calls it by
+ * name and it had no other caller.
+ */
+void __cdecl ResetItemsAndUids(void)
+{
+    int32_t i;
+
+    ItemsReset();
+
+    for (i = 0; i < AM2_UID_ARMY_OWNERS; i++)
+        ((uint32_t *)(uintptr_t)ADDR_UID_COUNTERS)[i] = AM2_UID_COUNTER_START;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
@@ -4284,6 +4315,8 @@ void item_install(void)
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,
                   "ItemsReset", 0);
+    patch_replace(ADDR_RESET_ITEMS_AND_UIDS, (const void *)ResetItemsAndUids,
+                  "ResetItemsAndUids", 1);
     patch_replace(ADDR_STEP_TYPE1_4, (const void *)StepType1And4,
                   "StepType1And4", 1);
     patch_replace(ADDR_TYPE238_ACTION, (const void *)Type238Action,
