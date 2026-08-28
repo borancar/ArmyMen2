@@ -4580,6 +4580,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * stores as "in order" swaps the last two. Named by SLOT so the swap is
  * visible at the use site. */
 #define ADDR_WEAPON_HANDLERS     0x00489880u  /* 16-byte records, 4 fns each */
+/* The soldier CLASS NAMES, indexed by the weapon code -- "Rifleman",
+ * "Grenadier", "Flamethrower", "Bazookaman", "Mortarman", "Machine Gunner" --
+ * with "Sarge" in the entry immediately BEFORE the table, which 0x0044BAF0
+ * reaches when OBJ_OFF_SARGE is set. Codes 0, 6, 7 and 8 point at
+ * ADDR_DIR_SCRATCH instead of a literal, so those have no fixed name.
+ *
+ * THIS IS WHAT SETTLES OBJ_OFF_SARGE. ObjType2Field548's comment says only
+ * "the dword at +0x548, but only for a type 2", and LookupOwnerObj's says
+ * "`ArmyLeader` was the name I nearly gave it. What the +0x548 test means is
+ * not established, so the claim is not made." It is established now: a unit
+ * with that field set is called Sarge, so LookupOwnerObj really does find the
+ * army's leader. */
+#define ADDR_UNIT_NAME_SARGE     0x00489B40u  /* the entry before the table */
+#define ADDR_UNIT_CLASS_NAMES    0x00489B44u  /* const char *[] by weapon code */
+#define OBJ_OFF_SARGE            0x548u
+/* 0x0044BAF0, one caller. A unit's class name: "Sarge" when OBJ_OFF_SARGE is
+ * set, otherwise the name for the code of the weapon it holds, and entry 0
+ * when it holds none. Reconstructed. */
+#define ADDR_UNIT_CLASS_NAME     0x0044BAF0u  /* const char *(void *unit) */
 #define ADDR_WEAPON_FN_SLOT0     0x005122D4u
 #define ADDR_WEAPON_FN_SLOT1     0x005122D8u
 #define ADDR_WEAPON_FN_SLOT2     0x005122F0u  /* int32_t, -1 by default */

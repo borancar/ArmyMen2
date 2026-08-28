@@ -80,7 +80,12 @@ int32_t __cdecl ObjIsType8(const AM2_Object *obj);
 int32_t __cdecl ObjIsType4(const AM2_Object *obj);
 
 /* 0x00457450. The dword at +0x548, but only for a type 2 object: null gives 0
- * and so does any other type, so the field is only meaningful on type 2. */
+ * and so does any other type, so the field is only meaningful on type 2.
+ *
+ * WHAT THE FIELD MEANS IS SETTLED NOW, and not from here. UnitClassName reads
+ * it and, when it is set, answers "Sarge" from the entry before the class-name
+ * table -- so OBJ_OFF_SARGE is the name it goes by, and this predicate is
+ * "is this the army's Sarge". */
 uint32_t __cdecl ObjType2Field548(const AM2_Object *obj);
 
 /* Original: 0x00427D40, fifteen callers. The event mask for an object -- top

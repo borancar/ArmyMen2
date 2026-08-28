@@ -275,6 +275,10 @@ void *__cdecl WeaponByUid(uint32_t uid);
  * when the slot is empty or does not hold a weapon. */
 int32_t __cdecl HeldWeaponCode(void *unit);
 
+/* 0x0044BAF0. A unit's class name: "Sarge" when OBJ_OFF_SARGE is set, else
+ * the name for its weapon's code, else entry 0. */
+const char *__cdecl UnitClassName(void *unit);
+
 /* 0x00449660. Set a unit's soldier kind from the code of the weapon now in
  * its hands -- the value HeldWeaponCode returns. Code 0 writes nothing. */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);

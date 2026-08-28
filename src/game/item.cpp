@@ -194,6 +194,54 @@ int32_t __cdecl HeldWeaponCode(void *unit)
                                       + OBJ_OFF_FIELD_C0);
 }
 
+/* 0x0044BAF0, one caller. A unit's class NAME.
+ *
+ * "Sarge" when OBJ_OFF_SARGE is set; otherwise the entry for the code of the
+ * weapon it holds; and entry 0 when it holds none. The same three steps
+ * HeldWeaponCode above takes, ending in a table lookup instead of the code.
+ *
+ * READING THAT TABLE SETTLES A FIELD TWO OTHER COMMENTS GAVE UP ON.
+ * ObjType2Field548 says only "the dword at +0x548, but only for a type 2", and
+ * LookupOwnerObj's comment says "`ArmyLeader` was the name I nearly gave it.
+ * What the +0x548 test means is not established, so the claim is not made."
+ * It is established now: the field's only effect here is to make the unit
+ * called "Sarge", so LookupOwnerObj really does find the army's leader. A
+ * string table names a field that two functions reading it could not.
+ *
+ * "SARGE" IS THE ENTRY BEFORE THE TABLE, at 0x00489B40 rather than inside it,
+ * which is why it is a separate name here rather than an index. Codes 0, 6, 7
+ * and 8 point at ADDR_DIR_SCRATCH instead of a literal, so those units have no
+ * fixed name and the caller sees whatever that buffer holds.
+ *
+ * THE CODE IS NOT BOUNDED. Whatever the weapon's OBJ_OFF_FIELD_C0 record says
+ * indexes the table, so a code past its end reads whatever follows.
+ * Reproduced; the shipped codes are the eleven the table covers.
+ *
+ * MEASURED AT 0, which is worth a second look because the HUD's SQUAD panel
+ * plainly shows "Sarge" during a mission. It does not come from here: this has
+ * one caller and that caller is the original's, so the counter is not blind
+ * and the panel's name reaches it some other way. The identification does not
+ * depend on the function running -- it rests on what the table holds, which is
+ * six class names with "Sarge" in the slot before them.
+ */
+const char *__cdecl UnitClassName(void *unit)
+{
+    const uint8_t      *u = (const uint8_t *)unit;
+    const char *const  *names =
+        (const char *const *)AM2_IMAGE(ADDR_UNIT_CLASS_NAMES);
+    const uint8_t      *w;
+
+    if (*(const int32_t *)(u + OBJ_OFF_SARGE))
+        return *(const char *const *)AM2_IMAGE(ADDR_UNIT_NAME_SARGE);
+
+    w = (const uint8_t *)WeaponByUid(
+            *(const uint32_t *)(u + TROOPER_OFF_WEAPON_UID));
+    if (!w)
+        return names[0];
+
+    return names[**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)];
+}
+
 void *__cdecl WeaponByUid(uint32_t uid)
 {
     uint32_t *obj;
@@ -4191,6 +4239,8 @@ void item_install(void)
                   "NotifyDropped", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
+    patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,
+                  "UnitClassName", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,

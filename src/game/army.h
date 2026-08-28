@@ -62,8 +62,11 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3);
  * with a non-zero field at +0x548. Null when the army is out of range or
  * nothing qualifies.
  *
- * `ArmyLeader` was the name I nearly gave it. What the +0x548 test means is
- * not established, so the claim is not made. What IS known is what audio.cpp
+ * `ArmyLeader` was the name I nearly gave it, and the +0x548 test is why it
+ * was not: what that field meant was not established. It is now. UnitClassName
+ * answers "Sarge" for a unit with OBJ_OFF_SARGE set, so this really does find
+ * the army's leader and `ArmyLeader` would have been right. The name stays as
+ * the image's own, but the caution can go. What IS known is what audio.cpp
  * uses it for: `LookupOwnerObj(g_defaultOwner)` is where the ear is. */
 void *__cdecl LookupOwnerObj(uint32_t owner);
 
