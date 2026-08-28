@@ -199,10 +199,10 @@ static const am2_void_fn kTeardown[] = {
      * than free" until docs/functions.tsv was checked against the disassembly:
      * 0x0043C720 is twelve bytes and the rest of that entry is the roach
      * mask builder next door. A merged entry, exactly as merges.py says. */
-    /* Eight of the thirteen are ours and go in BY NAME. Reaching them by
+    /* Nine of the thirteen are ours and go in BY NAME. Reaching them by
      * address worked -- the detour is there -- but it is the seam
      * tools/checkseams.py exists to stop, and this table was invisible to it
-     * for as long as the table held plain integers. The other four are still
+     * for as long as the table held plain integers. The other three are still
      * the original's and stay as addresses; the shape says which is which. */
     FreeExplosionAnims, FreeMissileAnims, FreeRoachAnims,
     FreeVehicleAnims, FreeSoldierAnims,
@@ -210,7 +210,7 @@ static const am2_void_fn kTeardown[] = {
     (am2_void_fn)(uintptr_t)0x00445F40u,
     (am2_void_fn)(uintptr_t)0x00446880u,
     (am2_void_fn)(uintptr_t)0x0042E590u,
-    (am2_void_fn)(uintptr_t)0x0040C9F0u,
+    ShutdownAudio,
     ShutdownDirectDraw, ShutdownInput,
 };
 

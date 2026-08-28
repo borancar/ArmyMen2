@@ -371,6 +371,38 @@ void __cdecl FreeWaveSounds(void)
     FreeDynamicSounds();
 }
 
+/* 0x0040C9F0. Bring the audio subsystem down: stop the stream, free the wave
+ * sounds, release the DirectSound objects. The mirror of InitAudio, which sits
+ * 0x40 bytes in front of it and sets the very flag this tests.
+ *
+ * THE FLAG IS THE WHOLE NAME. Nothing in the body says "audio" that its three
+ * callees do not say already; what makes ShutdownAudio a reading rather than a
+ * guess is that ADDR_AUDIO_ENABLED gates it and InitAudio is that flag's only
+ * writer. Taken as a pair there is no other reading.
+ *
+ * It leaves the flag SET. A second call would stop an already-stopped stream
+ * and walk an already-cleared slot array, which is why FreeWaveSounds clears
+ * each slot after freeing it -- its comment records that its caller is on a
+ * path where things get called twice. Reproduced, not tidied.
+ *
+ * ITS COUNTER WILL READ 0, AND THAT IS PREDICTED. It is the tenth entry of
+ * ShutdownSubsystems' teardown table, which is ours, so the call reaches this
+ * function by name and never crosses the patched entry. What moves instead is
+ * FreeWaveSounds: 1 while this was the original's, 0 once it is not, and that
+ * disappearance is the evidence the new code ran. `ab.sh quit` is the only
+ * configuration that reaches any of it, and only through the log -- the
+ * control socket is gone by the time a teardown has run.
+ */
+void __cdecl ShutdownAudio(void)
+{
+    if (!*(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED)
+        return;
+
+    StopAudioStream();
+    FreeWaveSounds();
+    ReleaseSoundObjects();
+}
+
 /* 8-bit PCM is unsigned, so its silence is 0x80; 16-bit is signed and silence
  * is 0. The original derives this branchlessly and then smears the byte across
  * a dword to fill with `rep stosd`. */
@@ -1747,6 +1779,8 @@ int audio_install(void)
                         "LoadWaveSound", 3);
     rc |= patch_replace(ADDR_FREE_DYN_SOUNDS, (const void *)FreeDynamicSounds,
                         "FreeDynamicSounds", 0);
+    rc |= patch_replace(ADDR_SHUTDOWN_AUDIO, (const void *)ShutdownAudio,
+                        "ShutdownAudio", 0);
     rc |= patch_replace(ADDR_FREE_WAVE_SOUNDS, (const void *)FreeWaveSounds,
                         "FreeWaveSounds", 1);
     rc |= patch_replace(ADDR_UPDATE_3D_AUDIO, (const void *)Update3DAudioVolumes,

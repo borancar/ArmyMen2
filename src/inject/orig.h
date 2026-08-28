@@ -1791,6 +1791,15 @@
  * src/game/win32/wavefile.cpp. Reconstructed in src/game/win32/audio.cpp.
  */
 #define ADDR_STOP_AUDIO_STREAM   0x0040D5D0u  /* void(void) */
+/* 0x0040C9F0, InitAudio's counterpart and the tenth of ShutdownSubsystems'
+ * ordered teardown entries. Gated on exactly the flag InitAudio sets, which is
+ * what grounds the name: nothing in the body says "audio" that its three
+ * callees do not say already, and that flag has exactly one writer.
+ *
+ * It does NOT clear the flag, so a second call would run the whole thing
+ * again. Safe rather than sloppy -- FreeWaveSounds clears each slot after
+ * freeing it for that reason, and its own comment says so. */
+#define ADDR_SHUTDOWN_AUDIO      0x0040C9F0u  /* void(void) */
 #define ADDR_START_AUDIO_STREAM  0x0040D680u  /* void(void *track, int32) */
 #define ADDR_AUDIO_ENABLED       0x004FA468u  /* int32_t; nothing runs while clear */
 #define ADDR_AUDIO_BUFFER        0x004FA404u  /* IDirectSoundBuffer *, the stream */

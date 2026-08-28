@@ -51,6 +51,10 @@ void __cdecl StartAudioStream(void *track, int32_t which);
  * immediately afterwards. */
 void __cdecl ReleaseSoundObjects(void);
 
+/* Original: 0x0040C9F0. Bring audio down -- the mirror of InitAudio, and the
+ * audio entry of ShutdownSubsystems' ordered teardown. */
+void __cdecl ShutdownAudio(void);
+
 /* Original: 0x0040C800, 1 call site. Bring DirectSound up.
  *
  * Creates the object, takes priority cooperative level, makes a primary buffer
