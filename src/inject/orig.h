@@ -430,6 +430,29 @@
  * strip is also the panel's tab. It arbitrates that press through
  * ADDR_MOUSE_GRAB exactly as the top strip does. */
 #define ADDR_HUD_EDGE_UPDATE   0x004196E0u  /* thiscall void(obj) */
+/* Vtable slot 1 of the same class: it draws, top to bottom, exactly what the
+ * update above fills. One vertical pen runs the whole function and every
+ * element advances it, so the layout is a STACK and not a set of fixed
+ * positions -- an element that is absent takes no space.
+ *
+ * Bars grow UPWARD from a baseline at pen + AM2_HUD_BAR_BASE: the rectangle is
+ * `top = pen + 94 - percent`, which is why the bar width constant is 90 and
+ * the baseline 94. Four pixels of margin, and nothing else in it.
+ *
+ * The ammo is clamped for display rather than by the update: over 99 it draws
+ * AM2_HUD_AMMO_OVER, otherwise "%02d". */
+#define ADDR_HUD_EDGE_PAINT    0x00419AC0u  /* thiscall void(obj, RECT) */
+#define EDGE_OFF_SPRITE        0x5Cu   /* AM2_Sprite *, drawn under each label */
+#define EDGE_OFF_AMMO_SPRITE   0x60u   /* AM2_Sprite *, drawn above the count */
+#define AM2_HUD_BAR_BASE       0x5E    /* 94: the bar's baseline below the pen */
+#define AM2_HUD_BAR_X          4       /* inset from the strip's left */
+#define AM2_HUD_BAR_W          8       /* left+4 .. left+12 */
+#define AM2_HUD_EDGE_GAP       8       /* after a text element */
+#define AM2_HUD_EDGE_GAP_BAR   0x10    /* 16, after a bar */
+#define AM2_HUD_AMMO_MAX       99
+#define AM2_HUD_STR_SARGE      0x00476FA8u
+#define AM2_HUD_STR_AMMO_FMT   0x00476F9Cu  /* "%02d" */
+#define AM2_HUD_STR_AMMO_OVER  0x00476FA4u  /* "**" */
 #define EDGE_OFF_HEALTH_PCT    0x64u   /* int32_t, the trooper's own bar */
 #define EDGE_OFF_CAPTION_A     0x68u   /* char[], the vehicle or ARMOR */
 #define EDGE_OFF_SECOND_PCT    0x88u   /* int32_t, whatever A names */
