@@ -29,7 +29,13 @@
  * when the value is going out rather than coming in. */
 #define ADDR_WRITE_SAVE_TAG 0x00423680u  /* void(FILE*, uint32_t) */
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
-#define ADDR_RECT_SET       0x0042E1C0u  /* void(AM2_Rect*,int32,int32,int32,int32) */
+/* RETURNS ITS ARGUMENT -- see rect.h, which is the authority here. This comment
+ * said `void` and that is the stale remnant of the first reading: it happened
+ * to work because the compiler also chose eax to hold `r`, by luck and not by
+ * contract, and a different optimisation level would have broken all 186 call
+ * sites at once. Prefer the reconstructed declaration over the note beside an
+ * address; the header is maintained with the code. */
+#define ADDR_RECT_SET       0x0042E1C0u  /* AM2_Rect *(AM2_Rect*,int32 x4) */
 #define ADDR_CLAMP          0x0042E180u  /* int32_t(int32_t v, int32_t lo, int32_t hi) */
 #define ADDR_POINT_IN_RECT  0x0042E1F0u  /* int32_t(const AM2_Rect*, const AM2_Point*) */
 
