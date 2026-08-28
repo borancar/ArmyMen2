@@ -5946,6 +5946,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * The owner keys are compared UNSIGNED -- the search uses `jae`.
  * 151 calls on a driven Boot Camp mission, one per ADDR_MAKE_RECORD_LIST. */
 #define ADDR_ADD_RECORD_LIST     0x00434150u  /* int32_t(void *list) */
+/* 0x004344A0, seven callers, and every one of them hands the result straight
+ * to 0x004345A0 -- the same make-then-register pair ADDR_MAKE_RECORD_LIST and
+ * ADDR_ADD_RECORD_LIST form one entry above.
+ *
+ * It builds a 0x40-byte record from seven arguments and, when the type is not
+ * negative, SEEDS ten more fields from the object.aai record for that type and
+ * key through ADDR_DEF_FIND_OBJ_REC. So the record is an instance of a
+ * definition; what it is an instance OF is not established here, and the name
+ * says only where the fields come from.
+ *
+ * The key is split with PackKey's arithmetic -- low 7 bits and the next 10 --
+ * which is the same split ADDR_KEY_LOOKUP_TRIPLE performs, and is what ties
+ * this to the .aai vocabulary rather than to a table of its own.
+ * Reconstructed; 151 calls on a driven Boot Camp mission, matching
+ * ADDR_ADD_RECORD_LIST exactly. */
+#define ADDR_MAKE_AAI_RECORD     0x004344A0u  /* void *(type,key,slot,4 more) */
+#define AM2_AAI_RECORD_BYTES     0x40u
+#define AAIREC_OFF_TYPE          0x00u   /* 0x2E when the argument is negative */
+#define AAIREC_OFF_KEY           0x08u
+#define AAIREC_OFF_MINUS_ONE     0x0Cu   /* always -1 */
+#define AAIREC_OFF_LIST_SLOT     0x10u   /* into ADDR_RECORD_LISTS, 0 for none */
 #define ADDR_RECORD_LIST_CAP     0x00516138u  /* int32_t, slots allocated */
 #define ADDR_RECORD_LIST_COUNT   0x0051613Cu  /* int32_t, slots used */
 #define ADDR_RECORD_LISTS        0x00516140u  /* void **, one per slot */

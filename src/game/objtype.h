@@ -47,6 +47,11 @@ void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner);
  * the slot, or -1 when that owner already has one. */
 int32_t __cdecl AddRecordList(void *list);
 
+/* 0x004344A0. A 0x40-byte record from seven arguments, seeded from the
+ * object.aai record for its (type, key) when the type is not negative. */
+void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
+                            int32_t a, int32_t b, int32_t c, int32_t d);
+
 /* 0x00434E60, three callers. Clear bit 0 on every row the sub-list holds. Its
  * argument is the sub-list header, not the object. */
 void __cdecl SubrecHideRows(void *subrec);

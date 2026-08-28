@@ -19,6 +19,7 @@
 #include "objtable.h"
 #include "objflag.h"       /* ObjFlagClear0 -- reconstructed */
 #include "misc.h"          /* CommArmyOfSlot -- reconstructed */
+#include "defparse.h"      /* DefFindObjRec -- reconstructed */
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -374,6 +375,98 @@ int32_t __cdecl AddRecordList(void *list)
     return slot;
 }
 
+/* 0x004344A0, seven callers, and every one of them hands the result straight
+ * to 0x004345A0 -- the same make-then-register shape MakeRecordList and
+ * AddRecordList have above.
+ *
+ * It allocates a zeroed 0x40-byte record, writes seven arguments into it, and
+ * then -- only when the type is not negative -- SEEDS ten more fields from the
+ * object.aai record for that (type, key) through DefFindObjRec. So the record
+ * is an instance of a definition. What it is an instance OF is not established
+ * here and the name claims nothing more than where the fields come from.
+ *
+ * A NEGATIVE TYPE BECOMES 0x2E AND SKIPS THE LOOKUP. Both halves of that are
+ * the same test, spelled twice: the store picks 0x2E, and the branch further
+ * down skips the seeding. So a record built with a negative type carries a
+ * type of 46 and none of the definition's fields, which is a different thing
+ * from a record whose lookup missed -- that one keeps its real type and is
+ * also unseeded. The two are indistinguishable afterwards.
+ *
+ * THE KEY IS SPLIT WITH PackKey's ARITHMETIC -- low 7 bits, then the next 10 --
+ * which is the same split KeyLookupTriple performs. That is what ties this to
+ * the .aai vocabulary rather than to some table of its own.
+ *
+ * THE SEEDED COPY IS NOT IN ORDER, and the last two fields are the trap: the
+ * destination's +0x38 takes the source's +0x30 and its +0x3A takes the
+ * source's +0x28. Everything before them ascends in step. Transcribing the
+ * block as a run would swap those two and nothing here would notice.
+ *
+ * THE TAIL WRITES BACK INTO THE RECORD LIST. When a slot was given, every
+ * twelve-byte entry of that list gets its +8 set to the record's +0x30 --
+ * zero-extended from a uint16 into an int32. The count is re-read from the
+ * header on every iteration, which cannot change anything and is reproduced as
+ * the plain loop it amounts to.
+ *
+ * MEASURED AT 151 CALLS on a driven Boot Camp mission, matching
+ * AddRecordList exactly on the same run -- so the two really are
+ * one-for-one, and the make-then-register reading holds by count as well
+ * as by call site. The negative-type arm is reached by construction rather
+ * than by luck: the caller at 0x00434789 pushes a literal -1, so the 0x2E
+ * substitution and the skipped lookup are both on the compared path.
+ * DefFindObjRec reads 1,689 on the same run, which is its OTHER callers --
+ * ours reaches it by name.
+ */
+void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
+                            int32_t a, int32_t b, int32_t c, int32_t d)
+{
+    uint8_t *rec = (uint8_t *)am2_malloc(AM2_AAI_RECORD_BYTES);
+    uint8_t *def;
+
+    memset(rec, 0, AM2_AAI_RECORD_BYTES);
+
+    *(int32_t *)(rec + AAIREC_OFF_TYPE)      = type >= 0 ? type : 0x2E;
+    *(int32_t *)(rec + AAIREC_OFF_KEY)       = key;
+    *(int32_t *)(rec + AAIREC_OFF_MINUS_ONE) = -1;
+    *(int32_t *)(rec + AAIREC_OFF_LIST_SLOT) = slot;
+    *(int32_t *)(rec + 0x14)                 = a;
+    *(int32_t *)(rec + 0x18)                 = b;
+    *(int32_t *)(rec + 0x1C)                 = c;
+    *(int32_t *)(rec + 0x20)                 = d;
+
+    if (type < 0)
+        return rec;
+
+    def = (uint8_t *)DefFindObjRec(type, (key >> 7) & 0x3FF, key & 0x7F);
+    if (def) {
+        *(int32_t *)(rec + 0x24) = *(const int32_t *)(rec + AAIREC_OFF_TYPE);
+        *(int32_t *)(rec + 0x28) = *(const int32_t *)(def + 0x10);
+        *(int16_t *)(rec + 0x2C) = *(const int16_t *)(def + 0x14);
+        *(uint8_t *)(rec + 0x2E) = *(const uint8_t *)(def + 0x18);
+        *(uint8_t *)(rec + 0x2F) = *(const uint8_t *)(def + 0x1C);
+        *(int16_t *)(rec + 0x30) = *(const int16_t *)(def + 0x20);
+        *(int32_t *)(rec + 0x34) = *(const int32_t *)(def + 0x24);
+        /* Out of order, and deliberately: +0x38 takes +0x30, +0x3A takes
+           +0x28. */
+        *(int16_t *)(rec + 0x38) = *(const int16_t *)(def + 0x30);
+        *(int16_t *)(rec + 0x3A) = *(const int16_t *)(def + 0x28);
+        *(uint8_t *)(rec + 0x3C) = *(const uint8_t *)(def + 0x34);
+    }
+
+    if (slot > 0) {
+        uint8_t *list = (uint8_t *)
+            (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot];
+        int32_t  n    = *(const int32_t *)(list + LISTHDR_OFF_COUNT);
+        uint8_t *ents = *(uint8_t *const *)(list + LISTHDR_OFF_RECORDS);
+        int32_t  i;
+
+        for (i = 0; i < n; i++)
+            *(int32_t *)(ents + i * AM2_LIST_RECORD_BYTES + 8) =
+                (int32_t)*(const uint16_t *)(rec + 0x30);
+    }
+
+    return rec;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -386,6 +479,8 @@ int objtype_install(void)
                         "MakeRecordList", 8);
     rc |= patch_replace(ADDR_ADD_RECORD_LIST, (const void *)AddRecordList,
                         "AddRecordList", 8);
+    rc |= patch_replace(ADDR_MAKE_AAI_RECORD, (const void *)MakeAaiRecord,
+                        "MakeAaiRecord", 7);
     rc |= patch_replace(ADDR_SUBREC_HIDE_ROWS, (const void *)SubrecHideRows,
                         "SubrecHideRows", 3);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);
