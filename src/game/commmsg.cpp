@@ -587,12 +587,16 @@ void __cdecl ExitGamePostClose(void)
 
 typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);
 typedef void (__cdecl *AM2_MsgHandlerFn)(void *msg, int32_t dpid);
-typedef void (__cdecl *AM2_HudMessageFn)(const char *text, int32_t colour);
+/* Forward-declared rather than reached through win32/widget.h, which is the
+   same reason script.cpp forward-declares PreloadSprite: this module is in the
+   flat half and that header names Win32 types. The definition is in
+   win32/widget.cpp, whose header is `extern "C"` like every other, so this
+   has to be too or the two mangle differently and only the linker notices. */
+extern "C" void __cdecl HudMessage(const char *text, int32_t colour);
 /* MenuMessage is reconstructed below; this forward declaration is here
  * because the two callers in this file come before it. */
 void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
 
-#define orig_hud_message   ((AM2_HudMessageFn)(uintptr_t)ADDR_HUD_MESSAGE)
 
 #define AM2_MSG_TYPE   0        /* the first dword: what the arm is chosen on */
 #define AM2_MSG_SENDER 8        /* the chat arm reads this as a SIGNED byte */
@@ -617,7 +621,7 @@ static void DispatchChat(const uint8_t *msg)
     /* SIGNED, and then shifted left eight -- a negative sender would index
      * backwards out of the table. The original's, and the table is 256-byte
      * records of which only the first byte is read. */
-    orig_hud_message((const char *)(msg + AM2_MSG_TEXT),
+    HudMessage((const char *)(msg + AM2_MSG_TEXT),
                      *(const uint8_t *)((uintptr_t)ADDR_CHAT_COLOUR_TABLE
                                         + (uintptr_t)(sender << 8)));
 }

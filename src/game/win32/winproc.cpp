@@ -183,7 +183,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
 #define orig_remove_player  (*(am2_int_fn2)ADDR_REMOVE_PLAYER)
 #define orig_lobby_reset    (*(am2_void_fn2)ADDR_LOBBY_RESET)
-#define orig_hud_message    (*(am2_str_int_fn)ADDR_HUD_MESSAGE)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -282,7 +281,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
 
     orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_LEFT_AI,
                  PlayerName(comm, slot));
-    orig_hud_message(text, g_hudColour);
+    HudMessage(text, g_hudColour);
     return 1;
 }
 
@@ -305,7 +304,7 @@ static LRESULT OnHostMigrated(void)
     orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_HOST_NOW,
                  PlayerName(comm, g_ourSlot));
     if (g_gameState == 2)
-        orig_hud_message(text, g_hudColour);
+        HudMessage(text, g_hudColour);
     else
         MenuMessage(text, 4, 1);
     SendChatMsg(text, 1);

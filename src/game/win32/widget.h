@@ -1458,6 +1458,10 @@ int32_t __cdecl HudPanelWidth(void);
  * action at once and revert to mode 0. */
 void __cdecl SetPointerMode(int32_t mode);
 
+/* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
+ * written as a '^' escape ahead of the text. */
+void __cdecl HudMessage(const char *text, int32_t colour);
+
 int widget_install(void);
 
 #ifdef __cplusplus

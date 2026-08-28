@@ -1625,6 +1625,22 @@
  * flags, which makes fog a negotiated multiplayer option. */
 #define ADDR_SET_FOG_OF_WAR      0x004295C0u  /* void(int32_t noFog) */
 #define ADDR_LOBBY_RESET         0x00413480u  /* void(void), 320 bytes */
+/* The HUD's message LOG, inside ADDR_HUD_WIDGET_A. Twelve rows of 88 bytes at
+ * +0x6C, a live count at +0x594, and a running total of characters at +0x59C.
+ * A row is text at +0, an x position as a FLOAT at +0x50, and the text's width
+ * at +0x54 -- so the text has 80 bytes and nothing checks that. */
+#define HUDLOG_OFF_ROWS          0x6Cu
+#define HUDLOG_OFF_COUNT         0x594u
+#define HUDLOG_OFF_TOTAL         0x59Cu
+#define AM2_HUD_MSG_SIZE         0x58u   /* 88 */
+#define AM2_HUD_MSG_ROWS         12
+#define HUDMSG_OFF_X             0x50u   /* float */
+#define HUDMSG_OFF_WIDTH         0x54u   /* int32_t, TextExtent of the TEXT */
+#define AM2_HUD_MSG_X_MIN        0x280   /* 640: never further left than this */
+#define AM2_HUD_MSG_GAP          0x20    /* added between one row and the next */
+#define AM2_HUD_TOTAL_CAP        10      /* per message, whatever its length */
+/* Reconstructed. 46 callers and NONE of them runs on any drive here -- 0 on
+ * Boot Camp and 0 on the campaign -- so it is verified by reading. */
 #define ADDR_HUD_MESSAGE         0x004144A0u  /* void(const char *, int32), 384 bytes */
 #define ADDR_MENU_MESSAGE        0x00431C30u  /* void(const char *, int32, int32) */
 /* What MenuMessage reaches. The log itself is the string-list class already

@@ -5860,6 +5860,109 @@ int32_t __cdecl HudPanelWidth(void)
     return w->rect.right - w->rect.left;
 }
 
+/* 0x004144A0, forty-six callers -- the most-called thing left unreconstructed.
+ * Append one line to the HUD's message log.
+ *
+ * THE SECOND ARGUMENT IS A COLOUR AND IT BECOMES PART OF THE STRING. A
+ * non-zero colour writes '^' and the colour byte ahead of the text, so the row
+ * holds "^<colour><text>" and the renderer's escape handling does the rest. A
+ * zero colour writes the text alone -- there is no "default colour" escape.
+ * Both seams this replaces already called the parameter a colour, which is
+ * what the two stores confirm rather than establish.
+ *
+ * THE WIDTH IS MEASURED ON THE TEXT, NOT ON WHAT WAS STORED. TextExtent is
+ * handed the caller's pointer, so the two escape bytes are not in the
+ * measurement -- which happens to be right, since TextExtent skips '^' anyway,
+ * but it is not why: the original simply never measures the composed string.
+ *
+ * SCROLLING DROPS THE OLDEST AND HAPPENS FIRST. At twelve rows it moves eleven
+ * rows down by one and sets the count to eleven, so the new line always has
+ * somewhere to go and the count is never bounded anywhere else.
+ *
+ * THE X POSITION CHAINS OFF THE PREVIOUS ROW: previous x, plus the previous
+ * row's width, plus a gap, floored at 640 -- and an empty log starts at 640
+ * outright. The floor is a maximum on how far LEFT a row can start, so the
+ * first message of a burst sits at the right edge and each one after it steps
+ * further right. Stored as a float and read back through an int truncation,
+ * which is what the original's _ftol does and what a C cast does.
+ *
+ * THE RUNNING TOTAL COUNTS AT MOST TEN PER MESSAGE, whatever the length. The
+ * original computes strlen TWICE on the short path, which is what a `min`
+ * compiles to when the compiler cannot prove the string is unchanged; written
+ * as the min it is.
+ *
+ * NOTHING BOUNDS THE COPY. A row gives the text 80 bytes before the x position
+ * begins, and this is a plain copy of the caller's string. Reproduced.
+ *
+ * MEASURED AT 0 ON BOTH DRIVES, and with forty-six callers that is worth
+ * saying rather than assuming. Boot Camp with movement and fire, and the
+ * campaign through SELECT PLAYER into MAP 01, both leave it at 0; the counter
+ * is not blind, since forty-four of the callers are still the original's and
+ * reach it by address, and the two that are ours are the multiplayer chat
+ * path. So the HUD message log is for events no drive here produces, and every
+ * word above -- the x chaining, the float truncation, the escape composition,
+ * the ten-character cap -- is verified by reading and by nothing else.
+ */
+void __cdecl HudMessage(const char *text, int32_t colour)
+{
+    uint8_t *h = *(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_A;
+    uint8_t *rows;
+    uint8_t *row;
+    char    *dst;
+    int32_t  n;
+    int32_t  x;
+    size_t   len;
+
+    if (!h)
+        return;
+
+    rows = h + HUDLOG_OFF_ROWS;
+
+    if (*(const int32_t *)(h + HUDLOG_OFF_COUNT) >= AM2_HUD_MSG_ROWS) {
+        int32_t i;
+
+        for (i = 0; i < AM2_HUD_MSG_ROWS - 1; i++)
+            memcpy(rows + i * AM2_HUD_MSG_SIZE,
+                   rows + (i + 1) * AM2_HUD_MSG_SIZE,
+                   AM2_HUD_MSG_SIZE);
+        *(int32_t *)(h + HUDLOG_OFF_COUNT) = AM2_HUD_MSG_ROWS - 1;
+    }
+
+    n   = *(const int32_t *)(h + HUDLOG_OFF_COUNT);
+    row = rows + n * AM2_HUD_MSG_SIZE;
+
+    if ((uint8_t)colour) {
+        row[0] = '^';
+        row[1] = (uint8_t)colour;
+        dst    = (char *)row + 2;
+    } else {
+        dst = (char *)row;
+    }
+
+    strcpy(dst, text);
+
+    *(int32_t *)(row + HUDMSG_OFF_WIDTH) = TextExtent(text, 1, (int32_t *)0);
+
+    x = AM2_HUD_MSG_X_MIN;
+    if (n > 0) {
+        const uint8_t *prev = row - AM2_HUD_MSG_SIZE;
+        int32_t        v    = (int32_t)*(const float *)(prev + HUDMSG_OFF_X)
+                              + *(const int32_t *)(prev + HUDMSG_OFF_WIDTH)
+                              + AM2_HUD_MSG_GAP;
+
+        if (v >= AM2_HUD_MSG_X_MIN)
+            x = v;
+    }
+    *(float *)(row + HUDMSG_OFF_X) = (float)x;
+
+    *(int32_t *)(h + HUDLOG_OFF_COUNT) = n + 1;
+
+    len = strlen(text);
+    if (len > AM2_HUD_TOTAL_CAP)
+        len = AM2_HUD_TOTAL_CAP;
+    *(int32_t *)(h + HUDLOG_OFF_TOTAL) += (int32_t)len;
+}
+
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
 typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
 
@@ -6487,5 +6590,7 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
+                        "HudMessage", 46);
     return rc;
 }
