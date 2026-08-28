@@ -24,6 +24,8 @@
 #include "crt.h"       /* the game's allocator owns the grid */
 #include "item.h"      /* RowUnregisterAll -- reconstructed */
 #include "misc.h"      /* ListUnlink -- reconstructed */
+#include "anim.h"      /* AM2_Anim and the table it lives in */
+#include "image.h"
 #include "crt.h"       /* am2_malloc -- the game's own */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -773,9 +775,140 @@ void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
     RowUpdate(r, 0, desc);
 }
 
+/* 0x0040A1A0, eleven callers. Put a row on an animation frame: pick up the
+ * animation whose entry id matches, reset it to cell 0, and set the sprite the
+ * new cell asks for.
+ *
+ * FOUR OF THE FRAME VALUES ARE NOT FRAMES. -2 returns at once, -1 means "the
+ * frame it is already on", 0 clears bit 0 of the row's first dword and returns
+ * without touching the animation at all, and only then is the value an id to
+ * look up. So a caller can say "stop", "again" or "nothing" through the same
+ * argument, and a reconstruction that range-checked the id would swallow three
+ * of the four.
+ *
+ * `force` is only consulted for the early-out: without it, asking for the
+ * frame the row is already on returns immediately. With it, everything below
+ * runs again -- which is what restarts an animation from cell 0.
+ *
+ * A PENDING TABLE IS TAKEN UP HERE AND NOWHERE ELSE. ROW_OFF_ANIM_NEXT, when
+ * set, becomes ROW_OFF_ANIM_CUR and is cleared; that is the only consumer of
+ * the field, so a table queued by anyone else waits for the next frame change.
+ *
+ * THE SEARCH FALLS BACK TO ENTRY 0 RATHER THAN FAILING. An id that is not in
+ * the table takes entry 0 and the row is still told it is on the requested
+ * frame -- ROW_OFF_FRAME is written from the argument, not from the entry
+ * found. Reproduced; a not-found that returned early would leave the row on
+ * its old animation and is the obvious tidier version.
+ *
+ * The heading it draws with is ROW_OFF_HEADING plus a per-FRAME bias byte from
+ * ADDR_FRAME_HEADING_BIAS, added as an 8-bit value so it wraps. That table is
+ * zero almost everywhere: index 19 holds 0xC0, three quarters of a turn, so
+ * exactly one animation is drawn facing backwards and the table exists for it.
+ * The sum then goes through RoundTo8 with the animation's own directionBits,
+ * which is how an 8-bit heading becomes one of 1, 2, 8, 16 or 32 directions.
+ *
+ * The cell index is `frames * direction + cell`, which is the direction-major
+ * layout anim.h records, and the sprite is that cell's id through
+ * ADDR_SPRITE_LIST.
+ *
+ * THE LAST TWO LINES ARE A SPECIAL CASE FOR ONE LUT. ROW_OFF_FIELD_3C takes
+ * the animation's field4, DOUBLED when the row's MAPOBJ_OFF_LUT is
+ * ADDR_ROW_LUT_DOUBLES and not otherwise. The comparison is on the LUT's
+ * ADDRESS, not its contents. What makes that lut special is not established
+ * here; six sites compare against it and none of them says.
+ *
+ * MEASURED AT 11,698 CALLS on a driven Boot Camp mission, which makes this the
+ * best-covered thing landed in a while -- every animating row on screen goes
+ * through it every time its frame changes. The four special frame values, the
+ * fallback to entry 0 and the heading bias are all on that path; the LUT
+ * special case is the one arm a run cannot be assumed to reach, since it needs
+ * a row using that particular lut.
+ *
+ * Landing it also took RowSetSprite's counter down to 146: those are the calls
+ * from its OTHER callers, since this one now calls by name. The usual cost,
+ * named here so the drop is not read as a regression.
+ */
+void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
+{
+    uint8_t         *r = (uint8_t *)row;
+    AM2_AnimTable   *t;
+    AM2_AnimEntry   *e;
+    AM2_Anim        *anim;
+    int32_t          f = frame;
+    int32_t          n, i;
+    int32_t          dir, cell;
+    uint8_t          heading;
+    int16_t          v;
+
+    if (!force && frame == *(const int16_t *)(r + ROW_OFF_FRAME))
+        return;
+
+    if (f == -2)
+        return;
+    if (f == -1)
+        frame = *(const int16_t *)(r + ROW_OFF_FRAME);
+    else if (f == 0) {
+        *(uint32_t *)r &= 0xFFFFFFFEu;
+        return;
+    }
+
+    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT);
+    if (t) {
+        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_CUR)  = t;
+        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_NEXT) = (AM2_AnimTable *)0;
+    }
+
+    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
+    if (!t)
+        return;
+
+    n = t->count;
+    i = 0;
+    if (n > 0) {
+        for (i = 0; i < n; i++)
+            if (t->entries[i].id == (int32_t)frame)
+                break;
+        if (i >= n)
+            i = 0;                      /* not found: entry 0, not a failure */
+    }
+
+    e = &t->entries[i];
+
+    *(uint8_t *)(r + ROW_OFF_CELL)  = 0;
+    *(int16_t *)(r + ROW_OFF_FRAME) = frame;
+    *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = e->anim;
+    *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
+        ((const uint8_t *)AM2_IMAGE(ADDR_FRAME_HEADING_BIAS))[frame];
+    *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)e->next;
+
+    anim    = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
+                        + *(const uint8_t *)(r + ROW_OFF_HEADING_BIAS));
+
+    dir  = (uint8_t)RoundTo8(heading, anim->directionBits);
+    cell = anim->frames * dir + *(const uint8_t *)(r + ROW_OFF_CELL);
+
+    RowSetSprite(row,
+                 (*(void *const *const *)(uintptr_t)ADDR_SPRITE_LIST)
+                     [anim->cells[cell].sprite],
+                 (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    anim = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    v    = anim->field4;
+    *(int16_t *)(r + ROW_OFF_FIELD_3C) = v;
+
+    if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
+        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
+        *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
+}
+
 int maprow_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_SET_ANIM_FRAME, (const void *)SetAnimFrame,
+
+                        "SetAnimFrame", 11);
 
     rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
                         "DepthCompare", 2);

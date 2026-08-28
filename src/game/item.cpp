@@ -3161,9 +3161,9 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
     ObjDeathCleanup(obj);
 }
 
-typedef void (__cdecl *AM2_SetFrameFn)(void *row, int16_t frame, int32_t force);
 typedef int32_t (__cdecl *AM2_PoseIndexFn)(void *obj, void *weapon);
-#define orig_set_anim_frame  ((AM2_SetFrameFn)(uintptr_t)ADDR_SET_ANIM_FRAME)
+/* SetAnimFrame is maprow.cpp's now; the image seam that stood here went
+   with the reconstruction, and checkseams is what noticed. */
 /* Still original: 272 bytes of per-row animation advance, one caller and that
  * caller is StepObjRows below. */
 typedef void (__cdecl *AM2_StepRowFn)(void *row);
@@ -3225,16 +3225,16 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
             if (w) {
                 int32_t pose = orig_weapon_pose(obj, w);
 
-                orig_set_anim_frame(*(uint8_t **)(o + OBJ_OFF_ROWS),
+                SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS),
                                     (int16_t)((const int32_t *)(uintptr_t)
                                         ADDR_WEAPON_POSE_FRAMES)[pose], 1);
             } else {
-                orig_set_anim_frame(*(uint8_t **)(o + OBJ_OFF_ROWS), 1, 1);
+                SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS), 1, 1);
             }
         } else {
             uint8_t *r = *(uint8_t **)(o + OBJ_OFF_ROWS);
 
-            orig_set_anim_frame(r, *(const int16_t *)(r + ROW_OFF_FRAME), 1);
+            SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_FRAME), 1);
         }
     }
 

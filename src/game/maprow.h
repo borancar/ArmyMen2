@@ -47,6 +47,11 @@ void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y);
  * its cell buffer only when the new one needs more cells. */
 void __cdecl RowSetSprite(void *row, void *sprite, void *desc);
 
+/* 0x0040A1A0. Put a row on an animation frame. -2 does nothing, -1 means the
+ * frame it is already on, 0 clears bit 0 of the row and returns; anything else
+ * is an entry id, and one not in the table takes entry 0. */
+void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force);
+
 int maprow_install(void);
 
 #ifdef __cplusplus

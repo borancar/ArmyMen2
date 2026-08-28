@@ -3133,6 +3133,9 @@ typedef struct {
 /* What SetSoldierKind reaches. The frame setter compares against the row's
  * current frame and returns early unless forced; the pose table is int32 and
  * ships {1, 1, 5, 3, ...}. */
+/* Reconstructed in maprow.cpp. 11,698 calls on a driven Boot Camp mission.
+ * Four of the frame values are not frames: -2 does nothing, -1 means the
+ * frame already set, 0 clears bit 0 of the row and returns. */
 #define ADDR_SET_ANIM_FRAME      0x0040A1A0u  /* void(row, int16 frame, int32) */
 #define ADDR_WEAPON_POSE_INDEX   0x004494A0u  /* int32(obj, weapon) */
 #define ADDR_WEAPON_POSE_FRAMES  0x00474FE0u  /* int32[] */
@@ -3154,6 +3157,17 @@ typedef struct {
  * RowAnimFinished reads both back and agrees: it compares +0x51 against
  * anim->frames - 1 and indexes anim->cells with it. */
 #define ROW_OFF_ANIM_PLAYING     0x44u   /* AM2_Anim * */
+#define ROW_OFF_ANIM_NEXT_ID     0x4Eu   /* int16_t, the entry's `next` */
+/* One byte per FRAME ID, added to a row's heading when that frame is taken up.
+ * It is 0 almost everywhere: of the entries this reads, only index 19 is
+ * non-zero and it is 0xC0 -- three quarters of a turn on an 8-bit heading. So
+ * one animation is drawn facing backwards and the table exists for it. */
+#define ADDR_FRAME_HEADING_BIAS  0x004740CCu  /* uint8_t[] */
+/* A byte LUT, filled at 0x0040A5C2 and 0x0040A5D7 and compared by ADDRESS at
+ * six sites including this one. A row whose MAPOBJ_OFF_LUT is THIS lut gets
+ * ROW_OFF_FIELD_3C doubled; every other lut takes the value unchanged. What
+ * makes it special is not established -- the name says which one it is. */
+#define ADDR_ROW_LUT_DOUBLES     0x004F9EDCu  /* uint8_t[] */
 #define ROW_OFF_CELL             0x51u   /* uint8_t, index into anim->cells */
 /* Two bytes ADDR_ROW_FACE_SPRITE adds together and hands to RoundTo8 with the
  * animation's directionBits, so their sum is an 8-BIT HEADING. Which is which
