@@ -51,6 +51,7 @@
 #include "../rect.h"
 #include "surface.h"
 #include "audio.h"
+#include "font.h"    /* FreeAllFonts -- reconstructed */
 #include "device.h"
 #include "dplay.h"
 #include "frame.h"
@@ -199,25 +200,31 @@ static const am2_void_fn kTeardown[] = {
      * than free" until docs/functions.tsv was checked against the disassembly:
      * 0x0043C720 is twelve bytes and the rest of that entry is the roach
      * mask builder next door. A merged entry, exactly as merges.py says. */
-    /* Nine of the thirteen are ours and go in BY NAME. Reaching them by
-     * address worked -- the detour is there -- but it is the seam
-     * tools/checkseams.py exists to stop, and this table was invisible to it
-     * for as long as the table held plain integers. The other three are still
-     * the original's and stay as addresses; the shape says which is which. */
+    /* Twelve of the thirteen are ours and go in BY NAME, and this comment was
+     * wrong about that twice over. It said the table was invisible to
+     * tools/checkseams.py "for as long as the table held plain integers" and
+     * then went on holding three -- two of which were reconstructed. So "the
+     * shape says which is which" was false: FreeAllFonts and StateLeaveAlias
+     * looked exactly like the one entry that really is still the original's.
+     *
+     * A bare hex literal is a FIFTH spelling of the seam and the check now has
+     * a rule for it, which is what found these. The comment describing the gate
+     * was sitting one paragraph above the breach. */
     FreeExplosionAnims, FreeMissileAnims, FreeRoachAnims,
     FreeVehicleAnims, FreeSoldierAnims,
     FreeSpriteList,
     (am2_void_fn)(uintptr_t)0x00445F40u,
-    (am2_void_fn)(uintptr_t)0x00446880u,
-    (am2_void_fn)(uintptr_t)0x0042E590u,
+    FreeAllFonts,
+    StateLeaveAlias,
     ShutdownAudio,
     ShutdownDirectDraw, ShutdownInput,
 };
 
 void __cdecl ShutdownSubsystems(void)
 {
-    ((void (__attribute__((thiscall)) *)(void *))(uintptr_t)0x0042A680u)(
-        (void *)(uintptr_t)ADDR_SELECTED_UIDS);
+    /* And the call in front of the loop is ours too, which the comment above
+     * called "thiscall on a fixed object" and left as an integer. */
+    ClearPtrList((void *)(uintptr_t)ADDR_SELECTED_UIDS);
 
     for (uint32_t i = 0; i < sizeof kTeardown / sizeof kTeardown[0]; i++)
         kTeardown[i]();

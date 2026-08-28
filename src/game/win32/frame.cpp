@@ -482,16 +482,29 @@ void __cdecl State1Frame(void)
 #define AM2_SUBSTATE_PAINTED_FIRST 1     /* arm 23 */
 #define AM2_SUBSTATE_PAINTED_LAST  9     /* arm 31 */
 
-static const uint32_t kSubStatePainter[] = {
-    0x00452F50u,           /* 23 */
-    0x00452990u,           /* 24 */
-    0x00453890u,           /* 25 */
-    0x00452680u,           /* 26 */
-    0x0044F9E0u,           /* 27 */
-    0x00451210u,           /* 28 */
-    0x00450250u,           /* 29 */
-    0x00450250u,           /* 30 */
-    0x004506A0u,           /* 31 */
+/* FIVE OF THE NINE ARE OURS AND WERE REACHED THROUGH THE IMAGE, which nothing
+ * could see while the table held plain integers. A bare hex literal is not an
+ * ADDR_ name, so checkseams' "named by address" rule -- whose own docstring
+ * claimed to cover "a table of plain integers that are function pointers" --
+ * walked straight past all five. It has a rule for the literal now, and this
+ * table is why.
+ *
+ * Mixed on purpose: the four still-original arms keep an address, cast through
+ * AM2_IMAGE like any other image pointer, and the five reconstructed ones are
+ * named. The shape says which is which, which is what winmain.cpp's teardown
+ * table claimed and could not deliver. */
+typedef void (__cdecl *AM2_SubStatePainter)(void);
+
+static const AM2_SubStatePainter kSubStatePainter[] = {
+    (AM2_SubStatePainter)AM2_IMAGE(0x00452F50u),  /* 23 */
+    (AM2_SubStatePainter)AM2_IMAGE(0x00452990u),  /* 24 */
+    (AM2_SubStatePainter)AM2_IMAGE(0x00453890u),  /* 25 */
+    OpenLoadGame,                                 /* 26 */
+    OpenAudioOptions,                             /* 27 */
+    OpenControls,                                 /* 28 */
+    OpenDeleteGame,                               /* 29 */
+    OpenDeleteGame,                               /* 30 */
+    (AM2_SubStatePainter)AM2_IMAGE(0x004506A0u),  /* 31 */
 };
 
 
@@ -535,10 +548,11 @@ void __cdecl State2Frame(void)
         Substate22();
     } else if (arm >= AM2_SUBSTATE_PAINTED_FIRST
                && arm <= AM2_SUBSTATE_PAINTED_LAST) {
-        uint32_t painter = kSubStatePainter[arm - AM2_SUBSTATE_PAINTED_FIRST];
+        AM2_SubStatePainter painter =
+            kSubStatePainter[arm - AM2_SUBSTATE_PAINTED_FIRST];
 
         if (g_overlayDirty)
-            call0(painter);
+            painter();
         DrawMenuOverlay();
     } else if (arm == 11) {
         /* 33 -- ordinary play, and the arm Boot Camp sits in the whole time. */

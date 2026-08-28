@@ -193,6 +193,31 @@ def main():
                     if sym in addr and addr[sym] in patched:
                         bad.append(("%s:%d" % (rel, n), "named by address",
                                     sym, addr[sym]))
+            # The FIFTH spelling, and the one the fourth's own docstring
+            # promised was covered when it was not. "A table of plain
+            # integers that are function pointers" is only caught while the
+            # integers are written as ADDR_ names; a BARE HEX LITERAL is not
+            # an ADDR_ name, so nothing looked at it.
+            #
+            # It had eight live instances when this rule was added, in the
+            # two places a table of addresses exists: frame.cpp's nine
+            # sub-state painters, five of which are ours, and winmain.cpp's
+            # teardown table, whose comment said in so many words that the
+            # remaining integers were "still the original's and the shape
+            # says which is which". The shape did not say. Two of the four
+            # were reconstructed, and so was the thiscall call above the
+            # loop.
+            #
+            # Five hex digits is the floor because a four-digit constant is
+            # ordinarily a mask or a message id; every address in this image
+            # is at least 0x400000. Data addresses cannot collide, since a
+            # patched address is by definition code.
+            if rel.startswith("src/game/"):
+                for m in re.finditer(r"\b0x0*([0-9A-Fa-f]{5,8})u?\b", bare):
+                    val = int(m.group(1), 16)
+                    if val in patched:
+                        bad.append(("%s:%d" % (rel, n), "bare literal",
+                                    "0x%08X" % val, val))
 
     for f, name, sym, a in bad:
         print("  %s: %s -> %s (0x%08X) is reconstructed; call it directly"
