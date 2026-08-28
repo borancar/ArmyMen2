@@ -439,6 +439,98 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
 }
 
 
+/* 0x00446C50, four callers, all of them the edge strip's paint -- the vertical
+ * twin of DrawTextClipped above, and deliberately written to the same shape so
+ * the two can be read against each other.
+ *
+ * Identical: the lock test before anything else, the '^' escape recolouring
+ * the rest of the line by overwriting the colour ARGUMENT, the double clip
+ * screen-then-caller with the second working on the first one's output, and
+ * the pen advancing even for a glyph that clipped away entirely.
+ *
+ * Different, and it is only these two things:
+ *
+ *   the pen x is `x - width/2` recomputed FOR EACH GLYPH, so every glyph is
+ *   centred on the caller's x rather than started at it -- which is what makes
+ *   a stack of differently-sized glyphs line up down a 16-pixel bar;
+ *
+ *   the pen advances DOWN by `height - AM2_GLYPH_STACK_KERN`, which is exactly
+ *   what TextStackHeight sums over the same string. Measuring and drawing
+ *   agree by construction and not by coincidence, which is worth stating
+ *   because the two live in different files.
+ *
+ * The original reuses its own `font` and `y` argument slots as the in/out pair
+ * ClipRect needs. That is an MSVC register-allocation artefact and not
+ * behaviour: both values are read into locals before the loop starts. Written
+ * with real locals here.
+ */
+void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
+                              int32_t font, RECT clip, int32_t colour)
+{
+    const uint8_t  *record;
+    const uint16_t *offsets;
+    int32_t         len;
+    int32_t         i;
+    int32_t         col;
+    int32_t         penY = y;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
+        return;
+
+    len = (int32_t)strlen(text);
+    if (len <= 0)
+        return;
+
+    record  = (const uint8_t *)(uintptr_t)ADDR_GLYPH_SIZE
+              + (size_t)font * ADDR_FONT_STRIDE;
+    offsets = (const uint16_t *)(record + 4);
+
+    for (i = 0, col = 1; i < len; i++, col++) {
+        uint8_t          ch = (uint8_t)text[i];
+        const AM2_Rle16 *glyph;
+        AM2_Rect         src;
+        AM2_Rect         mid;
+        AM2_Rect         out;
+        int32_t          dx;
+        int32_t          dy;
+        int32_t          width;
+        int32_t          height;
+
+        if (ch == '^' && col < len) {
+            colour = (int32_t)(int8_t)text[i + 1];
+            i++;
+            col++;
+            continue;
+        }
+
+        glyph  = (const AM2_Rle16 *)(*(const uint8_t *const *)(record + 0x204)
+                                     + offsets[ch]);
+        width  = glyph->width;
+        height = glyph->height;
+
+        src.left   = 0;
+        src.top    = 0;
+        src.right  = width;
+        src.bottom = height;
+
+        dx = x - width / 2;
+        dy = penY;
+
+        if (ClipRect(&src, (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
+                     &dx, &dy, &mid)
+            && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &out)) {
+            if (g_drawTarget == g_primarySurface) {
+                dx += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX;
+                dy += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY;
+            }
+            BlitGlyph(dx, dy, glyph, out, colour);
+        }
+
+        penY += height - AM2_GLYPH_STACK_KERN;
+    }
+}
+
+
 int font_install(void)
 {
     int rc = 0;
@@ -457,5 +549,7 @@ int font_install(void)
                         "BuildFontAlias", 1);
     rc |= patch_replace(ADDR_DRAW_TEXT_CLIPPED, (const void *)DrawTextClipped,
                         "DrawTextClipped", 11);
+    rc |= patch_replace(ADDR_DRAW_TEXT_VERTICAL, (const void *)DrawTextVertical,
+                        "DrawTextVertical", 4);
     return rc;
 }

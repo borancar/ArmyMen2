@@ -53,6 +53,13 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
 void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
                              int32_t font, RECT clip, int32_t colour);
 
+/* 0x00446C50. The same, drawn DOWNWARD: each glyph centred on x rather than
+ * started at it, and the pen advancing by the glyph's height less
+ * AM2_GLYPH_STACK_KERN -- which is what TextStackHeight sums, so the two
+ * agree. All four callers are the edge strip's paint. */
+void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
+                              int32_t font, RECT clip, int32_t colour);
+
 uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused);
 

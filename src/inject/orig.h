@@ -705,6 +705,23 @@
  * functions over the same strings disagreeing about the escape is worth
  * knowing before assuming either is the other's shape. */
 #define ADDR_TEXT_STACK_HEIGHT 0x00446E00u  /* int32(const char *, int32 font) */
+/* 0x00446C50, four callers and ALL FOUR are the edge strip's paint: the
+ * DRAWING half of the pair above. Same signature as DrawTextClipped, same
+ * double clip in the same order, same '^' escape written over its own colour
+ * argument -- and two differences that are the whole of what makes it
+ * vertical.
+ *
+ * Each glyph is CENTRED on x rather than started at it: the pen x is
+ * `x - width/2`, recomputed per glyph, so a stack of glyphs of different
+ * widths lines up down a 16-pixel bar. And the pen advances DOWN by the
+ * glyph's height minus three -- exactly what ADDR_TEXT_STACK_HEIGHT sums, so
+ * measuring and drawing agree by construction rather than by coincidence.
+ *
+ * Like its horizontal sibling it advances the pen even when the glyph clipped
+ * away entirely, which keeps a partly off-screen stack aligned with a visible
+ * one. */
+#define ADDR_DRAW_TEXT_VERTICAL 0x00446C50u /* void(x,y,str,font,RECT,colour) */
+#define AM2_GLYPH_STACK_KERN    3           /* taken off each glyph's height */
 #define ADDR_FONT_DESCS     0x004897E8u  /* {const char *face; int32 h; uint16 style}[] */
 #define ADDR_BUILD_FONT     0x004466E0u  /* int32_t(int32_t fontIndex) */
 /* 0x00446840 and 0x00446880: give one font's glyph bytes back and clear its
