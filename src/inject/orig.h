@@ -1494,7 +1494,12 @@
 #define ADDR_SEQ_STEP5           0x004614D0u
 /* 0x00461350, one caller, 144 bytes: a fourth adder, and the only one that
  * fills ADDR_SEQ_CTX_B rather than ctx A. Kind 4. Stays original. */
+/* Reconstructed. Its three constants are globals rather than literals, which
+ * is the only reason they can be named at all. */
 #define ADDR_SEQ_ADD_KIND4       0x00461350u  /* void(const int32_t *at, int32_t) */
+#define ADDR_SEQ_K4_FIELD_0C     0x0048CBD8u  /* int32_t, reads 3 */
+#define ADDR_SEQ_K4_FIELD_10     0x0048CBDCu  /* int32_t, reads -1 */
+#define ADDR_SEQ_K4_LIFE         0x0048CBC4u  /* int32_t, reads 120 */
 #define AM2_SEQ_KIND4            4
 #define AM2_SEQ_EMIT_ARG         0x0F
 /* How often kind 5 emits, in milliseconds. Two readers, both in that one
@@ -7684,7 +7689,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0x2C is only ever zeroed. Named for their offsets, which is all that is
  * established. */
 #define ROW_OFF_FIELD_26       0x26u  /* int16_t */
-#define ROW_OFF_FIELD_2C       0x2Cu  /* int32_t */
+/* IT IS THE ROW'S REMAP TABLE, and the evidence is that MAPOBJ_OFF_LUT is
+ * already 0x2C "-> the sprite's +0x34" -- which is AM2_Sprite::lut, the
+ * 256-entry remap. SeqAddKind4 writes ADDR_REMAP_SHADES[0] here where the
+ * other three adders write 0, so a kind 4 is a SHADED sprite and the rest are
+ * not.
+ *
+ * Which also says MAPOBJ_* and ROW_OFF_* are two name families for ONE
+ * structure: MAPOBJ_OFF_FLAGS is 0x00 and "bit 0 clear means do not draw",
+ * and the row's first dword is the bit RowUpdate tests to choose between
+ * unlinking and re-linking. Recorded rather than merged -- collapsing two
+ * families is a change of its own and wants doing deliberately. */
+#define ROW_OFF_FIELD_2C       0x2Cu  /* int32_t, a uint8_t *remap or NULL */
 #define ROW_OFF_PREV_X         0x22u  /* int16_t */
 #define ROW_OFF_PREV_Y         0x24u  /* int16_t */
 /* One entry of the row's buffer: which map cell it is linked into, or -1. */

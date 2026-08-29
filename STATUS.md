@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,091 patches.**
+Nothing uncommitted. **1,092 patches.**
 
-Thirty-nine functions since the last snapshot. The seven-class HUD family is
+Forty functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -212,6 +212,18 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   And `ROW_OFF_STAMP_54` is **milliseconds here and a frame count in kind
   2**. One field, two units, chosen by the kind that owns the record -- there
   is no single reading that is right for both.
+
+- **`SeqAddKind4`** (`0x00461350`) is the fourth adder, the only one filling
+  the second context, and what a kind 5 emits. It **identifies
+  `ROW_OFF_FIELD_2C`**: three adders zero it and this one writes
+  `ADDR_REMAP_SHADES[0]`, and `MAPOBJ_OFF_LUT` is already 0x2C "-> the
+  sprite's +0x34". So it is the row's remap table and a kind 4 is a shaded
+  sprite. **A field that three writers agree is zero says nothing; the fourth
+  writer is what names it.**
+
+  It also shows `MAPOBJ_*` and `ROW_OFF_*` are two name families for one
+  structure -- 0x00 and 0x2C are both, with the same meanings. Recorded, not
+  merged; collapsing two families is a change of its own.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

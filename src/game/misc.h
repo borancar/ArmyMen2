@@ -29,6 +29,10 @@ void __cdecl SeqRun(void *ctx);
 /* 0x00461310, and both kinds 2 and 3 reach it: a two-frame life. */
 int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx);
 
+/* 0x00461350. The fourth adder -- kind 4, into the OTHER context, shaded
+ * through ROW_OFF_FIELD_2C, and what a kind 5 emits every 300 ms. */
+void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust);
+
 /* 0x004614D0. Kind 5's stepper: an emitter that adds a kind 4 into the other
  * context every 300 ms until its life runs out. */
 int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx);

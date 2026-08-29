@@ -1327,8 +1327,6 @@ typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
 typedef int32_t (__cdecl *AM2_SeqRetireFn)(void *ctx, void *rec);
 #define SeqRetire ((AM2_SeqRetireFn)(uintptr_t)ADDR_SEQ_RETIRE)
-typedef void (__cdecl *AM2_SeqAdd4Fn)(const int32_t *at, int32_t a);
-#define orig_seq_add_kind4 ((AM2_SeqAdd4Fn)(uintptr_t)ADDR_SEQ_ADD_KIND4)
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
 #define orig_seq_step4 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP4)
 #define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
@@ -1745,6 +1743,71 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
                   + AM2_SEQ_DEPTH_BIAS);
 }
 
+/* SeqAddKind4 -- original 0x00461350, one caller, and the fourth adder.
+ *
+ * The only one that fills ADDR_SEQ_CTX_B rather than ctx A, which is what
+ * makes the per-frame step walk two contexts. Its one caller is
+ * SeqStepKind5's emitter, so a kind 4 is what a kind 5 throws off every
+ * 300 ms.
+ *
+ * IT IDENTIFIES ROW_OFF_FIELD_2C, which the other three adders only ever
+ * zeroed. This one writes ADDR_REMAP_SHADES[0] into it -- and MAPOBJ_OFF_LUT
+ * is already 0x2C, "-> the sprite's +0x34", which is AM2_Sprite::lut. So the
+ * field is the row's REMAP TABLE and a kind 4 is a shaded sprite where the
+ * other kinds are not. A field that three writers agree is zero says nothing;
+ * the fourth writer is what names it.
+ *
+ * AND IT SAYS MAPOBJ_* AND ROW_OFF_* ARE ONE STRUCTURE. Two name families
+ * have been growing at the same offsets -- 0x00 is MAPOBJ_OFF_FLAGS "bit 0
+ * clear means do not draw" and is also the bit RowUpdate tests, and 0x2C is
+ * both. Recorded in orig.h rather than merged here: collapsing two families
+ * is a change of its own.
+ *
+ * ITS SECOND ARGUMENT IS A Y-ADJUST, and kind 5 passes 15. So the emitted
+ * sprite floats fifteen above the point that threw it.
+ *
+ * The depth key is a flat 0x3F2, where kind 6 writes that plus the terrain
+ * under its point. Two writers agreeing on the bias is what turns "probably a
+ * depth key" from one function's guess into a shape.
+ *
+ * Three of its constants are globals rather than literals -- 3, -1 and a life
+ * of 120 -- which is the only reason they can be named at all.
+ */
+void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
+{
+    uint8_t *seq;
+    uint8_t *row;
+
+    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+                     (const AM2_Point *)at))
+        return;
+
+    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
+
+    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND4;
+    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) =
+        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_FIELD_0C);
+    *(int32_t *)(seq + SEQ_OFF_FIELD_10) =
+        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_FIELD_10);
+    *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+    *(int32_t *)(seq + SEQ_OFF_LIFE)     =
+        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_LIFE);
+
+    *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
+    *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
+    *(int32_t *)(row + 0)                = 1;
+    *(void **)(row + ROW_OFF_SPRITE)     =
+        **(void *const *const *)AM2_IMAGE(ADDR_SEQ_SPRITES_5);
+    *(int32_t *)(row + ROW_OFF_X)        = *at;
+    *(int16_t *)(row + ROW_OFF_Y_ADJUST) = (int16_t)yAdjust;
+    *(void **)(row + ROW_OFF_FIELD_2C)   =
+        *(void *const *)AM2_IMAGE(ADDR_REMAP_SHADES);
+    *(int16_t *)(row + ROW_OFF_FIELD_26) = AM2_SEQ_DEPTH_BIAS;
+}
+
 /* SeqStepKind5 -- original 0x004614D0, one caller.
  *
  * Kind 5 is an EMITTER. Every ADDR_SEQ_EMIT_MS -- 300 -- it adds a kind 4 at
@@ -1787,7 +1850,7 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
 
         *(int16_t *)&pt = (int16_t)(*(const int16_t *)&pt
                                     + (orig_seq_rand() % 3) * 4 - 4);
-        orig_seq_add_kind4(&pt, AM2_SEQ_EMIT_ARG);
+        SeqAddKind4(&pt, AM2_SEQ_EMIT_ARG);
 
         *(int32_t *)(r + SEQ_OFF_GATE) -=
             *(const int32_t *)AM2_IMAGE(ADDR_SEQ_EMIT_MS);
@@ -2118,6 +2181,8 @@ int misc_install(void)
                   "SeqStepKind2", 2);
     patch_replace(ADDR_SEQ_STEP5, (const void *)SeqStepKind5,
                   "SeqStepKind5", 1);
+    patch_replace(ADDR_SEQ_ADD_KIND4, (const void *)SeqAddKind4,
+                  "SeqAddKind4", 1);
     patch_replace(ADDR_SEQ_ADD_KIND6, (const void *)SeqAddKind6,
                   "SeqAddKind6", 2);
     patch_replace(ADDR_SEQ_ADD_KIND5, (const void *)SeqAddKind5,
