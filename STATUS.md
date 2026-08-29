@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,076 patches.**
+Nothing uncommitted. **1,077 patches.**
 
-Twenty-four functions since the last snapshot. The seven-class HUD family is
+Twenty-five functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -69,6 +69,18 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
   `-nm` is **no movies**: two references in the image, the switch parse and
   this function's gate.
+
+- **`CommReopenSession`** (`0x0040FA00`, 152 B) puts a finished multiplayer
+  game back in the lobby, and the two bits it clears are what name it:
+  `AM2_SESSION_FLAGS_START` (0x21) is `DPSESSION_NEWPLAYERSDISABLED |
+  DPSESSION_JOINDISABLED`, OR'd in when the game starts, and this is exactly
+  that undone. Verified by reading -- it needs a session that has ENDED,
+  which needs a second player.
+
+  Second loop this stretch that does not advance over a removal, after
+  `DrawSelection`. It terminates only because the callee changes what is at
+  that index, which is a property of the callee; the code alone reads like a
+  hang, so it says so.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

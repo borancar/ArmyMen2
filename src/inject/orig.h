@@ -5297,6 +5297,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_TIME              0x00465052u /* int32_t(int32_t *) -- GetLocalTime */
 #define COMM_OFF_STARTED           0x400u      /* non-zero once the game is running */
 #define AM2_SESSION_FLAGS_START    0x21u       /* or'd into the description */
+/* The same pair CommReopenSession clears again, and the offset it clears them
+ * at: DPSESSIONDESC2.dwFlags. Not restated from the SDK header -- dplay.cpp
+ * reaches the description as an opaque pointer, because the game passes it
+ * around as one. */
+#define AM2_DPSESSION_OFF_FLAGS    0x04u
+/* Four player slots, and the count every loop over them uses. */
+#define AM2_COMM_SLOTS             4
 #define COMM_ARMY_OFF_READY        0x274u   /* m_ArmyReady, its own name */
 #define COMM_ARMY_RECORD_SIZE      112u
 #define COMM_ARMY_OFF_READY_TO_LOAD 0x270u

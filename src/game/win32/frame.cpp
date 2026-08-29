@@ -910,9 +910,6 @@ void __cdecl Substate22(void)
 }
 
 
-typedef void (__attribute__((thiscall)) *AM2_CommVoidFn)(void *comm);
-#define orig_comm_reopen_session ((AM2_CommVoidFn)(uintptr_t)ADDR_COMM_REOPEN_SESSION)
-
 /* 0x00426A90, three callers. The multiplayer end screen.
  *
  * ITS ARGUMENT IS A RESULT CODE, NOT A BOOLEAN. 0 won, 1 lost, 2 the host
@@ -929,8 +926,8 @@ typedef void (__attribute__((thiscall)) *AM2_CommVoidFn)(void *comm);
  * relative to that directory, so moving it after the load would find nothing.
  *
  * Two comm methods run before any of that -- the statistics report and the
- * property publish -- and the function TAIL-JUMPS to a third that removes our
- * player and reopens the session. So the end screen is also where the session
+ * property publish -- and the function TAIL-JUMPS to CommReopenSession, which
+ * is reconstructed in dplay.cpp. So the end screen is also where the session
  * is handed back, and reproducing the tail call as an ordinary call at the end
  * is equivalent here only because nothing follows it.
  *
@@ -969,7 +966,7 @@ void __cdecl ShowMpResult(int32_t result)
     *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
 
     orig_log_noargs();
-    orig_comm_reopen_session(comm);
+    CommReopenSession(comm);
 }
 
 

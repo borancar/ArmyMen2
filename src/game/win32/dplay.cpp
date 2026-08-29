@@ -1858,6 +1858,89 @@ void __cdecl OnLobbySlave(void)
     CommEnumPlayers();
 }
 
+/* CommReopenSession -- original 0x0040FA00, thiscall, one caller.
+ *
+ * Put a finished multiplayer game back in the lobby: drop the slots whose
+ * player has gone, take the JOIN-DISABLED bits back out of the session
+ * description so new players can arrive, clear everybody's ready flags, and
+ * empty the menu message log. ShowMpResult tail-jumps to it, so it is the
+ * last thing the end screen does.
+ *
+ * A LOOP THAT DOES NOT ADVANCE OVER A REMOVAL, which is the second one this
+ * project has transcribed this week -- DrawSelection has the same shape. The
+ * original writes it as `dec ebx; sub esi, 0x70` immediately before the step
+ * that adds them back, so a slot that was removed is looked at again. It
+ * terminates only because the removal changes what is at that index;
+ * that is a property of the callee and not of this function, and the comment
+ * is here because the code alone reads like a hang.
+ *
+ * THE TWO BITS ARE WHAT NAMES IT. `and 0xFFFFFFDE` on the description's flags
+ * clears 0x01 and 0x20 -- DPSESSION_NEWPLAYERSDISABLED and
+ * DPSESSION_JOINDISABLED -- and orig.h already carries AM2_SESSION_FLAGS_START
+ * as 0x21, the pair that gets OR'd in when the game STARTS. So this is
+ * exactly that undone, and "reopen" is the right word rather than a guess off
+ * the error string.
+ *
+ * Only the host does it, and only below four players: a full session has
+ * nothing to reopen for.
+ *
+ * The clear at the end walks the same four records writing zero to
+ * COMM_ARMY_OFF_READY_TO_LOAD and COMM_ARMY_OFF_READY, and then the function
+ * TAIL-JUMPS to ClearMenuMsgs. Written as a call followed by a return, which
+ * is the same thing here -- both are void and the argument lists are empty.
+ *
+ * Verified by reading. It needs a multiplayer session that has ENDED, which
+ * needs a second player, which this machine cannot provide -- the same
+ * standing as the five window messages in winproc.cpp.
+ */
+typedef int32_t (__attribute__((thiscall)) *am2_comm_remove_fn)(void *comm,
+                                                                int32_t id);
+#define orig_comm_remove_player \
+    ((am2_comm_remove_fn)(uintptr_t)ADDR_COMM_REMOVE_PLAYER)
+
+void __attribute__((thiscall)) CommReopenSession(void *comm)
+{
+    uint8_t *c = (uint8_t *)comm;
+    int32_t  i;
+
+    for (i = 0; i < AM2_COMM_SLOTS; ) {
+        int32_t id = *(const int32_t *)(c + i * COMM_ARMY_RECORD_SIZE
+                                        + AM2_PLAYER_ID);
+
+        if (id == -1) {
+            /* No step: the slot is looked at again. See above. */
+            orig_comm_remove_player(comm, id);
+            continue;
+        }
+        i++;
+    }
+
+    if (*(const int32_t *)(c + COMM_OFF_IS_HOST)
+        && *(const uint32_t *)(c + COMM_OFF_PLAYER_COUNT) < AM2_COMM_SLOTS) {
+        void *desc;
+
+        CommGetSessionDesc(comm);
+
+        desc = *(void **)(c + COMM_OFF_SESSION_DESC);
+        if (desc) {
+            *(uint32_t *)((uint8_t *)desc + AM2_DPSESSION_OFF_FLAGS)
+                &= ~(uint32_t)AM2_SESSION_FLAGS_START;
+
+            if (CommSetSessionDesc(comm, desc, 0) < 0)
+                orig_log((const char *)(uintptr_t)ADDR_STR_SET_SESSION_FAIL);
+        }
+    }
+
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+        uint8_t *rec = c + i * COMM_ARMY_RECORD_SIZE;
+
+        *(int32_t *)(rec + COMM_ARMY_OFF_READY_TO_LOAD) = 0;
+        *(int32_t *)(rec + COMM_ARMY_OFF_READY)         = 0;
+    }
+
+    ClearMenuMsgs();
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1875,6 +1958,8 @@ int dplay_install(void)
                         "CommSetSessionDesc", 2);
     rc |= patch_replace(ADDR_COMM_GET_SESSION, (const void *)CommGetSessionDesc,
                         "CommGetSessionDesc", 0);
+    rc |= patch_replace(ADDR_COMM_REOPEN_SESSION, (const void *)CommReopenSession,
+                        "CommReopenSession", 1);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
     rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,

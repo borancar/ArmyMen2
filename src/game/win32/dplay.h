@@ -94,6 +94,12 @@ int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
  * reads the size out of the complaint. Returns 1 on success. */
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 
+/* Original: 0x0040FA00, one caller -- ShowMpResult, which tail-jumps to it.
+ * Put a finished game back in the lobby: drop the departed players, clear
+ * DPSESSION_NEWPLAYERSDISABLED and DPSESSION_JOINDISABLED, reset the ready
+ * flags and empty the menu message log. */
+void __attribute__((thiscall)) CommReopenSession(void *comm);
+
 /* Original: 0x0040DB80 and 0x0040DCC0, thiscall on the single global comm
  * object. The game's entire registry surface lives in these two: the key is
  * created at static-initialisation time and closed again from atexit, and
