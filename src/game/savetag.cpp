@@ -101,6 +101,59 @@ int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
     return 1;
 }
 
+typedef void (__cdecl *AM2_ScriptUniqueNameFn)(void *rec, const char *name);
+#define orig_script_unique_name \
+    ((AM2_ScriptUniqueNameFn)(uintptr_t)ADDR_SCRIPT_UNIQUE_NAME)
+
+/* LoadScriptName -- original 0x004287E0, one caller, and the exact counterpart
+ * of SaveScriptName above.
+ *
+ * Read the tag. "No name" writes -1 into the record and stops; anything else
+ * is taken as the name tag without being checked, and a length and that many
+ * bytes follow.
+ *
+ * THE TAG IS NOT VALIDATED, only compared against the "no name" one. A file
+ * carrying any other four bytes there falls into the name arm and the next
+ * dword is read as a length. That is the asymmetry with the save half, which
+ * writes one of exactly two tags -- the loader trusts the writer.
+ *
+ * NOTHING BOUNDS THE LENGTH AGAINST THE BUFFER. The name lands in a 0x100-byte
+ * stack local and the count comes off the file, so a long name overruns the
+ * frame. The save half writes strlen + 1 of a table entry, so a file this game
+ * wrote cannot do it. Reproduced.
+ *
+ * IT DOES NOT CHECK EITHER READ. Both go through the game's fread and the
+ * result is discarded, so a truncated file leaves the length and the name as
+ * whatever the stack held -- and the length is used before the name is read.
+ * The same lack of a check CheckSaveTag documents at the top of this file.
+ *
+ * The binding is 0x0043F910's, which lower-cases the name, looks it up, and
+ * makes a fresh "name_1", "name_2" when it is already taken. So loading a save
+ * into a session that already has these names does not collide; it duplicates.
+ *
+ * It always answers 1, like the save half, and the caller does not look.
+ */
+int32_t __cdecl LoadScriptName(am2_FILE *fp, void *rec)
+{
+    uint32_t tag;
+    uint32_t n;
+    char     name[AM2_SAVED_NAME_MAX];
+
+    orig_fread(&tag, 4, 1, fp);
+
+    if (tag == AM2_SAVETAG_NO_NAME) {
+        *(int32_t *)((uint8_t *)rec + SCRIPT_REF_OFF_NAME_INDEX) = -1;
+        return 1;
+    }
+
+    orig_fread(&n, 4, 1, fp);
+    orig_fread(name, n, 1, fp);
+
+    orig_script_unique_name(rec, name);
+
+    return 1;
+}
+
 int savetag_install(void)
 {
     int rc = 0;
@@ -109,6 +162,8 @@ int savetag_install(void)
                         "CheckSaveTag", 4);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_NAME, (const void *)SaveScriptName,
                         "SaveScriptName", 2);
+    rc |= patch_replace(ADDR_LOAD_SCRIPT_NAME, (const void *)LoadScriptName,
+                        "LoadScriptName", 1);
     rc |= patch_replace(ADDR_WRITE_SAVE_TAG, (const void *)WriteSaveTag,
                         "WriteSaveTag", 2);
     return rc;

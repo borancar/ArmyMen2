@@ -34,4 +34,8 @@ int savetag_install(void);
  * the "no name" tag alone, or the name tag, the length and the string. */
 int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec);
 
+/* 0x004287E0, one caller. The load half of SaveScriptName: read the tag, and
+ * for a real name a length and that many bytes, then bind the record. */
+int32_t __cdecl LoadScriptName(am2_FILE *fp, void *rec);
+
 #endif /* AM2_SAVETAG_H */

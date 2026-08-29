@@ -32,6 +32,16 @@
  * reference: either the "no name" tag alone, or the name tag, the length and
  * the string. */
 #define ADDR_SAVE_SCRIPT_NAME 0x00428760u  /* int32_t(am2_FILE *, void *rec) */
+/* 0x004287E0, one caller -- the load half of the pair, and it reads exactly
+ * what the save half wrote: a tag, then for a real name a length and that many
+ * bytes. */
+#define ADDR_LOAD_SCRIPT_NAME 0x004287E0u  /* int32_t(am2_FILE *, void *rec) */
+/* 0x0043F910, one caller, and that caller is LoadScriptName. Lower-case the
+ * name, find it in the script name table and bind the record to it -- and when
+ * the name is already taken, make a fresh one by appending "_1", "_2", ... off
+ * the format at 0x00485D90. Still original. */
+#define ADDR_SCRIPT_UNIQUE_NAME 0x0043F910u /* void(void *rec, const char *) */
+#define AM2_SAVED_NAME_MAX    0x100u  /* LoadScriptName's stack buffer */
 #define AM2_SAVETAG_NAME      0x06660669u
 #define AM2_SAVETAG_NO_NAME   0x06660670u
 /* The record SaveScriptName is handed carries the table index at +0x0C. */
@@ -4026,6 +4036,10 @@ typedef struct {
 #define ADDR_TYPE2_ACTION_B      0x00448220u  /* void(void *obj) */
 /* A third of the same twin, with an argument to pass on. */
 #define ADDR_EVT_TYPE2_ACTION_C  0x0041FBA0u  /* void(uint32_t, int32_t) */
+/* 0x0041FC80, one caller, and the `dropitem` action's handler: find a weapon
+ * uid among the trooper's inventory slots 1..5 and TrooperDropItem it at a
+ * point. Both uids are refused below AM2_UID_COUNTER_START. */
+#define ADDR_EVT_DROP_ITEM       0x0041FC80u  /* void(uint32,uint32,uint32) */
 #define ADDR_TYPE2_ACTION_C      0x004480E0u  /* void(void *obj, int32_t) */
 /* 0x0041F6E0. The one that does NOT null-check: it passes whatever LookupByUID
  * returned straight on. 0x00428370 has eight callers and no name. */
@@ -5782,6 +5796,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define COMM_ARMY_RECORD_SIZE      112u
 #define COMM_ARMY_OFF_READY_TO_LOAD 0x270u
 #define ADDR_REMOVE_INVENTORY_ITEM 0x00447990u /* void(AM2_Object *, int32_t) */
+/* 0x00448D60, self-named in both its log lines -- "TrooperDropItem  %x" and
+ * "TrooperDropItem  %x  ammo: %d". Still original; EvtDropItem reaches it. */
+#define ADDR_TROOPER_DROP_ITEM   0x00448D60u /* void(unit,int32 slot,uint32) */
 #define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value

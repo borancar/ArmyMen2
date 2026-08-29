@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,145 patches.**
+Nothing uncommitted. **1,147 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -533,16 +533,34 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   first is whether the callee has already been reconstructed. `MapCode`,
   `Type2ActionA` and `SoldierKindForWeapon` were all caught this way.
 
+- **`0x00448D60` names itself `TrooperDropItem`** in both its log lines, which
+  is what identified `EvtDropItem` (`0x0041FC80`) above it: the `dropitem`
+  action. Its search starts at inventory slot 1, not 0, and `TrooperDropItem`
+  refuses slot 0 and slot 6 independently -- so the weapon a trooper has in
+  hand is not what this drops. Its zero-point test is on the LOW SIXTEEN BITS
+  of the packed point, so x==0 with a non-zero y still counts as "no point
+  given" and is replaced; x==0 is the map's left edge and is reachable.
+- **`SaveScriptName` and `LoadScriptName` are asymmetric on purpose.** The
+  writer emits one of exactly two tags; the reader compares against the "no
+  name" one and takes anything else as the name tag without checking, then
+  reads the next dword as a length with nothing bounding it against a
+  0x100-byte stack buffer. A file this game wrote cannot overrun it. The
+  loader trusts the writer, and that is the shape of every save helper here.
+- The binding on load is `0x0043F910`, which lower-cases the name and, when it
+  is already taken, makes `name_1`, `name_2` off a `"%s_%d"`. So loading a
+  save into a session that already holds these names does not collide -- it
+  duplicates.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **995 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,145
+line (0x0045C000) patched**. Measured: **997 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,147
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ten batches have gone in and the 244 entries outstanding start at 48
+small ones in batches. Eleven batches have gone in and the 242 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

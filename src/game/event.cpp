@@ -15,6 +15,7 @@
 #include "objtable.h"
 #include "item.h"   /* UidOnWire */
 #include "objtype.h"
+#include "msgslot.h"  /* CommMustBroadcast -- the multiplayer guard */
 #include "savetag.h"
 #include "script.h"
 #include "../inject/orig.h"
@@ -2186,6 +2187,74 @@ void __cdecl ResetTimers(void)
         *id = 0;
 }
 
+typedef void (__cdecl *AM2_TrooperDropItemFn)(void *unit, int32_t slot,
+                                              uint32_t at);
+/* TrooperDropItem names itself in both its log lines and is still the
+ * original's. */
+#define orig_trooper_drop_item \
+    ((AM2_TrooperDropItemFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM)
+
+/* EvtDropItem -- original 0x0041FC80, one caller.
+ *
+ * The `dropitem` action: find a weapon uid among a trooper's inventory slots
+ * and hand it to TrooperDropItem at a point.
+ *
+ * THE SEARCH STARTS AT SLOT 1, NOT SLOT 0. The scan walks
+ * UNIT_OFF_INVENTORY + 4 upward for five slots, so a weapon sitting in slot 0
+ * can never be dropped by this action. TrooperDropItem refuses slot 0 and slot
+ * 6 as well -- `0 < slot < 6` -- so the two agree, and the slot the trooper
+ * has in hand is not what this drops.
+ *
+ * BOTH UIDS ARE REFUSED BELOW AM2_UID_COUNTER_START, which is the same guard
+ * the two type-2 shims above use. It is a range test on a uid rather than a
+ * null check, and it catches a small integer that arrived where a uid was
+ * meant.
+ *
+ * A ZERO POINT MEANS "WHERE THE TROOPER IS". The test is on the LOW SIXTEEN
+ * BITS of the packed point, so a point whose x is 0 and whose y is not still
+ * counts as zero and is replaced -- x==0 is the left edge of the map, which is
+ * reachable. The original tests `dx`, and that is reproduced rather than
+ * widened to the whole dword.
+ *
+ * THE MULTIPLAYER GUARD IS SKIPPED ENTIRELY IN SINGLE PLAYER. It runs only
+ * when there is a session, and then asks CommMustBroadcast about the trooper's
+ * own army; without one the action always proceeds. So the whole ownership
+ * test is unreachable on every configuration this project can drive, and is
+ * verified by reading.
+ *
+ * The Sarge test is on the object, not on the weapon: only Sarge drops things.
+ */
+void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
+{
+    uint8_t *obj;
+    int32_t  slot;
+
+    if (uid < AM2_UID_COUNTER_START || weaponUid < AM2_UID_COUNTER_START)
+        return;
+
+    obj = (uint8_t *)LookupByUID(uid);
+    if (!ObjIsType2((const AM2_Object *)obj))
+        return;
+
+    if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(obj + OBJ_OFF_ARMY)))
+        return;
+
+    if (!*(const int32_t *)(obj + OBJ_OFF_SARGE))
+        return;
+
+    if (!(uint16_t)at)
+        at = *(const uint32_t *)(obj + OBJ_OFF_POS);
+
+    for (slot = 1; slot < AM2_INVENTORY_SLOTS; slot++)
+        if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY
+                                + (size_t)slot * 4) == weaponUid) {
+            orig_trooper_drop_item(obj, slot, at);
+            return;
+        }
+}
+
 int event_install(void)
 {
     int rc = 0;
@@ -2212,6 +2281,8 @@ int event_install(void)
                         (const void *)EvtType2ActionB, "EvtType2ActionB", 1);
     rc |= patch_replace(ADDR_EVT_TYPE2_ACTION_C,
                         (const void *)EvtType2ActionC, "EvtType2ActionC", 1);
+    rc |= patch_replace(ADDR_EVT_DROP_ITEM, (const void *)EvtDropItem,
+                        "EvtDropItem", 1);
     rc |= patch_replace(ADDR_EVT_OBJ_SET, (const void *)EvtObjSet,
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,

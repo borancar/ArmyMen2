@@ -536,4 +536,8 @@ int event_install(void);
 }
 #endif
 
+/* 0x0041FC80, one caller. The `dropitem` action: find a weapon uid among a
+ * trooper's inventory slots 1..5 and drop it at a point. */
+void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at);
+
 #endif /* AM2_EVENT_H */
