@@ -51,6 +51,11 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life);
 void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
                          int32_t c, int32_t life);
 
+/* 0x00453AB0, thiscall. Grow a list of 260-byte records by one, then search
+ * it for a key at +0x100 -- including the record just allocated, which is
+ * uninitialised. See misc.cpp. */
+int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key);
+
 #endif
 
 /* 0x0045AFA0. The dword at +0x53C. */

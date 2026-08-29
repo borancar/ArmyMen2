@@ -545,10 +545,54 @@ AM2_DefLink *__cdecl DefFindLink(int32_t parent, int32_t siblings)
                                        (const void *)ComparePair);
 }
 
+typedef void (__cdecl *AM2_DefLogFn)(void);
+#define orig_def_log ((AM2_DefLogFn)(uintptr_t)ADDR_LOG)
+
+/* DefSortObjRecs and DefSortTrooperRecs -- originals 0x00435A50 and
+ * 0x0044CD40, one caller each, and both from DefFinish.
+ *
+ * The same function with different tables: qsort the record array by its
+ * count and stride, then TAIL-JUMP to the logger with no arguments. The
+ * object records go through ADDR_COMPARE_TRIPLE and the trooper records
+ * through ADDR_COMPARE_DWORD, which is the only thing that distinguishes
+ * them apart from the three globals.
+ *
+ * They use the game's own qsort, not ours, for the same reason the file
+ * functions do: the comparator is an address in the image and the array is
+ * on the game's heap. Nothing here would break with libc's, but nothing here
+ * has any reason to prefer it either.
+ *
+ * The trooper one had been read before and left original -- orig.h described
+ * it exactly and said so. It is the whole of a 48-byte function, so what was
+ * left was the writing.
+ */
+void __cdecl DefSortObjRecs(void)
+{
+    orig_qsort(*(void **)(uintptr_t)ADDR_DEF_OBJ_RECS,
+               *(const uint32_t *)(uintptr_t)ADDR_DEF_OBJ_REC_COUNT,
+               AM2_DEF_OBJ_REC_SIZE,
+               (const void *)CompareTriple);
+    orig_def_log();
+}
+
+void __cdecl DefSortTrooperRecs(void)
+{
+    orig_qsort(*(void **)(uintptr_t)ADDR_DEF_TROOPER_RECS,
+               *(const uint32_t *)(uintptr_t)ADDR_DEF_TROOPER_COUNT,
+               AM2_DEF_TROOPER_REC_SIZE,
+               (const void *)CompareDword);
+    orig_def_log();
+}
+
 int defparse_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_DEF_SORT_OBJ_RECS, (const void *)DefSortObjRecs,
+                        "DefSortObjRecs", 1);
+    rc |= patch_replace(ADDR_DEF_SORT_TROOPER_RECS,
+                        (const void *)DefSortTrooperRecs,
+                        "DefSortTrooperRecs", 1);
     rc |= patch_replace(ADDR_DEF_LINK_PARSE, (const void *)DefLinkParse,
                         "DefLinkParse", 1);
     rc |= patch_replace(ADDR_DEF_COUNT_LINKS, (const void *)DefCountLinks,

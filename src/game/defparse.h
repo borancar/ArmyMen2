@@ -16,6 +16,12 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x00435A50 and 0x0044CD40, one caller each and both from DefFinish. The
+ * same qsort with different tables and comparators, each ending in a
+ * no-argument tail jump to the logger. */
+void __cdecl DefSortObjRecs(void);
+void __cdecl DefSortTrooperRecs(void);
+
 #endif
 
 /* One entry of the link table at ADDR_DEF_LINKS. Twenty bytes, which is the

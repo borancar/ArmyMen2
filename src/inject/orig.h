@@ -5470,8 +5470,31 @@ typedef struct {
  * fact. */
 #define ADDR_DEF_FINISH          0x0041A230u  /* void(void) */
 #define ADDR_DEF_STEP_460290     0x00460290u
-#define ADDR_DEF_STEP_435A50     0x00435A50u
 #define ADDR_DEF_STEP_45EBC0     0x0045EBC0u
+/* Two of DefFinish's five are qsorts, and they are the same function with
+ * different tables: 0x00435A50 sorts ADDR_DEF_OBJ_RECS by ADDR_COMPARE_TRIPLE
+ * and 0x0044CD40 sorts ADDR_DEF_TROOPER_RECS by ADDR_COMPARE_DWORD. Both end
+ * by tail-jumping to the logger with no arguments.
+ *
+ * 0x00435A50 went in as ADDR_DEF_STEP_435A50 one commit ago, when DefFinish
+ * could only say "the third of five". checkpatches refused the second name
+ * the moment it was reconstructed, which is the alias ratchet doing exactly
+ * what it is for: a placeholder name is fine until the thing has a real one. */
+#define ADDR_DEF_SORT_OBJ_RECS   0x00435A50u  /* void(void) */
+/* 0x0044C550, one caller. Walk the four comm slots and run 0x0044C480 on
+ * every one that is occupied AND that CommMustBroadcast accepts. */
+#define ADDR_TELL_EACH_SLOT      0x0044C550u  /* void(void) */
+#define ADDR_TELL_ONE_SLOT       0x0044C480u  /* void(int32_t slot) */
+/* 0x00453AB0, thiscall with one argument, `ret 4`. Grow a list of 260-byte
+ * records by one and then SEARCH it for a key at +0x100, answering the index
+ * or -1.
+ *
+ * The count is bumped BEFORE the realloc and the search runs over the new
+ * count, so the last record it compares is the one just allocated and never
+ * written. Reading uninitialised memory, and the original's. */
+#define ADDR_LIST_GROW_FIND      0x00453AB0u  /* thiscall int32(this, key) */
+#define AM2_GROWLIST_STRIDE      0x104u
+#define AM2_GROWLIST_KEY         0x100u
 /* Walk the objects in the cell a point falls in, calling a function for each
  * -- the same cell arithmetic as ObjectsAtPoint with a CALLBACK instead of a
  * chain. 0x0044A3A0 is the one wrapper that supplies a callback. */
@@ -5497,7 +5520,7 @@ typedef struct {
  * with the stubbed logger, exactly the case CLAUDE.md describes for vtable slot
  * 2. Left original rather than reconstructed around, since reproducing it needs
  * a decision about what that folded function WAS. */
-#define ADDR_DEF_SORT_TROOPER_RECS 0x0044CD40u  /* void(void), left original */
+#define ADDR_DEF_SORT_TROOPER_RECS 0x0044CD40u  /* void(void). Reconstructed. */
 #define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
 /* An int16 the height handler ADDS to the row's depth key. So an object type
  * can sit in front of or behind another at the same ground height, which is

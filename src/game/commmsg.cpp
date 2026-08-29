@@ -1803,10 +1803,43 @@ void __cdecl DrainMsgList(void *list)
         MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_A, node);
 }
 
+typedef void (__cdecl *AM2_TellSlotFn)(int32_t slot);
+#define orig_tell_one_slot ((AM2_TellSlotFn)(uintptr_t)ADDR_TELL_ONE_SLOT)
+
+/* TellEachSlot -- original 0x0044C550, one caller.
+ *
+ * Walk the four comm slots and run one thing on every slot that is OCCUPIED
+ * and that CommMustBroadcast accepts. Both tests, in that order, and the
+ * second is the usual "must I tell the other players about this army" --
+ * which answers no outside a multiplayer session, so this loop does nothing
+ * in single player however many slots are filled.
+ *
+ * The slot index and the byte offset are carried separately -- `esi` by 0x70
+ * and `edi` by one -- and the bound is on the OFFSET, `esi < 0x1C0`. Four
+ * records of 112 bytes. Written as an index with the stride applied, which is
+ * the same walk; the original's two counters are the compiler's.
+ */
+void __cdecl TellEachSlot(void)
+{
+    int32_t slot;
+
+    for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
+        if (!*(const int32_t *)(kCommObj + slot * COMM_ARMY_RECORD_SIZE
+                                + COMM_ARMY_OFF_REMOTE))
+            continue;
+        if (!CommMustBroadcast((void *)kCommObj, (int16_t)slot))
+            continue;
+
+        orig_tell_one_slot(slot);
+    }
+}
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_DRAIN_MSG_LIST, (const void *)DrainMsgList,
                   "DrainMsgList", 1);
+    patch_replace(ADDR_TELL_EACH_SLOT, (const void *)TellEachSlot,
+                  "TellEachSlot", 1);
     patch_replace(ADDR_TROOP_MESSAGE_RECV, (const void *)TroopMessageRecv,
                   "TroopMessageRecv", 1);
     patch_replace(ADDR_RECV_TROOP_16, (const void *)RecvTroopBatch,

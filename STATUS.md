@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,117 patches.**
+Nothing uncommitted. **1,121 patches.**
 
-Sixty-four functions since the last snapshot. The seven-class HUD family is
+Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -398,14 +398,20 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **967 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,117
+line (0x0045C000) patched**. Measured: **971 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,121
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Two batches of six have gone in, and the 272 entries
-outstanding still start at thirty-two bytes.
+small ones in batches. Three batches have gone in and the 268 entries outstanding start at 48
+bytes.
+
+**A placeholder name is fine until the thing has a real one.** `DefFinish`
+went in naming its five callees `ADDR_DEF_STEP_*`; two commits later two of
+them were reconstructed and `checkpatches` refused the second name. That is
+the alias ratchet doing what it is for, not an argument against
+placeholders.
 
 **Four of the twelve are three-argument pass-throughs** -- a thunk that
 forwards its arguments to one large function and adds nothing. The compiler

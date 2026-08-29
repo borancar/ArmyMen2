@@ -2115,6 +2115,45 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     SeqAddKind6(at, orig_seq_rand() % 3);
 }
 
+/* ListGrowFind -- original 0x00453AB0, thiscall with one argument.
+ *
+ * Grow a list of 260-byte records by one and then SEARCH it for a key at
+ * +0x100, answering the index or -1. Two jobs in one function, which is
+ * unusual enough to be worth the name saying both.
+ *
+ * THE SEARCH RUNS OVER THE NEW COUNT. The count is bumped BEFORE the realloc
+ * and the loop bound is the bumped value, so the last record it compares is
+ * the one just allocated and never written -- uninitialised memory, read as a
+ * key. A match there would answer the index of a record the caller has not
+ * filled in yet. Reproduced: it is the original's, it is what the caller's
+ * -1 test is written against, and "fixing" it would change which index comes
+ * back on a collision nobody has observed.
+ *
+ * The record size is written as `((n << 6) + n) << 2` -- n * 65 * 4 -- which
+ * is the compiler's way of saying 260 and is why the stride shows up twice in
+ * different forms. One name for it.
+ */
+int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key)
+{
+    uint8_t *s = (uint8_t *)self;
+    int32_t  n = ++*(int32_t *)s;
+    uint8_t *items;
+    int32_t  i;
+
+    items = (uint8_t *)am2_realloc(*(void **)(s + 4),
+                                   (size_t)n * AM2_GROWLIST_STRIDE);
+    *(void **)(s + 4) = items;
+
+    n = *(const int32_t *)s;
+
+    for (i = 0; i < n; i++)
+        if (*(const int32_t *)(items + i * AM2_GROWLIST_STRIDE
+                               + AM2_GROWLIST_KEY) == key)
+            return i;
+
+    return -1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -2256,6 +2295,8 @@ int misc_install(void)
                   "InitPtrList", 1);
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,
                   "ClearPtrListAlias", 1);
+    patch_replace(ADDR_LIST_GROW_FIND, (const void *)ListGrowFind,
+                  "ListGrowFind", 1);
     patch_replace(ADDR_SEQ_RUN, (const void *)SeqRun, "SeqRun", 2);
     patch_replace(ADDR_SEQ_STEP2, (const void *)SeqStepKind2,
                   "SeqStepKind2", 2);

@@ -57,6 +57,10 @@ void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle);
  * than in gameproc.cpp because of SELFTEST_SRC; see commmsg.cpp. */
 void __cdecl DrainMsgList(void *list);
 
+/* 0x0044C550, one caller. Run one thing on every occupied comm slot that
+ * CommMustBroadcast accepts -- so nothing at all in single player. */
+void __cdecl TellEachSlot(void);
+
 #endif
 
 /* 0x0044C250, one caller, and it names itself -- "Trooper Fire Send,

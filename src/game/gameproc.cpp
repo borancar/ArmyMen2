@@ -850,10 +850,7 @@ typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
 
 #define orig_big_4057d0   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_4057D0)
 #define orig_big_407710   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_407710)
-#define orig_def_sort_trooper \
-    ((AM2_VoidFn)(uintptr_t)ADDR_DEF_SORT_TROOPER_RECS)
 #define orig_def_460290   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_460290)
-#define orig_def_435a50   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_435A50)
 #define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
 #define orig_walk_cell    ((AM2_WalkCellFn)(uintptr_t)ADDR_WALK_CELL_AT_POINT)
 
@@ -868,15 +865,17 @@ void __cdecl Call407710(int32_t a, int32_t b, int32_t c)
 }
 
 /* 0x0041A230. Four calls and a tail jump, all five into the def tables:
- * the trooper-record sort, two unnamed, DefCheckLinks, and one more. The ORDER is
+ * DefSortTrooperRecs, one unnamed, DefSortObjRecs, DefCheckLinks and one
+ * more -- three of the five are ours now, and the two sorts arrived a
+ * commit later than this function did. The ORDER is
  * the fact here -- DefCheckLinks needs the link table sorted, which the step
  * before it is presumably what does. Five invented names would say less than
  * five addresses in the right sequence. */
 void __cdecl DefFinish(void)
 {
-    orig_def_sort_trooper();
+    DefSortTrooperRecs();
     orig_def_460290();
-    orig_def_435a50();
+    DefSortObjRecs();
     DefCheckLinks();
     orig_def_45ebc0();
 }
