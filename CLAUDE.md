@@ -571,7 +571,23 @@ already there, and in five cases the OLD name was the one that knew something:
 
 None of it changed behaviour -- the address is the address -- but every one of
 those comments described the mechanism less well than the name already in the
-file did. **Before naming a global, grep `orig.h` for its address.** This rule is stated
+file did. **Before naming a global, grep `orig.h` for its address.**
+
+**And a table with ONE consumer is a table you cannot name.**
+`ADDR_SOLDIER_NAMES` pointed at `0x00489BFC` for as long as `TakeSoldierName`
+was its only reader: that function touches only the taken flag, the stride is 8
+either way, so it indexed correctly and nothing could see that the record
+actually begins four bytes earlier at `0x00489BF8` with the name at +0.
+`SoldierNameOf` (`0x004475C0`) needs the name and would not compile as a lie.
+`MSGNODE_OFF_OWNER` went the same way -- named from `DumpMsgList` printing one
+dereference past it, corrected once `MsgListCopyByKey` was seen memcpy'ing the
+field wholesale for the length beside it.
+
+The cure is the same in both directions: `ADDR_CELL_WEIGHTS` and
+`ADDR_TILE_COVER` sat unnamed for months and were settled in an afternoon by a
+`+1`/`-1` PAIR writing one of them and a footprint routine subtracting fifteen
+from the other. **Look for a second toucher before believing a layout, and
+prefer the writer/reader pair over either alone.** This rule is stated
 here, restated under the alias ratchet, and was still broken THREE TIMES in a
 single session -- on `0x00428DA0`, which was `ADDR_OBJ_ACTION`; on
 `0x0040F560`, which was already reconstructed; and on `0x00458070`, which was
@@ -813,6 +829,15 @@ That table also confirms what this file worked out by probing: arm 34 is index
 12 and calls `0x00425DA0`, the in-mission ESCAPE handler, and ordinary play
 sits in 33. Two independent routes to the same fact.
 
+**Three instances now, and the second failure mode is SLOTS SHARING AN ARM.**
+`WeaponClassOf` (`0x0042AAE0`) lays four arms out in one order and dispatches
+them in another -- kinds 2, 3, 4, 5 answer 2, 3, 1, 4, where reading the bodies
+top to bottom gives 1, 2, 3, 4. `SpriteKeyForKind` (`0x0043A5F0`) has eight
+table slots and only SIX distinct targets, because selectors 0, 1 and 2 all
+point at the same code; counting the bodies gives six arms for an eight-case
+switch. So the table answers two questions the bodies cannot -- which arm each
+index takes, and how many indices share one. Read it every time.
+
 **States 0 and 3 check the same two flags in opposite orders.** State 0 tests
 "leaving" first and state 3 tests "entering" first, so a state entered and left
 in the same frame runs its entry action in 3 and not in 0. Reproduced rather
@@ -1019,6 +1044,24 @@ shifts of one to five per channel, and three further runs of the same build
 gave the usual 22. The failing run had been started seconds after Xvfb itself.
 `ab.sh` already says to read a difference before believing it -- re-running is
 part of reading it.
+
+**But re-running proves nothing once the machine's own behaviour has moved,
+and the control is the PARENT COMMIT.** Under an external load average of
+18-21 -- other users' processes, nothing of ours running at all -- the two
+halves of a run are starved unequally. Measured in one session: frame counts
+fell from the usual 6,000-13,000 to 1,700 and then to 64, `combat` went
+out-of-phase five times running, and `bootcamp`, which had read **22 pixels on
+every run that day**, read 291,505 with an IDENTICAL log.
+
+Re-rolling under that only samples the new distribution. What settles it is to
+stash the work, build the commit before it, and run the same configuration:
+the parent failed the same way, 306,172 pixels and log differences, on code
+that had been clean hours earlier. So the noise was the machine.
+
+Check `uptime` before believing an A/B failure, and reach for the parent
+commit rather than a fourth re-run. **The `frames` line is the early warning**
+-- it is printed before the pixels and a collapse in it means neither side ran
+the scene the other did.
 
 **Read the loop, not the data, when a table's bounds are in question.**
 `tools/scripttokens.py` was reading a range I guessed -- `0x00487A00` to
