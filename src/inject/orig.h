@@ -802,12 +802,71 @@
  * and neither pushes a string.
  *
  * The second is the tail JUMP, and a little is established about it: it walks
- * records of 0x64 bytes at 0x004FC8E0, clearing those whose deadline at +0x30
- * has passed and stamping ADDR_CURSOR_X/Y into +0x10 and +0x12 of the live
- * ones. So it ages a table of cursor-anchored, time-limited entries. What they
- * are FOR is not established. */
+ * the two AIM MARKER tables below, clearing those whose deadline has passed
+ * and stamping ADDR_CURSOR_X/Y into the local player's point. So it ages a
+ * table of cursor-anchored, time-limited entries. What they are FOR is not
+ * established.
+ *
+ * THIS SAID "records of 0x64 bytes at 0x004FC8E0" AND THAT WAS WRONG, which
+ * is worth keeping because the mistake is a good one. The function handles
+ * both tables in one unrolled body, so it reads `[eax]` and `[eax+0x64]`, and
+ * 0x64 looks exactly like a record stride. It is not: `add eax, 4` at the
+ * bottom, with `cmp eax, 0x004FC8F0`, says four entries four bytes apart, and
+ * 0x64 is the displacement of the SECOND TABLE. Two parallel arrays read as
+ * one array of structs. **Take a stride from the loop step, never from the
+ * largest displacement in the body** -- the same rule that says to read a
+ * table's bounds from the loop rather than from the data. */
 #define ADDR_HUD_POST_UPDATE 0x00413E70u  /* void(void), 1280 bytes */
 #define ADDR_HUD_MARKER_AGE  0x00412190u  /* void(void), the tail jump */
+
+/* ---- The AIM MARKERS -----------------------------------------------------
+ *
+ * Two tables of four -- one entry per army -- driven by an arm of the weapon
+ * dispatcher at 0x0045F460, aged by ADDR_HUD_MARKER_AGE, and drawn by
+ * ADDR_DRAW_EFFECT_LAYER. Everything below is parallel arrays with a stride of
+ * FOUR, indexed by army; see the correction above for why that needs saying.
+ *
+ * What the effect looks like is fully mapped and what it is FOR is not. The
+ * draw does three things per live entry: it re-reads a 112x112 block of the
+ * offscreen surface through a displacement table, writes it back to the draw
+ * target -- a refraction, the pixels are moved rather than tinted -- and then
+ * puts two sprites over it. The local player's point follows the CURSOR,
+ * which is what makes "aim" the reading; it is a reading and not a fact.
+ *
+ * Sprite set 19 again, the air-support set, indices 4 and 5. Six frames of
+ * index 4 stepped every 50 ms and stopped at the last, and index 5 drawn as
+ * entry 0 plus one of entries 5..8 chosen at random. */
+#define ADDR_AIM_SPRITES_A       0x004FC8C8u  /* AM2_Sprite *[6], set 19 idx 4 */
+#define ADDR_AIM_LIVE_A          0x004FC8E0u  /* int32_t[4], per army */
+#define ADDR_AIM_POINT_A         0x004FC8F0u  /* {int16 x, int16 y}[4] */
+#define ADDR_AIM_STAMP_A         0x004FC900u  /* int32_t[4], game-clock ms */
+#define ADDR_AIM_DEADLINE_A      0x004FC910u  /* int32_t[4] */
+#define ADDR_AIM_SPRITES_B       0x004FC920u  /* AM2_Sprite *[9], set 19 idx 5 */
+#define ADDR_AIM_LIVE_B          0x004FC944u  /* int32_t[4] */
+#define ADDR_AIM_POINT_B         0x004FC954u  /* {int16 x, int16 y}[4] */
+#define ADDR_AIM_FRAME_B         0x004FC964u  /* int32_t[4], 5..8, re-rolled */
+#define ADDR_AIM_STAMP_B         0x004FC974u  /* int32_t[4] */
+#define ADDR_AIM_DEADLINE_B      0x004FC984u  /* int32_t[4] */
+/* 112 x 112 entries of {int16 dx, int16 dy}, relative to the block's top-left
+ * corner. 50,176 bytes, which is exactly the span up to the next named datum,
+ * and 112 is the block's width -- so the table tiles the block exactly. */
+#define ADDR_AIM_DISPLACE_MAP    0x00478CDCu
+#define AM2_AIM_BLOCK            112
+#define AM2_AIM_BOX_LEFT         0x2F   /* off ADDR_AIM_POINT_A */
+#define AM2_AIM_BOX_TOP          (-0xD8)
+#define AM2_AIM_BOX_RIGHT        0x9F
+#define AM2_AIM_BOX_BOTTOM       (-0x68)
+#define AM2_AIM_STEP_MS          50     /* one frame of the A sprites */
+#define AM2_AIM_B_STEP_MS        150    /* and of the B ones */
+#define AM2_AIM_FRAMES_A         5      /* the index stops here */
+#define AM2_AIM_B_OFF_X          0x8C   /* where the B sprites go */
+#define AM2_AIM_B_OFF_Y          (-0x87)
+#define AM2_AIM_B_OFF_X2         0x96
+#define AM2_AIM_B_OFF_Y2         (-0x7D)
+#define AM2_AIM_B_FIRST          5      /* the random frame is 5 + rand()%4 */
+#define AM2_AIM_B_HOLD           7      /* 1 in 7 re-rolls it */
+/* 0x00412230 and 0x00412310, the two halves of starting one. */
+#define ADDR_AIM_START           0x00412230u  /* void(int8_t army, uint32 pt) */
 /* One record per font, 524 bytes apart -- BuildFont computes the stride as
  * ((f<<6)+f)*2+f then <<2, which is 131 dwords and not the 133 this said
  * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
@@ -1152,9 +1211,10 @@
  * 0x00409070 is the AIR layer, and it is reconstructed -- the block at
  * ADDR_AIR_PATH_TURN_X has the flight path it turned out to draw.
  *
- * 0x004123D0 reserves 0x3144 bytes of stack, reads ADDR_GAME_RAND and the
- * framebuffer directly, and draws from a table at 0x004FC8C8. Randomised
- * full-screen drawing on a timer; what the effect IS is not established.
+ * 0x004123D0 is reconstructed: the AIM MARKERS, one per army. See the block
+ * at ADDR_AIM_SPRITES_A. "Randomised full-screen drawing on a timer" was a
+ * fair description of the shape and wrong about the scale -- the randomness
+ * picks one of four flicker frames, and the drawing is a 112x112 block.
  *
  * ADDR_DRAW_SELECTION was the third and is reconstructed; see the block at
  * ADDR_SELECTED_ITEMS for what it turned out to be. */

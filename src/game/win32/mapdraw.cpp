@@ -37,6 +37,7 @@
 #include "../air.h"      /* RevealNearby, AirSupportPop -- ours */
 #include "../item.h"     /* UidArmy, ChangeObjectFrame -- ours */
 #include "audio.h"       /* PlaySoundAt -- reconstructed */
+#include "../image.h"    /* AM2_IMAGE, for the displacement table */
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
@@ -2221,6 +2222,193 @@ void __cdecl AirFrameDraw(void)
     UnlockSurface();
 }
 
+/* DrawEffectLayer -- original 0x004123D0, one caller.
+ *
+ * THE AIM MARKERS: one per army, each a 112x112 REFRACTION of the offscreen
+ * surface plus two sprite pairs over it. The last of the Lock/Unlock batch
+ * under a thousand bytes.
+ *
+ * A refraction and not a tint: the block is read out of the offscreen surface
+ * through a table of {dx, dy} pairs -- one per pixel of the block, relative to
+ * the block's own top-left -- into a stack buffer, and the buffer is written
+ * back to the draw target. Every pixel comes from somewhere else in the same
+ * frame, clamped to the screen. Nothing is blended and no colour is computed.
+ *
+ * WHAT IT IS FOR IS NOT ESTABLISHED and "aim" is a reading. What supports it:
+ * the entry is started by an arm of the weapon dispatcher at 0x0045F460, and
+ * ADDR_HUD_MARKER_AGE stamps ADDR_CURSOR_X/Y into the LOCAL player's point
+ * every frame, so one of the four follows the mouse. What is missing is
+ * anything that says which weapon.
+ *
+ * FOUR LOCK BRACKETS PER LIVE ENTRY, and they are not interchangeable. The
+ * read is on ADDR_OFFSCREEN_SURFACE and the other three are on whatever was
+ * the draw target on entry; each is preceded by its own SetDrawTarget, which
+ * is what makes the pair meaningful. A failed lock RETURNS -- it does not
+ * unlock, and it does not go on to the next army. Reproduced.
+ *
+ * TWO ANIMATIONS ON TWO DIFFERENT CLOCKS, and both divisors were MEASURED by
+ * running the multiply-shift rather than read off the magic constant. The A
+ * sprites step every 50 ms and stop at frame 5. The B sprites step every 150
+ * ms to frame 4 and then FLICKER: past that the stored frame is held, and a
+ * one-in-seven roll replaces it with 5 + rand() % 4. Reading 0x51EB851F as
+ * "divide by 100" would have been wrong in one direction and 0x1B4E81B5 as
+ * "divide by 50" wrong in the other; the tool for this is a calculator, not
+ * a memory of what MSVC emits.
+ *
+ * The displacement table's index arithmetic is written out rather than
+ * strength-reduced. The original carries seven derived values across the row
+ * loop -- 112*y, 448*y, 448*src.top and so on -- because it is 1999 and the
+ * multiply is expensive; every one of them is `(y - box.top) * 112` or
+ * `(y - box.top) * 448` in the end, and saying so is the whole point of
+ * porting it.
+ *
+ * ONE DELIBERATE INFIDELITY, and it changes nothing. The original computes
+ * the clamped source x in a 16-bit register and the comparison in a 32-bit
+ * one; the two can only disagree for a coordinate outside a 16-bit range,
+ * which the clamp has already excluded. Written as int32 throughout.
+ *
+ * NOT ONE ENTRY IS EVER LIVE ON ANY DRIVE HERE, and that is measured rather
+ * than assumed: reading ADDR_AIM_LIVE_A and _B over the control socket
+ * through a Boot Camp mission with six rounds of walking and firing gives
+ * all eight dwords zero, before and after every shot. So this function loops
+ * four times, finds nothing, and returns -- and a clean A/B on bootcamp,
+ * mission and combat is a check on that loop and on nothing else. The
+ * refraction and both sprite pairs stand on the disassembly.
+ *
+ * The reason is upstream: ADDR_AIM_START is reached from ONE arm of a
+ * 42-arm weapon dispatcher, so it takes a weapon Sarge is not carrying.
+ * Reaching it needs a mission that issues that weapon, which is a drive this
+ * project does not have -- not a defect and not a dead path.
+ */
+/* The image's own LCG, spelled as audio.cpp and event.cpp spell it. libc's
+ * would be a different sequence and the flicker is observable. */
+typedef int32_t (__cdecl *AM2_MapRandFn)(void);
+#define orig_rand (*(AM2_MapRandFn)(uintptr_t)ADDR_GAME_RAND)
+
+void __cdecl DrawEffectLayer(void)
+{
+    uint8_t             block[AM2_AIM_BLOCK * AM2_AIM_BLOCK];
+    LPDIRECTDRAWSURFACE target = g_drawTarget;
+    const int16_t      *map    = (const int16_t *)AM2_IMAGE(ADDR_AIM_DISPLACE_MAP);
+    int32_t             army;
+
+    for (army = 0; army < AM2_COMM_SLOTS; army++) {
+        const int16_t *ptA = (const int16_t *)((uint8_t *)(uintptr_t)
+                                 ADDR_AIM_POINT_A + army * 4);
+        int32_t x, y, frame;
+        RECT    box, hit;
+
+        if (!((const int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army])
+            continue;
+
+        frame = (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                 - ((const int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[army])
+                / AM2_AIM_STEP_MS + 1;
+        if ((uint32_t)frame >= AM2_AIM_FRAMES_A)
+            frame = AM2_AIM_FRAMES_A;
+
+        x = ptA[0];
+        y = ptA[1];
+
+        box.left   = x + AM2_AIM_BOX_LEFT;
+        box.top    = y + AM2_AIM_BOX_TOP;
+        box.right  = x + AM2_AIM_BOX_RIGHT;
+        box.bottom = y + AM2_AIM_BOX_BOTTOM;
+
+        if (IntersectRect(&hit, &box, (const RECT *)AM2_IMAGE(ADDR_SCREEN_CLIP))) {
+            int32_t row, col;
+
+            /* Read: every pixel of the visible part of the block, taken from
+             * wherever the map points, out of the OFFSCREEN surface. */
+            SetDrawTarget(g_offscreen);
+            if (!LockSurface(g_offscreen))
+                return;
+
+            for (row = hit.top; row < hit.bottom; row++) {
+                for (col = hit.left; col < hit.right; col++) {
+                    int32_t  at = (row - box.top) * AM2_AIM_BLOCK
+                                  + (col - box.left);
+                    int32_t  sx = map[at * 2]     + box.left;
+                    int32_t  sy = map[at * 2 + 1] + box.top;
+                    int32_t  w  = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W;
+                    int32_t  h  = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H;
+
+                    if (sx > w - 1)
+                        sx = w - 1;
+                    else if (sx < 0)
+                        sx = 0;
+
+                    if (sy > h - 1)
+                        sy = h - 1;
+                    else if (sy < 0)
+                        sy = 0;
+
+                    block[at] = g_framebuffer[sy * g_pitch + sx];
+                }
+            }
+
+            UnlockSurface();
+
+            /* Write: the same rows, straight back to the draw target. */
+            SetDrawTarget(target);
+            if (!LockSurface(target))
+                return;
+
+            for (row = hit.top; row < hit.bottom; row++)
+                memcpy(g_framebuffer + row * g_pitch + hit.left,
+                       block + (row - box.top) * AM2_AIM_BLOCK
+                             + (hit.left - box.left),
+                       (size_t)(hit.right - hit.left));
+
+            UnlockSurface();
+        }
+
+        SetDrawTarget(target);
+        if (!LockSurface(target))
+            return;
+
+        DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_A)[frame],
+                   x, y, 0);
+        DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_A)[0],
+                   x + AM2_AIM_BOX_LEFT, y + AM2_AIM_BOX_TOP, 0);
+
+        UnlockSurface();
+
+        if (((const int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[army]) {
+            const int16_t *ptB = (const int16_t *)((uint8_t *)(uintptr_t)
+                                     ADDR_AIM_POINT_B + army * 4);
+            int32_t *held = &((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[army];
+            int32_t  frameB;
+
+            frameB = (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                      - ((const int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[army])
+                     / AM2_AIM_B_STEP_MS + 1;
+
+            /* Past the fourth step it stops counting and starts flickering. */
+            if ((uint32_t)frameB > 4) {
+                if (*held != 0 && orig_rand() % AM2_AIM_B_HOLD != 1) {
+                    frameB = *held;
+                } else {
+                    frameB = orig_rand() % 4;
+                    frameB += AM2_AIM_B_FIRST;
+                    *held = frameB;
+                }
+            }
+
+            SetDrawTarget(target);
+            if (!LockSurface(target))
+                return;
+
+            DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_B)[0],
+                       ptB[0] + AM2_AIM_B_OFF_X, ptB[1] + AM2_AIM_B_OFF_Y, 0);
+            DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIM_SPRITES_B)[frameB],
+                       ptB[0] + AM2_AIM_B_OFF_X2, ptB[1] + AM2_AIM_B_OFF_Y2, 0);
+
+            UnlockSurface();
+        }
+    }
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
@@ -2271,5 +2459,7 @@ int mapdraw_install(void)
                         "DrawSelection", 1);
     rc |= patch_replace(ADDR_AIR_FRAME_DRAW, (const void *)AirFrameDraw,
                         "AirFrameDraw", 1);
+    rc |= patch_replace(ADDR_DRAW_EFFECT_LAYER, (const void *)DrawEffectLayer,
+                        "DrawEffectLayer", 1);
     return rc;
 }

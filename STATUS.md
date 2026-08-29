@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,077 patches.**
+Nothing uncommitted. **1,078 patches.**
 
-Twenty-five functions since the last snapshot. The seven-class HUD family is
+Twenty-six functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -81,6 +81,27 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   `DrawSelection`. It terminates only because the callee changes what is at
   that index, which is a property of the callee; the code alone reads like a
   hang, so it says so.
+
+- **`DrawEffectLayer`** (`0x004123D0`, 992 B) is the AIM MARKERS: one entry
+  per army, each a 112x112 **refraction** of the offscreen surface -- every
+  pixel taken from wherever a {dx,dy} table points, nothing blended -- with
+  two sprite pairs over it. Bracket batch **27 of 29**, and the two left are
+  1088 and 2656 bytes.
+
+  It corrected a written claim on the way. `orig.h` said the table was
+  "records of 0x64 bytes"; the ager handles BOTH tables in one unrolled body,
+  so `[eax]` and `[eax+0x64]` read exactly like a stride. `add eax, 4` at the
+  bottom says otherwise. **Take a stride from the loop step, never from the
+  largest displacement in the body.**
+
+  Both animation divisors were measured by running the multiply-shift: 50 ms
+  for one clock and **150** for the other, where reading the magic constants
+  by eye would have given 100 and 50.
+
+  Not one entry is ever live on any drive here -- eight dwords read over the
+  socket through a firing Boot Camp mission, all zero -- so the clean A/B
+  checks the loop guard and nothing else. `ADDR_AIM_START` is one arm of a
+  42-arm weapon dispatcher.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

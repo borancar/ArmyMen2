@@ -115,6 +115,10 @@ void __cdecl DrawSelection(void);
  * gauge that times it, and the frame cycle of the object that called it. */
 void __cdecl AirFrameDraw(void);
 
+/* 0x004123D0. The aim markers: a 112x112 refraction of the offscreen
+ * surface plus two sprite pairs, one entry per army. */
+void __cdecl DrawEffectLayer(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

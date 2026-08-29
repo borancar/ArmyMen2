@@ -970,7 +970,6 @@ void __cdecl ShowMpResult(int32_t result)
 }
 
 
-#define orig_draw_effect_layer ((AM2_NoArgFn)(uintptr_t)ADDR_DRAW_EFFECT_LAYER)
 
 /* 0x00424BF0, two callers. Repaints the whole screen from scratch -- what
  * TakeMenuRequest does instead of the ordinary present when the state has not
@@ -1020,7 +1019,7 @@ void __cdecl RefreshDraw(void)
 
     SetDrawTarget(g_backBuffer);
     AirFrameDraw();
-    orig_draw_effect_layer();
+    DrawEffectLayer();
     orig_paused_frame_step();
 
     SetDrawTarget(g_backBuffer);
