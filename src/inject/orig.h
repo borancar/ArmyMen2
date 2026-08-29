@@ -2623,6 +2623,10 @@
  * to 6, which orig.h already records as `attack`. So the departed player's
  * units are handed to the AI, which is what the message beside it says. */
 #define ADDR_OBJ_TO_AI           0x0045A030u  /* void(void *obj) */
+/* 0x00459FE0, two callers, and 0x0045A030's neighbour -- functions.tsv runs
+ * the two together into one 144-byte entry, so reconstructing either alone
+ * would mark both done. The weapon object a unit or vehicle is holding. */
+#define ADDR_HELD_WEAPON_OBJ     0x00459FE0u  /* void *(const void *obj) */
 #define ADDR_STR_ALLRIGHT_WAV    0x00474194u  /* "AllRight.wav" */
 #define ADDR_STR_HOST_NOW        0x00474178u  /* "Player %s is now the host." */
 #define ADDR_STR_LEFT_AI         0x004741ECu  /* "Player %s has left the game - now AI" */
@@ -4192,6 +4196,15 @@ typedef struct {
  * Renamed rather than aliased: ten use sites outside this file. */
 #define OBJ_OFF_SOLDIER_KIND     0x544u
 #define ADDR_SET_SOLDIER_KIND    0x00449570u  /* void(obj, kind) -- the writer */
+/* 0x0045B000, three callers. The OTHER writer of OBJ_OFF_SOLDIER_KIND: set it
+ * and put the object's rows on the frames that go with it, unless a row is
+ * mid-animation. */
+#define ADDR_SET_KIND_FRAMES     0x0045B000u  /* void(void *obj, int32_t) */
+/* Eight int32 frame ids indexed by kind: 81, 81, 80, 82, 83, 85, 4, 5. Past
+ * the eighth is string data, and nothing bounds the index. */
+#define ADDR_KIND_FRAMES         0x0048BE30u  /* int32_t[8] */
+#define AM2_KIND_FRAMES          8
+#define AM2_SECOND_ROW_FRAME     0x50  /* what row 1 always gets, no table */
 /* 0x00449660, sixteen callers. It was ADDR_UNIT_ACTION, "void(obj, action) --
  * 44 arms", and that was wrong about the argument and about the arms.
  *

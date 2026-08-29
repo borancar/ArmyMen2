@@ -510,4 +510,15 @@ void __cdecl SetObjField530(void *obj, int32_t state);
  * only when it stays in the same direction bucket. */
 uint8_t __cdecl JitterFacing(void *obj, uint8_t facing);
 
+/* 0x00459FE0, two callers. The weapon object a unit or vehicle is holding. */
+void *__cdecl HeldWeaponObj(const void *obj);
+
+/* 0x0045A030, reached by address from the army walker. Hand a unit to the
+ * AI: stop it firing if alive, and give Sarge stance 6. */
+void __cdecl ObjToAI(void *obj);
+
+/* 0x0045B000, three callers. Set the soldier kind and put the first two rows
+ * on the frames that go with it, skipping any row mid-animation. */
+void __cdecl SetKindFrames(void *obj, int32_t kind);
+
 #endif

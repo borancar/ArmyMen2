@@ -5463,6 +5463,147 @@ uint8_t __cdecl JitterFacing(void *obj, uint8_t facing)
     return jitter;
 }
 
+/* The row test SetKindFrames applies twice, written once. All three
+ * conditions must hold for the row to be left alone: an animation is
+ * playing, ROW_OFF_FIELD_3C is zero, and the cell index is short of the
+ * last. This is a helper of ours -- the original inlines it both times --
+ * and it is one only because writing the conjunction twice is how a
+ * polarity gets flipped in one copy. */
+static int32_t RowMidAnimation(const uint8_t *row)
+{
+    const AM2_Anim *anim =
+        *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
+
+    return anim
+        && *(const int16_t *)(row + ROW_OFF_FIELD_3C) == 0
+        && (int32_t)*(const uint8_t *)(row + ROW_OFF_CELL)
+               < (int32_t)anim->frames - 1;
+}
+
+/* HeldWeaponObj -- original 0x00459FE0, two callers.
+ *
+ * The weapon OBJECT a unit or vehicle is holding, or NULL. Type 2 reads the
+ * inventory slot UNIT_OFF_INVENTORY_SEL selects; type 3 reads a single fixed
+ * slot, UNIT_OFF_INVENTORY + 4 -- not slot 0, and not a selection. Everything
+ * else answers NULL.
+ *
+ * IT SHARES A functions.tsv ENTRY WITH ObjToAI below it. The two run together
+ * into one 144-byte entry, so patching either alone would mark both
+ * reconstructed -- the merged-entry inflation CLAUDE.md warns about, met head
+ * on. Both are written here for that reason.
+ *
+ * The type tests are each a `sete` into a register that is then tested, which
+ * is MSVC materialising a bool it did not need; written as the comparisons
+ * they are.
+ *
+ * It hands the uid to WeaponByUid, which complains and answers NULL for a uid
+ * that is not a weapon -- so an empty slot is not silent here. Both callers
+ * accept NULL.
+ */
+void *__cdecl HeldWeaponObj(const void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (!o)
+        return (void *)0;
+
+    if (*(const int32_t *)o == 2)
+        return WeaponByUid(*(const uint32_t *)
+            (o + UNIT_OFF_INVENTORY
+             + (size_t)*(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL) * 4));
+
+    if (*(const int32_t *)o == 3)
+        return WeaponByUid(*(const uint32_t *)(o + UNIT_OFF_INVENTORY + 4));
+
+    return (void *)0;
+}
+
+/* ObjToAI -- original 0x0045A030, and its two references are one call site: a
+ * `push` of the address, which appears twice because the aligned-dword scan
+ * and the instruction stream both find it.
+ *
+ * Hand a unit over to the AI. It is passed BY ADDRESS to the walker at
+ * 0x00457820, which calls it for every object an army owns -- the "left, AI
+ * takes over" path.
+ *
+ * ONLY TYPE 2 IS TOUCHED and the two things it does are independently gated:
+ * a unit with health above zero stops firing, and a unit that is Sarge gets
+ * stance 6. A dead Sarge therefore gets the stance and not the fire clear,
+ * which is the arm a single combined `if` would lose.
+ *
+ * The health test is `> 0` on an int16, so a negative health -- which this
+ * game does produce, since damage is not clamped at zero -- takes the same
+ * arm as a dead one.
+ */
+void __cdecl ObjToAI(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (!o || *(const int32_t *)o != 2)
+        return;
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0)
+        *(int32_t *)(o + UNIT_OFF_FIRE_ACTIVE) = 0;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+        *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 6;
+}
+
+/* SetKindFrames -- original 0x0045B000, three callers, and the other writer of
+ * OBJ_OFF_SOLDIER_KIND beside SetSoldierKind.
+ *
+ * Set the kind and put the object's first two rows on the frames that go with
+ * it -- unless a row is mid-animation, in which case that row is left alone.
+ *
+ * THE "MID-ANIMATION" TEST IS THREE CONDITIONS AND ALL THREE MUST HOLD to skip
+ * the row: there is an animation playing, the row's ROW_OFF_FIELD_3C is zero,
+ * and the current cell is short of the last. Any one failing means the frame
+ * is set. Written as the single `if` the original branches into, because the
+ * three are a conjunction and splitting them invites getting the polarity
+ * wrong.
+ *
+ * THE KIND IS WRITTEN INSIDE THAT GUARD, not before it. A call that arrives
+ * while row 0 is mid-animation changes NOTHING -- the field keeps its old
+ * value -- and yet the second row is still considered, on its own test. So the
+ * two rows can disagree about which kind they are showing.
+ *
+ * ROW 1 GETS A LITERAL FRAME, NOT A TABLE LOOKUP. Row 0 takes
+ * ADDR_KIND_FRAMES[kind] and row 1 takes 0x50 whatever the kind is, so only
+ * the first row's appearance depends on it.
+ *
+ * The early exit is on the kind being unchanged, before anything is read, so
+ * re-asserting a kind is free.
+ *
+ * Nothing bounds the kind against the eight-entry table; past it is string
+ * data. All three callers pass a small literal.
+ */
+void __cdecl SetKindFrames(void *obj, int32_t kind)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *row;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == kind)
+        return;
+
+    row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+    if (!RowMidAnimation(row)) {
+        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = kind;
+        SetAnimFrame(row,
+                     (int16_t)((const int32_t *)(uintptr_t)
+                         ADDR_KIND_FRAMES)[kind],
+                     0);
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 1)
+        return;
+
+    row += AM2_OBJ_ROW_STRIDE;
+
+    if (!RowMidAnimation(row))
+        SetAnimFrame(row, AM2_SECOND_ROW_FRAME, 0);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5596,6 +5737,11 @@ void item_install(void)
                   "SetObjField530", 2);
     patch_replace(ADDR_JITTER_FACING, (const void *)JitterFacing,
                   "JitterFacing", 3);
+    patch_replace(ADDR_HELD_WEAPON_OBJ, (const void *)HeldWeaponObj,
+                  "HeldWeaponObj", 2);
+    patch_replace(ADDR_OBJ_TO_AI, (const void *)ObjToAI, "ObjToAI", 1);
+    patch_replace(ADDR_SET_KIND_FRAMES, (const void *)SetKindFrames,
+                  "SetKindFrames", 3);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

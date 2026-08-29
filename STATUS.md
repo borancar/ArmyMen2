@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,152 patches.**
+Nothing uncommitted. **1,155 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -589,16 +589,39 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   twelve records first and then grow by SIX, which are separate constants
   rather than one expressed twice, and neither checks either allocation.
 
+- **A merged `functions.tsv` entry was met head on rather than counted.**
+  `HeldWeaponObj` (`0x00459FE0`) and `ObjToAI` (`0x0045A030`) share one
+  144-byte entry, so patching either alone would have marked both
+  reconstructed -- the inflation CLAUDE.md warns about. Both are written.
+- **`checkseams` caught the FOURTH spelling of a seam**, the one that looks
+  like nothing: `winproc.cpp` passed `ADDR_OBJ_TO_AI` to `ForEachArmyObject`
+  as a cast function pointer. That was correct while the callback was the
+  original's and became a lie the moment `ObjToAI` was reconstructed, with
+  nothing on the line resembling a call. It goes in by name now.
+- **`SetKindFrames`** (`0x0045B000`) writes the kind INSIDE its
+  mid-animation guard, not before it. A call arriving while row 0 is
+  mid-animation changes nothing at all -- and yet row 1 is still considered on
+  its own test, so the two rows can disagree about which kind they show. Row 1
+  also takes a LITERAL frame rather than the table lookup row 0 gets.
+- **`ObjToAI`'s two effects are independently gated**, so a dead Sarge gets
+  the stance and not the fire clear -- the arm a single combined `if` would
+  lose.
+- **`combat` went out-of-phase twice running and came back on the third.**
+  177,112 then 177,111 then 706, all on one build with identical logs. The
+  three out-of-phase figures differ by a pixel or two rather than repeating
+  exactly, which is what says "scene" rather than "defect" -- a repeated
+  EXACT count is the signal to worry about.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,002 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,152
+line (0x0045C000) patched**. Measured: **1,004 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,155
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirteen batches have gone in and the 237 entries outstanding start at 48
+small ones in batches. Fourteen batches have gone in and the 235 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

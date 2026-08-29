@@ -42,6 +42,7 @@
 #include "movie.h"    /* StateLeave -- reconstructed */
 #include "audio.h"
 #include "winproc.h"
+#include "../item.h"   /* ObjToAI -- the walker's callback */
 #include "winmain.h"
 #include "mapdraw.h"
 #include "../commmsg.h"  /* CommFindPlayer -- reconstructed */
@@ -274,10 +275,13 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
     orig_remove_player(id);
 
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        /* Not a sprite: hand the departed player's units to the AI. The
-         * callback is still original; the walk is ours. See army.h. */
-        ForEachArmyObject(slot,
-                          (void (__cdecl *)(void *))(uintptr_t)ADDR_OBJ_TO_AI);
+        /* Not a sprite: hand the departed player's units to the AI. Both
+         * halves are ours now -- the walk and the callback -- so the callback
+         * goes in by NAME. It was ADDR_OBJ_TO_AI cast to a pointer while it
+         * was still the original's, which is exactly the fourth spelling of a
+         * seam checkseams was taught to catch: nothing on that line looked
+         * like a call. See army.h. */
+        ForEachArmyObject(slot, ObjToAI);
 
     orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_LEFT_AI,
                  PlayerName(comm, slot));
