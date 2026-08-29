@@ -525,4 +525,12 @@ void __cdecl SetKindFrames(void *obj, int32_t kind);
  * random points across the view, six kinds, each with a random delay. */
 void __cdecl SpawnRandomBarrage(void);
 
+/* 0x00458380, four callers. Select one object if it is ours and selectable,
+ * clearing the existing selection first unless CONTROL is held. */
+int32_t __cdecl SelectIfOwn(void *obj);
+
+/* 0x004572A0, two callers. Clear a type 2's working block and stamp its
+ * facing into the copy at +0xF8. */
+void __cdecl ResetType2Fields(void *obj);
+
 #endif

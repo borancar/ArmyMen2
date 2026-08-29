@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,159 patches.**
+Nothing uncommitted. **1,161 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -717,16 +717,40 @@ ZERO, so `tools/vectors.py` cannot be extended to any of them -- the offline
 harness has finished its job on this half of the image, and the in-process
 check and the A/B are what remain.
 
+- **The offset ratchet SUPPLIED a meaning rather than preventing a
+  duplicate.** `ResetType2Fields` (`0x004572A0`) went in with eleven
+  `OBJ_OFF_FIELD_<hex>` names for the block it clears, and `checkoffsets`
+  refused six of them: the four script fields, `OBJ_OFF_FOLLOW_UID` and the
+  `OBJ_OFF_HIT_DIR` / `OBJ_OFF_HIT_TIME` pair were named long ago. Taking the
+  existing names turned eleven unknowns into a plain reading -- drop the
+  script binding, the weapon type record, the follow target and the last-hit
+  record, wipe the tail block, re-stamp the facing.
+
+  **"Grep for the offset before naming it" is usually stated as a way to avoid
+  a second name. This is the other direction, and it is the more valuable
+  one.** `OBJ_OFF_HIT_DIR` also corroborated the byte width the instruction
+  showed, from the writing side.
+- **`SelectIfOwn`** (`0x00458380`) checks CONTROL LAST, after every test that
+  can refuse -- so a click on someone else's unit with CONTROL held leaves the
+  selection alone rather than clearing it. Its health test is `!= 0` where
+  `ObjToAI`'s is `> 0`, so a unit at negative health is selectable here and
+  dead there. Two functions in one file reading one field two ways.
+- **`0x004248A0` is deliberately left original.** It is MSVC static-init glue:
+  five tail-jumping thiscall stubs for one global object at `0x00511A68` --
+  a constructor, its member-constructor trampoline, an `atexit` registration
+  and the matching destructor pair. Compiler-generated, and reproducing the
+  `ecx` convention and the tail jumps would be work with nothing behind it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,008 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,159
+line (0x0045C000) patched**. Measured: **1,010 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,161
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixteen batches have gone in and the 231 entries outstanding start at 48
+small ones in batches. Seventeen batches have gone in and the 229 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

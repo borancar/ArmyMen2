@@ -3647,6 +3647,8 @@ typedef struct {
  * place: SINGLE PLAYER, which with it set and either SHIFT held asks for
  * SELECT MAP instead of SELECT PLAYER. The cheat is a level select. */
 #define ADDR_CHEAT_LEVEL_SELECT   0x004FCF98u  /* int32_t */
+#define AM2_DIK_LCONTROL          0x1Du
+#define AM2_DIK_RCONTROL          0x9Du
 #define AM2_DIK_LSHIFT            0x2Au
 #define AM2_DIK_RSHIFT            0x36u
 /* Every checkbox's LEFT-click handler, written by the constructor and not by
@@ -4395,6 +4397,22 @@ typedef struct {
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
  * the field gates the first delayed event, the flag suppresses the second. */
 #define OBJ_OFF_FIELD_94         0x94u
+/* 0x004572A0, two callers. Reset a type 2's transient state.
+ *
+ * WHAT IT CLEARS WAS ALREADY NAMED, and the offset ratchet is what said so:
+ * six of the eleven fields had meaningful names already -- the four script
+ * fields, OBJ_OFF_FIELD_C0's weapon record, OBJ_OFF_FOLLOW_UID, and the
+ * OBJ_OFF_HIT_DIR / OBJ_OFF_HIT_TIME pair. Naming them a second time by
+ * offset would have made a coherent function look like eleven unknowns.
+ * Only four needed new names, and they are named by offset because nothing
+ * read so far says what they hold. */
+#define OBJ_OFF_FIELD_CC         0xCCu
+#define OBJ_OFF_FACING_COPY      0xF8u   /* stamped from OBJ_OFF_FACING */
+#define OBJ_OFF_FIELD_FC         0xFCu
+#define OBJ_OFF_FIELD_100        0x100u
+#define OBJ_OFF_TAIL_BLOCK       0x118u  /* 0x103 dwords, cleared wholesale */
+#define AM2_OBJ_TAIL_DWORDS      0x103u
+#define ADDR_RESET_TYPE2_FIELDS  0x004572A0u  /* void(void *obj) */
 /* And 0x94 is type-dependent too, on the same evidence as 0xA0 above.
  * ADDR_STEP_TYPE1_4 dereferences it -- `mov eax,[obj+0x94]; cmp [eax],0x2A` --
  * and misc.cpp's MeetsAllThree does the same for 0x1F, so for those objects it
@@ -7446,6 +7464,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_SELECTED_UIDS       0x00512308u  /* {capacity, count, items} */
 #define AM2_MAX_SELECTED         0x40
 #define OBJ_FLAG_SELECTED        0x400u
+/* 0x00458380, four callers. Select one object if it is ours and selectable,
+ * clearing the existing selection first unless a CONTROL key is held. */
+#define ADDR_SELECT_IF_OWN       0x00458380u  /* int32_t(void *obj) */
 #define ADDR_SELECT_UNIT         0x00427CE0u  /* void(void *obj) -- NOT
                                                * SelectObject: wingdi.h has that
                                                * name and dllmain.c sees it */

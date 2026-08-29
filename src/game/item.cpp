@@ -5651,6 +5651,129 @@ void __cdecl SpawnRandomBarrage(void)
     }
 }
 
+/* SelectIfOwn -- original 0x00458380, four callers.
+ *
+ * Select one object, if it passes six tests: it exists, its army is the local
+ * player's, its health is not zero, it is not destroyed, its type is 2, 3 or
+ * 8, and its type record pointer is null. Anything failing answers 0 without
+ * touching the selection at all.
+ *
+ * CONTROL IS THE ADD-TO-SELECTION MODIFIER, and it is checked LAST -- after
+ * every test that can refuse. So a click on someone else's unit with CONTROL
+ * held leaves the existing selection alone rather than clearing it, which is
+ * what a player expects and is not obviously what the code says until the
+ * order is read. Both control keys count.
+ *
+ * THE HEALTH TEST IS `!= 0`, NOT `> 0`. A unit whose health has gone negative
+ * -- which this game produces, since damage is not clamped at zero -- is still
+ * selectable here, where ObjToAI's `> 0` treats the same value as dead. Two
+ * functions in this file reading one field two ways; reproduced, and worth
+ * knowing before assuming either is the house rule.
+ *
+ * THE TYPE TEST IS 2, 3 OR 8 written as a range and an equality, which is the
+ * same set ObjIsTypeIn238 answers for -- but this does NOT call it. The
+ * original inlines the comparisons, and it is left inlined: routing it through
+ * the accessor would change which counter moves and would be a different
+ * function.
+ *
+ * The last test, on OBJ_OFF_FIELD_94, refuses an object that already has a
+ * type record. What that means is not established; the field is named for its
+ * offset and this is one more reader of it.
+ */
+int32_t __cdecl SelectIfOwn(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  type;
+
+    if (!o)
+        return 0;
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY)
+        != (int8_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return 0;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        return 0;
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return 0;
+
+    type = *(const int32_t *)o;
+    if (type < 2 || (type > 3 && type != 8))
+        return 0;
+
+    if (*(const void *const *)(o + OBJ_OFF_FIELD_94))
+        return 0;
+
+    if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
+        DeselectAll();
+
+    SelectUnit(o);
+    return 1;
+}
+
+/* ResetType2Fields -- original 0x004572A0, two callers.
+ *
+ * Clear a type 2's working block and stamp its current facing into the copy at
+ * +0xF8. Nothing here is conditional: every write happens on every call.
+ *
+ * WHAT IT CLEARS WAS ALREADY NAMED, and the offset ratchet is what said so. I
+ * added eleven `OBJ_OFF_FIELD_<hex>` names for the block and `checkoffsets`
+ * refused six of them, because the four script fields, OBJ_OFF_FOLLOW_UID and
+ * the OBJ_OFF_HIT_DIR / OBJ_OFF_HIT_TIME pair were named long ago. Taking the
+ * existing names turns eleven unknowns into a function with a plain reading:
+ * drop the script binding, the weapon type record, the follow target and the
+ * last-hit record, wipe the tail block, and re-stamp the facing.
+ *
+ * That is the rule "grep for the offset before naming it" earning its keep in
+ * the direction that matters -- not preventing a duplicate, but SUPPLYING a
+ * meaning the new reader did not have.
+ *
+ * THE FIVE FIELDS AT +0xB0..+0xC0 ARE CLEARED THROUGH ADDR_ZERO_POINT, not
+ * with an immediate, and the original RELOADS that global before each store --
+ * five separate `mov eax,[0x005125A0]`. A compiler emits that when it cannot
+ * prove the stores do not alias the global, which is the tell that the source
+ * assigned a named zero rather than a literal. Reproduced as the five loads it
+ * is; they are all zero, so nothing observable turns on it, and writing `= 0`
+ * would lose the only evidence of what the source said.
+ *
+ * OBJ_OFF_HIT_DIR IS A BYTE WHERE ITS NEIGHBOURS ARE DWORDS. Clearing it as a
+ * dword would take +0x105..+0x107 with it, which the original leaves alone --
+ * and orig.h already records that field as `uint8_t, >= 1`, so the width is
+ * corroborated from the writing side as well as from this instruction.
+ *
+ * The order is the original's and the tail block is cleared in the MIDDLE of
+ * it: +0xC4 and +0xCC are zeroed, then 0x103 dwords from +0x118, then the four
+ * at +0xFC..+0x108, then the facing copy last. Nothing overlaps, so the order
+ * cannot matter -- said because a reader checking for overlap should not have
+ * to derive it twice.
+ */
+void __cdecl ResetType2Fields(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_CC) = 0;
+
+    memset(o + OBJ_OFF_TAIL_BLOCK, 0, AM2_OBJ_TAIL_DWORDS * 4);
+
+    *(uint32_t *)(o + OBJ_OFF_FIELD_FC)  = 0;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_100) = 0;
+    *(uint8_t  *)(o + OBJ_OFF_HIT_DIR) = 0;
+    *(uint32_t *)(o + OBJ_OFF_HIT_TIME) = 0;
+
+    *(uint8_t *)(o + OBJ_OFF_FACING_COPY) =
+        *(const uint8_t *)(o + OBJ_OFF_FACING);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5792,6 +5915,10 @@ void item_install(void)
     patch_replace(ADDR_SPAWN_RANDOM_BARRAGE,
                   (const void *)SpawnRandomBarrage,
                   "SpawnRandomBarrage", 1);
+    patch_replace(ADDR_SELECT_IF_OWN, (const void *)SelectIfOwn,
+                  "SelectIfOwn", 4);
+    patch_replace(ADDR_RESET_TYPE2_FIELDS, (const void *)ResetType2Fields,
+                  "ResetType2Fields", 2);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,
