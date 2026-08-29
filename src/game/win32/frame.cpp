@@ -978,7 +978,6 @@ void __cdecl ShowMpResult(int32_t result)
 }
 
 
-#define orig_air_frame_draw    ((AM2_NoArgFn)(uintptr_t)ADDR_AIR_FRAME_DRAW)
 #define orig_draw_effect_layer ((AM2_NoArgFn)(uintptr_t)ADDR_DRAW_EFFECT_LAYER)
 
 /* 0x00424BF0, two callers. Repaints the whole screen from scratch -- what
@@ -1028,7 +1027,7 @@ void __cdecl RefreshDraw(void)
     ComposeFrame();
 
     SetDrawTarget(g_backBuffer);
-    orig_air_frame_draw();
+    AirFrameDraw();
     orig_draw_effect_layer();
     orig_paused_frame_step();
 

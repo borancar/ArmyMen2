@@ -1149,9 +1149,8 @@
  * Lock and Unlock a surface and draw sprites; what distinguishes them is what
  * else they touch, which is all these names claim.
  *
- * 0x00409070 is the AIR layer -- it logs "Air frame %d, pt %d,%d" and reaches
- * ADDR_AIR_POP and ADDR_REVEAL_NEARBY, so it steps and draws air units rather
- * than only drawing them.
+ * 0x00409070 is the AIR layer, and it is reconstructed -- the block at
+ * ADDR_AIR_PATH_TURN_X has the flight path it turned out to draw.
  *
  * 0x004123D0 reserves 0x3144 bytes of stack, reads ADDR_GAME_RAND and the
  * framebuffer directly, and draws from a table at 0x004FC8C8. Randomised
@@ -2053,6 +2052,93 @@
  * So the name here is ours, from the body. */
 #define ADDR_AIR_POP             0x00408FF0u  /* void(void) */
 #define ADDR_AIR_BEGIN           0x00408F80u  /* void(void) */
+
+/* ---- The air-support RUN -------------------------------------------------
+ *
+ * ADDR_AIR_FRAME_DRAW is the animation, and it turns out to be a flight path
+ * with three legs plus two other things drawn beside it. Everything below was
+ * read out of the nine one-line derivations at 0x00408AB0..0x00408D16 -- each
+ * behind its own `jmp` thunk, each computing one path parameter from the
+ * constants -- rather than guessed from the drawing code.
+ *
+ * The path, with the numbers those derivations produce:
+ *
+ *   leg 1, 0..800 ms    (110, 520) -> (300, 320)   in from off the bottom
+ *   leg 2, 800..1200    a parabola through (340, 240) back to (300, 160)
+ *   leg 3, 1200..2000   (300, 160) -> (-6, -100)   away off the top
+ *
+ * Both ends are off a 640x480 screen, which is what settles that this is an
+ * aircraft entering and leaving rather than an effect placed on the map. The
+ * middle leg bulges RIGHT by 40 pixels and comes back: a bank, not a turn.
+ *
+ * TWO OF THESE ARE COMPUTED AT STARTUP AND THE FILE'S VALUES ARE NOT THEIRS.
+ * ADDR_AIR_PATH_TURN_Y_IN and _OUT read 300 and 0 in the image and 320 and
+ * 160 once 0x00408AF0 and 0x00408B20 have run. Reading a table out of the
+ * binary answers about the file; ask who WRITES it before treating a number
+ * as a constant. */
+/* The two waypoints that are genuinely constant -- nothing writes either. */
+#define ADDR_AIR_PATH_TURN_X     0x00473F6Cu  /* int16_t, 300: leg 1 ends */
+#define ADDR_AIR_PATH_AWAY_X     0x00473F70u  /* int16_t, 300: leg 3 starts */
+#define ADDR_AIR_PATH_MID_Y      0x00473F60u  /* int32_t, 240: the bank's centre */
+#define ADDR_AIR_PATH_APEX_X     0x00473F64u  /* int32_t, 340: its rightmost X */
+#define ADDR_AIR_PATH_HALF_Y     0x00473F68u  /* int32_t, 80: half its height */
+#define ADDR_AIR_PATH_IN_Y       0x00473F48u  /* int32_t, 520: below the screen */
+#define ADDR_AIR_PATH_OUT_Y      0x00473F4Cu  /* int32_t, -100: above it */
+/* Written by 0x00408AF0 and 0x00408B20 as MID_Y +/- HALF_Y. */
+#define ADDR_AIR_PATH_TURN_Y_IN  0x00473F6Eu  /* int16_t, 320 at run time */
+#define ADDR_AIR_PATH_TURN_Y_OUT 0x00473F72u  /* int16_t, 160 at run time */
+/* The leg boundaries, in milliseconds of the run. */
+#define ADDR_AIR_LEG1_MS         0x00473F40u  /* int32_t, 800 */
+#define ADDR_AIR_LEG2_MS         0x00473F44u  /* int32_t, 1200 */
+#define ADDR_AIR_RUN_MS          0x00473F3Cu  /* int32_t, 2000 */
+/* Phase 1's period: how long the summoning object cycles its frames for. */
+#define ADDR_AIR_CYCLE_MS        0x00473F38u  /* int32_t, 1000 */
+/* Phase 2 -- the gauge that slides ADDR_AIR_SPRITES_2 across the top -- has a
+ * duration and a line of its own, and 0x00473F28 is the double 0.43 that
+ * gives that line its slope. */
+#define ADDR_AIR_GAUGE_MS        0x00473F30u  /* int32_t, 2500 */
+#define ADDR_AIR_GAUGE_X0        0x00473F20u  /* int32_t, -278 */
+#define ADDR_AIR_GAUGE_Y0        0x00473F24u  /* int32_t, 320 */
+#define ADDR_AIR_GAUGE_SLOPE     0x00473F28u  /* double, 0.43 */
+/* The nine derived parameters, each named for the leg it belongs to. */
+#define ADDR_AIR_LEG1_X0         0x004F96ACu  /* int32_t, 110 */
+#define ADDR_AIR_LEG1_DX         0x004F96B0u  /* int32_t, TURN_X - LEG1_X0 */
+#define ADDR_AIR_LEG1_DY         0x004F93C8u  /* int32_t, IN_Y - TURN_Y_IN */
+#define ADDR_AIR_LEG2_MS_SPAN    0x004F93D0u  /* int32_t, LEG2_MS - LEG1_MS */
+#define ADDR_AIR_LEG2_DY         0x004F96A4u  /* int32_t, TURN_Y_IN - TURN_Y_OUT */
+#define ADDR_AIR_LEG2_DIVISOR    0x004F93CCu  /* float, the parabola's */
+#define ADDR_AIR_LEG3_X1         0x004F96B4u  /* int32_t, -6 */
+#define ADDR_AIR_LEG3_DX         0x004F93D4u  /* int32_t, AWAY_X - LEG3_X1 */
+#define ADDR_AIR_LEG3_DY         0x004F96A8u  /* int32_t, TURN_Y_OUT - OUT_Y */
+/* The hot spot of each of ADDR_AIR_SPRITES_6's eleven frames, {x, y} int16
+ * pairs, subtracted from the path point before the draw. Eleven pairs for
+ * eleven sprites is what ties the two tables together. */
+#define ADDR_AIR_FRAME_HOTSPOTS  0x00473FB0u  /* int16_t[11][2] */
+#define AM2_AIR_FRAMES           11
+/* "Air frame %d, pt %d,%d\n" -- printed on leg 2 only, and the reason the
+ * frame index is worth calling a frame index. */
+#define ADDR_MSG_AIR_FRAME       0x00474024u
+/* 0x004093D0, one caller, 80 bytes: what the run DELIVERS when it is over.
+ * It dispatches on AIR_OFF_KIND -- 0 one way, 1 pushes onto the eight-slot
+ * pass sub-queue, anything else does nothing. Note that is 0 and 1 where
+ * AIR_OFF_KIND's own comment says "2 or 3"; both readings are from live code
+ * and the field evidently carries more than two values. Stays original. */
+#define ADDR_AIR_DELIVER         0x004093D0u  /* void(void) */
+/* 0x00408E50, 304 bytes, one caller -- ADDR_AIR_FRAME_DRAW, first thing.
+ * Walks the eight-slot pass sub-queue and draws ADDR_AIR_SPRITES_3 at each
+ * live one, advancing its timer. Stays original. */
+#define ADDR_AIR_PASSES_DRAW     0x00408E50u  /* void(void) */
+/* The sound the summoning object makes as it reaches frame 2, one per cycle.
+ * AM2_AIR_SOUND above is 0x2E and this is 0x2F, so they are two different
+ * sounds and not one name for one thing. */
+#define AM2_AIR_CYCLE_SOUND      0x2F
+#define AM2_AIR_CYCLE_FRAMES     3     /* wraps past this, and skips frame 1 */
+#define AM2_AIR_CYCLE_STEP_MS    100
+/* The two reveal radii RevealNearby is given, by AIR_OFF_KIND. */
+#define AM2_AIR_REVEAL_NEAR_2    0x1388
+#define AM2_AIR_REVEAL_FAR_2     0x4E20
+#define AM2_AIR_REVEAL_NEAR_3    0x0140
+#define AM2_AIR_REVEAL_FAR_3     0x1388
 #define ADDR_AIR_CLEAR           0x00408FD0u  /* void(void) */
 #define ADDR_COMM_SET_REMOTE     0x0040F600u /* thiscall void(this, int32 slot) */
 #define ADDR_COMM_CLEAR_REMOTE   0x0040F620u /* thiscall void(this, int32 slot) */

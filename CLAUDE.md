@@ -1707,7 +1707,7 @@ and grep the run's own log for `bind/listen`, which says so outright.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **25** are reconstructed
+  all. Measured: **29 functions** call the bracket and **26** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates, and the menu-widget painters that
   have landed since.
@@ -1887,7 +1887,6 @@ exact oracle**, however meaningful it is when it is set.
 
   | | |
   |---|---|
-  | `0x00409070` | 864 B, the air frame's own draw |
   | `0x004123D0` | 992 B, 0x3144 of stack and a table at `0x004FC8C8` |
   | `0x00462600` | 1088 B |
   | `0x00416340` | 2656 B, the squad detail panel |

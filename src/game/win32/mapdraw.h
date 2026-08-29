@@ -111,6 +111,10 @@ void __cdecl DrawViewRect(void);
  * the pruning of ADDR_SELECTED_UIDS that happens while drawing them. */
 void __cdecl DrawSelection(void);
 
+/* 0x00409070. The air-support run: an aircraft on a three-leg path, the
+ * gauge that times it, and the frame cycle of the object that called it. */
+void __cdecl AirFrameDraw(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,073 patches.**
+Nothing uncommitted. **1,074 patches.**
 
-Twenty-one functions since the last snapshot. The seven-class HUD family is
+Twenty-two functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -32,6 +32,19 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   And measured in the other direction too: displacing every bar 40 pixels
   leaves `bootcamp` at 22 and `mission` at 281 against 287. The suite runs
   this function and does not discriminate it.
+
+- **`AirFrameDraw`** (`0x00409070`, 864 B) is the twenty-second: the
+  air-support run -- an aircraft on a three-leg flight path, the gauge that
+  times it, and the frame cycle of the object that called it in, each on its
+  own millisecond timer. The path is not in the function; nine one-line
+  derivations at `0x00408AB0..0x00408D16` compute it, and reading those is
+  what turned transcription into description.
+
+  It corrected three field types and one open question. `AIR_OFF_FLAG_A`,
+  `_FLAG_B` and `AIR_OFF_ACTIVE` are milliseconds, not flags. And two path
+  constants are written at startup, so the values in the image file are not
+  the ones the game uses -- a table dumped out of the binary answers about
+  the file.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

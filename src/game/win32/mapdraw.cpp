@@ -34,6 +34,9 @@
 #include "../packkey.h"  /* KeyFieldA/B -- reconstructed */
 #include "../army.h"     /* LookupOwnerObj -- reconstructed */
 #include "../objtable.h" /* LookupByUID -- reconstructed */
+#include "../air.h"      /* RevealNearby, AirSupportPop -- ours */
+#include "../item.h"     /* UidArmy, ChangeObjectFrame -- ours */
+#include "audio.h"       /* PlaySoundAt -- reconstructed */
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
@@ -1999,6 +2002,225 @@ void __cdecl DrawSelection(void)
     UnlockSurface();
 }
 
+/* The two air functions that stay original, both reached only from here. */
+typedef void (__cdecl *AM2_AirNoArgFn)(void);
+#define orig_air_passes_draw ((AM2_AirNoArgFn)(uintptr_t)ADDR_AIR_PASSES_DRAW)
+#define orig_air_deliver     ((AM2_AirNoArgFn)(uintptr_t)ADDR_AIR_DELIVER)
+
+/* AirFrameDraw -- original 0x00409070, one caller.
+ *
+ * The AIR SUPPORT RUN: an aircraft flying a three-leg path across the map,
+ * with the gauge that times it and the object that called it in animating
+ * beside it. The last of the Lock/Unlock batch under a thousand bytes.
+ *
+ * WHAT IT DRAWS IS THREE INDEPENDENT THINGS ON THREE INDEPENDENT CLOCKS,
+ * not one animation. AIR_OFF_FLAG_B times the caller's frame cycle,
+ * AIR_OFF_ACTIVE times the gauge, and AIR_OFF_FLAG_A times the run itself;
+ * each gates its own block and each advances by the frame step. Any of them
+ * can be running while the others are not.
+ *
+ * SO TWO "FLAGS" AND AN "ACTIVE" ARE ALL TIMERS, and orig.h said otherwise
+ * until this function was read. AIR_OFF_FLAG_A and _B were "set and cleared
+ * together" and AIR_OFF_ACTIVE was "1 while one is running" -- true of the
+ * values, wrong about the type. Every one of them is milliseconds, compared
+ * against a duration and incremented by ADDR_FRAME_DELTA_MS. A field that
+ * is only ever seen as 0 or non-zero reads as a flag from its writers; it
+ * takes a reader that does arithmetic on it to say otherwise.
+ *
+ * THE PATH IS NOT IN THIS FUNCTION. Its nine parameters are computed once, by
+ * nine one-line derivations at 0x00408AB0..0x00408D16, and orig.h records
+ * what each works out to. That is the only reason the legs below can be
+ * described rather than merely transcribed: leg 1 comes in from (110, 520),
+ * leg 2 banks right through (340, 240), leg 3 leaves at (-6, -100). Both
+ * ends are off a 640x480 screen.
+ *
+ * FRAME 6 IS UNREACHABLE and that is arithmetic rather than an omission. Leg
+ * 2's first half maps its progress onto 1..5 and its second half onto 7..9;
+ * leg 1 is frame 0 and leg 3 is frame 10. Nothing produces 6. Reproduced.
+ *
+ * THE OBJECT IS NOT NULL-CHECKED. LookupByUID's answer goes straight into a
+ * health read, so a stale uid in AIR_OFF_EXTRA faults. That is the original's
+ * and it is left alone; the note is here so the next reader does not take the
+ * missing check for a transcription slip.
+ *
+ * OBJ_OFF_FORMATION_SLOT IS THE ANIMATION FRAME HERE, which is the third
+ * reading of that offset and the second of this shape -- add one, skip the
+ * value 1, wrap. ADDR_STEP_TYPE1_4 does the identical thing and wraps at
+ * SIXTEEN where this wraps at three, so the wrap bound belongs to the caller
+ * and not to the field. orig.h already records that 0xA0 is probably
+ * type-dependent; this is a second witness for the animation arm of it.
+ *
+ * ONE LOCK AND ONE UNLOCK, unlike DrawSelection above: everything here is
+ * DrawSprite into locked bits and there is no ClearRegion to keep out.
+ */
+void __cdecl AirFrameDraw(void)
+{
+    uint8_t *air = (uint8_t *)(uintptr_t)ADDR_AIR_SAVE_BLOCK;
+    AM2_Sprite *gauge =
+        *(AM2_Sprite *const *)(uintptr_t)ADDR_AIR_SPRITES_2;
+    int32_t  step = *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+
+    /* Nothing to draw the gauge with means nothing to draw at all -- the
+     * original gives up before it even takes the lock. */
+    if (!gauge || (!gauge->image.rle16 && !gauge->overlay))
+        return;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    orig_air_passes_draw();
+
+    /* --- the caller's own animation, on AIR_OFF_FLAG_B ------------------ */
+    if (*(const int32_t *)(air + AIR_OFF_FLAG_B) > 0) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(air + AIR_OFF_EXTRA));
+
+        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
+            uint8_t *row = *(uint8_t **)(obj + OBJ_OFF_ROWS);
+            int32_t  now = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+            if (now - *(const int32_t *)(row + ROW_OFF_STAMP_54)
+                    > AM2_AIR_CYCLE_STEP_MS) {
+                int32_t f = *(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT) + 1;
+
+                if (f == 1)
+                    f++;
+                if (f > AM2_AIR_CYCLE_FRAMES)
+                    f = 0;
+
+                ChangeObjectFrame(obj, f, 1);
+                *(int32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
+                             + ROW_OFF_STAMP_54) =
+                    *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+                if (f == 2)
+                    PlaySoundAt(AM2_AIR_CYCLE_SOUND, 0, 0,
+                                *(const int16_t *)(obj + OBJ_OFF_POS),
+                                *(const int16_t *)(obj + OBJ_OFF_POS + 2));
+            }
+
+            *(int32_t *)(air + AIR_OFF_FLAG_B) += step;
+
+            if (*(const int32_t *)(air + AIR_OFF_FLAG_B)
+                    >= *(const int32_t *)(uintptr_t)ADDR_AIR_CYCLE_MS) {
+                *(int32_t *)(air + AIR_OFF_FLAG_B) = 0;
+                ChangeObjectFrame(obj, 0, 1);
+            }
+        }
+    }
+
+    /* --- the gauge, on AIR_OFF_ACTIVE ----------------------------------- */
+    if (*(const int32_t *)(air + AIR_OFF_ACTIVE) > 0) {
+        int32_t t     = *(const int32_t *)(air + AIR_OFF_ACTIVE);
+        int32_t track = *(const int32_t *)(uintptr_t)ADDR_AIR_SPRITES_EDGE;
+        int32_t span  = *(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_MS;
+        int32_t x, y;
+
+        y = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_Y0
+                      - (double)track * (double)t
+                        * *(const double *)(uintptr_t)ADDR_AIR_GAUGE_SLOPE
+                        / (double)span);
+        x = track * t / span
+            + *(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_X0;
+
+        DrawSprite(gauge, x, y, 0);
+
+        *(int32_t *)(air + AIR_OFF_ACTIVE) += step;
+
+        /* The reveal happens ONCE, halfway along, and only for the army that
+         * asked -- AIR_OFF_PENDING is what says it has been done. Reading it
+         * as "one is queued" survived because nothing else writes it here. */
+        if (UidArmy(*(const uint32_t *)(air + AIR_OFF_FROM))
+                == *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+            && *(const int32_t *)(air + AIR_OFF_EXTRA) == 0
+            && *(const int32_t *)(air + AIR_OFF_PENDING) == 0
+            && *(const int32_t *)(air + AIR_OFF_ACTIVE) >= (span >> 1)) {
+
+            if (*(const int32_t *)(air + AIR_OFF_KIND) == 2)
+                RevealNearby(*(const AM2_Point *)(air + AIR_OFF_WHERE),
+                             AM2_AIR_REVEAL_NEAR_2, AM2_AIR_REVEAL_FAR_2);
+            else
+                RevealNearby(*(const AM2_Point *)(air + AIR_OFF_WHERE),
+                             AM2_AIR_REVEAL_NEAR_3, AM2_AIR_REVEAL_FAR_3);
+
+            *(int32_t *)(air + AIR_OFF_PENDING) = 1;
+        }
+
+        if (*(const int32_t *)(air + AIR_OFF_ACTIVE) >= span) {
+            orig_air_deliver();
+            AirSupportPop();
+        }
+    }
+
+    /* --- the aircraft, on AIR_OFF_FLAG_A -------------------------------- */
+    if (*(const int32_t *)(air + AIR_OFF_FLAG_A) > 0) {
+        int32_t t     = *(const int32_t *)(air + AIR_OFF_FLAG_A);
+        int32_t leg1  = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_MS;
+        int32_t leg2  = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS;
+        int32_t frame = 0;
+        int32_t x, y;
+
+        if (t < leg1) {
+            x = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_DX * t / leg1
+                + *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_X0;
+            y = *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_IN_Y
+                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_DY * t / leg1;
+        } else if (t < leg2) {
+            int32_t into = t - leg1;
+            int32_t half = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS_SPAN;
+            double  off;
+
+            y = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN
+                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_DY * into / half;
+
+            off = (double)y - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_MID_Y;
+            x = (int32_t)(off * off
+                          / *(const float *)(uintptr_t)ADDR_AIR_LEG2_DIVISOR
+                          + *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_APEX_X);
+
+            /* Half the leg maps onto frames 1..5 and half onto 7..9, both
+             * rounded to nearest by the half-divisor added before the divide.
+             * That is where frame 6 goes missing. */
+            half /= 2;
+            if (into >= half)
+                frame = (half / 2 + (into - half) * 2) / half + 7;
+            else
+                frame = (half / 2 + into * 5) / half + 1;
+
+            orig_log((const char *)(uintptr_t)ADDR_MSG_AIR_FRAME,
+                     frame, x, y);
+        } else {
+            int32_t into = t - leg2;
+            int32_t span = *(const int32_t *)(uintptr_t)ADDR_AIR_RUN_MS - leg2;
+
+            x = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X
+                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_DX * into / span;
+            y = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT
+                - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_DY * into / span;
+            frame = AM2_AIR_FRAMES - 1;
+        }
+
+        {
+            const int16_t *hot =
+                (const int16_t *)(uintptr_t)ADDR_AIR_FRAME_HOTSPOTS;
+
+            DrawSprite(((AM2_Sprite *const *)(uintptr_t)ADDR_AIR_SPRITES_6)
+                           [frame],
+                       x - hot[frame * 2],
+                       y - hot[frame * 2 + 1],
+                       0);
+        }
+
+        *(int32_t *)(air + AIR_OFF_FLAG_A) += step;
+
+        if (*(const int32_t *)(air + AIR_OFF_FLAG_A)
+                >= *(const int32_t *)(uintptr_t)ADDR_AIR_RUN_MS)
+            AirSupportPop();
+    }
+
+    UnlockSurface();
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
@@ -2047,5 +2269,7 @@ int mapdraw_install(void)
                         "PaintMapTiles", 1);
     rc |= patch_replace(ADDR_DRAW_SELECTION, (const void *)DrawSelection,
                         "DrawSelection", 1);
+    rc |= patch_replace(ADDR_AIR_FRAME_DRAW, (const void *)AirFrameDraw,
+                        "AirFrameDraw", 1);
     return rc;
 }
