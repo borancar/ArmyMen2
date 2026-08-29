@@ -5,86 +5,104 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-29**, at `a8ff654`. Working tree clean.
+Last updated: **2026-08-29**, at `9e064e6`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,055 patches.**
+Nothing uncommitted. **1,065 patches.**
 
-Two commits since the last snapshot, both halves of one HUD class -- the top
-strip, which is the message log, the chat console and a rewind button in one
-640x21 widget.
+Thirteen functions since the last snapshot: the HUD's top strip and edge strip
+end to end, the whole radar, the squad panel, and the two text/rect
+rasterisers underneath them.
 
-- **`HudTopPaint`** (`0x00418A20`), vtable slot 1. Three parts: the text inside
-  a Lock/Unlock bracket, `WidgetPaint` for the children, then one sprite via
-  `IntersectRect` -> `ClipRect` -> `DrawSpriteClipped`. `ClearRegion` runs
-  OUTSIDE the lock, which `surface.h` already explains and which is the only
-  ordering here not free to change.
+- **The top strip** -- `HudTopPaint` (`0x00418A20`) and `HudTopUpdate`
+  (`0x00418660`). The class is the message log, the multiplayer chat console
+  and a rewind button in one 640x21 widget.
 
-  The message record layout did not have to be read: `orig.h` had every field
-  of it named from the `HudMessage` work. Grep the STRUCTURE, not just the
-  address.
+- **The edge strip** -- `HudEdgeUpdate` (`0x004196E0`) and `HudEdgePaint`
+  (`0x00419AC0`). It is the selected trooper's status line AND the panel's
+  tab: a click toggles `HUDPANEL_OFF_OPEN` and the panel slides away.
+  **`ADDR_HUD_WIDGET_C` is this widget**, which `orig.h` had listed among
+  three whose identity "has not been established here".
 
-- **`HudTopUpdate`** (`0x00418660`), slot 2, and everything the paint reads is
-  what this moves -- the blip budget, the row ease, the scroll and the button.
+- **The radar, end to end** -- `HudRadarPaint` (`0x00414B50`) over
+  `RadarBlipColour` (`0x004149B0`), `DrawBlip3` (`0x0041C7F0`),
+  `DrawBlipPulse` (`0x0041CA50`), `DrawBlipSquare` (`0x0041C8A0`) and
+  `DrawRectFast` (`0x0041CCE0`).
 
-Two names in `orig.h` were wrong and are corrected rather than aliased:
+- **`HudSquadPaint`** (`0x00416DA0`), twelve portraits in a 3x4 grid.
+
+- **`DrawTextVertical`** (`0x00446C50`), the drawing half of a pair whose
+  measuring half (`TextStackHeight`) was already ours.
+
+### What the numbers say, and where they say nothing
+
+Six of the thirteen have a real pixel oracle, and it took two corrections to
+know which. The screenshots are 1024x768 with the game's 640x480 frame at 1:1
+in the TOP LEFT -- not scaled into it, which is what I assumed at first, so two
+of three HUD rectangles I was sampling were pure black border and would have
+read 0 whatever the code did. And a 0 means nothing until the region is known
+to be non-blank: `HudTopPaint`'s strip was an empty log compared against an
+empty log.
+
+With both fixed: `DrawTextVertical` 12,750 calls with the strip identical and
+a one-pixel kern change worth 148; `HudEdgePaint` 5,432 calls, identical, a
+five-pixel pen shift worth 701; `HudRadarPaint` 5,003 calls with the radar 0
+differing and **175 distinct colours present**; `HudSquadPaint` 5,467 with the
+panel at 0.
+
+Two have NO check at all and say so in their own source. `DrawBlipPulse` and
+`DrawBlipSquare` are gated on an `OBJ_FLAG_BIT4` no drive sets. Poking it onto
+the leader's object runs them -- 2,288 and 2,913 calls -- but the radar's
+pixels cannot discriminate their colour assignment: swapping the two colours
+scores 62 against the original where the correct code scores 54. Six shots
+give four distinct radar frames and one flagged object contributes at most 72
+pixels, so the signal is the size of the noise. **Verified by reading, and the
+comments say which half that is.**
+
+### The one real defect, and the three fixes that were not it
+
+`HudSquadPaint` came back 3,729 pixels over a budget of 500, consistently
+across all three configurations -- unmistakably real, unlike the frame-count
+ratios that failed twice this session and were wall-clock both times.
+
+The cause was an INVERTED RECTANGLE. The wide backdrop runs from the
+portrait's right edge out to `x + 131`; I had the two ends swapped, and
+crossed ends make `IntersectRect` reject the rect so `ClearRegion` never ran.
+**An inverted rect fails silently rather than drawing wrong**, which is why it
+presented as missing output. What found it was reading the differing PIXELS
+rather than the disassembly again: the original is black in a 60x75 block and
+mine showed the map's green through, which says "a fill I am skipping"
+outright.
+
+Three earlier fixes were each correct against the disassembly and none was the
+bug -- `continue` where I had `return` (`0x0041701C` is the loop advance,
+`0x00417036` the epilogue), and `DrawSpriteClipped` taking ClipRect's ADJUSTED
+pair rather than the box it started from, in `HudSquadPaint`, `HudTopPaint`
+and `HudSargePaint`. The last two were LATENT: their sprites are never partly
+outside the clip, and when nothing is clipped the two forms are identical.
+`HudCommandsPaint` genuinely uses its saved origin. **Both conventions exist
+in this binary and it has to be read per function**, which is what made one
+assumption reach three places.
+
+### Names corrected rather than aliased
 
 - `ADDR_MOUSE_B0_EXTRA` -> **`ADDR_MOUSE_GRAB`**. Its comment said "nothing
-  here reads it" and 32 sites do. It is the click ARBITER: `PollMouse` zeroes
-  it as button 0 goes down so every press starts unowned, and the first widget
-  to claim it owns that press while everyone downstream stays quiet. The token
-  is an ADDRESS and not always the widget's -- this class claims `this + 0x64`
-  for its button and plain `this` for the rest of the strip, arbitrating two
-  targets through one global.
+  here reads it" and 32 sites do. It is the click ARBITER, and the token is an
+  ADDRESS: the top strip claims `this + 0x64` for its button and plain `this`
+  for the rest of itself, arbitrating two targets through one global.
+- `HUDLOG_OFF_TOTAL` -> **`HUDLOG_OFF_BLIPS`**. `HudMessage` adds to it; the
+  update DRAINS it with a sound each, so radio chatter is per character.
+- `CLAUDE.md`'s Lock/Unlock shortlist was listing FINISHED work -- it named
+  `0x0041CC40`, which is `DrawHLine`. A count that only goes up cannot say a
+  candidate has been taken.
 
-- `HUDLOG_OFF_TOTAL` -> **`HUDLOG_OFF_BLIPS`**. It went in as "a running total
-  of characters" because that is what `HudMessage` adds to it. The update is
-  what says why: it DRAINS it, one every ~136 ms with a sound each, so the
-  radio chatter is per character and a longer message chatters for longer. A
-  field named from its writer alone reads as a statistic nothing consumes.
+### Two process failures worth not repeating
 
-### Measured, and one open item corrected
-
-`HudTopPaint` runs 3,186 times in a Boot Camp mission with **zero** differing
-pixels inside the strip's own rectangle -- which is an empty log compared
-against an empty log, and proves nothing about the scrolling, the rewind or the
-console. That was stated as a prediction before it was measured.
-
-So the update got **`tools/hudstrip.sh`**, which drives the strip and reads the
-game's own memory over the control socket. It therefore runs identically under
-`AM2_NOPATCH=1`, and the two sides come back line-for-line identical on: the
-three hover states, the console open, the twelve-message fill, the count cap
-and view width, ALL TWELVE rows sitting exactly on their running sum, the
-overflow condition, and the settled scroll landing on the row the walk-back
-picks.
-
-Live numbers rather than reasoning: the scroll converged on exactly **2238.00**,
-which is row 10's x and what walking back from a 598-pixel view predicts by
-hand; a click then pulled it down at ~230 px/s for 2 s and the other branch
-pulled it back. Both scroll modes, the deadline and the ease in both directions,
-observed.
-
-The tool compares the INVARIANT and not the absolute row positions on purpose.
-Row widths come from `TextExtent` of the text that actually arrived, and `type`
-drops a character often enough that the first attempt diffed 191 against 192
-and read exactly like a defect.
-
-**The console is the multiplayer CHAT line, not the cheat entry** -- the send
-at `0x00418480` posts the line to the log and broadcasts it to every comm
-player. And `orig.h`'s open item, "somewhere between the handler and the submit
-the characters are being dropped", is **wrong**: row 0 came back holding
-`5e d2 5a 75 6c 75`, a colour escape then `Zulu`, intact. What is still
-unreached is the RETURN exit inside the char handler, where the cheat table
-sits. That is a different exit and stays open.
-
-### One A/B failure that was not one
-
-`mission`'s first suite reported `frames 4004/1958` and FAILED on the ratio,
-with widgets, log and pixels all identical. In the same suite `campaign` was
-anomalously low on the OTHER side. The re-run gave 4763/5477 and A/B clean, so
-it was wall-clock. The counter-evidence was in the same output as the failure:
-a systematic slowdown does not change sign between configurations.
+I launched a second `ab.sh` while the first was still driving, then -- having
+just written that down -- edited `src/` during the next one. Both runs were
+invalid and were thrown away rather than read. `ab.sh` rebuilds on every
+launch; there is no such thing as a safe edit while it runs.
 
 ## Next
 
