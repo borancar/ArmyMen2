@@ -1985,6 +1985,58 @@ void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
     return n ? dst : (void *)0;
 }
 
+/* MsgListTakeFlags -- original 0x00401330, two callers.
+ *
+ * The same function as MsgListCopyByKey with the key test replaced by a mask
+ * test: find the first node with any of ADDR_MSG_WANTED_FLAGS set, CLEAR
+ * exactly those bits on it, copy its body out, and answer the bits that were
+ * taken. Under the list's mutex throughout, for the same reason.
+ *
+ * THE SEARCH CONSUMES WHAT IT FINDS. Clearing the matched bits is what stops a
+ * second call answering the same node, which is why this cannot be written as
+ * a pure find. The node itself stays on the list.
+ *
+ * IT COPIES THE BODY EVEN THOUGH IT ALREADY HAS ITS ANSWER, and the length
+ * again comes off the node rather than from the caller -- unbounded, as
+ * MsgListCopyByKey is. Both callers pass a fixed stack buffer.
+ *
+ * The mask is a global rather than an argument. So "which messages do I want"
+ * is set somewhere else entirely and this reads it fresh on every call: two
+ * calls with the same list can answer differently for that reason alone.
+ *
+ * The return is `(found ? ~0 : 0) & taken`, and `taken` is already 0 when
+ * nothing was found, so the mask is redundant. Reproduced as the plain value,
+ * which is what it compiles to either way.
+ */
+int32_t __cdecl MsgListTakeFlags(void *list, void *dst)
+{
+    uint8_t       *l    = (uint8_t *)list;
+    const uint32_t want = *(const uint32_t *)(uintptr_t)ADDR_MSG_WANTED_FLAGS;
+    uint8_t       *n;
+    uint32_t       taken = 0;
+
+    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+
+    for (n = *(uint8_t **)(l + MSGLIST_OFF_HEAD); n;
+         n = *(uint8_t **)(n + MSGNODE_OFF_NEXT))
+        if (*(const uint32_t *)(n + MSGNODE_OFF_FLAGS) & want)
+            break;
+
+    if (n) {
+        uint32_t flags = *(const uint32_t *)(n + MSGNODE_OFF_FLAGS);
+
+        taken = flags & want;
+        *(uint32_t *)(n + MSGNODE_OFF_FLAGS) = flags & ~want;
+
+        memcpy(dst, *(const void *const *)(n + MSGNODE_OFF_BODY),
+               *(const uint32_t *)(n + MSGNODE_OFF_BODY_LEN));
+    }
+
+    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+
+    return (int32_t)taken;
+}
+
 /* DumpMsgList -- original 0x004013B0, one caller.
  *
  * It lives HERE rather than in msgslot.cpp with the rest of the list code:
@@ -2052,6 +2104,9 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_MSG_LIST_COPY_BY_KEY,
                         (const void *)MsgListCopyByKey,
                         "MsgListCopyByKey", 1);
+    rc |= patch_replace(ADDR_MSG_LIST_TAKE_FLAGS,
+                        (const void *)MsgListTakeFlags,
+                        "MsgListTakeFlags", 2);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
     rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,

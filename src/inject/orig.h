@@ -1225,6 +1225,23 @@
 #define ADDR_MAP_CACHE_SURFACE 0x00514E94u /* IDirectDrawSurface *, the painted map */
 #define ADDR_PAINT_MAP_TILES   0x0042D580u /* void(const AM2_Rect *tiles) */
 #define ADDR_MAP_TILES         0x00514EB8u /* uint16 *, one index per tile */
+/* The scenario table, and all three names are ours -- what fixes the family is
+ * the "Scenario" the parser at 0x0043DC10 scans for. Records are 0x40 bytes:
+ * four dwords, then four 0x0C-byte sub-entries each ending in a malloc'd
+ * string. The count is a WORD and the loop bound is re-read from it. */
+#define ADDR_SCENARIOS           0x00656334u  /* uint8_t *, count * 0x40 */
+#define ADDR_SCENARIO_COUNT      0x00656332u  /* uint16_t */
+/* Zeroed by the parser on entry and by the teardown on exit, and read by
+ * nothing in the image. Same standing as ZeroUnread50C34C's global. */
+#define ADDR_SCENARIO_UNREAD     0x00656330u  /* int32_t */
+#define AM2_SCENARIO_BYTES       0x40u
+#define AM2_SCENARIO_PARTS       4u
+#define SCENARIO_OFF_PARTS       0x10u
+#define SCENARIO_PART_BYTES      0x0Cu
+#define SCENARIO_PART_OFF_NAME   0x08u
+/* 0x0043DD30, one caller. Free every string the scenario table owns, then the
+ * table, then clear both globals. */
+#define ADDR_FREE_SCENARIOS      0x0043DD30u  /* void(void) */
 /* The byte beside it, indexed by a TILE INDEX rather than by a map square: 27
  * sites read it and nothing here writes it. The name is ours. */
 #define ADDR_TILE_ATTRS        0x00514EBCu /* uint8_t *, one per tile index */
@@ -6269,9 +6286,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSGLIST_OFF_COUNT          0x0Cu
 #define MSGNODE_OFF_PREV           0x00u
 #define MSGNODE_OFF_NEXT           0x04u
-/* The two the debug dump prints, and its only readers. +0x20 is a pointer and
- * what is printed is the dword at ITS +8, so the pair reads as "id, and a
- * field of whatever this node points at". Named for their offsets. */
 /* Both named from DumpMsgList, which prints them, and both corrected from
  * MsgListCopyByKey (0x004012C0), which uses them for what they are: +0x14 is
  * the KEY it matches on, +0x20 is the start of the message BODY and +0x24 is
@@ -6281,6 +6295,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSGNODE_OFF_KEY            0x14u
 #define MSGNODE_OFF_BODY           0x20u
 #define MSGNODE_OFF_BODY_LEN       0x24u
+/* The other thing a node is searched on. MsgListTakeFlags (0x00401330) tests
+ * it against ADDR_MSG_WANTED_FLAGS, and CLEARS the bits it matched before
+ * copying the body out -- so the search consumes what it finds and a second
+ * call cannot answer the same node twice. */
+#define MSGNODE_OFF_FLAGS          0x18u
+#define ADDR_MSG_WANTED_FLAGS      0x004F8B98u  /* uint32_t */
+/* 0x00401330, two callers, and the exact shape of MsgListCopyByKey with the
+ * key test replaced by a mask test. Answers the bits it took, or 0. */
+#define ADDR_MSG_LIST_TAKE_FLAGS   0x00401330u  /* int32_t(list, void *dst) */
 #define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
 /* 0x004010C0, "RemHead: Impossible List Size %d". Unlinks and answers the head
  * node, or null. The same sanity complaint as the append, and a second one --
@@ -8081,6 +8104,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * below. Pick a point `dist` away from an object on a heading within +/-32 of
  * the way it is facing. ITS FIRST ARGUMENT IS NEVER READ -- both call sites
  * push four, and the body uses only the last three. */
+/* 0x00404E50, and the same function as ADDR_RANDOM_POINT_AHEAD with the
+ * heading taken from ANOTHER OBJECT rather than from the way this one faces:
+ * AngleBetween the two positions, then the same +/-32 spread. */
+#define ADDR_RANDOM_POINT_TOWARD 0x00404E50u /* void(target, obj, int32,
+                                              *      AM2_Point *) */
 #define ADDR_RANDOM_POINT_AHEAD 0x00404ED0u /* void(void *, obj, int32,
                                              *      AM2_Point *) */
 #define ADDR_FORMATION_POINT   0x00404400u  /* void(follower, leader,

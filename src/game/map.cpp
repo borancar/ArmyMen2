@@ -468,10 +468,63 @@ int32_t __cdecl LevelCount(void)
     return *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
 }
 
+/* FreeScenarios -- original 0x0043DD30, one caller.
+ *
+ * Free every string the scenario table owns, then the table, then clear both
+ * globals. The records are 0x40 bytes -- four dwords, then four 0x0C-byte
+ * parts each ending in a malloc'd name -- and it is only those four names per
+ * record that are owned.
+ *
+ * A NULL TABLE SKIPS EVERYTHING INCLUDING THE CLEARS, which is the one branch
+ * worth noticing: the original tests the pointer first and jumps past the two
+ * stores, so a table that was never built leaves the count word alone. It is
+ * already 0 in that case, so nothing observable turns on it, and it is
+ * reproduced as written rather than tidied into an unconditional clear.
+ *
+ * A count of 0 still frees the table. The bound is tested with an UNSIGNED
+ * compare against a word, and re-read from the global on every iteration --
+ * `free` cannot change it, so that is the compiler keeping a register free
+ * rather than anything defensive. Written as the plain loop it is.
+ *
+ * The allocator is the game's, because the strings came from the game's.
+ */
+void __cdecl FreeScenarios(void)
+{
+    uint8_t *tab = *(uint8_t **)(uintptr_t)ADDR_SCENARIOS;
+
+    if (!tab)
+        return;
+
+    {
+        uint32_t i;
+
+        for (i = 0; i < *(const uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT;
+             i++) {
+            uint8_t *rec = tab + (size_t)i * AM2_SCENARIO_BYTES
+                           + SCENARIO_OFF_PARTS;
+            uint32_t k;
+
+            for (k = 0; k < AM2_SCENARIO_PARTS; k++, rec += SCENARIO_PART_BYTES) {
+                char *name = *(char **)(rec + SCENARIO_PART_OFF_NAME);
+
+                if (name)
+                    am2_free(name);
+            }
+        }
+    }
+
+    am2_free(tab);
+
+    *(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD = 0;
+    *(uint8_t **)(uintptr_t)ADDR_SCENARIOS      = (uint8_t *)0;
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
                         "LevelCount", 2);
+    patch_replace(ADDR_FREE_SCENARIOS, (const void *)FreeScenarios,
+                  "FreeScenarios", 1);
     patch_replace(ADDR_TRACE_TILE_LINE, (const void *)TraceTileLine,
                         "TraceTileLine", 7);
     patch_replace(ADDR_SCRIPT_LIST_FIND, (const void *)ScriptListFind,

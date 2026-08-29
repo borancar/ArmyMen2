@@ -102,4 +102,8 @@ void  __cdecl ReadCampaignLevels(void);
 void  __cdecl ReadMpMapList(void);
 void  __cdecl ReadBootcampLevels(void);
 
+/* 0x0043DD30, one caller. Free every string the scenario table owns, then the
+ * table, then clear both globals. */
+void __cdecl FreeScenarios(void);
+
 #endif /* AM2_MAP_H */

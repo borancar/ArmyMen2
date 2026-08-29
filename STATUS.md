@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,132 patches.**
+Nothing uncommitted. **1,135 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -452,16 +452,32 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   `dir` -- the same thing only when there is one frame. Reproduced as written;
   a "fix" here would move what is drawn.
 
+- **`MsgListTakeFlags`** (`0x00401330`) is `MsgListCopyByKey` with the key
+  test replaced by a mask test -- and it CONSUMES what it finds, clearing the
+  matched bits on the node before copying the body out. That is what stops a
+  second call answering the same node, so it cannot be written as a pure
+  find. The mask is a global rather than an argument, so two calls with the
+  same list can differ for that reason alone.
+- **`RandomPointToward`** (`0x00404E50`) and `RandomPointAhead` differ in one
+  line: where the heading comes from. Both add the same `(rand & 0x3F) - 32`
+  spread. `AngleBetween` is called obj-then-target and the step is from obj,
+  which is the only ordering that approaches anything -- and both arguments
+  are the same type, so nothing would catch the swap.
+- **`FreeScenarios`** (`0x0043DD30`) skips its two global clears when the
+  table is NULL, because the original tests the pointer before them. Nothing
+  observable turns on it -- the count is already 0 in that case -- and it is
+  reproduced rather than tidied.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **982 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,132
+line (0x0045C000) patched**. Measured: **985 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,135
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Six batches have gone in and the 257 entries outstanding start at 48
+small ones in batches. Seven batches have gone in and the 254 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -445,6 +445,45 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
 typedef int32_t (__cdecl *AM2_AirRandFn)(void);
 #define orig_air_rand ((AM2_AirRandFn)AM2_IMAGE(ADDR_GAME_RAND))
 
+/* RandomPointToward -- original 0x00404E50, two callers, and the same
+ * function as
+ * RandomPointAhead below with one substitution: the heading comes from where
+ * ANOTHER object is rather than from the way this one faces.
+ *
+ * AngleBetween the two positions, add the same `(rand & 0x3F) - 32` spread,
+ * and step `dist` from the moving object's position along it. So the two are
+ * "wander roughly ahead" and "move roughly toward", and they differ in one
+ * line.
+ *
+ * THE ANGLE IS TAKEN FROM obj TO target AND THE STEP IS FROM obj, which is the
+ * only ordering that makes the result approach the target. The original passes
+ * `&obj->pos` first and `&target->pos` second, which is worth stating because
+ * getting AngleBetween's arguments the wrong way round gives a heading 128 out
+ * and a unit that runs away -- and both arguments are the same type, so
+ * nothing would catch it.
+ *
+ * Same two quirks as its sibling: the heading reaches Cos8 and Sin8 as a dword
+ * with three uninitialised bytes above it, which they mask off; and the rand
+ * is the image's own LCG, which it must be.
+ */
+void __cdecl RandomPointToward(const void *target, const void *obj,
+                               int32_t dist, AM2_Point *out)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    const uint8_t *t = (const uint8_t *)target;
+    uint8_t        heading;
+    double         d = (double)dist;
+
+    heading = (uint8_t)(AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                     (const AM2_Point *)(t + OBJ_OFF_POS))
+                        + (orig_air_rand() & 0x3F) - 0x20);
+
+    out->x = (int16_t)(int32_t)((double)Cos8(heading) * d
+                                + (double)*(const int16_t *)(o + OBJ_OFF_X));
+    out->y = (int16_t)(int32_t)((double)Sin8(heading) * d
+                                + (double)*(const int16_t *)(o + OBJ_OFF_Y));
+}
+
 /* RandomPointAhead -- original 0x00404ED0, two callers, and a sibling of the
  * formation-point pair above.
  *
@@ -982,6 +1021,8 @@ void air_install(void)
                   "FormationPoint", 4);
     patch_replace(ADDR_RANDOM_POINT_AHEAD, (const void *)RandomPointAhead,
                   "RandomPointAhead", 2);
+    patch_replace(ADDR_RANDOM_POINT_TOWARD, (const void *)RandomPointToward,
+                  "RandomPointToward", 2);
     patch_replace(ADDR_RESOLVE_FORMATION_POINT,
                   (const void *)ResolveFormationPoint,
                   "ResolveFormationPoint", 3);

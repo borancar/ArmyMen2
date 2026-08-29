@@ -213,4 +213,9 @@ void air_install(void);
 void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
                               AM2_Point *out);
 
+/* 0x00404E50. RandomPointAhead with the heading taken from another object's
+ * position rather than from the way this one faces. */
+void __cdecl RandomPointToward(const void *target, const void *obj,
+                               int32_t dist, AM2_Point *out);
+
 #endif /* AM2_AIR_H */

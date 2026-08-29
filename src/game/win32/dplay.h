@@ -237,4 +237,8 @@ int dplay_install(void);
  * dst under the list's mutex, and answer dst or NULL. */
 void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
 
+/* 0x00401330, one caller. Find the first node with any wanted flag set, clear
+ * those bits, copy its body to dst, and answer the bits taken. */
+int32_t __cdecl MsgListTakeFlags(void *list, void *dst);
+
 #endif /* AM2_DPLAY_H */
