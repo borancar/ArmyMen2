@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,100 patches.**
+Nothing uncommitted. **1,101 patches.**
 
-Forty-seven functions since the last snapshot. The seven-class HUD family is
+Forty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -319,6 +319,23 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   across four runs of one build, three pixels apart within each cluster.
   That is the two sides' scroll being in or out of phase, not noise. Recorded
   in CLAUDE.md; its budget is disabled and the log is the evidence.
+
+- **`StepRowAnim`** (`0x0040A380`) is the per-row animation advance -- once
+  per row of every object every frame -- and it is the first reconstruction
+  this session that **shipped a defect the A/B caught**.
+
+  One missing dereference: `ADDR_SPRITE_LIST` holds the array, and I read the
+  global as the array. The game left at the first mission. That is the exact
+  failure `CLAUDE.md` records under "obj -> table -> slot", which I had read.
+
+  **What caught it was the widget dump, not the pixels.** `campaign` came
+  back missing a whole second dump and 294,304 pixels -- and the same figure
+  to the pixel on a re-run, which is what said "deterministic, not timing".
+  A repeated exact number is the signal; a repeated approximate one is not.
+
+  It also settles `ROW_OFF_FRAME`: below 1000 a frame id, exactly 1000 "take
+  up the queued animation", above 1000 a countdown in frames. One field, three
+  meanings by range.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

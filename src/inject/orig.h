@@ -4146,7 +4146,14 @@ typedef struct {
 /* Fields of the object's FIRST ROW that carry its animation. */
 #define ROW_OFF_ANIM_CUR         0x40u   /* AM2_AnimTable * */
 #define ROW_OFF_ANIM_NEXT        0x48u   /* AM2_AnimTable *, taken up next */
+/* An int16, and StepRowAnim shows it is TWO THINGS by range. Below 1000 it is
+ * the frame id SetAnimFrame matched on and the stepper ignores it. At exactly
+ * 1000 the stepper takes up ROW_OFF_ANIM_NEXT_ID; above 1000 it counts DOWN
+ * one per step and does nothing else. So values over 1000 are a delay in
+ * FRAMES before the queued animation starts, and 1000 is that delay expired. */
 #define ROW_OFF_FRAME            0x4Cu   /* int16_t */
+#define AM2_ROW_DELAY_BASE       0x3E8   /* the delay's zero point */
+#define AM2_ROW_ANIM_HOLD        (-2)    /* ANIM_NEXT_ID: stay on the last cell */
 /* Two more, and SetAnimFrame is what establishes both: it searches the table
  * at ROW_OFF_ANIM_CUR for an entry whose id is ROW_OFF_FRAME, stores that
  * entry's AM2_Anim here, and resets the cell index to 0. So +0x44 is the

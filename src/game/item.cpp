@@ -3926,10 +3926,119 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
 
 /* SetAnimFrame is maprow.cpp's now; the image seam that stood here went
    with the reconstruction, and checkseams is what noticed. */
-/* Still original: 272 bytes of per-row animation advance, one caller and that
- * caller is StepObjRows below. */
-typedef void (__cdecl *AM2_StepRowFn)(void *row);
-#define orig_step_row_anim   ((AM2_StepRowFn)(uintptr_t)ADDR_STEP_ROW_ANIM)
+/* StepRowAnim -- original 0x0040A380, one caller.
+ *
+ * Advance one row's animation by one frame. The per-frame path reaches it once
+ * per row of every object in the mission, so it is among the hottest functions
+ * in this tree and one of the few in this stretch a pixel comparison can
+ * actually see.
+ *
+ * ROW_OFF_FRAME IS TWO THINGS BY RANGE, and that is what this function shows.
+ * Below 1000 the stepper ignores it -- it is the frame id SetAnimFrame matched
+ * on. At exactly 1000 it takes up ROW_OFF_ANIM_NEXT_ID. Above 1000 it counts
+ * DOWN by one and returns. So anything over 1000 is a delay in FRAMES before a
+ * queued animation starts, counting down to the 1000 that starts it. orig.h
+ * called the field "int16_t" and nothing more; it can say that now.
+ *
+ * THE CELL'S HOLD IS HALVED FOR ONE PARTICULAR REMAP TABLE. If the row's
+ * MAPOBJ_OFF_LUT is ADDR_ROW_LUT_DOUBLES -- compared by ADDRESS, not by
+ * content -- the dwell is shifted right by one, so that animation runs at
+ * double speed. orig.h records the same table making a DIFFERENT function
+ * double ROW_OFF_FIELD_3C. Two readers, two fields, and both amount to
+ * "this one goes faster"; what makes the table special is still not
+ * established, but it now has two witnesses instead of one.
+ *
+ * ANIM_NEXT_ID OF -2 MEANS HOLD. On the last cell the stepper decrements the
+ * cell index back, so the animation sits on its final frame forever rather
+ * than looping or stopping. Every other value is a frame id to take up.
+ *
+ * The heading is ROW_OFF_HEADING plus ROW_OFF_HEADING_BIAS, added as BYTES so
+ * it wraps at 256, then put through RoundTo8 with the animation's own
+ * direction-bit count -- which is what picks the row of cells to use.
+ *
+ * The sprite is only re-set when it actually changes, and SetRowSprite
+ * rebuilds the row's cell buffer when it does; that guard is why a mission
+ * does not rebuild every row every frame.
+ */
+/* The sprite list, as a void ** rather than sprite.cpp's AM2_Sprite *** --
+ * this is the FLAT half and must not name that type, which has an
+ * LPDIRECTDRAWSURFACE in it. Same address, same arithmetic, and deliberately
+ * NOT called g_spriteList: two different expansions under one g_ name is
+ * exactly the drift checkglobals refuses. */
+#define kSpriteList     (*(void ***)(uintptr_t)ADDR_SPRITE_LIST)
+
+void __cdecl StepRowAnim(void *row)
+{
+    uint8_t        *r = (uint8_t *)row;
+    const AM2_Anim *anim;
+    const AM2_AnimCell *cell;
+    int32_t         idx;
+    int32_t         hold;
+    uint32_t        now;
+    int32_t         at;
+
+    if (!(*(const uint8_t *)(r + MAPOBJ_OFF_FLAGS) & 1))
+        return;
+
+    if (*(const int16_t *)(r + ROW_OFF_FRAME) >= AM2_ROW_DELAY_BASE) {
+        if (*(const int16_t *)(r + ROW_OFF_FRAME) == AM2_ROW_DELAY_BASE) {
+            SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+            return;
+        }
+        *(int16_t *)(r + ROW_OFF_FRAME) -= 1;
+        return;
+    }
+
+    anim = *(const AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    if (!anim)
+        return;
+
+    idx = anim->frames
+          * (uint8_t)RoundTo8((uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
+                                        + *(const uint8_t *)(r + ROW_OFF_HEADING)),
+                              anim->directionBits)
+          + *(const uint8_t *)(r + ROW_OFF_CELL);
+
+    cell = &anim->cells[idx];
+
+    {
+        /* TWO dereferences: the global holds the array. Written with one on
+         * the first attempt and the game left at the first mission -- the
+         * exact failure CLAUDE.md records for `obj -> table -> slot`, which I
+         * had read and still made. */
+        void *want = kSpriteList[cell->sprite];
+
+        if (*(void *const *)(r + ROW_OFF_SPRITE) != want)
+            RowSetSprite(r, want, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    hold = cell->hold;
+    if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
+            == (const void *)AM2_IMAGE(ADDR_ROW_LUT_DOUBLES))
+        hold >>= 1;
+
+    now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    if (now < *(const uint32_t *)(r + ROW_OFF_STAMP_54) + (uint32_t)hold)
+        return;
+
+    at = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_CELL) + 1);
+    *(uint8_t *)(r + ROW_OFF_CELL) = (uint8_t)at;
+
+    if ((int16_t)at < anim->frames) {
+        *(uint32_t *)(r + ROW_OFF_STAMP_54) = now;
+        return;
+    }
+
+    if (*(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) == AM2_ROW_ANIM_HOLD) {
+        *(uint8_t *)(r + ROW_OFF_CELL) = (uint8_t)(at - 1);
+        return;
+    }
+
+    *(uint8_t *)(r + ROW_OFF_CELL)      = 0;
+    *(uint32_t *)(r + ROW_OFF_STAMP_54) = now;
+    SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+}
+
 /* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
  * because it is CRT code the offline test maps as data. */
 typedef int32_t (__cdecl *AM2_RandFn)(void);
@@ -4276,7 +4385,7 @@ void __cdecl StepObjRows(void *obj)
     int32_t  i;
 
     for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-        orig_step_row_anim(*(uint8_t **)(o + OBJ_OFF_ROWS)
+        StepRowAnim(*(uint8_t **)(o + OBJ_OFF_ROWS)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
 
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
@@ -4713,6 +4822,8 @@ void item_install(void)
     patch_replace(ADDR_PLACE_OBJ, (const void *)PlaceObj, "PlaceObj", 1);
     patch_replace(ADDR_APPLY_HEIGHT_1_4, (const void *)ApplyHeightItem,
                   "ApplyHeightItem", 3);
+    patch_replace(ADDR_STEP_ROW_ANIM, (const void *)StepRowAnim,
+                  "StepRowAnim", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

@@ -27,6 +27,10 @@ void __cdecl PlaceObj(void *obj, uint32_t where);
  * chain until a link that is not an item. */
 void __cdecl ApplyHeightItem(void *obj, int32_t height);
 
+/* 0x0040A380, one caller -- StepObjRows, so this runs once per row of every
+ * object every frame. Advance one row's animation. */
+void __cdecl StepRowAnim(void *row);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one
