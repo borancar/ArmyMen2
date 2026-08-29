@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,158 patches.**
+Nothing uncommitted. **1,159 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -655,16 +655,47 @@ had been clean hours earlier. So the noise is the machine.
 signal and both passed. **Re-run `bootcamp` and `combat` on this batch when
 the machine is quiet.**
 
+- **`ShutdownSubsystems`' teardown table is now entirely named functions.**
+  The last bare literal, `0x00445F40`, is `FreeSpriteRegistry`: close the open
+  sprite file, force every sprite's refcount down to 1 so the release that
+  follows is the last one, free the slot table and the id/slot pairs, zero the
+  count and capacity. **The clamp is the whole reason it is not a loop of
+  plain releases** -- `ReleaseSprite` frees at zero and takes one reference at
+  a time, so a shared sprite would survive a single release and leak.
+
+  It had a placeholder name, `ADDR_FREE_445F40`, from when only its caller had
+  been read, and the alias ratchet is what stopped a second name landing
+  beside it. Fourth time that check has caught its own author.
+
+### An exact repeat can also mean both runs failed the same way
+
+CLAUDE.md says a repeated EXACT pixel count is a defect signal where a
+repeated approximate one is the scene. That held, and it needs one
+qualification: `bootcamp` read **291,505 twice, on two different builds**,
+which is as exact as a repeat gets -- and the control settled it the other
+way. Checking out the batch that read 22 pixels this morning and running it
+now gave **305,747**, with the script-load lines present on ONE side only.
+
+So the pair being compared is a fully-loaded briefing against a
+partially-loaded one, and that is a reproducible pair of images, hence a
+reproducible count. **An exact repeat means the two runs failed identically,
+which is a defect when they were otherwise comparable and starvation when
+they were not.** The control tells them apart; nothing else does.
+
+`quit` is the configuration that matters for this batch and it came back
+**0 of 786,432** with an identical eight-message log -- `FreeSpriteRegistry`
+is in the shutdown table, so that run executes it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,007 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,158
+line (0x0045C000) patched**. Measured: **1,008 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,159
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifteen batches have gone in and the 232 entries outstanding start at 48
+small ones in batches. Sixteen batches have gone in and the 231 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

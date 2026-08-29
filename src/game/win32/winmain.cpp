@@ -209,11 +209,17 @@ static const am2_void_fn kTeardown[] = {
      *
      * A bare hex literal is a FIFTH spelling of the seam and the check now has
      * a rule for it, which is what found these. The comment describing the gate
-     * was sitting one paragraph above the breach. */
+     * was sitting one paragraph above the breach.
+     *
+     * The last literal is gone too: 0x00445F40 is FreeSpriteRegistry, and the
+     * whole table is named functions now. It was the sprite registry all
+     * along -- close the file, force-release every sprite, free both tables --
+     * which is exactly what a teardown table's thirteenth entry ought to be,
+     * and could not be seen from the call site. */
     FreeExplosionAnims, FreeMissileAnims, FreeRoachAnims,
     FreeVehicleAnims, FreeSoldierAnims,
     FreeSpriteList,
-    (am2_void_fn)(uintptr_t)0x00445F40u,
+    FreeSpriteRegistry,
     FreeAllFonts,
     StateLeaveAlias,
     ShutdownAudio,

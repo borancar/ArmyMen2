@@ -1911,9 +1911,85 @@ void __cdecl ResetAirSupport(void)
             *(int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W + first->bounds.right * 2;
 }
 
+/* FreeSpriteRegistry -- original 0x00445F40, three callers.
+ *
+ * Take the whole sprite registry down: close the open sprite file, release
+ * every registered sprite, free the slot table and the id/slot pairs, and zero
+ * the count and the capacity.
+ *
+ * IT FORCES THE REFCOUNT TO 1 BEFORE RELEASING. ReleaseSprite frees at zero
+ * and takes one reference at a time, so a sprite held by three things would
+ * survive a single release -- this clamps `refs` down to 1 first, exactly so
+ * the release that follows is the last one. That clamp is the whole reason
+ * this is not a loop of plain releases, and dropping it would leak every
+ * shared sprite in the game.
+ *
+ * IT CLAMPS ONLY DOWNWARD. A refcount already at 1 or 0 is left alone, so a
+ * sprite whose count is 0 is released once more and goes negative inside
+ * ReleaseSprite. That is the original's and it is reachable: nothing here
+ * checks whether a slot has already been released.
+ *
+ * THE TABLE POINTER IS RE-READ AFTER EVERY CALL and the count after every
+ * iteration, because ReleaseSprite can free a slot and, through
+ * ADDR_SPRITE_SLOT_OF's registry, move the tables. Written as the re-reads
+ * they are rather than hoisted -- this is the one loop in the teardown where
+ * hoisting would be wrong rather than merely different.
+ *
+ * The three frees are guarded independently: the file, then the table, then
+ * the pairs, each skipped when already null. The count and capacity are zeroed
+ * unconditionally at the end, unlike FreeScenarios, which skips its clears when
+ * its table was null.
+ *
+ * The file goes through the game's own fclose because the game's CRT opened it.
+ */
+void __cdecl FreeSpriteRegistry(void)
+{
+    am2_FILE *fp = *(am2_FILE **)(uintptr_t)ADDR_SPRITE_FILE;
+    AM2_Sprite **table;
+
+    if (fp) {
+        orig_fclose(fp);
+        *(am2_FILE **)(uintptr_t)ADDR_SPRITE_FILE = (am2_FILE *)0;
+    }
+
+    table = *(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE;
+    if (table) {
+        int32_t i;
+
+        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT;
+             i++) {
+            AM2_Sprite *spr =
+                (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)[i];
+
+            if (!spr)
+                continue;
+
+            if (spr->refs > 1)
+                spr->refs = 1;
+
+            ReleaseSprite((*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)[i]);
+        }
+
+        am2_free(*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE);
+        *(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE = (AM2_Sprite **)0;
+    }
+
+    if (*(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS) {
+        am2_free(*(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS);
+        *(void **)(uintptr_t)ADDR_SPRITE_REG_PAIRS = (void *)0;
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT = 0;
+    *(int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP   = 0;
+}
+
 int sprite_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_FREE_SPRITE_REGISTRY,
+                        (const void *)FreeSpriteRegistry,
+                        "FreeSpriteRegistry", 3);
 
     rc |= patch_replace(ADDR_SPRITE_SLOT_OF, (const void *)SpriteSlotOf,
                         "SpriteSlotOf", 1);

@@ -77,6 +77,17 @@ static int ScriptLines(int *passed);
 static int ScriptSpine(int *passed);
 static int ScriptVariables(int *passed);
 
+/* gameproc.cpp's FreeSpriteRegistry call is a real symbol now that the seam
+ * is closed, and the function lives in win32/sprite.cpp, which this harness
+ * cannot link: it reaches DirectDraw. Nothing under test calls it -- the
+ * teardown is not a pure function and has no vectors -- so a stub satisfies
+ * the linker and nothing else. Fourth stub here for the same reason; see
+ * LoadSpriteFile above. */
+/* NOT extern "C": sprite.h and gameproc.cpp both declare it as ordinary
+ * C++, so the stub has to carry the same mangled name. The stubs below
+ * are extern "C" because their declarations are. */
+void __cdecl FreeSpriteRegistry(void) { }
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;

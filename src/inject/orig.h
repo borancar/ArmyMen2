@@ -1529,6 +1529,15 @@
 #define ADDR_SPRITE_REG_COUNT    0x006598C0u  /* int32_t */
 #define ADDR_SPRITE_REG_PAIRS    0x006598C8u  /* {uint32 id; int32 slot} * */
 #define ADDR_SPRITE_REG_CAP      0x006598BCu  /* int32_t, grown 50 at a time */
+/* The open sprite FILE, closed by the registry teardown and by nothing else --
+ * two references in the image and both are in that one function. */
+#define ADDR_SPRITE_FILE         0x006598B8u  /* am2_FILE * */
+/* 0x00445F40, three callers. Close that file, force-release every registered
+ * sprite, free both tables and zero the count and capacity. It went in as the
+ * placeholder ADDR_FREE_445F40 when only its caller was read; the alias
+ * ratchet is what stopped a second name landing beside it. */
+#define ADDR_FREE_SPRITE_REGISTRY 0x00445F40u /* void(void) */
+
 #define AM2_SPRITE_REG_GROW      50
 #define ADDR_FILL_SOUND_BUFFER   0x0040C440u  /* int32(buf, const void *, uint32) */
 #define ADDR_STR_SND_LOCK_FAIL   0x00474E6Cu  /* "Unable to lock sound buffer\n" */
@@ -5582,9 +5591,12 @@ typedef struct {
  * reach it without repeating the argument list; nothing is added. */
 #define ADDR_CALL_405220         0x004057B0u  /* void(int32, int32, int32) */
 #define ADDR_BIG_405220          0x00405220u  /* void(int32, int32, int32) */
-/* Free one thing, then log. */
+/* Free one thing, then log -- and that one thing is the sprite registry, so
+ * the placeholder ADDR_FREE_445F40 this used to sit beside has a real name
+ * now: ADDR_FREE_SPRITE_REGISTRY, up with the rest of the sprite lifetime.
+ * The teardown's own name stays a literal; it is a wrapper and 0x00445FE0 is
+ * all that is known about it. */
 #define ADDR_TEARDOWN_445F40     0x00445FE0u  /* void(void) */
-#define ADDR_FREE_445F40         0x00445F40u  /* void(void), three callers */
 /* Free four, then log. Two of the four are already named. */
 #define ADDR_TEARDOWN_DEF_TABLES 0x004033E0u  /* void(void) */
 #define ADDR_FREE_LIST_662024    0x0045EDF0u  /* void(void), two callers */

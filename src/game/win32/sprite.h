@@ -316,4 +316,8 @@ int sprite_install(void);
 }
 #endif
 
+/* 0x00445F40, three callers. Take the sprite registry down: close the file,
+ * force-release every sprite, free both tables, zero the count and capacity. */
+void __cdecl FreeSpriteRegistry(void);
+
 #endif /* AM2_SPRITE_H */

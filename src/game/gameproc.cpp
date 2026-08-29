@@ -13,6 +13,14 @@
 #include "event.h"
 #include "script.h"
 #include "objscript.h"
+
+/* FreeSpriteRegistry is reconstructed, in win32/sprite.cpp with the rest of
+ * the sprite lifetime. It is declared here rather than by including that
+ * header for the reason script.cpp declares PreloadSprite: gameproc.cpp is on
+ * the flat side of the split and must name no Win32 or COM type, and
+ * AM2_Sprite has an LPDIRECTDRAWSURFACE in it. This one takes no arguments and
+ * returns nothing, so the declaration needs no types at all. */
+void __cdecl FreeSpriteRegistry(void);
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -772,7 +780,6 @@ typedef void (__cdecl *AM2_TeardownFn)(void);
 typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
 
 #define orig_teardown_log   ((AM2_TeardownFn)(uintptr_t)ADDR_LOG)
-#define orig_free_445f40    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_445F40)
 #define orig_free_list_a    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662024)
 #define orig_free_list_b    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662928)
 #define orig_free_40a4b0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A4B0)
@@ -810,7 +817,7 @@ void __cdecl Call405220(int32_t a, int32_t b, int32_t c)
 /* 0x00445FE0. Free, then log. */
 void __cdecl Teardown445F40(void)
 {
-    orig_free_445f40();
+    FreeSpriteRegistry();
     orig_teardown_log();
 }
 
