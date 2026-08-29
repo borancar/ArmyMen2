@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,085 patches.**
+Nothing uncommitted. **1,086 patches.**
 
-Thirty-three functions since the last snapshot. The seven-class HUD family is
+Thirty-four functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -149,6 +149,14 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   is corroboration rather than a hole: `orig.h` already had 0x22 as
   "handled somewhere else entirely" and 0x23 as `AM2_MSG_DEATH`. Two message
   families share one number space.
+
+- **`TroopMessageRecv`** (`0x0044C590`, 240 B) is its sibling, and it gave
+  back two message names in **the program's own vocabulary**: kind 0x21 logs
+  "got eTROOPER_DROP_ITEM_MESSAGE" and 0x22 "got
+  eTROOPER_SET_WEAPON_MESSAGE". The `e` prefix is the original's enum
+  convention, so those two codes now carry the names their authors used. 0x22
+  also closes the note that called `AM2_MSG_TROOPER_WEAPON` "handled
+  somewhere else entirely" -- this is somewhere else.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

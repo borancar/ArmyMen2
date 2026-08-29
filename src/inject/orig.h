@@ -6393,6 +6393,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Both self-named. "troopMessageReceive: got eTROOPER_DROP_ITEM_MESSAGE" and
  * "Unknown Vehicle Message of type %d Received". */
 #define ADDR_TROOP_MESSAGE_RECV  0x0044C590u  /* void(msg *, int32_t army) */
+/* Reconstructed. Thirteen arms over kinds 0x16..0x22, of which SEVEN --
+ * 0x1A..0x20 -- fall to the unknown log; the same shape as the vehicle
+ * dispatcher and the same reading, that two families share one number space.
+ *
+ * TWO OF ITS ARMS NAME THEIR MESSAGE IN THE PROGRAM'S OWN VOCABULARY, which
+ * is worth more than the handler addresses: kind 0x21 logs
+ * "got eTROOPER_DROP_ITEM_MESSAGE" and 0x22 "got eTROOPER_SET_WEAPON_MESSAGE".
+ * The `e` prefix is the original's enum convention. 0x22 also settles a note
+ * left elsewhere in this file, which had AM2_MSG_TROOPER_WEAPON as "handled
+ * somewhere else entirely" -- this is somewhere else.
+ *
+ * Only the FIRST arm takes the army, exactly as in the vehicle half. */
+#define ADDR_RECV_TROOP_16       0x0044CC90u  /* void(msg *, int32_t army) */
+#define ADDR_RECV_TROOPER_FIRE   0x0044CB20u  /* 0x17, already named */
+#define ADDR_RECV_TROOP_PAIR     0x0044C960u  /* 0x18, already named */
+#define ADDR_RECV_TROOP_19       0x0044C680u
+#define ADDR_RECV_TROOP_DROP_ITEM 0x0044C9C0u /* eTROOPER_DROP_ITEM_MESSAGE */
+#define ADDR_RECV_TROOP_SET_WEAPON 0x0044C3E0u /* eTROOPER_SET_WEAPON_MESSAGE */
+#define AM2_MSG_TROOPER_DROP_ITEM 0x21u
+#define AM2_MSG_TROOP_FIRST       0x16u
+#define AM2_MSG_TROOP_LAST        0x22u
+#define ADDR_STR_UNKNOWN_TROOP_MSG 0x0048AB5Cu
+#define ADDR_STR_GOT_DROP_ITEM     0x0048ABC0u
+#define ADDR_STR_GOT_SET_WEAPON    0x0048AB88u
 #define ADDR_VEHICLE_MSG_RECV    0x0045E590u  /* void(msg *, int32_t army) */
 /* Reconstructed. Eleven arms over message kinds 0x1B..0x25, and the four in
  * the middle -- 0x20 through 0x23 -- fall to the "unknown" log rather than to

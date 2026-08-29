@@ -749,7 +749,6 @@ typedef int32_t (__attribute__((thiscall)) *AM2_ArmyInPlayFn)(void *comm,
                                                               uint32_t uid);
 typedef int32_t (__cdecl *AM2_KindFn)(uint32_t wire);
 typedef int32_t (__cdecl *AM2_FilterFn)(void *msg, int32_t army);
-typedef void (__cdecl *AM2_KindMsgFn)(void *msg, int32_t army);
 /* The stubbed logger, reached as a plain three-argument function so the
  * message buffer can be passed where a format string goes without the
  * compiler having an opinion. It is one `ret` in this build. */
@@ -814,6 +813,89 @@ int32_t __cdecl UidObjKind(uint32_t uid)
     if (!obj)
         return 0;
     return (int32_t)obj[0];
+}
+
+/* TroopMessageRecv -- original 0x0044C590, one caller.
+ *
+ * The trooper half of the army-message dispatcher, and the sibling of
+ * VehicleMsgRecv below: thirteen arms over kinds 0x16..0x22 and a log line
+ * for anything else. It names itself in that line -- "Unknown Troop Message
+ * of type %d Received".
+ *
+ * SEVEN OF THE THIRTEEN ARMS ARE THAT LOG. Kinds 0x1A..0x20 have no handler,
+ * which is the same shape the vehicle half has and reads the same way: two
+ * families share one number space, and a kind this one refuses may well be
+ * another's.
+ *
+ * TWO ARMS NAME THEIR MESSAGE IN THE PROGRAM'S OWN VOCABULARY, and that is
+ * the find here rather than the dispatch. Kind 0x21 logs "got
+ * eTROOPER_DROP_ITEM_MESSAGE" and 0x22 "got eTROOPER_SET_WEAPON_MESSAGE" --
+ * the `e` prefix being the original's enum convention. So two message codes
+ * now have the names their authors used, not ours. 0x22 also closes a note
+ * left in orig.h months ago, which recorded AM2_MSG_TROOPER_WEAPON as
+ * "handled somewhere else entirely": this is somewhere else.
+ *
+ * Both of those logs are gated on COMM_OFF_VERBOSE and sit BEFORE the
+ * handler, so the line goes out whether or not the handler does anything.
+ *
+ * Only the first arm takes the army, exactly as in the vehicle half.
+ *
+ * VERIFIED BY READING, for the same reason as its sibling: reached only for a
+ * uid whose object kind is 2, off a packet from another player.
+ */
+typedef void (__cdecl *AM2_TroopMsgFn)(void *msg);
+typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
+
+#define orig_recv_troop_16 \
+    ((AM2_TroopMsgArmyFn)(uintptr_t)ADDR_RECV_TROOP_16)
+#define orig_recv_trooper_fire \
+    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOPER_FIRE)
+#define orig_recv_troop_pair \
+    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_PAIR)
+#define orig_recv_troop_19 \
+    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_19)
+#define orig_recv_troop_drop_item \
+    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_DROP_ITEM)
+#define orig_recv_troop_set_weapon \
+    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_SET_WEAPON)
+
+void __cdecl TroopMessageRecv(void *msg, int32_t army)
+{
+    uint32_t kind = *(const uint16_t *)((const uint8_t *)msg + 2);
+
+    switch (kind) {
+    case AM2_MSG_TROOP_FIRST:
+        orig_recv_troop_16(msg, army);
+        return;
+
+    case AM2_MSG_TROOPER_FIRE:
+        orig_recv_trooper_fire(msg);
+        return;
+
+    case AM2_MSG_PAIR:
+        orig_recv_troop_pair(msg);
+        return;
+
+    case 0x19:
+        orig_recv_troop_19(msg);
+        return;
+
+    case AM2_MSG_TROOPER_DROP_ITEM:
+        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_GOT_DROP_ITEM));
+        orig_recv_troop_drop_item(msg);
+        return;
+
+    case AM2_MSG_TROOPER_WEAPON:
+        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_GOT_SET_WEAPON));
+        orig_recv_troop_set_weapon(msg);
+        return;
+
+    default:
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_UNKNOWN_TROOP_MSG), kind);
+        return;
+    }
 }
 
 /* VehicleTakeOutOccupant -- original 0x0045ADD0, one caller.
@@ -945,7 +1027,6 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
     }
 }
 
-#define orig_troop_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_TROOP_MESSAGE_RECV)
 #define orig_raw_log       ((AM2_RawLogFn)(uintptr_t)ADDR_LOG)
 
 /* Spelled exactly as objtable.h spells it -- uint32_t, not int32_t -- so the
@@ -1001,7 +1082,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
         /* Accepted and ignored, in silence. */
         return;
     case 2:
-        orig_troop_msg_recv(m, army);
+        TroopMessageRecv(m, army);
         return;
     case 3:
         VehicleMsgRecv(m, army);
@@ -1572,6 +1653,8 @@ void __cdecl CommDrainMsgs(void)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_TROOP_MESSAGE_RECV, (const void *)TroopMessageRecv,
+                  "TroopMessageRecv", 1);
     patch_replace(ADDR_VEHICLE_MSG_RECV, (const void *)VehicleMsgRecv,
                   "VehicleMsgRecv", 1);
     patch_replace(ADDR_RECV_VEHICLE_EXIT, (const void *)RecvVehicleExit,
