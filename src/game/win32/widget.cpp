@@ -2729,6 +2729,84 @@ void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip)
     }
 }
 
+/* 0x00454840, vtable slot 1 of the CHECKBOX. Another of the nine outstanding
+ * Lock/Unlock functions, and it is the class's whole appearance.
+ *
+ * FOUR STATES, NOT TWO. The sprite and the ink are chosen together from
+ * (focused, checked) -- focused meaning the PARENT's focusedChild is this
+ * widget, which is why the parent has to be walked rather than a flag read.
+ * The four sprites are dwords from 0x68 and the four inks are single BYTES
+ * from 0x84, in the same order; they are not one array of pairs.
+ *
+ * Then two overrides, and the order between them matters:
+ *
+ *   CHECKBOX_OFF_FORCE_PLAIN, when the box is CHECKED, puts back the
+ *   unfocused-checked pair even though the widget holds the focus -- it undoes
+ *   the focus, not the check;
+ *
+ *   and a disabled widget takes ADDR_COLOUR_STALE for its INK ONLY, keeping
+ *   whichever sprite was chosen. So a greyed-out checkbox still shows whether
+ *   it is ticked, which a single "draw it grey" would have lost.
+ *
+ * The sprite is written into w->sprite and drawn by WidgetPaint; this function
+ * never blits it itself. The caption is its own Lock/Unlock bracket after
+ * that, at AM2_CHECKBOX_TEXT_X from the left, and is skipped entirely when the
+ * pointer is null.
+ */
+void __attribute__((thiscall)) CheckboxPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t    *self    = (uint8_t *)w;
+    int32_t     focused = w->parent && w->parent->focusedChild == w;
+    int32_t     checked = *(const uint8_t *)(self + CHECKBOX_OFF_CHECKED);
+    const char *caption;
+    RECT        vis;
+    uint8_t     ink;
+
+    if (focused) {
+        if (checked) {
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON_FOC);
+        } else {
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF_FOC);
+        }
+    } else {
+        if (checked) {
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
+        } else {
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF);
+        }
+    }
+
+    /* Undoes the FOCUS, not the check. */
+    if (*(const uint8_t *)(self + CHECKBOX_OFF_FORCE_PLAIN) && checked) {
+        w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
+        ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
+    }
+
+    /* Ink only -- the sprite stays, so a disabled box still reads as ticked. */
+    if (w->disabled)
+        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE;
+
+    WidgetPaint(w, clip);
+
+    caption = *(const char *const *)(self + CHECKBOX_OFF_CAPTION);
+    if (!caption)
+        return;
+
+    if (!IntersectRect(&vis, &clip, &w->rect))
+        return;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    DrawTextClipped(w->rect.left + AM2_CHECKBOX_TEXT_X, w->rect.top,
+                    caption, AM2_TEXT_LIST_FONT, vis, ink);
+    UnlockSurface();
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -8550,6 +8628,8 @@ int widget_install(void)
                         "HudSargeUpdate", 1);
     rc |= patch_replace(ADDR_TEXT_LIST_PAINT, (const void *)TextListPaint,
                         "TextListPaint", 1);
+    rc |= patch_replace(ADDR_CHECKBOX_PAINT, (const void *)CheckboxPaint,
+                        "CheckboxPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,

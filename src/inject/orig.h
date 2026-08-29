@@ -3130,6 +3130,35 @@ typedef struct {
 #define VTABLE_MULTISPRITE       0x0046FD38u
 #define VTABLE_LISTBOX           0x0046FCC0u
 #define VTABLE_CHECKBOX          0x0046FC5Cu
+/* Its paint, and the class is FOUR STATES rather than two: the sprite and the
+ * ink are picked together from (focused, checked), where focused means the
+ * PARENT's focusedChild is this widget. The four sprites run from 0x68 --
+ * straight after the button base's three at BUTTON_BASE_OFF_A..C -- and the
+ * four inks are single BYTES at 0x84..0x87, which is why they are not a
+ * parallel array of dwords.
+ *
+ * Then two overrides in order. CHECKBOX_OFF_FORCE_PLAIN, when the box is
+ * checked, puts back the UNFOCUSED-checked pair even though the widget has the
+ * focus. And a disabled widget takes ADDR_COLOUR_STALE for its ink, keeping
+ * whichever sprite was chosen -- so a greyed checkbox still shows its state.
+ *
+ * ADDR_COLOUR_STALE is that address's SECOND reading: it went in as the comm
+ * list's "silent over 1250 ms" grey. Both are a greyed-out ink and they may be
+ * the same idea; recorded rather than renamed, because nothing here settles
+ * which name is the general one. */
+#define ADDR_CHECKBOX_PAINT      0x00454840u /* thiscall void(w, RECT) */
+#define CHECKBOX_OFF_SPR_ON      0x68u  /* checked, not focused */
+#define CHECKBOX_OFF_SPR_OFF     0x6Cu
+#define CHECKBOX_OFF_SPR_ON_FOC  0x70u
+#define CHECKBOX_OFF_SPR_OFF_FOC 0x74u
+#define CHECKBOX_OFF_CHECKED     0x78u  /* uint8_t */
+#define CHECKBOX_OFF_INK_ON      0x84u  /* uint8_t, and the same order */
+#define CHECKBOX_OFF_INK_OFF     0x85u
+#define CHECKBOX_OFF_INK_ON_FOC  0x86u
+#define CHECKBOX_OFF_INK_OFF_FOC 0x87u
+#define CHECKBOX_OFF_CAPTION     0x88u  /* const char *, or null */
+#define CHECKBOX_OFF_FORCE_PLAIN 0x8Cu  /* uint8_t; see above */
+#define AM2_CHECKBOX_TEXT_X      0x13   /* 19, from the widget's left */
 #define VTABLE_ARROW             0x0046FCD4u /* stamped over the button's */
 /* The scroll bar's two arrow handlers, and the three bitmaps it loads. */
 #define ADDR_ON_ARROW_LEFT       0x00455ED0u
