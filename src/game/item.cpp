@@ -5355,6 +5355,70 @@ void __cdecl SelectBestWeapon(void *unit)
                                  + (size_t)bestSlot * 4)) + OBJ_OFF_FIELD_C0));
 }
 
+/* SetObjField530 -- original 0x0043CD40, two callers.
+ *
+ * Move an object to a new OBJ_OFF_FIELD_530 and put its first row on the
+ * animation frame that goes with it. Named for the field, which is itself
+ * named for its offset: nothing here says what the states MEAN, only how they
+ * are changed.
+ *
+ * THE GATE IS "THE CURRENT ANIMATION HAS FINISHED", AND IT IS SKIPPED rather
+ * than tested when two conditions hold together -- the transition is one the
+ * table below allows to interrupt, and the row's ROW_OFF_FIELD_3C is
+ * non-zero. Otherwise RowAnimFinished has to agree or nothing happens at all,
+ * including the field write. So a caller cannot assume the state changed.
+ *
+ * WHICH TRANSITIONS MAY INTERRUPT IS TWO TESTS, NOT ONE, and they are not
+ * symmetric. Leaving a state in 3..6 does NOT allow it; entering one in 5..6
+ * does, and that second test overrides the first. So 4 -> 5 interrupts and
+ * 4 -> 3 does not, though both are inside the same band. Written as the two
+ * separate assignments the original makes, because collapsing them into one
+ * condition loses the override.
+ *
+ * NOTHING BOUNDS THE NEW STATE against the seven-entry frame table. An eighth
+ * state would read the string data that follows it and hand the result to
+ * SetAnimFrame as a frame id. Both callers pass a literal.
+ *
+ * State 4 alone stamps a deadline 200 ms out into OBJ_OFF_DEADLINE_58. It is
+ * the last thing done and only on that state.
+ *
+ * An unchanged state returns at once -- before the gate, so re-asserting the
+ * state an object is already in costs nothing and cannot restart its
+ * animation.
+ */
+void __cdecl SetObjField530(void *obj, int32_t state)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  cur = *(const int32_t *)(o + OBJ_OFF_FIELD_530);
+    uint8_t *row;
+    int32_t  mayInterrupt;
+
+    if (cur == state)
+        return;
+
+    mayInterrupt = (cur >= 3 && cur <= 6) ? 0 : 1;
+    if (state >= 5 && state <= 6)
+        mayInterrupt = 1;
+
+    row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+    if (!(mayInterrupt && *(const int16_t *)(row + ROW_OFF_FIELD_3C) != 0)
+        && !RowAnimFinished(row))
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_530) = state;
+
+    SetAnimFrame(row,
+                 (int16_t)((const int32_t *)(uintptr_t)
+                     ADDR_FIELD_530_FRAMES)[state],
+                 0);
+
+    if (state == 4)
+        *(int32_t *)(o + OBJ_OFF_DEADLINE_58) =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + AM2_FIELD_530_DELAY_MS;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5484,6 +5548,8 @@ void item_install(void)
                   "SlotBandHeading", 1);
     patch_replace(ADDR_SELECT_BEST_WEAPON, (const void *)SelectBestWeapon,
                   "SelectBestWeapon", 1);
+    patch_replace(ADDR_SET_OBJ_FIELD_530, (const void *)SetObjField530,
+                  "SetObjField530", 2);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

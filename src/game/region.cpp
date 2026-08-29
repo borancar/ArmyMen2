@@ -1,5 +1,6 @@
 /* region.cpp -- see region.h. */
 #include <stdint.h>
+#include <string.h>
 
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
@@ -767,6 +768,52 @@ int32_t __cdecl ObjBoxAction(void *obj, int32_t arg)
                            arg);
 }
 
+/* RebuildTileCover -- original 0x0042BE10, one caller.
+ *
+ * Clear the whole cover grid and rebuild it from the cell weights: every
+ * interior tile carrying a full weight is fed to TileCoverAdd, which puts one
+ * back on it and on its twenty neighbours.
+ *
+ * ITS MARGIN IS ONE AND TileCoverAdd's IS TWO. This scans x and y over
+ * 1 .. size-2 and TileCoverAdd refuses anything outside 2 .. size-3, so the
+ * outermost scanned ring is passed to a function that rejects every tile in
+ * it. That is not a bug and it is not a coincidence worth tidying: the two
+ * bounds were written independently and the stricter one wins. Reproduced,
+ * and worth knowing before reading the loop as "every tile that can be
+ * covered".
+ *
+ * THE CLEAR IS width * height BYTES and the walk is over the interior only, so
+ * the border keeps the zeros rather than any older value.
+ *
+ * The weight is read through a SIXTEEN-BIT mask of the tile index, and
+ * compared SIGNED against fifteen -- the same reading MarkOpenTile does, so a
+ * weight of 0x80 or more counts as unweighted here too.
+ *
+ * Both dimensions are re-read from their globals inside the loops rather than
+ * hoisted. Nothing can change them; it is the compiler, and it is written as
+ * the plain loop it means.
+ */
+void __cdecl RebuildTileCover(void)
+{
+    int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t h = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
+    const int8_t *weights;
+    int32_t       y;
+
+    memset(*(void **)(uintptr_t)ADDR_TILE_COVER, 0, (size_t)h * (size_t)w);
+
+    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+
+    for (y = 1; y < h - 1; y++) {
+        int32_t tile = w * y + 1;
+        int32_t x;
+
+        for (x = 1; x < w - 1; x++, tile++)
+            if (weights[(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+                TileCoverAdd((uint16_t)tile);
+    }
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -785,6 +832,9 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_REBUILD_TILE_COVER,
+                        (const void *)RebuildTileCover,
+                        "RebuildTileCover", 1);
     rc |= patch_replace(ADDR_OBJ_BOX_ACTION, (const void *)ObjBoxAction,
                         "ObjBoxAction", 2);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,

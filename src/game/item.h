@@ -502,4 +502,8 @@ void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
  * highest map code, and apply the soldier kind that goes with it. */
 void __cdecl SelectBestWeapon(void *unit);
 
+/* 0x0043CD40, two callers. Move an object to a new field-530 state and put its
+ * first row on the frame that goes with it, when the animation allows. */
+void __cdecl SetObjField530(void *obj, int32_t state);
+
 #endif

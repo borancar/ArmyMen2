@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,147 patches.**
+Nothing uncommitted. **1,149 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -551,16 +551,31 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   save into a session that already holds these names does not collide -- it
   duplicates.
 
+- **`RebuildTileCover`** (`0x0042BE10`) scans an interior margin of ONE and
+  feeds every weighted tile to `TileCoverAdd`, whose own margin is TWO -- so
+  the outermost scanned ring is handed to a function that rejects every tile
+  in it. The two bounds were written independently and the stricter wins.
+  Worth knowing before reading that loop as "every tile that can be covered".
+- **`SetObjField530`** (`0x0043CD40`) decides whether a state change may
+  interrupt the current animation with TWO tests that are not symmetric:
+  leaving a state in 3..6 forbids it, entering one in 5..6 allows it, and the
+  second overrides the first. So `4 -> 5` interrupts and `4 -> 3` does not,
+  though both are inside the same band. Collapsing them into one condition
+  loses the override.
+
+  When the gate refuses, NOTHING happens -- including the field write. A
+  caller cannot assume the state changed.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **997 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,147
+line (0x0045C000) patched**. Measured: **999 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,149
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eleven batches have gone in and the 242 entries outstanding start at 48
+small ones in batches. Twelve batches have gone in and the 240 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

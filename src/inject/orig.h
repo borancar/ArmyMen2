@@ -7957,6 +7957,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * whether OBJ_FLAG_REVEALED is cleared, and nothing read so far says why. */
 #define OBJ_FLAG_BIT4            0x10u
 #define OBJ_OFF_FIELD_530        0x530u  /* int32_t; ObjConceal compares to 5 */
+/* 0x0043CD40, two callers. Move an object to a new OBJ_OFF_FIELD_530 and put
+ * the first row on the animation frame that goes with it -- gated on the
+ * current animation having finished, unless the states involved allow the
+ * interruption. Named for the field, as the field is named for its offset. */
+#define ADDR_SET_OBJ_FIELD_530   0x0043CD40u  /* void(void *obj, int32_t) */
+/* Seven int32 frame ids, indexed by the NEW field-530 value and nothing
+ * bounds the index: 81, 81, 80, 85, 6, 35, 84. Past the seventh is string
+ * data. */
+#define ADDR_FIELD_530_FRAMES    0x00487BF8u  /* int32_t[7] */
+#define AM2_FIELD_530_FRAMES     7
+#define AM2_FIELD_530_DELAY_MS   0xC8         /* 200, stamped for state 4 */
 /* 0x00449200, one caller. Put an object into state 5 and give up its
  * ALTERNATE table record: SAVED_OFF_TABLE_REC3 moves into
  * SAVED_OFF_TABLE_REC2, the alternate is cleared, and the value goes through
@@ -8711,6 +8722,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TILE_COVER_ADD      0x004384A0u  /* void(uint16_t tile) */
 #define ADDR_TILE_COVER_SUB      0x00438520u  /* void(uint16_t tile) */
 #define ADDR_MARK_OPEN_TILE      0x0043A4F0u  /* int32_t(uint16_t tile) */
+/* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell
+ * weights: every interior tile carrying a full weight gets TileCoverAdd. */
+#define ADDR_REBUILD_TILE_COVER  0x0042BE10u  /* void(void) */
 #define AM2_REVEAL_RADIUS        2
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
 #define MSG_CREATE_OFF_UID       4u

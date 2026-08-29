@@ -79,4 +79,8 @@ int32_t __cdecl MarkOpenTile(uint16_t tile);
  * it, when the first row's sprite has a software image. */
 int32_t __cdecl ObjBoxAction(void *obj, int32_t arg);
 
+/* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell
+ * weights. */
+void __cdecl RebuildTileCover(void);
+
 #endif /* AM2_REGION_H */
