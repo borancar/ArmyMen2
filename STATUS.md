@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,162 patches.**
+Nothing uncommitted. **1,163 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -760,16 +760,42 @@ check and the A/B are what remain.
   the shipped game directory. Worth doing on a throwaway copy of the install;
   not on this one.
 
+- **`StartShake`** (`0x0042B2E0`) is the screen shake, and its four
+  comparisons are NESTED rather than independent. Each `jle` skips everything
+  after it, so a request whose time is not greater than the current one never
+  reaches the step tests at all. Reading it as four separate maxima is wrong
+  for every case but the strongest.
+
+  The two phases are cleared UNCONDITIONALLY, above the first branch, so even
+  a request that changes nothing else restarts the oscillation. The two steps
+  are compared by ABSOLUTE value and the time and amplitude are not -- a step
+  is signed, so "stronger" means further from zero. Its four presets are
+  `{250,25,12,2}`, `{500,16,35,2}` and `{750,45,17,2}` plus an all-zero one:
+  the amplitude is 2 for every one that does anything, so they differ in
+  duration and in which axis dominates, not in how far the screen moves.
+- **I nearly shipped it never installed.** The scripted edit that adds the
+  `patch_replace` line silently matched nothing -- `mapdraw_install` has no
+  `int rc = 0;` -- and the build was clean, `make check` passed, and the
+  function was dead. This is the exact failure CLAUDE.md records for
+  `ApproxDistXY`, `AngleDelta`, `RoundTo8` and `WriteSaveTag`, arrived at
+  from the other direction: not a `return` above the call, but an insertion
+  that never landed.
+
+  What caught it was grepping for the install line, and the cheap standing
+  check is the coverage count -- it does not move for a function that was
+  never patched. **Measure the count after every batch; a build that compiles
+  proves nothing about whether the patch is in.**
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,011 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,162
+line (0x0045C000) patched**. Measured: **1,012 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,163
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighteen batches have gone in and the 228 entries outstanding start at 48
+small ones in batches. Nineteen batches have gone in and the 227 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

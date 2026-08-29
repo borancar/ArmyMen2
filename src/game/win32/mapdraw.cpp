@@ -2409,8 +2409,68 @@ void __cdecl DrawEffectLayer(void)
     }
 }
 
+/* The `cdq; xor; sub` the original spells out twice, written once. Not a
+ * helper the original has -- it inlines both -- but writing the idiom twice
+ * is how one of the two comes to be missing its `sub`. */
+static int32_t AbsInt(int32_t v)
+{
+    return v < 0 ? -v : v;
+}
+
+/* StartShake -- original 0x0042B2E0, one caller.
+ *
+ * Start a screen shake. Each of the four fields takes the MAXIMUM of what is
+ * asked for and what is already running, so a shake can only ever strengthen
+ * one in progress -- a weak explosion during a strong one cannot cut it short.
+ *
+ * THE TWO PHASES ARE CLEARED UNCONDITIONALLY, before the first test that can
+ * refuse. So even a request that changes nothing else restarts the
+ * oscillation from zero. That is the one thing here a caller can always do,
+ * and it is easy to miss because the stores sit above the branch rather than
+ * inside it.
+ *
+ * THE TWO STEPS ARE COMPARED BY ABSOLUTE VALUE AND THE OTHER TWO ARE NOT.
+ * A step is signed -- ADDR_SHAKE_STEP_X's own note says the sign flips at a
+ * limit -- so "stronger" for a step means further from zero, while the time
+ * and the amplitude are plain magnitudes. The original spells the absolute
+ * value as `cdq; xor; sub`, which is what makes the difference visible; it is
+ * written here as the comparison it is.
+ *
+ * THE COMPARISONS ARE NESTED, NOT INDEPENDENT. Each `jle` skips everything
+ * after it, so a request whose time is not greater than the current one never
+ * reaches the step tests at all -- and one whose X step is weaker never
+ * reaches Y or the amplitude. Written as the early returns the original
+ * branches into: reading them as four separate maxima would be wrong for
+ * every case but the strongest.
+ *
+ * Its one caller picks a preset from ADDR_SHAKE_PRESETS and pushes all four
+ * fields, so the values that ever arrive are the twelve in that table.
+ */
+void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp)
+{
+    *(float *)(uintptr_t)ADDR_SHAKE_PHASE_X = 0.0f;
+    *(float *)(uintptr_t)ADDR_SHAKE_PHASE_Y = 0.0f;
+
+    if (ms <= *(const int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
+        return;
+    *(int32_t *)(uintptr_t)ADDR_SHAKE_TIME = ms;
+
+    if (AbsInt(stepX) <= AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X))
+        return;
+    *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X = stepX;
+
+    if (AbsInt(stepY) <= AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y))
+        return;
+    *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y = stepY;
+
+    if (amp <= *(const int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
+        return;
+    *(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE = amp;
+}
+
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_START_SHAKE, (const void *)StartShake, "StartShake", 1);
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
     patch_replace(ADDR_DRAW_HLINE, (const void *)DrawHLine, "DrawHLine", 2);

@@ -144,4 +144,8 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
  * from src/inject, which is C and has no object model. */
 int32_t __cdecl RadarBlipColour(const void *obj, int32_t *blink);
 
+/* 0x0042B2E0, one caller. Start a screen shake, taking the maximum of each
+ * field against whatever is already running. */
+void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp);
+
 #endif /* AM2_MAPDRAW_H */

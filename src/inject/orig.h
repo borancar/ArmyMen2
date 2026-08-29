@@ -1695,6 +1695,19 @@
 #define ADDR_SHAKE_PHASE_Y       0x00514E70u  /* float */
 #define ADDR_SHAKE_STEP_Y        0x00514E74u  /* int32_t */
 #define ADDR_SHAKE_AMPLITUDE     0x00514E78u  /* int32_t, pixels */
+/* 0x0042B2E0, one caller. Start a shake, taking the MAXIMUM of each field
+ * against whatever is already running -- so a new shake can only strengthen
+ * one in progress, never cut it short. Its one caller reads a preset out of
+ * the four-record table below and pushes all four fields. */
+#define ADDR_START_SHAKE         0x0042B2E0u  /* void(ms,stepX,stepY,amp) */
+/* Four 16-byte presets, {ms, stepX, stepY, amplitude}: the first is all
+ * zeroes and the other three are 250/25/12/2, 500/16/35/2 and 750/45/17/2.
+ * The amplitude is 2 for every one that does anything, so the presets differ
+ * in duration and in which axis dominates, and not in how far the screen
+ * moves. */
+#define ADDR_SHAKE_PRESETS       0x00486170u  /* int32_t[4][4] */
+#define AM2_SHAKE_PRESETS        4
+#define SHAKE_PRESET_BYTES       0x10u
 /* Not a shake constant, despite living in this block and being read by the
  * shake: it is the frame delta in SECONDS, the twin of ADDR_FRAME_DELTA_MS at
  * 0x00511E08. ADDR_FRAME_CLOCK_STEP writes it as delta_ms * 0.001, and
