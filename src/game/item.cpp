@@ -4307,8 +4307,57 @@ void __cdecl ResetItemsAndUids(void)
         ((uint32_t *)(uintptr_t)ADDR_UID_COUNTERS)[i] = AM2_UID_COUNTER_START;
 }
 
+/* 0x0045F2D0, one caller. HAS THIS WEAPON RECHARGED -- the difference between
+ * the sarge panel's selected-slot flag being 1 and being 2.
+ *
+ * Two early exits and the second is the interesting one. A null item answers
+ * 0 outright; a null TYPE record answers by returning the null it just
+ * loaded, which is the same 0 by a different route. Reproduced rather than
+ * folded into one `return 0`, because the two are not the same instruction
+ * and nothing here establishes they were meant to be.
+ *
+ * The comparison is unsigned and STRICT: `cooldown < elapsed`, via
+ * cmp/sbb/neg. Exactly at the cooldown the weapon is not yet ready.
+ */
+int32_t __cdecl ItemIsReady(const void *item)
+{
+    const uint8_t *self = (const uint8_t *)item;
+    const uint8_t *type;
+    uint32_t       elapsed;
+
+    if (!self)
+        return 0;
+
+    type = *(const uint8_t *const *)(self + OBJ_OFF_FIELD_C0);
+    if (!type)
+        return 0;
+
+    elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+              - *(const uint32_t *)(self + ITEM_OFF_LAST_USE);
+
+    return *(const uint32_t *)(type + ITEMTYPE_OFF_COOLDOWN) < elapsed;
+}
+
+/* 0x004600E0, three instructions and no bounds check at all: the caller is
+ * expected to have a real type in hand. The sarge panel's tooltip is the only
+ * one there is.
+ *
+ * The table holds IMAGE addresses, so both the table and what it yields are
+ * read through the slide -- zero in the game, and the reason AM2_IMAGE exists
+ * at all. */
+const char *__cdecl ItemTypeName(uint32_t kind)
+{
+    const char *const *names = (const char *const *)AM2_IMAGE(ADDR_ITEM_TYPE_NAMES);
+
+    return names[kind];
+}
+
 void item_install(void)
 {
+    patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
+                  "ItemIsReady", 1);
+    patch_replace(ADDR_ITEM_TYPE_NAME, (const void *)ItemTypeName,
+                  "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
                   "ItemPreDestroy", 2);
     patch_replace(ADDR_FREE_SUBRECORD_ROWS, (const void *)FreeSubrecordRows,

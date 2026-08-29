@@ -599,7 +599,17 @@
  * indifferent to and what a `!!` would have flattened. */
 #define ADDR_HUD_SARGE_UPDATE  0x004150F0u  /* thiscall void(obj) */
 #define ADDR_SELECT_WEAPON     0x00414F20u  /* void(obj *, int32 slot) */
+/* A WEAPON COOLDOWN, which is what the sarge panel's 1-or-2 flag distinguishes:
+ * `clock - ITEM_OFF_LAST_USE` against the type's ITEMTYPE_OFF_COOLDOWN, so 1
+ * means the weapon has recharged. Null item answers 0 and a null type record
+ * answers 0 as well -- by returning the null it just loaded, which is a
+ * shortcut worth reproducing rather than tidying into an explicit 0. */
 #define ADDR_ITEM_IS_READY     0x0045F2D0u  /* int32(const obj *), 48 bytes */
+/* +0xC4 on an ITEM is a timestamp, and orig.h already calls the same offset
+ * OBJ_OFF_FOLLOW_UID on another kind of object. One number, two meanings, and
+ * an alias between them would be a name that lies -- so this is its own. */
+#define ITEM_OFF_LAST_USE      0xC4u   /* uint32_t, stamped from the clock */
+#define ITEMTYPE_OFF_COOLDOWN  0x04u   /* uint32_t, milliseconds */
 /* Three instructions: `return ADDR_ITEM_TYPE_NAMES[kind]`. Named rather than
  * reconstructed here -- it is one caller away and nothing about the update
  * depends on more than its shape. */

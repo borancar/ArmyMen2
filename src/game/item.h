@@ -429,4 +429,15 @@ void __cdecl DestroyItemCommon(void *item, int32_t unlink);
  * beyond its being 0x94 bytes and limited to 32 live. */
 void __cdecl DestroyKind7(void *item, int32_t unlink);
 
+
+/* Original: 0x0045F2D0, one caller -- the sarge panel's update. Has this
+ * weapon recharged? `clock - ITEM_OFF_LAST_USE` against the type record's
+ * ITEMTYPE_OFF_COOLDOWN. It is what makes that panel's selected-slot flag 2
+ * rather than 1. */
+int32_t __cdecl ItemIsReady(const void *item);
+
+/* Original: 0x004600E0, three instructions: one bounds-free read of
+ * ADDR_ITEM_TYPE_NAMES. The sarge panel's tooltip is its only caller. */
+const char *__cdecl ItemTypeName(uint32_t kind);
+
 #endif

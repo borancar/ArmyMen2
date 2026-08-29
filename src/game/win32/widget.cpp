@@ -231,14 +231,12 @@ typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
  * original's -- nothing about it is needed to know what HudSquadPaint does. */
 typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int32_t);
 #define orig_hud_squad_detail (*(am2_squad_detail_fn)ADDR_HUD_SQUAD_DETAIL)
-/* The sarge panel's three still-original callees. Selecting a weapon reaches
- * the unit and comm layers; the other two are a predicate and a table read. */
+/* Selecting a weapon reaches the unit and comm layers and stays the
+ * original's. ItemIsReady and ItemTypeName were seams here until they were
+ * reconstructed a commit later; checkseams caught both the moment they were,
+ * which is the whole reason that ratchet exists. */
 typedef void (__cdecl *am2_select_weapon_fn)(void *, int32_t);
 #define orig_select_weapon (*(am2_select_weapon_fn)ADDR_SELECT_WEAPON)
-typedef int32_t (__cdecl *am2_item_ready_fn)(const void *);
-#define orig_item_is_ready (*(am2_item_ready_fn)ADDR_ITEM_IS_READY)
-typedef const char *(__cdecl *am2_type_name_fn)(uint32_t);
-#define orig_item_type_name (*(am2_type_name_fn)ADDR_ITEM_TYPE_NAME)
 
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
@@ -2614,7 +2612,7 @@ void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w)
             strcpy((char *)((uint8_t *)*(AM2_Widget *const *)
                                 (uintptr_t)ADDR_HUD_WIDGET_B
                             + HUDPANEL_OFF_CAPTION),
-                   orig_item_type_name(
+                   ItemTypeName(
                        **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)));
         }
     }
@@ -2654,7 +2652,7 @@ refill:
         /* 1 or 2, never a boolean -- see the header comment. */
         *(int32_t *)(rec + HUDSARGE_REC_READY) =
             i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)
-            ? (orig_item_is_ready(item) != 0) + 1
+            ? (ItemIsReady(item) != 0) + 1
             : 0;
     }
 }
