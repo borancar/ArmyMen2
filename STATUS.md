@@ -5,104 +5,101 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-29**, at `9e064e6`. Working tree clean.
+Last updated: **2026-08-29**, at `a536c5a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,065 patches.**
+Nothing uncommitted. **1,072 patches.**
 
-Thirteen functions since the last snapshot: the HUD's top strip and edge strip
-end to end, the whole radar, the squad panel, and the two text/rect
-rasterisers underneath them.
+Twenty functions since the last snapshot. The seven-class HUD family is
+complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
+batch has gone from **14 to 24 of 29**.
 
-- **The top strip** -- `HudTopPaint` (`0x00418A20`) and `HudTopUpdate`
-  (`0x00418660`). The class is the message log, the multiplayer chat console
-  and a rewind button in one 640x21 widget.
+- **The HUD**, all seven classes: the top strip (paint and update), the edge
+  strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
+  `DrawBlipPulse`, `DrawBlipSquare` and `DrawRectFast`), the squad panel's
+  paint and the sarge panel's update.
+- **`DrawTextVertical`**, the drawing half of a pair whose measuring half was
+  already ours.
+- **Four more from the bracket batch**: `TextListPaint`, `CheckboxPaint`,
+  `CountButtonPaint`, `MpNamePaint`.
+- **`ItemIsReady` and `ItemTypeName`**, closing the seams the sarge update
+  left; `checkseams` failed the build the moment they landed.
 
-- **The edge strip** -- `HudEdgeUpdate` (`0x004196E0`) and `HudEdgePaint`
-  (`0x00419AC0`). It is the selected trooper's status line AND the panel's
-  tab: a click toggles `HUDPANEL_OFF_OPEN` and the panel slides away.
-  **`ADDR_HUD_WIDGET_C` is this widget**, which `orig.h` had listed among
-  three whose identity "has not been established here".
+### Two real defects, and how each was found
 
-- **The radar, end to end** -- `HudRadarPaint` (`0x00414B50`) over
-  `RadarBlipColour` (`0x004149B0`), `DrawBlip3` (`0x0041C7F0`),
-  `DrawBlipPulse` (`0x0041CA50`), `DrawBlipSquare` (`0x0041C8A0`) and
-  `DrawRectFast` (`0x0041CCE0`).
+**`HudSquadPaint` drew an INVERTED RECTANGLE.** The wide backdrop runs from the
+portrait's right edge out to `x + 131`; the two ends were swapped, and crossed
+ends make `IntersectRect` reject the rect so `ClearRegion` never ran. **An
+inverted rect fails silently rather than drawing wrong**, which is why it
+presented as missing output. Found by reading the differing PIXELS -- original
+black, mine showing the map's green -- after two wrong guesses from the
+disassembly. Three other fixes went in alongside and none of them was the bug.
 
-- **`HudSquadPaint`** (`0x00416DA0`), twelve portraits in a 3x4 grid.
+**`MpNamePaint` KILLED THE PROCESS.** `MPNAME_OFF_TEXT` is a pointer and
+`orig.h` says so in as many words; passing the address of the field to sprintf
+formatted over `MPNAME_OFF_FLAG`, `_INK` and `_PAPER`. The signature was
+distinctive: 28-38% of the frame, a ZERO-BYTE widget dump where the original
+wrote 131 lines, and the checksum sequence run once instead of twice. That is
+"the process is gone", not "wrong pixels".
 
-- **`DrawTextVertical`** (`0x00446C50`), the drawing half of a pair whose
-  measuring half (`TextStackHeight`) was already ours.
+### Two latent bugs found beside the first
 
-### What the numbers say, and where they say nothing
+`HudTopPaint` and `HudSargePaint` were passing `DrawSpriteClipped` the box they
+started from rather than ClipRect's ADJUSTED pair. Both agreed with the
+original only because their sprites are never partly outside the clip -- **when
+nothing is clipped the two forms are identical**. `HudCommandsPaint` genuinely
+uses its saved origin and says so. Both conventions exist in this binary and it
+has to be read per function, which is what made one assumption reach three
+places.
 
-Six of the thirteen have a real pixel oracle, and it took two corrections to
-know which. The screenshots are 1024x768 with the game's 640x480 frame at 1:1
-in the TOP LEFT -- not scaled into it, which is what I assumed at first, so two
-of three HUD rectangles I was sampling were pure black border and would have
-read 0 whatever the code did. And a 0 means nothing until the region is known
-to be non-blank: `HudTopPaint`'s strip was an empty log compared against an
-empty log.
+### Read the instruction between the accesses
 
-With both fixed: `DrawTextVertical` 12,750 calls with the strip identical and
-a one-pixel kern change worth 148; `HudEdgePaint` 5,432 calls, identical, a
-five-pixel pen shift worth 701; `HudRadarPaint` 5,003 calls with the radar 0
-differing and **175 distinct colours present**; `HudSquadPaint` 5,467 with the
-panel at 0.
+Twice this batch a single instruction between two stack accesses decided what a
+slot means. `DrawBlipPulse` interleaves `pop edi`/`pop esi` into the middle of
+two arms, so the same `[esp+0x10]` names arg3 before them and arg4 after --
+taken at face value the two colours come out swapped. `CountButtonPaint` has a
+`push edi` between its two colour stores, so what looks like one slot written
+twice is the ink and the fill; read at face value the default ink looks dead
+and the ink looks read uninitialised. Both were written down wrongly before the
+stack was recounted.
 
-Two have NO check at all and say so in their own source. `DrawBlipPulse` and
-`DrawBlipSquare` are gated on an `OBJ_FLAG_BIT4` no drive sets. Poking it onto
-the leader's object runs them -- 2,288 and 2,913 calls -- but the radar's
-pixels cannot discriminate their colour assignment: swapping the two colours
-scores 62 against the original where the correct code scores 54. Six shots
-give four distinct radar frames and one flagged object contributes at most 72
-pixels, so the signal is the size of the noise. **Verified by reading, and the
-comments say which half that is.**
+### Where the numbers stop
 
-### The one real defect, and the three fixes that were not it
+Six of the twenty have a real pixel oracle. Establishing that took two
+corrections: the screenshots put the game's 640x480 frame at 1:1 in the TOP
+LEFT rather than scaled into 1024x768, so two of three HUD rectangles being
+sampled were black border; and a 0 means nothing until the region is known
+non-blank.
 
-`HudSquadPaint` came back 3,729 pixels over a budget of 500, consistently
-across all three configurations -- unmistakably real, unlike the frame-count
-ratios that failed twice this session and were wall-clock both times.
+Four functions have NO check at all and say so in their own source.
+`DrawBlipPulse` and `DrawBlipSquare` are gated on an `OBJ_FLAG_BIT4` no drive
+sets -- poking it runs them, but the radar's pixels cannot discriminate their
+colour assignment: swapping the two colours scores 62 against the original
+where the correct code scores 54. `TextListPaint` and `CheckboxPaint` are
+unreached on every configuration here, and those zeros are REAL rather than
+blind -- `blindspots.py` files both under "reached by address". Their
+constructor chains are recorded so the next session can find the screens
+instead of repeating the drives.
 
-The cause was an INVERTED RECTANGLE. The wide backdrop runs from the
-portrait's right edge out to `x + 131`; I had the two ends swapped, and
-crossed ends make `IntersectRect` reject the rect so `ClearRegion` never ran.
-**An inverted rect fails silently rather than drawing wrong**, which is why it
-presented as missing output. What found it was reading the differing PIXELS
-rather than the disassembly again: the original is black in a 60x75 block and
-mine showed the map's green through, which says "a fill I am skipping"
-outright.
+`ItemIsReady`'s 1-vs-2 return is unobservable: the sarge paint tests `> 0`.
 
-Three earlier fixes were each correct against the disassembly and none was the
-bug -- `continue` where I had `return` (`0x0041701C` is the loop advance,
-`0x00417036` the epilogue), and `DrawSpriteClipped` taking ClipRect's ADJUSTED
-pair rather than the box it started from, in `HudSquadPaint`, `HudTopPaint`
-and `HudSargePaint`. The last two were LATENT: their sprites are never partly
-outside the clip, and when nothing is clipped the two forms are identical.
-`HudCommandsPaint` genuinely uses its saved origin. **Both conventions exist
-in this binary and it has to be read per function**, which is what made one
-assumption reach three places.
+### The ratchets, and the rule that keeps being ignored
 
-### Names corrected rather than aliased
+`checkpatches`, `checkseams` and `checkoffsets` all fired at once on
+`MpNamePaint` for one cause -- three "helpers" named without grepping, which
+were already named AND already reconstructed. That is the rule quoted twice
+earlier in the same session. Aliases went 21 -> 24 and are back to 21.
 
-- `ADDR_MOUSE_B0_EXTRA` -> **`ADDR_MOUSE_GRAB`**. Its comment said "nothing
-  here reads it" and 32 sites do. It is the click ARBITER, and the token is an
-  ADDRESS: the top strip claims `this + 0x64` for its button and plain `this`
-  for the rest of itself, arbitrating two targets through one global.
-- `HUDLOG_OFF_TOTAL` -> **`HUDLOG_OFF_BLIPS`**. `HudMessage` adds to it; the
-  update DRAINS it with a sound each, so radio chatter is per character.
-- `CLAUDE.md`'s Lock/Unlock shortlist was listing FINISHED work -- it named
-  `0x0041CC40`, which is `DrawHLine`. A count that only goes up cannot say a
-  candidate has been taken.
+`checkclaims` failed the build on the bracket count at every single step, which
+is the whole argument for it.
 
-### Two process failures worth not repeating
+### Process failures worth not repeating
 
-I launched a second `ab.sh` while the first was still driving, then -- having
-just written that down -- edited `src/` during the next one. Both runs were
-invalid and were thrown away rather than read. `ab.sh` rebuilds on every
-launch; there is no such thing as a safe edit while it runs.
+A second `ab.sh` was launched while the first was still driving, and then --
+having just written that down -- `src/` was edited during the next one. Both
+runs were invalid and were thrown away rather than read. `ab.sh` rebuilds on
+every launch; there is no safe edit while it runs.
 
 ## Next
 
