@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,164 patches.**
+Nothing uncommitted. **1,166 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -807,16 +807,47 @@ check and the A/B are what remain.
   Its caller count was also wrong in the old comment -- one, where the image
   has two -- and fixing it was free once the address was the question.
 
+### Rank the queue by what is ALREADY NAMED, not by size
+
+Size ranking has been the picker for twenty batches and it stopped paying:
+the small entries left are the ones whose types are not established, so each
+costs three to six new names on thin evidence. A better order is how many
+addresses a candidate touches that `orig.h` does NOT already know.
+
+Measured: **eighteen outstanding entries reference nothing unnamed at all**,
+from 112 bytes up to 272. Those are pure transcription -- the reading is
+already done, by whoever named the callees. The scratch tool that ranks them
+disassembles each entry, collects every call target and every absolute
+operand in `0x400000..0x700000`, and subtracts the addresses `orig.h` names.
+
+- **`ObjRowsMaskAt`** (`0x00435440`) tests the FIRST row only, and `orig.h`
+  said it "walks the object's OBJ_OFF_ROWS and tests each row's sprite".
+  There is one load of `rows`, one `[rows + ROW_OFF_SPRITE]`, and no loop;
+  the row count is read only to refuse an object that has none. The
+  description came from the name and the name came from a call site --
+  **third time reconstructing a function is what corrects its own macro's
+  comment.**
+
+  Its unrecognised-format arm answers **1, a hit**, where all four early
+  exits answer 0. Format 0 means the image is a DirectDraw surface, so there
+  is no software mask to read and "assume solid" is the only answer available
+  without a lock.
+- **`RemapInventoryUids`** (`0x004276F0`) is the savegame uid fixup. It
+  clears its gate flag BEFORE testing the type, so an object of any other
+  type still loses it -- the flag means "seen by this pass", not "remapped".
+  A uid with no table entry is left alone rather than zeroed, so a save
+  referring to something gone keeps a dangling uid.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,013 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,164
+line (0x0045C000) patched**. Measured: **1,015 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,166
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty batches have gone in and the 226 entries outstanding start at 48
+small ones in batches. Twenty-one batches have gone in and the 224 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

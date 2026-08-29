@@ -1354,11 +1354,17 @@
 /* Bit 17 of OBJ_OFF_FLAGS, read in one place: ObjectsAtPoint takes it as
  * "ask ADDR_OBJ_ROWS_MASK_AT instead of the box or the bitmask". */
 #define OBJ_FLAG_ROWS_MASK     0x20000u
-/* 0x00435440, one caller. The multi-row answer to "is this point on me": it
- * walks the object's OBJ_OFF_ROWS and tests the point against each row's
- * sprite, where ADDR_OBJ_MASK_BIT_AT tests one bitmask. Refuses an object
- * with fewer than one row, a row with no sprite, or a sprite with no image.
- * Stays original. */
+/* 0x00435440, one caller. "Is this point on me", answered against the
+ * object's SPRITE rather than a bitmask -- where ADDR_OBJ_MASK_BIT_AT tests
+ * one bitmask. Refuses an object with fewer than one row, a row with no
+ * sprite, or a sprite with no image, and refuses a point outside the row's
+ * rectangle before any mask is consulted.
+ *
+ * IT TESTS THE FIRST ROW ONLY. This comment used to say it walks
+ * OBJ_OFF_ROWS and tests every row, and the body does not: there is one load
+ * of `rows`, one `[rows + ROW_OFF_SPRITE]`, and no loop. The row COUNT is
+ * read, but only to refuse an object that has none. Reconstructed, and the
+ * claim was corrected by writing it. */
 #define ADDR_OBJ_ROWS_MASK_AT  0x00435440u /* int32_t(obj, const AM2_Point *) */
 /* The mask test itself is ADDR_OBJ_MASK_BIT_AT, further down and already
  * reconstructed -- a second name went on it here and both the alias ratchet
@@ -1445,6 +1451,7 @@
 #define ADDR_TICKS               0x00426CD0u  /* uint32_t(void) */
 /* Sprite fields the cursor code reads: two int16 hotspot pairs and the
  * width/height, plus the mode slot DrawSprite consults. */
+#define SPR_OFF_FORMAT           0x08u   /* AM2_Sprite::format; 0 = a surface */
 #define SPR_OFF_FLAGS            0x0Cu   /* AM2_Sprite::flags */
 #define SPR_OFF_IMAGE            0x10u   /* AM2_Sprite::image, the union */
 #define SPR_OFF_W                0x1Cu
@@ -5974,6 +5981,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_UID_REMAP_CAP         0x00513080u  /* int32_t, records allocated */
 #define ADDR_UID_REMAP_COUNT       0x00513084u  /* int32_t, records used */
 #define ADDR_UID_REMAP             0x00513088u  /* uint32_t (*)[2] */
+/* 0x004276F0, one caller. Walk every registered object and put each type 2's
+ * six inventory uids through the remap table -- the savegame fixup, gated on
+ * a flag the loader sets and this clears. */
+#define ADDR_REMAP_INVENTORY_UIDS  0x004276F0u  /* void(void) */
+#define OBJ_FLAG_NEEDS_REMAP       0x04000000u
+#define OBJ_FLAG_REMAP_DONE        0x00000400u  /* cleared, never set here */
 #define AM2_UID_REMAP_GROW         10   /* records added per grow */
 /* 0x00427650, two callers -- both in 0x00457370's band, which is where a load
  * puts the table back. Free the records and zero all three globals. */
@@ -7979,6 +7992,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_DIRTY_COLLECT     0x0041DD90u  /* void(const AM2_Rect *) */
 /* A row's own rectangle, which is what it hands the collector. */
 #define ROW_OFF_RECT           0x0Cu
+/* 0x00435440, one caller. Is a point on a SOLID pixel of the object's first
+ * row -- rectangle first, then the sprite's own mask. */
 #define ADDR_REMAP_BYTES       0x0041BB60u  /* void(dst, src, table, count) */
 #define ADDR_SET_FIELD_IN_ALL  0x00434E90u  /* int32_t(void *record, void *v) */
 /* The "Flame On!" cheat's three globals, named from the two cheat arms that

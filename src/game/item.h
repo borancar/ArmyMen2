@@ -541,4 +541,17 @@ void __cdecl ResetObjOnCof(void *obj);
  * slot only when the winner is not slot 0. */
 void __cdecl SelectRankedWeapon(void *unit);
 
+/* 0x00435440, one caller. Is a point on a solid pixel of the object's FIRST
+ * row? Rectangle first, then the sprite's own mask.
+ *
+ * The point is a `const void *` here rather than an AM2_Point, because this
+ * header is included by translation units that do not pull in rect.h and
+ * adding that include for one declaration would widen what item.h drags in.
+ * The definition casts it back. */
+int32_t __cdecl ObjRowsMaskAt(void *obj, const void *pt);
+
+/* 0x004276F0, one caller. The savegame uid fixup: put every type 2's six
+ * inventory uids through the remap table. */
+void __cdecl RemapInventoryUids(void);
+
 #endif

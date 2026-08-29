@@ -871,10 +871,6 @@ typedef void (__cdecl *AM2_ObjRemapFn)(void *obj, void *desc, int32_t force);
 #define orig_obj_remap     ((AM2_ObjRemapFn)(uintptr_t)ADDR_OBJ_REMAP)
 
 
-typedef int32_t (__cdecl *AM2_RowsMaskFn)(void *obj, const AM2_Point *pt);
-#define orig_obj_rows_mask_at \
-    ((AM2_RowsMaskFn)(uintptr_t)ADDR_OBJ_ROWS_MASK_AT)
-
 /* ObjectsAtPoint -- original 0x0042A550, fifteen callers.
  *
  * The sibling of ObjectsHitByPoint above, and the two really are different
@@ -940,7 +936,7 @@ void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
             continue;
 
         if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_ROWS_MASK) {
-            if (!orig_obj_rows_mask_at(o, (const AM2_Point *)pt))
+            if (!ObjRowsMaskAt(o, pt))
                 continue;
         } else if (!*(void *const *)(o + OBJ_OFF_HIT_MASK)) {
             AM2_Rect box;
@@ -5900,6 +5896,149 @@ void __cdecl SelectRankedWeapon(void *unit)
         *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = bestSlot;
 }
 
+/* ObjRowsMaskAt -- original 0x00435440, one caller.
+ *
+ * Is a point on a solid pixel of the object's first row? The rectangle is
+ * tested first and the sprite's own mask second, so a point inside the box but
+ * on a transparent pixel answers 0 -- which is the whole reason this exists
+ * rather than a rectangle test at the call site.
+ *
+ * IT TESTS THE FIRST ROW ONLY, AND orig.h SAID OTHERWISE. That macro's comment
+ * described it as walking OBJ_OFF_ROWS and testing every row; there is one
+ * load of `rows`, one `[rows + ROW_OFF_SPRITE]`, and no loop. The row count is
+ * read only to refuse an object that has none. The description was written
+ * from the name and the name was written from the call site -- corrected by
+ * reconstructing it, which is the third time that order has been the fix.
+ *
+ * The name is kept as the established one rather than renamed to fit the
+ * reading: the address already had it, and the alias ratchet refused the
+ * second. What changed is the comment.
+ *
+ * WHICH MASK READER IS USED COMES FROM THE SPRITE'S FORMAT, and the mapping is
+ * sprite.h's: format 1 has the 32-bit row table and 2 and 3 the 16-bit one.
+ * Anything else -- 0, or above 3 -- answers **1**, a HIT, without consulting
+ * any mask at all. That is the arm worth noticing: an unrecognised format is
+ * treated as solid everywhere, not as empty.
+ *
+ * Format 0 means the image is a DirectDraw SURFACE rather than a software
+ * mask, so there is nothing to read per pixel and answering "solid" is the
+ * only thing it could do without a lock. Reproduced, and it is why the four
+ * early exits answer 0 while this one answers 1: they mean "no sprite to
+ * test", and this means "cannot test, assume yes".
+ *
+ * The point is made relative to the row's rectangle before the mask sees it,
+ * and the two subtractions read the rectangle's left and top from DIFFERENT
+ * expressions in the original -- `[ebp]` after `lea ebp,[ebx+0xC]` for the
+ * left, and `[ebx+0x10]` for the top. Same two fields either way.
+ */
+int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
+{
+    const AM2_Point *pt = (const AM2_Point *)ptv;
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t       *row;
+    const uint8_t *spr;
+    int32_t        x;
+    int32_t        y;
+
+    if (!o)
+        return 0;
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
+        return 0;
+
+    row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
+    if (!spr)
+        return 0;
+    if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
+        return 0;
+
+    if (!PointInRect((const AM2_Rect *)(row + ROW_OFF_RECT), pt))
+        return 0;
+
+    x = pt->x - *(const int32_t *)(row + ROW_OFF_RECT);
+    y = pt->y - *(const int32_t *)(row + ROW_OFF_RECT + 4);
+
+    switch (*(const int32_t *)(spr + SPR_OFF_FORMAT)) {
+    case 1:
+        return MaskPixelSolid32((uint32_t)x, (uint32_t)y,
+                                *(const void *const *)(spr + SPR_OFF_IMAGE));
+    case 2:
+    case 3:
+        return MaskPixelSolid((uint32_t)x, (uint32_t)y,
+                              *(const void *const *)(spr + SPR_OFF_IMAGE));
+    default:
+        return 1;               /* no software mask: assume solid */
+    }
+}
+
+/* RemapInventoryUids -- original 0x004276F0, one caller.
+ *
+ * The savegame uid fixup. Walk every registered object; for each one carrying
+ * OBJ_FLAG_NEEDS_REMAP, clear that flag, and if it is a type 2 put all six of
+ * its inventory uids through the {old, new} table the loader built.
+ *
+ * THE FLAG IS CLEARED BEFORE THE TYPE IS TESTED, so an object of any other
+ * type still loses it -- the flag means "has been seen by this pass", not
+ * "has been remapped".
+ *
+ * A SECOND FLAG, 0x0400, IS CLEARED AT THE END AND SET NOWHERE IN THIS
+ * FUNCTION. The original spells it `and ch, 0xFB`, a byte operation on the
+ * second byte of the dword, which is how it stays distinct from the first
+ * clear; only type 2s that reached the loop lose it.
+ *
+ * THE TABLE AND ITS COUNT ARE RE-READ AFTER EVERY SUCCESSFUL SUBSTITUTION and
+ * not otherwise. Nothing in the loop can move them -- the writes go to the
+ * object, not the table -- so this is the compiler reloading across a store it
+ * cannot prove disjoint. Written as the plain loop that means.
+ *
+ * A uid with no entry in the table is LEFT ALONE rather than zeroed, so a save
+ * referring to something that no longer exists keeps a dangling uid. The
+ * lookups elsewhere answer NULL for it, which is the same thing the empty-slot
+ * path produces.
+ *
+ * The search is linear per slot, so this is O(six slots x table) per object.
+ * The table is a load-time artefact and the object count is a few hundred.
+ */
+void __cdecl RemapInventoryUids(void)
+{
+    uint8_t *obj;
+
+    for (obj = (uint8_t *)FirstItem(); obj; obj = (uint8_t *)NextItem()) {
+        uint32_t flags = *(const uint32_t *)(obj + OBJ_OFF_FLAGS);
+        int32_t  slot;
+
+        if (!(flags & OBJ_FLAG_NEEDS_REMAP))
+            continue;
+
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) = flags & ~OBJ_FLAG_NEEDS_REMAP;
+
+        if (*(const int32_t *)obj != 2)
+            continue;
+
+        for (slot = 0; slot < AM2_INVENTORY_SLOTS; slot++) {
+            uint32_t *here = (uint32_t *)(obj + UNIT_OFF_INVENTORY
+                                          + (size_t)slot * 4);
+            int32_t   i;
+
+            if (!*here)
+                continue;
+
+            for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_UID_REMAP_COUNT;
+                 i++) {
+                const uint32_t (*map)[2] =
+                    *(const uint32_t (**)[2])(uintptr_t)ADDR_UID_REMAP;
+
+                if (map[i][0] == *here) {
+                    *here = map[i][1];
+                    break;
+                }
+            }
+        }
+
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_REMAP_DONE;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6050,6 +6189,11 @@ void item_install(void)
     patch_replace(ADDR_SELECT_RANKED_WEAPON,
                   (const void *)SelectRankedWeapon,
                   "SelectRankedWeapon", 1);
+    patch_replace(ADDR_OBJ_ROWS_MASK_AT, (const void *)ObjRowsMaskAt,
+                  "ObjRowsMaskAt", 1);
+    patch_replace(ADDR_REMAP_INVENTORY_UIDS,
+                  (const void *)RemapInventoryUids,
+                  "RemapInventoryUids", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,
