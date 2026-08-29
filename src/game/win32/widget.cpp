@@ -227,6 +227,10 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * table below it, neither of which is ours. */
 typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
 #define orig_hud_chat_send (*(am2_chat_send_fn)ADDR_HUD_CHAT_SEND)
+/* The squad panel's per-slot detail painter, 3,328 bytes and still the
+ * original's -- nothing about it is needed to know what HudSquadPaint does. */
+typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int32_t);
+#define orig_hud_squad_detail (*(am2_squad_detail_fn)ADDR_HUD_SQUAD_DETAIL)
 
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
@@ -1633,7 +1637,11 @@ void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip)
         if (!ClipRect(&spr->bounds, (const AM2_Rect *)&clip, &x, &y, &part))
             return;
 
-        DrawSpriteClipped(spr, box.left, box.top, &part, 0);
+        /* The ADJUSTED pair. The original reads back the very stack slots it
+         * handed ClipRect as &x and &y. Both forms exist in this binary --
+         * HudCommandsPaint below deliberately uses its saved origin instead --
+         * so it has to be read per function rather than assumed. */
+        DrawSpriteClipped(spr, x, y, &part, 0);
     }
 }
 
@@ -2308,6 +2316,175 @@ void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip)
     UnlockSurface();
 }
 
+/* 0x00416DA0, vtable slot 1 of the squad panel. Twelve portraits in a 3x4
+ * grid, each with optional decoration on top.
+ *
+ * THE GRID IS A TABLE, not arithmetic: x is 6, 50, 94 and y is 22, 60, 98,
+ * 136, and the original walks it four bytes at a time from 0x004766CA reading
+ * `[p-2]` for x and `[p]` for y -- so the first x sits two bytes BEFORE the
+ * pointer the loop starts from, and the bound it stops at is one past the last
+ * pair. Written as an ordinary indexed table here; the two are the same twelve
+ * pairs and the odd pointer is a compiler artefact, not a layout.
+ *
+ * SQUAD_REC_WIDE CHANGES THREE THINGS AT ONCE and that is the whole shape of
+ * the function. Set, the portrait comes from HUD_SQUAD_PAIR_HI rather than
+ * _LO, a AM2_SQUAD_WIDE_W-wide backdrop is filled behind it, and the slot
+ * stops after the portrait to call ADDR_HUD_SQUAD_DETAIL instead of drawing
+ * its own bar and pips. Reading it as three independent flags would produce a
+ * panel that is wrong in three ways at once.
+ *
+ * Everything below the portrait is skipped for a wide slot: the bar is
+ * `SQUAD_REC_BAR_W` pixels from the left inset, and the pips are
+ * `SQUAD_REC_ICONS` copies of ONE sprite at HUD_SQUAD_ICON_SPRITE, spaced
+ * AM2_SQUAD_ICON_DX apart. Each is clipped independently and the pen advances
+ * whether or not it drew, the same as every other clipped run in this tree.
+ *
+ * ADDR_HUD_SQUAD_DETAIL stays the original's -- 3,328 bytes, one caller, and
+ * nothing about it is needed to know what this function does.
+ */
+void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t        *self = (uint8_t *)w;
+    const int16_t  *grid = (const int16_t *)AM2_IMAGE(ADDR_HUD_SQUAD_SLOT_XY);
+    RECT            vis;
+    int32_t         slot;
+
+    if (!IntersectRect(&vis, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
+        return;
+
+    for (slot = 0; slot < AM2_HUD_SQUAD_SLOTS; slot++) {
+        const uint8_t *rec = self + HUD_SQUAD_RECS + slot * HUD_SQUAD_REC_SIZE;
+        int32_t        idx = *(const int32_t *)(rec + SQUAD_REC_INDEX);
+        int32_t        wide;
+        AM2_Sprite    *spr;
+        RECT           box;
+        RECT           hit;
+        AM2_Rect       part;
+        int32_t        x;
+        int32_t        y;
+        int32_t        i;
+
+        if (idx < 0)
+            continue;
+
+        spr = *(AM2_Sprite **)(self + HUD_SQUAD_PAIR_LO + idx * 4);
+        if (!spr)
+            continue;
+
+        wide = *(const int32_t *)(rec + SQUAD_REC_WIDE);
+        if (wide)
+            spr = *(AM2_Sprite **)(self + HUD_SQUAD_PAIR_HI + idx * 4);
+
+        x = grid[slot * 2]     + w->rect.left;
+        y = grid[slot * 2 + 1] + w->rect.top;
+
+        box.left   = x;
+        box.top    = y;
+        box.right  = x + spr->bounds.right;
+        box.bottom = y + spr->bounds.bottom;
+
+        /* The wide backdrop, behind the portrait rather than over it. */
+        if (wide) {
+            RECT back;
+
+            /* From the portrait's RIGHT EDGE out to x + AM2_SQUAD_WIDE_W --
+             * the original computes the far edge by taking spr->bounds.right
+             * back off box.right to recover x and adding 131 to it, which is
+             * easy to transcribe with the two ends swapped. Swapped, the rect
+             * is inverted, IntersectRect rejects it, and the fill silently
+             * does not happen: bootcamp came back with a 60x75 block of the
+             * map showing through where the original had painted it out. */
+            back.left   = box.right;
+            back.top    = y;
+            back.right  = box.right - spr->bounds.right + AM2_SQUAD_WIDE_W;
+            back.bottom = box.bottom;
+
+            if (IntersectRect(&hit, &back, &vis))
+                ClearRegion(&hit,
+                            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+        }
+
+        /* TWO NEARLY IDENTICAL EXITS, and they are not the same. This
+         * intersect fails to 0x0041701C, which is the LOOP ADVANCE; the
+         * ClipRect below fails to 0x00417036, which is the function's own
+         * epilogue. Written as `return` for both -- the first slot whose box
+         * fell outside the clip killed every slot after it, and bootcamp came
+         * back 3,707 pixels wrong inside the squad panel. */
+        if (!IntersectRect(&hit, &box, &vis))
+            continue;
+
+        {
+            int32_t cx = box.left;
+            int32_t cy = box.top;
+
+            if (!ClipRect(&spr->bounds, (const AM2_Rect *)&hit, &cx, &cy, &part))
+                return;
+
+            if (*(const int32_t *)(rec + SQUAD_REC_HILITE))
+                ClearRegion(&hit, AM2_HUD_SQUAD_HILITE);
+
+            /* THE ADJUSTED PAIR, not the box. ClipRect's x and y are IN/OUT
+             * and the original hands DrawSpriteClipped the very slots it wrote
+             * back through -- rect.h says so and this function is the second
+             * place in one session where passing the originals instead drew
+             * the panel wrong. */
+            DrawSpriteClipped(spr, cx, cy, &part, 0);
+        }
+
+        if (wide) {
+            orig_hud_squad_detail(w, *(const int32_t *)(rec + SQUAD_REC_DETAIL_ARG));
+            continue;
+        }
+
+        /* The bar under the portrait. */
+        if (*(const int32_t *)(rec + SQUAD_REC_BAR_W) > 0) {
+            RECT bar;
+
+            bar.left   = x + AM2_SQUAD_BAR_X;
+            bar.top    = y + AM2_SQUAD_BAR_TOP;
+            bar.right  = x + *(const int32_t *)(rec + SQUAD_REC_BAR_W);
+            bar.bottom = y + AM2_SQUAD_BAR_BOTTOM;
+
+            if (IntersectRect(&hit, &bar, &vis))
+                ClearRegion(&hit, *(const uint8_t *)(rec + SQUAD_REC_BAR_COLOUR));
+        }
+
+        /* The pips, all one sprite, spaced along the bottom. */
+        for (i = 0; i < *(const int32_t *)(rec + SQUAD_REC_ICONS); i++) {
+            AM2_Sprite *pip = *(AM2_Sprite **)(self + HUD_SQUAD_ICON_SPRITE);
+            RECT        pbox;
+            int32_t     px;
+            int32_t     py;
+
+            if (!pip)
+                break;
+
+            px = x + i * AM2_SQUAD_ICON_DX + AM2_SQUAD_ICON_X;
+            py = y + AM2_SQUAD_ICON_Y;
+
+            pbox.left   = px;
+            pbox.top    = py;
+            pbox.right  = px + pip->bounds.right;
+            pbox.bottom = py + pip->bounds.bottom;
+
+            if (!IntersectRect(&hit, &pbox, &vis))
+                continue;
+
+            {
+                int32_t cx = px;
+                int32_t cy = py;
+
+                if (!ClipRect(&pip->bounds, (const AM2_Rect *)&hit,
+                              &cx, &cy, &part))
+                    continue;
+
+                /* Same contract again, same adjusted pair. */
+                DrawSpriteClipped(pip, cx, cy, &part, 0);
+            }
+        }
+    }
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -2353,7 +2530,12 @@ void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
         if (*(const int32_t *)(rec + HUDSARGE_REC_HIGHLIGHT) > 0)
             ClearRegion((const RECT *)&hit, AM2_HUD_CMD_HIGHLIGHT);
 
-        DrawSpriteClipped(spr, box.left, box.top, &part, 0);
+        /* The ADJUSTED pair -- 0x00415686 reads back the slots it gave
+         * ClipRect. This was `box.left, box.top` and agreed with the original
+         * only because a sarge sprite is never partly outside the clip; the
+         * squad panel, whose slots do straddle its edge, is where the same
+         * mistake finally showed. */
+        DrawSpriteClipped(spr, x, y, &part, 0);
 
         count = *(const int32_t *)(rec + HUDSARGE_REC_COUNT);
         if (count < 0)
@@ -8118,6 +8300,8 @@ int widget_install(void)
                         "HudRadarUpdate", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_PAINT, (const void *)HudRadarPaint,
                         "HudRadarPaint", 1);
+    rc |= patch_replace(ADDR_HUD_SQUAD_PAINT, (const void *)HudSquadPaint,
+                        "HudSquadPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,

@@ -624,6 +624,39 @@
 #define HUD_SQUAD_PAIR_LO      0x5Cu
 #define HUD_SQUAD_PAIR_HI      0x8Cu
 #define AM2_HUD_SQUAD_SLOTS    12
+/* Vtable slot 1 of the squad panel: twelve slots in a 3x4 grid, each a portrait
+ * with optional decoration. The grid comes from a table of int16 PAIRS rather
+ * than from arithmetic -- x is 6, 50, 94 and y is 22, 60, 98, 136 -- and the
+ * loop walks it by four bytes from 0x004766CA reading `[p-2]` and `[p]`, so
+ * the table's first x sits two bytes BEFORE the pointer it starts from.
+ *
+ * Each slot has a 0x20-byte record; twelve of them run from +0xBC. The record
+ * decides everything drawn over the portrait, and SQUAD_REC_WIDE is the one
+ * that changes the portrait itself -- set, the sprite comes from
+ * HUD_SQUAD_PAIR_HI instead of _LO, a wide backdrop is filled behind it, and
+ * the slot's own drawing stops there in favour of ADDR_HUD_SQUAD_DETAIL. */
+#define ADDR_HUD_SQUAD_PAINT   0x00416DA0u  /* thiscall void(obj, RECT) */
+#define ADDR_HUD_SQUAD_SLOT_XY 0x004766C8u  /* int16[12][2], x then y */
+#define ADDR_HUD_SQUAD_DETAIL  0x00416340u  /* thiscall void(obj, int32) */
+#define HUD_SQUAD_ICON_SPRITE  0x58u   /* AM2_Sprite *, the pip drawn per icon */
+#define HUD_SQUAD_RECS         0xBCu   /* the twelve records start here */
+#define HUD_SQUAD_REC_SIZE     0x20u
+#define SQUAD_REC_INDEX        0x00u  /* int32, into the sprite pair; <0 skips */
+#define SQUAD_REC_DETAIL_ARG   0x04u  /* int32, handed to ADDR_HUD_SQUAD_DETAIL */
+#define SQUAD_REC_WIDE         0x08u  /* int32; see above -- it changes three
+                                       * separate things at once */
+#define SQUAD_REC_HILITE       0x10u  /* int32, fill the portrait box first */
+#define SQUAD_REC_BAR_W        0x14u  /* int32, > 0 draws a bar under it */
+#define SQUAD_REC_BAR_COLOUR   0x18u  /* uint8_t */
+#define SQUAD_REC_ICONS        0x1Cu  /* int32, how many pips along the bottom */
+#define AM2_SQUAD_WIDE_W       0x83   /* 131, the wide backdrop's width */
+#define AM2_SQUAD_BAR_X        3
+#define AM2_SQUAD_BAR_TOP      0x1A
+#define AM2_SQUAD_BAR_BOTTOM   0x1D
+#define AM2_SQUAD_ICON_X       7
+#define AM2_SQUAD_ICON_DX      6
+#define AM2_SQUAD_ICON_Y       0x1E
+#define AM2_HUD_SQUAD_HILITE   0xEE
 /* 0x004135C0, two callers. Delete all three of those through vtable slot 0
  * with the scalar-delete flag and clear each global -- the same shape
  * ADDR_CLOSE_SCREEN has for the screen, three times over. Reconstructed. */

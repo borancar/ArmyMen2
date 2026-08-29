@@ -688,6 +688,9 @@ void __attribute__((thiscall)) HudEdgePaint(AM2_Widget *w, RECT clip);
 /* Original: 0x00414B50, vtable slot 1 of the radar. */
 void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip);
 
+/* Original: 0x00416DA0, vtable slot 1 of the squad panel. */
+void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made
