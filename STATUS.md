@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,086 patches.**
+Nothing uncommitted. **1,087 patches.**
 
-Thirty-four functions since the last snapshot. The seven-class HUD family is
+Thirty-five functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -157,6 +157,22 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   convention, so those two codes now carry the names their authors used. 0x22
   also closes the note that called `AM2_MSG_TROOPER_WEAPON` "handled
   somewhere else entirely" -- this is somewhere else.
+
+- **`SeqRun`** (`0x00461870`, 192 B) finishes the seq family: an
+  index-chained walk where each stepper returns the next index. Two
+  corrections to `orig.h` from reading it -- the gate is skipped when it is
+  **zero**, not "not positive" (`test r,r; jbe` is `jz`, the rule this file
+  already records), and `SEQ_OFF_NEXT` is an **int16** the adders happen to
+  clear as a dword.
+
+  **Arm 1 is an infinite loop, and it is reproduced.** Kind 1 jumps to the
+  loop test with the index unchanged, so a live record of that kind hangs the
+  game. `orig.h` called it "does nothing but continue"; continuing needs a
+  new index and that arm supplies none.
+
+  Measured: the list is EMPTY on every drive here -- count 0 with the array
+  allocated and capacity 200 -- so stepping no record at all changes nothing.
+  That is "there are no records", not "the steppers do not matter".
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

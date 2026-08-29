@@ -22,6 +22,10 @@ extern "C" {
  * nothing else of that subsystem is reconstructed yet. */
 void __cdecl MovieBuildName(char *dst, const char *name);
 
+/* 0x00461870, two callers. Walk one seq context and step every live record;
+ * the walk is index-chained through SEQ_OFF_NEXT rather than sequential. */
+void __cdecl SeqRun(void *ctx);
+
 /* 0x00462000 and 0x00462080. Add one SEQ record at a map point -- kind 5 and
  * kind 7. Were ADDR_BY_REF_ACTION_A and _B; see misc.cpp. */
 void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life);

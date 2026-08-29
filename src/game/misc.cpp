@@ -1310,7 +1310,6 @@ typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
 #define orig_atoi ((AM2_AtoiFn)AM2_IMAGE(ADDR_CRT_ATOI))
 
 typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
-#define orig_seq_run ((AM2_SeqRunFn)(uintptr_t)ADDR_SEQ_RUN)
 
 /* The three the seq adders below still reach the image for: the pool
  * allocator, the kind-6 adder, and the game's own LCG. */
@@ -1320,6 +1319,17 @@ typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 #define SeqAlloc              ((AM2_SeqAllocFn)(uintptr_t)ADDR_SEQ_ALLOC)
 #define orig_seq_add_kind6    ((AM2_SeqAdd6Fn)(uintptr_t)ADDR_SEQ_ADD_KIND6)
 #define orig_seq_rand         ((AM2_SeqRandFn)(uintptr_t)ADDR_GAME_RAND)
+
+/* The seven steppers SeqRun dispatches to. All take (index, record, context)
+ * and answer the next index; kinds 2 and 3 share one. Still original. */
+typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
+#define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
+#define orig_seq_step2 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP2)
+#define orig_seq_step3 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP2)
+#define orig_seq_step4 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP4)
+#define orig_seq_step5 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP5)
+#define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
+#define orig_seq_step7 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP7)
 
 /* 0x0043B7C0, one caller -- the per-frame path, and reached only in a network
  * game. The AI taking over armies whose players have gone.
@@ -1383,8 +1393,8 @@ void __cdecl AiTakeAbandoned(void)
  * installs. */
 void __cdecl SeqRunBoth(void)
 {
-    orig_seq_run((void *)(uintptr_t)ADDR_SEQ_CTX_A);
-    orig_seq_run((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    SeqRun((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    SeqRun((void *)(uintptr_t)ADDR_SEQ_CTX_B);
 }
 
 /* 0x0042E310, one caller -- read a sprite's identity back out of its FILENAME.
@@ -1644,6 +1654,79 @@ void __cdecl MovieBuildName(char *dst, const char *name)
     strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_EXT));
 }
 
+/* SeqRun -- original 0x00461870, two callers.
+ *
+ * Walk one seq context and step every live record. The walk is INDEX-CHAINED
+ * rather than sequential: entry 0 is a head whose SEQ_OFF_NEXT names the first
+ * record, each arm RETURNS the next index, and a record that is skipped
+ * supplies its own successor. So the order is the list's and not the array's.
+ *
+ * THE GATE IS TESTED FOR ZERO, NOT FOR POSITIVE, and orig.h said the second
+ * until this was read. `test edx, edx; jbe` is `je`, because `test` clears the
+ * carry -- an idiom CLAUDE.md already records, and this is the second time it
+ * has caught somebody in this tree. A negative gate would be walked.
+ *
+ * ARM 1 IS AN INFINITE LOOP AND IT IS REPRODUCED. Kind 1's jump-table entry
+ * goes straight to the loop test with the index UNCHANGED, so a live record of
+ * kind 1 would be stepped forever and the game would hang. orig.h described it
+ * as "does nothing but continue", which is what it looks like and not what it
+ * does -- continuing needs a new index and this arm supplies none. Nothing
+ * creates a kind 1: the three adders make 5, 6 and 7. Written as an empty case
+ * inside the loop, which hangs in exactly the same way; correcting it would be
+ * inventing behaviour the original does not have, and a `break` here would
+ * silently paper over a state that should be impossible.
+ *
+ * A kind above 7 takes the same exit as a closed gate, which is the arm the
+ * jump table cannot express.
+ *
+ * The seven steppers stay original and are reached by address; all seven take
+ * (index, record, context) and answer the next index.
+ *
+ * IT WALKS AN EMPTY LIST ON EVERY DRIVE HERE, measured rather than assumed.
+ * Reading ADDR_SEQ_CTX_A over the control socket through a Boot Camp mission
+ * with firing gives a count of ZERO throughout -- while its record array is
+ * allocated and its capacity reads 200, so the subsystem is up and simply has
+ * nothing in it. Nothing on these drives calls the adders: kind 5 comes from
+ * an event action and kind 7 from the flame cheat.
+ *
+ * Which is why the mutation says nothing. Making the loop step NO record --
+ * take the next index and continue, for every entry -- leaves `bootcamp` at
+ * 22 and `mission` at 287. That is not "the steppers do not matter"; it is
+ * "there are no records", and the two are worth separating. The chain, the
+ * gate and the dispatch stand on the disassembly.
+ */
+void __cdecl SeqRun(void *ctx)
+{
+    uint8_t *recs = *(uint8_t **)((uint8_t *)ctx + SEQ_CTX_OFF_RECORDS);
+    int32_t  at   = *(const int16_t *)(recs + SEQ_OFF_NEXT);
+
+    while (at > 0) {
+        uint8_t *rec = *(uint8_t **)((uint8_t *)ctx + SEQ_CTX_OFF_RECORDS)
+                       + at * AM2_SEQ_RECORD_SIZE;
+
+        if (*(const uint32_t *)(rec + SEQ_OFF_GATE) == 0) {
+            at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
+            continue;
+        }
+
+        switch (*(const uint32_t *)(rec + SEQ_OFF_KIND)) {
+        case 0: at = orig_seq_step0(at, rec, ctx); break;
+        case 1: break;   /* hangs; see above */
+        case 2: at = orig_seq_step2(at, rec, ctx); break;
+        case 3: at = orig_seq_step3(at, rec, ctx); break;
+        case 4: at = orig_seq_step4(at, rec, ctx); break;
+        case 5: at = orig_seq_step5(at, rec, ctx); break;
+        case 6: at = orig_seq_step6(at, rec, ctx); break;
+        case 7: at = orig_seq_step7(at, rec, ctx); break;
+        default:
+            at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
+            break;
+        }
+    }
+
+    (void)recs;
+}
+
 /* SeqAddKind5 and SeqAddKind7 -- originals 0x00462000 and 0x00462080.
  *
  * Add one 48-byte SEQ record at a map point. Two of a family of three that
@@ -1884,6 +1967,7 @@ int misc_install(void)
                   "InitPtrList", 1);
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,
                   "ClearPtrListAlias", 1);
+    patch_replace(ADDR_SEQ_RUN, (const void *)SeqRun, "SeqRun", 2);
     patch_replace(ADDR_SEQ_ADD_KIND5, (const void *)SeqAddKind5,
                   "SeqAddKind5", 1);
     patch_replace(ADDR_SEQ_ADD_KIND7, (const void *)SeqAddKind7,

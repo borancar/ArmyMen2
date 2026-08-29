@@ -1472,6 +1472,15 @@
  *
  * 0x00461930 is the whole of the per-frame step: run it over two contexts. */
 #define ADDR_SEQ_RUN             0x00461870u  /* void(void *ctx) */
+/* Its seven steppers, kind by kind. Kinds 2 and 3 share one, and kind 1 has
+ * no stepper at all -- see misc.cpp on why that is a hang rather than a
+ * no-op. All take (index, record, context) and answer the next index. */
+#define ADDR_SEQ_STEP0           0x00461150u
+#define ADDR_SEQ_STEP2           0x00461310u  /* kinds 2 AND 3 */
+#define ADDR_SEQ_STEP4           0x004613E0u
+#define ADDR_SEQ_STEP5           0x004614D0u
+#define ADDR_SEQ_STEP6           0x00461560u
+#define ADDR_SEQ_STEP7           0x00461700u
 #define ADDR_SEQ_RUN_BOTH        0x00461930u  /* void(void) */
 #define ADDR_SEQ_CTX_A           0x00664580u
 #define ADDR_SEQ_CTX_B           0x006640B0u
@@ -4256,17 +4265,33 @@ typedef struct {
 #define ADDR_SEQ_ADD_KIND7       0x00462080u  /* void(pt*, uid, 0, 0, life) */
 #define ADDR_SEQ_ADD_KIND6       0x00461660u  /* void(pt*, int32_t) */
 #define ADDR_SEQ_ALLOC           0x00461070u  /* void *(void *ctx) */
+/* The context's own fields, as far as the allocator and the walker read them.
+ * Records are ONE-BASED: SeqAlloc increments the count before using it as an
+ * index, and the walker starts from record 0's next, so entry 0 is the head
+ * rather than a record. */
+#define SEQ_CTX_OFF_COUNT        0x00u  /* int32_t */
+#define SEQ_CTX_OFF_RECORDS      0x10u  /* the 48-byte records */
+#define AM2_SEQ_RECORD_SIZE      48
 /* Its fields, all read out of the three adders and the walker. The record is
  * 48 bytes, which is what makes +0x2C the last of them. */
 #define SEQ_OFF_KIND             0x00u  /* int32_t, an 8-arm jump table */
 #define SEQ_OFF_FLAG4            0x04u  /* uint8_t, zeroed by kinds 5 and 7 */
-#define SEQ_OFF_GATE             0x08u  /* int32_t; the walker skips it if <= 0 */
+/* int32_t, and the walker skips the record when it is ZERO -- not when it is
+ * "not positive", which is what this said. `test edx,edx; jbe` is `je`,
+ * because test clears the carry; CLAUDE.md already records that idiom and
+ * this is a second instance of being caught by it. A negative gate would be
+ * walked, not skipped. */
+#define SEQ_OFF_GATE             0x08u
 #define SEQ_OFF_FIELD_0C         0x0Cu  /* int32_t, zeroed */
 #define SEQ_OFF_FIELD_10         0x10u  /* int32_t, zeroed by kind 5 only */
 #define SEQ_OFF_LIFE             0x14u  /* int32_t, the caller's or a default */
 #define SEQ_OFF_ROW              0x1Cu  /* the AM2 row this seq draws through */
 #define SEQ_OFF_OWNER            0x24u  /* int32_t: an army for 5, a uid for 7 */
-#define SEQ_OFF_NEXT             0x2Cu  /* int32_t, the index chain */
+/* The index chain, and the two halves disagree about its width: the adders
+ * zero a DWORD here and the walker reads it back with `movsx word`. So it is
+ * an int16 with two bytes of padding that the adders happen to clear. Read as
+ * the walker reads it. */
+#define SEQ_OFF_NEXT             0x2Cu  /* int16_t */
 #define AM2_SEQ_KIND5            5
 #define AM2_SEQ_KIND6            6
 #define AM2_SEQ_KIND7            7
