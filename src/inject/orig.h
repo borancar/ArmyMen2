@@ -4899,7 +4899,21 @@ typedef struct {
 #define RANK_REC_BYTES           28u
 #define RANK_REC_OFF_SCALE       0u    /* handed to ADDR_RANK_APPLY */
 #define RANK_REC_OFF_XP          4u    /* experience needed for this rank */
+/* Reconstructed. Bump the rank and, at ranks 3, 5 and 7, hand a type 2 a new
+ * weapon -- 0x0A, 0x08 and 0x1D, three ids in no order and with rank 4 and 6
+ * giving nothing. The promotion itself happens for every type; only the
+ * weapon is a trooper's. */
 #define ADDR_RANK_PROMOTE        0x00457BC0u  /* void(obj) */
+/* AM2_RANK_MAX is beside OBJ_OFF_RANK, where it belongs -- I defined it a
+ * second time here and checkoffsets refused an identical redefinition, which
+ * is legal C and says nothing. */
+#define AM2_RANK_WEAPON_3        0x0A
+#define AM2_RANK_WEAPON_5        0x08
+#define AM2_RANK_WEAPON_7        0x1D
+#define AM2_RANK_WEAPON_GROUP    0x2D   /* KeyLookupTriple's first argument */
+/* Flag bit 1 on the weapon being replaced. Set as it is let go and read
+ * nowhere this function can see. */
+#define OBJ_FLAG_REPLACED        2u
 /* 0x98 IS TYPE-DEPENDENT, the same way 0x94 and 0xA0 are. For a trooper it is
  * the rank, an int32 in 0..7. For an ITEM -- types 1 and 4 -- HeightAtPoint
  * reads its low byte and uses only the SIGN, as "this thing raises the ground

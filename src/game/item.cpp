@@ -4358,9 +4358,97 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
     return any;
 }
 
-typedef void (__cdecl *AM2_RankPromoteFn)(void *obj);
-#define orig_rank_promote ((AM2_RankPromoteFn)(uintptr_t)ADDR_RANK_PROMOTE)
+/* RankPromote -- original 0x00457BC0, one caller.
+ *
+ * Bump an object's OBJ_OFF_RANK and, for a plain type 2 at ranks 3, 5 and 7,
+ * give it a new weapon.
+ *
+ * THE PROMOTION AND THE WEAPON HAVE DIFFERENT CONDITIONS, and the rank is
+ * written BEFORE the weapon's are tested -- so a vehicle, a Sarge or a
+ * soldier of a non-zero kind still gets promoted, it just gets nothing for
+ * it. Reading the function as "promote a trooper" would put the write inside
+ * the guard and quietly stop ranking everything else.
+ *
+ * THE THREE WEAPONS ARE 0x0A, 0x08 and 0x1D, in that order for ranks 3, 5 and
+ * 7. Not ascending, not consecutive, and ranks 4 and 6 give nothing -- the
+ * original writes it as a chain of `sub`/`je`, which is a switch over a
+ * sparse set rather than a table, and it is reproduced as one.
+ *
+ * The outgoing weapon is flagged rather than freed: OBJ_FLAG_REPLACED goes on
+ * it and it is left alone. Nothing this function can see reads that bit.
+ *
+ * The multiplayer guard is the usual one -- CommMustBroadcast on the object's
+ * owner, skipped entirely when there is no session, so single player always
+ * promotes.
+ *
+ * CreateWeapon's eight arguments are taken from armymsg.cpp's typedef for the
+ * same address; three of them are constants this function supplies and the
+ * fourth is ADDR_ZERO_POINT, so the weapon is created at the origin and the
+ * caller's own SendTrooperSetWeapon is what places it.
+ */
+void __cdecl RankPromote(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  rank;
+    int32_t  weaponId;
+    void    *old;
+    uint8_t *made;
 
+    if (!obj)
+        return;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        return;
+
+    rank = *(const int32_t *)(o + OBJ_OFF_RANK);
+    if (rank >= AM2_RANK_MAX)
+        return;
+
+    rank++;
+    *(int32_t *)(o + OBJ_OFF_RANK) = rank;
+
+    if (*(const int32_t *)o != 2)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND))
+        return;
+
+    switch (rank) {
+    case 3: weaponId = AM2_RANK_WEAPON_3; break;
+    case 5: weaponId = AM2_RANK_WEAPON_5; break;
+    case 7: weaponId = AM2_RANK_WEAPON_7; break;
+    default: return;
+    }
+
+    old = WeaponByUid(*(const uint32_t *)(o + UNIT_OFF_INVENTORY));
+    if (old)
+        *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+
+    made = (uint8_t *)orig_make_weapon(
+        (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+        *(const int8_t *)(o + OBJ_OFF_ARMY),
+        KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+        4, -1, 0, 0);
+
+    if (!made)
+        return;
+
+    /* +4 is AM2_Object::uid; item.cpp reaches it that way in a dozen places
+     * and there is no OBJ_OFF_ macro for it. */
+    *(uint32_t *)(o + UNIT_OFF_INVENTORY) =
+        ((const AM2_Object *)made)->uid;
+
+    SoldierKindForWeapon(
+        o, **(const uint32_t *const *)(made + OBJ_OFF_FIELD_C0));
+
+    SendTrooperSetWeapon(o, ((const AM2_Object *)made)->uid, 0);
+}
+
+typedef void (__cdecl *AM2_RankPromoteFn)(void *obj);
 /* 0x00457CD0, two callers. Awards experience and promotes when it is enough.
  *
  * IT LOOPS. One award can carry a unit through more than one rank: after each
@@ -4437,7 +4525,7 @@ void __cdecl Type238Action(void *obj, int32_t award)
             < *(const int32_t *)(rec + RANK_REC_OFF_XP))
             return;
 
-        orig_rank_promote(obj);
+        RankPromote(obj);
 
         rec = (const uint8_t *)(uintptr_t)ADDR_RANK_TABLE
               + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES;
@@ -4918,6 +5006,8 @@ void item_install(void)
                   "StepRowAnim", 1);
     patch_replace(ADDR_OBJECTS_AT_POINT, (const void *)ObjectsAtPoint,
                   "ObjectsAtPoint", 15);
+    patch_replace(ADDR_RANK_PROMOTE, (const void *)RankPromote,
+                  "RankPromote", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

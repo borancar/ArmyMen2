@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,102 patches.**
+Nothing uncommitted. **1,103 patches.**
 
-Forty-nine functions since the last snapshot. The seven-class HUD family is
+Fifty functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -347,6 +347,18 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   Coverage stated: the sibling's own comment records that returning NULL
   unconditionally left `mission` and `bootcamp` at their floors across 3,872
   calls. Fifteen callers is not evidence anything watches the answer.
+
+- **`RankPromote`** (`0x00457BC0`) bumps the rank and, for a plain type 2 at
+  ranks 3, 5 and 7, hands over a new weapon -- 0x0A, 0x08, 0x1D, in that
+  order, with ranks 4 and 6 giving nothing.
+
+  **The rank is written before the weapon's guards are tested**, so a
+  vehicle, a Sarge or a soldier of a non-zero kind is still promoted and just
+  gets nothing for it. Reading this as "promote a trooper" would put the
+  write inside the guard and quietly stop ranking everything else.
+
+  `checkoffsets` refused an identical redefinition of `AM2_RANK_MAX` -- I
+  defined it a second time where it already sat beside `OBJ_OFF_RANK`.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

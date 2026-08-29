@@ -31,6 +31,11 @@ void __cdecl ApplyHeightItem(void *obj, int32_t height);
  * object every frame. Advance one row's animation. */
 void __cdecl StepRowAnim(void *row);
 
+/* 0x00457BC0, one caller. Bump an object's rank and, for a plain type 2 at
+ * ranks 3, 5 and 7, hand it a new weapon. The promotion happens for every
+ * type; only the weapon is a trooper's. */
+void __cdecl RankPromote(void *obj);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one
