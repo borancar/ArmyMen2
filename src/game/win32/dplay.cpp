@@ -1941,6 +1941,49 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
     ClearMenuMsgs();
 }
 
+/* DumpMsgList -- original 0x004013B0, one caller.
+ *
+ * It lives HERE rather than in msgslot.cpp with the rest of the list code:
+ * msgslot.cpp is the FLAT half and cannot name HANDLE or call
+ * WaitForSingleObject, and this function is nothing but a lock, three log
+ * lines and an unlock. The split decides where a function goes even when
+ * every other function it belongs beside is on the other side.
+ *
+ * Print one message list under its own mutex: "List: ", then "(%d %d)" for
+ * every node, then a newline. A debug dump, and the only place those three
+ * strings are used anywhere in the image.
+ *
+ * IT TAKES THE MUTEX AND HOLDS IT ACROSS EVERY Log CALL. In this build the
+ * logger is a stub patched by the harness, so that is cheap; in the retail
+ * build it was a varargs formatter running with the packet thread locked
+ * out. Reproduced -- the lock is what makes the dump consistent, and moving
+ * the logging outside it would be a different function.
+ *
+ * The second number printed is not the node's: it is the dword at +8 of
+ * whatever MSGNODE_OFF_OWNER points at. One dereference further than the
+ * first, which is why the two offsets are named separately.
+ */
+void __cdecl DumpMsgList(void *list)
+{
+    const uint8_t *l = (const uint8_t *)list;
+    const uint8_t *n;
+
+    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_LIST_HEAD));
+
+    for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
+         n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_LIST_NODE),
+                     *(const int32_t *)(n + MSGNODE_OFF_FIELD_14),
+                     *(const int32_t *)(*(const uint8_t *const *)
+                                            (n + MSGNODE_OFF_OWNER) + 8));
+
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_NEWLINE));
+
+    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -1960,6 +2003,8 @@ int dplay_install(void)
                         "CommGetSessionDesc", 0);
     rc |= patch_replace(ADDR_COMM_REOPEN_SESSION, (const void *)CommReopenSession,
                         "CommReopenSession", 1);
+    rc |= patch_replace(ADDR_DUMP_MSG_LIST, (const void *)DumpMsgList,
+                        "DumpMsgList", 1);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
     rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,

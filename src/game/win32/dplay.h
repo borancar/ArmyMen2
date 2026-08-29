@@ -9,6 +9,10 @@
  * compatible so dllmain.c can still call the install hooks. */
 #ifdef __cplusplus
 extern "C" {
+/* 0x004013B0, one caller. Print one message list under its own mutex. Here
+ * rather than in msgslot.cpp because the flat half cannot take a mutex. */
+void __cdecl DumpMsgList(void *list);
+
 #endif
 
 /* Creating the DirectPlay objects -- the game's entire networking boundary.

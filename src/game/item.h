@@ -36,6 +36,10 @@ void __cdecl StepRowAnim(void *row);
  * type; only the weapon is a trooper's. */
 void __cdecl RankPromote(void *obj);
 
+/* 0x00417AB0, one caller. Walk a uid list, drop what no longer resolves, and
+ * act on every live type 2. */
+void __cdecl Type2ActionAll(void);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one

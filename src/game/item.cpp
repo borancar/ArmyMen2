@@ -4980,6 +4980,48 @@ const char *__cdecl ItemTypeName(uint32_t kind)
     return names[kind];
 }
 
+/* Type2ActionAll -- original 0x00417AB0, one caller.
+ *
+ * Walk a list of uids, drop the entries that no longer resolve, and run
+ * ADDR_TYPE2_ACTION_A on every live type 2 that is not destroyed.
+ *
+ * THIRD LOOP IN THIS TREE THAT DOES NOT ADVANCE OVER A REMOVAL, after
+ * DrawSelection and CommReopenSession. The unresolved arm jumps past the
+ * increment, so the entry that shifts down into the slot is looked at next --
+ * and the bound is re-read from the list every iteration, which is what makes
+ * that safe. The other two have the same shape and this one makes it a
+ * pattern rather than a pair.
+ *
+ * The list is a {capacity, count, items} triple, and both the count and the
+ * items pointer are re-read inside the loop rather than hoisted -- the
+ * removal can move both.
+ *
+ * Type2ActionA is ours, five hundred lines down in this same file, and is
+ * called by name; checkseams caught the orig_ macro that went in first out of
+ * habit. Second time in this session.
+ */
+void __cdecl Type2ActionAll(void)
+{
+    int32_t i = 0;
+
+    while (i < ((const int32_t *)(uintptr_t)ADDR_TYPE2_ACTION_LIST)[1]) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)((const uint8_t *)(uintptr_t)
+                 ADDR_TYPE2_ACTION_LIST + 8))[i]);
+
+        if (!obj) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_TYPE2_ACTION_LIST, i);
+            continue;   /* no step: the shifted-down entry is next */
+        }
+
+        if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            && ObjIsType2((const AM2_Object *)obj))
+            Type2ActionA(obj);
+
+        i++;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5103,6 +5145,8 @@ void item_install(void)
     patch_replace(ADDR_RANK_PROMOTE, (const void *)RankPromote,
                   "RankPromote", 1);
     patch_replace(ADDR_STEP_TYPE8, (const void *)StepType8, "StepType8", 1);
+    patch_replace(ADDR_TYPE2_ACTION_ALL, (const void *)Type2ActionAll,
+                  "Type2ActionAll", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

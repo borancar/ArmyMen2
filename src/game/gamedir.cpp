@@ -57,6 +57,40 @@ int32_t __cdecl FileExists(const char *path)
     return 1;
 }
 
+/* FileHasSaveTag -- original 0x00423620, two callers, both save-game dialogs.
+ *
+ * Does this file begin with a save tag? Open it, read four bytes, close it,
+ * and answer whether they are one of TWO accepted values.
+ *
+ * THE TWO ARMS ARE NOT THE SAME SHAPE, which is the only interesting thing
+ * about it: the first comparison answers a literal 1 and the second answers a
+ * `sete`. Identical for every caller -- both are 1 or 0 -- and reproduced as
+ * one expression, since the difference is the compiler's and not the
+ * function's.
+ *
+ * IT DOES NOT CHECK WHETHER THE READ SUCCEEDED. A file that opens and gives
+ * fewer than four bytes leaves the tag holding whatever the stack had, and
+ * the answer is then whatever that compares to. Its callers hand it directory
+ * entries, so a zero-length file is reachable. The original's.
+ *
+ * A failed open answers 0 without closing anything, which is right -- there
+ * is nothing to close.
+ */
+int32_t __cdecl FileHasSaveTag(const char *path)
+{
+    am2_FILE *fp;
+    uint32_t  tag;
+
+    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp)
+        return 0;
+
+    orig_fread(&tag, 4, 1, fp);
+    orig_fclose(fp);
+
+    return tag == AM2_SAVETAG_GAMEPROC || tag == AM2_SAVETAG_ALT;
+}
+
 int gamedir_install(void)
 {
     int rc = 0;
@@ -65,5 +99,7 @@ int gamedir_install(void)
                         "SetGameDir", 82);
     rc |= patch_replace(ADDR_FILE_EXISTS, (const void *)FileExists,
                         "FileExists", 1);
+    rc |= patch_replace(ADDR_FILE_HAS_SAVE_TAG, (const void *)FileHasSaveTag,
+                        "FileHasSaveTag", 2);
     return rc;
 }

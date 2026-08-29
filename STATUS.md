@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
+Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,121 patches.**
+Nothing uncommitted. **1,124 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -395,16 +395,31 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   A fourth reading of that contested pair, and it fits neither way round.
   Reproduced exactly.
 
+- **`Type2ActionAll`** (`0x00417AB0`) is the THIRD loop in this tree that does
+  not advance over a removal, after `DrawSelection` and `CommReopenSession`.
+  The unresolved arm jumps past the increment, so the entry that shifts down
+  is looked at next; the bound is re-read from the list each iteration, which
+  is what makes that safe. Three instances make it a pattern rather than a
+  pair.
+- **`FileHasSaveTag`** (`0x00423620`) accepts TWO tags, and does not check
+  that the read succeeded -- a file that opens and gives fewer than four bytes
+  is answered from whatever the stack held. Its callers hand it directory
+  entries, so that is reachable. The original's, reproduced.
+- **`DumpMsgList`** (`0x004013B0`) lives in `win32/dplay.cpp` rather than
+  beside the rest of the list code in `msgslot.cpp`, because the flat half
+  cannot name `HANDLE`. The split decides where a function goes even when
+  every function it belongs beside is on the other side.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **971 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,121
+line (0x0045C000) patched**. Measured: **974 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,124
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Three batches have gone in and the 268 entries outstanding start at 48
+small ones in batches. Four batches have gone in and the 265 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

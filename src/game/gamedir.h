@@ -17,6 +17,10 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x00423620, two callers, both save-game dialogs. Whether a file begins with
+ * one of the two accepted save tags. */
+int32_t __cdecl FileHasSaveTag(const char *path);
+
 #endif
 
 /* 1 if the directory was entered, 0 if neither path worked.

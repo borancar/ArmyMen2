@@ -5493,6 +5493,22 @@ typedef struct {
  * count, so the last record it compares is the one just allocated and never
  * written. Reading uninitialised memory, and the original's. */
 #define ADDR_LIST_GROW_FIND      0x00453AB0u  /* thiscall int32(this, key) */
+/* 0x004013B0, one caller. Print one message list under its own mutex --
+ * "List: ", then "(%d %d)" per node, then a newline. A debug dump, and the
+ * only place those three strings are used. */
+#define ADDR_DUMP_MSG_LIST       0x004013B0u  /* void(void *list) */
+#define ADDR_STR_LIST_HEAD       0x00473110u  /* "List: " */
+#define ADDR_STR_LIST_NODE       0x00473108u  /* "(%d %d)" */
+#define ADDR_STR_NEWLINE         0x00473104u  /* "\n" */
+/* 0x00417AB0, one caller. Walk a uid list, drop the entries that no longer
+ * resolve, and run ADDR_TYPE2_ACTION_A on every live type 2 that is not
+ * destroyed. The list is a {capacity, count, items} triple. */
+#define ADDR_TYPE2_ACTION_ALL    0x00417AB0u  /* void(void) */
+#define ADDR_TYPE2_ACTION_LIST   0x004F9ED0u  /* {cap, count, uids} */
+/* 0x00423620, two callers, both save-game dialogs. Does this file begin with
+ * a save tag? Two are accepted: AM2_SAVETAG_GAMEPROC and one more. */
+#define ADDR_FILE_HAS_SAVE_TAG   0x00423620u  /* int32_t(const char *path) */
+#define AM2_SAVETAG_ALT          0x06660668u
 #define AM2_GROWLIST_STRIDE      0x104u
 #define AM2_GROWLIST_KEY         0x100u
 /* Walk the objects in the cell a point falls in, calling a function for each
@@ -6224,6 +6240,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSGLIST_OFF_COUNT          0x0Cu
 #define MSGNODE_OFF_PREV           0x00u
 #define MSGNODE_OFF_NEXT           0x04u
+/* The two the debug dump prints, and its only readers. +0x20 is a pointer and
+ * what is printed is the dword at ITS +8, so the pair reads as "id, and a
+ * field of whatever this node points at". Named for their offsets. */
+#define MSGNODE_OFF_FIELD_14       0x14u
+#define MSGNODE_OFF_OWNER          0x20u
 #define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
 /* 0x004010C0, "RemHead: Impossible List Size %d". Unlinks and answers the head
  * node, or null. The same sanity complaint as the append, and a second one --
