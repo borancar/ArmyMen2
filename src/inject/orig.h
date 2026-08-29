@@ -4220,8 +4220,44 @@ typedef struct {
  * library. Neither callee names itself. */
 #define ADDR_EVT_BY_REF_A        0x0041FD10u  /* void(int32_t, int32_t) */
 #define ADDR_EVT_BY_REF_B        0x0041FD30u  /* void(int32_t, int32_t) */
-#define ADDR_BY_REF_ACTION_A     0x00462000u  /* void(int32_t *, int32, int32) */
-#define ADDR_BY_REF_ACTION_B     0x00462080u  /* void(int32_t *,0,0,0,int32) */
+/* Two of the SEQ family -- see ADDR_SEQ_RUN for where the word comes from.
+ * Both add one 48-byte record to ADDR_SEQ_CTX_A at a map point, and they
+ * differ only in the KIND they stamp, the sprite they take and their default
+ * lifetime. A third, 0x00461660, is the same shape with kind 6, and kind 7
+ * calls it with a random 0..2.
+ *
+ * The names were ADDR_BY_REF_ACTION_A and _B, from the one thing their call
+ * sites showed: a point passed by reference. What they DO is add a seq, and
+ * that is now the name. What a seq is FOR is still not established -- but
+ * "adds a record of kind 5" is a fact about the function where "by ref" was a
+ * fact about its argument list. */
+#define ADDR_SEQ_ADD_KIND5       0x00462000u  /* void(pt*, owner, life) */
+#define ADDR_SEQ_ADD_KIND7       0x00462080u  /* void(pt*, uid, 0, 0, life) */
+#define ADDR_SEQ_ADD_KIND6       0x00461660u  /* void(pt*, int32_t) */
+#define ADDR_SEQ_ALLOC           0x00461070u  /* void *(void *ctx) */
+/* Its fields, all read out of the three adders and the walker. The record is
+ * 48 bytes, which is what makes +0x2C the last of them. */
+#define SEQ_OFF_KIND             0x00u  /* int32_t, an 8-arm jump table */
+#define SEQ_OFF_FLAG4            0x04u  /* uint8_t, zeroed by kinds 5 and 7 */
+#define SEQ_OFF_GATE             0x08u  /* int32_t; the walker skips it if <= 0 */
+#define SEQ_OFF_FIELD_0C         0x0Cu  /* int32_t, zeroed */
+#define SEQ_OFF_FIELD_10         0x10u  /* int32_t, zeroed by kind 5 only */
+#define SEQ_OFF_LIFE             0x14u  /* int32_t, the caller's or a default */
+#define SEQ_OFF_ROW              0x1Cu  /* the AM2 row this seq draws through */
+#define SEQ_OFF_OWNER            0x24u  /* int32_t: an army for 5, a uid for 7 */
+#define SEQ_OFF_NEXT             0x2Cu  /* int32_t, the index chain */
+#define AM2_SEQ_KIND5            5
+#define AM2_SEQ_KIND6            6
+#define AM2_SEQ_KIND7            7
+#define AM2_SEQ_LIFE5            0x17318   /* 95,000 */
+#define AM2_SEQ_LIFE7            0x2710    /* 10,000 */
+#define AM2_SEQ_ROW26_5          0x3E8     /* what each stamps at ROW_OFF_26 */
+#define AM2_SEQ_ROW26_7          1
+/* The two preloaded sprite arrays they draw with, in the same block as
+ * ADDR_MARK_SPRITES and reached the same way -- the global holds a pointer to
+ * the array and entry 0 is what these take. */
+#define ADDR_SEQ_SPRITES_5       0x0048CBA8u  /* AM2_Sprite ** */
+#define ADDR_SEQ_SPRITES_7       0x0048CB98u  /* AM2_Sprite ** */
 #define ADDR_POINT_ACTION_A      0x004582F0u  /* void(obj, point) */
 /* 0x00428F80, two callers -- adjacent sites in one function. Move an object
  * to a point, taking every one of its rows with it.
@@ -7511,6 +7547,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ROW_OFF_X              0x1Cu  /* int16_t */
 #define ROW_OFF_Y              0x1Eu  /* int16_t */
 #define ROW_OFF_Y_ADJUST       0x20u  /* int16_t, taken off Y as well as hotY */
+/* Two more the seq adders write and nothing here reads. 0x26 takes 0x3E8 from
+ * kind 5 and 1 from kind 7, so it is a scale or a count rather than a flag;
+ * 0x2C is only ever zeroed. Named for their offsets, which is all that is
+ * established. */
+#define ROW_OFF_FIELD_26       0x26u  /* int16_t */
+#define ROW_OFF_FIELD_2C       0x2Cu  /* int32_t */
 #define ROW_OFF_PREV_X         0x22u  /* int16_t */
 #define ROW_OFF_PREV_Y         0x24u  /* int16_t */
 /* One entry of the row's buffer: which map cell it is linked into, or -1. */

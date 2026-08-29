@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "misc.h"
+#include "rect.h"   /* PointInRect -- reconstructed */
 #include "place.h"   /* LoadArmyPlacement */
 #include "script.h"  /* GetVarValue */
 #include "crt.h"
@@ -1311,6 +1312,15 @@ typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
 typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
 #define orig_seq_run ((AM2_SeqRunFn)(uintptr_t)ADDR_SEQ_RUN)
 
+/* The three the seq adders below still reach the image for: the pool
+ * allocator, the kind-6 adder, and the game's own LCG. */
+typedef void *(__cdecl *AM2_SeqAllocFn)(void *ctx);
+typedef void  (__cdecl *AM2_SeqAdd6Fn)(const int32_t *at, int32_t a);
+typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
+#define SeqAlloc              ((AM2_SeqAllocFn)(uintptr_t)ADDR_SEQ_ALLOC)
+#define orig_seq_add_kind6    ((AM2_SeqAdd6Fn)(uintptr_t)ADDR_SEQ_ADD_KIND6)
+#define orig_seq_rand         ((AM2_SeqRandFn)(uintptr_t)ADDR_GAME_RAND)
+
 /* 0x0043B7C0, one caller -- the per-frame path, and reached only in a network
  * game. The AI taking over armies whose players have gone.
  *
@@ -1634,6 +1644,105 @@ void __cdecl MovieBuildName(char *dst, const char *name)
     strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_EXT));
 }
 
+/* SeqAddKind5 and SeqAddKind7 -- originals 0x00462000 and 0x00462080.
+ *
+ * Add one 48-byte SEQ record at a map point. Two of a family of three that
+ * differ only in the kind they stamp, the sprite they take and their default
+ * lifetime; 0x00461660 is the third, kind 6, and kind 7 calls it with a
+ * random 0..2 on the way out.
+ *
+ * THEY WERE ADDR_BY_REF_ACTION_A AND _B, named off the one thing their call
+ * sites showed -- a point passed by reference. That is a fact about the
+ * argument list rather than about the function, which is the failure orig.h
+ * keeps recording under "name a function from its body". The body says:
+ * refuse a point off the map, allocate from ADDR_SEQ_CTX_A, stamp a kind,
+ * open the walker's gate, and fill in the row it draws through.
+ *
+ * The two are written out rather than shared. They differ in five places --
+ * kind, sprite array, default lifetime, the value at ROW_OFF_26, and whether
+ * SEQ_OFF_FIELD_10 is zeroed -- and kind 7 has the extra call at the end, so
+ * a common helper would take five parameters and a flag to save eight lines.
+ * The original has them as two functions and so does this.
+ *
+ * THE POINT IS TESTED AGAINST THE MAP BOUNDS AND NOTHING ELSE IS TESTED. The
+ * allocator's answer is used without a null check, which matters because it
+ * can grow the pool and a failure there is not visibly handled anywhere in
+ * this family. The original's, and reproduced.
+ *
+ * Both are on live paths -- kind 5 from an event action, kind 7 from the
+ * flame cheat and from two other callers -- so a Boot Camp A/B compares them
+ * whenever a mission fires one. What is NOT established is what a seq is for;
+ * ADDR_SEQ_RUN's own comment says the same, and neither of these adds to it.
+ */
+void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
+{
+    uint8_t *seq;
+    uint8_t *row;
+
+    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+                     (const AM2_Point *)at))
+        return;
+
+    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+
+    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
+    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND5;
+    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
+    *(int32_t *)(seq + SEQ_OFF_FIELD_10) = 0;
+    *(int32_t *)(seq + SEQ_OFF_LIFE)     = life > 0 ? life : AM2_SEQ_LIFE5;
+    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+
+    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
+
+    *(uint8_t *)(row + ROW_OFF_CELL)      = 0;
+    *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
+    *(int32_t *)(row + 0)                 = 0;
+    *(void **)(row + ROW_OFF_SPRITE)      =
+        **(void ***)AM2_IMAGE(ADDR_SEQ_SPRITES_5);
+    *(int32_t *)(row + ROW_OFF_X)         = *at;
+    *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
+    *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
+    *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_5;
+}
+
+void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
+                         int32_t c, int32_t life)
+{
+    uint8_t *seq;
+    uint8_t *row;
+
+    (void)b;
+    (void)c;
+
+    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+                     (const AM2_Point *)at))
+        return;
+
+    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+
+    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
+    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND7;
+    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_LIFE)     = life > 0 ? life : AM2_SEQ_LIFE7;
+    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
+    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+
+    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
+
+    *(int32_t *)(row + 0)                 = 0;
+    *(uint8_t *)(row + ROW_OFF_CELL)      = 0;
+    *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
+    *(void **)(row + ROW_OFF_SPRITE)      =
+        **(void ***)AM2_IMAGE(ADDR_SEQ_SPRITES_7);
+    *(int32_t *)(row + ROW_OFF_X)         = *at;
+    *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
+    *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
+    *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_7;
+
+    orig_seq_add_kind6(at, orig_seq_rand() % 3);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -1775,6 +1884,10 @@ int misc_install(void)
                   "InitPtrList", 1);
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,
                   "ClearPtrListAlias", 1);
+    patch_replace(ADDR_SEQ_ADD_KIND5, (const void *)SeqAddKind5,
+                  "SeqAddKind5", 1);
+    patch_replace(ADDR_SEQ_ADD_KIND7, (const void *)SeqAddKind7,
+                  "SeqAddKind7", 3);
     patch_replace(ADDR_MOVIE_BUILD_NAME, (const void *)MovieBuildName,
                   "MovieBuildName", 4);
     return 0;

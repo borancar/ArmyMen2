@@ -2042,9 +2042,6 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
     SendItemDeploy(obj, resurrect);
 }
 
-typedef void (__cdecl *AM2_ByRefBFn2)(int32_t *slot, int32_t b, int32_t c,
-                                      int32_t d, int32_t e);
-#define orig_by_ref_b2 ((AM2_ByRefBFn2)(uintptr_t)ADDR_BY_REF_ACTION_B)
 
 /* 0x00417810, one caller, on the per-frame path -- and it is the "Flame On!"
  * cheat's actual effect, which is what identifies every global in it. The
@@ -2100,8 +2097,8 @@ void __cdecl FlameTick(void)
 
     SetFieldInAll(leader + 0x6C,
                           (void *)(uintptr_t)ADDR_FLAME_RECORD);
-    orig_by_ref_b2(&pt, (int32_t)((const AM2_Object *)leader)->uid, 0, 0,
-                   AM2_FLAME_EFFECT);
+    SeqAddKind7(&pt, (int32_t)((const AM2_Object *)leader)->uid, 0, 0,
+                AM2_FLAME_EFFECT);
 }
 
 /* 0x00437A50, one caller, on the per-frame path. Push every repeating pad's

@@ -944,11 +944,6 @@ typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
 typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
                                                              int32_t i);
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
-typedef void (__cdecl *AM2_ByRefAFn)(int32_t *slot, int32_t b, int32_t c);
-typedef void (__cdecl *AM2_ByRefBFn)(int32_t *slot, int32_t b, int32_t c,
-                                     int32_t d, int32_t e);
-#define orig_by_ref_a (*(AM2_ByRefAFn)AM2_IMAGE(ADDR_BY_REF_ACTION_A))
-#define orig_by_ref_b (*(AM2_ByRefBFn)AM2_IMAGE(ADDR_BY_REF_ACTION_B))
 
 /* 0x0041FE70. Deploy the object a uid names.
  *
@@ -1248,12 +1243,12 @@ void __cdecl EvtAtObjPosC(uint32_t target, uint32_t at, int32_t relative)
  * are not one function called twice. */
 void __cdecl EvtByRefA(int32_t a, int32_t b)
 {
-    orig_by_ref_a(&a, 0, b);
+    SeqAddKind5(&a, 0, b);
 }
 
 void __cdecl EvtByRefB(int32_t a, int32_t b)
 {
-    orig_by_ref_b(&a, 0, 0, 0, b);
+    SeqAddKind7(&a, 0, 0, 0, b);
 }
 
 /* 0x0041F710. The most guarded member of the family: four tests before it acts.

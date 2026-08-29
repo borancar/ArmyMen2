@@ -22,6 +22,12 @@ extern "C" {
  * nothing else of that subsystem is reconstructed yet. */
 void __cdecl MovieBuildName(char *dst, const char *name);
 
+/* 0x00462000 and 0x00462080. Add one SEQ record at a map point -- kind 5 and
+ * kind 7. Were ADDR_BY_REF_ACTION_A and _B; see misc.cpp. */
+void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life);
+void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
+                         int32_t c, int32_t life);
+
 #endif
 
 /* 0x0045AFA0. The dword at +0x53C. */

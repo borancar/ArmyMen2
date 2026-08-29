@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,078 patches.**
+Nothing uncommitted. **1,080 patches.**
 
-Twenty-six functions since the last snapshot. The seven-class HUD family is
+Twenty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -102,6 +102,16 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   socket through a firing Boot Camp mission, all zero -- so the clean A/B
   checks the loop guard and nothing else. `ADDR_AIM_START` is one arm of a
   42-arm weapon dispatcher.
+
+- **`SeqAddKind5` and `SeqAddKind7`** (`0x00462000`, `0x00462080`) were
+  `ADDR_BY_REF_ACTION_A` and `_B` -- names taken from the one thing their
+  call sites showed, a point passed by reference. Their bodies say what they
+  do: add one 48-byte SEQ record at a map point. Three seams closed across
+  `event.cpp` and `item.cpp`, and the tree's `orig_` count is down to 128.
+
+  **Name a function from its body, not from its argument list.** That is the
+  same rule as naming from the body rather than from a call site, one step
+  further in -- "by ref" was true and said nothing.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
