@@ -476,4 +476,21 @@ const char *__cdecl ItemTypeName(uint32_t kind);
  * of the soldier-name table, or leave the buffer empty. */
 void __cdecl SoldierNameOf(char *out, const void *obj);
 
+/* 0x00417B10, one caller. Award 300 experience to every live type 2 the
+ * player's own army owns, dropping stale uids on the way past. */
+void __cdecl AwardOwnArmyXp(void);
+
+/* 0x0042AAE0, one caller. Classify a weapon uid; 0 for anything that does not
+ * resolve to a type 4 with a kind in 2..5. */
+int32_t __cdecl WeaponClassOf(uint32_t uid);
+
+/* 0x00435650, one caller -- DamageItem itself. Damage an item and then every
+ * item in the chain hanging off it. */
+void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
+                             int32_t kind, uint32_t attacker);
+
+/* 0x0044A3C0, one caller. The negated overlay Y of the sprite the object's
+ * first row is showing. */
+int32_t __cdecl ObjOverlayY(const void *obj);
+
 #endif

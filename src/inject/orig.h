@@ -3992,6 +3992,11 @@ typedef struct {
 #define ADDR_DAMAGE_OBJECT       0x00428140u  /* void(obj,int32,int32,uid,
                                                *      int32,int32) */
 #define ADDR_DAMAGE_ITEM         0x004356C0u  /* type 1 */
+/* 0x00435650, one caller -- and that caller is ADDR_DAMAGE_ITEM itself, so
+ * the two are mutually recursive. Damage an item and then every item in the
+ * chain hanging off it, OBJ_OFF_CHAIN_UID then OBJ_OFF_CHAIN_NEXT_UID. */
+#define ADDR_DAMAGE_ITEM_CHAIN   0x00435650u  /* void(obj,int32,int32,
+                                               *      int32,uint32) */
 #define ADDR_DAMAGE_TROOPER      0x00447A40u  /* type 2 -- and this one
                                                * is NOT a guess: it logs
                                                * "DamageTrooper: droping armor
@@ -4946,6 +4951,10 @@ typedef struct {
 #define OBJ_OFF_RANK             0x98u  /* int32_t 0..7, or an item's flag byte */
 #define AM2_RANK_MAX             7
 #define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
+/* 0x00417B10, one caller, at the tail of it. Award 300 experience to every
+ * live type 2 the player's own army owns. */
+#define ADDR_AWARD_OWN_ARMY_XP    0x00417B10u  /* void(void) */
+#define AM2_ARMY_XP_AWARD         0x12C        /* 300 */
 /* 0x0044BBD0, two callers: put 1 in the dword at +0x548 and then run the line
  * above with 0x2710. Both names are ours. */
 #define ADDR_SET_LEADS_AND_ACT    0x0044BBD0u  /* void(void *obj) */
@@ -7682,6 +7691,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_IS_TYPE3   0x00457490u
 #define ADDR_OBJ_IS_TYPE8   0x004574B0u  /* int32_t(const AM2_Object *) */
 #define ADDR_OBJ_IS_TYPE4   0x0045EEB0u
+/* 0x0042AAE0, one caller, which stores the answer into a word field of a
+ * record it is packing. Classify a weapon uid: 0 if it does not resolve or is
+ * not a type 4, otherwise a small code taken through a FOUR-ARM JUMP TABLE
+ * whose arms are not in the order they are laid out -- see AM2_WEAPON_CLASS. */
+#define ADDR_WEAPON_CLASS_OF 0x0042AAE0u  /* int32_t(uint32_t uid) */
 
 /* The lookup and the type test in one. Eight callers. */
 #define ADDR_LOOKUP_TYPE3_BY_UID 0x0045D970u  /* AM2_Object *(uint32_t uid) */
@@ -8655,6 +8669,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * is read; what has changed is that it is no longer unread. */
 #define OBJ_OFF_FIELD_C0           0xC0u
 #define ADDR_DESTROY_TYPE2         0x00449460u  /* void(void *obj) */
+/* 0x0044A3C0, one caller, which ADDS the answer to a y coordinate. The
+ * negated SPR_OFF_OVY of the sprite the object's FIRST row is showing. */
+#define ADDR_OBJ_OVERLAY_Y         0x0044A3C0u  /* int32_t(const void *obj) */
 /* 0x0045A770, 336 bytes, seven callers -- READ, and it identifies its own
  * table. It takes an object's footprint back OUT of the map's cell weights:
  * gated on flag 0x00200000, which it clears on the way out, it walks the

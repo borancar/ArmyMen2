@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,128 patches.**
+Nothing uncommitted. **1,132 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -430,16 +430,38 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   a dword with three uninitialised bytes above the one the original computes;
   `Cos8` and `Sin8` mask their index, which is why it has never mattered.
 
+- **`WeaponClassOf`** (`0x0042AAE0`) has a four-arm jump table whose arms are
+  NOT in the order they are laid out. Reading the bodies top to bottom gives
+  1, 2, 3, 4 for kinds 2, 3, 4, 5; the table at `0x0042AB38` dispatches them
+  2, 3, 1, 4. Second instance in this project after the state-2 sub-state
+  table -- **take the order from the table, never from the addresses**, and
+  it is worth one look every time.
+- **`DamageItemChain`** (`0x00435650`) and `DamageItem` (`0x004356C0`) are
+  mutually recursive, and the recursion is bounded by an ARGUMENT rather than
+  by either body: every call from the chain walker passes 1 for DamageItem's
+  sixth parameter, and DamageItem's first test is on exactly that -- non-zero
+  takes the arm that does not come back. Changing the constant would make it
+  unbounded.
+- **`AwardOwnArmyXp`** (`0x00417B10`) is the FOURTH non-advancing removal loop
+  in this tree, and it indexes `ADDR_ARMY_OBJ_LISTS` element 0 with no slot
+  lookup at all, where every other walker resolves one first. Same thing in
+  single player; not necessarily in a multiplayer game. Reproduced.
+- **`ObjOverlayY`** (`0x0044A3C0`) indexes the animation's cell array by
+  DIRECTION alone. The cells are `frames * directions`, direction-major, so
+  `cells[dir]` is frame `dir` of direction 0 rather than frame 0 of direction
+  `dir` -- the same thing only when there is one frame. Reproduced as written;
+  a "fix" here would move what is drawn.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **978 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,128
+line (0x0045C000) patched**. Measured: **982 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,132
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Five batches have gone in and the 261 entries outstanding start at 48
+small ones in batches. Six batches have gone in and the 257 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

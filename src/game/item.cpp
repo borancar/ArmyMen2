@@ -5064,6 +5064,178 @@ void __cdecl SoldierNameOf(char *out, const void *obj)
          + (size_t)n * AM2_SOLDIER_NAME_BYTES + SOLDIER_NAME_OFF_NAME));
 }
 
+/* AwardOwnArmyXp -- original 0x00417B10, one caller, at the tail of it.
+ *
+ * Award 300 experience to every live type 2 the player's own army owns, and
+ * drop the uids that no longer resolve on the way past.
+ *
+ * FOURTH LOOP IN THIS TREE THAT DOES NOT ADVANCE OVER A REMOVAL, after
+ * DrawSelection, CommReopenSession and Type2ActionAll. The unresolved arm
+ * jumps past the increment; the bound is re-read from the list at the bottom
+ * of every iteration, so the entry that shifts down is seen next.
+ *
+ * IT IS SLOT 0 AND NOT THE PLAYER'S ARMY. ADDR_ARMY_OBJ_LISTS is one list per
+ * comm slot and the original indexes element 0 with no lookup at all, where
+ * every other walker in this tree resolves a slot first. In single player
+ * those are the same thing; in a multiplayer game they need not be, and this
+ * is reproduced rather than corrected.
+ *
+ * The flag test is bit 2 of OBJ_OFF_FLAGS -- destroyed -- and it is tested
+ * before the type is, so a destroyed non-type-2 costs one test rather than
+ * two. Immaterial, and the order is the original's.
+ *
+ * The removal goes through the original's thiscall list helper, as every other
+ * caller of it in this tree does.
+ */
+void __cdecl AwardOwnArmyXp(void)
+{
+    void   *list = ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[0];
+    int32_t i    = 0;
+
+    while (i < *(const int32_t *)((const uint8_t *)list + LIST_OFF_COUNT)) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)((const uint8_t *)list
+                                        + LIST_OFF_UIDS))[i]);
+
+        if (!obj) {
+            ListRemoveAt(list, i);
+            continue;               /* no step: the shifted-down entry is next */
+        }
+
+        if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            && ObjIsType2((const AM2_Object *)obj))
+            Type238Action(obj, AM2_ARMY_XP_AWARD);
+
+        i++;
+    }
+}
+
+/* WeaponClassOf -- original 0x0042AAE0, one caller, which stores the answer
+ * into a word field of a record it is packing.
+ *
+ * Classify a weapon by uid. Nothing there, not a type 4, or a kind outside
+ * 2..5 all answer 0; the four that are in range answer a small code.
+ *
+ * THE JUMP TABLE'S ARMS ARE NOT IN THE ORDER THEY ARE LAID OUT. Reading the
+ * bodies top to bottom gives 1, 2, 3, 4 for kinds 2, 3, 4, 5, which is wrong
+ * for two of the four: the table at 0x0042AB38 dispatches to the arms in the
+ * order 2, 3, 1, 4. This is the same trap the state-2 sub-state table set,
+ * written up in CLAUDE.md, and it is worth one look at the table every time --
+ * the linker's layout is not the switch.
+ *
+ * The kind is the first dword of the record OBJ_OFF_FIELD_C0 points at, which
+ * is the same record SelectInventorySlot indexes ADDR_WEAPON_HANDLERS with.
+ * So the codes here are a second, smaller classification over the same field.
+ */
+int32_t __cdecl WeaponClassOf(uint32_t uid)
+{
+    const uint8_t *obj = (const uint8_t *)LookupByUID(uid);
+
+    if (!obj || !ObjIsType4((const AM2_Object *)obj))
+        return 0;
+
+    switch (**(const int32_t *const *)(obj + OBJ_OFF_FIELD_C0)) {
+    case 2:  return 2;
+    case 3:  return 3;
+    case 4:  return 1;
+    case 5:  return 4;
+    default: return 0;
+    }
+}
+
+/* DamageItemChain -- original 0x00435650, one caller, and that caller is
+ * DamageItem itself, so the two are mutually recursive.
+ *
+ * Damage an item, then damage every item in the chain hanging off it:
+ * OBJ_OFF_CHAIN_UID gives the first, and each link's OBJ_OFF_CHAIN_NEXT_UID
+ * gives the one after. Only types 1 and 4 are followed; anything else ends the
+ * walk rather than being skipped.
+ *
+ * THE RECURSION IS BOUNDED BY DamageItem's SIXTH ARGUMENT, NOT BY THIS
+ * FUNCTION. Every call from here passes 1, and DamageItem's first test is on
+ * that argument -- non-zero takes the arm that does NOT come back here. So the
+ * chain is walked once, iteratively, and the mutual recursion is one level
+ * deep by construction. Reproduced exactly; changing the constant would make
+ * it unbounded.
+ *
+ * The chain walk reuses the object variable, so the first link's own chain
+ * head is never consulted -- it is the NEXT pointer that continues, which is
+ * why a linked item's OBJ_OFF_CHAIN_UID does not start a second walk.
+ */
+void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
+                             int32_t kind, uint32_t attacker)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t uid;
+
+    orig_damage_item(o, amount, d, kind, attacker, 1);
+
+    for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid;
+         uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_NEXT_UID)) {
+        int32_t type;
+
+        o = (uint8_t *)LookupByUID(uid);
+        if (!o)
+            return;
+
+        type = *(const int32_t *)o;
+        if (type != 1 && type != 4)
+            return;
+
+        orig_damage_item(o, amount, d, kind, attacker, 1);
+    }
+}
+
+/* ObjOverlayY -- original 0x0044A3C0, one caller, which ADDS the answer to a
+ * y coordinate.
+ *
+ * The negated SPR_OFF_OVY of the sprite the object's FIRST row is currently
+ * showing -- an anchor offset, turned from "how far down the sprite the point
+ * is" into "how far up from the point the sprite must go".
+ *
+ * IT INDEXES THE CELL ARRAY BY DIRECTION ALONE. The cells are laid out
+ * direction-major, `frames * directions` of them, so cells[dir] is frame `dir`
+ * of direction 0 rather than frame 0 of direction `dir` -- those coincide only
+ * when the animation has one frame. Reproduced as written: whether the
+ * original meant `dir * frames` is not something the code can be asked, and a
+ * "fix" here would change where things are drawn.
+ *
+ * The direction bits reach RoundTo8 as a dword whose upper three bytes are
+ * the animation POINTER's, because the original loads them with a byte move
+ * into a register it has just used for the pointer. RoundTo8 masks, so it
+ * cannot matter; the same shape as RandomPointAhead's heading.
+ *
+ * Three ways out answer 0, and the third is a fall-through rather than a
+ * written return: with no animation playing the original simply leaves the
+ * register holding the null it just tested. Same value, and worth saying,
+ * because a reader looking for a `return 0` will not find one.
+ */
+int32_t __cdecl ObjOverlayY(const void *obj)
+{
+    const uint8_t   *o = (const uint8_t *)obj;
+    const uint8_t   *row;
+    const AM2_Anim  *anim;
+    int32_t          dir;
+    int32_t          sprite;
+
+    if (!o)
+        return 0;
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
+        return 0;
+
+    row  = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
+    if (!anim)
+        return 0;
+
+    dir    = RoundTo8(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                      anim->directionBits) & 0xFF;
+    sprite = anim->cells[dir].sprite;
+
+    return -(int32_t)*(const int16_t *)
+        ((const uint8_t *)kSpriteList[sprite] + SPR_OFF_OVY);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5189,6 +5361,14 @@ void item_install(void)
     patch_replace(ADDR_STEP_TYPE8, (const void *)StepType8, "StepType8", 1);
     patch_replace(ADDR_TYPE2_ACTION_ALL, (const void *)Type2ActionAll,
                   "Type2ActionAll", 1);
+    patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
+                  "AwardOwnArmyXp", 1);
+    patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,
+                  "WeaponClassOf", 1);
+    patch_replace(ADDR_DAMAGE_ITEM_CHAIN, (const void *)DamageItemChain,
+                  "DamageItemChain", 1);
+    patch_replace(ADDR_OBJ_OVERLAY_Y, (const void *)ObjOverlayY,
+                  "ObjOverlayY", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,
