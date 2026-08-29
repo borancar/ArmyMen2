@@ -399,10 +399,36 @@
  * They are their own family, NOT the thirty-three menu vtables at
  * 0x0046FAB8..0x0046FD38: slot 3 is 0x004170E0 across this group where the
  * menu classes share 0x00454070. Two of the eight in the band never appear in
- * either Boot Camp's tree or MAP 01's, so 0x0046F930 stays unnamed.
+ * either Boot Camp's tree or MAP 01's, so 0x0046F930 stayed unnamed for a
+ * while. It is named now, from its PAINT rather than from a tree it is not in:
+ * a button that draws a COUNT right-aligned in a 0x29-wide cell. Its slots 2,
+ * 3 and 4 are the menu button's and the menu base's, so despite the address
+ * band it belongs to that family and not to this one -- which is what the
+ * slot-3 observation above already implied.
  *
  * MAP 01's HUD is identical to Boot Camp's -- same vtables, rectangles and
  * sprite ids -- so this layout is not per-map. */
+/* A button with a COUNT, drawn right-aligned in AM2_COUNT_CELL_W. In neither
+ * widget tree, so the paint below is verified by reading.
+ *
+ * READ ITS TWO COLOUR SLOTS WITH THE PUSH IN MIND. `al` is loaded from
+ * ADDR_VIEW_RECT_COLOUR and stored, and a few instructions later a zero is
+ * stored at what LOOKS like the same offset -- but a `push edi` sits between
+ * them, so they are two different slots: the ink, defaulted to that colour,
+ * and the fill, defaulted to zero. Read at face value the default ink appears
+ * to be dead code and the ink appears to be read uninitialised on two of the
+ * four paths, neither of which is true. */
+#define VTABLE_COUNT_BUTTON    0x0046F930u
+#define ADDR_COUNT_BUTTON_PAINT 0x00418DC0u /* thiscall void(w, RECT) */
+#define COUNTBTN_OFF_SPR       0x68u   /* AM2_Sprite *, the normal face */
+#define COUNTBTN_OFF_SPR_OFF   0x6Cu   /* AM2_Sprite *, when disabled */
+#define COUNTBTN_OFF_LIT       0x70u   /* uint8_t, fills behind the sprite */
+#define COUNTBTN_OFF_COUNT     0x80u   /* int32_t, formatted with "%d" */
+#define AM2_COUNT_FILL_LIT     0xE3    /* +1 when it also has the focus */
+#define AM2_COUNT_FILL_FOCUS   0xE9    /* focused but not lit */
+#define AM2_COUNT_CELL_W       0x29    /* 41; the count is RIGHT-aligned in it */
+#define AM2_COUNT_TEXT_DY      0x10
+#define AM2_COUNT_FONT         0
 #define VTABLE_HUD_TOP_STRIP   0x0046F908u  /* 0,0,640,21 */
 #define VTABLE_HUD_PANEL       0x0046F944u  /* 480,21,624,480 -- HUD_WIDGET_B */
 #define VTABLE_HUD_RADAR       0x0046F8B8u  /* 486,31,618,163 */

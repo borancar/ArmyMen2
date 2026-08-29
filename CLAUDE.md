@@ -1707,7 +1707,7 @@ and grep the run's own log for `bind/listen`, which says so outright.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **22** are reconstructed
+  all. Measured: **29 functions** call the bracket and **23** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates, and the menu-widget painters that
   have landed since.

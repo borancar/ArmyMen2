@@ -2807,6 +2807,82 @@ void __attribute__((thiscall)) CheckboxPaint(AM2_Widget *w, RECT clip)
     UnlockSurface();
 }
 
+/* 0x00418DC0, vtable slot 1 of VTABLE_COUNT_BUTTON -- a button that shows a
+ * number. Another of the outstanding Lock/Unlock functions.
+ *
+ * FOUR PATHS, and they set two independent things: which sprite the widget
+ * shows, and what colour is filled BEHIND it. Only two of the four fill at
+ * all, which is why the fill is gated on its own flag rather than on a colour
+ * being non-zero -- zero is a real palette entry.
+ *
+ *   disabled          the off sprite, ink ADDR_COLOUR_BELOW_BG, no fill
+ *   lit               the on sprite, ink ADDR_BACKGROUND_COLOUR, fill
+ *                     AM2_COUNT_FILL_LIT and one MORE if it also has focus
+ *   focused, not lit  the on sprite, default ink, fill AM2_COUNT_FILL_FOCUS
+ *   neither           the on sprite, default ink, no fill
+ *
+ * THE DEFAULT INK IS NOT DEAD CODE, though it reads as it. The original loads
+ * ADDR_VIEW_RECT_COLOUR into the ink slot at the very top and then stores a
+ * zero at what looks like the same offset four instructions later -- but a
+ * `push edi` sits between them, so those are two different slots. Taken at
+ * face value the load looks overwritten and the ink looks read uninitialised
+ * on the two paths that never assign it; neither is so. Same shape as the
+ * interleaved pops in DrawBlipPulse, one push instead of two.
+ *
+ * The count is formatted with the game's own sprintf, measured with
+ * TextExtent, and drawn RIGHT-aligned: x is `rect.left + 41 - width`, so the
+ * digits grow leftward from a fixed edge. Its font is 0, not the 1 every other
+ * widget in this family uses.
+ */
+void __attribute__((thiscall)) CountButtonPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t *self = (uint8_t *)w;
+    uint8_t  ink  = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    uint8_t  fill = 0;
+    int32_t  do_fill = 0;
+    int32_t  focused;
+    RECT     vis;
+    char     text[32];
+    int32_t  width;
+
+    if (w->disabled) {
+        w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR_OFF);
+        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG;
+    } else {
+        w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR);
+        focused = w->parent && w->parent->focusedChild == w;
+
+        if (*(const uint8_t *)(self + COUNTBTN_OFF_LIT)) {
+            ink     = *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+            do_fill = 1;
+            fill    = (uint8_t)(AM2_COUNT_FILL_LIT + (focused ? 1 : 0));
+        } else if (focused) {
+            do_fill = 1;
+            fill    = AM2_COUNT_FILL_FOCUS;
+        }
+    }
+
+    if (!IntersectRect(&vis, &clip, &w->rect))
+        return;
+
+    if (do_fill)
+        ClearRegion(&vis, fill);
+
+    WidgetPaint(w, clip);
+
+    am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
+                *(const int32_t *)(self + COUNTBTN_OFF_COUNT));
+    width = TextExtent(text, 0, NULL);
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    DrawTextClipped(w->rect.left + AM2_COUNT_CELL_W - width,
+                    w->rect.top + AM2_COUNT_TEXT_DY,
+                    text, AM2_COUNT_FONT, vis, ink);
+    UnlockSurface();
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -8630,6 +8706,8 @@ int widget_install(void)
                         "TextListPaint", 1);
     rc |= patch_replace(ADDR_CHECKBOX_PAINT, (const void *)CheckboxPaint,
                         "CheckboxPaint", 1);
+    rc |= patch_replace(ADDR_COUNT_BUTTON_PAINT, (const void *)CountButtonPaint,
+                        "CountButtonPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
