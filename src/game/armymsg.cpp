@@ -773,12 +773,61 @@ void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
              UidArmy(attacker));
 }
 
+/* SendVehicleExit -- original 0x0045E3C0, two callers.
+ *
+ * Tell the other players a unit has got out of a vehicle. Twelve bytes: the
+ * header's uid is the VEHICLE and the dword after it is the occupant.
+ *
+ * It names itself twice and the pair is the identification: "<--Vehicle Exit
+ * Send" before the send and "-->Vehicle Exit Sent" after it, both gated on
+ * COMM_OFF_VERBOSE. The arrows are the original's convention, not ours.
+ *
+ * THE OUTGOING LOG CONVERTS THE UIDS A SECOND TIME, and that is harmless
+ * rather than a misreading: UidOnWire is `mov eax, [esp+4]; ret` -- five
+ * bytes and the identity, with a hundred callers. So a uid that has already
+ * been through it can go through it again and nothing happens. Worth knowing
+ * before treating any UidOnWire call as evidence of a conversion.
+ *
+ * The occupant is tested for null and the vehicle is not, which is the wrong
+ * way round for a function whose header uid comes from the VEHICLE: a null
+ * vehicle faults in the first log line and again in the send. Its two callers
+ * both have one; reproduced as it stands.
+ */
+void __cdecl SendVehicleExit(void *vehicle, void *occupant)
+{
+    struct {
+        AM2_ArmyMsgHdr hdr;
+        uint32_t       occupant;
+    } msg;
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_VEH_EXIT_SEND),
+                 UidOnWire(((const AM2_Object *)vehicle)->uid),
+                 UidOnWire(((const AM2_Object *)occupant)->uid));
+
+    if (!occupant)
+        return;
+
+    msg.hdr.len  = AM2_MSG_VEHICLE_EXIT_LEN;
+    msg.hdr.kind = AM2_MSG_VEHICLE_EXIT;
+    msg.hdr.uid  = UidOnWire(((const AM2_Object *)vehicle)->uid);
+    msg.occupant = UidOnWire(((const AM2_Object *)occupant)->uid);
+
+    ArmyMessageSend(&msg);
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_VEH_EXIT_SENT),
+                 UidOnWire(msg.hdr.uid), UidOnWire(msg.occupant));
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
+    rc |= patch_replace(ADDR_VEHICLE_DROP_OCCUPANT, (const void *)SendVehicleExit,
+                        "SendVehicleExit", 2);
     rc |= patch_replace(ADDR_DAMAGE_BROADCAST, (const void *)DamageBroadcast,
                         "DamageBroadcast", 4);
     rc |= patch_replace(ADDR_RECV_ITEM_CREATE, (const void *)RecvItemCreate,

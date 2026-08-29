@@ -189,14 +189,11 @@ uint32_t __cdecl ListFirstField548(const void *obj)
 }
 
 typedef int32_t (__cdecl *AM2_SeatBlockedFn)(int32_t seat, void *vehicle);
-typedef void (__cdecl *AM2_DropOccupantFn)(void *vehicle, void *occupant);
 typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
                                              int32_t kind, uint32_t uid,
                                              int32_t a, int32_t b);
 #define orig_seat_blocked \
     (*(AM2_SeatBlockedFn)AM2_IMAGE(ADDR_VEHICLE_SEAT_BLOCKED))
-#define orig_drop_occupant \
-    (*(AM2_DropOccupantFn)AM2_IMAGE(ADDR_VEHICLE_DROP_OCCUPANT))
 
 void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 {
@@ -225,7 +222,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
                 *(int32_t *)(out + OBJ_OFF_RIDING) = 0;
                 if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
                                       (int16_t)((const AM2_Object *)v)->owner))
-                    orig_drop_occupant(vehicle, out);
+                    SendVehicleExit(vehicle, out);
             }
         }
 

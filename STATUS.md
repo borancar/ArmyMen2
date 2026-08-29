@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,081 patches.**
+Nothing uncommitted. **1,082 patches.**
 
-Twenty-nine functions since the last snapshot. The seven-class HUD family is
+Thirty functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -126,6 +126,16 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   "computes an index into `ADDR_WEAPON_POSE_FRAMES`" -- true of what it
   returns, and not of the table its default arm READS, which is 416 bytes
   earlier and is now `ADDR_POSE_BY_CLASS`.
+
+- **`SendVehicleExit`** (`0x0045E3C0`, 192 B) tells the other players a unit
+  has got out of a vehicle. `ADDR_VEHICLE_DROP_OCCUPANT` is half the story --
+  it drops nobody, it REPORTS a drop -- and the name is kept with the
+  correction in its comment rather than aliased, which is what the ratchet is
+  for.
+
+  It also settles something about a hundred call sites: `UidOnWire` is
+  `mov eax, [esp+4]; ret`, the identity. This function converts twice on its
+  outgoing log line and nothing happens.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

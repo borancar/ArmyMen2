@@ -19,6 +19,10 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x0045E3C0, two callers, both a unit leaving a vehicle. Twelve bytes: the
+ * header's uid is the VEHICLE and the dword after it is the occupant. */
+void __cdecl SendVehicleExit(void *vehicle, void *occupant);
+
 #endif
 
 /* The header every message on this transport begins with. ArmyMessageSend

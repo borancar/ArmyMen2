@@ -8189,6 +8189,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_SEND_TROOPER_WEAPON 0x0048AA60u
 #define AM2_MSG_TROOPER_WEAPON   0x22u
 #define AM2_MSG_TROOPER_WEAPON_LEN 0x1Cu
+/* The message ADDR_VEHICLE_DROP_OCCUPANT sends -- twelve bytes, with the
+ * header's uid the VEHICLE and the dword after it the occupant. */
+#define AM2_MSG_VEHICLE_EXIT     0x25u
+#define AM2_MSG_VEHICLE_EXIT_LEN 0x0Cu
+#define ADDR_STR_VEH_EXIT_SEND   0x0048C27Cu
+#define ADDR_STR_VEH_EXIT_SENT   0x0048C24Cu
 /* A 3-bit field at bit 18 of the object's word at +8, get and set. Named for
  * its position rather than its meaning; src/game/item.h records what points at
  * an army index and what argues against it. */
@@ -8385,6 +8391,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * message says the damage was not ours. */
 #define ADDR_EXIT_ALL_FROM_VEHICLE 0x0045AE30u  /* void(vehicle, uint32 uid) */
 #define ADDR_VEHICLE_SEAT_BLOCKED  0x0045AC90u  /* int32(int32 seat, vehicle) */
+/* Reconstructed as SendVehicleExit in armymsg.cpp. The name here is the one
+ * the call site suggested and it is half the story: it does not drop anybody,
+ * it TELLS THE OTHER PLAYERS that somebody was dropped. Its own two log lines
+ * say so -- "<--Vehicle Exit Send" and "-->Vehicle Exit Sent". Kept rather
+ * than renamed, because the address already had it and a second name is what
+ * the ratchet exists to refuse; the comment carries the correction. */
 #define ADDR_VEHICLE_DROP_OCCUPANT 0x0045E3C0u  /* void(vehicle, occupant) */
 #define ADDR_DAMAGE_BROADCAST      0x0042A880u  /* void(obj,uid,int,int,pt,int) */
 #define VEHICLE_OFF_KIND           0x52Cu  /* 2 and 3 skip the damage entirely */
