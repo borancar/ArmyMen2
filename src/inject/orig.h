@@ -1322,6 +1322,12 @@
  * looser box. Only that function reads them, and only when OBJ_OFF_HIT_MASK
  * is null -- so they are the fallback shape for an object with no bitmask. */
 #define OBJ_OFF_BOX_LEFT       0x7Cu  /* int32_t, added to OBJ_OFF_POS.x */
+/* 0x00438F80, two callers. Offset the object's box by its position and hand
+ * the result to 0x00438DF0 -- but only when the first row's sprite has a
+ * software image; without one it answers 1 and does nothing. */
+#define ADDR_OBJ_BOX_ACTION      0x00438F80u  /* int32_t(void *obj, int32_t) */
+#define ADDR_BOX_ACTION          0x00438DF0u  /* int32_t(AM2_Rect, int32_t) */
+#define SPR_FLAG_SOFTWARE_BITS   0x1Cu  /* the subset of 0x3C these two test */
 #define OBJ_OFF_BOX_TOP        0x80u  /* int32_t, added to .y */
 #define OBJ_OFF_BOX_RIGHT      0x84u  /* int32_t, added to .x */
 #define OBJ_OFF_BOX_BOTTOM     0x88u  /* int32_t, added to .y */
@@ -1419,6 +1425,8 @@
 #define ADDR_TICKS               0x00426CD0u  /* uint32_t(void) */
 /* Sprite fields the cursor code reads: two int16 hotspot pairs and the
  * width/height, plus the mode slot DrawSprite consults. */
+#define SPR_OFF_FLAGS            0x0Cu   /* AM2_Sprite::flags */
+#define SPR_OFF_IMAGE            0x10u   /* AM2_Sprite::image, the union */
 #define SPR_OFF_W                0x1Cu
 #define SPR_OFF_H                0x20u
 #define SPR_OFF_HOTX             0x24u   /* int16_t */
@@ -2694,6 +2702,11 @@
  * is wrong about its own caller and both are wrong about the global. Found
  * while reading a third user in air.cpp, which returns it for a null object. */
 #define ADDR_ZERO_POINT          0x005125A0u  /* AM2_Point, always {0,0} */
+/* 0x00456E20, one caller. Split a slot number into a band code, an index
+ * within the band, and a heading byte off ADDR_SLOT_HEADINGS. */
+#define ADDR_SLOT_BAND_HEADING   0x00456E20u  /* void(int32,int32*,int32*,
+                                               *      uint8_t *) */
+#define ADDR_SLOT_HEADINGS       0x0065A068u  /* uint8_t[], filled at runtime */
 #define ADDR_VOLUME_AT_ZERO      0x00512318u  /* int32_t, volume at no distance */
 #define SOUND_REC_OFF_POS        0x10u   /* AM2_Point */
 #define SOUND_REC_OFF_OWNER      0x14u   /* uid; the object making the sound */
@@ -4210,6 +4223,10 @@ typedef struct {
 #define AM2_KIND7_NAME_COUNT     64
 /* Fields of the object's FIRST ROW that carry its animation. */
 #define ROW_OFF_ANIM_CUR         0x40u   /* AM2_AnimTable * */
+/* 0x0040A130, two callers. The reader the ROW_OFF_FIELD_2C block above
+ * predicts: look an animation up in the row's current table by id and answer
+ * its AM2_Anim::field4, DOUBLED when the row's lut is ADDR_ROW_LUT_DOUBLES. */
+#define ADDR_ROW_ANIM_FIELD4     0x0040A130u  /* int16_t(row *, uint16_t id) */
 #define ROW_OFF_ANIM_NEXT        0x48u   /* AM2_AnimTable *, taken up next */
 /* An int16, and StepRowAnim shows it is TWO THINGS by range. Below 1000 it is
  * the frame id SetAnimFrame matched on and the stepper ignores it. At exactly

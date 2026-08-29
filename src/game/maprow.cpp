@@ -959,16 +959,72 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
     memcpy(h + ROWSET_OFF_RECT, rect, 16);
 }
 
+/* RowAnimField4 -- original 0x0040A130, two callers.
+ *
+ * This is the reader ROW_OFF_FIELD_2C's block in orig.h predicted from the
+ * writing side: look an animation up in the row's current table by id, take
+ * its AM2_Anim::field4, and DOUBLE it when the row's lut is the one that
+ * doubles. Every other lut takes the value unchanged, which is exactly what
+ * the comparison against ADDR_ROW_LUT_DOUBLES says.
+ *
+ * THE LUT IS COMPARED BY ADDRESS, not by anything in it. There is one lut that
+ * doubles and the test is `row->lut == that table`, so a second doubling lut
+ * could not be added without touching this function.
+ *
+ * THE FIRST TEST IS A SHORTCUT AND IT DOES NOT GO THROUGH THE TABLE. An id
+ * equal to the row's own ROW_OFF_FRAME answers ROW_OFF_FIELD_3C directly --
+ * the value already cached on the row -- and is NOT doubled. So the same id
+ * gives two different answers depending on whether the row happens to be
+ * showing it. Reproduced; it is the whole reason the cached field exists.
+ *
+ * A MISS FALLS BACK TO ENTRY 0 RATHER THAN FAILING, and does so without
+ * checking the count, so a table with no entries is read out of bounds. That
+ * is the same last-resort LoadAnimTable has and the same lack of a guard;
+ * anim.h says no shipped file reaches it there, and nothing here changes that.
+ *
+ * Id 0 is refused before the table is touched at all.
+ */
+int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
+{
+    const uint8_t       *r = (const uint8_t *)row;
+    const AM2_AnimTable *table;
+    int32_t              i = 0;
+    int16_t              value;
+
+    if ((int16_t)id == *(const int16_t *)(r + ROW_OFF_FRAME))
+        return *(const int16_t *)(r + ROW_OFF_FIELD_3C);
+
+    if (!id)
+        return 0;
+
+    table = *(const AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
+    if (!table)
+        return 0;
+
+    while (i < table->count && table->entries[i].id != (int32_t)(int16_t)id)
+        i++;
+    if (i >= table->count)
+        i = 0;                  /* not found: entry 0, count unchecked */
+
+    value = (int16_t)table->entries[i].anim->field4;
+
+    if (*(const void *const *)(r + ROW_OFF_FIELD_2C)
+        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
+        value = (int16_t)(value + value);
+
+    return value;
+}
+
 int maprow_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_ROW_ANIM_FIELD4, (const void *)RowAnimField4,
+                        "RowAnimField4", 2);
     rc |= patch_replace(ADDR_BUILD_ROW_SET, (const void *)BuildRowSet,
-
                         "BuildRowSet", 6);
 
     rc |= patch_replace(ADDR_SET_ANIM_FRAME, (const void *)SetAnimFrame,
-
                         "SetAnimFrame", 11);
 
     rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,

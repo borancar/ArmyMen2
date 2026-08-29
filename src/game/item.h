@@ -493,4 +493,9 @@ void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
  * first row is showing. */
 int32_t __cdecl ObjOverlayY(const void *obj);
 
+/* 0x00456E20, one caller. Split a slot number into a band code, an index
+ * within the band, and a heading byte. */
+void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
+                             uint8_t *heading);
+
 #endif

@@ -75,4 +75,8 @@ void __cdecl TileCoverSub(uint16_t tile);
  * that comes up short. Always answers 0. */
 int32_t __cdecl MarkOpenTile(uint16_t tile);
 
+/* 0x00438F80, two callers. Offset the object's box by its position and act on
+ * it, when the first row's sprite has a software image. */
+int32_t __cdecl ObjBoxAction(void *obj, int32_t arg);
+
 #endif /* AM2_REGION_H */

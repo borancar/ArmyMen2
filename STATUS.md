@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,140 patches.**
+Nothing uncommitted. **1,143 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -497,16 +497,35 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   hide a real difference. The same build re-run gave 22 and 2. **Read the
   number even when the verdict is clean, and re-run before believing it.**
 
+- **`RowAnimField4`** (`0x0040A130`) is the reader `ROW_OFF_FIELD_2C`'s block
+  in `orig.h` predicted from the writing side, and it arrived matching: the
+  value is doubled exactly when the row's lut is `ADDR_ROW_LUT_DOUBLES`, and
+  the lut is compared BY ADDRESS rather than by anything in it. Its first test
+  is a shortcut that does not go through the table at all -- an id equal to
+  the row's own frame answers the cached `ROW_OFF_FIELD_3C` and is NOT
+  doubled, so the same id gives two answers depending on whether the row
+  happens to be showing it. **A prediction written down from one side and met
+  from the other is better evidence than either reading alone.**
+- **`ObjBoxAction`** (`0x00438F80`) returns 0 and 1 that are not failure and
+  success: 1 is "nothing to do", 0 is "no sprite at all", and the real answer
+  is the callee's. It also tests sprite flags `0x1C` where `sprite.h`
+  documents the software mask as `0x3C`, so bit 5 alone takes the do-nothing
+  arm. Both stated, because `0x3C` is the number a reader arrives with.
+- **`SlotBandHeading`** (`0x00456E20`) halves the slot to get an index, so two
+  consecutive slots share one -- and the pair is told apart by the parity of
+  the SLOT, not of the index. The two disagree for exactly the values the
+  function exists to separate.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **990 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,140
+line (0x0045C000) patched**. Measured: **993 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,143
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eight batches have gone in and the 249 entries outstanding start at 48
+small ones in batches. Nine batches have gone in and the 246 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

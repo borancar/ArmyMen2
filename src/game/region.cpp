@@ -707,6 +707,66 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
     return 0;
 }
 
+typedef int32_t (__cdecl *AM2_BoxActionFn)(int32_t l, int32_t t,
+                                           int32_t r, int32_t b,
+                                           int32_t arg);
+/* 0x00438DF0 clamps the four edges to the map and walks what they cover;
+ * still original, and it takes the rectangle as four separate dwords
+ * because that is how both callers push it. */
+#define orig_box_action ((AM2_BoxActionFn)(uintptr_t)ADDR_BOX_ACTION)
+
+/* ObjBoxAction -- original 0x00438F80, two callers.
+ *
+ * Offset the object's box by its position and hand the four edges to
+ * 0x00438DF0 -- but only when the object is actually drawn with a software
+ * sprite. Three ways out come before that, and they do NOT answer the same
+ * thing: no sprite and no image both answer 0, while a sprite whose flags say
+ * "not a software blit" answers 1.
+ *
+ * SO 0 AND 1 ARE NOT SUCCESS AND FAILURE HERE. 1 is "nothing to do, carry on"
+ * and 0 is "this object has no sprite at all"; the real answer, when there is
+ * one, is whatever 0x00438DF0 returns. Reading the two constants as a boolean
+ * gets the middle case backwards.
+ *
+ * THE FLAGS TESTED ARE 0x1C, WHICH IS NOT THE WHOLE SOFTWARE MASK. sprite.h
+ * documents bits 2..5 (0x3C) as selecting the software path; this pair tests
+ * only 2..4. Bit 5 alone therefore takes the "nothing to do" arm. Reproduced,
+ * and stated because 0x3C is the number a reader arrives with.
+ *
+ * The box is four separate dwords on the object -- OBJ_OFF_BOX_LEFT and the
+ * three after it -- and the x pair and y pair take different offsets, so they
+ * cannot be written as one loop.
+ *
+ * The sprite is reached as raw offsets rather than as AM2_Sprite, because this
+ * is the FLAT half and that structure names LPDIRECTDRAWSURFACE. The same
+ * reason item.cpp reads the sprite list as void **.
+ */
+int32_t __cdecl ObjBoxAction(void *obj, int32_t arg)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    const uint8_t *spr;
+    int32_t        x;
+    int32_t        y;
+
+    spr = *(const uint8_t *const *)
+              (*(const uint8_t *const *)(o + OBJ_OFF_ROWS) + ROW_OFF_SPRITE);
+    if (!spr)
+        return 0;
+    if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
+        return 0;
+    if (!(*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS))
+        return 1;
+
+    x = *(const int16_t *)(o + OBJ_OFF_X);
+    y = *(const int16_t *)(o + OBJ_OFF_Y);
+
+    return orig_box_action(*(const int32_t *)(o + OBJ_OFF_BOX_LEFT)   + x,
+                           *(const int32_t *)(o + OBJ_OFF_BOX_TOP)    + y,
+                           *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x,
+                           *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y,
+                           arg);
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -725,6 +785,8 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_OBJ_BOX_ACTION, (const void *)ObjBoxAction,
+                        "ObjBoxAction", 2);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
                         "TileCoverAdd", 3);
     rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,

@@ -5236,6 +5236,59 @@ int32_t __cdecl ObjOverlayY(const void *obj)
         ((const uint8_t *)kSpriteList[sprite] + SPR_OFF_OVY);
 }
 
+/* SlotBandHeading -- original 0x00456E20, one caller.
+ *
+ * Split a slot number into three things the caller wants at once: which of
+ * three BANDS it falls in, its index WITHIN that band, and a heading byte off
+ * ADDR_SLOT_HEADINGS. Four arguments, three of them out-pointers.
+ *
+ * The bands are 2, 3 and 4 for slot <= 24, <= 56 and above, and each has its
+ * own base -- 9, 25 and 57. The index is `base + (slot - base) / 2`, so two
+ * consecutive slots share an index and the pair is told apart by the third
+ * output: EVEN adds 16 to the table byte and ODD subtracts 16. That is a
+ * heading, and the two members of a pair face 32 apart.
+ *
+ * `*band = 0` FIRST, THEN OVERWRITTEN ON EVERY PATH. There is no arm that
+ * leaves it at zero, so the initial store is dead -- reproduced because it is
+ * one instruction and removing it invites the reader to ask which arm needs
+ * it.
+ *
+ * THE PARITY IS TESTED ON THE SLOT, NOT ON THE INDEX. `slot & 1` after the
+ * halving, not `index & 1`; the two disagree for exactly the values this
+ * function exists to tell apart.
+ *
+ * NOTHING GUARDS THE BOTTOM. A slot below 9 gives a negative `(slot - 9) / 2`
+ * and indexes ADDR_SLOT_HEADINGS backwards. The division is signed -- MSVC's
+ * `cdq; sub; sar 1` -- so it truncates toward zero rather than flooring, which
+ * is the ordinary C division and is written as one.
+ */
+void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
+                             uint8_t *heading)
+{
+    int32_t base;
+    int32_t i;
+    uint8_t h;
+
+    *band = 0;
+
+    if (slot <= 24) {
+        *band = 2;
+        base  = 9;
+    } else if (slot <= 56) {
+        *band = 3;
+        base  = 25;
+    } else {
+        *band = 4;
+        base  = 57;
+    }
+
+    i = base + (slot - base) / 2;
+    *index = i;
+
+    h = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[i];
+    *heading = (uint8_t)((slot & 1) ? h - 0x10 : h + 0x10);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5361,6 +5414,8 @@ void item_install(void)
     patch_replace(ADDR_STEP_TYPE8, (const void *)StepType8, "StepType8", 1);
     patch_replace(ADDR_TYPE2_ACTION_ALL, (const void *)Type2ActionAll,
                   "Type2ActionAll", 1);
+    patch_replace(ADDR_SLOT_BAND_HEADING, (const void *)SlotBandHeading,
+                  "SlotBandHeading", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

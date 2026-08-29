@@ -295,7 +295,6 @@ int blit_install(void)
     int rc = 0;
 
     rc |= patch_replace(ADDR_BLIT_BITMAP_IN, (const void *)BlitBitmapIn,
-
                         "BlitBitmapIn", 4);
 
     rc |= patch_replace(ADDR_BLIT_GLYPH,   (const void *)BlitGlyph,   "BlitGlyph", 6);
