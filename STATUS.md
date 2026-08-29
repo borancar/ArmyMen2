@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,080 patches.**
+Nothing uncommitted. **1,081 patches.**
 
-Twenty-eight functions since the last snapshot. The seven-class HUD family is
+Twenty-nine functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -112,6 +112,20 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   **Name a function from its body, not from its argument list.** That is the
   same rule as naming from the body rather than from a call site, one step
   further in -- "by ref" was true and said nothing.
+
+- **`WeaponPoseIndex`** (`0x004494A0`, 208 B) picks the pose a unit takes for
+  the weapon it holds, out of a 43-byte table transcribed by hand.
+  `tools/posecheck.py` is the twentieth tool in `make check` and checks all
+  282 cases against the original -- and its **mutation counts** are the
+  useful part: one corrupt table byte fails 2 cases, swapping two constants
+  fails 5, dropping an armed branch fails 8, and 5 and 8 are exactly how many
+  codes select those arms. A failure count that matches the table is evidence
+  the corpus reaches every arm; "0 disagree" never is.
+
+  It also caught a comment being half right: `orig.h` said this function
+  "computes an index into `ADDR_WEAPON_POSE_FRAMES`" -- true of what it
+  returns, and not of the table its default arm READS, which is 416 bytes
+  earlier and is now `ADDR_POSE_BY_CLASS`.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **19** analysis
+**`make check` runs everything that does not need the game.** **20** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -49,7 +49,7 @@ said "eight" here for a long time after it stopped being eight, and then said
 not a defence against one. `checkclaims.py` counts the recipe now, so this
 sentence cannot drift again.
 
-One of the 19 is `tools/checkclaims.py`, which reads the numeric claims out
+One of the 20 is `tools/checkclaims.py`, which reads the numeric claims out
 of *this file* and recomputes them. It exists because three separate figures
 here were found stale by measuring rather than reading, each from the same
 cause: a tool changed, some prose was updated, the rest kept asserting the old
@@ -371,7 +371,20 @@ which is the right number and is the evidence that the corpus reaches each
 exempt name in the one flag setting that distinguishes it; flipping the flag
 sense fails 24; dropping the slow-machine term fails 12.
 
-What it does not reach: the buffer overrun. `dst` is unbounded and the fourth
+`tools/posecheck.py` is the second of the shape and a better example, because
+the thing it checks is a 43-byte TABLE transcribed by hand. `WeaponPoseIndex`
+answers from an object class (0, 1 or 2), one bit of a field, and that table;
+282 cases cover it exhaustively, and no A/B can -- a Boot Camp mission issues
+a handful of weapon codes, so the other forty entries are verified by this or
+by nothing.
+
+Its mutation counts are the useful part. Corrupting ONE table byte fails 2
+cases, swapping the two "kneel armed" constants fails 5, and dropping the
+armed branch of one arm fails 8 -- and 5 and 8 are exactly how many codes
+select those arms. A mutation whose failure count matches the table is
+evidence the corpus reaches every arm, which no amount of "0 disagree" is.
+
+What moviecheck does not reach: the buffer overrun. `dst` is unbounded and the fourth
 call site passes a name a mission's script wrote, so a long enough name in a
 script smashes a 0x40-byte frame. That is the original's behaviour and is kept
 -- but nothing here tests it, and a corpus of short names could not.

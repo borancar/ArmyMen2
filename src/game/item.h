@@ -13,6 +13,10 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x004494A0, three callers. Which pose a unit takes for the weapon it holds
+ * -- an index into ADDR_WEAPON_POSE_FRAMES. */
+int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one

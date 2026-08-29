@@ -3674,14 +3674,87 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
     ObjDeathCleanup(obj);
 }
 
-typedef int32_t (__cdecl *AM2_PoseIndexFn)(void *obj, void *weapon);
+/* WeaponPoseIndex -- original 0x004494A0, three callers.
+ *
+ * Which POSE a unit takes for the weapon it is holding. The answer is an
+ * index into ADDR_WEAPON_POSE_FRAMES, which the caller turns into a frame.
+ *
+ * TWO TABLES, BOTH INSIDE THE FUNCTION'S OWN 208 BYTES. One byte per weapon
+ * code 1..0x2B picks one of four arms, and the arms are a jump table. Written
+ * out as a switch over the arm rather than as the jump: the compiler chose the
+ * table, the source did not, and three of the four arms are two lines.
+ *
+ * The 43 arm bytes are reproduced verbatim. They are not derivable -- there is
+ * no pattern in {0,3,3,0,3,3,0,0,0,0,3...} beyond "most weapons take the
+ * default" -- and inventing an `if` chain that happened to agree on the codes
+ * the game ships would be the same mistake as reading a table's bounds from
+ * its data.
+ *
+ * ADDR_POSE_BY_CLASS IS NOT ADDR_WEAPON_POSE_FRAMES, which sits 0x1A0 bytes
+ * earlier. The default arm reads the first, not the second, and orig.h's note
+ * on the pose field says WeaponPoseIndex "computes an index into"
+ * ADDR_WEAPON_POSE_FRAMES -- true of what it RETURNS and not of what it
+ * reads. Two tables 416 bytes apart is exactly the sort of thing to check
+ * rather than assume when a comment already names one of them.
+ *
+ * OBJ_OFF_FIELD_578 is the second axis and it is still unnamed. It selects
+ * between {1, 4} and {0x19, 0x1A} for one family of weapons and between
+ * {1, 4} and {0x1F} for another, and it does nothing at all for class 2,
+ * which always answers 6. The original computes it with `neg`/`sbb`/`and`,
+ * which is a branchless "non-zero to a constant"; written as a conditional.
+ */
+int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
+{
+    /* The arm each weapon code selects, verbatim from 0x0044953C. */
+    static const uint8_t arm_of_code[AM2_WEAPON_CODE_MAX] = {
+        0, 3, 3, 0, 3, 3, 0, 0, 0, 0, 3, 3, 3, 3, 3,
+        3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 3, 3, 0, 0,
+        3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 3, 3, 2
+    };
+    const uint8_t *o     = (const uint8_t *)obj;
+    int32_t        cls   = ClassifyByCode74(obj);
+    int32_t        armed;
+    int32_t        code;
+
+    if (!weapon)
+        return ((const int32_t *)AM2_IMAGE(ADDR_POSE_BY_CLASS))[cls];
+
+    code = **(const int32_t *const *)((const uint8_t *)weapon
+                                      + OBJ_OFF_FIELD_C0) - 1;
+    if ((uint32_t)code >= AM2_WEAPON_CODE_MAX)
+        return ((const int32_t *)AM2_IMAGE(ADDR_POSE_BY_CLASS))[cls];
+
+    armed = *(const int32_t *)(o + OBJ_OFF_FIELD_578) != 0;
+
+    switch (arm_of_code[code]) {
+    case 0:
+        if (cls == 1)
+            return armed ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
+        if (cls == 2)
+            return AM2_POSE_CLASS2;
+        return armed ? AM2_POSE_STAND_ARMED : AM2_POSE_STAND;
+
+    case 1:
+        if (cls == 1)
+            return armed ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
+        if (cls == 2)
+            return AM2_POSE_CLASS2;
+        return AM2_POSE_STAND;
+
+    case 2:
+        return AM2_POSE_STAND;
+
+    default:
+        return ((const int32_t *)AM2_IMAGE(ADDR_POSE_BY_CLASS))[cls];
+    }
+}
+
 /* SetAnimFrame is maprow.cpp's now; the image seam that stood here went
    with the reconstruction, and checkseams is what noticed. */
 /* Still original: 272 bytes of per-row animation advance, one caller and that
  * caller is StepObjRows below. */
 typedef void (__cdecl *AM2_StepRowFn)(void *row);
 #define orig_step_row_anim   ((AM2_StepRowFn)(uintptr_t)ADDR_STEP_ROW_ANIM)
-#define orig_weapon_pose     ((AM2_PoseIndexFn)(uintptr_t)ADDR_WEAPON_POSE_INDEX)
 /* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
  * because it is CRT code the offline test maps as data. */
 typedef int32_t (__cdecl *AM2_RandFn)(void);
@@ -3736,7 +3809,7 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
                                           (o + UNIT_OFF_INVENTORY_SEL) * 4));
 
             if (w) {
-                int32_t pose = orig_weapon_pose(obj, w);
+                int32_t pose = WeaponPoseIndex(obj, w);
 
                 SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS),
                                     (int16_t)((const int32_t *)(uintptr_t)
@@ -4460,6 +4533,8 @@ void item_install(void)
                   "NotifyPickedUp", 1);
     patch_replace(ADDR_NOTIFY_DROPPED, (const void *)NotifyDropped,
                   "NotifyDropped", 1);
+    patch_replace(ADDR_WEAPON_POSE_INDEX, (const void *)WeaponPoseIndex,
+                  "WeaponPoseIndex", 3);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

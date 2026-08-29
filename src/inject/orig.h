@@ -4063,7 +4063,28 @@ typedef struct {
  * Four of the frame values are not frames: -2 does nothing, -1 means the
  * frame already set, 0 clears bit 0 of the row and returns. */
 #define ADDR_SET_ANIM_FRAME      0x0040A1A0u  /* void(row, int16 frame, int32) */
+/* Reconstructed in item.cpp. Its two tables are inside its own 208 bytes: an
+ * ARM index, one byte per weapon code 1..0x2B, and the four-entry jump table
+ * it selects. Three of the four arms answer from the object's class and its
+ * OBJ_OFF_FIELD_578; the fourth falls through to ADDR_POSE_BY_CLASS, which is
+ * also where a null weapon and an out-of-range code go. */
 #define ADDR_WEAPON_POSE_INDEX   0x004494A0u  /* int32(obj, weapon) */
+/* NOT ADDR_WEAPON_POSE_FRAMES, which is 0x1A0 bytes earlier. This one is
+ * indexed by ClassifyByCode74's answer -- 0, 1 or 2 -- and gives 1, 4 and 6:
+ * the poses a unit takes with no weapon to hold. The entries past the third
+ * are never reached, so its length is not established. */
+#define ADDR_POSE_BY_CLASS       0x00475180u  /* int32_t[] */
+/* Set with a weapon in hand, the pose is one of a higher set. Which is why
+ * OBJ_OFF_FIELD_578 is worth a second look: it selects between {1, 4} and
+ * {0x19, 0x1A} for one family of weapons and {1, 4} and {0x1F} for another,
+ * and it does nothing at all for class 2, which always answers 6. */
+#define AM2_POSE_CLASS2          6
+#define AM2_POSE_STAND           1
+#define AM2_POSE_STAND_ARMED     0x19
+#define AM2_POSE_KNEEL           4
+#define AM2_POSE_KNEEL_ARMED_A   0x1A
+#define AM2_POSE_KNEEL_ARMED_B   0x1F
+#define AM2_WEAPON_CODE_MAX      0x2B
 #define ADDR_WEAPON_POSE_FRAMES  0x00474FE0u  /* int32[] */
 /* Kind 7's two extras, both read out of the image: a 64-entry table of names
  * filled at runtime, and a health multiplier that is exactly 1.5. */
