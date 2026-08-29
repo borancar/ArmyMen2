@@ -2247,6 +2247,30 @@
 #define ADDR_MP_PANEL_SPRITES_B_END 0x00515FD4u
 #define ADDR_MP_PANEL_DESTRUCT   0x00430480u  /* thiscall void(this) */
 #define VTABLE_MP_PANEL          0x0046FA20u
+/* A SCROLLING LIST OF COLOURED TEXT LINES, five slots like every widget here:
+ * its own destructor and paint, the base's update, focus and repaint. Built at
+ * 0x00433290 from 0x00430C95, on the screen that also loads
+ * 03_010_00_scrollbar.bmp and the red and green button pairs -- so it is the
+ * list those scroll, and the name is from what the paint DRAWS rather than
+ * from that screen.
+ *
+ * Its source at +0x60 is {count, records} and a record is 0x104 bytes: 0x100
+ * of text and then an INDEX, not a colour. The colour comes from a table of
+ * dwords at +0x80 whose low byte is taken, so the records name a palette
+ * entry rather than carrying one. */
+#define VTABLE_TEXT_LIST         0x0046FA84u
+#define ADDR_TEXT_LIST_PAINT     0x00433360u  /* thiscall void(obj, RECT) */
+#define TEXTLIST_OFF_SOURCE      0x60u  /* {int32 count; void *records} */
+#define TEXTLIST_OFF_FIRST       0x74u  /* int32, the top visible row */
+#define TEXTLIST_OFF_VISIBLE     0x78u  /* int32, how many fit */
+#define TEXTLIST_OFF_COLOURS     0x80u  /* int32[], low byte used */
+#define TEXTLIST_SRC_COUNT       0x00u
+#define TEXTLIST_SRC_RECORDS     0x04u
+#define TEXTLIST_REC_SIZE        0x104u
+#define TEXTLIST_REC_COLOUR      0x100u /* int32 index into +0x80 */
+#define AM2_TEXT_LIST_ROW_H      14     /* (row - first) * 14 + 4 */
+#define AM2_TEXT_LIST_PAD        4
+#define AM2_TEXT_LIST_FONT       1
 #define ADDR_MENU_MSG_LIST       0x0051612Cu  /* the message log, a string list */
 #define AM2_MENU_MSG_MAX         0x64         /* trimmed above this many lines */
 #define ADDR_CHATBOX_REFLOW      0x00455D60u  /* thiscall(this) on [widget+0x7C] */

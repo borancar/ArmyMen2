@@ -694,6 +694,9 @@ void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip);
 /* Original: 0x004150F0, vtable slot 2 of the sarge panel. */
 void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w);
 
+/* Original: 0x00433360, vtable slot 1 of the scrolling text list. */
+void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip);
+
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
  * vtable stamp and the base call, so they are written out rather than made

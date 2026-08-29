@@ -2657,6 +2657,78 @@ refill:
     }
 }
 
+/* 0x00433360, vtable slot 1 of the scrolling text list. One of the nine
+ * functions still outstanding on CLAUDE.md's Lock/Unlock batch, and the
+ * smallest of them.
+ *
+ * A RECORD NAMES A COLOUR RATHER THAN CARRYING ONE. Each is 0x104 bytes --
+ * 0x100 of text and then an INDEX -- and the byte actually drawn comes from a
+ * table of dwords at TEXTLIST_OFF_COLOURS whose low byte is taken. Reading
+ * that index as the colour would give the right shape and the wrong palette,
+ * and on a list of one colour it would look correct.
+ *
+ * THE LOCK IS PER ROW, not per paint: LockSurface and UnlockSurface bracket
+ * each DrawTextClipped individually. That is a full bracket rather than one of
+ * the halves this batch keeps turning up, and it means a lock failure
+ * abandons the rest of the list -- the original returns rather than skipping
+ * the row, which is reproduced.
+ *
+ * TWO BOUNDS, checked in different places and both needed. The loop's own
+ * condition is the source's total count; inside it, a second test stops at
+ * FIRST + VISIBLE. So a list longer than the window is cut by the inner test
+ * and a window larger than the list by the outer one, and neither alone is
+ * enough.
+ */
+void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip)
+{
+    uint8_t       *self = (uint8_t *)w;
+    const uint8_t *src  = *(const uint8_t *const *)(self + TEXTLIST_OFF_SOURCE);
+    RECT           vis;
+    int32_t        row;
+
+    if (!src)
+        return;
+
+    WidgetScreenRect(w);
+
+    if (!IntersectRect(&vis, &clip, &w->rect))
+        return;
+
+    ClearRegion(&vis, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+
+    src = *(const uint8_t *const *)(self + TEXTLIST_OFF_SOURCE);
+
+    for (row = *(const int32_t *)(self + TEXTLIST_OFF_FIRST);
+         row < *(const int32_t *)(src + TEXTLIST_SRC_COUNT);
+         row++) {
+        const uint8_t *rec;
+        int32_t        first = *(const int32_t *)(self + TEXTLIST_OFF_FIRST);
+        int32_t        idx;
+        uint8_t        colour;
+        int32_t        y;
+
+        if (row >= first + *(const int32_t *)(self + TEXTLIST_OFF_VISIBLE))
+            return;
+
+        rec = *(const uint8_t *const *)(src + TEXTLIST_SRC_RECORDS)
+              + row * TEXTLIST_REC_SIZE;
+
+        idx    = *(const int32_t *)(rec + TEXTLIST_REC_COLOUR);
+        colour = *(const uint8_t *)(self + TEXTLIST_OFF_COLOURS + idx * 4);
+
+        y = w->rect.top + (row - first) * AM2_TEXT_LIST_ROW_H + AM2_TEXT_LIST_PAD;
+
+        if (!LockSurface(g_drawTarget))
+            return;
+
+        DrawTextClipped(w->rect.left + AM2_TEXT_LIST_PAD, y,
+                        (const char *)rec, AM2_TEXT_LIST_FONT, vis, colour);
+        UnlockSurface();
+
+        src = *(const uint8_t *const *)(self + TEXTLIST_OFF_SOURCE);
+    }
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -8476,6 +8548,8 @@ int widget_install(void)
                         "HudSquadPaint", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_UPDATE, (const void *)HudSargeUpdate,
                         "HudSargeUpdate", 1);
+    rc |= patch_replace(ADDR_TEXT_LIST_PAINT, (const void *)TextListPaint,
+                        "TextListPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
