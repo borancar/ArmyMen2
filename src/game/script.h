@@ -529,4 +529,8 @@ int script_install(void);
 }
 #endif
 
+/* 0x00443F10, one caller. Read a script variable, add to it, write it back,
+ * and answer whether both halves succeeded. */
+int32_t __cdecl AddToVar(int32_t index, int32_t delta);
+
 #endif /* AM2_SCRIPT_H */

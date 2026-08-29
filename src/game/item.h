@@ -472,4 +472,8 @@ int32_t __cdecl ItemIsReady(const void *item);
  * ADDR_ITEM_TYPE_NAMES. The sarge panel's tooltip is its only caller. */
 const char *__cdecl ItemTypeName(uint32_t kind);
 
+/* 0x004475C0, two callers, both in the HUD. Copy a type 2's personal name out
+ * of the soldier-name table, or leave the buffer empty. */
+void __cdecl SoldierNameOf(char *out, const void *obj);
+
 #endif

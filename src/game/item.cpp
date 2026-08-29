@@ -370,14 +370,16 @@ int32_t __cdecl TakeSoldierName(void)
         % AM2_SOLDIER_NAMES);
     int32_t  i     = start;
 
-    while (*(const int32_t *)(tab + (size_t)i * 8)) {
+    while (*(const int32_t *)(tab + (size_t)i * AM2_SOLDIER_NAME_BYTES
+                              + SOLDIER_NAME_OFF_TAKEN)) {
         if (++i >= AM2_SOLDIER_NAMES)
             i = 0;
         if (i == start)
             return start;               /* all taken; not marked */
     }
 
-    *(int32_t *)(tab + (size_t)i * 8) = 1;
+    *(int32_t *)(tab + (size_t)i * AM2_SOLDIER_NAME_BYTES
+                 + SOLDIER_NAME_OFF_TAKEN) = 1;
     return i;
 }
 
@@ -5022,6 +5024,46 @@ void __cdecl Type2ActionAll(void)
     }
 }
 
+/* SoldierNameOf -- original 0x004475C0, two callers, both in the HUD.
+ *
+ * Copy a soldier's personal name into the caller's buffer. Three things have
+ * to hold -- an object, a type 2, and a name index inside the table -- and if
+ * any of them does not, the buffer is left as an empty string rather than
+ * untouched. The clear happens FIRST, before the object is even tested, so a
+ * caller that ignores the failure prints nothing rather than the last name.
+ *
+ * The names are the team's own: "D. DuBois", "J. Wildblood", "One Eye". This
+ * is the table TakeSoldierName hands indices out of, and the pair is what
+ * settled the record layout -- the name is at +0 and the taken flag at +4, and
+ * ADDR_SOLDIER_NAMES had been pointing at the flag. Two functions indexing one
+ * table from different offsets is how that kind of error shows itself.
+ *
+ * The bound is `0 <= n < 62` with the low half a SIGNED test, so a negative
+ * index is rejected rather than wrapping -- which matters, because the field
+ * is an int32 and nothing guarantees it was ever assigned.
+ *
+ * The original inlines the copy as strlen-then-rep-movs, which is strcpy, and
+ * is written as one. Unbounded, exactly as the original: both callers pass a
+ * field of the HUD structure and the longest name is thirteen characters.
+ */
+void __cdecl SoldierNameOf(char *out, const void *obj)
+{
+    int32_t n;
+
+    out[0] = '\0';
+
+    if (!obj || !ObjIsType2((const AM2_Object *)obj))
+        return;
+
+    n = *(const int32_t *)((const uint8_t *)obj + OBJ_OFF_NAME_INDEX);
+    if (n < 0 || (uint32_t)n >= AM2_SOLDIER_NAMES)
+        return;
+
+    strcpy(out, *(const char *const *)
+        ((const uint8_t *)AM2_IMAGE(ADDR_SOLDIER_NAMES)
+         + (size_t)n * AM2_SOLDIER_NAME_BYTES + SOLDIER_NAME_OFF_NAME));
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5156,6 +5198,8 @@ void item_install(void)
                   "ObjDropAltRecord", 1);
     patch_replace(ADDR_TAKE_SOLDIER_NAME, (const void *)TakeSoldierName,
                   "TakeSoldierName", 1);
+    patch_replace(ADDR_SOLDIER_NAME_OF, (const void *)SoldierNameOf,
+                  "SoldierNameOf", 2);
     patch_replace(ADDR_BLOCK_WEIGHT_AT, (const void *)BlockWeightAt,
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,

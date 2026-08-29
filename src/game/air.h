@@ -208,4 +208,9 @@ void air_install(void);
 }
 #endif
 
+/* 0x00404ED0, two callers. Pick a point `dist` away from an object on a
+ * heading within +/-32 of the way it is facing. The first argument is unused. */
+void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
+                              AM2_Point *out);
+
 #endif /* AM2_AIR_H */

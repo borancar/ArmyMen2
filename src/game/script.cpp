@@ -3277,6 +3277,41 @@ int32_t __cdecl ScriptRunLine(const char *line)
     return 1;
 }
 
+/* AddToVar -- original 0x00443F10, one caller.
+ *
+ * Read a script variable, add a delta, write it back, and answer whether both
+ * halves succeeded. The one caller is the `changevar` action, which passes the
+ * variable's index and the amount from the script.
+ *
+ * THE NON-POSITIVE GUARD IS ON THE INDEX, NOT THE VALUE: index 0 is "no
+ * variable" throughout this subsystem, and a negative one is nothing at all.
+ * Both answer 0 without touching anything.
+ *
+ * The original writes the sum back into its own local before calling
+ * SetVarValue and never reads it again, so the local is dead; it is a local
+ * here too only because that is what the two calls need between them.
+ *
+ * GetVarValue leaves its out-parameter alone on failure, and the original
+ * zeroes the local before the call for exactly that reason -- so a failed read
+ * would add the delta to 0 rather than to rubbish. It never gets that far,
+ * because the failure is tested first, but the zero is reproduced: it is the
+ * same care misc.cpp's ScriptArmyScore already needed.
+ */
+int32_t __cdecl AddToVar(int32_t index, int32_t delta)
+{
+    int32_t v = 0;
+
+    if (index <= 0)
+        return 0;
+
+    if (!GetVarValue(index, &v))
+        return 0;
+
+    v += delta;
+
+    return SetVarValue(index, v) ? 1 : 0;
+}
+
 int script_install(void)
 {
     int rc = 0;
@@ -3323,6 +3358,8 @@ int script_install(void)
                         "SetVarValue", 2);
     rc |= patch_replace(ADDR_SET_VAR_BY_NAME, (const void *)SetVarValueByName,
                         "SetVarValueByName", 2);
+    rc |= patch_replace(ADDR_ADD_TO_VAR, (const void *)AddToVar,
+                        "AddToVar", 1);
     rc |= patch_replace(ADDR_FREE_SCRIPT_NAMES, (const void *)FreeScriptNames,
                         "FreeScriptNames", 0);
     rc |= patch_replace(ADDR_SAVE_SCRIPT_SECTION, (const void *)SaveScriptSection,

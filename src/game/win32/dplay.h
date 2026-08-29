@@ -233,4 +233,8 @@ int dplay_install(void);
 }
 #endif
 
+/* 0x004012C0, one caller. Find the node whose key matches, copy its body to
+ * dst under the list's mutex, and answer dst or NULL. */
+void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
+
 #endif /* AM2_DPLAY_H */

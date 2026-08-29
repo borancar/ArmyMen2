@@ -442,6 +442,48 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
     orig_settle_point(TileOfPoint(*(const uint32_t *)out), out);
 }
 
+typedef int32_t (__cdecl *AM2_AirRandFn)(void);
+#define orig_air_rand ((AM2_AirRandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* RandomPointAhead -- original 0x00404ED0, two callers, and a sibling of the
+ * formation-point pair above.
+ *
+ * Pick a point `dist` away from an object, on a heading within +/-32 of the
+ * way it is facing -- a quarter-turn's spread, since a heading here is 0..255.
+ * Both callers use it as a wander target, re-picked every five seconds.
+ *
+ * ITS FIRST ARGUMENT IS NEVER READ. Both call sites push four and the body
+ * uses the last three; the first is the object doing the wandering, which the
+ * caller then writes the result into itself. Reproduced as an unnamed
+ * parameter rather than dropped, because the calling convention is cdecl and
+ * the sites are the original's.
+ *
+ * THE HEADING IS PASSED AS A DWORD WITH THREE UNINITIALISED BYTES. The
+ * original computes the sum in `al`, stores that one byte into a stack local,
+ * and then loads the whole dword back to push it. Cos8 and Sin8 mask their
+ * index, so the rubbish above the low byte cannot reach the table -- which is
+ * why nothing has ever gone wrong with it. Written here as the uint8_t the
+ * arithmetic is actually done in.
+ *
+ * The rand is the image's own LCG and must be: libc's would give a different
+ * sequence and every wandering unit would go somewhere else.
+ */
+void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
+                              AM2_Point *out)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    uint8_t        facing;
+    double         d = (double)dist;
+
+    facing = (uint8_t)((orig_air_rand() & 0x3F)
+                       + *(const uint8_t *)(o + OBJ_OFF_FACING) - 0x20);
+
+    out->x = (int16_t)(int32_t)((double)Cos8(facing) * d
+                                + (double)*(const int16_t *)(o + OBJ_OFF_X));
+    out->y = (int16_t)(int32_t)((double)Sin8(facing) * d
+                                + (double)*(const int16_t *)(o + OBJ_OFF_Y));
+}
+
 /* 0x00404580, three callers. Place a follower in formation on its leader,
  * except that a leader who is RIDING something is not the thing to follow --
  * the vehicle is.
@@ -938,6 +980,8 @@ void air_install(void)
 {
     patch_replace(ADDR_FORMATION_POINT, (const void *)FormationPoint,
                   "FormationPoint", 4);
+    patch_replace(ADDR_RANDOM_POINT_AHEAD, (const void *)RandomPointAhead,
+                  "RandomPointAhead", 2);
     patch_replace(ADDR_RESOLVE_FORMATION_POINT,
                   (const void *)ResolveFormationPoint,
                   "ResolveFormationPoint", 3);

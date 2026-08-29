@@ -3061,6 +3061,9 @@ typedef struct {
  * certainly two overloads of it -- one taking an index, one a name. */
 #define ADDR_GET_VAR_VALUE       0x00443E40u  /* int32_t(int32_t, int32_t *) */
 #define ADDR_SET_VAR_VALUE       0x00443E90u  /* int32_t(int32_t, int32_t) */
+/* 0x00443F10, one caller. Read a script variable, add to it, write it back --
+ * and answer whether both halves succeeded. */
+#define ADDR_ADD_TO_VAR          0x00443F10u  /* int32_t(int32_t, int32_t) */
 #define ADDR_SET_VAR_BY_NAME     0x00443ED0u  /* int32_t(const char *, int32_t) */
 #define ADDR_SCRIPT_ALLOC_UID    0x0041E7F0u  /* int32_t(void) */
 #define ADDR_NEXT_UID            0x00511DF4u
@@ -4245,17 +4248,30 @@ typedef struct {
 /* TWO name indices, four bytes apart, and both live -- ten sites each. +0x5A8
  * is the kind-7 one, into ADDR_KIND7_NAMES, which SetSoldierKind writes. +0x5AC
  * is a different table entirely: ADDR_SOLDIER_NAMES, 62 records of
- * {taken, const char *} holding "R. Pavey", "D. Lee", "J. Wildblood" and the
- * rest of the team. ADDR_TAKE_SOLDIER_NAME hands out an index into it. */
+ * {const char *name; int32_t taken} holding "R. Pavey", "D. Lee",
+ * "J. Wildblood" and the rest of the team -- the developers, as it turns out.
+ * ADDR_TAKE_SOLDIER_NAME hands out an index into it.
+ *
+ * THE RECORD BASE IS 0x00489BF8 AND THIS MACRO USED TO BE 0x00489BFC, the
+ * taken column. Both readings index correctly, because the stride is 8 either
+ * way and TakeSoldierName only ever touches the flag -- so the error was
+ * invisible until SoldierNameOf needed the name at +0 of the same record. The
+ * base is the base now, and TakeSoldierName adds the offset. */
 #define OBJ_OFF_FIELD_5A8        0x5A8u  /* int32_t, the random name index */
 #define OBJ_OFF_NAME_INDEX       0x5ACu  /* into ADDR_SOLDIER_NAMES */
-#define ADDR_SOLDIER_NAMES       0x00489BFCu  /* {int32 taken; const char *} */
+#define ADDR_SOLDIER_NAMES       0x00489BF8u  /* {const char *; int32 taken} */
+#define SOLDIER_NAME_OFF_NAME    0x00u
+#define SOLDIER_NAME_OFF_TAKEN   0x04u
+#define AM2_SOLDIER_NAME_BYTES   0x08u
 #define AM2_SOLDIER_NAMES        0x3E         /* 62 of them */
 /* 0x00447570, one caller. Take an unused soldier name: start at a random
  * index, walk forward to the first free one, mark it and return it. If every
  * name is taken it returns the STARTING index without marking, so the caller
  * gets a name already in use rather than a failure. Reconstructed. */
 #define ADDR_TAKE_SOLDIER_NAME   0x00447570u  /* int32_t(void) */
+/* 0x004475C0, two callers, both in the HUD. Copy a type 2's personal name out
+ * of ADDR_SOLDIER_NAMES into the caller's buffer, or leave it empty. */
+#define ADDR_SOLDIER_NAME_OF     0x004475C0u  /* void(char *, const void *) */
 #define AM2_ANIM_TABLE_BYTES     8u      /* ADDR_SOLDIER_ANIMS' stride */
 #define AM2_MP_ROLE_SEVEN        7
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
@@ -6203,6 +6219,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * All three are "incidental" by the rule in CLAUDE.md: waiting on a handle,
  * releasing a mutex and posting a message operate on things somebody else
  * created, so a module using them is not boundary code. */
+/* 0x004012C0, one caller. Find the node whose MSGNODE_OFF_KEY matches, copy
+ * its body out, and answer the destination or NULL -- all under the list's
+ * own mutex. */
+#define ADDR_MSG_LIST_COPY_BY_KEY  0x004012C0u  /* void *(list,key,void *dst) */
 #define IAT_WAIT_FOR_SINGLE_OBJECT 0x0046F080u
 #define IAT_RELEASE_MUTEX          0x0046F060u
 #define IAT_POST_MESSAGE_A         0x0046F1CCu
@@ -6243,8 +6263,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The two the debug dump prints, and its only readers. +0x20 is a pointer and
  * what is printed is the dword at ITS +8, so the pair reads as "id, and a
  * field of whatever this node points at". Named for their offsets. */
-#define MSGNODE_OFF_FIELD_14       0x14u
-#define MSGNODE_OFF_OWNER          0x20u
+/* Both named from DumpMsgList, which prints them, and both corrected from
+ * MsgListCopyByKey (0x004012C0), which uses them for what they are: +0x14 is
+ * the KEY it matches on, +0x20 is the start of the message BODY and +0x24 is
+ * its length. DumpMsgList's second number is the dword at +8 of the body, one
+ * dereference further than the first, which is why "owner" looked plausible
+ * from the dump alone. Name a field from the code that acts on it. */
+#define MSGNODE_OFF_KEY            0x14u
+#define MSGNODE_OFF_BODY           0x20u
+#define MSGNODE_OFF_BODY_LEN       0x24u
 #define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
 /* 0x004010C0, "RemHead: Impossible List Size %d". Unlinks and answers the head
  * node, or null. The same sanity complaint as the append, and a second one --
@@ -8036,6 +8063,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MAP_BOUNDS_BOTTOM   0x00514E04u
 #define ADDR_RESOLVE_FORMATION_POINT 0x00404580u /* void(follower, leader,
                                                   *      AM2_Point *out) */
+/* 0x00404ED0, two callers, and a sibling of the two formation-point helpers
+ * below. Pick a point `dist` away from an object on a heading within +/-32 of
+ * the way it is facing. ITS FIRST ARGUMENT IS NEVER READ -- both call sites
+ * push four, and the body uses only the last three. */
+#define ADDR_RANDOM_POINT_AHEAD 0x00404ED0u /* void(void *, obj, int32,
+                                             *      AM2_Point *) */
 #define ADDR_FORMATION_POINT   0x00404400u  /* void(follower, leader,
                                              *      AM2_Point *out, int32 slot) */
 #define ADDR_REVEAL_NEARBY 0x004097D0u /* void(AM2_Point, int32, int32) */

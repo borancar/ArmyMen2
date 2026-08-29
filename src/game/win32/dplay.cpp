@@ -1941,6 +1941,50 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
     ClearMenuMsgs();
 }
 
+/* MsgListCopyByKey -- original 0x004012C0, one caller.
+ *
+ * Find the node whose key matches, copy its body into the caller's buffer, and
+ * answer the buffer -- or NULL if there is no such node. All of it under the
+ * list's own mutex, which is the point: the packet thread is appending to this
+ * list while the game reads it, so the walk and the copy have to be one
+ * operation.
+ *
+ * It lives here rather than in msgslot.cpp for the same reason DumpMsgList
+ * does: the flat half cannot name HANDLE.
+ *
+ * THE LENGTH COMES OFF THE NODE, NOT THE CALLER. Nothing bounds the copy
+ * against the destination, so a node claiming more than the caller allotted
+ * overruns it. The one caller passes a fixed-size stack buffer. The original's,
+ * and reproduced -- the sizes are decided where the node is built.
+ *
+ * The original tests the found node for NULL a second time, immediately after
+ * the loop that can only leave it non-NULL on that path. Dead, and not
+ * reproduced as a branch: what it compiles to is the `if (n)` already here.
+ *
+ * The return is `(n ? ~0 : 0) & dst`, i.e. the destination or NULL, which is
+ * the caller's way of asking "did you find it" without a second output.
+ */
+void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
+{
+    uint8_t       *l = (uint8_t *)list;
+    const uint8_t *n;
+
+    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+
+    for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
+         n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
+        if (*(const int32_t *)(n + MSGNODE_OFF_KEY) == key)
+            break;
+
+    if (n)
+        memcpy(dst, *(const void *const *)(n + MSGNODE_OFF_BODY),
+               *(const uint32_t *)(n + MSGNODE_OFF_BODY_LEN));
+
+    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+
+    return n ? dst : (void *)0;
+}
+
 /* DumpMsgList -- original 0x004013B0, one caller.
  *
  * It lives HERE rather than in msgslot.cpp with the rest of the list code:
@@ -1960,7 +2004,7 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
  * the logging outside it would be a different function.
  *
  * The second number printed is not the node's: it is the dword at +8 of
- * whatever MSGNODE_OFF_OWNER points at. One dereference further than the
+ * whatever MSGNODE_OFF_BODY points at. One dereference further than the
  * first, which is why the two offsets are named separately.
  */
 void __cdecl DumpMsgList(void *list)
@@ -1975,9 +2019,9 @@ void __cdecl DumpMsgList(void *list)
     for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
          n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
         orig_log((const char *)AM2_IMAGE(ADDR_STR_LIST_NODE),
-                     *(const int32_t *)(n + MSGNODE_OFF_FIELD_14),
+                     *(const int32_t *)(n + MSGNODE_OFF_KEY),
                      *(const int32_t *)(*(const uint8_t *const *)
-                                            (n + MSGNODE_OFF_OWNER) + 8));
+                                            (n + MSGNODE_OFF_BODY) + 8));
 
     orig_log((const char *)AM2_IMAGE(ADDR_STR_NEWLINE));
 
@@ -2005,6 +2049,9 @@ int dplay_install(void)
                         "CommReopenSession", 1);
     rc |= patch_replace(ADDR_DUMP_MSG_LIST, (const void *)DumpMsgList,
                         "DumpMsgList", 1);
+    rc |= patch_replace(ADDR_MSG_LIST_COPY_BY_KEY,
+                        (const void *)MsgListCopyByKey,
+                        "MsgListCopyByKey", 1);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
     rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,

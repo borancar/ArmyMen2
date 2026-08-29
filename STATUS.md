@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,124 patches.**
+Nothing uncommitted. **1,128 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -410,16 +410,36 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   cannot name `HANDLE`. The split decides where a function goes even when
   every function it belongs beside is on the other side.
 
+- **`ADDR_SOLDIER_NAMES` was pointing at the wrong column, and it took a
+  second reader to show it.** The table is 62 records of
+  `{const char *name; int32_t taken}` at `0x00489BF8`, and the macro was
+  `0x00489BFC` -- the taken flag. `TakeSoldierName` only ever touches that
+  flag and the stride is 8 either way, so it indexed correctly and the error
+  was invisible for as long as it had one user. `SoldierNameOf`
+  (`0x004475C0`) needs the name at +0 of the same record and would not
+  compile as a lie. **One consumer cannot check a layout.**
+
+  The names are the team's own -- "D. DuBois", "J. Wildblood", "One Eye".
+- **`MSGNODE_OFF_OWNER` was likewise named from a dump.** `DumpMsgList`
+  prints the dword at +8 of whatever +0x20 holds, which reads as an owner
+  record; `MsgListCopyByKey` (`0x004012C0`) memcpy's it wholesale for the
+  length at +0x24, so it is the message BODY. Renamed with +0x14 to
+  `MSGNODE_OFF_KEY` at the same time, which is what that function matches on.
+- **`RandomPointAhead`** (`0x00404ED0`) ignores its first argument -- both
+  call sites push four and the body uses three. Its heading is also passed as
+  a dword with three uninitialised bytes above the one the original computes;
+  `Cos8` and `Sin8` mask their index, which is why it has never mattered.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **974 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,124
+line (0x0045C000) patched**. Measured: **978 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,128
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Four batches have gone in and the 265 entries outstanding start at 48
+small ones in batches. Five batches have gone in and the 261 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
