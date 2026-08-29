@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,092 patches.**
+Nothing uncommitted. **1,093 patches.**
 
-Forty functions since the last snapshot. The seven-class HUD family is
+Forty-one functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -224,6 +224,21 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   It also shows `MAPOBJ_*` and `ROW_OFF_*` are two name families for one
   structure -- 0x00 and 0x2C are both, with the same meanings. Recorded, not
   merged; collapsing two families is a change of its own.
+
+- **`SeqStepKind4`** (`0x004613E0`) makes the pair legible: a kind 4 is a
+  four-cell shaded sprite that drifts 3 right, 1 up and 3 further off the
+  ground every 120 ms, advancing cell after a per-cell hold and retiring on
+  its last cell or on leaving the map.
+
+  Two parallel tables read with ONE index -- the sprite array and
+  `ADDR_REMAP_SHADES` -- which is what says the four shade tables are an
+  animation rather than four independent effects.
+
+  Seven of the seq family's eleven are ours, and the pattern across them is
+  that **nothing in a seq record means one thing**: `SEQ_OFF_LIFE` is an
+  interval here and a total in kind 5, `SEQ_OFF_GATE` a step counter here and
+  a millisecond accumulator there, `ROW_OFF_STAMP_54` milliseconds in one
+  stepper and frames in another.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

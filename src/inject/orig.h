@@ -1497,9 +1497,18 @@
 /* Reconstructed. Its three constants are globals rather than literals, which
  * is the only reason they can be named at all. */
 #define ADDR_SEQ_ADD_KIND4       0x00461350u  /* void(const int32_t *at, int32_t) */
-#define ADDR_SEQ_K4_FIELD_0C     0x0048CBD8u  /* int32_t, reads 3 */
-#define ADDR_SEQ_K4_FIELD_10     0x0048CBDCu  /* int32_t, reads -1 */
-#define ADDR_SEQ_K4_LIFE         0x0048CBC4u  /* int32_t, reads 120 */
+/* The kind-4 constants, now that its stepper says what each is for: the two
+ * SEQ_OFF_FIELD_0C/_10 sources are a per-step DRIFT in x and y, and the life
+ * is the interval BETWEEN steps rather than a total -- the stepper zeroes the
+ * row's elapsed each time it fires. */
+#define ADDR_SEQ_K4_DRIFT_X      0x0048CBD8u  /* int32_t, reads 3 */
+#define ADDR_SEQ_K4_DRIFT_Y      0x0048CBDCu  /* int32_t, reads -1 */
+#define ADDR_SEQ_K4_STEP_MS      0x0048CBC4u  /* int32_t, reads 120 */
+/* How many steps each of the four cells holds for, indexed by ROW_OFF_CELL. */
+#define ADDR_SEQ_K4_HOLD         0x0048CBC8u  /* int32_t[], reads 2,3,4,5 */
+/* Added to ROW_OFF_Y_ADJUST every step, so it also floats. */
+#define ADDR_SEQ_K4_RISE         0x0048CBE0u  /* int16_t, reads 3 */
+#define AM2_SEQ_K4_CELLS         4
 #define AM2_SEQ_KIND4            4
 #define AM2_SEQ_EMIT_ARG         0x0F
 /* How often kind 5 emits, in milliseconds. Two readers, both in that one

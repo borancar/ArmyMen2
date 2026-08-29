@@ -33,6 +33,10 @@ int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx);
  * through ROW_OFF_FIELD_2C, and what a kind 5 emits every 300 ms. */
 void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust);
 
+/* 0x004613E0. Kind 4's stepper: a four-cell shaded sprite that drifts and
+ * retires, either on its last cell or on leaving the map. */
+int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx);
+
 /* 0x004614D0. Kind 5's stepper: an emitter that adds a kind 4 into the other
  * context every 300 ms until its life runs out. */
 int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx);

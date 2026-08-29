@@ -1328,7 +1328,6 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
 typedef int32_t (__cdecl *AM2_SeqRetireFn)(void *ctx, void *rec);
 #define SeqRetire ((AM2_SeqRetireFn)(uintptr_t)ADDR_SEQ_RETIRE)
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
-#define orig_seq_step4 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP4)
 #define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
 #define orig_seq_step7 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP7)
 
@@ -1788,13 +1787,13 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND4;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) =
-        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_FIELD_0C);
+        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_DRIFT_X);
     *(int32_t *)(seq + SEQ_OFF_FIELD_10) =
-        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_FIELD_10);
+        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_DRIFT_Y);
     *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
     *(int32_t *)(seq + SEQ_OFF_LIFE)     =
-        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_LIFE);
+        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_STEP_MS);
 
     *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
@@ -1806,6 +1805,87 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(void **)(row + ROW_OFF_FIELD_2C)   =
         *(void *const *)AM2_IMAGE(ADDR_REMAP_SHADES);
     *(int16_t *)(row + ROW_OFF_FIELD_26) = AM2_SEQ_DEPTH_BIAS;
+}
+
+/* SeqStepKind4 -- original 0x004613E0, one caller.
+ *
+ * A kind 4 is a four-cell shaded sprite that DRIFTS and then goes out. Every
+ * ADDR_SEQ_K4_STEP_MS it moves 3 right, 1 up and 3 further off the ground,
+ * and after a per-cell number of steps it advances to the next cell -- new
+ * sprite, new shade -- retiring once it has used all four. It also retires
+ * the moment it drifts off the map. Smoke, on the evidence, but that is a
+ * reading and the code says only "shaded, drifting, four cells".
+ *
+ * SEQ_OFF_LIFE IS AN INTERVAL HERE AND A TOTAL IN KIND 5. This stepper
+ * compares the row's elapsed against it and then ZEROES the elapsed, so it is
+ * the time between steps; kind 5 compares and retires, so it is a whole
+ * lifetime. That makes two fields in this record -- LIFE and the row's
+ * STAMP_54 -- whose units are chosen by the kind. Three of the four kinds
+ * read this way now, and the pattern is that nothing in a seq record means
+ * one thing.
+ *
+ * SEQ_OFF_GATE IS A STEP COUNTER HERE, where kind 5 uses it as a millisecond
+ * accumulator. Same field, incremented by one per step and reset to 1 -- not
+ * to 0 -- when the cell advances, which keeps the walker from skipping the
+ * record on the frame after.
+ *
+ * TWO PARALLEL TABLES INDEXED BY THE CELL. The sprite comes from
+ * ADDR_SEQ_SPRITES_5 and the remap from ADDR_REMAP_SHADES, both at the same
+ * index, so cell 0..3 is progressively dimmer as it is a later frame. That
+ * the two are read with one index is what says the four shade tables are an
+ * animation and not four independent effects.
+ *
+ * The relink passes force 0 where kind 2 passes 1; this row really has moved.
+ */
+int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
+{
+    uint8_t *r   = (uint8_t *)rec;
+    uint8_t *row = *(uint8_t **)(r + SEQ_OFF_ROW);
+
+    (void)at;
+
+    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+            > *(const uint32_t *)(r + SEQ_OFF_LIFE)) {
+        uint32_t step = *(const uint32_t *)(r + SEQ_OFF_GATE) + 1;
+        uint32_t cell = *(const uint8_t *)(row + ROW_OFF_CELL);
+
+        *(uint32_t *)(r + SEQ_OFF_GATE) = step;
+
+        if (step > ((const uint32_t *)AM2_IMAGE(ADDR_SEQ_K4_HOLD))[cell]) {
+            cell++;
+            *(uint8_t *)(row + ROW_OFF_CELL) = (uint8_t)cell;
+
+            if (cell >= AM2_SEQ_K4_CELLS)
+                return SeqRetire(ctx, rec);
+
+            *(void **)(row + ROW_OFF_SPRITE) =
+                (*(void *const *const *)AM2_IMAGE(ADDR_SEQ_SPRITES_5))[cell];
+            *(void **)(row + ROW_OFF_FIELD_2C) =
+                ((void *const *)AM2_IMAGE(ADDR_REMAP_SHADES))[cell];
+
+            *(uint32_t *)(r + SEQ_OFF_GATE) = 1;
+        }
+
+        *(int16_t *)(row + ROW_OFF_Y_ADJUST) +=
+            *(const int16_t *)AM2_IMAGE(ADDR_SEQ_K4_RISE);
+        *(int16_t *)(row + ROW_OFF_X) +=
+            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
+        *(int16_t *)(row + ROW_OFF_Y) +=
+            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
+
+        *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
+
+        if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+                         (const AM2_Point *)(row + ROW_OFF_X)))
+            return SeqRetire(ctx, rec);
+
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    *(int32_t *)(row + ROW_OFF_STAMP_54) +=
+        *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+
+    return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }
 
 /* SeqStepKind5 -- original 0x004614D0, one caller.
@@ -1923,7 +2003,7 @@ void __cdecl SeqRun(void *ctx)
         case 1: break;   /* hangs; see above */
         case 2:          /* both reach the same stepper */
         case 3: at = SeqStepKind2(at, rec, ctx); break;
-        case 4: at = orig_seq_step4(at, rec, ctx); break;
+        case 4: at = SeqStepKind4(at, rec, ctx);   break;
         case 5: at = SeqStepKind5(at, rec, ctx);   break;
         case 6: at = orig_seq_step6(at, rec, ctx); break;
         case 7: at = orig_seq_step7(at, rec, ctx); break;
@@ -2183,6 +2263,8 @@ int misc_install(void)
                   "SeqStepKind5", 1);
     patch_replace(ADDR_SEQ_ADD_KIND4, (const void *)SeqAddKind4,
                   "SeqAddKind4", 1);
+    patch_replace(ADDR_SEQ_STEP4, (const void *)SeqStepKind4,
+                  "SeqStepKind4", 1);
     patch_replace(ADDR_SEQ_ADD_KIND6, (const void *)SeqAddKind6,
                   "SeqAddKind6", 2);
     patch_replace(ADDR_SEQ_ADD_KIND5, (const void *)SeqAddKind5,
