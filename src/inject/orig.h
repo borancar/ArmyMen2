@@ -4256,6 +4256,14 @@ typedef struct {
  * ADDR_MAP_CODE, record it in UNIT_OFF_INVENTORY_SEL, and apply the soldier
  * kind that goes with it. */
 #define ADDR_SELECT_BEST_WEAPON  0x004069B0u  /* void(void *unit) */
+/* 0x00406AB0, SelectBestWeapon's twin: the same six-slot walk scored by
+ * ADDR_WEAPON_RANK instead of ADDR_MAP_CODE, and it does NOT apply a soldier
+ * kind afterwards. */
+#define ADDR_SELECT_RANKED_WEAPON 0x00406AB0u /* void(void *unit) */
+/* The scorer is ADDR_MAP_CODE_18_28, already reconstructed as MapCode18To28
+ * -- 0x18 -> 8, 0x19 -> 2, 0x1A -> 1, 0x27 -> 4, 0x28 -> 6, everything else
+ * 0. Do not give it a second name here; that is what the alias ratchet
+ * refused. */
 /* What SetSoldierKind reaches. The frame setter compares against the row's
  * current frame and returns early unless forced; the pose table is int32 and
  * ships {1, 1, 5, 3, ...}. */

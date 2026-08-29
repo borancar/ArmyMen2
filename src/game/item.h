@@ -537,4 +537,8 @@ void __cdecl ResetType2Fields(void *obj);
  * of it behind a data file that does not ship, so it never runs here. */
 void __cdecl ResetObjOnCof(void *obj);
 
+/* 0x00406AB0, SelectBestWeapon's twin: scored by WeaponRank, and it writes the
+ * slot only when the winner is not slot 0. */
+void __cdecl SelectRankedWeapon(void *unit);
+
 #endif

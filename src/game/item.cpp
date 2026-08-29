@@ -5844,6 +5844,62 @@ void __cdecl ResetObjOnCof(void *obj)
     *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 2;
 }
 
+/* SelectRankedWeapon -- original 0x00406AB0, and SelectBestWeapon's twin. Same
+ * six slots, same unguarded slot 0, same strictly-greater comparison so the
+ * LOWEST slot wins a tie. Two differences, and both matter.
+ *
+ * IT SCORES WITH MapCode18To28, NOT MapCode. Five weapon codes rank at all
+ * and the order is a lookup rather than a formula, so "best" here is a
+ * different ordering from the other function's -- the two can disagree about
+ * which of two weapons to hold.
+ *
+ * That scorer was nearly reconstructed a second time while this was being
+ * written, under the name WeaponRank, because its address was not grepped
+ * first. checkpatches refused the build. **Before reconstructing anything,
+ * grep the tree for the ADDRESS as well as for the name** -- fourth time.
+ *
+ * AND IT ONLY WRITES THE SLOT WHEN THE WINNER IS NOT SLOT 0. `test ebp,ebp;
+ * jle` skips the store, so a unit whose best weapon is already the first one
+ * keeps whatever selection it had rather than being moved to slot 0. It also
+ * does NOT call SoldierKindForWeapon afterwards, where SelectBestWeapon
+ * always does. So this one changes the selection and nothing else.
+ *
+ * Written out beside its twin rather than sharing a helper, for the reason
+ * AddLevelRecord and AddNameRecord are: the original has two functions, and
+ * the duplication is what makes a later divergence visible.
+ */
+void __cdecl SelectRankedWeapon(void *unit)
+{
+    uint8_t *u = (uint8_t *)unit;
+    int32_t  best;
+    int32_t  bestSlot = 0;
+    int32_t  i;
+
+    best = MapCode18To28(**(const int32_t *const *)
+        ((const uint8_t *)WeaponByUid(
+             *(const uint32_t *)(u + UNIT_OFF_INVENTORY)) + OBJ_OFF_FIELD_C0));
+
+    for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
+        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                           + (size_t)i * 4);
+        int32_t  rank;
+
+        if (!uid)
+            continue;
+
+        rank = MapCode18To28(**(const int32_t *const *)
+            ((const uint8_t *)WeaponByUid(uid) + OBJ_OFF_FIELD_C0));
+
+        if (rank > best) {
+            bestSlot = i;
+            best     = rank;
+        }
+    }
+
+    if (bestSlot > 0)
+        *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = bestSlot;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5991,6 +6047,9 @@ void item_install(void)
                   "ResetType2Fields", 2);
     patch_replace(ADDR_RESET_OBJ_ON_COF, (const void *)ResetObjOnCof,
                   "ResetObjOnCof", 3);
+    patch_replace(ADDR_SELECT_RANKED_WEAPON,
+                  (const void *)SelectRankedWeapon,
+                  "SelectRankedWeapon", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

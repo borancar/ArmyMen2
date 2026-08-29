@@ -820,7 +820,20 @@ int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta)
     return FacingFromDelta(rec, delta, 0x14, 0x18);
 }
 
-/* Read out of the index table at 0x00406A94 and the five arms at 0x00406A7C. */
+/* Read out of the index table at 0x00406A94 and the five arms at 0x00406A7C.
+ *
+ * ONLY FIVE OF THE SEVENTEEN ENTRIES ANSWER ANYTHING -- 0x18, 0x19, 0x1A,
+ * 0x27 and 0x28 -- and the twelve between them share the default arm with
+ * everything outside the range, which is why the table can be the answer
+ * rather than an index into one. The values are not monotonic in the code, so
+ * it is a ranking and not a formula.
+ *
+ * Its two callers are SelectBestWeapon's twin SelectRankedWeapon and nothing
+ * else. It was very nearly reconstructed a SECOND time under the name
+ * WeaponRank while that twin was being written; checkpatches refused the
+ * build on both counts, the duplicate patch and the second ADDR_ name. Fourth
+ * near-miss of this kind in the project, and the first where the tool caught
+ * both halves at once. */
 int32_t __cdecl MapCode18To28(int32_t code)
 {
     static const uint8_t kMap[17] = {
@@ -2221,7 +2234,7 @@ int misc_install(void)
     patch_replace(ADDR_FACING_DELTA_14, (const void *)FacingFromDelta14,
                   "FacingFromDelta14", 2);
     patch_replace(ADDR_MAP_CODE_18_28, (const void *)MapCode18To28,
-                  "MapCode18To28", 1);
+                  "MapCode18To28", 2);
     patch_replace(ADDR_MEETS_ALL_THREE, (const void *)MeetsAllThree,
                   "MeetsAllThree", 1);
     patch_replace(ADDR_MISSION_NETWORKED, (const void *)MissionNetworked,

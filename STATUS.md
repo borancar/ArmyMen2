@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,163 patches.**
+Nothing uncommitted. **1,164 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -786,16 +786,37 @@ check and the A/B are what remain.
   never patched. **Measure the count after every batch; a build that compiles
   proves nothing about whether the patch is in.**
 
+- **`SelectRankedWeapon`** (`0x00406AB0`) is `SelectBestWeapon`'s twin and
+  differs in two things that matter. It scores with `MapCode18To28`, whose
+  five live codes rank in an order that is a lookup rather than a formula, so
+  the two functions can disagree about which weapon to hold. And it writes the
+  slot ONLY when the winner is not slot 0 -- a unit whose best weapon is
+  already the first keeps whatever selection it had -- where its twin always
+  writes and then applies a soldier kind as well.
+- **I reconstructed its scorer a second time, and `checkpatches` refused the
+  build on BOTH counts at once** -- "0x00406A40 patched 2 times" and a
+  22nd `ADDR_` alias. `MapCode18To28` has been in `misc.cpp` all along.
+  Fourth near-miss of this kind after `ScriptCompare`, `AllocUid` and
+  `SwapColourBytes`, and the first where one tool caught the duplicate patch
+  and the duplicate name together.
+
+  **Grep the tree for the ADDRESS as well as for the name.** The name would
+  never have collided: I called it `WeaponRank` and the existing one is
+  `MapCode18To28`, which is exactly why the address is the thing to check.
+
+  Its caller count was also wrong in the old comment -- one, where the image
+  has two -- and fixing it was free once the address was the question.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,012 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,163
+line (0x0045C000) patched**. Measured: **1,013 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,164
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Nineteen batches have gone in and the 227 entries outstanding start at 48
+small ones in batches. Twenty batches have gone in and the 226 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
