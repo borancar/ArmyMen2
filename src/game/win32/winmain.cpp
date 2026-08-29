@@ -572,8 +572,8 @@ static void ParseCommandLine(char *cmdLine)
     if (strstr(cmdLine, "-peter"))     opt(ADDR_OPT_PETER) = 1;
     if (strstr(cmdLine, "-dan"))       opt(ADDR_OPT_DAN) = 1;
     if (strstr(cmdLine, "-df"))        opt(ADDR_OPT_DF) = 0;
-    if (strstr(cmdLine, "-bm"))        opt(ADDR_OPT_MUSIC) = 1;
-    if (strstr(cmdLine, "-sm"))        opt(ADDR_OPT_MUSIC) = 0;
+    if (strstr(cmdLine, "-bm"))        opt(ADDR_OPT_BIG_MOVIES) = 1;
+    if (strstr(cmdLine, "-sm"))        opt(ADDR_OPT_BIG_MOVIES) = 0;
     if (strstr(cmdLine, "-nm"))        opt(ADDR_OPT_NM) = 1;
 
     /* `-map:NAME` -- everything after the colon up to the first character that

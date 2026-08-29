@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **18** analysis
+**`make check` runs everything that does not need the game.** **19** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -49,7 +49,7 @@ said "eight" here for a long time after it stopped being eight, and then said
 not a defence against one. `checkclaims.py` counts the recipe now, so this
 sentence cannot drift again.
 
-One of the 18 is `tools/checkclaims.py`, which reads the numeric claims out
+One of the 19 is `tools/checkclaims.py`, which reads the numeric claims out
 of *this file* and recomputes them. It exists because three separate figures
 here were found stale by measuring rather than reading, each from the same
 cause: a tool changed, some prose was updated, the rest kept asserting the old
@@ -357,6 +357,25 @@ where `0x00400000` is equally unavailable, will need exactly this and nothing
 more. What stays out of reach is a global the game WRITES at runtime, and a
 call into the image; those still need `AM2_SELFCHECK=1`.
 
+**Where the input space is SMALL, enumerate it and stop sampling.**
+`MovieBuildName` turns a short movie name into a filename, and everything it
+can do is decided by four literal comparisons and two globals. That is 64
+cases, so `tools/moviecheck.py` runs the original under Unicorn over all of
+them and compares against the rule the reconstruction implements -- an exact
+oracle in a tenth of a second, where `tools/vectors.py` could give none at all
+(its arguments are strings and it reads two globals the game writes).
+
+Mutation-checked in all three directions, because a check that cannot fail has
+not passed: dropping `portal` from the exempt set fails on exactly ONE case,
+which is the right number and is the evidence that the corpus reaches each
+exempt name in the one flag setting that distinguishes it; flipping the flag
+sense fails 24; dropping the slow-machine term fails 12.
+
+What it does not reach: the buffer overrun. `dst` is unbounded and the fourth
+call site passes a name a mission's script wrote, so a long enough name in a
+script smashes a 0x40-byte frame. That is the original's behaviour and is kept
+-- but nothing here tests it, and a corpus of short names could not.
+
 **Where the program ships its own input, use that instead of vectors.**
 A keyword lookup learns nothing from a random 32-bit argument.
 `tools/scriptcheck.py` runs the ORIGINAL tokeniser under Unicorn over every
@@ -555,10 +574,14 @@ act of writing this paragraph -- `0x0041DB20` was already
 and citing it repeatedly did not produce compliance; only the check did. Treat
 that as the finding: the ratchet is not a backstop for carelessness, it is the
 mechanism, and the same argument says the offset macros need one too, since
-their fourth duplicate passed every check silently. The one
-that is genuinely unresolved is `0x005125C4`, which was `ADDR_OPT_MUSIC` and
-which `SetGameDir` latches on entering the `avi` directory; one of the two
-readings is wrong and it is not yet established which.
+their fourth duplicate passed every check silently. The one that was
+genuinely unresolved -- `0x005125C4`, `ADDR_OPT_MUSIC`, which `SetGameDir`
+latches on entering the `avi` directory -- is settled: it is
+`ADDR_OPT_BIG_MOVIES`. `MovieBuildName` appends `sml` to a movie's filename
+when it is 0 and the machine is slow, so the avi latch means "the full-size
+movies are here" and `-bm`/`-sm` are big and small. **What settled it was
+reading a function that USES the flag**, where both earlier readings came
+from functions that write it.
 
 **The "event flags" are the pause mask, and both functions that move it say
 so themselves.** `0x004267C0` logs `"PauseGame: %x (set: %x)"` and `0x00426800`

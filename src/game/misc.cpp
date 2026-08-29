@@ -1593,6 +1593,47 @@ int32_t __cdecl RandomAround(int32_t centre, int32_t spread)
     return total / n;
 }
 
+/* MovieBuildName -- original 0x0042E770, four call sites.
+ *
+ * Turn a short movie name into a filename: copy it, append "sml" when the
+ * small set is in use, and append ".smk". Four names are exempt from the
+ * "sml" -- they are already the file the game wants.
+ *
+ * THE FLAG IT CONSULTS WAS MISNAMED, AND THIS IS WHAT SETTLED IT.
+ * ADDR_OPT_BIG_MOVIES was ADDR_OPT_MUSIC, named off `-bm` and `-sm` alone,
+ * with CLAUDE.md recording that SetGameDir also latches it on entering the
+ * `avi` directory and that "one of the two readings is wrong". Neither
+ * reading came from a function that USES the value. This one does, and it
+ * uses it to choose between `name.smk` and `namesml.smk` -- so `-bm` is big
+ * movies, `-sm` is small ones, and latching it on finding `avi` means the
+ * full-size set is present. Read a consumer, not another writer.
+ *
+ * THE ORIGINAL'S FOUR COMPARISONS ARE INLINED strcmp, not a table walk, and
+ * they are reproduced in the order it makes them. A loop over four pointers
+ * would be the same function and a smaller one; it would also be the first
+ * place a fifth name could quietly appear.
+ *
+ * Unbounded, like SetGameDir beside it: `dst` is a 0x20-byte stack buffer at
+ * three of the four call sites and the longest name the image ships is seven
+ * characters, so "credits" + ".smk" is twelve. The fourth passes
+ * ADDR_MOVIE_TO_PLAY, which a mission's script fills, and nothing checks its
+ * length. Kept as it is, for the reason gamedir.cpp gives.
+ */
+void __cdecl MovieBuildName(char *dst, const char *name)
+{
+    strcpy(dst, name);
+
+    if (strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_3DO)) != 0
+        && strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_CREDITS)) != 0
+        && strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_ACT2)) != 0
+        && strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_PORTAL)) != 0
+        && *(const int32_t *)AM2_IMAGE(ADDR_SLOW_MACHINE)
+        && !*(const int32_t *)AM2_IMAGE(ADDR_OPT_BIG_MOVIES))
+        strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_SMALL));
+
+    strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_EXT));
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -1734,5 +1775,7 @@ int misc_install(void)
                   "InitPtrList", 1);
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,
                   "ClearPtrListAlias", 1);
+    patch_replace(ADDR_MOVIE_BUILD_NAME, (const void *)MovieBuildName,
+                  "MovieBuildName", 4);
     return 0;
 }

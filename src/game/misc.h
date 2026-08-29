@@ -17,6 +17,11 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x0042E770. Short movie name -> filename: the name, "sml" when the small
+ * set is in use, then ".smk". Here rather than in a movie module because
+ * nothing else of that subsystem is reconstructed yet. */
+void __cdecl MovieBuildName(char *dst, const char *name);
+
 #endif
 
 /* 0x0045AFA0. The dword at +0x53C. */

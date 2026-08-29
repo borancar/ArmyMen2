@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,074 patches.**
+Nothing uncommitted. **1,075 patches.**
 
-Twenty-two functions since the last snapshot. The seven-class HUD family is
+Twenty-three functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -45,6 +45,20 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   constants are written at startup, so the values in the image file are not
   the ones the game uses -- a table dumped out of the binary answers about
   the file.
+
+- **`MovieBuildName`** (`0x0042E770`, 592 B) is small and settled something
+  that had been open for months. It appends `sml` to a movie's filename when
+  `ADDR_OPT_MUSIC` is 0 and the machine is slow -- so that flag is
+  **`ADDR_OPT_BIG_MOVIES`**, `-bm`/`-sm` are big and small movies, and
+  `SetGameDir` latching it on entering `avi` means the full-size set is
+  present. CLAUDE.md had recorded the two readings and said one must be
+  wrong; both came from functions that WRITE the flag. Reading one that uses
+  it took minutes.
+
+  `tools/moviecheck.py` is the nineteenth tool in `make check`: 64 cases, the
+  whole input space, run against the original under Unicorn in a tenth of a
+  second. Three mutations of the expected rule fail it, one of them on
+  exactly the single case that distinguishes it.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

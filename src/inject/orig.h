@@ -5589,6 +5589,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FILL_LIST_FROM_RULES 0x00430140u /* void(const char *, void *) */
 #define ADDR_GAME_DIR            0x0051235Cu  /* char[], the install directory */
 #define ADDR_STR_AVI_DIR         0x004852C8u  /* const char **, -> "avi" */
+/* The movie names MovieBuildName knows, and the two suffixes it appends. The
+ * four it compares against are the ones that are ALREADY the right file: a
+ * name not among them gets "sml" when the small set is in use.
+ *
+ * Its four call sites pass "3do", "act1", "credits" and ADDR_MOVIE_TO_PLAY,
+ * the buffer a mission's script fills -- so "act2" and "portal" are reached from
+ * script data and not from any literal in the image. */
+#define ADDR_STR_MOVIE_3DO       0x0048658Cu  /* "3do" */
+#define ADDR_STR_MOVIE_CREDITS   0x00486584u  /* "credits" */
+#define ADDR_STR_MOVIE_ACT2      0x004865A4u  /* "act2" */
+#define ADDR_STR_MOVIE_PORTAL    0x0048659Cu  /* "portal" */
+#define ADDR_STR_MOVIE_SMALL     0x00486598u  /* "sml" */
+#define ADDR_STR_MOVIE_EXT       0x00486590u  /* ".smk" */
 #define ADDR_STR_PATH_SEP        0x00478984u  /* "\\" */
 #define ADDR_MAP_FOLDER          0x00511AC8u  /* the map's own directory */
 #define ADDR_RULES_DIR_STR       0x00485110u  /* a `char *` to "rules"    */
@@ -5954,7 +5967,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OPT_PETER           0x004FD744u  /* -peter */
 #define ADDR_OPT_DAN             0x004FD740u  /* -dan */
 #define ADDR_OPT_DF              0x0047894Cu  /* -df clears it; 1 by default */
-#define ADDR_OPT_MUSIC           0x005125C4u  /* -bm sets, -sm clears */
+/* -bm sets it to 1 and -sm to 0, and it was ADDR_OPT_MUSIC for months on that
+ * pairing alone. It is BIG MOVIES, and three independent things now say so:
+ *
+ *   the switches themselves, -bm and -sm;
+ *   MovieBuildName, which appends "sml" to a movie's filename when this is 0
+ *   and the machine is slow, and does not when it is 1;
+ *   SetGameDir, which sets it after successfully entering the `avi`
+ *   directory -- i.e. when the full-size movies are actually present.
+ *
+ * The third was already in this file as a puzzle: "one of the two readings is
+ * wrong and it is not yet established which". As "music" the avi latch makes
+ * no sense at all; as "big movies" it is the obvious thing to latch. What
+ * settled it was reading a function that USES the flag rather than one that
+ * writes it. */
+#define ADDR_OPT_BIG_MOVIES      0x005125C4u  /* -bm sets, -sm clears */
 #define ADDR_OPT_NM              0x0051259Cu  /* -nm */
 #define ADDR_OPT_MAP_NAME        0x004F9FECu  /* char[], the text after -map: */
 /* The comm subsystem object; -debugComm, -traceComm and -logComm set flags
