@@ -1502,6 +1502,22 @@ static const int8_t kBlipRing[8][2] = {
     { 2,  0}, {-1,  1}, { 1,  1}, { 0,  2}
 };
 
+/* The square variant's two shapes: a 5x5 outline and the 3x3 ring inside it,
+ * the latter without its centre -- which two of the three phases write
+ * separately and the third leaves dark. */
+static const int8_t kBlipSquare[16][2] = {
+    {-2, -2}, {-1, -2}, { 0, -2}, { 1, -2}, { 2, -2},
+    {-2, -1},                               { 2, -1},
+    {-2,  0},                               { 2,  0},
+    {-2,  1},                               { 2,  1},
+    {-2,  2}, {-1,  2}, { 0,  2}, { 1,  2}, { 2,  2}
+};
+static const int8_t kBlipInner[8][2] = {
+    {-1, -1}, { 0, -1}, { 1, -1},
+    {-1,  0},           { 1,  0},
+    {-1,  1}, { 0,  1}, { 1,  1}
+};
+
 static void BlipPoints(uint8_t *centre, int32_t pitch, const int8_t (*pts)[2],
                        int32_t n, uint8_t colour)
 {
@@ -1584,6 +1600,63 @@ static void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
     case 2:
         BlipPoints(p, pitch, kBlipRing, 8, (uint8_t)colourA);
         BlipPoints(p, pitch, kBlipPlus, 4, (uint8_t)colourB);
+        break;
+    default:
+        break;
+    }
+}
+
+/* 0x0041C8A0, one caller -- the same radar path as DrawBlipPulse, one branch
+ * over. ObjType2Field548 picks between them: non-zero takes the diamond pulse
+ * above, zero takes this.
+ *
+ * It is STRUCTURALLY IDENTICAL to that function -- same bounds test, same
+ * lock, same three phases moving colour A outward with B one step behind, and
+ * the same interleaved `pop edi`/`pop esi` in the same two arms. Only the
+ * shapes differ: a 5x5 SQUARE outline where the pulse has a diamond ring, and
+ * a 3x3 ring where it has a plus.
+ *
+ *   phase 0   centre in A, the square in B
+ *   phase 1   the 3x3 ring in A, centre in B
+ *   phase 2   the square in A, the 3x3 ring in B, and no centre
+ *
+ * The two were read out separately rather than one assumed from the other,
+ * which is what makes sharing the phase structure between them safe. Its
+ * coverage is the pulse's exactly -- gated on the same OBJ_FLAG_BIT4 that no
+ * drive here sets, so the colours are verified by reading. See DrawBlipPulse
+ * for why the radar's pixels cannot settle that.
+ */
+static void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
+                                   int32_t colourB, int32_t phase)
+{
+    uint8_t *p;
+    int32_t  pitch;
+
+    if (x - 2 < 0 || y - 2 < 0)
+        return;
+    if (x + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
+        return;
+    if (y + 2 >= *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H)
+        return;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    pitch = (int32_t)g_pitch;
+    p     = g_framebuffer + pitch * y + x;
+
+    switch (phase) {
+    case 0:
+        *p = (uint8_t)colourA;
+        BlipPoints(p, pitch, kBlipSquare, 16, (uint8_t)colourB);
+        break;
+    case 1:
+        BlipPoints(p, pitch, kBlipInner, 8, (uint8_t)colourA);
+        *p = (uint8_t)colourB;
+        break;
+    case 2:
+        BlipPoints(p, pitch, kBlipSquare, 16, (uint8_t)colourA);
+        BlipPoints(p, pitch, kBlipInner, 8, (uint8_t)colourB);
         break;
     default:
         break;
@@ -1762,6 +1835,8 @@ int mapdraw_install(void)
                   "RadarBlipColour", 1);
     patch_replace(ADDR_DRAW_BLIP_PULSE, (const void *)DrawBlipPulse,
                   "DrawBlipPulse", 1);
+    patch_replace(ADDR_DRAW_BLIP_SQUARE, (const void *)DrawBlipSquare,
+                  "DrawBlipSquare", 1);
     patch_replace(ADDR_DRAW_VIEW_RECT, (const void *)DrawViewRect,
                   "DrawViewRect", 2);
     int rc = 0;

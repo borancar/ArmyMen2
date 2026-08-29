@@ -864,6 +864,17 @@
  * Another half-bracket -- Locks, never Unlocks. */
 #define ADDR_DRAW_BLIP_PULSE 0x0041CA50u /* void(x,y,colourA,colourB,phase) */
 #define AM2_BLIP_PULSE_PHASES 3
+/* 0x0041C8A0, one caller -- the same radar path, one branch over. It is
+ * STRUCTURALLY IDENTICAL to ADDR_DRAW_BLIP_PULSE above: same bounds test, same
+ * lock, same three phases moving colour A outward with B behind it, same
+ * interleaved pops in the same two arms. Only the two shapes differ -- a 5x5
+ * SQUARE outline where the pulse has a diamond, and a 3x3 ring where it has a
+ * plus.
+ *
+ * ADDR_OBJ_TYPE2_FIELD548 picks between them: non-zero takes the diamond, zero
+ * takes this. Both were read out separately rather than one assumed from the
+ * other, which is what makes sharing their phase structure safe. */
+#define ADDR_DRAW_BLIP_SQUARE 0x0041C8A0u /* void(x,y,colourA,colourB,phase) */
 /* 0x00413610. The one caller of DrawRect: it takes a rectangle stored in the
  * SAME space as ADDR_VIEW_ORIGIN, subtracts that origin to get screen
  * coordinates, and outlines it. A full Lock/Unlock bracket, unlike the two line
