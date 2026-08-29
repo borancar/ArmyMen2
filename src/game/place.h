@@ -76,4 +76,7 @@ int place_install(void);
 }
 #endif
 
+/* 0x0043A5F0, one caller. A packed sprite key for a selector in 0..7. */
+int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n);
+
 #endif /* AM2_PLACE_H */

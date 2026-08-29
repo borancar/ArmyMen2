@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,155 patches.**
+Nothing uncommitted. **1,158 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -612,16 +612,59 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   exactly, which is what says "scene" rather than "defect" -- a repeated
   EXACT count is the signal to worry about.
 
+- **`0x00417890` is the "Duck and cover!" cheat's effect**, named from the
+  string its caller prints one instruction earlier -- two hundred `SpawnAt`
+  calls scattered over a 620x480 span from the VIEW origin, so the barrage
+  lands where the player is looking rather than somewhere in the level. **The
+  order of its four `rand()` calls is part of the function**: they draw from
+  the image's own LCG, and C does not sequence argument evaluation, so writing
+  them inline as arguments would be free for the compiler to reorder. They are
+  four locals in the original's order.
+- **`SpriteKeyForKind`'s jump table has EIGHT slots and SIX distinct targets**
+  -- selectors 0, 1 and 2 share one arm. Counting the bodies gives six arms
+  where the switch has eight cases. Third instance of the same trap, after the
+  state-2 sub-state table and `WeaponClassOf`.
+- **`TileRegionOrBorrow`'s ring table is DOUBLED and its loop stops on a VALUE,
+  not an index.** The eight deltas are followed by a copy of themselves, so the
+  walk runs forward from any start for eight steps with no wrap test and
+  terminates when the delta equals the one it began with. That is why there is
+  no counter: the table's layout is the bound. Eight deltas that were not
+  distinct would stop early; a table that was not doubled would run off the end.
+
+  It also bounds-checks the RESULTING tile index rather than a margin, so a
+  tile on a row's left edge can borrow its region from the right edge of the
+  row above -- unlike the cover functions, which refuse a margin instead.
+
+### An A/B needs a quiet machine, and the way to tell is the PARENT commit
+
+This batch could not be verified on `bootcamp` or `combat`, and that is worth
+recording rather than papering over. Under an external load average of 18-21
+-- other users' processes, none of them ours -- the two halves of a run are
+starved unequally: frame counts collapsed from the usual 6,000-13,000 to
+1,700 and then to 64, `combat` went out-of-phase five times running, and
+`bootcamp`, which has read **22 pixels on every run all session**, read
+291,505 with an IDENTICAL log.
+
+Re-running proves nothing when the distribution itself has moved. What does
+prove something is stashing the batch and running the PARENT commit: it
+failed the same way, with log differences and 306,172 pixels, on code that
+had been clean hours earlier. So the noise is the machine.
+
+`campaign` (2 pixels, identical log, 35 widget nodes byte-identical) and
+`mission` (299, identical log, 16 nodes identical) still produced a coherent
+signal and both passed. **Re-run `bootcamp` and `combat` on this batch when
+the machine is quiet.**
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,004 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,155
+line (0x0045C000) patched**. Measured: **1,007 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,158
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fourteen batches have gone in and the 235 entries outstanding start at 48
+small ones in batches. Fifteen batches have gone in and the 232 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

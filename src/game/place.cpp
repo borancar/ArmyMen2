@@ -5,6 +5,7 @@
 #include "place.h"
 #include "image.h"
 #include "definfo.h"  /* DefParseInfoFile */
+#include "packkey.h"  /* PackKey -- reconstructed */
 #include "gamedir.h"  /* SetGameDir */
 #include "crt.h"       /* the game's allocator -- this table is its memory */
 #include "../inject/orig.h"
@@ -232,9 +233,51 @@ int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line)
     return 0;
 }
 
+/* SpriteKeyForKind -- original 0x0043A5F0, one caller.
+ *
+ * A packed sprite key for a selector in 0..7. Five of the eight arms call
+ * PackKey with a set id of their own and their own arithmetic on `n`; one
+ * answers a global outright; anything above 7 answers 0.
+ *
+ * SELECTORS 0, 1 AND 2 SHARE ONE ARM. The jump table has eight slots and only
+ * six distinct targets, with the first three pointing at the same code -- so
+ * counting the bodies gives six arms where the switch has eight cases. That is
+ * the same trap the state-2 sub-state table set and WeaponClassOf's jump table
+ * set again: read the TABLE, not the bodies.
+ *
+ * THE BOUND IS UNSIGNED, so a negative selector is refused by the same test
+ * that refuses 8 and above rather than falling through to an arm.
+ *
+ * The five arithmetics on `n` are all different -- n+1 three times over three
+ * different set ids, n+2 once, and 10*(n+1) once -- so nothing here collapses
+ * into a table of set ids. Written as the switch it is.
+ *
+ * Arm 7 ignores `n` entirely and answers ADDR_CREATE_WATCHED_KIND, which is a
+ * global something else writes; it is not a packed key at all, so the return
+ * type is what the two kinds of answer have in common and nothing more.
+ */
+int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n)
+{
+    switch ((uint32_t)sel) {
+    case 0:
+    case 1:
+    case 2:  return (int32_t)PackKey(0x26, (uint32_t)(n + 1), 0);
+    case 3:  return (int32_t)PackKey(0x20, (uint32_t)(n + 1), 0);
+    case 4:  return (int32_t)PackKey(0x21, (uint32_t)(n + 1), 0);
+    case 5:  return (int32_t)PackKey(0x2A, (uint32_t)(n + 2), 0);
+    case 6:  return (int32_t)PackKey(0x1F, (uint32_t)((n + 1) * 10), 0);
+    case 7:  return *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND;
+    default: return 0;
+    }
+}
+
 int place_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_SPRITE_KEY_FOR_KIND,
+                        (const void *)SpriteKeyForKind,
+                        "SpriteKeyForKind", 1);
 
     rc |= patch_replace(ADDR_FREE_PLACEMENTS, (const void *)FreePlacements,
                         "FreePlacements", 1);

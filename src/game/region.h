@@ -83,4 +83,8 @@ int32_t __cdecl ObjBoxAction(void *obj, int32_t arg);
  * weights. */
 void __cdecl RebuildTileCover(void);
 
+/* 0x0043A450, two callers. The region a tile is in, borrowing one from a
+ * neighbour and caching it when the tile has none. */
+uint16_t __cdecl TileRegionOrBorrow(uint16_t tile);
+
 #endif /* AM2_REGION_H */

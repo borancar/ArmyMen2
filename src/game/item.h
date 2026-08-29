@@ -521,4 +521,8 @@ void __cdecl ObjToAI(void *obj);
  * on the frames that go with it, skipping any row mid-animation. */
 void __cdecl SetKindFrames(void *obj, int32_t kind);
 
+/* 0x00417890, one caller -- the "Duck and cover!" cheat. Two hundred spawns at
+ * random points across the view, six kinds, each with a random delay. */
+void __cdecl SpawnRandomBarrage(void);
+
 #endif

@@ -5377,6 +5377,16 @@ typedef struct {
  * site, this one, and passed straight through as an argument. */
 #define ADDR_OBJ_MOVE_ALONG_FACING 0x00429040u /* void(obj, int32, int32, int32) */
 #define ADDR_SPAWN_AT              0x00422860u /* void(x, y, kind, army, uid, ...) */
+/* 0x00417890, one caller, and that caller prints "Duck and cover!" one
+ * instruction earlier -- so this is the cheat's effect: 200 SpawnAt calls at
+ * random points across the view, six kinds, each with a random delay. */
+#define ADDR_SPAWN_RANDOM_BARRAGE  0x00417890u /* void(void) */
+#define AM2_BARRAGE_COUNT          0xC8   /* 200 */
+#define AM2_BARRAGE_KINDS          6
+#define AM2_BARRAGE_SPAN_X         0x26C  /* 620 */
+#define AM2_BARRAGE_SPAN_Y         0x1E0  /* 480 */
+#define AM2_BARRAGE_DELAY_MAX      0xFA0  /* 4000 */
+#define AM2_BARRAGE_ARG6           0xC8
 #define ADDR_WATCHED_TYPE_ID       0x00516164u /* int32_t, ships 0xE80609 */
 #define ADDR_SPAWN_EXTRA_6622BC    0x006622BCu /* int32_t, one reader */
 /* Bit 7 of OBJ_OFF_FLAGS. The stepper acts on it and then clears it, so it is
@@ -6452,6 +6462,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * fields reached here are a link COUNT at +8, a byte, and a pointer to the
  * links at +0x0C. A link is six bytes. */
 #define ADDR_REGION_OF_CELL        0x00514ECCu  /* uint8_t * */
+/* 0x0043A450, two callers. The region a tile is in -- and when the tile has
+ * none, borrow one from a neighbour and cache it on the tile. */
+#define ADDR_TILE_REGION_OR_BORROW 0x0043A450u /* uint16_t(uint16_t tile) */
+/* Eight tile-index deltas, DOUBLED: entries 0..7 are the ring and 8..15 repeat
+ * them, so a walk starting anywhere in 0..7 runs forward for eight steps
+ * without a wrap test and stops when the VALUE comes back to where it began.
+ * Built at map load beside ADDR_TILE_NEIGHBOURS; the seventeenth dword the
+ * builder writes is not part of that scheme and nothing here reads it. */
+#define ADDR_TILE_RING8            0x0053C480u /* int32_t[17] */
 #define ADDR_REGIONS               0x00514EF0u
 #define AM2_REGION_SIZE            44
 #define REGION_OFF_ACTIVE          4u   /* int32_t; 0x0042BAD4 sets it to 1 */
@@ -7776,6 +7795,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_TYPE_OFF_GAME_MASK 0x24u
 #define ADDR_UNIT_TYPE_COST 0x0043A5E0u  /* uint32_t(int32_t type) */
 #define ADDR_PACK_KEY       0x00433810u
+/* 0x0043A5F0, one caller. A packed sprite key for a selector in 0..7: five of
+ * the eight arms call PackKey with their own set id and their own arithmetic
+ * on the second argument, one answers a global, and the top three selectors
+ * share a single arm. */
+#define ADDR_SPRITE_KEY_FOR_KIND 0x0043A5F0u /* int32_t(int32_t sel, int32_t) */
 #define ADDR_KEY_FIELD_A    0x00433830u
 #define ADDR_KEY_FIELD_B    0x00433840u
 #define ADDR_KEY_FIELD_C    0x00433850u

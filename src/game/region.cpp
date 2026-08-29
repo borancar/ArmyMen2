@@ -814,6 +814,81 @@ void __cdecl RebuildTileCover(void)
     }
 }
 
+typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
+#define orig_region_rand ((AM2_RegionRandFn)(uintptr_t)ADDR_GAME_RAND)
+
+/* TileRegionOrBorrow -- original 0x0043A450, two callers.
+ *
+ * Which region a tile belongs to. If it already has one, answer that. If it
+ * does not, walk the eight-neighbour ring from a random even start looking for
+ * a neighbour that has one and is not blocked, CACHE that region on this tile,
+ * and answer it. Nothing found answers 0 and caches nothing.
+ *
+ * THE RING TABLE IS DOUBLED AND THE LOOP STOPS ON A VALUE, NOT AN INDEX. The
+ * eight deltas are followed by a copy of themselves, so the walk runs forward
+ * from wherever it started for eight steps with no wrap test, and terminates
+ * when the delta it reads equals the one it began with. That is why there is
+ * no counter here: the table's own layout is the bound. It also means a table
+ * whose eight deltas were not distinct would stop early, and one that was not
+ * doubled would run off the end.
+ *
+ * THE RANDOM START IS `rand() & 6`, so it is 0, 2, 4 or 6 -- four of the eight
+ * positions, never an odd one. The walk still covers all eight from any of
+ * them; only where it begins is restricted, which decides WHICH neighbour wins
+ * when several qualify.
+ *
+ * THE TWO NEIGHBOUR TESTS ARE READ DIFFERENTLY AND THAT IS NOT A SLIP. The
+ * region byte is compared UNSIGNED against zero -- any non-zero value counts,
+ * including 0x80 and above -- while the weight is compared SIGNED against
+ * fifteen, so a weight of 0x80 or more reads as negative and counts as
+ * unblocked. The same signed reading MarkOpenTile and RebuildTileCover use.
+ *
+ * The bounds test is on the RESULTING index rather than on the tile's x and y,
+ * so a neighbour that wraps around a row edge is accepted as long as it lands
+ * inside the grid. That is the difference from the cover functions, which
+ * refuse a margin instead; here a tile on the left edge can borrow its region
+ * from the right edge of the row above.
+ *
+ * The map dimensions are multiplied inside the loop on every neighbour rather
+ * than once. Reproduced as the plain expression; nothing can change them.
+ */
+uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
+{
+    uint8_t       *regions = *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL;
+    const int8_t  *weights;
+    const int32_t *ring;
+    int32_t        first;
+    int32_t        delta;
+
+    if (regions[tile])
+        return regions[tile];
+
+    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+    regions = *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL;
+
+    ring  = (const int32_t *)(uintptr_t)ADDR_TILE_RING8
+            + (orig_region_rand() & 6);
+    first = ring[0];
+    delta = first;
+
+    for (;;) {
+        int32_t at = delta + (int32_t)tile;
+
+        if (at > 0
+            && at < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                    * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+            && regions[at] != 0
+            && weights[at] < (int8_t)AM2_CELL_WEIGHT_STEP) {
+            regions[tile] = regions[at];
+            return (*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL)[tile];
+        }
+
+        delta = *++ring;
+        if (delta == first)
+            return 0;
+    }
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -832,6 +907,9 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_TILE_REGION_OR_BORROW,
+                        (const void *)TileRegionOrBorrow,
+                        "TileRegionOrBorrow", 2);
     rc |= patch_replace(ADDR_REBUILD_TILE_COVER,
                         (const void *)RebuildTileCover,
                         "RebuildTileCover", 1);

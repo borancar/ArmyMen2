@@ -5604,6 +5604,53 @@ void __cdecl SetKindFrames(void *obj, int32_t kind)
         SetAnimFrame(row, AM2_SECOND_ROW_FRAME, 0);
 }
 
+/* SpawnRandomBarrage -- original 0x00417890, one caller, and that caller
+ * prints "Duck and cover!" one instruction before calling it. So this is a
+ * CHEAT's effect: two hundred SpawnAt calls scattered across the view, each
+ * one of six kinds, each with its own random delay.
+ *
+ * The name is from the body. The string names the cheat, not the function, and
+ * that distinction is the one CLAUDE.md keeps having to make.
+ *
+ * THE ORDER OF THE FOUR rand() CALLS IS PART OF THE FUNCTION. They draw from
+ * the image's own LCG, so which draw becomes the delay and which becomes the x
+ * decides every spawn -- and C does not sequence argument evaluation, so
+ * writing them inline as arguments would be free for the compiler to reorder.
+ * They are four locals, assigned in the original's order: delay, then kind,
+ * then y, then x.
+ *
+ * THE SPAN IS 620 x 480 FROM THE VIEW ORIGIN, which is the screen and not the
+ * map -- so the barrage lands where the player is looking rather than
+ * somewhere in the level. 620 rather than 640 is the original's number.
+ *
+ * The six kinds are a table built on the stack every call rather than a
+ * constant in the image; reproduced as a local for the same reason, since a
+ * static would be a different object with a different lifetime and nothing
+ * here needs one.
+ *
+ * Seven of SpawnAt's ten arguments are constants here -- an army of 0, a uid
+ * of 0, 0xC8, then the delay, then three more zeros -- and what most of them
+ * mean is not established. They are passed as the literals they are, through
+ * the typedef that was already in this file for the other caller.
+ */
+void __cdecl SpawnRandomBarrage(void)
+{
+    const int32_t kinds[AM2_BARRAGE_KINDS] =
+        { 0x81, 0x82, 0x8C, 0x78, 0x94, 0x95 };
+    int32_t i;
+
+    for (i = 0; i < AM2_BARRAGE_COUNT; i++) {
+        int32_t delay = orig_rand() % AM2_BARRAGE_DELAY_MAX;
+        int32_t kind  = kinds[orig_rand() % AM2_BARRAGE_KINDS];
+        int32_t y     = orig_rand() % AM2_BARRAGE_SPAN_Y
+                        + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
+        int32_t x     = orig_rand() % AM2_BARRAGE_SPAN_X
+                        + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+
+        orig_spawn_at(x, y, kind, 0, 0, AM2_BARRAGE_ARG6, delay, 0, 0, 0);
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5742,6 +5789,9 @@ void item_install(void)
     patch_replace(ADDR_OBJ_TO_AI, (const void *)ObjToAI, "ObjToAI", 1);
     patch_replace(ADDR_SET_KIND_FRAMES, (const void *)SetKindFrames,
                   "SetKindFrames", 3);
+    patch_replace(ADDR_SPAWN_RANDOM_BARRAGE,
+                  (const void *)SpawnRandomBarrage,
+                  "SpawnRandomBarrage", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,
