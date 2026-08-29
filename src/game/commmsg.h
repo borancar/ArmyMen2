@@ -29,6 +29,12 @@ int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid);
  * Army 4 is neutral and answers yes without touching the object. */
 int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid);
 
+/* 0x0044CC90 and 0x0044C960, two arms of the trooper dispatcher: kind 0x16 is
+ * a batch of variable-length sub-records, kind 0x18 a (trooper, weapon) pair
+ * whose sender armymsg.cpp already has. */
+void __cdecl RecvTroopBatch(void *msg, int32_t army);
+void __cdecl RecvTroopPair(void *msg);
+
 /* 0x0044C590, one caller. The trooper half of the army-message dispatcher:
  * thirteen arms over kinds 0x16..0x22, seven of which are the unknown log. */
 void __cdecl TroopMessageRecv(void *msg, int32_t army);

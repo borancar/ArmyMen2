@@ -30,6 +30,7 @@
 #include "event.h"     /* EventMessageReceive -- reconstructed */
 #include "misc.h"      /* XorChecksum, reconstructed */
 #include "rect.h"       /* AM2_Rect, for the dialog paint slot */
+#include "objtype.h"    /* ObjIsType4 -- reconstructed */
 #include "armymsg.h"    /* SendGamePause */
 #include "../inject/orig.h"
 #include "crt.h"        /* am2_log */
@@ -815,6 +816,77 @@ int32_t __cdecl UidObjKind(uint32_t uid)
     return (int32_t)obj[0];
 }
 
+typedef void *(__cdecl *AM2_TroopSubFn)(const void *at, int32_t army);
+typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
+#define orig_troop_sub_parse \
+    ((AM2_TroopSubFn)(uintptr_t)ADDR_TROOP_SUB_PARSE)
+#define orig_trooper_pair_apply \
+    ((AM2_PairApplyFn)(uintptr_t)ADDR_TROOPER_PAIR_APPLY)
+
+/* RecvTroopBatch -- original 0x0044CC90, one caller. Message kind 0x16.
+ *
+ * A BATCH, and that is why it is the only arm of the trooper dispatcher that
+ * takes the army. The header's length bounds a run of variable-length
+ * sub-records starting at +8; each is parsed by ADDR_TROOP_SUB_PARSE, which
+ * answers the pointer past itself, and every one of them is handed the army.
+ *
+ * The bound is a 16-bit length ZERO-extended and added to the message's own
+ * address, so a length below 8 makes the loop not run rather than run
+ * backwards. Reproduced as the unsigned compare it is.
+ */
+void __cdecl RecvTroopBatch(void *msg, int32_t army)
+{
+    const uint8_t *m   = (const uint8_t *)msg;
+    const uint8_t *end = m + *(const uint16_t *)m;
+    const uint8_t *at  = m + sizeof(AM2_ArmyMsgHdr);
+
+    while (at < end)
+        at = (const uint8_t *)orig_troop_sub_parse(at, army);
+}
+
+/* RecvTroopPair -- original 0x0044C960, one caller. Message kind 0x18.
+ *
+ * Two uids and two dwords. The first uid must resolve; the second must
+ * resolve AND be a type 4, which ADDR_OBJ_IS_TYPE4's own error string calls a
+ * WEAPON. Then the pair and both dwords go to ADDR_TROOPER_PAIR_APPLY.
+ *
+ * THE TWO UIDS ARE LOOKED UP BY DIFFERENT FUNCTIONS, which is not a
+ * transcription slip: the first goes through ObjByUidAlias and the second
+ * through LookupByUID. Those are the same lookup one wrapper apart, so the
+ * answers agree -- but the original really does call two different addresses
+ * and this reproduces that rather than tidying to one.
+ *
+ * The two dwords are passed in the OTHER ORDER from the one they sit in:
+ * +0x18 before +0x14 -- which is MSG_PAIR_OFF_BYTE before MSG_PAIR_OFF_ARG,
+ * matching SendPairMsg's own (a, b, int8, int32). The sender was
+ * reconstructed first and its comment said "nothing read so far says what the
+ * pair means"; this confirms its field layout and its argument order, which
+ * is what a receiver is for. Read off the pushes, not off the record.
+ *
+ * UidOnWire on both, and it is the identity -- see armymsg.cpp.
+ */
+void __cdecl RecvTroopPair(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    void          *a;
+    void          *b;
+
+    a = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + MSG_PAIR_OFF_A)));
+    if (!a)
+        return;
+
+    b = LookupByUID(UidOnWire(*(const uint32_t *)(m + MSG_PAIR_OFF_B)));
+    if (!b)
+        return;
+
+    if (!ObjIsType4((const AM2_Object *)b))
+        return;
+
+    orig_trooper_pair_apply(a, b,
+                            *(const int32_t *)(m + MSG_PAIR_OFF_BYTE),
+                            *(const int32_t *)(m + MSG_PAIR_OFF_ARG));
+}
+
 /* TroopMessageRecv -- original 0x0044C590, one caller.
  *
  * The trooper half of the army-message dispatcher, and the sibling of
@@ -846,12 +918,8 @@ int32_t __cdecl UidObjKind(uint32_t uid)
 typedef void (__cdecl *AM2_TroopMsgFn)(void *msg);
 typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
 
-#define orig_recv_troop_16 \
-    ((AM2_TroopMsgArmyFn)(uintptr_t)ADDR_RECV_TROOP_16)
 #define orig_recv_trooper_fire \
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOPER_FIRE)
-#define orig_recv_troop_pair \
-    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_PAIR)
 #define orig_recv_troop_19 \
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_19)
 #define orig_recv_troop_drop_item \
@@ -865,7 +933,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
 
     switch (kind) {
     case AM2_MSG_TROOP_FIRST:
-        orig_recv_troop_16(msg, army);
+        RecvTroopBatch(msg, army);
         return;
 
     case AM2_MSG_TROOPER_FIRE:
@@ -873,7 +941,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
         return;
 
     case AM2_MSG_PAIR:
-        orig_recv_troop_pair(msg);
+        RecvTroopPair(msg);
         return;
 
     case 0x19:
@@ -1655,6 +1723,10 @@ int commmsg_install(void)
 {
     patch_replace(ADDR_TROOP_MESSAGE_RECV, (const void *)TroopMessageRecv,
                   "TroopMessageRecv", 1);
+    patch_replace(ADDR_RECV_TROOP_16, (const void *)RecvTroopBatch,
+                  "RecvTroopBatch", 1);
+    patch_replace(ADDR_RECV_TROOP_PAIR, (const void *)RecvTroopPair,
+                  "RecvTroopPair", 1);
     patch_replace(ADDR_VEHICLE_MSG_RECV, (const void *)VehicleMsgRecv,
                   "VehicleMsgRecv", 1);
     patch_replace(ADDR_RECV_VEHICLE_EXIT, (const void *)RecvVehicleExit,

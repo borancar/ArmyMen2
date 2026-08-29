@@ -4709,9 +4709,14 @@ typedef struct {
  * Reproduced; a memset would be tidier and would change what the receiver sees
  * on a machine where the stack held something else.
  *
- * The name is structural. Kind 0x18 has no receiver reconstructed yet and
- * nothing read so far says what the pair means -- the callers are all in the
- * trooper band and pass an object, another object, a byte and a field. */
+ * The name is structural, and the RECEIVER is reconstructed now -- see
+ * RecvTroopPair in commmsg.cpp. It confirms this layout exactly and settles
+ * the argument order: it passes +0x18 before +0x14, which is the byte before
+ * the field, matching this function's own (a, b, int8, int32). It also says
+ * the second object must be a TYPE 4 -- a weapon -- and hands the pair to a
+ * 576-byte function that stamps a two-second deadline on the first and plays
+ * a sound at the second. Still not enough to name the message; enough to say
+ * the pair is a trooper and a weapon. */
 #define ADDR_SEND_PAIR_MSG         0x0044C0F0u  /* void(a, b, int8, int32) */
 #define AM2_MSG_PAIR               0x18
 #define AM2_MSG_PAIR_LEN           0x1C
@@ -6493,9 +6498,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * somewhere else entirely" -- this is somewhere else.
  *
  * Only the FIRST arm takes the army, exactly as in the vehicle half. */
+/* Reconstructed. Kind 0x16 is a BATCH: the header's length bounds a run of
+ * variable-length sub-records starting at +8, each parsed by
+ * ADDR_TROOP_SUB_PARSE, which answers the pointer past itself. That is why
+ * this is the only arm of the trooper dispatcher that takes the army -- it
+ * hands it to every sub-record. */
 #define ADDR_RECV_TROOP_16       0x0044CC90u  /* void(msg *, int32_t army) */
+#define ADDR_TROOP_SUB_PARSE     0x0044BEA0u  /* void *(const void *, int32) */
 #define ADDR_RECV_TROOPER_FIRE   0x0044CB20u  /* 0x17, already named */
+/* Reconstructed. Kind 0x18 carries two uids and two dwords: the first uid
+ * must resolve, the second must resolve AND be a type 4 -- a WEAPON, per
+ * ADDR_OBJ_IS_TYPE4's own error string -- and then the pair goes to
+ * ADDR_TROOPER_PAIR_APPLY. */
 #define ADDR_RECV_TROOP_PAIR     0x0044C960u  /* 0x18, already named */
+/* 0x00448B20, 576 bytes, one caller. What a kind 0x18 does with its pair: it
+ * stamps `now + 2000` into the trooper's +0xC8 and plays sound 0x37 at the
+ * weapon's position, among a good deal else. The name is the pairing, not the
+ * effect -- 576 bytes is more than one verb and none of it is read yet. */
+#define ADDR_TROOPER_PAIR_APPLY  0x00448B20u  /* void(troop, weapon, a, b) */
+
 #define ADDR_RECV_TROOP_19       0x0044C680u
 #define ADDR_RECV_TROOP_DROP_ITEM 0x0044C9C0u /* eTROOPER_DROP_ITEM_MESSAGE */
 #define ADDR_RECV_TROOP_SET_WEAPON 0x0044C3E0u /* eTROOPER_SET_WEAPON_MESSAGE */

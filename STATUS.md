@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,097 patches.**
+Nothing uncommitted. **1,099 patches.**
 
-Forty-four functions since the last snapshot. The seven-class HUD family is
+Forty-six functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -282,6 +282,24 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
   A frame-count FAIL of 297% on `campaign` re-ran clean, as the two before
   it did.
+
+- **`RecvTroopBatch` and `RecvTroopPair`** (`0x0044CC90`, `0x0044C960`) close
+  two arms of the trooper dispatcher. Kind 0x16 is a **batch** -- a run of
+  variable-length sub-records, each parser returning the pointer past itself
+  -- which is why it is the one arm that takes the army.
+
+  Kind 0x18's receiver **confirms its sender**. `armymsg.cpp`'s
+  `SendPairMsg` was reconstructed first with the note "nothing read so far
+  says what the pair means"; the receiver validates the field layout exactly,
+  settles the argument order (+0x18 before +0x14, byte before field), and
+  says the second object must be a **type 4 -- a weapon**.
+
+  **The offset ratchet caught me** adding a second name for all four of that
+  message's fields. `MSG_PAIR_OFF_*` already had them from the sender.
+
+  `combat` reported **177,112 pixels (22.5%)** and `ab.sh` still said "A/B
+  clean", because that configuration's budget is disabled. Re-ran at 716.
+  Read the number, not the verdict.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
