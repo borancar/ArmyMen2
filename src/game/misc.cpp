@@ -5,6 +5,9 @@
 
 #include "misc.h"
 #include "rect.h"   /* PointInRect -- reconstructed */
+#include "map.h"    /* TileOfPoint -- reconstructed */
+#include "item.h"   /* TileAttrAt -- reconstructed */
+#include "maprow.h" /* RowUpdate -- reconstructed */
 #include "place.h"   /* LoadArmyPlacement */
 #include "script.h"  /* GetVarValue */
 #include "crt.h"
@@ -1317,15 +1320,14 @@ typedef void *(__cdecl *AM2_SeqAllocFn)(void *ctx);
 typedef void  (__cdecl *AM2_SeqAdd6Fn)(const int32_t *at, int32_t a);
 typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 #define SeqAlloc              ((AM2_SeqAllocFn)(uintptr_t)ADDR_SEQ_ALLOC)
-#define orig_seq_add_kind6    ((AM2_SeqAdd6Fn)(uintptr_t)ADDR_SEQ_ADD_KIND6)
 #define orig_seq_rand         ((AM2_SeqRandFn)(uintptr_t)ADDR_GAME_RAND)
 
 /* The seven steppers SeqRun dispatches to. All take (index, record, context)
  * and answer the next index; kinds 2 and 3 share one. Still original. */
 typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
+typedef int32_t (__cdecl *AM2_SeqRetireFn)(void *ctx, void *rec);
+#define SeqRetire ((AM2_SeqRetireFn)(uintptr_t)ADDR_SEQ_RETIRE)
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
-#define orig_seq_step2 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP2)
-#define orig_seq_step3 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP2)
 #define orig_seq_step4 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP4)
 #define orig_seq_step5 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP5)
 #define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
@@ -1654,6 +1656,94 @@ void __cdecl MovieBuildName(char *dst, const char *name)
     strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_EXT));
 }
 
+/* SeqStepKind2 -- original 0x00461310, and BOTH kinds 2 and 3 reach it.
+ *
+ * The whole of it is a two-frame life: bump ROW_OFF_STAMP_54, and once that
+ * has passed 1 hand the record to SeqRetire. On the frame before that it
+ * re-links the row into the map descriptor's cell lists instead.
+ *
+ * `inc; cmp 1; jbe` is UNSIGNED, so a stamp of 0xFFFFFFFF wraps to 0 and takes
+ * the same arm as a fresh record. Nothing writes that value -- the adders zero
+ * it -- and the comparison is reproduced as written rather than as `n == 1`,
+ * which would be the same function for every reachable input and a different
+ * one on paper.
+ *
+ * The relink is RowUpdate with its second argument set, which orig.h
+ * records as "force the work even when nothing moved". So a kind-2 record's
+ * row is put back into the map every frame it is alive, whether it moved or
+ * not.
+ */
+int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
+{
+    uint8_t *row = *(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
+    uint32_t n   = *(const uint32_t *)(row + ROW_OFF_STAMP_54) + 1;
+
+    (void)at;
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) = n;
+
+    if (n > 1)
+        return SeqRetire(ctx, rec);
+
+    RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
+}
+
+/* SeqAddKind6 -- original 0x00461660, two callers, and the third of the
+ * adders. SeqAddKind7 is one of its callers, with a random 0..2.
+ *
+ * The same shape as the other two and three things of its own.
+ *
+ * ITS SPRITE IS A VARIANT RATHER THAN A FRAME. It shares ADDR_SEQ_SPRITES_7
+ * with kind 7, which takes entry 0, and indexes it by `variant * 8` -- so the
+ * array is variants of eight frames each and this picks the first frame of
+ * one of them. The 8 is a global, not a literal.
+ *
+ * ROW_OFF_FIELD_26 IS PROBABLY A DEPTH KEY, and this is what suggests it.
+ * Kind 5 writes 0x3E8 and kind 7 writes 1, which said only "a scale or a
+ * count"; kind 6 writes the terrain attribute under its own point, scaled,
+ * plus 0x3F2. Three constants of 1000, 1010-ish and 1 with a ground-height
+ * term in the middle one read as a sort order rather than as a size.
+ * Recorded as a reading; nothing here shows what consumes it.
+ *
+ * It also writes 1 into the row's first dword where kinds 5 and 7 write 0.
+ * That is ROW_OFF_FLAGS bit 0, which ADDR_ROW_RELINK tests to decide between
+ * unlinking and re-linking -- so a kind-6 row starts linkable and the other
+ * two start not. Reproduced; the asymmetry is the original's.
+ */
+void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
+{
+    uint8_t *seq;
+    uint8_t *row;
+
+    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+                     (const AM2_Point *)at))
+        return;
+
+    seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
+
+    *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND6;
+    *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = (uint8_t)variant;
+    *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
+    *(int32_t *)(seq + SEQ_OFF_FIELD_10) = 0;
+    *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE6;
+    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
+
+    *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
+    *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
+    *(int32_t *)(row + 0)                = 1;
+    *(void **)(row + ROW_OFF_SPRITE)     =
+        (*(void *const *const *)AM2_IMAGE(ADDR_SEQ_SPRITES_7))
+            [variant * *(const int32_t *)AM2_IMAGE(AM2_SEQ_VARIANT_STRIDE)];
+    *(int32_t *)(row + ROW_OFF_X)        = *at;
+    *(int16_t *)(row + ROW_OFF_Y_ADJUST) = 0;
+    *(int32_t *)(row + ROW_OFF_FIELD_2C) = 0;
+    *(int16_t *)(row + ROW_OFF_FIELD_26) =
+        (int16_t)(ScaleBy32Blocks(TileAttrAt(TileOfPoint((uint32_t)*at)))
+                  + AM2_SEQ_DEPTH_BIAS);
+}
+
 /* SeqRun -- original 0x00461870, two callers.
  *
  * Walk one seq context and step every live record. The walk is INDEX-CHAINED
@@ -1712,8 +1802,8 @@ void __cdecl SeqRun(void *ctx)
         switch (*(const uint32_t *)(rec + SEQ_OFF_KIND)) {
         case 0: at = orig_seq_step0(at, rec, ctx); break;
         case 1: break;   /* hangs; see above */
-        case 2: at = orig_seq_step2(at, rec, ctx); break;
-        case 3: at = orig_seq_step3(at, rec, ctx); break;
+        case 2:          /* both reach the same stepper */
+        case 3: at = SeqStepKind2(at, rec, ctx); break;
         case 4: at = orig_seq_step4(at, rec, ctx); break;
         case 5: at = orig_seq_step5(at, rec, ctx); break;
         case 6: at = orig_seq_step6(at, rec, ctx); break;
@@ -1823,7 +1913,7 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
     *(int16_t *)(row + ROW_OFF_FIELD_26)  = AM2_SEQ_ROW26_7;
 
-    orig_seq_add_kind6(at, orig_seq_rand() % 3);
+    SeqAddKind6(at, orig_seq_rand() % 3);
 }
 
 int misc_install(void)
@@ -1968,6 +2058,10 @@ int misc_install(void)
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,
                   "ClearPtrListAlias", 1);
     patch_replace(ADDR_SEQ_RUN, (const void *)SeqRun, "SeqRun", 2);
+    patch_replace(ADDR_SEQ_STEP2, (const void *)SeqStepKind2,
+                  "SeqStepKind2", 2);
+    patch_replace(ADDR_SEQ_ADD_KIND6, (const void *)SeqAddKind6,
+                  "SeqAddKind6", 2);
     patch_replace(ADDR_SEQ_ADD_KIND5, (const void *)SeqAddKind5,
                   "SeqAddKind5", 1);
     patch_replace(ADDR_SEQ_ADD_KIND7, (const void *)SeqAddKind7,

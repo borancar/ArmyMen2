@@ -1476,7 +1476,17 @@
  * no stepper at all -- see misc.cpp on why that is a hang rather than a
  * no-op. All take (index, record, context) and answer the next index. */
 #define ADDR_SEQ_STEP0           0x00461150u
+/* Reconstructed. Kinds 2 and 3 share it: bump the row's ROW_OFF_STAMP_54 and
+ * retire the record once that has passed 1, so these two live for exactly two
+ * frames. */
 #define ADDR_SEQ_STEP2           0x00461310u  /* kinds 2 AND 3 */
+/* 0x00460EC0, eleven callers: take one seq record out of the chain. Every
+ * stepper that can finish calls it, and it answers the index to carry on
+ * from. Stays original. */
+#define ADDR_SEQ_RETIRE          0x00460EC0u  /* int32_t(void *ctx, void *rec) */
+/* The number of frames per variant in ADDR_SEQ_SPRITES_7, which kinds 6 and 7
+ * share: kind 7 takes entry 0 and kind 6 takes `variant * 8`. */
+#define AM2_SEQ_VARIANT_STRIDE   0x0048CB8Cu  /* int32_t, reads 8 */
 #define ADDR_SEQ_STEP4           0x004613E0u
 #define ADDR_SEQ_STEP5           0x004614D0u
 #define ADDR_SEQ_STEP6           0x00461560u
@@ -4297,6 +4307,9 @@ typedef struct {
 #define AM2_SEQ_KIND7            7
 #define AM2_SEQ_LIFE5            0x17318   /* 95,000 */
 #define AM2_SEQ_LIFE7            0x2710    /* 10,000 */
+#define AM2_SEQ_LIFE6            0x3E8     /* 1,000 */
+/* Added to the scaled terrain attribute for kind 6's ROW_OFF_FIELD_26. */
+#define AM2_SEQ_DEPTH_BIAS       0x3F2
 #define AM2_SEQ_ROW26_5          0x3E8     /* what each stamps at ROW_OFF_26 */
 #define AM2_SEQ_ROW26_7          1
 /* The two preloaded sprite arrays they draw with, in the same block as

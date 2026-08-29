@@ -26,6 +26,13 @@ void __cdecl MovieBuildName(char *dst, const char *name);
  * the walk is index-chained through SEQ_OFF_NEXT rather than sequential. */
 void __cdecl SeqRun(void *ctx);
 
+/* 0x00461310, and both kinds 2 and 3 reach it: a two-frame life. */
+int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx);
+
+/* 0x00461660. The third adder -- kind 6, whose sprite is a VARIANT of eight
+ * frames rather than a frame, and whose depth key carries the terrain. */
+void __cdecl SeqAddKind6(const int32_t *at, int32_t variant);
+
 /* 0x00462000 and 0x00462080. Add one SEQ record at a map point -- kind 5 and
  * kind 7. Were ADDR_BY_REF_ACTION_A and _B; see misc.cpp. */
 void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life);

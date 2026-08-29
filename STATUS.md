@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,088 patches.**
+Nothing uncommitted. **1,090 patches.**
 
-Thirty-six functions since the last snapshot. The seven-class HUD family is
+Thirty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -188,6 +188,17 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   lines" on the recon side. The build was fine -- launched by hand it reaches
   the title screen with 1,088 patches -- so the guard fired on a launch
   failure and did exactly what it was added to do. Re-run clean.
+
+- **`SeqStepKind2` and `SeqAddKind6`** (`0x00461310`, `0x00461660`) take the
+  seq family to five of its eleven functions. Kind 6's sprite is a **variant
+  of eight frames**, not a frame -- it shares kind 7's array and indexes it by
+  `variant * 8` from a global.
+
+  And it turned `ROW_OFF_FIELD_26` from "a scale or a count" into a likely
+  **depth key**: kinds 5 and 7 write 1000 and 1, and kind 6 writes the scaled
+  terrain attribute under its own point plus 1010. A ground-height term in
+  the middle of three constants reads as a sort order. Recorded as a reading;
+  nothing yet shows what consumes it.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
