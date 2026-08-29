@@ -53,6 +53,10 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army);
 void __cdecl RecvVehicleExit(void *msg);
 void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle);
 
+/* 0x00401210. Drain one message list into another, head first. Here rather
+ * than in gameproc.cpp because of SELFTEST_SRC; see commmsg.cpp. */
+void __cdecl DrainMsgList(void *list);
+
 #endif
 
 /* 0x0044C250, one caller, and it names itself -- "Trooper Fire Send,

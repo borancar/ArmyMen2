@@ -834,10 +834,97 @@ void __cdecl Teardown40A4B0(void)
     orig_free_40a5f0();
 }
 
+/* ---- Six more, same size and same argument ----------------------------
+ *
+ * TWO MORE THREE-ARGUMENT PASS-THROUGHS, which makes four in this tree with
+ * Call405220 above. Each forwards its three arguments to one large function
+ * and adds nothing at all. The compiler did not produce these: a thunk that
+ * only moves arguments is what a source-level wrapper compiles to, so the
+ * original had four one-line functions and so does this. Worth knowing before
+ * reading one as a place where something happens.
+ */
+typedef void (__cdecl *AM2_Call3Fn2)(int32_t a, int32_t b, int32_t c);
+typedef void (__cdecl *AM2_VoidFn)(void);
+typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
+                                       void *fn);
+
+#define orig_big_4057d0   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_4057D0)
+#define orig_big_407710   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_407710)
+#define orig_def_sort_trooper \
+    ((AM2_VoidFn)(uintptr_t)ADDR_DEF_SORT_TROOPER_RECS)
+#define orig_def_460290   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_460290)
+#define orig_def_435a50   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_435A50)
+#define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
+#define orig_walk_cell    ((AM2_WalkCellFn)(uintptr_t)ADDR_WALK_CELL_AT_POINT)
+
+void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
+{
+    orig_big_4057d0(a, b, c);
+}
+
+void __cdecl Call407710(int32_t a, int32_t b, int32_t c)
+{
+    orig_big_407710(a, b, c);
+}
+
+/* 0x0041A230. Four calls and a tail jump, all five into the def tables:
+ * the trooper-record sort, two unnamed, DefCheckLinks, and one more. The ORDER is
+ * the fact here -- DefCheckLinks needs the link table sorted, which the step
+ * before it is presumably what does. Five invented names would say less than
+ * five addresses in the right sequence. */
+void __cdecl DefFinish(void)
+{
+    orig_def_sort_trooper();
+    orig_def_460290();
+    orig_def_435a50();
+    DefCheckLinks();
+    orig_def_45ebc0();
+}
+
+/* 0x0044A3A0, two callers. Walk the objects in the cell a point falls in,
+ * calling ADDR_WALK_CELL_CALLBACK for each -- the same cell arithmetic
+ * ObjectsAtPoint uses, with a callback instead of a chain.
+ *
+ * ITS FIRST ARGUMENT IS NOT READ. Both callers push an object into it and
+ * this function never touches it; what it passes on is the ADDRESS of its
+ * second argument, which is the packed point. That is the same "the point
+ * arrives by value and its address is taken" shape orig.h records for
+ * RevealNearby, one step further -- here the argument slot IS the storage.
+ * Reproduced, unused parameter and all. */
+void __cdecl WalkCellWrapper(void *unused, uint32_t at)
+{
+    (void)unused;
+
+    orig_walk_cell(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                   (void *)(uintptr_t)ADDR_WALK_CELL_CALLBACK);
+}
+
+/* 0x0042F140. Undo what HostBattle set up: reset the pair mask, put 1000 in
+ * the value beside it, and EMPTY BOTH SAVED NAMES -- by storing a zero byte
+ * at the front of each, not by clearing the buffer. The two names are
+ * ADDR_SAVED_PLAYER_NAME and ADDR_SAVED_BATTLE_NAME, which is what makes this
+ * the reset rather than an unrelated three-global write. */
+void __cdecl ResetHostState(void)
+{
+    ResetPairMask((uint32_t *)(uintptr_t)ADDR_HOST_MASK_A,
+                  (uint32_t *)(uintptr_t)ADDR_HOST_MASK_B);
+
+    *(int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8 = 1000;
+    *(char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME = '\0';
+    *(char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME = '\0';
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_ZERO_50C34C, (const void *)ZeroUnread50C34C,
                   "ZeroUnread50C34C", 1);
+    patch_replace(ADDR_CALL_4057D0, (const void *)Call4057D0, "Call4057D0", 1);
+    patch_replace(ADDR_CALL_407710, (const void *)Call407710, "Call407710", 1);
+    patch_replace(ADDR_DEF_FINISH, (const void *)DefFinish, "DefFinish", 1);
+    patch_replace(ADDR_WALK_CELL_WRAPPER, (const void *)WalkCellWrapper,
+                  "WalkCellWrapper", 2);
+    patch_replace(ADDR_RESET_HOST_STATE, (const void *)ResetHostState,
+                  "ResetHostState", 1);
     patch_replace(ADDR_NOTE_KIND_31, (const void *)NoteKind31, "NoteKind31", 1);
     patch_replace(ADDR_CALL_405220, (const void *)Call405220, "Call405220", 2);
     patch_replace(ADDR_TEARDOWN_445F40, (const void *)Teardown445F40,

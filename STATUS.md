@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,111 patches.**
+Nothing uncommitted. **1,117 patches.**
 
-Fifty-eight functions since the last snapshot. The seven-class HUD family is
+Sixty-four functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -398,14 +398,24 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **961 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,111
+line (0x0045C000) patched**. Measured: **967 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,117
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. The 278 entries outstanding start at sixteen bytes,
-and six of them went in one commit.
+small ones in batches. Two batches of six have gone in, and the 272 entries
+outstanding still start at thirty-two bytes.
+
+**Four of the twelve are three-argument pass-throughs** -- a thunk that
+forwards its arguments to one large function and adds nothing. The compiler
+did not make those; a source-level wrapper is what compiles to one. Worth
+knowing before reading one as a place where something happens.
+
+**A batch's real cost is where the functions can LIVE.** `DrainMsgList`
+belongs with the other five but had to go in `commmsg.cpp`, because
+`gameproc.cpp` is in `SELFTEST_SRC` and a call from there to
+`MsgListRemHead` drags eleven win32 symbols into the offline harness.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

@@ -1792,8 +1792,21 @@ void __cdecl CommDrainMsgs(void)
     }
 }
 
+/* 0x00401210. Drain one message list into another, head first, until the
+ * source is empty. RemHead answers null when there is nothing left, which is
+ * both the loop's test and its value. */
+void __cdecl DrainMsgList(void *list)
+{
+    void *node;
+
+    while ((node = MsgListRemHead(list)) != (void *)0)
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_A, node);
+}
+
 int commmsg_install(void)
 {
+    patch_replace(ADDR_DRAIN_MSG_LIST, (const void *)DrainMsgList,
+                  "DrainMsgList", 1);
     patch_replace(ADDR_TROOP_MESSAGE_RECV, (const void *)TroopMessageRecv,
                   "TroopMessageRecv", 1);
     patch_replace(ADDR_RECV_TROOP_16, (const void *)RecvTroopBatch,

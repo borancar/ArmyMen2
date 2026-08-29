@@ -19,6 +19,11 @@ void __cdecl Call405220(int32_t a, int32_t b, int32_t c);
 void __cdecl Teardown445F40(void);
 void __cdecl TeardownDefTables(void);
 void __cdecl Teardown40A4B0(void);
+void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c);
+void __cdecl Call407710(int32_t a, int32_t b, int32_t c);
+void __cdecl DefFinish(void);
+void __cdecl WalkCellWrapper(void *unused, uint32_t at);
+void __cdecl ResetHostState(void);
 
 #endif
 

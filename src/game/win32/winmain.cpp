@@ -305,7 +305,7 @@ void __cdecl ResetToTitle(void)
     for (uint32_t i = 0; i < sizeof kCleared / sizeof kCleared[0]; i++)
         *(int32_t *)(uintptr_t)kCleared[i] = 0;
 
-    ((am2_void_fn)(uintptr_t)0x0042F140u)();
+    ResetHostState();
     ((am2_void_fn)(uintptr_t)0x0044D110u)();
     ((am2_void_fn)(uintptr_t)ADDR_APPLY_GAME_SETTINGS)();
 }

@@ -5453,6 +5453,41 @@ typedef struct {
 /* Two steps, the second a tail jump. Both halves are inside one merged
  * functions.tsv entry, which is why the second has no entry of its own. */
 #define ADDR_TEARDOWN_40A4B0     0x0040A690u  /* void(void) */
+
+/* ---- Six more small ones ------------------------------------------------
+ *
+ * TWO MORE THREE-ARGUMENT PASS-THROUGHS, which makes four in this tree
+ * counting ADDR_CALL_405220. Each forwards its three arguments to one large
+ * function and adds nothing -- the compiler did not make these, since a
+ * thunk that only moves arguments is what a source-level wrapper compiles
+ * to. Worth knowing before reading one as a place where something happens. */
+#define ADDR_CALL_4057D0         0x00405D10u  /* void(int32, int32, int32) */
+#define ADDR_BIG_4057D0          0x004057D0u
+#define ADDR_CALL_407710         0x00407BD0u  /* void(int32, int32, int32) */
+#define ADDR_BIG_407710          0x00407710u
+/* Four calls and a tail jump, all five to the def tables: sort the trooper
+ * records, two unnamed, then DefCheckLinks, then one more. The order is the
+ * fact. */
+#define ADDR_DEF_FINISH          0x0041A230u  /* void(void) */
+#define ADDR_DEF_STEP_460290     0x00460290u
+#define ADDR_DEF_STEP_435A50     0x00435A50u
+#define ADDR_DEF_STEP_45EBC0     0x0045EBC0u
+/* Walk the objects in the cell a point falls in, calling a function for each
+ * -- the same cell arithmetic as ObjectsAtPoint with a CALLBACK instead of a
+ * chain. 0x0044A3A0 is the one wrapper that supplies a callback. */
+#define ADDR_WALK_CELL_AT_POINT  0x0042A110u  /* void(pt*, desc, fn) */
+#define ADDR_WALK_CELL_WRAPPER   0x0044A3A0u  /* void(void *unused, uint32 pt) */
+#define ADDR_WALK_CELL_CALLBACK  0x0044A380u
+/* Drain one message list into another, head first, until it is empty. */
+#define ADDR_DRAIN_MSG_LIST      0x00401210u  /* void(void *list) */
+/* Reset the host-battle state: empty both saved names, put 1000 in the value
+ * below and reset the pair mask. Its two names are ADDR_SAVED_PLAYER_NAME and
+ * ADDR_SAVED_BATTLE_NAME, which HostBattle fills -- so this is what undoes
+ * it. */
+#define ADDR_RESET_HOST_STATE    0x0042F140u  /* void(void) */
+#define ADDR_HOST_MASK_A         0x00516078u  /* uint32_t */
+#define ADDR_HOST_MASK_B         0x0051607Cu  /* uint32_t */
+#define ADDR_HOST_VALUE_3E8      0x00516090u  /* int32_t, set to 1000 */
 #define ADDR_FREE_40A4B0         0x0040A4B0u  /* void(void) */
 #define ADDR_FREE_40A5F0         0x0040A5F0u  /* void(void) */
 /* 0x0044CD40 is the third: qsort the table with ADDR_COMPARE_DWORD and then
