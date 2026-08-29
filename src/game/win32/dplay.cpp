@@ -1985,6 +1985,95 @@ void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
     return n ? dst : (void *)0;
 }
 
+/* MsgListInsert -- original 0x00401150, one caller.
+ *
+ * Insert a node into the message list in ascending MSGNODE_OFF_KEY order,
+ * under the list's own mutex, and answer the node. Four cases: an empty list,
+ * before the head, between two nodes, and after the tail.
+ *
+ * THE KEY IS COMPARED UNSIGNED. The original uses `jbe` and `ja`, so a key
+ * with the top bit set sorts ABOVE everything rather than below -- which is
+ * what a wrapping counter wants and is not what a signed reading would give.
+ *
+ * IT IS A STABLE INSERT: the walk advances while the node's key is
+ * `<=` the new one and stops at the first strictly greater, so a node ties
+ * with the ones already there by going AFTER them.
+ *
+ * THERE IS A DEAD EARLY RETURN AND IT WOULD HAVE SKIPPED THE COUNT. After
+ * taking `next` and finding it non-null, the original reloads it, tests it
+ * again, and on the impossible zero falls into a path that releases the mutex
+ * and returns the node WITHOUT incrementing MSGLIST_OFF_COUNT. The second test
+ * cannot fail -- the first one already established it -- so the list can never
+ * end up with a node it has not counted. Not reproduced as a branch, because
+ * there is no input that reaches it; recorded here instead, since a reader
+ * comparing the two will find one `ret` fewer than the original has.
+ *
+ * The tail pointer is maintained only on the two paths that need it -- empty
+ * list, and append past the end -- and left alone on the two that insert
+ * before an existing node. Correct, because neither can change the tail.
+ */
+void *__cdecl MsgListInsert(void *list, void *node)
+{
+    uint8_t *l = (uint8_t *)list;
+    uint8_t *n = (uint8_t *)node;
+    uint8_t *at;
+    uint32_t key;
+
+    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+
+    at = *(uint8_t **)(l + MSGLIST_OFF_HEAD);
+
+    if (!at) {
+        *(uint8_t **)(l + MSGLIST_OFF_HEAD) = n;
+        *(uint8_t **)(l + MSGLIST_OFF_TAIL) = n;
+        *(uint8_t **)(n + MSGNODE_OFF_PREV) = (uint8_t *)0;
+        *(uint8_t **)(n + MSGNODE_OFF_NEXT) = (uint8_t *)0;
+    } else {
+        key = *(const uint32_t *)(n + MSGNODE_OFF_KEY);
+
+        if (*(const uint32_t *)(at + MSGNODE_OFF_KEY) > key) {
+            *(uint8_t **)(n + MSGNODE_OFF_PREV)  = (uint8_t *)0;
+            *(uint8_t **)(n + MSGNODE_OFF_NEXT)  = at;
+            *(uint8_t **)(l + MSGLIST_OFF_HEAD)  = n;
+            *(uint8_t **)(at + MSGNODE_OFF_PREV) = n;
+        } else {
+            for (;;) {
+                uint8_t *next = *(uint8_t **)(at + MSGNODE_OFF_NEXT);
+
+                if (!next) {                    /* past the tail */
+                    *(uint8_t **)(at + MSGNODE_OFF_NEXT) = n;
+                    *(uint8_t **)(n + MSGNODE_OFF_PREV)  = at;
+                    *(uint8_t **)(n + MSGNODE_OFF_NEXT)  = (uint8_t *)0;
+                    *(uint8_t **)(l + MSGLIST_OFF_TAIL)  = n;
+                    break;
+                }
+
+                at = next;
+
+                if (*(const uint32_t *)(at + MSGNODE_OFF_KEY) > key) {
+                    uint8_t *prev = *(uint8_t **)(at + MSGNODE_OFF_PREV);
+
+                    if (prev)
+                        *(uint8_t **)(prev + MSGNODE_OFF_NEXT) = n;
+                    else
+                        *(uint8_t **)(l + MSGLIST_OFF_HEAD) = n;
+
+                    *(uint8_t **)(n + MSGNODE_OFF_PREV)  = prev;
+                    *(uint8_t **)(n + MSGNODE_OFF_NEXT)  = at;
+                    *(uint8_t **)(at + MSGNODE_OFF_PREV) = n;
+                    break;
+                }
+            }
+        }
+    }
+
+    *(int32_t *)(l + MSGLIST_OFF_COUNT) += 1;
+
+    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
+
+    return n;
+}
+
 /* MsgListTakeFlags -- original 0x00401330, two callers.
  *
  * The same function as MsgListCopyByKey with the key test replaced by a mask
@@ -2107,6 +2196,8 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_MSG_LIST_TAKE_FLAGS,
                         (const void *)MsgListTakeFlags,
                         "MsgListTakeFlags", 2);
+    rc |= patch_replace(ADDR_MSG_LIST_INSERT, (const void *)MsgListInsert,
+                        "MsgListInsert", 1);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
     rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,

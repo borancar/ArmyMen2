@@ -540,4 +540,8 @@ int event_install(void);
  * trooper's inventory slots 1..5 and drop it at a point. */
 void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at);
 
+/* 0x0041FDB0, one caller. Attach every object an army owns -- optionally only
+ * those whose field A matches -- to one target object. */
+void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid);
+
 #endif /* AM2_EVENT_H */

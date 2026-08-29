@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,166 patches.**
+Nothing uncommitted. **1,168 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -838,16 +838,37 @@ operand in `0x400000..0x700000`, and subtracts the addresses `orig.h` names.
   A uid with no table entry is left alone rather than zeroed, so a save
   referring to something gone keeps a dangling uid.
 
+- **`MsgListInsert`** (`0x00401150`) sorts on an UNSIGNED key -- `jbe` and
+  `ja` -- so a key with the top bit set sorts above everything rather than
+  below, which is what a wrapping counter wants and not what a signed reading
+  would give. It is a stable insert: ties go after the nodes already there.
+
+  It also has a DEAD EARLY RETURN that would have skipped the count. After
+  taking `next` and finding it non-null the original reloads and re-tests it,
+  and the impossible zero falls into a path that releases the mutex and
+  returns without incrementing `MSGLIST_OFF_COUNT`. The second test cannot
+  fail, so the list can never hold an uncounted node. Not reproduced as a
+  branch -- no input reaches it -- and recorded instead, since a reader
+  comparing the two will find one `ret` fewer than the original has.
+- **`EvtArmyAttach`** (`0x0041FDB0`) is the FIFTH non-advancing removal loop.
+  Its filter is a VALUE rather than a predicate, `-1` meaning all, and the
+  accessor it compares against is only consulted when the filter is set.
+- **`quit`'s thread-line difference has now appeared on BOTH sides**, one run
+  each. A defect would favour one side consistently; an extra
+  "Receive thread got event 0" on the original in one run and on the
+  reconstruction in another is the shutdown race and nothing else.
+  **Which side a difference lands on, across runs, is evidence.**
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,015 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,166
+line (0x0045C000) patched**. Measured: **1,017 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,168
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-one batches have gone in and the 224 entries outstanding start at 48
+small ones in batches. Twenty-two batches have gone in and the 222 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

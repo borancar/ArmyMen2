@@ -4080,6 +4080,10 @@ typedef struct {
  * uid among the trooper's inventory slots 1..5 and TrooperDropItem it at a
  * point. Both uids are refused below AM2_UID_COUNTER_START. */
 #define ADDR_EVT_DROP_ITEM       0x0041FC80u  /* void(uint32,uint32,uint32) */
+/* 0x0041FDB0, one caller. Attach every object an army owns -- optionally only
+ * those whose ADDR_OBJ_FIELD_A matches -- to one target object. */
+#define ADDR_EVT_ARMY_ATTACH     0x0041FDB0u  /* void(army, filter, uid) */
+#define AM2_ATTACH_ANY           (-1)         /* the filter that matches all */
 #define ADDR_TYPE2_ACTION_C      0x004480E0u  /* void(void *obj, int32_t) */
 /* 0x0041F6E0. The one that does NOT null-check: it passes whatever LookupByUID
  * returned straight on. 0x00428370 has eight callers and no name. */
@@ -6496,6 +6500,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00401330, two callers, and the exact shape of MsgListCopyByKey with the
  * key test replaced by a mask test. Answers the bits it took, or 0. */
 #define ADDR_MSG_LIST_TAKE_FLAGS   0x00401330u  /* int32_t(list, void *dst) */
+/* 0x00401150, one caller. Insert a node into the list in ascending
+ * MSGNODE_OFF_KEY order, under the list's own mutex. */
+#define ADDR_MSG_LIST_INSERT       0x00401150u  /* void *(list, void *node) */
 #define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
 /* 0x004010C0, "RemHead: Impossible List Size %d". Unlinks and answers the head
  * node, or null. The same sanity complaint as the append, and a second one --

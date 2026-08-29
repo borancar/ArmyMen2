@@ -241,4 +241,8 @@ void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
  * those bits, copy its body to dst, and answer the bits taken. */
 int32_t __cdecl MsgListTakeFlags(void *list, void *dst);
 
+/* 0x00401150, one caller. Insert a node in ascending key order under the
+ * list's mutex, and answer the node. */
+void *__cdecl MsgListInsert(void *list, void *node);
+
 #endif /* AM2_DPLAY_H */

@@ -2255,6 +2255,73 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
         }
 }
 
+/* EvtArmyAttach -- original 0x0041FDB0, one caller.
+ *
+ * Attach every object an army owns to one target: resolve the target uid,
+ * resolve the army to a comm slot, and walk that slot's object list, calling
+ * ObjAttachTo for each live type 2, 3 or 8 that passes the filter.
+ *
+ * FIFTH LOOP IN THIS TREE THAT DOES NOT ADVANCE OVER A REMOVAL, after
+ * DrawSelection, CommReopenSession, Type2ActionAll and AwardOwnArmyXp. The
+ * unresolved arm jumps past the increment and the bound is re-read from the
+ * list at the bottom of every iteration, so the entry that shifts down is
+ * looked at next.
+ *
+ * THE FILTER IS A VALUE, NOT A PREDICATE, and -1 means "all". When it is
+ * anything else the object's ADDR_OBJ_FIELD_A must equal it. That accessor is
+ * only consulted when the filter is set, so a caller passing -1 costs nothing
+ * per object.
+ *
+ * THE TARGET IS RESOLVED ONCE, BEFORE THE WALK, and the resulting POINTER is
+ * what every attach gets -- the original stores it back over its own argument
+ * slot. So an attach that destroys the target would leave the rest of the walk
+ * using a stale pointer; ObjAttachTo does not, and the order is the
+ * original's.
+ *
+ * The uid is refused below AM2_UID_COUNTER_START, the same range test the
+ * type-2 shims and EvtDropItem use rather than a null check.
+ *
+ * The list is re-read from ADDR_ARMY_OBJ_LISTS on every iteration and after
+ * every removal. Nothing here can move it -- ListRemoveAt compacts in place --
+ * but the original reloads, and it is written as the plain indexed access that
+ * means.
+ */
+void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
+{
+    void    *target;
+    int32_t  slot;
+    uint8_t *list;
+    int32_t  i = 0;
+
+    if (uid < AM2_UID_COUNTER_START)
+        return;
+
+    target = LookupByUID(uid);
+    if (!target)
+        return;
+
+    slot = CommSlotForArmy(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                           (int16_t)army);
+    list = ((uint8_t **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[slot];
+
+    while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+        if (!obj) {
+            ListRemoveAt(list, i);
+            continue;           /* no step: the shifted-down entry is next */
+        }
+
+        if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            && ObjIsTypeIn238((const AM2_Object *)obj)
+            && (filter == AM2_ATTACH_ANY || ObjFieldA(obj) == (uint32_t)filter))
+            orig_obj_attach_to(obj, target);
+
+        i++;
+    }
+}
+
 int event_install(void)
 {
     int rc = 0;
@@ -2283,6 +2350,8 @@ int event_install(void)
                         (const void *)EvtType2ActionC, "EvtType2ActionC", 1);
     rc |= patch_replace(ADDR_EVT_DROP_ITEM, (const void *)EvtDropItem,
                         "EvtDropItem", 1);
+    rc |= patch_replace(ADDR_EVT_ARMY_ATTACH, (const void *)EvtArmyAttach,
+                        "EvtArmyAttach", 1);
     rc |= patch_replace(ADDR_EVT_OBJ_SET, (const void *)EvtObjSet,
                         "EvtObjSet", 1);
     rc |= patch_replace(ADDR_EVT_GUARDED_ACTION,
