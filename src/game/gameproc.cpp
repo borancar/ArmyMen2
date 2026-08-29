@@ -4,6 +4,7 @@
 
 #include "gameproc.h"
 #include "savetag.h"
+#include "defparse.h"  /* DefFreeTables -- reconstructed */
 #include "definfo.h"   /* DefParseNumber, and the .aai vocabulary */
 #include "map.h"
 #include "pad.h"
@@ -750,8 +751,101 @@ void __cdecl UidRemapAdd(uint32_t from, uint32_t to)
     g_uidRemapCount       = n + 1;
 }
 
+/* ---- Six small teardown steps -----------------------------------------
+ *
+ * Four are called from the level teardown at 0x00425300 and share one shape:
+ * free something, then TAIL-JUMP to the logger with no arguments. The log
+ * line is the game's own -- these are the steps, not the messages -- so none
+ * of them names itself and all of their names here are structural.
+ *
+ * They are reconstructed together because each is between sixteen and
+ * thirty-two bytes and not one is worth a commit of its own. Their callees
+ * stay original and are reached by address; what these functions ARE is the
+ * order they run in, exactly as ShutdownSubsystems' thirteen turned out to
+ * be, and that order is now in the source rather than in the image.
+ *
+ * A NO-ARGUMENT TAIL JUMP TO THE LOGGER IS NOT Log(""). Reproduced through a
+ * no-argument pointer, as frame.cpp does in three places; the varargs call
+ * with none is what the original makes.
+ */
+typedef void (__cdecl *AM2_TeardownFn)(void);
+typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
+
+#define orig_teardown_log   ((AM2_TeardownFn)(uintptr_t)ADDR_LOG)
+#define orig_free_445f40    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_445F40)
+#define orig_free_list_a    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662024)
+#define orig_free_list_b    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662928)
+#define orig_free_40a4b0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A4B0)
+#define orig_free_40a5f0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A5F0)
+#define orig_big_405220     ((AM2_Call3Fn)(uintptr_t)ADDR_BIG_405220)
+
+/* 0x0041E740. Zero a global NOTHING READS. One reference in the whole image
+ * -- this store -- confirmed by a decoded scan and a raw dword scan both. So
+ * the teardown clears it every time and no code anywhere looks. Reproduced;
+ * a write to a dead global is still a write, and dropping it would be the
+ * first thing to go wrong if something starts reading it. */
+void __cdecl ZeroUnread50C34C(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_UNREAD_50C34C = 0;
+}
+
+/* 0x00402670. Its answer is always 0 and its one caller ignores it, so the
+ * only thing it does is the flag. */
+int32_t __cdecl NoteKind31(void *rec)
+{
+    if (**(const int32_t *const *)((const uint8_t *)rec + 0x20) == AM2_KIND_31)
+        *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                     + COMM_OFF_SAW_KIND_31) = 1;
+
+    return 0;
+}
+
+/* 0x004057B0, two callers. A pass-through and nothing else: three arguments
+ * forwarded to a 1,424-byte function that has two other callers of its own. */
+void __cdecl Call405220(int32_t a, int32_t b, int32_t c)
+{
+    orig_big_405220(a, b, c);
+}
+
+/* 0x00445FE0. Free, then log. */
+void __cdecl Teardown445F40(void)
+{
+    orig_free_445f40();
+    orig_teardown_log();
+}
+
+/* 0x004033E0. Free four things, then log. Two of the four already had names,
+ * which is the only reason this one reads as anything but four addresses. */
+void __cdecl TeardownDefTables(void)
+{
+    DefFreeTables();
+    orig_free_list_a();
+    orig_free_list_b();
+    DefFreeTrooperRecs();
+    orig_teardown_log();
+}
+
+/* 0x0040A690. Two steps, the second a tail jump -- and both halves sit inside
+ * ONE functions.tsv entry, which is why the second has no entry of its own
+ * and why tools/merges.py is what finds it. */
+void __cdecl Teardown40A4B0(void)
+{
+    orig_free_40a4b0();
+    orig_free_40a5f0();
+}
+
 void gameproc_install(void)
 {
+    patch_replace(ADDR_ZERO_50C34C, (const void *)ZeroUnread50C34C,
+                  "ZeroUnread50C34C", 1);
+    patch_replace(ADDR_NOTE_KIND_31, (const void *)NoteKind31, "NoteKind31", 1);
+    patch_replace(ADDR_CALL_405220, (const void *)Call405220, "Call405220", 2);
+    patch_replace(ADDR_TEARDOWN_445F40, (const void *)Teardown445F40,
+                  "Teardown445F40", 1);
+    patch_replace(ADDR_TEARDOWN_DEF_TABLES, (const void *)TeardownDefTables,
+                  "TeardownDefTables", 1);
+    patch_replace(ADDR_TEARDOWN_40A4B0, (const void *)Teardown40A4B0,
+                  "Teardown40A4B0", 1);
     patch_replace(ADDR_UID_REMAP_CLEAR, (const void *)UidRemapClear,
                   "UidRemapClear", 2);
     patch_replace(ADDR_UID_REMAP_ADD, (const void *)UidRemapAdd,

@@ -11,6 +11,15 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* Six small teardown steps, none over thirty-two bytes; four of them run from
+ * the level teardown and each ends by tail-jumping to the logger. */
+void __cdecl ZeroUnread50C34C(void);
+int32_t __cdecl NoteKind31(void *rec);
+void __cdecl Call405220(int32_t a, int32_t b, int32_t c);
+void __cdecl Teardown445F40(void);
+void __cdecl TeardownDefTables(void);
+void __cdecl Teardown40A4B0(void);
+
 #endif
 
 /* 0x00426850 and 0x00426880. 1080 bytes from 0x00511A68, and no section tag of

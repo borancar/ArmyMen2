@@ -5418,6 +5418,43 @@ typedef struct {
 #define AM2_DEF_TROOPER_REC_SIZE   0x20u
 #define ADDR_DEF_ADD_TROOPER_REC   0x0044CCC0u  /* void(const void *rec) */
 #define ADDR_DEF_FREE_TROOPER_RECS 0x0044CF70u  /* void(void) */
+
+/* ---- Six small teardown steps -------------------------------------------
+ *
+ * Four of these are called from the level teardown at 0x00425300 and are the
+ * shape ShutdownSubsystems already showed: a step that frees one thing and
+ * then TAIL-JUMPS to the logger with no arguments, so the log line is the
+ * game's own and the step has no name of its own. Reconstructed together
+ * because each is under thirty-two bytes and none is worth a commit.
+ *
+ * ADDR_ZERO_50C34C IS WRITE-ONLY. Its global has exactly ONE reference in the
+ * whole image -- this store -- by a decoded scan and by a raw dword scan
+ * both. So the game zeroes it on every teardown and never reads it. Named for
+ * the address because there is nothing else to name it for. */
+#define ADDR_ZERO_50C34C         0x0041E740u  /* void(void) */
+#define ADDR_UNREAD_50C34C       0x0050C34Cu  /* int32_t, written here only */
+/* `if (arg->[0x20]'s first dword == 0x31) comm[0x3E0] = 1`, and answers 0
+ * either way -- its caller ignores the answer. */
+#define ADDR_NOTE_KIND_31        0x00402670u  /* int32_t(void *) */
+#define COMM_OFF_SAW_KIND_31     0x3E0u
+#define AM2_KIND_31              0x31
+/* A three-argument pass-through to 0x00405220, which is 1,424 bytes and has
+ * two other callers of its own. The wrapper exists so two call sites can
+ * reach it without repeating the argument list; nothing is added. */
+#define ADDR_CALL_405220         0x004057B0u  /* void(int32, int32, int32) */
+#define ADDR_BIG_405220          0x00405220u  /* void(int32, int32, int32) */
+/* Free one thing, then log. */
+#define ADDR_TEARDOWN_445F40     0x00445FE0u  /* void(void) */
+#define ADDR_FREE_445F40         0x00445F40u  /* void(void), three callers */
+/* Free four, then log. Two of the four are already named. */
+#define ADDR_TEARDOWN_DEF_TABLES 0x004033E0u  /* void(void) */
+#define ADDR_FREE_LIST_662024    0x0045EDF0u  /* void(void), two callers */
+#define ADDR_FREE_LIST_662928    0x004607D0u  /* void(void), two callers */
+/* Two steps, the second a tail jump. Both halves are inside one merged
+ * functions.tsv entry, which is why the second has no entry of its own. */
+#define ADDR_TEARDOWN_40A4B0     0x0040A690u  /* void(void) */
+#define ADDR_FREE_40A4B0         0x0040A4B0u  /* void(void) */
+#define ADDR_FREE_40A5F0         0x0040A5F0u  /* void(void) */
 /* 0x0044CD40 is the third: qsort the table with ADDR_COMPARE_DWORD and then
  * TAIL-JUMP to 0x0045CAA0. That address is ADDR_LOG, which src/inject/gamelog.c
  * patches -- so naming it in src/game would be a seam checkseams refuses, and
