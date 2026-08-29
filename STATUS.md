@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,143 patches.**
+Nothing uncommitted. **1,145 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -516,16 +516,33 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   the SLOT, not of the index. The two disagree for exactly the values the
   function exists to separate.
 
+- **`SelectBestWeapon`** (`0x004069B0`) guards five of its six slots and not
+  the first: slot 0 is looked up and dereferenced unconditionally, so an empty
+  one goes through `WeaponByUid` -- which complains and answers NULL -- and
+  the dereference takes the process down. Reproduced; adding the guard would
+  be inventing a behaviour. It also uses `WeaponByUid` rather than
+  `HeldWeaponCode`'s quieter lookup, and only one of those two is safe to call
+  speculatively.
+- **`AimInit`** (`0x00412090`) does NOT clear everything. Four of the ten
+  per-army arrays -- both runs' points and deadlines -- are left as `.bss`
+  gives them. Nothing reads a point whose live flag is clear, so it does not
+  matter; but "the init clears the state" is not true of this function.
+- **An `orig_` macro for a callee that is already ours went in for the THIRD
+  time this session**, and `checkseams` took it out each time. The reflex when
+  writing a call into the image is to reach for `orig_`; the question to ask
+  first is whether the callee has already been reconstructed. `MapCode`,
+  `Type2ActionA` and `SoldierKindForWeapon` were all caught this way.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **993 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,143
+line (0x0045C000) patched**. Measured: **995 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,145
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Nine batches have gone in and the 246 entries outstanding start at 48
+small ones in batches. Ten batches have gone in and the 244 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

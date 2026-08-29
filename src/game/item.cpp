@@ -5289,6 +5289,72 @@ void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
     *heading = (uint8_t)((slot & 1) ? h - 0x10 : h + 0x10);
 }
 
+/* SelectBestWeapon -- original 0x004069B0, one caller.
+ *
+ * Walk the unit's six inventory slots, keep the one whose weapon has the
+ * highest ADDR_MAP_CODE, record that slot in UNIT_OFF_INVENTORY_SEL and apply
+ * the soldier kind the winning code implies.
+ *
+ * SLOT 0 IS NOT GUARDED AND THE OTHER FIVE ARE. The first is read, looked up
+ * and dereferenced unconditionally; slots 1..5 are skipped when the uid is
+ * zero. So an empty slot 0 goes through WeaponByUid, which answers NULL having
+ * complained, and the dereference that follows takes the process down. The
+ * one caller has just put something there. Reproduced -- adding the guard
+ * would be inventing a behaviour, and the crash is the original's.
+ *
+ * It uses WeaponByUid rather than HeldWeaponCode's lookup, and the difference
+ * matters: WeaponByUid LOGS for a uid that is not a weapon and then answers
+ * NULL, where the other simply answers 0. Same shape, different noise, and
+ * only one of them is safe to call speculatively.
+ *
+ * MapCode is ours, in misc.cpp, and is called by name -- checkseams caught the
+ * orig_ macro that went in first out of habit. Third time this session, and
+ * the habit is worth naming: an `orig_` for a callee is the reflex, and the
+ * question to ask before writing one is whether the callee is already ours.
+ *
+ * THE COMPARISON IS STRICTLY GREATER, so the LOWEST slot wins a tie. With six
+ * slots holding the same weapon the answer is slot 0.
+ *
+ * The winning weapon is looked up a THIRD time at the end rather than the code
+ * being carried out of the loop. Nothing can have changed in between; it is
+ * the original's and it is one lookup, so it is written as one.
+ */
+void __cdecl SelectBestWeapon(void *unit)
+{
+    uint8_t *u = (uint8_t *)unit;
+    int32_t  best;
+    int32_t  bestSlot = 0;
+    int32_t  i;
+
+    best = MapCode(**(const int32_t *const *)
+        ((const uint8_t *)WeaponByUid(
+             *(const uint32_t *)(u + UNIT_OFF_INVENTORY)) + OBJ_OFF_FIELD_C0));
+
+    for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
+        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                           + (size_t)i * 4);
+        int32_t  code;
+
+        if (!uid)
+            continue;
+
+        code = MapCode(**(const int32_t *const *)
+            ((const uint8_t *)WeaponByUid(uid) + OBJ_OFF_FIELD_C0));
+
+        if (code > best) {
+            bestSlot = i;
+            best     = code;
+        }
+    }
+
+    *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = bestSlot;
+
+    SoldierKindForWeapon(u, (uint32_t)**(const int32_t *const *)
+        ((const uint8_t *)WeaponByUid(
+             *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                 + (size_t)bestSlot * 4)) + OBJ_OFF_FIELD_C0));
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5416,6 +5482,8 @@ void item_install(void)
                   "Type2ActionAll", 1);
     patch_replace(ADDR_SLOT_BAND_HEADING, (const void *)SlotBandHeading,
                   "SlotBandHeading", 1);
+    patch_replace(ADDR_SELECT_BEST_WEAPON, (const void *)SelectBestWeapon,
+                  "SelectBestWeapon", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

@@ -844,6 +844,16 @@
  * Sprite set 19 again, the air-support set, indices 4 and 5. Six frames of
  * index 4 stepped every 50 ms and stopped at the last, and index 5 drawn as
  * entry 0 plus one of entries 5..8 chosen at random. */
+/* 0x00412090, one caller. Preload both aim-marker sprite runs and clear the
+ * per-army state -- some of it. */
+#define ADDR_AIM_INIT            0x00412090u  /* void(void) */
+#define AM2_AIM_SPRITES_A        6u
+#define AM2_AIM_SPRITES_B        9u
+#define AM2_AIM_ARMIES           4u
+#define AM2_AIM_SET              0x13  /* the air-support sprite set */
+#define AM2_AIM_INDEX_A          4
+#define AM2_AIM_INDEX_B          5
+#define AM2_AIM_PRELOAD_FLAGS    0x1000
 #define ADDR_AIM_SPRITES_A       0x004FC8C8u  /* AM2_Sprite *[6], set 19 idx 4 */
 #define ADDR_AIM_LIVE_A          0x004FC8E0u  /* int32_t[4], per army */
 #define ADDR_AIM_POINT_A         0x004FC8F0u  /* {int16 x, int16 y}[4] */
@@ -4186,6 +4196,10 @@ typedef struct {
  * ADDR_SET_SOLDIER_KIND's counter to 0 with it: that is now called by name
  * from here and nowhere else. */
 #define ADDR_SOLDIER_KIND_FOR_WEAPON 0x00449660u /* void(unit, int32 code) */
+/* 0x004069B0, one caller. Pick the inventory slot whose weapon has the highest
+ * ADDR_MAP_CODE, record it in UNIT_OFF_INVENTORY_SEL, and apply the soldier
+ * kind that goes with it. */
+#define ADDR_SELECT_BEST_WEAPON  0x004069B0u  /* void(void *unit) */
 /* What SetSoldierKind reaches. The frame setter compares against the row's
  * current frame and returns early unless forced; the pose table is int32 and
  * ships {1, 1, 5, 3, ...}. */

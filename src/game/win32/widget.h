@@ -1581,4 +1581,8 @@ void __cdecl HudUpdate(void);
  * buffer through vtable slot 1. */
 void __cdecl HudPaint(void);
 
+/* 0x00412090, one caller. Preload both aim-marker sprite runs and clear part
+ * of the per-army state behind them. */
+void __cdecl AimInit(void);
+
 #endif /* AM2_WIDGET_H */

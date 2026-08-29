@@ -498,4 +498,8 @@ int32_t __cdecl ObjOverlayY(const void *obj);
 void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
                              uint8_t *heading);
 
+/* 0x004069B0, one caller. Select the inventory slot whose weapon has the
+ * highest map code, and apply the soldier kind that goes with it. */
+void __cdecl SelectBestWeapon(void *unit);
+
 #endif

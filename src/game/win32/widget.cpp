@@ -7986,6 +7986,58 @@ uint8_t __cdecl MpNamePaper(int32_t row)
 #define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
 #define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
 
+/* AimInit -- original 0x00412090, one caller.
+ *
+ * Preload both aim-marker sprite runs -- six frames of set 19 index 4, nine of
+ * index 5 -- and clear the per-army state behind them.
+ *
+ * IT DOES NOT CLEAR EVERYTHING. Run A's live flags and stamps are zeroed and
+ * its POINTS and DEADLINES are not; run B's live flags, frames and stamps are
+ * zeroed and its points and deadlines are not. Those four arrays therefore
+ * start as whatever `.bss` gives them, which is zero at load and whatever the
+ * last mission left after that. Nothing reads a point or a deadline whose live
+ * flag is clear, so it does not matter -- but "the init clears the state" is
+ * not true of this function and a reader should not assume it.
+ *
+ * The zeroing loops reach two and three arrays from one cursor with a
+ * displacement each, which is why the original walks a pointer rather than
+ * indexing: -0x20 and 0 in the first, -0x20, 0 and +0x10 in the second.
+ * Written as plain indexed loops, which is the same stores in the same order.
+ *
+ * The sprite runs are DIFFERENT LENGTHS -- six and nine -- and the state
+ * arrays behind both are four, one per army. Reading either count as shared is
+ * the easy mistake here.
+ *
+ * PreloadSprite's answer is stored without being checked, as it is at most of
+ * its 37 call sites; a run that fails to load leaves null sprite pointers and
+ * the painter tests them.
+ */
+void __cdecl AimInit(void)
+{
+    uint32_t i;
+
+    for (i = 0; i < AM2_AIM_SPRITES_A; i++)
+        ((AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_A)[i] =
+            PreloadSprite(AM2_AIM_SET, AM2_AIM_INDEX_A, (int32_t)i,
+                          AM2_AIM_PRELOAD_FLAGS, 1);
+
+    for (i = 0; i < AM2_AIM_ARMIES; i++) {
+        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[i]  = 0;
+        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[i] = 0;
+    }
+
+    for (i = 0; i < AM2_AIM_SPRITES_B; i++)
+        ((AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_B)[i] =
+            PreloadSprite(AM2_AIM_SET, AM2_AIM_INDEX_B, (int32_t)i,
+                          AM2_AIM_PRELOAD_FLAGS, 1);
+
+    for (i = 0; i < AM2_AIM_ARMIES; i++) {
+        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[i]  = 0;
+        ((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[i] = 0;
+        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[i] = 0;
+    }
+}
+
 /* AimMarkerAge -- original 0x00412190, one caller.
  *
  * Expire the aim markers and, for the LOCAL player only, drag its two points
@@ -8493,6 +8545,7 @@ int widget_install(void)
                         "HudUpdate", 0);
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
+    rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
     rc |= patch_replace(ADDR_HUD_PAINT, (const void *)HudPaint,
                         "HudPaint", 0);
 
