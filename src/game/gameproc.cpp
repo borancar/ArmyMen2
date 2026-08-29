@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "gameproc.h"
+#include "gamedir.h"  /* SetGameDir -- the chdir into the save directory */
 #include "savetag.h"
 #include "defparse.h"  /* DefFreeTables -- reconstructed */
 #include "definfo.h"   /* DefParseNumber, and the .aai vocabulary */
@@ -920,8 +921,78 @@ void __cdecl ResetHostState(void)
     *(char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME = '\0';
 }
 
+/* OpenSaveForLoad -- original 0x00425950, one caller.
+ *
+ * Open the current save for reading and hand back the open FILE, positioned at
+ * byte zero, or NULL. Four things have to hold: both names must be non-empty,
+ * the file must open, its first section must carry the gameproc tag, and
+ * LoadGameproc must accept it.
+ *
+ * THE TWO EMPTINESS TESTS READ ONE BYTE EACH, not a length -- `mov al,[name];
+ * test al,al` -- so "no save selected" is spelled as an empty string. They are
+ * checked in the opposite order to the order they are USED: the file name is
+ * tested first and the directory name second, while the directory is what gets
+ * formatted and chdir'd into first.
+ *
+ * IT LEAVES THE PROCESS IN THE SAVE DIRECTORY. SetGameDir is a chdir and
+ * nothing here puts it back, on any path including the two failures after it.
+ * The caller owns that, and every later relative path depends on it.
+ *
+ * THE REWIND IS THE POINT OF THE FUNCTION. Both checks consume from the
+ * stream -- CheckSaveTag reads four bytes and LoadGameproc reads its whole
+ * 0x438-byte block -- so without the fseek the caller would resume in the
+ * middle. It rewinds to 0 rather than to just past the header, so the caller
+ * reads the gameproc section again for itself.
+ *
+ * A FAILED CHECK CLOSES THE FILE, and a failed OPEN does not -- there is
+ * nothing to close, and the same `return` serves both by answering the null
+ * pointer it already has.
+ *
+ * LoadGameProcSection is ours, further down this file, and is called by name;
+ * checkseams caught the orig_ macro that went in first out of habit. Fourth
+ * time this session, and the reflex is now well enough attested to be worth
+ * inverting: when writing a call into the image, assume the callee is already
+ * reconstructed and go looking for the proof, rather than the other way round.
+ *
+ * The line number handed to CheckSaveTag is the original's `__LINE__`, 1320,
+ * from a source file whose name the binary still carries. It is passed
+ * verbatim: it names a line in the 1999 source, not in this one.
+ */
+am2_FILE *__cdecl OpenSaveForLoad(void)
+{
+    char      path[AM2_SAVE_PATH_BYTES];
+    am2_FILE *fp;
+
+    if (!*(const char *)(uintptr_t)ADDR_GAMEPROC_STR_B)
+        return (am2_FILE *)0;
+    if (!*(const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
+        return (am2_FILE *)0;
+
+    am2_sprintf(path, (const char *)(uintptr_t)ADDR_STR_SAVE_PLAYER_FMT,
+                 (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
+    SetGameDir(path);
+
+    fp = orig_fopen((const char *)(uintptr_t)ADDR_GAMEPROC_STR_B,
+                    (const char *)(uintptr_t)ADDR_MODE_RB);
+    if (!fp)
+        return fp;
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
+                      (const char *)(uintptr_t)ADDR_STR_GAMEPROC_CPP,
+                      AM2_GAMEPROC_TAG_LINE)
+        || !LoadGameProcSection(fp)) {
+        orig_fclose(fp);
+        return (am2_FILE *)0;
+    }
+
+    orig_fseek(fp, 0, 0);
+    return fp;
+}
+
 void gameproc_install(void)
 {
+    patch_replace(ADDR_OPEN_SAVE_FOR_LOAD, (const void *)OpenSaveForLoad,
+                  "OpenSaveForLoad", 1);
     patch_replace(ADDR_ZERO_50C34C, (const void *)ZeroUnread50C34C,
                   "ZeroUnread50C34C", 1);
     patch_replace(ADDR_CALL_4057D0, (const void *)Call4057D0, "Call4057D0", 1);

@@ -129,4 +129,8 @@ void __cdecl UidRemapAdd(uint32_t from, uint32_t to);
  * Closes `fp` on both exits. Returns 1 on success, 0 if any loader failed. */
 int32_t __cdecl LoadGame(am2_FILE *fp);
 
+/* 0x00425950, one caller. Open the current save for reading, verify its
+ * gameproc section, rewind, and hand back the open FILE or NULL. */
+am2_FILE *__cdecl OpenSaveForLoad(void);
+
 #endif /* AM2_GAMEPROC_H */

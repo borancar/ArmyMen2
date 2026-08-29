@@ -4709,6 +4709,12 @@ typedef struct {
 #define AM2_GAMEPROC_SAVE_SIZE   0x438u       /* 1080 bytes, and its own tag */
 #define ADDR_GAMEPROC_STR_B      0x00511B88u  /* a second string inside it */
 #define ADDR_STR_GAMEPROC_CPP    0x004851ECu  /* "C:\\ArmyMen2\\source\\gameproc.cpp" */
+/* 0x00425950, one caller. Open the current save for reading, verify its
+ * gameproc section, rewind it, and hand back the open FILE -- or close it and
+ * answer NULL. The two names it needs are both inside ADDR_GAMEPROC_BLOCK. */
+#define ADDR_OPEN_SAVE_FOR_LOAD  0x00425950u  /* am2_FILE *(void) */
+#define AM2_SAVE_PATH_BYTES      0x100u       /* its stack buffer */
+#define AM2_GAMEPROC_TAG_LINE    0x528        /* 1320, the __LINE__ it passes */
 
 #define ADDR_SAVE_AIR_SECTION    0x00409840u  /* int32_t(FILE *) */
 #define ADDR_LOAD_AIR_SECTION    0x00409870u  /* int32_t(FILE *) */

@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,168 patches.**
+Nothing uncommitted. **1,169 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -859,16 +859,35 @@ operand in `0x400000..0x700000`, and subtracts the addresses `orig.h` names.
   reconstruction in another is the shutdown race and nothing else.
   **Which side a difference lands on, across runs, is evidence.**
 
+- **`OpenSaveForLoad`** (`0x00425950`) exists for its REWIND. Both of its
+  checks consume from the stream -- `CheckSaveTag` reads four bytes and
+  `LoadGameProcSection` reads its whole 0x438-byte block -- so without the
+  `fseek` the caller would resume in the middle. It rewinds to 0 rather than
+  past the header, so the caller reads the gameproc section again for itself.
+
+  It leaves the process in the SAVE DIRECTORY on every path after the chdir,
+  including both failures; the caller owns that. Its two emptiness tests read
+  one byte each rather than a length, and in the opposite order to the order
+  the names are used.
+
+  The `__LINE__` it hands `CheckSaveTag` is 1320, from `gameproc.cpp` as it
+  stood in 1999. It is passed verbatim: it names a line in the original
+  source, not in ours.
+- **A fourth `orig_` macro for an already-reconstructed callee**, caught by
+  `checkseams` again. The reflex is now well enough attested to invert: when
+  writing a call into the image, **assume the callee is already ours and go
+  looking for the proof**, rather than the other way round.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,017 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,168
+line (0x0045C000) patched**. Measured: **1,018 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,169
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-two batches have gone in and the 222 entries outstanding start at 48
+small ones in batches. Twenty-three batches have gone in and the 221 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
