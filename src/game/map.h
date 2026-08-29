@@ -106,4 +106,12 @@ void  __cdecl ReadBootcampLevels(void);
  * table, then clear both globals. */
 void __cdecl FreeScenarios(void);
 
+/* 0x0043E160, one caller. Append one level record, allocating the table on
+ * first use and growing it when full. */
+void __cdecl AddLevelRecord(const void *record);
+
+/* 0x0043E9A0, one caller. AddLevelRecord's twin over the 0xCC-byte name
+ * records. */
+void __cdecl AddNameRecord(const void *record);
+
 #endif /* AM2_MAP_H */

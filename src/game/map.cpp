@@ -519,12 +519,129 @@ void __cdecl FreeScenarios(void)
     *(uint8_t **)(uintptr_t)ADDR_SCENARIOS      = (uint8_t *)0;
 }
 
+/* AddLevelRecord -- original 0x0043E160, one caller.
+ *
+ * Append one 0x30C-byte level record: allocate the table on first use, grow it
+ * when it is full, copy the record in and bump the count.
+ *
+ * THE FIRST ALLOCATION AND THE GROWTH STEP DISAGREE. The initial malloc is
+ * 0x2490 bytes -- room for twelve records -- and the capacity is set to twelve
+ * to match; every growth after that adds SIX. So the table goes 12, 18, 24,
+ * and the two constants are separate numbers in the original rather than one
+ * expressed twice.
+ *
+ * NEITHER ALLOCATION IS CHECKED. A failed malloc leaves the table pointer NULL
+ * and the memcpy that follows writes through it; a failed realloc loses the
+ * old pointer as well. VC6's operator new answers NULL rather than throwing
+ * and this is the CRT's malloc, so both are reachable in principle. The
+ * original's, and reproduced -- it is the same absence of a check every
+ * allocation in this subsystem has.
+ *
+ * THE GROWTH REWRITES THE CAPACITY BEFORE THE REALLOC and does not put it back
+ * if the realloc fails. There is no arm that can put it back, because there is
+ * no test.
+ *
+ * The count is re-read from its global after the realloc rather than kept in a
+ * register across the call. Nothing can have changed it -- realloc does not
+ * reach back into this table -- so that is the compiler, and it is written as
+ * the one value it is.
+ *
+ * The size arithmetic is `capacity * 780` built out of shifts and `lea`, which
+ * is AM2_LEVEL_RECORD_SIZE and is written as that.
+ */
+void __cdecl AddLevelRecord(const void *record)
+{
+    uint8_t *table = *(uint8_t **)AM2_IMAGE(ADDR_LEVEL_TABLE);
+    int32_t  cap;
+    int32_t  count;
+
+    if (!table) {
+        table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
+                                      * AM2_LEVEL_RECORD_SIZE);
+        cap   = AM2_LEVEL_TABLE_FIRST;
+        *(uint8_t **)AM2_IMAGE(ADDR_LEVEL_TABLE)    = table;
+        *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP) = cap;
+    } else {
+        cap = *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP);
+    }
+
+    count = *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
+
+    if (count >= cap) {
+        cap += AM2_LEVEL_TABLE_GROW;
+        *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP) = cap;
+
+        table = (uint8_t *)am2_realloc(table,
+                                       (size_t)cap * AM2_LEVEL_RECORD_SIZE);
+        *(uint8_t **)AM2_IMAGE(ADDR_LEVEL_TABLE) = table;
+
+        count = *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
+    }
+
+    memcpy(table + (size_t)count * AM2_LEVEL_RECORD_SIZE, record,
+           AM2_LEVEL_RECORD_SIZE);
+
+    *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) = count + 1;
+}
+
+/* AddNameRecord -- original 0x0043E9A0, one caller, and AddLevelRecord's twin.
+ *
+ * The same function over the other table DefParseInfoFile fills: 0xCC-byte
+ * records instead of 0x30C-byte ones, the same first twelve, the same growth
+ * of six, the same two unchecked allocations, the same re-read of the count
+ * after the realloc. Only the record size differs, and it appears twice --
+ * once in the first malloc's literal and once in the stride.
+ *
+ * They are written out separately rather than shared, because the original has
+ * two functions and a shared helper would be a third thing that is not in the
+ * binary. The duplication is the point of comparison: if these two ever stop
+ * matching line for line, one of them has been misread.
+ */
+void __cdecl AddNameRecord(const void *record)
+{
+    uint8_t *table = *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE);
+    int32_t  cap;
+    int32_t  count;
+
+    if (!table) {
+        table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
+                                      * AM2_NAME_RECORD_SIZE);
+        cap   = AM2_LEVEL_TABLE_FIRST;
+        *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE) = table;
+        *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP)   = cap;
+    } else {
+        cap = *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP);
+    }
+
+    count = *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT);
+
+    if (count >= cap) {
+        cap += AM2_LEVEL_TABLE_GROW;
+        *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP) = cap;
+
+        table = (uint8_t *)am2_realloc(table,
+                                       (size_t)cap * AM2_NAME_RECORD_SIZE);
+        *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE) = table;
+
+        count = *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT);
+    }
+
+    memcpy(table + (size_t)count * AM2_NAME_RECORD_SIZE, record,
+           AM2_NAME_RECORD_SIZE);
+
+    *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT) = count + 1;
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
                         "LevelCount", 2);
     patch_replace(ADDR_FREE_SCENARIOS, (const void *)FreeScenarios,
                   "FreeScenarios", 1);
+    patch_replace(ADDR_ADD_LEVEL_RECORD, (const void *)AddLevelRecord,
+                  "AddLevelRecord", 1);
+    patch_replace(ADDR_ADD_NAME_RECORD, (const void *)AddNameRecord,
+                  "AddNameRecord", 1);
     patch_replace(ADDR_TRACE_TILE_LINE, (const void *)TraceTileLine,
                         "TraceTileLine", 7);
     patch_replace(ADDR_SCRIPT_LIST_FIND, (const void *)ScriptListFind,

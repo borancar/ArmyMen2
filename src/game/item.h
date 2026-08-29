@@ -506,4 +506,8 @@ void __cdecl SelectBestWeapon(void *unit);
  * first row on the frame that goes with it, when the animation allows. */
 void __cdecl SetObjField530(void *obj, int32_t state);
 
+/* 0x00449F40, three callers. Wobble a facing by -2..+2, keeping the wobble
+ * only when it stays in the same direction bucket. */
+uint8_t __cdecl JitterFacing(void *obj, uint8_t facing);
+
 #endif

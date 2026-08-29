@@ -5419,6 +5419,50 @@ void __cdecl SetObjField530(void *obj, int32_t state)
             + AM2_FIELD_530_DELAY_MS;
 }
 
+/* JitterFacing -- original 0x00449F40, three callers.
+ *
+ * Wobble a facing by `rand() % 5 - 2` and keep the wobble only if it rounds
+ * into the same direction bucket as the original -- so a unit's aim drifts
+ * within the sprite it is already drawn with, and never far enough to change
+ * which sprite that is.
+ *
+ * FOR EVERY OBJECT WHOSE RECORD KIND IS NOT 3, THAT TEST IS VACUOUS. The
+ * bucket width comes from the kind: 3 for kind 3, and 0x20 otherwise. RoundTo8
+ * masks its second argument to a byte and then shifts by `7 - b` and `8 - b`,
+ * which x86 masks to five bits -- so b = 0x20 gives `1 << 7` and `>> 8` of a
+ * value already masked to a byte, i.e. ZERO for every input. Both sides of the
+ * comparison are 0, they always agree, and the wobble is always kept.
+ *
+ * That is not a reading of undefined behaviour taken on trust. tests/vectors.h
+ * carries RoundTo8 vectors with `bits` of 0x2A40, 0x7FFFFFFF and 0xFFFFFFFE --
+ * every one of them on the same masked-shift path -- and `make selftest`
+ * passes all 6,852 against the original. The behaviour at 0x20 is measured, on
+ * this target, by the harness that exists for exactly this.
+ *
+ * THE JITTER IS COMPUTED BEFORE THE KIND IS LOOKED AT, so rand() is consumed
+ * on every call whether the result is used or not. Anything downstream that
+ * depends on the sequence would notice a version that returned early.
+ *
+ * `rand() % 5` is a SIGNED remainder of the image's own LCG, which answers
+ * 0..0x7FFF, so it is 0..4 and the bias of 2 makes the wobble -2..+2. The
+ * arithmetic is done in a byte and wraps, which is what a facing wants.
+ */
+uint8_t __cdecl JitterFacing(void *obj, uint8_t facing)
+{
+    uint8_t jitter = (uint8_t)(orig_rand() % AM2_JITTER_SPREAD
+                               + facing - AM2_JITTER_BIAS);
+    uint32_t bits;
+
+    bits = (**(const int32_t *const *)((const uint8_t *)obj
+                                       + OBJ_OFF_FIELD_C0) == 3)
+           ? AM2_JITTER_BITS_3 : AM2_JITTER_BITS_OTHER;
+
+    if (RoundTo8(facing, bits) != RoundTo8(jitter, bits))
+        return facing;
+
+    return jitter;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5550,6 +5594,8 @@ void item_install(void)
                   "SelectBestWeapon", 1);
     patch_replace(ADDR_SET_OBJ_FIELD_530, (const void *)SetObjField530,
                   "SetObjField530", 2);
+    patch_replace(ADDR_JITTER_FACING, (const void *)JitterFacing,
+                  "JitterFacing", 3);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

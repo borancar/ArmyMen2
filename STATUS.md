@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,149 patches.**
+Nothing uncommitted. **1,152 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -566,16 +566,39 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   When the gate refuses, NOTHING happens -- including the field write. A
   caller cannot assume the state changed.
 
+- **`JitterFacing`'s "same direction bucket" test is VACUOUS for every object
+  whose record kind is not 3**, and the offline harness is what settled it
+  rather than an argument about undefined behaviour. The bucket width is 3 for
+  kind 3 and `0x20` otherwise; `RoundTo8` masks its second argument to a byte
+  and then shifts by `7 - b` and `8 - b`, which x86 masks to five bits, so
+  `b = 0x20` gives `1 << 7` and `>> 8` of a byte -- zero for every input. Both
+  sides of the comparison are 0, they always agree, and the wobble is always
+  kept.
+
+  `tests/vectors.h` already carries `RoundTo8` vectors with `bits` of `0x2A40`,
+  `0x7FFFFFFF` and `0xFFFFFFFE`, every one on that same masked-shift path, and
+  `make selftest` passes all 6,852 against the original. **Where a
+  reconstruction leans on behaviour the C standard does not define, the
+  question is what this target does -- and there is a harness that measures
+  it.**
+- **`AddLevelRecord` and `AddNameRecord`** (`0x0043E160`, `0x0043E9A0`) are the
+  same function over two record sizes, and are written out separately rather
+  than shared: the original has two functions, and a helper would be a third
+  thing that is not in the binary. The duplication is the comparison -- if the
+  two ever stop matching line for line, one has been misread. Both allocate
+  twelve records first and then grow by SIX, which are separate constants
+  rather than one expressed twice, and neither checks either allocation.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **999 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,149
+line (0x0045C000) patched**. Measured: **1,002 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,152
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twelve batches have gone in and the 240 entries outstanding start at 48
+small ones in batches. Thirteen batches have gone in and the 237 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

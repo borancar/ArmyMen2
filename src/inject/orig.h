@@ -3595,6 +3595,11 @@ typedef struct {
  * Both callers are in the menu band beside CloseScreen. Reconstructed. */
 #define ADDR_LEVEL_COUNT         0x0043ED40u  /* int32_t(void) */
 #define AM2_LEVEL_RECORD_SIZE     0x30Cu
+/* 0x0043E160, one caller. Append one level record, allocating the table on
+ * first use and growing it when it is full. */
+#define ADDR_ADD_LEVEL_RECORD     0x0043E160u  /* void(const void *record) */
+#define AM2_LEVEL_TABLE_FIRST     12  /* what the first malloc holds */
+#define AM2_LEVEL_TABLE_GROW      6   /* records added each time it is full */
 /* 0x0043ED50: copy the names out of a level record into the globals the
  * loader reads -- ADDR_MAP_NAME, ADDR_MAP_FOLDER and two more. */
 #define ADDR_SELECT_LEVEL         0x0043ED50u  /* void(void *record) */
@@ -6058,6 +6063,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * so the first search is also the load. */
 #define ADDR_SCRIPT_LIST_FIND    0x0043E900u  /* void *(char *name) */
 #define AM2_NAME_RECORD_SIZE     0xCCu
+/* 0x0043E9A0, one caller -- AddLevelRecord's twin for the OTHER table the same
+ * `.txt` fills, with 0xCC-byte records instead of 0x30C-byte ones. Same first
+ * twelve, same growth of six, same absence of any allocation check. */
+#define ADDR_ADD_NAME_RECORD     0x0043E9A0u  /* void(const void *record) */
 #define orig_amm_checksum \
             ((uint32_t (__cdecl *)(const char *, const char *)) \
              (uintptr_t)ADDR_AMM_CHECKSUM)
@@ -8407,6 +8416,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */
 #define ADDR_ANGLE_DELTA    0x0042DD90u  /* int32_t(from, to), 8-bit headings */
 #define ADDR_ROUND_TO_8     0x0042DFB0u  /* int32_t(value, bits) */
+/* 0x00449F40, three callers. Wobble a facing by rand() % 5 - 2, and keep the
+ * wobble only if it rounds into the same direction bucket as the original. */
+#define ADDR_JITTER_FACING  0x00449F40u  /* uint8_t(void *obj, uint8_t) */
+#define AM2_JITTER_SPREAD   5            /* rand() % this, then minus 2 */
+#define AM2_JITTER_BIAS     2
+#define AM2_JITTER_BITS_3   3            /* the bucket width for kind 3 */
+#define AM2_JITTER_BITS_OTHER 0x20       /* and for everything else -- see
+                                          * JitterFacing on what that does */
 #define ADDR_MAKE_POINT     0x0042E1A0u  /* uint32_t(x, y) -> packed AM2_Point */
 #define ADDR_FIND_SLOT      0x004277A0u  /* int32_t(uint32_t uid, int32_t *insert_at) */
 #define ADDR_LOOKUP_BY_UID  0x00427820u  /* void *(uint32_t uid) */
