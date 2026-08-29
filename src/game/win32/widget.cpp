@@ -2178,6 +2178,136 @@ void __attribute__((thiscall)) HudEdgePaint(AM2_Widget *w, RECT clip)
     }
 }
 
+/* 0x00414B50, vtable slot 1 of the radar. Two things: the VIEW BOX, and one
+ * blip per registered object. Every function it reaches is now ours.
+ *
+ * THE VIEW BOX is ADDR_SECOND_RECT -- the visible world rectangle -- scaled
+ * from map space onto the widget. Its right edge is clamped to the bitmap
+ * width less AM2_RADAR_RIGHT_MARGIN and intersected with the widget, but ONLY
+ * when ADDR_NET_GAME is clear: a network game gets the box unclamped and
+ * unintersected. Reproduced; nothing read so far says why.
+ *
+ * A BLIP'S GATE is four tests deep and the third is the surprising one. Type
+ * 2/3/8 AND flagged OBJ_FLAG_DESTROYED sends it down a rider check -- the
+ * object must be type 2, must be riding something, and that vehicle must be
+ * REVEALED and CONCEALED both -- while anything else falls straight through to
+ * the object's own REVEALED/CONCEALED/BIT4 trio. So the destroyed flag selects
+ * an entirely different test, which reads backwards until you follow the two
+ * `je` targets and see they converge.
+ *
+ * TWO DIFFERENT BLINKS, and they are not the same clock arithmetic. An
+ * ordinary blip picks between a colour PAIR with `~(clock + owner*8) >> 9 & 1`
+ * -- per OBJECT, seeded from a POINTER field, so distinct objects land on
+ * distinct phases and the blips do not flash in unison. The two animated
+ * drawers instead share ONE global phase, (clock >> 8) % 3. A single blink
+ * source would have been the natural guess and it is wrong.
+ */
+void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip)
+{
+    const AM2_Rect *view  = (const AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT;
+    int32_t         mapW  = *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X;
+    int32_t         mapH  = *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y;
+    const uint8_t  *pal   = (const uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS;
+    AM2_Rect        box;
+    uint8_t        *obj;
+    int32_t         phase;
+
+    WidgetPaint(w, clip);
+
+    box.left   = w->rect.left + view->left * w->w / mapW;
+    box.top    = w->rect.top  + view->top  * w->h / mapH;
+    box.right  = box.left + (view->right  - view->left) * w->w / mapW;
+    box.bottom = box.top  + (view->bottom - view->top)  * w->h / mapH;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        AM2_Rect lim;
+        int32_t  edge = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+                        - AM2_RADAR_RIGHT_MARGIN;
+
+        lim.left   = w->rect.left;
+        lim.top    = w->rect.top;
+        lim.right  = w->rect.right < edge ? w->rect.right : edge;
+        lim.bottom = w->rect.bottom;
+
+        IntersectRect((RECT *)&box, (const RECT *)&box, (const RECT *)&lim);
+    }
+
+    DrawRectFast(&box, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+
+    phase = (int32_t)((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                       >> AM2_RADAR_PHASE_SHIFT) % AM2_BLIP_PULSE_PHASES);
+
+    for (obj = (uint8_t *)FirstItem(); obj; obj = (uint8_t *)NextItem()) {
+        const AM2_Object *o = (const AM2_Object *)obj;
+        uint32_t          flags;
+        int32_t           x;
+        int32_t           y;
+        int32_t           colour;
+        int32_t           blink;
+
+        if (ObjIsTypeIn238(o) && (*(const uint32_t *)(obj + OBJ_OFF_FLAGS8)
+                                & OBJ_FLAG_DESTROYED)) {
+            const uint8_t *veh;
+            uint32_t       ride;
+
+            if (!ObjIsType2(o))
+                continue;
+
+            ride = *(const uint32_t *)(obj + OBJ_OFF_RIDING);
+            if (!ride)
+                continue;
+
+            veh = (const uint8_t *)LookupByUID(ride);
+
+            /* The object's OWN bit 4 short-circuits the vehicle test. The
+             * original dereferences `veh` without checking it; reproduced. */
+            if (!(*(const uint32_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG_BIT4)) {
+                uint32_t vf = *(const uint32_t *)(veh + OBJ_OFF_FLAGS8);
+
+                if ((vf & OBJ_FLAG_REVEALED) && !(vf & OBJ_FLAG_CONCEALED))
+                    continue;
+            }
+        }
+
+        flags = *(const uint32_t *)(obj + OBJ_OFF_FLAGS8);
+
+        if ((flags & OBJ_FLAG_CONCEALED) && !(flags & OBJ_FLAG_BIT4))
+            continue;
+        if (!(flags & OBJ_FLAG_REVEALED))
+            continue;
+        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0)
+            continue;
+
+        x = *(const int16_t *)(obj + OBJ_OFF_POS)     * w->w / mapW
+            + w->rect.left;
+        y = *(const int16_t *)(obj + OBJ_OFF_POS + 2) * w->h / mapH
+            + w->rect.top;
+
+        colour = RadarBlipColour(o, &blink);
+
+        if ((flags & OBJ_FLAG_BIT4) && !blink) {
+            int32_t a = pal[colour * 2];
+            int32_t b = pal[colour * 2 + 1];
+
+            if (ObjType2Field548(o))
+                DrawBlipPulse(x, y, a, b, phase);
+            else
+                DrawBlipSquare(x, y, a, b, phase);
+        } else {
+            /* Per-OBJECT blink, seeded from OBJ_OFF_OWNER -- which is a
+             * POINTER, not a uid, so distinct objects land on distinct phases
+             * and the blips do not all flash together. */
+            uint32_t t = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                         + *(const uint32_t *)(obj + OBJ_OFF_OWNER) * 8;
+
+            DrawBlip3(x, y, pal[((~t) >> AM2_RADAR_BLINK_SHIFT & 1)
+                                + colour * 2]);
+        }
+    }
+
+    UnlockSurface();
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -7986,6 +8116,8 @@ int widget_install(void)
                         "HudPanelPaint", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_UPDATE, (const void *)HudRadarUpdate,
                         "HudRadarUpdate", 1);
+    rc |= patch_replace(ADDR_HUD_RADAR_PAINT, (const void *)HudRadarPaint,
+                        "HudRadarPaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,

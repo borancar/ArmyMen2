@@ -1346,7 +1346,7 @@ static void __cdecl DrawRect(const AM2_Rect *r, int32_t colour)
  * runs are the short ones, and nothing here settles which. The radar's view
  * box is the only thing drawn by it.
  */
-static void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
+void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
 {
     AM2_Rect  vis;
     uint8_t  *top;
@@ -1392,7 +1392,7 @@ static void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
  * global before each row. Written as a loop; the pitch cannot change under it,
  * since nothing between the stores can call anything.
  */
-static void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour)
+void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour)
 {
     uint8_t *p;
     int32_t  row;
@@ -1447,9 +1447,10 @@ static void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour)
  * strip's vehicle table is not, so the trap is real and not universal; the
  * tables still have to be read either way, which is how this was established.
  */
-static int32_t __cdecl RadarBlipColour(const AM2_Object *obj, int32_t *blink)
+int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
 {
-    const uint8_t *self = (const uint8_t *)obj;
+    const AM2_Object *obj  = (const AM2_Object *)objv;
+    const uint8_t    *self = (const uint8_t *)objv;
     int32_t        colour;
 
     colour = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
@@ -1569,7 +1570,7 @@ static void BlipPoints(uint8_t *centre, int32_t pitch, const int8_t (*pts)[2],
  * radar. Discriminating the colours would need many objects flagged at once,
  * or a static scene.
  */
-static void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
+void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
                                   int32_t colourB, int32_t phase)
 {
     uint8_t *p;
@@ -1626,7 +1627,7 @@ static void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
  * drive here sets, so the colours are verified by reading. See DrawBlipPulse
  * for why the radar's pixels cannot settle that.
  */
-static void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
+void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
                                    int32_t colourB, int32_t phase)
 {
     uint8_t *p;

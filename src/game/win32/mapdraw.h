@@ -113,4 +113,23 @@ int mapdraw_install(void);
 }
 #endif
 
+
+/* The radar's four drawing primitives and its colour decision. They live here
+ * because they are rasterisers over the locked framebuffer, while the radar's
+ * PAINT is a HUD widget vtable slot and lives in widget.cpp -- the same split
+ * DrawTextVertical already has between font.cpp and its callers.
+ *
+ * All four blip drawers reject rather than clip, and all of them Lock without
+ * Unlocking: the pairing belongs to HudRadarPaint, which Unlocks once at the
+ * end. */
+void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour);
+void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour);
+void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
+                           int32_t colourB, int32_t phase);
+void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
+                            int32_t colourB, int32_t phase);
+/* The object is AM2_Object; taken as void here so mapdraw.h stays includable
+ * from src/inject, which is C and has no object model. */
+int32_t __cdecl RadarBlipColour(const void *obj, int32_t *blink);
+
 #endif /* AM2_MAPDRAW_H */

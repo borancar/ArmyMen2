@@ -416,6 +416,26 @@
 #define ADDR_HUD_TOP_DESTRUCT  0x00417790u  /* thiscall void(obj) */
 #define ADDR_HUD_PANEL_DELETE  0x00419340u
 #define ADDR_HUD_PANEL_DESTRUCT 0x00419360u
+/* Vtable slot 1 of the radar. It draws two things: the VIEW BOX, which is
+ * ADDR_SECOND_RECT scaled from map space onto the widget, and one blip per
+ * registered object.
+ *
+ * The view box's right edge is clamped to ADDR_BITMAP_AREA_W - 22 before the
+ * intersect, and only when ADDR_NET_GAME is clear -- so a network game gets an
+ * unclamped box. Reproduced; nothing here says why.
+ *
+ * A blip's gate is four tests deep and the third is the surprising one: the
+ * rider check runs only for a type-2/3/8 object that is ALSO flagged
+ * OBJ_FLAG_DESTROYED. Then the object's own REVEALED/CONCEALED/BIT4 trio and a
+ * non-zero health.
+ *
+ * The blink for an ordinary blip is per OBJECT, not global: the colour index
+ * is `~(clock + uid*8) >> 9 & 1`, so each object alternates on its own phase.
+ * The two animated drawers instead share ONE global phase, (clock >> 8) % 3. */
+#define ADDR_HUD_RADAR_PAINT   0x00414B50u  /* thiscall void(obj, RECT) */
+#define AM2_RADAR_RIGHT_MARGIN 0x16  /* 22, taken off the bitmap width */
+#define AM2_RADAR_BLINK_SHIFT  9     /* of ~(clock + uid*8) */
+#define AM2_RADAR_PHASE_SHIFT  8     /* of the clock, then %3 */
 #define ADDR_HUD_RADAR_DELETE  0x00414810u
 #define ADDR_HUD_RADAR_DESTRUCT 0x00414830u
 #define ADDR_HUD_SQUAD_DELETE  0x00415830u
