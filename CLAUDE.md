@@ -1707,7 +1707,7 @@ and grep the run's own log for `bind/listen`, which says so outright.
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
   its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
   `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **24** are reconstructed
+  all. Measured: **29 functions** call the bracket and **25** are reconstructed
   — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
   the last of which the old list predates, and the menu-widget painters that
   have landed since.
@@ -1874,11 +1874,23 @@ exact oracle**, however meaningful it is when it is set.
   was corrected. A count that only goes up cannot tell you a candidate has
   been taken; only re-reading the list against the patch list can.
 
-  The radar's three drawing primitives were the ones behind it:
-  `DrawRectFast` (`0x0041CCE0`, its view box) and `DrawBlip3` (`0x0041C7F0`,
-  a stationary blip) are done. Still outstanding there are `0x0041C8A0`
-  (432 B) and `0x0041CA50` (336 B), the two blinking-blip drawers, and
-  `0x004149B0` (288 B), which classifies an object into a colour.
+  **And it did it again one entry later**, listing `0x0041C8A0`, `0x0041CA50`
+  and `0x004149B0` as outstanding when all three -- `DrawBlipPulse`,
+  `DrawBlipSquare` and `RadarBlipColour` -- had landed with the radar. The
+  radar's five primitives are now all ours. So is `DrawSelection`
+  (`0x00462120`, 688 B), the leader's caret and the selected units' health
+  bars, which is the first of the batch that ordinary play actually reaches.
+
+  Rather than keep writing the queue down, generate it -- the same argument
+  that put the count in `tools/checkclaims.py`. What that tool has, minus the
+  patch list, is **four** functions and none of them small:
+
+  | | |
+  |---|---|
+  | `0x00409070` | 864 B, the air frame's own draw |
+  | `0x004123D0` | 992 B, 0x3144 of stack and a table at `0x004FC8C8` |
+  | `0x00462600` | 1088 B |
+  | `0x00416340` | 2656 B, the squad detail panel |
 - **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
   COM method takes the interface as an explicit first argument, so it goes on
   the stack; an i386 MSVC C++ virtual is thiscall and keeps `this` in `ecx`.
@@ -2447,9 +2459,17 @@ exact oracle**, however meaningful it is when it is set.
   `ListDropOldest` is the sharpest case of a function that cannot be driven
   rather than merely has not been: its one caller is `MenuMessage` and it
   fires only above a hundred logged menu lines, which no configuration in
-  `ab.sh` produces. `RefreshScreen` has 7 callers and is reached by none of
-  Boot Camp, the intro, the HQ dialog or F1, so whatever forces an
-  out-of-band repaint is somewhere further in. `RestoreTileSet` is a
+  `ab.sh` produces. `RefreshScreen` has 7 callers and "whatever forces an
+  out-of-band repaint is somewhere further in" is no longer the state of
+  knowledge: six of the seven are the in-mission dialog openers — GAME MENU,
+  SAVE, LOAD, DELETE, OVERWRITE, AUDIO — and every one of them calls it only
+  when `ADDR_GAME_STATE` is 2, so opening AUDIO from the TITLE screen does not
+  reach it and a probe confirms that (0 calls with the dialog on screen). The
+  seventh is the WndProc activation handler, which needs an alt-tab. Reaching
+  it means opening one of those dialogs from inside a mission, and the
+  state-2 sub-state table at `0x00426230` says which arm does it: index
+  `substate - 22`, with 23 the game menu and 27 AUDIO. Ordinary Boot Camp
+  play sits at sub-state 24. `RestoreTileSet` is a
   different case and probably a permanent one: it runs only when DirectDraw
   takes a surface back, which needs an alt-tab or a mode change, and nothing
   under Xvfb does either. Anyone on a real display should alt-tab out of a

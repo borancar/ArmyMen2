@@ -107,6 +107,10 @@ void __cdecl ViewUpdate(void);
  * De-static'd when RefreshDraw needed to call it by name. */
 void __cdecl DrawViewRect(void);
 
+/* 0x00462120. The leader's caret and the selected units' health bars, and
+ * the pruning of ADDR_SELECTED_UIDS that happens while drawing them. */
+void __cdecl DrawSelection(void);
+
 int mapdraw_install(void);
 
 #ifdef __cplusplus

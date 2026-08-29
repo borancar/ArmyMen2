@@ -1157,8 +1157,8 @@
  * framebuffer directly, and draws from a table at 0x004FC8C8. Randomised
  * full-screen drawing on a timer; what the effect IS is not established.
  *
- * 0x00462120 reads ADDR_SELECTED_COUNT, the view origins and four HUD
- * colours, and prunes a list with ADDR_LIST_REMOVE_AT while drawing. */
+ * ADDR_DRAW_SELECTION was the third and is reconstructed; see the block at
+ * ADDR_SELECTED_ITEMS for what it turned out to be. */
 #define ADDR_AIR_FRAME_DRAW      0x00409070u  /* void(void) */
 #define ADDR_DRAW_EFFECT_LAYER   0x004123D0u  /* void(void) */
 #define ADDR_DRAW_SELECTION      0x00462120u  /* void(void) */
@@ -3825,6 +3825,43 @@ typedef struct {
 #define ADDR_DESELECT_UNIT       0x00427C80u  /* void(obj) */
 /* The count word of ADDR_SELECTED_UIDS, which is {capacity, count, items}. */
 #define ADDR_SELECTED_COUNT      0x0051230Cu  /* int32_t */
+/* The SELECTION MARKERS: a caret over the army's leader and a health bar under
+ * every selected unit. It is also where dead and concealed selections are
+ * DROPPED -- a paint that edits the list it is drawing, which is worth knowing
+ * before treating it as read-only.
+ *
+ * ITS THREE BAR COLOURS ARE EACH ALREADY NAMED FROM SOMEWHERE ELSE:
+ * ADDR_HUD_MESSAGE_COLOUR under a quarter health, ADDR_COLOUR_LAG_MID under a
+ * half, ADDR_VIEW_RECT_COLOUR above it. So the same three bytes serve the comm
+ * latency readout and a health traffic light. Recorded rather than renamed --
+ * they are not adjacent in memory, so calling them a palette would be a guess.
+ *
+ * ONE LOCK AND TWO UNLOCKS, and that is the original's. Only the leader's
+ * sprite is drawn into locked bits; every bar is a ClearRegion, which BLITS
+ * and must not be inside a lock. The second UnlockSurface is a no-op, since
+ * UnlockSurface is gated on ADDR_SURFACE_LOCKED. */
+#define ADDR_SELECTED_ITEMS      0x00512310u  /* uint32_t *, the uids */
+/* An ARRAY of preloaded sprites and its count, built by 0x00463060 through
+ * PreloadSprite and freed by 0x00463200. Entry 0 is the leader's caret; the
+ * multiplayer set is the pair at 0x0048CBB8/0x0048CBBC, allocated only when
+ * ADDR_MP_SESSION is set. */
+#define ADDR_MARK_SPRITES        0x0048CBB0u  /* AM2_Sprite ** */
+#define ADDR_MARK_SPRITE_COUNT   0x0048CBB4u  /* int32_t */
+#define AM2_MARK_LEADER          0        /* the entry drawn over the leader */
+#define AM2_LEADER_MARK_DY       0x0C     /* below the leader's own point */
+/* The `test [obj+8], 0x204` that drops an entry. Both bits already have names
+ * one screen apart in this file -- OBJ_FLAG_DESTROYED and OBJ_FLAG_CONCEALED
+ * -- so this is spelled out of them rather than given a third. The flag
+ * cleared on the way out is OBJ_FLAG_SELECTED, likewise already named. */
+#define AM2_MARK_GONE            (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED)
+#define AM2_MARK_TROOPER_W       0x18     /* a type-2's bar, 6 px below it */
+#define AM2_MARK_TROOPER_DY      6
+#define AM2_MARK_WIDE_W          0x3C     /* everything else */
+#define AM2_MARK_BIG_DY          0x30     /* VEHICLE_OFF_KIND 5 */
+/* Otherwise the drop comes off the sprite: how far its bounds reach below the
+ * hot spot, rounded DOWN to a multiple of 8, plus 8. */
+#define AM2_MARK_DY_MASK         0xFF8u
+#define AM2_MARK_DY_BIAS         8
 /* Set by ADDR_DESTROY_OBJ_COMMON; every reader treats it as "already gone". */
 #define OBJ_FLAG_DESTROYED       0x04u
 /* Promoted out of army.cpp, which had it as a local, so item.cpp can use the

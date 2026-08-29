@@ -980,7 +980,6 @@ void __cdecl ShowMpResult(int32_t result)
 
 #define orig_air_frame_draw    ((AM2_NoArgFn)(uintptr_t)ADDR_AIR_FRAME_DRAW)
 #define orig_draw_effect_layer ((AM2_NoArgFn)(uintptr_t)ADDR_DRAW_EFFECT_LAYER)
-#define orig_draw_selection    ((AM2_NoArgFn)(uintptr_t)ADDR_DRAW_SELECTION)
 
 /* 0x00424BF0, two callers. Repaints the whole screen from scratch -- what
  * TakeMenuRequest does instead of the ordinary present when the state has not
@@ -1007,9 +1006,19 @@ void __cdecl ShowMpResult(int32_t result)
  * already dirty. So the bitmap is drawn only when nothing else is about to
  * repaint over it.
  *
- * VERIFIED BY READING. Its counter is blind -- both callers are ours -- and
- * the arm of TakeMenuRequest that reaches it needs ADDR_STATE_ENTER_ONCE
- * clear, which no drive here produces. */
+ * IT WAS "VERIFIED BY READING" AND IT IS NOT ANY MORE. This comment used to
+ * say the arm of TakeMenuRequest that reaches it needs ADDR_STATE_ENTER_ONCE
+ * clear, "which no drive here produces". A probe says otherwise: an ordinary
+ * Boot Camp start runs it 55 times, every one at ADDR_GAME_STATE 2, and all
+ * 55 come through TakeMenuRequest -- RefreshScreen, the other caller, does
+ * not run at all. They stop the moment the two opening dialogs are cleared,
+ * so this is the repaint the game does WHILE a dialog is up and not part of
+ * ordinary play at all.
+ *
+ * Its counter is blind, all three call sites being ours, which is why the
+ * wrong claim survived: nothing contradicted it because nothing measured it.
+ * The right response to a blind counter is a probe, which is what the rest
+ * of this file keeps saying. */
 void __cdecl RefreshDraw(void)
 {
     void *bmp;
@@ -1024,7 +1033,7 @@ void __cdecl RefreshDraw(void)
     orig_paused_frame_step();
 
     SetDrawTarget(g_backBuffer);
-    orig_draw_selection();
+    DrawSelection();
     DrawViewRect();
 
     orig_log_noargs();

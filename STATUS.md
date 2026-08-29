@@ -5,15 +5,33 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-29**, at `a536c5a`. Working tree clean.
+Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,072 patches.**
+Nothing uncommitted. **1,073 patches.**
 
-Twenty functions since the last snapshot. The seven-class HUD family is
+Twenty-one functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
-batch has gone from **14 to 24 of 29**.
+batch has gone from **14 to 25 of 29** -- four left, and none of them small.
+
+- **`DrawSelection`** (`0x00462120`, 688 B) is the newest: the caret over the
+  army's leader and a health bar under every selected unit, and the pruning of
+  `ADDR_SELECTED_UIDS` that happens *while* it draws. One lock and two
+  unlocks, because only the caret goes into locked bits and every bar is a
+  `ClearRegion`, which blits.
+
+  It also corrected a written claim. `RefreshDraw` carried "no drive here
+  produces" the arm that reaches it; a probe says an ordinary Boot Camp start
+  runs it **55 times**, all at state 2, all through `TakeMenuRequest`, and all
+  while the two opening dialogs are up. `RefreshScreen` -- the other caller --
+  still reads 0, and now for a mapped reason rather than a shrug: its six
+  dialog-opener callers each require `ADDR_GAME_STATE` 2, so opening AUDIO
+  from the title screen cannot reach it.
+
+  And measured in the other direction too: displacing every bar 40 pixels
+  leaves `bootcamp` at 22 and `mission` at 281 against 287. The suite runs
+  this function and does not discriminate it.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

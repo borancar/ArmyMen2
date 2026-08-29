@@ -32,6 +32,8 @@
 #include "../maprow.h"  /* the flat declaration of RowUpdate */
 #include "../objtype.h"  /* ObjIsType2/4, ObjIsItem -- reconstructed */
 #include "../packkey.h"  /* KeyFieldA/B -- reconstructed */
+#include "../army.h"     /* LookupOwnerObj -- reconstructed */
+#include "../objtable.h" /* LookupByUID -- reconstructed */
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
@@ -1823,6 +1825,180 @@ void __cdecl DrawViewRect(void)
     UnlockSurface();
 }
 
+/* DrawSelection -- original 0x00462120, one caller.
+ *
+ * The SELECTION MARKERS: a caret over the army's leader, and a health bar
+ * under every unit in ADDR_SELECTED_UIDS.
+ *
+ * A PAINT THAT EDITS THE LIST IT IS DRAWING. Any selected uid that no longer
+ * resolves, or whose object has gone CONCEALED or DESTROYED, or whose health
+ * has reached zero, is removed from the list then and there -- and the loop
+ * does NOT advance over a removal, because the entry that shifted down into
+ * that slot has not been looked at yet. The original jumps to the loop TEST
+ * rather than to the step, which is a `continue` with no increment; the
+ * increment is written out at the bottom of the body instead of in the `for`.
+ *
+ * TWO OF THE THREE REMOVALS ALSO CLEAR A FLAG. `and ah, 0xFB` on the object's
+ * flags is OBJ_FLAG_SELECTED going out. The unresolved-uid arm cannot do it,
+ * having no object to clear it on, and that asymmetry is the original's
+ * rather than a gap in transcription.
+ *
+ * ONE LOCK AND TWO UNLOCKS, also the original's. Only the leader's sprite goes
+ * into locked bits; every bar is a ClearRegion, which blits and must be
+ * outside the lock -- the same rule widget.cpp already records for the HUD.
+ * The trailing UnlockSurface is therefore a no-op, and reproduced because
+ * UnlockSurface is gated on ADDR_SURFACE_LOCKED and cannot mind.
+ *
+ * THE HIGH HALF OF A 16-BIT PARTIAL WRITE IS STALE AND IT DOES NOT MATTER.
+ * The original loads the hot spot with `mov dx, [eax+0x26]`, leaving the top
+ * of edx holding the rows pointer from two instructions earlier, and then
+ * subtracts the whole of edx. AM2_MARK_DY_MASK keeps only bits 3..11, and a
+ * subtraction's low 16 bits depend on nothing above them, so the answer is
+ * the same as subtracting the hot spot alone. Written the clear way, with the
+ * reason recorded rather than the accident reproduced.
+ *
+ * The bar's WIDTH is a constant per kind capped at half the unit's maximum
+ * health, so a weak unit gets a short bar; the filled part is that width
+ * scaled by health over maximum. Its DROP below the object's own point is a
+ * constant for a trooper and for vehicle kind 5, and otherwise how far the
+ * sprite reaches below its hot spot, rounded down to a multiple of eight.
+ *
+ * Health at or below zero fills the bar completely. That arm cannot run: the
+ * test above it removes the entry at exactly zero and nothing here carries a
+ * negative. Reproduced, not tidied.
+ *
+ * IT RUNS, AND NO A/B SEES IT -- both halves measured rather than assumed.
+ * A probe puts it at 55 calls in an ordinary Boot Camp start, every one with
+ * `selected` at 1, so the leader arm and the whole loop body execute over a
+ * real object. All 55 are while the two opening dialogs are up, through
+ * TakeMenuRequest -> RefreshDraw, and they stop the instant the dialogs are
+ * cleared: this is the WHILE-A-DIALOG-IS-UP repaint, not part of live play.
+ *
+ * Then the mutation, because running is not being checked. Displacing every
+ * bar 40 pixels left leaves `bootcamp` at its usual 22 differing pixels and
+ * `mission` at 281 against 287 -- inside the noise on both. So the suite
+ * covers this function and does not discriminate it, and the arithmetic here
+ * stands on the disassembly. The counter cannot help either: its one caller
+ * is ours, so it reads 0 by construction. */
+void __cdecl DrawSelection(void)
+{
+    const uint8_t *leader;
+    int32_t        i;
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    leader = (const uint8_t *)LookupOwnerObj(
+                 *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+    if (leader
+        && !(*(const uint32_t *)(leader + OBJ_OFF_FLAGS) & AM2_MARK_GONE)
+        && *(const int16_t *)(leader + OBJ_OFF_HEALTH) != 0) {
+        AM2_Sprite *spr =
+            (*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MARK_SPRITES)
+                [AM2_MARK_LEADER];
+
+        DrawSprite(spr,
+                   *(const int16_t *)(leader + OBJ_OFF_POS)
+                       - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                   *(const int16_t *)(leader + OBJ_OFF_POS + 2)
+                       - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                       + AM2_LEADER_MARK_DY,
+                   0);
+    }
+
+    UnlockSurface();
+
+    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+        int32_t  x, y, wide, drop, fill;
+        int16_t  hp, max;
+        RECT     box;
+        uint8_t  ink;
+
+        if (!obj) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            continue;
+        }
+
+        if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & AM2_MARK_GONE) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            continue;
+        }
+
+        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            continue;
+        }
+
+        x = *(const int16_t *)(obj + OBJ_OFF_POS)
+            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+        y = *(const int16_t *)(obj + OBJ_OFF_POS + 2)
+            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
+
+        if (ObjIsType2((const AM2_Object *)obj)) {
+            wide = AM2_MARK_TROOPER_W;
+            drop = AM2_MARK_TROOPER_DY;
+        } else {
+            wide = AM2_MARK_WIDE_W;
+
+            if (*(const uint32_t *)(obj + VEHICLE_OFF_KIND) == 5) {
+                drop = AM2_MARK_BIG_DY;
+            } else {
+                const AM2_Sprite *spr = *(const AM2_Sprite *const *)(
+                    *(const uint8_t *const *)(obj + OBJ_OFF_ROWS)
+                    + ROW_OFF_SPRITE);
+
+                drop = (int32_t)(((uint32_t)spr->bounds.bottom
+                                  - (uint32_t)(uint16_t)spr->hotY)
+                                 & AM2_MARK_DY_MASK) + AM2_MARK_DY_BIAS;
+            }
+        }
+
+        max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+        hp  = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+
+        if (max / 2 < wide)
+            wide = max / 2;
+
+        fill = hp > 0 ? hp * wide / max : wide;
+
+        x -= wide / 2;
+
+        /* The frame first, then the filled part, then the remainder -- three
+         * ClearRegions over one rectangle, each narrowing it. */
+        box.left   = x - 1;
+        box.top    = y + drop;
+        box.right  = x + wide + 1;
+        box.bottom = y + drop + 4;
+        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+
+        if (hp <= (int16_t)(max >> 2))
+            ink = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+        else if (hp <= (int16_t)(max >> 1))
+            ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+        else
+            ink = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+
+        box.left   = x;
+        box.top    = y + drop + 1;
+        box.right  = x + fill;
+        box.bottom = y + drop + 3;
+        ClearRegion(&box, ink);
+
+        box.left  = x + fill;
+        box.right = x + wide;
+        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL);
+
+        i++;
+    }
+
+    UnlockSurface();
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
@@ -1869,5 +2045,7 @@ int mapdraw_install(void)
                         "BlitMapBackdrop", 4);
     rc |= patch_replace(ADDR_PAINT_MAP_TILES, (const void *)PaintMapTiles,
                         "PaintMapTiles", 1);
+    rc |= patch_replace(ADDR_DRAW_SELECTION, (const void *)DrawSelection,
+                        "DrawSelection", 1);
     return rc;
 }
