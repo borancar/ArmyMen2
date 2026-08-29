@@ -578,6 +578,37 @@
 #define AM2_HUD_CMD_SLOTS      3
 #define AM2_HUD_CMD_HIGHLIGHT  0xEE
 #define ADDR_HUD_SARGE_PAINT   0x004155A0u  /* thiscall void(obj, RECT) */
+/* Vtable slot 2 of the same panel, and what fills every record the paint
+ * reads. Three passes over the same six slots, in this order:
+ *
+ *   the HOTKEYS -- bindings 0x15..0x1A, one per slot, each selecting that
+ *   weapon through ADDR_SELECT_WEAPON. The first that answers wins and the
+ *   rest of the chain is skipped;
+ *
+ *   the MOUSE, over the same six cells: claim through ADDR_MOUSE_GRAB, select
+ *   on release, and -- after a full second of mouse stillness -- write the
+ *   item's name into ADDR_HUD_WIDGET_B's caption. That is the same one-frame
+ *   tooltip idiom the radar uses for "Stratmap", so the panel's caption is
+ *   re-asserted every frame by whoever is hovered;
+ *
+ *   and the REFILL, which rewrites all six records from the inventory.
+ *
+ * The refill's sprite comes from a 41-entry jump table over object type 2..42.
+ * Its selected-slot flag is 1 or 2, never a bare boolean: 2 when
+ * ADDR_ITEM_IS_READY answers non-zero, which is what the paint's `> 0` test is
+ * indifferent to and what a `!!` would have flattened. */
+#define ADDR_HUD_SARGE_UPDATE  0x004150F0u  /* thiscall void(obj) */
+#define ADDR_SELECT_WEAPON     0x00414F20u  /* void(obj *, int32 slot) */
+#define ADDR_ITEM_IS_READY     0x0045F2D0u  /* int32(const obj *), 48 bytes */
+/* Three instructions: `return ADDR_ITEM_TYPE_NAMES[kind]`. Named rather than
+ * reconstructed here -- it is one caller away and nothing about the update
+ * depends on more than its shape. */
+#define ADDR_ITEM_TYPE_NAME    0x004600E0u  /* const char *(int32 kind) */
+#define ADDR_ITEM_TYPE_NAMES   0x0048C480u  /* const char *[] */
+#define AM2_ACTION_WEAPON_FIRST 0x15  /* .. 0x1A, one per sarge slot */
+#define AM2_HUD_SARGE_AMMO_MAX  99
+#define AM2_HUD_TOOLTIP_DWELL   0x3E8 /* 1000 ms of stillness before the name */
+#define HUDSARGE_REC_READY      0x0Cu /* 0 unselected, else 1 or 2 */
 /* SIX slots in a 3x2 grid: x at 6/50/94, y at 21 and 49 -- the same three
  * columns the build menu and the command row use. int16 PAIRS, and the loop
  * pointer starts at 0x004766B2 reading [ebx-2] and [ebx], so the table BASE is
@@ -586,6 +617,7 @@
 #define ADDR_HUD_SARGE_OFF_END 0x004766CAu
 #define AM2_HUD_SARGE_ROWS     6
 /* One record per slot, 0x10 apart, from HUDSARGE_OFF_SLOTS. */
+#define HUDSARGE_OFF_SPRITES   0x58u  /* AM2_Sprite *[31], what INDEX picks */
 #define HUDSARGE_OFF_SLOTS     0xD4u  /* {index, ?, count, flag}[6] */
 #define HUDSARGE_REC_STRIDE    0x10u
 #define HUDSARGE_REC_INDEX     0x00u  /* into the 31 sprites at +0x58; -1 empty */

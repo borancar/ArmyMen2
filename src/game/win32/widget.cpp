@@ -231,6 +231,14 @@ typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
  * original's -- nothing about it is needed to know what HudSquadPaint does. */
 typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int32_t);
 #define orig_hud_squad_detail (*(am2_squad_detail_fn)ADDR_HUD_SQUAD_DETAIL)
+/* The sarge panel's three still-original callees. Selecting a weapon reaches
+ * the unit and comm layers; the other two are a predicate and a table read. */
+typedef void (__cdecl *am2_select_weapon_fn)(void *, int32_t);
+#define orig_select_weapon (*(am2_select_weapon_fn)ADDR_SELECT_WEAPON)
+typedef int32_t (__cdecl *am2_item_ready_fn)(const void *);
+#define orig_item_is_ready (*(am2_item_ready_fn)ADDR_ITEM_IS_READY)
+typedef const char *(__cdecl *am2_type_name_fn)(uint32_t);
+#define orig_item_type_name (*(am2_type_name_fn)ADDR_ITEM_TYPE_NAME)
 
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
@@ -2482,6 +2490,172 @@ void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip)
                 DrawSpriteClipped(pip, cx, cy, &part, 0);
             }
         }
+    }
+}
+
+/* Object type -> sarge sprite index, for types AM2_ITEM_TYPE_FIRST..LAST. The
+ * original is a 41-entry jump table whose arms are `mov ecx, imm`, so this is
+ * the table read through the arms rather than the arms read in layout order --
+ * the same discipline the edge strip's vehicle table needed, and here the two
+ * orders genuinely differ: entry 24 lands on the arm that sets 10 while the
+ * arm before it sets 8. Zero is the default and several real types map to it. */
+static const uint8_t kSargeSprite[AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST + 1] = {
+     2,  3,  1,  4,  0,  0, 16,  0,  5,  7,
+     6,  0,  0, 26, 27, 28, 29, 30,  8,  0,
+     0, 12, 10, 11,  9,  0, 13, 14, 15,  0,
+     0,  0, 17, 18, 19, 20, 21, 22, 23, 24,
+    25
+};
+
+/* 0x004150F0, vtable slot 2 of the sarge panel. It fills every record
+ * HudSargePaint reads, in three passes over the same six slots.
+ *
+ * THE HOTKEYS come first and they short-circuit: bindings 0x15..0x1A, one per
+ * slot, and the first that answers selects that weapon and skips both the rest
+ * of the chain and the whole mouse pass. Written as a loop with a break, which
+ * is the same thing the original's ladder of `jmp` does.
+ *
+ * THE MOUSE pass walks the same six cells, claims through ADDR_MOUSE_GRAB the
+ * way every panel in this family does, and selects on RELEASE. Its second job
+ * is the tooltip: after AM2_HUD_TOOLTIP_DWELL of no mouse activity it writes
+ * the hovered item's name into ADDR_HUD_WIDGET_B's caption -- the same
+ * one-frame idiom the radar uses for "Stratmap", where the panel empties the
+ * buffer every frame and whoever is hovered re-asserts it.
+ *
+ * THE REFILL rewrites all six records from the inventory, and its selected
+ * flag is 1 OR 2 rather than a boolean: 2 when ADDR_ITEM_IS_READY answers
+ * non-zero. The paint only tests `> 0`, so a `!!` here would pass every check
+ * in this tree and still be wrong -- the original computes it with
+ * neg/sbb/neg/inc, which is `(r != 0) + 1`.
+ */
+void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w)
+{
+    uint8_t        *self = (uint8_t *)w;
+    const int16_t  *grid = (const int16_t *)AM2_IMAGE(ADDR_HUD_SARGE_OFFSETS);
+    uint8_t        *obj;
+    int32_t         i;
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
+        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+        return;
+
+    WidgetUpdate(w);
+
+    obj = (uint8_t *)LookupOwnerObj(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+    if (!obj)
+        return;
+
+    /* Pass one: the hotkeys, first match wins and nothing else runs. */
+    for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
+        if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + i)) {
+            orig_select_weapon(obj, i);
+            goto refill;
+        }
+    }
+
+    /* Pass two: the mouse, but only while the panel is open. */
+    if (!*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
+                                (uintptr_t)ADDR_HUD_WIDGET_B
+                            + HUDPANEL_OFF_OPEN))
+        goto refill;
+
+    for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
+        const uint8_t *rec = self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE;
+        int32_t        idx = *(const int32_t *)(rec + HUDSARGE_REC_INDEX);
+        AM2_Sprite    *spr;
+        AM2_Rect       cell;
+        AM2_Widget    *grab;
+        int32_t        changed;
+        uint32_t       uid;
+
+        if (idx < 0)
+            continue;
+
+        spr = *(AM2_Sprite **)(self + HUDSARGE_OFF_SPRITES + idx * 4);
+        if (!spr)
+            continue;
+
+        cell.left   = grid[i * 2]     + w->rect.left;
+        cell.top    = grid[i * 2 + 1] + w->rect.top;
+        cell.right  = spr->bounds.right  + cell.left;
+        cell.bottom = spr->bounds.bottom + cell.top;
+
+        if (!PointInRect(&cell, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+            continue;
+
+        grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+        changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+
+        if (!grab && changed) {
+            grab = w;
+            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+        }
+
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            && changed && grab == w)
+            orig_select_weapon(obj, i);
+
+        /* The tooltip, and it is gated on STILLNESS rather than on the click.
+         * ADDR_MOUSE_ACTIVITY is stamped from the clock on any movement or
+         * button change, so this fires while the pointer rests on a cell. */
+        if ((int32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                      - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY)
+            > AM2_HUD_TOOLTIP_DWELL) {
+            const uint8_t *item;
+
+            uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
+            if (!uid)
+                continue;
+
+            item = (const uint8_t *)WeaponByUid(uid);
+            if (!item)
+                continue;
+
+            strcpy((char *)((uint8_t *)*(AM2_Widget *const *)
+                                (uintptr_t)ADDR_HUD_WIDGET_B
+                            + HUDPANEL_OFF_CAPTION),
+                   orig_item_type_name(
+                       **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)));
+        }
+    }
+
+refill:
+    /* Pass three: rebuild every record from the inventory. */
+    for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
+        uint8_t       *rec = self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE;
+        uint32_t       uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
+        const uint8_t *item;
+        uint32_t       kind;
+        int32_t        ammo;
+
+        if (!uid) {
+            *(int32_t *)(rec + HUDSARGE_REC_INDEX) = -1;
+            continue;
+        }
+
+        item = (const uint8_t *)WeaponByUid(uid);
+        if (!item) {
+            *(int32_t *)(rec + HUDSARGE_REC_INDEX) = -1;
+            continue;
+        }
+
+        kind = **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0);
+        *(int32_t *)(rec + HUDSARGE_REC_INDEX) =
+            kind - AM2_ITEM_TYPE_FIRST
+                <= (uint32_t)(AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST)
+            ? kSargeSprite[kind - AM2_ITEM_TYPE_FIRST]
+            : 0;
+
+        ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
+        if (ammo > AM2_HUD_SARGE_AMMO_MAX)
+            ammo = AM2_HUD_SARGE_AMMO_MAX;
+        *(int32_t *)(rec + HUDSARGE_REC_COUNT) = ammo;
+
+        /* 1 or 2, never a boolean -- see the header comment. */
+        *(int32_t *)(rec + HUDSARGE_REC_READY) =
+            i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)
+            ? (orig_item_is_ready(item) != 0) + 1
+            : 0;
     }
 }
 
@@ -8302,6 +8476,8 @@ int widget_install(void)
                         "HudRadarPaint", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_PAINT, (const void *)HudSquadPaint,
                         "HudSquadPaint", 1);
+    rc |= patch_replace(ADDR_HUD_SARGE_UPDATE, (const void *)HudSargeUpdate,
+                        "HudSargeUpdate", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
