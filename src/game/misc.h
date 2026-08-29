@@ -29,6 +29,10 @@ void __cdecl SeqRun(void *ctx);
 /* 0x00461310, and both kinds 2 and 3 reach it: a two-frame life. */
 int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx);
 
+/* 0x004614D0. Kind 5's stepper: an emitter that adds a kind 4 into the other
+ * context every 300 ms until its life runs out. */
+int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx);
+
 /* 0x00461660. The third adder -- kind 6, whose sprite is a VARIANT of eight
  * frames rather than a frame, and whose depth key carries the terrain. */
 void __cdecl SeqAddKind6(const int32_t *at, int32_t variant);

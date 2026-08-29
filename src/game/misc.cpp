@@ -1327,9 +1327,10 @@ typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
 typedef int32_t (__cdecl *AM2_SeqRetireFn)(void *ctx, void *rec);
 #define SeqRetire ((AM2_SeqRetireFn)(uintptr_t)ADDR_SEQ_RETIRE)
+typedef void (__cdecl *AM2_SeqAdd4Fn)(const int32_t *at, int32_t a);
+#define orig_seq_add_kind4 ((AM2_SeqAdd4Fn)(uintptr_t)ADDR_SEQ_ADD_KIND4)
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
 #define orig_seq_step4 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP4)
-#define orig_seq_step5 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP5)
 #define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
 #define orig_seq_step7 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP7)
 
@@ -1744,6 +1745,61 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
                   + AM2_SEQ_DEPTH_BIAS);
 }
 
+/* SeqStepKind5 -- original 0x004614D0, one caller.
+ *
+ * Kind 5 is an EMITTER. Every ADDR_SEQ_EMIT_MS -- 300 -- it adds a kind 4 at
+ * its own point jittered by -4, 0 or +4 in x, and it retires once its elapsed
+ * time has passed SEQ_OFF_LIFE, which for a kind 5 defaults to 95 seconds.
+ * The kind 4 goes into ADDR_SEQ_CTX_B, the other context, which is what the
+ * per-frame step walks second.
+ *
+ * SO SEQ_OFF_GATE IS NOT A FLAG, and orig.h has said "gate" since before
+ * anything read it. This stepper adds the frame delta to it every frame and
+ * subtracts the interval whenever it passes it: a millisecond accumulator.
+ * The adders write 1 into it, which is not "true" but "start just above zero
+ * so the walker does not skip me". The name is kept because what the WALKER
+ * does with it is still a gate, and the field's comment now carries both.
+ *
+ * ROW_OFF_STAMP_54 IS MILLISECONDS HERE AND A FRAME COUNT IN KIND 2. One
+ * field, two units, chosen by the kind that owns the record. Worth saying
+ * plainly: there is no reading of that field that is right for both.
+ *
+ * The jitter is `(rand() % 3) * 4 - 4` added to the low half of the packed
+ * point, so it moves in x only, and the original does it with a 16-bit add
+ * into a stack copy of the point -- an argument slot it reuses as a local.
+ * Written as a local; the reuse is the compiler's.
+ */
+int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
+{
+    uint8_t *r    = (uint8_t *)rec;
+    uint8_t *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
+    int32_t  step;
+
+    (void)at;
+
+    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+            > *(const uint32_t *)(r + SEQ_OFF_LIFE))
+        return SeqRetire(ctx, rec);
+
+    if (*(const uint32_t *)(r + SEQ_OFF_GATE)
+            > *(const uint32_t *)AM2_IMAGE(ADDR_SEQ_EMIT_MS)) {
+        int32_t pt = *(const int32_t *)(row + ROW_OFF_X);
+
+        *(int16_t *)&pt = (int16_t)(*(const int16_t *)&pt
+                                    + (orig_seq_rand() % 3) * 4 - 4);
+        orig_seq_add_kind4(&pt, AM2_SEQ_EMIT_ARG);
+
+        *(int32_t *)(r + SEQ_OFF_GATE) -=
+            *(const int32_t *)AM2_IMAGE(ADDR_SEQ_EMIT_MS);
+    }
+
+    step = *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    *(int32_t *)(row + ROW_OFF_STAMP_54) += step;
+    *(int32_t *)(r + SEQ_OFF_GATE)       += step;
+
+    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+}
+
 /* SeqRun -- original 0x00461870, two callers.
  *
  * Walk one seq context and step every live record. The walk is INDEX-CHAINED
@@ -1805,7 +1861,7 @@ void __cdecl SeqRun(void *ctx)
         case 2:          /* both reach the same stepper */
         case 3: at = SeqStepKind2(at, rec, ctx); break;
         case 4: at = orig_seq_step4(at, rec, ctx); break;
-        case 5: at = orig_seq_step5(at, rec, ctx); break;
+        case 5: at = SeqStepKind5(at, rec, ctx);   break;
         case 6: at = orig_seq_step6(at, rec, ctx); break;
         case 7: at = orig_seq_step7(at, rec, ctx); break;
         default:
@@ -2060,6 +2116,8 @@ int misc_install(void)
     patch_replace(ADDR_SEQ_RUN, (const void *)SeqRun, "SeqRun", 2);
     patch_replace(ADDR_SEQ_STEP2, (const void *)SeqStepKind2,
                   "SeqStepKind2", 2);
+    patch_replace(ADDR_SEQ_STEP5, (const void *)SeqStepKind5,
+                  "SeqStepKind5", 1);
     patch_replace(ADDR_SEQ_ADD_KIND6, (const void *)SeqAddKind6,
                   "SeqAddKind6", 2);
     patch_replace(ADDR_SEQ_ADD_KIND5, (const void *)SeqAddKind5,

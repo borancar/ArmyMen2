@@ -1488,7 +1488,18 @@
  * share: kind 7 takes entry 0 and kind 6 takes `variant * 8`. */
 #define AM2_SEQ_VARIANT_STRIDE   0x0048CB8Cu  /* int32_t, reads 8 */
 #define ADDR_SEQ_STEP4           0x004613E0u
+/* Reconstructed. Kind 5 is an EMITTER: every ADDR_SEQ_EMIT_MS it adds a kind
+ * 4 into the OTHER context, at its own point jittered by -4, 0 or +4 in x,
+ * and it retires when its elapsed time passes SEQ_OFF_LIFE. */
 #define ADDR_SEQ_STEP5           0x004614D0u
+/* 0x00461350, one caller, 144 bytes: a fourth adder, and the only one that
+ * fills ADDR_SEQ_CTX_B rather than ctx A. Kind 4. Stays original. */
+#define ADDR_SEQ_ADD_KIND4       0x00461350u  /* void(const int32_t *at, int32_t) */
+#define AM2_SEQ_KIND4            4
+#define AM2_SEQ_EMIT_ARG         0x0F
+/* How often kind 5 emits, in milliseconds. Two readers, both in that one
+ * stepper: the test and the subtraction that pays for it. */
+#define ADDR_SEQ_EMIT_MS         0x0048CBE4u  /* int32_t, reads 300 */
 #define ADDR_SEQ_STEP6           0x00461560u
 #define ADDR_SEQ_STEP7           0x00461700u
 #define ADDR_SEQ_RUN_BOTH        0x00461930u  /* void(void) */
@@ -4286,14 +4297,22 @@ typedef struct {
  * 48 bytes, which is what makes +0x2C the last of them. */
 #define SEQ_OFF_KIND             0x00u  /* int32_t, an 8-arm jump table */
 #define SEQ_OFF_FLAG4            0x04u  /* uint8_t, zeroed by kinds 5 and 7 */
-/* int32_t, and the walker skips the record when it is ZERO -- not when it is
- * "not positive", which is what this said. `test edx,edx; jbe` is `je`,
- * because test clears the carry; CLAUDE.md already records that idiom and
- * this is a second instance of being caught by it. A negative gate would be
- * walked, not skipped. */
-#define SEQ_OFF_GATE             0x08u
+/* The walker skips the record when it is ZERO -- not when it is "not
+ * positive", which is what this said. `test edx,edx; jbe` is `je`, because
+ * test clears the carry; CLAUDE.md already records that idiom and this is a
+ * second instance of being caught by it.
+ *
+ * AND IT IS NOT A FLAG. Kind 5's stepper adds the frame delta to it every
+ * frame and subtracts ADDR_SEQ_EMIT_MS whenever it passes that, so it is a
+ * millisecond accumulator driving an emitter. The adders' `= 1` is not "true"
+ * -- it is "start just above zero so the walker does not skip me". Which is
+ * why the name is kept: what the WALKER does with it is still a gate. */
+#define SEQ_OFF_GATE             0x08u  /* int32_t, milliseconds */
 #define SEQ_OFF_FIELD_0C         0x0Cu  /* int32_t, zeroed */
 #define SEQ_OFF_FIELD_10         0x10u  /* int32_t, zeroed by kind 5 only */
+/* A DURATION in milliseconds, which kind 5 compares against the row's
+ * ROW_OFF_STAMP_54 -- and that field is elapsed milliseconds there and a
+ * FRAME COUNT in kind 2's stepper. One field, two units, by kind. */
 #define SEQ_OFF_LIFE             0x14u  /* int32_t, the caller's or a default */
 #define SEQ_OFF_ROW              0x1Cu  /* the AM2 row this seq draws through */
 #define SEQ_OFF_OWNER            0x24u  /* int32_t: an army for 5, a uid for 7 */

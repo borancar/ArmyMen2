@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,090 patches.**
+Nothing uncommitted. **1,091 patches.**
 
-Thirty-eight functions since the last snapshot. The seven-class HUD family is
+Thirty-nine functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -199,6 +199,19 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   terrain attribute under its own point plus 1010. A ground-height term in
   the middle of three constants reads as a sort order. Recorded as a reading;
   nothing yet shows what consumes it.
+
+- **`SeqStepKind5`** (`0x004614D0`) makes kind 5 an **emitter**: every 300 ms
+  it adds a kind 4 at its own point, jittered -4/0/+4 in x, into the *other*
+  context. Two more field corrections fall out of it.
+
+  `SEQ_OFF_GATE` **is not a flag** -- this stepper adds the frame delta to it
+  every frame and subtracts the interval when it passes, so it is a
+  millisecond accumulator. The adders' `= 1` means "start just above zero so
+  the walker does not skip me".
+
+  And `ROW_OFF_STAMP_54` is **milliseconds here and a frame count in kind
+  2**. One field, two units, chosen by the kind that owns the record -- there
+  is no single reading that is right for both.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
