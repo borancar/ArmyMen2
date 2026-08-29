@@ -43,6 +43,7 @@
 #include "../game/misc.h"
 #include "../game/script.h"
 #include "../game/item.h"
+#include "../game/place.h"
 #include "../game/objflag.h"
 #include "../game/msgslot.h"
 #include "../game/army.h"
@@ -192,6 +193,24 @@ static const struct check kChecks[] = {
     { "ObjKind538In10To17", ADDR_OBJ_KIND538_10_17,
                             (void *)ObjKind538In10To17, 1, {1,0,0,0}, 0 },
     { "FilterMatches",  ADDR_FILTER_MATCHES, (void *)FilterMatches,  6, {0,0,0,0}, 0 },
+    /* Here for its JUMP TABLE and for nothing else. Eight slots, six distinct
+     * targets -- selectors 0, 1 and 2 share one arm -- and the arms are not in
+     * the order the table dispatches them, which is the mistake CLAUDE.md has
+     * now recorded three times. Reading the bodies top to bottom produces a
+     * function that is wrong for exactly two inputs, and `pick`'s edge set
+     * opens with 0, 1, 0xFFFFFFFF, 2, ... so it reaches every arm and both
+     * sides of the unsigned bound in the first few calls.
+     *
+     * Safe in the empty world: five arms are arithmetic and a PackKey, the
+     * sixth reads ADDR_CREATE_WATCHED_KIND, which is a .bss dword both sides
+     * read identically whatever it holds. No pointer arguments, so nothing
+     * here can fault the way LookupOwnerObj did.
+     *
+     * This matters more than usual right now: the machine's load makes the
+     * whole-game A/B unreliable, and this check runs BOTH sides in ONE
+     * process, so it does not care what else is running. */
+    { "SpriteKeyForKind", ADDR_SPRITE_KEY_FOR_KIND,
+                          (void *)SpriteKeyForKind, 2, {0,0,0,0}, 0 },
 };
 
 /* A cheap deterministic generator: the interesting values first, then a

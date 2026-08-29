@@ -70,13 +70,19 @@ void __cdecl LoadArmyPlacement(int32_t slot);
  * 3 x, 4 y, 5 the facing, 6 the group, 7 the name. */
 int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line);
 
+/* 0x0043A5F0, one caller. A packed sprite key for a selector in 0..7.
+ *
+ * INSIDE the extern "C" block, unlike most of the tail declarations in these
+ * headers: src/inject/selfcheck.c is C and names this one, so it needs C
+ * linkage. The others accumulated outside because only C++ ever called them,
+ * which links either way -- worth knowing before adding a declaration that a
+ * C file will use. */
+int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n);
+
 int place_install(void);
 
 #ifdef __cplusplus
 }
 #endif
-
-/* 0x0043A5F0, one caller. A packed sprite key for a selector in 0..7. */
-int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n);
 
 #endif /* AM2_PLACE_H */

@@ -686,6 +686,37 @@ they were not.** The control tells them apart; nothing else does.
 **0 of 786,432** with an identical eight-message log -- `FreeSpriteRegistry`
 is in the shutdown table, so that run executes it.
 
+### The in-process check is the one the machine cannot spoil
+
+`AM2_SELFCHECK=1` runs our function and the original **side by side in one
+process**, so it does not care what else is on the machine -- which makes it
+the right tool while an external load average of 14-21 leaves the whole-game
+A/B unusable. It was 48 functions and is 49 now.
+
+`SpriteKeyForKind` was added to it for its JUMP TABLE and for nothing else:
+eight slots, six distinct targets, and arms laid out in a different order from
+the one the table dispatches. `pick`'s edge set opens 0, 1, 0xFFFFFFFF, 2, so
+it reaches every arm and both sides of the unsigned bound within a few calls.
+
+**Proved in both directions, which is the only way this is worth anything.**
+Correct: 6,272 calls across 49 functions, 0 disagree. With the arms read in
+layout order -- the mistake a careful reader actually makes -- 3 disagree, and
+the log names the function and the arguments:
+`SpriteKeyForKind(0,1) -> 01000100, original 01300100`, which is set 0x20
+where the original uses 0x26.
+
+**What it cannot take.** A function that dereferences an argument twice faults
+on scratch bytes, so `JitterFacing`, `RowAnimField4` and `ObjOverlayY` stay
+out; one that indexes a table the game has not built yet takes the process
+down, as `LookupOwnerObj` did. Scalars in, scalar out, and no second
+dereference.
+
+**There are no pure leaves left below the CRT line.** A scan of every
+outstanding entry for one that neither calls nor touches a global returns
+ZERO, so `tools/vectors.py` cannot be extended to any of them -- the offline
+harness has finished its job on this half of the image, and the in-process
+check and the A/B are what remain.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
