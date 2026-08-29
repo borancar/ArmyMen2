@@ -15,6 +15,8 @@
 
 #include "surface.h"
 #include "movie.h"
+#include "../gamedir.h"   /* SetGameDir, FileExists -- reconstructed */
+#include "../image.h"
 #include "palette.h"
 #include "../../inject/patch.h"
 
@@ -87,6 +89,9 @@ typedef void (__stdcall *am2_smack_volumepan_fn)(void *smack, uint32_t trackFlag
 typedef void (__stdcall *am2_movie_slot_fn)(void);
 typedef void (__cdecl *am2_delete_fn)(void *);
 #define orig_delete (*(am2_delete_fn)ADDR_GAME_DELETE)
+/* Spelled as widget.cpp spells it, so the two stay one definition. */
+typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
+#define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
 #define g_movieDSound (*(void **)(uintptr_t)ADDR_DSOUND)
 #define g_soundReady  (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
@@ -532,6 +537,77 @@ void __cdecl StateLeave(void)
     ClearSurface(g_primarySurface, 0);
 }
 
+/* PlayMovie -- original 0x0042E5E0, four call sites.
+ *
+ * Open a film and start it: chdir to wherever it lives, refuse if the file is
+ * not there or if -nm was given, tear down whatever the state was showing,
+ * construct a movie object and set it going.
+ *
+ * TWO DIRECTORIES, and which one is decided by the film's NAME. "3do" and
+ * "credits" -- matched by prefix, with strncmp and their own lengths -- come
+ * from ADDR_DIR_SCRATCH, whatever the last caller left in it; everything else
+ * comes from `avi`. That is the same split MovieBuildName exempts the same two
+ * names from, one layer up, which is what makes it a rule rather than a
+ * coincidence: those two are not the campaign's films and are not kept beside
+ * them.
+ *
+ * -nm IS "NO MOVIES", and the whole image is two references to that global:
+ * the switch parse and this gate. A flag read in exactly one place, by a
+ * function that decides whether to play a film, does not need a second
+ * witness. It was ADDR_OPT_NM.
+ *
+ * THE FAILURE PATH POSTS THE FINISHED MESSAGE RATHER THAN RETURNING QUIETLY,
+ * which is the only thing that keeps the state machine moving: state 3 waits
+ * for that message, so a missing .smk has to look exactly like a film that
+ * played and ended. MovieFinished posts the same WM_USER from the other end.
+ *
+ * The volume is ADDR_VOLUME_VOICE put through `v * 3 + 0x8000`, floored to 0
+ * below -2000. Transcribed rather than explained -- that is Smacker's scale
+ * and nothing here says what it means.
+ *
+ * The MSVC SEH frame around all of this is not reproduced; see CLAUDE.md.
+ * Neither is the unwind-state index the original writes as it goes.
+ */
+void __cdecl PlayMovie(const char *name, int32_t big)
+{
+    void   *movie;
+    int32_t volume;
+
+    if (strncmp((const char *)AM2_IMAGE(ADDR_STR_MOVIE_3DO), name, 3) == 0
+        || strncmp((const char *)AM2_IMAGE(ADDR_STR_MOVIE_CREDITS),
+                   name, 7) == 0)
+        SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    else
+        SetGameDir(*(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR));
+
+    if (!FileExists(name)
+        || *(const int32_t *)(uintptr_t)ADDR_OPT_NO_MOVIES) {
+        MovieFinished();
+        return;
+    }
+
+    StateLeave();
+
+    movie = orig_operator_new(AM2_MOVIE_SIZE);
+    if (movie)
+        movie = MovieOpen(movie, name, -1, -1, big);
+
+    /* The original stores whatever the constructor returned, which for an
+     * i386 MSVC constructor is `this`. Written as the pointer rather than as
+     * a second variable, since the two cannot differ. */
+    *(void **)(uintptr_t)ADDR_STATE_MOVIE = movie;
+
+    ClearSurface(g_primarySurface, 0);
+    MovieSetCurrent(*(void **)(uintptr_t)ADDR_STATE_MOVIE);
+
+    volume = *(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE;
+    MovieSetVolume(*(void **)(uintptr_t)ADDR_STATE_MOVIE,
+                   volume > AM2_MOVIE_VOLUME_FLOOR
+                       ? volume * 3 + 0x8000
+                       : 0);
+    MovieStart(*(void **)(uintptr_t)ADDR_STATE_MOVIE, (void *)0);
+}
+
 int movie_install(void)
 {
     int rc = 0;
@@ -557,6 +633,8 @@ int movie_install(void)
                         "MovieFinished", 0);
     rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);
     rc |= patch_replace(ADDR_MOVIE_START, (const void *)MovieStart, "MovieStart", 1);
+    rc |= patch_replace(ADDR_PLAY_MOVIE, (const void *)PlayMovie,
+                        "PlayMovie", 4);
     rc |= patch_replace(ADDR_MOVIE_POLL, (const void *)MoviePoll, "MoviePoll", 0);
     rc |= patch_replace(ADDR_MOVIE_APPLY_PALETTE, (const void *)MovieApplyPalette,
                         "MovieApplyPalette", 1);

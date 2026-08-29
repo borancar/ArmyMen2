@@ -737,8 +737,6 @@ void __cdecl TakeMenuRequest(void)
  * four stay one definition; checkglobals enforces that. */
 #define g_activePalette   (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
-typedef void (__cdecl *AM2_PlayMovieFn)(const char *name, int32_t arg);
-#define orig_play_movie       ((AM2_PlayMovieFn)(uintptr_t)ADDR_PLAY_MOVIE)
 
 /* 0x004266F0, one caller -- RunFrame, on entering state 3. State 3 is the
  * MOVIE state, and the body is what settles that: it loads a GREYSCALE palette
@@ -750,10 +748,9 @@ typedef void (__cdecl *AM2_PlayMovieFn)(const char *name, int32_t arg);
  * surfaces are cleared, so the clear happens in the palette the film will play
  * in -- doing it the other way round would flash the menu's colours.
  *
- * Five of the six calls are ours -- LoadPaletteFile, SetGamePalette,
- * RefreshGate, LatchKeyState and now MovieBuildName -- so the only one still
- * reaching the image is PlayMovie, which stays original because the Smacker
- * class layout is not reconstructed yet.
+ * All six calls are ours now -- LoadPaletteFile, SetGamePalette, RefreshGate,
+ * LatchKeyState, MovieBuildName and PlayMovie. Nothing in this state reaches
+ * the image any more.
  *
  * The name buffer is 0x40 bytes because that is the frame the original
  * reserves, and the builder writes into it unchecked. Reproduced at that size
@@ -773,7 +770,7 @@ void __cdecl StateEnter3(void)
     RefreshGate(0);
 
     MovieBuildName(name, (const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY);
-    orig_play_movie(name, 0);
+    PlayMovie(name, 0);
 
     LatchKeyState();
 

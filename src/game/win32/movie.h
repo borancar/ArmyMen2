@@ -82,7 +82,14 @@ void __cdecl MovieForget(void);
 
 /* 0x0042E720. Leaving a game state: stop and delete the state's movie if it
  * has one, and clear the primary surface either way. */
-void __cdecl StateLeave(void);              /* 0x00445670 */
+void __cdecl StateLeave(void);              /* 0x0042E720 */
+
+/* 0x0042E5E0, four call sites. Chdir to where the film lives, refuse if it
+ * is missing or -nm was given, and construct and start a movie object. */
+void __cdecl PlayMovie(const char *name, int32_t big);
+
+/* 0x004451F0. Put the multimedia timer on a movie. */
+int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg);
 
 int movie_install(void);
 

@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,075 patches.**
+Nothing uncommitted. **1,076 patches.**
 
-Twenty-three functions since the last snapshot. The seven-class HUD family is
+Twenty-four functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -59,6 +59,16 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   whole input space, run against the original under Unicorn in a tenth of a
   second. Three mutations of the expected rule fail it, one of them on
   exactly the single case that distinguishes it.
+
+- **`PlayMovie`** (`0x0042E5E0`, 592 B) went in beside it and closes the movie
+  state entirely: every call `StateEnter3` makes is now ours. It ran **twice**
+  on a `-dbg` startup with `MoviePoll` at 618,232, and `MovieOpen`,
+  `MovieSetVolume`, `MovieSetCurrent` and `MovieStart` all dropped to 0 in the
+  same run -- the blind spot arriving exactly where reconstruction predicts,
+  which is the confirmation rather than the worry.
+
+  `-nm` is **no movies**: two references in the image, the switch parse and
+  this function's gate.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

@@ -574,7 +574,7 @@ static void ParseCommandLine(char *cmdLine)
     if (strstr(cmdLine, "-df"))        opt(ADDR_OPT_DF) = 0;
     if (strstr(cmdLine, "-bm"))        opt(ADDR_OPT_BIG_MOVIES) = 1;
     if (strstr(cmdLine, "-sm"))        opt(ADDR_OPT_BIG_MOVIES) = 0;
-    if (strstr(cmdLine, "-nm"))        opt(ADDR_OPT_NM) = 1;
+    if (strstr(cmdLine, "-nm"))        opt(ADDR_OPT_NO_MOVIES) = 1;
 
     /* `-map:NAME` -- everything after the colon up to the first character that
      * is not greater than a space. The comparison is signed, so a byte with the

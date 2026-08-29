@@ -5602,6 +5602,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_MOVIE_PORTAL    0x0048659Cu  /* "portal" */
 #define ADDR_STR_MOVIE_SMALL     0x00486598u  /* "sml" */
 #define ADDR_STR_MOVIE_EXT       0x00486590u  /* ".smk" */
+/* operator new's argument in PlayMovie, and the volume floor below which the
+ * film is played silent. */
+#define AM2_MOVIE_SIZE           0xC4
+#define AM2_MOVIE_VOLUME_FLOOR   (-2000)
 #define ADDR_STR_PATH_SEP        0x00478984u  /* "\\" */
 #define ADDR_MAP_FOLDER          0x00511AC8u  /* the map's own directory */
 #define ADDR_RULES_DIR_STR       0x00485110u  /* a `char *` to "rules"    */
@@ -5982,7 +5986,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * settled it was reading a function that USES the flag rather than one that
  * writes it. */
 #define ADDR_OPT_BIG_MOVIES      0x005125C4u  /* -bm sets, -sm clears */
-#define ADDR_OPT_NM              0x0051259Cu  /* -nm */
+/* -nm, and it is NO MOVIES. Two references in the whole image: the switch
+ * parse and PlayMovie's gate, which refuses to open a film when it is set.
+ * A flag read in exactly one place, by a function that decides whether to
+ * play a film, needs no second witness. It was ADDR_OPT_NM. */
+#define ADDR_OPT_NO_MOVIES       0x0051259Cu  /* -nm */
 #define ADDR_OPT_MAP_NAME        0x004F9FECu  /* char[], the text after -map: */
 /* The comm subsystem object; -debugComm, -traceComm and -logComm set flags
  * inside it rather than in globals of their own. */
