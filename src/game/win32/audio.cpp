@@ -900,15 +900,99 @@ typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
 #define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
 #define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
 
+/* The RIFF chunk walk, which stays original: given the whole file, find the
+ * format, the samples and their length. */
+typedef int32_t (__cdecl *AM2_ParseWaveFn)(void *file, LPWAVEFORMATEX *fmt,
+                                           void **samples, DWORD *length);
+#define ParseWave ((AM2_ParseWaveFn)AM2_IMAGE(ADDR_PARSE_WAVE))
+
+/* ReadWaveFile -- original 0x0040C340, two callers.
+ *
+ * Slurp a .WAV whole and hand the caller its format, its samples, their
+ * length, and the buffer that owns all three. The chunk walking is
+ * ADDR_PARSE_WAVE's, which stays original -- so this is the I/O half, and
+ * that split is why it can be reconstructed without touching the RIFF layout.
+ *
+ * FOUR OUT-PARAMETERS AND THE CALLER OWNS ONE OF THEM. `format` and `samples`
+ * point INTO the buffer returned through `owned`, so freeing that buffer
+ * invalidates both -- which is what audio.cpp's LoadWaveSound is doing when it
+ * keeps the raw pointer alongside the DSBUFFERDESC it filled from it.
+ *
+ * IT LEAKS THE FILE ON TWO OF ITS FOUR FAILURE PATHS, and that is the
+ * original's. A failed fopen has nothing to close; but the seek failure and
+ * the empty-file check both return with the handle open, and only the parse
+ * failure closes and frees. Reproduced, with the note, because the game opens
+ * 56 waves once at startup and never retries -- a leak that cannot accumulate
+ * is not the same defect as one that can.
+ *
+ * The first parameter is read by nothing. Both call sites pass 0.
+ *
+ * `orig_fread` is the game's stdio and `orig_malloc` its heap, for the reason
+ * crt.h gives: a FILE opened by the game's CRT cannot be closed by ours, and
+ * a block from its heap cannot be freed by ours. Every one of these is a
+ * seam that stays.
+ *
+ * VERIFIED BY tools/checkwaves.py, WHICH IS AN EXACT ORACLE FOR EXACTLY THIS.
+ * With a silent ALSA device and AM2_DUMP_SOUND=1 it compares the bytes handed
+ * to every DirectSound buffer against the .WAV's own data chunk: 56 waves,
+ * all matching, 0 differing. That is a byte-for-byte check on this function's
+ * output, which no A/B could be.
+ *
+ * AND ITS SENSITIVITY AT THE MARGIN IS LOW, which is worth knowing before
+ * leaning on it. Reading `size - 1` bytes instead of `size` fails only TWO of
+ * the 56 -- burndie.wav and explosionwater.wav -- because a wave whose `data`
+ * chunk does not run to the last byte of the file never notices the missing
+ * one. So this catches a truncation only when the file has no trailing slack,
+ * and it took a mutation to find that out rather than the 56/56.
+ */
+int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
+                             LPWAVEFORMATEX *format, void **samples,
+                             DWORD *length, void **owned)
+{
+    am2_FILE *fp;
+    int32_t   size;
+
+    (void)unused;
+
+    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOLOAD), name);
+        return 0;
+    }
+
+    if (orig_fseek(fp, 0, SEEK_END)) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_SEEK_END), name);
+        return 0;   /* the handle stays open -- see above */
+    }
+
+    size = orig_ftell(fp);
+    if (size <= 0) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_EMPTY), name);
+        return 0;   /* and here */
+    }
+
+    orig_fseek(fp, 0, SEEK_SET);
+
+    *owned = orig_malloc((size_t)size);
+    if (!*owned)
+        return 0;
+
+    orig_fread(*owned, (size_t)size, 1, fp);
+    orig_fclose(fp);
+
+    if (!ParseWave(*owned, format, samples, length)) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_PARSE), name);
+        orig_free(*owned);
+        return 0;
+    }
+
+    return 1;
+}
+
 /* The reader fills four out-parameters, and two of them are fields of the
  * DSBUFFERDESC itself -- which is why the original only ever assigns dwSize
  * and dwFlags by hand. Getting that wrong leaves the descriptor with no format
  * and no length, and CreateSoundBuffer refuses every wave in the game. */
-typedef int32_t (__cdecl *am2_read_wave_fn)(int32_t zero, const char *name,
-                                            LPWAVEFORMATEX *format,
-                                            void **samples, DWORD *length,
-                                            void **owned);
-#define orig_read_wave (*(am2_read_wave_fn)ADDR_READ_WAVE_FILE)
 
 /* Play a sound that is not one of the fixed ones -- 0x0040B8F0.
  *
@@ -1065,7 +1149,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
         memcpy(copy, name, n);
 
         memset(&desc, 0, sizeof desc);
-        if (!orig_read_wave(0, name, &desc.lpwfxFormat, &raw,
+        if (!ReadWaveFile(0, name, &desc.lpwfxFormat, &raw,
                             &desc.dwBufferBytes, &owned)) {
             orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOLOAD, name);
             goto drop_name;
@@ -1504,7 +1588,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
 
     /* Straight into the descriptor: the format and the length are the reader's
      * answers, not ours. */
-    if (!orig_read_wave(0, name, &desc.lpwfxFormat, &raw, &desc.dwBufferBytes,
+    if (!ReadWaveFile(0, name, &desc.lpwfxFormat, &raw, &desc.dwBufferBytes,
                         &owned)) {
         orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOLOAD, name);
         goto give_up;
@@ -1775,6 +1859,8 @@ int audio_install(void)
                         "FillSoundBuffer", 3);
     rc |= patch_replace(ADDR_INIT_WAVE_SOUNDS, (const void *)InitWaveSounds,
                         "InitWaveSounds", 0);
+    rc |= patch_replace(ADDR_READ_WAVE_FILE, (const void *)ReadWaveFile,
+                        "ReadWaveFile", 2);
     rc |= patch_replace(ADDR_LOAD_WAVE_SOUND, (const void *)LoadWaveSound,
                         "LoadWaveSound", 3);
     rc |= patch_replace(ADDR_FREE_DYN_SOUNDS, (const void *)FreeDynamicSounds,

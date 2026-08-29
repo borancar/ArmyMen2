@@ -9,6 +9,13 @@
  * compatible so dllmain.c can still call the install hooks. */
 #ifdef __cplusplus
 extern "C" {
+/* 0x0040C340, two callers. Slurp a .WAV whole and hand back its format, its
+ * samples, their length, and the buffer that owns all three. The RIFF walk
+ * stays original. */
+int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
+                             LPWAVEFORMATEX *format, void **samples,
+                             DWORD *length, void **owned);
+
 #endif
 
 /* Streaming audio -- the music player.

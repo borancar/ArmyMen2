@@ -2659,6 +2659,14 @@
 #define ADDR_STR_WAVE_NOMEM_DATA 0x00474D44u
 #define ADDR_STR_WAVE_NOMEM_NAME 0x00474D18u
 #define ADDR_STR_WAVE_NOLOAD     0x00474CF8u
+#define ADDR_STR_WAVE_SEEK_END   0x00474E24u  /* "Error seeking end of file" */
+#define ADDR_STR_WAVE_EMPTY      0x00474E0Cu  /* "Empty sound file %s" */
+#define ADDR_STR_WAVE_PARSE      0x00474DF0u  /* "Error parsing wave file %s" */
+/* 0x0040C220, one caller. Given the whole file in memory, find the format,
+ * the sample bytes and their length. ReadWaveFile does the I/O and this does
+ * the RIFF walking; the split is why the reader can be reconstructed without
+ * touching the chunk layout. Stays original. */
+#define ADDR_PARSE_WAVE          0x0040C220u  /* int32(void *,fmt**,void**,DWORD*) */
 #define ADDR_STR_WAVE_NOBUFFER   0x00474CD0u
 #define ADDR_STR_WAVE_NOFILL     0x00474CA4u
 #define ADDR_WAVE_NAMES          0x00474360u  /* const char *[32] */

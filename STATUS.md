@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,093 patches.**
+Nothing uncommitted. **1,094 patches.**
 
-Forty-one functions since the last snapshot. The seven-class HUD family is
+Forty-two functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -239,6 +239,21 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   interval here and a total in kind 5, `SEQ_OFF_GATE` a step counter here and
   a millisecond accumulator there, `ROW_OFF_STAMP_54` milliseconds in one
   stepper and frames in another.
+
+- **`ReadWaveFile`** (`0x0040C340`) is the first of this stretch with a
+  BYTE-EXACT oracle. `tools/checkwaves.py` compares what reaches every
+  DirectSound buffer against the `.WAV`'s own data chunk: **56 waves, 0
+  differ**.
+
+  And its sensitivity was measured, not assumed. Reading `size - 1` bytes
+  fails only **2 of 56** -- a wave whose data chunk does not run to the last
+  byte of the file never notices the missing one. So the check catches a
+  truncation only where the file has no trailing slack, and it took a
+  mutation to find that out rather than the 56/56.
+
+  It leaks the file handle on two of its four failure paths. The original's,
+  reproduced -- the game opens 56 waves once at startup and never retries, so
+  a leak that cannot accumulate is not the same defect as one that can.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
