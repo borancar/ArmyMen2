@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "armymsg.h"
+#include "map.h"       /* TileOfPoint -- reconstructed */
 #include "image.h"
 #include "item.h"          /* UidOnWire, UidArmy */
 #include "../inject/orig.h"
@@ -595,12 +596,91 @@ typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t, const char *, int32_t,
 typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *, int32_t, int32_t,
                                             int32_t, int32_t, int32_t,
                                             int32_t, uint32_t);
-typedef void (__cdecl *AM2_PostCreateFn)(void *obj, int32_t a);
+/* ItemPostCreate -- original 0x0043A210, four callers.
+ *
+ * Walk the 5x5 block of map tiles around a new object and increment the entry
+ * in every ALLIED army's reveal grid. Four grids, one byte per tile: a count
+ * of what reveals each tile, not a flag.
+ *
+ * ITS SIGNATURE WAS WRONG IN orig.h AND THE ERROR WAS LIVE. The macro read
+ * `void(obj, int32)`, and RecvItemCreate below passed the freshly created
+ * object into the first slot. The function opens `cmp eax, 4; jge` and
+ * returns -- so with an object pointer there, every call returned at the
+ * first instruction and no tile was ever revealed. The original's own call
+ * site pushes the ARMY, which is what settles it; the argument that reaches
+ * the second slot was right all along.
+ *
+ * It survived because nothing here can run it: RecvItemCreate is a
+ * multiplayer message receiver, so no configuration in ab.sh reaches this at
+ * all. A wrong signature on a `void` function called through a pointer costs
+ * nothing at compile time and nothing at run time until somebody plays a
+ * network game. Found by reading the callee, which is the only thing that
+ * could have found it.
+ *
+ * THE INITIAL INDEX USES ADDR_MAP_TILES_H AND THE ROW STRIDE USES
+ * ADDR_MAP_TILES_W. `H * y0 + x0` starts it and the row advance works out to
+ * exactly W, which the loop's own arithmetic proves -- it adds
+ * `W - x1 + x0 - 1` after covering `x1 - x0 + 1` cells. Those two agree only
+ * on a square map. CLAUDE.md already records that 0x00514DDC carried two
+ * names and that width won on three counts; this is a fourth reading and it
+ * does not fit either way round. Reproduced exactly as written, because a
+ * "fix" here would be inventing an index the game does not use.
+ *
+ * The block is clamped per axis before the walk, so an object at the map's
+ * edge reveals a smaller rectangle rather than wrapping.
+ */
+void __cdecl ItemPostCreate(int32_t army, uint32_t where)
+{
+    int32_t tile;
+    int32_t x, y, x0, x1, y0, y1;
+    int32_t other;
+
+    if (army >= AM2_COMM_SLOTS)
+        return;
+
+    tile = TileOfPoint(where) & 0xFFFF;
+
+    x = tile & (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
+    y = tile >> *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+
+    x0 = Clamp(x - AM2_REVEAL_RADIUS, 0,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
+    x1 = Clamp(x + AM2_REVEAL_RADIUS, 0,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
+    y0 = Clamp(y - AM2_REVEAL_RADIUS, 0,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 1);
+    y1 = Clamp(y + AM2_REVEAL_RADIUS, 0,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 1);
+
+    for (other = 0; other < AM2_COMM_SLOTS; other++) {
+        uint8_t *grid =
+            ((uint8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[other];
+        int32_t  at;
+        int32_t  row;
+
+        if (!ArmiesAllied(army, other))
+            continue;
+
+        /* H here and W in the row advance below; see the note above. */
+        at = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H * y0 + x0;
+
+        for (row = y0; row <= y1; row++) {
+            int32_t col;
+
+            for (col = x0; col <= x1; col++) {
+                grid[at & 0xFFFF]++;
+                at++;
+            }
+
+            at += *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - x1 + x0 - 1;
+        }
+    }
+}
+
 #define orig_create_item     ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
 #define orig_create_trooper  ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
 #define orig_create_vehicle  ((AM2_CreateVehicleFn)(uintptr_t)ADDR_CREATE_VEHICLE)
 #define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
-#define orig_post_create     ((AM2_PostCreateFn)(uintptr_t)ADDR_ITEM_POST_CREATE)
 
 /* 0x0042AFA0, the SIXTH receiver and the one that completes the family. It
  * makes an object the other side has made, dispatching on
@@ -658,7 +738,8 @@ void __cdecl RecvItemCreate(void *msg)
         if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
             != *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
             return;
-        orig_post_create(made, *(const int32_t *)(m + MSG_CREATE_OFF_A));
+        /* ARMY first, not the object -- see ItemPostCreate above. */
+        ItemPostCreate(army, *(const uint32_t *)(m + MSG_CREATE_OFF_A));
         if (!AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, army))
             ObjConceal(made, 1);
         return;
@@ -828,6 +909,8 @@ int armymsg_install(void)
                         "ArmyMessageSend", 1);
     rc |= patch_replace(ADDR_VEHICLE_DROP_OCCUPANT, (const void *)SendVehicleExit,
                         "SendVehicleExit", 2);
+    rc |= patch_replace(ADDR_ITEM_POST_CREATE, (const void *)ItemPostCreate,
+                        "ItemPostCreate", 4);
     rc |= patch_replace(ADDR_DAMAGE_BROADCAST, (const void *)DamageBroadcast,
                         "DamageBroadcast", 4);
     rc |= patch_replace(ADDR_RECV_ITEM_CREATE, (const void *)RecvItemCreate,

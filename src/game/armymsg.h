@@ -23,6 +23,12 @@ extern "C" {
  * header's uid is the VEHICLE and the dword after it is the occupant. */
 void __cdecl SendVehicleExit(void *vehicle, void *occupant);
 
+/* 0x0043A210, four callers. Increment the reveal count on the 5x5 block of
+ * tiles around a new object, in every allied army's grid. Its first argument
+ * is an ARMY, which orig.h had as an object for a long time -- see
+ * armymsg.cpp. */
+void __cdecl ItemPostCreate(int32_t army, uint32_t where);
+
 #endif
 
 /* The header every message on this transport begins with. ArmyMessageSend

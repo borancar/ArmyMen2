@@ -8411,7 +8411,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CREATE_TROOPER      0x00447620u  /* type 2 */
 #define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
-#define ADDR_ITEM_POST_CREATE    0x0043A210u  /* void(obj, int32) */
+/* Reconstructed, and its SIGNATURE WAS WRONG HERE: `void(obj, int32)` said
+ * the first argument is an object, and the function opens with `cmp eax, 4;
+ * jge` and returns. It is (army, packed point). armymsg.cpp's RecvItemCreate
+ * passed the created object into the first slot for as long as that typedef
+ * stood, so every call returned at the first instruction. */
+#define ADDR_ITEM_POST_CREATE    0x0043A210u  /* void(int32 army, uint32 pt) */
+/* Four byte grids, one per army, one entry per map tile: PostCreate walks a
+ * 5x5 block of tiles around a new object and INCREMENTS the entry in every
+ * allied army's grid. A count of what reveals each tile, so a reference count
+ * rather than a flag. */
+#define ADDR_TILE_REVEAL_GRIDS   0x00514ED8u  /* uint8_t *[4] */
+#define AM2_REVEAL_RADIUS        2
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
 #define MSG_CREATE_OFF_UID       4u
 #define MSG_CREATE_OFF_NAME      8u    /* char[]; empty means none */

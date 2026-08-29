@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,104 patches.**
+Nothing uncommitted. **1,105 patches.**
 
-Fifty-one functions since the last snapshot. The seven-class HUD family is
+Fifty-two functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -376,6 +376,32 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   three win32 sprite loaders. Adding `win32/sprite.cpp` was tried first and
   is not an option -- it needs ddraw, and the harness exists so that no part
   of the game runs. Three stubs, with the reasoning beside them.
+
+- **`ItemPostCreate`** (`0x0043A210`) found a **live defect in committed
+  code**. `orig.h` had it as `void(obj, int32)`; the function opens
+  `cmp eax, 4; jge` and returns, so its first argument is an ARMY.
+  `RecvItemCreate` had been passing the freshly created object into that slot
+  -- every call returned at the first instruction and no tile was ever
+  revealed.
+
+  It survived because nothing here can run it: `RecvItemCreate` is a
+  multiplayer receiver. **A wrong signature on a `void` function called
+  through a pointer costs nothing until somebody plays a network game.**
+  Found by reading the callee, which is the only thing that could have found
+  it.
+
+  It also reads `ADDR_MAP_TILES_H` for the initial index and
+  `ADDR_MAP_TILES_W` for the row stride -- which agree only on a square map.
+  A fourth reading of that contested pair, and it fits neither way round.
+  Reproduced exactly.
+
+## Stop condition
+
+The loop's `completion_promise` is now **every game function below the CRT
+line (0x0045C000) patched**. Measured today: **955 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,105
+patched addresses. That figure counts merged entries generously and is a
+ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
