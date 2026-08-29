@@ -4410,6 +4410,13 @@ typedef struct {
  * them are exactly which of those guards each one has, so they are worth
  * keeping separate rather than folding into one helper. */
 #define ADDR_EVT_SET_FIELD_540   0x0041FAB0u  /* void(uid, int32), type 2 only */
+/* StepType8 says what it is for a ROACH: the object's own copy of
+ * OBJ_OFF_FACING, refreshed from it at the top of every step and then passed
+ * BY ADDRESS to four callees -- so one of them can turn the roach by writing
+ * the copy, and the object's facing is only read into it again next frame.
+ * Kept as FIELD_540 rather than renamed: ADDR_EVT_SET_FIELD_540 writes the
+ * same offset for a type 2, which is not a roach, and one offset with two
+ * uses wants one name and two readings. */
 #define OBJ_OFF_FIELD_540        0x540u
 /* 0x0041FD50. Takes TWO uids, requires both above the threshold and both to
  * resolve, clears field 0x540 on the first if it is type 2, and hands the pair
@@ -5262,7 +5269,19 @@ typedef struct {
 #define ADDR_STEP_TYPE5          0x0043C110u  /* void(obj) */
 #define ADDR_STEP_TYPE6          0x00422B90u  /* void(obj) */
 #define ADDR_OBJ_MARK_IF_OVERDUE 0x004355D0u /* void(void *obj) -- type 7 */
+/* Reconstructed. The roach's per-frame step, and the five functions below are
+ * everything it calls that had no name. They are given ROLE names from where
+ * they sit in this one function, which is the weakest kind of naming and is
+ * said so plainly: two run only while the roach is alive, two run on EVERY
+ * path including the dead ones, and one runs once as a dead roach is finally
+ * destroyed. Nothing here reads their bodies. */
 #define ADDR_STEP_TYPE8          0x0043D980u  /* void(obj) */
+#define ADDR_ROACH_ALIVE_STEP_A  0x00408A60u  /* void(obj, uint8_t *facing) */
+#define ADDR_ROACH_ALIVE_STEP_B  0x0043D5B0u  /* void(obj, uint8_t *facing) */
+#define ADDR_ROACH_STEP_TAIL_A   0x0043D750u  /* void(obj, uint8_t *facing) */
+#define ADDR_ROACH_STEP_TAIL_B   0x0043C8D0u  /* void(obj) */
+#define ADDR_ROACH_ROW_FINAL     0x00461EA0u  /* void(row), before the destroy */
+#define AM2_ROACH_ALIVE_SOUND    0x30
 #define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */
 #define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u

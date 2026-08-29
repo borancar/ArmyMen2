@@ -3382,12 +3382,106 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
     SendTrooperSetWeapon(unit, ((const AM2_Object *)w)->uid, slot);
 }
 
+typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *facing);
+typedef void (__cdecl *AM2_RoachRowFn)(void *row);
+#define orig_roach_alive_a \
+    ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_ALIVE_STEP_A)
+#define orig_roach_alive_b \
+    ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_ALIVE_STEP_B)
+#define orig_roach_tail_a \
+    ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_STEP_TAIL_A)
+#define orig_roach_row_final \
+    ((AM2_RoachRowFn)(uintptr_t)ADDR_ROACH_ROW_FINAL)
+
 typedef void (__cdecl *AM2_StepFn)(void *obj);
+#define orig_roach_tail_b ((AM2_StepFn)(uintptr_t)ADDR_ROACH_STEP_TAIL_B)
+
+/* StepType8 -- original 0x0043D980, one caller. The ROACH's per-frame step.
+ *
+ * Clear the footprint, refresh the roach's own copy of its facing, and then
+ * split on health: alive, it makes a sound and takes two steps; dead, it
+ * dispatches on OBJ_OFF_FIELD_530 through three arms and a default. Every
+ * path ends with the same two calls.
+ *
+ * IT DISPATCHES ON 0x530 AND WRITES 0x554, AND THOSE ARE DIFFERENT FIELDS.
+ * OBJ_OFF_DEATH_STATE (0x554) is what DamageRoach writes 5 or 6 into when a
+ * roach's health reaches zero -- and this stepper does not read it. It reads
+ * OBJ_OFF_FIELD_530, whose only other named reader is ObjConceal comparing it
+ * to 5, and it takes the SAME value set: 0, 5 and 6. Checked against the
+ * bytes rather than assumed, because two fields carrying one vocabulary is
+ * exactly the shape a mis-transcribed offset produces. What sets 0x530 is not
+ * established; it is not the damage path.
+ *
+ * THE FACING IS PASSED BY ADDRESS to four of the five callees. The step reads
+ * OBJ_OFF_FACING into OBJ_OFF_FIELD_540 at the top and hands the address of
+ * the copy on, so a callee that turns the roach writes the copy and the
+ * object's own facing is only refreshed on the NEXT frame. Reproduced as the
+ * pointer it is.
+ *
+ * FIVE CALLEES HAD NO NAME and they now have role names taken from where they
+ * sit here, which is the weakest kind of naming this project does. Said
+ * plainly rather than dressed up: two are what an alive roach runs, two are
+ * the common tail, and one runs once as a dead one is destroyed. 704, 416,
+ * 560, 304 and 64 bytes, none of them read.
+ *
+ * The alive path plays AM2_ROACH_ALIVE_SOUND every frame with flag 1, which
+ * PlaySoundAt's own comment gives as restart-if-playing or do-not-interrupt.
+ * A per-frame call only makes sense under the second reading; the flag's
+ * meaning is not settled here and the call is reproduced either way.
+ */
+void __cdecl StepType8(void *obj)
+{
+    uint8_t *o      = (uint8_t *)obj;
+    uint8_t *facing = o + OBJ_OFF_FIELD_540;
+
+    orig_obj_clear_roach_footprint(obj);
+    *facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0) {
+        *(int32_t *)(o + OBJ_OFF_DEATH_STATE)     = 1;
+        *(int32_t *)(o + OBJ_OFF_DEATH_STATE + 4) = 0;
+
+        PlaySoundAt(AM2_ROACH_ALIVE_SOUND, 1, 0,
+                    *(const int16_t *)(o + OBJ_OFF_POS),
+                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+
+        orig_roach_alive_a(obj, facing);
+        orig_roach_alive_b(obj, facing);
+
+    } else {
+        switch (*(const int32_t *)(o + OBJ_OFF_FIELD_530)) {
+        case 0:
+            DestroyByType(obj);
+            break;
+
+        case 5:
+            if (!RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS)))
+                break;
+            *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 6;
+            break;
+
+        case 6:
+            if (!RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS)))
+                break;
+            RowFaceSprite(*(void **)(o + OBJ_OFF_ROWS));
+            orig_roach_row_final(*(void **)(o + OBJ_OFF_ROWS));
+            DestroyByType(obj);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    orig_roach_tail_a(obj, facing);
+    orig_roach_tail_b(obj);
+}
+
+typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
 #define orig_step_type2   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE2)
 #define orig_step_type3   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE3)
 #define orig_step_type5   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE5)
 #define orig_step_type6   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE6)
-#define orig_step_type8   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE8)
 
 /* Defined below, beside the rest of the object stepping. */
 void __cdecl StepType1And4(void *obj);
@@ -3468,7 +3562,7 @@ void __cdecl ObjFrameStep(void *obj)
     case 4:         orig_step_type5(obj);   break;
     case 5:         orig_step_type6(obj);   break;
     case 6:         ObjMarkIfOverdue(obj);  break;   /* ours already */
-    default:        orig_step_type8(obj);   break;
+    default:        StepType8(obj);         break;
     }
 }
 
@@ -5008,6 +5102,7 @@ void item_install(void)
                   "ObjectsAtPoint", 15);
     patch_replace(ADDR_RANK_PROMOTE, (const void *)RankPromote,
                   "RankPromote", 1);
+    patch_replace(ADDR_STEP_TYPE8, (const void *)StepType8, "StepType8", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

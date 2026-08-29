@@ -663,6 +663,28 @@ extern "C" void __cdecl ReleaseSprite(AM2_Sprite *)
 {
 }
 
+/* anim.cpp's two sprite loaders, both in win32/sprite.cpp. Same reasoning as
+ * the stubs above and the same route in: item.cpp's StepType8 gained calls to
+ * RowAnimFinished and RowFaceSprite, which live in anim.cpp, so anim.cpp
+ * joined SELFTEST_SRC -- and it brings these two with it.
+ *
+ * Adding the module they live in was tried FIRST and is not an option here:
+ * win32/sprite.cpp pulls in ddraw and the whole point of this harness is that
+ * no part of the game runs. Two stubs and a note is the honest shape. */
+extern "C" int32_t __cdecl LoadSpriteFile(const char *, void *, const void *,
+                                          int32_t, uint32_t)
+{
+    return 0;
+}
+
+extern "C" void __cdecl BuildVehicleMask(int32_t)
+{
+}
+
+extern "C" void __cdecl BuildRoachMask(void)
+{
+}
+
 /* misc.cpp's MissionNetworked shows the multiplayer end screen, and
  * ShowMpResult is in win32/frame.cpp. Same reasoning as the stubs above, and
  * the same route in -- a seam closed rather than a call added. Its signature

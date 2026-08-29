@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,103 patches.**
+Nothing uncommitted. **1,104 patches.**
 
-Fifty functions since the last snapshot. The seven-class HUD family is
+Fifty-one functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -359,6 +359,23 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
   `checkoffsets` refused an identical redefinition of `AM2_RANK_MAX` -- I
   defined it a second time where it already sat beside `OBJ_OFF_RANK`.
+
+- **`StepType8`** (`0x0043D980`) is the roach's per-frame step, and it turned
+  up a discrepancy worth keeping: **it dispatches on `OBJ_OFF_FIELD_530` and
+  writes `OBJ_OFF_DEATH_STATE`**, which are different fields carrying the same
+  {0, 5, 6} vocabulary. `DamageRoach` writes 0x554 and never touches 0x530 --
+  checked against the bytes, because two fields sharing one vocabulary is
+  exactly the shape a mis-transcribed offset produces. What sets 0x530 is not
+  established.
+
+  Its five unnamed callees got **role names from where they sit in this one
+  function**, which is the weakest kind of naming here and is labelled as
+  such.
+
+  Closing the seam pulled `anim.cpp` into `SELFTEST_SRC` and that pulled in
+  three win32 sprite loaders. Adding `win32/sprite.cpp` was tried first and
+  is not an option -- it needs ddraw, and the harness exists so that no part
+  of the game runs. Three stubs, with the reasoning beside them.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
