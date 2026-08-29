@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,161 patches.**
+Nothing uncommitted. **1,162 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -741,16 +741,35 @@ check and the A/B are what remain.
   and the matching destructor pair. Compiler-generated, and reproducing the
   `ecx` convention and the tail jumps would be work with nothing behind it.
 
+- **`ResetObjOnCof` (`0x00457220`) cannot run on this install, and the reason
+  is a missing FILE rather than a patched branch.** `ADDR_STATE2_ENTER` does
+  `_findfirst("default.cof")` on entering a level and sets `0x00511DDC` only
+  when it is found; the GOG install ships no `.cof` at all, so the flag is 0
+  for the whole of every run and this function returns at its first
+  instruction. Reconstructed because it is game code below the CRT line, and
+  **verified by reading with no A/B able to say otherwise** -- stated plainly,
+  because a clean suite would otherwise imply coverage that does not exist.
+
+  Its null check comes AFTER five stores through the pointer, so it is dead;
+  reproduced as written, because the order is the evidence.
+
+  **The probe exists and was not taken.** Creating an empty `default.cof`
+  would set the flag and turn reading into measurement -- but `0x00457070`
+  does not merely test for that file, it opens and parses it, so an empty one
+  feeds a parser nothing and the outcome is unknown, and it means writing into
+  the shipped game directory. Worth doing on a throwaway copy of the install;
+  not on this one.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,010 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,161
+line (0x0045C000) patched**. Measured: **1,011 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,162
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventeen batches have gone in and the 229 entries outstanding start at 48
+small ones in batches. Eighteen batches have gone in and the 228 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

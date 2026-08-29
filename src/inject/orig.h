@@ -4407,6 +4407,10 @@ typedef struct {
  * Only four needed new names, and they are named by offset because nothing
  * read so far says what they hold. */
 #define OBJ_OFF_FIELD_CC         0xCCu
+/* Cleared by ResetObjOnCof and compared against ADDR_GAME_CLOCK_MS by two
+ * steppers in the 0x004057xx band, which is what makes "deadline" the reading
+ * rather than the offset. */
+#define OBJ_OFF_DEADLINE_D0      0xD0u
 #define OBJ_OFF_FACING_COPY      0xF8u   /* stamped from OBJ_OFF_FACING */
 #define OBJ_OFF_FIELD_FC         0xFCu
 #define OBJ_OFF_FIELD_100        0x100u
@@ -4645,6 +4649,19 @@ typedef struct {
  * the answer to STATUS.md's open item 2, which is that the flag is set, read
  * as SET at 0x00425360, and read as 0 again by 0x004255CB. */
 #define ADDR_LOAD_PENDING        0x00511DD8u  /* int32_t */
+/* "default.cof is present." ADDR_STATE2_ENTER runs _findfirst on that name and
+ * sets this to 1 when it is found, then _findclose; seven references and that
+ * is the only writer. The file does NOT ship with the GOG install, so this
+ * reads 0 for the whole of any run here -- which makes ResetObjOnCof, its only
+ * consumer that does real work, dead on this data set. Not patched out of the
+ * binary like the CD checks; simply never satisfied. */
+#define ADDR_HAVE_DEFAULT_COF    0x00511DDCu  /* int32_t */
+#define ADDR_STR_DEFAULT_COF     0x004851C0u  /* "default.cof" */
+/* 0x00457220, three callers. Clear an object's hit record, give it a random
+ * phase, detach it, and hand a non-Sarge kind-3 trooper stance 2 -- all of it
+ * behind ADDR_HAVE_DEFAULT_COF. */
+#define ADDR_RESET_OBJ_ON_COF    0x00457220u  /* void(void *obj) */
+#define AM2_COF_PHASE_MAX        0x1F4        /* 500 */
 /* Raised beside it and consumed by the level teardown, which bumps
  * ADDR_ATTEMPT_COUNT and logs "Attempt# %d". */
 #define ADDR_MISSION_RETRY       0x0051232Cu  /* int32_t */

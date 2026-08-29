@@ -533,4 +533,8 @@ int32_t __cdecl SelectIfOwn(void *obj);
  * facing into the copy at +0xF8. */
 void __cdecl ResetType2Fields(void *obj);
 
+/* 0x00457220, three callers. Reset an object's hit record and detach it -- all
+ * of it behind a data file that does not ship, so it never runs here. */
+void __cdecl ResetObjOnCof(void *obj);
+
 #endif

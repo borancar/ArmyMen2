@@ -5774,6 +5774,76 @@ void __cdecl ResetType2Fields(void *obj)
         *(const uint8_t *)(o + OBJ_OFF_FACING);
 }
 
+/* ResetObjOnCof -- original 0x00457220, three callers.
+ *
+ * Clear an object's last-hit record, give it a random phase, detach it from
+ * whatever it was attached to, and hand a non-Sarge kind-3 trooper stance 2.
+ *
+ * THE WHOLE BODY IS BEHIND "default.cof EXISTS", AND THAT FILE DOES NOT SHIP.
+ * ADDR_STATE2_ENTER runs `_findfirst("default.cof")` on entering a level and
+ * sets the flag only when it is found; the GOG install has no `.cof` at all,
+ * so this function returns at its first instruction for the whole of every run
+ * this project can drive. It is reconstructed because it is game code below
+ * the CRT line, not because anything here exercises it -- **verified by
+ * reading, and no A/B can say otherwise**, which is worth stating plainly
+ * rather than letting a clean suite imply coverage it does not have.
+ *
+ * It is not the copy-protection case either: nothing was patched out of the
+ * binary, the condition is simply never satisfied by the shipped data.
+ *
+ * THERE IS A PROBE AND IT WAS NOT TAKEN. Creating an empty `default.cof` in
+ * the game directory would set the flag and make this run, which would turn
+ * "verified by reading" into a measurement. It is left undone deliberately:
+ * 0x00457070 does not merely test for that file, it OPENS and parses it, so an
+ * empty one feeds a parser nothing and the outcome is unknown -- and it means
+ * writing into the shipped game directory to find out. Worth doing on a
+ * throwaway copy of the install; not worth doing on this one.
+ *
+ * THE NULL CHECK COMES AFTER FOUR STORES THROUGH THE POINTER. The original
+ * writes +0xD0, +0x108, +0x104, +0x100 and +0xFC, calls ObjAttachTo, and only
+ * then tests the object against zero -- so a null argument has already
+ * faulted. That test is dead, and it is reproduced as written because the
+ * order is the evidence: it says the second half was added later, or copied
+ * from somewhere the pointer really could be null.
+ *
+ * The random phase is `rand() % 500` from the image's own LCG, so a caller
+ * that reconstructed it with libc would desynchronise every later draw.
+ *
+ * It clears the same +0x100 / +0x104 / +0x108 group ResetType2Fields does,
+ * which is the only reason those three are believed to be one record rather
+ * than three unrelated slots.
+ *
+ * The last arm wants a type 2 whose soldier kind is 3 and which is NOT Sarge.
+ * ObjToAI gives Sarge stance 6 on the other path, so the two together cover
+ * both, from opposite directions.
+ */
+void __cdecl ResetObjOnCof(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF)
+        return;
+
+    *(uint32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+    *(uint32_t *)(o + OBJ_OFF_HIT_TIME)    = 0;
+    *(uint8_t  *)(o + OBJ_OFF_HIT_DIR)     = 0;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_100)   = 0;
+    *(int32_t  *)(o + OBJ_OFF_FIELD_FC)    = orig_rand() % AM2_COF_PHASE_MAX;
+
+    orig_obj_attach_to(o, (void *)0);
+
+    if (!o)                     /* dead: five stores above already used it */
+        return;
+    if (*(const int32_t *)o != 2)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 3)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 2;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -5919,6 +5989,8 @@ void item_install(void)
                   "SelectIfOwn", 4);
     patch_replace(ADDR_RESET_TYPE2_FIELDS, (const void *)ResetType2Fields,
                   "ResetType2Fields", 2);
+    patch_replace(ADDR_RESET_OBJ_ON_COF, (const void *)ResetObjOnCof,
+                  "ResetObjOnCof", 3);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,
