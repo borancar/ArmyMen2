@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,087 patches.**
+Nothing uncommitted. **1,088 patches.**
 
-Thirty-five functions since the last snapshot. The seven-class HUD family is
+Thirty-six functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -173,6 +173,21 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   Measured: the list is EMPTY on every drive here -- count 0 with the array
   allocated and capacity 200 -- so stepping no record at all changes nothing.
   That is "there are no records", not "the steppers do not matter".
+
+- **`AimMarkerAge`** (`0x00412190`, 272 B) is the other half of the aim
+  markers, and writing it CONFIRMED the correction it caused. Every offset it
+  uses lands exactly on a name given to those parallel arrays three commits
+  ago -- +0x00, +0x10, +0x20, +0x30 for one table and +0x64 through +0xA4 for
+  the other. The "records of 0x64 bytes" reading could not have produced that.
+
+  Two asymmetries reproduced: the deadline is tested twice for the local
+  player (dead the second time, load-bearing for everybody else), and the
+  shared expiry clears the random frame where the local one does not.
+
+  **`ab.sh` refused a run rather than passing it**, reporting "no game log
+  lines" on the recon side. The build was fine -- launched by hand it reaches
+  the title screen with 1,088 patches -- so the guard fired on a launch
+  failure and did exactly what it was added to do. Re-run clean.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

@@ -7986,9 +7986,89 @@ uint8_t __cdecl MpNamePaper(int32_t row)
 #define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
 #define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
 
-typedef void (__cdecl *AM2_HudStepFn)(void);
+/* AimMarkerAge -- original 0x00412190, one caller.
+ *
+ * Expire the aim markers and, for the LOCAL player only, drag its two points
+ * along behind the cursor. Four armies, two tables, one pass. The tables are
+ * mapdraw.cpp's DrawEffectLayer draws.
+ *
+ * THIS IS THE FUNCTION THAT MADE orig.h SAY "records of 0x64 bytes", and the
+ * reconstruction is what settles that it does not. It handles both tables in
+ * one unrolled body, so it reads `[eax]` and `[eax+0x64]` and 0x64 looks like
+ * a stride; the bottom of its loop is `add eax, 4` against `cmp eax,
+ * 0x004FC8F0`, which is four entries four bytes apart. Every offset it uses
+ * lands exactly on a name given to those parallel arrays two commits ago --
+ * +0x00, +0x10, +0x20, +0x30 for the A table and +0x64, +0x74, +0x84, +0x94,
+ * +0xA4 for the B one -- which is the confirmation, and it is worth more than
+ * the correction was.
+ *
+ * THE DEADLINE IS TESTED TWICE FOR OUR OWN ARMY, and reproduced. The local
+ * arm expires the entry and then stamps the cursor into its point; the code
+ * below it expires the entry again for every army including ours. The second
+ * test always sees the flag the first one cleared, so it is dead for the
+ * local player and load-bearing for everybody else -- one shared tail rather
+ * than a bug.
+ *
+ * AND THE TWO B EXPIRIES ARE NOT THE SAME. The local one clears the flag and
+ * the stamp; the shared one clears the flag, the stamp AND the random frame at
+ * ADDR_AIM_FRAME_B. So a remote army's marker forgets which flicker frame it
+ * was on and the local player's does not. Asymmetric in the original, and not
+ * obviously deliberate; reproduced rather than tidied, as with the two state
+ * handlers that check their flags in opposite orders.
+ *
+ * The stamp runs whether or not the entry just EXPIRED -- it sits after the
+ * expiry and outside its `if`, but inside the live test above it. So a marker
+ * dying this frame still gets one last cursor position written into it, and a
+ * marker that was already dead gets none.
+ */
+void __cdecl AimMarkerAge(void)
+{
+    int32_t  cursorX = *(const int32_t *)(uintptr_t)ADDR_CURSOR_X;
+    int32_t  cursorY = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
+    uint32_t owner   = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    uint32_t now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    uint32_t army;
+
+    for (army = 0; army < AM2_COMM_SLOTS; army++) {
+        uint8_t *a = (uint8_t *)(uintptr_t)ADDR_AIM_LIVE_A + army * 4;
+
+        if (owner == army) {
+            if (*(const int32_t *)a) {
+                if (now >= *(const uint32_t *)(a + 0x30)) {
+                    *(int32_t *)a          = 0;
+                    *(int32_t *)(a + 0x20) = 0;
+                }
+                *(int16_t *)(a + 0x10) = (int16_t)cursorX;
+                *(int16_t *)(a + 0x12) = (int16_t)cursorY;
+            }
+        }
+
+        if (*(const int32_t *)a && now >= *(const uint32_t *)(a + 0x30)) {
+            *(int32_t *)a          = 0;
+            *(int32_t *)(a + 0x20) = 0;
+        }
+
+        if (owner == army) {
+            if (*(const int32_t *)(a + 0x64)) {
+                if (now >= *(const uint32_t *)(a + 0xA4)) {
+                    *(int32_t *)(a + 0x64) = 0;
+                    *(int32_t *)(a + 0x94) = 0;
+                }
+                *(int16_t *)(a + 0x74) = (int16_t)cursorX;
+                *(int16_t *)(a + 0x76) = (int16_t)cursorY;
+            }
+        }
+
+        if (*(const int32_t *)(a + 0x64) && now >= *(const uint32_t *)(a + 0xA4)) {
+            *(int32_t *)(a + 0x64) = 0;
+            *(int32_t *)(a + 0x84) = 0;   /* and the frame, unlike above */
+            *(int32_t *)(a + 0x94) = 0;
+        }
+    }
+}
+
+typedef void (__cdecl *AM2_HudStepFn)(void);typedef void (__cdecl *AM2_HudStepFn)(void);
 #define orig_hud_post_update ((AM2_HudStepFn)(uintptr_t)ADDR_HUD_POST_UPDATE)
-#define orig_hud_marker_age  ((AM2_HudStepFn)(uintptr_t)ADDR_HUD_MARKER_AGE)
 
 /* 0x00414370, one caller -- the per-frame path. HudPaint's twin: the same
  * three top-level widgets, in the same order and with the same null test on
@@ -8016,7 +8096,7 @@ void __cdecl HudUpdate(void)
             g_hudWidgetC);
 
     orig_hud_post_update();
-    orig_hud_marker_age();
+    AimMarkerAge();
 }
 
 /* 0x004143A0, two callers, one of them the per-frame path. Point the drawing
@@ -8411,6 +8491,8 @@ int widget_install(void)
 
     rc |= patch_replace(ADDR_HUD_UPDATE, (const void *)HudUpdate,
                         "HudUpdate", 0);
+    rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
+                        "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_HUD_PAINT, (const void *)HudPaint,
                         "HudPaint", 0);
 

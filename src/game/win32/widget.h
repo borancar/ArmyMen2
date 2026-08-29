@@ -8,6 +8,10 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x00412190, one caller. Expire the aim markers and drag the local player's
+ * two points along behind the cursor. See mapdraw.cpp for what draws them. */
+void __cdecl AimMarkerAge(void);
+
 #endif
 
 /* The menu widget hierarchy.
