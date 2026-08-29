@@ -196,6 +196,11 @@ uint8_t __cdecl HeightAtPoint(uint32_t packedPoint);
  * contains the point, chained through OBJ_OFF_QUERY_NEXT. */
 void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc);
 
+/* 0x0042A550, fifteen callers. Its sibling, asking a LOOSER question of the
+ * same cell: the hit rectangle, then one of three further tests chosen by the
+ * object's flags and whether it has a bitmask at all. */
+void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc);
+
 /* 0x004294C0, fifteen callers. Recompute an object's tile from its position
  * and, if anything moved, put it back on the map. */
 void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force);

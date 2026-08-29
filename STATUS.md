@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,101 patches.**
+Nothing uncommitted. **1,102 patches.**
 
-Forty-eight functions since the last snapshot. The seven-class HUD family is
+Forty-nine functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -336,6 +336,17 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   It also settles `ROW_OFF_FRAME`: below 1000 a frame id, exactly 1000 "take
   up the queued animation", above 1000 a countdown in frames. One field, three
   meanings by range.
+
+- **`ObjectsAtPoint`** (`0x0042A550`, 15 callers) is `ObjectsHitByPoint`'s
+  sibling and asks a **looser** question of the same cell: the hit rectangle,
+  then one of three further tests -- the object's rows' sprites, a box built
+  from four offsets nothing else in the image reads, or the single bitmask
+  the sibling uses. So an object with no mask is accepted by a BOX here and
+  by its rectangle alone there. Not duplicates.
+
+  Coverage stated: the sibling's own comment records that returning NULL
+  unconditionally left `mission` and `bootcamp` at their floors across 3,872
+  calls. Fifteen callers is not evidence anything watches the answer.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

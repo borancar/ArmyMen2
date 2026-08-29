@@ -869,9 +869,101 @@ typedef void (__cdecl *AM2_ObjRemapFn)(void *obj, void *desc, int32_t force);
 #define orig_obj_remap     ((AM2_ObjRemapFn)(uintptr_t)ADDR_OBJ_REMAP)
 
 
-typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
-#define orig_objects_at_point ((AM2_ObjectsAtFn)(uintptr_t)ADDR_OBJECTS_AT_POINT)
+typedef int32_t (__cdecl *AM2_RowsMaskFn)(void *obj, const AM2_Point *pt);
+#define orig_obj_rows_mask_at \
+    ((AM2_RowsMaskFn)(uintptr_t)ADDR_OBJ_ROWS_MASK_AT)
 
+/* ObjectsAtPoint -- original 0x0042A550, fifteen callers.
+ *
+ * The sibling of ObjectsHitByPoint above, and the two really are different
+ * questions of the same cell. That one asks "is the point inside your
+ * OBJ_OFF_HIT_RECT, and on a set bit of your mask if you have one". This one
+ * asks the rectangle too, and then chooses between THREE further tests:
+ *
+ *   OBJ_FLAG_ROWS_MASK set -- ask ADDR_OBJ_ROWS_MASK_AT, which walks the
+ *   object's rows and tests the point against each row's sprite;
+ *
+ *   otherwise, no OBJ_OFF_HIT_MASK -- build a looser box from four offsets at
+ *   OBJ_OFF_BOX_LEFT.. added to the object's own position, and test that;
+ *
+ *   otherwise -- ObjMaskBitAt, the same single-bitmask test the sibling uses.
+ *
+ * So an object with no mask is accepted by a BOX HERE and by its hit
+ * rectangle alone in the sibling. That is the whole difference between the
+ * two functions and it is worth stating plainly: they are not duplicates, and
+ * fifteen callers plus four is not nineteen callers of one thing.
+ *
+ * The four box offsets are read NOWHERE ELSE in the image, so this function is
+ * the only reason they have names.
+ *
+ * Both bounds are COLS, as in the sibling -- the row coordinate is checked
+ * against `cols - 1` and not `rows - 1`, which MapDescInit's allocation makes
+ * correct. Fourth place in this tree that has to say so.
+ *
+ * The answer is chained through OBJ_OFF_QUERY_NEXT and returned NEWEST-FIRST,
+ * which reverses the cell's own order. Both siblings do it and both callers'
+ * loops assume it.
+ *
+ * WHAT A CLEAN A/B IS WORTH HERE IS NOT MUCH, and the sibling says why: its
+ * own comment records that returning NULL unconditionally left `mission` at
+ * 281 and `bootcamp` at 22, both at their floors, across 3,872 calls. Fifteen
+ * callers is not evidence that anything watches the answer, and nothing here
+ * measures that it does. Verified by reading, with the sibling's structure
+ * as the strongest corroboration available -- the two share their bounds,
+ * their chaining and their newest-first order, and differ only in the test.
+ */
+void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
+{
+    const uint8_t *d    = (const uint8_t *)desc;
+    int32_t        cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    int32_t        cx   = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
+    int32_t        cy   = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
+    uint8_t       *head = (uint8_t *)0;
+    uint8_t       *node;
+
+    if (cx < 0 || cx > cols - 1 || cy < 0 || cy > cols - 1)
+        return (void *)0;
+
+    node = ((uint8_t *const *)(*(const uint8_t *const *)
+                (d + MAPDESC_OFF_CELLS)))
+           [(cy << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + cx];
+
+    for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
+        uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+
+        if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            continue;
+        if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
+                         (const AM2_Point *)pt))
+            continue;
+
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_ROWS_MASK) {
+            if (!orig_obj_rows_mask_at(o, (const AM2_Point *)pt))
+                continue;
+        } else if (!*(void *const *)(o + OBJ_OFF_HIT_MASK)) {
+            AM2_Rect box;
+            int32_t  x = *(const int16_t *)(o + OBJ_OFF_POS);
+            int32_t  y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+
+            box.left   = x + *(const int32_t *)(o + OBJ_OFF_BOX_LEFT);
+            box.top    = y + *(const int32_t *)(o + OBJ_OFF_BOX_TOP);
+            box.right  = x + *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT);
+            box.bottom = y + *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM);
+
+            if (!PointInRect(&box, (const AM2_Point *)pt))
+                continue;
+        } else if (!ObjMaskBitAt(o, (const AM2_Point *)pt)) {
+            continue;
+        }
+
+        *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+        head = o;
+    }
+
+    return head;
+}
+
+typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 /* Still original. Declared here rather than with the other teardown seams
  * further down, because VehicleDied is above them. */
 typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
@@ -1422,7 +1514,7 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
     int32_t  total = 0;
     uint32_t tile;
 
-    o = (uint8_t *)orig_objects_at_point(
+    o = (uint8_t *)ObjectsAtPoint(
             &at, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
@@ -1697,7 +1789,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
                 << 16);
 
         /* NOTE: the BASE point, not `here`. */
-        chain = orig_objects_at_point(&at,
+        chain = (uint8_t *)ObjectsAtPoint(&at,
                                       (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
 
         total += (kind == AM2_MASK_CHAIN_KIND)
@@ -1735,7 +1827,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint)
 {
     int8_t  best = (int8_t)TileAttrAt((uint32_t)TileOfPoint(packedPoint));
-    uint8_t *o   = (uint8_t *)orig_objects_at_point(
+    uint8_t *o   = (uint8_t *)ObjectsAtPoint(
                        &packedPoint, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
@@ -4824,6 +4916,8 @@ void item_install(void)
                   "ApplyHeightItem", 3);
     patch_replace(ADDR_STEP_ROW_ANIM, (const void *)StepRowAnim,
                   "StepRowAnim", 1);
+    patch_replace(ADDR_OBJECTS_AT_POINT, (const void *)ObjectsAtPoint,
+                  "ObjectsAtPoint", 15);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

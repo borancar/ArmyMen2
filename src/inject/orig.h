@@ -1277,6 +1277,22 @@
 #define ADDR_OBJECTS_HIT_BY_POINT 0x0042A1B0u /* void *(const AM2_Point*, desc) */
 #define OBJ_OFF_HIT_RECT       0x30u  /* AM2_Rect, in world units */
 #define OBJ_OFF_HIT_MASK       0x78u  /* non-null means test the bitmask too */
+/* The four ObjectsAtPoint adds to the object's own position to make its
+ * looser box. Only that function reads them, and only when OBJ_OFF_HIT_MASK
+ * is null -- so they are the fallback shape for an object with no bitmask. */
+#define OBJ_OFF_BOX_LEFT       0x7Cu  /* int32_t, added to OBJ_OFF_POS.x */
+#define OBJ_OFF_BOX_TOP        0x80u  /* int32_t, added to .y */
+#define OBJ_OFF_BOX_RIGHT      0x84u  /* int32_t, added to .x */
+#define OBJ_OFF_BOX_BOTTOM     0x88u  /* int32_t, added to .y */
+/* Bit 17 of OBJ_OFF_FLAGS, read in one place: ObjectsAtPoint takes it as
+ * "ask ADDR_OBJ_ROWS_MASK_AT instead of the box or the bitmask". */
+#define OBJ_FLAG_ROWS_MASK     0x20000u
+/* 0x00435440, one caller. The multi-row answer to "is this point on me": it
+ * walks the object's OBJ_OFF_ROWS and tests the point against each row's
+ * sprite, where ADDR_OBJ_MASK_BIT_AT tests one bitmask. Refuses an object
+ * with fewer than one row, a row with no sprite, or a sprite with no image.
+ * Stays original. */
+#define ADDR_OBJ_ROWS_MASK_AT  0x00435440u /* int32_t(obj, const AM2_Point *) */
 /* The mask test itself is ADDR_OBJ_MASK_BIT_AT, further down and already
  * reconstructed -- a second name went on it here and both the alias ratchet
  * and checkseams said so in the same run. */
