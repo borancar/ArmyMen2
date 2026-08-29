@@ -1952,12 +1952,101 @@ void __cdecl DestroyObjCommon(void *obj)
 
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 
+/* PlaceObj -- original 0x00429220, one caller.
+ *
+ * Put an object at a point: move every row it owns, take it off the map and
+ * put it back, and re-apply its height. The deploy dispatcher's default arm,
+ * so this is what everything that is not a trooper or a vehicle gets.
+ *
+ * THE EARLY EXIT NEEDS ALL THREE. Same position, same OBJ_OFF_FLAGS bit 2
+ * SET -- and it is the flag being set that means "already placed", because
+ * the body clears it on the way out. So a second call with the same point
+ * does nothing, and a call with a new point does the work even for an object
+ * that was already down.
+ *
+ * AND THE TEARDOWN RUNS FIRST, but only for an ITEM that is not already
+ * placed. Moving a type 1 or 4 unregisters it before re-registering, where a
+ * type 2 or 3 is simply moved -- which is what makes RemoveFromItemList's
+ * caller reachable from a place rather than only from a destroy.
+ *
+ * ROW 0 IS MOVED TO THE POINT AND THE REST TO THE POINT PLUS THEIR SPRITE'S
+ * ATTACH OFFSET, which is the other half of what orig.h records under
+ * AM2_Sprite::attachX: "where an attached row sits relative to the one
+ * carrying this sprite -- a turret on its body". PointActionC was the one
+ * reader that named those fields; this is the second, and it agrees.
+ *
+ * Row 0 is relinked with force 1 and the rest with force 0. The first has
+ * just had its position rewritten and the others may not have moved at all,
+ * so the asymmetry is not arbitrary -- but it is the original's either way.
+ *
+ * HOW OFTEN IT RUNS IS ONCE PER MISSION, and that is worth stating rather
+ * than leaving to the clean A/B. Its one caller is the deploy dispatcher
+ * below, whose own comment records that a Boot Camp mission reaches it
+ * exactly once, through EvtDeployItem. So four clean configurations compare
+ * this function on a handful of calls, not on the map load -- objects placed
+ * during loading go through the type 2 and 3 arms or through the loader
+ * directly, not through here.
+ */
+typedef void (__cdecl *AM2_ObjOnlyFn3)(void *obj);
+typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
+#define orig_place_teardown ((AM2_ObjOnlyFn3)(uintptr_t)ADDR_ITEM_TEARDOWN)
+#define orig_after_move     ((AM2_AfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
+
+void __cdecl PlaceObj(void *obj, uint32_t where)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *row;
+    int32_t  i;
+
+    if (!obj)
+        return;
+
+    if (*(const int16_t *)(o + OBJ_OFF_POS) == (int16_t)where
+        && *(const int16_t *)(o + OBJ_OFF_POS + 2) == (int16_t)(where >> 16)
+        && (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+        return;
+
+    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        && ObjIsItem((const AM2_Object *)obj))
+        orig_place_teardown(obj);
+
+    *(int16_t *)(o + OBJ_OFF_POS)     = (int16_t)where;
+    *(int16_t *)(o + OBJ_OFF_POS + 2) = (int16_t)(where >> 16);
+
+    row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
+    ObjFlagSet0(row);
+    RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        const uint8_t *spr;
+
+        row = *(uint8_t **)(o + OBJ_OFF_ROWS) + i * AM2_OBJ_ROW_STRIDE;
+        *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
+
+        spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
+        *(int16_t *)(row + ROW_OFF_X) +=
+            *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
+        spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
+        *(int16_t *)(row + ROW_OFF_Y) +=
+            *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y);
+
+        ObjFlagSet0(row);
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+
+    ObjTileChanged(obj, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 1);
+
+    if (ObjIsItem((const AM2_Object *)obj))
+        orig_after_move(obj, 1, 0);
+}
+
 typedef void (__cdecl *AM2_DeployTypeFn)(void *obj, int32_t x, int32_t y,
                                          int32_t resurrect);
-typedef void (__cdecl *AM2_PlaceObjFn)(void *obj, uint32_t where);
 #define orig_deploy_trooper ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_TROOPER)
 #define orig_deploy_vehicle ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_VEHICLE)
-#define orig_place_obj      ((AM2_PlaceObjFn)(uintptr_t)ADDR_PLACE_OBJ)
 
 /* 0x00428CA0, seven callers, and it names itself in the resurrection log line.
  * Put an object into the world at `where`, then tell the other machines.
@@ -2027,7 +2116,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                             resurrect);
         break;
     default:
-        orig_place_obj(obj, where);
+        PlaceObj(obj, where);
         if (resurrect)
             am2_log("Warning: check if resurrect command works with this "
                     "object type!\n");
@@ -4535,6 +4624,7 @@ void item_install(void)
                   "NotifyDropped", 1);
     patch_replace(ADDR_WEAPON_POSE_INDEX, (const void *)WeaponPoseIndex,
                   "WeaponPoseIndex", 3);
+    patch_replace(ADDR_PLACE_OBJ, (const void *)PlaceObj, "PlaceObj", 1);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

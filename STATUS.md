@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,094 patches.**
+Nothing uncommitted. **1,095 patches.**
 
-Forty-two functions since the last snapshot. The seven-class HUD family is
+Forty-three functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -254,6 +254,19 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   It leaks the file handle on two of its four failure paths. The original's,
   reproduced -- the game opens 56 waves once at startup and never retries, so
   a leak that cannot accumulate is not the same defect as one that can.
+
+- **`PlaceObj`** (`0x00429220`) is the deploy dispatcher's default arm. Its
+  second interesting fact is a **confirmation**: row 0 goes to the point and
+  every other row to the point plus its sprite's attach offset, which is the
+  second independent reader of `AM2_Sprite::attachX/attachY` and agrees with
+  the first.
+
+  Its early exit needs the position unchanged AND the flag SET, and the body
+  clears that flag on the way out -- so the flag means "already placed" here.
+
+  Coverage stated rather than implied: it runs **once per mission**, through
+  `EvtDeployItem`. Four clean configurations compare it on a handful of
+  calls, not on the map load.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

@@ -17,6 +17,11 @@ extern "C" {
  * -- an index into ADDR_WEAPON_POSE_FRAMES. */
 int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon);
 
+/* 0x00429220, one caller -- the deploy dispatcher's default arm. Put an
+ * object at a point: move every row, take it off the map and put it back,
+ * re-apply its height. */
+void __cdecl PlaceObj(void *obj, uint32_t where);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one
