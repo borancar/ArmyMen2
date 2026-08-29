@@ -11,6 +11,7 @@
 
 #include "item.h"
 #include "misc.h"      /* ClearPtrList */
+#include "defparse.h"  /* DefFindObjRec -- reconstructed */
 #include "objtable.h"
 #include "objtype.h"   /* ObjType2Field548 */
 #include "objflag.h"   /* ObjFlagClear0 -- reconstructed */
@@ -890,10 +891,95 @@ typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
 #define orig_trooper_died_tail ((AM2_DiedTailFn)(uintptr_t)ADDR_TROOPER_DIED_TAIL)
 #define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
 
-/* Still original: types 1 and 4 have their own height handler. */
-typedef void (__cdecl *AM2_ApplyHeight14Fn)(void *obj, int32_t height);
-#define orig_apply_height_1_4 \
-            ((AM2_ApplyHeight14Fn)(uintptr_t)ADDR_APPLY_HEIGHT_1_4)
+/* ApplyHeightItem -- original 0x00433C20, three callers.
+ *
+ * Types 1 and 4 have their own height handler, and this is it: stamp
+ * OBJ_OFF_HEIGHT_SET, recompute the row's depth key from the height, and do
+ * the same to every object chained off this one.
+ *
+ * A THIRD WRITER OF ROW_OFF_FIELD_26, AND IT SETTLES THE READING. The seq
+ * adders write 0x3E8 and 1 and "terrain plus 0x3F2", which said only that the
+ * field is a small biased number. This one writes `ScaleBy32Blocks(height) -
+ * 0x3E8` and then ADDS an int16 from the object's def record. A term that is
+ * the object's HEIGHT and a term that is a per-type constant, summed into one
+ * field that the renderer reads: that is a depth key, and the record's field
+ * is what lets two types at the same height sort against each other.
+ *
+ * THE CHAIN IS FOLLOWED BY UID AND STOPS AT THE FIRST LINK THAT IS NOT AN
+ * ITEM. Not skips -- stops. A chain of {item, trooper, item} applies the
+ * height to the first only. The chain walk in ApplyObjFrame two hundred lines
+ * up does the same thing, so it is the family's convention rather than this
+ * function's accident.
+ *
+ * AND THE PARENT AND THE CHILDREN LOOK UP THEIR DEF RECORD DIFFERENTLY. Both
+ * take the type and the `a` field out of the packed key, but the parent's
+ * third argument is OBJ_OFF_REPAIR_FRAME -- or OBJ_OFF_FORMATION_SLOT when
+ * that is not positive -- while a child's is the key's own low seven bits.
+ * Reproduced; nothing here says why, and the two are not the same lookup.
+ *
+ * The parent is guarded on having a def record and the children are not: a
+ * child with a null OBJ_OFF_FIELD_94 faults. Both the original's.
+ */
+void __cdecl ApplyHeightItem(void *obj, int32_t height)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t key;
+    int32_t  third;
+    void    *rec;
+    uint32_t uid;
+
+    if (!obj)
+        return;
+    if (!*(void **)(o + OBJ_OFF_FIELD_94))
+        return;
+
+    third = *(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME);
+    if (third <= 0)
+        third = *(const int32_t *)(o + OBJ_OFF_FORMATION_SLOT);
+
+    key = *(const uint32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8);
+    rec = DefFindObjRec((int32_t)((key >> AM2_OBJREC_SHIFT_B)
+                                  & AM2_OBJREC_MASK_B),
+                        (int32_t)((key >> AM2_OBJREC_SHIFT_A)
+                                  & AM2_OBJREC_MASK_A),
+                        third);
+
+    *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+    *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
+        (int16_t)(ScaleBy32Blocks(height) - AM2_DEPTH_BASE);
+
+    if (rec)
+        *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) +=
+            *(const int16_t *)((const uint8_t *)rec + DEF_OBJ_REC_OFF_DEPTH);
+
+    for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid; ) {
+        uint8_t *link = (uint8_t *)LookupByUID(uid);
+        void    *lrec;
+
+        if (!link)
+            return;
+        if (*(const int32_t *)link != 1 && *(const int32_t *)link != 4)
+            return;
+
+        *(uint8_t *)(link + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
+        *(int16_t *)(*(uint8_t **)(link + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
+            (int16_t)(ScaleBy32Blocks(height) - AM2_DEPTH_BASE);
+
+        key = *(const uint32_t *)(*(uint8_t **)(link + OBJ_OFF_FIELD_94) + 8);
+        lrec = DefFindObjRec((int32_t)((key >> AM2_OBJREC_SHIFT_B)
+                                       & AM2_OBJREC_MASK_B),
+                             (int32_t)((key >> AM2_OBJREC_SHIFT_A)
+                                       & AM2_OBJREC_MASK_A),
+                             (int32_t)(key & AM2_OBJREC_MASK_B));
+        if (lrec)
+            *(int16_t *)(*(uint8_t **)(link + OBJ_OFF_ROWS)
+                         + ROW_OFF_FIELD_26) +=
+                *(const int16_t *)((const uint8_t *)lrec
+                                   + DEF_OBJ_REC_OFF_DEPTH);
+
+        uid = *(const uint32_t *)(link + OBJ_OFF_CHAIN_NEXT_UID);
+    }
+}
 
 /* Still original: the teardown PointActionC opens with, and the notify it
  * ends on. */
@@ -1062,7 +1148,7 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
     switch (*(const int32_t *)o) {
     case 1:
     case 4:
-        orig_apply_height_1_4(o, height);
+        ApplyHeightItem(o, height);
         return;
 
     case 2:
@@ -4625,6 +4711,8 @@ void item_install(void)
     patch_replace(ADDR_WEAPON_POSE_INDEX, (const void *)WeaponPoseIndex,
                   "WeaponPoseIndex", 3);
     patch_replace(ADDR_PLACE_OBJ, (const void *)PlaceObj, "PlaceObj", 1);
+    patch_replace(ADDR_APPLY_HEIGHT_1_4, (const void *)ApplyHeightItem,
+                  "ApplyHeightItem", 3);
     patch_replace(ADDR_HELD_WEAPON_CODE, (const void *)HeldWeaponCode,
                   "HeldWeaponCode", 1);
     patch_replace(ADDR_UNIT_CLASS_NAME, (const void *)UnitClassName,

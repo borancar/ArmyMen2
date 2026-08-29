@@ -22,6 +22,11 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon);
  * re-apply its height. */
 void __cdecl PlaceObj(void *obj, uint32_t where);
 
+/* 0x00433C20, three callers. The height handler for types 1 and 4: stamp the
+ * height, recompute the row's depth key from it, and do the same down the
+ * chain until a link that is not an item. */
+void __cdecl ApplyHeightItem(void *obj, int32_t height);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one

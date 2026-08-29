@@ -5366,6 +5366,15 @@ typedef struct {
  * a decision about what that folded function WAS. */
 #define ADDR_DEF_SORT_TROOPER_RECS 0x0044CD40u  /* void(void), left original */
 #define DEF_OBJ_REC_OFF_LINKS      0x0Cu        /* where the count is stored */
+/* An int16 the height handler ADDS to the row's depth key. So an object type
+ * can sit in front of or behind another at the same ground height, which is
+ * the one thing a scaled height alone cannot express. */
+#define DEF_OBJ_REC_OFF_DEPTH      0x20u        /* int16_t */
+/* Subtracted from the scaled height to make a row's ROW_OFF_FIELD_26. It is
+ * 1000, which is also AM2_SEQ_LIFE6 -- two unrelated constants that happen to
+ * share a value, and writing one for the other is how a name goes wrong
+ * silently. Its own name. */
+#define AM2_DEPTH_BASE             0x3E8
 #define ADDR_CRT_QSORT             0x004660B2u
 #define ADDR_CRT_BSEARCH           0x00466280u
 /* One spelling for the game's bsearch, because two modules want it now.

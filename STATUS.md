@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,095 patches.**
+Nothing uncommitted. **1,097 patches.**
 
-Forty-three functions since the last snapshot. The seven-class HUD family is
+Forty-four functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -267,6 +267,21 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   Coverage stated rather than implied: it runs **once per mission**, through
   `EvtDeployItem`. Four clean configurations compare it on a handful of
   calls, not on the map load.
+
+- **`ApplyHeightItem`** (`0x00433C20`) is the height handler for types 1 and
+  4, and it **settles the depth-key reading**: it writes
+  `ScaleBy32Blocks(height) - 1000` into `ROW_OFF_FIELD_26` and then adds an
+  int16 from the object's def record. A height term plus a per-type constant,
+  summed into one field the renderer reads -- that is a depth key, and the
+  record's field is what lets two types at the same height sort against each
+  other. Third independent writer, and the first that makes it unambiguous.
+
+  Its chain walk **stops** at the first link that is not an item rather than
+  skipping it, which matches `ApplyObjFrame` two hundred lines up -- the
+  family's convention, not this function's accident.
+
+  A frame-count FAIL of 297% on `campaign` re-ran clean, as the two before
+  it did.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,
