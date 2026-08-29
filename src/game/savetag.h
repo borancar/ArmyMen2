@@ -30,4 +30,8 @@ int savetag_install(void);
 }
 #endif
 
+/* 0x00428760, two callers. Write a script-name reference into a savegame:
+ * the "no name" tag alone, or the name tag, the length and the string. */
+int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec);
+
 #endif /* AM2_SAVETAG_H */

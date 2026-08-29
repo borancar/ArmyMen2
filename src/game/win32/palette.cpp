@@ -33,6 +33,7 @@
  */
 
 #include "palette.h"
+#include "../gamedir.h"  /* SetGameDir -- the chdir, reconstructed */
 #include "../image.h"  /* AM2_IMAGE */
 #include "../misc.h"   /* ColourDistance -- pure, so it lives in the flat half */
 #include "surface.h"
@@ -604,6 +605,44 @@ void __cdecl PaletteLoaded(void)
     }
 }
 
+/* LoadTilesetPalettes -- original 0x0042B120, one caller.
+ *
+ * Load palette0.bmp through palette5.bmp into the six tileset palettes, after
+ * chdir'ing into the map's own directory.
+ *
+ * THE WHOLE FUNCTION IS GATED ON ADDR_TILESET_RESERVE, and that is the one
+ * thing about it worth reading twice: a zero there does not mean "load them
+ * without reserving the first ten entries", it means load NOTHING. The flag
+ * that elsewhere selects a loading MODE selects here whether the step happens
+ * at all.
+ *
+ * THE SIX NAME STRINGS RUN BACKWARDS. palette5.bmp is at the low address and
+ * palette0.bmp at the high one, sixteen bytes apart, so the natural
+ * `base + i * stride` walks away from them. Written as the subtraction it is;
+ * a forward walk would read whatever the linker put after palette0.bmp and
+ * hand it to fopen.
+ *
+ * The chdir happens once, before all six, and is never undone -- the caller
+ * owns that. SetGameDir's answer is discarded here as it is at most of its
+ * call sites, and so is every LoadPaletteFile's: a missing palette leaves that
+ * slot holding whatever it had, and nothing complains.
+ */
+void __cdecl LoadTilesetPalettes(void)
+{
+    uint32_t i;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+        return;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_BLOCK));
+
+    for (i = 0; i < AM2_TILESET_PALETTES; i++)
+        LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_PALETTE0)
+                            - i * AM2_PALETTE_NAME_STRIDE,
+                        (uint8_t *)AM2_IMAGE(ADDR_TILESET_PALETTES)
+                            + i * AM2_TILESET_PALETTE_BYTES);
+}
+
 int palette_install(void)
 {
     int rc = 0;
@@ -626,6 +665,9 @@ int palette_install(void)
                         "ReadBitmapPalette", 1);
     rc |= patch_replace(ADDR_EXPAND_PALETTE, (const void *)ExpandPalette,
                         "ExpandPalette", 1);
+    rc |= patch_replace(ADDR_LOAD_TILESET_PALETTES,
+                        (const void *)LoadTilesetPalettes,
+                        "LoadTilesetPalettes", 1);
     rc |= patch_replace(ADDR_LOAD_PALETTE_FILE, (const void *)LoadPaletteFile,
                         "LoadPaletteFile", 10);
     rc |= patch_replace(ADDR_PALETTE_LOADED, (const void *)PaletteLoaded,

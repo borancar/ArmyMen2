@@ -66,4 +66,13 @@ int region_install(void);
 }
 #endif
 
+/* 0x004384A0 and 0x00438520, five callers between them. Add or subtract one
+ * from a tile's cover count and its twenty neighbours'. */
+void __cdecl TileCoverAdd(uint16_t tile);
+void __cdecl TileCoverSub(uint16_t tile);
+
+/* 0x0043A4F0, one caller. Set a tile flag for each of two neighbourhood counts
+ * that comes up short. Always answers 0. */
+int32_t __cdecl MarkOpenTile(uint16_t tile);
+
 #endif /* AM2_REGION_H */

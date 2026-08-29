@@ -28,6 +28,14 @@
  * else; the destination-aliasing subtlety CheckSaveTag has does not arise
  * when the value is going out rather than coming in. */
 #define ADDR_WRITE_SAVE_TAG 0x00423680u  /* void(FILE*, uint32_t) */
+/* 0x00428760, two callers, both inside one save function. Write a script-name
+ * reference: either the "no name" tag alone, or the name tag, the length and
+ * the string. */
+#define ADDR_SAVE_SCRIPT_NAME 0x00428760u  /* int32_t(am2_FILE *, void *rec) */
+#define AM2_SAVETAG_NAME      0x06660669u
+#define AM2_SAVETAG_NO_NAME   0x06660670u
+/* The record SaveScriptName is handed carries the table index at +0x0C. */
+#define SCRIPT_REF_OFF_NAME_INDEX 0x0Cu
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
 /* RETURNS ITS ARGUMENT -- see rect.h, which is the authority here. This comment
  * said `void` and that is the stale remnant of the first reading: it happened
@@ -1118,6 +1126,14 @@
 #define ADDR_PALETTE_CYCLE_STAMP 0x00514F70u  /* uint32_t, last step's clock */
 #define ADDR_TILESET_PALETTES    0x00503108u  /* PALETTEENTRY[][513] */
 #define AM2_TILESET_PALETTE_BYTES (513u * 4u)
+#define AM2_TILESET_PALETTES     6u   /* palette0.bmp .. palette5.bmp */
+/* 0x0042B120, one caller. chdir to ADDR_MAP_BLOCK and load all six of them. */
+#define ADDR_LOAD_TILESET_PALETTES 0x0042B120u /* void(void) */
+/* The six file names, 16 bytes apart and laid out BACKWARDS: palette5.bmp is
+ * at the low address and palette0.bmp at the high one, so walking forward from
+ * ADDR_STR_PALETTE0 goes DOWN. Index i is ADDR_STR_PALETTE0 - i * 0x10. */
+#define ADDR_STR_PALETTE0        0x00486288u  /* "palette0.bmp" */
+#define AM2_PALETTE_NAME_STRIDE  0x10u
 #define ADDR_SET_SURF_COLORKEY 0x0041B970u  /* void(surface *, uint8_t key) */
 #define PALETTE_HOLDER_OFF     0x800u       /* where the DD palette hangs */
 
@@ -1245,6 +1261,14 @@
 /* The byte beside it, indexed by a TILE INDEX rather than by a map square: 27
  * sites read it and nothing here writes it. The name is ours. */
 #define ADDR_TILE_ATTRS        0x00514EBCu /* uint8_t *, one per tile index */
+/* The MAP'S CELL WEIGHTS, and the name is evidenced rather than guessed:
+ * ObjClearFootprint walks a vehicle mask's points and does `add byte, 0xF1`
+ * on this table -- subtract fifteen -- with the adder doing the opposite, and
+ * MarkOpenTile tests it against exactly that fifteen. So a covered cell is one
+ * whose weight has reached AM2_CELL_WEIGHT_STEP. Per tile index, like the two
+ * tables beside it. */
+#define ADDR_CELL_WEIGHTS      0x00514EC0u /* uint8_t *, one per tile index */
+#define AM2_CELL_WEIGHT_STEP   0x0Fu       /* what one footprint point is worth */
 #define OBJ_OFF_TILE           0x1Au       /* uint16_t, indexes the above */
 /* Scratch, and only ObjTileChanged writes it: the tile the object was in
  * before that function recomputed OBJ_OFF_TILE from its position. Stored as a
@@ -5773,6 +5797,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0 means "open" follows from that polarity and from nothing else. Eleven of
  * the 23 sites on ADDR_TILE_FLAGS test this bit. */
 #define AM2_TILE_OPEN              0x01u
+/* Bits 2 and 3, and MarkOpenTile (0x0043A4F0) is the only thing that sets
+ * either. It ORs 0x04 into a tile with no WEIGHTED neighbour and 0x08 into one
+ * with fewer than two COVERED neighbours, over the same twenty deltas the
+ * cover pair walks. What reads them is elsewhere; the names say what sets
+ * them. */
+#define AM2_TILE_NO_WEIGHT_NEAR    0x04u
+#define AM2_TILE_LITTLE_COVER_NEAR 0x08u
 /* 0x0045B690, two callers, 112 bytes. The same accumulation as
  * ADDR_BLOCK_WEIGHT_AT with two differences: the object chain is GIVEN rather
  * than queried -- both callers run ADDR_OBJECTS_AT_POINT themselves -- and the
@@ -8613,6 +8644,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * allied army's grid. A count of what reveals each tile, so a reference count
  * rather than a flag. */
 #define ADDR_TILE_REVEAL_GRIDS   0x00514ED8u  /* uint8_t *[4] */
+/* A per-tile COVER COUNT, and what settles it is that the only two functions
+ * writing it are an exact +1/-1 pair over the same twenty neighbours --
+ * TileCoverAdd (0x004384A0) and TileCoverSub (0x00438520). ObjClearFootprint
+ * calls the second immediately after taking fifteen off ADDR_CELL_WEIGHTS, so
+ * the two tables move together and count different things: weight in
+ * fifteens on the cell itself, and a plain count out to a radius. */
+#define ADDR_TILE_COVER          0x00514EE8u  /* uint8_t *, one per tile index */
+/* Twenty tile-index deltas, in .bss and filled at map load, giving the
+ * neighbourhood all three cover functions walk. The bound is the ADDRESS the
+ * loop stops at, which is what fixes the count at twenty. */
+#define ADDR_TILE_NEIGHBOURS     0x00654BD8u  /* int32_t[20] */
+#define AM2_TILE_NEIGHBOURS      20
+/* The +1/-1 pair, and the reader that turns their two tables into tile flags.
+ * All three share one bounds test: 2 <= x < width-2 and 2 <= y < height-2,
+ * which is what keeps `tile + delta` inside the map without a per-neighbour
+ * check. */
+#define ADDR_TILE_COVER_ADD      0x004384A0u  /* void(uint16_t tile) */
+#define ADDR_TILE_COVER_SUB      0x00438520u  /* void(uint16_t tile) */
+#define ADDR_MARK_OPEN_TILE      0x0043A4F0u  /* int32_t(uint16_t tile) */
 #define AM2_REVEAL_RADIUS        2
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
 #define MSG_CREATE_OFF_UID       4u

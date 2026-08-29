@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,135 patches.**
+Nothing uncommitted. **1,140 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -468,16 +468,45 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   observable turns on it -- the count is already 0 in that case -- and it is
   reproduced rather than tidied.
 
+- **Two map grids are named from evidence at last, and a +1/-1 pair is what
+  did it.** `0x00514EC0` is the map's CELL WEIGHTS: `ObjClearFootprint` does
+  `add byte, 0xF1` on it -- subtract fifteen -- per footprint point, and
+  `MarkOpenTile` tests it against exactly that fifteen. `0x00514EE8` is a
+  per-tile COVER COUNT, and what settles it is that its only two writers are
+  an exact `inc`/`dec` pair over one tile and twenty neighbours.
+  `ObjClearFootprint` calls the second right after taking fifteen off the
+  first, so the two move together and count different things.
+
+  Neither could be named from any single reader. **A table with one consumer
+  is a table you cannot name**, which is the same lesson `ADDR_SOLDIER_NAMES`
+  taught one batch earlier.
+- **Three functions sharing a neighbourhood do NOT share its precondition.**
+  `TileCoverAdd` and `TileCoverSub` refuse a tile outside a two-tile margin,
+  and then check no individual neighbour -- the margin is what makes the walk
+  safe. `MarkOpenTile` walks the same twenty deltas with NO margin test at
+  all, so near an edge it reads outside the grid. It was nearly written with
+  the test, on the assumption that the three were of a piece. Read each one.
+- **`LoadTilesetPalettes`** (`0x0042B120`) is gated entirely on
+  `ADDR_TILESET_RESERVE`: a zero there does not select a loading mode, it
+  means load nothing. Its six file-name strings are also laid out BACKWARDS --
+  `palette5.bmp` at the low address -- so the natural forward walk reads past
+  `palette0.bmp` and hands the result to `fopen`.
+- **A pixel figure moved and the re-run put it back.** This batch's first
+  `bootcamp` read 76 rather than its usual 22, and `campaign` 47 rather than
+  2 -- both far inside budget, which is exactly the case CLAUDE.md warns can
+  hide a real difference. The same build re-run gave 22 and 2. **Read the
+  number even when the verdict is clean, and re-run before believing it.**
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **985 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,135
+line (0x0045C000) patched**. Measured: **990 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,140
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seven batches have gone in and the 254 entries outstanding start at 48
+small ones in batches. Eight batches have gone in and the 249 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

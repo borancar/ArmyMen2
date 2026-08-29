@@ -101,4 +101,8 @@ int palette_install(void);
 }
 #endif
 
+/* 0x0042B120, one caller. Load palette0.bmp .. palette5.bmp into the six
+ * tileset palettes, after chdir'ing into the map's own directory. */
+void __cdecl LoadTilesetPalettes(void);
+
 #endif /* AM2_PALETTE_H */

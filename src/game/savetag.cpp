@@ -25,10 +25,12 @@
  */
 
 #include "savetag.h"
+#include "script.h"   /* AM2_ScriptName */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
 #include <stdint.h>
+#include <string.h>
 
 static const char kSaveReadError[] =
     "Error reading save file, source file: %s  line: %d\n";
@@ -52,12 +54,61 @@ void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag)
     orig_fwrite(&tag, 4, 1, fp);
 }
 
+/* SaveScriptName -- original 0x00428760, two callers, both inside one save
+ * function and one immediately after the other.
+ *
+ * Write a script-name reference into a savegame. Either the record names
+ * nothing, in which case the "no name" tag goes out alone; or it names a
+ * script-name-table entry, and the tag, the length and the string follow.
+ *
+ * THE LENGTH WRITTEN IS strlen + 1, and the string is written with the same
+ * count -- so the terminator IS in the file and the length includes it. The
+ * original computes strlen with `repne scasb`, `not`, `dec`, giving the length
+ * without the terminator, and then increments; both halves are needed and it
+ * is easy to reproduce one and not the other.
+ *
+ * IT ALWAYS ANSWERS 1. Both exits set it, and neither caller looks. Kept
+ * because the prototype is the original's, not because anything turns on it.
+ *
+ * The name is fetched TWICE from the table -- once to measure it and once to
+ * write it -- with the index re-read from the record in between. Nothing can
+ * change either in the meantime; it is the compiler running out of registers.
+ * Written as one lookup, which is what it means.
+ *
+ * The write goes through the game's own fwrite for the same reason the tags go
+ * through the game's own helper: the FILE * came from the game's CRT.
+ */
+int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
+{
+    int32_t index = *(const int32_t *)((const uint8_t *)rec
+                                       + SCRIPT_REF_OFF_NAME_INDEX);
+    const char *name;
+    uint32_t    n;
+
+    if (index < 0) {
+        WriteSaveTag(fp, AM2_SAVETAG_NO_NAME);
+        return 1;
+    }
+
+    name = (*(const AM2_ScriptName *const *)(uintptr_t)ADDR_SCRIPT_NAMES)
+               [index].name;
+    n    = (uint32_t)strlen(name) + 1;
+
+    WriteSaveTag(fp, AM2_SAVETAG_NAME);
+    WriteSaveTag(fp, n);
+    orig_fwrite(name, n, 1, fp);
+
+    return 1;
+}
+
 int savetag_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_CHECK_SAVE_TAG, (const void *)CheckSaveTag,
                         "CheckSaveTag", 4);
+    rc |= patch_replace(ADDR_SAVE_SCRIPT_NAME, (const void *)SaveScriptName,
+                        "SaveScriptName", 2);
     rc |= patch_replace(ADDR_WRITE_SAVE_TAG, (const void *)WriteSaveTag,
                         "WriteSaveTag", 2);
     return rc;

@@ -557,6 +557,156 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
     return 1;
 }
 
+/* The three tile-cover functions -- TileCoverAdd (0x004384A0), TileCoverSub
+ * (0x00438520) and MarkOpenTile (0x0043A4F0) -- share one bounds test and one
+ * neighbourhood, so they are written together and the shared parts are stated
+ * once here.
+ *
+ * A TILE INDEX IS PACKED, NOT A PAIR. The map's width is a power of two and
+ * ADDR_MAP_ROW_SHIFT is its log, so x is `tile & (width - 1)` and y is
+ * `tile >> shift`. That is why the neighbour deltas can be plain additions on
+ * the index.
+ *
+ * THE MARGIN IS TWO AND IT IS WHAT MAKES THE NEIGHBOUR WALK SAFE. The two
+ * writers refuse a tile outside `2 <= x < width - 2` and `2 <= y < height - 2`
+ * and then check no individual neighbour -- the twenty deltas are known to
+ * stay inside the map once the centre is two in from every edge. Get the
+ * margin wrong and the errors are silent writes past the grid.
+ *
+ * THE READER DOES NOT HAVE IT. MarkOpenTile walks the same twenty deltas with
+ * no margin test of any kind, so a tile near an edge reads bytes outside the
+ * grid. That is the original's and it is reproduced; it was nearly written
+ * with the test, on the assumption that three functions sharing a
+ * neighbourhood share its precondition. They do not -- read each one.
+ *
+ * The argument arrives as a dword and is masked to sixteen bits before use.
+ */
+static int32_t TileCoverInBounds(uint16_t tile)
+{
+    int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t x = (int32_t)tile & (w - 1);
+    int32_t y = (int32_t)tile
+                >> *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+
+    return x >= 2 && x < w - 2
+        && y >= 2 && y < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 2;
+}
+
+/* TileCoverAdd -- original 0x004384A0, three callers.
+ *
+ * Add one to the cover count of a tile and of its twenty neighbours.
+ *
+ * THE GRID POINTER IS RE-READ ON EVERY NEIGHBOUR. Nothing in the loop can move
+ * it, so that is the compiler keeping a register rather than anything
+ * defensive; written as one load, which is what it means.
+ *
+ * The count is a byte and nothing clamps it. Twenty-one increments per call
+ * with no saturation means a tile covered by more than 255 things wraps to 0
+ * and reads as uncovered. The original's, and the map would have to be
+ * extraordinary to reach it.
+ */
+void __cdecl TileCoverAdd(uint16_t tile)
+{
+    uint8_t *cover;
+    uint32_t i;
+
+    if (!TileCoverInBounds(tile))
+        return;
+
+    cover = *(uint8_t **)(uintptr_t)ADDR_TILE_COVER;
+    cover[tile]++;
+
+    for (i = 0; i < AM2_TILE_NEIGHBOURS; i++)
+        cover[(int32_t)tile
+              + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]++;
+}
+
+/* TileCoverSub -- original 0x00438520, two callers, and TileCoverAdd with
+ * `dec` where the other has `inc` -- the same bounds test, the same twenty
+ * deltas, the same re-read of the grid pointer. The pair is what identifies
+ * the table: nothing else writes it.
+ *
+ * ObjClearFootprint calls this immediately after taking fifteen off
+ * ADDR_CELL_WEIGHTS for the same point, which is how the two tables are known
+ * to move together.
+ *
+ * IT DOES NOT CHECK FOR ZERO. A subtract without a matching add wraps the byte
+ * to 255, which reads as heavily covered rather than as empty -- the failure
+ * is the loud kind rather than the quiet one, but it is not guarded.
+ */
+void __cdecl TileCoverSub(uint16_t tile)
+{
+    uint8_t *cover;
+    uint32_t i;
+
+    if (!TileCoverInBounds(tile))
+        return;
+
+    cover = *(uint8_t **)(uintptr_t)ADDR_TILE_COVER;
+    cover[tile]--;
+
+    for (i = 0; i < AM2_TILE_NEIGHBOURS; i++)
+        cover[(int32_t)tile
+              + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]--;
+}
+
+/* MarkOpenTile -- original 0x0043A4F0, one caller.
+ *
+ * The reader for the two tables the pair above writes. Over the same twenty
+ * neighbours, count how many carry a full cell weight and how many carry any
+ * cover at all, and set a tile flag for each count that comes up short.
+ *
+ * ITS ONLY GUARD IS THAT THE TILE IS NOT ITSELF WEIGHTED -- there is nothing
+ * to say about a cell something already stands on. It does NOT test the
+ * margin the two writers do, so the neighbour walk can read outside the grid
+ * near an edge. Reproduced.
+ *
+ * THE TWO THRESHOLDS ARE DIFFERENT AND THAT IS THE POINT: fewer than ONE
+ * weighted neighbour sets 0x04, fewer than TWO covered neighbours sets 0x08.
+ * Reading them as the same test loses the distinction the function exists for.
+ *
+ * IT ALWAYS ANSWERS 0. The original zeroes the register on every path
+ * including the early one, and the caller does not look. Kept because the
+ * prototype is the original's.
+ *
+ * The counts are compared with SIGNED tests against a byte read as signed, so
+ * a weight of 0x80 or more reads as negative and does NOT count as weighted.
+ * A cell would need nine footprint points to get there. Reproduced.
+ */
+int32_t __cdecl MarkOpenTile(uint16_t tile)
+{
+    const int8_t *weights;
+    const int8_t *cover;
+    int32_t       weighted = 0;
+    int32_t       covered  = 0;
+    uint32_t      i;
+
+    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+    if (weights[tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+        return 0;
+
+    cover = *(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER;
+
+    for (i = 0; i < AM2_TILE_NEIGHBOURS; i++) {
+        int32_t at = (int32_t)tile
+                     + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i];
+
+        if (weights[at] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+            weighted++;
+        if (cover[at] >= 1)
+            covered++;
+    }
+
+    if (weighted < 1)
+        (*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile]
+            |= AM2_TILE_NO_WEIGHT_NEAR;
+    if (covered < 2)
+        (*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile]
+            |= AM2_TILE_LITTLE_COVER_NEAR;
+
+    return 0;
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -575,6 +725,12 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
+                        "TileCoverAdd", 3);
+    rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,
+                        "TileCoverSub", 2);
+    rc |= patch_replace(ADDR_MARK_OPEN_TILE, (const void *)MarkOpenTile,
+                        "MarkOpenTile", 1);
     rc |= patch_replace(ADDR_ACTIVATE_REGION, (const void *)ActivateRegion,
                         "ActivateRegion", 1);
     rc |= patch_replace(ADDR_BEGIN_MOVE_TO, (const void *)BeginMoveTo,
