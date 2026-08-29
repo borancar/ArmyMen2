@@ -6223,6 +6223,44 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and the shape names ("toggle", "spinner") are gone. */
 #define ADDR_MP_NAME_CTOR      0x004329A0u /* thiscall, ret 0x24 */
 #define VTABLE_MP_NAME         0x0046FA48u
+/* Its PAINT, and the row has three states with a different text source each:
+ *
+ *   an occupied slot flagged in ADDR_PAUSE_FLAGS shows "Not responding"
+ *   followed by one DOT per AM2_MP_DOT_MS of silence -- the count is
+ *   `(GetTickCount() - AM2_PLAYER_HEARD) * 6 / 45000`, which is 7,500 ms a
+ *   dot written so the multiply keeps the division exact;
+ *
+ *   an occupied slot that is answering shows the name at COMM_OFF_PLAYERS,
+ *   with its ink and fill from the two per-slot helpers;
+ *
+ *   and an empty one shows "-- Computer --" or "-- Open --" on
+ *   AM2_PLAYER_ACTIVE.
+ *
+ * The bit tested is `0x800 << slot`, so the four slots occupy pause-mask bits
+ * 11..14 -- which is what says that mask is not only about pausing.
+ *
+ * ADDR_HUD_MESSAGE_COLOUR is that address's SECOND reading: it went in as the
+ * colour ADDR_HUD_MESSAGE draws with, and here it is the row fill for a silent
+ * player. Recorded rather than renamed. */
+#define ADDR_MP_NAME_PAINT     0x00432A70u /* thiscall void(w, RECT) */
+/* Its ink, paper and the setter are ADDR_MP_NAME_INK, ADDR_MP_NAME_PAPER and
+ * ADDR_MP_NAME_SET_INK, all three already reconstructed; the fields are
+ * MPBTN_OFF_ROW and the MPNAME_OFF_* block further down. None of that was
+ * grepped for before a second set of names was written beside it, and all
+ * three ratchets said so at once -- checkpatches on the aliases, checkseams
+ * because the "helpers" were OURS, checkoffsets on the duplicated fields.
+ *
+ * MPNAME_OFF_FLAG earns a note rather than a rename: this paint passes it as
+ * DrawTextClipped's FONT, and 1 -- which the block already records the panel
+ * writing -- is the font every other widget in this family uses. */
+#define AM2_PLAYER_HEARD       0x26Cu /* uint32_t, GetTickCount when last seen */
+#define AM2_MP_PAUSE_BIT0      0x800u /* shifted by the slot */
+#define AM2_MP_DOT_NUM         6      /* the exact (x*6)/45000 the game uses */
+#define AM2_MP_DOT_DEN         45000
+#define AM2_STR_NOT_RESPONDING 0x004873ECu /* "Not responding%s" */
+#define AM2_STR_PCT_S          0x004852B4u /* "%s" */
+#define AM2_STR_COMPUTER_SLOT  0x004873DCu /* "-- Computer --" */
+#define AM2_STR_OPEN_SLOT      0x004871A0u /* "-- Open --" */
 #define ADDR_ON_MP_NAME        0x00432D50u
 /* The name button's own destructor pair. It derives from the BASE WIDGET and
  * not from the dialog, so this one jumps to ADDR_WIDGET_DESTRUCT -- which is

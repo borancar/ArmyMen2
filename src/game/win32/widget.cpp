@@ -2883,6 +2883,103 @@ void __attribute__((thiscall)) CountButtonPaint(AM2_Widget *w, RECT clip)
     UnlockSurface();
 }
 
+/* 0x00432A70, vtable slot 1 of VTABLE_MP_NAME -- one row of the multiplayer
+ * player list. Another of the outstanding Lock/Unlock functions.
+ *
+ * IT NAMES ITSELF. "Not responding%s", "-- Computer --" and "-- Open --" are
+ * the three states, and no reading was needed to tell them apart:
+ *
+ *   occupied and flagged in ADDR_PAUSE_FLAGS -- "Not responding" plus one DOT
+ *   per AM2_MP_DOT_MS of silence, white on ADDR_HUD_MESSAGE_COLOUR;
+ *   occupied and answering -- the player's name, ink and fill per slot;
+ *   empty -- "-- Computer --" or "-- Open --" on AM2_PLAYER_ACTIVE.
+ *
+ * THE DOT COUNT IS `(elapsed * 6) / 45000`, not `elapsed / 7500`. Those agree
+ * for every value that fits, and the original really does multiply first --
+ * the magic-number divide it compiles to was checked against 45000 by running
+ * the instruction sequence rather than by reading the constant. Written the
+ * long way so the arithmetic is the same one.
+ *
+ * THE PAUSE MASK IS NOT ONLY ABOUT PAUSING. The bit tested is `0x800 << slot`,
+ * so the four player slots own bits 11..14 of the same global that
+ * PauseGame/UnPauseGame move. CLAUDE.md already says every `if (!pauseFlags)`
+ * in the frame chain reads as "not paused"; this says the word covers a
+ * dropped connection too.
+ *
+ * The three helpers below it stay the original's: one writes the ink into the
+ * widget and two answer a slot's ink and fill.
+ */
+void __attribute__((thiscall)) MpNamePaint(AM2_Widget *w, RECT clip)
+{
+    /* MPNAME_OFF_TEXT IS A POINTER, and orig.h says so in as many words --
+     * "const char *, the name shown". The original loads it and hands that to
+     * sprintf as the DESTINATION; taking the address of the field instead
+     * formats over MPNAME_OFF_FLAG, _INK and _PAPER and everything after them,
+     * which killed the process the first time this ran. The field's own
+     * comment was the evidence and it was read as `char[]` anyway. */
+    uint8_t       *self = (uint8_t *)w;
+    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        slot = *(const int32_t *)(self + MPBTN_OFF_ROW);
+    const uint8_t *rec  = comm + slot * AM2_PLAYER_STRIDE;
+    RECT           vis;
+    char           dots[64];
+
+    WidgetScreenRect(w);
+
+    if (!IntersectRect(&vis, &clip, &w->rect))
+        return;
+
+    /* `test edx,edx; jbe` -- and `test` CLEARS CF, so that jbe is a jz. The
+     * condition is `id != 0`, not `id > 0`: a -1 id takes the OCCUPIED branch
+     * here even though AM2_PLAYER_ID's own comment calls 0 and -1 both "none".
+     * Reproduced as written rather than as the comment reads. */
+    if (*(const int32_t *)(rec + AM2_PLAYER_ID) != 0) {
+        if (*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS
+            & (AM2_MP_PAUSE_BIT0 << slot)) {
+            uint32_t now = orig_get_tick_count();
+            int32_t  n   = (int32_t)((now * AM2_MP_DOT_NUM
+                                      - *(const uint32_t *)(rec + AM2_PLAYER_HEARD)
+                                        * AM2_MP_DOT_NUM)
+                                     / AM2_MP_DOT_DEN);
+
+            if (n > 0)
+                memset(dots, '.', (size_t)n);
+            dots[n] = '\0';
+
+            am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
+                        (const char *)AM2_IMAGE(AM2_STR_NOT_RESPONDING), dots);
+            MpNameSetInk(w, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+            *(uint8_t *)(self + MPNAME_OFF_PAPER) =
+                *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+        } else {
+            am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
+                        (const char *)AM2_IMAGE(AM2_STR_PCT_S),
+                        rec + COMM_OFF_PLAYERS);
+            MpNameSetInk(w, MpNameInk(slot));
+            *(uint8_t *)(self + MPNAME_OFF_PAPER) = MpNamePaper(slot);
+        }
+    } else {
+        am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
+                    (const char *)AM2_IMAGE(
+                        *(const int32_t *)(rec + AM2_PLAYER_ACTIVE)
+                        ? AM2_STR_COMPUTER_SLOT : AM2_STR_OPEN_SLOT));
+        MpNameSetInk(w, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+        *(uint8_t *)(self + MPNAME_OFF_PAPER) =
+            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+    }
+
+    ClearRegion(&vis, *(const uint8_t *)(self + MPNAME_OFF_PAPER));
+
+    if (!LockSurface(g_drawTarget))
+        return;
+
+    DrawTextClipped(w->rect.left, w->rect.top,
+                    *(const char *const *)(self + MPNAME_OFF_TEXT),
+                    *(const int32_t *)(self + MPNAME_OFF_FLAG),
+                    vis, *(const uint8_t *)(self + MPNAME_OFF_INK));
+    UnlockSurface();
+}
+
 void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 {
     const uint8_t *self = (const uint8_t *)w;
@@ -8708,6 +8805,8 @@ int widget_install(void)
                         "CheckboxPaint", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_PAINT, (const void *)CountButtonPaint,
                         "CountButtonPaint", 1);
+    rc |= patch_replace(ADDR_MP_NAME_PAINT, (const void *)MpNamePaint,
+                        "MpNamePaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
