@@ -1004,6 +1004,15 @@ stay original and are reached by address, so our code runs in the middle of a
 live path and the A/B compares the result. Nothing had to wait for the layer
 beneath it.
 
+**`combat`'s pixel figure is BIMODAL, and both modes are meaningless.** Four
+runs of one build gave 177,112, 716, 177,109 and 684 -- two clusters, three
+pixels apart within each. That is not noise around a mean; it is whether the
+two sides' camera happened to be at the same point in the scroll when the
+shot landed. Its budget is disabled for the same reason `mission`'s is, so
+`ab.sh` says "A/B clean" at 22.5% of the frame -- and the log is the evidence
+there, exactly as for `mission` and `intro`. Do not read a `combat` pixel
+count as a result in either direction.
+
 **Re-run an A/B difference before believing it.** One `bootcamp` run reported
 64,391 differing pixels and "the frame is wrong"; it was whole-frame palette
 shifts of one to five per channel, and three further runs of the same build

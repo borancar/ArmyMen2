@@ -887,6 +887,81 @@ void __cdecl RecvTroopPair(void *msg)
                             *(const int32_t *)(m + MSG_PAIR_OFF_ARG));
 }
 
+/* RecvTrooperSetWeapon -- original 0x0044C3E0, one caller.
+ *
+ * The receiver for eTROOPER_SET_WEAPON_MESSAGE, and the twin of armymsg.cpp's
+ * SendTrooperSetWeapon -- so that message, like kind 0x25, is now ours at both
+ * ends. Put the weapon's uid in the trooper's inventory SLOT, set the soldier
+ * kind from the weapon's own code, and select that slot.
+ *
+ * IT CONFIRMS THE SENDER'S ONE UNNAMED FIELD. SendTrooperSetWeapon writes its
+ * third value to a literal `msg + 0x18` -- the sender could say only that it
+ * is "the weapon" the caller passed. Here it is the INDEX: the receiver uses
+ * it twice, once to pick the UNIT_OFF_INVENTORY slot and once to write
+ * UNIT_OFF_INVENTORY_SEL. So it is an inventory slot, 0..5, and
+ * MSG_SETWEAPON_OFF_SLOT is named for that.
+ *
+ * ITS THREE LOG LINES ARE NOT GATED ON COMM_OFF_VERBOSE, unlike the pair the
+ * vehicle-exit family has. One fires on every successful receive and the
+ * other two on each of the two failures, so a multiplayer session with the
+ * verbosity off still logs every weapon change. Reproduced; the asymmetry is
+ * within one message family and is the original's.
+ *
+ * The success line is emitted BEFORE either lookup, so it announces a link
+ * that the very next branch may refuse.
+ *
+ * SoldierKindForWeapon is ours, so it is called by name; checkseams failed
+ * the build on the first attempt, where it had gone in as an orig_ macro out
+ * of habit. Three of this function's four callees were already reconstructed
+ * and I reached for the image for one of them anyway.
+ *
+ * The two uids resolve through different functions again -- ObjByUidAlias for
+ * the trooper and WeaponByUid for the weapon, the latter insisting on kind 4
+ * and complaining itself if it is not. What is stored is the WIRE UID, not
+ * the object.
+ */
+void __cdecl RecvTrooperSetWeapon(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint32_t       trooperUid;
+    uint32_t       weaponUid;
+    uint8_t       *trooper;
+    void          *weapon;
+    int32_t        slot;
+
+    trooperUid = UidOnWire(*(const uint32_t *)(m + MSG_SETWEAPON_OFF_TROOPER));
+    weaponUid  = UidOnWire(*(const uint32_t *)(m + MSG_SETWEAPON_OFF_WEAPON));
+
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_SETW_LINK),
+             trooperUid, weaponUid);
+
+    trooper = (uint8_t *)ObjByUidAlias(trooperUid);
+    if (!trooper) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_SETW_NO_TROOP),
+                 trooperUid);
+        return;
+    }
+
+    weapon = WeaponByUid(weaponUid);
+    if (!weapon) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_SETW_NO_WEAP),
+                 weaponUid);
+        return;
+    }
+
+    slot = *(const int32_t *)(m + MSG_SETWEAPON_OFF_SLOT);
+
+    *(uint32_t *)(trooper + UNIT_OFF_INVENTORY + (uint32_t)slot * 4) =
+        weaponUid;
+
+    SoldierKindForWeapon(
+        trooper,
+        **(const uint32_t *const *)((const uint8_t *)weapon
+                                    + OBJ_OFF_FIELD_C0));
+
+    *(int32_t *)(trooper + UNIT_OFF_INVENTORY_SEL) = slot;
+}
+
 /* TroopMessageRecv -- original 0x0044C590, one caller.
  *
  * The trooper half of the army-message dispatcher, and the sibling of
@@ -924,8 +999,6 @@ typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_19)
 #define orig_recv_troop_drop_item \
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_DROP_ITEM)
-#define orig_recv_troop_set_weapon \
-    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_SET_WEAPON)
 
 void __cdecl TroopMessageRecv(void *msg, int32_t army)
 {
@@ -957,7 +1030,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
     case AM2_MSG_TROOPER_WEAPON:
         if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
             orig_log((const char *)AM2_IMAGE(ADDR_STR_GOT_SET_WEAPON));
-        orig_recv_troop_set_weapon(msg);
+        RecvTrooperSetWeapon(msg);
         return;
 
     default:
@@ -1727,6 +1800,9 @@ int commmsg_install(void)
                   "RecvTroopBatch", 1);
     patch_replace(ADDR_RECV_TROOP_PAIR, (const void *)RecvTroopPair,
                   "RecvTroopPair", 1);
+    patch_replace(ADDR_RECV_TROOP_SET_WEAPON,
+                  (const void *)RecvTrooperSetWeapon,
+                  "RecvTrooperSetWeapon", 1);
     patch_replace(ADDR_VEHICLE_MSG_RECV, (const void *)VehicleMsgRecv,
                   "VehicleMsgRecv", 1);
     patch_replace(ADDR_RECV_VEHICLE_EXIT, (const void *)RecvVehicleExit,

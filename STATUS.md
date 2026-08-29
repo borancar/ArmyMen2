@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,099 patches.**
+Nothing uncommitted. **1,100 patches.**
 
-Forty-six functions since the last snapshot. The seven-class HUD family is
+Forty-seven functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -300,6 +300,25 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   `combat` reported **177,112 pixels (22.5%)** and `ab.sh` still said "A/B
   clean", because that configuration's budget is disabled. Re-ran at 716.
   Read the number, not the verdict.
+
+- **`RecvTrooperSetWeapon`** (`0x0044C3E0`) makes kind 0x22 ours at both
+  ends, and it **names the sender's last unnamed field**: `SendTrooperSetWeapon`
+  wrote a literal `msg + 0x18` and could only call it "the weapon"; the
+  receiver uses it twice as an INDEX, so it is an inventory slot.
+
+  Its three log lines are **not** gated on `COMM_OFF_VERBOSE`, unlike the
+  vehicle-exit pair -- an asymmetry inside one message family. And the
+  success line fires before either lookup, so it announces a link the next
+  branch may refuse.
+
+  `checkseams` failed the build: I reached for the image for
+  `SoldierKindForWeapon`, which is already ours. Three of this function's
+  four callees were reconstructed and I made a seam to one out of habit.
+
+- **`combat`'s pixel figure is bimodal** -- 177,112 / 716 / 177,109 / 684
+  across four runs of one build, three pixels apart within each cluster.
+  That is the two sides' scroll being in or out of phase, not noise. Recorded
+  in CLAUDE.md; its budget is disabled and the log is the evidence.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

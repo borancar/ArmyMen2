@@ -6519,7 +6519,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 
 #define ADDR_RECV_TROOP_19       0x0044C680u
 #define ADDR_RECV_TROOP_DROP_ITEM 0x0044C9C0u /* eTROOPER_DROP_ITEM_MESSAGE */
+/* Reconstructed. The receiver for eTROOPER_SET_WEAPON_MESSAGE, and the twin
+ * of armymsg.cpp's SendTrooperSetWeapon: put the weapon's uid in the
+ * trooper's inventory SLOT, set the soldier kind from the weapon's code, and
+ * select that slot. Its three log lines are NOT gated on COMM_OFF_VERBOSE,
+ * unlike the two Vehicle Exit ones. */
 #define ADDR_RECV_TROOP_SET_WEAPON 0x0044C3E0u /* eTROOPER_SET_WEAPON_MESSAGE */
+#define MSG_SETWEAPON_OFF_TROOPER  0x04u
+#define MSG_SETWEAPON_OFF_WEAPON   0x08u
+#define MSG_SETWEAPON_OFF_SLOT     0x18u  /* the inventory slot, 0..5 */
+#define ADDR_STR_RECV_SETW_LINK    0x0048AB14u
+#define ADDR_STR_RECV_SETW_NO_TROOP 0x0048AAD8u
+#define ADDR_STR_RECV_SETW_NO_WEAP 0x0048AA9Cu
 #define AM2_MSG_TROOPER_DROP_ITEM 0x21u
 #define AM2_MSG_TROOP_FIRST       0x16u
 #define AM2_MSG_TROOP_LAST        0x22u

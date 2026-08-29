@@ -35,6 +35,10 @@ int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid);
 void __cdecl RecvTroopBatch(void *msg, int32_t army);
 void __cdecl RecvTroopPair(void *msg);
 
+/* 0x0044C3E0, kind 0x22 -- the twin of armymsg.cpp's SendTrooperSetWeapon, so
+ * that message is ours at both ends. */
+void __cdecl RecvTrooperSetWeapon(void *msg);
+
 /* 0x0044C590, one caller. The trooper half of the army-message dispatcher:
  * thirteen arms over kinds 0x16..0x22, seven of which are the unknown log. */
 void __cdecl TroopMessageRecv(void *msg, int32_t army);
