@@ -9,9 +9,9 @@ Last updated: **2026-08-29**, at `fb70e49`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,082 patches.**
+Nothing uncommitted. **1,085 patches.**
 
-Thirty functions since the last snapshot. The seven-class HUD family is
+Thirty-three functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
 batch has gone from **14 to 25 of 29** -- four left, and none of them small.
 
@@ -136,6 +136,19 @@ batch has gone from **14 to 25 of 29** -- four left, and none of them small.
   It also settles something about a hundred call sites: `UidOnWire` is
   `mov eax, [esp+4]; ret`, the identity. This function converts twice on its
   outgoing log line and nothing happens.
+
+- **`VehicleMsgRecv`, `RecvVehicleExit` and `VehicleTakeOutOccupant`** close
+  the other end of it: the vehicle half of the army-message dispatcher and
+  the receive path for kind 0x25, so that message is now ours at **both**
+  ends. `VehicleTakeOutOccupant` is the exact mirror of what `army.cpp` does
+  locally, and every field it touches was already named from that side --
+  `OBJ_OFF_RIDING`'s own comment says "cleared as an occupant gets out", and
+  this is the other place that does it.
+
+  Four of the dispatcher's eleven arms are the unknown-message log, and that
+  is corroboration rather than a hole: `orig.h` already had 0x22 as
+  "handled somewhere else entirely" and 0x23 as `AM2_MSG_DEATH`. Two message
+  families share one number space.
 
 - **The HUD**, all seven classes: the top strip (paint and update), the edge
   strip (both), the radar (paint plus `RadarBlipColour`, `DrawBlip3`,

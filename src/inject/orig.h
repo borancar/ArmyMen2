@@ -6394,6 +6394,36 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * "Unknown Vehicle Message of type %d Received". */
 #define ADDR_TROOP_MESSAGE_RECV  0x0044C590u  /* void(msg *, int32_t army) */
 #define ADDR_VEHICLE_MSG_RECV    0x0045E590u  /* void(msg *, int32_t army) */
+/* Reconstructed. Eleven arms over message kinds 0x1B..0x25, and the four in
+ * the middle -- 0x20 through 0x23 -- fall to the "unknown" log rather than to
+ * a handler. That is corroboration rather than a gap: orig.h already records
+ * AM2_MSG_TROOPER_WEAPON (0x22) as "handled somewhere else entirely", and
+ * AM2_MSG_DEATH is 0x23. Two message families share one number space and this
+ * dispatcher owns only its own end of it.
+ *
+ * The seven handlers stay original and are reached by address. Only the FIRST
+ * takes the army; the other six take the message alone, which is why the
+ * dispatcher's second parameter looks unused at six of its seven call sites.
+ *
+ * Kind 0x25 is the one this project can name: ADDR_VEHICLE_DROP_OCCUPANT
+ * sends it. The rest are numbered because the number is what is established. */
+#define ADDR_RECV_VEHICLE_1B     0x0045EB10u  /* void(msg *, int32_t army) */
+#define ADDR_RECV_VEHICLE_1C     0x0045E980u  /* void(msg *) */
+#define ADDR_RECV_VEHICLE_1D     0x0045E630u
+#define ADDR_RECV_VEHICLE_1E     0x0045E810u
+#define ADDR_RECV_VEHICLE_1F     0x0045E860u
+#define ADDR_RECV_VEHICLE_24     0x0045EA30u
+#define ADDR_RECV_VEHICLE_EXIT   0x0045EAA0u  /* the twin of the sender */
+/* 0x0045ADD0, 60 bytes, one caller -- the receive side of a unit leaving a
+ * vehicle, and the exact mirror of what army.cpp does locally: find the uid in
+ * the vehicle's VEHICLE_OFF_PTR_LIST and drop that slot, clear the unit's
+ * OBJ_OFF_RIDING, and give it the vehicle's OBJ_OFF_HEIGHT_SET so it steps out
+ * at the right height. Reconstructed. */
+#define ADDR_VEHICLE_TAKE_OUT    0x0045ADD0u  /* void(uint32_t uid, void *veh) */
+#define ADDR_STR_VEH_EXIT_RECV   0x0048C424u
+#define AM2_MSG_VEHICLE_FIRST    0x1Bu
+#define AM2_MSG_VEHICLE_LAST     0x25u
+#define ADDR_STR_UNKNOWN_VEH_MSG 0x0048C2ACu
 /* Who won, written only by the two game-over arms of the army dispatcher. */
 #define ADDR_GAME_WINNER         0x00512300u  /* int32_t */
 /* Gates the WON arm: with this clear, a win is recorded exactly as a loss.

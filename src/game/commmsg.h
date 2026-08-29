@@ -29,6 +29,16 @@ int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid);
  * Army 4 is neutral and answers yes without touching the object. */
 int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid);
 
+/* 0x0045E590, one caller. The vehicle half of the army-message dispatcher:
+ * eleven arms over kinds 0x1B..0x25, four of which are the unknown log. */
+void __cdecl VehicleMsgRecv(void *msg, int32_t army);
+
+/* 0x0045EAA0 and 0x0045ADD0, the receive side of a unit leaving a vehicle --
+ * the twin of armymsg.cpp's SendVehicleExit, so message kind 0x25 is now ours
+ * at both ends. */
+void __cdecl RecvVehicleExit(void *msg);
+void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle);
+
 #endif
 
 /* 0x0044C250, one caller, and it names itself -- "Trooper Fire Send,

@@ -816,8 +816,136 @@ int32_t __cdecl UidObjKind(uint32_t uid)
     return (int32_t)obj[0];
 }
 
+/* VehicleTakeOutOccupant -- original 0x0045ADD0, one caller.
+ *
+ * The receive side of a unit leaving a vehicle, and the exact mirror of what
+ * army.cpp's ExitAllFromVehicle does locally: find the uid in the vehicle's
+ * occupant list and drop that slot, clear the unit's OBJ_OFF_RIDING, and give
+ * it the vehicle's OBJ_OFF_HEIGHT_SET so it steps out at the right height.
+ *
+ * The three fields were all already named, from the local side, which is what
+ * made this readable at all -- OBJ_OFF_RIDING's own comment says "cleared as
+ * an occupant gets out" and this is the other place that does it.
+ *
+ * TWO THINGS RUN WHETHER THE UID WAS FOUND OR NOT. The search breaks out on a
+ * match and falls through on a miss, and the clear and the height happen
+ * either way -- on whatever LookupByUID answers, which is not null-checked. A
+ * uid that names nothing faults. The original's, and the third of these in
+ * this family; the send side has the same shape with its vehicle.
+ */
+void __cdecl VehicleTakeOutOccupant(uint32_t uid, void *vehicle)
+{
+    uint8_t *v = (uint8_t *)vehicle;
+    uint8_t *unit;
+    int32_t  i;
+
+    if (!vehicle)
+        return;
+
+    for (i = 0; i < *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4); i++) {
+        if ((*(const uint32_t *const *)(v + VEHICLE_OFF_PTR_LIST + 8))[i]
+                == uid) {
+            ListRemoveAt(v + VEHICLE_OFF_PTR_LIST, i);
+            break;
+        }
+    }
+
+    unit = (uint8_t *)LookupByUID(uid);
+
+    *(int32_t *)(unit + OBJ_OFF_RIDING) = 0;
+    ApplyObjHeight(unit, *(const int8_t *)(v + OBJ_OFF_HEIGHT_SET));
+}
+
+/* RecvVehicleExit -- original 0x0045EAA0, one caller.
+ *
+ * The twin of ADDR_VEHICLE_DROP_OCCUPANT, and between them the send and the
+ * receive of message kind 0x25 are both ours. It names itself the same way --
+ * "-->Vehicle Exit Received: Vehicle: %x, trooper: %x", gated on
+ * COMM_OFF_VERBOSE -- and calls the occupant a TROOPER where the sender calls
+ * it an item. Neither word is ours and they disagree; the message is the same
+ * twelve bytes either way.
+ *
+ * UidOnWire again, and again it is the identity -- see armymsg.cpp. Every
+ * call here is reproduced because the original makes it, not because anything
+ * is converted.
+ */
+void __cdecl RecvVehicleExit(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    void          *vehicle;
+
+    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_VEH_EXIT_RECV),
+                 UidOnWire(*(const uint32_t *)(m + 4)),
+                 UidOnWire(*(const uint32_t *)(m + 8)));
+
+    vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    if (vehicle)
+        VehicleTakeOutOccupant(UidOnWire(*(const uint32_t *)(m + 8)), vehicle);
+}
+
+/* VehicleMsgRecv -- original 0x0045E590, one caller.
+ *
+ * The vehicle half of the army-message dispatcher: eleven arms over kinds
+ * 0x1B..0x25, and a log line for anything else. It names itself in that line
+ * -- "Unknown Vehicle Message of type %d Received".
+ *
+ * FOUR OF THE ELEVEN ARMS ARE THE UNKNOWN LOG, and that is corroboration
+ * rather than a hole. Kinds 0x20..0x23 have no handler here, and orig.h
+ * already records AM2_MSG_TROOPER_WEAPON as 0x22 "handled somewhere else
+ * entirely" with AM2_MSG_DEATH at 0x23. Two message families share one number
+ * space and this dispatcher owns only its own end of it -- so a message it
+ * refuses is not necessarily a message the game refuses.
+ *
+ * ONLY THE FIRST ARM TAKES THE ARMY. The other six are handed the message
+ * alone, which is why the second parameter looks unused at six of seven call
+ * sites; it is not dead, it is used once.
+ *
+ * Written as a switch rather than as the jump table the compiler chose,
+ * because the arms are a contiguous run of kinds and the switch says so where
+ * `table[kind - 0x1B]` does not.
+ *
+ * The seven handlers stay original and are reached by address, which is the
+ * usual shape: our code runs in the middle of a live path and the layer below
+ * it can wait. Kind 0x25 is the twin of ADDR_VEHICLE_DROP_OCCUPANT, which is
+ * reconstructed -- so the send and receive of one message are now one ours and
+ * one theirs, and that pair is worth closing next.
+ *
+ * VERIFIED BY READING. Its caller only reaches it for a uid whose object kind
+ * is 3, off a packet from another player, so nothing without a multiplayer
+ * session can execute one line of it.
+ */
+typedef void (__cdecl *AM2_VehMsgFn)(void *msg);
+typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
+
+#define orig_recv_vehicle_1b ((AM2_VehMsgArmyFn)(uintptr_t)ADDR_RECV_VEHICLE_1B)
+#define orig_recv_vehicle_1c ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1C)
+#define orig_recv_vehicle_1d ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1D)
+#define orig_recv_vehicle_1e ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1E)
+#define orig_recv_vehicle_1f ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1F)
+#define orig_recv_vehicle_24 ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_24)
+
+void __cdecl VehicleMsgRecv(void *msg, int32_t army)
+{
+    uint32_t kind = *(const uint16_t *)((const uint8_t *)msg + 2);
+
+    switch (kind) {
+    case 0x1B: orig_recv_vehicle_1b(msg, army); return;
+    case 0x1C: orig_recv_vehicle_1c(msg);       return;
+    case 0x1D: orig_recv_vehicle_1d(msg);       return;
+    case 0x1E: orig_recv_vehicle_1e(msg);       return;
+    case 0x1F: orig_recv_vehicle_1f(msg);       return;
+    case 0x24: orig_recv_vehicle_24(msg);       return;
+    case AM2_MSG_VEHICLE_EXIT:
+        RecvVehicleExit(msg);
+        return;
+    default:
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_UNKNOWN_VEH_MSG), kind);
+        return;
+    }
+}
+
 #define orig_troop_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_TROOP_MESSAGE_RECV)
-#define orig_vehicle_msg_recv ((AM2_KindMsgFn)(uintptr_t)ADDR_VEHICLE_MSG_RECV)
 #define orig_raw_log       ((AM2_RawLogFn)(uintptr_t)ADDR_LOG)
 
 /* Spelled exactly as objtable.h spells it -- uint32_t, not int32_t -- so the
@@ -876,7 +1004,7 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
         orig_troop_msg_recv(m, army);
         return;
     case 3:
-        orig_vehicle_msg_recv(m, army);
+        VehicleMsgRecv(m, army);
         return;
     default:
         break;   /* 4, and anything the table does not cover */
@@ -1444,6 +1572,12 @@ void __cdecl CommDrainMsgs(void)
 
 int commmsg_install(void)
 {
+    patch_replace(ADDR_VEHICLE_MSG_RECV, (const void *)VehicleMsgRecv,
+                  "VehicleMsgRecv", 1);
+    patch_replace(ADDR_RECV_VEHICLE_EXIT, (const void *)RecvVehicleExit,
+                  "RecvVehicleExit", 1);
+    patch_replace(ADDR_VEHICLE_TAKE_OUT, (const void *)VehicleTakeOutOccupant,
+                  "VehicleTakeOutOccupant", 1);
     patch_replace(ADDR_COMM_FIND_PLAYER, (const void *)CommFindPlayer,
                   "CommFindPlayer", 2);
     patch_replace(ADDR_ARMY_IN_PLAY, (const void *)ArmyInPlay,
