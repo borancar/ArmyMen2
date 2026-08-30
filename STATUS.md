@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,219 patches.**
+Nothing uncommitted. **1,220 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1964,16 +1964,47 @@ commit -- gave the right answer every time it was used.
   transcribed that argument as the point first, and the string is what caught
   it.
 
+- **`SaveOptions`** (`0x0044CFA0`) writes `Options.cfg`, and **`orig.h` had
+  declined it for the wrong reason.** The note said "left original -- it is
+  CRT file I/O, and this port replaces the CRT wholesale rather than function
+  by function". The CRT is what this function CALLS, not what it is; every
+  other file writer in the tree goes through `orig_fopen` and `orig_fwrite`
+  for the seam `crt.h` describes. Corrected in place.
+
+  **It chmods the file writable before opening it** -- `_S_IREAD|_S_IWRITE` on
+  something it is about to `fopen("w")` -- which is what a read-only CD
+  install would need. Neither that nor anything else is checked; the only
+  failure path is the fopen.
+
+  **The mode is `"w"`, not `"wb"`**, so a text stream carries binary dwords
+  and every 0x0A becomes 0x0D 0x0A on the way out. The reader opens the same
+  way, so the pair agrees with itself -- but it is a format that cannot
+  survive being moved between platforms.
+
+  **The key bindings are written one byte out of every two.** The table is
+  pairs, primary and alternate, and the loop steps TWO while writing ONE. So
+  only the primary is persisted and the alternate is rebuilt from the defaults
+  every run -- which is why the first four actions can bind W/UP, S/DOWN,
+  A/LEFT and D/RIGHT and still round-trip. Both names are length-prefixed with
+  no terminator.
+
+  **Verified by an exact oracle rather than by the A/B.** Deleting
+  `Options.cfg` and driving OPTIONS -> AUDIO -> OK makes each build write it
+  from nothing: 61 bytes from the original, 61 bytes from the reconstruction,
+  **byte for byte identical**. That was needed -- three of the seven call
+  sites are in reconstructed handlers, so the counter is blind and reads 0
+  even when it runs.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,065 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,219
+line (0x0045C000) patched**. Measured: **1,066 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,220
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-five batches have gone in and the 174 entries outstanding start at 48
+small ones in batches. Sixty-six batches have gone in and the 173 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

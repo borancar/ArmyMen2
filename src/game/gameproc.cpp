@@ -83,6 +83,89 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
  * and a C linkage declaration here would not resolve. */
 int32_t __cdecl LoadAudioSection(am2_FILE *fp);
 
+/* _chmod and fflush, neither of which this tree had needed before. */
+typedef int32_t (__cdecl *AM2_ChmodFn)(const char *path, int32_t mode);
+#define orig_chmod  ((AM2_ChmodFn)AM2_IMAGE(ADDR_CRT_CHMOD))
+typedef int32_t (__cdecl *AM2_FflushFn)(am2_FILE *fp);
+#define orig_fflush ((AM2_FflushFn)AM2_IMAGE(ADDR_CRT_FFLUSH))
+
+/* SaveOptions -- original 0x0044CFA0, seven callers. Write Options.cfg: every
+ * setting the game keeps between runs, as one straight line of fwrites with
+ * no header, no tag and no version.
+ *
+ * IT CHMODS THE FILE BEFORE OPENING IT. `_chmod(path, _S_IREAD|_S_IWRITE)` on
+ * a file it is about to `fopen("w")` -- so a read-only Options.cfg, which is
+ * what a CD install would leave behind, is made writable first. The chmod's
+ * result is not checked and neither is anything else; the only failure path
+ * is the fopen, which logs and returns.
+ *
+ * THE MODE IS "w" AND NOT "wb", so this is a TEXT stream carrying binary
+ * dwords. On Windows that turns every 0x0A byte into 0x0D 0x0A on the way
+ * out, and the reader at 0x0044D110 opens the same way, so the pair agrees
+ * with itself. It is still a file format that cannot survive being moved
+ * between platforms, and worth knowing before anyone tries to read one here.
+ *
+ * THE KEY BINDINGS ARE WRITTEN ONE BYTE OUT OF EVERY TWO. ADDR_KEY_BINDINGS
+ * is pairs -- a primary scancode and an alternate -- and the loop steps TWO
+ * bytes while writing ONE, from the table's start to ADDR_KEY_BINDINGS_END.
+ * So only the primary of each binding is persisted and the alternate is
+ * rebuilt from the defaults on every run. That is the whole reason the first
+ * four actions can bind W/UP, S/DOWN, A/LEFT and D/RIGHT and still round-trip.
+ *
+ * THE TWO NAMES ARE LENGTH-PREFIXED AND NOT TERMINATED. Each is measured with
+ * strlen, the length goes out as a dword, and exactly that many bytes follow
+ * -- no NUL. A name containing one would be truncated by the reader and not
+ * by this.
+ *
+ * It fflushes and then fcloses, which is belt and braces; fclose flushes.
+ * Reproduced.
+ */
+void __cdecl SaveOptions(void)
+{
+    am2_FILE *fp;
+    const uint8_t *key;
+    int32_t   len;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    orig_chmod((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG), AM2_CHMOD_RW);
+
+    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG),
+                    (const char *)AM2_IMAGE(ADDR_MODE_W));
+    if (!fp) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_NOWRITE));
+        return;
+    }
+
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO), 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_STREAM_VOLUME), 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_VOLUME_VOICE), 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_MOVIE_COUNT), 4, 1, fp);
+
+    for (key = (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+         key < (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END);
+         key += 2)
+        orig_fwrite(key, 1, 1, fp);
+
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_DIFFICULTY), 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_HOST_MASK_A), 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_HOST_MASK_B), 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_HOST_VALUE_3E8), 4, 1, fp);
+
+    len = (int32_t)strlen((const char *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME));
+    orig_fwrite(&len, 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME),
+                1, (size_t)len, fp);
+
+    len = (int32_t)strlen((const char *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME));
+    orig_fwrite(&len, 4, 1, fp);
+    orig_fwrite((const void *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME),
+                1, (size_t)len, fp);
+
+    orig_fflush(fp);
+    orig_fclose(fp);
+}
+
 /* LoadDefaultCof -- original 0x00457320, one caller, and that caller is the
  * state-2 ENTRY: this runs on the way into a level, not on a save load.
  *
@@ -1115,6 +1198,8 @@ void gameproc_install(void)
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
     patch_replace(ADDR_LOAD_DEFAULT_COF, (const void *)LoadDefaultCof,
                   "LoadDefaultCof", 1);
+    patch_replace(ADDR_SAVE_OPTIONS, (const void *)SaveOptions,
+                  "SaveOptions", 7);
     patch_replace(ADDR_DEF_GAME_PARSE, (const void *)DefGameParse,
                   "DefGameParse", 1);
     patch_replace(ADDR_SAVE_GAMEPROC, (const void *)SaveGameProcSection,

@@ -3760,7 +3760,6 @@ void __attribute__((thiscall)) ListDropOldest(void *list)
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 typedef void (__cdecl *am2_void_fn)(void);
-#define orig_save_options (*(am2_void_fn)ADDR_SAVE_OPTIONS)
 #define g_menuRequestSet  (*(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET)
 #define g_commObject      (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 
@@ -6130,7 +6129,7 @@ void __cdecl ApplyVolumes(int32_t effects, int32_t music, int32_t voice)
     g_volumeAtZero = effects;
     g_streamVolume = music;
     g_voiceVolume  = voice;
-    orig_save_options();
+    SaveOptions();
 }
 
 /* 0x0044F930. AUDIO's OK: read the three bars, apply, save, leave.
@@ -6170,7 +6169,7 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
     g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
     g_difficulty     = *(const int32_t *)(list + LIST_OFF_HOT);
     g_menuRequestSet = 1;
-    orig_save_options();
+    SaveOptions();
 }
 
 /* 0x00451150. CONTROLS' OK: write all twenty-one rows back into the key
@@ -6192,7 +6191,7 @@ void __cdecl OnControlsOk(AM2_Widget *w)
         int32_t k = *(const int32_t *)((const uint8_t *)rows[i] + KEYROW_OFF_KEY);
         binding[i * 2] = (uint8_t)keys[k].dik;
     }
-    orig_save_options();
+    SaveOptions();
     PlaySoundAt(2, 0, 0, 0, 0);
     OnControlsCancel(w);
 }

@@ -126,6 +126,13 @@ void __cdecl UidRemapClear(void);
  * not ship, so everything past the fopen is unreachable here; see
  * gameproc.cpp. */
 int32_t __cdecl LoadDefaultCof(void);
+
+/* 0x0044CFA0, seven callers. Write Options.cfg -- volumes, key bindings,
+ * difficulty, the host masks and two names -- as one straight line of
+ * fwrites with no header, tag or version. It chmods the file writable first,
+ * writes only ONE BYTE OF EVERY TWO of the key table, and length-prefixes
+ * both names without a terminator. See gameproc.cpp. */
+void __cdecl SaveOptions(void);
 void __cdecl UidRemapAdd(uint32_t from, uint32_t to);
 
 #ifdef __cplusplus

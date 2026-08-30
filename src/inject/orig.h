@@ -3130,6 +3130,16 @@
 /* Where HostBattle keeps the two names after the session is up. */
 #define ADDR_SAVED_PLAYER_NAME   0x00516094u  /* char[] */
 #define ADDR_SAVED_BATTLE_NAME   0x005160D5u  /* char[] */
+/* ADDR_SAVE_OPTIONS is already defined further down, from the menu side --
+ * checkoffsets refused the second one. The strings and constants it needs are
+ * here because this is where the file's CONTENTS are described. */
+#define ADDR_STR_OPTIONS_CFG     0x0048B448u  /* "Options.cfg" */
+#define ADDR_MODE_W              0x0048B3CCu  /* "w" -- TEXT mode, not "wb" */
+#define ADDR_STR_OPTIONS_NOWRITE 0x0048B420u
+#define ADDR_CRT_CHMOD           0x00466359u  /* int32(const char *, int32) */
+#define AM2_CHMOD_RW             0x180        /* _S_IREAD | _S_IWRITE */
+#define ADDR_CRT_FFLUSH          0x00465A96u  /* int32(FILE *) */
+#define ADDR_KEY_BINDINGS_END    0x004854E6u  /* the write loop's bound */
 #define ADDR_HOST_BATTLE         0x0042FFF0u  /* void(void) */
 #define ADDR_APP_ACTIVE          0x004FA02Cu  /* int32_t; RunFrame ticks only if set */
 #define ADDR_CHAR_HANDLER        0x005125B8u  /* void(*)(wparam, lo, hi), may be null */
@@ -3502,8 +3512,12 @@ typedef struct {
 /* 0x0044F860: store three volumes, each -2000 turned into DSBVOLUME_MIN,
  * then tail-jump the Options.cfg writer. Only AUDIO's OK reaches it. */
 #define ADDR_APPLY_VOLUMES       0x0044F860u  /* void(fx, music, voice) */
-/* 0x0044CFA0: rewrite Options.cfg. Left original -- it is CRT file I/O, and
- * this port replaces the CRT wholesale rather than function by function. */
+/* 0x0044CFA0: rewrite Options.cfg. This said "left original -- it is CRT
+ * file I/O, and this port replaces the CRT wholesale rather than function by
+ * function", which was the wrong reading of its own rule: the CRT is what
+ * this function CALLS, not what it is. Every other file writer in the tree
+ * goes through orig_fopen and orig_fwrite for the seam crt.h describes, and
+ * so does this one now. Reconstructed. */
 #define ADDR_SAVE_OPTIONS        0x0044CFA0u  /* void(void) */
 #define ADDR_ON_AUDIO_CANCEL     0x0044F8B0u
 /* Three bars at 0x0064..0x006C, and the volumes they started from at
