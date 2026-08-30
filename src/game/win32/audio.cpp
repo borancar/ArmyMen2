@@ -900,11 +900,109 @@ typedef void *(__cdecl *am2_lookup_uid_fn)(uint32_t uid);
 #define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
 #define g_volumeAtZero  (*(int32_t *)(uintptr_t)ADDR_VOLUME_AT_ZERO)
 
-/* The RIFF chunk walk, which stays original: given the whole file, find the
- * format, the samples and their length. */
-typedef int32_t (__cdecl *AM2_ParseWaveFn)(void *file, LPWAVEFORMATEX *fmt,
-                                           void **samples, DWORD *length);
-#define ParseWave ((AM2_ParseWaveFn)AM2_IMAGE(ADDR_PARSE_WAVE))
+/* ParseWave -- original 0x0040C220, one caller, and that caller is
+ * ReadWaveFile below. The RIFF chunk walk: given the whole file in memory,
+ * find the format chunk, the sample bytes and their length.
+ *
+ * EVERY OUT-PARAMETER IS OPTIONAL AND THAT IS THE WHOLE CONTROL FLOW. A null
+ * one is skipped; a non-null one is cleared on entry and then filled when its
+ * chunk turns up. The function returns 1 the moment everything the caller
+ * ASKED FOR has been found -- so the loop's exit condition is not "both
+ * chunks seen" but "no requested output is still empty", and a caller passing
+ * only `length` stops at the first data chunk.
+ *
+ * THE EXIT TEST IS "IS ANYTHING ELSE STILL EMPTY", and it is written out
+ * twice, once per arm, in the negative -- a null output counts as satisfied
+ * and so does a filled one. Both arms are easy to transcribe inverted; the
+ * shape to keep is that finding a chunk returns 1 only when the OTHER
+ * requested outputs are already non-zero.
+ *
+ * "STILL EMPTY" IS TESTED AS "STILL ZERO", which is where it gets interesting.
+ * The length is checked with `*length == 0`, so a zero-length `data` chunk
+ * does not count as found and a later one overwrites both the pointer and the
+ * length. A file with an empty data chunk followed by a real one therefore
+ * works, and one ending on the empty chunk returns 0 having set `samples` to
+ * a pointer nobody should read. Reproduced.
+ *
+ * THE END IS COMPUTED FROM THE RIFF SIZE AND IS FOUR BYTES SHORT of where the
+ * arithmetic first suggests: `size + start + 8`, with the walk beginning at
+ * start + 12. So the last four bytes the RIFF header covers are outside the
+ * loop. That is the original's and it is why a file whose final chunk ends
+ * exactly at the header's limit is still walked correctly -- the chunk header
+ * would not fit in four bytes anyway.
+ *
+ * CHUNKS ARE WORD-ALIGNED on the way past: `(len + 1) & ~1`, which is the
+ * RIFF rule. The format chunk is refused below 14 bytes with its own
+ * complaint; nothing else is length-checked.
+ *
+ * Its three failure messages are what named it and are the reason it went
+ * into the self-naming sweep at all -- but only two of the four exits log.
+ * Running off the end of the chunk area returns 0 in silence, and so does a
+ * file whose chunk area is empty from the start.
+ */
+int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
+                          DWORD *length)
+{
+    const uint8_t *p = (const uint8_t *)file;
+    const uint8_t *end;
+    uint32_t       size;
+
+    if (fmt)
+        *fmt = (LPWAVEFORMATEX)0;
+    if (samples)
+        *samples = (void *)0;
+    if (length)
+        *length = 0;
+
+    size = *(const uint32_t *)(p + 4);
+    if (*(const uint32_t *)p != AM2_RIFF_TAG_RIFF) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOT_RIFF));
+        return 0;
+    }
+    if (*(const uint32_t *)(p + 8) != AM2_RIFF_TAG_WAVE) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOT_WAVE));
+        return 0;
+    }
+
+    end = (const uint8_t *)file + size + 8;
+    p  += 12;
+
+    while (p < end) {
+        uint32_t id  = *(const uint32_t *)p;
+        uint32_t len = *(const uint32_t *)(p + 4);
+
+        p += 8;
+
+        if (id == AM2_RIFF_TAG_FMT) {
+            if (fmt && *fmt == (LPWAVEFORMATEX)0) {
+                if (len < AM2_WAVEFMT_MIN) {
+                    orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_BAD_HDR));
+                    return 0;
+                }
+                *fmt = (LPWAVEFORMATEX)p;
+                /* Return only when nothing else asked for is still empty. */
+                if (!samples || *samples != (void *)0) {
+                    if (!length || *length != 0)
+                        return 1;
+                }
+            }
+        } else if (id == AM2_RIFF_TAG_DATA) {
+            if ((samples && *samples == (void *)0)
+                || (length && *length == 0)) {
+                if (samples)
+                    *samples = (void *)p;
+                if (length)
+                    *length = len;
+                if (!fmt || *fmt != (LPWAVEFORMATEX)0)
+                    return 1;
+            }
+        }
+
+        p += (len + 1) & ~1u;
+    }
+
+    return 0;
+}
 
 /* ReadWaveFile -- original 0x0040C340, two callers.
  *
@@ -1859,6 +1957,8 @@ int audio_install(void)
                         "FillSoundBuffer", 3);
     rc |= patch_replace(ADDR_INIT_WAVE_SOUNDS, (const void *)InitWaveSounds,
                         "InitWaveSounds", 0);
+    rc |= patch_replace(ADDR_PARSE_WAVE, (const void *)ParseWave,
+                        "ParseWave", 1);
     rc |= patch_replace(ADDR_READ_WAVE_FILE, (const void *)ReadWaveFile,
                         "ReadWaveFile", 2);
     rc |= patch_replace(ADDR_LOAD_WAVE_SOUND, (const void *)LoadWaveSound,

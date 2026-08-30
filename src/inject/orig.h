@@ -2922,9 +2922,17 @@
 #define ADDR_STR_WAVE_PARSE      0x00474DF0u  /* "Error parsing wave file %s" */
 /* 0x0040C220, one caller. Given the whole file in memory, find the format,
  * the sample bytes and their length. ReadWaveFile does the I/O and this does
- * the RIFF walking; the split is why the reader can be reconstructed without
- * touching the chunk layout. Stays original. */
+ * the RIFF walking; the split is why the reader could be reconstructed long
+ * before the chunk layout was read. Reconstructed. */
 #define ADDR_PARSE_WAVE          0x0040C220u  /* int32(void *,fmt**,void**,DWORD*) */
+#define AM2_RIFF_TAG_RIFF        0x46464952u  /* 'RIFF' */
+#define AM2_RIFF_TAG_WAVE        0x45564157u  /* 'WAVE' */
+#define AM2_RIFF_TAG_FMT         0x20746D66u  /* 'fmt ' */
+#define AM2_RIFF_TAG_DATA        0x61746164u  /* 'data' */
+#define AM2_WAVEFMT_MIN          0x0Eu        /* a shorter fmt chunk is refused */
+#define ADDR_STR_WAVE_NOT_RIFF   0x00474DD0u
+#define ADDR_STR_WAVE_NOT_WAVE   0x00474DBCu
+#define ADDR_STR_WAVE_BAD_HDR    0x00474D9Cu
 #define ADDR_STR_WAVE_NOBUFFER   0x00474CD0u
 #define ADDR_STR_WAVE_NOFILL     0x00474CA4u
 #define ADDR_WAVE_NAMES          0x00474360u  /* const char *[32] */

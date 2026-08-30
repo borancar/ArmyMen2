@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,216 patches.**
+Nothing uncommitted. **1,217 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1873,16 +1873,51 @@ commit -- gave the right answer every time it was used.
   `campaign` report `names: 316`, so a wrong declaration would move a number
   the comparison reads.
 
+- **`ParseWave`** (`0x0040C220`) is the RIFF chunk walk `ReadWaveFile` has
+  been calling through the image since it was reconstructed -- the note beside
+  it said "stays original", and now it does not. **The whole `.WAV` path is
+  ours.**
+
+  **EVERY OUT-PARAMETER IS OPTIONAL AND THAT IS THE ENTIRE CONTROL FLOW.** A
+  null one is skipped, a non-null one is cleared on entry and filled when its
+  chunk turns up, and the function returns 1 the moment nothing the caller
+  ASKED FOR is still empty. So a caller passing only `length` stops at the
+  first data chunk.
+
+  **That exit test is written out twice, once per arm, in the negative, and I
+  transcribed BOTH INVERTED first time.** A null output counts as satisfied
+  and so does a filled one; finding a chunk returns 1 only when the OTHER
+  requested outputs are already non-zero. Caught by re-reading the branch
+  targets rather than by any check -- it builds and passes `make check` either
+  way.
+
+  **"Still empty" is tested as "still zero"**, so a zero-length `data` chunk
+  does not count as found and a later one overwrites both fields. A file
+  ending on the empty chunk returns 0 having set `samples` to a pointer nobody
+  should read.
+
+  **`tools/checkwaves.py` is an exact oracle for exactly this** and it is what
+  verified the batch: **56 waves match the `.WAV` data chunk byte for byte, 0
+  differ.** That is this function's own two outputs checked against the files
+  on disk, which is worth more than the clean `audio` A/B beside it. The
+  counter reads 0 and is blind by construction -- closing the seam made
+  `ReadWaveFile` call it by name.
+
+  Running it needed `DISPLAY` set as well as `AM2_DISPLAY`: `make config`
+  named `am2-0.log` while the run wrote `am2-99.log`, which is the trap
+  CLAUDE.md already records for `ab.sh` and which bites `checkwaves.py` the
+  same way.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,062 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,216
+line (0x0045C000) patched**. Measured: **1,063 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,217
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-two batches have gone in and the 177 entries outstanding start at 48
+small ones in batches. Sixty-three batches have gone in and the 176 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
