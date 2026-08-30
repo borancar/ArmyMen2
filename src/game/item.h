@@ -575,4 +575,9 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
  * one by kind, one by the owner's comm slot -- propagate one, refresh rows. */
 void __cdecl SetObjTablePair(uint32_t uid, int32_t kind);
 
+/* 0x00406800, one caller. Which inventory slot should take this weapon, and
+ * may it be taken at all? The slot is an out-parameter carrying -1 for "no
+ * slot needed" and -2 for "all six full"; the permission is the return. */
+int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot);
+
 #endif

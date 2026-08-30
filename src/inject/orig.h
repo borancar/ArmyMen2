@@ -8128,6 +8128,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MAP_CODE          0x00406920u  /* int32_t(int32_t) */
 #define ADDR_COMPARE_TRIPLE    0x00435A80u  /* int32_t(const void*, const void*) */
 #define ADDR_TYPES_COMPATIBLE  0x00433570u  /* int32_t(int32_t a, int32_t b) */
+/* 0x00406800, one caller. Which inventory slot should take this weapon, and
+ * may it be taken at all? The slot goes to an out-parameter and the answer is
+ * the return: -1 means the kind needs no slot, -2 that all six are full. */
+#define ADDR_PICK_WEAPON_SLOT  0x00406800u /* int32(cand, unit, int32 *slot) */
+#define AM2_SLOT_NONE_NEEDED   (-1)
+#define AM2_SLOT_ALL_FULL      (-2)
 #define ADDR_SET_FACING_14     0x0043D450u  /* void(facing, src, out) */
 #define ADDR_SET_FACING_08     0x0045C5E0u
 #define ADDR_IS_KIND_10_17     0x0044BBF0u  /* int32_t(int32_t) */

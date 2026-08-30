@@ -6408,6 +6408,90 @@ void __cdecl SetObjTablePair(uint32_t uid, int32_t kind)
               (void *)(uintptr_t)ADDR_MAP_DESC);
 }
 
+/* PickWeaponSlot -- original 0x00406800, one caller.
+ *
+ * Which of a unit's six inventory slots should take this weapon, and may it be
+ * taken at all? The slot is written to an out-parameter and the permission is
+ * the return value, so the two answers are separate and a caller must read
+ * both.
+ *
+ * THE OUT-PARAMETER CARRIES THREE KINDS OF ANSWER. -1 means the candidate's
+ * kind needs no slot at all and the function returns at once; -2 means all six
+ * slots hold something and none of them settled the question; anything else is
+ * the index to use. Only the last is a slot.
+ *
+ * IT STOPS AT THE FIRST SLOT THAT DECIDES, NOT THE FIRST FREE ONE. The walk
+ * ends when it finds an empty slot, a slot whose weapon shares this one's AAI
+ * record, or a slot whose weapon is kind-compatible with it -- and the last
+ * two RETURN A VERDICT rather than a slot to fill, which is why the return is
+ * not simply "found". A caller taking the index without the verdict would put
+ * a weapon into an occupied slot.
+ *
+ * AN UNRESOLVABLE UID IS TREATED AS AN EMPTY SLOT AND REPAIRED IN PASSING:
+ * WeaponByUid answering NULL makes the function zero that slot and answer 1
+ * with the index still pointing at it. So a stale uid becomes the slot the
+ * caller fills, which is tidier than it looks -- it is the only place that
+ * clears one.
+ *
+ * THE SAME-RECORD TEST ANSWERS FROM A THIRD FIELD. When a slot's weapon has
+ * the same OBJ_OFF_FIELD_94 as the candidate, the verdict is whether the
+ * CANDIDATE's OBJ_OFF_FIELD_CC is not -1 -- nothing about the slot. So "you
+ * already carry one of these" is resolved by a property of the thing being
+ * offered.
+ *
+ * The kind-compatibility arm requires BOTH weapons to be in set B before it
+ * asks whether the kinds are compatible; a candidate outside that set never
+ * reaches TypesCompatible and the walk moves on.
+ */
+int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot)
+{
+    uint8_t *c = (uint8_t *)cand;
+    uint8_t *u = (uint8_t *)unit;
+
+    if (IsKind14Or22(**(const int32_t *const *)(c + OBJ_OFF_FIELD_C0))) {
+        *slot = AM2_SLOT_NONE_NEEDED;
+        return 1;
+    }
+
+    *slot = 0;
+
+    if (!*(const uint32_t *)(u + UNIT_OFF_INVENTORY))
+        return 1;
+
+    for (;;) {
+        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                           + (size_t)*slot * 4);
+        uint8_t *w   = (uint8_t *)WeaponByUid(uid);
+
+        if (!w) {
+            *(uint32_t *)(u + UNIT_OFF_INVENTORY + (size_t)*slot * 4) = 0;
+            return 1;
+        }
+
+        if (*(void *const *)(w + OBJ_OFF_FIELD_94)
+            == *(void *const *)(c + OBJ_OFF_FIELD_94))
+            return *(const int32_t *)(c + OBJ_OFF_FIELD_CC) != -1;
+
+        if (KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+            && KindInSetB(**(const int32_t *const *)(c + OBJ_OFF_FIELD_C0)))
+            return TypesCompatible(
+                       **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0),
+                       **(const int32_t *const *)(c + OBJ_OFF_FIELD_C0))
+                   ? 1 : 0;
+
+        (*slot)++;
+
+        if (*slot >= AM2_INVENTORY_SLOTS) {
+            *slot = AM2_SLOT_ALL_FULL;
+            return 1;
+        }
+
+        if (!*(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                 + (size_t)*slot * 4))
+            return 1;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6573,6 +6657,8 @@ void item_install(void)
                   "WeaponFrameReady", 1);
     patch_replace(ADDR_SET_OBJ_TABLE_PAIR, (const void *)SetObjTablePair,
                   "SetObjTablePair", 1);
+    patch_replace(ADDR_PICK_WEAPON_SLOT, (const void *)PickWeaponSlot,
+                  "PickWeaponSlot", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

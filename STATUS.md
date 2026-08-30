@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,187 patches.**
+Nothing uncommitted. **1,188 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1203,16 +1203,46 @@ timing failure mode too, and that its own output distinguishes the two.
   `StartShake`; **the count is the check, and it must be read before the A/B,
   not after** -- that clean A/B was of the parent's code.
 
+### The whole suite, on a quiet machine, clean
+
+The external load fell away and `tools/ab.sh all` ran end to end: **all
+seventeen configurations clean** -- `bootcamp`, `mission`, `combat`,
+`campaign`, `controls`, `difficulty`, `audiovol`, `menuscreens`, `movies`,
+`multi`, `mpoptions`, `df`, `state3`, `quit`, `intro`, `windowed`, `audio`.
+
+That clears the verification debt this file recorded from batch fifteen, when
+`bootcamp` and `combat` could not be compared at all. `combat` came back
+in-phase at 730, `bootcamp` at its usual figure, and `mpoptions` at **0**
+pixels with its 131-node widget tree and 5-line state dump identical.
+
+Worth noting for pacing: none of the thirty-odd batches committed under load
+turned out to be hiding anything. The control technique -- run the parent
+commit -- gave the right answer every time it was used.
+
+- **`PickWeaponSlot`** (`0x00406800`) returns TWO answers and a caller must
+  read both: the slot goes to an out-parameter and the permission is the
+  return. The out-parameter carries `-1` for "this kind needs no slot" and
+  `-2` for "all six full", so only a non-negative value is a slot.
+
+  **It stops at the first slot that DECIDES, not the first free one.** Two of
+  its three stopping conditions return a verdict rather than a slot to fill,
+  which is why the return is not simply "found" -- a caller taking the index
+  without the verdict would put a weapon into an occupied slot.
+
+  An unresolvable uid is treated as an empty slot and REPAIRED in passing:
+  the slot is zeroed and the index left pointing at it. It is the only place
+  that clears one.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,034 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,187
+line (0x0045C000) patched**. Measured: **1,035 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,188
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-eight batches have gone in and the 205 entries outstanding start at 48
+small ones in batches. Thirty-nine batches have gone in and the 204 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
