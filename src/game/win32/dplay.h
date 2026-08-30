@@ -245,4 +245,8 @@ int32_t __cdecl MsgListTakeFlags(void *list, void *dst);
  * list's mutex, and answer the node. */
 void *__cdecl MsgListInsert(void *list, void *node);
 
+/* 0x0040F790, two callers. Take a departed player out: drop it, clear its
+ * slot, release the three pause reasons it held, mark its army ready. */
+int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id);
+
 #endif /* AM2_DPLAY_H */

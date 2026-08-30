@@ -2457,6 +2457,14 @@
 #define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
                                                * "Remove Player numPlayers now = %d" */
 #define ADDR_COMM_PLAYER_LEFT    0x0040F790u  /* thiscall int32(this,id), 272 bytes */
+/* The three pause reasons a departing player releases, one set per slot. They
+ * ARE `0x800 << slot`, `0x10 << slot` and `0x20000 << slot` -- and the
+ * original does not compute them: all twelve are spelled out as literals in
+ * four arms. Reproduced that way, because a formula would be a claim the
+ * binary does not make. */
+#define AM2_PAUSE_LEFT_A         0x800u    /* << slot */
+#define AM2_PAUSE_LEFT_B         0x10u     /* << slot */
+#define AM2_PAUSE_LEFT_C         0x20000u  /* << slot */
 /* void(void) -- "Sending EndSetupMessage". The end-of-setup scan, and the same
  * block is INLINED at the end of both ready handlers, so the image holds three
  * identical copies of it. That is what an inline member function looks like

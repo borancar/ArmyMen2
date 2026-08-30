@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,185 patches.**
+Nothing uncommitted. **1,186 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1161,16 +1161,33 @@ timing failure mode too, and that its own output distinguishes the two.
   enables and the maximum do not. So the three are related and distinct rather
   than one record with a longer header.
 
+- **`CommPlayerLeft`** (`0x0040F790`) releases three pause reasons per slot,
+  and they ARE `0x800 << slot`, `0x10 << slot` and `0x20000 << slot` -- but
+  **the original does not compute them**. All twelve are literals across four
+  `cmp slot, N` arms. Reproduced that way: collapsing them into a shift is a
+  claim the binary does not make, and would invent behaviour for a fifth slot
+  where the original has none. A slot outside 0..3 releases NOTHING and still
+  marks its army ready.
+
+  Its last field is written through the GLOBAL comm object rather than through
+  `this`, where every other access in the function goes via the pointer. The
+  same object in practice; reproduced because it is the only line that would
+  still work if `this` were something else.
+- **It was verified on `mpoptions`, which is the strongest evidence this
+  project has for a comm function**: state identical (5 lines), widgets
+  identical (131 nodes), log identical (35 messages), and four screenshots
+  inside budget. `multi` and `campaign` clean too.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,032 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,185
+line (0x0045C000) patched**. Measured: **1,033 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,186
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-six batches have gone in and the 207 entries outstanding start at 48
+small ones in batches. Thirty-seven batches have gone in and the 206 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

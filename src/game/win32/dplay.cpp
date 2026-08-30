@@ -2126,6 +2126,80 @@ int32_t __cdecl MsgListTakeFlags(void *list, void *dst)
     return (int32_t)taken;
 }
 
+/* CommPlayerLeft -- original 0x0040F790, two callers, both in WndProc's
+ * player-gone handler.
+ *
+ * Take a departed player out: drop the DirectPlay player, find its slot, clear
+ * the slot's id and its remote state, release the three pause reasons that
+ * slot was holding, and mark its army ready. Answers 1, or 0 without touching
+ * anything if the comm object is inactive or the id is 0 or -1.
+ *
+ * THE THREE PAUSE MASKS ARE `0x800 << slot`, `0x10 << slot` and
+ * `0x20000 << slot` -- AND THE ORIGINAL DOES NOT COMPUTE THEM. All twelve are
+ * literals across four `cmp slot, N` arms. Written the same way: collapsing
+ * them into a shift would be a claim the binary does not make, and if a fifth
+ * slot ever existed the shift would invent behaviour for it where the original
+ * has none. A slot outside 0..3 releases NOTHING and still marks its army
+ * ready.
+ *
+ * IT WRITES THE LAST FIELD THROUGH THE GLOBAL COMM, NOT THROUGH `this`. Every
+ * other access goes via the `this` pointer; the army-ready store re-fetches
+ * ADDR_COMM_OBJECT and indexes that. The same object in practice -- there is
+ * one comm object -- and reproduced, because it is the only line here that
+ * would still work if `this` were something else.
+ *
+ * THE ID IS REJECTED AT BOTH ENDS: zero and -1 are both "no player", which is
+ * the convention AM2_PLAYER_ID's own comment records, and the slot's id field
+ * is set back to -1 rather than to 0.
+ *
+ * RemovePlayer is still the original's and goes in by address; the other
+ * three callees are ours and go in by name. This file already had the
+ * orig_remove_player macro, further up, so it is reused rather than made a
+ * second time.
+ *
+ * `ret 4` on a thiscall: one stack argument, `this` in ecx.
+ */
+int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id)
+{
+    uint8_t *c = (uint8_t *)comm;
+    int32_t  slot;
+
+    if (!*(const int32_t *)(c + COMM_OFF_JOINED))
+        return 0;
+    if (!id || id == -1)
+        return 0;
+
+    orig_remove_player((uint32_t)id);
+
+    slot = CommPlayerSlot(c, id);
+
+    *(int32_t *)(c + (size_t)slot * COMM_PLAYER_STRIDE + AM2_PLAYER_ID) = -1;
+
+    CommClearSlotRemote(c, slot);
+
+    switch (slot) {
+    case 0:
+        UnPauseGame(0x800u); UnPauseGame(0x10u); UnPauseGame(0x20000u);
+        break;
+    case 1:
+        UnPauseGame(0x1000u); UnPauseGame(0x20u); UnPauseGame(0x40000u);
+        break;
+    case 2:
+        UnPauseGame(0x2000u); UnPauseGame(0x40u); UnPauseGame(0x80000u);
+        break;
+    case 3:
+        UnPauseGame(0x4000u); UnPauseGame(0x80u); UnPauseGame(0x100000u);
+        break;
+    default:
+        break;                  /* releases nothing; see above */
+    }
+
+    *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                 + (size_t)slot * COMM_PLAYER_STRIDE + COMM_ARMY_OFF_READY) = 1;
+
+    return 1;
+}
+
 /* DumpMsgList -- original 0x004013B0, one caller.
  *
  * It lives HERE rather than in msgslot.cpp with the rest of the list code:
@@ -2198,6 +2272,8 @@ int dplay_install(void)
                         "MsgListTakeFlags", 2);
     rc |= patch_replace(ADDR_MSG_LIST_INSERT, (const void *)MsgListInsert,
                         "MsgListInsert", 1);
+    rc |= patch_replace(ADDR_COMM_PLAYER_LEFT, (const void *)CommPlayerLeft,
+                        "CommPlayerLeft", 2);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
     rc |= patch_replace(ADDR_PACKET_SLOT_RESET, (const void *)PacketSlotReset,
