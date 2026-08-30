@@ -6169,6 +6169,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MP_SCRIPT_CHECKSUM  0x00430400u  /* uint32_t(void) */
 #define ADDR_MAP_CHECKSUM        0x00430450u  /* uint32_t(void) */
 #define ADDR_AMM_CHECKSUM        0x0042C350u  /* uint32_t(const char *map) */
+/* The three IFF tags it walks, in the order it requires them. */
+#define AM2_IFF_FORM             0x4D524F46u  /* 'FORM' */
+#define AM2_IFF_MAP              0x2050414Du  /* 'MAP ' */
+#define AM2_IFF_CSUM            0x4D555343u  /* 'CSUM' */
+#define AM2_AMM_NAME_BYTES       0x40u
 /* NOT ADDR_SCRIPT_FIND_NAME, which is 0x0043F670 over a different table.
  * This one lower-cases its argument IN PLACE and searches the second of the
  * two triples FreeLevelTables owns -- the one at ADDR_NAME_TABLE_BASE, loaded
@@ -6192,9 +6197,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * `.txt` fills, with 0xCC-byte records instead of 0x30C-byte ones. Same first
  * twelve, same growth of six, same absence of any allocation check. */
 #define ADDR_ADD_NAME_RECORD     0x0043E9A0u  /* void(const void *record) */
-#define orig_amm_checksum \
-            ((uint32_t (__cdecl *)(const char *, const char *)) \
-             (uintptr_t)ADDR_AMM_CHECKSUM)
 /* FileExists opens "r" where the checksum opens ADDR_MODE_RB, which on the
  * platform this came from is not a distinction without a difference. */
 #define ADDR_STR_MODE_R          0x00478950u  /* "r" */

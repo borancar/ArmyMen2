@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,173 patches.**
+Nothing uncommitted. **1,174 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -956,16 +956,32 @@ count. A rule that has been ignored five times should be turned into a tool.
   original side and once on the reconstruction's.** Well enough characterised
   to stop re-running for it.
 
+- **`AmmChecksum`** (`0x0042C350`) does not parse IFF, it reads ONE fixed
+  layout: `FORM`, a length, `MAP `, then a chunk tag that must be `CSUM` with
+  a length of exactly 4. There is no loop, so a `.amm` whose first chunk is
+  anything else answers 0 -- and 0 is also what a valid zero checksum answers,
+  which the function cannot distinguish for its caller.
+
+  **THE BODY SAYS ONE ARGUMENT AND THE CALL SITE SAYS TWO.** It reads only the
+  map name, and does its chdir with the folder global's ADDRESS as a literal
+  rather than with the parameter it was handed -- the same pointer either way,
+  which is why nothing has ever gone wrong. The existing `orig_` macro had the
+  arity right and my first reading of the body had it wrong.
+
+  **A body cannot tell you its own arity when it ignores an argument.** Read
+  the call site for that, the way `RandomPointAhead`'s unused first parameter
+  was settled.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,022 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,173
+line (0x0045C000) patched**. Measured: **1,023 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,174
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-six batches have gone in and the 217 entries outstanding start at 48
+small ones in batches. Twenty-seven batches have gone in and the 216 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

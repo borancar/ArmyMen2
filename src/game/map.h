@@ -114,4 +114,9 @@ void __cdecl AddLevelRecord(const void *record);
  * records. */
 void __cdecl AddNameRecord(const void *record);
 
+/* 0x0042C350, one caller. The map's stored checksum, read out of the first
+ * CSUM chunk of its `.amm` file. The second argument is pushed by the call
+ * site and ignored by the body -- see the definition. */
+uint32_t __cdecl AmmChecksum(const char *map, const char *folder);
+
 #endif /* AM2_MAP_H */

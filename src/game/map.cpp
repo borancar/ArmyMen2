@@ -174,8 +174,8 @@ uint32_t __cdecl MpScriptChecksum(void)
  * object table the map was authored against. */
 uint32_t __cdecl MapChecksum(void)
 {
-    uint32_t sum = orig_amm_checksum((const char *)AM2_IMAGE(ADDR_MAP_NAME),
-                                     (const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    uint32_t sum = AmmChecksum((const char *)AM2_IMAGE(ADDR_MAP_NAME),
+                               (const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
     return sum ^ Checksum((const char *)AM2_IMAGE(ADDR_STR_OBJECT_AAI));
@@ -632,6 +632,82 @@ void __cdecl AddNameRecord(const void *record)
     *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT) = count + 1;
 }
 
+/* AmmChecksum -- original 0x0042C350, one caller.
+ *
+ * The map's stored checksum, read out of its `.amm` file. An IFF walk:
+ * `FORM`, a length, `MAP `, then a chunk tag, a chunk length, and four bytes
+ * of payload.
+ *
+ * IT DOES NOT SEARCH THE FILE. There is no loop: the `CSUM` chunk has to be
+ * the FIRST one after `MAP `, and its length has to be exactly 4. Anything
+ * else -- a different first chunk, a longer CSUM, a file that is not IFF at
+ * all -- falls straight through to the close and answers 0. So this reads one
+ * fixed layout rather than parsing a container.
+ *
+ * ZERO IS BOTH "no checksum" AND "the checksum is zero", and the function
+ * cannot tell a caller which. The sum is initialised to 0 before the file is
+ * even opened and every failure path returns it untouched, including the
+ * failed open, which reaches the same `return` by way of the fclose being
+ * skipped rather than by a branch of its own.
+ *
+ * NOT ONE OF THE SIX READS IS CHECKED. A truncated file leaves each slot
+ * holding whatever the stack had, and the tag comparisons then decide on
+ * rubbish -- which will almost always fail and answer 0, but is not
+ * guaranteed to. Same absence of a check as every other reader in this
+ * subsystem.
+ *
+ * The FORM length is read into a slot nothing looks at. Reproduced: the read
+ * has to happen to advance the stream, and a `fseek` would be a different
+ * function.
+ *
+ * IT TAKES A SECOND ARGUMENT AND IGNORES IT. The caller pushes the map name
+ * and the folder; the body reads only the name, and does its chdir with the
+ * folder global's address as a LITERAL rather than with the parameter it was
+ * handed. Same pointer either way, which is why nothing has ever gone wrong
+ * with it -- and why the parameter is kept, unnamed, rather than dropped: the
+ * call site pushes two and the signature has to say so.
+ *
+ * That also means the existing `orig_amm_checksum` macro was right about the
+ * arity and my first reading of the body was not. The body alone says one
+ * argument; only the call site says two.
+ *
+ * It chdirs into the folder and does not put it back, as OpenSaveForLoad does
+ * with the save directory.
+ */
+uint32_t __cdecl AmmChecksum(const char *map, const char *)
+{
+    char      name[AM2_AMM_NAME_BYTES];
+    uint32_t  sum = 0;
+    uint32_t  tag;
+    uint32_t  len;
+    am2_FILE *fp;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+
+    am2_sprintf(name, (const char *)AM2_IMAGE(ADDR_FMT_DOT_AMM), map);
+
+    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp)
+        return sum;
+
+    orig_fread(&tag, 4, 1, fp);
+    if (tag == AM2_IFF_FORM) {
+        orig_fread(&len, 4, 1, fp);          /* the FORM length, unread */
+        orig_fread(&tag, 4, 1, fp);
+
+        if (tag == AM2_IFF_MAP) {
+            orig_fread(&tag, 4, 1, fp);
+            orig_fread(&len, 4, 1, fp);
+
+            if (tag == AM2_IFF_CSUM && len == 4)
+                orig_fread(&sum, 4, 1, fp);
+        }
+    }
+
+    orig_fclose(fp);
+    return sum;
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
@@ -657,6 +733,8 @@ void map_install(void)
                   "SaveMapSection", 1);
     patch_replace(ADDR_LOAD_MAP_SECTION, (const void *)LoadMapSection,
                   "LoadMapSection", 1);
+    patch_replace(ADDR_AMM_CHECKSUM, (const void *)AmmChecksum,
+                  "AmmChecksum", 1);
     patch_replace(ADDR_RULES_CHECKSUM, (const void *)RulesChecksum,
                   "RulesChecksum", 1);
     patch_replace(ADDR_MP_SCRIPT_CHECKSUM, (const void *)MpScriptChecksum,
