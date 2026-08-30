@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **20** analysis
+**`make check` runs everything that does not need the game.** **21** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -771,6 +771,31 @@ original against itself.
 GCC does not warn: `-Wunreachable-code` has been a no-op for years. What
 settles it is the game's own log, which prints one `patch:` line per install —
 one where there should have been four.
+
+**The same hole has a second shape, and `checkpatches.py` cannot see that one
+either.** There, the `patch_replace` call is present and unreachable. Here it
+is ABSENT: the function is written, its declaration goes in the header, and
+the edit meant to add the install line matches nothing. The build is clean,
+every static check passes, and **`tools/ab.sh` passes too** -- the address
+still holds the original, so the A/B compares the original against itself and
+reports a clean run of code that is not in the binary. `StartShake`
+(`0x0042B2E0`) and `TroopSubParse` (`0x0044BEA0`) both got that far.
+
+`tools/checkinstalled.py` closes it, and what makes it possible is a
+convention these headers already keep: a reconstruction's declaration is
+preceded by a comment OPENING with the address it replaces. 801 declarations
+follow it and there were no exceptions when the tool was written, so it is a
+gate rather than a hint. A comment that merely MENTIONS an address partway
+through is not matched -- that was tried first and produced three false hits,
+each an address the comment was discussing rather than replacing.
+
+Two things worth keeping from how it was found. The coverage count is the
+cheap manual version -- it does not move for a function that was never
+patched -- and it **must be read BEFORE the A/B, not after**, because
+otherwise the clean result you are reading belongs to the parent's code. And
+a scripted edit that anchors on something not every install function has
+(`int rc = 0;`) will fail silently on the ones that lack it; anchor on
+something that always exists, or verify the line landed.
 
 `tools/checkpatches.py` fails on a `patch_replace` after a `return` at an
 install function's own brace depth now, and tested in the failing direction by
