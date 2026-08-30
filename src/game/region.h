@@ -103,4 +103,8 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight);
  * blocking and/or near the border. */
 void __cdecl SealMapEdges(void);
 
+/* 0x0043A330, one caller. Decrement the reveal count over a five-by-five tile
+ * block, in the grid of every allied army. */
+void __cdecl UnrevealArea(int32_t army, uint32_t at);
+
 #endif /* AM2_REGION_H */

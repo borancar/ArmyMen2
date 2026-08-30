@@ -9099,6 +9099,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * weights: every interior tile carrying a full weight gets TileCoverAdd. */
 #define ADDR_REBUILD_TILE_COVER  0x0042BE10u  /* void(void) */
 #define AM2_REVEAL_RADIUS        2
+/* 0x0043A330, one caller. Decrement the reveal count over a five-by-five tile
+ * block, in the grid of every army allied to this one. The counterpart of
+ * whatever increments them; this is the half that takes visibility AWAY. */
+#define ADDR_UNREVEAL_AREA       0x0043A330u  /* void(int32 army, uint32 at) */
+#define AM2_REVEAL_ARMIES        4
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
 #define MSG_CREATE_OFF_UID       4u
 #define MSG_CREATE_OFF_NAME      8u    /* char[]; empty means none */

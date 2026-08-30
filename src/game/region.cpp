@@ -1216,6 +1216,85 @@ void __cdecl SealMapEdges(void)
     }
 }
 
+/* UnrevealArea -- original 0x0043A330, one caller.
+ *
+ * Take visibility away over a five-by-five block of tiles, in the reveal grid
+ * of every army allied to the one given. Each byte is DECREMENTED, so the
+ * grids are counts rather than flags and this is one half of a matched pair.
+ *
+ * IT INDEXES THE BLOCK'S CORNER BY HEIGHT AND STEPS IT BY WIDTH. The base is
+ * `height * y0 + x0` and the per-row advance works out to exactly `width`.
+ * Both cannot be right unless the map is square -- and it is: MapDescInit
+ * sizes the grid `cols << Log2Mask(cols)`, so width and height agree in every
+ * shipped map and the inconsistency never shows. Reproduced as written.
+ *
+ * That is the SECOND function in this file to measure one axis with the
+ * other's extent, after SealMapEdges' border margin. Two independent
+ * occurrences make it a habit of the original rather than a slip, and both are
+ * invisible for the same reason.
+ *
+ * THE ARMY IS REFUSED AT 4 AND ABOVE with no lower bound, so a negative army
+ * would index the alliance test out of range. Four is the neutral army
+ * everywhere else in this tree, so the test reads as "a real army only".
+ *
+ * THE CLAMPS ARE ASYMMETRIC BETWEEN THE AXES: x is clamped to `width - 1` and
+ * y to `height - 1`, which is the one place the two extents are used
+ * correctly. So the corner arithmetic and the clamping disagree with each
+ * other about which extent belongs to which axis.
+ *
+ * THE INDEX IS MASKED TO SIXTEEN BITS on every write -- `and ecx, 0xFFFF`
+ * inside the inner loop -- so a block near the end of a large grid wraps to
+ * the start rather than running off it. The same sixteen-bit tile index the
+ * cover functions use.
+ *
+ * An empty range in either axis is skipped rather than looping backwards; the
+ * two guards are separate, so an empty row range skips the whole thing while
+ * an empty column range still walks the rows.
+ */
+void __cdecl UnrevealArea(int32_t army, uint32_t at)
+{
+    int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t h = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
+    uint32_t tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
+    int32_t x = (int32_t)(tile & (uint32_t)(w - 1));
+    int32_t y = (int32_t)(tile >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+    int32_t x0, x1, y0, y1, slot;
+
+    if (army >= AM2_REVEAL_ARMIES)
+        return;
+
+    x0 = Clamp(x - AM2_REVEAL_RADIUS, 0, w - 1);
+    x1 = Clamp(x + AM2_REVEAL_RADIUS, 0, w - 1);
+    y0 = Clamp(y - AM2_REVEAL_RADIUS, 0, h - 1);
+    y1 = Clamp(y + AM2_REVEAL_RADIUS, 0, h - 1);
+
+    for (slot = 0; slot < AM2_REVEAL_ARMIES; slot++) {
+        uint8_t *grid;
+        int32_t  at_i;
+        int32_t  rows;
+
+        if (!ArmiesAllied(army, slot))
+            continue;
+
+        grid = ((uint8_t **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[slot];
+        at_i = h * y0 + x0;         /* height for the corner; see above */
+
+        if (y0 > y1)
+            continue;
+
+        for (rows = y1 - y0 + 1; rows; rows--) {
+            if (x0 <= x1) {
+                int32_t cols = x1 - x0 + 1;
+
+                for (; cols; cols--, at_i++)
+                    grid[(uint32_t)at_i & 0xFFFFu]--;
+            }
+
+            at_i += w - x1 + x0 - 1;   /* width for the stride; see above */
+        }
+    }
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -1234,6 +1313,8 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_UNREVEAL_AREA, (const void *)UnrevealArea,
+                        "UnrevealArea", 1);
     rc |= patch_replace(ADDR_SEAL_MAP_EDGES, (const void *)SealMapEdges,
                         "SealMapEdges", 1);
     rc |= patch_replace(ADDR_CONSIDER_SIGHTING_C,

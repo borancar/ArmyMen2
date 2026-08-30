@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,191 patches.**
+Nothing uncommitted. **1,192 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1291,16 +1291,33 @@ commit -- gave the right answer every time it was used.
   the event id in the delay argument. Two paths differing in the type, the
   subject and three of ten arguments, and only one of them registers.
 
+- **`UnrevealArea`** (`0x0043A330`) DECREMENTS a five-by-five block in the
+  reveal grid of every allied army -- so those grids are counts, not flags,
+  and this is one half of a matched pair.
+
+  **It indexes the block's corner by HEIGHT and steps it by WIDTH.** The base
+  is `height * y0 + x0` and the per-row advance works out to exactly `width`;
+  its clamps, meanwhile, use each axis correctly. So the corner arithmetic and
+  the clamping disagree about which extent belongs to which axis. Both are
+  invisible because `MapDescInit` sizes the grid `cols << Log2Mask(cols)` and
+  every shipped map is square.
+
+  **That is the SECOND function to measure one axis with the other's extent**,
+  after `SealMapEdges`' border margin two batches ago. Two independent
+  occurrences make it a habit of the original rather than a slip -- and both
+  are hidden by the same squareness, so a non-square map would break two
+  things at once.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,038 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,191
+line (0x0045C000) patched**. Measured: **1,039 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,192
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-two batches have gone in and the 201 entries outstanding start at 48
+small ones in batches. Forty-three batches have gone in and the 200 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
