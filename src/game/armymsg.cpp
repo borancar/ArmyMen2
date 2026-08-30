@@ -220,6 +220,74 @@ typedef void (__cdecl *AM2_AppendTroopStateFn)(void *msg, void *obj);
 #define orig_append_troop_state \
     ((AM2_AppendTroopStateFn)(uintptr_t)ADDR_APPEND_TROOP_STATE)
 
+/* TrooperDropItemSend -- original 0x0044C150, two callers, and it names itself
+ * in both of its log lines: "<--Trooper Drop Item Send" going out and
+ * "-->Trooper Drop Item Sent" once it has gone.
+ *
+ * A 0x1C-byte kind-0x21 message. Five of its six fields come from the
+ * arguments and the sixth, MSG_DROP_OFF_REQUEST, is the literal 3 every time
+ * -- the "request: %d" the second log prints is a constant, not a value the
+ * caller chose.
+ *
+ * THE SECOND LOG PUTS THE UIDS THROUGH UidOnWire A SECOND TIME. The message
+ * fields already hold wire uids, and the "Sent" line reads them back out and
+ * wires them again. It is harmless HERE and only because UidOnWire is the
+ * identity in this build -- the harmlessness is a property of that function,
+ * not of this code, and if it ever stopped being the identity the two log
+ * lines would disagree about the same message.
+ *
+ * That second log also reads its values back OUT OF THE MESSAGE rather than
+ * from the arguments it still has in registers, which is the detail that
+ * makes the double-wiring visible at all.
+ *
+ * IT DEREFERENCES THE ITEM BEFORE TESTING IT, exactly as TrooperDropItem
+ * does one file over: the first log takes `item->uid` and the `if (!item)`
+ * guard is eleven instructions later. The unit is never null-tested at all.
+ * Both reproduced.
+ *
+ * The two logs are gated on COMM_OFF_VERBOSE and the SEND is not, so a quiet
+ * build still sends and simply says nothing.
+ */
+void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
+                                 int32_t quantity, uint32_t at)
+{
+    uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
+    uint8_t *u = (uint8_t *)unit;
+    uint8_t *it = (uint8_t *)item;
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log("<--Trooper Drop Item Send: Trooper: %x, item: %x,  slot: %d,"
+                " quant: %d \n",
+                UidOnWire(((const AM2_Object *)u)->uid),
+                UidOnWire(((const AM2_Object *)it)->uid),
+                slot, quantity);
+
+    if (!it)
+        return;
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_DROP_ITEM_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_DROP_ITEM;
+    *(uint32_t *)(msg + MSG_DROP_OFF_TROOPER) =
+        UidOnWire(((const AM2_Object *)u)->uid);
+    *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
+        UidOnWire(((const AM2_Object *)it)->uid);
+    *(uint32_t *)(msg + MSG_DROP_OFF_AT)      = at;
+    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_MSG_DROP_REQUEST;
+    *(int32_t *)(msg + MSG_DROP_OFF_QUANT)    = quantity;
+    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)     = (int32_t)(int8_t)slot;
+
+    ArmyMessageSend(msg);
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log("-->Trooper Drop Item Sent: Trooper: %x, item: %x,"
+                " request: %d, slot: %d, quant: %d \n",
+                UidOnWire(*(const uint32_t *)(msg + MSG_DROP_OFF_TROOPER)),
+                UidOnWire(*(const uint32_t *)(msg + MSG_DROP_OFF_ITEM)),
+                *(const int32_t *)(msg + MSG_DROP_OFF_REQUEST),
+                *(const int32_t *)(msg + MSG_DROP_OFF_SLOT),
+                *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+}
+
 /* TellOneSlot -- original 0x0044C480, one caller, which is TellEachSlot.
  *
  * The SENDER of the kind-0x16 batch. Its receiver, RecvTroopBatch, has been
@@ -1020,6 +1088,9 @@ int armymsg_install(void)
                         "SendObjDestroyed", 2);
     rc |= patch_replace(ADDR_TELL_ONE_SLOT, (const void *)TellOneSlot,
                         "TellOneSlot", 1);
+    rc |= patch_replace(ADDR_TROOPER_DROP_ITEM_SEND,
+                        (const void *)TrooperDropItemSend,
+                        "TrooperDropItemSend", 2);
     rc |= patch_replace(ADDR_ITEM_GONE_SEND, (const void *)ItemGoneMessageSend,
                         "ItemGoneMessageSend", 1);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,

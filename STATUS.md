@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,212 patches.**
+Nothing uncommitted. **1,213 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1750,16 +1750,44 @@ commit -- gave the right answer every time it was used.
   a driven Boot Camp mission, because a rifle is not a consumable. Checked
   before the A/B.
 
+- **`TrooperDropItemSend`** (`0x0044C150`) is the message the last two
+  batches' functions both send -- so `TrooperDropItem`, `UseInventoryItem` and
+  their sender are now one closed group.
+
+  **Its second log puts the uids through `UidOnWire` a SECOND time.** The
+  message fields already hold wire uids, and the "-->... Sent" line reads them
+  back OUT OF THE MESSAGE and wires them again. It is harmless here and only
+  because `UidOnWire` is the identity in this build -- the harmlessness is a
+  property of that function, not of this code, and if it stopped being the
+  identity the two log lines would disagree about the same message.
+
+  Reading the values back out of the message rather than from the arguments
+  still sitting in registers is what makes the double-wiring visible at all.
+
+  **Its "request" field is the literal 3 every time.** The `request: %d` the
+  second log prints is a constant, not something a caller chose.
+
+  **It dereferences the item before testing it**, exactly as `TrooperDropItem`
+  does -- the first log takes `item->uid` and the `if (!item)` guard is eleven
+  instructions later. The unit is never null-tested at all. Both reproduced,
+  and that is now the second and third sighting of this shape in one family.
+
+  Both logs are gated on `COMM_OFF_VERBOSE` and the SEND is not, so a quiet
+  build still sends and simply says nothing.
+
+  `combat`, `mpoptions` and `multi` all clean first time, with `mpoptions` at
+  0 pixels on three of its four frames.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,058 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,212
+line (0x0045C000) patched**. Measured: **1,059 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,213
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-eight batches have gone in and the 181 entries outstanding start at 48
+small ones in batches. Fifty-nine batches have gone in and the 180 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -4224,10 +4224,6 @@ typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
 typedef int32_t (__cdecl *AM2_SettlePointFn)(int32_t tile, uint32_t *pt);
 #define orig_settle_point \
     ((AM2_SettlePointFn)(uintptr_t)ADDR_SETTLE_POINT_IN_REGION)
-typedef void (__cdecl *AM2_DropSendFn)(void *unit, void *item, int32_t slot,
-                                       int32_t quantity, uint32_t at);
-#define orig_drop_item_send \
-    ((AM2_DropSendFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM_SEND)
 
 /* UseInventoryItem -- original 0x00449760, one caller, and it names itself in
  * both of its log lines.
@@ -4306,7 +4302,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
             am2_log("UseInventoryItem: droping item:%x\n",
                     ((const AM2_Object *)item)->uid);
 
-        orig_drop_item_send(u, item, slot, 0,
+        TrooperDropItemSend(u, item, slot, 0,
                             *(const uint32_t *)(u + OBJ_OFF_POS));
     }
 
@@ -4368,7 +4364,7 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
                                + COMM_OFF_VERBOSE))
             am2_log("TrooperDropItem  %x\n", ((const AM2_Object *)item)->uid);
 
-        orig_drop_item_send(u, item, slot,
+        TrooperDropItemSend(u, item, slot,
                             *(const int32_t *)(item + ITEM_OFF_AMMO), at);
     }
 

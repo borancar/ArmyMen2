@@ -6152,9 +6152,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TROOPER_DROP_ITEM   0x00448D60u /* void(unit,int32 slot,uint32) */
 /* 0x0044C150, and it names itself twice: "<--Trooper Drop Item Send: Trooper:
  * %x, item: %x,  slot: %d, quant: %d" and the "-->... Sent" beside it. The
- * message TrooperDropItem sends when the drop has to be told to the others.
- * Still original. */
+ * message TrooperDropItem and UseInventoryItem send when a drop has to be
+ * told to the others. Reconstructed. */
 #define ADDR_TROOPER_DROP_ITEM_SEND 0x0044C150u /* void(unit,item,slot,q,pt) */
+#define MSG_DROP_OFF_TROOPER      0x04u  /* UidOnWire(unit->uid) */
+#define MSG_DROP_OFF_ITEM         0x08u  /* UidOnWire(item->uid) */
+#define MSG_DROP_OFF_AT           0x0Cu  /* the caller's point, unchanged */
+#define MSG_DROP_OFF_REQUEST      0x10u  /* the literal 3, always */
+#define MSG_DROP_OFF_QUANT        0x14u
+#define MSG_DROP_OFF_SLOT         0x18u  /* the byte argument, sign-extended */
+#define AM2_MSG_DROP_ITEM_LEN     0x1Cu
+#define AM2_MSG_DROP_REQUEST      3
 /* 0x00449760, one caller, and it names itself twice: "UseInventoryItem" and
  * "UseInventoryItem: droping item:%x". Spend one charge of an inventory slot.
  * Reconstructed. */

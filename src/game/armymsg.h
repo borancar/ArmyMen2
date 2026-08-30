@@ -36,6 +36,14 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where);
  * and for the one uid on this transport that is not put on the wire. */
 void __cdecl TellOneSlot(int32_t slot);
 
+/* 0x0044C150, two callers, and it names itself in both log lines. The
+ * kind-0x21 message a drop goes out as. Its "request" field is the literal 3
+ * every time, and its second log puts the uids through UidOnWire a SECOND
+ * time -- harmless only because that function is the identity here. See
+ * armymsg.cpp. */
+void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
+                                 int32_t quantity, uint32_t at);
+
 #endif
 
 /* The header every message on this transport begins with. ArmyMessageSend
