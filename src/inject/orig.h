@@ -4087,6 +4087,23 @@ typedef struct {
 #define ADDR_OBJ_CTX_OBJ_A        0x005122C8u
 #define ADDR_PAD_NUMBERS          0x0051F198u  /* AM2_PadNumber[], stride 76 */
 #define ADDR_PAD_FINALISE         0x004375A0u  /* void(AM2_Pad *, int32_t) */
+/* AM2_Pad's fields, named from what PadFinalise does with them. The pad is a
+ * TRIGGER: a value, an operator and a threshold that ScriptCompare answers,
+ * an "inside" flag, and two event ids with a uid slot each -- one for
+ * entering and one for leaving. The two halves are mirror images, which is
+ * what makes the pairing certain: entering clears the LEAVE uid and arms the
+ * enter event, leaving does the opposite. */
+#define PAD_OFF_ID                0x00u
+#define PAD_OFF_CMP_OP            0x18u  /* ScriptCompare's middle argument */
+#define PAD_OFF_CMP_A             0x1Cu
+#define PAD_OFF_CMP_B             0x30u
+#define PAD_OFF_EVENT_ENTER       0x20u
+#define PAD_OFF_EVENT_LEAVE       0x24u
+#define PAD_OFF_UID_ENTER         0x28u
+#define PAD_OFF_UID_LEAVE         0x2Cu
+#define PAD_OFF_INSIDE            0x44u
+#define AM2_PAD_NOTIFY_ENTER      3
+#define AM2_PAD_NOTIFY_LEAVE      2
 
 /* The two map layers the centroid scan reads, one byte per cell. The first
  * holds a pad number per cell and serves numbers 8 and above; the second holds

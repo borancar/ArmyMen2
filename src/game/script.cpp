@@ -15,6 +15,7 @@
 #include "objscript.h"
 #include "script.h"
 #include "scriptint.h"
+#include "pad.h"       /* PadFinalise -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -2549,9 +2550,12 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
          * words -- or whose next token is not a control character -- jumps
          * straight to binding the name, so it is never finalised. That is the
          * original's control flow, not an omission: both of those paths land
-         * on 0x00444842, past the call. */
-        ((void (__cdecl *)(AM2_Pad *, int32_t))(uintptr_t)
-            ADDR_PAD_FINALISE)(pad, 0);
+         * on 0x00444842, past the call.
+         *
+         * The second argument is an OBJECT and the original passes a literal
+         * zero here, which the callee reads as "no object" -- so the notify
+         * this pad eventually sends carries a zero uid. */
+        PadFinalise(pad, (void *)0);
     }
 
     /* The name resolves to the pad, and only now does the pad count move. */

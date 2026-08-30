@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,190 patches.**
+Nothing uncommitted. **1,191 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1272,16 +1272,35 @@ commit -- gave the right answer every time it was used.
 
   Bit 1 (`AM2_TILE_NEAR_EDGE`) had no name and this is its only writer.
 
+- **`PadFinalise`** (`0x004375A0`) named nine `AM2_Pad` fields at once, and
+  what made that possible is that **its two halves are mirror images**.
+  Entering sets the inside flag, clears the LEAVE uid and arms the ENTER
+  event; leaving clears the flag, clears the ENTER uid and arms the LEAVE
+  event. Not one of those fields is identifiable on its own -- the symmetry is
+  the evidence, and it is the same argument the `+1`/`-1` pair gave for
+  `ADDR_TILE_COVER`.
+
+  A pad is therefore a TRIGGER: a value, an operator and a threshold that
+  `ScriptCompare` answers, plus two events. It is EDGE-triggered -- true while
+  already inside and false while already outside both return having touched
+  nothing.
+
+  A pad with no event still notifies, with a different TYPE (3 entering, 2
+  leaving) against the pad's own id; one with an event allocates a uid,
+  registers a handler and notifies type 0 against that uid instead, carrying
+  the event id in the delay argument. Two paths differing in the type, the
+  subject and three of ten arguments, and only one of them registers.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,037 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,190
+line (0x0045C000) patched**. Measured: **1,038 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,191
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-one batches have gone in and the 202 entries outstanding start at 48
+small ones in batches. Forty-two batches have gone in and the 201 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

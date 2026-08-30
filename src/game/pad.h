@@ -55,4 +55,8 @@ void pad_install(void);
 }
 #endif
 
+/* 0x004375A0, one caller. Run one pad's trigger for a frame: act on the two
+ * transitions of its comparison and nothing else. */
+void __cdecl PadFinalise(void *pad, void *obj);
+
 #endif /* AM2_PAD_H */
