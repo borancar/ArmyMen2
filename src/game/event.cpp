@@ -13,6 +13,8 @@
 #include "objscript.h" /* AM2_ObjScript, kObjScripts */
 #include "scriptint.h"
 #include "objtable.h"
+#include "dist.h"     /* AM2_Point, AngleBetween */
+#include "map.h"      /* TileOfPoint */
 #include "item.h"   /* UidOnWire */
 #include "objtype.h"
 #include "msgslot.h"  /* CommMustBroadcast -- the multiplayer guard */
@@ -1970,6 +1972,187 @@ void __cdecl AdvanceMission(int32_t a, int32_t b)
 
 /* ---------------------------------------------- action point ---- */
 
+/* ----------------------------------------------- firing a weapon ---- */
+
+/* The four glue functions between RunScriptAction and the weapon dispatcher
+ * at 0x0045F460, one per way a script can ask for a shot: an explicit weapon
+ * or the unit's own, aimed at a point or at another object. RunScriptAction
+ * picks between the pairs on the action's own fields and this is where each
+ * lands.
+ *
+ * Three things they all do, and each is worth stating once here rather than
+ * four times below.
+ *
+ * A NEGATIVE HEADING MEANS "WORK IT OUT". Every one of them tests the caller's
+ * heading against zero and, only when it is negative, replaces it with
+ * AngleBetween masked to eight bits. A non-negative one is passed straight
+ * through UNMASKED, so a script writing 300 gets 300 and not 44 -- reproduced,
+ * because the two paths really do differ and only one of them is clamped.
+ *
+ * THE SPOT IS TWO FIELDS AND BOTH HAVE A FALLBACK IN THE CALLEE. The point is
+ * zero when the shot is at an object, and the ground height is zero when it
+ * is at another object too; 0x0045F460 fills the first from the target's
+ * position and the second from the shooter's own height. So the "at an
+ * object" pair pass a spot of all zeros and let the callee do the work, while
+ * the "at a point" pair look the tile's height up themselves.
+ *
+ * THE TOP TWO BYTES OF THE SPOT ARE NEVER WRITTEN. The original assembles it
+ * in eight bytes of stack and fills a dword and a word, leaving the last two
+ * as whatever was there. `pad` is left uninitialised here for the same
+ * reason: writing a zero would be inventing a value the original does not
+ * supply, and nothing correct in the callee can read it.
+ *
+ * The two with an explicit weapon LEND IT THE FIRING UNIT'S ARMY, and put the
+ * old value back on the way out -- so the shot is attributed to whoever fired
+ * it rather than to whoever owns the weapon object. The unit's-own-weapon
+ * pair do not, because a held weapon already belongs to its holder. */
+
+typedef struct {
+    uint32_t at;      /* the packed destination, or 0 to use the target's */
+    int16_t  ground;  /* the height there, or 0 to use the shooter's own */
+    int16_t  pad;     /* NOT written by any caller; see above */
+} AM2_FireSpot;
+
+typedef int32_t (__cdecl *AM2_FireWeaponFn)(void *weapon, void *unit,
+                                            int32_t height, int32_t heading,
+                                            AM2_FireSpot spot, void *target);
+#define orig_fire_weapon ((AM2_FireWeaponFn)(uintptr_t)ADDR_FIRE_WEAPON)
+
+/* 0x004200F0. A named weapon, fired by a named unit, at a point. */
+void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
+                               int32_t heading, uint32_t at)
+{
+    uint8_t     *weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
+    uint8_t     *unit;
+    AM2_Point    dest;
+    AM2_FireSpot spot;
+    int8_t       lent;
+
+    if (!weapon)
+        return;
+    unit = (uint8_t *)UnitByUid(unitUid);
+    if (!unit)
+        return;
+
+    dest.x = (int16_t)(at & 0xFFFFu);
+    dest.y = (int16_t)(at >> 16);
+
+    spot.at     = at;
+    spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
+
+    lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
+    *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
+
+    if (heading < 0)
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &dest);
+
+    orig_fire_weapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
+
+    *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
+}
+
+/* 0x004201A0. A named weapon, fired by a named unit, at another object.
+ *
+ * The one asymmetry in the family: this is the only one of the four that
+ * measures the shooter with ObjHeight rather than reading OBJ_OFF_HEIGHT_ADJ
+ * through ObjFieldB, so it accounts for the ground the shooter is standing on
+ * and the other three do not. Reproduced; nothing here says which is meant.
+ *
+ * It also reads the TARGET's OBJ_OFF_HEIGHT_SET as a SIGNED byte, where
+ * orig.h documents the field as unsigned. The sign-extension is in the
+ * instruction (`movsx ax, byte ptr [esi+0x65]`), so it is the original's
+ * reading of its own field and not ours. */
+void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
+                                int32_t heading, uint32_t targetUid)
+{
+    uint8_t     *weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
+    uint8_t     *unit;
+    uint8_t     *target;
+    AM2_FireSpot spot;
+    int8_t       lent;
+
+    if (!weapon)
+        return;
+    unit = (uint8_t *)UnitByUid(unitUid);
+    if (!unit)
+        return;
+    target = (uint8_t *)LookupByUID(targetUid);
+    if (!target)
+        return;
+
+    spot.at     = *(const uint32_t *)(target + OBJ_OFF_POS);
+    spot.ground = (int16_t)*(const int8_t *)(target + OBJ_OFF_HEIGHT_SET);
+
+    if (heading < 0)
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
+                               (const AM2_Point *)(target + OBJ_OFF_POS));
+
+    lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
+    *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
+
+    orig_fire_weapon(weapon, unit, ObjHeight(unit), heading, spot, target);
+
+    *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
+}
+
+/* 0x00420260. The unit's own held weapon, at a point. */
+void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at)
+{
+    uint8_t     *unit = (uint8_t *)UnitByUid(unitUid);
+    void        *weapon;
+    AM2_Point    dest;
+    AM2_FireSpot spot;
+
+    if (!unit)
+        return;
+    weapon = HeldWeaponObj(unit);
+    if (!weapon)
+        return;
+
+    dest.x = (int16_t)(at & 0xFFFFu);
+    dest.y = (int16_t)(at >> 16);
+
+    spot.at     = at;
+    spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
+
+    if (heading < 0)
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &dest);
+
+    orig_fire_weapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
+}
+
+/* 0x00420300. The unit's own held weapon, at another object.
+ *
+ * The only one that passes an all-zero spot: both halves are left for
+ * 0x0045F460 to fill from the target, which is what makes the two defaults
+ * documented on ADDR_FIRE_WEAPON load-bearing rather than decorative. */
+void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
+                              uint32_t targetUid)
+{
+    uint8_t     *unit = (uint8_t *)UnitByUid(unitUid);
+    void        *weapon;
+    uint8_t     *target;
+    AM2_FireSpot spot;
+
+    if (!unit)
+        return;
+    weapon = HeldWeaponObj(unit);
+    if (!weapon)
+        return;
+    target = (uint8_t *)LookupByUID(targetUid);
+    if (!target)
+        return;
+
+    spot.at     = 0;
+    spot.ground = 0;
+
+    if (heading < 0)
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
+                               (const AM2_Point *)(target + OBJ_OFF_POS));
+
+    orig_fire_weapon(weapon, unit, ObjFieldB(unit), heading, spot, target);
+}
+
 /* 0x004203A0. Work out the point an action refers to. Fourteen callers.
  *
  * A script may express an action's coordinates three ways, and this is where
@@ -2435,6 +2618,18 @@ int event_install(void)
                         "SaveEventSection", 1);
     rc |= patch_replace(ADDR_RESOLVE_UID, (const void *)ResolveUid,
                         "ResolveUid", 2);
+    rc |= patch_replace(ADDR_FIRE_WEAPON_AT_POINT,
+                        (const void *)FireWeaponAtPoint,
+                        "FireWeaponAtPoint", 4);
+    rc |= patch_replace(ADDR_FIRE_WEAPON_AT_OBJECT,
+                        (const void *)FireWeaponAtObject,
+                        "FireWeaponAtObject", 4);
+    rc |= patch_replace(ADDR_UNIT_FIRE_AT_POINT,
+                        (const void *)UnitFireAtPoint,
+                        "UnitFireAtPoint", 3);
+    rc |= patch_replace(ADDR_UNIT_FIRE_AT_OBJECT,
+                        (const void *)UnitFireAtObject,
+                        "UnitFireAtObject", 3);
     rc |= patch_replace(ADDR_COND_RUN_ACTION, (const void *)CondRunAction,
                         "CondRunAction", 4);
     rc |= patch_replace(ADDR_COND_RUN_ACTIONS, (const void *)RunCondActions,

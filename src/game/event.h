@@ -135,6 +135,19 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg);
  * type-2 entry, gives 0. Fifty-three callers. */
 uint32_t __cdecl ResolveUid(int32_t name, uint32_t me);
 
+/* The four ways a script action asks for a shot -- 0x004200F0, 0x004201A0,
+ * 0x00420260 and 0x00420300 -- an explicit weapon or the unit's own, at a
+ * point or at another object. A NEGATIVE heading means "work it out from the
+ * geometry"; the two with an explicit weapon lend it the firing unit's army
+ * for the duration. See event.cpp for what the callee fills in. */
+void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
+                               int32_t heading, uint32_t at);
+void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
+                                int32_t heading, uint32_t targetUid);
+void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at);
+void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
+                              uint32_t targetUid);
+
 /* 0x004203A0. Work out the point an action refers to: a pair of variables when
  * `xvar` is set, a literal when its x is non-zero, or the target object's
  * position otherwise. Fourteen callers. */

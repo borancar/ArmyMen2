@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,196 patches.**
+Nothing uncommitted. **1,200 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1397,16 +1397,57 @@ commit -- gave the right answer every time it was used.
 
   Not exercised for the same reason `BoxAction` is not, and stated there.
 
+- **The four ways a script asks for a shot** -- `FireWeaponAtPoint`
+  (`0x004200F0`), `FireWeaponAtObject` (`0x004201A0`), `UnitFireAtPoint`
+  (`0x00420260`) and `UnitFireAtObject` (`0x00420300`). An explicit weapon or
+  the unit's own, aimed at a point or at another object; `RunScriptAction`
+  picks between them on the action's own fields. All nine helpers they call
+  were already reconstructed, so all four are glue.
+
+  **A NEGATIVE HEADING MEANS "WORK IT OUT".** Each tests the caller's heading
+  against zero and only then replaces it with `AngleBetween` masked to eight
+  bits. A non-negative one is passed through UNMASKED, so a script writing 300
+  gets 300 and not 44 -- reproduced, because the two paths really do differ
+  and only one is clamped.
+
+  **Both halves of the "spot" have a fallback in the callee**, which is what
+  makes the four a family rather than four functions. `0x0045F460` fills a
+  zero point from the target's position and a zero ground height from the
+  shooter's own, so the at-an-object pair pass all zeros and let it do the
+  work while the at-a-point pair look the tile's height up themselves.
+
+  **The top two bytes of that eight-byte argument are never written by any
+  caller**, so `pad` is left uninitialised here too. Writing a zero would be
+  inventing a value the original does not supply.
+
+  The two with an explicit weapon LEND IT THE FIRING UNIT'S ARMY and put the
+  old value back afterwards, so a shot is attributed to whoever fired it
+  rather than to whoever owns the weapon object. The held-weapon pair do not,
+  because a held weapon already belongs to its holder.
+
+  **One asymmetry, reproduced rather than smoothed.** `FireWeaponAtObject` is
+  the only one that measures the shooter with `ObjHeight` instead of reading
+  `OBJ_OFF_HEIGHT_ADJ` through `ObjFieldB`, so it accounts for the ground the
+  shooter stands on and the other three do not. It also reads the target's
+  `OBJ_OFF_HEIGHT_SET` as a SIGNED byte where `orig.h` documents the field as
+  unsigned -- the `movsx` is in the instruction, so that is the original's
+  reading of its own field.
+
+  **`fireweapon` appears in seven shipped mission scripts and `unitfire` in
+  none at all**, and neither Boot Camp nor campaign MAP 01 is among the seven.
+  So none of the four is reached by any drive here: verified by reading, with
+  the clean A/B saying only that nothing regressed.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,043 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,196
+line (0x0045C000) patched**. Measured: **1,047 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,200
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-seven batches have gone in and the 196 entries outstanding start at 48
+small ones in batches. Forty-eight batches have gone in and the 192 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -6017,6 +6017,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and this is WeaponByUid. Answers null, having complained, for any other
  * kind. */
 #define ADDR_WEAPON_BY_UID        0x0045EE80u  /* obj *(int32_t uid) */
+/* 0x0045F460, 3,200 bytes and four callers, all of them the little glue
+ * functions below. THE ONE THING WORTH KNOWING BEFORE READING THEM is what
+ * its last three arguments do, because two of them default:
+ *
+ *   - argument 6 is the GROUND HEIGHT at the shot's destination, and when it
+ *     is zero the low word of argument 3 -- the shooter's own height -- is
+ *     used instead;
+ *   - argument 5 is the destination POINT, and when it is zero and argument 7
+ *     is not null the target object's own position is used instead.
+ *
+ * So a caller may supply the point, or the target, or both, and the four
+ * below are exactly the four ways of doing that. Argument 5 and argument 6
+ * are one 8-byte structure pushed by value; its top two bytes are never
+ * written by any caller, so nothing correct can read them. */
+#define ADDR_FIRE_WEAPON          0x0045F460u  /* int32_t(weapon, unit, ...) */
+/* The four ways a script asks for a shot: an explicit weapon or the unit's
+ * own, at a point or at another object. All four take a HEADING that is
+ * computed from the geometry when it arrives NEGATIVE, and the two with an
+ * explicit weapon lend it the firing unit's army for the duration of the
+ * call and put the old one back afterwards. */
+#define ADDR_FIRE_WEAPON_AT_POINT  0x004200F0u /* void(wpn,unit,head,at) */
+#define ADDR_FIRE_WEAPON_AT_OBJECT 0x004201A0u /* void(wpn,unit,head,uid) */
+#define ADDR_UNIT_FIRE_AT_POINT    0x00420260u /* void(unit,head,at) */
+#define ADDR_UNIT_FIRE_AT_OBJECT   0x00420300u /* void(unit,head,uid) */
 #define ADDR_STR_NOT_A_WEAPON     0x0048C6E0u  /* "uid wasn't a weapon!\n" */
 #define AM2_OBJ_TYPE_WEAPON       4
 /* 0x00447990, "RemoveInventoryItem": take one slot out of a unit's six-entry
