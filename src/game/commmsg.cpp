@@ -925,6 +925,101 @@ void __cdecl RecvTroopBatch(void *msg, int32_t army)
         at = (const uint8_t *)TroopSubParse(at, army);
 }
 
+/* RecvTrooperDropItem -- original 0x0044C9C0, one caller. Message kind 0x21,
+ * eTROOPER_DROP_ITEM_MESSAGE in the original's own vocabulary.
+ *
+ * The receiver for what TrooperDropItemSend sends, so that function, this one
+ * and TrooperDropItem are one closed group now -- and reading them together
+ * is what makes the odd parts legible.
+ *
+ * IT PUTS THE UIDS THROUGH UidOnWire ON THE WAY IN, and the sender already
+ * put them through on the way out. That is the THIRD place in this family
+ * doing it to a value that is already a wire uid, after the sender's own
+ * second log line. Harmless only because UidOnWire is the identity in this
+ * build; if it ever stopped being, this is where a message would arrive
+ * addressed to nobody.
+ *
+ * THE ITEM GOING MISSING IS A HANDLED CASE, NOT A FAILURE. When the uid does
+ * not resolve it looks in the slot the message names, and if what is there is
+ * a weapon carrying OBJ_FLAG_REPLACED -- the flag UseInventoryItem sets on a
+ * spent one -- it removes the slot and says "Weapon destroyed before
+ * dropping; but we handled it". Anything else is dropped in silence. So a
+ * drop and a use racing each other is anticipated.
+ *
+ * AND A MESSAGE ABOUT OUR OWN UNIT IS REFUSED, which is the mirror of the
+ * sender's gate: CommMustBroadcast on the TROOPER's army says the drop was
+ * ours to begin with and has already happened locally. That arm returns
+ * without touching anything, logging only if COMM_OFF_VERBOSE is set -- so
+ * with logging off the two paths are indistinguishable from outside.
+ *
+ * THE AMMO IS ONLY APPLIED WHEN POSITIVE. A quantity of zero -- which is
+ * exactly what UseInventoryItem's send puts in the message -- leaves the
+ * item's own ITEM_OFF_AMMO alone, and TrooperDropItem then reads that zero
+ * and makes the item vanish rather than placing it. The two functions agree
+ * about the meaning of zero without either of them saying so.
+ */
+void __cdecl RecvTrooperDropItem(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint8_t *trooper;
+    uint8_t *item;
+
+    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        am2_log("-->Trooper Drop Item Received: Trooper: %x, item: %x,"
+                " request: %d, slot: %d, quant: %d \n",
+                UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)),
+                UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)),
+                *(const int32_t *)(m + MSG_DROP_OFF_REQUEST),
+                *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+                *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+
+    trooper = (uint8_t *)ObjByUidAlias(
+        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)));
+    if (!trooper)
+        return;
+
+    item = (uint8_t *)LookupByUID(
+        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)));
+
+    if (!item) {
+        int32_t  slot = *(const int32_t *)(m + MSG_DROP_OFF_SLOT);
+        uint8_t *held = (uint8_t *)WeaponByUid(
+            (int32_t)(*(const uint32_t *)(trooper + UNIT_OFF_INVENTORY
+                                          + slot * 4)));
+
+        if (!held)
+            return;
+        if (!(*(const uint8_t *)(held + OBJ_OFF_FLAGS) & OBJ_FLAG_REPLACED))
+            return;
+
+        RemoveInventoryItem(trooper, slot);
+        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+            am2_log("Weapon destroyed before dropping; but we handled it\n");
+        return;
+    }
+
+    if (!ObjIsType4((const AM2_Object *)item))
+        return;
+
+    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        am2_log("Drop item received & performed; ammo %d\n",
+                *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+
+    if (CommMustBroadcast((void *)kCommObj,
+                          (int16_t)*(const int8_t *)(trooper + OBJ_OFF_ARMY))) {
+        if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+            am2_log("\tDrop Item already handled (it's my unit)\n");
+        return;
+    }
+
+    if (*(const int32_t *)(m + MSG_DROP_OFF_QUANT) > 0)
+        *(int32_t *)(item + ITEM_OFF_AMMO) =
+            *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
+
+    TrooperDropItem(trooper, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+                    *(const uint32_t *)(m + MSG_DROP_OFF_AT));
+}
+
 /* RecvTroopPair -- original 0x0044C960, one caller. Message kind 0x18.
  *
  * Two uids and two dwords. The first uid must resolve; the second must
@@ -1078,8 +1173,6 @@ typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOPER_FIRE)
 #define orig_recv_troop_19 \
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_19)
-#define orig_recv_troop_drop_item \
-    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_DROP_ITEM)
 
 void __cdecl TroopMessageRecv(void *msg, int32_t army)
 {
@@ -1105,7 +1198,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
     case AM2_MSG_TROOPER_DROP_ITEM:
         if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
             orig_log((const char *)AM2_IMAGE(ADDR_STR_GOT_DROP_ITEM));
-        orig_recv_troop_drop_item(msg);
+        RecvTrooperDropItem(msg);
         return;
 
     case AM2_MSG_TROOPER_WEAPON:
@@ -2016,6 +2109,8 @@ int commmsg_install(void)
                   "TellEachSlot", 1);
     patch_replace(ADDR_TROOP_MESSAGE_RECV, (const void *)TroopMessageRecv,
                   "TroopMessageRecv", 1);
+    patch_replace(ADDR_RECV_TROOP_DROP_ITEM, (const void *)RecvTrooperDropItem,
+                  "RecvTrooperDropItem", 1);
     patch_replace(ADDR_RECV_TROOP_16, (const void *)RecvTroopBatch,
                   "RecvTroopBatch", 1);
     patch_replace(ADDR_RECV_TROOP_PAIR, (const void *)RecvTroopPair,

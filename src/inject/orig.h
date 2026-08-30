@@ -7339,7 +7339,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TROOPER_PAIR_APPLY  0x00448B20u  /* void(troop, weapon, a, b) */
 
 #define ADDR_RECV_TROOP_19       0x0044C680u
+/* Reconstructed. The receiver for the message TrooperDropItemSend sends, so
+ * the sender, this and TrooperDropItem itself are one closed group now. Four
+ * log lines, all gated on COMM_OFF_VERBOSE. */
 #define ADDR_RECV_TROOP_DROP_ITEM 0x0044C9C0u /* eTROOPER_DROP_ITEM_MESSAGE */
+#define ADDR_STR_RECV_DROP_HDR    0x0048ADACu
+#define ADDR_STR_RECV_DROP_GONE   0x0048ACC0u
+#define ADDR_STR_RECV_DROP_DONE   0x0048AD80u
+#define ADDR_STR_RECV_DROP_MINE   0x0048AD54u
 /* Reconstructed. The receiver for eTROOPER_SET_WEAPON_MESSAGE, and the twin
  * of armymsg.cpp's SendTrooperSetWeapon: put the weapon's uid in the
  * trooper's inventory SLOT, set the soldier kind from the weapon's code, and

@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,217 patches.**
+Nothing uncommitted. **1,218 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1908,16 +1908,46 @@ commit -- gave the right answer every time it was used.
   CLAUDE.md already records for `ab.sh` and which bites `checkwaves.py` the
   same way.
 
+- **`RecvTrooperDropItem`** (`0x0044C9C0`) closes a loop five batches wide:
+  `UseInventoryItem` and `TrooperDropItem` do the work, `TrooperDropItemSend`
+  puts it on the wire, and this takes it off again. **All four are ours, and
+  reading them together is what makes the odd parts legible.**
+
+  **Two of them agree about the meaning of ZERO without either saying so.** A
+  quantity of zero -- exactly what `UseInventoryItem`'s send puts in the
+  message -- is NOT applied to the item's `ITEM_OFF_AMMO` here, so
+  `TrooperDropItem` then reads whatever was there and, if that is zero,
+  makes the item vanish rather than placing it. Neither function documents the
+  convention; the pair does.
+
+  **The item going missing is a handled case, not a failure.** When the uid
+  does not resolve it looks in the slot the message names, and if what is
+  there carries `OBJ_FLAG_REPLACED` -- the flag `UseInventoryItem` sets on a
+  spent weapon -- it removes the slot and says "Weapon destroyed before
+  dropping; but we handled it". So a drop and a use racing each other is
+  anticipated by the original.
+
+  **A message about our OWN unit is refused**, the mirror of the sender's
+  gate: `CommMustBroadcast` on the trooper's army means the drop already
+  happened locally. With `COMM_OFF_VERBOSE` off that arm is
+  indistinguishable from success at the call site.
+
+  **It puts the uids through `UidOnWire` on the way IN**, and the sender
+  already did on the way out. Third place in this family doing it to a value
+  that is already a wire uid. Harmless only because that function is the
+  identity in this build -- and this is where a message would arrive addressed
+  to nobody if it ever stopped being.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,063 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,217
+line (0x0045C000) patched**. Measured: **1,064 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,218
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-three batches have gone in and the 176 entries outstanding start at 48
+small ones in batches. Sixty-four batches have gone in and the 175 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
