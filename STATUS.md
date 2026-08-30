@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,211 patches.**
+Nothing uncommitted. **1,212 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1720,16 +1720,46 @@ commit -- gave the right answer every time it was used.
   `dropitem` at all**, and the other caller needs a full inventory plus a
   better weapon on the ground, which no drive here arranges.
 
+- **`UseInventoryItem`** (`0x00449760`) spends one charge of an inventory slot
+  and gives the slot up when the last one goes. Third off the self-naming
+  queue, and it sits directly beside `TrooperDropItem` -- which is what makes
+  its first oddity visible.
+
+  **ITS SLOT IS CHECKED AT ONE END ONLY.** `slot <= 0` is refused and there is
+  NO UPPER BOUND, so a slot of 6 or more indexes past the six-entry
+  `UNIT_OFF_INVENTORY`. `TrooperDropItem`, twenty lines away in the same file,
+  checks `>= 6` as well. Reproduced; the asymmetry is the original's, and its
+  one caller passes a slot it took from the unit itself.
+
+  **It decrements first and decides afterwards.** The ammo is written back
+  whatever it becomes; only when it has reached exactly zero is the slot
+  removed and the others told. So the common case writes one field and
+  returns, and everything below the decrement is the LAST charge's path.
+
+  **The spent item is FLAGGED, not freed** -- `OBJ_FLAG_REPLACED`, the same
+  bit the two weapon-making paths in this file set on a weapon they supersede.
+  And the message goes out with a quantity of ZERO, which is what tells a
+  used-up item from `TrooperDropItem`'s genuine drop: same sender, same slot,
+  no ammo left to hand over.
+
+  The multiplayer guard is the first thing and applies only in a session: with
+  none it falls straight through, and in one a unit whose army
+  `CommMustBroadcast` refuses does nothing at all.
+
+  Not exercised -- `UseInventoryItem` and `RemoveInventoryItem` both read 0 on
+  a driven Boot Camp mission, because a rifle is not a consumable. Checked
+  before the A/B.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,057 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,211
+line (0x0045C000) patched**. Measured: **1,058 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,212
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-seven batches have gone in and the 182 entries outstanding start at 48
+small ones in batches. Fifty-eight batches have gone in and the 181 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

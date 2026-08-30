@@ -108,6 +108,12 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
  * disappears instead. See item.cpp. */
 void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at);
 
+/* 0x00449760, one caller, and it names itself twice. Spend one charge of an
+ * inventory slot; when the last one goes the slot is removed, the others are
+ * told, and the item is FLAGGED rather than freed. Its slot is checked at one
+ * end only -- `<= 0` and no upper bound. See item.cpp. */
+void __cdecl UseInventoryItem(void *unit, int32_t slot);
+
 /* A uid carries its owner in the top three bits, over a 29-bit per-owner
  * counter -- the layout objtable.h already describes and AddToItemList already
  * builds. UidArmy is the original's accessor for the owner half. */

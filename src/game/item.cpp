@@ -4229,6 +4229,90 @@ typedef void (__cdecl *AM2_DropSendFn)(void *unit, void *item, int32_t slot,
 #define orig_drop_item_send \
     ((AM2_DropSendFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM_SEND)
 
+/* UseInventoryItem -- original 0x00449760, one caller, and it names itself in
+ * both of its log lines.
+ *
+ * Spend one charge of an inventory slot, and give the slot up when the last
+ * one goes. Four things worth stating.
+ *
+ * ITS SLOT IS CHECKED AT ONE END ONLY. `slot <= 0` is refused and there is NO
+ * UPPER BOUND, so a slot of 6 or more indexes past the six-entry
+ * UNIT_OFF_INVENTORY and reads whatever follows it. TrooperDropItem, twenty
+ * lines away in the same file, checks `>= 6` as well. Reproduced, and the
+ * asymmetry is the original's -- the one caller passes a slot it took from
+ * the unit itself, so nothing here can reach the gap.
+ *
+ * THE MULTIPLAYER GUARD IS THE FIRST THING AND IT ONLY APPLIES IN A SESSION.
+ * With no session it falls straight through; in one, a unit whose army
+ * CommMustBroadcast refuses returns having done nothing -- so a charge is
+ * spent by the owner and by nobody else, and everyone else hears about it
+ * from the message at the end.
+ *
+ * IT DECREMENTS FIRST AND DECIDES AFTERWARDS. The ammo is written back
+ * whatever it becomes; only when it has reached exactly zero is the slot
+ * removed and the message sent. So the common case -- a charge spent with
+ * some left -- writes one field and returns, and everything below the
+ * decrement is the LAST charge's path.
+ *
+ * THE SPENT ITEM IS FLAGGED, NOT FREED. Its OBJ_OFF_FLAGS gains bit 1 and it
+ * is left for whatever sweeps that flag. orig.h carries two names for that
+ * bit -- OBJ_FLAG_OVERDUE and OBJ_FLAG_REPLACED, an alias in the ratchet's
+ * baseline -- and REPLACED is the reading here: this is the same flag the two
+ * weapon-making paths in this file set on the weapon they supersede.
+ *
+ * The message goes out with a quantity of ZERO, which is what distinguishes a
+ * used-up item from TrooperDropItem's genuine drop: same sender, same slot,
+ * no ammo left to hand over.
+ */
+void __cdecl UseInventoryItem(void *unit, int32_t slot)
+{
+    uint8_t *u = (uint8_t *)unit;
+    uint8_t *comm = (uint8_t *)AM2_IMAGE(ADDR_COMM_OBJECT);
+    uint8_t *item;
+    int32_t  ammo;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(comm, (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY)))
+        return;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log("UseInventoryItem\n");
+
+    if (slot <= 0)
+        return;
+
+    item = (uint8_t *)WeaponByUid(
+        (int32_t)(*(const uint32_t *)(u + UNIT_OFF_INVENTORY + slot * 4)));
+    if (!item)
+        return;
+
+    if (!KindInSetA(**(const int32_t *const *)(item + OBJ_OFF_FIELD_C0)))
+        return;
+
+    ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
+    if (ammo <= 0)
+        return;
+
+    ammo--;
+    *(int32_t *)(item + ITEM_OFF_AMMO) = ammo;
+    if (ammo != 0)
+        return;
+
+    RemoveInventoryItem(u, slot);
+
+    if (CommMustBroadcast(comm,
+                          (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log("UseInventoryItem: droping item:%x\n",
+                    ((const AM2_Object *)item)->uid);
+
+        orig_drop_item_send(u, item, slot, 0,
+                            *(const uint32_t *)(u + OBJ_OFF_POS));
+    }
+
+    *(uint32_t *)(item + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+}
+
 /* TrooperDropItem -- original 0x00448D60, and it names itself in both of its
  * log lines: "TrooperDropItem  %x" and "TrooperDropItem  %x  ammo: %d".
  *
@@ -7142,6 +7226,8 @@ void item_install(void)
                   "ApplyShotDamage", 1);
     patch_replace(ADDR_TROOPER_DROP_ITEM, (const void *)TrooperDropItem,
                   "TrooperDropItem", 1);
+    patch_replace(ADDR_USE_INVENTORY_ITEM, (const void *)UseInventoryItem,
+                  "UseInventoryItem", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_DAMAGING,
                   (const void *)BlockWeightDamaging,
                   "BlockWeightDamaging", 1);

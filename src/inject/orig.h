@@ -6155,6 +6155,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * message TrooperDropItem sends when the drop has to be told to the others.
  * Still original. */
 #define ADDR_TROOPER_DROP_ITEM_SEND 0x0044C150u /* void(unit,item,slot,q,pt) */
+/* 0x00449760, one caller, and it names itself twice: "UseInventoryItem" and
+ * "UseInventoryItem: droping item:%x". Spend one charge of an inventory slot.
+ * Reconstructed. */
+#define ADDR_USE_INVENTORY_ITEM   0x00449760u /* void(unit, int32_t slot) */
 /* The uid of the last thing this unit dropped. Only TrooperDropItem writes it
  * and nothing read so far reads it, so the name is what the write says and no
  * more. */
