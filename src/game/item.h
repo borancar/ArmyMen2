@@ -331,6 +331,13 @@ void __cdecl ItemsReset(void);
  * array is freed only when there is one. */
 void __cdecl FreeSubrecordRows(void *subrecord);
 
+/* 0x00429B60, one caller. Give the object a new hit box -- four offsets from
+ * its own position -- and put it back on the map under it: unlink, write both
+ * views of the box, grow and re-initialise the cell entries, relink. The item
+ * counterpart of maprow.cpp's RowAlloc. */
+void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
+                        int32_t right, int32_t bottom);
+
 /* 0x00429F40, two callers. The other half of ItemPreDestroy: link the object
  * into every cell list its OBJ_OFF_HIT_RECT covers, and clear the entries it
  * did not need. It does NOT unlink first. See the definition. */

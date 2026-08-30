@@ -1250,6 +1250,29 @@ loading, which is caught in the bluntest possible way. What one row cannot
 reach is the empty-name arm, a part with no rows, and the three
 variable-length runs the parser skips before it reads anything it keeps.
 
+**A PARTIAL offline oracle is often available where a whole-function one is
+not, and it does not have to become a tool.** `ItemSetBox` is cold -- 0 calls
+on Boot Camp with walking, firing AND turning, while the sibling it calls
+reads 1,450 on the same run -- and it cannot be emulated whole: it unlinks
+from the map, reallocs, and relinks. But everything up to the grow test can
+be, because `ItemPreDestroy` returns at once on an object whose cell count is
+zero, which a scratch buffer's is. Emulating entry to `0x00429BF1` and
+comparing both the eight rectangle stores and the count in EAX gives 24,696
+cases and 0 disagreements over spans from -4096 to 30000, including every
++/-2 and +/-256 boundary.
+
+That was run once and NOT committed as a check, unlike `formationcheck.py`,
+and the difference is worth stating: the arithmetic it covers is `RowAlloc`'s,
+which runs 2,512 times a mission, so the subsystem has live coverage and only
+this transcription of it does not. A tool earns `make check` when nothing else
+watches the thing at all. Mutation-checked all the same -- dropping the -2
+fails 2,236 cases, +2 becoming +1 fails 22,932, transposing the position into
+the rectangle fails all 24,696 -- because a check that cannot fail has not
+passed whether it is committed or not.
+
+What stays verified by reading is what needs the game: the two guards, the
+realloc, the entry initialisation and the relink.
+
 **`tools/formationcheck.py` is the third enumerating oracle, and it exists
 because the subsystem is COLD.** `FormationPoint`'s counter is 0 on a full
 Boot Camp run and on the campaign: both drivable missions start with a squad
@@ -2655,7 +2678,7 @@ exact oracle**, however meaningful it is when it is set.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
-  `RestoreTileSet`, `AllObjectsInRect`, and `RefreshScreen` —
+  `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, and `RefreshScreen` —
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and

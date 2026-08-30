@@ -438,6 +438,100 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     return 1;
 }
 
+/* 0x00429B60, one caller -- ApplyObjFrame, which calls it only when the four
+ * offsets it is about to pass differ from the ones the object already holds.
+ * Give the object a new hit box and put it back on the map under it.
+ *
+ * THE THIRD OF THE ROW/ITEM PAIRS, and this one is maprow.cpp's RowAlloc.
+ * Same cell-count arithmetic to the instruction: take 2 off each span first,
+ * so a box that exactly fills a cell boundary does not claim the next one,
+ * shift down by 8, and add 2 back for the partial cells at either end. Same
+ * 8-BIT `imul` with only AL kept, so a box needing more than 255 cells wraps.
+ * Same initialisation of every entry to {owner, no links, index -1}, which is
+ * the state ItemLinkCells assumes. RowAlloc's comment is the fuller
+ * discussion; this note says what differs.
+ *
+ * WHAT DIFFERS IS THE ORDER AND TWO GUARDS. RowAlloc is called to CREATE a
+ * row and takes its spans directly; this is called to CHANGE an object that
+ * is already on the map, so it opens with ItemPreDestroy to take the object
+ * off every cell list first -- the unlink ItemLinkCells does not do for
+ * itself. And it has two exits RowAlloc has no need of: OBJ_FLAG_BIT0 clear
+ * returns after writing the box but before sizing anything, and
+ * OBJ_FLAG_DESTROYED returns after sizing but before relinking. So a hidden
+ * object keeps a stale entry array and a destroyed one keeps a correct array
+ * that is in no list.
+ *
+ * THE BOX IS STORED TWICE, WHICH IS THE FINDING. The four arguments are
+ * offsets from the object's own position and go to OBJ_OFF_BOX_OFFSETS
+ * verbatim; the same four with the position added go to OBJ_OFF_HIT_RECT.
+ * That is what settles MSG_CREATE_OFF_BLOCK, whose sixteen bytes are copied
+ * out of the first of those and which orig.h described as unidentified: an
+ * item create message carries the sender's box SHAPE, so the receiver can
+ * build the same box without knowing the sprite.
+ *
+ * The grow is a realloc and it only ever grows: the count is compared with
+ * `>=` and left alone when it already suffices, so an object whose box
+ * shrinks keeps the larger array and the entries past the new box are the
+ * ones ItemLinkCells clears.
+ */
+void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
+                        int32_t right, int32_t bottom)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  x, y;
+    int32_t  w, h, need;
+    int32_t  i;
+
+    ItemPreDestroy(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
+
+    x = *(const int16_t *)(o + OBJ_OFF_POS);
+    y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)  = left;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)  = top;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)  = right;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12) = bottom;
+
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  = x + left;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  = y + top;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  = x + right;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 12) = y + bottom;
+
+    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
+        return;
+
+    w = right - left;
+    h = bottom - top;
+    if (w > 2)
+        w -= 2;
+    if (h > 2)
+        h -= 2;
+    need = (int32_t)(uint8_t)(int8_t)((int8_t)((w >> AM2_CELL_SHIFT) + 2)
+                                      * (int8_t)((h >> AM2_CELL_SHIFT) + 2));
+
+    if ((int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) < need) {
+        *(o + OBJ_OFF_CELL_COUNT) = (uint8_t)need;
+        *(void **)(o + OBJ_OFF_CELL_ENTRIES) =
+            am2_realloc(*(void **)(o + OBJ_OFF_CELL_ENTRIES),
+                        (size_t)((uint32_t)need * AM2_CELL_ENTRY_STRIDE));
+    }
+
+    for (i = 0; i < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
+        uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
+                         + (uint32_t)i * AM2_CELL_ENTRY_STRIDE;
+
+        *(void **)(entry + 0) = obj;
+        *(void **)(entry + 8) = (void *)0;   /* next */
+        *(void **)(entry + 4) = (void *)0;   /* prev */
+        *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+    }
+
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return;
+
+    ItemLinkCells(o, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+}
+
 /* 0x00429F40, two callers. ItemPreDestroy's other half: link the object into
  * every cell list its OBJ_OFF_HIT_RECT covers, and clear the entries it did
  * not need. Link on placement, unlink before the storage goes back.
@@ -7290,6 +7384,8 @@ void item_install(void)
                   "ItemPreDestroy", 2);
     patch_replace(ADDR_ITEM_LINK_CELLS, (const void *)ItemLinkCells,
                   "ItemLinkCells", 2);
+    patch_replace(ADDR_ITEM_SET_BOX, (const void *)ItemSetBox,
+                  "ItemSetBox", 1);
     patch_replace(ADDR_FREE_SUBRECORD_ROWS, (const void *)FreeSubrecordRows,
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,

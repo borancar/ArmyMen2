@@ -1980,6 +1980,14 @@
  * is what the rest of the tree calls them, and which frees OBJ_OFF_ 0x1C for
  * the GAME object's own field at that offset. Two structs overlap here and
  * only one of them is a map object. */
+/* The object's hit box as four OFFSETS from its own position -- left, top,
+ * right, bottom. OBJ_OFF_HIT_RECT at 0x30 is the same box with the position
+ * added, and ItemSetBox is what writes both from one pair of corners. The
+ * sixteen bytes an item create message carries are exactly these; see
+ * MSG_CREATE_OFF_BLOCK. Named from the writer, the old OBJ_OFF_CREATE_BLOCK
+ * having been named from a memcpy. */
+#define OBJ_OFF_BOX_OFFSETS      0x20u
+#define AM2_OBJ_BOX_BYTES        0x10u
 #define OBJ_OFF_DEPTH_LAYER      0x26u  /* int16_t, only when > 0 on both */
 #define OBJ_OFF_DEPTH_SLOPE      0x28u  /* float */
 /* The rest of a map object, as the drawer reads it. The lut and the palette
@@ -8832,6 +8840,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The object's REGISTRATION table -- a byte count and an array of 0x10-byte
  * entries, each holding the index of the cell list it is linked into. -1 is
  * "not linked", which is what the teardown writes back. */
+/* 0x00429B60, one caller -- ADDR_APPLY_OBJ_FRAME, which calls it only when
+ * the box it is about to pass differs from the one the object already holds.
+ * maprow.cpp's RowAlloc for objects: unlink, write the box twice (offsets at
+ * OBJ_OFF_BOX_OFFSETS, absolute at OBJ_OFF_HIT_RECT), size and grow the cell
+ * entry array, re-initialise every entry, relink. Reconstructed. */
+#define ADDR_ITEM_SET_BOX      0x00429B60u  /* void(obj, l, t, r, b) */
 /* 0x00429F40, two callers. The link half: one entry per cell the object's
  * OBJ_OFF_HIT_RECT covers, each pushed onto that cell's head. It is the reason
  * ADDR_OBJECTS_IN_RECT needs a de-duplication rule at all -- an object really
@@ -9515,11 +9529,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_CREATE_OFF_SUBTYPE   0x64u /* int16_t */
 #define MSG_CREATE_OFF_D         0x68u
 #define MSG_CREATE_OFF_E         0x6Cu /* uint8_t */
-/* Sixteen bytes copied wholesale out of the object at +0x20, which the
- * receiver hands straight back. Named for where they come from, since nothing
- * either end does says what they are. */
+/* Sixteen bytes copied wholesale out of the object at OBJ_OFF_BOX_OFFSETS,
+ * which the receiver hands straight back. This used to say "nothing either end
+ * does says what they are", which was true of both ends and not of the object:
+ * ItemSetBox writes them, and they are the object's hit box RELATIVE to its
+ * position -- left, top, right, bottom, the same four the absolute
+ * OBJ_OFF_HIT_RECT is built from by adding the position. So an item create
+ * message carries the sender's box shape, which is what lets the receiver
+ * build the same box without knowing the sprite. */
 #define MSG_CREATE_OFF_BLOCK     0x50u
-#define OBJ_OFF_CREATE_BLOCK     0x20u
 #define AM2_MSG_ITEM_CREATE_LEN  0x70u
 /* 0x0042AB50, FOUR callers -- the four creators, one per object type, which is
  * the same fourfold split RecvItemCreate dispatches on. Reconstructed. */

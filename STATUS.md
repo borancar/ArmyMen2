@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `32dd3e7`. Working tree clean.
+Last updated: **2026-08-31**, at `96a0174`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,233 patches.**
+Nothing uncommitted. **1,234 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2405,16 +2405,49 @@ commit -- gave the right answer every time it was used.
   7600, 7957, 8082, 7053, 7828 and 6937 across six builds. Nothing else needs
   saying about it.
 
+- **`ItemSetBox`** (`0x00429B60`) is the THIRD of the row/item pairs, and it is
+  `maprow.cpp`'s `RowAlloc`: the same cell-count arithmetic to the instruction
+  -- 2 off each span first, shift down by 8, add 2 back, an 8-bit `imul` with
+  only AL kept -- and the same initialisation of every entry to
+  {owner, no links, index -1}, which is the state `ItemLinkCells` assumes.
+
+  What differs is the order and two guards. `RowAlloc` CREATES; this CHANGES
+  an object already on the map, so it opens with `ItemPreDestroy` to take it
+  off every cell list first -- the unlink `ItemLinkCells` does not do for
+  itself. And it has two exits `RowAlloc` has no need of: bit 0 clear returns
+  after writing the box but before sizing, `OBJ_FLAG_DESTROYED` returns after
+  sizing but before relinking.
+
+  **The box is stored twice, and that settles a field orig.h had given up on.**
+  The four arguments are offsets from the object's own position and go to
+  `OBJ_OFF_BOX_OFFSETS` verbatim; the same four with the position added go to
+  `OBJ_OFF_HIT_RECT`. `MSG_CREATE_OFF_BLOCK` copies sixteen bytes out of the
+  first of those and said "nothing either end does says what they are" -- true
+  of both ends and not of the object. An item create message carries the
+  sender's box SHAPE, so the receiver can build the same box without knowing
+  the sprite. `OBJ_OFF_CREATE_BLOCK`, named from that memcpy, is renamed
+  `OBJ_OFF_BOX_OFFSETS` after the writer.
+
+  **Cold, and checked anyway.** 0 calls on Boot Camp with walking, firing and
+  turning -- `ApplyObjFrame` calls it only when the sprite's box actually
+  changes size, which a rifleman's frames never do. Everything up to the grow
+  test emulates offline, because `ItemPreDestroy` returns at once on a zeroed
+  object: 24,696 cases comparing both the eight rectangle stores and the
+  count, 0 disagreements, mutation-checked four ways. Run once rather than
+  committed as a check, because the arithmetic is `RowAlloc`'s and that runs
+  2,512 times a mission. The guards, the realloc, the entry initialisation and
+  the relink stay verified by reading.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,079 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,233
+line (0x0045C000) patched**. Measured: **1,080 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,234
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-nine batches have gone in and the 160 entries outstanding start at 48
+small ones in batches. Eighty batches have gone in and the 159 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

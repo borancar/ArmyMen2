@@ -986,7 +986,8 @@ void __cdecl SendItemCreate(void *obj)
     *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = (uint16_t)type;
     *(uint32_t *)(msg + MSG_CREATE_OFF_A) =
         *(const uint32_t *)(o + OBJ_OFF_POS);
-    memcpy(msg + MSG_CREATE_OFF_BLOCK, o + OBJ_OFF_CREATE_BLOCK, 16);
+    memcpy(msg + MSG_CREATE_OFF_BLOCK, o + OBJ_OFF_BOX_OFFSETS,
+           AM2_OBJ_BOX_BYTES);
     *(uint32_t *)(msg + MSG_CREATE_OFF_C) =
         *(const uint32_t *)(o + OBJ_OFF_FLAGS);
 
