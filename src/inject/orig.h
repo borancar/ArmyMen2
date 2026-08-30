@@ -1976,6 +1976,17 @@
 #define AM2_CELL_SHIFT           8    /* world units per cell, as a shift */
 #define AM2_SUBDIVIDE_FLOOR      0x20 /* below this a split stops recursing */
 #define OBJ_OFF_BOUNDS           0x0Cu /* AM2_Rect; +0x0C left, +0x10 top */
+/* THE SAME OFFSET IN A GAME OBJECT is its NAME-TABLE INDEX, and it is spelled
+ * without the _OFF_ family so the alias ratchet is not asked to accept two
+ * OBJ_OFF_ names on 0x0C -- the rectangle above belongs to a different
+ * structure.
+ *
+ * Three readers agree. item.cpp raises every object event with it as
+ * EventNotify's `num1`; SetObjScriptState indexes kScriptNames with it to say
+ * which object has no script; SendItemCreate indexes the same table to put
+ * the object's NAME into the message. It carried the first of those as its
+ * name -- AM2_OBJ_EVENT_NUM_OFF -- until the other two turned up. */
+#define AM2_OBJ_NAME_IDX_OFF     0x0Cu
 /* The dirty list is 20-byte records: a RECT, then the index of the PREVIOUS
  * record and the index of the next. Record ZERO is the sentinel, so both of
  * its links are addressed as globals -- base + 0x10 and base + 0x12.
@@ -9417,6 +9428,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * into `numgreen`. "Trooper" is the vocabulary orig.h already uses for it --
  * ADDR_CREATE_TROOPER is the type-2 arm of the item-create message. */
 #define AM2_OBJ_TYPE_TROOPER     2
+/* Type 3, from FreeItem's own "DestroyVehicle" arm; see the type table. */
+#define AM2_OBJ_TYPE_VEHICLE     3
 /* 0x0043CF70, one caller. The FOURTH member of the block-weight family, and
  * the only one with a SIDE EFFECT: it damages what it walks past. See
  * item.cpp beside BlockWeightChain, which it is otherwise a twin of. */
@@ -9432,6 +9445,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_CREATE_OFF_SUBTYPE   0x64u /* int16_t */
 #define MSG_CREATE_OFF_D         0x68u
 #define MSG_CREATE_OFF_E         0x6Cu /* uint8_t */
+/* Sixteen bytes copied wholesale out of the object at +0x20, which the
+ * receiver hands straight back. Named for where they come from, since nothing
+ * either end does says what they are. */
+#define MSG_CREATE_OFF_BLOCK     0x50u
+#define OBJ_OFF_CREATE_BLOCK     0x20u
+#define AM2_MSG_ITEM_CREATE_LEN  0x70u
+/* 0x0042AB50, FOUR callers -- the four creators, one per object type, which is
+ * the same fourfold split RecvItemCreate dispatches on. Reconstructed. */
+#define ADDR_SEND_ITEM_CREATE    0x0042AB50u  /* void(void *obj) */
+#define ADDR_STR_SEND_ITEM_CREATE 0x00485E74u
+#define AM2_TROOPER_SARGE_SUBTYPE 0x0A
 #define AM2_TROOPER_SUBTYPE_LEADS 0xA  /* then SetLeadsAndAct runs */
 #define AM2_WEAPON_KEY_KIND      0x2D  /* KeyLookupTriple's first argument */
 #define ADDR_STR_ITEM_GONE_SEND  0x00485E10u

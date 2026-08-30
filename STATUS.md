@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,223 patches.**
+Nothing uncommitted. **1,224 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2078,16 +2078,47 @@ commit -- gave the right answer every time it was used.
   a driven campaign, so its condition does not trigger inside the drive. Its
   caller is the original's `RunScriptAction`, so that 0 is not blind.
 
+- **`SendItemCreate`** (`0x0042AB50`) has FOUR callers and they are the four
+  creators -- item, trooper, vehicle, weapon -- so every object the game makes
+  announces itself, and the fourfold split here is the one `RecvItemCreate`
+  dispatches on. Both ends of the create message are ours now.
+
+  **The four arms disagree about which fields they use.** SUBTYPE means four
+  different things and `MSG_CREATE_OFF_D` three: a trooper puts 0x0A in the
+  subtype when `OBJ_OFF_SARGE` is set -- so **"Sarge" travels as a subtype
+  rather than as a flag** -- and otherwise the class of the weapon in its
+  first inventory slot. An unknown type returns WITHOUT sending rather than
+  sending a half-filled message.
+
+- **AND IT SETTLED THE FIELD I LEFT AS A LITERAL LAST BATCH, WHICH SHOULD
+  NEVER HAVE BEEN ONE.** `SetObjScriptState` prints an object's name through
+  `obj[0x0C]`, and I recorded it as the only reader in the image on the
+  strength of a scan of the BINARY. The TREE already had another --
+  `item.cpp` had been calling it `AM2_OBJ_EVENT_NUM_OFF` since long before --
+  and this sender is a third. Two of the three resolve it through
+  `kScriptNames`, which settles it.
+
+  So the name was also wrong: `AM2_OBJ_EVENT_NUM_OFF` described the one call
+  site it was found at, when the field is an object's NAME-TABLE INDEX and an
+  object event is simply raised against it. It is `AM2_OBJ_NAME_IDX_OFF` now,
+  in `orig.h` where all three modules can see it, spelled without `_OFF_` so
+  the ratchet is not asked to accept a second `OBJ_OFF_` name on `0x0C`.
+
+  **CLAUDE.md's advice is to grep the TREE for what already answers a
+  question before recording it as unknown. Scanning the image is not the same
+  thing**, and I had just written a paragraph claiming there was no second
+  reader.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,069 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,223
+line (0x0045C000) patched**. Measured: **1,070 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,224
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-nine batches have gone in and the 170 entries outstanding start at 48
+small ones in batches. Seventy batches have gone in and the 169 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

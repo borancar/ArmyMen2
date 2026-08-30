@@ -13,6 +13,7 @@
 #include "dist.h"     /* AngleBetween */
 #include "army.h"     /* AllyFlag, SetLeadsAndAct */
 #include "packkey.h"
+#include "scriptint.h"  /* kScriptNames -- the object name the message carries */
 #include "misc.h"
 #include "air.h"      /* ObjConceal */
 
@@ -917,6 +918,122 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
 #define orig_create_vehicle  ((AM2_CreateVehicleFn)(uintptr_t)ADDR_CREATE_VEHICLE)
 #define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 
+/* SendItemCreate -- original 0x0042AB50, FOUR callers, and they are the four
+ * creators: CreateItem, CreateTrooper, CreateVehicle and CreateWeapon. So
+ * every object the game makes announces itself, and the fourfold split here
+ * is the same one RecvItemCreate below dispatches on.
+ *
+ * A 0x70-byte kind-0x12 message, ZEROED FIRST and then filled in two passes:
+ * a common part every type gets, and one arm per type. The zeroing is what
+ * makes MSG_CREATE_OFF_E meaningful -- nothing ever writes it, so the
+ * receiver's read of that byte always sees 0.
+ *
+ * THE NAME IS OPTIONAL AND THE EMPTY CASE IS ONE BYTE. A negative name index,
+ * or one whose table entry has a null string, writes a single NUL at
+ * MSG_CREATE_OFF_NAME rather than clearing the field -- the buffer was zeroed
+ * already, so the two are the same thing said twice.
+ *
+ * MSG_CREATE_OFF_A GETS A DWORD HERE AND IS READ BOTH WAYS. The sender copies
+ * the object's whole packed position into it; orig.h records that the
+ * receiver takes a WORD for types 2 and 3 and a DWORD for 1 and 4. That is a
+ * fact about the reader, not about this, and both notes are right.
+ *
+ * THE FOUR ARMS DISAGREE ABOUT WHICH FIELDS THEY USE:
+ *
+ *   - an ITEM puts its type record's +8 in MSG_CREATE_OFF_D;
+ *   - a TROOPER puts 0x0A in the SUBTYPE when OBJ_OFF_SARGE is set, and
+ *     otherwise the class of the weapon in its first inventory slot -- so
+ *     "Sarge" travels as a subtype rather than as a flag;
+ *   - a VEHICLE puts its kind in the SUBTYPE and a wire uid in _D;
+ *   - a WEAPON puts its type record's first word in the SUBTYPE and
+ *     OBJ_OFF_FIELD_CC in _D.
+ *
+ * So SUBTYPE means four different things and _D means three, which is why
+ * neither is named for a meaning.
+ *
+ * AN UNKNOWN TYPE RETURNS WITHOUT SENDING. The jump table covers 1..4 and the
+ * default arm skips the ArmyMessageSend entirely -- it does not send a
+ * half-filled message.
+ *
+ * The whole function is behind ADDR_MP_SESSION, so in single player it is one
+ * compare and a return.
+ */
+void __cdecl SendItemCreate(void *obj)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t        msg[AM2_MSG_ITEM_CREATE_LEN];
+    int32_t        nameidx;
+    const char    *name;
+    int32_t        type;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+
+    memset(msg, 0, sizeof msg);
+    *(uint16_t *)(msg + 0) = AM2_MSG_ITEM_CREATE_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_ITEM_CREATE;
+    *(uint32_t *)(msg + MSG_CREATE_OFF_UID) =
+        UidOnWire(((const AM2_Object *)o)->uid);
+
+    nameidx = *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF);
+    name = (nameidx >= 0) ? kScriptNames[nameidx].name : (const char *)0;
+    if (name)
+        strcpy((char *)(msg + MSG_CREATE_OFF_NAME), name);
+    else
+        *(char *)(msg + MSG_CREATE_OFF_NAME) = '\0';
+
+    type = *(const int32_t *)o;
+    *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = (uint16_t)type;
+    *(uint32_t *)(msg + MSG_CREATE_OFF_A) =
+        *(const uint32_t *)(o + OBJ_OFF_POS);
+    memcpy(msg + MSG_CREATE_OFF_BLOCK, o + OBJ_OFF_CREATE_BLOCK, 16);
+    *(uint32_t *)(msg + MSG_CREATE_OFF_C) =
+        *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+
+    switch (type) {
+    case AM2_OBJ_TYPE_ITEM:
+        *(int32_t *)(msg + MSG_CREATE_OFF_D) =
+            *(const int32_t *)(*(const uint8_t *const *)
+                                   (o + OBJ_OFF_FIELD_94) + 8);
+        break;
+
+    case AM2_OBJ_TYPE_TROOPER:
+        if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+            *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+                AM2_TROOPER_SARGE_SUBTYPE;
+        else
+            *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+                (uint16_t)WeaponClassOf(
+                    *(const uint32_t *)(o + UNIT_OFF_INVENTORY));
+        break;
+
+    case AM2_OBJ_TYPE_VEHICLE:
+        *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+            *(const uint16_t *)(o + VEHICLE_OFF_KIND);
+        *(uint32_t *)(msg + MSG_CREATE_OFF_D) =
+            UidOnWire(*(const uint32_t *)(o + VEHICLE_OFF_WEAPON_UID));
+        break;
+
+    case AM2_OBJ_TYPE_WEAPON:
+        *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
+            **(const uint16_t *const *)(o + OBJ_OFF_FIELD_C0);
+        *(uint32_t *)(msg + MSG_CREATE_OFF_D) =
+            *(const uint32_t *)(o + OBJ_OFF_FIELD_CC);
+        break;
+
+    default:
+        return;                 /* nothing is sent for an unknown type */
+    }
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_SEND_ITEM_CREATE),
+                 UidOnWire(*(const uint32_t *)(msg + MSG_CREATE_OFF_UID)),
+                 *(const int32_t *)o,
+                 (int32_t)*(const int16_t *)(msg + MSG_CREATE_OFF_SUBTYPE));
+
+    ArmyMessageSend(msg);
+}
+
 /* 0x0042AFA0, the SIXTH receiver and the one that completes the family. It
  * makes an object the other side has made, dispatching on
  * MSG_CREATE_OFF_TYPE, whose four values are this project's object types:
@@ -1148,6 +1265,8 @@ int armymsg_install(void)
                         "ItemPostCreate", 4);
     rc |= patch_replace(ADDR_DAMAGE_BROADCAST, (const void *)DamageBroadcast,
                         "DamageBroadcast", 4);
+    rc |= patch_replace(ADDR_SEND_ITEM_CREATE, (const void *)SendItemCreate,
+                        "SendItemCreate", 4);
     rc |= patch_replace(ADDR_RECV_ITEM_CREATE, (const void *)RecvItemCreate,
                         "RecvItemCreate", 1);
     rc |= patch_replace(ADDR_RECV_DAMAGE, (const void *)RecvDamage,

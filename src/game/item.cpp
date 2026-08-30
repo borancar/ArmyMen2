@@ -2420,10 +2420,6 @@ void __cdecl DestroyObjCommon(void *obj)
 /* AM2_Object names `owner` at +0x10; orig.h's OBJ_OFF_OWNER is 0x04 and
  * belongs to a different structure, as air.cpp already records. */
 #define AM2_OBJ_OWNER_OFF  0x10u
-/* The dword EventNotify takes as `num1`. Not an OBJ_OFF_ name on purpose:
- * orig.h already has OBJ_OFF_BOUNDS on 0x0C for a different structure, and a
- * second one there would be a family alias the ratchet is right to refuse. */
-#define AM2_OBJ_EVENT_NUM_OFF  0x0Cu
 
 #define g_mpSession     (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 
@@ -2830,10 +2826,10 @@ static void __cdecl NotifyHealed(void *obj, void *src)
         const uint8_t *a = (const uint8_t *)src;
 
         EventNotify(AM2_EVENT_HEALED,
-                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)obj)->uid,
                     ObjEventMask((const AM2_Object *)obj),
-                    *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(a + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)src)->uid,
                     ObjEventMask((const AM2_Object *)src),
                     0, 0, 0);
@@ -2841,7 +2837,7 @@ static void __cdecl NotifyHealed(void *obj, void *src)
     }
 
     EventNotify(AM2_EVENT_HEALED,
-                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                 ((const AM2_Object *)obj)->uid,
                 ObjEventMask((const AM2_Object *)obj),
                 0, 0, 0, 0, 0, 0);
@@ -2978,10 +2974,10 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
         const uint8_t *a = (const uint8_t *)attacker;
 
         EventNotify(AM2_EVENT_DAMAGED,
-                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)obj)->uid,
                     ObjEventMask((const AM2_Object *)obj),
-                    *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(a + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)attacker)->uid,
                     ObjEventMask((const AM2_Object *)attacker),
                     0, 0, 0);
@@ -2989,7 +2985,7 @@ static void __cdecl NotifyDamaged(void *obj, void *attacker)
     }
 
     EventNotify(AM2_EVENT_DAMAGED,
-                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                 ((const AM2_Object *)obj)->uid,
                 ObjEventMask((const AM2_Object *)obj),
                 0, 0, 0, 0, 0, 0);
@@ -3042,10 +3038,10 @@ static void __cdecl NotifyPickedUp(void *item, void *taker)
         const uint8_t *t = (const uint8_t *)taker;
 
         EventNotify(AM2_EVENT_PICKED_UP,
-                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)item)->uid,
                     ObjEventMask((const AM2_Object *)item),
-                    *(const int32_t *)(t + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(t + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)taker)->uid,
                     ObjEventMask((const AM2_Object *)taker),
                     0, 0, 0);
@@ -3053,7 +3049,7 @@ static void __cdecl NotifyPickedUp(void *item, void *taker)
     }
 
     EventNotify(AM2_EVENT_PICKED_UP,
-                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                 ((const AM2_Object *)item)->uid,
                 ObjEventMask((const AM2_Object *)item),
                 0, 0, 0, 0, 0, 0);
@@ -3090,10 +3086,10 @@ static void __cdecl NotifyDropped(void *item, void *dropper)
         const uint8_t *d = (const uint8_t *)dropper;
 
         EventNotify(AM2_EVENT_DROPPED,
-                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)item)->uid,
                     ObjEventMask((const AM2_Object *)item),
-                    *(const int32_t *)(d + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(d + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)dropper)->uid,
                     ObjEventMask((const AM2_Object *)dropper),
                     0, 0, 0);
@@ -3101,7 +3097,7 @@ static void __cdecl NotifyDropped(void *item, void *dropper)
     }
 
     EventNotify(AM2_EVENT_DROPPED,
-                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                 ((const AM2_Object *)item)->uid,
                 ObjEventMask((const AM2_Object *)item),
                 0, 0, 0, 0, 0, 0);
@@ -3149,10 +3145,10 @@ static void __cdecl TriggerItemDestroyed(void *obj, void *attacker)
         const uint8_t *a = (const uint8_t *)attacker;
 
         EventNotify(AM2_EVENT_KILLED,
-                    *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)obj)->uid,
                     ObjEventMask((const AM2_Object *)obj),
-                    *(const int32_t *)(a + AM2_OBJ_EVENT_NUM_OFF),
+                    *(const int32_t *)(a + AM2_OBJ_NAME_IDX_OFF),
                     ((const AM2_Object *)attacker)->uid,
                     ObjEventMask((const AM2_Object *)attacker),
                     0, 0, 0);
@@ -3160,7 +3156,7 @@ static void __cdecl TriggerItemDestroyed(void *obj, void *attacker)
     }
 
     EventNotify(AM2_EVENT_KILLED,
-                *(const int32_t *)(o + AM2_OBJ_EVENT_NUM_OFF),
+                *(const int32_t *)(o + AM2_OBJ_NAME_IDX_OFF),
                 ((const AM2_Object *)obj)->uid,
                 ObjEventMask((const AM2_Object *)obj),
                 0, 0, 0, 0, 0, 0);

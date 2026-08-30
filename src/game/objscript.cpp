@@ -352,12 +352,15 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
  * script due immediately, and UpdateObjectScript is run before returning --
  * so the new state takes effect in this frame rather than the next.
  *
- * ONE FIELD IS LEFT AS A LITERAL. The "has no object script" message prints
- * the object's own name through `obj[0x0C]` as a name-table index, and this
- * is the ONLY reader of that offset anywhere in the image -- a scan for a
- * second one finds none. CLAUDE.md's rule applies: a field with one consumer
- * is a field you cannot name, and buying `OBJ_OFF_FIELD_0C` would also cost a
- * family alias against OBJ_OFF_BOUNDS. Left as 0x0C with this note.
+ * ITS NAME-INDEX FIELD WENT IN AS A LITERAL AND SHOULD NOT HAVE. The "has no
+ * object script" message prints the object's own name through `obj[0x0C]`,
+ * and I recorded it as the only reader in the image on the strength of a scan
+ * of the BINARY. The TREE already had another -- item.cpp had been calling it
+ * AM2_OBJ_EVENT_NUM_OFF since long before -- and SendItemCreate is a third.
+ * Two of the three resolve it through kScriptNames, which is what settles it.
+ * CLAUDE.md's advice is to grep the tree for what already answers a question
+ * before recording it as unknown; scanning the image is not the same thing.
+ * It is AM2_OBJ_NAME_IDX_OFF now, in item.cpp, and this uses it.
  */
 int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
                                   int32_t frame)
@@ -399,7 +402,7 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
         am2_log("Tried to set object script state (%s) in object %s, which "
                 "has no object script.\n",
                 names[stateName].name,
-                names[*(const int32_t *)(obj + 0x0C)].name);
+                names[*(const int32_t *)(obj + AM2_OBJ_NAME_IDX_OFF)].name);
         return 0;
     }
 
