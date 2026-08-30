@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,207 patches.**
+Nothing uncommitted. **1,208 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1596,16 +1596,46 @@ commit -- gave the right answer every time it was used.
   of two tile heights and add `AM2_BLOCK_FULL` when it EXCEEDS this. Corrected
   by writing a second reader and finding the two disagreed with the prose.
 
+- **`ObjCollidesWith`** (`0x0045B700`) decides whether `from` runs into `obj`,
+  and its arms answer one at a time with nothing falling through to a default:
+  height first (more than `AM2_BLOCK_HEIGHT_STEP` apart and they never meet),
+  then `OBJ_FLAG_BIT24` on a vehicle of kind 1 or 2, then the type 2/3/8
+  rules, then a watched-kind item.
+
+  **The game rule worth keeping: a vehicle the PLAYER is driving stops for
+  friendly troops and one the AI is driving does not.** An ally collides only
+  when the player's own unit is riding `from` and `OBJ_OFF_FIELD_10C` is
+  clear. `BlockWeightTroops` has the same three fields in the same relation
+  and uses them the OTHER WAY ROUND -- there they are a reason to SKIP a
+  trooper's weight. Two functions, one condition, two polarities, both
+  transcribed rather than reconciled.
+
+  **`OBJ_OFF_DEADLINE_58` has two users on two timescales**, and orig.h's
+  "0x004355D0 is the only thing that reads it" is no longer true: this reads
+  it as a five-second cooldown before one of your own army collides, and the
+  caller stamps it with the clock plus 100 on whatever it has just hit.
+
+- **A single clean CONTROL run does not establish a regression.** Two runs of
+  this build failed the frame gate on all three configurations with identical
+  logs; the parent commit, run once minutes later, came back clean. That reads
+  as decisive and is not -- the control is one sample of something that fails
+  about one run in three under load, and the same build then ran clean at
+  4891/5402 and 10781/10286.
+
+  What settled it was neither run: **`ObjCollidesWith`'s counter is ZERO on
+  that drive**, so it cannot have changed a frame count. Ask whether the new
+  code executes at all before comparing runs of it. Recorded in CLAUDE.md.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,053 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,207
+line (0x0045C000) patched**. Measured: **1,054 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,208
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-three batches have gone in and the 186 entries outstanding start at 48
+small ones in batches. Fifty-four batches have gone in and the 185 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

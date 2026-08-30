@@ -199,6 +199,12 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
  * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
 int32_t __cdecl ObjIsWatchedKind(const void *obj);
 
+/* 0x0045B700, two callers. Does `from` run into `obj`? Height first, then a
+ * flag-and-vehicle-kind shortcut, then the type 2/3/8 rules -- of which the
+ * one worth knowing is that a vehicle the PLAYER is driving stops for
+ * friendly troops and one the AI is driving does not. See item.cpp. */
+int32_t __cdecl ObjCollidesWith(void *from, void *obj);
+
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
  * and not even then for the unit the player is driving. */

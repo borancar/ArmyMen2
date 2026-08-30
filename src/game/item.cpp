@@ -1724,6 +1724,92 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
     return total;
 }
 
+/* ObjCollidesWith -- original 0x0045B700, 224 bytes, two callers, both inside
+ * 0x0045BC70. Does `from` run into `obj`?
+ *
+ * A stack of arms, and each one answers on its own; nothing falls through to
+ * a default. In order:
+ *
+ *   - HEIGHT FIRST. If the two OBJ_OFF_HEIGHT_SET bytes differ by more than
+ *     AM2_BLOCK_HEIGHT_STEP the answer is no, whatever else is true -- one is
+ *     above or below the other and they never meet. The same 16 the whole
+ *     block-weight family uses.
+ *
+ *   - OBJ_FLAG_BIT24 with a vehicle of KIND 1 OR 2 collides unconditionally,
+ *     before any question of type or side. What the flag means is not
+ *     established; see orig.h.
+ *
+ *   - FOR A TYPE 2, 3 OR 8: a VEHICLE of your own army does not (you drive
+ *     past your own); anything you are not allied with does; and an ALLY does
+ *     only under one condition -- the player's own unit is riding `from` and
+ *     OBJ_OFF_FIELD_10C is clear.
+ *
+ *     That last arm is a real game rule and worth stating plainly: a vehicle
+ *     the player is driving stops for friendly troops and one the AI is
+ *     driving does not. BlockWeightTroops has the same three fields in the
+ *     same relation and uses them the OTHER WAY ROUND -- there they are a
+ *     reason to SKIP a trooper's weight. Two functions, one condition, two
+ *     polarities; both are transcribed rather than reconciled.
+ *
+ *   - ANYTHING ELSE only collides if ObjIsWatchedKind accepts it, and then
+ *     one of YOUR OWN army only after AM2_COLLIDE_OWN_DELAY has passed since
+ *     its OBJ_OFF_DEADLINE_58. The caller stamps that field with the clock
+ *     plus 100 on whatever it just hit, so the five seconds and the hundred
+ *     milliseconds are two cooldowns on one field.
+ *
+ * MEASURED, see the note on the batch: its two callers are the original's, so
+ * the counter is not blind.
+ */
+int32_t __cdecl ObjCollidesWith(void *from, void *obj)
+{
+    uint8_t *f = (uint8_t *)from;
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  step;
+
+    step = (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET)
+         - (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET);
+    if (step < 0)
+        step = -step;
+    if (step > AM2_BLOCK_HEIGHT_STEP)
+        return 0;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT24) {
+        int32_t kind = *(const int32_t *)(f + VEHICLE_OFF_KIND);
+
+        if (kind == 1 || kind == 2)
+            return 1;
+    }
+
+    if (ObjIsTypeIn238((const AM2_Object *)o)) {
+        if (ObjIsType3((const AM2_Object *)o)
+            && *(const int8_t *)(f + OBJ_OFF_ARMY)
+                   == *(const int8_t *)(o + OBJ_OFF_ARMY))
+            return 0;
+
+        if (!ObjsAreAllied(f, o, 0))
+            return 1;
+
+        if (*(const uint32_t *)((const uint8_t *)LookupOwnerObj(
+                    *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+                + OBJ_OFF_RIDING) != ((const AM2_Object *)f)->uid)
+            return 0;
+        if (*(const int32_t *)(f + OBJ_OFF_FIELD_10C))
+            return 0;
+        return 1;
+    }
+
+    if (!ObjIsWatchedKind(o))
+        return 0;
+
+    if (*(const int8_t *)(f + OBJ_OFF_ARMY) == *(const int8_t *)(o + OBJ_OFF_ARMY)
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+           <= AM2_COLLIDE_OWN_DELAY)
+        return 0;
+
+    return 1;
+}
+
 /* 0x0045B7E0, three callers, 336 bytes -- the THIRD variant, and the one the
  * other two are simplifications of.
  *
@@ -6870,6 +6956,8 @@ void item_install(void)
                   "BoardVehicle", 1);
     patch_replace(ADDR_OBJ_IS_WATCHED_KIND, (const void *)ObjIsWatchedKind,
                   "ObjIsWatchedKind", 8);
+    patch_replace(ADDR_OBJ_COLLIDES_WITH, (const void *)ObjCollidesWith,
+                  "ObjCollidesWith", 2);
     patch_replace(ADDR_BLOCK_WEIGHT_DAMAGING,
                   (const void *)BlockWeightDamaging,
                   "BlockWeightDamaging", 1);

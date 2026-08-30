@@ -1063,6 +1063,21 @@ shot landed. Its budget is disabled for the same reason `mission`'s is, so
 there, exactly as for `mission` and `intro`. Do not read a `combat` pixel
 count as a result in either direction.
 
+**A single clean CONTROL run does not establish a regression, and this cost
+an hour.** Two `ab.sh` runs of one build failed the frame gate on all three
+configurations with identical logs; the parent commit, run once on the same
+machine minutes later, came back clean. That reads as decisive -- the change
+is the only difference -- and it is not: the control is one sample of a thing
+that fails about one run in three under load. The same build then ran clean,
+and a behavioural difference does not come and go.
+
+What settled it was neither run. The function under suspicion has a COUNTER
+of ZERO on that drive, so it cannot have changed a frame count. **Ask whether
+the new code executes at all before comparing runs of it** -- that question is
+cheap, deterministic, and answers "could this possibly be the cause" outright.
+Give the control as many samples as the thing it is controlling for, or find
+a measurement that does not need samples.
+
 **Re-run an A/B difference before believing it.** One `bootcamp` run reported
 64,391 differing pixels and "the frame is wrong"; it was whole-frame palette
 shifts of one to five per channel, and three further runs of the same build

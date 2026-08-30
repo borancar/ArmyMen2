@@ -5610,9 +5610,19 @@ typedef struct {
 #define ADDR_SPIRAL_DY           0x0048783Cu  /* int32_t[4]: -1, 0, 1, 0 */
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
-/* A second deadline on the same clock, at +0x58, and 0x004355D0 is the only
- * thing that reads it: past it, bit 1 of the flags goes on. Both names ours. */
+/* A second deadline on the same clock, at +0x58. It had "0x004355D0 is the
+ * only thing that reads it" here, and that is no longer true: ObjCollidesWith
+ * reads it too -- an object of your own army is collided with only once five
+ * seconds have passed since it -- and 0x0045BC70 STAMPS it, with the clock
+ * plus 100, on the object it has just collided with. So it is a per-object
+ * cooldown as well as the deadline 0x004355D0 uses to set OBJ_FLAG_OVERDUE.
+ * Both names ours; the field has two users on two timescales. */
 #define OBJ_OFF_DEADLINE_58      0x58u
+#define AM2_COLLIDE_OWN_DELAY    0x1388  /* 5,000 ms before your own blocks */
+/* 0x0045B700, two callers, both in 0x0045BC70. Does `from` run into `obj`?
+ * The per-object half of a collision test, and the arms are stated in
+ * item.cpp. Reconstructed. */
+#define ADDR_OBJ_COLLIDES_WITH   0x0045B700u  /* int32_t(void *from, void *obj) */
 #define OBJ_FLAG_OVERDUE         0x02u
 /* The eight per-TYPE frame steppers ADDR_OBJ_FRAME_STEP dispatches to. Named
  * by the type they serve, because the jump table at 0x00428564 is what
@@ -6232,6 +6242,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * a flag the loader sets and this clears. */
 #define ADDR_REMAP_INVENTORY_UIDS  0x004276F0u  /* void(void) */
 #define OBJ_FLAG_NEEDS_REMAP       0x04000000u
+/* Bit 24. ObjCollidesWith is the only reader found: an object carrying it is
+ * collided with unconditionally by a vehicle of kind 1 or 2, before any of
+ * the type or alliance questions. Named structurally -- nothing yet says what
+ * it means, only when it matters. */
+#define OBJ_FLAG_BIT24             0x01000000u
 /* The other flag RemapInventoryUids clears is OBJ_FLAG_SELECTED, further
  * down and named long ago -- a freshly loaded object is not selected. */
 #define AM2_UID_REMAP_GROW         10   /* records added per grow */
