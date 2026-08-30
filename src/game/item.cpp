@@ -5981,10 +5981,17 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
  * type still loses it -- the flag means "has been seen by this pass", not
  * "has been remapped".
  *
- * A SECOND FLAG, 0x0400, IS CLEARED AT THE END AND SET NOWHERE IN THIS
- * FUNCTION. The original spells it `and ch, 0xFB`, a byte operation on the
- * second byte of the dword, which is how it stays distinct from the first
- * clear; only type 2s that reached the loop lose it.
+ * IT DESELECTS EVERY TYPE 2 IT REMAPS. The second flag it clears is
+ * OBJ_FLAG_SELECTED, which is right for an object that has just come off
+ * disk, and the original spells it `and ch, 0xFB` -- a byte operation on the
+ * second byte of the dword -- which is how it stays distinct from the first
+ * clear. Only type 2s that reached the loop lose it.
+ *
+ * That flag went in here as a fresh name, OBJ_FLAG_REMAP_DONE, "cleared,
+ * never set". It is OBJ_FLAG_SELECTED and has been named since long before;
+ * ToggleSelect is what sets it. **A second name on a flag was the one thing
+ * checkoffsets did not watch** -- it tracked `*_OFF_*` families only -- and
+ * it watches `*_FLAG_*` now for exactly this.
  *
  * THE TABLE AND ITS COUNT ARE RE-READ AFTER EVERY SUCCESSFUL SUBSTITUTION and
  * not otherwise. Nothing in the loop can move them -- the writes go to the
@@ -6035,8 +6042,152 @@ void __cdecl RemapInventoryUids(void)
             }
         }
 
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_REMAP_DONE;
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
     }
+}
+
+/* SetPointerMode is reconstructed, in win32/widget.cpp with the rest of the
+ * pointer. Declared here rather than by including that header, for the reason
+ * script.cpp declares PreloadSprite: item.cpp is on the flat side of the split
+ * and must not reach a win32 header, even transitively. An int32 in and
+ * nothing out, so the declaration needs no types this side cannot name. */
+extern "C" void __cdecl SetPointerMode(int32_t mode);
+
+/* ToggleSelect -- original 0x00413710, one caller.
+ *
+ * Add an object to the selection, or take it out if it is already in -- and
+ * clear the selection first unless a CONTROL key is held, which is the same
+ * modifier SelectIfOwn uses and, unlike there, is tested FIRST here rather
+ * than last.
+ *
+ * YOU CANNOT DESELECT THE LAST OBJECT. The removal path is gated on the
+ * selection holding more than one, so clicking the only selected unit with
+ * CONTROL held leaves it selected. Reproduced: the guard is explicit in the
+ * original, not an accident of the loop.
+ *
+ * A SELECTED OBJECT WHOSE UID IS NOT IN THE LIST is possible and handled --
+ * the flag says selected, the search finds nothing, and the function falls
+ * out having only notified. The two can disagree because the flag lives on
+ * the object and the list is a separate array.
+ *
+ * REMOVAL DOES THREE THINGS AND ADDITION DOES TWO. Coming out also detaches
+ * the object, through ObjAttachTo with a null target; going in does not
+ * attach it to anything. So selection and attachment are not symmetric.
+ *
+ * Every path that changes anything notifies ADDR_ON_SELECTION_CHANGED with
+ * the zero point, including the one that found nothing to remove.
+ */
+void __cdecl ToggleSelect(void *obj)
+{
+    AM2_Object *o = (AM2_Object *)obj;
+    int32_t     n;
+    int32_t     i;
+
+    if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
+        DeselectAll();
+
+    if (!(*(const uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS)
+          & OBJ_FLAG_SELECTED)) {
+        PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
+                    (void *)(uintptr_t)o->uid);
+        *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+        orig_on_selection_changed(
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+        return;
+    }
+
+    n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+
+    for (i = 0; i < n; i++)
+        if ((*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
+            == o->uid)
+            break;
+
+    if (i >= n || n <= 1) {
+        orig_on_selection_changed(
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+        return;
+    }
+
+    ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+    *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+    orig_obj_attach_to(o, (void *)0);
+    orig_on_selection_changed(
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+}
+
+/* SetObjContext -- original 0x00457A60, three callers.
+ *
+ * Point the object-context globals at one object and set the pointer mode
+ * from what that object is: SARGE gets mode 0, anything else that is a type 2
+ * or 3 gets mode 4, and any other type leaves the mode ALONE.
+ *
+ * SARGE IS REACHED TWO WAYS and that is the shape of the function: directly,
+ * when the object is a type 2 with OBJ_OFF_SARGE set; and through a type 3,
+ * whose first listed object is checked for the same thing. So selecting the
+ * vehicle Sarge is riding gives the same pointer as selecting Sarge.
+ *
+ * IT WRITES BOTH HALVES OF TWO PARALLEL PAIRS, and re-reads the source for
+ * the second of each: `obj` into OBJ_A and OBJ, and `obj->uid` into VAL_A and
+ * VAL through two separate loads of the same field. Reproduced as the two
+ * loads, because the duplication is the only evidence that the source had two
+ * assignments rather than one.
+ *
+ * THE POINTER MODE IS CLEARED DIRECTLY AND THEN SET THROUGH THE SETTER. The
+ * store at the top writes ADDR_POINTER_MODE itself; SetPointerMode later does
+ * the real work, including the five companion globals this function has
+ * already zeroed by hand. So the by-hand clears are redundant on the two
+ * paths that call the setter and are the whole effect on the path that does
+ * not.
+ *
+ * ADDR_OBJ_CTX_SET IS 1 ONLY FOR SARGE. The other path writes 0 before
+ * calling the setter, so the flag distinguishes "the context is Sarge" and
+ * not "a context is set".
+ */
+void __cdecl SetObjContext(void *obj)
+{
+    AM2_Object *o = (AM2_Object *)obj;
+    int32_t     type;
+
+    if (!o)
+        return;
+
+    *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = 0;
+
+    *(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A = o;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A = (int32_t)o->uid;
+    *(void **)(uintptr_t)ADDR_OBJ_CTX_OBJ   = o;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL = (int32_t)o->uid;
+
+    *(int32_t *)(uintptr_t)ADDR_POINTER_ACTION  = 0;
+    *(int32_t *)(uintptr_t)ADDR_POINTER_PICK    = 0;
+    *(int32_t *)(uintptr_t)ADDR_POINTER_F14     = 0;
+    *(int32_t *)(uintptr_t)ADDR_POINTER_F10     = 0;
+    *(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY = 0;
+
+    type = *(const int32_t *)o;
+
+    if (type == 2 && *(const int32_t *)((uint8_t *)o + OBJ_OFF_SARGE)) {
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 1;
+        SetPointerMode(AM2_POINTER_MODE_SARGE);
+        return;
+    }
+
+    if (type == 3) {
+        const uint8_t *inner = (const uint8_t *)ListFirstObj(o);
+
+        if (inner && *(const int32_t *)inner == 2
+            && *(const int32_t *)(inner + OBJ_OFF_SARGE)) {
+            *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 1;
+            SetPointerMode(AM2_POINTER_MODE_SARGE);
+            return;
+        }
+    } else if (type != 2) {
+        return;                 /* neither 2 nor 3: the mode is left alone */
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
+    SetPointerMode(AM2_POINTER_MODE_OTHER);
 }
 
 void item_install(void)
@@ -6194,6 +6345,10 @@ void item_install(void)
     patch_replace(ADDR_REMAP_INVENTORY_UIDS,
                   (const void *)RemapInventoryUids,
                   "RemapInventoryUids", 1);
+    patch_replace(ADDR_TOGGLE_SELECT, (const void *)ToggleSelect,
+                  "ToggleSelect", 1);
+    patch_replace(ADDR_SET_OBJ_CONTEXT, (const void *)SetObjContext,
+                  "SetObjContext", 3);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

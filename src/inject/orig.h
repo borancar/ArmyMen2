@@ -5996,7 +5996,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * a flag the loader sets and this clears. */
 #define ADDR_REMAP_INVENTORY_UIDS  0x004276F0u  /* void(void) */
 #define OBJ_FLAG_NEEDS_REMAP       0x04000000u
-#define OBJ_FLAG_REMAP_DONE        0x00000400u  /* cleared, never set here */
+/* The other flag RemapInventoryUids clears is OBJ_FLAG_SELECTED, further
+ * down and named long ago -- a freshly loaded object is not selected. */
 #define AM2_UID_REMAP_GROW         10   /* records added per grow */
 /* 0x00427650, two callers -- both in 0x00457370's band, which is where a load
  * puts the table back. Free the records and zero all three globals. */
@@ -7531,6 +7532,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00458380, four callers. Select one object if it is ours and selectable,
  * clearing the existing selection first unless a CONTROL key is held. */
 #define ADDR_SELECT_IF_OWN       0x00458380u  /* int32_t(void *obj) */
+/* 0x00413710, one caller. Add an object to the selection or take it out,
+ * clearing the selection first unless CONTROL is held. */
+#define ADDR_TOGGLE_SELECT       0x00413710u  /* void(void *obj) */
+/* 0x00457A60, three callers. Point the object-context globals at one object
+ * and set the pointer mode from what it is. */
+#define ADDR_SET_OBJ_CONTEXT     0x00457A60u  /* void(void *obj) */
+#define AM2_POINTER_MODE_SARGE   0
+#define AM2_POINTER_MODE_OTHER   4
 #define ADDR_SELECT_UNIT         0x00427CE0u  /* void(void *obj) -- NOT
                                                * SelectObject: wingdi.h has that
                                                * name and dllmain.c sees it */

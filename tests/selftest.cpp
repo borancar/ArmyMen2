@@ -88,6 +88,12 @@ static int ScriptVariables(int *passed);
  * are extern "C" because their declarations are. */
 void __cdecl FreeSpriteRegistry(void) { }
 
+/* item.cpp's SetObjContext calls this now that its seam is closed, and it
+ * lives in win32/widget.cpp, which this harness cannot link. Fifth stub, and
+ * extern "C" this time because widget.h declares it inside such a block --
+ * the linkage has to match the declaration, not the file it is stubbed in. */
+extern "C" void __cdecl SetPointerMode(int32_t) { }
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;

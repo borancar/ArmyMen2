@@ -554,4 +554,12 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *pt);
  * inventory uids through the remap table. */
 void __cdecl RemapInventoryUids(void);
 
+/* 0x00413710, one caller. Add an object to the selection or take it out;
+ * CONTROL adds rather than replaces, and the last one cannot be removed. */
+void __cdecl ToggleSelect(void *obj);
+
+/* 0x00457A60, three callers. Point the object-context globals at one object
+ * and set the pointer mode from what it is. */
+void __cdecl SetObjContext(void *obj);
+
 #endif

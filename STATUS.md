@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,169 patches.**
+Nothing uncommitted. **1,171 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -878,16 +878,48 @@ operand in `0x400000..0x700000`, and subtracts the addresses `orig.h` names.
   writing a call into the image, **assume the callee is already ours and go
   looking for the proof**, rather than the other way round.
 
+### The offset ratchet was blind to FLAGS, and I walked into the gap
+
+`tools/checkoffsets.py` watched `*_OFF_*` families and nothing else. Two
+batches ago `OBJ_FLAG_REMAP_DONE` went on `0x400` beside `OBJ_FLAG_SELECTED`
+-- one bit, two names, two readings -- and every check passed.
+`ToggleSelect` is what exposed it: that flag is what selection SETS.
+
+So the correct reading of `RemapInventoryUids` is better than the one it
+shipped with. It does not clear a bookkeeping bit; **it deselects every type
+2 it remaps**, which is obviously right for an object that has just come off
+disk.
+
+The regex now covers `_OFF_` and `_FLAG_`, with the family captured so
+`OBJ_OFF_` and `OBJ_FLAG_` stay separate -- an offset and a bitmask sharing a
+number means nothing. Tested in the failing direction by putting the
+duplicate back: 15 against a baseline of 14, named and refused.
+
+Widening it found one PRE-EXISTING alias, which is why the baseline is 14 and
+not 13: `OBJ_FLAG_OVERDUE` and `OBJ_FLAG_REPLACED` are both `0x2`. Left as
+backlog rather than guessed at.
+
+- **`ToggleSelect`** (`0x00413710`) cannot deselect the LAST object -- the
+  removal path is gated on the selection holding more than one, and the guard
+  is explicit rather than an accident of the loop. Removal also DETACHES the
+  object where addition attaches nothing, so the two directions are not
+  symmetric. Its CONTROL test comes FIRST, where `SelectIfOwn`'s comes last.
+- **`SetObjContext`** (`0x00457A60`) reaches Sarge two ways -- directly, and
+  as the first listed object of a type 3 -- so selecting the vehicle Sarge is
+  riding gives the same pointer as selecting Sarge. Any type that is neither
+  2 nor 3 leaves the pointer mode ALONE, having already written the context
+  globals.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,018 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,169
+line (0x0045C000) patched**. Measured: **1,020 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,171
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-three batches have gone in and the 221 entries outstanding start at 48
+small ones in batches. Twenty-four batches have gone in and the 219 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

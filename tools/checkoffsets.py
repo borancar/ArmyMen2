@@ -49,10 +49,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HEADER = os.path.join(ROOT, "src", "inject", "orig.h")
 
 # Two names on one offset inside a family.  May only go down.
-FAMILY_ALIAS_BASELINE = 13
+#
+# It went 13 -> 14 when `_FLAG_` families joined `_OFF_` ones, and the extra
+# one is NOT the duplicate that prompted the change -- that was fixed in the
+# same commit.  It is OBJ_FLAG_OVERDUE and OBJ_FLAG_REPLACED, both 0x2: two
+# readings of one bit, sitting there unremarked for as long as nothing looked
+# at flags.  Left as backlog rather than guessed at, which is what a ratchet
+# baseline is for.
+FAMILY_ALIAS_BASELINE = 14
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
-FAMILY = re.compile(r"^([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)?)_OFF_")
+# `_OFF_` was the whole of this for as long as offsets were the thing that got
+# duplicated.  Then OBJ_FLAG_REMAP_DONE went on 0x400 beside OBJ_FLAG_SELECTED
+# and nothing said a word: a flag is exactly the same failure -- one value,
+# two names, two readings -- and it was simply not being watched.  The group
+# is captured so `OBJ_OFF_` and `OBJ_FLAG_` stay separate families, since an
+# offset and a bitmask sharing a number means nothing.
+FAMILY = re.compile(r"^([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)?_(?:OFF|FLAG))_")
 
 
 def value_of(text):
@@ -100,7 +113,7 @@ def main():
 
     if os.environ.get("AM2_SHOW_OFFSET_ALIASES"):
         for fam, value, names in alias_pairs:
-            print("  ALIAS  %s_OFF_ 0x%X: %s" % (fam, value, ", ".join(sorted(names))))
+            print("  ALIAS  %s_ 0x%X: %s" % (fam, value, ", ".join(sorted(names))))
 
     if surplus > FAMILY_ALIAS_BASELINE:
         print("\n  FAILED   %d surplus family names (baseline %d) -- a second"
