@@ -8573,6 +8573,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * reconstruction in win32/mapdraw.cpp -- it lives there rather than beside
  * its siblings in item.cpp because it clips with IntersectRect. */
 #define ADDR_OBJECTS_IN_RECT   0x0042A240u  /* obj *(const AM2_Rect *, void *, pred) */
+/* 0x0042A3D0, 384 bytes and three callers -- ADDR_STEP_TYPE6, 0x0043D330 and
+ * ADDR_SEQ_STEP7, all three passing ADDR_OBJ_MAP_DESC. The same query with no
+ * predicate, and two differences that are easy to miss because the bodies are
+ * otherwise instruction for instruction the same: its entry clip demands the
+ * WHOLE rectangle be on the map where ADDR_OBJECTS_IN_RECT's accepts any
+ * overlap, and its home-cell rule has one arm fewer. Both written up at the
+ * definition in win32/mapdraw.cpp. */
+#define ADDR_ALL_OBJECTS_IN_RECT 0x0042A3D0u /* obj *(const AM2_Rect *, void *) */
 /* 0x00409680. Is there an enemy within five hundred units of a point? Used by
  * DoAirSupport to decide whether paratroopers are dropping into a fight, which
  * is the difference between its kind 2 and its kind 3. */

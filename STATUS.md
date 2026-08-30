@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-30**, at `6ec3194`. Working tree clean.
+Last updated: **2026-08-30**, at `8507c04`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,228 patches.**
+Nothing uncommitted. **1,229 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2212,24 +2212,65 @@ commit -- gave the right answer every time it was used.
   Forward-declared instead, the way `script.cpp` forward-declares
   `PreloadSprite`, with a seventh stub in `tests/selftest.cpp` for the linker.
 
-- **It runs, and the A/B discriminates it.** 38 calls in a driven Boot Camp
-  mission, all from the two still-original callers at `0x00403B40` and
-  `0x004137D0` -- `FindEnemyNear` reads 0, which is the usual blind spot now
-  that its call is ours. Answering nothing at all puts `mission` at 22372/7957
-  frames, a 281% frame-gate failure, and the side that ran away is the
-  RECONSTRUCTED one, which is what makes it the mutation's doing and not the
-  machine's.
+- **It runs, and the A/B does NOT discriminate it.** 38 calls in a driven Boot
+  Camp mission -- 112 with eight rounds of walking and firing -- all from the
+  two still-original callers at `0x00403B40` and `0x004137D0`;
+  `FindEnemyNear` reads 0, the usual blind spot now that its call is ours.
+  Answering nothing at all leaves the log identical, the 16-node HUD tree
+  identical, and the reconstruction's own frame count unmoved (7957 mutated
+  against 8082 clean, inside the run-to-run spread). So this function is
+  covered and unchecked, the same standing as `NearestPalIndex`'s `from`
+  guard.
+
+- **This bullet first said the opposite, and the error is the one the entry
+  below it warns about.** The mutation run failed the frame gate at
+  22372/7957 and I read that as the reconstruction running away. `ab.sh`
+  prints `$vo/$vr` -- ORIGINAL first -- so the side that moved was the
+  original's, which `AM2_NOPATCH` runs and no reconstruction can reach. The
+  next unmutated run on the same machine gave 25493/8082, the same shape with
+  nothing mutated at all, which is what settled it. **Read which side of the
+  ratio moved before reading the ratio**, and the cheap way to be sure is the
+  artifact: `$WORK/<cfg>-orig.volatile` and `-recon.volatile` are the two
+  numbers, named.
+
+- **`AllObjectsInRect`** (`0x0042A3D0`) is `ObjectsInRect` with no predicate,
+  and the pair is worth having together because the bodies are otherwise
+  instruction for instruction the same. Two things differ, and both are the
+  kind a transcription from memory of the sibling would get wrong.
+
+  **The entry clip is the opposite test.** `ObjectsInRect` rejects a rectangle
+  entirely off the map and accepts any overlap; this rejects unless the WHOLE
+  rectangle is on the map. A query straddling the map edge is answered by one
+  and refused outright by the other. That has a consequence inside the body:
+  with left and top known non-negative, the two `>= 0 ?` clamps on x0 and y0
+  can never take their zero arm. The original emits both anyway, so they are
+  written out -- "the original checks and the check is vacuous" is a different
+  fact from "the original does not check".
+
+  **The home-cell rule has one arm fewer**: `jge take` where the sibling has
+  `jg skip; jge take`. The dropped arm is "the object's home cell is still
+  ahead of us, let that cell answer it". Whether it can ever fire depends on
+  something neither body says -- whether an object is chained into a cell
+  above or left of its own hit rect's top-left -- so it is reproduced as
+  written and left unresolved.
+
+  **Unexercised, and its twin is not.** `ObjectsInRect` reads 112 on a driven
+  Boot Camp mission with walking and firing; this reads 0 on the same drive.
+  Its three callers are `ADDR_STEP_TYPE6`, `0x0043D330` and `ADDR_SEQ_STEP7`,
+  and object type 6 is one of the three types still unread here, so the
+  likely answer is that Boot Camp has none. Neither offline harness can help:
+  it reads two globals, and its descriptor is null before `install()`.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,074 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,228
+line (0x0045C000) patched**. Measured: **1,075 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,229
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-four batches have gone in and the 165 entries outstanding start at 48
+small ones in batches. Seventy-five batches have gone in and the 164 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -155,4 +155,9 @@ void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp);
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
                             int32_t (__cdecl *keep)(void *obj));
 
+/* 0x0042A3D0, three callers. ObjectsInRect with no predicate, a stricter entry
+ * clip -- the whole rectangle must be on the map -- and one arm fewer in the
+ * home-cell rule. See the definition. */
+void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
+
 #endif /* AM2_MAPDRAW_H */

@@ -1103,6 +1103,24 @@ commit rather than a fourth re-run. **The `frames` line is the early warning**
 -- it is printed before the pixels and a collapse in it means neither side ran
 the scene the other did.
 
+**And the `frames` line is `orig/recon`, in that order -- read WHICH SIDE
+moved before reading the ratio.** A run of `mission` failed the gate at
+22372/7957 with a function mutated to answer nothing, and it was written up as
+the reconstruction running away and therefore as the mutation being caught.
+The first number is the ORIGINAL's, which `AM2_NOPATCH` runs and no
+reconstruction can reach, so it was evidence of nothing; the next unmutated
+run on the same machine gave 25493/8082, the same shape with nothing mutated
+at all. The mutation had in fact moved nothing the suite watches -- identical
+log, identical widget tree, and a reconstruction-side frame count inside the
+run-to-run spread -- so a function that had just been recorded as CHECKED was
+merely covered.
+
+That is the rule one entry above, applied to the other half of the comparison,
+and it was got backwards within a day of writing it down. The cure is not to
+remember the argument order: it is to read the two artifacts, which are named
+-- `$WORK/<cfg>-orig.volatile` and `$WORK/<cfg>-recon.volatile` hold the two
+numbers with the side in the filename.
+
 **Read the loop, not the data, when a table's bounds are in question.**
 `tools/scripttokens.py` was reading a range I guessed -- `0x00487A00` to
 `0x00488100` -- and reported 141 keywords. `ScriptLookupToken` walks from
@@ -2553,7 +2571,21 @@ exact oracle**, however meaningful it is when it is set.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
-  `RestoreTileSet`, and `RefreshScreen` —
+  `RestoreTileSet`, `AllObjectsInRect`, and `RefreshScreen` —
+
+  **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
+  the same drive**, which is the useful shape of it. `ObjectsInRect` and
+  `AllObjectsInRect` are instruction for instruction the same query; what
+  differs is who calls them. The first has two still-original callers in the
+  live path, the second has three -- `ADDR_STEP_TYPE6`, `0x0043D330` and
+  `ADDR_SEQ_STEP7` -- and none of the three fires on a Boot Camp mission,
+  through walking, firing or scrolling. Object type 6 is one of the three
+  types this file still records as unread, so the likeliest answer is that
+  Boot Camp has none. Verified by reading, and neither harness can help: it
+  reads two globals, so `tools/vectors.py` will not take it, and its
+  descriptor is null before `install()`, so `AM2_SELFCHECK=1` would take the
+  process down the way `LookupOwnerObj` did.
+
 
   **`OverlayPrepare` and `SelectUnit` were on this list and should not have
   been.** With a drive that actually reaches a Boot Camp mission they read

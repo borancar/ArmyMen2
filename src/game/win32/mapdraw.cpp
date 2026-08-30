@@ -2568,10 +2568,116 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
     return head;
 }
 
+/* 0x0042A3D0, three callers, 384 bytes. ObjectsInRect with no predicate: the
+ * same entry clip, the same tile conversion, the same block of cells, the same
+ * IntersectRect and the same chain through OBJ_OFF_QUERY_NEXT. The name is
+ * ours, and it says the one thing that distinguishes the two -- this one keeps
+ * everything the rectangle touches.
+ *
+ * TWO GUARDS ARE MISSING RATHER THAN CHANGED, and that is worth stating
+ * exactly, because both bodies were transcribed within an hour of each other
+ * and the difference is four bytes of jump. ObjectsInRect's home-cell rule has
+ * three arms per edge:
+ *
+ *     the object's tile is the cell      -> take it
+ *     the object's tile is EARLIER       -> take it only from the first row
+ *                                           or column scanned
+ *     the object's tile is LATER         -> skip, that cell will answer it
+ *
+ * This function has the first two and not the third: `jge take` where the
+ * other has `jg skip; jge take`. So the arm it drops is "the object's home
+ * cell is still ahead of us". Whether that arm can ever fire depends on
+ * something neither body says -- whether an object is ever chained into a cell
+ * above or left of its own hit rect's top-left. If it never is, the two rules
+ * pick the same single cell and the guard is dead; if it can be, this one
+ * answers such an object early and the other waits for its home cell.
+ * Reproduced as written either way, and not resolved here.
+ *
+ * THE ENTRY CLIP IS THE OPPOSITE TEST, which is the bigger of the two
+ * differences and the easy one to transcribe from memory of the sibling.
+ * ObjectsInRect rejects a rectangle that is entirely off the map -- right
+ * below zero, left past the extent -- and accepts one that merely overlaps.
+ * This rejects unless the WHOLE rectangle is on the map: left and top at or
+ * above zero, right and bottom inside the extents. A query straddling the map
+ * edge is answered by one and refused outright by the other.
+ *
+ * That has a consequence inside the body. With left and top known
+ * non-negative, the two clamps below -- the `>= 0 ?` on each of x0 and y0 --
+ * can never take their zero arm. The original still emits both, in the same
+ * `test reg, 0xFFFFFF00` form as the sibling, so they are written out here
+ * rather than folded away: "the original checks and the check is vacuous" is
+ * a different fact from "the original does not check".
+ */
+void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
+{
+    const uint8_t *d    = (const uint8_t *)desc;
+    uint8_t       *head = (uint8_t *)0;
+    int32_t        cols;
+    int32_t        x0, y0, x1, y1;
+    int32_t        x, y;
+    int32_t        cell;
+    int32_t        wrap;
+    RECT           hit;
+
+    if (r->left < 0
+        || r->right >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+        || r->top < 0
+        || r->bottom >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+        return (void *)0;
+
+    x0 = r->left >= 0 ? r->left >> AM2_CELL_SHIFT : 0;
+    y0 = r->top  >= 0 ? r->top  >> AM2_CELL_SHIFT : 0;
+
+    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    x1   = r->right >> AM2_CELL_SHIFT;
+    if (cols - 1 < x1)
+        x1 = cols - 1;
+    y1 = r->bottom >> AM2_CELL_SHIFT;
+    if (*(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < y1)
+        y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1;
+
+    wrap = cols - x1 + x0 - 1;
+    cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
+
+    for (y = y0; y <= y1; y++, cell += wrap) {
+        for (x = x0; x <= x1; x++, cell++) {
+            uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
+                                 (d + MAPDESC_OFF_CELLS)))[cell];
+
+            for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
+                uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+
+                if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+                    continue;
+
+                if (*(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)
+                        >> AM2_CELL_SHIFT < y
+                    && y > y0)
+                    continue;
+                if (*(const int32_t *)(o + OBJ_OFF_HIT_RECT)
+                        >> AM2_CELL_SHIFT < x
+                    && x > x0)
+                    continue;
+
+                if (!IntersectRect(&hit, (const RECT *)(o + OBJ_OFF_HIT_RECT),
+                                   (const RECT *)r))
+                    continue;
+
+                *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+                head = o;
+            }
+        }
+    }
+
+    return head;
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_OBJECTS_IN_RECT, (const void *)ObjectsInRect,
                   "ObjectsInRect", 3);
+    patch_replace(ADDR_ALL_OBJECTS_IN_RECT, (const void *)AllObjectsInRect,
+                  "AllObjectsInRect", 3);
     patch_replace(ADDR_START_SHAKE, (const void *)StartShake, "StartShake", 1);
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
