@@ -4864,6 +4864,19 @@ typedef struct {
  * binary like the CD checks; simply never satisfied. */
 #define ADDR_HAVE_DEFAULT_COF    0x00511DDCu  /* int32_t */
 #define ADDR_STR_DEFAULT_COF     0x004851C0u  /* "default.cof" */
+#define ADDR_STR_UNIT_CPP        0x0048BDD8u  /* "C:\\ArmyMen2\\source\\unit.cpp" */
+#define ADDR_STR_NUMGREEN        0x004888F4u  /* the script variable it sets */
+/* docs/00-recon.md already maps this tag to unit.cpp, from the survey of every
+ * CheckSaveTag site; this is the call it was recovered from. */
+#define AM2_SAVETAG_COF          0x06660668u  /* CheckSaveTag's expected tag */
+#define AM2_COF_TAG_LINE         0x142        /* the line CheckSaveTag reports */
+/* 0x00457320, one caller -- the state-2 ENTRY, so this runs on going into a
+ * level. Read `save\default.cof`: every object in it, healed to full, and the
+ * troopers counted into the script variable `numgreen`. Reconstructed.
+ *
+ * THE FILE DOES NOT SHIP, per ADDR_HAVE_DEFAULT_COF above, so everything past
+ * the fopen is unreachable on this data set. */
+#define ADDR_LOAD_DEFAULT_COF    0x00457320u  /* int32_t(void) */
 /* 0x00457220, three callers. Clear an object's hit record, give it a random
  * phase, detach it, and hand a non-Sarge kind-3 trooper stance 2 -- all of it
  * behind ADDR_HAVE_DEFAULT_COF. */
@@ -9276,6 +9289,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Reconstructed. */
 #define ADDR_OBJ_IS_WATCHED_KIND 0x0045EED0u  /* int32_t(const void *obj) */
 #define AM2_OBJ_TYPE_ITEM        1
+/* Type 2, the one ObjIsType2 answers for and the one LoadDefaultCof counts
+ * into `numgreen`. "Trooper" is the vocabulary orig.h already uses for it --
+ * ADDR_CREATE_TROOPER is the type-2 arm of the item-create message. */
+#define AM2_OBJ_TYPE_TROOPER     2
 /* 0x0043CF70, one caller. The FOURTH member of the block-weight family, and
  * the only one with a SIDE EFFECT: it damages what it walks past. See
  * item.cpp beside BlockWeightChain, which it is otherwise a twin of. */

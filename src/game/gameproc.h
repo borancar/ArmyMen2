@@ -118,6 +118,14 @@ void gameproc_install(void);
 /* 0x00427650 and 0x00427680. The uid remap table a load builds: clear it, and
  * append one (from, to) pair. See ADDR_UID_REMAP in orig.h for what reads it. */
 void __cdecl UidRemapClear(void);
+
+/* 0x00457320, one caller -- the state-2 entry, so this runs on the way INTO a
+ * level. Read `save\default.cof`: every object in it healed to full and every
+ * trooper counted into the script variable `numgreen`. It names
+ * C:\ArmyMen2\source\unit.cpp, a third original module name. The file does
+ * not ship, so everything past the fopen is unreachable here; see
+ * gameproc.cpp. */
+int32_t __cdecl LoadDefaultCof(void);
 void __cdecl UidRemapAdd(uint32_t from, uint32_t to);
 
 #ifdef __cplusplus

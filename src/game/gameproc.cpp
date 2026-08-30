@@ -83,6 +83,100 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
  * and a C linkage declaration here would not resolve. */
 int32_t __cdecl LoadAudioSection(am2_FILE *fp);
 
+/* LoadDefaultCof -- original 0x00457320, one caller, and that caller is the
+ * state-2 ENTRY: this runs on the way into a level, not on a save load.
+ *
+ * IT NAMES ITS OWN SOURCE FILE, and that file was already known: its
+ * CheckSaveTag call passes "C:\ArmyMen2\source\unit.cpp", which
+ * docs/00-recon.md already lists against tag 0x06660668 from the survey of
+ * every CheckSaveTag site. Worth checking before writing up -- CLAUDE.md's
+ * "two module names come from the image" is about the ones the SPLIT follows,
+ * not about how many the image carries, and the answer to the second question
+ * is ten.
+ *
+ * What it does: chdir into `save`, open `default.cof`, check its tag, then
+ * read a run of objects each preceded by AM2_SAVE_RECORD_MARK. Every object
+ * that loads is HEALED TO FULL -- OBJ_OFF_HEALTH takes OBJ_OFF_MAX_HEALTH,
+ * but only when both are already positive, so a dead one is left dead -- and
+ * every type 2 among them is counted. The count goes into the script variable
+ * `numgreen` at the end.
+ *
+ * Its per-object marker is AM2_SAVE_RECORD_MARK, the same "another record
+ * follows" dword every list-storing section uses -- orig.h already records
+ * that it is not section-specific, and this is one more section agreeing.
+ *
+ * THE LOOP READS ITS TAG BEFORE THE TEST AND AGAIN AT THE BOTTOM, so the tag
+ * that ends the run is consumed and not pushed back. Nothing reads the file
+ * afterwards, so it does not matter here; it does mean the terminator can be
+ * any dword that is not the item tag, including EOF leaving the buffer
+ * unchanged -- the fread's result is discarded, which is the same missing
+ * check LoadScriptName documents one file over.
+ *
+ * THE UID REMAP TABLE IS CLEARED AT BOTH ENDS. UidRemapClear runs before the
+ * first object and again after the last, with RemapInventoryUids between --
+ * so the table is built by the loads, consumed once, and left empty. Those
+ * are the "two callers in 0x00457370's band" orig.h already predicted for it,
+ * and this is both of them.
+ *
+ * ITS FIRST FAILURE ANSWERS THE fopen RESULT ITSELF -- a null FILE * returned
+ * as the int32 zero, which is the same value the tag failure returns
+ * deliberately. Reproduced as a literal 0, since that is what it is.
+ *
+ * EVERYTHING PAST THE fopen IS UNREACHABLE ON THIS DATA SET. orig.h already
+ * records that default.cof does not ship with the GOG install and that
+ * ADDR_HAVE_DEFAULT_COF therefore reads 0 for the whole of any run. This
+ * function does not consult that flag -- it simply tries the file and finds
+ * nothing -- so the reading of the body is verified by reading alone, and
+ * that is a stronger statement than a counter at 0 would be.
+ */
+int32_t __cdecl LoadDefaultCof(void)
+{
+    am2_FILE *fp;
+    uint32_t  tag;
+    int32_t   green = 0;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+
+    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_DEFAULT_COF),
+                    (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp)
+        return 0;
+
+    if (!CheckSaveTag(fp, AM2_SAVETAG_COF,
+                      (const char *)AM2_IMAGE(ADDR_STR_UNIT_CPP),
+                      AM2_COF_TAG_LINE)) {
+        orig_fclose(fp);
+        return 0;
+    }
+
+    UidRemapClear();
+
+    orig_fread(&tag, 4, 1, fp);
+    while (tag == AM2_SAVE_RECORD_MARK) {
+        uint8_t *obj = (uint8_t *)LoadOneItem(fp, 1);
+
+        if (obj) {
+            int16_t max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+
+            if (max > 0 && *(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
+                *(int16_t *)(obj + OBJ_OFF_HEALTH) = max;
+                if (*(const int32_t *)obj == AM2_OBJ_TYPE_TROOPER)
+                    green++;
+            }
+            LoadScriptName(fp, obj);
+        }
+        orig_fread(&tag, 4, 1, fp);
+    }
+
+    RemapInventoryUids();
+    UidRemapClear();
+
+    SetVarValueByName((const char *)AM2_IMAGE(ADDR_STR_NUMGREEN), green);
+
+    orig_fclose(fp);
+    return 1;
+}
+
 /* 0x00425A10. The read end of the savegame. Check the outer tag, throw away
  * whatever tokens the context is holding, then run the eleven loaders in the
  * order SaveGame wrote them -- which is also the order the sections appear in
@@ -1019,6 +1113,8 @@ void gameproc_install(void)
     patch_replace(ADDR_UID_REMAP_ADD, (const void *)UidRemapAdd,
                   "UidRemapAdd", 2);
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
+    patch_replace(ADDR_LOAD_DEFAULT_COF, (const void *)LoadDefaultCof,
+                  "LoadDefaultCof", 1);
     patch_replace(ADDR_DEF_GAME_PARSE, (const void *)DefGameParse,
                   "DefGameParse", 1);
     patch_replace(ADDR_SAVE_GAMEPROC, (const void *)SaveGameProcSection,

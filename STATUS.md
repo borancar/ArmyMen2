@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,213 patches.**
+Nothing uncommitted. **1,214 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1778,16 +1778,47 @@ commit -- gave the right answer every time it was used.
   `combat`, `mpoptions` and `multi` all clean first time, with `mpoptions` at
   0 pixels on three of its four frames.
 
+- **`LoadDefaultCof`** (`0x00457320`) runs on the way INTO a level -- its one
+  caller is the state-2 entry, not a save load. It reads `save\default.cof`:
+  every object in it healed to full (`OBJ_OFF_HEALTH` takes
+  `OBJ_OFF_MAX_HEALTH`, but only when both are already positive, so a dead one
+  stays dead) and every trooper counted into the script variable `numgreen`.
+
+  The uid remap table is cleared at BOTH ends, with `RemapInventoryUids`
+  between -- so it is built by the loads, consumed once, and left empty. Those
+  are the "two callers in 0x00457370's band" `orig.h` predicted for
+  `UidRemapClear`, and this function is both of them.
+
+  **Everything past the `fopen` is unreachable on this data set**, and that is
+  a stronger statement than a counter at 0: `orig.h` already records that
+  `default.cof` does not ship with the GOG install, and the `save/` directory
+  confirms it. The function does not consult `ADDR_HAVE_DEFAULT_COF` -- it
+  simply tries the file and finds nothing.
+
+- **I nearly wrote up a "third source filename recovered from the image" and
+  it would have been wrong.** This function passes
+  `C:\ArmyMen2\source\unit.cpp` to `CheckSaveTag`, and CLAUDE.md's "two
+  module names come from the image itself" made that look new. It is not:
+  `docs/00-recon.md` lists ten of them and maps this very tag, `0x06660668`,
+  to `unit.cpp`. **CLAUDE.md's "two" is about which names the SPLIT follows,
+  not about how many the image carries** -- two different questions, and the
+  same sentence answers only the first. Checked before writing rather than
+  after.
+
+  A second near-miss in the same batch: `AM2_SAVETAG_COF_ITEM` was a new name
+  for `AM2_SAVE_RECORD_MARK`, whose own comment says it is not
+  section-specific and that a second name appeared once before. Deleted.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,059 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,213
+line (0x0045C000) patched**. Measured: **1,060 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,214
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-nine batches have gone in and the 180 entries outstanding start at 48
+small ones in batches. Sixty batches have gone in and the 179 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
