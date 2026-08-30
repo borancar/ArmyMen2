@@ -1668,22 +1668,25 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
  * caller in the image is a panel or in-mission path, and a guard here would
  * be a different function.
  *
- * BlinkerStart and ListAdd live in win32/widget.cpp and are declared here
- * rather than included: this module is flat, and widget.h reaches
- * LPDIRECTDRAWSURFACE through the sprite in a widget. Same seam and the same
- * reason as the three comm methods above. */
+ * BlinkerStart, ListAdd and ArrowBarFollowEnd live in win32/widget.cpp and
+ * are declared here rather than included: this module is flat, and widget.h
+ * reaches LPDIRECTDRAWSURFACE through the sprite in a widget. Same seam and
+ * the same reason as the three comm methods above.
+ *
+ * The widget at MP_PANEL_OFF_CHATBOX is the scrolling text list itself and
+ * its 0x7C is LIST_OFF_ARROWBAR -- the bar beside it, which is what gets
+ * told to follow the end. It was CHATBOX_OFF_INNER until the bar's own
+ * method was read; one offset, one name. */
 extern "C" {
 void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
                                             int32_t flips);
 void __attribute__((thiscall)) ListAdd(void *list, const char *name,
                                        void *value);
 void __attribute__((thiscall)) ListDropOldest(void *list);
+void __attribute__((thiscall)) ArrowBarFollowEnd(void *bar);
 }
 
 typedef void (__attribute__((thiscall)) *AM2_PaintSlotFn)(void *w, AM2_Rect r);
-#define orig_chatbox_reflow \
-            ((void (__attribute__((thiscall)) *)(void *)) \
-             (uintptr_t)ADDR_CHATBOX_REFLOW)
 
 void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
 {
@@ -1706,7 +1709,7 @@ void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
         return;
 
     chatbox = *(uint8_t **)(screen + MP_PANEL_OFF_CHATBOX);
-    orig_chatbox_reflow(*(void **)(chatbox + CHATBOX_OFF_INNER));
+    ArrowBarFollowEnd(*(void **)(chatbox + LIST_OFF_ARROWBAR));
 
     /* Re-read, as the original does: it loads the field again rather than
      * keeping the register it had across the call. */

@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,193 patches.**
+Nothing uncommitted. **1,194 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1324,16 +1324,35 @@ commit -- gave the right answer every time it was used.
   This is the SIXTH non-advancing removal loop found in this tree, and the
   first where the same function gets it right once and wrong once.
 
+- **`ArrowBarFollowEnd`** (`0x00455D60`) went in months ago under
+  `ADDR_CHATBOX_REFLOW`, which is a name taken from its one call site: the
+  chat appender reaches it as `[chatbox + 0x7C]`. That offset is
+  `LIST_OFF_ARROWBAR` and the object on the other end of it is the BAR, not
+  the box -- so the name was wrong about which class the method belongs to,
+  which is the sixth instance of naming a function from a call site. Renamed,
+  not aliased, and `CHATBOX_OFF_INNER` went with it: one offset, one name.
+
+  The body is `ArrowBarScroll`'s tail with the step replaced by a clamp. It
+  raises the list's top row to `count - visible` and NEVER lowers it, so the
+  bar follows a list that grew and cannot follow one that shrank. Nothing
+  shrinks one: the log is trimmed from the oldest end, which moves the count
+  and the content together.
+
+  Every field is loaded again after the paint, the list pointer included.
+  Reproduced -- the painter is a virtual and could have moved any of them, and
+  which loads the original chose to repeat is evidence about what it thought
+  could change.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,040 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,193
+line (0x0045C000) patched**. Measured: **1,041 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,194
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-four batches have gone in and the 199 entries outstanding start at 48
+small ones in batches. Forty-five batches have gone in and the 198 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

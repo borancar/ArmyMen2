@@ -2639,13 +2639,11 @@
 #define AM2_TEXT_LIST_FONT       1
 #define ADDR_MENU_MSG_LIST       0x0051612Cu  /* the message log, a string list */
 #define AM2_MENU_MSG_MAX         0x64         /* trimmed above this many lines */
-#define ADDR_CHATBOX_REFLOW      0x00455D60u  /* thiscall(this) on [widget+0x7C] */
 #define AM2_BLINK_PERIOD         0x64
 #define AM2_BLINK_FLASHES        0x14
 #define MP_PANEL_OFF_CHATBOX     0x21Cu
 #define MP_PANEL_OFF_BLINKER_0   0x250u
 #define MP_PANEL_OFF_BLINKER_1   0x254u
-#define CHATBOX_OFF_INNER        0x7Cu
 #define AM2_MENU_MODE_NO_CHAT    8
 /* Was ADDR_CHAT_APPEND, which is what Announce's second call LOOKS like from
  * where it sits and not what the body does: it stamps a static message record
@@ -3659,6 +3657,10 @@ typedef struct {
 #define ADDR_ARROWBAR_DESTRUCT   0x00455BA0u /* thiscall void(obj) */
 #define ARROWBAR_OFF_SHIFT       0x70u /* int32_t, where the thumb sits */
 #define ARROWBAR_OFF_SPAN        0x74u
+/* Was ADDR_CHATBOX_REFLOW, from the one call site, which reaches it as
+ * `[chatbox + 0x7C]`. That field is LIST_OFF_ARROWBAR and the object on the
+ * other end of it is the BAR. Renamed, not aliased. */
+#define ADDR_ARROWBAR_FOLLOW_END 0x00455D60u /* thiscall void(AM2_Widget *) */
 /* 0x00455C10, thiscall `ret 0x10`: repaint a widget through the nearest
  * ANCESTOR that owns a sprite, ignoring the clip rectangle it is handed and
  * using that ancestor's own. Near-twin of WidgetRepaint (0x00453FF0) without

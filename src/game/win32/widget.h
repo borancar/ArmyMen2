@@ -1355,6 +1355,11 @@ void __cdecl OnControlsDefault(AM2_Widget *w);
  * the bar it belongs to is at ARROW_OFF_OWNER. */
 void __cdecl OnArrowUp(AM2_Widget *w);
 void __cdecl OnArrowDown(AM2_Widget *w);
+
+/* Original: 0x00455D60, thiscall, no stack arguments. The arrow bar's OTHER
+ * mover: jump the list to its end and put the thumb at the bottom. The chat
+ * log's appender calls it, so the newest line is always the visible one. */
+void __attribute__((thiscall)) ArrowBarFollowEnd(AM2_Widget *bar);
 void __cdecl OnArrowLeft(AM2_Widget *w);
 void __cdecl OnArrowRight(AM2_Widget *w);
 

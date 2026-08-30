@@ -6292,6 +6292,65 @@ void __cdecl OnArrowDown(AM2_Widget *w)
     ArrowBarScroll(w, 1);
 }
 
+/* 0x00455D60, thiscall, no stack arguments. The bar's other mover: not a step
+ * but a JUMP TO THE END, and it exists because the chat log grows from
+ * underneath. MenuMessage appends a line and calls this, so the newest line is
+ * always the one on screen.
+ *
+ * It is ArrowBarScroll's tail with the step replaced by a clamp, and the
+ * comparison is one-sided: it raises the top row to `count - visible` and
+ * never lowers it. So the bar cannot follow a list that SHRANK -- nothing here
+ * shrinks one, since the log is trimmed from the oldest end and the trim moves
+ * the count and the content together.
+ *
+ * The consequence for a reader who has scrolled up is the ordinary one: the
+ * next message pulls them back to the bottom. That is the original's
+ * behaviour and not a defect of it.
+ *
+ * The name it went in under -- ADDR_CHATBOX_REFLOW -- was taken from the one
+ * call site, which reaches it as `[chatbox + 0x7C]`. That field is
+ * LIST_OFF_ARROWBAR and the object is the bar, not the box. Renamed, not
+ * aliased. */
+void __attribute__((thiscall)) ArrowBarFollowEnd(AM2_Widget *bar)
+{
+    uint8_t          *b = (uint8_t *)bar;
+    AM2_Widget       *list = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
+    const AM2_Sprite *thumb;
+    uint8_t          *l;
+    int32_t           top;
+    int32_t           visible;
+    int32_t           count;
+
+    if (!list)
+        return;
+    l = (uint8_t *)list;
+
+    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
+    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
+    if (*(const int32_t *)(l + LIST_OFF_TOP_ROW) >= count - visible)
+        return;
+    *(int32_t *)(l + LIST_OFF_TOP_ROW) = count - visible;
+
+    ((AM2_WidgetPaintFn *)list->vtable)[WIDGET_VSLOT_PAINT](list, list->rect);
+
+    /* Every field is loaded again after the paint, the list pointer included.
+     * Reproduced: the painter is a virtual and could have moved any of them,
+     * and which loads the original chose to repeat is evidence about what it
+     * thought could change. */
+    list    = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
+    l       = (uint8_t *)list;
+    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
+    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
+    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
+
+    thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
+    *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+        ThumbShift(top, count - visible,
+                   *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
+                   - thumb->bounds.bottom);
+    RepaintAncestor(bar, bar->rect);
+}
+
 /* 0x00455ED0 and 0x00455F60. The scroll bar's own position, one step, and
  * then its onChange if it has one -- which the AUDIO dialog's three bars do,
  * so an arrow click is a volume change. Nothing here touches a list. */
@@ -8765,6 +8824,9 @@ int widget_install(void)
                         "OnArrowUp", 0);
     rc |= patch_replace(ADDR_ON_ARROW_DOWN, (const void *)OnArrowDown,
                         "OnArrowDown", 0);
+    rc |= patch_replace(ADDR_ARROWBAR_FOLLOW_END,
+                        (const void *)ArrowBarFollowEnd,
+                        "ArrowBarFollowEnd", 0);
     rc |= patch_replace(ADDR_ON_ARROW_LEFT, (const void *)OnArrowLeft,
                         "OnArrowLeft", 0);
     rc |= patch_replace(ADDR_ON_ARROW_RIGHT, (const void *)OnArrowRight,
