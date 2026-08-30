@@ -99,4 +99,8 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight);
  * that widens the cone and suppresses the reveal at once. */
 void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight);
 
+/* 0x0042BCF0, one caller. Seal the map's four edges, then flag every tile as
+ * blocking and/or near the border. */
+void __cdecl SealMapEdges(void);
+
 #endif /* AM2_REGION_H */

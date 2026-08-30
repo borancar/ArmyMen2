@@ -1288,6 +1288,11 @@
  * whose weight has reached AM2_CELL_WEIGHT_STEP. Per tile index, like the two
  * tables beside it. */
 #define ADDR_CELL_WEIGHTS      0x00514EC0u /* uint8_t *, one per tile index */
+/* 0x0042BCF0, one caller. Seal the map's four edges with a full cell weight,
+ * then walk every tile once: block what is marked open, mark what is blocked,
+ * and flag everything outside a five-tile margin. */
+#define ADDR_SEAL_MAP_EDGES    0x0042BCF0u /* void(void) */
+#define AM2_EDGE_MARGIN        5
 #define AM2_CELL_WEIGHT_STEP   0x0Fu       /* what one footprint point is worth */
 #define OBJ_OFF_TILE           0x1Au       /* uint16_t, indexes the above */
 /* Scratch, and only ObjTileChanged writes it: the tile the object was in
@@ -6081,6 +6086,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * with fewer than two COVERED neighbours, over the same twenty deltas the
  * cover pair walks. What reads them is elsewhere; the names say what sets
  * them. */
+/* Bit 1, and SealMapEdges is its only writer: set for every tile OUTSIDE a
+ * five-tile margin. Its margin is computed from the map's HEIGHT on both
+ * axes -- see that function -- so on a non-square map the x band is wrong. */
+#define AM2_TILE_NEAR_EDGE         0x02u
 #define AM2_TILE_NO_WEIGHT_NEAR    0x04u
 #define AM2_TILE_LITTLE_COVER_NEAR 0x08u
 /* 0x0045B690, two callers, 112 bytes. The same accumulation as

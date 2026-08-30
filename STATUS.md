@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,189 patches.**
+Nothing uncommitted. **1,190 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1254,16 +1254,34 @@ commit -- gave the right answer every time it was used.
   `lea eax, [esp+0xC]` points at where `cand` was pushed -- which is harmless
   and is why this needs a local where the disassembly appears not to.
 
+- **`SealMapEdges`** (`0x0042BCF0`) computes its five-tile border margin from
+  the map's HEIGHT ON BOTH AXES -- the band is `5 <= y <= height - 5` and
+  `5 <= x <= height - 5`, the same `height - 5`, not `width - 5`. On a square
+  map the two agree and nothing shows; on a wider one a column near the right
+  edge goes unflagged. It is one register the original computes once and
+  compares twice, so this is what the binary does rather than a transcription
+  slip. Reproduced.
+
+  **Its third pass reads a weight it may itself have just written.** A tile
+  marked `AM2_TILE_OPEN` is given a full cell weight and then, two
+  instructions later, has `AM2_TILE_BLOCKS` set because of it -- so "open"
+  implies "blocks", within one iteration. That is the other half of the
+  inverted polarity already recorded for bit 0: `BlockWeightChain` penalises a
+  tile whose bit 0 is CLEAR, and here the bit being SET is what makes the tile
+  impassable.
+
+  Bit 1 (`AM2_TILE_NEAR_EDGE`) had no name and this is its only writer.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,036 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,189
+line (0x0045C000) patched**. Measured: **1,037 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,190
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty batches have gone in and the 203 entries outstanding start at 48
+small ones in batches. Forty-one batches have gone in and the 202 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

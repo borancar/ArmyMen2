@@ -1145,6 +1145,77 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
     }
 }
 
+/* SealMapEdges -- original 0x0042BCF0, one caller.
+ *
+ * Seal the map's four edges with a full cell weight, then walk every tile once
+ * and settle three things about it.
+ *
+ * THE THREE PASSES ARE NOT INTERCHANGEABLE. The first two write weights; the
+ * third READS the weight it may itself have just written -- a tile marked
+ * AM2_TILE_OPEN is given a full weight and then, two instructions later, has
+ * AM2_TILE_BLOCKS set because of it. So "open" ends up implying "blocks",
+ * which is the opposite of what the two names suggest, and it happens inside
+ * one iteration rather than between passes.
+ *
+ * AM2_TILE_OPEN's polarity is already recorded as inverted against its name --
+ * `BlockWeightChain` penalises a tile whose bit 0 is CLEAR. This is the other
+ * half of that: the bit being SET is what makes the tile impassable here.
+ *
+ * THE EDGE MARGIN IS COMPUTED FROM THE HEIGHT ON BOTH AXES. The band is
+ * `5 <= y <= height - 5` and `5 <= x <= height - 5` -- the same `height - 5`,
+ * not `width - 5`. On a square map the two agree and nothing shows; on a wider
+ * one the x band is short and a column of tiles near the right edge would go
+ * unflagged, while on a taller one it runs past the width. Reproduced exactly:
+ * it is a single register the original computes once and compares twice, so
+ * this is what the binary does rather than a transcription slip.
+ *
+ * THE WEIGHT COMPARISON IS SIGNED, as everywhere else that reads this grid, so
+ * a weight of 0x80 or more reads as negative and does NOT get the blocks bit.
+ *
+ * The first pass walks x and touches two rows; the second walks y and touches
+ * two columns, indexing the LEFT edge of row y and the RIGHT edge of row y-1
+ * from one multiply. The corners are therefore written more than once, which
+ * costs nothing and is why the second pass starts at 1 rather than 0.
+ *
+ * Every global is re-read on every iteration -- the width, the height, both
+ * grids. Nothing here can move them; written as the plain loops that means.
+ */
+void __cdecl SealMapEdges(void)
+{
+    int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t  h = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
+    int8_t  *weights = *(int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS;
+    uint8_t *flags;
+    int32_t  x, y, i;
+
+    for (x = 0; x < w; x++) {
+        weights[x]                 = (int8_t)AM2_CELL_WEIGHT_STEP;
+        weights[(h - 1) * w + x]   = (int8_t)AM2_CELL_WEIGHT_STEP;
+    }
+
+    for (y = 1; y < h; y++) {
+        weights[w * y - 1] = (int8_t)AM2_CELL_WEIGHT_STEP;
+        weights[w * y]     = (int8_t)AM2_CELL_WEIGHT_STEP;
+    }
+
+    flags = *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS;
+
+    for (i = 0, y = 0; y < h; y++) {
+        for (x = 0; x < w; x++, i++) {
+            if (flags[i] & AM2_TILE_OPEN)
+                weights[i] = (int8_t)AM2_CELL_WEIGHT_STEP;
+
+            if (weights[i] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+                flags[i] |= AM2_TILE_BLOCKS;
+
+            /* `h - AM2_EDGE_MARGIN` on BOTH axes -- see above. */
+            if (!(y >= AM2_EDGE_MARGIN && y <= h - AM2_EDGE_MARGIN
+                  && x >= AM2_EDGE_MARGIN && x <= h - AM2_EDGE_MARGIN))
+                flags[i] |= AM2_TILE_NEAR_EDGE;
+        }
+    }
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -1163,6 +1234,8 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_SEAL_MAP_EDGES, (const void *)SealMapEdges,
+                        "SealMapEdges", 1);
     rc |= patch_replace(ADDR_CONSIDER_SIGHTING_C,
                         (const void *)ConsiderSightingC,
                         "ConsiderSightingC", 4);
