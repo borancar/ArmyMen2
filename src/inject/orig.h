@@ -1289,6 +1289,17 @@
 /* 0x0043DD30, one caller. Free every string the scenario table owns, then the
  * table, then clear both globals. */
 #define ADDR_FREE_SCENARIOS      0x0043DD30u  /* void(void) */
+/* 0x0043DC10, one caller -- the map loader. Parse the scenario table out of
+ * the map file's buffer: a count, then one 0x10-byte "Scenario<n>" header and
+ * four parts per record. Reconstructed. */
+#define ADDR_PARSE_SCENARIOS     0x0043DC10u  /* int32(uint8_t **, int32 *) */
+/* 0x0043DAA0, one caller, still original: fill one 0x0C-byte part from the
+ * buffer and answer how many bytes it took. */
+#define ADDR_PARSE_SCENARIO_PART 0x0043DAA0u  /* int32(void *part, void *at) */
+#define ADDR_STR_SCENARIO        0x00487C20u  /* "Scenario", memcmp'd, 8 bytes */
+#define AM2_SCENARIO_TAG_BYTES   8u
+#define AM2_SCENARIO_HDR_BYTES   0x10u
+#define SCENARIO_HDR_OFF_DIGIT   8u    /* '1'..'4'; the record it selects */
 /* The byte beside it, indexed by a TILE INDEX rather than by a map square: 27
  * sites read it and nothing here writes it. The name is ours. */
 #define ADDR_TILE_ATTRS        0x00514EBCu /* uint8_t *, one per tile index */

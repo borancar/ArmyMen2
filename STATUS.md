@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,224 patches.**
+Nothing uncommitted. **1,225 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2109,16 +2109,39 @@ commit -- gave the right answer every time it was used.
   thing**, and I had just written a paragraph claiming there was no second
   reader.
 
+- **`ParseScenarios`** (`0x0043DC10`) builds the table `FreeScenarios` has
+  been tearing down since long before. It RUNS -- one call per map load -- so
+  this one is genuinely A/B covered rather than verified by reading.
+
+  **The record is chosen by a DIGIT IN THE HEADER, not by the loop index.**
+  Byte 8, the character after `"Scenario"`, is read as '1'..'4' and
+  `digit - '1'` indexes the table. So records may arrive in any order, two
+  headers naming the same digit overwrite one another silently, and a byte of
+  ZERO is treated as index 0 rather than as an error -- which is the one case
+  the subtraction is guarded for.
+
+  A header that fails the memcmp abandons the parse and answers 0 **with the
+  table already allocated and the globals already pointing at it**, so a
+  truncated file leaves a half-filled table rather than none.
+
+  **Its second argument is a remaining-bytes counter that nothing ever reads,
+  passed BY VALUE.** Four comes off it for the count, sixteen per header and
+  the part parser's answer per part -- in a register discarded at the return,
+  which no caller can see. The parse trusts the buffer end to end and the
+  arithmetic is dead. Reproduced, and **GCC's own "set but not used" on that
+  parameter is the same finding arrived at independently** -- worth keeping
+  the warning's wording beside it rather than just silencing it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,070 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,224
+line (0x0045C000) patched**. Measured: **1,071 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,225
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy batches have gone in and the 169 entries outstanding start at 48
+small ones in batches. Seventy-one batches have gone in and the 168 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

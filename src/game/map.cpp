@@ -468,6 +468,112 @@ int32_t __cdecl LevelCount(void)
     return *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
 }
 
+/* The part parser stays original: it fills one 0x0C-byte sub-entry from the
+ * buffer and answers how many bytes it consumed. */
+typedef int32_t (__cdecl *AM2_ScenarioPartFn)(void *part, const void *at);
+#define orig_parse_scenario_part \
+    ((AM2_ScenarioPartFn)AM2_IMAGE(ADDR_PARSE_SCENARIO_PART))
+
+/* ParseScenarios -- original 0x0043DC10, one caller, which is the map loader.
+ * Build the scenario table FreeScenarios tears down.
+ *
+ * The buffer holds a dword count and then that many 0x40-byte records, each
+ * introduced by a 0x10-byte header whose first eight bytes are the literal
+ * "Scenario". A header that fails that memcmp abandons the whole parse and
+ * answers 0 -- with the table already allocated and the globals already
+ * pointing at it, so a truncated file leaves a half-filled table behind
+ * rather than none.
+ *
+ * THE RECORD IS CHOSEN BY A DIGIT IN THE HEADER, NOT BY THE LOOP INDEX. Byte
+ * 8 -- the character after "Scenario" -- is taken as '1'..'4' and `digit -
+ * '1'` indexes the table. So the records may arrive in any order, and two
+ * headers naming the same digit overwrite one another silently. A byte of
+ * ZERO is treated as index 0 rather than as an error, which is the one case
+ * the subtraction is guarded for.
+ *
+ * The whole 16-byte header is then copied into the record's first sixteen
+ * bytes, and the four SCENARIO_PARTS follow it at SCENARIO_OFF_PARTS -- each
+ * parsed by the original's part parser, which reports how far it got so the
+ * cursor can advance.
+ *
+ * ITS SECOND ARGUMENT IS A REMAINING-BYTES COUNTER THAT NOTHING EVER READS,
+ * and it is passed BY VALUE. Four comes off it for the count, sixteen for
+ * each header and the part parser's answer for each part -- in a register
+ * that is discarded at the return. Nothing compares it against anything and
+ * no caller can see the result. So the parse trusts the buffer from beginning
+ * to end and the arithmetic is dead; both are reproduced, because a bound
+ * that is computed and ignored is a fact about the original worth keeping.
+ *
+ * The CURSOR is by value too, and likewise never written back -- so a caller
+ * cannot learn how far the parse got except from the return.
+ *
+ * It answers the COUNT on success and 0 on a bad header. The count is read
+ * once into a local and the loop bound comes from that, not from the global
+ * the header word was written to.
+ */
+int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
+{
+    const uint8_t *p = at;
+    int32_t        count;
+    uint8_t       *table;
+    int32_t        i;
+
+    *(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD = 0;
+    *(uint8_t **)(uintptr_t)ADDR_SCENARIOS      = (uint8_t *)0;
+
+    count = *(const int32_t *)p;
+    p += 4;
+    remaining -= 4;
+
+    table = (uint8_t *)orig_malloc((size_t)count * AM2_SCENARIO_BYTES);
+    *(uint8_t **)(uintptr_t)ADDR_SCENARIOS = table;
+    *(uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT = (uint16_t)count;
+
+    for (i = 0; i < count; i++) {
+        uint32_t hdr[AM2_SCENARIO_HDR_BYTES / 4];
+        uint8_t *rec;
+        int32_t  which;
+        int32_t  part;
+
+        hdr[0] = *(const uint32_t *)(p + 0);
+        hdr[1] = *(const uint32_t *)(p + 4);
+        hdr[2] = *(const uint32_t *)(p + 8);
+        hdr[3] = *(const uint32_t *)(p + 12);
+        p += AM2_SCENARIO_HDR_BYTES;
+        remaining -= (int32_t)AM2_SCENARIO_HDR_BYTES;
+
+        if (memcmp(hdr, (const void *)AM2_IMAGE(ADDR_STR_SCENARIO),
+                   AM2_SCENARIO_TAG_BYTES) != 0)
+            return 0;
+
+        {
+            uint8_t digit = ((const uint8_t *)hdr)[SCENARIO_HDR_OFF_DIGIT];
+
+            which = digit ? (int32_t)(int8_t)digit - '1' : 0;
+        }
+
+        rec = table + (uint32_t)which * AM2_SCENARIO_BYTES;
+        *(uint32_t *)(rec + 0)  = hdr[0];
+        *(uint32_t *)(rec + 4)  = hdr[1];
+        *(uint32_t *)(rec + 8)  = hdr[2];
+        *(uint32_t *)(rec + 12) = hdr[3];
+
+        for (part = 0; part < (int32_t)AM2_SCENARIO_PARTS; part++) {
+            int32_t took = orig_parse_scenario_part(
+                rec + SCENARIO_OFF_PARTS
+                    + (uint32_t)part * SCENARIO_PART_BYTES, p);
+
+            p += took;
+            remaining -= took;
+        }
+    }
+
+    /* Kept, and said out loud: GCC's own "set but not used" on this parameter
+     * is the same finding the disassembly gives, arrived at independently. */
+    (void)remaining;
+    return count;
+}
+
 /* FreeScenarios -- original 0x0043DD30, one caller.
  *
  * Free every string the scenario table owns, then the table, then clear both
@@ -712,6 +818,8 @@ void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
                         "LevelCount", 2);
+    patch_replace(ADDR_PARSE_SCENARIOS, (const void *)ParseScenarios,
+                  "ParseScenarios", 1);
     patch_replace(ADDR_FREE_SCENARIOS, (const void *)FreeScenarios,
                   "FreeScenarios", 1);
     patch_replace(ADDR_ADD_LEVEL_RECORD, (const void *)AddLevelRecord,
