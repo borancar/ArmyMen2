@@ -1285,16 +1285,38 @@
 #define AM2_SCENARIO_PARTS       4u
 #define SCENARIO_OFF_PARTS       0x10u
 #define SCENARIO_PART_BYTES      0x0Cu
-#define SCENARIO_PART_OFF_NAME   0x08u
-/* 0x0043DD30, one caller. Free every string the scenario table owns, then the
- * table, then clear both globals. */
+#define SCENARIO_PART_OFF_COUNT  0x04u  /* uint16_t, rows in the array below */
+/* +0x08 was SCENARIO_PART_OFF_NAME until ParseScenarioPart was read. It is
+ * not a name: it is a malloc'd array of SCENARIO_PART_OFF_COUNT records of
+ * SCEN_ROW_BYTES each, and FreeScenarios frees it as one block. The old name
+ * came from the free alone, which cannot tell an array from a string. */
+#define SCENARIO_PART_OFF_ROWS   0x08u  /* uint8_t *, count * SCEN_ROW_BYTES */
+/* One row of a scenario part, as ParseScenarioPart writes it and 0x0043DDA0
+ * reads it back. +0x00 is a kind, which the reader compares against 0x8005;
+ * +0x04 is two uint16 taken off the wire as x then y, which the reader stores
+ * into a packed point global; +0x10 is an amount the reader floors at 1. Of
+ * the rest, +0x11 is a flag the parser writes NEGATED and +0x12 one it
+ * defaults to 1, so neither means on the wire what it means in the record.
+ * +0x64 and +0x68 come off no wire at all -- the parser seeds them from
+ * ADDR_ZERO_POINT and zero. */
+#define SCEN_ROW_BYTES           0x6Cu
+#define SCEN_ROW_OFF_KIND        0x00u
+#define SCEN_ROW_OFF_POS         0x04u  /* int16_t x, int16_t y */
+#define SCEN_ROW_OFF_AMOUNT      0x10u
+#define SCEN_ROW_OFF_FLAG        0x11u  /* set when the wire byte was ZERO */
+#define SCEN_ROW_OFF_FIELD_12    0x12u  /* wire byte, forced to 1 if zero */
+#define SCEN_ROW_OFF_NAME        0x13u  /* to +0x64, so 0x51 bytes, unbounded */
+#define SCEN_ROW_OFF_AT          0x64u  /* packed point, seeded to the origin */
+#define SCEN_ROW_OFF_FIELD_68    0x68u
+/* 0x0043DD30, one caller. Free the four row arrays each scenario owns, then
+ * the table, then clear both globals. */
 #define ADDR_FREE_SCENARIOS      0x0043DD30u  /* void(void) */
 /* 0x0043DC10, one caller -- the map loader. Parse the scenario table out of
  * the map file's buffer: a count, then one 0x10-byte "Scenario<n>" header and
  * four parts per record. Reconstructed. */
 #define ADDR_PARSE_SCENARIOS     0x0043DC10u  /* int32(uint8_t **, int32 *) */
-/* 0x0043DAA0, one caller, still original: fill one 0x0C-byte part from the
- * buffer and answer how many bytes it took. */
+/* 0x0043DAA0, one caller. Fill one 0x0C-byte part from the buffer and answer
+ * how many bytes it took. Reconstructed. */
 #define ADDR_PARSE_SCENARIO_PART 0x0043DAA0u  /* int32(void *part, void *at) */
 #define ADDR_STR_SCENARIO        0x00487C20u  /* "Scenario", memcmp'd, 8 bytes */
 #define AM2_SCENARIO_TAG_BYTES   8u

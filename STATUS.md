@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-30**, at `8507c04`. Working tree clean.
+Last updated: **2026-08-31**, at `cda06d3`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,229 patches.**
+Nothing uncommitted. **1,230 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2261,16 +2261,50 @@ commit -- gave the right answer every time it was used.
   likely answer is that Boot Camp has none. Neither offline harness can help:
   it reads two globals, and its descriptor is null before `install()`.
 
+- **`ParseScenarioPart`** (`0x0043DAA0`) fills one of the four parts of a
+  scenario record and answers how many bytes of the map buffer it took, which
+  is how `ParseScenarios` advances its cursor. Three findings, and an exact
+  oracle to check them with.
+
+  **The +0x08 field is not a name.** `SCENARIO_PART_OFF_NAME` was named from
+  `FreeScenarios`, which is a `free` site -- the weakest toucher there is,
+  since it says the field is owned memory and nothing else. The writer puts a
+  malloc'd array of `count * 0x6C` rows there. Renamed
+  `SCENARIO_PART_OFF_ROWS`, and `FreeScenarios`'s own comment went with it.
+
+  **Two of the row's four wire bytes are rewritten rather than stored.** The
+  second is stored NEGATED -- a wire zero becomes 1 -- and the third is stored
+  and then forced to 1 if it was zero. So a wire "0" means "yes" for one and
+  "default" for the other, and storing either straight is wrong in a way no
+  length check could see.
+
+  **The name's length byte is signed** (`movsx` before both the cursor
+  advance and the byte total), so 0x80 or more moves the cursor backwards. The
+  copy is a `strcpy` off the NUL and the byte never bounds it, so a name longer
+  than the 0x51 bytes to the next field overruns. Both reproduced. And a
+  NEGATIVE row count reaches the allocation: zero returns before it, the
+  `<= 0` guard comes after.
+
+  **Verified against an exact dump, not a pixel.** Reading the parsed table
+  out of the running game over the control socket and diffing against
+  `AM2_NOPATCH=1` is byte for byte identical. Boot Camp's table is one row --
+  kind 0x8005 at (0x6CF, 0x41C) named `greensarge1` -- and it is enough to
+  catch both rewrite rules: storing the flag straight gives `000101` for
+  `000001`, dropping the default gives `000000`. Dropping the name length from
+  the byte total kills the process before the map finishes loading. What one
+  row cannot reach is the empty-name arm, an empty part, and the three
+  variable-length runs skipped before the first kept field.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,075 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,229
+line (0x0045C000) patched**. Measured: **1,076 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,230
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-five batches have gone in and the 164 entries outstanding start at 48
+small ones in batches. Seventy-six batches have gone in and the 163 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

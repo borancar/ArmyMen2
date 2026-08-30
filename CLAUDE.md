@@ -583,6 +583,17 @@ actually begins four bytes earlier at `0x00489BF8` with the name at +0.
 dereference past it, corrected once `MsgListCopyByKey` was seen memcpy'ing the
 field wholesale for the length beside it.
 
+**`SCENARIO_PART_OFF_NAME` is the third, and its one toucher was a `free`.**
+That offset was named from `FreeScenarios`, which walks the scenario table and
+hands `[rec + 0x18 + n*0x0C]` to the allocator four times per record. A free
+site tells you the field is owned memory and NOTHING ELSE -- it cannot tell an
+array from a string, and "name" is the guess that fits a `char *`.
+`ParseScenarioPart` is the writer, and it puts a malloc'd array of
+`count * SCEN_ROW_BYTES` records there. Renamed `SCENARIO_PART_OFF_ROWS`, and
+`FreeScenarios`'s own comment -- "free every string the scenario table owns" --
+was wrong with it. **A `free` is the weakest possible toucher: prefer the
+writer, and treat a name derived from a teardown as unsupported.**
+
 The cure is the same in both directions: `ADDR_CELL_WEIGHTS` and
 `ADDR_TILE_COVER` sat unnamed for months and were settled in an afternoon by a
 `+1`/`-1` PAIR writing one of them and a footprint routine subtracting fifteen
@@ -1197,6 +1208,26 @@ the lock/unlock bracket. The title screen alone touches almost none of the
 engine, so it proves very little. From the briefing screen, **`RETURN` starts
 the mission** — the cursor is hidden there, so `tools/point.py` cannot find it
 and clicking is not an option.
+
+**The scenario table is another global worth dumping, and the dump is exact.**
+`ParseScenarioPart` fills a structure nothing draws: four parts per scenario,
+each a malloc'd array of 0x6C-byte rows with a kind, a point, three rewritten
+bytes and a name. A wrong field there changes which units a mission starts
+with, which reaches the screen only as a different-looking map. Reading the
+table out of the running game over the control socket and diffing against
+`AM2_NOPATCH=1` compares it byte for byte with no budget -- the same idea as
+`tools/trigdump.py` and `ctl widgets`.
+
+Boot Camp's table is ONE row -- `05800000 cf061c04 ... greensarge1`, kind
+0x8005 at the world point (0x6CF, 0x41C) -- so say what one row reaches.
+Storing the negated flag straight fails it (`000001` against `000101`), and so
+does dropping the default that forces the third byte to 1 (`000001` against
+`000000`), which between them prove that BOTH rewrite rules are exercised and
+that the wire bytes behind them are 1 and 0 respectively. Dropping the name's
+length from the byte total kills the process outright before the map finishes
+loading, which is caught in the bluntest possible way. What one row cannot
+reach is the empty-name arm, a part with no rows, and the three
+variable-length runs the parser skips before it reads anything it keeps.
 
 **`tools/anicheck.py` reads inside a structure no A/B can see.**
 `LoadAnimTable` is the tail of a `.ani` load — the list of animations over the

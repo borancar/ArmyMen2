@@ -468,11 +468,145 @@ int32_t __cdecl LevelCount(void)
     return *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
 }
 
-/* The part parser stays original: it fills one 0x0C-byte sub-entry from the
- * buffer and answers how many bytes it consumed. */
-typedef int32_t (__cdecl *AM2_ScenarioPartFn)(void *part, const void *at);
-#define orig_parse_scenario_part \
-    ((AM2_ScenarioPartFn)AM2_IMAGE(ADDR_PARSE_SCENARIO_PART))
+/* ParseScenarioPart -- original 0x0043DAA0, one caller, which is
+ * ParseScenarios below.
+ *
+ * It fills one 0x0C-byte part and answers how many bytes of the buffer it
+ * took, which is how the caller's cursor advances. The part is
+ * {?, uint16 count, rows *}: three dwords cleared on entry, the count written
+ * as a HALF word into the middle one, and a malloc'd array of SCEN_ROW_BYTES
+ * records in the third. FreeScenarios frees exactly that third dword for each
+ * of the four parts -- `[rec + 0x18 + n*0x0C]`, four times -- which is what
+ * settles that it is an array and not, as orig.h had it, a name.
+ *
+ * IT SKIPS THREE VARIABLE-LENGTH RUNS BEFORE IT READS ANYTHING IT KEEPS.
+ * The buffer opens with a dword, then a run of that many dwords; then two
+ * more dwords, each followed by its own run. All three counts are tested with
+ * a SIGNED `jle`, so a negative one skips nothing rather than stepping
+ * backwards, and none of the skipped dwords is looked at. Only the fourth
+ * count is kept.
+ *
+ * A NEGATIVE COUNT REACHES THE ALLOCATION. Zero returns before it; the
+ * `count <= 0` test that guards the loop comes AFTER the malloc, so a
+ * negative one asks for `count * 0x6C` bytes as a size_t and then copies
+ * nothing into whatever comes back. Written in that order deliberately.
+ *
+ * The row on the wire is four fixed dwords -- a kind, then two counts each
+ * padded to a dword, then a quad of bytes -- followed by the name. Only the
+ * LOW HALF of the two middle dwords is read, so the wire pads a uint16 to
+ * four bytes each time, and 0x10 goes on the byte total per row whatever the
+ * name does.
+ *
+ * TWO OF THE FOUR BYTES ARE REWRITTEN RATHER THAN STORED. The second is
+ * stored NEGATED -- a wire zero becomes 1 and anything else 0 -- and the
+ * third is stored as it stands and then forced to 1 if it was zero. So the
+ * wire's "0" means "yes" for one of them and "default" for the other, and a
+ * reconstruction that stored either straight would be wrong in a way no
+ * length check could see.
+ *
+ * THE NAME'S LENGTH BYTE IS SIGNED, and that is the original's, not a
+ * transcription: `movsx eax, bl` before both the cursor advance and the byte
+ * total. A length of 0x80 or more therefore moves the cursor BACKWARDS and
+ * takes the total down with it. The copy itself is a strlen-and-copy off the
+ * NUL, so the byte only advances the cursor -- it never bounds the copy, and
+ * a name longer than the 0x51 bytes between SCEN_ROW_OFF_NAME and
+ * SCEN_ROW_OFF_AT would run into the fields above it. Both reproduced.
+ *
+ * The two trailing fields are seeded rather than read: SCEN_ROW_OFF_AT takes
+ * ADDR_ZERO_POINT, which is the packed origin, and SCEN_ROW_OFF_FIELD_68 is
+ * cleared. Neither comes off the wire.
+ */
+int32_t __cdecl ParseScenarioPart(void *part, const void *at)
+{
+    uint8_t       *p    = (uint8_t *)part;
+    const uint8_t *cur  = (const uint8_t *)at + 8;
+    int32_t        took = 8;
+    int32_t        n;
+    int32_t        a;
+    int32_t        b;
+    int32_t        count;
+    uint8_t       *rows;
+    int32_t        i;
+
+    *(int32_t *)(p + 0) = 0;
+    *(int32_t *)(p + 4) = 0;
+    *(int32_t *)(p + 8) = 0;
+
+    n = *(const int32_t *)at;
+    if (n > 0) {
+        cur  += (uint32_t)n * 4;
+        took  = n * 4 + 8;
+    }
+
+    a     = *(const int32_t *)cur;
+    b     = *(const int32_t *)(cur + 4);
+    cur  += 8;
+    took += 8;
+    if (a > 0) {
+        cur  += (uint32_t)a * 4;
+        took += a * 4;
+    }
+    if (b > 0) {
+        cur  += (uint32_t)b * 4;
+        took += b * 4;
+    }
+
+    count = *(const int32_t *)cur;
+    cur  += 4;
+    took += 4;
+    *(uint16_t *)(p + SCENARIO_PART_OFF_COUNT) = (uint16_t)count;
+    if (count == 0)
+        return took;
+
+    rows = (uint8_t *)orig_malloc((size_t)((uint32_t)count * SCEN_ROW_BYTES));
+    *(uint8_t **)(p + SCENARIO_PART_OFF_ROWS) = rows;
+    memset(rows, 0, (size_t)((uint32_t)count * SCEN_ROW_BYTES));
+    if (count <= 0)
+        return took;
+
+    for (i = 0; i < count; i++) {
+        uint8_t *row = rows + (uint32_t)i * SCEN_ROW_BYTES;
+        uint8_t  amount;
+        uint8_t  flag;
+        uint8_t  mode;
+        uint8_t  len;
+
+        *(uint32_t *)(row + SCEN_ROW_OFF_KIND) = *(const uint32_t *)cur;
+        cur += 4;
+        *(uint16_t *)(row + SCEN_ROW_OFF_POS)     = *(const uint16_t *)cur;
+        cur += 4;
+        *(uint16_t *)(row + SCEN_ROW_OFF_POS + 2) = *(const uint16_t *)cur;
+        cur += 4;
+
+        amount = cur[0];
+        flag   = cur[1];
+        mode   = cur[2];
+        len    = cur[3];
+
+        row[SCEN_ROW_OFF_AMOUNT]   = amount;
+        row[SCEN_ROW_OFF_FLAG]     = (uint8_t)(flag == 0 ? 1 : 0);
+        row[SCEN_ROW_OFF_FIELD_12] = mode;
+        row[SCEN_ROW_OFF_FIELD_68] = 0;
+        *(uint32_t *)(row + SCEN_ROW_OFF_AT) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        if (mode == 0)
+            row[SCEN_ROW_OFF_FIELD_12] = 1;
+
+        if (len != 0) {
+            strcpy((char *)(row + SCEN_ROW_OFF_NAME),
+                   (const char *)(cur + 4));
+            took += (int32_t)(int8_t)len;
+            cur   = cur + 4 + (int32_t)(int8_t)len;
+        } else {
+            row[SCEN_ROW_OFF_NAME] = 0;
+            cur += 4;
+        }
+
+        took += 0x10;
+    }
+
+    return took;
+}
 
 /* ParseScenarios -- original 0x0043DC10, one caller, which is the map loader.
  * Build the scenario table FreeScenarios tears down.
@@ -559,7 +693,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
         *(uint32_t *)(rec + 12) = hdr[3];
 
         for (part = 0; part < (int32_t)AM2_SCENARIO_PARTS; part++) {
-            int32_t took = orig_parse_scenario_part(
+            int32_t took = ParseScenarioPart(
                 rec + SCENARIO_OFF_PARTS
                     + (uint32_t)part * SCENARIO_PART_BYTES, p);
 
@@ -611,10 +745,10 @@ void __cdecl FreeScenarios(void)
             uint32_t k;
 
             for (k = 0; k < AM2_SCENARIO_PARTS; k++, rec += SCENARIO_PART_BYTES) {
-                char *name = *(char **)(rec + SCENARIO_PART_OFF_NAME);
+                void *rows = *(void **)(rec + SCENARIO_PART_OFF_ROWS);
 
-                if (name)
-                    am2_free(name);
+                if (rows)
+                    am2_free(rows);
             }
         }
     }
@@ -820,6 +954,8 @@ void map_install(void)
                         "LevelCount", 2);
     patch_replace(ADDR_PARSE_SCENARIOS, (const void *)ParseScenarios,
                   "ParseScenarios", 1);
+    patch_replace(ADDR_PARSE_SCENARIO_PART, (const void *)ParseScenarioPart,
+                  "ParseScenarioPart", 1);
     patch_replace(ADDR_FREE_SCENARIOS, (const void *)FreeScenarios,
                   "FreeScenarios", 1);
     patch_replace(ADDR_ADD_LEVEL_RECORD, (const void *)AddLevelRecord,
