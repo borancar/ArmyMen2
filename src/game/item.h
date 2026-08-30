@@ -580,4 +580,9 @@ void __cdecl SetObjTablePair(uint32_t uid, int32_t kind);
  * slot needed" and -2 for "all six full"; the permission is the return. */
 int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot);
 
+/* 0x00406720, two callers. Should this unit take this weapon, dropping its
+ * least valuable one if the inventory is full? Answers the weapon's thing
+ * code, or 0 for a refusal. */
+int32_t __cdecl TryTakeWeapon(void *cand, void *unit);
+
 #endif

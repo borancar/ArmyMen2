@@ -8132,6 +8132,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * may it be taken at all? The slot goes to an out-parameter and the answer is
  * the return: -1 means the kind needs no slot, -2 that all six are full. */
 #define ADDR_PICK_WEAPON_SLOT  0x00406800u /* int32(cand, unit, int32 *slot) */
+/* 0x00406720, two callers, and PickWeaponSlot's only caller. Should this unit
+ * take this weapon -- and if its inventory is full, which one does it drop to
+ * make room? Answers the weapon's ADDR_THING_CODE, or 0 for a refusal. */
+#define ADDR_TRY_TAKE_WEAPON   0x00406720u /* int32_t(void *cand, void *unit) */
 #define AM2_SLOT_NONE_NEEDED   (-1)
 #define AM2_SLOT_ALL_FULL      (-2)
 #define ADDR_SET_FACING_14     0x0043D450u  /* void(facing, src, out) */

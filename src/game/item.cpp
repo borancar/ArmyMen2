@@ -6492,6 +6492,97 @@ int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot)
     }
 }
 
+typedef void (__cdecl *AM2_DropItemFn)(void *unit, int32_t slot, uint32_t at);
+#define orig_trooper_drop_item \
+    ((AM2_DropItemFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM)
+
+/* TryTakeWeapon -- original 0x00406720, two callers, and PickWeaponSlot's only
+ * caller.
+ *
+ * Should this unit take this weapon? Four refusals, then a value; and when the
+ * inventory is full, the unit drops its least valuable weapon to make room.
+ *
+ * IT ANSWERS A VALUE, NOT A BOOLEAN. Every success returns the candidate's
+ * ADDR_THING_CODE and every refusal returns 0 -- so a thing whose code is 0 is
+ * indistinguishable from a refusal, and both callers get the same answer for
+ * either. That is the original's, and it is why the code is computed BEFORE
+ * the drop rather than after: the return has to survive the whole tail.
+ *
+ * THE AMMO TEST IS THE ONE REFUSAL THAT IS NOT ABOUT SLOTS. When
+ * PickWeaponSlot points at an occupied slot, the weapon already there is
+ * refused only if its ITEM_OFF_AMMO is at least the candidate type's
+ * ITEMTYPE_OFF_CAPACITY -- i.e. the one you hold is full. Anything less and
+ * the take proceeds. So "already carrying one" is not a refusal by itself.
+ *
+ * THE FULL-INVENTORY WALK STARTS AT SLOT 1 AND SEEDS ITS BEST WITH SLOT 0's
+ * ANSWER -- which is the CANDIDATE's code, not slot 0's. The seed is the value
+ * computed a moment earlier for the thing being offered, so a weapon worth
+ * less than everything carried finds no victim, `*slot` stays -2, and the
+ * function refuses. That is the mechanism by which a unit declines to swap
+ * down, and it is invisible unless the seed is read carefully.
+ *
+ * IT REUSES ITS OWN ARGUMENT SLOT AS THE OUT-PARAMETER. `lea eax, [esp+0xC]`
+ * points at where `cand` was pushed; the pointer handed to PickWeaponSlot is
+ * that stack slot. Harmless -- `cand` is already in a register -- and the
+ * reason this needs a local where the disassembly appears not to.
+ *
+ * The drop goes through TrooperDropItem at the unit's own position, so what is
+ * dropped lands where the unit stands.
+ */
+int32_t __cdecl TryTakeWeapon(void *cand, void *unit)
+{
+    uint8_t *c = (uint8_t *)cand;
+    uint8_t *u = (uint8_t *)unit;
+    int32_t  slot;
+    int32_t  code;
+
+    if (!ObjIsType4((const AM2_Object *)c))
+        return 0;
+
+    if (!PickWeaponSlot(c, u, &slot))
+        return 0;
+
+    if (slot != AM2_SLOT_NONE_NEEDED && slot != AM2_SLOT_ALL_FULL) {
+        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                           + (size_t)slot * 4);
+
+        if (uid) {
+            const uint8_t *held = (const uint8_t *)WeaponByUid(uid);
+
+            if (*(const int32_t *)(held + ITEM_OFF_AMMO)
+                >= *(const int32_t *)(*(const uint8_t *const *)
+                        (c + OBJ_OFF_FIELD_C0) + ITEMTYPE_OFF_CAPACITY))
+                return 0;
+        }
+    }
+
+    code = ThingCode(c, u);
+
+    if (slot == AM2_SLOT_ALL_FULL && code > 0) {
+        int32_t best = code;    /* the CANDIDATE's, not slot 0's */
+        int32_t i;
+
+        for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
+            int32_t v = ThingCode(
+                WeaponByUid(*(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                                + (size_t)i * 4)), u);
+
+            if (v < best) {
+                best = v;
+                slot = i;
+            }
+        }
+
+        if (slot == AM2_SLOT_ALL_FULL)
+            return 0;           /* nothing carried is worth less */
+
+        orig_trooper_drop_item(u, slot,
+                               *(const uint32_t *)(u + OBJ_OFF_POS));
+    }
+
+    return code;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6659,6 +6750,8 @@ void item_install(void)
                   "SetObjTablePair", 1);
     patch_replace(ADDR_PICK_WEAPON_SLOT, (const void *)PickWeaponSlot,
                   "PickWeaponSlot", 1);
+    patch_replace(ADDR_TRY_TAKE_WEAPON, (const void *)TryTakeWeapon,
+                  "TryTakeWeapon", 2);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

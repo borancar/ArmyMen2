@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,188 patches.**
+Nothing uncommitted. **1,189 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1233,16 +1233,37 @@ commit -- gave the right answer every time it was used.
   the slot is zeroed and the index left pointing at it. It is the only place
   that clears one.
 
+- **`TryTakeWeapon`** (`0x00406720`) answers a VALUE, not a boolean: every
+  success returns the candidate's thing code and every refusal returns 0, so a
+  thing whose code is 0 is indistinguishable from a refusal. That is also why
+  the code is computed BEFORE the drop rather than after -- the return has to
+  survive the whole tail.
+
+  **Its full-inventory walk seeds its "best" with the CANDIDATE's code, not
+  slot 0's**, and starts at slot 1. So a weapon worth less than everything
+  already carried finds no victim, the slot stays -2, and the function
+  refuses. That is the entire mechanism by which a unit declines to swap down,
+  and it is invisible unless the seed is read carefully.
+
+  Its one non-slot refusal is the ammo test: an occupied slot blocks the take
+  only when the weapon already there is FULL -- `ITEM_OFF_AMMO` at least the
+  candidate type's `ITEMTYPE_OFF_CAPACITY`. "Already carrying one" is not a
+  refusal by itself.
+
+  It also reuses its own argument slot as `PickWeaponSlot`'s out-parameter --
+  `lea eax, [esp+0xC]` points at where `cand` was pushed -- which is harmless
+  and is why this needs a local where the disassembly appears not to.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,035 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,188
+line (0x0045C000) patched**. Measured: **1,036 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,189
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-nine batches have gone in and the 204 entries outstanding start at 48
+small ones in batches. Forty batches have gone in and the 203 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
