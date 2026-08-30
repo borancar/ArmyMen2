@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,181 patches.**
+Nothing uncommitted. **1,182 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1079,16 +1079,33 @@ timing failure mode too, and that its own output distinguishes the two.
   cannot run that configuration at present and this batch is not the cause.
   `mission` is clean at 290.
 
+- **`ConsiderSightingB`** (`0x00408580`) is the previous batch's sibling, and
+  the differences settle a layout question rather than raising one. **+0x3C is
+  a maximum RANGE in one and an ENABLE in the other**, and both readings are
+  literally what the instructions do -- so the two records differ rather than
+  one being misread. The three fields they share (observer, range, bearing)
+  agree exactly.
+
+  Its cone is EIGHT and compared `>=` where the other's is three compared `>`
+  -- wider, and off by one relative to it.
+
+  **The bearing it compares is the OUT record's, not the seen object's.** The
+  other reads `OBJ_OFF_FIELD_530` off the object; this reads a byte the out
+  record carries and, in its tail, writes the record's bearing back there. So
+  that record accumulates a bearing across calls and this function is a step
+  in a sequence rather than a standalone test -- which is also why it has a
+  tail that runs on EVERY path, including the ones that refuse.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,028 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,181
+line (0x0045C000) patched**. Measured: **1,029 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,182
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-two batches have gone in and the 211 entries outstanding start at 48
+small ones in batches. Thirty-three batches have gone in and the 210 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

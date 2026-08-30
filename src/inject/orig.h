@@ -2662,6 +2662,31 @@
 #define SIGHTOUT_OFF_Y         0x1Au  /* int16 */
 #define SIGHTOUT_OFF_YADJ      0x1Cu  /* int16, from OBJ_OFF_ROW0_Y_ADJUST */
 #define SIGHTOUT_OFF_UID       0x20u
+/* 0x00408580, one caller -- ConsiderSighting's sibling, and near enough to it
+ * that the differences are the point. Same three shared record fields (the
+ * observer at +0x10, the range at +0x14, the bearing at +0x18), same
+ * ObjIsOurs gate, same two-second reveal.
+ *
+ * FOUR THINGS DIFFER, and two of them are the record itself. Its enable is a
+ * SINGLE field at +0x3C where the other tests +0x30 and +0x40; its maximum
+ * range is at +0x38 where the other's is at +0x3C -- so +0x3C is a range in
+ * one and an enable in the other, and the two cannot be one layout. Its cone
+ * is EIGHT rather than three. And it has a tail the other has not.
+ *
+ * The out record is a different shape too: x, y and the y-adjust at +0x0C,
+ * +0x0E and +0x10 against +0x18, +0x1A and +0x1C, though both put the uid at
+ * +0x1C and +0x20 respectively and both use +0x04 as the hit flag. */
+#define ADDR_CONSIDER_SIGHTING_B 0x00408580u /* void(seen, out, const void *) */
+#define AM2_SIGHT_CONE_B         8
+#define SIGHTB_OFF_MAX_RANGE     0x38u
+#define SIGHTB_OFF_ENABLED       0x3Cu
+#define SIGHTBOUT_OFF_BEARING    0x00u  /* uint8_t, compared then updated */
+#define SIGHTBOUT_OFF_X          0x0Cu
+#define SIGHTBOUT_OFF_Y          0x0Eu
+#define SIGHTBOUT_OFF_YADJ       0x10u
+#define SIGHTBOUT_OFF_STATE      0x14u  /* written 4 when a hit is committed */
+#define SIGHTBOUT_OFF_UID        0x1Cu
+#define AM2_SIGHTB_STATE_HIT     4
 
 /* Non-zero means fog is ON -- objects get concealed. It was ADDR_AI_CONTROLLED,
  * a name taken from a call site; the cheat strings that drive it are about

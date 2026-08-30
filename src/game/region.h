@@ -91,4 +91,8 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile);
  * and a two-second reveal when the observer is ours. */
 void __cdecl ConsiderSighting(void *seen, void *out, const void *sight);
 
+/* 0x00408580, one caller. ConsiderSighting's sibling over a different record
+ * layout, with a wider cone and a tail that commits the hit. */
+void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight);
+
 #endif /* AM2_REGION_H */

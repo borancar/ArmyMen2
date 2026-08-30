@@ -974,6 +974,87 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
         *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_REVEAL_MS;
 }
 
+/* ConsiderSightingB -- original 0x00408580, one caller, and
+ * ConsiderSighting's sibling. Written out beside it rather than shared,
+ * because four things differ and two of them are the record.
+ *
+ * THE RECORD IS NOT THE SAME LAYOUT. Its enable is one field at +0x3C where
+ * the other tests two at +0x30 and +0x40, and its maximum range is at +0x38
+ * where the other's is at +0x3C. So +0x3C is a RANGE in one and an ENABLE in
+ * the other; both readings are literally what the instructions do, so the two
+ * records differ rather than one of them being misread. The three fields they
+ * share -- observer, range, bearing -- agree exactly.
+ *
+ * ITS CONE IS EIGHT, NOT THREE, and the comparison is `>=` on a byte where the
+ * other is `>`. Wider, and off by one relative to it.
+ *
+ * THE BEARING IT COMPARES IS THE OUT RECORD'S, NOT THE SEEN OBJECT'S. The
+ * other reads OBJ_OFF_FIELD_530 off the object; this reads a byte the out
+ * record carries and, in its tail, WRITES the record's bearing back there. So
+ * the out record accumulates a bearing across calls and this one is a step in
+ * a sequence rather than a standalone test.
+ *
+ * THE TAIL RUNS ON EVERY PATH, including the ones that refuse. It commits a
+ * recorded hit -- the bearing, the state 4, and clearing the flag -- and the
+ * flag it reads is memory rather than a local, so a refusal after a hit that
+ * was never committed would still commit it. Within one call the flag is set
+ * and cleared by the same call, so that cannot arise from here; it is written
+ * as the two branches the original has rather than folded into the success
+ * path, because folding would lose that.
+ */
+void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
+{
+    uint8_t       *s = (uint8_t *)seen;
+    uint8_t       *o = (uint8_t *)out;
+    const uint8_t *c = (const uint8_t *)sight;
+
+    if (*(const int32_t *)(c + SIGHTB_OFF_ENABLED)) {
+        int32_t range = *(const int32_t *)(c + SIGHT_OFF_RANGE);
+        int32_t delta;
+
+        if (range > 0
+            && range < *(const int32_t *)(c + SIGHTB_OFF_MAX_RANGE)) {
+
+            delta = AngleDelta(*(const uint8_t *)(o + SIGHTBOUT_OFF_BEARING),
+                               *(const uint8_t *)(c + SIGHT_OFF_BEARING));
+            if (delta < 0)
+                delta = -delta;
+
+            if ((uint8_t)delta < AM2_SIGHT_CONE_B) {
+                const uint8_t *observer =
+                    *(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER);
+
+                *(int32_t *)(o + SIGHTOUT_OFF_HIT) = 1;
+
+                if (observer) {
+                    *(int16_t *)(o + SIGHTBOUT_OFF_X) =
+                        *(const int16_t *)(observer + OBJ_OFF_X);
+                    *(int16_t *)(o + SIGHTBOUT_OFF_Y) =
+                        *(const int16_t *)(observer + OBJ_OFF_Y);
+                    *(int16_t *)(o + SIGHTBOUT_OFF_YADJ) =
+                        *(const int16_t *)(observer + OBJ_OFF_ROW0_Y_ADJUST);
+                    *(uint32_t *)(o + SIGHTBOUT_OFF_UID) =
+                        ((const AM2_Object *)observer)->uid;
+
+                    if (ObjIsOurs((void *)observer, 1)) {
+                        RevealObj(s);
+                        *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
+                            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                            + AM2_REVEAL_MS;
+                    }
+                }
+            }
+        }
+    }
+
+    if (*(const int32_t *)(o + SIGHTOUT_OFF_HIT)) {
+        *(uint8_t *)(o + SIGHTBOUT_OFF_BEARING) =
+            *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+        *(int32_t *)(o + SIGHTOUT_OFF_HIT)   = 0;
+        *(int32_t *)(o + SIGHTBOUT_OFF_STATE) = AM2_SIGHTB_STATE_HIT;
+    }
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -992,6 +1073,9 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_CONSIDER_SIGHTING_B,
+                        (const void *)ConsiderSightingB,
+                        "ConsiderSightingB", 1);
     rc |= patch_replace(ADDR_CONSIDER_SIGHTING,
                         (const void *)ConsiderSighting,
                         "ConsiderSighting", 4);
