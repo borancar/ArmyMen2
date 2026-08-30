@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,194 patches.**
+Nothing uncommitted. **1,195 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1343,16 +1343,48 @@ commit -- gave the right answer every time it was used.
   which loads the original chose to repeat is evidence about what it thought
   could change.
 
+- **`BoxAction`** (`0x00438DF0`) turns a rectangle in pixels into a scratch
+  tile mask: shift each edge down by four, clamp into the map, pad by two
+  tiles on every side, fill the padded rectangle with 2 and the box itself
+  with 3. The one reader tests BIT 0, so the margin is there to be walked over
+  rather than acted on, and nothing ever writes a 0 -- its `test al, al` guard
+  cannot fire on anything this function produces.
+
+  **Its fifth argument is a POINTER and this tree said `int32_t`.** The
+  typedef `region.cpp` reached it through declared `int32_t arg`, and
+  `ObjBoxAction` passed its own `arg` straight down, because both of
+  `ObjBoxAction`'s callers are original code handing it a stack buffer and
+  nothing on the C side ever had to name the type. A signature can be wrong
+  for as long as only the original ever supplies the argument.
+
+  The clamp is to `2 .. size-2` and the pad is 2, so the padded rectangle can
+  run from 0 to size exactly -- the margin is what the clamp leaves room for,
+  and neither bound is a coincidence.
+
+  **It is not exercised by any drive this project has, and the counter says so
+  rather than the absence of one.** A Boot Camp combat run past both dialogs,
+  walking and firing, with `TileOfPoint` at ten million, leaves `BoxAction`
+  and `ObjBoxAction` both at 0; an unknown name answers "(nothing traced)" and
+  these answer 0, so the counter exists and the zero is a measurement. Both of
+  `ObjBoxAction`'s callers test `OBJ_OFF_HIT_MASK` first and go elsewhere when
+  it is set, and everything on this map has a mask.
+
+  The mutation confirms that rather than contradicting it: filling the whole
+  grid with 3 leaves `combat` at 177,155 pixels, which is what an out-of-phase
+  `combat` gives anyway and what its disabled pixel check exists for. So this
+  one is verified by READING, and the clean A/B says only that nothing
+  regressed.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,041 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,194
+line (0x0045C000) patched**. Measured: **1,042 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,195
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-five batches have gone in and the 198 entries outstanding start at 48
+small ones in batches. Forty-six batches have gone in and the 197 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "rect.h"   /* Clamp -- reconstructed */
 #include "dist.h"   /* AngleDelta -- reconstructed */
 #include "army.h"   /* ObjIsOurs -- reconstructed */
 #include "air.h"    /* RevealObj -- reconstructed */
@@ -712,13 +713,93 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
     return 0;
 }
 
-typedef int32_t (__cdecl *AM2_BoxActionFn)(int32_t l, int32_t t,
-                                           int32_t r, int32_t b,
-                                           int32_t arg);
-/* 0x00438DF0 clamps the four edges to the map and walks what they cover;
- * still original, and it takes the rectangle as four separate dwords
- * because that is how both callers push it. */
-#define orig_box_action ((AM2_BoxActionFn)(uintptr_t)ADDR_BOX_ACTION)
+/* BoxAction -- original 0x00438DF0, two callers, both of them the box markers
+ * above and below it.
+ *
+ * Turn a rectangle in PIXELS into a scratch tile mask: shift each edge down by
+ * AM2_TILE_SHIFT, clamp it into the map, pad the result by two tiles on every
+ * side, and then write the padded rectangle into the caller's record followed
+ * by one byte per tile it covers -- 2 everywhere, then 3 over the box.
+ *
+ * THE FIFTH ARGUMENT IS A POINTER AND THIS FILE USED TO SAY int32_t. The
+ * typedef that reached it through the image declared `int32_t arg`, and
+ * ObjBoxAction passed its own `arg` straight through, because both callers of
+ * ObjBoxAction are original code handing it a stack buffer and nothing on this
+ * side ever had to name the type. It is a 16-byte rectangle and a byte grid;
+ * see TILEMASK_OFF_RECT in orig.h.
+ *
+ * The x pair is clamped against the map WIDTH and the y pair against its
+ * HEIGHT, which is what tells the four arguments apart -- they are pushed as
+ * plain dwords and nothing else distinguishes them.
+ *
+ * THE CLAMP IS TO 2 .. size-2 AND THE PAD IS 2, so the padded rectangle can
+ * run from 0 to size exactly: the margin is what the clamp leaves room for,
+ * and neither bound is a coincidence. What it does NOT guarantee is that the
+ * caller's buffer is big enough -- the area is (w+1)*(h+1) over whatever the
+ * box spans, and both callers use a fixed stack scratch.
+ *
+ * The row loop re-reads the rectangle out of the record every turn rather than
+ * keeping it, and tests `left <= right` inside the loop although nothing in it
+ * can change either. Reproduced; it is one comparison and hoisting it would be
+ * a claim about the original that costs more to make than to leave.
+ *
+ * Always answers 1.
+ *
+ * NOT EXERCISED BY ANY DRIVE THIS PROJECT HAS, and the counter says so rather
+ * than being assumed: a Boot Camp combat run past both dialogs, walking and
+ * firing, with TileOfPoint at ten million, leaves BoxAction and ObjBoxAction
+ * both at 0. The counter exists -- an unknown name answers "(nothing traced)"
+ * and these answer 0 -- so that is a measurement.
+ *
+ * The reason is one branch above. Both of ObjBoxAction's callers test
+ * OBJ_OFF_HIT_MASK first and go to 0x004389D0 when it is set; ObjBoxAction is
+ * the no-mask fallback, and everything on this map has a mask. BoxAction's
+ * other caller, 0x00438F10, does not run here either. So this is verified by
+ * READING, and the clean A/B says only that nothing regressed. */
+int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
+                          int32_t bottom, void *out)
+{
+    uint8_t *rec = (uint8_t *)out;
+    int32_t *box = (int32_t *)(rec + TILEMASK_OFF_RECT);
+    uint8_t *cells = rec + TILEMASK_OFF_CELLS;
+    int32_t  l;
+    int32_t  r;
+    int32_t  t;
+    int32_t  b;
+    int32_t  stride;
+    int32_t  y;
+
+    /* In the original's order: the two x edges, then the two y edges. */
+    l = Clamp(left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                  - AM2_TILEMASK_MARGIN);
+    r = Clamp(right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                  - AM2_TILEMASK_MARGIN);
+    t = Clamp(top   >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                  - AM2_TILEMASK_MARGIN);
+    b = Clamp(bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+              *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                  - AM2_TILEMASK_MARGIN);
+
+    box[2] = r + AM2_TILEMASK_MARGIN;   /* right, written before left */
+    box[3] = b + AM2_TILEMASK_MARGIN;   /* bottom */
+    box[0] = l - AM2_TILEMASK_MARGIN;
+    box[1] = t - AM2_TILEMASK_MARGIN;
+
+    memset(cells, AM2_TILEMASK_PAD_CELL,
+           (size_t)((box[2] - box[0] + 1) * (box[3] - box[1] + 1)));
+
+    stride = box[2] - box[0] + 1;
+    for (y = t; y <= b; y++) {
+        if (l > r)
+            continue;
+        memset(cells + (y - box[1]) * stride - box[0] + l,
+               AM2_TILEMASK_BOX_CELL, (size_t)(r - l + 1));
+    }
+    return 1;
+}
 
 /* ObjBoxAction -- original 0x00438F80, two callers.
  *
@@ -746,7 +827,7 @@ typedef int32_t (__cdecl *AM2_BoxActionFn)(int32_t l, int32_t t,
  * is the FLAT half and that structure names LPDIRECTDRAWSURFACE. The same
  * reason item.cpp reads the sprite list as void **.
  */
-int32_t __cdecl ObjBoxAction(void *obj, int32_t arg)
+int32_t __cdecl ObjBoxAction(void *obj, void *out)
 {
     const uint8_t *o = (const uint8_t *)obj;
     const uint8_t *spr;
@@ -765,11 +846,11 @@ int32_t __cdecl ObjBoxAction(void *obj, int32_t arg)
     x = *(const int16_t *)(o + OBJ_OFF_X);
     y = *(const int16_t *)(o + OBJ_OFF_Y);
 
-    return orig_box_action(*(const int32_t *)(o + OBJ_OFF_BOX_LEFT)   + x,
-                           *(const int32_t *)(o + OBJ_OFF_BOX_TOP)    + y,
-                           *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x,
-                           *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y,
-                           arg);
+    return BoxAction(*(const int32_t *)(o + OBJ_OFF_BOX_LEFT)   + x,
+                     *(const int32_t *)(o + OBJ_OFF_BOX_TOP)    + y,
+                     *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x,
+                     *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y,
+                     out);
 }
 
 /* RebuildTileCover -- original 0x0042BE10, one caller.
@@ -1334,6 +1415,8 @@ int region_install(void)
                         "RebuildTileCover", 1);
     rc |= patch_replace(ADDR_OBJ_BOX_ACTION, (const void *)ObjBoxAction,
                         "ObjBoxAction", 2);
+    rc |= patch_replace(ADDR_BOX_ACTION, (const void *)BoxAction,
+                        "BoxAction", 5);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
                         "TileCoverAdd", 3);
     rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,

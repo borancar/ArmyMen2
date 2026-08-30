@@ -1354,8 +1354,23 @@
 /* 0x00438F80, two callers. Offset the object's box by its position and hand
  * the result to 0x00438DF0 -- but only when the first row's sprite has a
  * software image; without one it answers 1 and does nothing. */
-#define ADDR_OBJ_BOX_ACTION      0x00438F80u  /* int32_t(void *obj, int32_t) */
-#define ADDR_BOX_ACTION          0x00438DF0u  /* int32_t(AM2_Rect, int32_t) */
+#define ADDR_OBJ_BOX_ACTION      0x00438F80u  /* int32_t(void *obj, AM2_TileMask *) */
+/* The SCRATCH both box markers fill, and its fifth argument is a POINTER --
+ * this macro said `int32_t` for as long as the function was reached through
+ * it, because both callers of ObjBoxAction pass a stack buffer and nothing on
+ * the C side ever looked. The record is a tile rectangle padded by two on
+ * every side, then one byte per tile inside it, row-major.
+ *
+ * Two values go in: 2 over the whole padded rectangle and 3 over the box
+ * itself. The one reader tests BIT 0, so the margin exists to be walked over
+ * rather than acted on, and nothing ever writes a 0 -- its `test al, al`
+ * guard cannot fire on anything this function produces. */
+#define ADDR_BOX_ACTION          0x00438DF0u  /* int32_t(l,t,r,b, AM2_TileMask *) */
+#define TILEMASK_OFF_RECT        0x00u  /* AM2_Rect, in TILES, padded by two */
+#define TILEMASK_OFF_CELLS       0x10u  /* uint8_t[], row-major over that rect */
+#define AM2_TILEMASK_MARGIN      2      /* tiles added on every side */
+#define AM2_TILEMASK_PAD_CELL    2      /* what the margin is filled with */
+#define AM2_TILEMASK_BOX_CELL    3      /* and the box; bit 0 is what is read */
 #define SPR_FLAG_SOFTWARE_BITS   0x1Cu  /* the subset of 0x3C these two test */
 #define OBJ_OFF_BOX_TOP        0x80u  /* int32_t, added to .y */
 #define OBJ_OFF_BOX_RIGHT      0x84u  /* int32_t, added to .x */

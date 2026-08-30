@@ -75,9 +75,17 @@ void __cdecl TileCoverSub(uint16_t tile);
  * that comes up short. Always answers 0. */
 int32_t __cdecl MarkOpenTile(uint16_t tile);
 
-/* 0x00438F80, two callers. Offset the object's box by its position and act on
- * it, when the first row's sprite has a software image. */
-int32_t __cdecl ObjBoxAction(void *obj, int32_t arg);
+/* 0x00438DF0, two callers. Turn a rectangle in pixels into a scratch tile
+ * mask: clamp each edge into the map, pad by two tiles, and fill the padded
+ * rectangle with 2 and the box itself with 3. `out` is a TILEMASK record.
+ * Always answers 1. */
+int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
+                          int32_t bottom, void *out);
+
+/* 0x00438F80, two callers. Offset the object's box by its position and hand it
+ * to BoxAction, when the first row's sprite has a software image. `out` is the
+ * same record, and was declared `int32_t arg` here until BoxAction was read. */
+int32_t __cdecl ObjBoxAction(void *obj, void *out);
 
 /* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell
  * weights. */
