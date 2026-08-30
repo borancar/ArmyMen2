@@ -6351,6 +6351,63 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
     return Field51MeetsMin(row);
 }
 
+/* SetObjTablePair -- original 0x0044BA70, one caller.
+ *
+ * Give an object a kind, point it at two of the 256-byte records at
+ * ADDR_OBJ_TABLE_RECORDS, propagate one of them through its sub-record, and
+ * refresh its rows.
+ *
+ * THE TWO POINTERS ARE INDEXED DIFFERENTLY AND THAT IS THE WHOLE FUNCTION.
+ * `OBJ_OFF_TABLE_REC_KIND` is `records + kind * 0x100`, straight from the
+ * argument. `OBJ_OFF_TABLE_REC_SLOT` is `records + slot * 0x100`, where the
+ * slot comes from the object's own uid, through UidArmy and then
+ * CommArmyOfSlot. So one is what the caller asked for and the other is who
+ * owns it, and reading them as a pair of the same thing loses that.
+ *
+ * IT CONFIRMS ANOTHER FUNCTION'S COMMENT FROM THE OTHER SIDE.
+ * `ADDR_SCRIPT_SET_OBJ_TABLE` is documented as writing "+0x4C0 and +0x4C8 of
+ * the sub-record at obj+0x6C" -- and obj + 0x6C + 0x4C0 is exactly +0x52C.
+ * Two routes to one pair of fields, arrived at independently.
+ *
+ * ONLY THE KIND POINTER IS PROPAGATED. SetFieldInAll is handed the sub-record
+ * and the kind record; the slot record is written to the object and left
+ * there. So whatever reads the propagated copy sees the kind's record and
+ * never the owner's.
+ *
+ * THE ARMY LOOKUP GOES THROUGH THE UID, NOT THE OBJECT. UidArmy is given the
+ * caller's uid rather than the object that was just resolved from it -- the
+ * same value by a longer route, and reproduced, since the two would differ if
+ * anything ever resolved a uid to an object of another army.
+ *
+ * A uid that does not resolve does nothing at all, silently.
+ */
+void __cdecl SetObjTablePair(uint32_t uid, int32_t kind)
+{
+    uint8_t *o = (uint8_t *)ObjByUidAlias(uid);
+    int32_t  slot;
+
+    if (!o)
+        return;
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_530) = kind;
+
+    slot = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                          (int32_t)UidArmy(uid));
+
+    *(void **)(o + OBJ_OFF_TABLE_REC_SLOT) =
+        (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        + (size_t)slot * AM2_OBJ_TABLE_REC_SIZE;
+    *(void **)(o + OBJ_OFF_TABLE_REC_KIND) =
+        (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        + (size_t)kind * AM2_OBJ_TABLE_REC_SIZE;
+
+    SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                  *(void *const *)(o + OBJ_OFF_TABLE_REC_KIND));
+
+    RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 1,
+              (void *)(uintptr_t)ADDR_MAP_DESC);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6514,6 +6571,8 @@ void item_install(void)
                   "WalkCellAtPoint", 2);
     patch_replace(ADDR_WEAPON_FRAME_READY, (const void *)WeaponFrameReady,
                   "WeaponFrameReady", 1);
+    patch_replace(ADDR_SET_OBJ_TABLE_PAIR, (const void *)SetObjTablePair,
+                  "SetObjTablePair", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

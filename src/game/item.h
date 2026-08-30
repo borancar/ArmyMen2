@@ -571,4 +571,8 @@ void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
  * weapon may act? Three answers -- see the definition. */
 int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
 
+/* 0x0044BA70, one caller. Set an object's kind, both table-record pointers --
+ * one by kind, one by the owner's comm slot -- propagate one, refresh rows. */
+void __cdecl SetObjTablePair(uint32_t uid, int32_t kind);
+
 #endif

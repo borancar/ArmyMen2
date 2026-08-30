@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,183 patches.**
+Nothing uncommitted. **1,184 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1114,16 +1114,39 @@ timing failure mode too, and that its own output distinguishes the two.
   of the first eight. Third unused parameter in this tree after
   `RandomPointAhead`'s first and `AmmChecksum`'s second.
 
+- **`SetObjTablePair`** (`0x0044BA70`) writes TWO pointers into the 256-byte
+  record table and indexes them DIFFERENTLY: `+0x52C` by the kind it was
+  given, `+0x534` by the object's army's comm slot. One is what the caller
+  asked for and the other is who owns it; reading them as a pair of the same
+  thing loses that. Only the kind pointer is propagated through the
+  sub-record, so whatever reads the propagated copy never sees the owner's.
+
+  **It confirms another function's comment from the other side.**
+  `ADDR_SCRIPT_SET_OBJ_TABLE` is documented as writing "+0x4C0 and +0x4C8 of
+  the sub-record at obj+0x6C" -- and `obj + 0x6C + 0x4C0` is exactly `+0x52C`.
+  Two routes to one pair of fields, arrived at independently and agreeing.
+
+  Its army lookup goes through the UID rather than the object it just
+  resolved from it: the same value by a longer route, reproduced because the
+  two would differ if a uid ever resolved to an object of another army.
+- **`0x00438F10` is left for now and the reason is its RECORD, not its code.**
+  Its sibling `ObjBoxAction` is done; this one reaches a sprite through
+  `*(rec + 0x0C)` and a box at `+0x20..+0x2C`, and no structure in `orig.h`
+  has that shape. Its caller disassembles as garbage before the call site, so
+  the type is not settled from there either. It is the last sub-128-byte
+  entry outstanding, and it is outstanding for want of a NAME rather than for
+  want of reading.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,030 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,183
+line (0x0045C000) patched**. Measured: **1,031 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,184
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-four batches have gone in and the 209 entries outstanding start at 48
+small ones in batches. Thirty-five batches have gone in and the 208 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

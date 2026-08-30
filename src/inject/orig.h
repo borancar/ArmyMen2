@@ -8204,6 +8204,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * it. Both structural: the three-deep condition they form is what decides
  * whether OBJ_FLAG_REVEALED is cleared, and nothing read so far says why. */
 #define OBJ_FLAG_BIT4            0x10u
+/* The two 256-byte-record pointers, and reaching them from the object rather
+ * than through the sub-record is what confirms ADDR_SCRIPT_SET_OBJ_TABLE's
+ * note: that function writes "+0x4C0 and +0x4C8 of the sub-record at obj+0x6C",
+ * and obj + 0x6C + 0x4C0 is exactly +0x52C. Two routes to one pair of fields.
+ *
+ * SetObjTablePair writes both, and NOT the same way: +0x52C is indexed by the
+ * KIND it was given and +0x534 by the object's army's comm SLOT. */
+#define OBJ_OFF_TABLE_REC_KIND   0x52Cu
+#define OBJ_OFF_TABLE_REC_SLOT   0x534u
+/* 0x0044BA70, one caller. Set an object's kind, both table-record pointers,
+ * propagate one of them, and refresh its rows. */
+#define ADDR_SET_OBJ_TABLE_PAIR  0x0044BA70u  /* void(uint32_t uid, int32_t) */
 #define OBJ_OFF_FIELD_530        0x530u  /* int32_t; ObjConceal compares to 5 */
 /* 0x0043CD40, two callers. Move an object to a new OBJ_OFF_FIELD_530 and put
  * the first row on the animation frame that goes with it -- gated on the
