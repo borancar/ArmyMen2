@@ -5712,8 +5712,39 @@ typedef struct {
 #define ADDR_DEF_PARSE_INFO_FILE   0x0041A5F0u
 /* NOT DefGameParse -- 0x00424590 is docs/functions.tsv's merged 784-byte
  * entry, and the handler with the "DefGameParse:" string starts at 0x00424780.
- * Same mistake, same cause, as ADDR_DEF_LINK_PARSE two commits ago. */
-#define ADDR_DEF_GAME_ENTRY        0x00424590u
+ * Same mistake, same cause, as ADDR_DEF_LINK_PARSE two commits ago.
+ *
+ * AND THE NAME IT GOT INSTEAD RECORDED A FACT ABOUT functions.tsv RATHER THAN
+ * ABOUT THE FUNCTION. It went in as ADDR_DEF_GAME_ENTRY, which says only
+ * "the merged entry DefGameParse is somewhere inside". The function at that
+ * address is the PACKED half of LoadMask: PackKey on the three arguments,
+ * SpriteSetForKey on the result, then the archive lookup -- and its one
+ * caller is LoadMask's non-`-df` branch. Renamed, not aliased; nothing
+ * referenced the old name. */
+#define ADDR_LOAD_MASK_PACKED      0x00424590u  /* void(out, set, idx, frame) */
+/* 0x00435280, two callers. Fill a mask record from the packed archive, or --
+ * under `-df` -- by globbing `<map>\<set>\masks\%02d_%03d_%02d_*.msk` for a
+ * loose file. Reconstructed. */
+#define ADDR_LOAD_MASK             0x00435280u  /* void(out, set, idx, frame) */
+#define ADDR_STR_FMT_MASK_DIR      0x00487448u  /* "%s\\%s\\masks" */
+#define ADDR_STR_GLOB_MSK          0x00487430u  /* "%02d_%03d_%02d_*.msk" */
+#define AM2_SPRITE_SET_MAP_FIRST   0x14  /* below this LoadMask's -df arm gives up */
+/* The record both halves fill. Only the loose arm is read here, so the two
+ * words are named for WHERE THEY COME FROM rather than for what they mean:
+ * the DIB descriptor's +0x04 and its DIB_OFF_BLOCKS. */
+#define MASKREC_OFF_ZERO_A         0x00u  /* written 0 */
+#define MASKREC_OFF_ZERO_B         0x02u  /* written 0 */
+#define MASKREC_OFF_DESC4          0x04u  /* uint16, from the descriptor's +4 */
+#define MASKREC_OFF_DESC_BLOCKS    0x06u  /* uint16, from DIB_OFF_BLOCKS */
+#define MASKREC_OFF_LOADER_OUT     0x08u  /* uint16, LoadDibFlipped writes it */
+#define MASKREC_OFF_BITS           0x0Cu  /* void *, the flipped pixels */
+/* The three stack buffers LoadMask's loose arm uses. The frame is 0x5E0 and
+ * the two paths through it are a 0x50-byte directory, a 0x50-byte pattern, a
+ * _finddata_t and a DIB descriptor; the sizes are what the offsets between
+ * them allow rather than what any field says. */
+#define AM2_MASK_PATH_MAX          0x50u
+#define AM2_FINDDATA_BYTES         0x118u
+#define AM2_DIB_DESC_BYTES         0x1Cu
 #define ADDR_DEF_OBJ_PARSE         0x00435B60u
 /* docs/functions.tsv merges THREE things into the 768-byte entry here:
  * DefObjParse itself (0x00435B60, a jump table over sixteen tokens), the table

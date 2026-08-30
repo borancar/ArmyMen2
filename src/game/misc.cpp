@@ -9,6 +9,7 @@
 #include "item.h"   /* TileAttrAt -- reconstructed */
 #include "maprow.h" /* RowUpdate -- reconstructed */
 #include "place.h"   /* LoadArmyPlacement */
+#include "gamedir.h" /* SetGameDir -- the chdir the mask glob needs */
 #include "script.h"  /* GetVarValue */
 #include "crt.h"
 #include "image.h"
@@ -364,6 +365,93 @@ static int32_t MaskSolid(uint32_t x, uint32_t y, const void *mask,
         /* Past the run length byte and the run's own pixels. */
         row += (uint32_t)run + 1;
     }
+}
+
+/* The two the loose arm needs that are still original: the packed half and
+ * MSVC's
+ * _findfirst. */
+typedef void (__cdecl *AM2_LoadMaskPackedFn)(void *out, int32_t set,
+                                             int32_t index, int32_t frame);
+#define orig_load_mask_packed \
+    ((AM2_LoadMaskPackedFn)AM2_IMAGE(ADDR_LOAD_MASK_PACKED))
+typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *pattern, void *data);
+#define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+/* LoadDibFlipped is reconstructed, in win32/surface.cpp. Declared here rather
+ * than by including that header, for the reason script.cpp declares
+ * PreloadSprite: misc.cpp is on the FLAT side of the split and must name no
+ * Win32 or COM type, and surface.h reaches LPDIRECTDRAWSURFACE. Its own
+ * header is `extern "C"`, so this has to be too or the two mangle
+ * differently and only the linker notices. */
+extern "C" void *__cdecl LoadDibFlipped(const char *path, void *hdr,
+                                        uint16_t *size);
+
+/* LoadMask -- original 0x00435280, two callers. Fill a mask record from
+ * {set, index, frame}, and it is SpriteLoadTriple's twin one file over: the
+ * same ADDR_OPT_DF fork, the same `%02d_%03d_%02d_*` glob convention, the
+ * same set directory table. Sprites glob `.bmp` and `.sha`; this globs
+ * `.msk`.
+ *
+ * THE TWO HALVES ARE NOT SYMMETRICAL AND THAT IS THE THING TO KNOW. Without
+ * `-df` it is a plain forward to the packed loader with the arguments
+ * unchanged. With it, the packed loader is never reached AND a set below
+ * AM2_SPRITE_SET_MAP_FIRST returns having done nothing at all -- so under
+ * `-df` the fixed sets have no masks, where under the pack they do. That is
+ * the original's, not a transcription: the `< 0x14` test guards only the
+ * loose arm, because only the map's own sets have a directory to glob in.
+ *
+ * IT GLOBS AND NEVER CLOSES THE HANDLE. _findfirst's result is compared
+ * against -1 and then discarded; there is no _findclose, unlike
+ * SpriteLoadTriple, which closes both of its. Reproduced -- it is a leak per
+ * mask loaded under a switch nothing here ships with, and tidying it would be
+ * inventing behaviour.
+ *
+ * THE FOUND NAME IS USED WITHOUT THE DIRECTORY, which works only because
+ * SetGameDir has already chdir'd into it. Same shape as the sprite loader.
+ *
+ * The record's first two words are zeroed and two more are copied out of the
+ * DIB descriptor the reader filled; the pixels land at MASKREC_OFF_BITS and a
+ * null there is the failure, checked before the two words are written. So a
+ * failed load leaves the record's words untouched rather than zeroed -- only
+ * the pointer says whether it worked.
+ */
+void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
+{
+    uint8_t *rec = (uint8_t *)out;
+    char     dir[AM2_MASK_PATH_MAX];
+    char     pattern[AM2_MASK_PATH_MAX];
+    uint8_t  find[AM2_FINDDATA_BYTES];
+    uint8_t  desc[AM2_DIB_DESC_BYTES];
+
+    if (!*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF)) {
+        orig_load_mask_packed(out, set, index, frame);
+        return;
+    }
+
+    if (set < AM2_SPRITE_SET_MAP_FIRST)
+        return;
+
+    am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_MASK_DIR),
+                (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
+                ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))[set]);
+    SetGameDir(dir);
+
+    am2_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_MSK),
+                set, index, frame);
+
+    if (orig_findfirst(pattern, find) == -1)
+        return;
+
+    *(void **)(rec + MASKREC_OFF_BITS) =
+        LoadDibFlipped((const char *)(find + AM2_FIND_OFF_NAME), desc,
+                       (uint16_t *)(rec + MASKREC_OFF_LOADER_OUT));
+    if (!*(void *const *)(rec + MASKREC_OFF_BITS))
+        return;
+
+    *(uint16_t *)(rec + MASKREC_OFF_ZERO_A) = 0;
+    *(uint16_t *)(rec + MASKREC_OFF_ZERO_B) = 0;
+    *(uint16_t *)(rec + MASKREC_OFF_DESC_BLOCKS) =
+        *(const uint16_t *)(desc + DIB_OFF_BLOCKS);
+    *(uint16_t *)(rec + MASKREC_OFF_DESC4) = *(const uint16_t *)(desc + 4);
 }
 
 int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
@@ -2214,6 +2302,8 @@ int misc_install(void)
     patch_replace(ADDR_KIND_IN_SET_B, (const void *)KindInSetB, "KindInSetB", 1);
     patch_replace(ADDR_MASK_PIXEL_SOLID, (const void *)MaskPixelSolid,
                   "MaskPixelSolid", 3);
+    patch_replace(ADDR_LOAD_MASK, (const void *)LoadMask,
+                  "LoadMask", 2);
     patch_replace(ADDR_XOR_CHECKSUM, (const void *)XorChecksum, "XorChecksum", 1);
     patch_replace(ADDR_CHAIN_FIELD_14, (const void *)ChainField14,
                   "ChainField14", 1);

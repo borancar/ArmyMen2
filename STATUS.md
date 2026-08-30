@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,214 patches.**
+Nothing uncommitted. **1,215 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1809,16 +1809,49 @@ commit -- gave the right answer every time it was used.
   for `AM2_SAVE_RECORD_MARK`, whose own comment says it is not
   section-specific and that a second name appeared once before. Deleted.
 
+- **`LoadMask`** (`0x00435280`) is `SpriteLoadTriple`'s twin one file over:
+  the same `ADDR_OPT_DF` fork, the same `%02d_%03d_%02d_*` glob convention and
+  the same set-directory table, globbing `.msk` where that one globs `.bmp`
+  and `.sha`.
+
+  **THE TWO HALVES ARE NOT SYMMETRICAL.** Without `-df` it forwards to the
+  packed loader with the arguments unchanged. With it, a set below
+  `AM2_SPRITE_SET_MAP_FIRST` returns having done NOTHING -- so under `-df` the
+  fixed sets have no masks where under the pack they do. The `< 0x14` test
+  guards only the loose arm, because only the map's own sets have a directory
+  to glob in.
+
+  **It globs and never closes the handle.** `_findfirst`'s result is compared
+  against -1 and discarded; there is no `_findclose`, unlike
+  `SpriteLoadTriple`, which closes both of its. Reproduced -- a leak per mask
+  under a switch nothing here ships art for.
+
+  **`ADDR_DEF_GAME_ENTRY` was a name about `functions.tsv`, not about a
+  function**, and this batch could finally replace it. It said only "the
+  merged 784-byte entry DefGameParse is somewhere inside". The function at
+  `0x00424590` is the PACKED half of this one -- PackKey, SpriteSetForKey,
+  archive lookup -- and its only caller is `LoadMask`'s non-`-df` branch. It
+  is `ADDR_LOAD_MASK_PACKED` now; nothing referenced the old name.
+
+  Unreachable on this data set, and checkably so: **the install contains no
+  `.msk` file and no `masks` directory at all**, so the loose arm always fails
+  at the glob and the packed arm is the only one that ever runs. `LoadMask`
+  reads 0 on a `-df` drive, and its callers are the original's, so that
+  counter is not blind.
+
+  `tools/ab.sh df` is the right configuration for it and came back at **0
+  pixels** with an identical 24-message log.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,060 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,214
+line (0x0045C000) patched**. Measured: **1,061 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,215
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty batches have gone in and the 179 entries outstanding start at 48
+small ones in batches. Sixty-one batches have gone in and the 178 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

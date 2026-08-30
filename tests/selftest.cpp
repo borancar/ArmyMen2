@@ -94,6 +94,16 @@ void __cdecl FreeSpriteRegistry(void) { }
  * the linkage has to match the declaration, not the file it is stubbed in. */
 extern "C" void __cdecl SetPointerMode(int32_t) { }
 
+/* misc.cpp's LoadMask calls this now that its seam is closed, and it lives in
+ * win32/surface.cpp, which this harness cannot link. Sixth stub, extern "C"
+ * because surface.h declares it inside such a block. Nothing under test
+ * reaches it: LoadMask's whole loose arm needs a chdir and a directory of
+ * `.msk` files. */
+extern "C" void *__cdecl LoadDibFlipped(const char *, void *, uint16_t *)
+{
+    return 0;
+}
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;
