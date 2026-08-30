@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,209 patches.**
+Nothing uncommitted. **1,210 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1659,16 +1659,44 @@ commit -- gave the right answer every time it was used.
   11,796 frames to 5,468, and `campaign` cannot reach the function at all.
   Both came back clean on a re-run at load average 12.
 
+- **`MsgListRemove`** (`0x00401410`) unlinks a node the caller already holds,
+  wherever it sits -- the general removal that `MsgListRemHead` is the
+  head-only case of. It NAMES ITSELF in all three of its complaints
+  (`"RemMsg: Impossible List Size %d"`), which is how it was picked: a sweep
+  of the outstanding entries for pushed string literals, the antidote CLAUDE.md
+  already recommends and I had not been using.
+
+  **Its three complaints have an early exit among them and I got the comment
+  wrong the first time.** An emptied POOL gets the "freelist EMPTY" message
+  AND THEN the "Why is list %x empty?" one, because the original falls through
+  rather than returning; the only thing the pool test skips is a pool that
+  still has buffers. Writing the three as independent `if`s would be wrong in
+  exactly one case, and it is the common one -- a pool that is not empty.
+
+  It moved two KERNEL32 import sites out of "game logic, incidental calls
+  only" and into "reconstructed", so `docs/boundary.md` regenerated with it.
+
+  Not exercised, and the whole family says so together: `MsgListRemove`,
+  `MsgListRemHead`, `MsgListAdd`, `MsgListInsert` and six more all read 0 on a
+  driven single-player mission. The comm message list only runs with a live
+  DirectPlay session. Checked BEFORE the A/B.
+
+- **The self-naming sweep is worth running before picking a target.** Fourteen
+  of the outstanding entries under 700 bytes push a string literal that names
+  them -- `RemMsg`, `TrooperDropItem`, `UseInventoryItem`, `DPlaySend`,
+  `SetObjScriptState` and more. `tools/` does not have this as a tool yet; it
+  is a dozen lines over `docs/functions.tsv` and the reconstructed set.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,055 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,209
+line (0x0045C000) patched**. Measured: **1,056 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,210
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-five batches have gone in and the 184 entries outstanding start at 48
+small ones in batches. Fifty-six batches have gone in and the 183 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

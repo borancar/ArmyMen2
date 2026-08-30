@@ -577,6 +577,89 @@ void *__cdecl MsgListRemHead(void *list)
     return node;
 }
 
+/* MsgListRemove -- original 0x00401410, three callers, and it NAMES ITSELF in
+ * all three of its complaints: "RemMsg: Impossible List Size %d". Unlink a
+ * node the caller already holds, wherever it sits, where MsgListRemHead
+ * unlinks the head.
+ *
+ * The unlink is the ordinary four-case doubly-linked one and the list's TAIL
+ * is maintained in both directions, which is what makes this a real removal
+ * rather than the head-only shortcut next door.
+ *
+ * THREE COMPLAINTS AND ONE EARLY EXIT AMONG THEM, which is the part worth
+ * reading twice. The size check is the same one every operation here makes.
+ * Then, only if this list IS the pool, a null head is "RemMsg has set
+ * freelist to EMPTY!!" -- and a pool that still HAS a head jumps past
+ * everything to the unlock. The third, "Why is list %x empty?", fires for any
+ * list whose head is null while its count is still positive, which is the
+ * structure contradicting itself rather than a resource running out.
+ *
+ * So an emptied POOL gets the second complaint AND THEN THE THIRD, because
+ * the original falls through rather than returning; the only thing the pool
+ * check skips is a pool with buffers left. Writing the three as independent
+ * ifs would be wrong in exactly one case -- and it is the common one, a pool
+ * that is not empty.
+ *
+ * THE UNLINKED NODE'S OWN LINKS ARE LEFT ALONE, exactly as in MsgListRemHead,
+ * so a caller walking a list while removing from it can still read the node's
+ * `next` afterwards. Two of the three callers do.
+ *
+ * All three complaints are made while the mutex is still held, as in the rest
+ * of the family.
+ */
+void __cdecl MsgListRemove(void *list, void *node)
+{
+    uint8_t *l = (uint8_t *)list;
+    uint8_t *n = (uint8_t *)node;
+    uint8_t *prev;
+    uint8_t *next;
+    int32_t  count;
+
+    orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+
+    prev = *(uint8_t **)(n + MSGNODE_OFF_PREV);
+    if (!prev) {
+        next = *(uint8_t **)(n + MSGNODE_OFF_NEXT);
+        *(void **)(l + MSGLIST_OFF_HEAD) = next;
+        if (next)
+            *(void **)(next + MSGNODE_OFF_PREV) = (void *)0;
+        else
+            *(void **)(l + MSGLIST_OFF_TAIL) = (void *)0;
+    } else {
+        next = *(uint8_t **)(n + MSGNODE_OFF_NEXT);
+        if (!next) {
+            *(void **)(prev + MSGNODE_OFF_NEXT) = (void *)0;
+            *(void **)(l + MSGLIST_OFF_TAIL) = prev;
+        } else {
+            *(void **)(prev + MSGNODE_OFF_NEXT) = next;
+            *(void **)(next + MSGNODE_OFF_PREV) = prev;
+        }
+    }
+
+    count = *(const int32_t *)(l + MSGLIST_OFF_COUNT) - 1;
+    *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
+    if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
+        orig_log("RemMsg: Impossible List Size %d \n", count);
+
+    if (l == (uint8_t *)(uintptr_t)ADDR_MSG_LIST_POOL) {
+        if (*(void *const *)(l + MSGLIST_OFF_HEAD)) {
+            /* The pool still has buffers: neither remaining complaint
+             * applies, and the original jumps straight to the unlock. */
+            orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+            return;
+        }
+        orig_log("RemMsg has set freelist to EMPTY!! l->numItems = %d\n",
+                 count);
+    }
+
+    if (!*(void *const *)(l + MSGLIST_OFF_HEAD)
+        && *(const int32_t *)(l + MSGLIST_OFF_COUNT) > 0)
+        orig_log("Why is list %x empty?  List Size %d \n", l,
+                 *(const int32_t *)(l + MSGLIST_OFF_COUNT));
+
+    orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+}
+
 void __cdecl ExitGamePostClose(void)
 {
     *(int32_t *)AM2_IMAGE(ADDR_EXIT_GAME_FLAG) = 1;
@@ -1974,6 +2057,8 @@ int commmsg_install(void)
                   "CommDrainMsgs", 0);
     patch_replace(ADDR_MSG_LIST_REM_HEAD, (const void *)MsgListRemHead,
                   "MsgListRemHead", 10);
+    patch_replace(ADDR_MSG_LIST_REMOVE, (const void *)MsgListRemove,
+                  "MsgListRemove", 3);
     patch_replace(ADDR_MSG_LIST_SET_FLAG, (const void *)MsgListSetFlag,
                   "MsgListSetFlag", 5);
     patch_replace(ADDR_MSG_LIST_ADD, (const void *)MsgListAdd,

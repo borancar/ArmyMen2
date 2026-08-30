@@ -148,6 +148,14 @@ void __cdecl SendChatMsg(char *text, int32_t system);
  * links are left alone, so a caller can still read its `next`. */
 void *__cdecl MsgListRemHead(void *list);
 
+/* Original: 0x00401410, three callers, and it names itself in all three of
+ * its complaints -- "RemMsg". Unlink a node the caller already holds,
+ * wherever it sits, where MsgListRemHead unlinks the head. The list's TAIL is
+ * maintained in both directions and the unlinked node's own links are left
+ * alone, so a caller walking while removing can still read its `next`. See
+ * commmsg.cpp for which complaint reaches which list. */
+void __cdecl MsgListRemove(void *list, void *node);
+
 /* Original: 0x00410B70, and it names itself -- "ReceiveEndSetupMsg". Log if
  * the comm object's verbosity field is set, then post AM2_WM_SETUP_DONE to the
  * game window. That is all of it: the receive side of this handshake holds no

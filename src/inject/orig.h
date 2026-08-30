@@ -6780,6 +6780,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * MSGNODE_OFF_KEY order, under the list's own mutex. */
 #define ADDR_MSG_LIST_INSERT       0x00401150u  /* void *(list, void *node) */
 #define AM2_MSGLIST_SANE_MAX       0x190   /* 400 */
+/* 0x00401410, three callers. Unlink a node the caller already holds, wherever
+ * it sits -- the general removal MsgListRemHead is the head-only case of. It
+ * names itself "RemMsg" in all three of its complaints. Reconstructed. */
+#define ADDR_MSG_LIST_REMOVE       0x00401410u  /* void(void *list, void *n) */
 /* 0x004010C0, "RemHead: Impossible List Size %d". Unlinks and answers the head
  * node, or null. The same sanity complaint as the append, and a second one --
  * "Empty List!" -- that fires ONLY for ADDR_MSG_LIST_POOL, because an empty
