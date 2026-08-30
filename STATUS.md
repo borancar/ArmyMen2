@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,218 patches.**
+Nothing uncommitted. **1,219 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1938,16 +1938,42 @@ commit -- gave the right answer every time it was used.
   identity in this build -- and this is where a message would arrive addressed
   to nobody if it ever stopped being.
 
+- **`TrooperWantItemSend`** (`0x0044BFA0`), and **its four log lines name a
+  protocol this project had been treating as a magic number.** Request 0 is
+  `WANT_PICKUP`, 1 `WANT_DROP`, 2 `DO_PICKUP` and 3 `DO_DROP`: a client asks
+  WANT and the host answers DO. One of this function's two callers IS the
+  kind-0x19 receiver, which turns a WANT into a DO and sends it back, so the
+  whole handshake is visible in one call graph.
+
+  **That retroactively explains `TrooperDropItemSend`'s literal 3**, which
+  went in two batches ago with a note calling it a constant nobody chose. It
+  is `AM2_DO_DROP` -- a drop message IS the completed request. The comment
+  there now says so, and `AM2_MSG_DROP_REQUEST` is gone.
+
+  It fills the same 0x1C record under kind 0x19, with two differences: the
+  point comes from the ITEM's own position rather than the caller, and the
+  request is an argument rather than a constant.
+
+  **The tail is a chain of `cmp`, not a switch**, and request 0 has no test of
+  its own -- it is the `!request` arm. Anything above 3 sends the message and
+  says nothing.
+
+  **The format string settled a field name.** All four logs read the quantity
+  back out of the MESSAGE rather than from the argument in hand, and call it
+  "ammo" -- which is what fixes what `MSG_DROP_OFF_QUANT` counts. I had
+  transcribed that argument as the point first, and the string is what caught
+  it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,064 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,218
+line (0x0045C000) patched**. Measured: **1,065 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,219
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-four batches have gone in and the 175 entries outstanding start at 48
+small ones in batches. Sixty-five batches have gone in and the 174 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -6243,7 +6243,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_DROP_OFF_QUANT        0x14u
 #define MSG_DROP_OFF_SLOT         0x18u  /* the byte argument, sign-extended */
 #define AM2_MSG_DROP_ITEM_LEN     0x1Cu
-#define AM2_MSG_DROP_REQUEST      3
+/* The `request` field is a four-value protocol and the program names all four
+ * of them, in TrooperWantItemSend's own log lines: WANT_PICKUP, WANT_DROP,
+ * DO_PICKUP, DO_DROP. So TrooperDropItemSend's literal 3 is not a magic
+ * number at all -- it is DO_DROP, the "this has happened" half of the pair
+ * whose "may I" half is WANT_DROP. */
+#define AM2_WANT_PICKUP           0
+#define AM2_WANT_DROP             1
+#define AM2_DO_PICKUP             2
+#define AM2_DO_DROP               3
 /* 0x00449760, one caller, and it names itself twice: "UseInventoryItem" and
  * "UseInventoryItem: droping item:%x". Spend one charge of an inventory slot.
  * Reconstructed. */
@@ -7347,6 +7355,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_RECV_DROP_GONE   0x0048ACC0u
 #define ADDR_STR_RECV_DROP_DONE   0x0048AD80u
 #define ADDR_STR_RECV_DROP_MINE   0x0048AD54u
+/* 0x0044BFA0, two callers -- one of them the kind-0x19 RECEIVER, which
+ * re-sends. The same 0x1C-byte record TrooperDropItemSend fills, under kind
+ * 0x19 instead of 0x21, with two differences: the point comes from the ITEM's
+ * own position rather than from the caller, and the request is an ARGUMENT
+ * rather than the literal DO_DROP. Reconstructed. */
+#define ADDR_TROOPER_WANT_ITEM_SEND 0x0044BFA0u /* void(troop,item,req,slot,q) */
+#define AM2_MSG_TROOPER_WANT_ITEM 0x19u
+#define ADDR_STR_WANT_SEND_HDR    0x0048A900u
+#define ADDR_STR_WANT_PICKUP      0x0048A8DCu
+#define ADDR_STR_WANT_DROP        0x0048A8B8u
+#define ADDR_STR_DO_PICKUP        0x0048A898u
+#define ADDR_STR_DO_DROP          0x0048A878u
 /* Reconstructed. The receiver for eTROOPER_SET_WEAPON_MESSAGE, and the twin
  * of armymsg.cpp's SendTrooperSetWeapon: put the weapon's uid in the
  * trooper's inventory SLOT, set the soldier kind from the weapon's code, and

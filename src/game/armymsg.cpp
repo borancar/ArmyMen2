@@ -225,9 +225,12 @@ typedef void (__cdecl *AM2_AppendTroopStateFn)(void *msg, void *obj);
  * "-->Trooper Drop Item Sent" once it has gone.
  *
  * A 0x1C-byte kind-0x21 message. Five of its six fields come from the
- * arguments and the sixth, MSG_DROP_OFF_REQUEST, is the literal 3 every time
- * -- the "request: %d" the second log prints is a constant, not a value the
- * caller chose.
+ * arguments and the sixth, MSG_DROP_OFF_REQUEST, is the same value every
+ * time. That looked like a magic 3 when this was written; TrooperWantItemSend
+ * below names it. It is AM2_DO_DROP -- the "this has happened" half of a
+ * four-value protocol whose "may I" half is AM2_WANT_DROP -- so the
+ * "request: %d" the second log prints is a constant because a drop message
+ * IS the completed request.
  *
  * THE SECOND LOG PUTS THE UIDS THROUGH UidOnWire A SECOND TIME. The message
  * fields already hold wire uids, and the "Sent" line reads them back out and
@@ -272,7 +275,7 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
     *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
         UidOnWire(((const AM2_Object *)it)->uid);
     *(uint32_t *)(msg + MSG_DROP_OFF_AT)      = at;
-    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_MSG_DROP_REQUEST;
+    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_DO_DROP;
     *(int32_t *)(msg + MSG_DROP_OFF_QUANT)    = quantity;
     *(int32_t *)(msg + MSG_DROP_OFF_SLOT)     = (int32_t)(int8_t)slot;
 
@@ -286,6 +289,86 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
                 *(const int32_t *)(msg + MSG_DROP_OFF_REQUEST),
                 *(const int32_t *)(msg + MSG_DROP_OFF_SLOT),
                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+}
+
+/* TrooperWantItemSend -- original 0x0044BFA0, two callers, and one of them is
+ * the kind-0x19 RECEIVER, which turns a WANT into a DO and sends it back.
+ * That is the whole shape of the protocol in one call graph.
+ *
+ * ITS FOUR LOG LINES NAME THE PROTOCOL, which is why it was worth doing:
+ * request 0 is WANT_PICKUP, 1 WANT_DROP, 2 DO_PICKUP and 3 DO_DROP. The
+ * halves pair up -- a client asks WANT and the host answers DO -- and that
+ * retroactively explains TrooperDropItemSend's literal 3 one function up,
+ * which had gone in as a magic number with a note saying so.
+ *
+ * It fills the same 0x1C-byte record TrooperDropItemSend does, under kind
+ * 0x19 instead of 0x21, with two differences: the point comes from the ITEM's
+ * own position rather than from the caller, and the request is an argument
+ * rather than a constant.
+ *
+ * THE TAIL IS A CHAIN OF `cmp` AND NOT A SWITCH, and it matters: request 0
+ * has no test of its own -- it is the `!request` arm reached when the header
+ * log has already run -- while 1, 2 and 3 are compared in turn and anything
+ * else falls off the end silently. So a fifth request value would send the
+ * message and say nothing.
+ *
+ * All five logs are gated on COMM_OFF_VERBOSE, and the SEND is not. The
+ * header log dereferences the item before the `if (!item)` guard below it,
+ * which is the same shape the other three functions in this family have.
+ */
+void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
+                                 int32_t slot, int32_t quantity)
+{
+    uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
+    uint8_t *t = (uint8_t *)trooper;
+    uint8_t *it = (uint8_t *)item;
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WANT_SEND_HDR),
+                 UidOnWire(((const AM2_Object *)t)->uid),
+                 UidOnWire(((const AM2_Object *)it)->uid),
+                 request, slot, quantity);
+
+    if (!it)
+        return;
+
+    *(uint16_t *)(msg + 0) = AM2_MSG_DROP_ITEM_LEN;
+    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_WANT_ITEM;
+    *(uint32_t *)(msg + MSG_DROP_OFF_TROOPER) =
+        UidOnWire(((const AM2_Object *)t)->uid);
+    *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
+        UidOnWire(((const AM2_Object *)it)->uid);
+    *(uint32_t *)(msg + MSG_DROP_OFF_AT) =
+        *(const uint32_t *)(it + OBJ_OFF_POS);
+    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST) = request;
+    *(int32_t *)(msg + MSG_DROP_OFF_QUANT)   = quantity;
+    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)    = (int32_t)(int8_t)slot;
+
+    ArmyMessageSend(msg);
+
+    if (!*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        return;
+
+    /* All four read the QUANTITY back out of the MESSAGE rather than using
+     * the argument still in a register -- the same habit TrooperDropItemSend's
+     * second log has. The format calls it "ammo", which is what settles what
+     * MSG_DROP_OFF_QUANT counts. */
+    if (!request)
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WANT_PICKUP),
+                 ((const AM2_Object *)it)->uid,
+                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+    else if (request == AM2_WANT_DROP)
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WANT_DROP),
+                 ((const AM2_Object *)it)->uid,
+                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+    else if (request == AM2_DO_PICKUP)
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_DO_PICKUP),
+                 ((const AM2_Object *)it)->uid,
+                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
+    else if (request == AM2_DO_DROP)
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_DO_DROP),
+                 ((const AM2_Object *)it)->uid,
+                 *(const int32_t *)(msg + MSG_DROP_OFF_QUANT));
 }
 
 /* TellOneSlot -- original 0x0044C480, one caller, which is TellEachSlot.
@@ -1088,6 +1171,9 @@ int armymsg_install(void)
                         "SendObjDestroyed", 2);
     rc |= patch_replace(ADDR_TELL_ONE_SLOT, (const void *)TellOneSlot,
                         "TellOneSlot", 1);
+    rc |= patch_replace(ADDR_TROOPER_WANT_ITEM_SEND,
+                        (const void *)TrooperWantItemSend,
+                        "TrooperWantItemSend", 2);
     rc |= patch_replace(ADDR_TROOPER_DROP_ITEM_SEND,
                         (const void *)TrooperDropItemSend,
                         "TrooperDropItemSend", 2);
