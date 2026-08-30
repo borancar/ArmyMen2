@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,222 patches.**
+Nothing uncommitted. **1,223 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2048,16 +2048,46 @@ commit -- gave the right answer every time it was used.
   The weapon also gains `OBJ_FLAG_NO_SWEEP`, whose meaning `orig.h` still
   records as unestablished; this is one more data point for it.
 
+- **`SetObjScriptState`** (`0x004372A0`) is `RunScriptAction`'s `setobjstate`.
+  It has FOUR refusals and only three complain -- an object with no script id
+  at all is refused SILENTLY, while a bad name gets one message and an
+  unresolvable or non-item uid share a second.
+
+  **THE "NO OBJECT SCRIPT" TEST IS AN ADDRESS COMPARED AGAINST ZERO**, and
+  transcribing it naturally would have deleted it. The original builds
+  `&kObjScripts[id - 1]` with an LEA and tests the RESULT -- which can only be
+  zero when the table pointer is null and the id is exactly 1, so it is "the
+  table was never allocated" wearing the shape of a null-record check. Written
+  as `&kObjScripts[id - 1]` in C the test is `!(&array[i])`, which a compiler
+  may fold to false and remove; the reconstruction would then have no refusal
+  and neither the build nor the A/B would say so. Built with explicit address
+  arithmetic instead.
+
+  **The frame is stored one LESS than it arrives**, so the action's frame
+  numbers are 1-based and the field 0-based, and `OBJ_OFF_SCRIPT_NEXT` is
+  cleared so the new state takes effect in this frame rather than the next.
+
+  **One field is deliberately left a literal.** The "has no object script"
+  message prints the object's name through `obj[0x0C]`, and a scan finds no
+  other reader anywhere in the image. CLAUDE.md's rule applies -- one consumer
+  is not enough to name a field -- and `OBJ_OFF_FIELD_0C` would also cost a
+  family alias against `OBJ_OFF_BOUNDS`.
+
+  Not exercised: `setobjstate` appears in 13 shipped scripts INCLUDING
+  `kitchen1.txt`, which is campaign MAP 01 -- but the counter still reads 0 on
+  a driven campaign, so its condition does not trigger inside the drive. Its
+  caller is the original's `RunScriptAction`, so that 0 is not blind.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,068 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,222
+line (0x0045C000) patched**. Measured: **1,069 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,223
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-eight batches have gone in and the 171 entries outstanding start at 48
+small ones in batches. Sixty-nine batches have gone in and the 170 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

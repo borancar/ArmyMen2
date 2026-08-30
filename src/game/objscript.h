@@ -106,6 +106,14 @@ void __cdecl FreeObjScripts(void);
  * index, 1 otherwise. Two callers. */
 int32_t __cdecl UpdateObjectScript(void *obj);
 
+/* 0x004372A0, one caller -- RunScriptAction's `setobjstate`. Point a named
+ * object's object-script at a named state and a frame. FOUR refusals come
+ * first and only three of them complain; the frame is stored one LESS than it
+ * arrives, so the action's numbering is 1-based and the field 0-based. See
+ * objscript.cpp. */
+int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
+                                  int32_t frame);
+
 /* 0x00437400, four callers. Does an object match a selector -- either a named
  * one, or a bitmask of nine independent tests? */
 int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj);

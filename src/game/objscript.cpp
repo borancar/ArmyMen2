@@ -315,6 +315,109 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
  * which pauses it. See ADDR_GAME_CLOCK_MS in orig.h. */
 #define kScriptTiming (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
 
+/* SetObjScriptState -- original 0x004372A0, one caller, which is
+ * RunScriptAction: the `setobjstate` action. It names itself twice, in two
+ * different refusals.
+ *
+ * Point a named object's object-script at a named STATE and a frame. Four
+ * refusals come first and they are not interchangeable:
+ *
+ *   - a name index of zero or below is refused silently, before anything is
+ *     read;
+ *   - a name that is not AM2_NAME_TYPE_REF gets "which is not an item";
+ *   - a name whose uid does not resolve, or resolves to something ObjIsItem
+ *     refuses, gets "which is not a valid object" -- ONE message for two
+ *     different failures;
+ *   - and an object with no script id at all is refused SILENTLY, which is
+ *     the fourth and the only one with no complaint of its own.
+ *
+ * THE "NO OBJECT SCRIPT" TEST IS AN ADDRESS COMPARED AGAINST ZERO. The
+ * original computes `&kObjScripts[id - 1]` with an LEA and then tests the
+ * RESULT for zero -- which can only happen when the table pointer is null and
+ * the id is exactly 1. So it is "the table was never allocated" wearing the
+ * shape of a null-record check.
+ *
+ * That is why the address is built with explicit arithmetic below. Written as
+ * `&kObjScripts[id - 1]` the check is `!(&array[i])`, which a compiler is
+ * entitled to fold to false and delete -- the reconstruction would then have
+ * no refusal at all, and nothing in the build or the A/B would say so.
+ *
+ * The state's own value is bounds-checked against the script's `statecount`
+ * and refused with "Bad state index" -- a fifth message, and the only one
+ * that names a state rather than an object.
+ *
+ * THE FRAME ARGUMENT IS STORED ONE LESS THAN IT ARRIVES. `frame - 1` goes
+ * into OBJ_OFF_SCRIPT_FRAME, so the action's frame numbers are 1-based and
+ * the field is 0-based. OBJ_OFF_SCRIPT_NEXT is cleared, which makes the
+ * script due immediately, and UpdateObjectScript is run before returning --
+ * so the new state takes effect in this frame rather than the next.
+ *
+ * ONE FIELD IS LEFT AS A LITERAL. The "has no object script" message prints
+ * the object's own name through `obj[0x0C]` as a name-table index, and this
+ * is the ONLY reader of that offset anywhere in the image -- a scan for a
+ * second one finds none. CLAUDE.md's rule applies: a field with one consumer
+ * is a field you cannot name, and buying `OBJ_OFF_FIELD_0C` would also cost a
+ * family alias against OBJ_OFF_BOUNDS. Left as 0x0C with this note.
+ */
+int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
+                                  int32_t frame)
+{
+    const AM2_ScriptName *names = kScriptNames;
+    uint8_t              *obj;
+    AM2_ObjScript        *script;
+    uintptr_t             at;
+    int32_t               state;
+
+    if (nameidx <= 0)
+        return 0;
+
+    if (names[nameidx].type != AM2_NAME_TYPE_REF) {
+        am2_log("ERROR: SetObjScriptState was called with %s which is not "
+                "an item\n", names[nameidx].name);
+        return 0;
+    }
+
+    obj = (uint8_t *)LookupByUID((uint32_t)names[nameidx].value);
+    if (!obj || !ObjIsItem((const AM2_Object *)obj)) {
+        am2_log("ERROR: SetObjScriptState was called with %s which is not "
+                "a valid object\n", names[nameidx].name);
+        return 0;
+    }
+
+    if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID) <= 0)
+        return 0;
+
+    /* Written as the original's LEA rather than as `&kObjScripts[id - 1]`,
+     * because the test below is on the ADDRESS: taking the address of an
+     * array element and asking whether it is null is something the compiler
+     * may fold away, and this check has to survive. */
+    at = (uintptr_t)kObjScripts
+       + (uintptr_t)(*(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID) - 1)
+         * sizeof(AM2_ObjScript);
+    script = (AM2_ObjScript *)at;
+    if (at == 0) {
+        am2_log("Tried to set object script state (%s) in object %s, which "
+                "has no object script.\n",
+                names[stateName].name,
+                names[*(const int32_t *)(obj + 0x0C)].name);
+        return 0;
+    }
+
+    state = names[stateName].value;
+    if (state >= script->statecount) {
+        am2_log("Bad state index associated with state %s\n",
+                names[stateName].name);
+        return 0;
+    }
+
+    *(int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) = state;
+    *(int32_t *)(obj + OBJ_OFF_SCRIPT_FRAME) = frame - 1;
+    *(int32_t *)(obj + OBJ_OFF_SCRIPT_NEXT)  = 0;
+
+    UpdateObjectScript(obj);
+    return 1;
+}
+
 /* 0x004351C0 and 0x00420410 stay original and are reached by address. The
  * first is ChangeObjectFrame, named by the error string below; the second is
  * unidentified beyond its role, so it keeps a role name. */
@@ -698,6 +801,9 @@ int objscript_install(void)
     rc |= patch_replace(ADDR_OBJ_MATCHES_SEL,
                         (const void *)ObjMatchesSel,
                         "ObjMatchesSel", 4);
+    rc |= patch_replace(ADDR_SET_OBJ_SCRIPT_STATE,
+                        (const void *)SetObjScriptState,
+                        "SetObjScriptState", 1);
 
     rc |= patch_replace(ADDR_SCRIPT_COMPARE,
                         (const void *)ScriptCompare, "ScriptCompare", 1);
