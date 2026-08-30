@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,205 patches.**
+Nothing uncommitted. **1,207 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1557,16 +1557,55 @@ commit -- gave the right answer every time it was used.
   `VehicleTakeOutOccupant` and nine more -- while `ObjTileChanged` runs 47,599
   times in the same run. The map has no vehicle to board.
 
+- **`BlockWeightDamaging`** (`0x0043CF70`) is the FOURTH member of the
+  block-weight family and the only one that CHANGES ANYTHING. The walk is
+  `BlockWeightChain`'s argument for argument -- but every object in the chain
+  that `ObjIsWatchedKind` accepts takes one point of kind-4 damage **with its
+  own uid as the attacker**. So a query that reads as "how obstructed is this
+  point" wears the obstruction down as a side effect of being asked, and
+  attributes the wear to the thing being worn.
+
+  The damage is gated on single player, or on `CommMustBroadcast` accepting
+  the OBJECT's army -- so in a session only the owner wears a thing down and
+  the others learn of it from `DamageObject`'s message.
+
+  Two other differences from its twin: the terrain term is `AM2_TILE_BLOCKS`
+  where `BlockWeightChain` uses `AM2_TILE_OPEN` (opposite polarity, same
+  meaning), and it HAS `BlockWeightAt`'s height step, which the chain variant
+  does not.
+
+  **Its dead guard is spelled a THIRD way, and the family now has three
+  spellings of one vacuous check.** This masks to 16 bits and then tests
+  signed-less-than and then greater-than 0xFFFF; `BlockWeightAt` masks then
+  tests signed; `BlockWeightChain` tests unsigned then masks. Three
+  compilations, not one slip repeated. A fifth argument goes in and is never
+  read -- the same shape as `ObjBlockWeight`'s unused third, one level down.
+
+- **`ObjIsWatchedKind`** (`0x0045EED0`, 48 bytes, eight callers) is the
+  predicate that gates it: an ITEM whose `OBJ_OFF_FIELD_94` record carries the
+  type id in `ADDR_CREATE_WATCHED_KIND`. A null object returns THE NULL rather
+  than a literal zero.
+
+  **It is the live one of the pair: 8,904 calls on a driven Boot Camp
+  mission**, so it is genuinely A/B covered. `BlockWeightDamaging` reads 0 --
+  its one caller sums over the roach footprint table -- while
+  `BlockWeightTroops` beside it reads 2,632,953 on the same run.
+
+- **`AM2_BLOCK_HEIGHT_STEP`'s comment had the polarity backwards.** It said "a
+  step this size stops it blocking"; both readers take the absolute difference
+  of two tile heights and add `AM2_BLOCK_FULL` when it EXCEEDS this. Corrected
+  by writing a second reader and finding the two disagreed with the prose.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,052 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,205
+line (0x0045C000) patched**. Measured: **1,053 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,207
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-two batches have gone in and the 187 entries outstanding start at 48
+small ones in batches. Fifty-three batches have gone in and the 186 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -1544,6 +1544,121 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
     return total;
 }
 
+/* 0x0045EED0, EIGHT callers, 48 bytes. Is this object an ITEM of the type id
+ * in ADDR_CREATE_WATCHED_KIND?
+ *
+ * Three exits and only two answers. A null object RETURNS THE NULL ITSELF
+ * rather than a literal zero -- `test eax,eax; jne; ret` with the argument
+ * still in eax -- which is the same value and worth reproducing as the
+ * constant it is. A non-item answers 0. An item answers the comparison
+ * between its OBJ_OFF_FIELD_94 record's +8 dword and that global, which
+ * orig.h already records as a type id being matched rather than a count; its
+ * neighbour 0x00516164 holds 0xE80609 and is matched against the same field.
+ */
+int32_t __cdecl ObjIsWatchedKind(const void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+
+    if (!o)
+        return 0;
+    if (*(const int32_t *)o != AM2_OBJ_TYPE_ITEM)
+        return 0;
+
+    return *(const int32_t *)
+               (*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94) + 8)
+           == *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND;
+}
+
+/* 0x0043CF70, one caller, 224 bytes. The FOURTH member of the block-weight
+ * family, and the only one that CHANGES ANYTHING.
+ *
+ * The walk is BlockWeightChain's, argument for argument: the same four in the
+ * same order, the same accumulation through ObjBlockWeight with the same
+ * point-into-the-unused-third-parameter shuffle, and the same stop the moment
+ * the total reaches AM2_BLOCK_FULL. Three things differ.
+ *
+ * IT DAMAGES WHAT IT WALKS PAST. Every object in the chain that
+ * ObjIsWatchedKind accepts takes one point of kind-4 damage, WITH ITS OWN UID
+ * AS THE ATTACKER. So a query that reads as "how obstructed is this point"
+ * wears down the obstruction as a side effect of being asked, and the wear is
+ * attributed to the thing being worn rather than to whoever asked. Nothing in
+ * the name of a block-weight function suggests that, which is why it is the
+ * first thing said here.
+ *
+ * The damage is gated on being single player -- ADDR_MP_SESSION zero -- or on
+ * CommMustBroadcast accepting the OBJECT's army. So in a session only the
+ * owner of a thing wears it down, and the others learn about it from the
+ * message DamageObject sends.
+ *
+ * ITS TERRAIN TERM IS THE OTHER POLARITY. This tests AM2_TILE_BLOCKS and adds
+ * when the bit is SET, where BlockWeightChain tests AM2_TILE_OPEN and adds
+ * when it is CLEAR. Both spellings mean "impassable" over their own bit; they
+ * are recorded separately because one of them being wrong is a
+ * one-character error no A/B here could report.
+ *
+ * AND IT HAS THE HEIGHT STEP, which BlockWeightChain does not: the absolute
+ * difference between the viewer's own tile height and the target tile's,
+ * against AM2_BLOCK_HEIGHT_STEP. That is BlockWeightAt's term, so this
+ * function is the chain variant with BlockWeightAt's terrain half bolted on.
+ *
+ * ITS DEAD GUARD IS SPELLED A THIRD WAY, and the family now has three. This
+ * one masks to 16 bits and then tests SIGNED-LESS-THAN and then GREATER-THAN
+ * 0xFFFF -- after the mask, neither can fire, and both reach a `return 0xFF`
+ * that no input produces. BlockWeightAt masks then tests signed; BlockWeight-
+ * Chain tests unsigned then masks. Three spellings of one vacuous check is
+ * three different compilations, not one transcription slip repeated.
+ *
+ * A FIFTH ARGUMENT GOES IN AND IS NEVER READ. The caller pushes five dwords
+ * and cleans five; the body reads four. Same shape as ObjBlockWeight's unused
+ * third parameter one level down, and reproduced the same way.
+ */
+int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
+                                    uint32_t ref, int32_t unused)
+{
+    uint8_t *o     = (uint8_t *)chain;
+    int32_t  total = 0;
+    uint32_t tile;
+
+    (void)unused;
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        total += ObjBlockWeight(from, o, (int32_t)at, ref);
+        if (total >= AM2_BLOCK_FULL)
+            return total;
+
+        if (ObjIsWatchedKind(o)
+            && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+                || CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
+                                     (int16_t)*(const int8_t *)
+                                         (o + OBJ_OFF_ARMY))))
+            DamageObject(o, AM2_BLOCK_WEAR_AMOUNT, AM2_BLOCK_WEAR_KIND,
+                         ((const AM2_Object *)o)->uid, 0, 0);
+    }
+
+    tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
+    /* The original's guard, and vacuous after the mask above; see the note. */
+    if ((int32_t)tile < 0 || tile > 0xFFFFu)
+        return 0xFF;
+
+    if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
+        total += AM2_BLOCK_FULL;
+
+    if (from) {
+        int32_t here = *(const int8_t *)
+            (g_tileAttrs + *(const uint16_t *)((const uint8_t *)from
+                                               + OBJ_OFF_TILE));
+        int32_t there = *(const int8_t *)(g_tileAttrs + tile);
+        int32_t step  = there - here;
+
+        if (step < 0)
+            step = -step;
+        if (step > AM2_BLOCK_HEIGHT_STEP)
+            total += AM2_BLOCK_FULL;
+    }
+
+    return total;
+}
+
 /* 0x0045B690, two callers, 112 bytes. The sibling of BlockWeightAt above, and
  * the two differences are the whole of it.
  *
@@ -6753,6 +6868,11 @@ void item_install(void)
                   "PickFireMode", 1);
     patch_replace(ADDR_BOARD_VEHICLE, (const void *)BoardVehicle,
                   "BoardVehicle", 1);
+    patch_replace(ADDR_OBJ_IS_WATCHED_KIND, (const void *)ObjIsWatchedKind,
+                  "ObjIsWatchedKind", 8);
+    patch_replace(ADDR_BLOCK_WEIGHT_DAMAGING,
+                  (const void *)BlockWeightDamaging,
+                  "BlockWeightDamaging", 1);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,

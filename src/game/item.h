@@ -187,6 +187,18 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref);
 int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
                                  uint32_t ref);
 
+/* 0x0043CF70. The FOURTH variant, and the only one with a side effect: the
+ * same walk as BlockWeightChain, with AM2_TILE_BLOCKS instead of
+ * AM2_TILE_OPEN, with BlockWeightAt's height step, and DAMAGING every object
+ * in the chain that ObjIsWatchedKind accepts. Its fifth argument is never
+ * read. See item.cpp. */
+int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
+                                    uint32_t ref, int32_t unused);
+
+/* 0x0045EED0, eight callers. Is this object an ITEM whose OBJ_OFF_FIELD_94
+ * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
+int32_t __cdecl ObjIsWatchedKind(const void *obj);
+
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
  * and not even then for the unit the player is driving. */

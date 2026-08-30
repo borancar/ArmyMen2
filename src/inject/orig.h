@@ -6163,7 +6163,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * reached, so it is verified by reading. */
 #define ADDR_OBJ_BLOCK_WEIGHT      0x00448E60u /* int32_t(void*,void*,int32,uint32) */
 #define AM2_BLOCK_FULL             15   /* the callers' own threshold */
-#define AM2_BLOCK_HEIGHT_STEP      0x10 /* a step this size stops it blocking */
+/* A height difference LARGER than this blocks: both readers take the absolute
+ * difference of two tile heights and add AM2_BLOCK_FULL when it exceeds this.
+ * The comment here used to say "a step this size stops it blocking", which is
+ * the polarity backwards; BlockWeightAt and BlockWeightDamaging agree. */
+#define AM2_BLOCK_HEIGHT_STEP      0x10
 /* 0x00448F00, three callers, 176 bytes. The TOTAL obstruction between an
  * object and a map point: every object standing at that point through
  * ADDR_OBJ_BLOCK_WEIGHT, then the tile's own blocking bit, then a height step
@@ -9222,7 +9226,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * whatever increments them; this is the half that takes visibility AWAY. */
 #define ADDR_UNREVEAL_AREA       0x0043A330u  /* void(int32 army, uint32 at) */
 #define AM2_REVEAL_ARMIES        4
+/* A TYPE ID, and its neighbour 0x00516164 is the same kind of thing -- that
+ * one holds 0xE80609 and is matched against the very same field. Both are
+ * compared with the +8 dword of an object's OBJ_OFF_FIELD_94 record, which
+ * orig.h already records as "a type id being matched, not a count". */
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
+/* 0x0045EED0, EIGHT callers, 48 bytes: is this object an ITEM of that type?
+ * Null answers null, a non-item answers 0, and an item answers the comparison.
+ * Reconstructed. */
+#define ADDR_OBJ_IS_WATCHED_KIND 0x0045EED0u  /* int32_t(const void *obj) */
+#define AM2_OBJ_TYPE_ITEM        1
+/* 0x0043CF70, one caller. The FOURTH member of the block-weight family, and
+ * the only one with a SIDE EFFECT: it damages what it walks past. See
+ * item.cpp beside BlockWeightChain, which it is otherwise a twin of. */
+#define ADDR_BLOCK_WEIGHT_DAMAGING 0x0043CF70u /* int32_t(from,at,chain,ref,x) */
+#define AM2_BLOCK_WEAR_AMOUNT      1
+#define AM2_BLOCK_WEAR_KIND        4
 #define MSG_CREATE_OFF_UID       4u
 #define MSG_CREATE_OFF_NAME      8u    /* char[]; empty means none */
 #define MSG_CREATE_OFF_TYPE      0x48u /* int16_t, 1..4 */
