@@ -5648,8 +5648,10 @@ typedef struct {
  * One of the eight callers is the "doctor doctor" cheat's per-object callback
  * at 0x00417A90, which is what confirms the reading: its message is
  * "Avoid the agony...". */
-/* Positive means the item has a repair frame; see ADDR_HEAL_OBJECT, which is
- * the only reader this reconstruction has read. */
+/* Positive means the item has a repair frame. ADDR_HEAL_OBJECT was the only
+ * reader this reconstruction had read; LoadType1 is a second, and it agrees
+ * -- it replays the field through ChangeObjectFrame with flag 0 when it is
+ * positive, which is the same "positive means there is one" test. */
 #define OBJ_OFF_REPAIR_FRAME     0x9Cu  /* int32_t */
 /* Runs one parsed action against an owner. 4096 bytes in event.cpp with three
  * callers, and it names itself nowhere -- so this is a ROLE, not a recovered
@@ -9755,6 +9757,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * is not allied with; still original. */
 #define ADDR_SHOOTER_REACT         0x00457DA0u /* void(shooter, target) */
 #define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
+/* THIRD READING, and it strengthens the type-dependence note below rather
+ * than settling it: LoadType1 replays this field through ChangeObjectFrame
+ * with flag 1, exactly as it replays OBJ_OFF_REPAIR_FRAME with flag 0. So on
+ * a TYPE 1 the pair are two frame indices for two layers, and a formation
+ * slot is what the same offset means somewhere else. */
 /* AND 0xA0 IS PROBABLY TYPE-DEPENDENT, which is a fact about the STRUCT
  * rather than about this name. Two readings, both from live code:
  *

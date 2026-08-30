@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,226 patches.**
+Nothing uncommitted. **1,227 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2159,16 +2159,46 @@ commit -- gave the right answer every time it was used.
   Blind by construction, like `State1Enter`. The menu frames are the evidence:
   `controls` came back at **0 pixels on all four of its frames**.
 
+- **`LoadType1`** (`0x00433D60`) is `SaveType1`'s counterpart, and the pair
+  shows what the file carries that the object does not. The saver writes the
+  0x2C type record and then a TAG taken from the pointer inside it; this reads
+  both back and builds the object FROM the tag. Pointer to tag on the way out,
+  tag to a fresh object on the way in.
+
+  **It builds the object and then overwrites most of it.** `CreateItem` makes
+  a live item, the saved header is memcpy'd over its first
+  `ADDR_ITEM_HEADER_SIZE` bytes and the saved type record over its
+  `OBJ_OFF_FIELD_94` -- and what survives is exactly what the function saves
+  in locals first: the FRESH object's `OBJ_OFF_FIELD_94` pointer, and the two
+  16-byte blocks at +0x20 and +0x30. Those blocks are the only part of the
+  header the loader refuses.
+
+  **It ends by replaying two frames, which is a further reading for two
+  fields.** `OBJ_OFF_REPAIR_FRAME` goes through `ChangeObjectFrame` with flag
+  0 and `OBJ_OFF_FORMATION_SLOT` with flag 1, each only when positive. That is
+  a second reader for the first (agreeing with `ADDR_HEAL_OBJECT`) and a third
+  for the second, strengthening `orig.h`'s suspicion that 0xA0 is
+  type-dependent: on a type 1 the pair are two frame indices for two layers.
+
+- **A frame-gate failure that reproduced TWICE and was still not the batch.**
+  `mission` came back 25560/7578 and then 25859/8010 -- same direction, same
+  ratio, on a machine reading load 2.06, which is not the noise signature at
+  all. What settled it was that the runaway side was the ORIGINAL's, and
+  `AM2_NOPATCH` runs none of our code, so no reconstruction can move it. The
+  control at HEAD was clean, and re-applying the batch was clean twice over
+  (7646/7950). **Two reproductions in the same direction are still not a
+  regression when the side that moved is the one your change cannot reach.**
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,072 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,226
+line (0x0045C000) patched**. Measured: **1,073 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,227
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-two batches have gone in and the 167 entries outstanding start at 48
+small ones in batches. Seventy-three batches have gone in and the 166 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

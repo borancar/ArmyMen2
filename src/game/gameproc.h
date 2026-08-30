@@ -101,6 +101,12 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg);
 int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj);
 int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
 int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
+
+/* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
+ * the tag, build the item from the tag, then overwrite most of it from the
+ * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its
+ * two 16-byte blocks at +0x20 and +0x30. See gameproc.cpp. */
+void *__cdecl LoadType1(am2_FILE *fp, const void *hdr);
 int32_t __cdecl SaveType6(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType8(am2_FILE *fp, void *obj);
 int32_t __cdecl SaveType4(am2_FILE *fp, void *obj);

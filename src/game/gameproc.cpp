@@ -488,6 +488,89 @@ int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
     WriteSaveTag(fp, *(const uint32_t *)(*(uint8_t *const *)rec + 8));
     return 1;
 }
+/* CreateItem stays original: it is the type-1 arm of the four creators, and
+ * the same one RecvItemCreate reaches. */
+typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
+                                          int32_t kind, int32_t at,
+                                          int32_t c, int32_t d, uint32_t uid);
+#define orig_create_item ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
+
+/* LoadType1 -- original 0x00433D60, one caller, and SaveType1's counterpart.
+ *
+ * The saver writes the 0x2C-byte type record and then a TAG taken from the
+ * pointer inside it; this reads both back and uses the tag to build the
+ * object. So the file carries a KIND where the object carries a POINTER, and
+ * the round trip is: pointer -> tag on the way out, tag -> fresh object on the
+ * way in.
+ *
+ * IT BUILDS THE OBJECT AND THEN OVERWRITES MOST OF IT. CreateItem makes a
+ * live item from the header's uid, position and flags; the saved header is
+ * then memcpy'd over its first ADDR_ITEM_HEADER_SIZE bytes and the saved type
+ * record over its OBJ_OFF_FIELD_94. What survives that is what the function
+ * carefully saves in locals first:
+ *
+ *   - the FRESH object's OBJ_OFF_FIELD_94 pointer, put back over the one the
+ *     file supplied -- the mirror of the saver's tag, and the reason a loaded
+ *     item points at this session's table rather than at a stale address;
+ *   - the two 16-byte blocks at +0x20 and +0x30, saved before the header copy
+ *     and restored after it, so the header's copies of them are discarded.
+ *
+ * Those two blocks are the only part of the header the loader refuses. The
+ * rest of it -- every other field CreateItem just filled in -- is replaced
+ * wholesale.
+ *
+ * IT ENDS BY REPLAYING TWO FRAMES, and that is a second reading for both
+ * fields. OBJ_OFF_REPAIR_FRAME goes to ChangeObjectFrame with flag 0 and
+ * OBJ_OFF_FORMATION_SLOT with flag 1, each only when positive -- so on a type
+ * 1 those two are frame indices for two layers, which is one more piece of
+ * evidence that 0xA0 is type-dependent exactly as orig.h suspects.
+ *
+ * A failed create returns 0 rather than the object, and nothing is read past
+ * that point -- the two freads have already happened, so the file position is
+ * correct either way.
+ */
+void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
+{
+    uint8_t   rec[AM2_TYPE1_RECORD_SIZE];
+    uint32_t  tag;
+    uint8_t  *obj;
+    void     *ownRec;
+    uint8_t   blockA[16];
+    uint8_t   blockB[16];
+
+    orig_fread(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
+    orig_fread(&tag, 4, 1, fp);
+
+    obj = (uint8_t *)orig_create_item(
+        (const char *)(uintptr_t)ADDR_DIR_SCRATCH, AM2_ARMY_NEUTRAL,
+        (int32_t)tag,
+        *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_POS),
+        *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_FLAGS), 1,
+        *(const uint32_t *)((const uint8_t *)hdr + 4));
+    if (!obj)
+        return (void *)0;
+
+    ownRec = *(void **)(obj + OBJ_OFF_FIELD_94);
+    memcpy(blockA, obj + 0x20, sizeof blockA);
+    memcpy(blockB, obj + 0x30, sizeof blockB);
+
+    memcpy(obj, hdr, (size_t)kItemHeaderSize);
+    memcpy(obj + OBJ_OFF_FIELD_94, rec, AM2_TYPE1_RECORD_SIZE);
+    *(void **)(obj + OBJ_OFF_FIELD_94) = ownRec;
+
+    memcpy(obj + 0x20, blockA, sizeof blockA);
+    memcpy(obj + 0x30, blockB, sizeof blockB);
+
+    if (*(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME) > 0)
+        ChangeObjectFrame(obj, *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME),
+                          0);
+    if (*(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT) > 0)
+        ChangeObjectFrame(obj,
+                          *(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT), 1);
+
+    return obj;
+}
+
 
 int32_t __cdecl SaveType6(am2_FILE *fp, void *obj)
 {
@@ -782,7 +865,6 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
 typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
-#define orig_load_type1  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE1)
 #define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
 #define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
@@ -832,7 +914,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     *(uint32_t *)(hdr + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 
     switch (*(const int32_t *)hdr) {
-    case 1:  made = (uint8_t *)orig_load_type1(fp, hdr);      break;
+    case 1:  made = (uint8_t *)LoadType1(fp, hdr);            break;
     case 2:  made = (uint8_t *)orig_load_type2(fp, hdr, arg); break;
     case 3:  made = (uint8_t *)orig_load_type3(fp, hdr);      break;
     case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
@@ -1224,6 +1306,7 @@ void gameproc_install(void)
     patch_replace(ADDR_LOAD_ITEM_HEADER, (const void *)LoadItemHeader,
                   "LoadItemHeader", 1);
     patch_replace(ADDR_SAVE_TYPE1, (const void *)SaveType1, "SaveType1", 2);
+    patch_replace(ADDR_LOAD_TYPE1, (const void *)LoadType1, "LoadType1", 1);
     patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
     patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);
