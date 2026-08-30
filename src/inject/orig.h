@@ -5032,6 +5032,12 @@ typedef struct {
 #define AM2_MAX_HEALTH_CAP       0x190        /* 400: above this, leave alone */
 #define AM2_HEALTH_PER_ATTEMPT   5
 #define ADDR_ALLY_FLAG           0x0040F230u  /* stdcall int32_t(a, b) */
+/* Three target predicates in one functions.tsv entry, 0x60, 0x60 and 0x30
+ * bytes. Reconstructing any one of them alone would have marked all three
+ * done, so all three are written. */
+#define ADDR_OBJ_IS_OURS         0x00403600u /* int32(void *obj, int32 allies) */
+#define ADDR_OBJ_IS_LIVE_TARGET  0x00403660u /* int32_t(void *obj) */
+#define ADDR_OBJ_IS_HITTABLE     0x004036C0u /* int32_t(void *obj) */
 /* 0x004574D0, eleven callers. Whether two objects are on the same side, which
  * is AllyFlag above with four exceptions layered over it. Reconstructed. Its
  * third argument chooses which of the second object's two OBJ_TABLE_RECORDS
@@ -7540,6 +7546,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * name knew. */
 #define ADDR_SELECTED_UIDS       0x00512308u  /* {capacity, count, items} */
 #define AM2_MAX_SELECTED         0x40
+/* Bit 8, and all three of the target predicates at 0x00403600..0x004036F0
+ * open by answering "yes" for it without looking at anything else -- health,
+ * destroyed and army are all skipped. So it is an override, and what sets it
+ * is not established. Named for the bit. */
+#define OBJ_FLAG_BIT8            0x100u
 #define OBJ_FLAG_SELECTED        0x400u
 /* 0x00458380, four callers. Select one object if it is ours and selectable,
  * clearing the existing selection first unless a CONTROL key is held. */

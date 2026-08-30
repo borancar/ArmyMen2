@@ -152,4 +152,10 @@ int army_install(void);
 }
 #endif
 
+/* 0x00403600, 0x00403660 and 0x004036C0 -- three target predicates sharing
+ * one functions.tsv entry, so all three are reconstructed together. */
+int32_t __cdecl ObjIsOurs(void *obj, int32_t allies);
+int32_t __cdecl ObjIsLiveTarget(void *obj);
+int32_t __cdecl ObjIsHittable(void *obj);
+
 #endif /* AM2_ARMY_H */

@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,175 patches.**
+Nothing uncommitted. **1,178 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -989,16 +989,41 @@ count. A rule that has been ignored five times should be turned into a tool.
   and falls through. Same meaning, one instruction shorter, and it is why
   `eax` is set to 1 in the middle of the function rather than at the end.
 
+- **Three target predicates in one `functions.tsv` entry** -- `ObjIsOurs`
+  (`0x00403600`), `ObjIsLiveTarget` (`0x00403660`) and `ObjIsHittable`
+  (`0x004036C0`), at 0x60, 0x60 and 0x30 bytes. Patching any one would have
+  marked all three done, so all three are written. Second merged entry taken
+  whole this session.
+
+  All three open on `OBJ_FLAG_BIT8` and answer yes without looking at health,
+  the destroyed flag or the army -- an override whose setter is not
+  established, but which three independent functions agree about.
+- **`ObjIsHittable` DISCARDS its last call's result.** It calls `ObjIsType4`,
+  pops the argument, and falls into the same `mov eax, 1` the override arm
+  jumps to, so the answer is 1 either way. It is a call for its side effect,
+  and `ObjIsType4`'s only side effect is to LOG "uid wasn't a weapon!". So
+  reaching that point with anything else is a complaint in the log and a yes
+  to the caller. Reproduced with the result discarded, because removing the
+  call would remove a log line -- one of the few things an A/B can see.
+- **A fourth reading of the health field.** `SelectIfOwn` takes `!= 0`,
+  `ObjToAI` takes `> 0`, and `ObjIsLiveTarget` takes BOTH -- zero refused for
+  everything, negative refused only for ITEMS, so a type 2 at negative health
+  is still a live target. Four functions, three readings, all reproduced.
+- **`ObjIsOurs`'s multiplayer guard is a flat refusal that runs FIRST**: in a
+  session, a type 2 of soldier kind 7 is never ours even when the armies
+  match. Outside a session the guard does not run and the same unit is ours
+  like any other.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,024 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,175
+line (0x0045C000) patched**. Measured: **1,025 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,178
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-eight batches have gone in and the 215 entries outstanding start at 48
+small ones in batches. Twenty-nine batches have gone in and the 214 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

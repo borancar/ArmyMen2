@@ -431,6 +431,131 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
     return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
 }
 
+/* Three target predicates that share one functions.tsv entry -- 0x00403600,
+ * 0x00403660 and 0x004036C0, at 0x60, 0x60 and 0x30 bytes. Patching any one
+ * of them would have marked all three reconstructed, so all three are here.
+ *
+ * ALL THREE OPEN THE SAME WAY on OBJ_FLAG_BIT8: answer yes, without looking
+ * at health, the destroyed flag or the army. It is an override, and what sets
+ * it is not established -- only that these three agree about it.
+ */
+
+/* ObjIsOurs -- original 0x00403600, five callers.
+ *
+ * Is this object on our side? Its own army against the local player's, and
+ * optionally an alliance as well.
+ *
+ * THE MULTIPLAYER GUARD COMES FIRST AND IS A FLAT REFUSAL. In a session, a
+ * type 2 whose soldier kind is 7 is never ours -- not even when the armies
+ * match, because the test runs before the comparison. Kind 7 is the one
+ * SetSoldierKind gives 1.5x health and a name from its own table, so this is
+ * a special unit being held at arm's length. Outside a session the guard does
+ * not run at all and such a unit is ours like any other.
+ *
+ * THE SECOND ARGUMENT ONLY WIDENS. A matching army answers 1 whatever it is;
+ * it decides only whether an ALLIED army counts too. So a caller passing 0
+ * gets "mine", and one passing non-zero gets "mine or my ally's".
+ *
+ * The army is sign-extended for the comparison against ADDR_DEFAULT_OWNER and
+ * passed to AllyFlag as that same widened value.
+ */
+int32_t __cdecl ObjIsOurs(void *obj, int32_t allies)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  army;
+    int32_t  mine;
+
+    if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
+        && ObjIsType2((const AM2_Object *)o)
+        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)
+        return 0;
+
+    army = *(const int8_t *)(o + OBJ_OFF_ARMY);
+    mine = (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+
+    if (army == mine)
+        return 1;
+    if (!allies)
+        return 0;
+
+    return AllyFlag(army, mine) ? 1 : 0;
+}
+
+/* ObjIsLiveTarget -- original 0x00403660, one call site (which the aligned
+ * scan reports twice).
+ *
+ * Is this object worth shooting at? Five tests after the override, and the
+ * order is the whole content: type 7 is always yes; zero health is always no;
+ * an ITEM with NEGATIVE health is no; destroyed is no; and finally the army
+ * must not be the neutral one.
+ *
+ * THE ZERO AND NEGATIVE HEALTH TESTS ARE SEPARATE AND MEAN DIFFERENT THINGS.
+ * Health of exactly zero is refused for everything. Health BELOW zero is
+ * refused only for items -- a type 2 or 3 at negative health is still a live
+ * target here. That is the third reading of this field in as many files:
+ * SelectIfOwn takes `!= 0`, ObjToAI takes `> 0`, and this takes both, on
+ * different objects.
+ *
+ * THE CONSTANT 4 IS USED TWICE, AS A FLAG MASK AND AS AN ARMY. The original
+ * loads `al = 4`, tests it against the flags for OBJ_FLAG_DESTROYED, and then
+ * compares the army byte against the same register. Two unrelated meanings in
+ * one constant, which is a compiler folding and not a fact about either --
+ * written out as the two constants they are.
+ */
+int32_t __cdecl ObjIsLiveTarget(void *obj)
+{
+    uint8_t *o     = (uint8_t *)obj;
+    uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+
+    if (flags & OBJ_FLAG_BIT8)
+        return 1;
+    if (*(const int32_t *)o == 7)
+        return 1;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        return 0;
+    if (ObjIsItem((const AM2_Object *)o)
+        && *(const int16_t *)(o + OBJ_OFF_HEALTH) < 0)
+        return 0;
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return 0;
+
+    return *(const uint8_t *)(o + OBJ_OFF_ARMY) != AM2_ARMY_NEUTRAL;
+}
+
+/* ObjIsHittable -- original 0x004036C0, and the shortest of the three.
+ *
+ * The same question with three tests instead of five: the override, zero
+ * health, destroyed, and then ObjIsType4 -- whose ANSWER IS RETURNED and then
+ * overwritten.
+ *
+ * THAT LAST CALL'S RESULT IS DISCARDED. The original calls ObjIsType4, pops
+ * the argument, and falls into the same `mov eax, 1` the override arm jumps
+ * to -- so the answer is 1 whether the object is a type 4 or not. It is a
+ * call for its side effects, and ObjIsType4's only side effect is to LOG for
+ * a non-weapon: "uid wasn't a weapon!". So reaching this point with anything
+ * else is a complaint in the log and a yes to the caller.
+ *
+ * Reproduced exactly, including the discarded result, because removing the
+ * call would remove the log line -- which is one of the few things an A/B can
+ * see.
+ */
+int32_t __cdecl ObjIsHittable(void *obj)
+{
+    uint8_t *o     = (uint8_t *)obj;
+    uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+
+    if (!(flags & OBJ_FLAG_BIT8)) {
+        if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+            return 0;
+        if (flags & OBJ_FLAG_DESTROYED)
+            return 0;
+
+        (void)ObjIsType4((const AM2_Object *)o);   /* for the log only */
+    }
+
+    return 1;
+}
+
 int army_install(void)
 {
     int rc = 0;
@@ -445,6 +570,12 @@ int army_install(void)
     rc |= patch_replace(ADDR_LIST_FIRST_FIELD548, (const void *)ListFirstField548,
                         "ListFirstField548", 1);
     rc |= patch_replace(ADDR_ALLY_FLAG, (const void *)AllyFlag, "AllyFlag", 2);
+    rc |= patch_replace(ADDR_OBJ_IS_OURS, (const void *)ObjIsOurs,
+                        "ObjIsOurs", 5);
+    rc |= patch_replace(ADDR_OBJ_IS_LIVE_TARGET, (const void *)ObjIsLiveTarget,
+                        "ObjIsLiveTarget", 1);
+    rc |= patch_replace(ADDR_OBJ_IS_HITTABLE, (const void *)ObjIsHittable,
+                        "ObjIsHittable", 0);
     rc |= patch_replace(ADDR_OBJS_ARE_ALLIED, (const void *)ObjsAreAllied,
                         "ObjsAreAllied", 11);
     rc |= patch_replace(ADDR_ARMY_ALLIED_WITH_OBJ,
