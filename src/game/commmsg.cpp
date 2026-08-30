@@ -925,6 +925,93 @@ void __cdecl RecvTroopBatch(void *msg, int32_t army)
         at = (const uint8_t *)TroopSubParse(at, army);
 }
 
+/* RecvTrooperFire -- original 0x0044CB20, one caller. Message kind 0x17, and
+ * the receiver for TrooperFireSend a few hundred lines up.
+ *
+ * IT SETTLES A NAME IN THE SENDER. That function's second parameter is called
+ * `target` and its message field `shotAt`, both from the call site. This end
+ * hands the same value to WeaponByUid -- which insists on kind 4 -- and then
+ * searches for it among the six UNIT_OFF_INVENTORY slots to work out which
+ * weapon index the shot came from. Two uses, both weapon-shaped: the field is
+ * the WEAPON's uid, not the target's. The other field, +0x08, really is the
+ * target, and both ends already call it `globTarg`.
+ *
+ * THE PAIR IS AN EXACT MIRROR IN ONE PLACE AND NOT IN ANOTHER. What the
+ * sender ZEROES on the way out -- UNIT_OFF_FIRE_ACTIVE and UNIT_OFF_FIRE_F588
+ * -- this sets to ONE on the way in, so the shot is armed on the receiving
+ * machine as it is disarmed on the sending one. But the sender reads the
+ * position out of the unit and this writes it back INTO the unit, so a remote
+ * trooper's UNIT_OFF_FIRE_X/Y/Z come off the wire rather than from where it
+ * actually stands.
+ *
+ * THE WEAPON GAINS OBJ_FLAG_NO_SWEEP, bit 27, whose meaning orig.h records as
+ * unestablished. It is set here on a weapon that has just been fired
+ * remotely, which is one more data point for whoever settles it.
+ *
+ * IF NO INVENTORY SLOT MATCHES, TROOPER_OFF_WEAPON is left alone. The six
+ * comparisons are a chain and the last one simply falls through, so a weapon
+ * the trooper is not carrying leaves the previous index standing rather than
+ * clearing it.
+ *
+ * It reuses its own ARGUMENT SLOT to hold the trooper's wire uid, which is
+ * why the log's first value is the uid and not the message pointer.
+ */
+void __cdecl RecvTrooperFire(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint32_t troopUid  = UidOnWire(*(const uint32_t *)(m + 4));
+    uint32_t targetUid = UidOnWire(*(const uint32_t *)(m + 8));
+    uint32_t weaponUid = UidOnWire(*(const uint32_t *)(m + 0x14));
+    uint8_t *unit;
+    uint8_t *weapon;
+    int32_t  i;
+
+    unit = (uint8_t *)ObjByUidAlias(troopUid);
+    if (!unit)
+        return;
+
+    weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
+    if (!weapon)
+        return;
+
+    *(uint32_t *)(weapon + OBJ_OFF_FLAGS) |= OBJ_FLAG_NO_SWEEP;
+
+    *(uint8_t *)(unit + UNIT_OFF_FIRE_F40) =
+        *(const uint8_t *)(unit + OBJ_OFF_FACING);
+    *(int32_t *)(unit + UNIT_OFF_FIRE_ACTIVE) = 1;
+    *(int32_t *)(unit + UNIT_OFF_FIRE_F588)   = 1;
+    *(int32_t *)(unit + UNIT_OFF_FIRE_F58C)   = 1;
+
+    *(int16_t *)(unit + UNIT_OFF_FIRE_X) = *(const int16_t *)(m + 0x0C);
+    *(int16_t *)(unit + UNIT_OFF_FIRE_Y) = *(const int16_t *)(m + 0x0E);
+    *(int16_t *)(unit + UNIT_OFF_FIRE_Z) = *(const int16_t *)(m + 0x10);
+
+    *(uint32_t *)(unit + UNIT_OFF_FIRE_UID)        = targetUid;
+    *(uint32_t *)(unit + UNIT_OFF_FIRE_WEAPON_UID) = weaponUid;
+
+    for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
+        if (*(const uint32_t *)(unit + UNIT_OFF_INVENTORY + i * 4)
+            == weaponUid) {
+            *(int32_t *)(unit + TROOPER_OFF_WEAPON) = i;
+            break;
+        }
+    }
+
+    *(uint8_t *)(unit + TROOPER_OFF_FIRE_FLAG) =
+        *(const uint8_t *)(m + 0x18);
+
+    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
+        am2_log("Trooper Fire Rec, trooper: %x,  face:%d, pos (%d,%d,%d),"
+                " loctarg %x, globTarg %x, weapidx %d\n",
+                troopUid,
+                (int32_t)*(const uint8_t *)(unit + OBJ_OFF_FACING),
+                (int32_t)*(const int16_t *)(m + 0x0C),
+                (int32_t)*(const int16_t *)(m + 0x0E),
+                (int32_t)*(const int16_t *)(m + 0x10),
+                targetUid, *(const uint32_t *)(m + 8),
+                *(const int32_t *)(unit + TROOPER_OFF_WEAPON));
+}
+
 /* RecvTrooperDropItem -- original 0x0044C9C0, one caller. Message kind 0x21,
  * eTROOPER_DROP_ITEM_MESSAGE in the original's own vocabulary.
  *
@@ -1169,8 +1256,6 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
 typedef void (__cdecl *AM2_TroopMsgFn)(void *msg);
 typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
 
-#define orig_recv_trooper_fire \
-    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOPER_FIRE)
 #define orig_recv_troop_19 \
     ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_19)
 
@@ -1184,7 +1269,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
         return;
 
     case AM2_MSG_TROOPER_FIRE:
-        orig_recv_trooper_fire(msg);
+        RecvTrooperFire(msg);
         return;
 
     case AM2_MSG_PAIR:
@@ -2111,6 +2196,8 @@ int commmsg_install(void)
                   "TroopMessageRecv", 1);
     patch_replace(ADDR_RECV_TROOP_DROP_ITEM, (const void *)RecvTrooperDropItem,
                   "RecvTrooperDropItem", 1);
+    patch_replace(ADDR_RECV_TROOPER_FIRE, (const void *)RecvTrooperFire,
+                  "RecvTrooperFire", 1);
     patch_replace(ADDR_RECV_TROOP_16, (const void *)RecvTroopBatch,
                   "RecvTroopBatch", 1);
     patch_replace(ADDR_RECV_TROOP_PAIR, (const void *)RecvTroopPair,

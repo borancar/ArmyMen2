@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,221 patches.**
+Nothing uncommitted. **1,222 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2025,16 +2025,39 @@ commit -- gave the right answer every time it was used.
   made `State1Enter` blind -- `State1Frame` calls it by name and is itself
   called by our own `RunFrame` -- so it reads 0 whether it works or not.
 
+- **`RecvTrooperFire`** (`0x0044CB20`) is the receiver for kind 0x17, whose
+  sender `TrooperFireSend` has been ours for some time -- and **it settles a
+  name in that sender.** Its second parameter is called `target` and its
+  message field `shotAt`, both taken from the call site. This end hands the
+  same value to `WeaponByUid`, which insists on kind 4, and then searches for
+  it among the six `UNIT_OFF_INVENTORY` slots to work out which weapon index
+  the shot came from. Two uses, both weapon-shaped: **the field is the
+  WEAPON's uid, not the target's.**
+
+  **The pair is an exact mirror in one place and not in another.** What the
+  sender ZEROES on the way out -- `UNIT_OFF_FIRE_ACTIVE` and
+  `UNIT_OFF_FIRE_F588` -- this sets to ONE on the way in, so a shot is armed
+  on the receiving machine as it is disarmed on the sending one. But the
+  sender reads the position out of the unit while this writes it back INTO
+  the unit, so a remote trooper's fire position comes off the wire rather
+  than from where it stands.
+
+  If no inventory slot matches, `TROOPER_OFF_WEAPON` is left alone -- the six
+  comparisons are a chain and the last falls through, so a weapon the trooper
+  is not carrying leaves the previous index standing rather than clearing it.
+  The weapon also gains `OBJ_FLAG_NO_SWEEP`, whose meaning `orig.h` still
+  records as unestablished; this is one more data point for it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,067 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,221
+line (0x0045C000) patched**. Measured: **1,068 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,222
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-seven batches have gone in and the 172 entries outstanding start at 48
+small ones in batches. Sixty-eight batches have gone in and the 171 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -6497,6 +6497,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_FIRE_Y          0x592u   /* int16_t */
 #define UNIT_OFF_FIRE_Z          0x594u   /* int16_t, always written zero */
 #define UNIT_OFF_FIRE_UID        0x598u   /* the target's uid, or 0 */
+/* The WEAPON's uid, written only by RecvTrooperFire -- and what settles it is
+ * that the same value is handed to WeaponByUid and then searched for among
+ * the six UNIT_OFF_INVENTORY slots. Two uses, both weapon-shaped. */
+#define UNIT_OFF_FIRE_WEAPON_UID 0x59Cu
 #define AM2_FIRE_MODE_POINT      0x1F
 #define AM2_INVENTORY_SLOTS       6
 #define AM2_OBJ_KIND_WEAPON       4
