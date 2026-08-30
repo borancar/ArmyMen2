@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,179 patches.**
+Nothing uncommitted. **1,180 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1039,16 +1039,34 @@ a matching tree; a drive that is a screen behind replaces the tree wholesale.
 The re-run was identical at 35 nodes. Worth knowing that this oracle has a
 timing failure mode too, and that its own output distinguishes the two.
 
+- **`WeaponFrameReady`** (`0x004499A0`) has THREE answers, not two: 1 means
+  "this weapon kind has no frame rule"; 0 means "the rule exists and this
+  frame fails it"; anything else is `Field51MeetsMin`'s answer on the row.
+  A caller reading it as a boolean gets the right shape and loses why.
+
+  Its dense switch covers kinds 1..0x2B and sends 27 of them to the default,
+  so the rules are for kinds 1, 2, 4, 5, 7..12, 29, 30 and 43 only. **Two of
+  its arms test the SAME frame by different routes** and the compiler did not
+  merge them; written as one case each way round, from the table rather than
+  the code layout.
+
+  Arm 0 has a guard the others do not -- a positive `OBJ_OFF_FIELD_44` answers
+  1 before the frame is looked at.
+- **A second "call whose result is discarded"**, after `ObjIsHittable`'s
+  `ObjIsType4`: this one calls `ClassifyByCode74` and overwrites the answer
+  with the row's frame on the next instruction. Reproduced, for the same
+  reason -- it is there for what it does, not what it returns.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,026 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,179
+line (0x0045C000) patched**. Measured: **1,027 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,180
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty batches have gone in and the 213 entries outstanding start at 48
+small ones in batches. Thirty-one batches have gone in and the 212 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

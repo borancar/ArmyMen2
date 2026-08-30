@@ -567,4 +567,8 @@ void __cdecl SetObjContext(void *obj);
 void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
                               int32_t (__cdecl *keep)(void *obj));
 
+/* 0x004499A0, one caller. Is the object's first row on a frame from which its
+ * weapon may act? Three answers -- see the definition. */
+int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
+
 #endif

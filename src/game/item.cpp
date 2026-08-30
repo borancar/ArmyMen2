@@ -6263,6 +6263,94 @@ void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
     return head;
 }
 
+/* WeaponFrameReady -- original 0x004499A0, one caller.
+ *
+ * Is the object's first row on a frame from which its weapon may act? A dense
+ * switch over the weapon's kind picks one of six frame sets; a kind with no
+ * rule answers 1 outright, and a frame that matches its set defers to
+ * Field51MeetsMin on the row.
+ *
+ * ITS GUARD IS THE FIRE-MODE FIELD. `UNIT_OFF_FIRE_F58C` is one of the pair
+ * PickFireMode writes, so this refuses outright any unit that has not been
+ * given a firing target -- which is what puts the whole function on the
+ * firing path rather than the animation one.
+ *
+ * SO THERE ARE THREE ANSWERS, NOT TWO. 1 means "no rule for this kind"; 0
+ * means "the rule exists and this frame fails it"; and everything else is
+ * whatever Field51MeetsMin says. A caller reading it as a plain boolean gets
+ * the right shape and loses why.
+ *
+ * THE FIRST CALL'S RESULT IS DISCARDED. ClassifyCode74 is called with the
+ * object and its answer is immediately overwritten by the row's frame. That
+ * is the second such call in this file after ObjIsHittable's ObjIsType4, and
+ * the same reading applies: it is there for whatever it does, not for what it
+ * returns. Reproduced.
+ *
+ * MOST KINDS HAVE NO RULE. The 43-entry index table sends 27 of them to the
+ * default arm, so the interesting cases are kinds 1, 2, 4, 5, 7..12, 29, 30
+ * and 43 -- and the two arms for kinds 11/12 and for kind 5 test the SAME
+ * frame, 0x0C, by different routes the compiler did not merge. Written as one
+ * case each way round, matching the table rather than the code layout.
+ *
+ * ARM 0 HAS AN EXTRA GUARD THE OTHERS DO NOT: a positive OBJ_OFF_FIELD_44
+ * takes the default answer of 1 before the frame is looked at, so an object
+ * with that field set is never refused on frame grounds.
+ *
+ * The kind is `*(int32 *)weapon->FIELD_C0` -- the same first dword of the type
+ * record `WeaponClassOf` and `SelectInventorySlot` index -- and the bound is
+ * `(uint32)(kind - 1) > 0x2A`, one comparison covering both ends.
+ */
+int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
+{
+    uint8_t *o   = (uint8_t *)obj;
+    uint8_t *row;
+    int32_t  kind;
+    int32_t  frame;
+
+    if (!*(const int32_t *)(o + UNIT_OFF_FIRE_F58C))
+        return 0;
+
+    (void)ClassifyByCode74(o);          /* answer discarded; see above */
+
+    row   = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    kind  = **(const int32_t *const *)((uint8_t *)weapon + OBJ_OFF_FIELD_C0);
+    frame = *(const int16_t *)(row + ROW_OFF_FRAME);
+
+    switch (kind) {
+    case 1: case 7: case 8: case 9: case 10: case 29: case 30:
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+            return 1;
+        if (frame != 6 && frame != 7 && frame != 0x0D)
+            return 0;
+        break;
+
+    case 2:
+        if (frame != 9 && frame != 0x0A && frame != 0x0B)
+            return 0;
+        break;
+
+    case 4:
+        if (frame != 6 && frame != 7 && frame != 0x2C)
+            return 0;
+        break;
+
+    case 5: case 11: case 12:
+        if (frame != 0x0C)
+            return 0;
+        break;
+
+    case 43:
+        if (frame != 6)
+            return 0;
+        break;
+
+    default:
+        return 1;                       /* no rule for this kind */
+    }
+
+    return Field51MeetsMin(row);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6424,6 +6512,8 @@ void item_install(void)
                   "SetObjContext", 3);
     patch_replace(ADDR_WALK_CELL_AT_POINT, (const void *)WalkCellAtPoint,
                   "WalkCellAtPoint", 2);
+    patch_replace(ADDR_WEAPON_FRAME_READY, (const void *)WeaponFrameReady,
+                  "WeaponFrameReady", 1);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,

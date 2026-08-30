@@ -8034,6 +8034,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_IS_KIND_10_17     0x0044BBF0u  /* int32_t(int32_t) */
 #define ADDR_IS_KIND_14_22     0x00433500u  /* int32_t(int32_t) */
 #define ADDR_CLASSIFY_CODE74   0x0040D7E0u  /* int32_t(const void *obj) */
+/* 0x004499A0, one caller. Is the object's first row on a frame from which its
+ * weapon may act? A dense switch over the weapon kind, 1..0x2B, through a
+ * 43-byte index table at 0x00449A78 and an eight-slot jump table at
+ * 0x00449A58 -- and most kinds have no rule and answer 1. */
+#define ADDR_WEAPON_FRAME_READY 0x004499A0u /* int32_t(void *obj, void *wpn) */
+#define AM2_WPN_FRAME_KINDS     0x2Bu
 #define ADDR_KIND_IN_SET_A     0x0045EE20u  /* int32_t(int32_t kind) */
 #define ADDR_KIND_IN_SET_B     0x00433520u  /* int32_t(int32_t kind) */
 /* The 1bpp source bitmap the RLE mask is encoded FROM, and the encoder's own
