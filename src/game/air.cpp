@@ -3,6 +3,7 @@
 
 #include "air.h"
 #include "rect.h"     /* AM2_Rect, Clamp */
+#include "region.h"   /* SettlePointInRegion -- reconstructed */
 #include "map.h"      /* TileOfPoint -- reconstructed */
 #include "item.h"     /* UidArmy -- reconstructed */
 #include "objtable.h" /* AM2_Object, FirstItem, NextItem */
@@ -341,9 +342,6 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
     return *(const uint32_t *)&pt;
 }
 
-typedef int32_t (__cdecl *AM2_SettlePointFn)(int32_t tile, AM2_Point *pt);
-#define orig_settle_point \
-    ((AM2_SettlePointFn)(uintptr_t)ADDR_SETTLE_POINT_IN_REGION)
 
 #define g_mapBoundsLeft   (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT))
 #define g_mapBoundsTop    (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_TOP))
@@ -430,7 +428,8 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
         out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
     }
 
-    orig_settle_point(TileOfPoint(*(const uint32_t *)out), out);
+    SettlePointInRegion(TileOfPoint(*(const uint32_t *)out),
+                        (uint32_t *)out);
 }
 
 /* 0x00404400, two callers. Put `out` where the follower in formation `slot`
@@ -518,7 +517,8 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
     }
 
-    orig_settle_point(TileOfPoint(*(const uint32_t *)out), out);
+    SettlePointInRegion(TileOfPoint(*(const uint32_t *)out),
+                        (uint32_t *)out);
 }
 
 typedef int32_t (__cdecl *AM2_AirRandFn)(void);

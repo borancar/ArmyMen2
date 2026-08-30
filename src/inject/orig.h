@@ -8859,10 +8859,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FORMATION_POINT_FAR 0x004042A0u /* void(follower, leader,
                                               *      AM2_Point *, int32) */
 /* 0x00439F40, five callers, all of them `TileOfPoint(pt)` and then this with
- * the same point. It reads ADDR_REGION_OF_CELL at that tile and dispatches
- * through the function pointer at 0x00523DDC, rewriting the point; every
- * caller discards the return. The name is ours and describes the effect --
- * what the dispatch actually does is not established here. Stays original. */
+ * the same point. The name is ours and describes the effect.
+ *
+ * What the dispatch does IS established now: this is 0x0043A0A0's twin, the
+ * same square spiral, run under ADDR_POINT_RULE_DEFAULT because it installs
+ * the rule for a null object. It differs from the sibling in writing nothing
+ * through the point when the starting tile is already accepted, and in taking
+ * two parameters rather than three. Reconstructed in region.cpp beside it. */
 #define ADDR_SETTLE_POINT_IN_REGION 0x00439F40u /* int32_t(int32 tile,
                                                  *         AM2_Point *) */
 /* 0x00437E00, four callers -- and one of them is 0x00439F40 itself, which

@@ -39,6 +39,11 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to);
  * the object asking. See region.cpp for why it lives here. */
 void __cdecl SetPointRule(void *obj);
 
+/* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
+ * under the DEFAULT point rule, and writing nothing through `pt` when the
+ * starting tile is already accepted. */
+uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt);
+
 /* 0x00406460 and 0x004066B0. Hops between two regions, and whether two objects
  * are in the same region or neighbouring ones. See region.cpp. */
 int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve);

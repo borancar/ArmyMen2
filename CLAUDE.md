@@ -1132,6 +1132,14 @@ remember the argument order: it is to read the two artifacts, which are named
 -- `$WORK/<cfg>-orig.volatile` and `$WORK/<cfg>-recon.volatile` hold the two
 numbers with the side in the filename.
 
+**Know the reconstruction side's NORMAL BAND, which is the cheapest form of
+this check.** Over one session `mission` failed that gate on four separate
+builds and the original's side was the runaway every time -- 22372, 25493,
+22771 -- while ours read 7957, 8082, 7053 against a clean run's 6291 and 7600.
+Our side never left its band, so no build in that session could have caused
+any of it. One number you already know beats a re-run, a control commit and a
+ratio.
+
 **Read the loop, not the data, when a table's bounds are in question.**
 `tools/scripttokens.py` was reading a range I guessed -- `0x00487A00` to
 `0x00488100` -- and reported 141 keywords. `ScriptLookupToken` walks from

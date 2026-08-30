@@ -365,6 +365,107 @@ void __cdecl InactivateRegion(int32_t region)
 
 typedef int32_t (__cdecl *AM2_PointRuleFn)(int32_t tile);
 
+/* 0x00439F40, five callers. NearestAllowedTile's TWIN, and reading them
+ * together is the only way to see what either one is for. Same square spiral,
+ * same four directions out of ADDR_SPIRAL_DX/DY, same three tests on a
+ * candidate, same give-up at the end of a ring. Three differences, all of them
+ * small and none of them cosmetic:
+ *
+ *  - It installs the rule for a NULL object, so it always searches under
+ *    ADDR_POINT_RULE_DEFAULT. The sibling takes an object and gets that
+ *    object's arm -- boat, other vehicle, or default. So this is the "what
+ *    would anything be allowed to stand on" question and the sibling is
+ *    "what would THIS unit be allowed to stand on".
+ *
+ *  - When the starting tile is already accepted it writes NOTHING through the
+ *    caller's pointer and simply answers the tile. The sibling writes the
+ *    point on that path too, conditionally. So a caller here keeps whatever
+ *    point it arrived with unless the search actually moved, which is exactly
+ *    what FormationPoint below relies on: it has just computed a point and
+ *    only wants it snapped if the tile it lands on is refused.
+ *
+ *  - Its first argument is the tile rather than an object, so there are two
+ *    parameters and not three.
+ *
+ * THE `push 0` SERVES TWO CALLS. The original pushes it for SetPointRule and
+ * then does not clean up, so the following `push tile; call rule; add esp, 8`
+ * cleans both. That is a deferred cleanup and not a two-argument rule -- the
+ * rule call inside the loop pushes one dword and cleans four, which is what
+ * settles the arity.
+ *
+ * It returns a UINT16, and the failure exit is `xor ax, ax` -- sixteen bits,
+ * leaving the rest of eax holding whatever the spiral left there. Log2Mask's
+ * problem again: read the low word.
+ */
+uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
+{
+    AM2_PointRuleFn rule;
+    const uint8_t  *cells;
+    int32_t         region;
+    int32_t         w, h, shift;
+    int32_t         x, y, dir, step, leg, tried;
+
+    SetPointRule((void *)0);
+
+    cells  = *(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL;
+    region = cells[tile & 0xFFFF];
+
+    rule = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
+    if (!rule(tile))
+        return (uint16_t)tile;
+
+    w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    h     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
+    shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+
+    x     = (tile & 0xFFFF) & (w - 1);
+    y     = (int32_t)((uint32_t)(tile & 0xFFFF) >> shift);
+    dir   = 0;
+    step  = 0;
+    leg   = 1;
+    tried = 0;
+
+    for (;;) {
+        x += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DX))[dir];
+        y += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DY))[dir];
+
+        if (x > 0 && x < w && y > 0 && y < h) {
+            int32_t cand = (y << shift) + x;
+            int32_t ok   = 1;
+
+            if (region != 0) {
+                int32_t r = cells[cand & 0xFFFF];
+
+                if (r != 0 && r != region)
+                    ok = 0;
+            }
+
+            if (ok) {
+                tried = 1;
+                rule  = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
+                if (!rule(cand)) {
+                    *pt = PointOfTile(cand);
+                    return (uint16_t)cand;
+                }
+            }
+        }
+
+        if (++step < leg)
+            continue;
+
+        if (dir == 3) {
+            if (!tried && region > 0)
+                return 0;
+            tried = 0;
+        }
+
+        if (dir & 1)
+            leg++;
+        dir  = (dir + 1) & 3;
+        step = 0;
+    }
+}
+
 /* 0x0043A0A0, six callers. The nearest tile the object's point rule will
  * accept, with the corresponding point written back through the caller's
  * pointer.
@@ -1434,6 +1535,9 @@ int region_install(void)
 
     rc |= patch_replace(ADDR_SET_POINT_RULE, (const void *)SetPointRule,
                         "SetPointRule", 4);
+    rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
+                        (const void *)SettlePointInRegion,
+                        "SettlePointInRegion", 5);
     rc |= patch_replace(ADDR_MIDDLE_REGION_LINK, (const void *)MiddleRegionLink,
                         "MiddleRegionLink", 3);
     rc |= patch_replace(ADDR_REGION_HOPS, (const void *)RegionHops,

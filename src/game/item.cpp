@@ -4217,9 +4217,6 @@ typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
  * reached by address. The first rewrites the point it is given through a rule
  * chosen from the region; the second is the "<--Trooper Drop Item Send"
  * message. */
-typedef int32_t (__cdecl *AM2_SettlePointFn)(int32_t tile, uint32_t *pt);
-#define orig_settle_point \
-    ((AM2_SettlePointFn)(uintptr_t)ADDR_SETTLE_POINT_IN_REGION)
 
 /* UseInventoryItem -- original 0x00449760, one caller, and it names itself in
  * both of its log lines.
@@ -4352,7 +4349,7 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
     item = (uint8_t *)WeaponByUid(
         (int32_t)(*(const uint32_t *)(u + UNIT_OFF_INVENTORY + slot * 4)));
 
-    orig_settle_point(TileOfPoint(at), &at);
+    SettlePointInRegion(TileOfPoint(at), &at);
 
     if (CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
                           (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {

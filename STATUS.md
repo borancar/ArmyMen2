@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d937aee`. Working tree clean.
+Last updated: **2026-08-31**, at `d5a4b96`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,231 patches.**
+Nothing uncommitted. **1,232 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2325,16 +2325,57 @@ commit -- gave the right answer every time it was used.
   fails all 3,520, and both the extra 0x20 and the sign of the swing fail
   exactly 304 -- the number of type-3 cases that take that arm.
 
+- **`SettlePointInRegion`** (`0x00439F40`) is `NearestAllowedTile`'s TWIN, and
+  reading the two together is the only way to see what either is for. Same
+  square spiral out of `ADDR_SPIRAL_DX`/`DY`, same three tests on a candidate,
+  same give-up at the end of a ring. Three differences:
+
+  - It installs the rule for a NULL object, so it always searches under
+    `ADDR_POINT_RULE_DEFAULT`. The sibling takes an object and gets that
+    object's arm. So this asks "what would anything be allowed to stand on"
+    and the sibling asks "what would THIS unit be allowed to stand on".
+  - When the starting tile is already accepted it writes NOTHING through the
+    caller's pointer. The sibling writes the point on that path too,
+    conditionally. That is what `FormationPoint` relies on: it has just
+    computed a point and only wants it snapped if the tile is refused.
+  - Two parameters rather than three.
+
+  **The `push 0` serves two calls.** The original pushes it for `SetPointRule`
+  and does not clean up, so the following `push tile; call rule; add esp, 8`
+  cleans both. That is a deferred cleanup, not a two-argument rule -- the rule
+  call inside the loop pushes one dword and cleans four, which settles the
+  arity. Reading the first call site alone would have given the rule an extra
+  parameter that nothing passes.
+
+  **50 calls on a driven Boot Camp mission**, so unlike the formation pair
+  above this one is in a live path. Closing its two seams -- one in `air.cpp`,
+  one in `item.cpp` -- took `SetPointRule` to 0, since both of its callers are
+  now ours.
+
+  **And the two local typedefs behind those seams disagreed with each other.**
+  `air.cpp` declared the second parameter `AM2_Point *` and `item.cpp`
+  `uint32_t *`, for the same function. Harmless here, both being four bytes,
+  but it is the shape that made `PlaySoundAt` compare two addresses: a local
+  typedef is a place for a signature to be wrong in private, and two of them
+  are a place for two signatures to disagree in private.
+
+- **`mission`'s frame gate failed a fourth time and the band settles it.** The
+  original's side read 22771 against our 7053. Ours has read 6291, 7600, 7957,
+  8082 and now 7053 across five runs of four different builds today, so it has
+  not moved at all; the original's has read 7600, 22372, 25493 and 22771. A
+  side that stays in its band cannot be the one that changed. `bootcamp` at
+  its floor of 22, `campaign` at 2, both logs and both widget trees identical.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,077 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,231
+line (0x0045C000) patched**. Measured: **1,078 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,232
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-seven batches have gone in and the 162 entries outstanding start at 48
+small ones in batches. Seventy-eight batches have gone in and the 161 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
