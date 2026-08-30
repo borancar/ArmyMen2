@@ -6208,6 +6208,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_FIRE_ACTIVE     0x57Cu
 #define UNIT_OFF_FIRE_F40        0x580u   /* uint8_t, a copy of the unit's +0x40 */
 #define UNIT_OFF_FIRE_MODE       0x584u   /* the pose, or 0x1F for a point */
+/* Stamped with ADDR_GAME_CLOCK_MS by TroopSubParse whenever it changes either
+ * of the two fields above, alongside setting UNIT_OFF_FIRE_ACTIVE. */
+#define UNIT_OFF_FIRE_STAMP      0x5A0u   /* uint32_t */
+/* TroopSubParse keeps UNIT_OFF_FIRE_F588 and _F58C only for fire modes
+ * 0x1C..0x1E and clears both for anything else -- including the 0x1F that
+ * means "a point". So that pair belongs to three modes and to no others. */
+#define AM2_FIRE_MODE_KEEPS_LO   0x1C
+#define AM2_FIRE_MODE_KEEPS_HI   0x1E
+/* The header word TroopSubParse reads is BIG-ENDIAN, byte by byte, and splits
+ * into a 29-bit uid and three flag bits -- one per optional field. The army
+ * is then shifted into those same top three bits to make the lookup key. */
+#define AM2_TROOPSUB_UID_MASK    0x1FFFFFFFu
+#define AM2_TROOPSUB_ARMY_SHIFT  29
+#define AM2_TROOPSUB_HAS_POS     0x80000000u
+#define AM2_TROOPSUB_HAS_FACING  0x40000000u
+#define AM2_TROOPSUB_HAS_MODE    0x20000000u
 /* 0x00447950, one caller. Choose a unit's UNIT_OFF_FIRE_MODE between two more
  * values: 0x25 when it has OBJ_OFF_FIELD_5A4 and its OBJ_OFF_DEADLINE_58 is
  * more than fifteen seconds behind the game clock, and 1 otherwise. So that

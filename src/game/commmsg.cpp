@@ -818,8 +818,6 @@ int32_t __cdecl UidObjKind(uint32_t uid)
 
 typedef void *(__cdecl *AM2_TroopSubFn)(const void *at, int32_t army);
 typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
-#define orig_troop_sub_parse \
-    ((AM2_TroopSubFn)(uintptr_t)ADDR_TROOP_SUB_PARSE)
 #define orig_trooper_pair_apply \
     ((AM2_PairApplyFn)(uintptr_t)ADDR_TROOPER_PAIR_APPLY)
 
@@ -841,7 +839,7 @@ void __cdecl RecvTroopBatch(void *msg, int32_t army)
     const uint8_t *at  = m + sizeof(AM2_ArmyMsgHdr);
 
     while (at < end)
-        at = (const uint8_t *)orig_troop_sub_parse(at, army);
+        at = (const uint8_t *)TroopSubParse(at, army);
 }
 
 /* RecvTroopPair -- original 0x0044C960, one caller. Message kind 0x18.
@@ -1834,8 +1832,101 @@ void __cdecl TellEachSlot(void)
     }
 }
 
+/* TroopSubParse -- original 0x0044BEA0, one caller: the kind 0x16 batch above.
+ *
+ * Parse one variable-length trooper record and answer the pointer past it. A
+ * four-byte header, then up to four more bytes, each present only if the
+ * header says so.
+ *
+ * THE HEADER IS BIG-ENDIAN AND IT IS READ BYTE BY BYTE. Four separate loads
+ * shifted into place -- 24, 16, 8, 0 -- on a little-endian machine, so this is
+ * a deliberate wire order and not a struct read. Its low 29 bits are the uid
+ * and the top three are one presence flag each.
+ *
+ * THE ARMY IS SHIFTED INTO THE SAME THREE BITS THE FLAGS CAME OUT OF. The
+ * lookup key is `(word & 0x1FFFFFFF) | (army << 29)`, so the uid on the wire
+ * carries no army and the receiver supplies its own. That is why the flags can
+ * live up there at all: they are stripped before the key is built.
+ *
+ * THE POSITION IS THREE BYTES FOR TWO TWELVE-BIT FIELDS. Low byte of x, low
+ * byte of y, then one byte whose low nibble is x's high four bits and whose
+ * high nibble is y's. The original stashes the first two bytes in its own
+ * ARGUMENT SLOTS and reads them back, which is why the reconstruction needs
+ * two locals where the disassembly appears to need none.
+ *
+ * NOTHING CHECKS THE LOOKUP. `ObjByUidAlias` answers NULL for a uid that no
+ * longer resolves, and every field below is written through it unconditionally
+ * -- including the fire-mode read at the end, which happens even when neither
+ * optional field was present. A stale uid in a packet faults the receiver.
+ * The original's, and reproduced.
+ *
+ * THE LAST TEST IS ON A FIELD THIS FUNCTION MAY NOT HAVE WRITTEN. It reads
+ * UNIT_OFF_FIRE_MODE whether or not the mode byte was in the record, so a
+ * record carrying neither optional field still clears the F588/F58C pair
+ * unless the mode already sitting there is 0x1C..0x1E.
+ *
+ * Both optional writes stamp UNIT_OFF_FIRE_STAMP and set UNIT_OFF_FIRE_ACTIVE,
+ * and they do it separately rather than once at the end -- so a record with
+ * both fields writes the clock twice.
+ */
+const void *__cdecl TroopSubParse(const void *rec, int32_t army)
+{
+    const uint8_t *p = (const uint8_t *)rec;
+    uint32_t       head;
+    uint8_t       *obj;
+
+    head = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16)
+         | ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+    p += 4;
+
+    obj = (uint8_t *)ObjByUidAlias((head & AM2_TROOPSUB_UID_MASK)
+                                   | ((uint32_t)army
+                                      << AM2_TROOPSUB_ARMY_SHIFT));
+
+    if (head & AM2_TROOPSUB_HAS_POS) {
+        uint8_t lox = p[0];
+        uint8_t loy = p[1];
+        uint8_t hi;
+
+        p += 2;
+        hi = *p++;
+
+        *(uint16_t *)(obj + OBJ_OFF_X) =
+            (uint16_t)(lox | ((uint16_t)(hi & 0x0Fu) << 8));
+        *(uint16_t *)(obj + OBJ_OFF_Y) =
+            (uint16_t)(loy | ((uint16_t)(hi & 0xF0u) << 4));
+    }
+
+    if (head & AM2_TROOPSUB_HAS_FACING) {
+        *(uint8_t *)(obj + UNIT_OFF_FIRE_F40) = *p++;
+        *(uint32_t *)(obj + UNIT_OFF_FIRE_STAMP) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(int32_t *)(obj + UNIT_OFF_FIRE_ACTIVE) = 1;
+    }
+
+    if (head & AM2_TROOPSUB_HAS_MODE) {
+        *(int32_t *)(obj + UNIT_OFF_FIRE_MODE) = (int32_t)*p++;
+        *(uint32_t *)(obj + UNIT_OFF_FIRE_STAMP) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(int32_t *)(obj + UNIT_OFF_FIRE_ACTIVE) = 1;
+    }
+
+    {
+        int32_t mode = *(const int32_t *)(obj + UNIT_OFF_FIRE_MODE);
+
+        if (mode < AM2_FIRE_MODE_KEEPS_LO || mode > AM2_FIRE_MODE_KEEPS_HI) {
+            *(int32_t *)(obj + UNIT_OFF_FIRE_F588) = 0;
+            *(int32_t *)(obj + UNIT_OFF_FIRE_F58C) = 0;
+        }
+    }
+
+    return p;
+}
+
 int commmsg_install(void)
 {
+    patch_replace(ADDR_TROOP_SUB_PARSE, (const void *)TroopSubParse,
+                  "TroopSubParse", 1);
     patch_replace(ADDR_DRAIN_MSG_LIST, (const void *)DrainMsgList,
                   "DrainMsgList", 1);
     patch_replace(ADDR_TELL_EACH_SLOT, (const void *)TellEachSlot,

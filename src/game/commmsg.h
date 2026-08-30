@@ -98,4 +98,8 @@ int commmsg_install(void);
  * returning its node to the pool. Called once a frame from FramePre. */
 void __cdecl CommDrainMsgs(void);
 
+/* 0x0044BEA0, one caller. Parse one variable-length trooper record from a
+ * batch and answer the pointer past it. */
+const void *__cdecl TroopSubParse(const void *rec, int32_t army);
+
 #endif

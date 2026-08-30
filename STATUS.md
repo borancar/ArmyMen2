@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,186 patches.**
+Nothing uncommitted. **1,187 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1178,16 +1178,41 @@ timing failure mode too, and that its own output distinguishes the two.
   identical (131 nodes), log identical (35 messages), and four screenshots
   inside budget. `multi` and `campaign` clean too.
 
+- **`TroopSubParse`** (`0x0044BEA0`) reads a BIG-ENDIAN header byte by byte --
+  four loads shifted 24, 16, 8, 0 on a little-endian machine, so it is a wire
+  order and not a struct read. Its low 29 bits are the uid and the top three
+  are one presence flag each, and **the army is then shifted into the very
+  bits the flags came out of**: the key is
+  `(word & 0x1FFFFFFF) | (army << 29)`. The uid on the wire carries no army;
+  the receiver supplies its own, which is what lets the flags live up there.
+
+  Its position is three bytes for two twelve-bit fields, and the original
+  stashes two of them in its OWN ARGUMENT SLOTS and reads them back -- which
+  is why the reconstruction needs two locals where the disassembly appears to
+  need none.
+
+  Nothing checks the lookup: a stale uid faults the receiver. And the final
+  fire-mode test reads a field this function may never have written, so a
+  record carrying neither optional field still clears the F588/F58C pair.
+- **The uninstalled-patch failure recurred, and the check I added for it
+  caught it.** The scripted `patch_replace` insertion matched nothing again --
+  `commmsg_install` has no `int rc = 0;` -- so the function was written, built
+  clean, passed `make check`, and passed a full A/B **while not being
+  installed at all**. The coverage count did not move and
+  `0x44BEA0 in reconstructed()` read False. Second occurrence after
+  `StartShake`; **the count is the check, and it must be read before the A/B,
+  not after** -- that clean A/B was of the parent's code.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,033 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,186
+line (0x0045C000) patched**. Measured: **1,034 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,187
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-seven batches have gone in and the 206 entries outstanding start at 48
+small ones in batches. Thirty-eight batches have gone in and the 205 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
