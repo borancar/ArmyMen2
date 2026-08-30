@@ -615,9 +615,89 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
     return 1;
 }
 
+/* ObjMatchesSel -- original 0x00437400, four callers.
+ *
+ * Does an object match a selector? There are two entirely separate answers
+ * here and the first argument picks between them.
+ *
+ * NON-ZERO MEANS "BY NAME" and the other two arguments change meaning with
+ * it: the second becomes an index into the script name table and the third
+ * stays the object. The entry must exist, must be a REF -- a name used before
+ * it was declared -- and its value must be this object's uid. Anything else,
+ * including an out-of-range index, answers 0.
+ *
+ * ZERO MEANS "BY MASK" and the second argument is nine independent tests,
+ * every one of which must pass. Four are type predicates, one is a vehicle
+ * kind, and four are armies -- the local player's, or literally 1, 2 or 3.
+ *
+ * THE ARMY BITS ARE NOT A FIELD, THEY ARE FOUR SEPARATE TESTS, so a mask
+ * asking for both army 1 and army 2 can never match rather than matching
+ * either. The same is true of the type bits: 0x08 and 0x20 together want an
+ * object that is both a type 2 and a type 3.
+ *
+ * THE LAST TEST IS INVERTED IN THE ORIGINAL and that is where a transcription
+ * goes wrong. Every other bit branches to the failure on a mismatch; the army
+ * 3 test branches to SUCCESS on a match and falls through to the failure. Same
+ * meaning, one instruction shorter, and it is why `eax` is set to 1 in the
+ * middle of the function rather than at the end.
+ *
+ * The local-army test sign-extends the byte and the three literal ones do not
+ * -- `movsx` against `cmp byte`. No army is negative, so it cannot matter.
+ */
+int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (byName) {
+        const AM2_ScriptName *rec;
+
+        if (sel < 0 || sel >= *(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
+            return 0;
+
+        rec = &(*(const AM2_ScriptName *const *)
+                    AM2_IMAGE(ADDR_SCRIPT_NAMES))[sel];
+
+        if (rec->type != AM2_NAME_TYPE_REF)
+            return 0;
+
+        return rec->value == (int32_t)((const AM2_Object *)o)->uid;
+    }
+
+    if ((sel & AM2_SEL_TYPE_1OR4)
+        && !ObjType2Field548((const AM2_Object *)o))
+        return 0;
+    if ((sel & AM2_SEL_TYPE_238) && !ObjIsTypeIn238((const AM2_Object *)o))
+        return 0;
+    if ((sel & AM2_SEL_TYPE_2) && !ObjIsType2((const AM2_Object *)o))
+        return 0;
+    if ((sel & AM2_SEL_TYPE_3) && !ObjIsType3((const AM2_Object *)o))
+        return 0;
+
+    if ((sel & AM2_SEL_VEHICLE_KIND_1)
+        && *(const int32_t *)(o + VEHICLE_OFF_KIND) != 1)
+        return 0;
+
+    if ((sel & AM2_SEL_ARMY_LOCAL)
+        && *(const int8_t *)(o + OBJ_OFF_ARMY)
+           != (int8_t)*(const uint32_t *)AM2_IMAGE(ADDR_DEFAULT_OWNER))
+        return 0;
+    if ((sel & AM2_SEL_ARMY_1) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 1)
+        return 0;
+    if ((sel & AM2_SEL_ARMY_2) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 2)
+        return 0;
+    if ((sel & AM2_SEL_ARMY_3) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 3)
+        return 0;
+
+    return 1;
+}
+
 int objscript_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_OBJ_MATCHES_SEL,
+                        (const void *)ObjMatchesSel,
+                        "ObjMatchesSel", 4);
 
     rc |= patch_replace(ADDR_SCRIPT_COMPARE,
                         (const void *)ScriptCompare, "ScriptCompare", 1);

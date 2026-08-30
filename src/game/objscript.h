@@ -106,4 +106,8 @@ void __cdecl FreeObjScripts(void);
  * index, 1 otherwise. Two callers. */
 int32_t __cdecl UpdateObjectScript(void *obj);
 
+/* 0x00437400, four callers. Does an object match a selector -- either a named
+ * one, or a bitmask of nine independent tests? */
+int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj);
+
 #endif /* AM2_OBJSCRIPT_H */

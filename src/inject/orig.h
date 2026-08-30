@@ -8537,6 +8537,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_POINTS_EQUAL      0x0042E140u  /* int32_t(AM2_Point, AM2_Point) */
 #define ADDR_POINTS_DIFFER     0x0042E110u
 #define ADDR_OBJ_IS_TYPE238 0x00457420u  /* types 2, 3, 8 */
+/* 0x00437400, four callers. Does an object match a selector? Either a NAMED
+ * one -- an index into the script name table, which must be a REF whose value
+ * is this object's uid -- or a bitmask of nine independent tests. */
+#define ADDR_OBJ_MATCHES_SEL   0x00437400u /* int32(int32 byName,int32,void*) */
+#define AM2_SEL_TYPE_1OR4        0x0002u  /* ObjType2Field548 */
+#define AM2_SEL_TYPE_238         0x0004u
+#define AM2_SEL_TYPE_2           0x0008u
+#define AM2_SEL_VEHICLE_KIND_1   0x0010u
+#define AM2_SEL_TYPE_3           0x0020u
+#define AM2_SEL_ARMY_LOCAL       0x0040u
+#define AM2_SEL_ARMY_1           0x0080u
+#define AM2_SEL_ARMY_2           0x0100u
+#define AM2_SEL_ARMY_3           0x0200u
 #define ADDR_APPROX_DIST    0x0042DDE0u  /* int32_t(const AM2_Point*, const AM2_Point*) */
 /* 0x004064E0, four callers -- and the four are what name it. Each is a
  * one-line wrapper passing an army 0..3 and one of "gflagbase", "tflagbase",

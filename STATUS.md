@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,174 patches.**
+Nothing uncommitted. **1,175 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -972,16 +972,33 @@ count. A rule that has been ignored five times should be turned into a tool.
   the call site for that, the way `RandomPointAhead`'s unused first parameter
   was settled.
 
+- **`ObjMatchesSel`** (`0x00437400`) is two functions behind one entry, and
+  its FIRST argument decides which -- the other two change meaning with it.
+  Non-zero selects by NAME, and the second argument becomes an index into the
+  script name table whose entry must be a `REF` -- a name used before it was
+  declared -- whose value is this object's uid. Zero selects by MASK, and the
+  second argument becomes nine independent tests.
+
+  **The army bits are four separate tests, not a field.** A mask asking for
+  army 1 and army 2 can never match, rather than matching either; the same
+  holds for the type bits, where 0x08 and 0x20 together want an object that is
+  both a type 2 and a type 3.
+
+  Its last test is INVERTED in the original -- every other bit branches to the
+  failure on a mismatch, and the army 3 test branches to SUCCESS on a match
+  and falls through. Same meaning, one instruction shorter, and it is why
+  `eax` is set to 1 in the middle of the function rather than at the end.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,023 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,174
+line (0x0045C000) patched**. Measured: **1,024 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,175
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-seven batches have gone in and the 216 entries outstanding start at 48
+small ones in batches. Twenty-eight batches have gone in and the 215 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
