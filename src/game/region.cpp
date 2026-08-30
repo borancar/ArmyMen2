@@ -1342,6 +1342,80 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     ConsiderSighting(obj, out, ctx);
 }
 
+/* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
+ * from what the context builder puts in front of it rather than from a
+ * keyword: the record's SIGHT_OFF_LEADER is the object at OBJ_OFF_FOLLOW_UID,
+ * and SIGHT_OFF_DEST is what ResolveFormationPoint answered for this unit
+ * behind that leader. Nothing else in the family reads either field.
+ *
+ * AiStepDefend's shape with the GATE replaced, which is the only interesting
+ * part. The other arms ask "am I still far from the place I remember"; this
+ * asks two questions about the formation:
+ *
+ *   - is the unit further than AM2_AI_FOLLOW_SLACK from its formation slot;
+ *   - or, if not, has the LEADER moved this frame -- PointsDiffer between its
+ *     OBJ_OFF_POS and its OBJ_OFF_PREV_POS.
+ *
+ * Either sends it walking. So a follower that has caught up stands still only
+ * while the leader is also standing still, and starts again the moment the
+ * leader does, without waiting to fall out of formation first. That second
+ * test is the whole of what makes a column move together.
+ *
+ * TWO POINTS RATHER THAN ONE, and it is further evidence about a field this
+ * file records as unresolved. The other arms clear OBJ_OFF_SCRIPT_STATE on
+ * arrival and copy it into OBJ_OFF_FIELD_C0 when they move; this clears it
+ * UNCONDITIONALLY at the top -- a follower has no destination of its own --
+ * and copies the FORMATION POINT into OBJ_OFF_FIELD_C0 instead. So 0xC0 takes
+ * a packed point from two different sources, which is one more reading under
+ * which 0xB4 is a point too.
+ */
+void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+    uint8_t *c = (uint8_t *)ctx;
+    int32_t  move;
+
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    move = *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE) > AM2_AI_FOLLOW_SLACK;
+    if (!move) {
+        const uint8_t *leader =
+            *(const uint8_t *const *)(c + SIGHT_OFF_LEADER);
+
+        if (leader
+            && PointsDiffer(*(const uint32_t *)(leader + OBJ_OFF_POS),
+                            *(const uint32_t *)(leader + OBJ_OFF_PREV_POS)))
+            move = 1;
+    }
+
+    if (move) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(c + SIGHT_OFF_DEST);
+        orig_ai_common(obj, out, ctx, 0);
+    } else {
+        uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+
+        if (hit) {
+            if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
+                w[1] = hit;
+            *(o + OBJ_OFF_HIT_DIR) = 0;
+        }
+
+        AiPromoteFound(o, c);
+
+        if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
+            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+               >= AM2_AI_TURN_DELAY_MS)
+            w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+    }
+
+    AiPromoteFound(o, c);
+    ConsiderSighting(obj, out, ctx);
+}
+
 /* ConsiderSighting -- original 0x004074A0, four callers.
  *
  * One observer against one object. Four gates -- both of the record's enable
@@ -1760,6 +1834,8 @@ int region_install(void)
                         "AiStepDefend", 1);
     rc |= patch_replace(ADDR_AI_STEP_TRACK, (const void *)AiStepTrack,
                         "AiStepTrack", 1);
+    rc |= patch_replace(ADDR_AI_STEP_FOLLOW, (const void *)AiStepFollow,
+                        "AiStepFollow", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);

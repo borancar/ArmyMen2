@@ -2768,12 +2768,17 @@
  * into +0x10/+0x14/+0x18 wholesale. +0x28 is ApproxDist from the object's
  * position to the destination point it remembers, computed only when that
  * point is non-zero. */
+#define SIGHT_OFF_LEADER       0x00u  /* object *, from OBJ_OFF_FOLLOW_UID */
+#define SIGHT_OFF_LEAD_RANGE   0x04u  /* to SIGHT_OFF_DEST, not to the leader */
+#define SIGHT_OFF_LEAD_BEARING 0x08u  /* uint8_t */
+#define SIGHT_OFF_DEST         0x0Au  /* packed point: where this unit belongs */
 #define SIGHT_OFF_FOUND        0x1Cu  /* object *, what 0x00403B40 answered */
 #define SIGHT_OFF_FOUND_RANGE  0x20u
 #define SIGHT_OFF_FOUND_BEARING 0x24u /* uint8_t */
 #define SIGHT_OFF_DEST_DIST    0x28u
 #define AM2_AI_ARRIVED_DIST    0x20   /* nearer than this counts as arrived */
 #define AM2_AI_TURN_DELAY_MS   0x82u
+#define AM2_AI_FOLLOW_SLACK    0xF0   /* how far out of formation before moving */
 /* 0x00407F80, the AI mode dispatcher: build the context with 0x00407D70, then
  * an eight-entry jump table at 0x0040803C on OBJ_OFF_AI_MODE. Indices 1, 4 and
  * 5 share one arm, so there are six handlers for eight modes. Read the table,
@@ -2788,6 +2793,8 @@
 #define ADDR_AI_STEP_IGNORE    0x00407BF0u  /* void(obj, out, const void *) */
 /* 0x00407640, one caller -- the `defend` arm, mode 7. Reconstructed. */
 #define ADDR_AI_STEP_DEFEND    0x00407640u  /* void(obj, out, void *) */
+/* 0x00407C80, one caller -- the `follow` arm, mode 3. Reconstructed. */
+#define ADDR_AI_STEP_FOLLOW    0x00407C80u  /* void(obj, out, void *) */
 /* 0x00407560, one caller -- the arm modes 1, 4 and 5 share, 5 being `evade`.
  * ADDR_AI_STEP_DEFEND with the turn test moved into the shared tail, so it
  * turns while still walking. Reconstructed. */

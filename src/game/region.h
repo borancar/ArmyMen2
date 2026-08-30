@@ -54,6 +54,10 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx);
  * while still walking, where defend turns only on arrival. Name ours. */
 void __cdecl AiStepTrack(void *obj, void *out, void *ctx);
 
+/* 0x00407C80, one caller. The `follow` arm -- mode 3. AiStepDefend with the
+ * gate replaced: walk when out of formation OR when the leader has moved. */
+void __cdecl AiStepFollow(void *obj, void *out, void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `9741124`. Working tree clean.
+Last updated: **2026-08-31**, at `d285114`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,237 patches.**
+Nothing uncommitted. **1,238 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2551,16 +2551,49 @@ commit -- gave the right answer every time it was used.
   dispatcher's only caller is the type-3 stepper. All three arms read 0 on the
   same driven mission.
 
+- **`AiStepFollow`** (`0x00407C80`) is mode 3, and the name comes from what the
+  context builder puts in front of it rather than from a keyword: the record's
+  `SIGHT_OFF_LEADER` is the object at `OBJ_OFF_FOLLOW_UID`, and
+  `SIGHT_OFF_DEST` is what `ResolveFormationPoint` answered for this unit
+  behind that leader. Nothing else in the family reads either field.
+
+  **`AiStepDefend`'s shape with the GATE replaced.** The other arms ask "am I
+  still far from the place I remember"; this asks two questions about the
+  formation -- is the unit further than `AM2_AI_FOLLOW_SLACK` from its slot,
+  or, if not, has the LEADER moved this frame (`PointsDiffer` between its
+  `OBJ_OFF_POS` and its `OBJ_OFF_PREV_POS`). Either sends it walking. So a
+  follower that has caught up stands still only while the leader does, and
+  starts again the moment the leader does, without waiting to fall out of
+  formation first. That second test is the whole of what makes a column move
+  together, and reading only the first would leave a squad that lurches.
+
+  **Three new fields, and a fourth vote on 0xB4.** The record's +0x00/+0x04/
+  +0x08 turn out to be the same {object, range, bearing} triple as
+  +0x10/+0x14/+0x18, with the destination point at +0x0A. And where the other
+  arms copy `OBJ_OFF_SCRIPT_STATE` into `OBJ_OFF_FIELD_C0`, this copies the
+  FORMATION POINT into it -- so 0xC0 takes a packed point from two different
+  sources, which is one more reading under which 0xB4 is a point too. Still
+  not renamed, for the reason recorded there.
+
+  Cold like its siblings: all four arms and `PointsDiffer` read 0 on the same
+  driven mission.
+
+- **`mission`'s frame gate, sixth instance, and the cheap question answered it
+  outright.** The original's side read 24778 against our 7611 -- ours in its
+  band as always -- and `AiStepFollow` has a counter of ZERO, so it cannot
+  have changed a frame count whatever the numbers said. `bootcamp` at its
+  floor of 22, and mission's log and 16-node tree identical.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,083 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,237
+line (0x0045C000) patched**. Measured: **1,084 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,238
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-three batches have gone in and the 156 entries outstanding start at 48
+small ones in batches. Eighty-four batches have gone in and the 155 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

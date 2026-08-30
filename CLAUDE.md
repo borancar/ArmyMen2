@@ -2745,7 +2745,7 @@ exact oracle**, however meaningful it is when it is set.
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
-  `AiStepDefend`, `AiStepTrack`, and `RefreshScreen` —
+  `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, and `RefreshScreen` —
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and
