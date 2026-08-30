@@ -4869,6 +4869,87 @@ void __cdecl DeselectAll(void)
     orig_on_selection_changed(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+/* ADDR_SEND_VEHICLE_ENTER stays original and is reached by address -- it is
+ * the twin of armymsg.cpp's SendVehicleExit and names itself the same way,
+ * "<--Vehicle Enter Send: Vehicle: %x, item: %x". */
+typedef void (__cdecl *AM2_SendVehicleEnterFn)(void *vehicle, void *unit);
+#define orig_send_vehicle_enter \
+    ((AM2_SendVehicleEnterFn)(uintptr_t)ADDR_SEND_VEHICLE_ENTER)
+
+/* EnterVehicle -- original 0x0045AA00, three callers.
+ *
+ * Put a unit into a vehicle, all the way. BoardVehicle below is the two-field
+ * half of this and is NOT called: the two writes appear here again, inline,
+ * which is either the compiler or the author and cannot be told apart from
+ * the code. What surrounds them is the rest of the transaction.
+ *
+ * THE SEAT CHECK IS THE FIRST THING AND THE ONLY REFUSAL. Once the occupant
+ * list has as many entries as VEHICLE_OFF_SEATS it returns having done
+ * nothing -- no message, no log, no sign at the call site that the unit is
+ * still outside.
+ *
+ * SARGE TAKES SEAT ZERO, AND THE SWAP IS NOT A ROTATION. When the unit that
+ * just boarded has OBJ_OFF_SARGE set and there is more than one occupant, the
+ * seat-zero uid is copied to the LAST seat -- the one this unit was just
+ * pushed into -- and the unit's own uid is written into seat zero. So the two
+ * exchange places and nobody else moves. That is what makes seat zero the
+ * one ExitAllFromVehicle empties last.
+ *
+ * The unit's OBJ_OFF_SCRIPT_STATE is written from ADDR_ZERO_POINT, which is
+ * the THIRD function seen to do that -- Type2ActionB and PointActionA are the
+ * others -- and orig.h already records that field as unresolved because its
+ * two writers put a POINT there and its two readers compare it as an int32.
+ * This one does not settle it; it is another writer of a zero.
+ *
+ * THE UNIT IS DESTROYED AT THE END. DestroyByType runs on it after the
+ * broadcast, so what rides in the vehicle is a uid in a list and not a live
+ * object. Worth knowing before reading the occupant list as a list of things
+ * that still exist.
+ *
+ * The broadcast is gated on the VEHICLE's army rather than the unit's, and
+ * the selection move -- deselect the unit, select the vehicle -- happens only
+ * when the unit was selected, which is the ordinary "the thing you were
+ * commanding became the thing you are now commanding".
+ */
+void __cdecl EnterVehicle(void *vehicle, void *unit)
+{
+    uint8_t  *v = (uint8_t *)vehicle;
+    uint8_t  *u = (uint8_t *)unit;
+    uint32_t  uid = ((const AM2_Object *)unit)->uid;
+    int32_t   n;
+
+    if (*(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4)
+            >= *(const int32_t *)(v + VEHICLE_OFF_SEATS))
+        return;
+
+    *(uint32_t *)(u + OBJ_OFF_RIDING) = ((const AM2_Object *)vehicle)->uid;
+    PtrListPush(v + VEHICLE_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+
+    n = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4);
+    if (*(const int32_t *)(u + OBJ_OFF_SARGE) && n > 1) {
+        /* Re-read between the two stores, as the original does. */
+        (*(uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[n - 1] =
+            (*(uint32_t *const *)(v + VEHICLE_OFF_PTR_LIST + 8))[0];
+        (*(uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[0] =
+            ((const AM2_Object *)unit)->uid;
+    }
+
+    *(uint32_t *)(u + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT);
+    *(uint32_t *)(u + OBJ_OFF_UID_56C) = 0;
+
+    if (*(const uint32_t *)(u + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
+        DeselectUnit(u);
+        SelectUnit(v);
+    }
+
+    if (CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
+                          (int16_t)*(const int8_t *)(v + OBJ_OFF_ARMY)))
+        orig_send_vehicle_enter(v, u);
+
+    DestroyByType(u);
+}
+
 /* 0x0045AAC0, one caller. Put a unit aboard a vehicle.
  *
  * TWO HALVES OF ONE RELATIONSHIP IN ONE FUNCTION, which is what makes the two
@@ -6672,6 +6753,8 @@ void item_install(void)
                   "PickFireMode", 1);
     patch_replace(ADDR_BOARD_VEHICLE, (const void *)BoardVehicle,
                   "BoardVehicle", 1);
+    patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
+                  "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,
                   "DeselectAll", 9);
     patch_replace(ADDR_SET_UNIT_POSE, (const void *)SetUnitPose,

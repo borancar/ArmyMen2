@@ -345,6 +345,13 @@ void __cdecl PickFireMode(void *obj);
  * uid and the unit's uid goes onto the vehicle's VEHICLE_OFF_PTR_LIST. */
 void __cdecl BoardVehicle(uint32_t uid, void *vehicle);
 
+/* 0x0045AA00, three callers. Put a unit into a vehicle, all the way: the seat
+ * check, the two fields BoardVehicle writes, Sarge's claim on seat zero, the
+ * selection moving from the unit to the vehicle, the broadcast, and then the
+ * unit's own destruction. See item.cpp -- what rides in a vehicle is a uid in
+ * a list and not a live object. */
+void __cdecl EnterVehicle(void *vehicle, void *unit);
+
 /* 0x00427BA0. Deselect everything: clear OBJ_FLAG_SELECTED on each selected
  * object that still resolves, drop the ones that do not, empty the list and
  * report the change. */

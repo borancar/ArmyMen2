@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,204 patches.**
+Nothing uncommitted. **1,205 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1528,16 +1528,45 @@ commit -- gave the right answer every time it was used.
   `ObjTileChanged` runs 154,184 times in that run, so the layer above is
   live -- Sarge simply never crosses a pad.
 
+- **`EnterVehicle`** (`0x0045AA00`) puts a unit into a vehicle, all the way.
+  `BoardVehicle` is the two-field half of it and is NOT called: the same two
+  writes appear inline here, which is either the compiler or the author and
+  cannot be told apart from the code.
+
+  **THE UNIT IS DESTROYED AT THE END.** `DestroyByType` runs on it after the
+  broadcast, so what rides in a vehicle is a UID IN A LIST and not a live
+  object. Worth knowing before reading an occupant list as a list of things
+  that still exist.
+
+  **Sarge takes seat zero, and the swap is not a rotation.** When the unit
+  that just boarded has `OBJ_OFF_SARGE` set and there is more than one
+  occupant, the seat-zero uid is copied to the LAST seat -- the one this unit
+  was just pushed into -- and its own uid goes into seat zero. The two
+  exchange places and nobody else moves.
+
+  **The seat check is the only refusal, and it is silent.** Once the occupant
+  list has reached `VEHICLE_OFF_SEATS` it returns having done nothing: no
+  message, no log, nothing at the call site to say the unit is still outside.
+
+  Its comm sender names itself -- `"<--Vehicle Enter Send: Vehicle: %x,
+  item: %x"` -- so `ADDR_SEND_VEHICLE_ENTER` and kind 0x24 are the program's,
+  one below `AM2_MSG_VEHICLE_EXIT`.
+
+  Not exercised, and measured: every vehicle function reads 0 on a live Boot
+  Camp mission -- `EnterVehicle`, `BoardVehicle`, `ExitAllFromVehicle`,
+  `VehicleTakeOutOccupant` and nine more -- while `ObjTileChanged` runs 47,599
+  times in the same run. The map has no vehicle to board.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,051 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,204
+line (0x0045C000) patched**. Measured: **1,052 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,205
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-one batches have gone in and the 188 entries outstanding start at 48
+small ones in batches. Fifty-two batches have gone in and the 187 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

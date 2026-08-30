@@ -9433,6 +9433,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Reconstructed. */
 #define ADDR_BOARD_VEHICLE         0x0045AAC0u  /* void(uint32 uid, void *veh) */
 #define VEHICLE_OFF_PTR_LIST       0x538u
+/* How many the vehicle holds -- EnterVehicle refuses once the occupant list
+ * has reached it. The same offset carries OBJ_OFF_DEATH_STATE on a roach,
+ * which is a different record; recorded as its own name in the VEHICLE_
+ * family rather than aliased onto that one, the way OBJ_OFF_FIELD_540 is
+ * kept apart from its second use. */
+#define VEHICLE_OFF_SEATS          0x554u
+/* A uid, and that is all that is evidenced. 0x00404730 resolves it through
+ * the uid lookup and stores the object it gets; EnterVehicle clears it. Two
+ * readers, neither of which says what it is FOR, so the name says only what
+ * it holds. */
+#define OBJ_OFF_UID_56C            0x56Cu
+/* 0x0045AA00, three callers. Put a unit into a vehicle, all the way: the seat
+ * check, the two fields BoardVehicle writes, Sarge's claim on seat zero, the
+ * selection moving from the unit to the vehicle, the broadcast, and then the
+ * unit's own destruction. */
+#define ADDR_ENTER_VEHICLE         0x0045AA00u  /* void(vehicle, unit) */
+/* 0x0045E300, and it names itself: "<--Vehicle Enter Send: Vehicle: %x,
+ * item: %x". The counterpart of SendVehicleExit, one kind lower. */
+#define ADDR_SEND_VEHICLE_ENTER    0x0045E300u  /* void(vehicle, unit) */
+#define ADDR_STR_VEHICLE_ENTER_SEND 0x0048C21Cu
+#define AM2_MSG_VEHICLE_ENTER      0x24u
+#define AM2_MSG_VEHICLE_ENTER_LEN  0x0Cu
 /* 0x0045AE30, one caller, and it names itself twice over: "ExitAllFromVehicle:
  * I was killed in a vehicle, damage owner is me" and "... not me". Empty a
  * vehicle from the last seat down.
