@@ -148,4 +148,11 @@ int32_t __cdecl RadarBlipColour(const void *obj, int32_t *blink);
  * field against whatever is already running. */
 void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp);
 
+/* 0x0042A240, three callers. Every object in a world rectangle, chained
+ * through OBJ_OFF_QUERY_NEXT with a caller-supplied predicate -- the family
+ * item.cpp holds, with a block of cells to walk rather than one, and a
+ * de-duplication rule on the object's home cell. See the definition. */
+void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+                            int32_t (__cdecl *keep)(void *obj));
+
 #endif /* AM2_MAPDRAW_H */

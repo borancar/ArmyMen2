@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
+Last updated: **2026-08-30**, at `6ec3194`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,227 patches.**
+Nothing uncommitted. **1,228 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2189,16 +2189,47 @@ commit -- gave the right answer every time it was used.
   (7646/7950). **Two reproductions in the same direction are still not a
   regression when the side that moved is the one your change cannot reach.**
 
+- **`ObjectsInRect`** (`0x0042A240`) is the fourth member of `item.cpp`'s
+  object-query family and the only one filed away from the others: it clips
+  each candidate with `IntersectRect`, so `checksplit` puts it in
+  `win32/mapdraw.cpp`. The three siblings walk ONE cell; this walks a block of
+  them, and that difference is the whole of what is interesting about it.
+
+  **A block of cells needs a de-duplication rule, and reading it as a bounds
+  check gets it wrong in both directions.** An object sits in one cell but its
+  `OBJ_OFF_HIT_RECT` may cover several, so a naive walk answers it once per
+  cell it overlaps. The original compares the object's own top-left TILE
+  against the cell being walked: equal means take it, later means skip and let
+  that cell answer it, earlier means take it only from the first row or column
+  of the query -- because its home cell lies outside the walk. Each object is
+  reported exactly once, and the first row and column carry everything whose
+  home cell the query does not reach.
+
+- **The seam it closed cost a stub and a forward declaration.** `air.cpp`'s
+  `FindEnemyNear` had been reaching it through `orig_objects_in_rect`;
+  `checkseams` asked for the direct call, and the direct call cannot be an
+  `#include` -- `win32/mapdraw.h` pulls in `windows.h` and `air.cpp` is flat.
+  Forward-declared instead, the way `script.cpp` forward-declares
+  `PreloadSprite`, with a seventh stub in `tests/selftest.cpp` for the linker.
+
+- **It runs, and the A/B discriminates it.** 38 calls in a driven Boot Camp
+  mission, all from the two still-original callers at `0x00403B40` and
+  `0x004137D0` -- `FindEnemyNear` reads 0, which is the usual blind spot now
+  that its call is ours. Answering nothing at all puts `mission` at 22372/7957
+  frames, a 281% frame-gate failure, and the side that ran away is the
+  RECONSTRUCTED one, which is what makes it the mutation's doing and not the
+  machine's.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,073 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,227
+line (0x0045C000) patched**. Measured: **1,074 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,228
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-three batches have gone in and the 166 entries outstanding start at 48
+small ones in batches. Seventy-four batches have gone in and the 165 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

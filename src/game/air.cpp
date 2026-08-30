@@ -60,10 +60,12 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 #define g_airFlagA   (*(int32_t *)kAirField(AIR_OFF_FLAG_A))
 #define g_airFlagB   (*(int32_t *)kAirField(AIR_OFF_FLAG_B))
 
-typedef void *(__cdecl *AM2_ObjectsInRectFn)(const AM2_Rect *r, void *table,
-                                             const void *pred);
-#define orig_objects_in_rect \
-    ((AM2_ObjectsInRectFn)(uintptr_t)ADDR_OBJECTS_IN_RECT)
+/* Forward-declared rather than included: ObjectsInRect lives in
+ * win32/mapdraw.h because it clips with IntersectRect, and including that
+ * header here would drag windows.h into a flat module. The same reason
+ * script.cpp forward-declares PreloadSprite. */
+void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+                            int32_t (__cdecl *keep)(void *obj));
 
 uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
 {
@@ -77,9 +79,8 @@ uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
     box.right  = x + AM2_AIR_ENEMY_RADIUS;
     box.bottom = y + AM2_AIR_ENEMY_RADIUS;
 
-    o = (uint8_t *)orig_objects_in_rect(&box,
-                                        (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                                        (const void *)MeetsAllThree);
+    o = (uint8_t *)ObjectsInRect(&box, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                                 (int32_t (__cdecl *)(void *))MeetsAllThree);
 
     /* `owner` is objtable.h's AM2_Object field at 0x0010, which orig.h's
      * OBJ_OFF_OWNER is NOT -- that constant is 0x0004 and belongs to a

@@ -2468,8 +2468,110 @@ void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp)
     *(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE = amp;
 }
 
+/* 0x0042A240, three callers, 400 bytes. Every object in a world rectangle,
+ * chained through OBJ_OFF_QUERY_NEXT -- the fourth member of the family
+ * item.cpp holds, and the only one that is not beside the others: it clips
+ * each candidate with IntersectRect, so tools/checksplit.py puts it on this
+ * side of the line. The name is ours, from the body.
+ *
+ * The interesting part is the pair of tests that DE-DUPLICATE. An object
+ * occupies one cell but its OBJ_OFF_HIT_RECT may cover several, so a walk
+ * over a block of cells would otherwise answer the same object once per cell
+ * it overlaps. The original guards it by comparing the object's own TOP-LEFT
+ * tile against the cell being walked:
+ *
+ *   - the object's tile is the cell     -> take it, this is its home cell;
+ *   - the object's tile is EARLIER      -> take it only from the first row or
+ *                                          column of the query, because its
+ *                                          home cell is outside the walk;
+ *   - the object's tile is LATER        -> skip, a later cell will answer it.
+ *
+ * So each object is reported exactly once, and the first scanned row and
+ * column carry everything whose home cell the query does not reach. Reading
+ * either test as an ordinary bounds check gets it wrong in both directions.
+ *
+ * Note which rect fields those two tests read: obj + 0x30 is the hit rect's
+ * LEFT and obj + 0x34 its TOP, since AM2_Rect is {left, top, right, bottom}.
+ * The same four offsets are what the entry clip reads out of the query
+ * rectangle, against ADDR_MAP_EXTENT_X and _Y.
+ *
+ * The predicate is cdecl and takes the object alone; it runs last, after the
+ * intersection, so it never sees an object that does not touch the rectangle.
+ */
+void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+                            int32_t (__cdecl *keep)(void *obj))
+{
+    const uint8_t *d    = (const uint8_t *)desc;
+    uint8_t       *head = (uint8_t *)0;
+    int32_t        cols;
+    int32_t        x0, y0, x1, y1;
+    int32_t        x, y;
+    int32_t        cell;
+    int32_t        wrap;
+    RECT           hit;
+
+    if (r->right < 0
+        || r->left >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+        || r->bottom < 0
+        || r->top >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+        return (void *)0;
+
+    x0 = r->left >= 0 ? r->left >> AM2_CELL_SHIFT : 0;
+    y0 = r->top  >= 0 ? r->top  >> AM2_CELL_SHIFT : 0;
+
+    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    x1   = r->right >> AM2_CELL_SHIFT;
+    if (cols - 1 < x1)
+        x1 = cols - 1;
+    y1 = r->bottom >> AM2_CELL_SHIFT;
+    if (*(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < y1)
+        y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1;
+
+    /* What to add to the cell index at the end of a row to land on x0 of the
+     * next one. The row's own walk has already advanced it x1 - x0 + 1 times. */
+    wrap = cols - x1 + x0 - 1;
+    cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
+
+    for (y = y0; y <= y1; y++, cell += wrap) {
+        for (x = x0; x <= x1; x++, cell++) {
+            uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
+                                 (d + MAPDESC_OFF_CELLS)))[cell];
+
+            for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
+                uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+                int32_t  t;
+
+                if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+                    continue;
+
+                t = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)
+                    >> AM2_CELL_SHIFT;
+                if (t > y || (t < y && y > y0))
+                    continue;
+                t = *(const int32_t *)(o + OBJ_OFF_HIT_RECT)
+                    >> AM2_CELL_SHIFT;
+                if (t > x || (t < x && x > x0))
+                    continue;
+
+                if (!IntersectRect(&hit, (const RECT *)(o + OBJ_OFF_HIT_RECT),
+                                   (const RECT *)r))
+                    continue;
+                if (!keep(o))
+                    continue;
+
+                *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+                head = o;
+            }
+        }
+    }
+
+    return head;
+}
+
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_OBJECTS_IN_RECT, (const void *)ObjectsInRect,
+                  "ObjectsInRect", 3);
     patch_replace(ADDR_START_SHAKE, (const void *)StartShake, "StartShake", 1);
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);

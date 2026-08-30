@@ -104,6 +104,17 @@ extern "C" void *__cdecl LoadDibFlipped(const char *, void *, uint16_t *)
     return 0;
 }
 
+/* air.cpp's FindEnemyNear calls this now that its seam is closed, and it lives
+ * in win32/mapdraw.cpp, which this harness cannot link: it clips with
+ * IntersectRect. Seventh stub, and NOT extern "C" -- air.cpp forward-declares
+ * it as ordinary C++, the same reason FreeSpriteRegistry above is not.
+ * FindEnemyNear has no vectors: it reads the map descriptor. */
+void *__cdecl ObjectsInRect(const AM2_Rect *, const void *,
+                            int32_t (__cdecl *)(void *))
+{
+    return 0;
+}
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;

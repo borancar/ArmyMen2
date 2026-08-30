@@ -8562,7 +8562,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * it into tile coordinates with an arithmetic shift of eight, walk the cells
  * and keep whatever the predicate accepts. The name is ours, from the body.
  *
- * The result is a list threaded through 0x0068 of each object. */
+ * The result is a list threaded through OBJ_OFF_QUERY_NEXT of each object,
+ * the same scratch chain ADDR_OBJECTS_HIT_BY_POINT and ADDR_WALK_CELL_AT_POINT
+ * answer with -- this is the fourth member of that family, and the only one
+ * that walks a BLOCK of cells rather than one. Walking a block means an
+ * object whose hit rect spans several cells would be answered once per cell,
+ * so it carries a de-duplication rule the other three have no need of: an
+ * object is taken only from the cell holding its own top-left, or, if that
+ * cell is outside the query, from the first row and column scanned. See the
+ * reconstruction in win32/mapdraw.cpp -- it lives there rather than beside
+ * its siblings in item.cpp because it clips with IntersectRect. */
 #define ADDR_OBJECTS_IN_RECT   0x0042A240u  /* obj *(const AM2_Rect *, void *, pred) */
 /* 0x00409680. Is there an enemy within five hundred units of a point? Used by
  * DoAirSupport to decide whether paratroopers are dropping into a fight, which
