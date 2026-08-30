@@ -8068,7 +8068,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STATE0_ENTER        0x004265F0u
 #define ADDR_STATE3_ENTER        0x004266F0u
 #define ADDR_STATE1_LEAVE        0x004263E0u
+/* Reconstructed. Entering state 1 -- the title screen: clear both surfaces,
+ * chdir to 01-title, load its palette from the screen bitmap, build two
+ * fonts, and start title.wav. Then decide which menu to open. */
 #define ADDR_STATE1_ENTER        0x004262E0u
+#define ADDR_DIR_TITLE_PTR       0x004852D0u  /* const char *, "01-title" */
+#define ADDR_STR_TITLE_WAV       0x00485218u
+#define ADDR_INIT_DIGIT_TABLE    0x00412E00u  /* void(void), fills 0x004FCDF8 */
+/* The menu modes this arm can leave behind. 7 and 9 are the two multiplayer
+ * screens a LOBBY launch goes straight to; 1 is the title's own. */
+#define AM2_MENU_MODE_TITLE      1
+#define AM2_MENU_MODE_LOBBY_HOST 7
+#define AM2_MENU_MODE_LOBBY_JOIN 9
 #define ADDR_STATE1_MENU         0x00426400u
 #define ADDR_STATE1_COMMON       0x00426270u
 #define ADDR_MOVIE_FRAME_STEP    0x00445630u  /* states 0 and 3, per frame */

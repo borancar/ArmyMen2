@@ -11,6 +11,9 @@
 #include "device.h"
 #include "mapdraw.h"
 #include "palette.h"
+#include "font.h"     /* BuildFontAlias -- reconstructed */
+#include "audio.h"    /* StartAudioStream -- reconstructed */
+#include "../gamedir.h" /* SetGameDir -- reconstructed */
 #include "surface.h"
 #include "../../inject/orig.h"
 #include "../../inject/patch.h"
@@ -423,6 +426,94 @@ void __cdecl State0Frame(void)
     call0(ADDR_STATE_FRAME_COMMON);
 }
 
+/* The two still-original callees this needs. The digit table is 0x00412E00 --
+ * it fills 0x004FCDF8 with a run of bytes and calls one more function; what
+ * that table is FOR is not established, only that entering the title rebuilds
+ * it. */
+typedef void (__cdecl *AM2_VoidFn0)(void);
+#define orig_init_digit_table ((AM2_VoidFn0)(uintptr_t)ADDR_INIT_DIGIT_TABLE)
+
+/* State1Enter -- original 0x004262E0, one caller, which is State1Frame below.
+ * Entering the title screen.
+ *
+ * The first half is unconditional setup: clear both surfaces, chdir to
+ * 01-title, load the palette OUT OF THE SCREEN BITMAP -- the game's palette
+ * for the whole title comes from `01_000_00_screen.bmp`, not from a palette
+ * file of its own -- build fonts 1 and 2, rebuild the digit table, turn
+ * presentation back on and clear the state-entered flag.
+ *
+ * ADDR_COMM_OBJECT HOLDS A POINTER, not the object. The first version of
+ * this read `(const uint8_t *)ADDR_COMM_OBJECT + COMM_OFF_LOBBIED` and so
+ * tested the dword at 0x004755A8, which is not zero -- every Boot Camp run
+ * took the LOBBY arm, set ADDR_MP_SESSION, and never loaded the map. The A/B
+ * caught it on bootcamp: the log stopped after "Lobby start" and printed the
+ * multiplayer checksums where the original goes on to parse the script.
+ * frame.cpp already had `g_comm` doing the dereference forty lines up.
+ *
+ * THE SECOND HALF DECIDES WHICH MENU IS ALREADY OPEN, and it has two sources.
+ * When the comm object says LOBBIED, the title screen is skipped: menu mode 7
+ * if we are the host and 9 if we are not, with ADDR_MP_SESSION set to 1 or 2
+ * to match. That is a launch from an external lobby arriving straight in the
+ * multiplayer screens.
+ *
+ * Otherwise it consults the pending MENU REQUEST through a jump table over
+ * 7..0x12, and the table has only TWO ARMS. Requests 7, 9, 13 and 18 are
+ * honoured -- the mode becomes the request and the request is reset to 1 --
+ * and 8, 10, 11, 12, 14, 15, 16, 17 and everything outside the range all fall
+ * to the same place: menu mode 1, the title's own. So twelve values index a
+ * table that answers two ways, which is worth writing out rather than
+ * collapsing: the four that are honoured are not a range and not a pattern.
+ *
+ * The request is reset to 1 and not to 0 on the honoured arm, which is the
+ * same "1 means nothing pending" convention ADDR_MENU_REQUEST carries
+ * elsewhere.
+ *
+ * It ends by marking the overlay dirty and starting title.wav, in that order.
+ */
+void __cdecl State1Enter(void)
+{
+    ClearBothSurfaces();
+    SetGameDir(*(const char *const *)(uintptr_t)ADDR_DIR_TITLE_PTR);
+    LoadPaletteFile((const char *)(uintptr_t)ADDR_STR_SCREEN_BMP,
+                    *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+    SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+
+    BuildFontAlias(1);
+    BuildFontAlias(2);
+    orig_init_digit_table();
+
+    *(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED = 1;
+    *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED   = 0;
+    RefreshGate(1);
+
+    {
+        const uint8_t *comm = g_comm;   /* the POINTER, dereferenced */
+
+        if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
+            if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+                *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_LOBBY_HOST;
+                *(int32_t *)(uintptr_t)ADDR_MP_SESSION = 1;
+            } else {
+                *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_LOBBY_JOIN;
+                *(int32_t *)(uintptr_t)ADDR_MP_SESSION = 2;
+            }
+        } else {
+            int32_t request = *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
+
+            if (request == 7 || request == 9 || request == 13
+                || request == 18) {
+                *(int32_t *)(uintptr_t)ADDR_MENU_MODE    = request;
+                *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = 1;
+            } else {
+                *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_TITLE;
+            }
+        }
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+    StartAudioStream((void *)(uintptr_t)ADDR_STR_TITLE_WAV, 0);
+}
+
 /* 0x00426570. State 1 -- the menus.
  *
  * A pending menu request is consumed here rather than by the mission's
@@ -441,7 +532,7 @@ void __cdecl State1Frame(void)
     }
 
     if (g_stateEntered)
-        call0(ADDR_STATE1_ENTER);
+        State1Enter();
 
     int32_t *requestSet = (int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET;
 
@@ -1155,6 +1246,8 @@ int frame_install(void)
                         "FramePost", 1);
     rc |= patch_replace(ADDR_STATE0_FRAME, (const void *)State0Frame,
                         "State0Frame", 1);
+    rc |= patch_replace(ADDR_STATE1_ENTER, (const void *)State1Enter,
+                        "State1Enter", 1);
     rc |= patch_replace(ADDR_STATE1_FRAME, (const void *)State1Frame,
                         "State1Frame", 1);
     rc |= patch_replace(ADDR_STATE2_FRAME, (const void *)State2Frame,

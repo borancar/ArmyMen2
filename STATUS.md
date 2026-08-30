@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,220 patches.**
+Nothing uncommitted. **1,221 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1995,16 +1995,46 @@ commit -- gave the right answer every time it was used.
   sites are in reconstructed handlers, so the counter is blind and reads 0
   even when it runs.
 
+- **`State1Enter`** (`0x004262E0`) is entering the title screen: clear both
+  surfaces, chdir to `01-title`, **load the palette out of the SCREEN BITMAP**
+  -- the whole title's palette comes from `01_000_00_screen.bmp`, not from a
+  palette file -- build fonts 1 and 2, rebuild the digit table, turn
+  presentation on, and start `title.wav`.
+
+  Its second half decides which menu is already open, from two sources. A
+  LOBBIED comm object skips the title entirely: menu mode 7 for the host and 9
+  for a client. Otherwise a jump table over requests 7..0x12 with only TWO
+  ARMS -- 7, 9, 13 and 18 are honoured and reset to 1, and the other eight
+  values plus everything outside the range all land on menu mode 1. Twelve
+  indices, two answers, and the four honoured are neither a range nor a
+  pattern.
+
+- **THE A/B CAUGHT A REAL DEFECT, and it is the two-dereference trap CLAUDE.md
+  already records.** `ADDR_COMM_OBJECT` holds a POINTER to the comm object; I
+  wrote `(const uint8_t *)ADDR_COMM_OBJECT + COMM_OFF_LOBBIED` and so tested
+  the dword at `0x004755A8`, which is not zero. Every Boot Camp run took the
+  LOBBY arm, set `ADDR_MP_SESSION`, and never loaded the map.
+
+  `bootcamp` said so plainly: 298,417 differing pixels and a log that stopped
+  after "Lobby start" and printed the multiplayer checksums where the original
+  goes on to parse the script. **`frame.cpp` already had `g_comm` doing the
+  dereference forty lines above.** Fixed; `bootcamp` is back to its usual 22
+  pixels and 13 identical messages, `controls` to 0.
+
+  Worth noting what could NOT have caught it: the counter. Closing the seam
+  made `State1Enter` blind -- `State1Frame` calls it by name and is itself
+  called by our own `RunFrame` -- so it reads 0 whether it works or not.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,066 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,220
+line (0x0045C000) patched**. Measured: **1,067 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,221
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-six batches have gone in and the 173 entries outstanding start at 48
+small ones in batches. Sixty-seven batches have gone in and the 172 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
