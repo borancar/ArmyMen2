@@ -9,6 +9,7 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "objtable.h" /* LookupByUID */
+#include "objtype.h"  /* ObjIsType2 */
 #include "dist.h"     /* AngleBetween */
 #include "army.h"     /* AllyFlag, SetLeadsAndAct */
 #include "packkey.h"
@@ -210,6 +211,89 @@ void __cdecl SendObjDestroyed(const void *obj)
         UidOnWire(*(const uint32_t *)((const uint8_t *)obj + 4));
 
     ArmyMessageSend(msg);
+}
+
+/* ADDR_APPEND_TROOP_STATE stays original and is reached by address. It writes
+ * one variable-length record for a trooper into the message and advances the
+ * length itself -- 632 bytes of it, none of them read here. */
+typedef void (__cdecl *AM2_AppendTroopStateFn)(void *msg, void *obj);
+#define orig_append_troop_state \
+    ((AM2_AppendTroopStateFn)(uintptr_t)ADDR_APPEND_TROOP_STATE)
+
+/* TellOneSlot -- original 0x0044C480, one caller, which is TellEachSlot.
+ *
+ * The SENDER of the kind-0x16 batch. Its receiver, RecvTroopBatch, has been
+ * reconstructed since long before this: that one walks a run of
+ * variable-length sub-records from +8 to the header's length, and this is
+ * where the run is built. One comm slot's army object list in, one message
+ * out -- or several, if they do not fit.
+ *
+ * TWO TESTS DECIDE WHAT GOES IN. The object must not be destroyed, and it
+ * must be a type 2 -- a trooper -- which is what makes this a TROOPER message
+ * despite the list being every object the army owns.
+ *
+ * THE FLUSH TEST IS A GUESS AND NOT A BOUND. It asks whether the current
+ * length plus TEN would exceed the buffer, and ten is nobody's record size:
+ * the appender writes variable-length records and is never asked how long the
+ * next one will be. So the check runs AFTER the append, which is the only
+ * reason it works -- an oversized record has already been written by the time
+ * anything notices. Reproduced, including the ordering, because the ordering
+ * is what makes it safe.
+ *
+ * THE HEADER UID IS THE FIRST ACCEPTED TROOPER'S, RAW. Every other sender in
+ * this module puts UidOnWire(uid) there and this one does not, so the field
+ * carries a local uid where the rest of the transport carries a wire one.
+ * Reproduced; the receiver hands each sub-record its army separately and does
+ * not read this field at all, so nothing here depends on which it is.
+ *
+ * The list POINTER and its count are both re-read from the table every
+ * iteration, so an append that reallocated the list would be seen. Nothing in
+ * the loop does, and it is reproduced rather than hoisted for the usual
+ * reason: which loads the original chose to repeat is evidence.
+ *
+ * A flush inside the loop resets the length and NOT the uid, so the second
+ * and later messages of a long list carry the first trooper's uid. */
+void __cdecl TellOneSlot(int32_t slot)
+{
+    uint8_t         msg[AM2_TROOP_BATCH_MAX];
+    AM2_ArmyMsgHdr *h = (AM2_ArmyMsgHdr *)msg;
+    const uint8_t  *list;
+    int32_t         i = 0;
+
+    h->len  = (uint16_t)sizeof(AM2_ArmyMsgHdr);
+    h->kind = AM2_MSG_TROOP_BATCH;
+    h->uid  = 0;
+
+    list = (const uint8_t *)
+        (*(void *const *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+    if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
+        return;
+
+    do {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+        if (obj) {
+            if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+                && ObjIsType2((const AM2_Object *)obj)) {
+                if (h->uid == 0)
+                    h->uid = *(const uint32_t *)(obj + 4);
+                orig_append_troop_state(msg, obj);
+            }
+            if ((uint32_t)h->len + AM2_TROOP_BATCH_SLACK
+                    > AM2_TROOP_BATCH_MAX) {
+                ArmyMessageSend(msg);
+                h->len = (uint16_t)sizeof(AM2_ArmyMsgHdr);
+            }
+        }
+
+        list = (const uint8_t *)
+            (*(void *const *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+        i++;
+    } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
+
+    if (h->len != sizeof(AM2_ArmyMsgHdr))
+        ArmyMessageSend(msg);
 }
 
 /* 0x0042A9A0. Tell the other players an item is gone.
@@ -934,6 +1018,8 @@ int armymsg_install(void)
                         "SendTrooperSetWeapon", 10);
     rc |= patch_replace(ADDR_SEND_OBJ_DESTROYED, (const void *)SendObjDestroyed,
                         "SendObjDestroyed", 2);
+    rc |= patch_replace(ADDR_TELL_ONE_SLOT, (const void *)TellOneSlot,
+                        "TellOneSlot", 1);
     rc |= patch_replace(ADDR_ITEM_GONE_SEND, (const void *)ItemGoneMessageSend,
                         "ItemGoneMessageSend", 1);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,

@@ -29,6 +29,13 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant);
  * armymsg.cpp. */
 void __cdecl ItemPostCreate(int32_t army, uint32_t where);
 
+/* 0x0044C480, one caller. The SENDER of the kind-0x16 batch RecvTroopBatch
+ * receives: walk one comm slot's army object list and append every live
+ * trooper's state to one message, flushing whenever another record would not
+ * fit. See armymsg.cpp for why the flush test is a guess rather than a bound,
+ * and for the one uid on this transport that is not put on the wire. */
+void __cdecl TellOneSlot(int32_t slot);
+
 #endif
 
 /* The header every message on this transport begins with. ArmyMessageSend

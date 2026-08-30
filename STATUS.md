@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,201 patches.**
+Nothing uncommitted. **1,202 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1466,16 +1466,44 @@ commit -- gave the right answer every time it was used.
   `ScriptBindUniqueName`, `LoadScriptName` and `CheckSaveTag` all at 0,
   because no drive here LOADS a save.
 
+- **`TellOneSlot`** (`0x0044C480`) is the SENDER of the kind-0x16 batch whose
+  RECEIVER, `RecvTroopBatch`, was reconstructed months ago. That one walks a
+  run of variable-length sub-records from +8 to the header's length; this is
+  where the run is built. Both ends of one message are ours now.
+
+  **Its flush test is a guess and not a bound.** It asks whether the current
+  length plus TEN would exceed the 0x12C buffer, and ten is nobody's record
+  size -- the appender writes variable-length records and is never asked how
+  long the next one will be. The check runs AFTER the append, which is the
+  only reason it is safe: an oversized record has already been written by the
+  time anything notices. Reproduced including the ordering, because the
+  ordering is the whole of it.
+
+  **The header uid is the first accepted trooper's, RAW.** Every other sender
+  in `armymsg.cpp` puts `UidOnWire(uid)` there and this one does not, so the
+  field carries a local uid where the rest of the transport carries a wire
+  one. Nothing depends on it -- the receiver hands each sub-record its army
+  separately and never reads the field -- and a flush inside the loop resets
+  the length and NOT the uid, so later messages of a long list still carry the
+  first trooper's.
+
+  Two tests decide what goes in: not destroyed, and a type 2. That is what
+  makes it a TROOPER message although the list it walks is every object the
+  army owns.
+
+  Multiplayer-only, so no drive here reaches it; `mpoptions`, `multi`,
+  `mission` and `combat` are all clean, which says nothing regressed.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,048 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,201
+line (0x0045C000) patched**. Measured: **1,049 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,202
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-nine batches have gone in and the 191 entries outstanding start at 48
+small ones in batches. Fifty batches have gone in and the 190 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

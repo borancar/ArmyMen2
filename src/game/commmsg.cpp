@@ -1804,9 +1804,6 @@ void __cdecl DrainMsgList(void *list)
         MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_A, node);
 }
 
-typedef void (__cdecl *AM2_TellSlotFn)(int32_t slot);
-#define orig_tell_one_slot ((AM2_TellSlotFn)(uintptr_t)ADDR_TELL_ONE_SLOT)
-
 /* TellEachSlot -- original 0x0044C550, one caller.
  *
  * Walk the four comm slots and run one thing on every slot that is OCCUPIED
@@ -1831,7 +1828,7 @@ void __cdecl TellEachSlot(void)
         if (!CommMustBroadcast((void *)kCommObj, (int16_t)slot))
             continue;
 
-        orig_tell_one_slot(slot);
+        TellOneSlot(slot);
     }
 }
 

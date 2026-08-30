@@ -5870,7 +5870,24 @@ typedef struct {
 /* 0x0044C550, one caller. Walk the four comm slots and run 0x0044C480 on
  * every one that is occupied AND that CommMustBroadcast accepts. */
 #define ADDR_TELL_EACH_SLOT      0x0044C550u  /* void(void) */
+/* 0x0044C480. It is the SENDER of the kind-0x16 batch whose receiver,
+ * ADDR_RECV_TROOP_16, was reconstructed months earlier: it walks one comm
+ * slot's army object list and appends each live trooper's state to one
+ * message, flushing whenever another record would not fit.
+ *
+ * The buffer is 0x12C bytes and the room it reserves for the next record is
+ * TEN, which is a guess about ADDR_APPEND_TROOP_STATE's output rather than a
+ * bound on it -- that function writes variable-length records and nothing
+ * here asks how long the next one will be. */
 #define ADDR_TELL_ONE_SLOT       0x0044C480u  /* void(int32_t slot) */
+#define ADDR_APPEND_TROOP_STATE  0x0044BC10u  /* void(msg *, void *obj) */
+#define AM2_TROOP_BATCH_MAX      0x12Cu  /* the whole message buffer */
+#define AM2_TROOP_BATCH_SLACK    0x0Au   /* what it keeps free for one more */
+/* The same number as AM2_MSG_TROOP_FIRST above, and not by accident: the
+ * batch is the lowest code the trooper dispatcher handles, so the range's
+ * lower bound and this kind are one value seen two ways. Spelled separately
+ * because a message kind and a range bound are different claims. */
+#define AM2_MSG_TROOP_BATCH      0x16u
 /* 0x00453AB0, thiscall with one argument, `ret 4`. Grow a list of 260-byte
  * records by one and then SEARCH it for a key at +0x100, answering the index
  * or -1.
