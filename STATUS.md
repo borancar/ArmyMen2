@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,210 patches.**
+Nothing uncommitted. **1,211 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1687,16 +1687,49 @@ commit -- gave the right answer every time it was used.
   `SetObjScriptState` and more. `tools/` does not have this as a tool yet; it
   is a dozen lines over `docs/functions.tsv` and the reconstructed set.
 
+- **`TrooperDropItem`** (`0x00448D60`) names itself in both log lines, and the
+  body has four things the name does not say.
+
+  **ITS SLOT RANGE IS 1..5, NOT 0..5.** The guards are `>= 6` and `<= 0`, so
+  slot 0 of the six-entry `UNIT_OFF_INVENTORY` can never be dropped -- the
+  array is six long and this reaches five of it.
+
+  **The deploy is gated on ammo.** `ITEM_OFF_AMMO` zero means the item is
+  spent: it is still removed from the inventory, still recorded in
+  `UNIT_OFF_LAST_DROPPED`, still made neutral -- but never placed on the map
+  and never notified as dropped. An empty weapon disappears rather than being
+  droppable.
+
+  **It dereferences the item before testing it.** Both the ammo and the uid in
+  the log line come out of what `WeaponByUid` returned, and the `if (!item)`
+  guard is four instructions further down. A slot holding a uid that no longer
+  resolves faults in the LOGGING, not in the work. Reproduced.
+
+  **One of its two log lines is gated and the other is not** -- the bare
+  `"TrooperDropItem %x"` needs a broadcast AND `COMM_OFF_VERBOSE`, while the
+  one with the ammo prints on every drop. So a single-player log shows the
+  second and never the first. The point is also rewritten in place by
+  `SettlePointInRegion` before anything uses it, which is why a drop lands
+  where it lands rather than under the trooper's feet.
+
+  Closing it took three seams with it: `checkseams` found `orig_` macros for
+  this address in both `event.cpp` and `item.cpp`, and an `orig_notify_dropped`
+  pointing at a function `item.cpp` had already reconstructed.
+
+  Not exercised, and the reason is precise: **no shipped script uses
+  `dropitem` at all**, and the other caller needs a full inventory plus a
+  better weapon on the ground, which no drive here arranges.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,056 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,210
+line (0x0045C000) patched**. Measured: **1,057 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,211
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-six batches have gone in and the 183 entries outstanding start at 48
+small ones in batches. Fifty-seven batches have gone in and the 182 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

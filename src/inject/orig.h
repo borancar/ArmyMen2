@@ -6150,6 +6150,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00448D60, self-named in both its log lines -- "TrooperDropItem  %x" and
  * "TrooperDropItem  %x  ammo: %d". Still original; EvtDropItem reaches it. */
 #define ADDR_TROOPER_DROP_ITEM   0x00448D60u /* void(unit,int32 slot,uint32) */
+/* 0x0044C150, and it names itself twice: "<--Trooper Drop Item Send: Trooper:
+ * %x, item: %x,  slot: %d, quant: %d" and the "-->... Sent" beside it. The
+ * message TrooperDropItem sends when the drop has to be told to the others.
+ * Still original. */
+#define ADDR_TROOPER_DROP_ITEM_SEND 0x0044C150u /* void(unit,item,slot,q,pt) */
+/* The uid of the last thing this unit dropped. Only TrooperDropItem writes it
+ * and nothing read so far reads it, so the name is what the write says and no
+ * more. */
+#define UNIT_OFF_LAST_DROPPED     0x564u
 #define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value

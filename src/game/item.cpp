@@ -4217,6 +4217,98 @@ typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
                                           uint32_t uid);
 #define orig_make_weapon  ((AM2_MakeWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 
+/* SettlePointInRegion and the two comm functions stay original and are
+ * reached by address. The first rewrites the point it is given through a rule
+ * chosen from the region; the second is the "<--Trooper Drop Item Send"
+ * message. */
+typedef int32_t (__cdecl *AM2_SettlePointFn)(int32_t tile, uint32_t *pt);
+#define orig_settle_point \
+    ((AM2_SettlePointFn)(uintptr_t)ADDR_SETTLE_POINT_IN_REGION)
+typedef void (__cdecl *AM2_DropSendFn)(void *unit, void *item, int32_t slot,
+                                       int32_t quantity, uint32_t at);
+#define orig_drop_item_send \
+    ((AM2_DropSendFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM_SEND)
+
+/* TrooperDropItem -- original 0x00448D60, and it names itself in both of its
+ * log lines: "TrooperDropItem  %x" and "TrooperDropItem  %x  ammo: %d".
+ *
+ * ITS SLOT RANGE IS 1..5, NOT 0..5. The two guards are `>= 6` and `<= 0`, so
+ * slot 0 of the six-entry UNIT_OFF_INVENTORY can never be dropped -- whatever
+ * a trooper is holding in that slot stays with it. Reproduced; the array is
+ * six long and this reaches five of it.
+ *
+ * THE POINT IS REWRITTEN IN THE CALLER'S OWN ARGUMENT SLOT. The original
+ * passes `&at` to SettlePointInRegion, which moves the point somewhere the
+ * region will accept, and every later use is of the moved one. A local here,
+ * since nothing observes the difference -- but it is why the drop lands where
+ * it lands rather than under the trooper's feet.
+ *
+ * ONE OF ITS TWO LOG LINES IS GATED AND THE OTHER IS NOT. The bare
+ * "TrooperDropItem %x" only prints for a drop that has to be broadcast, and
+ * only when COMM_OFF_VERBOSE is set; the one with the ammo prints on every
+ * drop. So a single-player log shows the second and never the first.
+ *
+ * IT DEREFERENCES THE ITEM BEFORE TESTING IT. Both the ammo read for that log
+ * line and the uid beside it come out of the item that WeaponByUid returned,
+ * and the `if (!item)` guard is four instructions further down -- so a slot
+ * holding a uid that no longer resolves faults in the logging, not in the
+ * work. Reproduced.
+ *
+ * THE ITEM TAKES THE TROOPER'S HEIGHT and then the neutral army. The height
+ * is copied before the deploy so the thing lands at the height the trooper
+ * was standing at; the army is written last and unconditionally, which is an
+ * item going ownerless as it leaves the hands that held it.
+ *
+ * AND THE DEPLOY IS GATED ON AMMO. ITEM_OFF_AMMO zero means the item is spent:
+ * it is still removed from the inventory, still recorded in
+ * UNIT_OFF_LAST_DROPPED, still made neutral -- but never placed on the map and
+ * never notified as dropped. So an empty weapon disappears rather than being
+ * droppable.
+ */
+void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
+{
+    uint8_t *u = (uint8_t *)unit;
+    uint8_t *item;
+
+    if (slot >= AM2_INVENTORY_SLOTS || slot <= 0)
+        return;
+
+    item = (uint8_t *)WeaponByUid(
+        (int32_t)(*(const uint32_t *)(u + UNIT_OFF_INVENTORY + slot * 4)));
+
+    orig_settle_point(TileOfPoint(at), &at);
+
+    if (CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
+                          (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
+        if (*(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_COMM_OBJECT)
+                               + COMM_OFF_VERBOSE))
+            am2_log("TrooperDropItem  %x\n", ((const AM2_Object *)item)->uid);
+
+        orig_drop_item_send(u, item, slot,
+                            *(const int32_t *)(item + ITEM_OFF_AMMO), at);
+    }
+
+    am2_log("TrooperDropItem  %x  ammo: %d\n",
+            ((const AM2_Object *)item)->uid,
+            *(const int32_t *)(item + ITEM_OFF_AMMO));
+
+    RemoveInventoryItem(u, slot);
+
+    if (!item)
+        return;
+
+    *(uint32_t *)(u + UNIT_OFF_LAST_DROPPED) = ((const AM2_Object *)item)->uid;
+    *(uint8_t *)(item + OBJ_OFF_HEIGHT_SET) =
+        *(const uint8_t *)(u + OBJ_OFF_HEIGHT_SET);
+
+    if (*(const int32_t *)(item + ITEM_OFF_AMMO)) {
+        DeployItem(item, at, 0, 0);
+        NotifyDropped(item, u);
+    }
+
+    *(uint8_t *)(item + OBJ_OFF_ARMY) = AM2_ARMY_NEUTRAL;
+}
+
 /* 0x00448170, five callers, and the last of the three Type2Action siblings.
  * Where B disarms and C hands the selection on, A RE-ARMS: the unit becomes
  * soldier kind 7, loses whatever it was holding, and is given a freshly
@@ -6867,10 +6959,6 @@ int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot)
     }
 }
 
-typedef void (__cdecl *AM2_DropItemFn)(void *unit, int32_t slot, uint32_t at);
-#define orig_trooper_drop_item \
-    ((AM2_DropItemFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM)
-
 /* TryTakeWeapon -- original 0x00406720, two callers, and PickWeaponSlot's only
  * caller.
  *
@@ -6951,8 +7039,7 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit)
         if (slot == AM2_SLOT_ALL_FULL)
             return 0;           /* nothing carried is worth less */
 
-        orig_trooper_drop_item(u, slot,
-                               *(const uint32_t *)(u + OBJ_OFF_POS));
+        TrooperDropItem(u, slot, *(const uint32_t *)(u + OBJ_OFF_POS));
     }
 
     return code;
@@ -7053,6 +7140,8 @@ void item_install(void)
                   "ObjCollidesWith", 2);
     patch_replace(ADDR_APPLY_SHOT_DAMAGE, (const void *)ApplyShotDamage,
                   "ApplyShotDamage", 1);
+    patch_replace(ADDR_TROOPER_DROP_ITEM, (const void *)TrooperDropItem,
+                  "TrooperDropItem", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_DAMAGING,
                   (const void *)BlockWeightDamaging,
                   "BlockWeightDamaging", 1);

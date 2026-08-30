@@ -102,6 +102,12 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src);
 
 void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
 
+/* 0x00448D60, and it names itself in both log lines. Drop one inventory slot
+ * on the ground. THE SLOT RANGE IS 1..5, not 0..5 -- slot 0 can never be
+ * dropped -- and the deploy is gated on ITEM_OFF_AMMO, so a spent weapon
+ * disappears instead. See item.cpp. */
+void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at);
+
 /* A uid carries its owner in the top three bits, over a 29-bit per-owner
  * counter -- the layout objtable.h already describes and AddToItemList already
  * builds. UidArmy is the original's accessor for the owner half. */

@@ -2370,13 +2370,6 @@ void __cdecl ResetTimers(void)
         *id = 0;
 }
 
-typedef void (__cdecl *AM2_TrooperDropItemFn)(void *unit, int32_t slot,
-                                              uint32_t at);
-/* TrooperDropItem names itself in both its log lines and is still the
- * original's. */
-#define orig_trooper_drop_item \
-    ((AM2_TrooperDropItemFn)(uintptr_t)ADDR_TROOPER_DROP_ITEM)
-
 /* EvtDropItem -- original 0x0041FC80, one caller.
  *
  * The `dropitem` action: find a weapon uid among a trooper's inventory slots
@@ -2433,7 +2426,7 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
     for (slot = 1; slot < AM2_INVENTORY_SLOTS; slot++)
         if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY
                                 + (size_t)slot * 4) == weaponUid) {
-            orig_trooper_drop_item(obj, slot, at);
+            TrooperDropItem(obj, slot, at);
             return;
         }
 }
