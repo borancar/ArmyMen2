@@ -39,13 +39,24 @@
 /* 0x0043F910, one caller, and that caller is LoadScriptName. Lower-case the
  * name, find it in the script name table and bind the record to it -- and when
  * the name is already taken, make a fresh one by appending "_1", "_2", ... off
- * the format at 0x00485D90. Still original. */
-#define ADDR_SCRIPT_UNIQUE_NAME 0x0043F910u /* void(void *rec, const char *) */
+ * the format at 0x00485D90.
+ *
+ * IT LOWER-CASES THE CALLER'S BUFFER IN PLACE. This macro said `const char *`
+ * for as long as the function was reached through it, which is the same
+ * mistake ADDR_BOX_ACTION's `int32_t` was: a prototype nothing on the C side
+ * had to satisfy. */
+#define ADDR_SCRIPT_UNIQUE_NAME 0x0043F910u /* void(void *rec, char *name) */
+#define AM2_SCRIPT_UNIQUE_BUF 0x40u   /* the stack buffer it builds names in */
+#define AM2_STR_UNIQUE_SUFFIX 0x00485D90u  /* "%s_%d" */
 #define AM2_SAVED_NAME_MAX    0x100u  /* LoadScriptName's stack buffer */
 #define AM2_SAVETAG_NAME      0x06660669u
 #define AM2_SAVETAG_NO_NAME   0x06660670u
-/* The record SaveScriptName is handed carries the table index at +0x0C. */
+/* The record SaveScriptName is handed carries the table index at +0x0C, and
+ * the value the name is to stand for at +0x04 -- which is what 0x0043F910
+ * writes into the table entry, so it is a name-table VALUE and named as one
+ * rather than guessed at. */
 #define SCRIPT_REF_OFF_NAME_INDEX 0x0Cu
+#define SCRIPT_REF_OFF_VALUE      0x04u
 #define ADDR_LOG            0x0045CAA0u  /* void(const char*,...) -- stubbed to `ret` */
 /* RETURNS ITS ARGUMENT -- see rect.h, which is the authority here. This comment
  * said `void` and that is the stale remnant of the first reading: it happened

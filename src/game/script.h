@@ -204,6 +204,14 @@ const char *__cdecl ScriptTokenName(int32_t id);
 /* 0x0043F670. The index of a declared name, or -1. */
 int32_t __cdecl ScriptFindName(const char *name);
 
+/* 0x0043F910, one caller, and that caller is LoadScriptName. Bind a loaded
+ * record to a name in the script name table, inventing "name_1", "name_2",
+ * ... when the one on the file is already taken by an entry with a value.
+ * LOWER-CASES ITS CALLER'S BUFFER IN PLACE, which is why `name` is not
+ * const. See script.cpp for the entry-adoption case and for the two
+ * unchecked copies. */
+void __cdecl ScriptBindUniqueName(void *rec, char *name);
+
 /* 0x00444A90. Render one token as text into `out`, which it returns.
  *
  * Eight arms for seven kinds. Kind 0 gives "unknown", 1 and 2 the keyword's

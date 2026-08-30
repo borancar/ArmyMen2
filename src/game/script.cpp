@@ -310,6 +310,76 @@ int32_t __cdecl ScriptFindName(const char *name)
     return -1;
 }
 
+/* Still original: the CRT lower-caser, the same seam map.cpp and definfo.cpp
+ * already have. ScriptBindUniqueName calls it on its caller's buffer. */
+typedef char *(__cdecl *AM2_StrlwrFn)(char *);
+#define orig_strlwr       ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+
+/* 0x0043F910, one caller, and that caller is LoadScriptName. Bind a loaded
+ * record to a name in the script name table, INVENTING A FRESH NAME when the
+ * one on the file is already taken.
+ *
+ * Three outcomes, and the middle one is the reason this is not four lines.
+ * The name is looked up, and:
+ *
+ *   - not there: it is appended with type AM2_NAME_TYPE_REF and the record's
+ *     value, and the record keeps that index;
+ *   - there but its VALUE IS ZERO: that entry is adopted -- the record keeps
+ *     its index and the record's value is written into it. Nothing else about
+ *     the entry is touched, so its type and its reference count survive;
+ *   - there with a value: "%s_%d" against the ORIGINAL name and a counter
+ *     from 1, and round again.
+ *
+ * The suffix does not accumulate, because every attempt formats from `name`
+ * rather than from the last attempt: a third try is "sarge_2" and never
+ * "sarge_1_1".
+ *
+ * IT LOWER-CASES THE CALLER'S BUFFER IN PLACE, which orig.h's `const char *`
+ * denied for as long as the function was only ever reached through the image.
+ * LoadScriptName's buffer is a local so nothing observes it afterwards -- but
+ * that is a fact about the one caller, not about this function.
+ *
+ * ITS BUFFER IS 64 BYTES AND THE NAME IT IS HANDED CAN BE 256. LoadScriptName
+ * reads a length off the file into a 0x100-byte local and passes it straight
+ * down, so a long enough name in a save file overruns this frame as well as
+ * that one. Reproduced, and the same reasoning applies: a file this game
+ * wrote cannot do it, because the save half writes strlen + 1 of a table
+ * entry. Two unchecked copies in a row is worth saying once. */
+void __cdecl ScriptBindUniqueName(void *rec, char *name)
+{
+    uint8_t *r = (uint8_t *)rec;
+    char     tried[AM2_SCRIPT_UNIQUE_BUF];
+    int32_t  n = 1;
+
+    if (!rec || !name)
+        return;
+
+    orig_strlwr(name);
+    strcpy(tried, name);
+
+    for (;;) {
+        int32_t index = ScriptFindName(tried);
+
+        if (index < 0)
+            break;
+
+        if (kScriptNames[index].value == 0) {
+            *(int32_t *)(r + SCRIPT_REF_OFF_NAME_INDEX) = index;
+            kScriptNames[index].value =
+                *(const int32_t *)(r + SCRIPT_REF_OFF_VALUE);
+            return;
+        }
+
+        am2_sprintf(tried, (const char *)AM2_IMAGE(AM2_STR_UNIQUE_SUFFIX),
+                    name, n);
+        n++;
+    }
+
+    *(int32_t *)(r + SCRIPT_REF_OFF_NAME_INDEX) =
+        AddNameTableName(tried, AM2_NAME_TYPE_REF,
+                         *(const int32_t *)(r + SCRIPT_REF_OFF_VALUE));
+}
+
 /* The original re-reads the count every iteration. Nothing in the loop can
  * change it, so a plain bound is the same function; noted rather than
  * transcribed. It frees the TABLE as well as the names, and zeroes all three
@@ -3353,6 +3423,9 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_NEXT_TOKEN,
                         (const void *)ScriptNextToken,
                         "ScriptNextToken", 1);
+    rc |= patch_replace(ADDR_SCRIPT_UNIQUE_NAME,
+                        (const void *)ScriptBindUniqueName,
+                        "ScriptBindUniqueName", 2);
     rc |= patch_replace(ADDR_SCRIPT_TOKEN_NAME,
                         (const void *)ScriptTokenName,
                         "ScriptTokenName", 1);

@@ -101,9 +101,6 @@ int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
     return 1;
 }
 
-typedef void (__cdecl *AM2_ScriptUniqueNameFn)(void *rec, const char *name);
-#define orig_script_unique_name \
-    ((AM2_ScriptUniqueNameFn)(uintptr_t)ADDR_SCRIPT_UNIQUE_NAME)
 
 /* LoadScriptName -- original 0x004287E0, one caller, and the exact counterpart
  * of SaveScriptName above.
@@ -149,7 +146,7 @@ int32_t __cdecl LoadScriptName(am2_FILE *fp, void *rec)
     orig_fread(&n, 4, 1, fp);
     orig_fread(name, n, 1, fp);
 
-    orig_script_unique_name(rec, name);
+    ScriptBindUniqueName(rec, name);
 
     return 1;
 }

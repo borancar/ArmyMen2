@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,200 patches.**
+Nothing uncommitted. **1,201 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1438,16 +1438,44 @@ commit -- gave the right answer every time it was used.
   So none of the four is reached by any drive here: verified by reading, with
   the clean A/B saying only that nothing regressed.
 
+- **`ScriptBindUniqueName`** (`0x0043F910`) binds a loaded record to a name in
+  the script name table and INVENTS A FRESH NAME when the one on the file is
+  already taken -- `"%s_%d"` against the ORIGINAL name and a counter from 1,
+  so the suffix does not accumulate: a third try is `sarge_2` and never
+  `sarge_1_1`.
+
+  **The middle of its three outcomes is the interesting one.** A name that is
+  in the table but whose VALUE IS ZERO is ADOPTED rather than skipped: the
+  record keeps that index and its own value is written into the entry, leaving
+  the entry's type and reference count alone. Only an entry with a non-zero
+  value forces a new name.
+
+  **It lower-cases its caller's buffer IN PLACE**, which `orig.h`'s
+  `const char *` denied for as long as the function was reached only through
+  the image -- the same class of error as `ADDR_BOX_ACTION`'s `int32_t` two
+  batches ago, and for the same reason: a prototype nothing on the C side had
+  to satisfy.
+
+  **Its buffer is 64 bytes and the name it is handed can be 256.**
+  `LoadScriptName` reads a length off the file into a `0x100`-byte local and
+  passes it straight down, so a long enough name in a save overruns this frame
+  as well as that one. Reproduced, with the same reasoning already recorded
+  there: a file this game wrote cannot do it.
+
+  Not exercised. Measured rather than assumed -- a driven session leaves
+  `ScriptBindUniqueName`, `LoadScriptName` and `CheckSaveTag` all at 0,
+  because no drive here LOADS a save.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,047 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,200
+line (0x0045C000) patched**. Measured: **1,048 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,201
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-eight batches have gone in and the 192 entries outstanding start at 48
+small ones in batches. Forty-nine batches have gone in and the 191 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
