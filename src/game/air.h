@@ -113,6 +113,11 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius,
  * need it, not "grow if full". Nothing checks the realloc. */
 void __cdecl FreeSpriteList(void);
 
+/* Original: 0x004042A0, one caller -- FormationPoint, for slot 12 and above,
+ * where the twelve-entry slot table runs out. Rings of sixteen. */
+void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
+                               int32_t slot);
+
 /* Original: 0x00404400, two callers. Write the formation position for `slot`
  * into `out`, relative to `leader`. See ADDR_FORMATION_SLOTS for the table. */
 void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,

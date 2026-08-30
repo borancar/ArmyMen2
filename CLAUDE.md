@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **21** analysis
+**`make check` runs everything that does not need the game.** **22** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -49,7 +49,7 @@ said "eight" here for a long time after it stopped being eight, and then said
 not a defence against one. `checkclaims.py` counts the recipe now, so this
 sentence cannot drift again.
 
-One of the 20 is `tools/checkclaims.py`, which reads the numeric claims out
+One of them is `tools/checkclaims.py`, which reads the numeric claims out
 of *this file* and recomputes them. It exists because three separate figures
 here were found stale by measuring rather than reading, each from the same
 cause: a tool changed, some prose was updated, the rest kept asserting the old
@@ -1228,6 +1228,38 @@ length from the byte total kills the process outright before the map finishes
 loading, which is caught in the bluntest possible way. What one row cannot
 reach is the empty-name arm, a part with no rows, and the three
 variable-length runs the parser skips before it reads anything it keeps.
+
+**`tools/formationcheck.py` is the third enumerating oracle, and it exists
+because the subsystem is COLD.** `FormationPoint`'s counter is 0 on a full
+Boot Camp run and on the campaign: both drivable missions start with a squad
+of ONE, so nothing places a follower. Past slot 11 the twelve-entry slot table
+runs out and `FormationPointFar` computes the position instead -- sixteen
+slots to a ring, the distance stepping 32 per ring, doubled for a vehicle, and
+a swing away from the front of one. That is decided by three inputs, so it is
+3,520 cases and it enumerates in 0.28 s.
+
+**Stop the emulation where the answer is final, not where the function
+returns.** It runs the original from its entry to `0x00404354` and reads the
+facing out of `BL` and the distance out of `EDI` -- the instruction after the
+last write to either and before the x87 step. Past that point it calls Cos8,
+Sin8 and a settle that dispatches through a global function pointer, none of
+which is set up outside the game, so a whole-function emulation is impossible
+and a partial one is easy. The trig, the clamp and the settle are shared
+verbatim with `FormationPoint` and stay verified by reading; say which half a
+partial oracle covers.
+
+**A model of a callee is a second source of truth, and mine was wrong.** The
+first version modelled `AngleDelta`'s wrap by hand as
+`((a - b + 128) & 0xFF) - 128` and reported 256 mismatches, all of them in the
+type-3 swing and all of them the model's. Calling the image's own
+`0x0042DD90` instead took it to zero. The reconstruction under test uses our
+`AngleDelta`, which the selftest already checks against that address, so this
+keeps one source of truth rather than adding a third.
+
+Mutation-checked in four directions and the counts are the useful part:
+halving the ring size fails 2,760 of 3,520, doubling the step fails all 3,520,
+and both the extra 0x20 and the sign of the swing fail exactly 304 -- which is
+how many type-3 cases take that arm.
 
 **`tools/anicheck.py` reads inside a structure no A/B can see.**
 `LoadAnimTable` is the tail of a `.ani` load — the list of animations over the

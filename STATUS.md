@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `cda06d3`. Working tree clean.
+Last updated: **2026-08-31**, at `d937aee`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,230 patches.**
+Nothing uncommitted. **1,231 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2295,16 +2295,46 @@ commit -- gave the right answer every time it was used.
   row cannot reach is the empty-name arm, an empty part, and the three
   variable-length runs skipped before the first kept field.
 
+- **`FormationPointFar`** (`0x004042A0`) is what `FormationPoint` does past
+  slot 11, where the twelve-entry slot table runs out. The table is replaced
+  by RINGS: sixteen slots each, the facing spread round the circle by taking
+  `slot + 4` as a byte and shifting it up four, and the distance
+  `((slot - 11) / 16 + 4) * 32`, so ring 0 sits at 128 and each ring after it
+  32 further out. Everything from the type test down is `FormationPoint`'s
+  tail, transcribed separately because the original does not share it either.
+  Its first argument is never read, the same shape as `0x00404ED0`.
+
+- **`tools/formationcheck.py`, the twenty-second check, and it exists because
+  the subsystem is cold.** `FormationPoint` reads 0 on a full Boot Camp run
+  and on the campaign -- both drivable missions start with a squad of one --
+  so this arm is verified by an offline oracle or by nothing. 3,520 cases in
+  0.28 s, comparing the original emulated to `0x00404354` against the rule the
+  reconstruction implements.
+
+  **Stop where the answer is final, not where the function returns.** Past
+  that instruction it calls Cos8, Sin8 and a settle that dispatches through a
+  global function pointer, none of which exists outside the game. So the
+  oracle covers the arithmetic and the trig/clamp/settle tail stays verified
+  by reading, which is worth stating rather than leaving to look like full
+  coverage.
+
+  **And a model of a callee is a second source of truth.** The first version
+  modelled `AngleDelta`'s wrap by hand and reported 256 mismatches, every one
+  of them the model's. Calling the image's own `0x0042DD90` took it to zero.
+  Mutation-checked four ways: halving the ring fails 2,760, doubling the step
+  fails all 3,520, and both the extra 0x20 and the sign of the swing fail
+  exactly 304 -- the number of type-3 cases that take that arm.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,076 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,230
+line (0x0045C000) patched**. Measured: **1,077 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,231
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-six batches have gone in and the 163 entries outstanding start at 48
+small ones in batches. Seventy-seven batches have gone in and the 162 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

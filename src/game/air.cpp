@@ -342,18 +342,96 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
 }
 
 typedef int32_t (__cdecl *AM2_SettlePointFn)(int32_t tile, AM2_Point *pt);
-typedef void    (__cdecl *AM2_FormationFarFn)(void *follower, void *leader,
-                                              AM2_Point *out, int32_t slot);
-
 #define orig_settle_point \
     ((AM2_SettlePointFn)(uintptr_t)ADDR_SETTLE_POINT_IN_REGION)
-#define orig_formation_far \
-    ((AM2_FormationFarFn)(uintptr_t)ADDR_FORMATION_POINT_FAR)
 
 #define g_mapBoundsLeft   (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT))
 #define g_mapBoundsTop    (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_TOP))
 #define g_mapBoundsRight  (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_RIGHT))
 #define g_mapBoundsBottom (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_BOTTOM))
+
+/* FormationPointFar -- original 0x004042A0, one caller, which is
+ * FormationPoint below. It is what happens past slot 11, where the twelve-entry
+ * ADDR_FORMATION_SLOTS table runs out.
+ *
+ * The table is replaced by arithmetic, and the arithmetic is a set of RINGS.
+ * Sixteen slots to a ring, the facing spread evenly round it -- `slot + 4`
+ * taken as a byte and shifted up four, so the low nibble becomes the high one
+ * and the ring covers the whole circle in steps of 16 -- and the distance
+ * `((slot - 11) / 16 + 4) * 32`, so ring 0 sits at 128 and each ring after it
+ * 32 further out. The leader's own facing is added to every slot exactly as
+ * the table version adds it, so the rings turn with the leader.
+ *
+ * The division is C's. The original is the usual `cdq; and edx, 0xF; add;
+ * sar 4`, which is truncation TOWARD ZERO for a signed dividend, which is what
+ * C's `/` gives -- checked rather than assumed, and it matters for slots below
+ * 11, which nothing calls this with but which the arithmetic accepts.
+ *
+ * EVERYTHING FROM THE TYPE TEST DOWN IS FormationPoint'S TAIL, and the two
+ * were transcribed separately rather than shared, because the original does
+ * not share them either. The same type 2/3/8 facing rule, the same doubling
+ * for a type 3, the same "no standing in front of a vehicle" swing of 0x3D or
+ * 0xC3 with 0x20 more distance, the same Cos8/Sin8 step, the same clamp to
+ * ADDR_MAP_BOUNDS_*, and the same settle through the region rule.
+ *
+ * ITS FIRST ARGUMENT IS NEVER READ. FormationPoint hands the follower on and
+ * nothing here touches it -- the same shape as 0x00404ED0, which orig.h
+ * already records. Kept in the signature because the call site pushes it.
+ */
+void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
+                               int32_t slot)
+{
+    const uint8_t *l = (const uint8_t *)leader;
+    uint8_t        leaderFacing;
+    uint8_t        facing;
+    int32_t        dist;
+    int32_t        type;
+    uint32_t       shift;
+
+    (void)follower;
+
+    out->x = *(const int16_t *)(l + OBJ_OFF_POS);
+    out->y = *(const int16_t *)(l + OBJ_OFF_POS + 2);
+
+    type = *(const int32_t *)l;
+    if (type == 3) {
+        leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
+        shift        = 1;
+    } else if (type == 2 || type == 8) {
+        leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
+        shift        = 0;
+    } else {
+        leaderFacing = 0;
+        shift        = 0;
+    }
+
+    facing = (uint8_t)((uint8_t)((uint8_t)(slot + 4) << 4) + leaderFacing);
+    dist   = (((slot - 11) / 16 + 4) * 32) << shift;
+
+    if (ObjIsType3((const AM2_Object *)leader)) {
+        int32_t delta = AngleDelta(facing, leaderFacing);
+        int32_t mag   = delta < 0 ? -delta : delta;
+
+        if (mag < 0x40) {
+            facing = (uint8_t)(facing + (delta < 0 ? 0xC3 : 0x3D));
+            dist  += 0x20;
+        }
+    }
+
+    if (dist > 0) {
+        double d = (double)dist;
+
+        out->x = (int16_t)(int32_t)((double)Cos8(facing) * d
+                                    + (double)out->x);
+        out->y = (int16_t)(int32_t)((double)Sin8(facing) * d
+                                    + (double)out->y);
+
+        out->x = (int16_t)Clamp(out->x, g_mapBoundsLeft, g_mapBoundsRight);
+        out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
+    }
+
+    orig_settle_point(TileOfPoint(*(const uint32_t *)out), out);
+}
 
 /* 0x00404400, two callers. Put `out` where the follower in formation `slot`
  * belongs, relative to `leader`. `follower` itself is only null-checked and
@@ -394,7 +472,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         return;
 
     if (slot >= AM2_FORMATION_SLOTS) {
-        orig_formation_far(follower, leader, out, slot);
+        FormationPointFar(follower, leader, out, slot);
         return;
     }
 
@@ -1020,6 +1098,8 @@ void air_install(void)
 {
     patch_replace(ADDR_FORMATION_POINT, (const void *)FormationPoint,
                   "FormationPoint", 4);
+    patch_replace(ADDR_FORMATION_POINT_FAR, (const void *)FormationPointFar,
+                  "FormationPointFar", 1);
     patch_replace(ADDR_RANDOM_POINT_AHEAD, (const void *)RandomPointAhead,
                   "RandomPointAhead", 2);
     patch_replace(ADDR_RANDOM_POINT_TOWARD, (const void *)RandomPointToward,
