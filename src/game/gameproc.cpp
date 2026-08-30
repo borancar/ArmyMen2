@@ -860,7 +860,6 @@ typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
 #define orig_big_407710   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_407710)
 #define orig_def_460290   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_460290)
 #define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
-#define orig_walk_cell    ((AM2_WalkCellFn)(uintptr_t)ADDR_WALK_CELL_AT_POINT)
 
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
 {
@@ -902,8 +901,13 @@ void __cdecl WalkCellWrapper(void *unused, uint32_t at)
 {
     (void)unused;
 
-    orig_walk_cell(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                   (void *)(uintptr_t)ADDR_WALK_CELL_CALLBACK);
+    /* The callback is still the original's, so it goes in by address -- and
+     * as a typed function pointer rather than a void *, now that
+     * WalkCellAtPoint's third parameter says what it is. That parameter used
+     * to be untyped because the macro declared the whole function `void`. */
+    WalkCellAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                    (int32_t (__cdecl *)(void *))(uintptr_t)
+                        ADDR_WALK_CELL_CALLBACK);
 }
 
 /* 0x0042F140. Undo what HostBattle set up: reset the pair mask, put 1000 in

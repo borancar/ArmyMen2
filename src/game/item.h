@@ -562,4 +562,9 @@ void __cdecl ToggleSelect(void *obj);
  * and set the pointer mode from what it is. */
 void __cdecl SetObjContext(void *obj);
 
+/* 0x0042A110, two callers. ObjectsHitByPoint with a caller-supplied
+ * predicate, which runs BETWEEN the rectangle test and the mask test. */
+void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
+                              int32_t (__cdecl *keep)(void *obj));
+
 #endif

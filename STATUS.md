@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,171 patches.**
+Nothing uncommitted. **1,172 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -910,16 +910,42 @@ backlog rather than guessed at.
   2 nor 3 leaves the pointer mode ALONE, having already written the context
   globals.
 
+- **`WalkCellAtPoint`** (`0x0042A110`) is the third member of the
+  point-query family, and its own macro called it "a CALLBACK instead of a
+  chain". It is BOTH: the callback is a FILTER whose answer decides whether
+  the object joins the chain, and the chain is built and returned exactly as
+  `ObjectsHitByPoint`'s is -- the macro even declared the return type `void`.
+  Fourth time reconstructing a function is what corrects its own comment.
+
+  The predicate sits BETWEEN the two hit tests, not before or after both. The
+  mask test is the per-pixel one, so the filter gets a chance to reject before
+  it runs but only after the cheap rectangle has accepted. Moving it either
+  way changes how often each runs and what a predicate with side effects sees.
+
+### Grep the ADDRESS first -- and now the picker does it for you
+
+Five batches running, I wrote a function, invented an `ADDR_` name, and had
+`checkpatches` refuse the build because the address had been named years ago:
+`ObjToAI`, `FreeSpriteRegistry`, `MapCode18To28`, `ObjRowsMaskAt`, and now
+`WalkCellAtPoint`. **The name never collides -- only the address does**,
+which is exactly why "grep for the name" never catches it.
+
+The ratchet caught all five, so nothing shipped wrong. But it caught them
+after the work, and twice the established name carried a WRONG description
+that only the reconstruction could correct. So the scratch picker now prints
+what `orig.h` already calls each candidate, beside the size and the unknown
+count. A rule that has been ignored five times should be turned into a tool.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,020 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,171
+line (0x0045C000) patched**. Measured: **1,021 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,172
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-four batches have gone in and the 219 entries outstanding start at 48
+small ones in batches. Twenty-five batches have gone in and the 218 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

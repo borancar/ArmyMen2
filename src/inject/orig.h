@@ -1336,6 +1336,10 @@
  * with the descriptor's COLS as the bound in each direction -- see
  * MapDescInit, which sizes the grid that way. */
 #define ADDR_OBJECTS_HIT_BY_POINT 0x0042A1B0u /* void *(const AM2_Point*, desc) */
+/* The third member of that family is ADDR_WALK_CELL_AT_POINT, further down --
+ * the same cell walk and the same two hit tests with a caller-supplied
+ * predicate between them. All three walk the cell themselves; none is built
+ * on either of the others. */
 #define OBJ_OFF_HIT_RECT       0x30u  /* AM2_Rect, in world units */
 #define OBJ_OFF_HIT_MASK       0x78u  /* non-null means test the bitmask too */
 /* The four ObjectsAtPoint adds to the object's own position to make its
@@ -5735,10 +5739,16 @@ typedef struct {
 #define AM2_SAVETAG_ALT          0x06660668u
 #define AM2_GROWLIST_STRIDE      0x104u
 #define AM2_GROWLIST_KEY         0x100u
-/* Walk the objects in the cell a point falls in, calling a function for each
- * -- the same cell arithmetic as ObjectsAtPoint with a CALLBACK instead of a
- * chain. 0x0044A3A0 is the one wrapper that supplies a callback. */
-#define ADDR_WALK_CELL_AT_POINT  0x0042A110u  /* void(pt*, desc, fn) */
+/* Walk the objects in the cell a point falls in and chain the ones that
+ * qualify through OBJ_OFF_QUERY_NEXT, answering the head. 0x0044A3A0 is one
+ * of its two callers.
+ *
+ * THIS COMMENT SAID "a CALLBACK instead of a chain" AND IT IS BOTH. The
+ * callback is a FILTER -- its answer decides whether the object joins the
+ * chain -- and the chain is built and returned exactly as
+ * ADDR_OBJECTS_HIT_BY_POINT's is. Reconstructing it is what settled that;
+ * the return type below was `void` for the same reason. */
+#define ADDR_WALK_CELL_AT_POINT  0x0042A110u  /* void *(pt*, desc, keep) */
 #define ADDR_WALK_CELL_WRAPPER   0x0044A3A0u  /* void(void *unused, uint32 pt) */
 #define ADDR_WALK_CELL_CALLBACK  0x0044A380u
 /* Drain one message list into another, head first, until it is empty. */

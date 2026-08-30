@@ -6190,6 +6190,79 @@ void __cdecl SetObjContext(void *obj)
     SetPointerMode(AM2_POINTER_MODE_OTHER);
 }
 
+/* WalkCellAtPoint -- original 0x0042A110, two callers.
+ *
+ * ITS OWN MACRO'S COMMENT CALLED IT "a CALLBACK instead of a chain" AND IT IS
+ * BOTH. The callback is a FILTER whose answer decides whether the object joins
+ * the chain, and the chain is built and returned exactly as
+ * ObjectsHitByPoint's is -- the macro even declared the return type `void`.
+ * Fourth time reconstructing a function is what corrects its own comment, and
+ * the established name is kept because the alias ratchet refused the second.
+ *
+ * ObjectsHitByPoint above with a caller-supplied predicate: the same cell
+ * walk, the same destroyed test, the same OBJ_OFF_HIT_RECT test, then the
+ * predicate, then the same optional OBJ_OFF_HIT_MASK test, chaining what
+ * survives through OBJ_OFF_QUERY_NEXT.
+ *
+ * THE PREDICATE SITS BETWEEN THE TWO HIT TESTS, not before or after both.
+ * That matters because the mask test is the expensive one -- it is per-pixel
+ * -- and the predicate is therefore given a chance to reject an object before
+ * the mask is consulted, but only after the cheap rectangle has already
+ * accepted it. Moving it either way would change how often each runs, and for
+ * a predicate with side effects it would change what it sees.
+ *
+ * IT IS NOT WHAT THE OTHER TWO ARE BUILT ON. All three members of this family
+ * walk the cell themselves; neither of the other two calls this one with a
+ * constant predicate. The duplication is the original's and is reproduced
+ * rather than factored, for the reason AddLevelRecord and AddNameRecord are:
+ * a shared helper would be a fourth thing that is not in the binary.
+ *
+ * THE BOUND IS `cols` IN BOTH DIRECTIONS, as in its sibling -- the grid is
+ * square in cols and MAPDESC_OFF_ROWS is not consulted. See MapDescInit.
+ *
+ * The chain is built newest-first, so the answer is the LAST qualifying
+ * object in the cell's own order and the walk from it runs backwards through
+ * that order. Same as the sibling, and worth stating because a caller taking
+ * "the first hit" gets the last one added.
+ */
+void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
+                              int32_t (__cdecl *keep)(void *obj))
+{
+    const uint8_t *d = (const uint8_t *)desc;
+    int32_t  cols    = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
+    int32_t  cy      = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
+    uint8_t *head    = (uint8_t *)0;
+    uint8_t *node;
+
+    if (cx < 0 || cx > cols - 1 || cy < 0 || cy > cols - 1)
+        return (void *)0;
+
+    node = ((uint8_t *const *)(*(const uint8_t *const *)
+                (d + MAPDESC_OFF_CELLS)))
+           [(cy << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + cx];
+
+    for (; node; node = *(uint8_t **)(node + CELL_NODE_OFF_NEXT)) {
+        uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);
+
+        if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            continue;
+        if (!PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
+                         (const AM2_Point *)pt))
+            continue;
+        if (!keep(o))
+            continue;
+        if (*(void *const *)(o + OBJ_OFF_HIT_MASK)
+            && !ObjMaskBitAt(o, (const AM2_Point *)pt))
+            continue;
+
+        *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT) = head;
+        head = o;
+    }
+
+    return head;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6349,6 +6422,8 @@ void item_install(void)
                   "ToggleSelect", 1);
     patch_replace(ADDR_SET_OBJ_CONTEXT, (const void *)SetObjContext,
                   "SetObjContext", 3);
+    patch_replace(ADDR_WALK_CELL_AT_POINT, (const void *)WalkCellAtPoint,
+                  "WalkCellAtPoint", 2);
     patch_replace(ADDR_AWARD_OWN_ARMY_XP, (const void *)AwardOwnArmyXp,
                   "AwardOwnArmyXp", 1);
     patch_replace(ADDR_WEAPON_CLASS_OF, (const void *)WeaponClassOf,
