@@ -49,6 +49,11 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx);
  * reads, and it calls ConsiderSighting on every path. */
 void __cdecl AiStepDefend(void *obj, void *out, void *ctx);
 
+/* 0x00407560, one caller. The arm modes 1, 4 and 5 share -- 5 is `evade`.
+ * AiStepDefend with one branch target moved: it turns toward what it sees
+ * while still walking, where defend turns only on arrival. Name ours. */
+void __cdecl AiStepTrack(void *obj, void *out, void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

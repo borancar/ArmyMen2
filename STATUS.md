@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `379ac29`. Working tree clean.
+Last updated: **2026-08-31**, at `9741124`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,236 patches.**
+Nothing uncommitted. **1,237 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2527,16 +2527,40 @@ commit -- gave the right answer every time it was used.
   stepper, not merely a vehicle on the map. **Find the DISPATCHER's caller
   before writing up any one arm as unexercised.**
 
+- **`AiStepTrack`** (`0x00407560`) is the arm modes 1, 4 and 5 SHARE -- 5 is
+  `evade`, and 1 and 4 have no keyword in the shipped scripts. The name is
+  ours, from the body, because naming it after one of three modes would be
+  naming it from a call site.
+
+  **It is `AiStepDefend` with ten instructions on the other side of a block,
+  and that is measured rather than eyeballed.** Disassembling both with branch
+  targets normalised gives sixty-nine instructions each, the same instructions
+  in the same order, except that the turn test sits BEFORE the second
+  promotion in `AiStepDefend` and AFTER it here; the rest of the diff is
+  eax/edx swapped by the register allocator.
+
+  That position is the whole behavioural difference, because the still-moving
+  path jumps to the second promotion in both -- landing there puts the turn
+  test behind you in one and ahead of you in the other. A defending unit turns
+  toward what it sees only once it has ARRIVED; one on this arm turns while it
+  is still walking. Anyone watching the game would see it, and a transcription
+  that noticed the two were "the same" and factored the shared tail into a
+  helper would flatten it in silence.
+
+  Cold like its siblings, for the reason the last commit established: the
+  dispatcher's only caller is the type-3 stepper. All three arms read 0 on the
+  same driven mission.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,082 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,236
+line (0x0045C000) patched**. Measured: **1,083 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,237
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-two batches have gone in and the 157 entries outstanding start at 48
+small ones in batches. Eighty-three batches have gone in and the 156 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

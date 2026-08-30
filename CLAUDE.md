@@ -660,6 +660,24 @@ branch of the stepper, not merely a vehicle on the map. Worth finding the
 DISPATCHER's caller before writing up any one arm as unexercised -- one xref
 answered it for all six.
 
+**DIFF THE DISASSEMBLY when two functions look like the same one twice --
+the resemblance is what makes the difference invisible.** `AiStepTrack` and
+`AiStepDefend` are 224 and 208 bytes of what reads as one function written
+out twice. Normalising branch targets to displacements gives SIXTY-NINE
+instructions each, the same instructions in the same order, and one
+structural difference: a ten-instruction turn test sits BEFORE the second
+promotion in one and AFTER it in the other. Since the still-moving path jumps
+to that promotion in both, the block is behind you in one and ahead of you in
+the other -- so a defending unit turns toward what it sees only once it has
+arrived and the other turns while still walking. That is visible in the game
+and invisible in a summary.
+
+The failure this guards is specific and tempting: noticing two functions are
+"the same", factoring the shared tail into a helper both call, and flattening
+a real difference in silence. Thirty seconds of `difflib` over normalised
+disassembly settles it, and the instruction counts matching exactly is the
+tell that nothing else moved.
+
 **A new PREFIX is invisible to the offset ratchet, and I proved it on myself
 one commit after quoting the rule.** Reading the AI context I named
 `AICTX_OFF_OBJ_10`, `_RANGE` and `_BEARING` at 0x10, 0x14 and 0x18 -- which
@@ -2727,7 +2745,7 @@ exact oracle**, however meaningful it is when it is set.
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
-  `AiStepDefend`, and `RefreshScreen` —
+  `AiStepDefend`, `AiStepTrack`, and `RefreshScreen` —
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and

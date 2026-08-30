@@ -1278,6 +1278,70 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
     ConsiderSighting(obj, out, ctx);
 }
 
+/* AiStepTrack -- original 0x00407560, one caller. The arm modes 1, 4 and 5
+ * SHARE, mode 5 being `evade`; 1 and 4 have no keyword in the shipped scripts
+ * and are set by code. The name is ours, from the body, because naming it
+ * after one of the three modes it serves would be naming it from a call site.
+ *
+ * IT IS AiStepDefend WITH TEN INSTRUCTIONS ON THE OTHER SIDE OF A BLOCK.
+ * Measured rather than eyeballed: disassembling both with branch targets
+ * normalised to displacements gives SIXTY-NINE instructions each, the same
+ * instructions in the same order, except that the turn test sits BEFORE the
+ * second promotion in AiStepDefend and AFTER it here. The rest of the diff is
+ * eax/edx swapped by the register allocator.
+ *
+ * That position is the whole behavioural difference, because the still-moving
+ * path jumps to the second promotion in both. Landing there puts the turn test
+ * behind you in one and ahead of you in the other:
+ *
+ *   AiStepDefend   turns toward what it sees only once it has ARRIVED
+ *   this one       turns while it is still walking
+ *
+ * Anyone watching the game would see it, and a transcription that noticed the
+ * two functions were "the same" and shared a tail between them would flatten
+ * it in silence. Which is the argument for diffing the disassembly rather
+ * than trusting the resemblance.
+ *
+ * Everything else is AiStepDefend's, including the promotion appearing twice
+ * with nothing between the two that can change what it reads. See that
+ * function for the rest.
+ */
+void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+    uint8_t *c = (uint8_t *)ctx;
+
+    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        orig_ai_common(obj, out, ctx, 0);
+    } else {
+        uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+        if (hit) {
+            if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
+                w[1] = hit;
+            *(o + OBJ_OFF_HIT_DIR) = 0;
+        }
+
+        AiPromoteFound(o, c);
+    }
+
+    AiPromoteFound(o, c);
+
+    if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
+        && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                      - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+           >= AM2_AI_TURN_DELAY_MS)
+        w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+
+    ConsiderSighting(obj, out, ctx);
+}
+
 /* ConsiderSighting -- original 0x004074A0, four callers.
  *
  * One observer against one object. Four gates -- both of the record's enable
@@ -1694,6 +1758,8 @@ int region_install(void)
                         "AiStepIgnore", 1);
     rc |= patch_replace(ADDR_AI_STEP_DEFEND, (const void *)AiStepDefend,
                         "AiStepDefend", 1);
+    rc |= patch_replace(ADDR_AI_STEP_TRACK, (const void *)AiStepTrack,
+                        "AiStepTrack", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);

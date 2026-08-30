@@ -2788,6 +2788,10 @@
 #define ADDR_AI_STEP_IGNORE    0x00407BF0u  /* void(obj, out, const void *) */
 /* 0x00407640, one caller -- the `defend` arm, mode 7. Reconstructed. */
 #define ADDR_AI_STEP_DEFEND    0x00407640u  /* void(obj, out, void *) */
+/* 0x00407560, one caller -- the arm modes 1, 4 and 5 share, 5 being `evade`.
+ * ADDR_AI_STEP_DEFEND with the turn test moved into the shared tail, so it
+ * turns while still walking. Reconstructed. */
+#define ADDR_AI_STEP_TRACK     0x00407560u  /* void(obj, out, void *) */
 #define SIGHTOUT_OFF_HIT       0x04u
 #define SIGHTOUT_OFF_X         0x18u  /* int16 */
 #define SIGHTOUT_OFF_Y         0x1Au  /* int16 */
