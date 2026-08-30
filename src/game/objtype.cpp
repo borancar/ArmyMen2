@@ -422,7 +422,7 @@ int32_t __cdecl FindRecordList(uint32_t owner)
  * ADDR_RECORD_LISTS, so this is MakeRecordList's counterpart.
  *
  * Free the header's records array, free a SECOND pointer at
- * LISTHDR_OFF_EXTRA, then free the header. Each is tested first, so a header
+ * LISTHDR_OFF_HIT_MASK, then free the header. Each is tested first, so a header
  * with either pointer null is fine.
  *
  * THAT SECOND POINTER IS NOT MakeRecordList'S. The maker zeroes the 0x30 bytes
@@ -450,7 +450,7 @@ void __cdecl FreeRecordList(void *list)
     if (!list)
         return;
 
-    p = *(void *const *)(h + LISTHDR_OFF_EXTRA);
+    p = *(void *const *)(h + LISTHDR_OFF_HIT_MASK);
     if (p)
         am2_free(p);
 

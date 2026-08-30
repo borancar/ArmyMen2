@@ -7975,12 +7975,38 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_LISTHDR_BYTES        0x30u
 #define AM2_LIST_RECORD_BYTES    0x0Cu
 #define LISTHDR_OFF_INDEX        0x04u   /* its slot in ADDR_RECORD_LISTS */
-/* A second pointer in the header, at +0x1C. ADDR_MAKE_RECORD_LIST does not
- * write it -- it zeroes the 0x30 bytes and fills only +0, +8 and +0x0C -- and
- * ADDR_FREE_RECORD_LIST is the only thing here that reads it. So something
- * else fills it in between, and what it points at is not established; the name
- * says only that the free releases it. */
-#define LISTHDR_OFF_EXTRA        0x1Cu
+/* A second pointer in the header, at +0x1C. It went in as LISTHDR_OFF_EXTRA,
+ * with "what it points at is not established", because the only reader in
+ * sight was the free -- which tells you a thing is owned and nothing about
+ * what it is.
+ *
+ * ITS SECOND READER SETTLES IT. 0x0043A6D0 tests it to choose between two
+ * markers over the same header: set goes to 0x004385A0, which walks a
+ * bitmask, and clear goes to ListBoxAction, which has only the box. That is
+ * the same test OBJ_OFF_HIT_MASK gets one structure over, choosing between
+ * 0x004389D0 and ObjBoxAction -- so this field plays the same part and gets
+ * the same name. Renamed, not aliased.
+ *
+ * A field named from one of two readers is a field named from a call site. */
+#define LISTHDR_OFF_HIT_MASK     0x1Cu
+/* The four edges of the header's own box, in world units, added to the point
+ * the caller supplies. The same fallback shape OBJ_OFF_BOX_LEFT and the three
+ * after it give an object, and read by the same one function. They are inside
+ * the 0x30 header that ADDR_MAKE_RECORD_LIST "zeroes and leaves unexplained";
+ * four of those nine dwords are explained now. */
+#define LISTHDR_OFF_BOX_LEFT     0x20u
+#define LISTHDR_OFF_BOX_TOP      0x24u
+#define LISTHDR_OFF_BOX_RIGHT    0x28u
+#define LISTHDR_OFF_BOX_BOTTOM   0x2Cu
+/* The first field of a twelve-byte list record is a SPRITE, which is the only
+ * thing anything has yet read out of one: ListBoxAction takes the FIRST
+ * record's and asks whether it has a software image, exactly as ObjBoxAction
+ * takes the first ROW's. Neither loops. */
+#define LISTREC_OFF_SPRITE       0x00u
+/* 0x00438F10, one caller. ObjBoxAction for a record-list header instead of an
+ * object: the same three exits, the same 0x1C flag test, the same box offset
+ * by a point -- except the point is an ARGUMENT here rather than a field. */
+#define ADDR_LIST_BOX_ACTION     0x00438F10u /* int32_t(uint32 at, hdr, mask) */
 /* 0x00434C40, one caller, and that caller walks every entry of
  * ADDR_RECORD_LISTS -- so this is ADDR_MAKE_RECORD_LIST's counterpart. Free
  * the header's two pointers and then the header. Reconstructed. */

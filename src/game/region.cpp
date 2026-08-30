@@ -853,6 +853,54 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out)
                      out);
 }
 
+/* ListBoxAction -- original 0x00438F10, one caller.
+ *
+ * ObjBoxAction for a RECORD-LIST HEADER instead of an object, and the same
+ * function line for line apart from where the two halves come from: the sprite
+ * is the first LIST RECORD's rather than the first ROW's, the box is the
+ * header's four edges rather than the object's, and the point they are offset
+ * by is an ARGUMENT here rather than a field.
+ *
+ * So the three exits mean what they mean there. No sprite and no image both
+ * answer 0; a sprite whose flags say "not a software blit" answers 1, meaning
+ * nothing to do; and the real answer, when there is one, is BoxAction's.
+ *
+ * ITS CALLER IS WHAT NAMED LISTHDR_OFF_HIT_MASK. 0x0043A6D0 tests that field
+ * and goes to the bitmask walker at 0x004385A0 when it is set and here when it
+ * is not -- the same choice OBJ_OFF_HIT_MASK drives one structure over. The
+ * field had been LISTHDR_OFF_EXTRA, named from the only reader anyone had
+ * found, which was the free; a field named from one of its two readers is a
+ * field named from a call site.
+ *
+ * Not exercised, for the same reason BoxAction is not -- see the note there.
+ */
+int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
+{
+    const uint8_t *h = (const uint8_t *)list;
+    const uint8_t *spr;
+    int32_t        x;
+    int32_t        y;
+
+    spr = *(const uint8_t *const *)
+              (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
+               + LISTREC_OFF_SPRITE);
+    if (!spr)
+        return 0;
+    if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
+        return 0;
+    if (!(*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS))
+        return 1;
+
+    x = (int32_t)(int16_t)(at & 0xFFFFu);
+    y = (int32_t)(int16_t)(at >> 16);
+
+    return BoxAction(*(const int32_t *)(h + LISTHDR_OFF_BOX_LEFT)   + x,
+                     *(const int32_t *)(h + LISTHDR_OFF_BOX_TOP)    + y,
+                     *(const int32_t *)(h + LISTHDR_OFF_BOX_RIGHT)  + x,
+                     *(const int32_t *)(h + LISTHDR_OFF_BOX_BOTTOM) + y,
+                     out);
+}
+
 /* RebuildTileCover -- original 0x0042BE10, one caller.
  *
  * Clear the whole cover grid and rebuild it from the cell weights: every
@@ -1417,6 +1465,8 @@ int region_install(void)
                         "ObjBoxAction", 2);
     rc |= patch_replace(ADDR_BOX_ACTION, (const void *)BoxAction,
                         "BoxAction", 5);
+    rc |= patch_replace(ADDR_LIST_BOX_ACTION, (const void *)ListBoxAction,
+                        "ListBoxAction", 3);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
                         "TileCoverAdd", 3);
     rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,

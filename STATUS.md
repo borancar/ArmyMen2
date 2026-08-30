@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,195 patches.**
+Nothing uncommitted. **1,196 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1375,16 +1375,38 @@ commit -- gave the right answer every time it was used.
   one is verified by READING, and the clean A/B says only that nothing
   regressed.
 
+- **`ListBoxAction`** (`0x00438F10`) is `ObjBoxAction` for a RECORD-LIST
+  HEADER instead of an object, line for line, and it had been the last
+  sub-128-byte entry outstanding -- held up not by the reading but by not
+  knowing what the record was. Its one caller answers that: it walks the AAI
+  records, takes each one's `AAIREC_OFF_LIST_SLOT` into `ADDR_RECORD_LISTS`,
+  and hands the header here.
+
+  **That caller also named a field `orig.h` had given up on.** `+0x1C` went in
+  as `LISTHDR_OFF_EXTRA` with "what it points at is not established", because
+  the only reader anyone had found was the free -- which tells you a thing is
+  owned and nothing about what it is. The caller tests it to choose between
+  the bitmask walker at `0x004385A0` and this function, which has only the
+  box: exactly the choice `OBJ_OFF_HIT_MASK` drives one structure over. It is
+  `LISTHDR_OFF_HIT_MASK` now. **A field named from one of its two readers is a
+  field named from a call site.**
+
+  Four more of the header's nine "zeroed and unexplained" dwords are its own
+  bounding box, `LISTHDR_OFF_BOX_LEFT` and the three after it -- the same
+  fallback shape an object gets, read by the same one function.
+
+  Not exercised for the same reason `BoxAction` is not, and stated there.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,042 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,195
+line (0x0045C000) patched**. Measured: **1,043 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,196
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-six batches have gone in and the 197 entries outstanding start at 48
+small ones in batches. Forty-seven batches have gone in and the 196 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

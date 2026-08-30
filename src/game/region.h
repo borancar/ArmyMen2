@@ -87,6 +87,11 @@ int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
  * same record, and was declared `int32_t arg` here until BoxAction was read. */
 int32_t __cdecl ObjBoxAction(void *obj, void *out);
 
+/* 0x00438F10, one caller. The same function for a record-list HEADER: the
+ * first list record's sprite, the header's own box, and the point as an
+ * argument rather than a field. */
+int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out);
+
 /* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell
  * weights. */
 void __cdecl RebuildTileCover(void);
