@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,184 patches.**
+Nothing uncommitted. **1,185 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1137,16 +1137,40 @@ timing failure mode too, and that its own output distinguishes the two.
   entry outstanding, and it is outstanding for want of a NAME rather than for
   want of reading.
 
+- **`ConsiderSightingC`** (`0x00404F40`) completes the family, and its
+  maximum-range field carries a MAGIC VALUE that cuts both ways. When the
+  maximum is exactly `0x1000`, a bearing outside the cone is FORGIVEN and the
+  reveal is SUPPRESSED -- one constant doing two opposite-seeming jobs: it
+  sees in every direction and tells nobody, which is what a passive sensor
+  looks like. Writing the two tests as separate ideas would hide that they are
+  the same number.
+
+  It has a second tail the other two lack, and that tail runs on EVERY path
+  including the ones that never looked at the geometry -- a record of kind 3
+  whose range is in bounds bumps the out record's state from 2 to 3, and the
+  range is re-tested there rather than reusing the earlier answer, so the bump
+  can happen on a call whose cone test refused.
+
+  Its last tail writes the SEEN OBJECT and not just the out record:
+  `OBJ_OFF_FIELD_578` goes to 1 on any recorded hit. That makes it the only
+  one of the three reaching back into the object it was asked about for a
+  reason other than the reveal.
+
+  A third record layout, and the offsets NEARLY line up with the first without
+  doing so: observer, range and bearing shift by exactly four, while the
+  enables and the maximum do not. So the three are related and distinct rather
+  than one record with a longer header.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,031 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,184
+line (0x0045C000) patched**. Measured: **1,032 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,185
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-five batches have gone in and the 208 entries outstanding start at 48
+small ones in batches. Thirty-six batches have gone in and the 207 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

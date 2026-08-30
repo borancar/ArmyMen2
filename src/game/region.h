@@ -95,4 +95,8 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight);
  * layout, with a wider cone and a tail that commits the hit. */
 void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight);
 
+/* 0x00404F40, four callers. The third sighting variant: a magic maximum range
+ * that widens the cone and suppresses the reveal at once. */
+void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight);
+
 #endif /* AM2_REGION_H */

@@ -2687,6 +2687,38 @@
 #define SIGHTBOUT_OFF_STATE      0x14u  /* written 4 when a hit is committed */
 #define SIGHTBOUT_OFF_UID        0x1Cu
 #define AM2_SIGHTB_STATE_HIT     4
+/* 0x00404F40, four callers -- the THIRD member of the family and the richest.
+ * Same skeleton as the other two: enables, a range below a maximum, a bearing
+ * cone, the output record, ObjIsOurs, the two-second reveal.
+ *
+ * ITS MAXIMUM RANGE HAS A MAGIC VALUE AND IT CUTS BOTH WAYS. When the record's
+ * maximum is exactly 0x1000, a bearing OUTSIDE the cone is forgiven -- and the
+ * reveal is SUPPRESSED. So that value means "sees in every direction but tells
+ * nobody", which is what a passive sensor looks like, and it is one constant
+ * doing two opposite-seeming jobs.
+ *
+ * A THIRD RECORD LAYOUT, and the offsets nearly line up with the first
+ * without doing so: observer, range and bearing sit at +0x14, +0x18, +0x1C
+ * against ConsiderSighting's +0x10, +0x14, +0x18 -- a clean shift of four --
+ * while the enables move +0x10 and +0x14 and the maximum +0x14. So it is not
+ * one record with a longer header; the three are related and distinct. */
+#define ADDR_CONSIDER_SIGHTING_C 0x00404F40u /* void(seen, out, const void *) */
+#define SIGHTC_OFF_OBSERVER      0x14u
+#define SIGHTC_OFF_RANGE         0x18u
+#define SIGHTC_OFF_BEARING       0x1Cu  /* uint8_t */
+#define SIGHTC_OFF_ENABLED_40    0x40u
+#define SIGHTC_OFF_KIND          0x44u  /* 3 enables the state bump */
+#define SIGHTC_OFF_MAX_RANGE     0x50u
+#define SIGHTC_OFF_ENABLED_54    0x54u
+#define AM2_SIGHT_OMNI_RANGE     0x1000
+#define SIGHTCOUT_OFF_BEARING    0x04u  /* uint8_t, compared not written */
+#define SIGHTCOUT_OFF_STATE      0x08u  /* 2 becomes 3 */
+#define SIGHTCOUT_OFF_HIT        0x0Cu
+#define SIGHTCOUT_OFF_SEEN       0x10u
+#define SIGHTCOUT_OFF_X          0x14u
+#define SIGHTCOUT_OFF_Y          0x16u
+#define SIGHTCOUT_OFF_YADJ       0x18u
+#define SIGHTCOUT_OFF_UID        0x1Cu
 
 /* Non-zero means fog is ON -- objects get concealed. It was ADDR_AI_CONTROLLED,
  * a name taken from a call site; the cheat strings that drive it are about

@@ -1055,6 +1055,96 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
     }
 }
 
+/* ConsiderSightingC -- original 0x00404F40, four callers, and the third member
+ * of this family. Same skeleton as the other two; three things are new.
+ *
+ * THE MAXIMUM RANGE HAS A MAGIC VALUE AND IT CUTS BOTH WAYS. When the record's
+ * maximum is exactly 0x1000, a bearing outside the cone is FORGIVEN and the
+ * reveal is SUPPRESSED. One constant, two opposite-seeming jobs: it sees in
+ * every direction and tells nobody. Writing the two tests as separate ideas
+ * would hide that they are the same number.
+ *
+ * IT HAS A SECOND TAIL THE OTHERS HAVE NOT, and that tail runs on EVERY path,
+ * including the ones that never looked at the geometry: a record of kind 3
+ * whose range is in bounds bumps the out record's state from 2 to 3. The range
+ * is re-tested there rather than reusing the earlier answer, so the bump can
+ * happen on a call whose cone test refused.
+ *
+ * ITS LAST TAIL WRITES THE SEEN OBJECT, not just the out record.
+ * `OBJ_OFF_FIELD_578` is set to 1 on any recorded hit -- the field
+ * SetSoldierKind clears for every kind -- which makes this the only one of the
+ * three that reaches back into the object it was asked about for a reason
+ * other than the reveal.
+ *
+ * A THIRD RECORD LAYOUT that nearly lines up with the first: observer, range
+ * and bearing shift by exactly four, but the enables and the maximum do not.
+ * So the three are related and distinct rather than one record with a longer
+ * header, and the offsets are named per family.
+ *
+ * As in ConsiderSightingB the bearing compared is the OUT record's -- but
+ * unlike B this one never writes it back, so the accumulation is somebody
+ * else's job here.
+ */
+void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
+{
+    uint8_t       *s = (uint8_t *)seen;
+    uint8_t       *o = (uint8_t *)out;
+    const uint8_t *c = (const uint8_t *)sight;
+    int32_t        maxRange = *(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE);
+
+    if (*(const int32_t *)(c + SIGHTC_OFF_ENABLED_40)
+        && *(const int32_t *)(c + SIGHTC_OFF_ENABLED_54)) {
+        int32_t range = *(const int32_t *)(c + SIGHTC_OFF_RANGE);
+
+        if (range > 0 && range < maxRange) {
+            int32_t delta =
+                AngleDelta(*(const uint8_t *)(o + SIGHTCOUT_OFF_BEARING),
+                           *(const uint8_t *)(c + SIGHTC_OFF_BEARING));
+
+            if (delta < 0)
+                delta = -delta;
+
+            if ((uint8_t)delta < AM2_SIGHT_CONE_B
+                || maxRange == AM2_SIGHT_OMNI_RANGE) {
+                const uint8_t *observer =
+                    *(const uint8_t *const *)(c + SIGHTC_OFF_OBSERVER);
+
+                *(int32_t *)(o + SIGHTCOUT_OFF_HIT) = 1;
+
+                if (observer) {
+                    *(int16_t *)(o + SIGHTCOUT_OFF_X) =
+                        *(const int16_t *)(observer + OBJ_OFF_X);
+                    *(int16_t *)(o + SIGHTCOUT_OFF_Y) =
+                        *(const int16_t *)(observer + OBJ_OFF_Y);
+                    *(int16_t *)(o + SIGHTCOUT_OFF_YADJ) =
+                        *(const int16_t *)(observer + OBJ_OFF_ROW0_Y_ADJUST);
+                    *(uint32_t *)(o + SIGHTCOUT_OFF_UID) =
+                        ((const AM2_Object *)observer)->uid;
+
+                    if (ObjIsOurs((void *)observer, 1)
+                        && maxRange != AM2_SIGHT_OMNI_RANGE) {
+                        RevealObj(s);
+                        *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
+                            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                            + AM2_REVEAL_MS;
+                    }
+                }
+            }
+        }
+    }
+
+    if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == 3
+        && *(const int32_t *)(c + SIGHTC_OFF_RANGE) > 0
+        && *(const int32_t *)(c + SIGHTC_OFF_RANGE) < maxRange
+        && *(const int32_t *)(o + SIGHTCOUT_OFF_STATE) == 2)
+        *(int32_t *)(o + SIGHTCOUT_OFF_STATE) = 3;
+
+    if (*(const int32_t *)(o + SIGHTCOUT_OFF_HIT)) {
+        *(int32_t *)(o + SIGHTCOUT_OFF_SEEN)  = 1;
+        *(int32_t *)(s + OBJ_OFF_FIELD_578)   = 1;
+    }
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -1073,6 +1163,9 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_CONSIDER_SIGHTING_C,
+                        (const void *)ConsiderSightingC,
+                        "ConsiderSightingC", 4);
     rc |= patch_replace(ADDR_CONSIDER_SIGHTING_B,
                         (const void *)ConsiderSightingB,
                         "ConsiderSightingB", 1);
