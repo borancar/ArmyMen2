@@ -205,6 +205,13 @@ int32_t __cdecl ObjIsWatchedKind(const void *obj);
  * friendly troops and one the AI is driving does not. See item.cpp. */
 int32_t __cdecl ObjCollidesWith(void *from, void *obj);
 
+/* 0x0043BBE0, one caller. What a shot does to what it hit: a thirty-arm jump
+ * table over the shot's TYPEREC_OFF_CODE scales its TYPEREC_OFF_DAMAGE, and
+ * then the shooter turns on the target if the two are not allied. Two of its
+ * five arguments are never read. See item.cpp. */
+void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
+                             int32_t unusedB, int32_t doubled);
+
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
  * and not even then for the unit the player is driving. */

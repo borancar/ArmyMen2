@@ -1724,6 +1724,104 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
     return total;
 }
 
+/* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
+ * because it is CRT code the offline test maps as data. */
+typedef int32_t (__cdecl *AM2_RandFn)(void);
+#define orig_rand ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* ADDR_SHOOTER_REACT stays original and is reached by address: what the
+ * shooter does once it has hit something it is not allied with. */
+typedef void (__cdecl *AM2_ShooterReactFn)(void *shooter, void *target);
+#define orig_shooter_react \
+    ((AM2_ShooterReactFn)(uintptr_t)ADDR_SHOOTER_REACT)
+
+/* ApplyShotDamage -- original 0x0043BBE0, one caller, 240 bytes. What a shot
+ * does to what it hit, and what the shooter does next.
+ *
+ * The amount starts as the shot's own TYPEREC_OFF_DAMAGE and a THIRTY-ARM
+ * JUMP TABLE over TYPEREC_OFF_CODE decides how to scale it. Thirty arms and
+ * four bodies -- the table at 0x0043BCB0 is a byte index into four targets at
+ * 0x0043BCA0 -- so most codes take the default and change nothing:
+ *
+ *   - code 3 REPLACES the amount with `rand() % (damage + 1) + 1` and is the
+ *     only code whose damage KIND is 1 rather than 2. Two things at once,
+ *     which is why it is worth naming rather than leaving as an index;
+ *   - codes 1, 7, 8, 9, 10 and 29 DOUBLE when the caller's fifth argument is
+ *     set;
+ *   - code 30 doubles on that and then doubles AGAIN if the target is a type
+ *     2, so it is four times against a trooper and once against anything
+ *     else;
+ *   - every other code takes the record's amount unchanged.
+ *
+ * TWO OF ITS FIVE ARGUMENTS ARE NEVER READ. The caller pushes five and cleans
+ * five; the body touches the first, the second and the fifth. Third instance
+ * of this shape in as many batches -- ObjBlockWeight has one unused
+ * parameter, BlockWeightDamaging has one, and this has two.
+ *
+ * The direction handed to DamageObject is the shot's own OBJ_OFF_FACING plus
+ * AM2_SHOT_DIR_BIAS -- a byte facing turned around, since 0x80 is half a
+ * turn: the hit comes FROM where the shot was going.
+ *
+ * AND THE SHOOTER TURNS ON THE TARGET, but only when the two are not allied:
+ * the shot's owner uid is resolved, and if that resolves to a type 2, 3 or 8
+ * its OBJ_OFF_FIELD_CC takes the target's uid and ShooterReact runs. So
+ * shooting something is also how a unit acquires it.
+ *
+ * OBJ_OFF_RANK IS A UID HERE, which is its THIRD reading. orig.h already
+ * records two -- a trooper's rank, and an item's flag byte read for its sign
+ * -- and says one name with several readings beats a second name on the
+ * offset. On a shot it is the uid of whoever fired it: DamageObject takes it
+ * as the attacker and LookupByUID resolves it four instructions later.
+ */
+void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
+                             int32_t unusedB, int32_t doubled)
+{
+    const uint8_t *sh  = (const uint8_t *)shot;
+    const uint8_t *rec = *(const uint8_t *const *)(sh + OBJ_OFF_FIELD_94);
+    int32_t amount = *(const int32_t *)(rec + TYPEREC_OFF_DAMAGE);
+    int32_t code   = *(const int32_t *)(rec + TYPEREC_OFF_CODE);
+    int32_t kind   = AM2_SHOT_DAMAGE_KIND;
+    uint8_t *owner;
+
+    (void)unusedA;
+    (void)unusedB;
+
+    switch (code) {
+    case AM2_SHOT_CODE_RANDOM:
+        amount = orig_rand() % (amount + 1) + 1;
+        kind   = AM2_SHOT_DAMAGE_KIND_RAND;
+        break;
+    case 1: case 7: case 8: case 9: case 10: case 29:
+        if (doubled)
+            amount += amount;
+        break;
+    case AM2_SHOT_CODE_ANTI_TROOP:
+        if (doubled)
+            amount += amount;
+        if (ObjIsType2((const AM2_Object *)target))
+            amount += amount;
+        break;
+    default:
+        break;
+    }
+
+    DamageObject(target, amount, kind,
+                 *(const uint32_t *)(sh + OBJ_OFF_RANK),
+                 (int32_t)(int8_t)(*(const uint8_t *)(sh + OBJ_OFF_FACING)
+                                   + AM2_SHOT_DIR_BIAS),
+                 0);
+
+    if (ObjsAreAllied((void *)sh, target, 0))
+        return;
+
+    owner = (uint8_t *)LookupByUID(*(const uint32_t *)(sh + OBJ_OFF_RANK));
+    if (!ObjIsTypeIn238((const AM2_Object *)owner))
+        return;
+
+    *(uint32_t *)(owner + OBJ_OFF_FIELD_CC) = ((const AM2_Object *)target)->uid;
+    orig_shooter_react(owner, target);
+}
+
 /* ObjCollidesWith -- original 0x0045B700, 224 bytes, two callers, both inside
  * 0x0045BC70. Does `from` run into `obj`?
  *
@@ -4424,11 +4522,6 @@ void __cdecl StepRowAnim(void *row)
     SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
 }
 
-/* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
- * because it is CRT code the offline test maps as data. */
-typedef int32_t (__cdecl *AM2_RandFn)(void);
-#define orig_rand ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
-
 /* 0x00449570, ten callers -- the only writer of OBJ_OFF_SOLDIER_KIND, and the
  * function that settles what that field is. The value it stores is the same
  * value it uses to index ADDR_SOLDIER_ANIMS, whose entry it hangs off the
@@ -6958,6 +7051,8 @@ void item_install(void)
                   "ObjIsWatchedKind", 8);
     patch_replace(ADDR_OBJ_COLLIDES_WITH, (const void *)ObjCollidesWith,
                   "ObjCollidesWith", 2);
+    patch_replace(ADDR_APPLY_SHOT_DAMAGE, (const void *)ApplyShotDamage,
+                  "ApplyShotDamage", 1);
     patch_replace(ADDR_BLOCK_WEIGHT_DAMAGING,
                   (const void *)BlockWeightDamaging,
                   "BlockWeightDamaging", 1);

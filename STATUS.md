@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,208 patches.**
+Nothing uncommitted. **1,209 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1626,16 +1626,49 @@ commit -- gave the right answer every time it was used.
   that drive**, so it cannot have changed a frame count. Ask whether the new
   code executes at all before comparing runs of it. Recorded in CLAUDE.md.
 
+- **`ApplyShotDamage`** (`0x0043BBE0`) is what a shot does to what it hit. The
+  amount starts as the shot's own `TYPEREC_OFF_DAMAGE` and a THIRTY-ARM JUMP
+  TABLE over `TYPEREC_OFF_CODE` decides how to scale it -- thirty arms and
+  four bodies, so most codes change nothing:
+
+  - code 3 REPLACES the amount with `rand() % (damage + 1) + 1` and is the
+    only code whose damage KIND is 1 rather than 2 -- two things at once,
+    which is why it is worth a name rather than an index;
+  - codes 1, 7, 8, 9, 10 and 29 double when the caller's fifth argument is
+    set;
+  - code 30 doubles on that and doubles AGAIN against a type 2, so it is four
+    times against a trooper and once against anything else.
+
+  **The shooter turns on the target**, but only when the two are not allied:
+  the shot's owner is resolved and, if it is a type 2, 3 or 8, its
+  `OBJ_OFF_FIELD_CC` takes the target's uid. So shooting something is also how
+  a unit acquires it.
+
+  **`OBJ_OFF_RANK` is a UID here, its THIRD reading** -- `orig.h` already
+  records a trooper's rank and an item's sign-read flag byte. On a shot it is
+  whoever fired it: `DamageObject` takes it as the attacker and `LookupByUID`
+  resolves it four instructions later. One name, three readings, per the
+  policy already on that offset.
+
+  **Two of its five arguments are never read**, the third instance of that
+  shape in as many batches.
+
+  **It RUNS: 4 calls on a driven Boot Camp mission**, checked before the A/B
+  rather than after, which is the lesson from last batch. That also settles
+  the two frame-gate failures this batch produced -- four calls cannot take
+  11,796 frames to 5,468, and `campaign` cannot reach the function at all.
+  Both came back clean on a re-run at load average 12.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,054 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,208
+line (0x0045C000) patched**. Measured: **1,055 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,209
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty-four batches have gone in and the 185 entries outstanding start at 48
+small ones in batches. Fifty-five batches have gone in and the 184 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

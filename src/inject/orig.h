@@ -9530,6 +9530,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* An 8-bit heading. Read for types 2, 3 and 8 and ADDED to a formation slot's
  * own facing before going to ADDR_COS8/ADDR_SIN8, which mask to 8 bits. */
 #define OBJ_OFF_FACING             0x40u   /* uint8_t */
+/* 0x0043BBE0, one caller. Apply a shot's damage to what it hit, and make the
+ * shooter turn on the target. Its OBJ_OFF_FIELD_94 record supplies both the
+ * damage and the code that decides how it is scaled. */
+#define ADDR_APPLY_SHOT_DAMAGE     0x0043BBE0u /* void(target,shot,a,b,dbl) */
+#define TYPEREC_OFF_CODE           0x00u  /* 1..30, the switch's subject */
+#define TYPEREC_OFF_DAMAGE         0x1Cu  /* int32_t, the base amount */
+#define AM2_SHOT_CODE_RANDOM       3      /* 1..damage+1, and kind 1 not 2 */
+#define AM2_SHOT_CODE_ANTI_TROOP   30     /* doubles again against a type 2 */
+#define AM2_SHOT_DAMAGE_KIND       2
+#define AM2_SHOT_DAMAGE_KIND_RAND  1
+#define AM2_SHOT_DIR_BIAS          0x80   /* added to OBJ_OFF_FACING */
+/* 0x00457DA0, one caller. What the shooter does once it has hit something it
+ * is not allied with; still original. */
+#define ADDR_SHOOTER_REACT         0x00457DA0u /* void(shooter, target) */
 #define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
 /* AND 0xA0 IS PROBABLY TYPE-DEPENDENT, which is a fact about the STRUCT
  * rather than about this name. Two readings, both from live code:
