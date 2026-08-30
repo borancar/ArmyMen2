@@ -1416,6 +1416,82 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
     ConsiderSighting(obj, out, ctx);
 }
 
+typedef void (__cdecl *AM2_AiBuildCtxFn)(void *obj, void *ctx);
+typedef void (__cdecl *AM2_AiBodyFn)(void *obj, void *out, void *ctx);
+
+#define orig_ai_build_ctx ((AM2_AiBuildCtxFn)(uintptr_t)ADDR_AI_BUILD_CONTEXT)
+#define orig_ai_attack_body ((AM2_AiBodyFn)(uintptr_t)ADDR_AI_ATTACK_BODY)
+
+/* AiStepAttack -- original 0x00407BD0, one caller. Mode 6, and it forwards its
+ * three arguments to ADDR_AI_ATTACK_BODY and does nothing else.
+ *
+ * It lived in gameproc.cpp among four one-line pass-throughs grouped by shape,
+ * as `Call407710`, with orig.h calling it "void(int32, int32, int32)" because
+ * nothing said otherwise. Reading the dispatcher said otherwise: it is the
+ * attack arm and its three arguments are the family's (obj, out, ctx). Moved
+ * here and retyped. The body it forwards to is shared with mode 0, which
+ * reaches it directly, so that address is named for neither mode.
+ */
+void __cdecl AiStepAttack(void *obj, void *out, void *ctx)
+{
+    orig_ai_attack_body(obj, out, ctx);
+}
+
+/* AiStep -- original 0x00407F80, two callers, both in ADDR_STEP_TYPE3. One
+ * frame of AI for one object: build the context, run the arm its mode selects,
+ * then record which region the object is standing in.
+ *
+ * THE TABLE IS THE FACT. Eight entries at ADDR_AI_JUMP_TABLE, six distinct
+ * arms, and the mapping is not the order the arms are laid out in:
+ *
+ *     0        ADDR_AI_ATTACK_BODY, called directly
+ *     1, 4, 5  AiStepTrack                            (5 is `evade`)
+ *     2        AiStepIgnore                           (`ignore`)
+ *     3        AiStepFollow                           (`follow`, from the body)
+ *     6        AiStepAttack -> the same body as 0     (`attack`)
+ *     7        AiStepDefend                           (`defend`)
+ *
+ * The keyword names come from tests/actions-reference.txt, which settled them
+ * from the shipped scripts before any of this was read.
+ *
+ * THE BOUND IS UNSIGNED. `cmp eax, 7; ja` sends anything above 7 -- and any
+ * NEGATIVE mode, which is the same thing to `ja` -- to the arm 1, 4 and 5
+ * already share. So that arm is the default as well as three modes, and a
+ * mode field left as garbage lands there rather than faulting.
+ *
+ * The context is 0x44 bytes of stack, built fresh every frame and never kept.
+ * Both callers pass `&obj[OBJ_OFF_FIELD_578]` as `out`, so what every arm
+ * writes as `out[1]` is a byte inside the object itself -- the heading it
+ * wants -- and not an output parameter in any useful sense.
+ *
+ * THE TAIL RUNS ONLY IF AN ARM DID. A null object returns before the context
+ * is built and skips the region write with it; that is the original's one
+ * guard and its only early exit.
+ */
+void __cdecl AiStep(void *obj, void *out)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t  ctx[AM2_AI_CONTEXT_BYTES];
+
+    if (!obj)
+        return;
+
+    orig_ai_build_ctx(obj, ctx);
+
+    switch (*(const uint32_t *)(o + OBJ_OFF_AI_MODE)) {
+    case 0:  orig_ai_attack_body(obj, out, ctx); break;
+    case 2:  AiStepIgnore(obj, out, ctx);        break;
+    case 3:  AiStepFollow(obj, out, ctx);        break;
+    case 6:  AiStepAttack(obj, out, ctx);        break;
+    case 7:  AiStepDefend(obj, out, ctx);        break;
+    default: AiStepTrack(obj, out, ctx);         break;
+    }
+
+    *(uint16_t *)(o + OBJ_OFF_REGION) =
+        (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
+            [*(const uint16_t *)(o + OBJ_OFF_TILE)];
+}
+
 /* ConsiderSighting -- original 0x004074A0, four callers.
  *
  * One observer against one object. Four gates -- both of the record's enable
@@ -1836,6 +1912,9 @@ int region_install(void)
                         "AiStepTrack", 1);
     rc |= patch_replace(ADDR_AI_STEP_FOLLOW, (const void *)AiStepFollow,
                         "AiStepFollow", 1);
+    rc |= patch_replace(ADDR_AI_STEP_ATTACK, (const void *)AiStepAttack,
+                        "AiStepAttack", 1);
+    rc |= patch_replace(ADDR_AI_STEP, (const void *)AiStep, "AiStep", 2);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);

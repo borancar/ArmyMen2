@@ -650,15 +650,19 @@ it takes the "or it is mine" arm and never reaches the comparison at all.
 Clicking row 1 as well puts the inverted guard 584 pixels out. Before
 believing a configuration covers a branch, ask which arm the input takes.
 
-**The whole AI mode family runs for VEHICLES ONLY, which explains six cold
-counters in one fact.** The dispatcher at `0x00407F80` has exactly one caller,
-`ADDR_STEP_TYPE3` -- the type-3 stepper -- so nothing that is not a vehicle
-ever reaches an arm. Boot Camp is not vehicle-free either: its scripts issue
-four `createvehicle` lines. So the arms are cold for a narrower reason than
-"no vehicles", and what a future drive needs is a vehicle actually taking that
-branch of the stepper, not merely a vehicle on the map. Worth finding the
-DISPATCHER's caller before writing up any one arm as unexercised -- one xref
-answered it for all six.
+**The whole AI mode family runs for VEHICLES ONLY, and reconstructing the
+DISPATCHER turned six explanations into one counter.** `0x00407F80` has exactly
+one caller, `ADDR_STEP_TYPE3`, so nothing that is not a vehicle reaches an arm;
+Boot Camp is not vehicle-free either -- four `createvehicle` lines -- so the
+arms were cold for a narrower reason than "no vehicles", and finding the
+dispatcher's caller answered for all six at once.
+
+Then the dispatcher itself was reconstructed and `AiStep` reads **0** on a
+driven Boot Camp mission. That is better than the xref argument in every way:
+it is a measurement rather than a chain of reasoning, it covers the arms
+whatever their modes, and it gives the family ONE number to check before
+anyone tries to exercise it again. **When a family of cold functions shares a
+dispatcher, reconstruct the dispatcher early -- its counter is the family's.**
 
 **DIFF THE DISASSEMBLY when two functions look like the same one twice --
 the resemblance is what makes the difference invisible.** `AiStepTrack` and
@@ -2745,7 +2749,8 @@ exact oracle**, however meaningful it is when it is set.
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
-  `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, and `RefreshScreen` —
+  `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`, and
+  `RefreshScreen` —
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and

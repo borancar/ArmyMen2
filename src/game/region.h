@@ -58,6 +58,15 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx);
  * gate replaced: walk when out of formation OR when the leader has moved. */
 void __cdecl AiStepFollow(void *obj, void *out, void *ctx);
 
+/* 0x00407BD0, one caller. The `attack` arm -- mode 6. Forwards its three
+ * arguments to ADDR_AI_ATTACK_BODY and does nothing else. */
+void __cdecl AiStepAttack(void *obj, void *out, void *ctx);
+
+/* 0x00407F80, two callers, both in the type-3 stepper. One frame of AI for one
+ * object: build the context, run the arm OBJ_OFF_AI_MODE selects through an
+ * eight-entry table, then record the object's region. */
+void __cdecl AiStep(void *obj, void *out);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

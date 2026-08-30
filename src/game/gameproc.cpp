@@ -1103,12 +1103,18 @@ void __cdecl Teardown40A4B0(void)
 
 /* ---- Six more, same size and same argument ----------------------------
  *
- * TWO MORE THREE-ARGUMENT PASS-THROUGHS, which makes four in this tree with
+ * ONE MORE THREE-ARGUMENT PASS-THROUGH, which makes three in this tree with
  * Call405220 above. Each forwards its three arguments to one large function
  * and adds nothing at all. The compiler did not produce these: a thunk that
  * only moves arguments is what a source-level wrapper compiles to, so the
- * original had four one-line functions and so does this. Worth knowing before
- * reading one as a place where something happens.
+ * original had these as one-line functions and so does this. Worth knowing
+ * before reading one as a place where something happens.
+ *
+ * THERE WERE FOUR AND ONE HAS LEFT. Call407710 was in this group until the AI
+ * mode dispatcher was read: it is the `attack` arm, mode 6, and it now sits in
+ * region.cpp with the other five as AiStepAttack. A function grouped by SHAPE
+ * moves out the moment its subsystem is identified -- the shape was never the
+ * reason it belonged anywhere.
  */
 typedef void (__cdecl *AM2_Call3Fn2)(int32_t a, int32_t b, int32_t c);
 typedef void (__cdecl *AM2_VoidFn)(void);
@@ -1116,7 +1122,6 @@ typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
                                        void *fn);
 
 #define orig_big_4057d0   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_4057D0)
-#define orig_big_407710   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_407710)
 #define orig_def_460290   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_460290)
 #define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
 
@@ -1125,10 +1130,6 @@ void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
     orig_big_4057d0(a, b, c);
 }
 
-void __cdecl Call407710(int32_t a, int32_t b, int32_t c)
-{
-    orig_big_407710(a, b, c);
-}
 
 /* 0x0041A230. Four calls and a tail jump, all five into the def tables:
  * DefSortTrooperRecs, one unnamed, DefSortObjRecs, DefCheckLinks and one
@@ -1259,7 +1260,6 @@ void gameproc_install(void)
     patch_replace(ADDR_ZERO_50C34C, (const void *)ZeroUnread50C34C,
                   "ZeroUnread50C34C", 1);
     patch_replace(ADDR_CALL_4057D0, (const void *)Call4057D0, "Call4057D0", 1);
-    patch_replace(ADDR_CALL_407710, (const void *)Call407710, "Call407710", 1);
     patch_replace(ADDR_DEF_FINISH, (const void *)DefFinish, "DefFinish", 1);
     patch_replace(ADDR_WALK_CELL_WRAPPER, (const void *)WalkCellWrapper,
                   "WalkCellWrapper", 2);

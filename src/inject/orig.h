@@ -2786,6 +2786,11 @@
 #define ADDR_AI_STEP           0x00407F80u  /* void(obj, out, int32) */
 #define ADDR_AI_JUMP_TABLE     0x0040803Cu
 #define ADDR_AI_BUILD_CONTEXT  0x00407D70u  /* void(obj, ctx *) */
+#define AM2_AI_CONTEXT_BYTES   0x44u
+/* The region the object is standing in, written by AiStep every frame from
+ * ADDR_REGION_OF_CELL indexed by OBJ_OFF_TILE. A byte zero-extended into a
+ * word, which is why it is a uint16_t. */
+#define OBJ_OFF_REGION         0xDCu  /* uint16_t */
 /* The step every arm but this one shares, nine call sites. Unnamed: nothing
  * in it says what it is and this file will not guess from a call site. */
 #define ADDR_AI_407190         0x00407190u  /* void(obj, out, ctx, int32) */
@@ -6105,8 +6110,14 @@ typedef struct {
  * to. Worth knowing before reading one as a place where something happens. */
 #define ADDR_CALL_4057D0         0x00405D10u  /* void(int32, int32, int32) */
 #define ADDR_BIG_4057D0          0x004057D0u
-#define ADDR_CALL_407710         0x00407BD0u  /* void(int32, int32, int32) */
-#define ADDR_BIG_407710          0x00407710u
+/* Not a nameless pass-through any more: 0x00407BD0 is the AI mode
+ * dispatcher's `attack` arm, mode 6, and all it does is forward its three
+ * arguments to 0x00407710. That body is shared with mode 0, which reaches it
+ * directly, so it is named for neither. Reconstructed in region.cpp beside the
+ * other five arms. */
+#define ADDR_AI_STEP_ATTACK      0x00407BD0u  /* void(obj, out, void *ctx) */
+#define ADDR_AI_ATTACK_BODY      0x00407710u  /* mode 6 through the above, and
+                                               * mode 0 directly */
 /* Four calls and a tail jump, all five to the def tables: sort the trooper
  * records, two unnamed, then DefCheckLinks, then one more. The order is the
  * fact. */

@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d285114`. Working tree clean.
+Last updated: **2026-08-31**, at `80823c2`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,238 patches.**
+Nothing uncommitted. **1,239 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2584,16 +2584,51 @@ commit -- gave the right answer every time it was used.
   have changed a frame count whatever the numbers said. `bootcamp` at its
   floor of 22, and mission's log and 16-node tree identical.
 
+- **`AiStep`** (`0x00407F80`) and **`AiStepAttack`** (`0x00407BD0`) finish the
+  family. The dispatcher builds a 0x44-byte context, runs the arm
+  `OBJ_OFF_AI_MODE` selects through the eight-entry table, and records which
+  region the object is standing in.
+
+  **The bound is UNSIGNED.** `cmp eax, 7; ja` sends anything above 7 -- and any
+  NEGATIVE mode, which is the same thing to `ja` -- to the arm 1, 4 and 5
+  already share. So that arm is the default as well as three modes, and a mode
+  field left as garbage lands there rather than faulting.
+
+  **Both callers pass `&obj[OBJ_OFF_FIELD_578]` as `out`**, so what every arm
+  writes as `out[1]` is a byte inside the object itself -- the heading it wants
+  -- and not an output parameter in any useful sense. That is worth knowing
+  before reading any of the six.
+
+  `OBJ_OFF_REGION` (0xDC) is named from the tail: a byte out of
+  `ADDR_REGION_OF_CELL` indexed by `OBJ_OFF_TILE`, zero-extended into a word.
+
+- **`Call407710` was the `attack` arm all along.** It sat in `gameproc.cpp`
+  among four one-line pass-throughs grouped by SHAPE, typed
+  `void(int32, int32, int32)` because nothing said otherwise. Reading the
+  dispatcher said otherwise: mode 6, three arguments that are the family's
+  `(obj, out, ctx)`. Moved to `region.cpp` as `AiStepAttack` and retyped. **A
+  function grouped by shape moves out the moment its subsystem is identified
+  -- the shape was never the reason it belonged anywhere.** The body it
+  forwards to is shared with mode 0, which reaches it directly, so that address
+  is named for neither mode.
+
+- **Six explanations became one counter.** `AiStep` reads 0 on a driven Boot
+  Camp mission, which is better than the xref argument in every way: a
+  measurement rather than a chain of reasoning, covering the arms whatever
+  their modes, and one number for anyone who tries to exercise the family
+  again. When a family of cold functions shares a dispatcher, reconstruct the
+  dispatcher early.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,084 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,238
+line (0x0045C000) patched**. Measured: **1,085 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,239
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-four batches have gone in and the 155 entries outstanding start at 48
+small ones in batches. Eighty-five batches have gone in and the 154 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
