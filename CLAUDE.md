@@ -650,6 +650,31 @@ it takes the "or it is mine" arm and never reaches the comparison at all.
 Clicking row 1 as well puts the inverted guard 584 pixels out. Before
 believing a configuration covers a branch, ask which arm the input takes.
 
+**The whole AI mode family runs for VEHICLES ONLY, which explains six cold
+counters in one fact.** The dispatcher at `0x00407F80` has exactly one caller,
+`ADDR_STEP_TYPE3` -- the type-3 stepper -- so nothing that is not a vehicle
+ever reaches an arm. Boot Camp is not vehicle-free either: its scripts issue
+four `createvehicle` lines. So the arms are cold for a narrower reason than
+"no vehicles", and what a future drive needs is a vehicle actually taking that
+branch of the stepper, not merely a vehicle on the map. Worth finding the
+DISPATCHER's caller before writing up any one arm as unexercised -- one xref
+answered it for all six.
+
+**A new PREFIX is invisible to the offset ratchet, and I proved it on myself
+one commit after quoting the rule.** Reading the AI context I named
+`AICTX_OFF_OBJ_10`, `_RANGE` and `_BEARING` at 0x10, 0x14 and 0x18 -- which
+are `SIGHT_OFF_OBSERVER`, `SIGHT_OFF_RANGE` and `SIGHT_OFF_BEARING`, already
+in the file at those offsets. `checkoffsets` passed, because its family-alias
+rule compares WITHIN a prefix and a brand-new prefix has nothing to compare
+against. This is the same hole CLAUDE.md already describes for the ROW_/OBJ_
+pair; the difference is that there the two prefixes were both old.
+
+What caught it was the next function, one commit later: `AiStepDefend` hands
+the record straight to `ConsiderSighting` as its `sight` argument, so it is
+one structure and the coincidence of offsets was not a coincidence. **Before
+opening a new offset family, grep the offsets it would contain, not the names
+-- the ratchet cannot.**
+
 **The AI MODES are an eight-arm jump table, and the numbers the scripts write
 land on it.** `0x00407F80` builds a context and dispatches on
 `OBJ_OFF_AI_MODE` through `0x0040803C`: index 0 goes straight to `0x00407710`,
@@ -2701,8 +2726,8 @@ exact oracle**, however meaningful it is when it is set.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
-  `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`, and
-  `RefreshScreen` —
+  `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
+  `AiStepDefend`, and `RefreshScreen` —
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and

@@ -946,7 +946,7 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
  *     "Sarge" travels as a subtype rather than as a flag;
  *   - a VEHICLE puts its kind in the SUBTYPE and a wire uid in _D;
  *   - a WEAPON puts its type record's first word in the SUBTYPE and
- *     OBJ_OFF_FIELD_CC in _D.
+ *     OBJ_OFF_TARGET_UID in _D.
  *
  * So SUBTYPE means four different things and _D means three, which is why
  * neither is named for a meaning.
@@ -1019,7 +1019,7 @@ void __cdecl SendItemCreate(void *obj)
         *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
             **(const uint16_t *const *)(o + OBJ_OFF_FIELD_C0);
         *(uint32_t *)(msg + MSG_CREATE_OFF_D) =
-            *(const uint32_t *)(o + OBJ_OFF_FIELD_CC);
+            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
         break;
 
     default:

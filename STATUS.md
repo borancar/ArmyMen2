@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `cb678fb`. Working tree clean.
+Last updated: **2026-08-31**, at `379ac29`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,235 patches.**
+Nothing uncommitted. **1,236 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2489,16 +2489,54 @@ commit -- gave the right answer every time it was used.
   a script reach this" and not "can anything reach this"; the two extra
   counters are what closed that gap.
 
+- **`AiStepDefend`** (`0x00407640`) is the `defend` arm, mode 7 --
+  `AiStepIgnore`'s shape with the two things that make it defending. It
+  PROMOTES whatever the search found into the slot `ConsiderSighting` reads,
+  recording that object's uid on the unit, and it calls `ConsiderSighting` on
+  every path including the one where it did not arrive. So a defending unit
+  keeps looking while it moves; an ignoring one does not.
+
+  The turn is gated on the OBSERVER rather than on the found object, and the
+  promotion may have just installed one -- so a unit that finds something this
+  frame can turn to it this frame. The promotion is inlined at BOTH sites in
+  the original and both run on the arrived path; it is idempotent, and kept as
+  two calls because "the original does it twice" is a fact about the original.
+
+- **The AI context and the sighting record are ONE STRUCTURE, and last
+  commit's names made three fields into six.** `AICTX_OFF_OBJ_10`, `_RANGE`
+  and `_BEARING` were `SIGHT_OFF_OBSERVER`, `SIGHT_OFF_RANGE` and
+  `SIGHT_OFF_BEARING` under new names. `checkoffsets` passed because its
+  family-alias rule compares within a prefix and a brand-new prefix has
+  nothing to compare against -- the same hole CLAUDE.md describes for the
+  ROW_/OBJ_ pair, except that there both prefixes were old. What caught it was
+  this function passing the record straight to `ConsiderSighting` as its
+  `sight`. Retired; the genuinely new fields keep the `SIGHT_OFF_` prefix.
+
+- **`OBJ_OFF_FIELD_CC` is `OBJ_OFF_TARGET_UID`**, from a writer/reader pair
+  rather than one side: the context builder resolves it with `LookupUid` into
+  the record's +0x10, and this writes the found object's uid into it in the
+  same breath as promoting that object into +0x10. It sits beside
+  `OBJ_OFF_FOLLOW_UID` and the two read coherently.
+
+- **Six cold counters explained by one xref.** The dispatcher at `0x00407F80`
+  has exactly ONE caller, `ADDR_STEP_TYPE3` -- the type-3 stepper -- so
+  nothing that is not a vehicle ever reaches an arm, and that is why
+  `AiStepIgnore`, `AiStepDefend` and `ConsiderSighting` all read 0. Boot Camp
+  is not vehicle-free either: its scripts issue four `createvehicle` lines. So
+  what a future drive needs is a vehicle actually taking that branch of the
+  stepper, not merely a vehicle on the map. **Find the DISPATCHER's caller
+  before writing up any one arm as unexercised.**
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,081 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,235
+line (0x0045C000) patched**. Measured: **1,082 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,236
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-one batches have gone in and the 158 entries outstanding start at 48
+small ones in batches. Eighty-two batches have gone in and the 157 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

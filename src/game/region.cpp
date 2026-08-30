@@ -1156,7 +1156,7 @@ typedef void (__cdecl *AM2_AiCommonFn)(void *obj, void *out, const void *ctx,
  * it are a hit it has not yet reacted to and, after a delay, the bearing of
  * whatever the context found. Which is what ignoring an order looks like.
  *
- * THE HIT ONLY TURNS IT WHEN THE CONTEXT HAS NO OBJECT AT AICTX_OFF_OBJ_10,
+ * THE HIT ONLY TURNS IT WHEN THE CONTEXT HAS NO OBJECT AT SIGHT_OFF_OBSERVER,
  * but OBJ_OFF_HIT_DIR is consumed either way -- the clear is outside that
  * test. So a unit hit while the context holds that object forgets the hit
  * without acting on it. Reproduced.
@@ -1170,7 +1170,7 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
     uint8_t       *w = (uint8_t *)out;
     const uint8_t *c = (const uint8_t *)ctx;
 
-    if (*(const int32_t *)(c + AICTX_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
+    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
         orig_ai_common(obj, out, ctx, 0);
@@ -1181,16 +1181,101 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
     if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR)) {
-        if (!*(const void *const *)(c + AICTX_OFF_OBJ_10))
+        if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
             w[1] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
         *(o + OBJ_OFF_HIT_DIR) = 0;
     }
 
-    if (*(const int32_t *)(c + AICTX_OFF_FOUND)
+    if (*(const int32_t *)(c + SIGHT_OFF_FOUND)
         && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
            >= AM2_AI_TURN_DELAY_MS)
-        w[1] = *(const uint8_t *)(c + AICTX_OFF_BEARING);
+        w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+}
+
+/* The promotion the `defend` arm does twice. Whatever 0x00403B40 found becomes
+ * the object this unit is engaging: its uid onto the object, and its
+ * {object, range, bearing} triple over the record's own at +0x10/+0x14/+0x18,
+ * which is where ConsiderSighting reads them from.
+ *
+ * The original inlines this at BOTH sites rather than calling it, and on the
+ * arrived path both run -- the second immediately after the first, with
+ * nothing between them that can change SIGHT_OFF_FOUND. So the repeat is
+ * idempotent and writing it once would be indistinguishable. Kept as two calls
+ * because "the original does it twice" is a fact about the original, and a
+ * reader diffing against the disassembly should find both. */
+static void AiPromoteFound(uint8_t *o, uint8_t *c)
+{
+    uint8_t *found = *(uint8_t **)(c + SIGHT_OFF_FOUND);
+
+    if (!found)
+        return;
+
+    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+        ((const AM2_Object *)found)->uid;
+    *(uint8_t **)(c + SIGHT_OFF_OBSERVER) = found;
+    *(int32_t *)(c + SIGHT_OFF_RANGE) =
+        *(const int32_t *)(c + SIGHT_OFF_FOUND_RANGE);
+    *(c + SIGHT_OFF_BEARING) = *(const uint8_t *)(c + SIGHT_OFF_FOUND_BEARING);
+}
+
+/* AiStepDefend -- original 0x00407640, one caller. The `defend` arm of the AI
+ * mode dispatcher, mode 7.
+ *
+ * AiStepIgnore's shape with two things added, and the two are what `defend`
+ * means. Both arms walk to the remembered destination while it is further than
+ * AM2_AI_ARRIVED_DIST, and both, on arrival, clear it and turn for an unreacted
+ * hit. What this one does that `ignore` does not:
+ *
+ *  - it PROMOTES whatever 0x00403B40 found into the slot ConsiderSighting
+ *    reads, and records that object's uid on the unit at OBJ_OFF_TARGET_UID.
+ *    `ignore` reads SIGHT_OFF_FOUND and does nothing with it but take a
+ *    bearing;
+ *  - and it ends by calling ConsiderSighting on every path, including the one
+ *    where it did not arrive. So a defending unit keeps looking while it
+ *    moves, which is the whole difference from ignoring.
+ *
+ * The turn is gated on the OBSERVER rather than on the found object, and that
+ * matters because the promotion above may have just installed one. So a unit
+ * that finds something this frame can turn to it this frame; a unit with
+ * nothing found keeps whatever observer it had.
+ *
+ * The delay is compared UNSIGNED, as in AiStepIgnore, so a deadline in the
+ * future wraps and passes. Written as the original has it.
+ */
+void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+    uint8_t *c = (uint8_t *)ctx;
+
+    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        orig_ai_common(obj, out, ctx, 0);
+    } else {
+        uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+        if (hit) {
+            if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
+                w[1] = hit;
+            *(o + OBJ_OFF_HIT_DIR) = 0;
+        }
+
+        AiPromoteFound(o, c);
+
+        if (*(const void *const *)(c + SIGHT_OFF_OBSERVER)
+            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+               >= AM2_AI_TURN_DELAY_MS)
+            w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+    }
+
+    AiPromoteFound(o, c);
+    ConsiderSighting(obj, out, ctx);
 }
 
 /* ConsiderSighting -- original 0x004074A0, four callers.
@@ -1607,6 +1692,8 @@ int region_install(void)
                         "SetPointRule", 4);
     rc |= patch_replace(ADDR_AI_STEP_IGNORE, (const void *)AiStepIgnore,
                         "AiStepIgnore", 1);
+    rc |= patch_replace(ADDR_AI_STEP_DEFEND, (const void *)AiStepDefend,
+                        "AiStepDefend", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);

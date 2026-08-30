@@ -44,6 +44,11 @@ void __cdecl SetPointRule(void *obj);
  * only for an unreacted hit or, after a delay, for what the context found. */
 void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx);
 
+/* 0x00407640, one caller. The `defend` arm -- mode 7. AiStepIgnore plus two
+ * things: it promotes whatever the search found into the slot ConsiderSighting
+ * reads, and it calls ConsiderSighting on every path. */
+void __cdecl AiStepDefend(void *obj, void *out, void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

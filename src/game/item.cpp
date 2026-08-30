@@ -1962,7 +1962,7 @@ typedef void (__cdecl *AM2_ShooterReactFn)(void *shooter, void *target);
  *
  * AND THE SHOOTER TURNS ON THE TARGET, but only when the two are not allied:
  * the shot's owner uid is resolved, and if that resolves to a type 2, 3 or 8
- * its OBJ_OFF_FIELD_CC takes the target's uid and ShooterReact runs. So
+ * its OBJ_OFF_TARGET_UID takes the target's uid and ShooterReact runs. So
  * shooting something is also how a unit acquires it.
  *
  * OBJ_OFF_RANK IS A UID HERE, which is its THIRD reading. orig.h already
@@ -2016,7 +2016,7 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
     if (!ObjIsTypeIn238((const AM2_Object *)owner))
         return;
 
-    *(uint32_t *)(owner + OBJ_OFF_FIELD_CC) = ((const AM2_Object *)target)->uid;
+    *(uint32_t *)(owner + OBJ_OFF_TARGET_UID) = ((const AM2_Object *)target)->uid;
     orig_shooter_react(owner, target);
 }
 
@@ -6495,7 +6495,7 @@ void __cdecl ResetType2Fields(void *obj)
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
     *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
-    *(uint32_t *)(o + OBJ_OFF_FIELD_CC) = 0;
+    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
 
     memset(o + OBJ_OFF_TAIL_BLOCK, 0, AM2_OBJ_TAIL_DWORDS * 4);
 
@@ -7173,7 +7173,7 @@ void __cdecl SetObjTablePair(uint32_t uid, int32_t kind)
  *
  * THE SAME-RECORD TEST ANSWERS FROM A THIRD FIELD. When a slot's weapon has
  * the same OBJ_OFF_FIELD_94 as the candidate, the verdict is whether the
- * CANDIDATE's OBJ_OFF_FIELD_CC is not -1 -- nothing about the slot. So "you
+ * CANDIDATE's OBJ_OFF_TARGET_UID is not -1 -- nothing about the slot. So "you
  * already carry one of these" is resolved by a property of the thing being
  * offered.
  *
@@ -7208,7 +7208,7 @@ int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot)
 
         if (*(void *const *)(w + OBJ_OFF_FIELD_94)
             == *(void *const *)(c + OBJ_OFF_FIELD_94))
-            return *(const int32_t *)(c + OBJ_OFF_FIELD_CC) != -1;
+            return *(const int32_t *)(c + OBJ_OFF_TARGET_UID) != -1;
 
         if (KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
             && KindInSetB(**(const int32_t *const *)(c + OBJ_OFF_FIELD_C0)))

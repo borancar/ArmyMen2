@@ -2747,23 +2747,31 @@
 #define SIGHT_OFF_MAX_RANGE    0x3Cu
 #define SIGHT_OFF_ENABLED_40   0x40u
 
-/* The AI CONTEXT, a 0x44-byte record 0x00407D70 builds from the object and
- * hands to whichever arm of the mode dispatcher runs. Only what is read by a
- * reconstructed arm is named; the rest of it is unread here.
+/* The rest of the SAME RECORD, which the AI arms call a context and
+ * ConsiderSighting calls a sight. 0x00407D70 builds it, 0x00407F80 hands it to
+ * whichever mode arm runs, and AiStepDefend hands it straight on to
+ * ConsiderSighting -- so it is one structure and the offsets above are the
+ * ones it reads.
  *
- * +0x00 and +0x10 are objects resolved from the uids at OBJ_OFF_UID_C4 and
- * OBJ_OFF_UID_CC, each dropped if it is gone or flagged. +0x14 and +0x18 are
- * the range and bearing to the second of those, from ADDR_DIST_AND_ANGLE --
- * the same {object, range, bearing} triple the SIGHT_OFF_ block uses, which
- * is why the offsets coincide and is not a reason to share the names. +0x1C
- * is what 0x00403B40 answered. +0x28 is ApproxDist from the object's position
- * to the destination point it remembers, computed only when that point is
- * non-zero. */
-#define AICTX_OFF_OBJ_10       0x10u
-#define AICTX_OFF_RANGE        0x14u
-#define AICTX_OFF_BEARING      0x18u  /* uint8_t */
-#define AICTX_OFF_FOUND        0x1Cu
-#define AICTX_OFF_DEST_DIST    0x28u
+ * THIS BLOCK BRIEFLY HAD AN AICTX_ PREFIX OF ITS OWN, which made
+ * SIGHT_OFF_OBSERVER, _RANGE and _BEARING a second time under new names.
+ * checkoffsets could not see it, exactly as CLAUDE.md says of the ROW_/OBJ_
+ * pair: the family-alias rule compares within a prefix and a new prefix is
+ * invisible to it. What caught it was the next function read, one commit
+ * later, passing the record to ConsiderSighting.
+ *
+ * +0x00 and +0x10 are objects resolved from the uids at OBJ_OFF_FOLLOW_UID
+ * and OBJ_OFF_TARGET_UID, each dropped if it is gone or flagged. +0x14 and
+ * +0x18 are the range and bearing to the second of those, from
+ * ADDR_DIST_AND_ANGLE. +0x1C is what 0x00403B40 answered, with its range and
+ * bearing beside it at +0x20 and +0x24; AiStepDefend promotes that triple
+ * into +0x10/+0x14/+0x18 wholesale. +0x28 is ApproxDist from the object's
+ * position to the destination point it remembers, computed only when that
+ * point is non-zero. */
+#define SIGHT_OFF_FOUND        0x1Cu  /* object *, what 0x00403B40 answered */
+#define SIGHT_OFF_FOUND_RANGE  0x20u
+#define SIGHT_OFF_FOUND_BEARING 0x24u /* uint8_t */
+#define SIGHT_OFF_DEST_DIST    0x28u
 #define AM2_AI_ARRIVED_DIST    0x20   /* nearer than this counts as arrived */
 #define AM2_AI_TURN_DELAY_MS   0x82u
 /* 0x00407F80, the AI mode dispatcher: build the context with 0x00407D70, then
@@ -2778,6 +2786,8 @@
 #define ADDR_AI_407190         0x00407190u  /* void(obj, out, ctx, int32) */
 /* 0x00407BF0, one caller -- the `ignore` arm, mode 2. Reconstructed. */
 #define ADDR_AI_STEP_IGNORE    0x00407BF0u  /* void(obj, out, const void *) */
+/* 0x00407640, one caller -- the `defend` arm, mode 7. Reconstructed. */
+#define ADDR_AI_STEP_DEFEND    0x00407640u  /* void(obj, out, void *) */
 #define SIGHTOUT_OFF_HIT       0x04u
 #define SIGHTOUT_OFF_X         0x18u  /* int16 */
 #define SIGHTOUT_OFF_Y         0x1Au  /* int16 */
@@ -4748,7 +4758,14 @@ typedef struct {
  * offset would have made a coherent function look like eleven unknowns.
  * Only four needed new names, and they are named by offset because nothing
  * read so far says what they hold. */
-#define OBJ_OFF_FIELD_CC         0xCCu
+/* The uid of what this object is ENGAGING, beside OBJ_OFF_FOLLOW_UID's uid of
+ * what it is following. Named from a writer/reader pair rather than from one
+ * side: ADDR_AI_BUILD_CONTEXT resolves it with LookupUid into the record's
+ * +0x10, and AiStepDefend writes the uid of whatever 0x00403B40 found into it
+ * in the same breath as promoting that object into +0x10. It was
+ * OBJ_OFF_FIELD_CC, named by offset because nothing read then said what it
+ * held. */
+#define OBJ_OFF_TARGET_UID       0xCCu   /* uint32_t */
 /* Cleared by ResetObjOnCof and compared against ADDR_GAME_CLOCK_MS by two
  * steppers in the 0x004057xx band, which is what makes "deadline" the reading
  * rather than the offset. */
@@ -5742,7 +5759,7 @@ typedef struct {
  * ADDR_AI_BUILD_CONTEXT tests the field with `cmp word` -- two bytes, not
  * four -- and then hands `&obj[0xB4]` to ADDR_APPROX_DIST as its second
  * `const AM2_Point *`, against the object's own OBJ_OFF_POS as the first,
- * storing the answer at AICTX_OFF_DEST_DIST. AiStepIgnore then treats that
+ * storing the answer at SIGHT_OFF_DEST_DIST. AiStepIgnore then treats that
  * distance as "how far to the place I am going" and clears the field to
  * ADDR_ZERO_POINT on arrival. A packed point is the only reading under which
  * all of that means anything.
