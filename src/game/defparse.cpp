@@ -5,7 +5,8 @@
 #include "image.h"
 #include "packkey.h"
 #include "definfo.h"
-#include "misc.h"      /* ComparePair */
+#include "misc.h"      /* ComparePair, FreeIfNotNull */
+#include "objtype.h"   /* FreeRecordList -- reconstructed */
 #include "crt.h"       /* the game's allocator -- this table is its memory */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -584,9 +585,86 @@ void __cdecl DefSortTrooperRecs(void)
     orig_def_log();
 }
 
+/* FreeAaiTables -- original 0x00434B60, two callers.
+ *
+ * Take down the two record tables the `.aai` parser builds and the two index
+ * arrays beside them: free each record list, free the array of them, free the
+ * sorted key index, free each AAI record, free the array of those, free the
+ * key table. Four blocks, and every pointer is cleared as it goes.
+ *
+ * THE FIRST BLOCK IS GATED ON ITS ARRAY AND THE THIRD ON ITS COUNT, which is
+ * not symmetry and is worth reading twice. `ADDR_RECORD_LISTS` non-null runs
+ * the loop and the free; `ADDR_KEY_TABLE_COUNT` non-zero does the same for
+ * `ADDR_AAI_RECORDS`. So a record-list array with a zero count is freed
+ * correctly -- the loop simply does not run -- while a NULL AAI array with a
+ * non-zero count would be indexed. Nothing sets one without the other, and
+ * the original takes the risk either way round. Reproduced.
+ *
+ * Both inner frees are ours already -- FreeRecordList in objtype.cpp and
+ * FreeIfNotNull in misc.cpp -- and are called by name. checkseams caught the
+ * two orig_ macros that went in first; fifth and sixth this session, and the
+ * picker now prints what orig.h already knows about a candidate for exactly
+ * this reason.
+ *
+ * THE TWO INNER FREES ARE DIFFERENT FUNCTIONS. `FreeRecordList` is a real
+ * teardown; `FreeIfNotNull` is the one-line guard its name says. So the record
+ * lists are structures and the AAI records are plain allocations, which is the
+ * only thing here that says the two tables hold different kinds of thing.
+ *
+ * The array pointer and the count are re-read from their globals on every
+ * iteration of both loops. Nothing in either callee can touch them -- they
+ * free an element, not the table -- so that is the compiler, and it is written
+ * as the plain loop it means.
+ *
+ * The capacities are cleared with the counts, but only in the two blocks that
+ * have one; the key table and the sorted index are single pointers with no
+ * count of their own.
+ */
+void __cdecl FreeAaiTables(void)
+{
+    int32_t i;
+
+    if (*(void *const *)(uintptr_t)ADDR_RECORD_LISTS) {
+        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+             i++)
+            FreeRecordList(
+                (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[i]);
+
+        am2_free(*(void **)(uintptr_t)ADDR_RECORD_LISTS);
+        *(void **)(uintptr_t)ADDR_RECORD_LISTS         = (void *)0;
+        *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT  = 0;
+        *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP    = 0;
+    }
+
+    if (*(void *const *)(uintptr_t)ADDR_RECORD_LIST_INDEX) {
+        am2_free(*(void **)(uintptr_t)ADDR_RECORD_LIST_INDEX);
+        *(void **)(uintptr_t)ADDR_RECORD_LIST_INDEX = (void *)0;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT) {
+        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT; i++)
+            FreeIfNotNull(
+                (*(void *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[i]);
+
+        am2_free(*(void **)(uintptr_t)ADDR_AAI_RECORDS);
+        *(void **)(uintptr_t)ADDR_AAI_RECORDS       = (void *)0;
+        *(int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT = 0;
+        *(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP  = 0;
+    }
+
+    if (*(void *const *)(uintptr_t)ADDR_KEY_TABLE) {
+        am2_free(*(void **)(uintptr_t)ADDR_KEY_TABLE);
+        *(void **)(uintptr_t)ADDR_KEY_TABLE = (void *)0;
+    }
+}
+
 int defparse_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_FREE_AAI_TABLES,
+                        (const void *)FreeAaiTables,
+                        "FreeAaiTables", 2);
 
     rc |= patch_replace(ADDR_DEF_SORT_OBJ_RECS, (const void *)DefSortObjRecs,
                         "DefSortObjRecs", 1);

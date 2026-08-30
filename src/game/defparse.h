@@ -95,4 +95,8 @@ void __cdecl DefFreeTrooperRecs(void);
 }
 #endif
 
+/* 0x00434B60, two callers. Take down the two `.aai` record tables and the two
+ * index arrays beside them. */
+void __cdecl FreeAaiTables(void);
+
 #endif /* AM2_DEFPARSE_H */

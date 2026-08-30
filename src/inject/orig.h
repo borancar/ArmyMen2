@@ -7867,6 +7867,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_KEY_LOOKUP_TRIPLE search -- so this is where the entries they find come
  * from, and ADDR_AAI_RECORDS is what a found value indexes. Reconstructed. */
 #define ADDR_ADD_AAI_RECORD      0x004345A0u  /* int32_t(void *rec) */
+/* 0x00434B60, two callers. The teardown for both of those tables and the two
+ * index arrays beside them. */
+#define ADDR_FREE_AAI_TABLES     0x00434B60u  /* void(void) */
 #define ADDR_AAI_RECORD_CAP      0x00516144u  /* int32_t, slots allocated */
 #define ADDR_AAI_RECORDS         0x0051614Cu  /* void **, one per slot */
 #define AM2_AAI_RECORD_GROW      0x13         /* 19 slots per grow */

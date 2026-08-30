@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,172 patches.**
+Nothing uncommitted. **1,173 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -936,16 +936,36 @@ that only the reconstruction could correct. So the scratch picker now prints
 what `orig.h` already calls each candidate, beside the size and the unknown
 count. A rule that has been ignored five times should be turned into a tool.
 
+- **`FreeAaiTables`** (`0x00434B60`) gates its first block on the ARRAY and
+  its third on the COUNT, which is not symmetry. A record-list array with a
+  zero count is freed correctly -- the loop just does not run -- while a NULL
+  AAI array with a non-zero count would be indexed. Nothing sets one without
+  the other; the original takes the risk either way round, and it is
+  reproduced.
+
+  Its two inner frees are DIFFERENT functions -- `FreeRecordList` is a real
+  teardown, `FreeIfNotNull` the one-line guard its name says -- which is the
+  only thing in the function that says the two tables hold different kinds of
+  thing.
+- The picker paid for itself immediately: `checkseams` caught two more
+  `orig_` macros here (fifth and sixth this session), and both callees were
+  already ours. That is the same failure the address-first rule addresses,
+  one level down -- **the CALLEE's address is worth grepping too**, not only
+  the entry's.
+- **`quit`'s thread-line race has now been seen three times, twice on the
+  original side and once on the reconstruction's.** Well enough characterised
+  to stop re-running for it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,021 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,172
+line (0x0045C000) patched**. Measured: **1,022 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,173
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-five batches have gone in and the 218 entries outstanding start at 48
+small ones in batches. Twenty-six batches have gone in and the 217 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
