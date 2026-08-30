@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,180 patches.**
+Nothing uncommitted. **1,181 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1057,16 +1057,38 @@ timing failure mode too, and that its own output distinguishes the two.
   with the row's frame on the next instruction. Reproduced, for the same
   reason -- it is there for what it does, not what it returns.
 
+- **`ConsiderSighting`** (`0x004074A0`) fills its output record BEFORE the
+  ownership test and reveals AFTER it, so a caller always gets the sighting's
+  numbers when the geometry passes and the two-second reveal happens only when
+  the observer is ours or an ally. Splitting those two apart is the obvious
+  tidy-up and would change what the caller sees.
+
+  Its cone is `|AngleDelta| <= 3` on a byte -- about eight degrees either
+  side, which is why a unit does not reveal everything around it.
+- **A SECOND READER OF `OBJ_OFF_FIELD_530`, AND IT DISAGREES WITH THE FIRST.**
+  `SetObjField530` treats that field as a small state, 0..6, indexing a table
+  of animation frames; this reads its low byte as an 8-BIT BEARING and hands
+  it to `AngleDelta`. Both cannot describe the same quantity unless the states
+  double as headings. Recorded rather than resolved -- the field is named for
+  its offset precisely because of this, the way `OBJ_OFF_CHAIN_UID`'s two
+  readings are.
+- **The control was used rather than a fourth re-roll.** `combat` came back
+  out-of-phase twice for this batch (177,231 then 175,848, identical logs).
+  Stashing and running the PARENT -- clean at 814 pixels earlier the same day
+  -- gave **306,178 with log differences**, worse than either. So the machine
+  cannot run that configuration at present and this batch is not the cause.
+  `mission` is clean at 290.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,027 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,180
+line (0x0045C000) patched**. Measured: **1,028 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,181
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-one batches have gone in and the 212 entries outstanding start at 48
+small ones in batches. Thirty-two batches have gone in and the 211 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

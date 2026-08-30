@@ -87,4 +87,8 @@ void __cdecl RebuildTileCover(void);
  * neighbour and caching it when the tile has none. */
 uint16_t __cdecl TileRegionOrBorrow(uint16_t tile);
 
+/* 0x004074A0, four callers. One observer against one object: range, bearing,
+ * and a two-second reveal when the observer is ours. */
+void __cdecl ConsiderSighting(void *seen, void *out, const void *sight);
+
 #endif /* AM2_REGION_H */

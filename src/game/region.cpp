@@ -2,6 +2,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "dist.h"   /* AngleDelta -- reconstructed */
+#include "army.h"   /* ObjIsOurs -- reconstructed */
+#include "air.h"    /* RevealObj -- reconstructed */
+
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
@@ -889,6 +893,87 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
     }
 }
 
+/* ConsiderSighting -- original 0x004074A0, four callers.
+ *
+ * One observer against one object. Four gates -- both of the record's enable
+ * flags, a positive range, and a range below the maximum -- then a bearing
+ * within three of the observer's own, and only then does the output record get
+ * filled and the reveal considered.
+ *
+ * THE OUTPUT IS FILLED BEFORE THE OWNERSHIP TEST AND THE REVEAL AFTER IT. So a
+ * caller always gets the sighting's numbers when the geometry passes, and the
+ * two-second reveal happens only when the OBSERVER belongs to us or an ally.
+ * Splitting those two would be the obvious tidy-up and would change what the
+ * caller sees.
+ *
+ * IT READS THE OBSERVER OUT OF THE RECORD FOUR SEPARATE TIMES, once per field
+ * it copies, rather than holding it. Nothing between can change it; written as
+ * one load, which is what it means.
+ *
+ * THE BEARING COMPARISON IS `|AngleDelta| <= 3` ON A BYTE. AngleDelta wraps in
+ * both directions, so this is a cone of about eight degrees either side --
+ * narrow, and the reason a unit does not reveal everything around it.
+ *
+ * A SECOND READER OF OBJ_OFF_FIELD_530, AND IT DISAGREES WITH THE FIRST.
+ * SetObjField530 treats that field as a small state, 0..6, indexing a table of
+ * animation frames; this reads its low byte as an 8-BIT BEARING and hands it
+ * to AngleDelta. Both cannot be describing the same quantity unless the states
+ * double as headings. The field is named for its offset precisely because of
+ * this kind of disagreement -- recorded rather than resolved, the way
+ * OBJ_OFF_CHAIN_UID's two readings are.
+ *
+ * The absolute value is the original's `cdq; xor; sub` and the comparison is
+ * on `al`, so a delta above 255 could not arise -- AngleDelta answers
+ * -128..128.
+ */
+void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
+{
+    uint8_t       *s = (uint8_t *)seen;
+    uint8_t       *o = (uint8_t *)out;
+    const uint8_t *c = (const uint8_t *)sight;
+    const uint8_t *observer;
+    int32_t        range;
+    int32_t        delta;
+
+    if (!*(const int32_t *)(c + SIGHT_OFF_ENABLED_30))
+        return;
+    if (!*(const int32_t *)(c + SIGHT_OFF_ENABLED_40))
+        return;
+
+    range = *(const int32_t *)(c + SIGHT_OFF_RANGE);
+    if (range <= 0 || range >= *(const int32_t *)(c + SIGHT_OFF_MAX_RANGE))
+        return;
+
+    delta = AngleDelta(*(const uint8_t *)(s + OBJ_OFF_FIELD_530),
+                       *(const uint8_t *)(c + SIGHT_OFF_BEARING));
+    if (delta < 0)
+        delta = -delta;
+    if ((uint8_t)delta > AM2_SIGHT_CONE)
+        return;
+
+    *(int32_t *)(o + SIGHTOUT_OFF_HIT) = 1;
+
+    observer = *(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER);
+    if (!observer)
+        return;
+
+    *(int16_t *)(o + SIGHTOUT_OFF_X) =
+        *(const int16_t *)(observer + OBJ_OFF_X);
+    *(int16_t *)(o + SIGHTOUT_OFF_Y) =
+        *(const int16_t *)(observer + OBJ_OFF_Y);
+    *(int16_t *)(o + SIGHTOUT_OFF_YADJ) =
+        *(const int16_t *)(observer + OBJ_OFF_ROW0_Y_ADJUST);
+    *(uint32_t *)(o + SIGHTOUT_OFF_UID) =
+        ((const AM2_Object *)observer)->uid;
+
+    if (!ObjIsOurs((void *)observer, 1))
+        return;
+
+    RevealObj(s);
+    *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_REVEAL_MS;
+}
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -907,6 +992,9 @@ int region_install(void)
                         "RegionsNear", 2);
     rc |= patch_replace(ADDR_ADD_REGION_LINK, (const void *)AddRegionLink,
                         "AddRegionLink", 2);
+    rc |= patch_replace(ADDR_CONSIDER_SIGHTING,
+                        (const void *)ConsiderSighting,
+                        "ConsiderSighting", 4);
     rc |= patch_replace(ADDR_TILE_REGION_OR_BORROW,
                         (const void *)TileRegionOrBorrow,
                         "TileRegionOrBorrow", 2);

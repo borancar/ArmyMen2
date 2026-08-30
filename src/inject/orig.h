@@ -2644,6 +2644,24 @@
  * went in as ADDR_SPRITE_DROP_NAMED from the one call site, which passes
  * 0x0045A030; that is a function too, not a sprite. See src/game/army.h. */
 #define ADDR_FOR_EACH_ARMY_OBJECT 0x00457820u /* void(army, void(*)(void*)) */
+/* 0x004074A0, four callers. One observer against one object: range, bearing,
+ * and then -- if the observer belongs to us -- reveal what it saw for two
+ * seconds. The output record is filled BEFORE the ownership test, so a caller
+ * gets the sighting's numbers whether or not the reveal happens. */
+#define ADDR_CONSIDER_SIGHTING 0x004074A0u /* void(seen, out, const void *) */
+#define AM2_SIGHT_CONE         3      /* |AngleDelta| must be at most this */
+#define AM2_REVEAL_MS          0x7D0  /* 2000 */
+#define SIGHT_OFF_OBSERVER     0x10u
+#define SIGHT_OFF_RANGE        0x14u
+#define SIGHT_OFF_BEARING      0x18u  /* uint8_t */
+#define SIGHT_OFF_ENABLED_30   0x30u
+#define SIGHT_OFF_MAX_RANGE    0x3Cu
+#define SIGHT_OFF_ENABLED_40   0x40u
+#define SIGHTOUT_OFF_HIT       0x04u
+#define SIGHTOUT_OFF_X         0x18u  /* int16 */
+#define SIGHTOUT_OFF_Y         0x1Au  /* int16 */
+#define SIGHTOUT_OFF_YADJ      0x1Cu  /* int16, from OBJ_OFF_ROW0_Y_ADJUST */
+#define SIGHTOUT_OFF_UID       0x20u
 
 /* Non-zero means fog is ON -- objects get concealed. It was ADDR_AI_CONTROLLED,
  * a name taken from a call site; the cheat strings that drive it are about
