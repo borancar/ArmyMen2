@@ -514,6 +514,96 @@ void __cdecl State1Enter(void)
     StartAudioStream((void *)(uintptr_t)ADDR_STR_TITLE_WAV, 0);
 }
 
+/* The twenty-one screen openers, in MENU MODE order, and every one of them is
+ * already reconstructed -- checkseams said so the moment this went in as a
+ * table of addresses, which is the fourth spelling of a seam it was extended
+ * to catch: a table of plain integers that are function pointers. Written as
+ * the openers themselves. */
+typedef void (__cdecl *AM2_OpenScreenFn)(void);
+static AM2_OpenScreenFn const kMenuScreens[AM2_MENU_MODE_MAX] = {
+    OpenTitleScreen,   /*  1 */
+    OpenSelectMap,     /*  2 */
+    OpenSelectPlayer,  /*  3 */
+    OpenEnterName,     /*  4 */
+    OpenLoadGame,      /*  5 */
+    OpenCommPanel,     /*  6 */
+    OpenMpHost,        /*  7 */
+    OpenMpOptions,     /*  8 */
+    OpenMpJoin,        /*  9 */
+    OpenCdPrompt,      /* 10 */
+    OpenBattleName,    /* 11 */
+    OpenBattleJoin,    /* 12 */
+    OpenMovies,        /* 13 */
+    OpenOptionsMenu,   /* 14 */
+    OpenControls,      /* 15 */
+    OpenDifficulty,    /* 16 */
+    OpenQuitConfirm,   /* 17 */
+    OpenReplayPrompt,  /* 18 */
+    OpenAudioOptions,  /* 19 */
+    OpenDeletePlayer,  /* 20 */
+    OpenDeleteGame    /* 21 */
+};
+
+typedef void (__attribute__((thiscall)) *AM2_DlgDeleteFn)(void *w, int32_t f);
+typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn2)(void *w, RECT r);
+
+/* State1Menu -- original 0x00426400, two callers, both in State1Frame below.
+ * The title state's menu step: take down whatever dialog is up, open the one
+ * ADDR_MENU_MODE now names, and paint it.
+ *
+ * THE JUMP TABLE IS THE DEFINITIVE LIST OF MENU SCREENS -- twenty-one arms,
+ * mode N opening arm N, and every one of them already had a name in orig.h.
+ * Writing it out is what confirms the four requests State1Enter honours: 7
+ * and 9 are the host and join lobbies, 13 is MOVIES and 18 the replay prompt.
+ * All four are screens you can arrive at without passing through the title,
+ * which is exactly what that arm is for.
+ *
+ * A MODE OUTSIDE 1..21 OPENS NOTHING and is not an error -- the default arm
+ * falls straight through to the paint, so a mode of 0 or 22 leaves the screen
+ * as it is. Since the dialog was already destroyed above, that means a blank
+ * screen rather than the previous one.
+ *
+ * THE TEARDOWN IS SLOT 0 WITH A FLAG OF 1, which is MSVC's scalar deleting
+ * destructor -- so the dialog is freed, not merely closed, and the global is
+ * cleared before the opener runs rather than after.
+ *
+ * THE DRAW TARGET IS SET TO THE PRIMARY BEFORE THE PAINT. It is
+ * SetDrawTarget, not a clear: menus paint straight onto the front buffer
+ * rather than through the back one the game uses in play.
+ *
+ * The rect is passed by value and the original reuses the SetDrawTarget
+ * argument slot as its last dword -- `sub esp, 0xc` after a `push` that is
+ * never cleaned, sixteen bytes in total, and the paint's own `ret 0x10`
+ * cleans them. Written here as an ordinary by-value RECT, which compiles to
+ * the same thing without the pun.
+ *
+ * It clears ADDR_OVERLAY_DIRTY last, whether or not anything was painted.
+ */
+void __cdecl State1Menu(void)
+{
+    void   *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    int32_t mode;
+
+    if (dlg) {
+        ((AM2_DlgDeleteFn *)*(void **)dlg)[AM2_DLG_SLOT_DELETE](dlg, 1);
+        *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
+    }
+
+    mode = *(const int32_t *)(uintptr_t)ADDR_MENU_MODE;
+    if (mode >= 1 && mode <= AM2_MENU_MODE_MAX)
+        kMenuScreens[mode - 1]();
+
+    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    if (dlg) {
+        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+        dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+        ((AM2_DlgPaintFn2 *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
+            dlg, *(const RECT *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
+}
+
 /* 0x00426570. State 1 -- the menus.
  *
  * A pending menu request is consumed here rather than by the mission's
@@ -541,9 +631,9 @@ void __cdecl State1Frame(void)
             *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
         *requestSet = 0;
         *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
-        call0(ADDR_STATE1_MENU);
+        State1Menu();
     } else if (g_overlayDirty) {
-        call0(ADDR_STATE1_MENU);
+        State1Menu();
     }
 
     if (!GetPauseFlags()) {
@@ -1246,6 +1336,8 @@ int frame_install(void)
                         "FramePost", 1);
     rc |= patch_replace(ADDR_STATE0_FRAME, (const void *)State0Frame,
                         "State0Frame", 1);
+    rc |= patch_replace(ADDR_STATE1_MENU, (const void *)State1Menu,
+                        "State1Menu", 2);
     rc |= patch_replace(ADDR_STATE1_ENTER, (const void *)State1Enter,
                         "State1Enter", 1);
     rc |= patch_replace(ADDR_STATE1_FRAME, (const void *)State1Frame,

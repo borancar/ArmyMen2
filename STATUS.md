@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,225 patches.**
+Nothing uncommitted. **1,226 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2132,16 +2132,43 @@ commit -- gave the right answer every time it was used.
   parameter is the same finding arrived at independently** -- worth keeping
   the warning's wording beside it rather than just silencing it.
 
+- **`State1Menu`** (`0x00426400`) is the title state's menu step, and **its
+  jump table is the definitive list of menu SCREENS** -- twenty-one arms, mode
+  N opening arm N, every one of them already named in `orig.h` and, as it
+  turned out, every one already RECONSTRUCTED.
+
+  Writing the table out cross-checks last session's `State1Enter`: the four
+  requests it honours -- 7, 9, 13, 18 -- are the host lobby, the join lobby,
+  MOVIES and the replay prompt. All four are screens reachable without passing
+  through the title, which is what that arm is for. It also confirms
+  `AM2_MENU_MODE_NO_CHAT` (8) is the multiplayer options screen, which has no
+  chat box.
+
+  **`checkseams` caught the table as its FOURTH spelling of a seam** -- "a
+  table of plain integers that are function pointers" -- the moment it went in
+  as addresses. Twenty-one sites at once. It is a table of the openers
+  themselves now.
+
+  **A mode outside 1..21 opens nothing and is not an error**: the default arm
+  falls through to the paint, and since the previous dialog was already
+  destroyed above, that leaves a blank screen rather than the old one. The
+  teardown is slot 0 with a flag of 1 -- MSVC's scalar deleting destructor --
+  so a dialog is freed rather than closed, and the draw target is set to the
+  PRIMARY before painting: menus paint straight onto the front buffer.
+
+  Blind by construction, like `State1Enter`. The menu frames are the evidence:
+  `controls` came back at **0 pixels on all four of its frames**.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,071 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,225
+line (0x0045C000) patched**. Measured: **1,072 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,226
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-one batches have gone in and the 168 entries outstanding start at 48
+small ones in batches. Seventy-two batches have gone in and the 167 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

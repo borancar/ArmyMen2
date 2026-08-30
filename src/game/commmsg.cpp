@@ -224,9 +224,10 @@ void __cdecl MsgListAdd(void *list, void *node)
  * tools/checksplit.py. The slot numbers are widget.h's. */
 typedef void (__attribute__((thiscall)) *AM2_DlgUpdateFn)(void *w);
 typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn)(void *w, AM2_Rect r);
-#define AM2_DLG_SLOT_PAINT  1
+/* AM2_DLG_SLOT_PAINT and AM2_DLG_OFF_RECT moved to orig.h -- frame.cpp
+ * needs the same two, and a second private copy is how two definitions of
+ * one constant begin. */
 #define AM2_DLG_SLOT_UPDATE 2
-#define AM2_DLG_OFF_RECT    0x14
 
 /* 0x0040F160, thiscall on the comm object: which slot holds this DirectPlay
  * id. Still original. */

@@ -8106,7 +8106,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_MENU_MODE_TITLE      1
 #define AM2_MENU_MODE_LOBBY_HOST 7
 #define AM2_MENU_MODE_LOBBY_JOIN 9
+/* Reconstructed. The title state's menu step: tear down whatever dialog is
+ * up, open the one ADDR_MENU_MODE now names through a 21-arm jump table, and
+ * paint it. The table is the definitive list of menu SCREENS -- mode N opens
+ * arm N -- and it is what confirms State1Enter's four honoured requests are
+ * the host lobby, the join lobby, MOVIES and the replay prompt. */
 #define ADDR_STATE1_MENU         0x00426400u
+#define AM2_MENU_MODE_MAX        21   /* the jump table's last arm */
+#define AM2_DLG_SLOT_DELETE      0    /* the scalar deleting destructor */
+#define AM2_DLG_SLOT_PAINT       1
+#define AM2_DLG_OFF_RECT         0x14u
 #define ADDR_STATE1_COMMON       0x00426270u
 #define ADDR_MOVIE_FRAME_STEP    0x00445630u  /* states 0 and 3, per frame */
 #define ADDR_STATE2_ENTER        0x00425300u
