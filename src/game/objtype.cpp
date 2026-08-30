@@ -15,6 +15,7 @@
  */
 
 #include "objtype.h"
+#include "maprow.h"   /* BuildRowsFromDef -- reconstructed */
 #include "crt.h"           /* am2_malloc -- the game's own heap */
 #include "objtable.h"
 #include "objflag.h"       /* ObjFlagClear0 -- reconstructed */
@@ -652,9 +653,109 @@ int32_t __cdecl AddAaiRecord(void *rec)
     return slot;
 }
 
+typedef void (__cdecl *AM2_ObjInitCommonFn)(void *obj, int32_t a, int32_t b,
+                                            int32_t at, const void *blk,
+                                            int32_t e, int32_t f);
+typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
+#define orig_obj_init_common \
+    ((AM2_ObjInitCommonFn)(uintptr_t)ADDR_OBJ_INIT_COMMON)
+#define orig_obj_after_move \
+    ((AM2_ObjAfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
+
+/* InitObjFromAai -- original 0x00433880, two callers.
+ *
+ * Build an object out of an AAI record: OR the record's flags into the
+ * object's, set the army, run the common init, copy health and two bytes
+ * across, build the row set from the record's def, stamp one field on every
+ * row, and finish with the post-move step. Answers 1, or 0 if the record
+ * index is out of range or its slot is empty -- and one of its callers frees
+ * the object on that 0.
+ *
+ * NINE ARGUMENTS AND THE NINTH IS NEVER READ. Both call sites push nine and
+ * `add esp, 0x24` confirms it; every stack read in the body lands on one of
+ * the first eight. Third unused parameter in this tree after
+ * RandomPointAhead's first and AmmChecksum's second, and as with those the
+ * signature keeps it because the call sites do.
+ *
+ * EVERY FIELD NAME ON THE AAI RECORD COMES FROM WHERE IT LANDS. +0x2C is
+ * copied to OBJ_OFF_MAX_HEALTH and OBJ_OFF_HEALTH in the same breath, so it is
+ * the starting health and the maximum at once; +0x2E to OBJ_OFF_HEIGHT_ADJ and
+ * +0x2F to OBJ_OFF_RANK. That is the strongest naming evidence available for a
+ * record with no strings of its own.
+ *
+ * THE FLAGS ARE OR'd FROM TWO SOURCES AND THE ORDER IS FIXED: the record's
+ * +0x28 and the sixth argument are combined first, then OR'd into whatever the
+ * object already had. So nothing is cleared, and a caller cannot use this to
+ * turn a flag off.
+ *
+ * THE POSITION IS ONE PACKED DWORD READ TWICE. The fifth argument goes to
+ * ObjInitCommon whole, and its two halves are pulled out separately for
+ * BuildRowsFromDef -- the low word as x through a register, the high word by
+ * reading two bytes further up the stack. Same value, two routes.
+ *
+ * THE ROW LOOP RE-READS THE COUNT EVERY ITERATION and the row array once, and
+ * writes the same constant into every row. Nothing in the loop can change
+ * either; written as the plain loop that means.
+ */
+int32_t __cdecl InitObjFromAai(void *obj, int32_t a2, int32_t army,
+                               int32_t index, uint32_t at, int32_t orFlags,
+                               int32_t a7, int32_t a8, int32_t)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const uint8_t *rec;
+    int32_t        i;
+
+    if (index < 0 || index >= *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
+        return 0;
+
+    rec = (*(const uint8_t *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[index];
+    if (!rec)
+        return 0;
+
+    *(uint8_t *)(o + OBJ_OFF_ARMY) = (uint8_t)army;
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
+        (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
+
+    orig_obj_init_common(o, a2, 1, (int32_t)at, rec + AAI_OFF_INIT_BLOCK,
+                         a7, a8);
+
+    *(const void **)(o + OBJ_OFF_FIELD_94) = rec;
+
+    *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+        *(const int16_t *)(rec + AAI_OFF_HEALTH);
+    *(int16_t *)(o + OBJ_OFF_HEALTH) =
+        *(const int16_t *)(rec + AAI_OFF_HEALTH);
+    *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
+        *(const int8_t *)(rec + AAI_OFF_HEIGHT_ADJ);
+    *(uint8_t *)(o + OBJ_OFF_RANK) =
+        *(const uint8_t *)(rec + AAI_OFF_RANK);
+
+    *(int32_t *)(o + OBJ_OFF_DEADLINE_58) =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    BuildRowsFromDef(o + OBJ_OFF_SUBRECORD,
+                     (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)
+                         [*(const int32_t *)(rec + AAI_OFF_DEF_INDEX)],
+                     (int32_t)(int16_t)at,
+                     (int32_t)(int16_t)(at >> 16),
+                     *(const uint32_t *)(o + OBJ_OFF_FLAGS));
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
+        *(int32_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                     + (size_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
+            *(const int32_t *)(rec + AAI_OFF_ROW_FIELD28);
+
+    orig_obj_after_move(o, 0, 0);
+    return 1;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
+
+    rc |= patch_replace(ADDR_INIT_OBJ_FROM_AAI,
+                        (const void *)InitObjFromAai,
+                        "InitObjFromAai", 2);
 
     rc |= patch_replace(ADDR_OBJ_EVENT_MASK, (const void *)ObjEventMask,
                         "ObjEventMask", 1);

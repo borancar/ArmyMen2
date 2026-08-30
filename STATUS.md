@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,182 patches.**
+Nothing uncommitted. **1,183 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1096,16 +1096,34 @@ timing failure mode too, and that its own output distinguishes the two.
   in a sequence rather than a standalone test -- which is also why it has a
   tail that runs on EVERY path, including the ones that refuse.
 
+- **`InitObjFromAai`** (`0x00433880`) builds an object out of an AAI record,
+  and **every field name on that record comes from where it lands**: +0x2C is
+  copied to `OBJ_OFF_MAX_HEALTH` and `OBJ_OFF_HEALTH` in the same breath, so
+  it is the starting health and the maximum at once; +0x2E to
+  `OBJ_OFF_HEIGHT_ADJ`, +0x2F to `OBJ_OFF_RANK`. That is the strongest naming
+  evidence available for a record carrying no strings of its own.
+
+  Its flags are OR'd from two sources and nothing is cleared, so a caller
+  cannot use it to turn a flag off. Its position is one packed dword read
+  twice -- whole for `ObjInitCommon`, and as two halves for
+  `BuildRowsFromDef`, the high one fetched by reading two bytes further up the
+  stack.
+
+  **Nine arguments and the ninth is never read.** Both call sites push nine
+  and `add esp, 0x24` confirms it; every stack read in the body lands on one
+  of the first eight. Third unused parameter in this tree after
+  `RandomPointAhead`'s first and `AmmChecksum`'s second.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,029 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,182
+line (0x0045C000) patched**. Measured: **1,030 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,183
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Thirty-three batches have gone in and the 210 entries outstanding start at 48
+small ones in batches. Thirty-four batches have gone in and the 209 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

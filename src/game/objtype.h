@@ -115,4 +115,10 @@ int objtype_install(void);
 }
 #endif
 
+/* 0x00433880, two callers. Build an object out of an AAI record. Nine
+ * arguments; the ninth is never read. */
+int32_t __cdecl InitObjFromAai(void *obj, int32_t a2, int32_t army,
+                               int32_t index, uint32_t at, int32_t orFlags,
+                               int32_t a7, int32_t a8, int32_t unused);
+
 #endif /* AM2_OBJTYPE_H */

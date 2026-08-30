@@ -9337,6 +9337,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Its second argument is unused. */
 #define ADDR_MAKE_KIND7            0x00435550u  /* void *(pt,int32,army,facing,
                                                  *        int32,int32) */
+/* The AAI record's fields, every one named from the OBJECT FIELD it lands in
+ * rather than from a guess -- InitObjFromAai copies each straight across.
+ * +0x2C goes to both OBJ_OFF_MAX_HEALTH and OBJ_OFF_HEALTH, so it is the
+ * starting health and the maximum at once; +0x2E to OBJ_OFF_HEIGHT_ADJ; +0x2F
+ * to OBJ_OFF_RANK; +0x28 is OR'd into the object's flags; +0x10 indexes
+ * ADDR_RECORD_LISTS for the row def; +0x14 is handed to ObjInitCommon; and
+ * +0x34 is written into every row's own +0x28. */
+#define AAI_OFF_DEF_INDEX          0x10u
+#define AAI_OFF_INIT_BLOCK         0x14u
+#define AAI_OFF_OR_FLAGS           0x28u
+#define AAI_OFF_HEALTH             0x2Cu  /* int16, to max AND current */
+#define AAI_OFF_HEIGHT_ADJ         0x2Eu  /* int8 */
+#define AAI_OFF_RANK               0x2Fu  /* int8 */
+#define AAI_OFF_ROW_FIELD28        0x34u
+#define ROW_OFF_FIELD_28           0x28u
+/* 0x00433880, two callers. Build an object out of an AAI record: flags, army,
+ * the common init, health, the row set, and a post-move. NINE arguments and
+ * the ninth is never read. */
+#define ADDR_INIT_OBJ_FROM_AAI     0x00433880u
 #define ADDR_OBJ_INIT_COMMON       0x00429940u  /* void(obj,dir,type,pt,name,
                                                  *      int32,int32), 8 callers */
 #define ADDR_STR_EMPTY             0x00487420u  /* "" */
