@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,192 patches.**
+Nothing uncommitted. **1,193 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1308,16 +1308,32 @@ commit -- gave the right answer every time it was used.
   are hidden by the same squareness, so a non-square map would break two
   things at once.
 
+- **`ForEachSelected`** (`0x004578A0`) has TWO removal paths and they disagree
+  about advancing. A uid that does not resolve is removed WITHOUT stepping --
+  the correct shape, and the one five other loops in this tree use. A
+  DESTROYED object is removed and the index IS stepped, so whatever shifts
+  into that slot is skipped for the pass. The two branches end in
+  `jmp 0x004578F9` and `jmp 0x004578F8`: one instruction apart, and that
+  instruction is the `inc`.
+
+  The consequence is small and real -- two adjacent destroyed selections leave
+  the second listed and flagged until the next call, and nothing here loops
+  until the list is stable. Reproduced, because a caller depending on one pass
+  clearing everything is depending on something the original does not do.
+
+  This is the SIXTH non-advancing removal loop found in this tree, and the
+  first where the same function gets it right once and wrong once.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,039 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,192
+line (0x0045C000) patched**. Measured: **1,040 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,193
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Forty-three batches have gone in and the 200 entries outstanding start at 48
+small ones in batches. Forty-four batches have gone in and the 199 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

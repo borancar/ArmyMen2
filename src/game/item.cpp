@@ -6583,6 +6583,64 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit)
     return code;
 }
 
+/* ForEachSelected -- original 0x004578A0, one caller.
+ *
+ * Call a function for every selected object, dropping the entries that no
+ * longer resolve or have been destroyed as it goes.
+ *
+ * ITS TWO REMOVAL PATHS DISAGREE ABOUT ADVANCING, AND ONE OF THEM IS WRONG.
+ * A uid that does not resolve is removed and the index is NOT stepped, so the
+ * entry that shifts down is examined next -- the correct shape, and the same
+ * one five other loops in this tree use. A DESTROYED object is removed and the
+ * index IS stepped, so whatever shifts into that slot is skipped for this
+ * pass. The two branches are four instructions apart and end in
+ * `jmp 0x004578F9` and `jmp 0x004578F8` -- one instruction apart, the `inc`.
+ *
+ * The consequence is small and real: two adjacent destroyed selections leave
+ * the second still in the list, still flagged, until the next call. Nothing
+ * here loops until the list is stable. Reproduced exactly, because a caller
+ * that depends on one pass clearing everything is depending on something the
+ * original does not do.
+ *
+ * ONLY THE DESTROYED PATH CLEARS OBJ_FLAG_SELECTED. The unresolvable path
+ * cannot -- there is no object to clear it on -- so a uid whose object has
+ * been freed leaves no flag behind to worry about, while a destroyed one is
+ * both unlisted and unflagged. The original spells that clear `and ah, 0xFB`,
+ * a byte operation on the second byte of the dword, which is how it stays
+ * distinct from the destroyed-bit test four instructions earlier.
+ *
+ * THE COUNT IS RE-READ FROM THE GLOBAL AT THE BOTTOM OF EVERY ITERATION, which
+ * is what makes removing entries mid-walk safe at all. The items pointer is
+ * re-read at the top for the same reason.
+ *
+ * The callback is called with the object and nothing else, and its answer is
+ * discarded.
+ */
+void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj))
+{
+    int32_t i = 0;
+
+    while (i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+
+        if (!obj) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            continue;                   /* no step: the shifted entry is next */
+        }
+
+        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            i++;                        /* steps -- and so skips one */
+            continue;
+        }
+
+        fn(obj);
+        i++;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -6726,6 +6784,8 @@ void item_install(void)
                   "SpawnRandomBarrage", 1);
     patch_replace(ADDR_SELECT_IF_OWN, (const void *)SelectIfOwn,
                   "SelectIfOwn", 4);
+    patch_replace(ADDR_FOR_EACH_SELECTED, (const void *)ForEachSelected,
+                  "ForEachSelected", 1);
     patch_replace(ADDR_RESET_TYPE2_FIELDS, (const void *)ResetType2Fields,
                   "ResetType2Fields", 2);
     patch_replace(ADDR_RESET_OBJ_ON_COF, (const void *)ResetObjOnCof,

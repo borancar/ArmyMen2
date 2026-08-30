@@ -7699,6 +7699,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00458380, four callers. Select one object if it is ours and selectable,
  * clearing the existing selection first unless a CONTROL key is held. */
 #define ADDR_SELECT_IF_OWN       0x00458380u  /* int32_t(void *obj) */
+/* 0x004578A0, one caller. Call a function for every selected object, dropping
+ * the entries that no longer resolve or have been destroyed on the way past.
+ * Its two removal paths do NOT agree about advancing -- see the source. */
+#define ADDR_FOR_EACH_SELECTED   0x004578A0u  /* void(void (*)(void *)) */
 /* 0x00413710, one caller. Add an object to the selection or take it out,
  * clearing the selection first unless CONTROL is held. */
 #define ADDR_TOGGLE_SELECT       0x00413710u  /* void(void *obj) */
