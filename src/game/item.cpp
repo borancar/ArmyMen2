@@ -438,6 +438,110 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     return 1;
 }
 
+/* 0x00429F40, two callers. ItemPreDestroy's other half: link the object into
+ * every cell list its OBJ_OFF_HIT_RECT covers, and clear the entries it did
+ * not need. Link on placement, unlink before the storage goes back.
+ *
+ * IT IS maprow.cpp's RowRegisterAll, SPECIALISED FOR OBJECTS. Same clip, same
+ * four clamps, same stride, same two loops, same "clear the leftovers" tail --
+ * and the same `cols - 1` on the bottom edge, which MapDescInit's comment
+ * settles: the grid is cols x cols, so cols is the bound the grid actually
+ * has and the ROWS in the guard above is the odd one. Reading that sibling
+ * first would have saved most of this; the image has several such pairs and
+ * the previous commit found another.
+ *
+ * What differs is what the two operate on -- a row's ROW_OFF_RECT, buffer and
+ * DepthLink there, an object's hit rect, OBJ_OFF_CELL_ENTRIES and
+ * ListPushFront here -- and ONE GUARD. RowRegisterAll returns early on
+ * ROW_FLAG_REMOVED; this has no such test, so a caller must not hand it
+ * anything it does not want registered.
+ *
+ * IT IS ALSO THE ANSWER TO WHY ObjectsInRect NEEDS A DE-DUPLICATION RULE. An
+ * object is not in one cell, it is in EVERY cell its hit rect overlaps. So a
+ * walk over a block of cells really would answer the same object several
+ * times, which is exactly what that function's home-cell rule prevents. The
+ * multi-cell registration had been INFERRED there from the de-duplication;
+ * this is the writer that confirms it.
+ *
+ * IT DOES NOT UNLINK FIRST. Every entry is pushed onto a head with no check of
+ * where it already is, so calling this on a still-linked object corrupts both
+ * lists. The caller has to have unlinked it -- which is the asymmetry with
+ * ItemPreDestroy, whose -1 makes it safe to repeat.
+ *
+ * AND IT DOES NOT BOUND ITSELF BY OBJ_OFF_CELL_COUNT. That count is consulted
+ * only by the loop that clears the leftovers; the linking loop writes one
+ * entry per cell covered whatever the array holds, so a hit rect spanning
+ * more cells than the object has entries writes past the end of it. The
+ * original's.
+ *
+ * The two low clamps are branchless in the original -- `setle` on the sign,
+ * `dec`, `and` -- which is max(v, 0) written so that v == 0 takes the same arm
+ * as v < 0. The clearing loop re-reads the byte count every iteration although
+ * nothing changes it, exactly as ItemPreDestroy's does, and it writes the two
+ * links and the index and never the object pointer at +0.
+ */
+void __cdecl ItemLinkCells(void *obj, void *cells)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const uint8_t *d = (const uint8_t *)cells;
+    int32_t        cl, ct, cr, cb;
+    int32_t        cols, rows, shift;
+    int32_t        cell, stride, used;
+
+    cl = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  >> AM2_CELL_SHIFT;
+    ct = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  >> AM2_CELL_SHIFT;
+    cr = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  >> AM2_CELL_SHIFT;
+    cb = *(const int32_t *)(o + OBJ_OFF_HIT_RECT + 12) >> AM2_CELL_SHIFT;
+
+    if (cb < 0)
+        return;
+    rows = *(const int32_t *)(d + MAPDESC_OFF_ROWS);
+    if (ct > rows - 1)
+        return;
+    if (cr < 0)
+        return;
+    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
+    if (cl > cols - 1)
+        return;
+
+    if (cl <= 0)
+        cl = 0;
+    if (ct <= 0)
+        ct = 0;
+    if (cr >= cols - 1)
+        cr = cols - 1;
+    if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
+        cb = cols - 1;
+
+    shift  = *(const int32_t *)(d + MAPDESC_OFF_SHIFT);
+    used   = 0;
+    cell   = (ct << shift) + cl;
+    stride = cols - cr + cl - 1;
+
+    for (; ct <= cb; ct++, cell += stride) {
+        int32_t x;
+
+        for (x = cl; x <= cr; x++, cell++, used++) {
+            uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
+                             + (uint32_t)used * AM2_CELL_ENTRY_STRIDE;
+
+            *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
+            ListPushFront(entry,
+                          (void **)(*(uint8_t **)(d + MAPDESC_OFF_CELLS)
+                                    + (uint32_t)cell * 4));
+        }
+    }
+
+    for (; used < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); used++) {
+        uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
+                         + (uint32_t)used * AM2_CELL_ENTRY_STRIDE;
+
+        *(void **)(entry + 4) = (void *)0;   /* prev, as ListPushFront has it */
+        *(void **)(entry + 8) = (void *)0;   /* next */
+        *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+    }
+}
+
 /* 0x0042A0A0. Unlink an object from every cell list it is registered in,
  * before the storage goes back.
  *
@@ -7184,6 +7288,8 @@ void item_install(void)
                   "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,
                   "ItemPreDestroy", 2);
+    patch_replace(ADDR_ITEM_LINK_CELLS, (const void *)ItemLinkCells,
+                  "ItemLinkCells", 2);
     patch_replace(ADDR_FREE_SUBRECORD_ROWS, (const void *)FreeSubrecordRows,
                   "FreeSubrecordRows", 1);
     patch_replace(ADDR_ITEMS_RESET, (const void *)ItemsReset,

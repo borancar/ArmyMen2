@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d5a4b96`. Working tree clean.
+Last updated: **2026-08-31**, at `32dd3e7`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,232 patches.**
+Nothing uncommitted. **1,233 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2366,16 +2366,55 @@ commit -- gave the right answer every time it was used.
   side that stays in its band cannot be the one that changed. `bootcamp` at
   its floor of 22, `campaign` at 2, both logs and both widget trees identical.
 
+- **`ItemLinkCells`** (`0x00429F40`) is `ItemPreDestroy`'s other half: link the
+  object into every cell list its `OBJ_OFF_HIT_RECT` covers, and clear the
+  entries it did not need.
+
+  **It is `maprow.cpp`'s `RowRegisterAll`, specialised for objects.** Same
+  clip, same four clamps, same stride, same two loops, same tail -- and the
+  same `cols - 1` on the bottom edge, which `MapDescInit`'s comment already
+  settles as the bound the grid actually has. Reading the sibling first would
+  have saved most of the work; that is the second such pair in two commits,
+  and the lesson is to grep the tree for the SHAPE, not only for the address
+  and the name.
+
+  What differs is the record -- a row's rect and buffer and `DepthLink` there,
+  an object's hit rect and `OBJ_OFF_CELL_ENTRIES` and `ListPushFront` here --
+  and one guard: `RowRegisterAll` returns early on `ROW_FLAG_REMOVED` and this
+  has no such test.
+
+  **It is also the answer to why `ObjectsInRect` needs a de-duplication rule.**
+  An object is in EVERY cell its hit rect overlaps, so a walk over a block
+  really would answer it several times. Batch 74 had inferred the multi-cell
+  registration from the de-duplication; this is the writer that confirms it.
+
+  **1,447 calls on a driven Boot Camp mission, and the A/B discriminates it
+  hard.** Taking the stride off by one puts `bootcamp` at 293,671 pixels of
+  786,432 with the log diverging too -- the mission does not finish loading.
+  So this one is genuinely checked rather than merely covered, unlike the two
+  before it.
+
+  **The odd clamp is unobservable here and that is worth saying.** Boot Camp's
+  descriptor reads cols 16, rows 16, shift 4, so `cols - 1` and `rows - 1` are
+  the same number on every map this project drives. The clamp is verified by
+  `MapDescInit`'s sizing argument, not by any run.
+
+- **`mission`'s frame gate failed a fifth time, and a sixth run passed.** The
+  original's side read 25705 against our 6937; earlier the same evening it
+  read 7828 against our 7308 and the gate passed. Ours has now read 6291,
+  7600, 7957, 8082, 7053, 7828 and 6937 across six builds. Nothing else needs
+  saying about it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,078 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,232
+line (0x0045C000) patched**. Measured: **1,079 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,233
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Seventy-eight batches have gone in and the 161 entries outstanding start at 48
+small ones in batches. Seventy-nine batches have gone in and the 160 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

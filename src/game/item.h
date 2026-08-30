@@ -331,6 +331,11 @@ void __cdecl ItemsReset(void);
  * array is freed only when there is one. */
 void __cdecl FreeSubrecordRows(void *subrecord);
 
+/* 0x00429F40, two callers. The other half of ItemPreDestroy: link the object
+ * into every cell list its OBJ_OFF_HIT_RECT covers, and clear the entries it
+ * did not need. It does NOT unlink first. See the definition. */
+void __cdecl ItemLinkCells(void *obj, void *cells);
+
 /* 0x0042A0A0. Unlink an object from every cell list it is registered in.
  * Each unlink writes -1 back, so a second call returns on the first entry --
  * and entry zero's index is tested BEFORE the loop as well as inside it. */

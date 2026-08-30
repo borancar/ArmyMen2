@@ -723,6 +723,19 @@ second patch had not been added yet. Three near-misses now, each caught by a
 different mechanism. **Before reconstructing anything, grep the tree for the
 address as well as for the name.**
 
+**And grep for the SHAPE, which neither the address nor the name will find.**
+This image specialises one routine for two record types more than once, and
+two consecutive commits found a pair each: `SettlePointInRegion` is
+`NearestAllowedTile`'s spiral run under the default rule, and `ItemLinkCells`
+is `RowRegisterAll`'s cell registration done to an object instead of a row --
+same clip, same four clamps, same stride, same two loops, same tail, differing
+only in which record's fields they read and in one guard apiece. Both siblings
+were ALREADY reconstructed, and in both cases the sibling's comment held the
+answer to the very thing that looked odd in the new one: `RowRegisterAll`
+already carried "COLS, not ROWS" for a clamp I was about to re-derive. The
+tell is cheap -- a disassembly that feels familiar probably is -- and the
+neighbours in `orig.h` are where to look.
+
 **`NearestPalIndex`'s output is 39% of the frame, and its `from` guard is not
 checked at all.** Making it pick a far entry instead of a near one puts
 `bootcamp` at 306,886 differing pixels, so the choice is thoroughly observed.

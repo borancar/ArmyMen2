@@ -8832,6 +8832,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The object's REGISTRATION table -- a byte count and an array of 0x10-byte
  * entries, each holding the index of the cell list it is linked into. -1 is
  * "not linked", which is what the teardown writes back. */
+/* 0x00429F40, two callers. The link half: one entry per cell the object's
+ * OBJ_OFF_HIT_RECT covers, each pushed onto that cell's head. It is the reason
+ * ADDR_OBJECTS_IN_RECT needs a de-duplication rule at all -- an object really
+ * is in several cells. Reconstructed in item.cpp beside ADDR_ITEM_PRE_DESTROY,
+ * which is the unlink half. */
+#define ADDR_ITEM_LINK_CELLS   0x00429F40u  /* void(obj, cells) */
 #define OBJ_OFF_CELL_COUNT     0x8Cu   /* uint8_t */
 #define OBJ_OFF_CELL_ENTRIES   0x90u
 #define AM2_CELL_ENTRY_STRIDE  0x10u
