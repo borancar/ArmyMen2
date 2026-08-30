@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `96a0174`. Working tree clean.
+Last updated: **2026-08-31**, at `cb678fb`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,234 patches.**
+Nothing uncommitted. **1,235 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2438,16 +2438,67 @@ commit -- gave the right answer every time it was used.
   2,512 times a mission. The guards, the realloc, the entry initialisation and
   the relink stay verified by reading.
 
+- **`AiStepIgnore`** (`0x00407BF0`) is eighty bytes and the identification is
+  the point of it. `0x00407F80` builds an AI context and dispatches on
+  `OBJ_OFF_AI_MODE` through an eight-entry jump table at `0x0040803C`:
+
+  | mode | arm |
+  |---|---|
+  | 0 | `0x00407710` directly |
+  | 1, 4, 5 | `0x00407560` -- 5 is `evade` |
+  | 2 | this -- `ignore` |
+  | 3 | `0x00407C80` |
+  | 6 | `0x00407BD0`, forwarding to `0x00407710` -- `attack` |
+  | 7 | `0x00407640` -- `defend` |
+
+  Six handlers for eight modes. The numbers are not this file's guess:
+  `tests/actions-reference.txt` settled them from the shipped scripts long
+  before the table was read -- attack 6, defend 7, ignore 2, evade 5 -- and the
+  table lands them where they make sense, `attack` reaching the largest handler
+  in the band through a pass-through thunk `orig.h` had noticed and could not
+  explain. Two independent routes to one fact.
+
+  **`OBJ_OFF_FIELD_E4` is `OBJ_OFF_AI_MODE` now.** Two comments in `orig.h`
+  already called it the AI mode in prose while the macro did not, which is the
+  drift the naming rule exists to stop.
+
+  **What `ignore` does**: past `AM2_AI_ARRIVED_DIST` from its remembered
+  destination it keeps going; on arrival it clears the destination and will
+  then turn only for an unreacted hit or, after a delay, for the bearing the
+  context found. The hit is CONSUMED either way -- the clear sits outside the
+  test that acts on it -- so a unit hit while the context holds an object at
+  `AICTX_OFF_OBJ_10` forgets the hit without turning.
+
+- **A reader settled what four writers could not, and the field still is not
+  renamed.** `orig.h` records `OBJ_OFF_SCRIPT_STATE` (0xB4) as UNRESOLVED:
+  writers put points into it, readers compare it against script values.
+  `ADDR_AI_BUILD_CONTEXT` tests it with `cmp word` and hands `&obj[0xB4]` to
+  `ApproxDist` as a `const AM2_Point *` against the object's own position,
+  and `AiStepIgnore` reads that distance as "how far to where I am going".
+  A packed point is the only reading under which any of it means anything.
+  Recorded as a fourth vote rather than acted on: two readers still say script
+  value and are not obviously reading the wrong object, so the honest state is
+  an overloaded field or a name not yet found, not a majority.
+
+- **Unreachable here, by four measurements rather than one.** The counter is 0
+  on a driven Boot Camp mission; `setaimode` appears in NEITHER drivable map
+  -- `bootcamp` and `kitchen` issue it zero times, while `ignore` appears 42
+  times across 8ball, airborne, fortress, frontyard, mania and playset -- and
+  the two code paths that also write mode 2, `Type2ActionB` and
+  `ResetObjOnCof`, both read 0 on the same run. Grepping the data answers "can
+  a script reach this" and not "can anything reach this"; the two extra
+  counters are what closed that gap.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,080 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,234
+line (0x0045C000) patched**. Measured: **1,081 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,235
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty batches have gone in and the 159 entries outstanding start at 48
+small ones in batches. Eighty-one batches have gone in and the 158 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -650,6 +650,29 @@ it takes the "or it is mine" arm and never reaches the comparison at all.
 Clicking row 1 as well puts the inverted guard 584 pixels out. Before
 believing a configuration covers a branch, ask which arm the input takes.
 
+**The AI MODES are an eight-arm jump table, and the numbers the scripts write
+land on it.** `0x00407F80` builds a context and dispatches on
+`OBJ_OFF_AI_MODE` through `0x0040803C`: index 0 goes straight to `0x00407710`,
+1, 4 and 5 SHARE one arm, 2 is `ignore`, 3 is `0x00407C80`, 6 is `attack` and
+reaches `0x00407710` through the pass-through thunk `orig.h` had noticed and
+could not explain, 7 is `defend`. Six handlers for eight modes -- the
+slots-sharing-an-arm case again, and another reason to read the table rather
+than the layout.
+
+The mode numbers were not guessed here: `tests/actions-reference.txt` settled
+them from the shipped scripts long before this table was read, and the two
+agree. Two independent routes to the same fact, which is what makes it worth
+recording rather than a plausible mapping.
+
+**And the `ignore` arm cannot run in this environment, by four measurements
+rather than one.** Its counter is 0 on a driven Boot Camp mission; `setaimode`
+appears in NEITHER drivable map -- `bootcamp` and `kitchen` issue it zero
+times, while `ignore` appears 42 times across 8ball, airborne, fortress,
+frontyard, mania and playset; and the two code paths that also write mode 2,
+`Type2ActionB` and `ResetObjOnCof`, both read 0 on the same run. Grepping the
+data answers "can a script reach this"; it does not answer "can anything
+reach this", and the two counters are what closed the gap.
+
 **Before reconstructing a function reached from a SCRIPT ACTION, grep the
 shipped data for the keyword.** `SelectUnit` (`0x00427CE0`) has fifteen
 callers and reaches none of them here: its script route is the `group` action,
@@ -2678,7 +2701,8 @@ exact oracle**, however meaningful it is when it is set.
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
-  `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, and `RefreshScreen` —
+  `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`, and
+  `RefreshScreen` —
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and

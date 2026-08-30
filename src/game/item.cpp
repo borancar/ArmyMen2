@@ -3659,7 +3659,7 @@ void __cdecl Type2ActionB(void *obj)
 
     *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
-    *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 2;
+    *(int32_t *)(o + OBJ_OFF_AI_MODE) = 2;
 
     SetSoldierKind(o, 8);
 
@@ -4195,8 +4195,8 @@ void __cdecl PointActionA(void *obj, uint32_t point)
         (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0) ? 1 : 0;
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) = point;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_E4) == 3)
-        *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 1;
+    if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) == 3)
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
 }
 
 /* 0x004480E0, three callers. Type2ActionB's sibling and the same shape: the
@@ -6280,7 +6280,7 @@ void __cdecl ObjToAI(void *obj)
         *(int32_t *)(o + UNIT_OFF_FIRE_ACTIVE) = 0;
 
     if (*(const int32_t *)(o + OBJ_OFF_SARGE))
-        *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 6;
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 6;
 }
 
 /* SetKindFrames -- original 0x0045B000, three callers, and the other writer of
@@ -6575,7 +6575,7 @@ void __cdecl ResetObjOnCof(void *obj)
     if (*(const int32_t *)(o + OBJ_OFF_SARGE))
         return;
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_E4) = 2;
+    *(int32_t *)(o + OBJ_OFF_AI_MODE) = 2;
 }
 
 /* SelectRankedWeapon -- original 0x00406AB0, and SelectBestWeapon's twin. Same

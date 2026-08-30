@@ -39,6 +39,11 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to);
  * the object asking. See region.cpp for why it lives here. */
 void __cdecl SetPointRule(void *obj);
 
+/* 0x00407BF0, one caller. The `ignore` arm of the AI mode dispatcher at
+ * 0x00407F80 -- mode 2. Walk to the remembered destination; on arrival, turn
+ * only for an unreacted hit or, after a delay, for what the context found. */
+void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

@@ -1763,9 +1763,9 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
             continue;
         }
 
-        *(int32_t *)(obj + OBJ_OFF_FIELD_E8) =
-            *(const int32_t *)(obj + OBJ_OFF_FIELD_E4);
-        *(int32_t *)(obj + OBJ_OFF_FIELD_E4) = value;
+        *(int32_t *)(obj + OBJ_OFF_AI_MODE_PREV) =
+            *(const int32_t *)(obj + OBJ_OFF_AI_MODE);
+        *(int32_t *)(obj + OBJ_OFF_AI_MODE) = value;
 
         i++;
     }

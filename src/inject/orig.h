@@ -2746,6 +2746,38 @@
 #define SIGHT_OFF_ENABLED_30   0x30u
 #define SIGHT_OFF_MAX_RANGE    0x3Cu
 #define SIGHT_OFF_ENABLED_40   0x40u
+
+/* The AI CONTEXT, a 0x44-byte record 0x00407D70 builds from the object and
+ * hands to whichever arm of the mode dispatcher runs. Only what is read by a
+ * reconstructed arm is named; the rest of it is unread here.
+ *
+ * +0x00 and +0x10 are objects resolved from the uids at OBJ_OFF_UID_C4 and
+ * OBJ_OFF_UID_CC, each dropped if it is gone or flagged. +0x14 and +0x18 are
+ * the range and bearing to the second of those, from ADDR_DIST_AND_ANGLE --
+ * the same {object, range, bearing} triple the SIGHT_OFF_ block uses, which
+ * is why the offsets coincide and is not a reason to share the names. +0x1C
+ * is what 0x00403B40 answered. +0x28 is ApproxDist from the object's position
+ * to the destination point it remembers, computed only when that point is
+ * non-zero. */
+#define AICTX_OFF_OBJ_10       0x10u
+#define AICTX_OFF_RANGE        0x14u
+#define AICTX_OFF_BEARING      0x18u  /* uint8_t */
+#define AICTX_OFF_FOUND        0x1Cu
+#define AICTX_OFF_DEST_DIST    0x28u
+#define AM2_AI_ARRIVED_DIST    0x20   /* nearer than this counts as arrived */
+#define AM2_AI_TURN_DELAY_MS   0x82u
+/* 0x00407F80, the AI mode dispatcher: build the context with 0x00407D70, then
+ * an eight-entry jump table at 0x0040803C on OBJ_OFF_AI_MODE. Indices 1, 4 and
+ * 5 share one arm, so there are six handlers for eight modes. Read the table,
+ * not the layout. */
+#define ADDR_AI_STEP           0x00407F80u  /* void(obj, out, int32) */
+#define ADDR_AI_JUMP_TABLE     0x0040803Cu
+#define ADDR_AI_BUILD_CONTEXT  0x00407D70u  /* void(obj, ctx *) */
+/* The step every arm but this one shares, nine call sites. Unnamed: nothing
+ * in it says what it is and this file will not guess from a call site. */
+#define ADDR_AI_407190         0x00407190u  /* void(obj, out, ctx, int32) */
+/* 0x00407BF0, one caller -- the `ignore` arm, mode 2. Reconstructed. */
+#define ADDR_AI_STEP_IGNORE    0x00407BF0u  /* void(obj, out, const void *) */
 #define SIGHTOUT_OFF_HIT       0x04u
 #define SIGHTOUT_OFF_X         0x18u  /* int16 */
 #define SIGHTOUT_OFF_Y         0x1Au  /* int16 */
@@ -4903,8 +4935,12 @@ typedef struct {
  * a different action. It pushes field 0xE4 into 0xE8 before overwriting it,
  * which is the one-deep save EvtPushObjCtx does with globals. */
 #define ADDR_EVT_ARMY_SET_FIELD  0x0041FA10u  /* void(army, filter, value) */
-#define OBJ_OFF_FIELD_E4         0xE4u
-#define OBJ_OFF_FIELD_E8         0xE8u  /* the previous value of 0xE4 */
+/* The AI MODE, which two comments in this file already called by that name
+ * while the macro did not. 0x00407F80 dispatches an eight-entry jump table
+ * on it and tests/actions-reference.txt gives the numbers the scripts
+ * write: attack 6, defend 7, ignore 2, evade 5. */
+#define OBJ_OFF_AI_MODE          0xE4u
+#define OBJ_OFF_AI_MODE_PREV     0xE8u  /* the previous value of it */
 #define ADDR_EVT_SET_MODE_F0     0x0041FAE0u  /* void(uid, int32), +0xF0, type 2/3/8 */
 #define ADDR_EVT_SET_MODE_94     0x0041FB10u  /* void(uid, int32), +0x94, type 2/3/8 */
 #define ADDR_EVT_SET_FLAG810     0x0041FB40u  /* void(uid, int32), flags 0x810 */
@@ -5700,11 +5736,25 @@ typedef struct {
  *
  * Two independent writers agreeing it is a position is the stronger half, but
  * the readers are not obviously wrong either, and nothing here settles which.
- * Left alone until something does; the byte pattern is identical either way,
- * so no code depends on the answer yet. */
+ *
+ * A THIRD KIND OF EVIDENCE ARRIVED WITH THE AI STEP, and it is a reader
+ * rather than a writer, which is what the earlier tally was short of.
+ * ADDR_AI_BUILD_CONTEXT tests the field with `cmp word` -- two bytes, not
+ * four -- and then hands `&obj[0xB4]` to ADDR_APPROX_DIST as its second
+ * `const AM2_Point *`, against the object's own OBJ_OFF_POS as the first,
+ * storing the answer at AICTX_OFF_DEST_DIST. AiStepIgnore then treats that
+ * distance as "how far to the place I am going" and clears the field to
+ * ADDR_ZERO_POINT on arrival. A packed point is the only reading under which
+ * all of that means anything.
+ *
+ * Still not renamed. Four functions now say point and two still say script
+ * value, and the two are not obviously reading the wrong object -- the honest
+ * state is a field the game overloads or a name this file has not found, not
+ * a majority vote. The byte pattern is identical either way, so no code
+ * depends on the answer yet. */
 /* Named structurally: nothing read so far says what any of the three is. The
  * word at 0xB2 is cleared beside the script id, 0xEC is set to whether 0xF4 is
- * positive, and 0xE4 is the AI mode OBJ_OFF_FIELD_E4 already names. */
+ * positive, and 0xE4 is the AI mode OBJ_OFF_AI_MODE names. */
 #define OBJ_OFF_FIELD_B2         0xB2u   /* uint16_t */
 #define OBJ_OFF_FIELD_EC         0xECu   /* int32_t, 0 or 1 */
 #define OBJ_OFF_FIELD_F4         0xF4u   /* int32_t; only its sign is read */
@@ -8038,7 +8088,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * could come from, which is the useful half.
  *
  * The mode is set only when a GATE survives the walk. It starts at 1 and is
- * cleared when two selected units disagree on OBJ_OFF_FIELD_E4, their AI mode,
+ * cleared when two selected units disagree on OBJ_OFF_AI_MODE,
  * with 8 as the wildcard the first unit replaces; an empty selection returns
  * before the dispatch. So "the pointer mode follows the selection" is really
  * "follows a selection that agrees with itself" -- which is why a drive that

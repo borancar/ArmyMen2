@@ -1123,6 +1123,76 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
     }
 }
 
+typedef void (__cdecl *AM2_AiCommonFn)(void *obj, void *out, const void *ctx,
+                                       int32_t flag);
+#define orig_ai_common ((AM2_AiCommonFn)(uintptr_t)ADDR_AI_407190)
+
+/* AiStepIgnore -- original 0x00407BF0, one caller, which is the AI mode
+ * dispatcher at 0x00407F80. THIS IS THE `ignore` ARM, and the identification
+ * is the point of the commit rather than the eighty bytes of body.
+ *
+ * The dispatcher switches on OBJ_OFF_AI_MODE through an eight-entry jump table
+ * at 0x0040803C, and the table is read rather than the layout, which matters
+ * here as much as it ever has: three of the eight indices share one arm.
+ *
+ *     0        -> 0x00407710 directly
+ *     1, 4, 5  -> 0x00407560          (5 is `evade`)
+ *     2        -> this                (`ignore`)
+ *     3        -> 0x00407C80
+ *     6        -> 0x00407BD0, which forwards to 0x00407710   (`attack`)
+ *     7        -> 0x00407640          (`defend`)
+ *
+ * The mode numbers are not this file's guess. tests/actions-reference.txt
+ * settled them from the shipped scripts -- attack 6, defend 7, ignore 2,
+ * evade 5, "neither sequential nor in keyword order" -- and the table lands
+ * them on arms that make sense of that: `attack` reaches the largest handler
+ * in the band through a pass-through thunk orig.h had already noticed and
+ * could not explain, and `ignore` gets the smallest.
+ *
+ * What `ignore` does. If the unit is still more than AM2_AI_ARRIVED_DIST from
+ * the destination it remembers, it keeps the destination -- copying it into
+ * OBJ_OFF_FIELD_C0 first -- and hands off to the common step. Otherwise it has
+ * arrived: the destination is cleared, and the only two things that will turn
+ * it are a hit it has not yet reacted to and, after a delay, the bearing of
+ * whatever the context found. Which is what ignoring an order looks like.
+ *
+ * THE HIT ONLY TURNS IT WHEN THE CONTEXT HAS NO OBJECT AT AICTX_OFF_OBJ_10,
+ * but OBJ_OFF_HIT_DIR is consumed either way -- the clear is outside that
+ * test. So a unit hit while the context holds that object forgets the hit
+ * without acting on it. Reproduced.
+ *
+ * The delay is compared UNSIGNED (`jb`), so a deadline in the future wraps to
+ * a huge number and passes. Written as the original has it.
+ */
+void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t       *w = (uint8_t *)out;
+    const uint8_t *c = (const uint8_t *)ctx;
+
+    if (*(const int32_t *)(c + AICTX_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        orig_ai_common(obj, out, ctx, 0);
+        return;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR)) {
+        if (!*(const void *const *)(c + AICTX_OFF_OBJ_10))
+            w[1] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        *(o + OBJ_OFF_HIT_DIR) = 0;
+    }
+
+    if (*(const int32_t *)(c + AICTX_OFF_FOUND)
+        && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                      - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+           >= AM2_AI_TURN_DELAY_MS)
+        w[1] = *(const uint8_t *)(c + AICTX_OFF_BEARING);
+}
+
 /* ConsiderSighting -- original 0x004074A0, four callers.
  *
  * One observer against one object. Four gates -- both of the record's enable
@@ -1535,6 +1605,8 @@ int region_install(void)
 
     rc |= patch_replace(ADDR_SET_POINT_RULE, (const void *)SetPointRule,
                         "SetPointRule", 4);
+    rc |= patch_replace(ADDR_AI_STEP_IGNORE, (const void *)AiStepIgnore,
+                        "AiStepIgnore", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);
