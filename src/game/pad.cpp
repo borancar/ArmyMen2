@@ -4,6 +4,8 @@
 
 #include "pad.h"
 #include "objtable.h"  /* AM2_Object -- the uid is all this needs */
+#include "objscript.h" /* ObjMatchesSel -- reconstructed */
+#include "crt.h"       /* am2_log */
 #include "misc.h"      /* ScriptCompare -- reconstructed */
 #include "script.h"    /* AllocUid -- reconstructed */
 #include "event.h"     /* EventRegister, EventNotify -- reconstructed */
@@ -60,6 +62,111 @@ void __cdecl ResetPadsAlias(void)
     ResetPads();
 }
 
+/* PadNumberEnter and PadNumberLeave -- originals 0x004376C0 and 0x00437770,
+ * two callers each, both of them ObjTileHook: when an object's tile changes it
+ * works out which pad numbers it has just ENTERED and which it has just LEFT
+ * -- `~old & new` and `~new & old` over a byte per tile -- and runs one of
+ * these on each.
+ *
+ * THE TWO ARE MIRROR IMAGES AND THAT IS WHAT NAMES THE COUNT. Entering bumps
+ * PAD_OFF_ITEM_COUNT and leaving drops it, once per object that matches the
+ * pad's selector; PadFinalise then compares the pad's threshold against it.
+ * The field had been PAD_OFF_CMP_B, which is a position rather than a
+ * meaning, and the leave half settles it in the program's own words: going
+ * below zero logs "pad # %d thinks there are less than zero items on it".
+ *
+ * A PAD WITH NO COMPARISON DOES NOT COUNT AT ALL. `compared` -- set by the
+ * parser when a `<`, `=` or `>` was seen -- chooses between the two arms:
+ * with it, the count moves and PadFinalise decides whether that crossed the
+ * threshold; without it, the object's arrival IS the event and the notify
+ * goes out immediately, type 3 for entering and 2 for leaving. Those are the
+ * same two types PadFinalise sends for a pad with no event id, against the
+ * same pad id, which is why AM2_PAD_NOTIFY_ENTER and _LEAVE were already
+ * named.
+ *
+ * BOTH ARMS TEST THE SELECTOR, and the original really does write the test
+ * twice rather than once above the branch. Reproduced as two calls.
+ *
+ * The underflow is REPAIRED, not just reported: the count is reset to zero
+ * and PadFinalise runs anyway. So a pad that has lost track recovers rather
+ * than latching, and the log line is the only trace.
+ *
+ * The count is re-read from the record every iteration in both, and the
+ * entry index is stepped by two bytes -- these are int16 indices into the pad
+ * array, not pointers. */
+
+typedef struct {
+    int16_t count;
+    int16_t pads[1];    /* really 32; only the count bounds the walk */
+} AM2_PadNumberHead;
+
+void __cdecl PadNumberEnter(void *obj, void *padNumber)
+{
+    const AM2_PadNumberHead *pn = (const AM2_PadNumberHead *)padNumber;
+    uint8_t *pads = (uint8_t *)kPads;
+    int32_t  i    = 0;
+
+    if (pn->count <= 0)
+        return;
+
+    do {
+        uint8_t *pad = pads + (uint32_t)(int32_t)pn->pads[i] * AM2_PAD_STRIDE;
+
+        if (*(const int32_t *)(pad + PAD_OFF_COMPARED)) {
+            if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
+                              *(const int32_t *)(pad + PAD_OFF_TRIGGER), obj)) {
+                *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) += 1;
+                PadFinalise(pad, obj);
+            }
+        } else if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
+                                 *(const int32_t *)(pad + PAD_OFF_TRIGGER),
+                                 obj)) {
+            EventNotify(AM2_PAD_NOTIFY_ENTER,
+                        *(const int32_t *)(pad + PAD_OFF_ID),
+                        obj ? ((const AM2_Object *)obj)->uid : 0,
+                        0, 0, 0, 0, 0, 0, 0);
+        }
+        i++;
+    } while (i < pn->count);
+}
+
+void __cdecl PadNumberLeave(void *obj, void *padNumber)
+{
+    const AM2_PadNumberHead *pn = (const AM2_PadNumberHead *)padNumber;
+    uint8_t *pads = (uint8_t *)kPads;
+    int32_t  i    = 0;
+
+    if (pn->count <= 0)
+        return;
+
+    do {
+        uint8_t *pad = pads + (uint32_t)(int32_t)pn->pads[i] * AM2_PAD_STRIDE;
+
+        if (*(const int32_t *)(pad + PAD_OFF_COMPARED)) {
+            if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
+                              *(const int32_t *)(pad + PAD_OFF_TRIGGER), obj)) {
+                *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) -= 1;
+                if (*(const int32_t *)(pad + PAD_OFF_ITEM_COUNT) < 0) {
+                    am2_log((const char *)AM2_IMAGE(ADDR_STR_PAD_UNDERFLOW),
+                            (int32_t)(((const uint8_t *)pn
+                                       - (const uint8_t *)kPadNumbers)
+                                      / AM2_PAD_NUMBER_STRIDE));
+                    *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) = 0;
+                }
+                PadFinalise(pad, obj);
+            }
+        } else if (ObjMatchesSel(*(const int32_t *)(pad + PAD_OFF_SPECIFIC),
+                                 *(const int32_t *)(pad + PAD_OFF_TRIGGER),
+                                 obj)) {
+            EventNotify(AM2_PAD_NOTIFY_LEAVE,
+                        *(const int32_t *)(pad + PAD_OFF_ID),
+                        obj ? ((const AM2_Object *)obj)->uid : 0,
+                        0, 0, 0, 0, 0, 0, 0);
+        }
+        i++;
+    } while (i < pn->count);
+}
+
 /* PadFinalise -- original 0x004375A0, one caller.
  *
  * Run one pad's trigger for a frame. A pad is a comparison, an "inside" flag,
@@ -99,7 +206,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
 
     if (ScriptCompare(*(const int32_t *)(p + PAD_OFF_CMP_A),
                       *(const int32_t *)(p + PAD_OFF_CMP_OP),
-                      *(const int32_t *)(p + PAD_OFF_CMP_B))) {
+                      *(const int32_t *)(p + PAD_OFF_ITEM_COUNT))) {
         if (*(const int32_t *)(p + PAD_OFF_INSIDE))
             return;
 
@@ -147,6 +254,10 @@ void pad_install(void)
 {
     patch_replace(ADDR_PAD_FINALISE, (const void *)PadFinalise,
                   "PadFinalise", 1);
+    patch_replace(ADDR_PAD_NUMBER_ENTER, (const void *)PadNumberEnter,
+                  "PadNumberEnter", 2);
+    patch_replace(ADDR_PAD_NUMBER_LEAVE, (const void *)PadNumberLeave,
+                  "PadNumberLeave", 2);
     patch_replace(ADDR_RESET_PADS, (const void *)ResetPads, "ResetPads", 0);
     patch_replace(ADDR_RESET_PADS_ALIAS, (const void *)ResetPadsAlias,
                   "ResetPadsAlias", 0);

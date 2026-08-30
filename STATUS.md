@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,202 patches.**
+Nothing uncommitted. **1,204 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1494,16 +1494,50 @@ commit -- gave the right answer every time it was used.
   Multiplayer-only, so no drive here reaches it; `mpoptions`, `multi`,
   `mission` and `combat` are all clean, which says nothing regressed.
 
+- **`PadNumberEnter` and `PadNumberLeave`** (`0x004376C0`, `0x00437770`) are
+  the two halves of the pad walk, reached from `ObjTileHook` when an object's
+  tile changes: it works out which pad numbers were entered and which left --
+  `~old & new` and `~new & old` over a byte per tile -- and runs one of these
+  on each.
+
+  **THE MIRROR NAMED A FIELD, AND THE PROGRAM CONFIRMED IT.** Entering bumps
+  `+0x30` and leaving drops it, once per object matching the pad's selector,
+  and `PadFinalise` compares the pad's threshold against it. That field had
+  been `PAD_OFF_CMP_B` -- a position rather than a meaning -- and the leave
+  half settles it in the original's own words: going below zero logs
+  *"pad # %d thinks there are less than zero items on it"*. It is
+  `PAD_OFF_ITEM_COUNT` now. So a pad's trigger is its threshold against HOW
+  MANY ITEMS ARE STANDING ON IT.
+
+  **A pad with no comparison does not count at all.** `compared` chooses
+  between the arms: with it the count moves and `PadFinalise` decides whether
+  that crossed the threshold; without it the arrival IS the event and the
+  notify goes straight out, type 3 entering and 2 leaving -- the same two
+  types `PadFinalise` sends for a pad with no event id.
+
+  The underflow is REPAIRED and not merely reported: the count is reset to
+  zero and `PadFinalise` runs anyway, so a pad that has lost track recovers
+  rather than latching.
+
+  **Not exercised, and this time the CONTROL is the state rather than a
+  counter.** All nine of Boot Camp's pads read an item count of zero after a
+  driven mission -- and read exactly the same zero under `AM2_NOPATCH=1`, over
+  the same drive, dumped from the game's own memory. So the original does not
+  count on this drive either, and the reconstruction is not merely uncounted:
+  the state it would have written is byte-identical to the original's.
+  `ObjTileChanged` runs 154,184 times in that run, so the layer above is
+  live -- Sarge simply never crosses a pad.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,049 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,202
+line (0x0045C000) patched**. Measured: **1,051 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,204
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Fifty batches have gone in and the 190 entries outstanding start at 48
+small ones in batches. Fifty-one batches have gone in and the 188 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

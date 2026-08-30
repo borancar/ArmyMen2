@@ -4115,6 +4115,13 @@ typedef struct {
 #define ADDR_OBJ_CTX_OBJ_A        0x005122C8u
 #define ADDR_PAD_NUMBERS          0x0051F198u  /* AM2_PadNumber[], stride 76 */
 #define ADDR_PAD_FINALISE         0x004375A0u  /* void(AM2_Pad *, int32_t) */
+/* The two halves of the pad walk, 0x004376C0 and 0x00437770, called from
+ * ADDR_OBJ_TILE_HOOK when an object's tile changes -- once for the pad
+ * numbers it has just entered and once for those it has just left. Mirror
+ * images, which is what makes the item count certain. */
+#define ADDR_PAD_NUMBER_ENTER     0x004376C0u  /* void(obj, AM2_PadNumber *) */
+#define ADDR_PAD_NUMBER_LEAVE     0x00437770u
+#define ADDR_STR_PAD_UNDERFLOW    0x004877C0u
 /* AM2_Pad's fields, named from what PadFinalise does with them. The pad is a
  * TRIGGER: a value, an operator and a threshold that ScriptCompare answers,
  * an "inside" flag, and two event ids with a uid slot each -- one for
@@ -4122,9 +4129,21 @@ typedef struct {
  * what makes the pairing certain: entering clears the LEAVE uid and arms the
  * enter event, leaving does the opposite. */
 #define PAD_OFF_ID                0x00u
+#define PAD_OFF_COMPARED          0x0Cu  /* 1 once a <, = or > was parsed */
+#define PAD_OFF_SPECIFIC          0x10u  /* ObjMatchesSel's `byName` */
+#define PAD_OFF_TRIGGER           0x14u  /* its selector: flags, or a name */
+#define AM2_PAD_STRIDE            72u
+#define AM2_PAD_NUMBER_STRIDE     76u
 #define PAD_OFF_CMP_OP            0x18u  /* ScriptCompare's middle argument */
-#define PAD_OFF_CMP_A             0x1Cu
-#define PAD_OFF_CMP_B             0x30u
+#define PAD_OFF_CMP_A             0x1Cu  /* the threshold the script wrote */
+/* ScriptCompare's THIRD argument, and the program names it: the leave half of
+ * the pad walk logs "pad # %d thinks there are less than zero items on it"
+ * when decrementing it goes negative. So a pad's trigger is its threshold
+ * compared against HOW MANY ITEMS ARE STANDING ON IT, and this field is that
+ * count -- bumped by PadNumberEnter and dropped by PadNumberLeave, once per
+ * matching object. It was PAD_OFF_CMP_B, which was a position and not a
+ * meaning. Renamed, not aliased. */
+#define PAD_OFF_ITEM_COUNT        0x30u
 #define PAD_OFF_EVENT_ENTER       0x20u
 #define PAD_OFF_EVENT_LEAVE       0x24u
 #define PAD_OFF_UID_ENTER         0x28u

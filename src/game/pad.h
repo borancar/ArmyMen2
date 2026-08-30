@@ -59,4 +59,13 @@ void pad_install(void);
  * transitions of its comparison and nothing else. */
 void __cdecl PadFinalise(void *pad, void *obj);
 
+/* 0x004376C0 and 0x00437770, two callers each, both ObjTileHook. The two
+ * halves of the pad walk: when an object's tile changes, every pad number it
+ * entered gets the first and every one it left gets the second. A pad with a
+ * comparison counts the object and hands it to PadFinalise; one without
+ * notifies immediately, type 3 for entering and 2 for leaving. See pad.cpp
+ * for what the leave half's own log line names. */
+void __cdecl PadNumberEnter(void *obj, void *padNumber);
+void __cdecl PadNumberLeave(void *obj, void *padNumber);
+
 #endif /* AM2_PAD_H */
