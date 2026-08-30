@@ -1684,6 +1684,25 @@
 #define ROWSET_OFF_ROWS          0x08u
 #define ROWSET_OFF_RECT          0x10u
 #define AM2_ROW_SPEC_BYTES       0x10u
+/* 0x00434C90, two callers -- BuildRowSet's sibling, one entry earlier, with
+ * the same 0x20-byte header and a different source. Where that one takes a
+ * count and an array of four-int32 specs, this takes a DEF record and reads
+ * the count, the specs and the rect out of it; and its specs are TWELVE bytes
+ * rather than sixteen. */
+#define ADDR_BUILD_ROWS_FROM_DEF 0x00434C90u /* void(set,def,x,y,objFlags) */
+#define ROWSET_OFF_DEF           0x00u  /* BuildRowSet zeroes this; this one
+                                         * stores the def it was built from */
+#define ROWSET_OFF_SUBREC        0x0Cu  /* def + 0x10, or NULL */
+#define DEFROWS_OFF_COUNT        0x08u
+#define DEFROWS_OFF_SPECS        0x0Cu
+#define DEFROWS_OFF_SUBREC       0x10u
+#define DEFROWS_OFF_HAS_SUBREC   0x1Cu
+#define DEFROWS_OFF_RECT         0x20u
+#define DEFSPEC_OFF_SPRITE       0x00u  /* AM2_Sprite *, to RowInit */
+#define DEFSPEC_OFF_DX           0x04u  /* int16 */
+#define DEFSPEC_OFF_DY           0x06u  /* int16 */
+#define DEFSPEC_OFF_DEPTH        0x08u  /* int16 -> ROW_OFF_FIELD_26 */
+#define AM2_DEFSPEC_BYTES        0x0Cu
 /* The left and top of the visible-area rectangle -- these are its first two
  * fields, not two loose globals: RedrawMapRegion is called with 0x00514E14
  * itself as its AM2_Rect *, which the trace shows plainly, so the four edges

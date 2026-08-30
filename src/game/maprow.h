@@ -68,4 +68,9 @@ int maprow_install(void);
  * row's lut is the one that doubles. */
 int16_t __cdecl RowAnimField4(const void *row, uint16_t id);
 
+/* 0x00434C90, two callers. BuildRowSet's sibling, driven by a def record with
+ * twelve-byte specs instead of a count and sixteen-byte ones. */
+void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
+                              uint32_t objFlags);
+
 #endif

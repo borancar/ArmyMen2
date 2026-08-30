@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,178 patches.**
+Nothing uncommitted. **1,179 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1014,16 +1014,41 @@ count. A rule that has been ignored five times should be turned into a tool.
   match. Outside a session the guard does not run and the same unit is ours
   like any other.
 
+- **`BuildRowsFromDef`** (`0x00434C90`) is `BuildRowSet`'s sibling one entry
+  earlier, and the two differ in where their input comes from and in their
+  SPEC SIZE: twelve bytes here against sixteen there. Anything that assumes
+  one stride from the other is wrong by a third. It also STORES the def in the
+  header's first dword where `BuildRowSet` zeroes it, which is the only way to
+  tell afterwards which built a given set.
+
+  Its per-row flag depends on the OBJECT, not the spec: bit 0 is set only when
+  the object's x is non-zero AND it is not destroyed. An x of exactly zero is
+  the map's left edge and reachable, so that is a live distinction rather than
+  a null check -- the original tests the same argument it adds to every row's
+  x. Fourth writer of `ROW_OFF_FIELD_26`, and consistent with a depth key.
+
+### A widget diff whose CONTENT said it was the drive
+
+`campaign` failed the widget oracle -- 32 nodes against 35, which is the
+exact comparison with no budget. Reading the diff settled it in seconds and a
+re-run only confirmed it: one side showed the six-button menu and the other a
+scrollable list with a scrollbar and two arrows. **Different SCREENS, not a
+different widget layer.** A defect in the widget code perturbs fields within
+a matching tree; a drive that is a screen behind replaces the tree wholesale.
+
+The re-run was identical at 35 nodes. Worth knowing that this oracle has a
+timing failure mode too, and that its own output distinguishes the two.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,025 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,178
+line (0x0045C000) patched**. Measured: **1,026 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,179
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Twenty-nine batches have gone in and the 214 entries outstanding start at 48
+small ones in batches. Thirty batches have gone in and the 213 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

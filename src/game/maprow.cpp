@@ -1015,10 +1015,97 @@ int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
     return value;
 }
 
+/* BuildRowsFromDef -- original 0x00434C90, two callers, and BuildRowSet's
+ * sibling one entry earlier in the image.
+ *
+ * Build a row set from a DEF record: allocate one block of rows, place each at
+ * its spec's offset from the object's position, give it a depth key and an
+ * entry buffer sized from its sprite, then copy the def's rect into the
+ * header.
+ *
+ * THE TWO DIFFER IN WHERE THEIR INPUT COMES FROM AND IN THEIR SPEC SIZE.
+ * BuildRowSet is handed a count, an array of four-int32 specs and a rect;
+ * this one reads all three out of the def, and its specs are TWELVE bytes --
+ * a sprite dword, two int16 offsets and an int16 depth, with two bytes spare.
+ * Anything that assumes one stride from the other is wrong by a third.
+ *
+ * IT STORES THE DEF IN THE HEADER'S FIRST DWORD, where BuildRowSet zeroes it.
+ * So a set built here remembers what it came from and one built there does
+ * not, which is the only way to tell them apart afterwards.
+ *
+ * THE FLAG WRITTEN ON EACH ROW DEPENDS ON THE OBJECT, NOT THE SPEC, and it is
+ * two conditions: bit 0 is SET only when the object's x is non-zero AND the
+ * object is not destroyed. Every other case clears it. An x of exactly zero is
+ * the map's left edge and reachable, so that is a live distinction and not a
+ * null check in disguise -- the original tests the same argument it also adds
+ * to every row's x.
+ *
+ * A FOURTH WRITER OF ROW_OFF_FIELD_26. The seq adders write 0x3E8 and 1 and
+ * "terrain plus 0x3F2", ApplyHeightItem writes a scaled height, and this
+ * copies an int16 straight out of the spec. Consistent with a depth key and
+ * with nothing else.
+ *
+ * THE SUB-RECORD POINTER IS A POINTER INTO THE DEF, not a copy. The header's
+ * +0x0C gets `def + 0x10` when the def's flag at +0x1C is set and NULL when it
+ * is not -- so the set holds a borrowed pointer whose lifetime is the def's.
+ *
+ * The allocation is `count * 0x60` written as `(n + n*2) << 5`, which is the
+ * row stride; nothing checks it succeeded, as nothing else in this subsystem
+ * does.
+ */
+void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
+                              uint32_t objFlags)
+{
+    uint8_t       *out = (uint8_t *)set;
+    const uint8_t *d   = (const uint8_t *)def;
+    int32_t        n   = *(const int32_t *)(d + DEFROWS_OFF_COUNT);
+    int32_t        i;
+
+    *(const void **)(out + ROWSET_OFF_DEF)   = def;
+    *(int32_t *)(out + ROWSET_OFF_COUNT)     = n;
+    *(void **)(out + ROWSET_OFF_ROWS)        =
+        am2_malloc((size_t)n * AM2_OBJ_ROW_STRIDE);
+
+    for (i = 0; i < *(const int32_t *)(out + ROWSET_OFF_COUNT); i++) {
+        uint8_t *row = *(uint8_t **)(out + ROWSET_OFF_ROWS)
+                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
+        const uint8_t *spec = *(const uint8_t *const *)(d + DEFROWS_OFF_SPECS)
+                              + (size_t)i * AM2_DEFSPEC_BYTES;
+        const uint8_t *spr;
+
+        RowInit(row, *(void *const *)(spec + DEFSPEC_OFF_SPRITE),
+                (int32_t)*(const int16_t *)(spec + DEFSPEC_OFF_DX) + x,
+                (int32_t)*(const int16_t *)(spec + DEFSPEC_OFF_DY) + y);
+
+        if (x && !(objFlags & OBJ_FLAG_DESTROYED))
+            ObjFlagSet0(row);
+        else
+            ObjFlagClear0(row);
+
+        *(int16_t *)(row + ROW_OFF_FIELD_26) =
+            *(const int16_t *)(spec + DEFSPEC_OFF_DEPTH);
+
+        spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
+        RowAlloc(*(const int32_t *)(spr + SPR_OFF_W),
+                 *(const int32_t *)(spr + SPR_OFF_H),
+                 row, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    if (*(const int32_t *)(d + DEFROWS_OFF_HAS_SUBREC))
+        *(const void **)(out + ROWSET_OFF_SUBREC) = d + DEFROWS_OFF_SUBREC;
+    else
+        *(const void **)(out + ROWSET_OFF_SUBREC) = (const void *)0;
+
+    memcpy(out + ROWSET_OFF_RECT, d + DEFROWS_OFF_RECT, 16);
+}
+
 int maprow_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_BUILD_ROWS_FROM_DEF,
+                        (const void *)BuildRowsFromDef,
+                        "BuildRowsFromDef", 2);
     rc |= patch_replace(ADDR_ROW_ANIM_FIELD4, (const void *)RowAnimField4,
                         "RowAnimField4", 2);
     rc |= patch_replace(ADDR_BUILD_ROW_SET, (const void *)BuildRowSet,
