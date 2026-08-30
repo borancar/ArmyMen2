@@ -157,6 +157,12 @@ int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid);
  * it, and grows the table ten entries at a time exactly as AddNameTableName
  * does. Both reproduced. */
 void __cdecl FreeScriptNames(void);
+
+/* 0x0043F6D0, one caller -- the state-2 entry. Empty the name table and put
+ * the nine built-in names back: six army keywords as type 2 with a literal
+ * uid each, and difficulty / systemspeed / numgreen as type 3 with values
+ * taken from the game. `all` and `green` share one uid. See script.cpp. */
+void __cdecl DeclareBuiltinNames(void);
 int32_t __cdecl SaveScriptSection(am2_FILE *fp);
 int32_t __cdecl LoadScriptSection(am2_FILE *fp);
 

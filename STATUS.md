@@ -9,7 +9,7 @@ Last updated: **2026-08-29**, at `f64eade`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,215 patches.**
+Nothing uncommitted. **1,216 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -1842,16 +1842,47 @@ commit -- gave the right answer every time it was used.
   `tools/ab.sh df` is the right configuration for it and came back at **0
   pixels** with an identical 24-message log.
 
+- **`DeclareBuiltinNames`** (`0x0043F6D0`) empties the script name table and
+  puts the nine names every mission may use without declaring back into it.
+  Its caller is the state-2 entry, beside last batch's `LoadDefaultCof`.
+
+  **SIX ARE TYPE 2 AND THREE ARE TYPE 3.** The army keywords and `me` go in as
+  `AM2_NAME_TYPE_REF` with a literal uid apiece; `difficulty`, `systemspeed`
+  and `numgreen` go in as ordinary script INTEGERS with values taken from the
+  game -- and `numgreen` goes in at ZERO, which is why `LoadDefaultCof` can
+  call `SetVarValueByName` on it a moment later and expect it to be there.
+
+  **`all` and `green` are the same value, both 100.** Every other keyword has
+  its own -- tan 200, grey 300, blue 400 -- so this is not a numbering scheme
+  with a gap, it is two names on one uid. Reproduced; nothing says whether
+  "everyone" resolving to the player's own army is deliberate.
+
+  **It names the one `ADDR_SVAR_ID15` holds.** `orig.h` records that global as
+  an id no keyword produces, reachable only because two functions compare a
+  name index against it directly, and leaves the name open. It is `all` --
+  this is the only writer.
+
+  **The alias ratchet fired on the very commit that documents it.** Four of
+  the strings already had names (`ADDR_STR_GREEN`, `_TAN`, `_BLUE`, `_GREY`)
+  and `checkpatches` refused the second set: 25 aliased addresses where the
+  baseline is 21. Grep the address before naming, again.
+
+  **It runs, and the A/B checks the RESULT rather than just the log.**
+  `DeclareBuiltinNames` reads 1 on a Boot Camp mission start, and
+  `ReadScript`'s own summary counts what the table holds -- both sides of
+  `campaign` report `names: 316`, so a wrong declaration would move a number
+  the comparison reads.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,061 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,215
+line (0x0045C000) patched**. Measured: **1,062 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,216
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Sixty-one batches have gone in and the 178 entries outstanding start at 48
+small ones in batches. Sixty-two batches have gone in and the 177 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

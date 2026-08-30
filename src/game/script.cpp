@@ -315,6 +315,73 @@ int32_t __cdecl ScriptFindName(const char *name)
 typedef char *(__cdecl *AM2_StrlwrFn)(char *);
 #define orig_strlwr       ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
 
+/* The nine globals DeclareBuiltinNames fills, each the name table INDEX of
+ * one built-in name. */
+#define g_svarId15        (*(int32_t *)AM2_IMAGE(ADDR_SVAR_ID15))
+#define g_svarGreen       (*(int32_t *)AM2_IMAGE(ADDR_SVAR_GREEN))
+#define g_svarTan         (*(int32_t *)AM2_IMAGE(ADDR_SVAR_TAN))
+#define g_svarBlue        (*(int32_t *)AM2_IMAGE(ADDR_SVAR_BLUE))
+#define g_svarGrey        (*(int32_t *)AM2_IMAGE(ADDR_SVAR_GREY))
+#define g_svarMe          (*(int32_t *)AM2_IMAGE(ADDR_SVAR_ME))
+#define g_svarDifficulty  (*(int32_t *)AM2_IMAGE(ADDR_SVAR_DIFFICULTY))
+#define g_svarSystemSpeed (*(int32_t *)AM2_IMAGE(ADDR_SVAR_SYSTEMSPEED))
+#define g_svarNumGreen    (*(int32_t *)AM2_IMAGE(ADDR_SVAR_NUMGREEN))
+
+/* DeclareBuiltinNames -- original 0x0043F6D0, one caller, and that caller is
+ * the state-2 ENTRY, beside LoadDefaultCof. Empty the script name table and
+ * put the nine names every mission script may use without declaring back into
+ * it.
+ *
+ * SIX ARE TYPE 2 AND THREE ARE TYPE 3, which is the division worth keeping.
+ * The six army keywords and `me` go in as AM2_NAME_TYPE_REF with a literal
+ * value apiece -- the uid each keyword stands for. The last three go in as
+ * AM2_NAME_TYPE_INTEGER, ordinary script variables, with values taken from
+ * the game: the difficulty, ADDR_FAST_MACHINE, and a zero.
+ *
+ * `all` AND `green` ARE THE SAME VALUE, both 100. Every other keyword has its
+ * own -- tan 200, grey 300, blue 400 -- so this is not a numbering scheme
+ * with a gap in it, it is two names on one uid. Reproduced; nothing here says
+ * whether "everyone" resolving to the player's own army is deliberate.
+ *
+ * IT NAMES THE ONE ADDR_SVAR_ID15 HOLDS. orig.h records that global as an id
+ * "no entry in the keyword table produces", reachable only because two
+ * functions compare a name index against it directly, and leaves the name
+ * open. It is `all`: this is the only writer, and `all` is what it stores.
+ *
+ * `numgreen` goes in at ZERO and LoadDefaultCof overwrites it a moment later
+ * with the trooper count, which is why that function can call
+ * SetVarValueByName and expect the name to be there.
+ *
+ * The clear is FreeScriptNames, so a mission entered twice gets a fresh table
+ * both times and the nine indices are re-derived rather than assumed.
+ */
+void __cdecl DeclareBuiltinNames(void)
+{
+    FreeScriptNames();
+
+    g_svarId15 = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_SVAR_ALL),
+                                  AM2_NAME_TYPE_REF, AM2_SVAR_UID_ALL);
+    g_svarGreen = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_GREEN),
+                                   AM2_NAME_TYPE_REF, AM2_SVAR_UID_GREEN);
+    g_svarTan = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_TAN),
+                                 AM2_NAME_TYPE_REF, AM2_SVAR_UID_TAN);
+    g_svarBlue = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_BLUE),
+                                  AM2_NAME_TYPE_REF, AM2_SVAR_UID_BLUE);
+    g_svarGrey = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_GREY),
+                                  AM2_NAME_TYPE_REF, AM2_SVAR_UID_GREY);
+    g_svarMe = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_SVAR_ME),
+                                AM2_NAME_TYPE_REF, AM2_SVAR_UID_ME);
+
+    g_svarDifficulty = AddNameTableName(
+        (const char *)AM2_IMAGE(ADDR_STR_DIFFICULTY), AM2_NAME_TYPE_INTEGER,
+        *(const int32_t *)AM2_IMAGE(ADDR_DIFFICULTY));
+    g_svarSystemSpeed = AddNameTableName(
+        (const char *)AM2_IMAGE(ADDR_STR_SYSTEMSPEED), AM2_NAME_TYPE_INTEGER,
+        *(const int32_t *)AM2_IMAGE(ADDR_FAST_MACHINE));
+    g_svarNumGreen = AddNameTableName(
+        (const char *)AM2_IMAGE(ADDR_STR_NUMGREEN), AM2_NAME_TYPE_INTEGER, 0);
+}
+
 /* 0x0043F910, one caller, and that caller is LoadScriptName. Bind a loaded
  * record to a name in the script name table, INVENTING A FRESH NAME when the
  * one on the file is already taken.
@@ -3426,6 +3493,9 @@ int script_install(void)
     rc |= patch_replace(ADDR_SCRIPT_UNIQUE_NAME,
                         (const void *)ScriptBindUniqueName,
                         "ScriptBindUniqueName", 2);
+    rc |= patch_replace(ADDR_DECLARE_BUILTIN_NAMES,
+                        (const void *)DeclareBuiltinNames,
+                        "DeclareBuiltinNames", 1);
     rc |= patch_replace(ADDR_SCRIPT_TOKEN_NAME,
                         (const void *)ScriptTokenName,
                         "ScriptTokenName", 1);

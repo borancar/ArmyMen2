@@ -4189,6 +4189,35 @@ typedef struct {
  * against this. The group comment above says "uids"; that is right for what a
  * type-0 entry's value holds and wrong for this global. */
 #define ADDR_SVAR_ME              0x00656458u
+/* The other three DeclareBuiltinNames makes, and these are type 3 -- ordinary
+ * script INTEGERS -- where the six above are type 2. Their values come from
+ * the game rather than from a literal: the difficulty, ADDR_FAST_MACHINE, and
+ * a zero that LoadDefaultCof later overwrites with the trooper count. */
+#define ADDR_SVAR_DIFFICULTY      0x0065649Cu
+#define ADDR_SVAR_SYSTEMSPEED     0x00656470u
+#define ADDR_SVAR_NUMGREEN        0x00656350u
+/* The six names' own strings. `all` is the one ADDR_SVAR_ID15 holds the index
+ * of, which is what makes that global's comment concrete: the id is
+ * unreachable through the resolver's jump table and the NAME is `all`. */
+#define ADDR_STR_SVAR_ALL         0x00488900u
+/* The four colour names are ADDR_STR_GREEN, ADDR_STR_TAN, ADDR_STR_BLUE and
+ * ADDR_STR_GREY, already in this file -- the alias ratchet refused a second
+ * set the moment they were added, which is the rule doing its job on the very
+ * commit that documents it. */
+#define ADDR_STR_SVAR_ME          0x004887C8u
+#define ADDR_STR_DIFFICULTY       0x00488898u
+#define ADDR_STR_SYSTEMSPEED      0x0048888Cu
+/* The uids the five keywords stand for. `all` and `green` are the SAME value;
+ * see script.cpp. */
+#define AM2_SVAR_UID_ALL          0x64
+#define AM2_SVAR_UID_GREEN        0x64
+#define AM2_SVAR_UID_TAN          0xC8
+#define AM2_SVAR_UID_BLUE         0x190
+#define AM2_SVAR_UID_GREY         0x12C
+#define AM2_SVAR_UID_ME           1
+/* 0x0043F6D0, one caller -- the state-2 ENTRY, beside LoadDefaultCof. Empty
+ * the script name table and put the nine built-in names back. Reconstructed. */
+#define ADDR_DECLARE_BUILTIN_NAMES 0x0043F6D0u  /* void(void) */
 #define ADDR_SCRIPT_PARSE_VALUE   0x00443010u  /* (ctx,at,&a,&b,&c) */
 #define ADDR_SCRIPT_PARSE_ACTION  0x00440D70u  /* (ctx,at,uint8_t[0x48]) */
 
