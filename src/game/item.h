@@ -224,6 +224,11 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj);
 void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
                              int32_t unusedB, int32_t doubled);
 
+/* 0x0043C000, one caller -- the type-5 stepper, type 5 being the SHOT. Damage
+ * everything at a point that this shot can hit, then ask the terrain whether
+ * it stops there. Answers one of AM2_SHOT_STRUCK_*. */
+int32_t __cdecl ShotStrike(void *shot, uint32_t at, int32_t height);
+
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
  * and not even then for the unit the player is driving. */

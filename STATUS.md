@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `3b15d57`. Working tree clean.
+Last updated: **2026-08-31**, at `0a86c36`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,241 patches.**
+Nothing uncommitted. **1,242 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2689,16 +2689,49 @@ commit -- gave the right answer every time it was used.
   question -- and the two non-zeroes are what make it evidence rather than a
   broken dump.
 
+- **`ShotStrike`** (`0x0043C000`) is what a shot does when it arrives
+  somewhere: damage everything at that point it can hit, then ask the terrain
+  whether it stops there. Its caller is the type-5 stepper, which makes this
+  the first function in the tree to say plainly that **type 5 is the SHOT**.
+
+  **A non-explosive shot stops at the first thing it damages.** After
+  `ApplyShotDamage` the code branches on `TYPEREC_OFF_CODE` and anything other
+  than 3 returns at once, out of the walk. Code 3 carries on down the chain.
+  That single `jne` is the difference between a bullet and a blast.
+
+  **The terrain compare is SIXTEEN BITS wide** -- the tile's `ADDR_TILE_ATTRS`
+  byte sign-extended into DX against BP, the low word of the height argument
+  and not the whole dword. Reproduced with the casts that say so.
+
+  It takes the address of its own by-value point argument and reuses the shot
+  argument's slot as an out parameter; both are MSVC reusing what it was given
+  and both are written out as they are.
+
+  `OBJ_OFF_RANK` (0x98) gains a THIRD meaning: a rank on a trooper, a flag
+  byte on an item, and here the SHOOTER's uid, which this compares against
+  each candidate to skip the unit that fired. Recorded at the field rather
+  than aliased.
+
+- **13,582 calls and the A/B still does not discriminate it.** That is the
+  busiest thing reconstructed in weeks, and making a non-explosive shot
+  penetrate left `combat` clean -- 21 identical messages, frames in step at
+  15796/15611. The reason is the shape of the count, not its size: almost all
+  those calls find nothing at the point and fall through to the terrain test,
+  while the mutated branch sits behind `ApplyShotDamage`, which eight rounds
+  of `combat` reach about six times. **Ask which branch the calls take, not
+  how many there are** -- a five-figure counter here certifies only the path
+  that does nothing.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,087 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,241
+line (0x0045C000) patched**. Measured: **1,088 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,242
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-seven batches have gone in and the 152 entries outstanding start at 48
+small ones in batches. Eighty-eight batches have gone in and the 151 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

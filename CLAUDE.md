@@ -1148,6 +1148,26 @@ stay original and are reached by address, so our code runs in the middle of a
 live path and the A/B compares the result. Nothing had to wait for the layer
 beneath it.
 
+**A HOT function can still be undiscriminated, and `ShotStrike` is the sharp
+example.** It runs **13,582 times** in a driven Boot Camp mission with eight
+rounds of firing -- the busiest thing reconstructed in weeks -- and `combat`
+still cannot see a change to it. Making a non-explosive shot penetrate instead
+of stopping at the first thing it damages left the run clean: 21 identical
+messages, frames in step at 15796/15611, pixels in the usual meaningless band.
+
+The reason is the shape of the call count, not the size of it. Of those 13,582
+calls almost all find nothing at the point and fall straight through to the
+terrain test; the branch the mutation moves is behind ApplyShotDamage, and
+this file already records that eight rounds of `combat` take `DamageObject` to
+SIX. Six shots landing differently is invisible to a configuration whose pixel
+budget is disabled by construction and whose log never mentions a shot.
+
+**So ask which BRANCH the calls take, not how many there are.** A five-figure
+counter reads like thorough coverage and here it certifies only the path that
+does nothing. What would settle it is `tools/objdump.py` on a target's health
+across the two sides, which is the class of check this project already keeps
+for functions that write an object field and return nothing.
+
 **`combat`'s pixel figure is BIMODAL, and both modes are meaningless.** Four
 runs of one build gave 177,112, 716, 177,109 and 684 -- two clusters, three
 pixels apart within each. That is not noise around a mean; it is whether the

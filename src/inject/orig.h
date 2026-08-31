@@ -5529,6 +5529,11 @@ typedef struct {
  * you stand on"; a rank could never make that byte negative. One name, both
  * readings, which is what OBJ_OFF_FIELD_94 already does rather than putting a
  * second name on the offset. */
+/* A THIRD MEANING, and the field is left with the first name. On a type-5
+ * SHOT this holds the SHOOTER's uid: ShotStrike compares it against each
+ * candidate's own uid to skip the unit that fired. So 0x98 is a rank on a
+ * trooper, a flag byte on an item and a uid on a shot -- read the type before
+ * reading the field. */
 #define OBJ_OFF_RANK             0x98u  /* int32_t 0..7, or an item's flag byte */
 #define AM2_RANK_MAX             7
 #define ADDR_TYPE238_ACTION       0x00457CD0u  /* void(void *obj, int32_t) */
@@ -9921,8 +9926,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * The result is clamped to the map bounds and then put through the tile
  * resolver, so a follower is never placed off the map or inside terrain.
  *
- * A slot of 12 or more goes to 0x004042A0 instead, which is not reconstructed
- * and is reached by address. */
+ * A slot of 12 or more goes to ADDR_FORMATION_POINT_FAR instead, which is
+ * reconstructed as FormationPointFar and called by name. */
 /* An 8-bit heading. Read for types 2, 3 and 8 and ADDED to a formation slot's
  * own facing before going to ADDR_COS8/ADDR_SIN8, which mask to 8 bits. */
 #define OBJ_OFF_FACING             0x40u   /* uint8_t */
@@ -9932,6 +9937,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_APPLY_SHOT_DAMAGE     0x0043BBE0u /* void(target,shot,a,b,dbl) */
 #define TYPEREC_OFF_CODE           0x00u  /* 1..30, the switch's subject */
 #define TYPEREC_OFF_DAMAGE         0x1Cu  /* int32_t, the base amount */
+#define TYPEREC_OFF_FIELD_08       0x08u  /* ShotStrike subtracts it from 20 */
+#define TYPEREC_OFF_FIELD_3C       0x3Cu  /* uint8_t; a non-zero one on an ITEM
+                                           * makes ShotStrike leave it alone */
+/* 0x0043C000, one caller -- ADDR_STEP_TYPE5. Reconstructed. */
+#define ADDR_SHOT_STRIKE           0x0043C000u /* int32(shot, packed, height) */
+/* 0x0043BCD0, one caller. Does this shot hit that object? Six arguments and
+ * an out parameter; nothing in it says what it is, so the name is from what
+ * ShotStrike does with the answer. */
+#define ADDR_SHOT_HITS_OBJ         0x0043BCD0u /* int32(target, code, army,
+                                                * height, shot, int32 *out) */
+#define AM2_SHOT_STRUCK_NOTHING    0
+#define AM2_SHOT_STRUCK_HARD       5   /* a flagged tile of weight >= 15 */
+#define AM2_SHOT_STRUCK_GROUND     6
 #define AM2_SHOT_CODE_RANDOM       3      /* 1..damage+1, and kind 1 not 2 */
 #define AM2_SHOT_CODE_ANTI_TROOP   30     /* doubles again against a type 2 */
 #define AM2_SHOT_DAMAGE_KIND       2

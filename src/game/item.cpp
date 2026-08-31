@@ -1933,6 +1933,106 @@ typedef void (__cdecl *AM2_ShooterReactFn)(void *shooter, void *target);
 #define orig_shooter_react \
     ((AM2_ShooterReactFn)(uintptr_t)ADDR_SHOOTER_REACT)
 
+typedef int32_t (__cdecl *AM2_ShotHitsObjFn)(void *target, int32_t code,
+                                             int32_t army, int32_t height,
+                                             void *shot, int32_t *out);
+#define orig_shot_hits_obj ((AM2_ShotHitsObjFn)(uintptr_t)ADDR_SHOT_HITS_OBJ)
+
+/* ShotStrike -- original 0x0043C000, one caller, which is the type-5 stepper.
+ * What a shot does when it arrives somewhere: damage everything at that point
+ * that it can hit, then ask the terrain whether it stops there. The name is
+ * ours; type 5 is the SHOT, which this is the first function in the tree to
+ * say plainly.
+ *
+ * IT TAKES THE ADDRESS OF ITS OWN POINT ARGUMENT and hands it to
+ * ObjectsAtPoint -- the point arrives by value and the original takes `&` of
+ * the stack slot. It reuses the SHOT argument's slot the same way, as the out
+ * parameter for ADDR_SHOT_HITS_OBJ. Both are MSVC reusing what it was given,
+ * and both are written out as they are.
+ *
+ * A NON-EXPLOSIVE SHOT STOPS AT THE FIRST THING IT DAMAGES. After
+ * ApplyShotDamage the code branches on the shot's TYPEREC_OFF_CODE, and
+ * anything other than 3 RETURNS at once -- out of the walk, with
+ * AM2_SHOT_STRUCK_NOTHING. Code 3 carries on down the chain, so it is the one
+ * that hits everything at the point rather than one thing. That single `jne`
+ * is the difference between a bullet and a blast.
+ *
+ * Code 3 also keeps a record of what it did: `20 - TYPEREC_OFF_FIELD_08` into
+ * OBJ_OFF_FIELD_44, for each object it damaged that is neither a trooper nor
+ * an item with TYPEREC_OFF_FIELD_3C set. The same write happens once more in
+ * the terrain test below, so the last one wins and the value does not
+ * accumulate.
+ *
+ * THE TERRAIN COMPARE IS SIXTEEN BITS WIDE. The original sign-extends the
+ * tile's ADDR_TILE_ATTRS byte into DX and compares it against BP -- the low
+ * word of the height argument, not the whole dword. A height above 0xFFFF
+ * therefore wraps into the comparison. Reproduced with the casts that say so.
+ *
+ * The three answers: below the terrain is AM2_SHOT_STRUCK_GROUND, and so is
+ * anything of code 3 that got this far; at or above it, a tile that is both
+ * flagged in ADDR_TILE_FLAGS and of ADDR_CELL_WEIGHTS 15 or more is
+ * AM2_SHOT_STRUCK_HARD; everything else is AM2_SHOT_STRUCK_NOTHING.
+ */
+int32_t __cdecl ShotStrike(void *shot, uint32_t at, int32_t height)
+{
+    uint8_t       *s = (uint8_t *)shot;
+    const uint8_t *rec = *(const uint8_t *const *)(s + OBJ_OFF_FIELD_94);
+    int32_t        code = *(const int32_t *)(rec + TYPEREC_OFF_CODE);
+    uint8_t       *o;
+    uint16_t       tile;
+    int32_t        scratch;
+
+    o = (uint8_t *)ObjectsAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        /* OBJ_OFF_RANK on a SHOT is the shooter's uid -- see orig.h. */
+        if (((const AM2_Object *)o)->uid
+            == *(const uint32_t *)(s + OBJ_OFF_RANK))
+            continue;
+
+        if (!orig_shot_hits_obj(o, code,
+                                *(const int8_t *)(s + OBJ_OFF_ARMY),
+                                height, shot, &scratch))
+            continue;
+
+        ApplyShotDamage(o, shot, (int32_t)at, height, scratch);
+
+        if (code != 3)
+            return AM2_SHOT_STRUCK_NOTHING;
+
+        if (ObjIsType2((const AM2_Object *)o))
+            continue;
+        if (ObjIsItem((const AM2_Object *)o)
+            && *(const uint8_t *)(*(const uint8_t *const *)
+                                      (o + OBJ_OFF_FIELD_94)
+                                  + TYPEREC_OFF_FIELD_3C) > 0)
+            continue;
+
+        *(int32_t *)(s + OBJ_OFF_FIELD_44) =
+            20 - *(const int32_t *)(rec + TYPEREC_OFF_FIELD_08);
+    }
+
+    tile = *(const uint16_t *)(s + OBJ_OFF_TILE);
+
+    if ((int16_t)*(const int8_t *)((*(const uint8_t *const *)
+                                        (uintptr_t)ADDR_TILE_ATTRS) + tile)
+        < (int16_t)height)
+        return AM2_SHOT_STRUCK_GROUND;
+
+    if (code == 3) {
+        *(int32_t *)(s + OBJ_OFF_FIELD_44) =
+            20 - *(const int32_t *)(rec + TYPEREC_OFF_FIELD_08);
+        return AM2_SHOT_STRUCK_GROUND;
+    }
+
+    if (!((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1))
+        return AM2_SHOT_STRUCK_NOTHING;
+    if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[tile] < 0x0F)
+        return AM2_SHOT_STRUCK_NOTHING;
+
+    return AM2_SHOT_STRUCK_HARD;
+}
+
 /* ApplyShotDamage -- original 0x0043BBE0, one caller, 240 bytes. What a shot
  * does to what it hit, and what the shooter does next.
  *
@@ -7415,6 +7515,8 @@ void item_install(void)
                   "ObjCollidesWith", 2);
     patch_replace(ADDR_APPLY_SHOT_DAMAGE, (const void *)ApplyShotDamage,
                   "ApplyShotDamage", 1);
+    patch_replace(ADDR_SHOT_STRIKE, (const void *)ShotStrike,
+                  "ShotStrike", 1);
     patch_replace(ADDR_TROOPER_DROP_ITEM, (const void *)TrooperDropItem,
                   "TrooperDropItem", 1);
     patch_replace(ADDR_USE_INVENTORY_ITEM, (const void *)UseInventoryItem,
