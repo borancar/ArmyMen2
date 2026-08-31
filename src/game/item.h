@@ -238,6 +238,11 @@ void __cdecl RoachBite(void *roach);
  * second of which -- an ADDR_MP_SESSION -- no drive here can satisfy. */
 void __cdecl WeaponRespawn(void *obj);
 
+/* 0x00417930, one caller -- a cheat's effect. Twenty-five armed enemies appear
+ * at random points inside the visible view, each with an explosion where it
+ * lands, all facing ADDR_LISTENER_POS. */
+void __cdecl PortalSpawn(void);
+
 /* 0x0045A620 and 0x0045A770, six and seven callers -- the GENERAL footprint
  * pair, of which the roach pair is the special case. Lay an object's mask over
  * ADDR_CELL_WEIGHTS, or take it off, using the vehicle mask record

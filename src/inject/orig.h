@@ -9170,6 +9170,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * clears the flag. The record is what SetFieldInAll points the leader's
  * weapon field at; "Flame Off!" restores what the object had saved at +0x52C,
  * which is what says the two are the same kind of thing. */
+/* 0x00417930, one caller -- and that caller is the cheat dispatcher two
+ * functions along from the Flame arms, so this is a cheat's effect too:
+ * twenty-five armed enemies appear inside the visible view. Reconstructed. */
+#define ADDR_PORTAL_SPAWN        0x00417930u  /* void(void) */
+#define ADDR_STR_PORTAL_WAV      0x00476B04u  /* "portal2_8bit.wav" */
+#define ADDR_STR_ONE_LETTER      0x00476B00u  /* "a" -- the trooper's name */
+#define AM2_PORTAL_COUNT         0x19   /* 25 of them */
+#define AM2_PORTAL_SPAN_X        0x26C  /* the random point's range, added to */
+#define AM2_PORTAL_SPAN_Y        0x1CC  /* ... the view origin */
+#define AM2_PORTAL_EFFECT        0x85
+#define AM2_PORTAL_ACTION        0xC8   /* handed to ADDR_TYPE238_ACTION */
 #define ADDR_FLAME_ON          0x004FCFA0u  /* int32_t */
 #define ADDR_FLAME_NEXT_MS     0x004FCFA4u  /* uint32_t, game-clock ms */
 #define ADDR_FLAME_RECORD      0x004FCDF8u

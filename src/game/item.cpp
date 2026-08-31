@@ -3558,6 +3558,99 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
 }
 
 
+/* PlayDynamicSound is reconstructed, in win32/audio.cpp. Declared here for the
+ * reason this file already declares PlaySoundAt above. */
+extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
+                                         int32_t unused, int32_t x, int32_t y,
+                                         int32_t slot, int32_t priority,
+                                         uint32_t owner);
+
+/* CreateTrooper and CreateWeapon, both still original -- the type-2 and type-4
+ * arms of the item-create message. */
+typedef void *(__cdecl *AM2_CreateTrooperFn)(const char *name, int32_t x,
+                                             int32_t y, int32_t a, int32_t b,
+                                             int32_t c, int32_t d, int32_t e,
+                                             int32_t f, int32_t g);
+#define orig_create_trooper \
+    ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
+
+/* PortalSpawn -- original 0x00417930, one caller, and that caller is the cheat
+ * dispatcher two functions along from the "Flame On!" arms -- so this is a
+ * cheat's effect too. Twenty-five armed enemies appear at random points inside
+ * the visible view, each with an explosion where it lands.
+ *
+ * THE FOUR WEAPON CODES ARE A STACK ARRAY, not a table in the image: the
+ * original writes 0x1E, 0x0A, 4 and 2 into four locals before the loop and
+ * indexes them with `rand() & 3`. The sign fixup around that AND is MSVC's
+ * signed-remainder idiom, and it cannot fire -- ADDR_GAME_RAND never answers
+ * negative -- but it is reproduced, because a reconstruction that dropped it
+ * would be assuming something about the LCG rather than about this function.
+ *
+ * THE ARGUMENT SHUFFLE IS THE SAME ONE WeaponRespawn HAS. Six dwords go on the
+ * stack, KeyLookupTriple consumes the top three -- two pushed for it and one
+ * already there -- `add esp, 0xc` cleans exactly those, and three fresh pushes
+ * complete CreateWeapon's eight. Written here as the two calls it is.
+ *
+ * The trooper is created with the one-character name "a" and army 1, and the
+ * weapon it gets is stamped with army 1 as well; the pair are then tied
+ * together by uid. Each one ends up facing ADDR_LISTENER_POS -- the player's
+ * ear, not the player's leader -- which is what makes them all turn inward.
+ *
+ * Verified by reading: it needs a cheat typed at the keyboard and no
+ * configuration in tools/ab.sh types one.
+ */
+void __cdecl PortalSpawn(void)
+{
+    static const int32_t kWeapons[4] = { 0x1E, 0x0A, 4, 2 };
+    int32_t i;
+
+    PlayDynamicSound((const char *)(uintptr_t)ADDR_STR_PORTAL_WAV,
+                     0, 0, 0, 0, 0x10, 3, 0);
+
+    for (i = 0; i < AM2_PORTAL_COUNT; i++) {
+        int32_t   x = (int32_t)(orig_game_rand() % AM2_PORTAL_SPAN_X)
+                      + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+        int32_t   y = (int32_t)(orig_game_rand() % AM2_PORTAL_SPAN_Y)
+                      + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
+        uint8_t  *trooper;
+        uint8_t  *weapon;
+        int32_t   pick;
+
+        orig_spawn_at(x, y, AM2_PORTAL_EFFECT, 0, 0, 0, 0, 0, 0, 0);
+
+        trooper = (uint8_t *)orig_create_trooper(
+                      (const char *)(uintptr_t)ADDR_STR_ONE_LETTER,
+                      x, y, 1, 1, 0, 0, 0, 1, 0);
+        if (!trooper)
+            continue;
+
+        pick = orig_game_rand() & 3;
+
+        weapon = (uint8_t *)orig_create_weapon(
+                     (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+                     KeyLookupTriple(AM2_WEAPON_RESPAWN_KEY,
+                                     (uint32_t)kWeapons[pick], 0),
+                     *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                     4, -1, 0, 0);
+        if (!weapon)
+            continue;
+
+        *(uint32_t *)(trooper + UNIT_OFF_INVENTORY) =
+            *(const uint32_t *)(weapon + 4);
+        *(uint8_t *)(weapon + OBJ_OFF_ARMY) = 1;
+
+        SoldierKindForWeapon(
+            trooper, **(const int32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
+        SendTrooperSetWeapon(trooper, *(const uint32_t *)(weapon + 4), 0);
+
+        *(uint8_t *)(trooper + OBJ_OFF_FACING) =
+            AngleBetween((const AM2_Point *)(trooper + OBJ_OFF_POS),
+                         (const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS);
+
+        Type238Action(trooper, AM2_PORTAL_ACTION);
+    }
+}
+
 /* 0x00417810, one caller, on the per-frame path -- and it is the "Flame On!"
  * cheat's actual effect, which is what identifies every global in it. The
  * cheat arm at 0x00417E20 sets ADDR_FLAME_ON and zeroes the clock; the one at
@@ -8504,6 +8597,8 @@ void item_install(void)
     patch_replace(ADDR_ROACH_BITE, (const void *)RoachBite, "RoachBite", 1);
     patch_replace(ADDR_WEAPON_RESPAWN, (const void *)WeaponRespawn,
                   "WeaponRespawn", 8);
+    patch_replace(ADDR_PORTAL_SPAWN, (const void *)PortalSpawn,
+                  "PortalSpawn", 1);
     patch_replace(ADDR_OBJ_SET_FOOTPRINT, (const void *)ObjSetFootprint,
                   "ObjSetFootprint", 6);
     patch_replace(ADDR_OBJ_CLEAR_FOOTPRINT, (const void *)ObjClearFootprint,

@@ -5,11 +5,27 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `bd2f873`. Working tree clean.
+Last updated: **2026-08-31**, at `44ca967`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,281 patches.**
+Nothing uncommitted. **1,282 patches.**
+
+**`PortalSpawn` (`0x00417930`)** -- a cheat's effect, identified by its one
+caller sitting two functions along from the "Flame On!" arms. Twenty-five armed
+enemies appear at random points inside the visible view, each with an explosion
+where it lands, all facing `ADDR_LISTENER_POS`.
+
+**Its four weapon codes are a STACK ARRAY**, not a table in the image: 0x1E,
+0x0A, 4 and 2 written into four locals before the loop and indexed with
+`rand() & 3`.
+
+It is the second function to show MSVC building `CreateWeapon`'s eight
+arguments ACROSS a `KeyLookupTriple` call -- the same shuffle `WeaponRespawn`
+has, now seen twice, which is what makes it an idiom rather than an oddity.
+
+Verified by reading: it needs a cheat typed at the keyboard and no
+configuration types one.
 
 **`InitMenuScreen` (`0x00412E00`)**, which was `ADDR_INIT_DIGIT_TABLE` -- one
 of the five things it does. It frees the old menu sprites, builds two glyph
@@ -3573,13 +3589,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,124 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 115
-outstanding, which is 1,239 minus 1,124 -- from 1,281 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,125 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 114
+outstanding, which is 1,239 minus 1,125 -- from 1,282 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-four batches have gone in and the 115 entries
+small ones in batches. A hundred and twenty-five batches have gone in and the 114 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
