@@ -1164,8 +1164,6 @@ typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 /* Still original. Declared here rather than with the other teardown seams
  * further down, because VehicleDied is above them. */
 typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
-#define orig_obj_clear_footprint \
-            ((AM2_ObjOnlyFn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
 
 /* Still original: the tail both death handlers share, and the ten-argument
  * maker. The second was already declared further down this file, so it moved
@@ -1530,7 +1528,7 @@ void __cdecl VehicleDied(void *obj, uint32_t by)
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
         ObjFlagClear0(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE);
 
-    orig_obj_clear_footprint(o);
+    ObjClearFootprint(o);
 
     if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE) {
         ItemPreDestroyAlias(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
@@ -1976,6 +1974,127 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
         ObjSetRoachFootprint(o);
 
     return o;
+}
+
+/* ObjSetFootprint and ObjClearFootprint -- original 0x0045A620 and 0x0045A770,
+ * six and seven callers. The GENERAL footprint pair, of which the roach pair
+ * above is the special case: same window, same stamp trick, same cell weights,
+ * with the vehicle mask in place of the roach one and a KIND index the roach
+ * has no use for.
+ *
+ * THEY ARE EXACT TWINS AND THE COUNT SAYS SO: 95 instructions each, differing
+ * in four places once branch targets are normalised -- the flag test's sense,
+ * `add 0xF` against `add 0xF1`, TileCoverAdd against TileCoverSub, and the
+ * `or` against the `and`. Nothing else.
+ *
+ * SO THEY SHARE A BODY HERE, AND THE ROACH PAIR ABOVE DOES NOT. That is an
+ * inconsistency inside one file and it is deliberate rather than an oversight:
+ * the 95-against-95 diff is evidence that the two differ in exactly four
+ * places, and a shared body is that evidence written down where it cannot go
+ * stale. The roach pair predates the measurement. If either is changed to
+ * match the other it should be the roach pair, and only after the same diff is
+ * run on it.
+ *
+ * The mask record is [kind * 32 + dir], where the kind is VEHICLE_OFF_KIND and
+ * the direction comes from RoundTo8 over the row's heading plus its bias,
+ * rounded to the animation's own directionBits. Both halves of the slot are
+ * needed and the roach version has only the second.
+ *
+ * The stamp is bumped ONCE PER CALL and compared per cell, so a cell that two
+ * of the mask's points land on is weighted once. It is a different array from
+ * the roach pair's, which is worth stating because the two look
+ * interchangeable: ADDR_OBJ_MARK is at 0x00661E20 and ADDR_ROACH_MARK at
+ * 0x00656128.
+ */
+static void ObjFootprint(void *obj, int32_t set)
+{
+    uint8_t        *o = (uint8_t *)obj;
+    const uint8_t  *rows;
+    const AM2_Anim *anim;
+    int32_t         dir, i, count;
+    int32_t         baseX, baseY;
+    uint32_t        slot;
+    const int16_t  *pts;
+
+    if (set) {
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
+            return;
+    } else {
+        if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON))
+            return;
+    }
+
+    ++*(uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP;
+
+    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+
+    baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
+            - AM2_MASK_WINDOW_HALF;
+    baseY = (*(const int16_t *)(o + OBJ_OFF_POS + 2) >> AM2_MASK_CELL_SHIFT)
+            - AM2_MASK_WINDOW_HALF;
+
+    dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
+                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+                   anim->directionBits) & 0xFF;
+
+    slot = ((uint32_t)dir
+            + (uint32_t)*(const int32_t *)(o + VEHICLE_OFF_KIND) * 32)
+           * AM2_MASK_STRIDE;
+
+    count = *(const int32_t *)((const uint8_t *)
+                AM2_IMAGE(ADDR_VEHICLE_MASK_COUNT) + slot);
+    pts   = (const int16_t *)((const uint8_t *)
+                AM2_IMAGE(ADDR_VEHICLE_MASK) + slot);
+
+    for (i = 0; i < count; i++) {
+        uint32_t  at;
+        uint16_t *mark;
+        int32_t   tile;
+
+        ((int16_t *)&at)[0] = (int16_t)(pts[i * 2]
+                                        + *(const int16_t *)(o + OBJ_OFF_POS));
+        ((int16_t *)&at)[1] = (int16_t)(pts[i * 2 + 1]
+                                        + *(const int16_t *)(o + OBJ_OFF_POS
+                                                             + 2));
+
+        mark = (uint16_t *)(uintptr_t)ADDR_OBJ_MARK
+               + (((int32_t)((int16_t *)&at)[0] >> AM2_MASK_CELL_SHIFT) - baseX)
+                 * AM2_MASK_WINDOW
+               + (((int32_t)((int16_t *)&at)[1] >> AM2_MASK_CELL_SHIFT)
+                  - baseY);
+
+        if (*mark == *(const uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP)
+            continue;
+
+        tile = TileOfPoint(at);
+        if (set) {
+            ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+                += AM2_TILE_COVER_STEP;
+            TileCoverAdd((uint16_t)tile);
+        } else {
+            ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+                -= AM2_TILE_COVER_STEP;
+            TileCoverSub((uint16_t)tile);
+        }
+
+        *mark = *(const uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP;
+    }
+
+    if (set)
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+    else
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
+}
+
+void __cdecl ObjSetFootprint(void *obj)
+{
+    ObjFootprint(obj, 1);
+}
+
+void __cdecl ObjClearFootprint(void *obj)
+{
+    ObjFootprint(obj, 0);
 }
 
 /* AllObjectsInRect is reconstructed, in win32/mapdraw.cpp. Declared here
@@ -3030,7 +3149,7 @@ void __cdecl DestroyType3(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
 
-    orig_obj_clear_footprint(obj);
+    ObjClearFootprint(obj);
 
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
@@ -3674,8 +3793,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
 typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
                                         int32_t dir, int32_t height);
-#define orig_clear_footprint \
-    ((AM2_ObjOnlyFn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
 
 #define orig_spawn_hit_effect \
     ((AM2_HitEffectFn)(uintptr_t)ADDR_SPAWN_HIT_EFFECT)
@@ -3771,7 +3888,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
         ObjFlagClear0(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE);
 
-    orig_clear_footprint(obj);
+    ObjClearFootprint(obj);
 
     if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & 1) {
         ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
@@ -8278,6 +8395,10 @@ void item_install(void)
     patch_replace(ADDR_CREATE_ROACH, (const void *)CreateRoach,
                   "CreateRoach", 2);
     patch_replace(ADDR_ROACH_BITE, (const void *)RoachBite, "RoachBite", 1);
+    patch_replace(ADDR_OBJ_SET_FOOTPRINT, (const void *)ObjSetFootprint,
+                  "ObjSetFootprint", 6);
+    patch_replace(ADDR_OBJ_CLEAR_FOOTPRINT, (const void *)ObjClearFootprint,
+                  "ObjClearFootprint", 7);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,

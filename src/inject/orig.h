@@ -9447,6 +9447,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_VEHICLE_MASK          0x0065A2F4u  /* record [kind*32 + dir]'s
                                                  * POINTS; its count is the
                                                  * dword below */
+/* That dword, named for the same reason ADDR_ROACH_MASK_COUNT is: the two
+ * spellings are how the code reads, one indexed by `slot` for the count and
+ * one for the points four bytes on. */
+#define ADDR_VEHICLE_MASK_COUNT    0x0065A2F0u  /* int32_t, stride AM2_MASK_STRIDE */
+/* The general footprint pair's own scratch, the twin of ADDR_ROACH_MARK and
+ * ADDR_ROACH_MARK_STAMP and at a different address -- the two families do not
+ * share it. A stamp bumped once per call, and one uint16 per cell of the 16x16
+ * window, so a cell two of the mask's points land on is only counted once. */
+#define ADDR_OBJ_MARK              0x00661E20u  /* uint16_t[16 * 16] */
+#define ADDR_OBJ_MARK_STAMP        0x00662020u  /* uint16_t */
 #define AM2_VEHICLE_MASK_KINDS     6
 #define AM2_VEHICLE_MASK_DIRS      32  /* the stride of the kind index */
 #define AM2_VEHICLE_MASK_MIN_SOLID 12  /* of the 64 samples -- NOT the roach's 16 */

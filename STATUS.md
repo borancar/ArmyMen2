@@ -5,11 +5,21 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `863aeff`. Working tree clean.
+Last updated: **2026-08-31**, at `e1d5ee5`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,266 patches.**
+Nothing uncommitted. **1,268 patches.**
+
+**`ObjSetFootprint` and `ObjClearFootprint` (`0x0045A620`, `0x0045A770`)** --
+the GENERAL footprint pair, of which the roach pair is the special case. They
+are exact twins, 95 instructions each, differing in four places once branch
+targets are normalised, so they share a body here and the diff is the argument
+for it.
+
+They are the most heavily exercised thing this session by a wide margin:
+**111,492 and 111,488 calls** on one Boot Camp mission, and the difference of
+four is the objects currently holding a footprint down.
 
 **`RoachBite` (`0x0043D330`).** The roach's attack, in its state 4: step 24
 units along the facing, play a sound there, and damage every object in a 48x48
@@ -3390,13 +3400,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,111 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,266
+line (0x0045C000) patched**. Measured: **1,113 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,268
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twelve batches have gone in and the 128 entries outstanding
+small ones in batches. A hundred and thirteen batches have gone in and the 126 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

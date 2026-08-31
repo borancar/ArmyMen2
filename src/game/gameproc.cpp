@@ -675,8 +675,6 @@ int32_t __cdecl SaveType8(am2_FILE *fp, void *obj)
 /* Still original: the footprint pair SaveType3 brackets its write with, and
  * the weapon lookup SaveType2 tags through. */
 typedef void (__cdecl *AM2_FootprintFn)(void *obj);
-#define orig_clear_footprint ((AM2_FootprintFn)(uintptr_t)ADDR_OBJ_CLEAR_FOOTPRINT)
-#define orig_set_footprint   ((AM2_FootprintFn)(uintptr_t)ADDR_OBJ_SET_FOOTPRINT)
 
 /* 0x00447130 and 0x0045A070 -- the two big per-type savers, and the two that
  * do more than write.
@@ -745,7 +743,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
     if (!o)
         return 0;
 
-    orig_clear_footprint(o);
+    ObjClearFootprint(o);
 
     rec = *(const int32_t *)(o + SAVED_OFF_TABLE_REC3);
     if (rec)
@@ -765,7 +763,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj)
                     (size_t)n * 4, 1, fp);
 
     *(int32_t *)(o + SAVED_OFF_TABLE_REC3) = rec;
-    orig_set_footprint(o);
+    ObjSetFootprint(o);
     return 1;
 }
 

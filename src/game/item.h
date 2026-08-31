@@ -233,6 +233,13 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
  * side. The name is descriptive; nothing in the image names this function. */
 void __cdecl RoachBite(void *roach);
 
+/* 0x0045A620 and 0x0045A770, six and seven callers -- the GENERAL footprint
+ * pair, of which the roach pair is the special case. Lay an object's mask over
+ * ADDR_CELL_WEIGHTS, or take it off, using the vehicle mask record
+ * [kind * 32 + dir]. Gated on OBJ_FLAG_FOOTPRINT_ON each way round. */
+void __cdecl ObjSetFootprint(void *obj);
+void __cdecl ObjClearFootprint(void *obj);
+
 void __cdecl ObjClearRoachFootprint(void *obj);
 
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
