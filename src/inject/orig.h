@@ -6771,6 +6771,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_OFF_INVENTORY        0x54Cu  /* int32_t[6], uids */
 #define UNIT_OFF_INVENTORY_LAST   0x560u  /* the sixth entry */
 #define UNIT_OFF_INVENTORY_SEL    0x568u  /* int32_t, which slot is in hand */
+/* 0x004045E0, 336 bytes, three callers -- read but not reconstructed. Fill a
+ * six-dword struct describing the weapon a unit is HOLDING: take
+ * UNIT_OFF_INVENTORY[UNIT_OFF_INVENTORY_SEL], resolve it to an object, and
+ * write {weapon, kind, damage, min, max, ready} into the caller's buffer at
+ * +0x40..+0x54. A null weapon zeroes the first, the fourth and the sixth and
+ * returns, which is the shape to reproduce first.
+ *
+ * Kind 0x2B takes a fixed range of (r - 4, r + 2); a zero range gives 0x1000
+ * both ways; everything else runs the range through three doubles at
+ * 0x0046F2E0..0x0046F2F0 on the x87 stack, with kind 3 scaling the input
+ * first. Kind 3 also computes `ready` from ADDR_GAME_CLOCK_MS against the
+ * weapon's +0xC4, as an sbb/neg pair -- a comparison written as arithmetic. */
+#define ADDR_UNIT_WEAPON_INFO     0x004045E0u  /* void(unit, out) */
 /* The weapon HANDLER table and the four globals SelectInventorySlot installs
  * out of it. Each record is 16 bytes and the index is the first dword of the
  * weapon's OBJ_OFF_FIELD_C0, so that field is a pointer to a type record
@@ -9989,6 +10002,31 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CREATE_TROOPER      0x00447620u  /* type 2 */
 #define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
+/* 0x00448280, 256 bytes, EIGHT callers -- the multiplayer weapon RESPAWN, read
+ * but not reconstructed. Its four gates are all guards and each one is worth
+ * knowing before trying to exercise it: the object must be ObjIsType4, there
+ * must be an ADDR_MP_SESSION, ADDR_GAME_OVER_FLAGS bit 20 must be set, and
+ * bit 15 of the object's own flags must be clear -- which it then SETS, so the
+ * whole thing fires at most once per weapon.
+ *
+ * It looks a key up with the three-argument 0x004346E0 keyed on 0x2D, hands
+ * the answer to ADDR_CREATE_WEAPON as one of eight arguments, and raises a
+ * delayed EventNotify on the new weapon's uid with a delay of 0x000493E0 --
+ * 300,000 ms, five minutes.
+ *
+ * THE ARGUMENT SHUFFLE IS THE ONLY HARD PART AND IS WRITTEN DOWN HERE SO IT
+ * NEED NOT BE RE-DERIVED. Eight dwords are pushed, the key lookup consumes the
+ * top three and `add esp, 0xc` removes exactly those, and the five that remain
+ * become CreateWeapon's last five arguments under three fresh pushes. MSVC
+ * builds one call's arguments across another call; a reading that pairs each
+ * push with the nearest call gets both wrong.
+ *
+ * Not reconstructed because it cannot be exercised: no DirectPlay session can
+ * be opened here, so ADDR_MP_SESSION is 0 on every drive and the first gate
+ * always refuses. */
+#define ADDR_WEAPON_RESPAWN      0x00448280u  /* void(void *weapon) */
+#define AM2_WEAPON_RESPAWN_MS    0x000493E0  /* 300,000 -- five minutes */
+#define AM2_WEAPON_RESPAWN_KEY   0x2D
 /* Reconstructed, and its SIGNATURE WAS WRONG HERE: `void(obj, int32)` said
  * the first argument is an object, and the function opens with `cmp eax, 4;
  * jge` and returns. It is (army, packed point). armymsg.cpp's RecvItemCreate
