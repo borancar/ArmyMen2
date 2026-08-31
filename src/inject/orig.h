@@ -2962,6 +2962,31 @@
 /* 0.75, and it has no counterpart in the SIGHTC path -- UnitWeaponInfo uses
  * ADDR_WEAPON_RANGE_LO, which is 0.9. Named separately for that reason. */
 #define ADDR_SIGHT_RANGE_WANT  0x0046F2F8u  /* double, 0.75 */
+#define SIGHT_OFF_SEED         0x2Cu  /* uint8_t, a fresh GameRand each build */
+/* 0x00407D70, one caller -- the 0x00407F80 dispatcher, whose `sub esp, 0x44`
+ * is this record's LENGTH. Build the sight record an AI mode arm reads:
+ * resolve the leader and the target, measure to each, ask ADDR_SCAN_403B40
+ * what is in view, and describe the held weapon.
+ *
+ * ITS TWIN IS 0x00408060 AND THEY ARE LESS ALIKE THAN THEY LOOK. That one
+ * fills a 0x40-byte record -- `rep stos` of 0x10 dwords against this one's
+ * 0x11 -- and differs in three ways, not one: it measures from the object's
+ * raw OBJ_OFF_POS where this measures from ADDR_OBJ_ANCHOR_POINT; it resolves
+ * a FORMATION point for the leader where this copies the leader's position;
+ * and it writes fixed ranges where this reads the weapon. Its tail fields sit
+ * one dword lower for want of the KIND field, which is exactly the four bytes
+ * between 0x40 and 0x44.
+ *
+ * A DEAD LEADER CLEARS THE TARGET UID, not the follow uid its two neighbour
+ * arms clear. Both builders do it identically, so it is the original's
+ * behaviour and not a slip in one place -- which is what a single sighting
+ * would have suggested. Reproduced.
+ *
+ * Reconstructed as AiBuildContext; ADDR_AI_BUILD_CONTEXT below is its
+ * address, and was already on it. */
+#define OBJ_OFF_FIELD_110      0x110u  /* ADDR_SCAN_403B40's fifth argument */
+#define OBJ_OFF_FIELD_114      0x114u  /* and its fourth */
+#define AM2_SIGHT_DROP         (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED)
 
 /* The rest of the SAME RECORD, which the AI arms call a context and
  * ConsiderSighting calls a sight. 0x00407D70 builds it, 0x00407F80 hands it to

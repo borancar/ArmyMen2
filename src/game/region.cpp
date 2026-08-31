@@ -1872,10 +1872,8 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
     ConsiderSighting(obj, out, ctx);
 }
 
-typedef void (__cdecl *AM2_AiBuildCtxFn)(void *obj, void *ctx);
 typedef void (__cdecl *AM2_AiBodyFn)(void *obj, void *out, void *ctx);
 
-#define orig_ai_build_ctx ((AM2_AiBuildCtxFn)(uintptr_t)ADDR_AI_BUILD_CONTEXT)
 #define orig_ai_attack_body ((AM2_AiBodyFn)(uintptr_t)ADDR_AI_ATTACK_BODY)
 
 /* AiStepAttack -- original 0x00407BD0, one caller. Mode 6, and it forwards its
@@ -1932,7 +1930,7 @@ void __cdecl AiStep(void *obj, void *out)
     if (!obj)
         return;
 
-    orig_ai_build_ctx(obj, ctx);
+    AiBuildContext(obj, ctx);
 
     switch (*(const uint32_t *)(o + OBJ_OFF_AI_MODE)) {
     case 0:  orig_ai_attack_body(obj, out, ctx); break;
@@ -2862,6 +2860,153 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 }
 
 
+typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
+                                       void *a, void *b, int32_t z);
+#define orig_scan_403b40  ((AM2_ScanFn)(uintptr_t)AM2_IMAGE(ADDR_SCAN_403B40))
+#define kRangeWant (*(const double *)AM2_IMAGE(ADDR_SIGHT_RANGE_WANT))
+#define kRangeHi   (*(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_HI))
+
+/* One of the two reference blocks both builders share: resolve a uid to an
+ * object and drop it if it has gone, been destroyed, been concealed, or is at
+ * zero health. Returns the object, or null when the caller should skip.
+ *
+ * THE ZERO-HEALTH ARM CLEARS THE TARGET UID EVEN WHEN IT IS THE LEADER BEING
+ * resolved, which is why `dead_clears` is a separate parameter rather than
+ * being the same field as `uid`. Both builders in the image do this
+ * identically, so it is the original's behaviour rather than a slip in one of
+ * them -- a single sighting would have read as a typo. Reproduced.
+ */
+static uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void **slot)
+{
+    uint8_t *t;
+
+    if (!*uid)
+        return NULL;
+
+    t = (uint8_t *)LookupByUID(*uid);
+    *slot = t;
+
+    if (!t) {
+        *uid = 0;
+        return NULL;
+    }
+    if (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP) {
+        *uid  = 0;
+        *slot = NULL;
+        return NULL;
+    }
+    if (*(const int16_t *)(t + OBJ_OFF_HEALTH) == 0) {
+        *dead_clears = 0;
+        *slot        = NULL;
+        return NULL;
+    }
+    return t;
+}
+
+/* AiBuildContext -- original 0x00407D70, one caller: the AI mode
+ * dispatcher at 0x00407F80, whose `sub esp, 0x44` is this record's LENGTH.
+ * Fill the sight record every mode arm below then reads -- the leader and the
+ * way to them, the target and the way to it, whatever ADDR_SCAN_403B40 has in
+ * view, and a description of the weapon in hand.
+ *
+ * ITS TAIL IS WHAT NAMED THREE FIELDS CORRECTLY. SIGHT_OFF_WEAPON and
+ * SIGHT_OFF_READY were ENABLED_30 and ENABLED_40, taken off ConsiderSighting,
+ * which only tests them -- and a pointer and a flag both read as "enabled"
+ * there. This is the writer: +0x30 is the weapon object, +0x40 is whether its
+ * cooldown has elapsed, and +0x3C really is a maximum range, scaled by the
+ * same named ADDR_WEAPON_RANGE_HI that UnitWeaponInfo uses for the SIGHTC
+ * record. See orig.h; the identical mistake had already been made and fixed
+ * one record over.
+ *
+ * IT MEASURES FROM THE ANCHOR POINT, NOT THE POSITION. ADDR_OBJ_ANCHOR_POINT
+ * is taken once at the top and is the first argument to both DistAndAngle
+ * calls -- but NOT to the ApproxDist below them, which uses the raw
+ * OBJ_OFF_POS. Two notions of where the object is, in one function, and the
+ * twin at 0x00408060 uses the raw position for all three.
+ *
+ * THE TWIN IS LESS ALIKE THAN IT LOOKS. It fills 0x40 bytes to this one's
+ * 0x44, resolves a FORMATION point for the leader where this copies the
+ * leader's position, and writes fixed ranges where this reads the weapon --
+ * 48 and 70, which are this function's own 0.75 and 1.1 over a default range
+ * of 64. Three differences, not one.
+ *
+ * A ZERO-HEALTH LEADER CLEARS THE TARGET UID rather than the follow uid its
+ * two neighbouring arms clear. Both builders do it, so it is the original's
+ * behaviour; see SightResolve.
+ *
+ * Nothing drives this yet -- its dispatcher's arms are reconstructed, so the
+ * counter cannot move, and tools/blindspots.py will say so.
+ */
+void __cdecl AiBuildContext(void *obj, void *out)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *s = (uint8_t *)out;
+    uint32_t  anchor;
+    uint8_t  *leader, *target, *w;
+
+    if (!obj)
+        return;
+
+    anchor = ObjAnchorPoint(obj);
+    memset(out, 0, AM2_AI_CONTEXT_BYTES);
+
+    leader = SightResolve((uint32_t *)(o + OBJ_OFF_FOLLOW_UID),
+                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
+                          (void **)(s + SIGHT_OFF_LEADER));
+    if (leader) {
+        *(uint32_t *)(s + SIGHT_OFF_DEST) =
+            *(const uint32_t *)(leader + OBJ_OFF_POS);
+        DistAndAngle((const AM2_Point *)&anchor,
+                     (const AM2_Point *)(s + SIGHT_OFF_DEST),
+                     (int32_t *)(s + SIGHT_OFF_LEAD_RANGE),
+                     s + SIGHT_OFF_LEAD_BEARING);
+    }
+
+    target = SightResolve((uint32_t *)(o + OBJ_OFF_TARGET_UID),
+                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
+                          (void **)(s + SIGHT_OFF_OBSERVER));
+    if (target)
+        DistAndAngle((const AM2_Point *)&anchor,
+                     (const AM2_Point *)(target + OBJ_OFF_POS),
+                     (int32_t *)(s + SIGHT_OFF_RANGE),
+                     s + SIGHT_OFF_BEARING);
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
+        *(int32_t *)(s + SIGHT_OFF_FOUND) =
+            orig_scan_403b40(obj, s + SIGHT_OFF_FOUND_RANGE,
+                             s + SIGHT_OFF_FOUND_BEARING,
+                             o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110, 0);
+
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
+        *(int32_t *)(s + SIGHT_OFF_DEST_DIST) =
+            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_STATE));
+
+    w = (uint8_t *)WeaponByUid(
+            *(const uint32_t *)(o + UNIT_OFF_INVENTORY + 4));
+    *(void **)(s + SIGHT_OFF_WEAPON) = w;
+
+    if (!w) {
+        *(int32_t *)(s + SIGHT_OFF_KIND) = 0;
+    } else {
+        const uint8_t *rec = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+        double         v   = (double)*(const int32_t *)(rec + ITEMTYPE_OFF_RANGE);
+
+        *(int32_t *)(s + SIGHT_OFF_KIND) =
+            *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
+        *(int32_t *)(s + SIGHT_OFF_WANT_RANGE) = (int32_t)(v * kRangeWant);
+        *(int32_t *)(s + SIGHT_OFF_MAX_RANGE)  = (int32_t)(v * kRangeHi);
+        *(int32_t *)(s + SIGHT_OFF_READY) =
+            (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+             - *(const uint32_t *)(w + ITEM_OFF_LAST_USE))
+            > *(const uint32_t *)(rec + ITEMTYPE_OFF_COOLDOWN);
+    }
+
+    *(uint8_t *)(s + SIGHT_OFF_SEED) = (uint8_t)orig_region_rand();
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -2897,6 +3042,8 @@ int region_install(void)
                         "AiWalkStep", 2);
     rc |= patch_replace(ADDR_SARGE_AI_STEP, (const void *)SargeAiStep,
                         "SargeAiStep", 1);
+    rc |= patch_replace(ADDR_AI_BUILD_CONTEXT, (const void *)AiBuildContext,
+                        "AiBuildContext", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

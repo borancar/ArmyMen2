@@ -111,6 +111,13 @@ void __cdecl SargeAiStep(void *obj, void *out);
  * 0x0044B9FE chooses between the two on OBJ_OFF_SARGE. */
 void __cdecl TrooperAiStep(void *obj, void *out);
 
+/* 0x00407D70, one caller -- the AI mode dispatcher at 0x00407F80, whose
+ * `sub esp, 0x44` is this record's length. Build the sight record every mode
+ * arm reads: the leader, the target, what is in view, and the held weapon.
+ * Its twin 0x00408060 fills a 0x40-byte record and differs in three ways;
+ * see the body. */
+void __cdecl AiBuildContext(void *obj, void *out);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

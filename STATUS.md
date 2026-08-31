@@ -10217,3 +10217,53 @@ dialog is up, which CLAUDE.md already records. **A screenshot answered both in
 seconds where the counters could not**: reach for one before believing a
 probe, and read the reply, since `ctl` reported the bad key perfectly clearly
 and it went past unread.
+
+## The whole AI-mode band is dormant on every drive this project has
+
+Not one function, a SUBSYSTEM. `AiStep` (`0x00407F80`) is the AI mode
+dispatcher, it is NOT blind -- `tools/blindspots.py` does not list it, because
+its two callers at `0x0045D883` and `0x0045D8A4` are original -- and its
+counter reads **0** through a live Boot Camp mission in which
+`ObjectsAtPoint` climbs past 21 million. So does every arm below it, and so do
+`SargeAiStep` and `TrooperAiStep`, whose caller is likewise original.
+
+That covers `AiStep`, `AiStepIgnore`, `AiStepDefend`, `AiStepTrack`,
+`AiStepFollow`, `AiStepAttack`, `AiBuildContext`, `SargeAiStep`,
+`TrooperAiStep` and the arms they reach. All of it is verified by READING, and
+`tools/ab.sh` compares none of it however green the run is.
+
+**Worth stating as a class rather than rediscovering per function.** Each time
+one of these lands, the counter reads 0 and the question "is it blind or is it
+cold" gets asked again. For this band the answer is settled: **cold**, and the
+reason is the drive rather than the code. Anything landing here should say so
+in its own comment and not lean on the A/B beside it.
+
+**Half of it is now explained, and saying which half is the point.**
+`ObjFrameStep` dispatches on object TYPE: type 2 reaches `0x0044B7D0` and the
+two trooper steps, type 3 reaches `0x0045D660` and the whole `AiStep` family.
+So one band is trooper AI and the other is VEHICLE AI.
+
+For the vehicle band the reason is settled by the shipped data. `setaimode`
+appears in eight map directories -- `8ball airborne areax fortress frontyard
+homeland mania playset` -- and **neither `bootcamp` nor `kitchen` is among
+them**, which is exactly what `ab.sh` drives. No script on any drive this
+project has ever sets an AI mode. `homeland` and `frontyard` are campaign
+maps, so driving deeper into the campaign would reach the whole family and let
+an A/B compare seven functions for the first time.
+
+**The first explanation offered here was wrong and one grep disproved it.**
+"Boot Camp has no AI-driven vehicles" sounded right; `bootcamp1.txt` creates
+four -- jeep, tank, halftrack and convoy. The 109 shipped scripts are the
+cheapest reachability oracle this project has, which CLAUDE.md says of parser
+functions and which generalises further than that.
+
+**And it does NOT cover the trooper pair.** `0x0044B7D0` contains no read of
+`OBJ_OFF_AI_MODE` anywhere in its 656 bytes, so the `setaimode` argument does
+not transfer. Why `SargeAiStep` and `TrooperAiStep` are cold is still unknown;
+the call sits 0x22E bytes in, past a dozen unread checks and calls. Two
+questions, one answer between them -- do not let the tidy story cover both.
+
+**The measurement that makes this trustworthy is the pair, not either half.**
+A counter at 0 means nothing alone. It means something when
+`tools/blindspots.py` says the counter CAN move, the log says the patch went
+in `(traced)`, and a second counter on the same drive reads 21 million.
