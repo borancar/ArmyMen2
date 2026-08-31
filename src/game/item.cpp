@@ -1767,6 +1767,65 @@ int32_t __cdecl ObjIsWatchedKind(const void *obj)
            == *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND;
 }
 
+/* RoachMaskWeight -- original 0x0043D050, four call sites in two functions,
+ * one of them ADDR_ROACH_STEP_TAIL_A. How obstructed is a roach that stands at
+ * `at` facing `dir`: the sum of BlockWeightDamaging over every point of its
+ * mask for that direction. The name is ours, and it uses the family's own
+ * vocabulary -- a MASK indexed by a DIRECTION, which the vehicle builder's
+ * "vehicle mask direction: %d" settled for all of them.
+ *
+ * THE TABLE IS ADDRESSED AS TWO ARRAYS WITH ONE STRIDE, which is how the
+ * original does it and worth writing out rather than tidying: the count comes
+ * from ADDR_ROACH_MASK_COUNT and the points from ADDR_ROACH_MASK, both indexed
+ * by `dir * AM2_MASK_STRIDE`, and the second is four bytes past the first.
+ * Folding them into one record pointer would hide the very off-by-one that
+ * ADDR_BUILD_ROACH_MASK's comment records as having cost a table.
+ *
+ * THE DIRECTION IS MASKED TO A BYTE and nothing checks it against
+ * ADDR_ROACH_MASK_DIRECTIONS. A direction of 200 indexes 200 * 0xA4 bytes past
+ * the table and sums whatever is there. The original's; the callers are
+ * trusted.
+ *
+ * The points are added to `at` SIXTEEN BITS AT A TIME, x into the low word and
+ * y into the high, so a mask point that carries the coordinate past 0x7FFF
+ * wraps rather than saturating -- the same 16-bit arithmetic
+ * NearestClearPoint's spiral does on the same kind of packed point.
+ *
+ * A count of zero or less answers 0 without looking at anything, which is the
+ * only exit that does not walk.
+ *
+ * Its fourth argument goes straight into BlockWeightDamaging's fifth, which
+ * that function never reads. Kept because the call sites are the original's.
+ */
+int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
+                                int32_t unused)
+{
+    uint32_t       slot  = (uint32_t)(dir & 0xFF) * AM2_MASK_STRIDE;
+    const int32_t *count = (const int32_t *)
+        ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK_COUNT) + slot);
+    const int16_t *pts = (const int16_t *)
+        ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK) + slot);
+    int32_t total = 0;
+    int32_t i;
+
+    if (*count <= 0)
+        return 0;
+
+    for (i = 0; i < *count; i++) {
+        uint32_t pt;
+        void    *chain;
+
+        pt = (uint32_t)(uint16_t)((uint16_t)at + (uint16_t)pts[i * 2])
+             | ((uint32_t)(uint16_t)((uint16_t)(at >> 16)
+                                     + (uint16_t)pts[i * 2 + 1]) << 16);
+
+        chain = ObjectsAtPoint(&pt, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        total += BlockWeightDamaging(from, pt, chain, at, unused);
+    }
+
+    return total;
+}
+
 /* 0x0043CF70, one caller, 224 bytes. The FOURTH member of the block-weight
  * family, and the only one that CHANGES ANYTHING.
  *
@@ -7592,6 +7651,8 @@ void item_install(void)
     patch_replace(ADDR_BLOCK_WEIGHT_DAMAGING,
                   (const void *)BlockWeightDamaging,
                   "BlockWeightDamaging", 1);
+    patch_replace(ADDR_ROACH_MASK_WEIGHT, (const void *)RoachMaskWeight,
+                  "RoachMaskWeight", 4);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,

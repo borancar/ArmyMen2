@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `b8f0700`. Working tree clean.
+Last updated: **2026-08-31**, at `8bf839c`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,245 patches.**
+Nothing uncommitted. **1,246 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2851,16 +2851,43 @@ commit -- gave the right answer every time it was used.
   `objdump.py`'s default, for the reason `drive.sh` gives about `ctl`: one
   place derives it, so the two cannot drift.
 
+- **`RoachMaskWeight`** (`0x0043D050`) answers how obstructed a roach standing
+  at a point facing a direction is: `BlockWeightDamaging` summed over every
+  point of its mask for that direction.
+
+  **The table is addressed as TWO ARRAYS WITH ONE STRIDE**, and that is
+  written out rather than tidied. The count comes from
+  `ADDR_ROACH_MASK_COUNT` and the points from `ADDR_ROACH_MASK`, both indexed
+  by `dir * AM2_MASK_STRIDE`, the second four bytes past the first. Folding
+  them into a record pointer would hide exactly the off-by-one that
+  `ADDR_BUILD_ROACH_MASK`'s comment records as having put a whole table one
+  dword early -- so the new name is the real base rather than a convenience.
+
+  **The direction is masked to a byte and nothing checks it** against
+  `ADDR_ROACH_MASK_DIRECTIONS`: 200 indexes 200 * 0xA4 past the table and sums
+  whatever is there. And the mask points are added SIXTEEN BITS at a time, the
+  same packed-point arithmetic `NearestClearPoint` does.
+
+- **Cold, and the grep says precisely why -- and where it would not be.**
+  `bootcamp` issues no `createroach` at all, so the counter is 0 there. But
+  `kitchen`, which is MAP 01 and which `ab.sh campaign` drives, issues NINE.
+  The campaign configuration stops at the briefing by design -- CLAUDE.md
+  records that MAP 01 is hostile the moment it clears -- and a probe that
+  clicked through anyway left `ADDR_GAME_CLOCK_MS` at 0, so the mission never
+  went live. So this is the first cold function in a while whose exercising
+  drive is IDENTIFIED rather than absent: clear MAP 01's briefing and let it
+  run.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,091 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,245
+line (0x0045C000) patched**. Measured: **1,092 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,246
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-one batches have gone in and the 148 entries outstanding start at 48
+small ones in batches. Ninety-two batches have gone in and the 147 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

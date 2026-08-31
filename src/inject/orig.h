@@ -9180,9 +9180,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * early, over the global at 0x00654CA4, and no A/B could see it. */
 #define ADDR_BUILD_ROACH_MASK 0x0043C730u  /* void(void) */
 #define ADDR_ROACH_MASK_DIRECTIONS 0x00654CA0u /* int32_t */
-#define ADDR_ROACH_MASK       0x00654CACu  /* the first record's POINTS;
-                                                  * its count is the dword
-                                                  * below, at 0x00654CA8 */
+#define ADDR_ROACH_MASK       0x00654CACu  /* the first record's POINTS */
+/* The same table addressed from its real base -- the first record's COUNT, one
+ * dword below the points. The original indexes both with the same
+ * `dir * AM2_MASK_STRIDE`, so having both spellings is how the code reads
+ * rather than an alias: two arrays, one stride. Getting THIS one wrong is the
+ * mistake ADDR_BUILD_ROACH_MASK's comment above records. */
+#define ADDR_ROACH_MASK_COUNT 0x00654CA8u  /* int32_t, stride AM2_MASK_STRIDE */
 #define AM2_MASK_STRIDE        0xA4
 #define AM2_MASK_POINTS        40
 #define AM2_MASK_STEP          16   /* the grid */
@@ -9662,6 +9666,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the only one with a SIDE EFFECT: it damages what it walks past. See
  * item.cpp beside BlockWeightChain, which it is otherwise a twin of. */
 #define ADDR_BLOCK_WEIGHT_DAMAGING 0x0043CF70u /* int32_t(from,at,chain,ref,x) */
+/* 0x0043D050, four callers in two functions. Sum ADDR_BLOCK_WEIGHT_DAMAGING
+ * over every point of a roach's mask for one direction, offset from a point.
+ * Reconstructed. */
+#define ADDR_ROACH_MASK_WEIGHT 0x0043D050u /* int32(from, dir, at, unused) */
 #define AM2_BLOCK_WEAR_AMOUNT      1
 #define AM2_BLOCK_WEAR_KIND        4
 #define MSG_CREATE_OFF_UID       4u

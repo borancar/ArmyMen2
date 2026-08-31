@@ -207,6 +207,12 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
 int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
                                     uint32_t ref, int32_t unused);
 
+/* 0x0043D050, four call sites in two functions. How obstructed is a roach at
+ * `at` facing `dir`: BlockWeightDamaging summed over every point of its mask
+ * for that direction. */
+int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
+                                int32_t unused);
+
 /* 0x0045EED0, eight callers. Is this object an ITEM whose OBJ_OFF_FIELD_94
  * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
 int32_t __cdecl ObjIsWatchedKind(const void *obj);

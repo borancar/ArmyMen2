@@ -2801,8 +2801,16 @@ exact oracle**, however meaningful it is when it is set.
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
-  `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`, and
-  `RefreshScreen` —
+  `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`,
+  `RoachMaskWeight`, and `RefreshScreen` —
+
+  **`RoachMaskWeight` is the one whose drive is IDENTIFIED**, which is worth
+  more than another entry on this list. `bootcamp` issues no `createroach`;
+  `kitchen` -- MAP 01, which `ab.sh campaign` already drives -- issues NINE.
+  What is missing is not a map but a configuration that clears MAP 01's
+  briefing and lets it run, which this suite avoids because the map is hostile
+  the moment it clears. Anyone wanting to exercise the roach code starts
+  there.
 
   **The AI is a WHOLE LAYER this environment does not reach, not a handful of
   cold functions, and ONE `counts` line says so.** `drive.sh ctl "counts Ai"`
