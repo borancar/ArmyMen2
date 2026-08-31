@@ -3465,7 +3465,6 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
 }
 
 
-#define orig_ai_408640 ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_408640))
 
 /* RoachAliveStepA -- original 0x00408A60, one caller, and orig.h's own note on
  * it predicted this commit: the five names in that block "are given ROLE names
@@ -3513,7 +3512,7 @@ void __cdecl RoachAliveStepA(void *obj, void *out)
     *(int32_t *)((uint8_t *)out + SIGHTCOUT_OFF_X) = 1;
 
     RoachBuildContext(obj, ctx);
-    orig_ai_408640(obj, out, ctx);
+    RoachBehaviour(obj, out, ctx);
 
     *(uint16_t *)(o + OBJ_OFF_REGION) =
         kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
@@ -3881,6 +3880,103 @@ emit:
 }
 
 
+typedef void (__cdecl *AM2_RegionCmpFn)(void *obj, void *out, void *ctx);
+#define orig_ai_408210 ((AM2_RegionCmpFn)(uintptr_t)AM2_IMAGE(ADDR_AI_408210))
+
+/* The promote-and-engage block, written out at each of its four sites rather
+ * than called, because the original inlines it four times and orig.h already
+ * settled that policy for AiStepDefend: "the original does it twice" is a fact
+ * about the original. A helper here would read better and record less. */
+#define AM2_ROACH_PROMOTE_FOUND(o_, c_)                                       \
+    do {                                                                      \
+        uint8_t *found_ = *(uint8_t **)((c_) + SIGHT_OFF_FOUND);              \
+        *(uint32_t *)((o_) + OBJ_OFF_TARGET_UID) =                            \
+            *(const uint32_t *)(found_ + OBJ_OFF_OWNER);                      \
+        *(void **)((c_) + SIGHT_OFF_OBSERVER) =                               \
+            *(void **)((c_) + SIGHT_OFF_FOUND);                               \
+        *(int32_t *)((c_) + SIGHT_OFF_RANGE) =                                \
+            *(const int32_t *)((c_) + SIGHT_OFF_FOUND_RANGE);                 \
+        *((c_) + SIGHT_OFF_BEARING) = *((c_) + SIGHT_OFF_FOUND_BEARING);      \
+    } while (0)
+
+/* RoachBehaviour -- original 0x00408640, one caller: RoachAliveStepA. The
+ * roach's decision half, and the function that shows what the SIGHT record is
+ * for.
+ *
+ * THE RECORD HOLDS {object, range, bearing} THREE TIMES -- leader at +0x00,
+ * observer at +0x10, found at +0x1C -- and this PROMOTES one triple into the
+ * observer slot depending on what the roach decides to engage. Four
+ * promotions: the found triple in the near, far and no-leader arms, and the
+ * leader triple in the follow arm. That is why ConsiderSighting reads only
+ * observer/range/bearing: the promotion has already chosen for it.
+ *
+ * ITS OPENING TEST IS "AM I FURTHER THAN I WANT TO BE": SIGHT_OFF_RANGE
+ * against ROACHCTX_OFF_WANT_RANGE, which RoachBuildContext writes as 48 --
+ * a default weapon range of 64 times 0.75. Far means close the gap; near means
+ * decide what to do.
+ *
+ * 26 jump targets, none an epilogue, counted and untruncated before writing.
+ * A single exit, like every other function in this band.
+ */
+void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *c = (uint8_t *)ctx;
+
+    if (*(const int32_t *)(c + SIGHT_OFF_RANGE) > 0
+        && *(const int32_t *)(c + SIGHT_OFF_RANGE)
+           > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
+        /* Far: head for what we are engaging and look again. */
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(*(uint8_t **)(c + SIGHT_OFF_OBSERVER)
+                                + OBJ_OFF_POS);
+        orig_ai_408210(obj, out, ctx);
+        if (*(void **)(c + SIGHT_OFF_FOUND))
+            AM2_ROACH_PROMOTE_FOUND(o, c);
+        goto tail;
+    }
+
+    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
+        /* Not arrived: keep the destination and look again. */
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        orig_ai_408210(obj, out, ctx);
+        if (*(void **)(c + SIGHT_OFF_FOUND))
+            AM2_ROACH_PROMOTE_FOUND(o, c);
+        goto tail;
+    }
+
+    /* Arrived. */
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
+
+    if (!*(void **)(c + SIGHT_OFF_LEADER)) {
+        /* No leader: take whatever is pending, then engage what was found. */
+        ConsumePendingByte(obj, out, ctx);
+        if (*(void **)(c + SIGHT_OFF_FOUND))
+            AM2_ROACH_PROMOTE_FOUND(o, c);
+        goto tail;
+    }
+
+    /* Following a leader: promote the LEADER triple rather than the found one,
+     * which is the only site in the band that promotes from that source. */
+    {
+        uint8_t *leader = *(uint8_t **)(c + SIGHT_OFF_LEADER);
+
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+            *(const uint32_t *)(leader + OBJ_OFF_OWNER);
+        *(void **)(c + SIGHT_OFF_OBSERVER) = leader;
+        *(int32_t *)(c + SIGHT_OFF_RANGE) =
+            *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
+        *(c + SIGHT_OFF_BEARING) = *(c + SIGHT_OFF_LEAD_BEARING);
+        ConsumePendingByte(obj, out, ctx);
+    }
+
+tail:
+    CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -3933,6 +4029,8 @@ int region_install(void)
                         "StepType2", 1);
     rc |= patch_replace(ADDR_STEP_TYPE3, (const void *)StepType3,
                         "StepType3", 1);
+    rc |= patch_replace(ADDR_ROACH_BEHAVIOUR, (const void *)RoachBehaviour,
+                        "RoachBehaviour", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

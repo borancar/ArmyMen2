@@ -160,6 +160,12 @@ void __cdecl StepType2(void *obj);
  * where StepType2's is at +0x57C. */
 void __cdecl StepType3(void *obj);
 
+/* 0x00408640, one caller -- RoachAliveStepA. The roach's decision half. It
+ * promotes one {object, range, bearing} triple into the SIGHT record's
+ * observer slot -- the found triple in three arms, the leader triple in the
+ * fourth -- which is what ConsiderSighting then reads. */
+void __cdecl RoachBehaviour(void *obj, void *out, void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

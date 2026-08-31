@@ -6637,7 +6637,34 @@ typedef struct {
  * +0x34 in its first two instructions -- and writes back the object's
  * destination, its follow uid and its target uid. Named by offset because its
  * body has not been read. */
-#define ADDR_AI_408640           0x00408640u  /* void(obj, out, ctx) */
+/* Reconstructed as RoachBehaviour. The roach's decision half, the third of
+ * the band's step/build/behave triples, and the one that shows what the SIGHT
+ * record is FOR.
+ *
+ * THE RECORD HOLDS {object, range, bearing} THREE TIMES -- leader at +0x00,
+ * observer at +0x10, found at +0x1C -- and the behaviour PROMOTES one triple
+ * into the observer slot depending on what the unit decides to engage. This
+ * function does it FOUR times: the found triple in its near, far and no-leader
+ * arms, and the leader triple in the arm that follows a leader. That is why
+ * ConsiderSighting reads observer/range/bearing and nothing else -- the
+ * promotion has already chosen for it.
+ *
+ * orig.h already records AiStepDefend inlining the same block twice and keeps
+ * both, because "the original does it twice" is a fact about the original.
+ * Four here, written out four times for the same reason.
+ *
+ * Its 0x818-byte frame is a TILE LINE buffer: it traces line of sight with
+ * ADDR_TRACE_TILE_LINE. Its opening test compares SIGHT_OFF_RANGE against
+ * ROACHCTX_OFF_WANT_RANGE -- "is my target further than the distance I want to
+ * be at" -- which splits the far arm from the near one.
+ *
+ * 26 jump targets and not one is an epilogue: a single exit, like the rest of
+ * the band. */
+#define ADDR_ROACH_BEHAVIOUR     0x00408640u  /* void(obj, out, ctx) */
+/* Its one unnamed callee, three call sites, still original: it compares the
+ * region of the object's position against the region of OBJ_OFF_FIELD_C0 --
+ * TileOfPoint on each, then ADDR_REGION_OF_CELL. A reachability helper. */
+#define ADDR_AI_408210           0x00408210u  /* void(obj, out, ctx) */
 /* 0x00408060, one caller -- ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is
  * this record's LENGTH. The roach's half of the sight-context idea: the same
  * structure ADDR_AI_BUILD_CONTEXT fills for a vehicle, four bytes shorter.
