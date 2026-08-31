@@ -1540,6 +1540,50 @@ this file records time lost to picking the wrong one. `StepType6`'s caller is
 ours, so its counter cannot move; `FormationSlotPoint`'s callers are original,
 so its zero was real and a `TRACE=1` probe proved the function never runs.
 
+**Grep for how the tree already reaches a GLOBAL before writing an expression
+for it.** The naming rule -- grep the address before inventing a name -- has an
+exact analogue for ACCESS, and ignoring it cost three defects in one function.
+`EnsureSpriteAaiRecord` indexed `ADDR_AAI_RECORDS` and `ADDR_RECORD_LISTS` as
+though the global were the array; both hold a POINTER to it, the original loads
+`mov eax,[0x51614c]` and only then indexes, and `objtype.cpp` already spelled it
+`(*(void ***)(uintptr_t)ADDR_RECORD_LISTS)[n]` in three places. A fourth
+spelling went in without the grep. The one global in that batch reached through
+an existing macro -- `kScriptNames` -- was right first time.
+
+The payoff is not tidiness, it is that DIVERGENCE BECOMES VISIBLE. `ObjAttachTo`
+gates two arms on `ADDR_MP_SESSION` and I had written the comm object; what
+exposed it was that `ObjsAreAllied`, four hundred lines up in the same file, is
+the SAME inlined block and gates them on `mp`. Had the surrounding lines been
+written in a private idiom there would have been nothing to line up against --
+and no A/B could have caught it, because `ADDR_MP_SESSION` is 0 on every drive
+this project has, so both arms are unreachable and the run comes back clean.
+
+**An exit NOTED is not an exit reproduced.** `ObjInitCommon`'s header comment
+said "both exits set eax deliberately" and the body was then written as two
+independent `if`s with a shared tail. The original's no-cells case is an EARLY
+RETURN that also skips `ItemLinkCells`, so every object without a cell list was
+linked into the map twice; both configurations truncated at the same point in
+map load, 37% of pixels differing. Write the exits first, from the epilogues,
+and count them -- 4 `ret` instructions can be 5 return PATHS sharing one, which
+is what `ObjAttachTo` does.
+
+**Verifying an ADDRESSING MODE is not verifying INDIRECTION DEPTH.** The same
+function's record loop was "verified against raw bytes" -- `8b 46 0c` / `8b 00`,
+no SIB, no index -- and that reading was correct and beside the point. It
+established there was no index; it said nothing about the chain being
+`array -> records[0] -> sprite -> key`, three loads where I had written two. A
+byte-level check of one instruction cannot answer a question about a sequence of
+them. CLAUDE.md already warns that `obj -> table -> slot` needs two
+dereferences; this is the same trap one level along.
+
+**Three defects in one session, and NOT ONE was a wrong offset.** Every one was
+control flow or indirection depth, and `tools/checkoffsetuse.py` reported
+byte-identically before and after all three fixes -- correctly, since it compares
+which offsets are NAMED. Do not read a clean offset check as a clean function,
+and do not stack a second unverified unit on an unverified one: both bugs
+produced the identical failure signature, and telling them apart depended on
+only one being in flight.
+
 ## Verifying a reconstruction
 
 Build, install, run, drive, screenshot, check counts:

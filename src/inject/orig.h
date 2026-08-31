@@ -9830,6 +9830,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_RECORD_LIST_GROW     0x11         /* 17 slots per grow */
 #define ADDR_KEY_LOOKUP          0x00434290u  /* int32_t(uint32_t key) */
 #define ADDR_KEY_LOOKUP_TRIPLE   0x004346E0u  /* int32_t(a, b, c) */
+/* 0x004342E0, 448 bytes, ten callers. Find the AAI record for one sprite
+ * triple and BUILD it when it is not there. Its head is KeyLookupTriple
+ * inlined -- the same PackKey arithmetic, computed rather than called -- which
+ * is also what says the three arguments are a sprite set, index and frame:
+ * they go on to PreloadSprite in that order. */
+#define ADDR_ENSURE_SPRITE_AAI_REC 0x004342E0u  /* int32(set, index, frame) */
 #define ADDR_KEY_TABLE_COUNT     0x00516148u  /* int32_t */
 #define ADDR_KEY_TABLE           0x00516150u  /* {uint32 key, int32 value}[] */
 /* 0x004345A0, seven callers -- the register half of ADDR_MAKE_AAI_RECORD, and

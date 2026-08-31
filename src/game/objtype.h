@@ -127,6 +127,13 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
  * orig.h; the parameters here are read off the body. `box` is an AM2_Rect,
  * spelled as a pointer to four int32 so this header need not pull in rect.h
  * for one declaration. */
+/* 0x004342E0, ten callers. Find the AAI record for a sprite triple, building
+ * it -- sprite, record list, hit mask, box -- when the key is not known.
+ * Returns the record's slot, or -1 if the .aai lookup or the sprite load
+ * fails. */
+int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index,
+                                      int32_t frame);
+
 /* 0x00429940, eight callers. The shared tail of every object constructor:
  * register it, unique its script name, place it, copy its box and build the
  * cell list. RETURNS the byte size of that list, or 0 when it builds none --

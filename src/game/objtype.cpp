@@ -26,6 +26,20 @@
 #include "scriptint.h"     /* kScriptNames -- the table itself */
 #include "map.h"           /* TileOfPoint -- reconstructed */
 #include "item.h"          /* ItemLinkCells -- reconstructed */
+#include "packkey.h"       /* PackKey, KeyLookup -- reconstructed */
+
+/* PreloadSprite and PreloadSpriteByKey are reconstructed, in win32/sprite.cpp.
+ * Declared here rather than by including that header because objtype.cpp is on
+ * the flat side of the split and must name no Win32 or COM type -- AM2_Sprite
+ * has an LPDIRECTDRAWSURFACE in it. An incomplete type is enough: everything
+ * below reaches the sprite through byte offsets, never a member. Same reason
+ * and same shape as script.cpp's declaration of the first of the two. */
+struct AM2_Sprite;
+extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
+                                             int32_t frame, int32_t flags,
+                                             int32_t addref);
+extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
+                                                  int32_t b);
 
 /* The CRT's _strlwr, which ObjInitCommon applies to the CALLER's buffer. Same
  * seam map.cpp and definfo.cpp use; it is CRT, so it stays original. */
@@ -755,6 +769,122 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
 }
 
 
+/* EnsureSpriteAaiRecord -- original 0x004342E0, ten callers. Find the AAI
+ * record for one sprite triple, and BUILD IT when it is not there: load the
+ * sprite, make a one-entry record list for it, give the list a hit mask and a
+ * box, and register both.
+ *
+ * ITS HEAD IS KeyLookupTriple INLINED. `((set << 12) + index) << 7 + frame` is
+ * PackKey's arithmetic to the instruction, and packkey.cpp already records
+ * that the original computes it inline rather than calling PackKey. That is
+ * also what identifies the three arguments: they go on to PreloadSprite in
+ * that order, so they are a sprite set, index and frame rather than an
+ * anonymous triple.
+ *
+ * THE HIT PATH'S LOOP NEVER USES ITS INDUCTION VARIABLE. It counts edi up to
+ * the list's count and compares, but the body is `mov eax,[esi+0xc];
+ * mov eax,[eax]` -- verified against the raw bytes, 8b 46 0c / 8b 00, no SIB
+ * and no index -- so it preloads entries[0] as many times as there are
+ * entries instead of walking them. Reproduced rather than corrected: it is
+ * the original's behaviour, and it goes unnoticed because preloading a sprite
+ * that is already loaded only takes a reference.
+ *
+ * `edi` IS THE KEY ON THE MISS PATH AND ZERO ON THE HIT PATH. The `xor edi,edi`
+ * belongs to the hit path alone, so by the time MakeRecordList and
+ * MakeAaiRecord are reached edi still holds what PackKey produced -- which is
+ * why the list's owner and the record's key are the same value. Reading the
+ * function top to bottom as one flow gets this wrong; it is two flows.
+ *
+ * The box defaults to (-16,-16,16,16) ONLY when LoadMask left the hit mask
+ * null, and the record's own box is the sprite's extent about its hot spot,
+ * -hotx, -hoty, w - hotx, h - hoty.
+ *
+ * Four exits: the index when the record was already there, -1 when the .aai
+ * lookup fails, -1 when the sprite will not load, and AddAaiRecord's answer
+ * when it built one. */
+int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
+{
+    uint32_t  key = PackKey((uint32_t)set, (uint32_t)index, (uint32_t)frame);
+    int32_t   slot = KeyLookup(key);
+    void     *rec;
+    AM2_Sprite *spr;
+    uint8_t  *list;
+    uint8_t   entry[AM2_LIST_RECORD_BYTES];  /* +8 deliberately unset */
+    int32_t   i;
+
+    if (slot >= 0) {
+        /* BOTH GLOBALS HOLD A POINTER TO THE ARRAY, not the array. The
+         * original loads `mov eax,[0x51614c]` and only then indexes, and the
+         * rest of this file already spells it
+         * `(*(void ***)(uintptr_t)ADDR_RECORD_LISTS)[n]`. Indexing the global
+         * itself is one dereference short -- the same mistake as the loop
+         * below, made twice more in the same function. */
+        const uint8_t *aai = (const uint8_t *)
+            (*(void *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[slot];
+        const uint8_t *l = (const uint8_t *)
+            (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)
+                [*(const int32_t *)(aai + AAIREC_OFF_LIST_SLOT)];
+
+        for (i = 0; i < *(const int32_t *)(l + LISTHDR_OFF_COUNT); i++) {
+            /* TWO dereferences, and records[0] every time -- see the note
+             * above. `mov eax,[esi+0xc]` is the record ARRAY, `mov eax,[eax]`
+             * is records[0]'s first dword, which is its sprite, and
+             * `mov ecx,[eax]` is that sprite's first dword, which is the key.
+             * Stopping one short passes a heap pointer as a sprite key; it
+             * cost a campaign and bootcamp A/B, failing exactly the way a
+             * broken map load does. */
+            const uint8_t *recs =
+                *(const uint8_t *const *)(l + LISTHDR_OFF_RECORDS);
+            const uint8_t *sp = *(const uint8_t *const *)recs;
+
+            if (sp)
+                PreloadSpriteByKey(*(const uint32_t *)sp, 0x1000, 1);
+        }
+        return slot;
+    }
+
+    rec = DefFindObjRec(set, index, frame);
+    if (!rec)
+        return -1;
+
+    spr = PreloadSprite(set, index, frame, 0x1000, 1);
+    if (!spr)
+        return -1;
+
+    /* ONLY EIGHT OF THE TWELVE BYTES ARE WRITTEN, and MakeRecordList copies
+     * all twelve -- its `out+8` comes from `in+8`. So the record's third dword
+     * is whatever this frame happened to hold, in the original as much as
+     * here. Not memset: zeroing it would be a different function, and it is
+     * the one part of this record that cannot be reproduced by value. */
+    *(AM2_Sprite **)entry = spr;
+    *(int16_t *)(entry + 4) = 0;
+    *(int16_t *)(entry + 6) = 0;
+
+    list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
+    LoadMask(list + 0x10, set, index, frame);
+
+    if (!*(const int32_t *)(list + LISTHDR_OFF_HIT_MASK)) {
+        AM2_Rect box;
+
+        RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+        *(int32_t *)(list + LISTHDR_OFF_BOX_LEFT)   = box.left;
+        *(int32_t *)(list + LISTHDR_OFF_BOX_TOP)    = box.top;
+        *(int32_t *)(list + LISTHDR_OFF_BOX_RIGHT)  = box.right;
+        *(int32_t *)(list + LISTHDR_OFF_BOX_BOTTOM) = box.bottom;
+    }
+
+    {
+        int32_t s = AddRecordList(list);
+        int32_t hx = *(const int16_t *)((const uint8_t *)spr + SPR_OFF_HOTX);
+        int32_t hy = *(const int16_t *)((const uint8_t *)spr + SPR_OFF_HOTY);
+        int32_t w  = *(const int32_t *)((const uint8_t *)spr + SPR_OFF_W);
+        int32_t h  = *(const int32_t *)((const uint8_t *)spr + SPR_OFF_H);
+
+        return AddAaiRecord(MakeAaiRecord(set, (int32_t)key, s,
+                                          -hx, -hy, w - hx, h - hy));
+    }
+}
+
 /* ObjInitCommon -- original 0x00429940, eight callers. The shared tail of
  * every object constructor: register the object, give it a unique script
  * name, place it, copy its box and build the list of map cells it occupies.
@@ -951,5 +1081,8 @@ int objtype_install(void)
                         "LookupType3ByUID", 1);
     rc |= patch_replace(ADDR_OBJ_INIT_COMMON, (const void *)ObjInitCommon,
                         "ObjInitCommon", 7);
+    rc |= patch_replace(ADDR_ENSURE_SPRITE_AAI_REC,
+                        (const void *)EnsureSpriteAaiRecord,
+                        "EnsureSpriteAaiRecord", 3);
     return rc;
 }

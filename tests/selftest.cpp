@@ -675,6 +675,15 @@ extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
     return 0;
 }
 
+/* And its by-key twin, which objtype.cpp's EnsureSpriteAaiRecord reaches on
+ * the path where the record already exists. Same reasoning as PreloadSprite
+ * above, and the same caveat: a vector that reached this would get 0 rather
+ * than a sprite, which is a wrong answer and not a link error. */
+extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t, int32_t, int32_t)
+{
+    return 0;
+}
+
 /* event.cpp's two bitmap triggers reach FreeBitmap, which is in win32/sprite.cpp
  * with the rest of the sprite code. Same reasoning as PreloadSprite above.
  *
