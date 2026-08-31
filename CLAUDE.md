@@ -2935,6 +2935,28 @@ exact oracle**, however meaningful it is when it is set.
   `ShakeAt`, `StartShake`, `RoachBite`, `CanPlaceAt`, `UnitWeaponInfo`, and
   `RefreshScreen` —
 
+  **THE ROACH FAMILY IS HEAVILY EXERCISED AND ENTIRELY UNCOMPARED, which is a
+  different failure from being cold.** A live MAP 01 run past the briefing
+  gives `RoachStepAllowed` 366,870 calls, `RoachMaskWeight` half a million and
+  `CreateRoach` nine -- and `ab.sh campaign` reaches NONE of it, because that
+  configuration deliberately stops at the briefing dialog. Its own comment says
+  why and it is not laziness: MAP 01 turns hostile the moment the dialog
+  clears, and the 24 FIRE lines that follow land in a 38-line log whose ORDER
+  differs between two unsynchronised runs. That was tried and it failed.
+
+  So the usual three artifacts are all unavailable at once on that screen. The
+  log is combat noise, the pixels are live play, and the object table -- which
+  works for `bootcamp` precisely because it is taken before anything moves --
+  is a moving target the instant the mission starts. Adding a configuration
+  will not fix this; what would is an EXHAUSTIVE ORACLE of the
+  `tools/shakecheck.py` shape, seeding the roach constants and the mask tables
+  and comparing against the original under Unicorn. That is the tool the roach
+  layer needs and it does not exist yet.
+
+  Do not read a large counter as coverage. `RoachStepAllowed` running a third
+  of a million times says the code executes and the mission plays; it says
+  nothing about whether it agrees with the original.
+
   **`RoachBite`'s drive is identified and it is not a longer wait.** Its one
   caller reaches it only in the roach's state 4, and a live MAP 01 run with
   nine roaches alive -- `CreateRoach=9`, `RoachMaskWeight=506808` -- leaves it

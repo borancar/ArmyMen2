@@ -7543,6 +7543,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * names settled elsewhere; still original, and 416 bytes with two nested
  * loops over a 258-entry path buffer. */
 #define ADDR_REGION_SOLVE_PAIR     0x00438300u  /* void(from, to) */
+/* READ AND DELIBERATELY LEFT ORIGINAL, with the reading recorded so it need
+ * not be redone. 416 bytes, a 0x204-byte stack frame -- a path array -- and
+ * three 2D byte tables indexed as `stride * a + b` off ADDR_REGION_STRIDE,
+ * written in two nested loops. The `from == to` and unreachable arms fall out
+ * early and stamp the cost entries; the found arm walks the path array
+ * backwards filling ADDR_REGION_NEXT for every prefix.
+ *
+ * Not attempted late in a session: an off-by-one in a 2D byte index is exactly
+ * the mistake this file catalogues, and NOTHING here would catch it -- region
+ * routing feeds the AI, which no drive reaches, so a wrong next-hop table
+ * would pass every configuration in tools/ab.sh. It wants the reading done
+ * fresh and an oracle to check it against, not a careful afternoon. */
 /* 0x0042BC70 and 0x0042BCB0, one caller each and adjacent: the script's
  * `activateregion` (token 149) and `inactivateregion` (150). Each range-checks
  * the id against ADDR_REGION_STRIDE, writes REGION_OFF_ACTIVE, and bumps
