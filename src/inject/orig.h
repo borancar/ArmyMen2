@@ -11591,7 +11591,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 656 bytes, six callers, still original -- the item-only half of the common
  * teardown, and the only callee of DestroyObjCommon without a name. */
 #define ADDR_ITEM_TEARDOWN         0x00439320u  /* void(void *obj) */
-/* 0x00458070, 640 bytes, 20 callers -- READ but not yet written, and the name
+/* 0x00458070, 640 bytes, 20 callers -- RECONSTRUCTED, and the name
  * is from the whole body rather than its head. 191 instructions, five returns.
  *
  * ObjAttachTo(subject, target). It DETACHES the subject from whatever it was
@@ -11605,15 +11605,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *   - with a NULL target it stops there, clearing +0xA0 and +0xC4. That is how
  *     the three per-type destroy handlers call it, so for them it is purely a
  *     detach;
- *   - otherwise it decides a stance code into +0xE4 -- 0, 3, 6 or 7 -- from the
- *     two armies, ADDR_DEFAULT_OWNER and three comm queries at 0x0040F190,
- *     0x0040F230 and 0x0040F250, then stores the target's uid in +0xC4 and
- *     appends itself to the target's list through 0x0042A6E0.
+ *   - otherwise it decides a stance code into +0xE4 -- 0, 3 or 6, NOT "0, 3, 6
+ *     or 7" as this note said until the body was written: only three
+ *     instructions store the field, and the 7 is `mov esi,7`, the value
+ *     soldier kind is COMPARED against. It comes from the two armies,
+ *     ADDR_DEFAULT_OWNER and three comm queries at 0x0040F190, 0x0040F230 and
+ *     0x0040F250, then stores the target's uid in +0xC4 and appends itself to
+ *     the target's list through 0x0042A6E0.
  *
- * NOT written yet on purpose: it would need names for nine fields (+0xA0,
- * +0xA4, +0xA8, +0xAC, +0xC4, +0xCC, +0xE4, +0x52C, +0x544), three comm
- * methods and four 0x100-byte blocks at 0x004F9ACC..0x004F9DCC. The three
- * 64-byte handlers that call it need only this name and can go first. */
+ * THE REASON IT WAS DEFERRED EXPIRED WITHOUT ANYBODY NOTICING. This note used
+ * to say it "would need names for nine fields (+0xA0, +0xA4, +0xA8, +0xAC,
+ * +0xC4, +0xCC, +0xE4, +0x52C, +0x544), three comm methods and four 0x100-byte
+ * blocks". Every one of those was named by some other unit in the months
+ * after, and re-testing the list against the tree took one command: it needed
+ * no new names at all. Re-test a decline against the tree rather than against
+ * the reason it was written. Reconstructed in army.cpp, beside ObjsAreAllied,
+ * which is the same inlined alliance block and is what caught a wrong global
+ * here that no A/B could have. */
 /* 0x00429C80, "DestroyItemObject, %x" -- its own name. Five callers. Frees the
  * allocation at +0x90 and clears the live byte at +0x8C; does nothing at all
  * if that byte is already clear, which makes it idempotent. */

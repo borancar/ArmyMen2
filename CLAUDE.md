@@ -3377,9 +3377,13 @@ exact oracle**, however meaningful it is when it is set.
   the box, the row spec, the anim table and the def record. Reach for
   `LoadTypeN` when a type is unidentified, before anything else.
 
-  Types 6 and 7 are still unread. They share `FreeItem`'s common arm with type
-  1 and type 5, which says nothing about what they are -- and now demonstrably
-  so, since type 5 is in that arm and is a missile.
+  **Type 7 is the last one unread.** Type 6 is an EXPLOSION -- `StepType6` and
+  the `BLAST_OFF_*` fields settled it, and `orig.h` records that its offsets
+  are overloaded by type, which is what cost a defect the day it was found.
+  Type 5 is a MISSILE, from `LoadType5` putting `missile.ani` into the row it
+  builds. So the shared `FreeItem` arm holds types 1, 5, 6 and 7 and says
+  nothing about any of them -- demonstrably, since three of the four are now
+  identified from elsewhere and none of it came from that arm.
 - **`object.aai`'s `link 33-1..4` complaint is explained, and it is data
   rather than a defect.** The message is "Object AAI record not found for link
   %02d-%-3d", emitted by `0x00435FD0` -- a post-parse validator that qsorts the
