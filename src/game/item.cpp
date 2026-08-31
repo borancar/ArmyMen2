@@ -3666,9 +3666,6 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
         orig_after_move(obj, 1, 0);
 }
 
-typedef void (__cdecl *AM2_DeployTypeFn)(void *obj, int32_t x, int32_t y,
-                                         int32_t resurrect);
-#define orig_deploy_trooper ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_TROOPER)
 
 /* 0x00428CA0, seven callers, and it names itself in the resurrection log line.
  * Put an object into the world at `where`, then tell the other machines.
@@ -3730,7 +3727,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
 
     switch (*(const int32_t *)o) {
     case 2:
-        orig_deploy_trooper(obj, (int16_t)where, (int16_t)(where >> 16),
+        DeployTrooper(obj, (int16_t)where, (int16_t)(where >> 16),
                             resurrect);
         break;
     case 3:
@@ -8981,7 +8978,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
         if (!ObjIsFriendly(o))
             ObjConceal(o, 0);
 
-        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_OWNER)
+        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
             != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
             *(int32_t *)(o + OBJ_OFF_AI_MODE) = 6;   /* dead: see above */
 
@@ -8999,6 +8996,121 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
 
     SetKindFrames(o, 1);
     ObjSetFootprint(o);
+}
+
+/* 0x00449250, one caller -- the type-2 arm of the deploy dispatcher. Place a
+ * trooper at a point. It names itself in its first log line.
+ *
+ * The near-twin of DeployVehicle above, and the three DIFFERENCES are the
+ * content: this clears from OBJ_OFF_SIGHT_OUT_T2 rather than
+ * OBJ_OFF_FIELD_578 -- each deploy clears its own type's sight-output block,
+ * and the two records start four bytes apart -- RowUpdate takes force 1 rather
+ * than 0, and an OBJ_OFF_SARGE guard decides whether rank and repair-frame are
+ * cleared. Writing this from the sibling erases all three.
+ *
+ * The `resurrect` gate is the same, and derived the same way: the original
+ * reads it at [esp+0x4C] BEFORE an `add esp, 0x2C`, which is arg3 and not the
+ * packed point that shares a slot with arg2.
+ *
+ * Two things reproduced rather than tidied. OBJ_OFF_AI_MODE = 6 for a foreign
+ * owner is dead -- the unconditional = 1 below overwrites it with no read
+ * between -- and the sibling has the identical dead store, which is what marks
+ * it a template artefact rather than a misreading here.
+ *
+ * The tail is a rule worth knowing: a freshly deployed Sarge of our own army
+ * selects himself when nothing else is selected. */
+void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *row0;
+    AM2_Point at;
+    uint8_t   height;
+
+    if (*(const int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                           + COMM_OFF_VERBOSE) != 0)
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_DEPLOY_TROOPER),
+                 *(const uint32_t *)(o + OBJ_OFF_OWNER), x, y);
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+
+    at.x = (int16_t)x;
+    at.y = (int16_t)y;
+    NearestClearPoint(*(const uint32_t *)&at, &at);
+    *(uint32_t *)(o + OBJ_OFF_POS) = *(const uint32_t *)&at;
+
+    height = HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+    *(o + OBJ_OFF_HEIGHT_SET) = height;
+    ObjTileChanged(o, (int32_t)(int8_t)height, 1);
+
+    row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    ObjFlagSet0(row0);
+    RowUpdate(row0, 1, (void *)AM2_IMAGE(ADDR_MAP_DESC));   /* force 1 here */
+
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    ResetType2Fields(o);
+    memset(o + OBJ_OFF_SIGHT_OUT_T2, 0, AM2_DEPLOY_CLEAR_DWORDS * 4u);
+
+    if (resurrect != 0) {
+        uint8_t  facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        void    *weapon;
+
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_BIT0;
+
+        if (*(const int32_t *)(o + OBJ_OFF_SARGE) == 0) {
+            *(int32_t *)(o + OBJ_OFF_RANK) = 0;
+            *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
+        }
+
+        *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)facing;
+        *(o + OBJ_OFF_FACING_COPY) = facing;
+        *(o + OBJ_OFF_FIELD_580)   = facing;
+        SetUnitPose(o, 1);
+
+        *(int32_t *)(o + OBJ_OFF_RIDING)    = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_5A4) = 0;
+        orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
+        *(int32_t *)(o + OBJ_OFF_POSE) = 0;
+
+        if (!ObjIsFriendly(o))
+            ObjConceal(o, 0);
+
+        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+            != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+            *(int32_t *)(o + OBJ_OFF_AI_MODE) = 6;   /* dead: see above */
+
+        weapon = WeaponByUid(*(const uint32_t *)(o + OBJ_OFF_WEAPON_UID));
+        if (weapon != 0)
+            SoldierKindForWeapon(o,
+                **(const uint32_t **)((const uint8_t *)weapon
+                                      + OBJ_OFF_FIELD_C0));
+
+        *(int32_t *)(o + OBJ_OFF_FIELD_568) = 0;
+        SetUnitPose(o, 1);
+
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) != AM2_DEPLOY_KIND_DONE) {
+            int32_t slot = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT);
+
+            *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_DEPLOY_KIND_DONE;
+            *(int32_t *)(o + OBJ_OFF_TABLE_REC_KIND) = slot;
+            *(int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT) = 0;
+            SetFieldInAll(o + OBJ_OFF_SUBRECORD, (void *)(uintptr_t)slot);
+        }
+
+        *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_584) = 1;
+        *(o + OBJ_OFF_FIELD_580) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(int32_t *)(o + OBJ_OFF_FIELD_588) = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_598) = 0;
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0
+        && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+           == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+        && *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT <= 0)
+        SelectUnit(o);
 }
 
 void item_install(void)
@@ -9272,6 +9384,8 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_DEPLOY_TROOPER, (const void *)DeployTrooper,
+                  "DeployTrooper", 1);
     patch_replace(ADDR_DEPLOY_VEHICLE, (const void *)DeployVehicle,
                   "DeployVehicle", 1);
     patch_replace(ADDR_OBJ_MOVE_ALONG_FACING,

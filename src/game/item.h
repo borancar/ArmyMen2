@@ -98,6 +98,11 @@ void __cdecl AdvanceSecondDeadline(void);
  * vehicle at a point: nearest clear spot for its facing, relink every row,
  * reset the AI block. See item.cpp for the two orderings that read backwards
  * and for the attack mode that is dead code in the original. */
+/* 0x00449250, one caller -- the type-2 arm. The near-twin of DeployVehicle;
+ * see item.cpp for the three differences that writing one from the other
+ * would erase. */
+void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
+
 void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
                            int32_t resurrect);
 

@@ -11234,3 +11234,84 @@ family.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.
+
+
+## DeployTrooper -- and writing the sibling found a bug that had ALREADY SHIPPED
+
+**1,239 - 1,152 = 87 entries outstanding.** `0x00449250` into
+`src/game/item.cpp`, the type-2 twin of `DeployVehicle`.
+
+**It caught `OBJ_OFF_OWNER` used where the code reads `OBJ_OFF_ARMY`.**
+`OBJ_OFF_OWNER` is `0x04`; the field both deploy functions compare is at
+`+0x10`, which is `OBJ_OFF_ARMY`. Three sites, and `DeployVehicle` was
+committed with it an hour earlier, past a clean A/B and every static check.
+
+**Two defects cancelled, which is why nothing caught it.** The branch it guards
+sets only `OBJ_OFF_AI_MODE = 6` -- the dead store documented in that same
+commit. A whole-program comparison cannot see a value nobody reads, so the
+original's own dead code masked mine.
+
+**What found it was writing the SIBLING**, not a tool and not a re-read: the
+same comparison in front of me a second time, and the second time I checked the
+offset. Near-twins cross-validate in a way no single-function check does, which
+argues for doing sibling pairs TOGETHER rather than spacing them out.
+
+The slip itself: I took `OBJ_OFF_OWNER` on the strength of the word "owner"
+without confirming it was `0x10`. This file already states the rule -- resolve
+the offset to a name, then verify the name resolves back to the offset -- and I
+applied it correctly to `ROW_OFF_HEADING_BIAS` the same day. **A name that
+sounds right is exactly when the offset goes unchecked.**
+
+### The three differences from its twin, and why they are not arbitrary
+
+  - it clears from `OBJ_OFF_SIGHT_OUT_T2` (`0x57C`) where the vehicle clears
+    from `OBJ_OFF_FIELD_578`. Each deploy clears ITS OWN TYPE'S sight-output
+    block and the two records start four bytes apart -- so this cannot be
+    copy-pasted between them;
+  - `RowUpdate` takes force 1 here and 0 there;
+  - an `OBJ_OFF_SARGE` guard decides whether rank and repair-frame are cleared.
+
+It names itself -- "DeployTrooper: uid:%x, pos=(%d,%d)" behind
+`COMM_OFF_VERBOSE` -- so unlike the vehicle its identity needs no inference. Its
+frame independently re-derives the four-argument signature and the `resurrect`
+gate that `checkseams` forced on the twin, and it carries the SAME dead
+`AI_MODE = 6`, which is what marks that a template artefact rather than a
+misreading.
+
+The tail is a real rule: a freshly deployed `OBJ_OFF_SARGE` belonging to
+`ADDR_DEFAULT_OWNER` calls `SelectUnit` on itself when `ADDR_SELECTED_COUNT` is
+not positive.
+
+### A gap in the ratchets, and a check for it
+
+Every ratchet here guards NAMES -- duplicates, drift, stale seams, missing
+installs. **None guards that a name's VALUE is the offset the original reads**,
+which is precisely the hole this bug fell through.
+
+`tools/checkoffsetuse.py` (drafted) closes it: collect the displacements the
+ORIGINAL's instruction stream reads off a register, collect what the C's
+`*_OFF_*` macros expand to, and diff the sets.
+
+Validated on five functions, and the two-way falsification matters more than
+the passes: with the bug reverted it flags `0x10`; with the fix it does not.
+Honestly, it catches that defect by ONE of its two routes -- `0x04` collides
+with `ROW_OFF_SPRITE`, which the original does read, so only the missing offset
+shows.
+
+    ArmyMessageFlush     sets agree (12/12)
+    ObjMoveAlongFacing   sets agree (19/19)
+    DeployTrooper        sets agree (30/30)
+    DeployVehicle        five offsets written as bare literals -- actionable
+    FormationSlotPoint   two known blind spots
+
+**Its blind spots are measured, not guessed**, and each was found by an
+implausible result rather than an error: capstone prints small displacements
+without `0x`; `[esp + N]` frame slots are not fields; absolute image addresses
+matched the same pattern; the original may compute a field address with
+`add reg, imm`, which a memory-operand scan never sees; the C may reach a field
+through a typed struct member with no macro at all; and offsets live in module
+headers as well as `orig.h` -- looking only at `orig.h` reported
+`CHECK_OFF_TICKED` unnamed.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.

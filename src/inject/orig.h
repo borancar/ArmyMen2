@@ -5076,6 +5076,40 @@ typedef struct {
  * same way ADDR_DAMAGE_VEHICLE does -- a method that has now been confirmed
  * twice by a sibling that does carry a string. */
 #define ADDR_DEPLOY_TROOPER      0x00449250u  /* type 2 */
+/* Reconstructed. The type-2 twin of ADDR_DEPLOY_VEHICLE and near-identical to
+ * it, which is exactly why the DIFFERENCES matter -- writing the second from
+ * the first erases all three.
+ *
+ *   - it clears ten dwords from OBJ_OFF_SIGHT_OUT_T2 (0x57C) where the vehicle
+ *     clears from OBJ_OFF_FIELD_578. Not arbitrary: each deploy clears ITS OWN
+ *     TYPE'S sight-output block, and the two records start four bytes apart.
+ *   - RowUpdate takes force 1 here and 0 there.
+ *   - an OBJ_OFF_SARGE guard decides whether rank and repair-frame are cleared.
+ *
+ * It names itself -- "DeployTrooper: uid:%x, pos=(%d,%d)" -- behind
+ * COMM_OFF_VERBOSE, so unlike the vehicle its identity needs no inference from
+ * the dispatch index.
+ *
+ * The tail is a real rule rather than bookkeeping: past the `resurrect` gate,
+ * a deployed OBJ_OFF_SARGE belonging to ADDR_DEFAULT_OWNER calls SelectUnit on
+ * itself when ADDR_SELECTED_COUNT is not positive -- a fresh Sarge selects
+ * himself if nothing else is selected.
+ *
+ * And it carries the SAME dead store as its sibling: OBJ_OFF_AI_MODE = 6 for a
+ * foreign owner, overwritten by an unconditional = 1 later with no read
+ * between. Two siblings with one dead assignment is a template artefact, not a
+ * misreading -- which is what makes reproducing it the right call. */
+#define ADDR_FMT_DEPLOY_TROOPER  0x0048A4ACu
+        /* "DeployTrooper: uid:%x, pos=(%d,%d)\n" -- and the uid it
+         * prints is OBJ_OFF_OWNER at +4, which the log calls a uid. */
+#define OBJ_OFF_WEAPON_UID       0x54Cu  /* handed to WeaponByUid */
+#define OBJ_OFF_FIELD_568        0x568u
+#define OBJ_OFF_FIELD_574        0x574u  /* int16_t, the facing widened */
+#define OBJ_OFF_FIELD_580        0x580u
+#define OBJ_OFF_FIELD_584        0x584u
+#define OBJ_OFF_FIELD_588        0x588u
+#define OBJ_OFF_FIELD_598        0x598u
+#define AM2_DEPLOY_KIND_DONE     5      /* the kind reassignment's no-op value */
 #define ADDR_DEPLOY_VEHICLE      0x0045B9F0u  /* type 3 */
 /* Reconstructed. Place a vehicle: clear OBJ_FLAG_DESTROYED, take the nearest clear
  * point for its facing, stamp the tile height, relink row 0 and every sub-part
