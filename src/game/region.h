@@ -139,6 +139,12 @@ void __cdecl AiStepAttach(void *obj, void *out);
  * do. Its counter cannot move; every caller is reconstructed. */
 void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge);
 
+/* 0x00408A60, one caller. The roach's per-frame step: build the sight
+ * context, run the behaviour that consumes it, record the region. Its
+ * `sub esp, 0x40` is what fixes RoachBuildContext's record length. The second
+ * argument is the output record, not a facing -- see the body. */
+void __cdecl RoachAliveStepA(void *obj, void *out);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

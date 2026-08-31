@@ -6557,7 +6557,28 @@ typedef struct {
  * path including the dead ones, and one runs once as a dead roach is finally
  * destroyed. Nothing here reads their bodies. */
 #define ADDR_STEP_TYPE8          0x0043D980u  /* void(obj) */
-#define ADDR_ROACH_ALIVE_STEP_A  0x00408A60u  /* void(obj, uint8_t *facing) */
+/* NO LONGER A ROLE NAME, and the block above predicted it would need reading:
+ * "they are given ROLE names from where they sit in this one function, which
+ * is the weakest kind of naming ... Nothing here reads their bodies."
+ *
+ * Read now, and it is exactly AiStep's shape one type over: set one field of
+ * the output record, build the roach's 0x40-byte sight context, run the
+ * behaviour that consumes it, and record which region the roach is standing
+ * in. Its `sub esp, 0x40` is what fixes RoachBuildContext's record length.
+ *
+ * The second argument is the OUTPUT RECORD, not a facing. The name here came
+ * from a caller; ADDR_AI_408640 takes it as `out` alongside the context, and
+ * 0x0045D660 initialises the same record inside the object at
+ * OBJ_OFF_FIELD_578, where +0x04, +0x08, +0x0C, +0x10 and +0x14 land exactly
+ * on the SIGHTCOUT_OFF_ names. Byte 1 of it is the heading, which is what
+ * "facing" was seeing. Reconstructed. */
+#define ADDR_ROACH_ALIVE_STEP_A  0x00408A60u  /* void(obj, void *out) */
+/* The roach's behaviour, still original. It takes (obj, out, ctx), reads the
+ * context RoachBuildContext filled -- SIGHT_OFF_RANGE against the record's
+ * +0x34 in its first two instructions -- and writes back the object's
+ * destination, its follow uid and its target uid. Named by offset because its
+ * body has not been read. */
+#define ADDR_AI_408640           0x00408640u  /* void(obj, out, ctx) */
 /* 0x00408060, one caller -- ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is
  * this record's LENGTH. The roach's half of the sight-context idea: the same
  * structure ADDR_AI_BUILD_CONTEXT fills for a vehicle, four bytes shorter.

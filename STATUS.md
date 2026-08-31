@@ -10357,3 +10357,43 @@ where that goes wrong -- the jump means "not a vehicle" and skims as "is one".
 **And it closed the last seam into the AI band.** `SargeAiStep`,
 `TrooperAiStep` and `AiStepAttach` all reached `0x00404730` through an
 `orig_ai_fill` macro; all three call it by name now.
+
+## This image was incrementally linked, and that is why entries merge
+
+`RoachAliveStepA` is 79 bytes and lives in a `docs/functions.tsv` entry of
+**704**, so patching it credits 625 bytes nobody wrote. Chasing why turned up a
+mechanism rather than a rounding error.
+
+`0x00408AB0` is a five-byte `jmp 0x00408AC0`, and `0x00408AC0`'s ONLY reference
+is that jump. That is the MSVC incremental-linker pattern: call sites call a
+thunk, so the linker can move the real function without patching them. A
+cross-reference scan cannot see either boundary -- the thunk is the target's
+sole referrer, and nothing references the thunk in a form the scan recognises.
+So this is not a defect in `tools/merges.py`; an intra-entry jump over
+alignment padding is a function boundary that is invisible by construction.
+
+**They cluster.** Scanning `.text` below the CRT for `E9 rel32` bracketed by
+`0x90`/`0xCC` padding and jumping under 0x40 bytes forward finds **20 sites**,
+and **eleven of them are inside that one entry** -- `0x00408AB0` through
+`0x00408CF0`. The rest are five around `0x0041A190`-`0x0041A890` and four
+scattered. So the 704-byte "entry" is one real function plus about a dozen
+thunk-and-function pairs.
+
+CLAUDE.md already records ~128 merged sub-CRT entries covering 90 KB without a
+cause. This names one, and the scan that finds them is three lines. Feeding
+those twenty targets to `merges.py` as known splits would make the coverage
+count more honest project-wide -- a change to a number every report quotes, so
+it wants its own commit rather than arriving as a side effect.
+
+Read the two figures `tools/reconstructed.py` prints with that in mind: they
+differ by 28,356 bytes (240,844 split at referenced starts against 269,200
+crediting whole entries), and this is part of the gap.
+
+**AND IT BEARS ON THE STOP CONDITION, WHICH IS WHY IT IS NOT HOUSEKEEPING.**
+The goal is "every game function below the CRT line is patched -- measure it,
+do not estimate it", and the measurement counts ENTRIES. Patching one function
+in a twelve-function entry marks that entry covered, so the outstanding count
+can reach zero with eleven functions still original. Merged entries do not
+merely flatter the number; they can let the goal be declared met while the
+work is unfinished. That is the argument for splitting them before the count
+gets close to zero rather than after.

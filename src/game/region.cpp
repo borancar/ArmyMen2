@@ -3465,6 +3465,61 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
 }
 
 
+#define orig_ai_408640 ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_408640))
+
+/* RoachAliveStepA -- original 0x00408A60, one caller, and orig.h's own note on
+ * it predicted this commit: the five names in that block "are given ROLE names
+ * from where they sit in this one function, which is the weakest kind of
+ * naming ... Nothing here reads their bodies." Read now.
+ *
+ * It is AiStep's shape one object type over -- set a field of the output
+ * record, build the sight context, run the behaviour that consumes it, record
+ * the region -- so the roach has a step/build/behave triple of its own beside
+ * the vehicle's and the trooper's.
+ *
+ * ITS FRAME IS WHAT FIXES THE ROACH RECORD'S LENGTH. `sub esp, 0x40` against
+ * RoachBuildContext's `rep stos` of 0x10 dwords: two independent statements of
+ * 0x40, which is how the roach and vehicle records were told apart.
+ *
+ * THE SECOND ARGUMENT IS THE OUTPUT RECORD, NOT A FACING. orig.h called it
+ * `facing` from a call site. It is the record 0x0045D660 initialises inside the
+ * object at OBJ_OFF_FIELD_578, whose +0x04, +0x08, +0x0C, +0x10 and +0x14 land
+ * exactly on the SIGHTCOUT_OFF_ names -- and whose byte 1 is the heading,
+ * which is what "facing" was seeing. A name taken from one caller, describing
+ * one byte of a structure.
+ *
+ * ITS COUNTER IS BLIND NOW, AND WRITING IT IS WHAT BLINDED IT. StepType8
+ * reached this address through an orig_roach_alive_a seam in item.cpp, so
+ * reconstructing it turned a live counter into a dead one -- checkseams
+ * required the seam be closed, and closing a seam creates blindness, which
+ * CLAUDE.md records as the standing cost of finishing a layer. The comment
+ * here said "its counter can move: the caller is original" until the ratchet
+ * pointed out that the caller is ours.
+ */
+void __cdecl RoachAliveStepA(void *obj, void *out)
+{
+    uint8_t  ctx[AM2_ROACH_CONTEXT_BYTES];
+    uint8_t *o = (uint8_t *)obj;
+
+    if (!obj)
+        return;
+
+    /* A DWORD 1 at +0x14, so it sets SIGHTCOUT_OFF_X to 1 and
+     * SIGHTCOUT_OFF_Y to 0 in one store -- those two are int16 and
+     * ConsiderSightingC writes them separately, which is what establishes the
+     * names. Written as the single store the original makes. This line said
+     * SIGHTCOUT_OFF_SEEN until the bytes were checked against the name: that
+     * is +0x10, reads perfectly in context, and is four bytes wrong. */
+    *(int32_t *)((uint8_t *)out + SIGHTCOUT_OFF_X) = 1;
+
+    RoachBuildContext(obj, ctx);
+    orig_ai_408640(obj, out, ctx);
+
+    *(uint16_t *)(o + OBJ_OFF_REGION) =
+        kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -3510,6 +3565,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_TROOPER_BUILD_CONTEXT,
                         (const void *)TrooperBuildContext,
                         "TrooperBuildContext", 1);
+    rc |= patch_replace(ADDR_ROACH_ALIVE_STEP_A,
+                        (const void *)RoachAliveStepA,
+                        "RoachAliveStepA", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

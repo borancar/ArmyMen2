@@ -5096,8 +5096,6 @@ void __cdecl NextInventorySlot(void *obj)
  * is; the callers pass exactly what they passed before. */
 typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *step);
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
-#define orig_roach_alive_a \
-    ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_ALIVE_STEP_A)
 #define orig_roach_tail_a \
     ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_STEP_TAIL_A)
 #define orig_roach_row_final \
@@ -5154,7 +5152,7 @@ void __cdecl StepType8(void *obj)
                     *(const int16_t *)(o + OBJ_OFF_POS),
                     *(const int16_t *)(o + OBJ_OFF_POS + 2));
 
-        orig_roach_alive_a(obj, facing);
+        RoachAliveStepA(obj, facing);
         RoachAliveStepB(obj, facing);
 
     } else {
