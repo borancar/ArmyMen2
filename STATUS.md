@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `c012b29`. Working tree clean.
+Last updated: **2026-08-31**, at `b3b1050`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,259 patches.**
+Nothing uncommitted. **1,260 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3282,16 +3282,54 @@ commit -- gave the right answer every time it was used.
 
   Cold, as the placement screen is multiplayer.
 
+- **`LoadType8`** (`0x0043CB60`) is the ROACH member of the per-type savegame
+  loader family `LoadType1` belongs to: read the 0x4CC-byte record, build a
+  roach from the header, paste the record over `OBJ_OFF_FIELD_94`.
+
+  **A C++ local is constructed INTO the read buffer and then read over.** The
+  pointer-list constructor runs on buffer + 0x10 and the `fread` that follows
+  covers all 0x4CC bytes, so nothing the constructor wrote survives. What makes
+  the pair matter is the other end: three dwords are zeroed at that same
+  address before the DESTRUCTOR runs, and without them the destructor would
+  free a pointer that came off the disk. The ctor is the compiler's; the
+  explicit clear is the source's, defending against exactly that.
+
+  **The health is RESCALED rather than restored, and the order is the whole of
+  it.** Take the saved health as a fraction of the saved maximum, THEN call
+  `SetMaxHealth` -- which replaces the maximum -- and multiply the new maximum
+  by that fraction, clamped to at least 1. So a save made on one difficulty
+  loads correctly on another, and a roach on half health stays on half health
+  rather than keeping a number that no longer means anything.
+
+  It clears `OBJ_FLAG_FOOTPRINT_ON` on the way out, so the loaded roach's
+  footprint gets laid down again by `ObjSetRoachFootprint` rather than being
+  assumed present from a flag the file supplied -- which ties this batch to
+  the two before it.
+
+  The MSVC SEH prologue is not reproduced, per the standing decision.
+
+- **Two ratchets fired in one build and both were right.**
+  `AM2_TYPE8_RECORD_SIZE` already existed at 0x4CC and my copy was an
+  identical redefinition -- legal C, says nothing, caught by `checkoffsets`.
+  And `checkseams` found three: the two pointer-list halves are reconstructed
+  as `InitPtrList` and `ClearPtrListAlias`, and `orig_load_type8` was the seam
+  this replaced.
+
+- **Its counter is blind by construction**, so no probe can show it:
+  `LoadOneItem` is ours and now calls it directly. What would exercise it is a
+  savegame from a map with roaches -- `kitchen` has nine -- restored on the
+  campaign path.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,105 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,259
+line (0x0045C000) patched**. Measured: **1,106 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,260
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and five batches have gone in and the 134 entries outstanding start at 48
+small ones in batches. A hundred and six batches have gone in and the 133 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

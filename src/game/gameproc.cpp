@@ -10,6 +10,7 @@
 #include "map.h"
 #include "pad.h"
 #include "air.h"
+#include "army.h"     /* SetMaxHealth -- reconstructed */
 #include "item.h"
 #include "event.h"
 #include "script.h"
@@ -495,6 +496,92 @@ typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
                                           int32_t c, int32_t d, uint32_t uid);
 #define orig_create_item ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
 
+typedef void *(__cdecl *AM2_CreateRoachFn)(int32_t a, const char *dir,
+                                           int32_t x, int32_t y, int32_t army,
+                                           int32_t e, int32_t f, int32_t g);
+#define orig_create_roach ((AM2_CreateRoachFn)(uintptr_t)ADDR_CREATE_ROACH)
+
+/* LoadType8 -- original 0x0043CB60, one caller, and the ROACH member of the
+ * per-type savegame loader family LoadType1 belongs to. Read the 0x4CC-byte
+ * record, build a roach from the header, and paste the record over the
+ * object's OBJ_OFF_FIELD_94.
+ *
+ * A C++ LOCAL IS CONSTRUCTED INTO THE READ BUFFER AND THEN READ OVER. The
+ * pointer-list constructor runs on buffer + 0x10 and the fread that follows
+ * covers all 0x4CC bytes, so nothing the constructor wrote survives. What
+ * makes the pair matter is the OTHER end: three dwords are zeroed at that same
+ * address before the destructor runs, and without them the destructor would
+ * free a pointer that came off the disk. So the ctor is the compiler's and the
+ * explicit clear is the source's, defending against exactly that.
+ *
+ * THE HEALTH IS RESCALED RATHER THAN RESTORED, and the order is the whole of
+ * it: take the saved health as a fraction of the saved maximum, THEN call
+ * SetMaxHealth -- which replaces the maximum -- and multiply the new maximum
+ * by that fraction. So a save made on one difficulty loads correctly on
+ * another, and a roach that was on half health stays on half health rather
+ * than keeping a number that no longer means anything. Clamped to at least 1,
+ * so a rounding that would have killed it does not.
+ *
+ * IT CLEARS OBJ_FLAG_FOOTPRINT_ON on the way out, which is what makes the
+ * loaded roach's footprint get laid down again by ObjSetRoachFootprint rather
+ * than being assumed present from a flag the file supplied.
+ *
+ * The MSVC SEH prologue is not reproduced, per the standing decision recorded
+ * in CLAUDE.md: nothing in this program throws, VC6's operator new answers
+ * NULL rather than throwing, and the registered frame is never consulted.
+ */
+void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
+{
+    uint8_t        rec[AM2_TYPE8_RECORD_SIZE];
+    const uint8_t *h   = (const uint8_t *)hdr;
+    uint8_t       *o;
+    float          part;
+
+    InitPtrList(rec + 0x10);
+    orig_fread(rec, AM2_TYPE8_RECORD_SIZE, 1, fp);
+
+    o = (uint8_t *)orig_create_roach(
+            *(const int32_t *)(rec + 0x498),
+            (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+            *(const int16_t *)(h + OBJ_OFF_POS),
+            *(const int16_t *)(h + OBJ_OFF_POS + 2),
+            *(const int8_t *)(h + OBJ_OFF_ARMY),
+            *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
+            *(const int32_t *)(h + 4));
+
+    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE8_RECORD_SIZE);
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+        int32_t was = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        int32_t now;
+
+        part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
+                       / (double)was);
+        SetMaxHealth(o, *(const int32_t *)AM2_IMAGE(ADDR_ROACH_HEALTH_SCALE));
+
+        now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            (int16_t)(int32_t)((double)now * (double)part);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
+    }
+
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST)     = 0;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 4) = 0;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 8) = 0;
+    ResetObjOnCof(o);
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
+
+    *(int32_t *)(rec + 0x10)     = 0;
+    *(int32_t *)(rec + 0x10 + 4) = 0;
+    *(int32_t *)(rec + 0x10 + 8) = 0;
+    ClearPtrListAlias(rec + 0x10);
+
+    return o;
+}
+
 /* LoadType1 -- original 0x00433D60, one caller, and SaveType1's counterpart.
  *
  * The saver writes the 0x2C-byte type record and then a TAG taken from the
@@ -869,7 +956,6 @@ typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
 #define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
 #define orig_load_type5  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE5)
-#define orig_load_type8  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE8)
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
  * hands it to the type's loader, which builds the object and RETURNS it.
@@ -921,7 +1007,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     case 5:  made = (uint8_t *)orig_load_type5(fp, hdr);      break;
     case 6:  made = (uint8_t *)LoadType6(fp, hdr);      break;
     case 7:  made = (uint8_t *)LoadType7(fp, hdr);            break;
-    case 8:  made = (uint8_t *)orig_load_type8(fp, hdr);      break;
+    case 8:  made = (uint8_t *)LoadType8(fp, hdr);      break;
     default: break;
     }
     if (!made)
@@ -1307,6 +1393,7 @@ void gameproc_install(void)
                   "LoadItemHeader", 1);
     patch_replace(ADDR_SAVE_TYPE1, (const void *)SaveType1, "SaveType1", 2);
     patch_replace(ADDR_LOAD_TYPE1, (const void *)LoadType1, "LoadType1", 1);
+    patch_replace(ADDR_LOAD_TYPE8, (const void *)LoadType8, "LoadType8", 1);
     patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
     patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);

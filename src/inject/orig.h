@@ -9596,7 +9596,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_LOAD_TYPE5       0x0043B870u
 #define ADDR_LOAD_TYPE6       0x00422780u
 #define ADDR_LOAD_TYPE7       0x00435500u
-#define ADDR_LOAD_TYPE8       0x0043CB60u
+#define ADDR_LOAD_TYPE8       0x0043CB60u  /* reconstructed */
+/* 0x0043CDD0. What LoadType8 builds its roach with. Eight arguments, the same
+ * shape ADDR_CREATE_ITEM has for LoadType1. Name from that one use. */
+#define ADDR_CREATE_ROACH     0x0043CDD0u
+/* The scale LoadType8 hands ADDR_SET_MAX_HEALTH, the same kind of value
+ * RANK_REC_OFF_SCALE supplies elsewhere. */
+#define ADDR_ROACH_HEALTH_SCALE 0x00487BACu  /* int32_t */
+/* The object's OWN pointer list, three dwords, which LoadType8 clears so a
+ * loaded roach starts with an empty one. */
+#define OBJ_OFF_PTR_LIST      0xA4u
 /* 0x004294C0, FIFTEEN callers -- the most-called thing still original in its
  * band. Recompute an object's tile from its position and, if anything moved,
  * put it back on the map and re-apply its height.

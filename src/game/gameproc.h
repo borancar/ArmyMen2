@@ -101,6 +101,12 @@ int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj);
 int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
 int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
 
+/* 0x0043CB60, one caller. The ROACH member of the per-type savegame loader
+ * family: read the 0x4CC-byte record, build a roach from the header, paste the
+ * record over OBJ_OFF_FIELD_94, and rescale the health across a possibly
+ * different maximum. */
+void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
+
 /* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
  * the tag, build the item from the tag, then overwrite most of it from the
  * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its
