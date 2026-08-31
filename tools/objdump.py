@@ -87,6 +87,34 @@ TABLE_FIELDS = (
 )
 TABLE_SPAN = 0x90
 
+# The AI band's own state -- dumped SEPARATELY and only for the types whose
+# records are big enough to hold it.
+#
+# Nothing could see this band at all: every function in it (the three per-type
+# steps, the three sight builders, the mode arms) writes only fields past 0x90,
+# so the table above was blind to all of them. It took a real defect to notice
+# -- StepType2 wrote a converging tail as early returns, skipping the call that
+# places a trooper's held weapon -- and the ONLY reason that was caught is that
+# the weapon's own `pos` is in the table. The step's own writes were invisible.
+#
+# IT CANNOT BE A WIDER TABLE_SPAN. Records differ in size by type: CLAUDE.md
+# records a missile's as 0xB8 bytes and a roach's as 0x560, so reading 0x590
+# from every object would run past most of them and return heap contents --
+# unstable between runs, which is exactly what the "values only" rule above
+# exists to prevent. Types 2 and 3 are known to reach at least 0x5A8, because
+# OBJ_OFF_FIELD_5A4 and a vehicle's +0x59C are read on them.
+AI_TYPES = (2, 3)
+AI_FIELDS = (
+    ("destpt", 0x0C0, "<I"),      # OBJ_OFF_FIELD_C0, a packed point
+    ("aimode", 0x0E4, "<i"),      # OBJ_OFF_AI_MODE -- which arm ran
+    ("pose",   0x538, "<i"),      # OBJ_OFF_POSE / a vehicle's list header
+    ("sarge",  0x548, "<i"),      # OBJ_OFF_SARGE
+    ("outbr",  0x57C, "<i"),      # StepType2's out+0, StepType3's out+4
+    ("outst",  0x580, "<i"),      # and +4 / +8
+    ("outhit", 0x584, "<i"),      # and +8 / +0x0C
+)
+AI_SPAN = 0x588
+
 
 def dump_table(ctl):
     """Every registered object, as values only. See TABLE_FIELDS.
@@ -115,6 +143,15 @@ def dump_table(ctl):
         for name, off, fmt in TABLE_FIELDS:
             vals = struct.unpack_from(fmt, blob, off)
             out.append("%s=%s" % (name, ",".join(str(v) for v in vals)))
+        # The AI block, only for the types whose records reach it. See
+        # AI_FIELDS: reading it from a missile or a roach would run past the
+        # allocation and print heap.
+        otype, = struct.unpack_from("<i", blob, 0)
+        if otype in AI_TYPES:
+            ai = read(ctl, obj, AI_SPAN)
+            for name, off, fmt in AI_FIELDS:
+                vals = struct.unpack_from(fmt, ai, off)
+                out.append("%s=%s" % (name, ",".join(str(v) for v in vals)))
         print("%08x %s" % (uid, " ".join(out)))
 
 

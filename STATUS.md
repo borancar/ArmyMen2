@@ -10489,3 +10489,40 @@ declared locally -- with `extern "C"`, because `audio.h` wraps its declarations
 in one. That is the exact opposite of `gameproc.cpp`'s `LoadAudioSection`,
 which must NOT have the wrapper because `audio.h` does not cover it. Both
 compile; only the linker says which is right.
+
+## The widened dump answered the trooper-AI question in one query
+
+`tools/objdump.py --table` read 0x90 bytes per object, and every field the AI
+band writes is past that -- so nothing could see any of it. Widening it (a
+type-gated second read, because a missile's record is 0xB8 bytes and a roach's
+0x560) made the band observable for the first time, and immediately settled
+what a counts probe could not.
+
+**Every trooper in Boot Camp is accounted for, by three different reasons.**
+Eleven objects carry the AI block:
+
+- `0x3E8` is the player's Sarge (`sarge=1`), and `StepType2` sends him to input
+  handling, never to the AI.
+- `0x3EA`-`0x3F6` are seven more army-0 troopers.
+- `0x2000043F`-`0x20000443` are **army 1** -- the enemy -- and all three are at
+  `aimode=6`, which is `attack`. Two of them carry `flags=4`, destroyed.
+- The one live enemy, `0x2000043F`, has **`outbr=1`**. That field IS
+  `obj+0x57C`, which is `out[0]` -- the first thing `StepType2`'s alive half
+  tests, and a non-zero value skips every AI arm.
+
+So the earlier reading was wrong in an instructive way: Boot Camp is not short
+of hostile units in an attack mode. It has them. They are gated out one by one,
+and the counters read 0 for three separate reasons rather than one.
+
+**None of that was visible an hour ago.** `outbr`, `aimode` and `sarge` are
+exactly the fields the old dump stopped short of, and the question had been
+open since this morning.
+
+**The fields discriminate.** Across eleven objects: `aimode` takes 0, 1 and 6;
+`pose` takes 0, 1, 33 and 36; `outbr`, `outst` and `sarge` all split. And
+`outhit` tracks `pose` exactly wherever both are non-zero, which independently
+confirms that `WeaponPoseIndex`'s result is what lands there -- the reading
+taken from `StepType2`'s record init.
+
+Both halves of the baseline run agree: state identical, 1,610 lines, 11 with
+an AI block.

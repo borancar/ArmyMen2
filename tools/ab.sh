@@ -356,6 +356,15 @@ play() {
     # Values only, never a heap pointer: type, flags, army, position, tile, the
     # two box rectangles, health and the cell count. The same rule
     # tools/actdiff.py and `ctl widgets` follow, for the same reason.
+    #
+    # AND, for types 2 and 3 only, the AI band's own state -- the destination
+    # point, the AI mode, the pose, the Sarge flag and three fields of the
+    # output record. Nothing could see any of that: every function in that
+    # band writes only past 0x90, where this dump used to stop. It took a real
+    # defect to notice, and even then only because the SIDE EFFECT reached a
+    # weapon's `pos`, which was already dumped. Types 2 and 3 alone because a
+    # missile's record is 0xB8 bytes and a roach's 0x560; reading the block
+    # from those would print heap. See tools/objdump.py.
     if [ "$cfg" = bootcamp ]; then
         drive objtable 2>/dev/null > "$WORK/$cfg-$side.state" || true
     fi
