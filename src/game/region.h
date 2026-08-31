@@ -168,6 +168,11 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out);
  * _WANT_RANGE, _MAX_RANGE and _READY. */
 void __cdecl UnitWeaponInfo(void *unit, void *out);
 
+/* 0x00438300, four callers. Solve the route from one region to another and
+ * record it in the two all-pairs byte matrices. The found exit fills BOTH
+ * directions of the path; the no-path exit answers one way round only. */
+void __cdecl RegionSolvePair(int32_t from, int32_t to);
+
 int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind);
 
 /* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell

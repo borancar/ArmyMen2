@@ -196,8 +196,6 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to)
 
 /* Still original: solving one pair of the routing tables. */
 typedef void (__cdecl *AM2_SolvePairFn)(int32_t from, int32_t to);
-#define orig_region_solve_pair \
-            ((AM2_SolvePairFn)AM2_IMAGE(ADDR_REGION_SOLVE_PAIR))
 
 /* 0x00406460, one caller. How many hops from one region to another.
  *
@@ -244,7 +242,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
     } else if (!solve) {
         return -1;
     } else {
-        orig_region_solve_pair(from, to);
+        RegionSolvePair(from, to);
         stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
     }
 
@@ -2567,6 +2565,88 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
     }
 }
 
+/* The search itself, still original: 1,168 bytes, and the only thing this
+ * function drives. It answers non-zero with the path written into the caller's
+ * array and its length through the fourth argument. */
+typedef int32_t (__cdecl *AM2_RegionFindPathFn)(int32_t from, int32_t to,
+                                                int16_t *path, int32_t *len);
+#define orig_region_find_path \
+    ((AM2_RegionFindPathFn)(uintptr_t)ADDR_REGION_FIND_PATH)
+
+/* RegionSolvePair -- original 0x00438300, four callers. Solve the route from
+ * one region to another and record it in the two all-pairs byte matrices, so
+ * that RegionHops can walk it a hop at a time afterwards.
+ *
+ * IT REFUSES OUTRIGHT WHEN THE DESTINATION IS INACTIVE, before it searches and
+ * before it stamps -- so an inactive `to` leaves the pair unanswered and the
+ * next caller tries again. Every other exit stamps.
+ *
+ * THE NO-PATH EXIT IS NOT SYMMETRIC AND ORIG.H SAID IT WAS. It clears
+ * next[from][to] and next[to][from], which really are a pair, and then writes
+ * the stamp into cost[from][to] TWICE -- two separate reloads of both globals,
+ * `imul ecx, edi` and `imul eax, edi`, the same register both times, checked
+ * in the bytes rather than in the mnemonics. cost[to][from] is never touched.
+ *
+ * So an unreachable pair is answered one way round only and the reverse gets
+ * solved again from the other side. Reproduced, including the duplicated
+ * store: a reconstruction that wrote it once would be the same program, and
+ * one that "fixed" the symmetry would not.
+ *
+ * THE FOUND EXIT FILLS BOTH DIRECTIONS, in two nested double loops that are
+ * mirror images. Forward: for every i along the path and every j at or after
+ * it, the next hop from path[i-1] toward path[j] is path[i]. Backward: the
+ * same with the ends swapped. That is the whole point of solving one pair --
+ * it answers every pair the path passes through, in both directions, for the
+ * price of one search.
+ *
+ * The path buffer is AM2_REGION_PATH_MAX int16 on the stack and nothing bounds
+ * the search against it here; that is the callee's business.
+ */
+void __cdecl RegionSolvePair(int32_t from, int32_t to)
+{
+    int32_t  len;
+    int16_t  path[AM2_REGION_PATH_MAX];
+    uint8_t *next  = *(uint8_t *const *)(uintptr_t)ADDR_REGION_NEXT;
+    uint8_t *cost  = *(uint8_t *const *)(uintptr_t)ADDR_REGION_COST;
+    int32_t  stride;
+    uint8_t  stamp;
+    int32_t  i, j;
+
+    if (!*(const int32_t *)((const uint8_t *)
+              *(void *const *)(uintptr_t)ADDR_REGIONS
+              + (uint32_t)to * AM2_REGION_SIZE + REGION_OFF_ACTIVE))
+        return;
+
+    if (!orig_region_find_path(from, to, path, &len)) {
+        stride = *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE;
+        stamp  = *(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP;
+
+        next[from * stride + to] = 0;
+        next[to * stride + from] = 0;
+
+        /* Both of these are cost[from][to]; the original writes it twice. */
+        cost[from * stride + to] = stamp;
+        cost[from * stride + to] = stamp;
+        return;
+    }
+
+    stride = *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE;
+    stamp  = *(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP;
+
+    for (i = 1; i < len; i++)
+        for (j = i; j < len; j++) {
+            next[path[i - 1] * stride + path[j]] = (uint8_t)path[i];
+            cost[path[i - 1] * stride + path[j]] = stamp;
+        }
+
+    for (i = len - 1; i > 0; i--)
+        for (j = i; j > 0; j--) {
+            next[path[i] * stride + path[i - j]] = (uint8_t)path[i - 1];
+            cost[path[i] * stride + path[i - j]] = stamp;
+        }
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -2640,6 +2720,8 @@ int region_install(void)
                         "CanPlaceAt", 6);
     rc |= patch_replace(ADDR_UNIT_WEAPON_INFO, (const void *)UnitWeaponInfo,
                         "UnitWeaponInfo", 3);
+    rc |= patch_replace(ADDR_REGION_SOLVE_PAIR, (const void *)RegionSolvePair,
+                        "RegionSolvePair", 4);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
                         "TileCoverAdd", 3);
     rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,

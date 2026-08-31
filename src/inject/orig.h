@@ -7536,13 +7536,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_REGION_NEXT           0x00514EF4u  /* uint8_t *, the next hop */
 #define ADDR_REGION_STAMP          0x00514EF8u  /* uint8_t, the solved generation */
 #define ADDR_REGION_COST           0x00514EFCu  /* uint8_t * */
-/* It writes ADDR_REGION_STAMP into cost[from][to] and cost[to][from] on BOTH
- * exits -- path found and no path -- which is what makes "stamped" mean
- * "answered" rather than "pending", and it opens by reading REGION_OFF_ACTIVE
- * of `to` and returning when that is clear. Two independent confirmations of
- * names settled elsewhere; still original, and 416 bytes with two nested
- * loops over a 258-entry path buffer. */
+/* It stamps on BOTH exits -- path found and no path -- which is what makes
+ * "stamped" mean "answered" rather than "pending", and it opens by reading
+ * REGION_OFF_ACTIVE of `to` and returning when that is clear.
+ *
+ * THE NO-PATH EXIT IS NOT SYMMETRIC, AND THIS COMMENT SAID IT WAS. It clears
+ * next[from][to] and next[to][from] -- those two really are a pair -- and then
+ * writes the stamp into cost[from][to] TWICE, at 0x00438389 and 0x004383A5,
+ * from two separate reloads of both globals. `imul ecx, edi` and
+ * `imul eax, edi` -- the same register, checked in the bytes, 0FAFCF and
+ * 0FAFC7. cost[to][from] is never touched on that exit.
+ *
+ * So an unreachable pair is answered one way round only, and the reverse
+ * direction keeps its old generation and gets solved again from the other
+ * side. The symmetry the old sentence described is real but lives on the FOUND
+ * exit, where two nested double loops fill both directions of the path. */
 #define ADDR_REGION_SOLVE_PAIR     0x00438300u  /* void(from, to) */
+/* 0x00437E70, 1,168 bytes, one caller -- the search RegionSolvePair drives.
+ * Answers non-zero with the path written into the caller's int16 array and its
+ * length through the fourth argument, zero when there is none. Still original;
+ * the pair-filling above is what is reconstructed. */
+#define ADDR_REGION_FIND_PATH      0x00437E70u /* int32(from,to,int16*,int32*) */
+#define AM2_REGION_PATH_MAX        256   /* the caller's buffer, 0x200 bytes */
 /* READ AND DELIBERATELY LEFT ORIGINAL, with the reading recorded so it need
  * not be redone. 416 bytes, a 0x204-byte stack frame -- a path array -- and
  * three 2D byte tables indexed as `stride * a + b` off ADDR_REGION_STRIDE,

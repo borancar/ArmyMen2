@@ -5,11 +5,29 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `0cc95c8`. Working tree clean.
+Last updated: **2026-08-31**, at `d253ee1`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,283 patches.**
+Nothing uncommitted. **1,284 patches.**
+
+**`RegionSolvePair` (`0x00438300`)**, declined one commit ago as wanting a
+fresh reading, and given one. Solve the route between two regions and record it
+in the two all-pairs byte matrices.
+
+**Its no-path exit is not symmetric, and orig.h said it was.** It clears
+`next[from][to]` and `next[to][from]` -- a real pair -- and then writes the
+stamp into `cost[from][to]` TWICE, from two separate reloads, the same register
+both times. `cost[to][from]` is never touched, so an unreachable pair is
+answered one way round only. Checked in the instruction bytes rather than the
+mnemonics.
+
+**Its found exit fills both directions**, in two nested double loops that are
+mirror images -- which is the point of solving one pair at all: it answers
+every pair the path passes through, both ways, for one search.
+
+Unexercised: `RegionSolvePair` and `RegionHops` both read 0 on a live Boot Camp
+mission, which is the AI pathing layer no drive reaches.
 
 **`RoachStepAllowed` (`0x0043D0F0`)** -- may the roach step the way this
 control record says? It runs **366,870 times** on a live MAP 01 mission, which
@@ -3605,13 +3623,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,126 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 113
-outstanding, which is 1,239 minus 1,126 -- from 1,283 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,127 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 112
+outstanding, which is 1,239 minus 1,127 -- from 1,284 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-six batches have gone in and the 113 entries
+small ones in batches. A hundred and twenty-seven batches have gone in and the 112 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
