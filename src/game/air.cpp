@@ -1384,8 +1384,93 @@ void __cdecl AirPassesDraw(void)
 }
 
 
+/* 0x00456EA0, three callers. Where a formation slot sits.
+ *
+ * It CACHES its own answer -- the tail writes ADDR_SLOT_POSITIONS and
+ * ADDR_SLOT_HEADINGS for this slot before returning -- so the three per-slot
+ * tables are its output as well as its input. Slots resolve in order, each
+ * reading its parent's cached entry, which is why the vehicle rule below
+ * propagates DOWN the formation tree instead of being a local test on two
+ * objects. Taking this for a pure "where does slot N go" query and dropping
+ * the writes would leave every later slot reading a stale parent.
+ *
+ * Three regimes, and the tables settle which: slot 0 is the leader itself;
+ * slots 1..8 read a parent, an angle and a distance out of ADDR_SLOT_RECS; and
+ * slots 9 and up are procedural rings, ADDR_SLOT_BAND_HEADING splitting the
+ * slot into a band and an index with the distance
+ * band * AM2_SLOT_RING_STEP + AM2_SLOT_RING_BASE.
+ *
+ * In all three the distance DOUBLES when the slot or its parent holds a
+ * vehicle. Note it is an OR over the two, not a test on the object passed in.
+ *
+ * Both early exits sit before the original's `push esi`, which is why they pop
+ * one register fewer -- the conditional-push shape, the same one that gives
+ * StepType6 two returns at different depths. */
+void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
+                                uint32_t *out)
+{
+    int32_t  *isVehicle = (int32_t *)AM2_IMAGE(ADDR_SLOT_IS_VEHICLE);
+    uint32_t *slotPos   = (uint32_t *)AM2_IMAGE(ADDR_SLOT_POSITIONS);
+    uint8_t  *headings  = (uint8_t *)AM2_IMAGE(ADDR_SLOT_HEADINGS);
+    const uint8_t *o = (const uint8_t *)obj;
+    uint8_t   heading = 0;
+    int32_t   parent, dist;
+    AM2_Point at;
+
+    if (slot >= AM2_SLOT_MAX || obj == 0)
+        return;
+
+    isVehicle[slot] = (*(const int32_t *)o == AM2_OBJ_TYPE_VEHICLE);
+
+    if (slot == 0) {
+        AM2_Point lead;
+
+        *out = leaderPos;
+        lead = *(const AM2_Point *)&leaderPos;
+        heading = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &lead);
+    } else {
+        uint8_t angle;
+
+        if (slot < 9) {
+            const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_SLOT_RECS)
+                                 + (uint32_t)slot * AM2_SLOT_REC_BYTES;
+
+            parent = *(const int32_t *)(rec + SLOT_REC_OFF_PARENT);
+            dist   = *(const int16_t *)(rec + SLOT_REC_OFF_DIST);
+            angle  = (uint8_t)(*(const uint8_t *)(rec + SLOT_REC_OFF_ANGLE)
+                               + headings[parent]);
+        } else {
+            int32_t band, index;
+
+            SlotBandHeading(slot, &band, &index, &angle);
+            parent = index;
+            dist   = band * AM2_SLOT_RING_STEP + AM2_SLOT_RING_BASE;
+        }
+
+        if (isVehicle[parent] || isVehicle[slot])
+            dist += dist;
+
+        *out = slotPos[parent];
+        at = *(const AM2_Point *)out;
+        /* fmul, then fiadd, then ftol -- the parent's coordinate is added
+         * BEFORE the truncation, not after. The distance is rounded to float
+         * once on the way in (fild then fstp dword), which is why it is cast
+         * rather than left as an int in the product. */
+        at.x = (int16_t)(int32_t)(Cos8(angle) * (float)dist + (float)at.x);
+        at.y = (int16_t)(int32_t)(Sin8(angle) * (float)dist + (float)at.y);
+        *out = *(const uint32_t *)&at;
+        heading = angle;
+    }
+
+    slotPos[slot]  = *out;
+    headings[slot] = heading;
+}
+
 void air_install(void)
 {
+    patch_replace(ADDR_FORMATION_SLOT_POINT,
+                  (const void *)FormationSlotPoint,
+                  "FormationSlotPoint", 3);
     patch_replace(ADDR_FORMATION_POINT, (const void *)FormationPoint,
                   "FormationPoint", 4);
     patch_replace(ADDR_FORMATION_POINT_FAR, (const void *)FormationPointFar,

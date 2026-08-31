@@ -3594,6 +3594,35 @@
 #define ADDR_SLOT_BAND_HEADING   0x00456E20u  /* void(int32,int32*,int32*,
                                                *      uint8_t *) */
 #define ADDR_SLOT_HEADINGS       0x0065A068u  /* uint8_t[], filled at runtime */
+/* The three per-slot runtime tables, 64 entries each, and they TILE exactly --
+ * ADDR_SLOT_HEADINGS uint8[64] runs to ADDR_SLOT_POSITIONS, which runs to
+ * ADDR_SLOT_IS_VEHICLE, which runs to ADDR_TURRET_ANIMS. Four boundaries fix
+ * the count at 64 independently of the `slot >= 0x40` guard in the code. */
+#define ADDR_SLOT_POSITIONS      0x0065A0A8u  /* uint32[64], packed points */
+#define ADDR_SLOT_IS_VEHICLE     0x0065A1A8u  /* int32[64], type == 3 */
+#define AM2_SLOT_MAX             0x40
+/* 0x00456EA0, three callers. Where a formation slot sits, and it CACHES its
+ * own answer: the tail writes ADDR_SLOT_POSITIONS and ADDR_SLOT_HEADINGS for
+ * the slot before returning. So slots resolve in order, each reading the
+ * parent's cached entry, and the vehicle rule below propagates DOWN the tree
+ * rather than being a local test on two objects.
+ *
+ * Three regimes. Slot 0 takes the leader's own position and an AngleBetween.
+ * Slots 1..8 read a parent, an angle and a distance from ADDR_SLOT_RECS.
+ * Slots 9 and up are procedural: ADDR_SLOT_BAND_HEADING splits the slot into a
+ * band and an index, and the distance is band * AM2_SLOT_RING_STEP +
+ * AM2_SLOT_RING_BASE.
+ *
+ * In every regime the distance DOUBLES when the slot or its parent holds a
+ * vehicle -- `isVehicle[parent] || isVehicle[slot]`. */
+#define ADDR_FORMATION_SLOT_POINT 0x00456EA0u /* void(slot, pos, obj, out) */
+#define ADDR_SLOT_RECS           0x0048BD90u  /* 8-byte records, slots 1..8 */
+#define SLOT_REC_OFF_PARENT      0u   /* int32, the slot this hangs off */
+#define SLOT_REC_OFF_ANGLE       4u   /* uint8, added to the parent's heading */
+#define SLOT_REC_OFF_DIST        6u   /* int16 */
+#define AM2_SLOT_REC_BYTES       8u
+#define AM2_SLOT_RING_STEP       48
+#define AM2_SLOT_RING_BASE       32
 #define ADDR_VOLUME_AT_ZERO      0x00512318u  /* int32_t, volume at no distance */
 #define SOUND_REC_OFF_POS        0x10u   /* AM2_Point */
 #define SOUND_REC_OFF_OWNER      0x14u   /* uid; the object making the sound */

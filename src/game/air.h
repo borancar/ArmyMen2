@@ -120,6 +120,12 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 
 /* Original: 0x00404400, two callers. Write the formation position for `slot`
  * into `out`, relative to `leader`. See ADDR_FORMATION_SLOTS for the table. */
+/* Original: 0x00456EA0, three callers. Where a formation slot sits, and it
+ * caches its own answer into the per-slot tables -- see air.cpp for why that
+ * makes the vehicle rule propagate down the tree. */
+void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
+                                uint32_t *out);
+
 void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
                             int32_t slot);
 

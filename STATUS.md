@@ -11118,3 +11118,63 @@ found nothing because the FUNCTION's name differs from the ADDRESS's.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels.
+
+
+## FormationSlotPoint, written but COLD -- and a function I nearly never installed
+
+**1,239 - 1,150 = 89 entries outstanding.** `0x00456EA0` into
+`src/game/air.cpp`, beside the formation family already there.
+
+**It CACHES its own answer**, and that is what the function is. The tail writes
+`ADDR_SLOT_POSITIONS[slot]` and `ADDR_SLOT_HEADINGS[slot]` before returning, so
+the three per-slot tables are its output as well as its input: slots resolve in
+order, each reading its parent's cached entry. Taking it for a pure "where does
+slot N go" query and dropping the writes would leave every later slot reading a
+stale parent -- plausible-looking formations, wrong ones, and nothing in a log
+or a frame to show it.
+
+That also changes what the vehicle rule means. The distance doubles when
+`isVehicle[parent] || isVehicle[slot]`, and `isVehicle[slot]` is written by
+THIS function at entry -- so the doubling propagates DOWN the formation tree
+rather than being a local test on two objects.
+
+Three regimes: slot 0 is the leader itself; slots 1..8 read a parent, angle and
+distance from `ADDR_SLOT_RECS`; slots 9 and up are procedural rings, with
+`ADDR_SLOT_BAND_HEADING` -- already named and already reconstructed -- splitting
+the slot into a band and an index.
+
+**The slot count is fixed at 64 by FOUR tiling boundaries**, checked BEFORE
+naming anything this time: `ADDR_SLOT_HEADINGS` uint8[64] runs to
+`ADDR_SLOT_POSITIONS`, which runs to `ADDR_SLOT_IS_VEHICLE`, which runs to
+`ADDR_TURRET_ANIMS`. That is independent of the `slot >= 0x40` guard in the
+code, and it is the check I skipped on the speech-group table this afternoon --
+which is the one table I then read four bytes late.
+
+**A truncation on the wrong side of an addition, caught by re-reading the
+encoding.** The original is `fmul` then `fiadd` then `ftol`: the parent's
+coordinate is added BEFORE the truncation. I had written
+`(int)(Cos8 * dist) + x`. Same class as ObjMoveAlongFacing's X/Y asymmetry, and
+invisible in C.
+
+**And I nearly shipped it uninstalled.** It compiled clean and passed EVERY
+static check with no `patch_replace` and no declaration -- the shape
+`StartShake` and `TroopSubParse` both reached here before. `checkinstalled.py`
+cannot see a function that was never declared with an address comment. What
+caught it was the transcription count sitting at 1,149 when it should have
+moved. **Read the count before the A/B, not after**; a suite over an
+uninstalled function compares the original against itself and reports clean.
+
+**It is COLD, and that is measured rather than assumed.** A `TRACE=1` Boot Camp
+drive reads `FormationSlotPoint=0` while `ObjMoveAlongFacing=847` on the same
+run, and all three of its callers sit in ONE ORIGINAL function at `0x00458400`
+-- so the zero cannot be the usual blind spot. It genuinely never executes on
+any drive this project has; reaching it needs whatever squad-order path that
+function serves.
+
+So this one is **verified by reading**, the same standing as `BoatExitPoint`
+and the five `WM_` comm messages, and the clean A/B says only that nothing else
+broke. Worth stating plainly: of the units landed today some are exercised by
+an artifact and some are not, and which is which matters more than the count.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.
