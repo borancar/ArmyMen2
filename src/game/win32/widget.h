@@ -1588,6 +1588,10 @@ void __cdecl HudPaint(void);
 
 /* 0x00412090, one caller. Preload both aim-marker sprite runs and clear part
  * of the per-army state behind them. */
+/* 0x00412310, one caller -- FireWeapon. The other half of starting an aim
+ * marker: the per-ARMY B arrays, a deadline, and the marker itself. */
+void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
+
 void __cdecl AimInit(void);
 
 #endif /* AM2_WIDGET_H */

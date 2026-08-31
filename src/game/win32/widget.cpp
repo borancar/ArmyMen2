@@ -8044,6 +8044,68 @@ uint8_t __cdecl MpNamePaper(int32_t row)
 #define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
 #define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
 
+typedef void (__cdecl *AM2_SpawnAtFn2)(int32_t x, int32_t y, int32_t kind,
+                                       int32_t army, uint32_t uid,
+                                       int32_t extra, int32_t e, int32_t f,
+                                       int32_t g, int32_t h);
+#define orig_spawn_at_aim ((AM2_SpawnAtFn2)(uintptr_t)ADDR_SPAWN_AT)
+
+/* AimStartB -- original 0x00412310, one caller, which is FireWeapon. The other
+ * half of starting an aim marker, and orig.h has framed 0x00412230 and this as
+ * "the two halves" since before either was read.
+ *
+ * It is per-ARMY and not per-unit: four parallel arrays indexed by the firing
+ * object's OBJ_OFF_ARMY -- ADDR_AIM_LIVE_B, _POINT_B, _STAMP_B and
+ * _DEADLINE_B -- so an army has one marker at a time and the next shot moves
+ * it. The B set is nine sprites where A has six; that split was already
+ * recorded and this is the writer for the B half of it.
+ *
+ * THE STAMP IS SET ONLY IF IT IS CLEAR and the deadline unconditionally. So
+ * the marker remembers when the FIRST shot of a run landed while its expiry
+ * keeps moving out with each later one -- a burst reads as one aim, and
+ * nothing resets the stamp except whatever clears the array.
+ *
+ * TWO LIFETIMES AND THE SHORT ONE IS FOR OTHER PEOPLE. In a multiplayer
+ * session where CommMustBroadcast refuses this army -- someone else's shot,
+ * relayed to us -- the deadline is a flat AM2_AIM_LIFE_REMOTE_MS. Ours, and
+ * every shot outside a session, gets `2 * ADDR_AIM_LIFE_HALF - 1`. So a
+ * remote player's marker is on a fixed timer and our own is on the game's.
+ *
+ * The spawned marker's position is the stored point PLUS THE VIEW ORIGIN,
+ * which is what makes it screen-relative; the point itself is stored raw.
+ */
+void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
+{
+    int32_t   i = army;
+    int16_t  *pt = (int16_t *)((uint8_t *)AM2_IMAGE(ADDR_AIM_POINT_B)
+                               + (uint32_t)i * 4);
+    int32_t   deadline;
+
+    ((int32_t *)AM2_IMAGE(ADDR_AIM_LIVE_B))[i] = 1;
+    *(uint32_t *)pt = at;
+
+    if (!((int32_t *)AM2_IMAGE(ADDR_AIM_STAMP_B))[i])
+        ((int32_t *)AM2_IMAGE(ADDR_AIM_STAMP_B))[i] =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)army)) {
+        deadline = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                   + AM2_AIM_LIFE_REMOTE_MS;
+    } else {
+        deadline = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                   + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF * 2 - 1;
+    }
+    ((int32_t *)AM2_IMAGE(ADDR_AIM_DEADLINE_B))[i] = deadline;
+
+    orig_spawn_at_aim(pt[0] + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                      pt[1] + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y,
+                      AM2_AIM_SPAWN_KIND, i, uid,
+                      *(const int32_t *)(uintptr_t)ADDR_AIM_SPAWN_ARG,
+                      0, 0, 0, 0);
+}
+
 /* AimInit -- original 0x00412090, one caller.
  *
  * Preload both aim-marker sprite runs -- six frames of set 19 index 4, nine of
@@ -8604,6 +8666,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_AIM_START_B, (const void *)AimStartB,
+                        "AimStartB", 1);
     rc |= patch_replace(ADDR_HUD_PAINT, (const void *)HudPaint,
                         "HudPaint", 0);
 

@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `93b3102`. Working tree clean.
+Last updated: **2026-08-31**, at `e1e3f88`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,254 patches.**
+Nothing uncommitted. **1,255 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3146,16 +3146,45 @@ commit -- gave the right answer every time it was used.
   which this port replaces with the C++ runtime wholesale. It has sat on the
   picker's shortlist for weeks; it should stay there and be skipped.
 
+- **`AimStartB`** (`0x00412310`) is the other half of starting an aim marker,
+  and `orig.h` had framed `0x00412230` and this as "the two halves" since
+  before either was read. Every global it touches was already named -- the
+  four per-army B arrays, the view origin, the spawn call -- so this was
+  almost entirely a matter of writing down what the existing names already
+  said.
+
+  **It is per-ARMY, not per-unit.** Four parallel arrays indexed by the firing
+  object's `OBJ_OFF_ARMY`, so an army has one marker at a time and the next
+  shot moves it.
+
+  **The stamp is set only if clear and the deadline unconditionally.** So the
+  marker remembers when the FIRST shot of a run landed while its expiry keeps
+  moving out with each later one -- a burst reads as one aim.
+
+  **Two lifetimes, and the short one is for other people.** In a multiplayer
+  session where `CommMustBroadcast` refuses this army -- someone else's shot,
+  relayed to us -- the deadline is a flat 1000 ms; ours, and every shot outside
+  a session, gets `2 * ADDR_AIM_LIFE_HALF - 1`.
+
+  Cold: 0 calls beside `AimInit`'s 1. The marker's sprite set is `AM2_AIM_SET`,
+  which `orig.h` already records as the AIR-SUPPORT set, and air support is
+  one of the bands this environment never enters.
+
+- **`bootcamp` read 67 pixels rather than 22 and the object table settled it
+  again**, for the second time since that oracle landed: 1,610 lines identical,
+  so nothing moved. A figure inside the budget that would otherwise have had to
+  be shrugged at.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,100 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,254
+line (0x0045C000) patched**. Measured: **1,101 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,255
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred batches have gone in and the 139 entries outstanding start at 48
+small ones in batches. A hundred and one batches have gone in and the 138 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

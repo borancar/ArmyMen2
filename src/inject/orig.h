@@ -914,6 +914,15 @@
 #define AM2_AIM_B_HOLD           7      /* 1 in 7 re-rolls it */
 /* 0x00412230 and 0x00412310, the two halves of starting one. */
 #define ADDR_AIM_START           0x00412230u  /* void(int8_t army, uint32 pt) */
+#define ADDR_AIM_START_B         0x00412310u  /* void(uid, int8_t, uint32) */
+/* Two globals AimStartB reads and nothing else here explains. The first is
+ * doubled and reduced by one to make the marker's deadline, so it is half a
+ * lifetime in milliseconds; the second goes straight into ADDR_SPAWN_AT's
+ * sixth argument. Both names are ours, from that one use each. */
+#define ADDR_AIM_LIFE_HALF       0x00662854u  /* int32_t */
+#define ADDR_AIM_SPAWN_ARG       0x0066286Cu  /* int32_t */
+#define AM2_AIM_SPAWN_KIND       0x7E   /* what the marker is spawned as */
+#define AM2_AIM_LIFE_REMOTE_MS   0x3E8  /* 1000, when the army is not ours */
 /* One record per font, 524 bytes apart -- BuildFont computes the stride as
  * ((f<<6)+f)*2+f then <<2, which is 131 dwords and not the 133 this said
  * before. Within a record: +0 the total encoded size, +4 a uint16 offset for
