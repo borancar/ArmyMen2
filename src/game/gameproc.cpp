@@ -844,6 +844,160 @@ void __cdecl ResetLevelState(void)
     *(int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE  = 0;
 }
 
+/* 0x00461F90 is above the CRT line and stays original; reached by name here
+ * rather than by address so checkseams can see it. */
+typedef int32_t (__cdecl *AM2_TimedDirFrameFn)(void *rows, int32_t dir);
+#define orig_timed_dir_frame \
+    ((AM2_TimedDirFrameFn)(uintptr_t)AM2_IMAGE(ADDR_TIMED_DIR_FRAME))
+
+/* CreateMissile -- original 0x0043B9B0, nine callers. Build a type-5 object
+ * from a weapon and a firing position: allocate it, run the shared init, give
+ * it a row set, and start its animation.
+ *
+ * TYPE 5 IS A MISSILE and LoadType5 (0x0043B870, reconstructed) is the
+ * evidence and the template: the savegame loader for the same type, sitting
+ * immediately before this in the image. Everything structural here is its
+ * vocabulary -- AM2_MISSILE_BYTES, ADDR_MISSILE_BOX, ADDR_MISSILE_ROW_SPEC,
+ * ADDR_MISSILE_ANIMS, OBJ_OFF_FIELD_94 for the def pointer -- and the two
+ * agreeing is better evidence than either alone.
+ *
+ * THE FRAME RULE IS `def == 2 || def == 5`, which is what LoadType5 does too.
+ * The original writes it as `sub 2; je` then `sub 3; jne`, the compiler's
+ * chained-comparison idiom; reading only the first `sub eax,2` gives
+ * `def == 2` and silently drops the second arm.
+ *
+ * DEF 3 IS A CHAINED KIND and it is the whole reason this is not LoadType5
+ * with different inputs. It sets no animation table at all -- ROW_OFF_ANIM_CUR
+ * stays 0 -- stamps ROW_OFF_STAMP_54 with the clock and calls the timed frame
+ * lookup at 0x00461F90 instead, which writes ROW_OFF_SPRITE from a table
+ * indexed by direction and elapsed time. Then, if the previously created
+ * missile still resolves and is younger than AM2_FRAME_PERIOD_MS, this one's
+ * uid goes into that one's +0xB4: consecutive segments link into a trail, and
+ * the weapon's +0xD0 carries the last-created uid forward. Every other def
+ * takes ADDR_MISSILE_ANIMS and an ordinary SetAnimFrame.
+ *
+ * ARGUMENT SLOTS ARE REUSED AS SCRATCH, TWICE, and the map below came from
+ * tracking esp per PATH rather than reading operands -- a linear walk is wrong
+ * here in two separate ways, because the function has an early exit AND a
+ * two-way tail, and stepping through either one's pops skews every depth after
+ * it. ARG3's slot is written and `fild`ed to convert an int to a float; ARG11
+ * holds the frame between the comparison chain and SetAnimFrame. And
+ * `[esp+0x34]` is ARG8 before the `add esp,4` that cleans malloc's argument and
+ * ARG9 after it -- one displacement, two parameters, on one straight path.
+ *
+ * `+0xA8` IS NOT OBJ_OFF_CHAIN_UID HERE. That name is the item's, this is a
+ * missile, and the fields at 0xA8 are overloaded by type the way orig.h
+ * records for 0x52C and 0x538. Nothing else in the tree touches a missile's
+ * +0xA8 -- LoadType5 restores RANK, REPAIR_FRAME, PTR_LIST and CHAIN_NEXT_UID
+ * and steps over it -- so with one toucher it gets a field-numbered name and
+ * no claim. What IS evidenced is that the same argument also lands in
+ * OBJ_OFF_ROW0_Y_ADJUST and goes through ScaleBy32Blocks into the row. */
+void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
+                            int32_t heading, int32_t a5, int32_t a6,
+                            int32_t repairFrame, int32_t ptrList,
+                            int32_t initUnused, uint32_t uid,
+                            int32_t scriptId)
+{
+    uint8_t *w = (uint8_t *)weapon;
+    uint8_t *b = (uint8_t *)source;
+    uint8_t *o;
+    uint8_t *rows;
+    int32_t  def;
+    int32_t  frame;
+
+    if (!weapon)
+        return (void *)0;
+
+    o = (uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
+    memset(o, 0, AM2_MISSILE_BYTES);
+
+    *(const void **)(o + OBJ_OFF_FIELD_94) =
+        *(const void *const *)(w + OBJ_OFF_FIELD_C0);
+    *(uint8_t *)(o + OBJ_OFF_FACING) = (uint8_t)heading;
+    *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = repairFrame;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST) = ptrList;
+    *(int32_t *)(o + OBJ_OFF_RANK) = (int32_t)((const AM2_Object *)source)->uid;
+    *(uint8_t *)(o + OBJ_OFF_SCRIPT_ID) = (uint8_t)scriptId;
+
+    def = **(const int32_t *const *)(o + OBJ_OFF_FIELD_94);
+    frame = (def == 2 || def == 5) ? AM2_MISSILE_FRAME_A : AM2_MISSILE_FRAME_B;
+
+    *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
+    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                  AM2_OBJ_TYPE_MISSILE, at,
+                  (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
+                  initUnused, uid);
+
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
+                (const void *)AM2_IMAGE(ADDR_MISSILE_ROW_SPEC),
+                (int16_t)at, (int16_t)(at >> 16),
+                (const void *)(uintptr_t)ADDR_ZERO_RECT);
+
+    *(int32_t *)(o + MISSILE_OFF_FIELD_A8) = a5;
+    *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = (int16_t)a5;
+    *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    *(int32_t *)(o + OBJ_OFF_FIELD_44) = *(const int32_t *)(b + OBJ_OFF_FIELD_44);
+
+    {
+        int32_t n = *(const int32_t *)
+            (*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)
+             + MISSILEDEF_OFF_FIELD_0C);
+
+        if (n > 0) {
+            *(float *)(o + OBJ_OFF_VEL_Z) = (float)n;
+        } else {
+            int32_t cur = *(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST);
+
+            /* Equal leaves OBJ_OFF_VEL_Z alone -- the original branches past
+             * the fstp rather than storing zero, so a missile launched at its
+             * own height keeps whatever the zeroed allocation left. */
+            if (cur != a6)
+                *(float *)(o + OBJ_OFF_VEL_Z) = (float)((a6 - cur) << 1);
+        }
+    }
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+    if (**(const int32_t *const *)(o + OBJ_OFF_FIELD_94) == 3) {
+        *(const void **)(rows + ROW_OFF_ANIM_CUR) = (const void *)0;
+        *(int16_t *)(rows + ROW_OFF_FIELD_26) =
+            (int16_t)(ScaleBy32Blocks(*(const int16_t *)
+                          (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
+        *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
+        *(uint32_t *)(rows + ROW_OFF_STAMP_54) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        orig_timed_dir_frame(rows, heading);
+
+        if (*(const uint32_t *)(w + MISSILE_OFF_LAST_UID)) {
+            uint8_t *prev = (uint8_t *)
+                LookupByUID(*(const uint32_t *)
+                            (w + MISSILE_OFF_LAST_UID));
+
+            if (prev
+                && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                   - *(const uint32_t *)
+                       (*(const uint8_t *const *)(prev + OBJ_OFF_ROWS)
+                        + ROW_OFF_STAMP_54) < AM2_FRAME_PERIOD_MS)
+                *(uint32_t *)(prev + MISSILE_OFF_NEXT_UID) =
+                    ((const AM2_Object *)o)->uid;
+        }
+
+        *(uint32_t *)(w + MISSILE_OFF_LAST_UID) =
+            ((const AM2_Object *)o)->uid;
+        return o;
+    }
+
+    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+        (const void *)(uintptr_t)ADDR_MISSILE_ANIMS;
+    *(int16_t *)(rows + ROW_OFF_FIELD_26) =
+        (int16_t)(ScaleBy32Blocks(*(const int16_t *)
+                      (o + OBJ_OFF_ROW0_Y_ADJUST)) + AM2_MISSILE_ROW26_BIAS);
+    *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
+    SetAnimFrame(rows, (int16_t)frame, 1);
+    return o;
+}
+
 /* LoadType5 -- original 0x0043B870, one caller, and the MISSILE member of the
  * per-type savegame loader family.
  *
@@ -1878,6 +2032,8 @@ void gameproc_install(void)
     patch_replace(ADDR_LOAD_TYPE1, (const void *)LoadType1, "LoadType1", 1);
     patch_replace(ADDR_LOAD_TYPE8, (const void *)LoadType8, "LoadType8", 1);
     patch_replace(ADDR_LOAD_TYPE5, (const void *)LoadType5, "LoadType5", 1);
+    patch_replace(ADDR_CREATE_MISSILE, (const void *)CreateMissile,
+                  "CreateMissile", 9);
     patch_replace(ADDR_LEVEL_STATE_RESET, (const void *)ResetLevelState,
                   "ResetLevelState", 1);
     patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);

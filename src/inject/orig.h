@@ -11258,6 +11258,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_RANDOM_RESPAWN_KIND 0x004601D0u  /* int32_t(int32_t *out) */
 #define ADDR_RESPAWN_KINDS       0x00662920u  /* int32_t *, the eligible kinds */
 #define ADDR_RESPAWN_KIND_COUNT  0x00662924u  /* int32_t */
+/* CreateMissile reads this as the vertical speed when it is positive; when it
+ * is not, the missile derives one from the height difference instead. Named
+ * field-numbered, as its neighbour is, since one reader is not a meaning. */
+#define MISSILEDEF_OFF_FIELD_0C  0x0Cu
 #define MISSILEDEF_OFF_FIELD_30  0x30u
 /* A weapon's own script-name index, used to look the name up in
  * ADDR_SCRIPT_NAMES and hand it to CreateWeapon. Zero or negative means no
@@ -11393,6 +11397,42 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * read -- only which two values it treats alike. */
 #define AM2_MISSILE_FRAME_A      0x5A
 #define AM2_MISSILE_FRAME_B      0x5B
+/* 0x0043B9B0, 448 bytes... nine callers. The RUNTIME half of the missile pair,
+ * beside LoadType5's savegame half. Everything structural is LoadType5's
+ * vocabulary; what is new is the def-3 chain and the fields below.
+ *
+ * THE MISSILE'S OWN NAMES FOR THREE OVERLOADED OFFSETS. All three carry other
+ * types' meanings -- 0xA8 is OBJ_OFF_CHAIN_UID on an item, 0xB4 is
+ * OBJ_OFF_SCRIPT_STATE and 0xD0 is OBJ_OFF_DEADLINE_D0 -- and none of those
+ * applies here, so the missile gets its own spelling the way the explosion got
+ * BLAST_OFF_*. FIELD_A8 keeps a field-numbered name and no claim: this
+ * function is its ONLY toucher, since LoadType5 restores RANK, REPAIR_FRAME,
+ * PTR_LIST and CHAIN_NEXT_UID and steps straight over it. What is evidenced is
+ * that the same argument also lands in OBJ_OFF_ROW0_Y_ADJUST. */
+#define MISSILE_OFF_FIELD_A8     0xA8u  /* = OBJ_OFF_CHAIN_UID's offset */
+#define MISSILE_OFF_NEXT_UID     0xB4u  /* the next segment of a def-3 trail */
+#define MISSILE_OFF_LAST_UID     0xD0u  /* on the WEAPON: last missile it made */
+/* NOT AM2_ROW_FIELD26_INIT, which is 0x3E8. LoadType5 stores that constant
+ * flat; this one stores ScaleBy32Blocks(y) plus 0x3E9. Reaching for the
+ * existing name because the sibling uses it would have been off by one. */
+#define AM2_MISSILE_ROW26_BIAS   0x3E9
+#define ADDR_CREATE_MISSILE      0x0043B9B0u
+/* 0x00461F90, two callers, ABOVE the CRT line and so outside the 1,239 -- it
+ * stays original and is reached through a seam. Advance a time-based
+ * directional animation: index a table by RoundTo8(dir,3) and the elapsed time
+ * since ROW_OFF_STAMP_54, clamped to the table height, write that frame into
+ * ROW_OFF_SPRITE, and answer whether the animation has NOT yet reached its
+ * last frame. CreateMissile discards the answer; naming it from that call site
+ * alone would have missed half of what it does. */
+#define ADDR_TIMED_DIR_FRAME     0x00461F90u  /* int32(void *rows, int32 dir) */
+/* MSVC's stack probe, 48 bytes with thirteen callers, above the CRT line. It
+ * walks down a page at a time comparing against 0x1000, which is what makes it
+ * recognisable; a function opening `mov eax, <size>; call 0x00465130` simply
+ * has a local bigger than a page. Nothing to reproduce -- it is a compiler
+ * artifact, not game code -- but it was UNNAMED, and an unnamed 48-byte helper
+ * with thirteen callers is exactly what this file records being misread as
+ * game code once already at 0x0045CAA0. */
+#define ADDR_CRT_CHKSTK          0x00465130u  /* __chkstk */
 /* 0x0043CF70, one caller. The FOURTH member of the block-weight family, and
  * the only one with a SIDE EFFECT: it damages what it walks past. See
  * item.cpp beside BlockWeightChain, which it is otherwise a twin of. */

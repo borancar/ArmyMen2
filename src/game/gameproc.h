@@ -117,6 +117,16 @@ void __cdecl ResetLevelState(void);
 
 void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
 
+/* 0x0043B9B0, nine callers. The runtime half of the missile pair: build a
+ * type-5 object from a weapon and a firing position. Def 3 is a chained kind
+ * that links consecutive segments into a trail; every other def gets
+ * missile.ani and an ordinary SetAnimFrame. */
+void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
+                            int32_t heading, int32_t a5, int32_t a6,
+                            int32_t repairFrame, int32_t ptrList,
+                            int32_t initUnused, uint32_t uid,
+                            int32_t scriptId);
+
 /* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
  * the tag, build the item from the tag, then overwrite most of it from the
  * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its
