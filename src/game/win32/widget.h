@@ -1250,6 +1250,20 @@ AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
                                                            int32_t flag,
                                                            AM2_Rect box);
 
+/* 0x00433290 and 0x00433330, one caller. The TEXT LIST -- the message log's
+ * list box. The LIST BOX with a different vtable, five colours and the
+ * read-only flag set, and no storage of its own. */
+AM2_Widget *__attribute__((thiscall)) TextListConstruct(AM2_Widget *w,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t right,
+                                                        int32_t bottom,
+                                                        void *rows,
+                                                        int32_t callback,
+                                                        int32_t ownsRows);
+AM2_Widget *__attribute__((thiscall)) TextListDelete(AM2_Widget *w,
+                                                     int32_t flags);
+
 /* Original: 0x00454F90, thiscall, `ret 0x20`. The LIST BOX. It works out how
  * many rows fit by dividing by SEVEN -- a magic-number division that is the
  * only place the row height appears. Its hot row starts at -1 and becomes 0

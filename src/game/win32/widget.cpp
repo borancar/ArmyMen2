@@ -471,6 +471,73 @@ AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags)
     return w;
 }
 
+/* TextListConstruct -- original 0x00433290, one caller, and the TEXT LIST:
+ * the message log's list box. It is the LIST BOX with a different vtable and
+ * five colours, and nothing else -- `operator new` asks for AM2_LISTBOX_SIZE
+ * and every field it writes is inside that, so the class adds no storage.
+ *
+ * ITS ONE CALLER PASSES ADDR_LOG AS THE ROW CALLBACK. In this build that
+ * address is a bare `ret` -- the retail logger, stubbed -- so the hook does
+ * nothing at all. Worth knowing before reading the argument as a feature;
+ * see CLAUDE.md on the vtable slot that is the same address for the same
+ * reason.
+ *
+ * THE FIVE COLOURS ARE COPIED AS BYTES INTO DWORDS. TEXTLIST_OFF_COLOURS is
+ * an int32 array whose low byte is what the painter uses, and the sources are
+ * five separate palette slots SetGamePalette fills by RGB. They are named for
+ * the colour they hold rather than for a role, because neither of their two
+ * readers establishes one.
+ *
+ * It marks itself LISTBOX_OFF_READ_ONLY, which is what makes it a log rather
+ * than a menu: all three readers of that field skip something when it is set
+ * -- the selected-row colour, the highlight, and the whole keyboard arm of the
+ * update -- so a text list cannot be selected in or typed at.
+ */
+AM2_Widget *__attribute__((thiscall)) TextListConstruct(AM2_Widget *w,
+                                                        int32_t left,
+                                                        int32_t top,
+                                                        int32_t right,
+                                                        int32_t bottom,
+                                                        void *rows,
+                                                        int32_t callback,
+                                                        int32_t ownsRows)
+{
+    uint8_t  *self = (uint8_t *)w;
+    int32_t  *colours;
+
+    ListBoxConstruct(w, left, top, right, bottom, rows, callback, 0, ownsRows);
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_TEXT_LIST);
+
+    colours = (int32_t *)(self + TEXTLIST_OFF_COLOURS);
+    colours[0] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREEN;
+    colours[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_OLIVE;
+    colours[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STEEL_BLUE;
+    colours[3] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREY;
+    colours[4] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+
+    *(int32_t *)(self + LISTBOX_OFF_READ_ONLY) = 1;
+    *(int32_t *)(self + LISTBOX_OFF_SELECTED)  = -1;
+    return w;
+}
+
+/* TextListDelete -- original 0x00433330, the scalar deleting destructor, and
+ * the same shape as ListDelete above.
+ *
+ * The class has no teardown of its own: the original reaches the base through
+ * 0x00433350, which is a one-instruction `jmp` to it and is left in the image.
+ * Nothing but this function refers to that thunk, and it is five bytes -- the
+ * exact size of a detour -- so patching it would be all risk and no gain.
+ */
+AM2_Widget *__attribute__((thiscall)) TextListDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    ListDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip)
 {
     uint8_t            *self = (uint8_t *)w;
@@ -9009,6 +9076,10 @@ int widget_install(void)
                         "CheckBoxConstruct", 11);
     rc |= patch_replace(ADDR_LISTBOX_CTOR, (const void *)ListBoxConstruct,
                         "ListBoxConstruct", 8);
+    rc |= patch_replace(ADDR_TEXTLIST_CTOR, (const void *)TextListConstruct,
+                        "TextListConstruct", 1);
+    rc |= patch_replace(ADDR_TEXTLIST_DELETE, (const void *)TextListDelete,
+                        "TextListDelete", 1);
     rc |= patch_replace(ADDR_MULTISPRITE_CTOR,
                         (const void *)MultiSpriteConstruct,
                         "MultiSpriteConstruct", 7);

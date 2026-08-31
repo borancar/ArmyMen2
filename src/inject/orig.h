@@ -7951,6 +7951,40 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the per-row colour SELECTION the colour handler cycles. */
 #define MP_PANEL_OFF_TYPE_BOX  0x204u   /* the list box a rules file fills */
 #define LISTBOX_OFF_ROWS       0x60u    /* its string list */
+/* Two of the list box's own fields, both settled by the three sites that READ
+ * them rather than by the constructor that writes them.
+ *
+ * +0x5C is the SELECTED ROW: the base constructor writes -1, one site writes a
+ * row index into it, and the painter compares the row it is drawing against
+ * it. -1 for "none" and a row index otherwise.
+ *
+ * +0x4C is non-zero for a list that cannot be interacted with. All three
+ * readers are `test eax,eax; jne <skip>` and what each skips says the same
+ * thing: the selected-row colour, the highlight, and the whole keyboard arm of
+ * the update. TextListCtor sets it to 1, which is what a message log wants. */
+#define LISTBOX_OFF_READ_ONLY  0x4Cu    /* non-zero: no selection, no keys */
+#define LISTBOX_OFF_SELECTED   0x5Cu    /* int32 row index, -1 for none */
+/* 0x00433290, one caller, and the TEXT LIST -- the message log's list box.
+ * A thiscall constructor that runs ADDR_LISTBOX_CTOR, takes VTABLE_TEXT_LIST,
+ * copies five palette indices into TEXTLIST_OFF_COLOURS and marks itself read
+ * only. Its one caller passes ADDR_LOG as the row callback, which in this
+ * build is a bare `ret`, so the list has no per-row hook at all.
+ *
+ * 0x00433330 is the scalar deleting destructor and 0x00433350 is a
+ * one-instruction `jmp` to the base destructor at 0x00455090 -- the class adds
+ * no teardown of its own. */
+#define ADDR_TEXTLIST_CTOR     0x00433290u
+#define ADDR_TEXTLIST_DELETE   0x00433330u
+#define ADDR_TEXTLIST_DESTRUCT 0x00433350u
+/* The four palette slots TextListCtor reads that had no name. Named by the
+ * COLOUR they hold, which is a fact -- SetGamePalette's own table in
+ * win32/palette.cpp matches each address to an RGB triple -- and not by a role,
+ * which neither of their two readers establishes: one is this constructor
+ * copying them into a widget and the other copies them into a second table. */
+#define ADDR_COLOUR_DARK_GREEN 0x004FDF74u  /* 32 71 26 */
+#define ADDR_COLOUR_OLIVE      0x004FE1AEu  /* 65 57 30 */
+#define ADDR_COLOUR_STEEL_BLUE 0x004FE088u  /* 32 5D 8A */
+#define ADDR_COLOUR_DARK_GREY  0x00502CE4u  /* 54 54 54 */
 #define MP_PANEL_OFF_PREVIEW   0x218u   /* the map thumbnail widget */
 #define MP_PANEL_OFF_NAMES     0x220u
 #define MP_PANEL_OFF_COLOURS   0x230u

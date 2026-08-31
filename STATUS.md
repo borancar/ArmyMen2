@@ -5,11 +5,23 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `8818ab5`. Working tree clean.
+Last updated: **2026-08-31**, at `248cba7`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,262 patches.**
+Nothing uncommitted. **1,264 patches.**
+
+**`TextListConstruct` and `TextListDelete` (`0x00433290`, `0x00433330`).** The
+message log's list box, inside the multiplayer panel: the LIST BOX with a
+different vtable, five palette colours and the read-only flag set, and no
+storage of its own -- `operator new` asks for `AM2_LISTBOX_SIZE` and every
+field it writes is inside that.
+
+`ab.sh mpoptions` compares it exactly. Its 131-node widget tree is byte for
+byte identical and the text list is node 44 in both,
+`vt=46fa84 r=20,379,272,446`, which also corroborates the argument reading:
+the caller hands `ADDR_RECT_SET` 20, 379, 252, 67 and the rectangle that comes
+out is (20,379)-(272,446).
 
 **`ShakeAt` (`0x0042B360`) and a defect it found underneath itself.** The gate
 in front of `StartShake`: it takes the midpoint of the view rectangle,
@@ -3354,13 +3366,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,108 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,262
+line (0x0045C000) patched**. Measured: **1,109 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,264
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and nine batches have gone in and the 131 entries outstanding start
+small ones in batches. A hundred and ten batches have gone in and the 130 entries outstanding start
 at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
