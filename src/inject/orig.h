@@ -6545,7 +6545,33 @@ typedef struct {
  * ADDR_GAME_CLOCK_MS against it and refuses a turn within
  * AM2_ROACH_TURN_HOLD_MS of it, so it is when the row last turned. */
 #define ROW_OFF_TURN_STAMP        0x58u    /* uint32_t, game-clock ms */
+/* Reconstructed as StepType2. The trooper's per-frame step: a sound prelude,
+ * the output record initialised once, the reveal expired, and then either the
+ * death sequence or one of three AI arms.
+ *
+ * ITS OUTPUT RECORD IS AT +0x57C AND THE VEHICLE'S IS AT +0x578. Both are the
+ * SIGHTCOUT layout and the SIGHTCOUT_OFF_ names are relative to whichever base
+ * the caller passes -- so obj+0x580 is this one's BEARING and StepType3's
+ * STATE. Read the base before reading a field. With +0x57C every write here
+ * lands coherently: OBJ_OFF_FACING into the BEARING byte, WeaponPoseIndex into
+ * STATE, zeros into HIT and UID.
+ *
+ * THE PRELUDE'S TWO SOUNDS SHARE ONE CALL SITE. The kind-7 branch pushes five
+ * arguments and JUMPS to the other branch's call, so pairing pushes with the
+ * nearest call gives one site five arguments and the other none. */
 #define ADDR_STEP_TYPE2          0x0044B7D0u  /* void(obj) */
+#define OBJ_OFF_SIGHT_OUT_T2     0x57Cu  /* StepType2's SIGHTCOUT base */
+#define AM2_SND_KIND7            0x33
+#define AM2_SND_FIELD5A4         0x2D
+/* Two of StepType2's callees, still original and named by offset. */
+#define ADDR_AI_449FD0           0x00449FD0u  /* void(obj, weapon, out) */
+#define ADDR_AI_44AFB0           0x0044AFB0u  /* void(obj, int32, void *) */
+/* The two StepType2 runs INSTEAD of the AI arms when the object is Sarge and
+ * belongs to the default owner -- the trooper the player commands. Named by
+ * the function they are called from and their offset: "player control" is read
+ * off that gate, not off their bodies, and neither has been read. */
+#define ADDR_STEP2_44A420        0x0044A420u  /* void(obj, weapon, out) */
+#define ADDR_STEP2_44AD40        0x0044AD40u  /* void(obj, out) */
 #define ADDR_STEP_TYPE3          0x0045D660u  /* void(obj) */
 #define ADDR_STEP_TYPE5          0x0043C110u  /* void(obj) */
 #define ADDR_STEP_TYPE6          0x00422B90u  /* void(obj) */

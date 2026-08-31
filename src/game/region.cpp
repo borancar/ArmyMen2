@@ -3520,6 +3520,200 @@ void __cdecl RoachAliveStepA(void *obj, void *out)
 }
 
 
+/* PlaySoundAt is reconstructed in win32/audio.cpp, and region.cpp is on the
+ * flat side of the split, so it is declared here rather than included -- the
+ * same reason script.cpp declares PreloadSprite. Its arguments are all
+ * int32_t, so the declaration names no Win32 type.
+ *
+ * `extern "C"` because audio.h WRAPS its declarations in one, so the symbol
+ * has C linkage -- the opposite of gameproc.cpp's LoadAudioSection, which
+ * needs no wrapper precisely because audio.h does not cover it. The linker
+ * says which: a C++-mangled reference to a C-linkage definition is undefined
+ * at link time and compiles perfectly. */
+extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
+                                    int32_t unused, int32_t x, int32_t y);
+
+typedef void (__cdecl *AM2_Step2AFn)(void *obj, void *weapon, void *out);
+typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
+typedef void (__cdecl *AM2_RowFinalFn)(void *row);
+#define orig_step2_449fd0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_449FD0))
+#define orig_step2_44afb0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_44AFB0))
+#define orig_step2_44a420 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44A420))
+#define orig_step2_44ad40 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44AD40))
+#define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
+
+/* StepType2 -- original 0x0044B7D0, one caller: ObjFrameStep's type-2 arm. The
+ * trooper's per-frame step, and the last piece of the AI band's shape.
+ *
+ * THE PLAYER'S OWN SARGE NEVER REACHES THE AI. When the object is Sarge AND
+ * belongs to the default owner, this runs ADDR_STEP2_44A420 and
+ * ADDR_STEP2_44AD40 and returns -- input, not AI. That branch sits upstream of
+ * SargeAiStep and TrooperAiStep, and it is why their counters read 0 through a
+ * live Boot Camp mission: the one trooper the player commands takes the player
+ * path, and it is taken before the AI arms are reached at all.
+ *
+ * ITS OUTPUT RECORD IS AT +0x57C AND StepType3's IS AT +0x578. Both are the
+ * SIGHTCOUT layout, so the SIGHTCOUT_OFF_ names are relative to whichever base
+ * the caller passes -- obj+0x580 is this one's BEARING and StepType3's STATE.
+ * With +0x57C every write lands coherently: OBJ_OFF_FACING into the BEARING
+ * byte, WeaponPoseIndex into STATE, zeros into HIT and UID. Read the base
+ * before reading a field.
+ *
+ * THE PRELUDE'S TWO SOUNDS SHARE ONE CALL SITE. The kind-7 branch pushes its
+ * five arguments and JUMPS to the other branch's call, so pairing pushes with
+ * the nearest call gives one site five arguments and the other none -- the
+ * mirror image of the argument shuffle, and it defeats the same shortcut.
+ *
+ * ITS COUNTER IS BLIND, AND WRITING IT BLINDED IT. ObjFrameStep is ours in
+ * item.cpp and reached this address through an orig_step_type2 seam;
+ * checkseams required that be closed, so the counter that could have measured
+ * this is dead the moment the function exists. Second time today -- the same
+ * happened to RoachAliveStepA. Closing a seam creates blindness, which is the
+ * standing cost of finishing a layer.
+ *
+ * BOTH DEAD BRANCHES END THE SAME WAY: clear the record, DestroyByType, then
+ * ADDR_AI_44AFB0 with the weapon looked up further up. The pose-range branch
+ * additionally finishes the row's animation first, and RETURNS EARLY if that
+ * animation has not finished -- so a dying trooper is stepped again next frame
+ * rather than destroyed mid-animation.
+ */
+void __cdecl StepType2(void *obj)
+{
+    uint8_t *o   = (uint8_t *)obj;
+    uint8_t *out = o + OBJ_OFF_SIGHT_OUT_T2;
+    uint8_t *w;
+
+    /* The held weapon's uid is read TWICE in the original, once inside each
+     * branch, and the destroyed path returns before its read for anything that
+     * is not Sarge. Hoisting it above the branch is obviously equivalent -- a
+     * plain read of an in-range slot with no side effects -- and it is still
+     * not what the program does, so it is written as the program has it. */
+#define AM2_STEP2_HELD_UID                                                    \
+    (((const uint32_t *)(o + UNIT_OFF_INVENTORY))                             \
+        [*(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL)])
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
+        if (!*(const int32_t *)(o + OBJ_OFF_SARGE))
+            return;
+        if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0)
+            return;
+        if (!*(const uint32_t *)(o + OBJ_OFF_RIDING))
+            return;
+        w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
+        if (!w)
+            return;
+        orig_step2_449fd0(obj, w, out);
+        return;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)
+        PlaySoundAt(AM2_SND_KIND7, 1, 0,
+                    *(const int16_t *)(o + OBJ_OFF_POS),
+                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+    else if (Type2Field5A4Set((const AM2_Object *)obj))
+        PlaySoundAt(AM2_SND_FIELD5A4, 1, 0,
+                    *(const int16_t *)(o + OBJ_OFF_POS),
+                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+
+    w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
+
+    if (*(const int32_t *)out == 0) {
+        *(int32_t *)out = 0;
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = WeaponPoseIndex(obj, w);
+        *(uint8_t *)(out + SIGHTCOUT_OFF_BEARING) =
+            *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 0;
+        *(int32_t *)(out + SIGHTCOUT_OFF_UID) = 0;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+           > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
+        if (!ObjIsFriendly(obj))
+            ObjConceal(obj, 0);
+        *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) = 0;
+    }
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
+        int32_t pose = *(const int32_t *)(o + OBJ_OFF_POSE);
+
+        if (pose > 0x1F && pose <= 0x24) {
+            void *row = *(void **)(o + OBJ_OFF_ROWS);
+
+            if (!RowAnimFinished(row))
+                goto tail;   /* 0x0044B925 is `je 0x0044BA42` -- a trooper
+                              * still playing its death animation reaches the
+                              * tail too, so its weapon keeps being placed */
+            RowFaceSprite(row);
+            *(int32_t *)out = 0;
+            orig_row_final(row);
+        } else {
+            *(int32_t *)out = 0;
+        }
+        DestroyByType(obj);
+        orig_step2_44afb0(obj, w, out);
+        return;
+    }
+
+    /* EVERY ALIVE PATH CONVERGES ON ADDR_AI_44AFB0 -- it is a tail, not a set
+     * of returns, and writing it as returns is what the state artifact caught:
+     * that call moves the held weapon to its owner's position, so skipping it
+     * left a dropped weapon at 0,0 where the original had it at the trooper's
+     * feet. One line of a 1,610-line object dump, with the pixels and the log
+     * identical on both sides.
+     *
+     * AND I MADE THE SAME MISTAKE TWICE HERE. The first fix converted the
+     * other exits and left the player gate returning, because I had never
+     * dumped 0x0044B9D4 -- it is `jmp 0x0044BA3F`, so that path converges too.
+     * The A/B came back with the identical one-line difference. The rule
+     * "decode the first instruction at every jump target" only works if it is
+     * applied to every jump, including the ones already believed understood;
+     * an unread address cannot fail a test that was never run on it. */
+    if (*(const int32_t *)out != 0)
+        goto tail;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
+        AiStepAttach(obj, out);
+        goto tail;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE)
+        && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+           == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        if (!*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A
+            && !*(const uint32_t *)(o + OBJ_OFF_RIDING))
+            orig_step2_44a420(obj, w, out);
+        orig_step2_44ad40(obj, out);
+        goto tail;                     /* 0x0044B9D4 is `jmp 0x0044BA3F` --
+                                        * this converges too, and Boot Camp's
+                                        * Sarge takes exactly this path */
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        goto tail;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_RIDING))
+        goto tail;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE)) {
+        SargeAiStep(obj, out);
+        /* AND SARGE RE-READS THE WEAPON. His step is the one that picks items
+         * up, so the tail must see what he is holding NOW; the trooper arm
+         * falls through with the uid stashed before the step. */
+        w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
+    } else {
+        TrooperAiStep(obj, out);
+    }
+
+tail:
+    orig_step2_44afb0(obj, w, out);
+
+#undef AM2_STEP2_HELD_UID
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -3568,6 +3762,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_ROACH_ALIVE_STEP_A,
                         (const void *)RoachAliveStepA,
                         "RoachAliveStepA", 1);
+    rc |= patch_replace(ADDR_STEP_TYPE2, (const void *)StepType2,
+                        "StepType2", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

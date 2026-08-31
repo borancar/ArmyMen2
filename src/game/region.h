@@ -145,6 +145,14 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge);
  * argument is the output record, not a facing -- see the body. */
 void __cdecl RoachAliveStepA(void *obj, void *out);
 
+/* 0x0044B7D0, one caller -- ObjFrameStep's type-2 arm. The trooper's
+ * per-frame step. The player's own Sarge never reaches the AI from here: a
+ * gate on OBJ_OFF_SARGE and the default owner sends it to input handling
+ * instead, which is why SargeAiStep and TrooperAiStep read 0 in Boot Camp.
+ * Its output record is at +0x57C where StepType3's is at +0x578, so the
+ * SIGHTCOUT_OFF_ names are relative to the base the caller passes. */
+void __cdecl StepType2(void *obj);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

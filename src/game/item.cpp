@@ -5185,7 +5185,6 @@ void __cdecl StepType8(void *obj)
 }
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
-#define orig_step_type2   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE2)
 #define orig_step_type3   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE3)
 #define orig_step_type5   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE5)
 #define orig_step_type6   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE6)
@@ -5264,7 +5263,7 @@ void __cdecl ObjFrameStep(void *obj)
 
     switch (type) {
     case 0: case 3: StepType1And4(obj);     break;   /* ours already */
-    case 1:         orig_step_type2(obj);   break;
+    case 1:         StepType2(obj);         break;   /* ours now */
     case 2:         orig_step_type3(obj);   break;
     case 4:         orig_step_type5(obj);   break;
     case 5:         orig_step_type6(obj);   break;

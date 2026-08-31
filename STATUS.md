@@ -10397,3 +10397,95 @@ can reach zero with eleven functions still original. Merged entries do not
 merely flatter the number; they can let the goal be declared met while the
 work is unfinished. That is the argument for splitting them before the count
 gets close to zero rather than after.
+
+## StepType2 answers why the trooper AI is cold, and the band is symmetric
+
+`0x0044B7D0` is the trooper's per-frame step, and writing it closed the
+question this morning left explicitly open. `setaimode` explains the VEHICLE
+band's silence and I recorded plainly that it does not transfer to the trooper
+pair -- their cause was unknown, somewhere in this function's unread checks.
+
+It is here: **the player's own Sarge never reaches the AI.** When the object is
+Sarge and belongs to the default owner, `StepType2` runs input handling and
+returns, and that gate sits upstream of `SargeAiStep` and `TrooperAiStep`. So
+they read 0 through a live Boot Camp mission not because they are dead but
+because the one trooper the player commands takes the player path. A drive with
+hostile troopers would reach them -- and `setaimode`'s eight map directories
+are where those live, so one drive would light up both bands.
+
+**The band turns out to be symmetric, three families all the way down:**
+
+| family | step | builder | sighting | record |
+|---|---|---|---|---|
+| vehicle | `StepType3` | `AiBuildContext` | `ConsiderSighting` | `SIGHT` 0x44 |
+| roach | `RoachAliveStepA` | `RoachBuildContext` | `ConsiderSightingB` | 0x40 |
+| trooper | `StepType2` | `TrooperBuildContext` | `ConsiderSightingC` | `SIGHTC` 0x58 |
+
+The three sighting variants were all reconstructed long ago; what was missing
+was their correspondence to the three record layouts, and every difference
+between those records is now derived rather than observed.
+
+**Two output-record bases.** `StepType2` uses `obj+0x57C` and `StepType3`
+`obj+0x578`, both `SIGHTCOUT` -- so `obj+0x580` is one's `BEARING` and the
+other's `STATE`. Read the base before reading a field.
+
+**I hoisted a read and had to take it back.** The original computes the held
+weapon's uid twice, inside each branch, and the destroyed path returns before
+its read for anything that is not Sarge. Hoisting it above the branch is
+obviously equivalent -- a plain in-range read with no side effects -- and it is
+still not what the program does. It is a macro now, `#undef`'d at the end, so
+it cannot be collapsed back by someone tidying.
+
+**THE STATE ARTIFACT CAUGHT A REAL BUG THAT PIXELS AND LOG COULD NOT.** The
+first version turned a CONVERGING TAIL into early returns. `0x0044BA42` looks
+like an epilogue -- `pop/pop/pop/ret` three instructions later -- but every
+alive path jumps INTO it, and it first calls `0x0044AFB0(obj, w, out)`, which
+moves the held weapon to its owner's position. The symptom was one line of a
+1,610-line object dump: a dropped weapon at `0,0` where the original had it at
+`1743,1052`. Boot Camp's 22 pixels and 13 messages were identical on both
+sides, so no amount of re-running would have found it.
+
+I have spent today correctly noting that the A/B cannot see blind counters,
+cold paths, or anything past `campaign`'s briefing -- and drifted toward
+treating a clean run as near-meaningless. This is the counterexample. **"The
+A/B cannot see X" is not "the A/B sees nothing"**; the three artifacts see
+different things and I had stopped counting the third.
+
+**It took THREE fixes, and the second one failed identically.** After the
+first A/B failure I converted the obvious exits, wrote the rule down -- decode
+the first instruction at every jump target -- and re-ran. The same one-line
+difference came back, because I had never dumped `0x0044B9D4`: it is
+`jmp 0x0044BA3F`, so the player gate converges too, and Boot Camp's Sarge takes
+exactly that path. Only when I listed all seventeen targets mechanically and
+classified each did a THIRD instance surface, `je 0x0044BA42` when the death
+animation has not finished. Exactly one target is a return.
+
+**The lesson is about applying the rule, not the rule.** It was correct from
+the second attempt and I applied it twice from memory, to the jumps I
+remembered rather than to all of them. An unread address cannot fail a test
+never run on it, and "I already understand this branch" is what keeps it
+unread. **Run the list.** Enumerating the other six functions written today
+afterwards showed all of them correct -- one return target, one `return` --
+which I had no evidence for until I checked.
+
+**And this is the second instance of one failure mode in a day**, which makes
+it characteristic rather than accidental: *reading a jump to a late address as
+"return" when it lands mid-tail*. This morning the trooper's kind-7 shortcut
+landed ON the region write rather than past it; tonight the alive paths landed
+on a call before the epilogue. Both times the target looked like the end of
+the function and was not. **Look at what is AT a jump's target, every time** --
+the rule was already written down this morning after the first instance.
+
+The fix also exposed an asymmetry a tidier shape would have erased: the SARGE
+arm re-reads the held weapon after `SargeAiStep`, because his step is the one
+that picks items up, while the trooper arm uses the uid stashed before its
+step. Two arms, two weapons, one tail. Written with `goto tail`, because the
+original IS a converging tail and any if/else shape is a re-interpretation --
+which is the instinct that caused the bug.
+
+**A linkage trap worth knowing.** `PlaySoundAt` is reconstructed in
+`win32/audio.cpp`, and `region.cpp` is on the flat side of the split, so it is
+declared locally -- with `extern "C"`, because `audio.h` wraps its declarations
+in one. That is the exact opposite of `gameproc.cpp`'s `LoadAudioSection`,
+which must NOT have the wrapper because `audio.h` does not cover it. Both
+compile; only the linker says which is right.
