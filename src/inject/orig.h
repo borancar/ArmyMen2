@@ -11319,6 +11319,29 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Its box is six units square and its whole record is 0xB8 bytes, against a
  * roach's 0x560, which is the other thing that fits. */
 #define AM2_OBJ_TYPE_MISSILE     5
+/* TYPE 6 IS AN EXPLOSION, identified from ADDR_STEP_TYPE6's body: it holds a
+ * deadline against ADDR_GAME_CLOCK_MS, plays sound 0x27 at its own position
+ * ONCE, damages every object AllObjectsInRect finds in a rectangle it carries,
+ * shakes the screen through ADDR_SHAKE_AT, and can spawn. Sitting immediately
+ * after MISSILE is the corroboration rather than the argument -- an exploding
+ * missile is what becomes one. CLAUDE.md lists types 5, 6 and 7 as unread;
+ * this settles 6.
+ *
+ * ITS FIELDS ARE OVERLOADED BY TYPE, which is the collision that cost a defect
+ * today when one type's OBJ_OFF_ name was used on another's pointer. The same
+ * offsets are OBJ_OFF_CHAIN_NEXT_UID, OBJ_OFF_SCRIPT_ID, OBJ_OFF_SCRIPT_STATE
+ * and OBJ_OFF_SCRIPT_FRAME on the types that own those names, and none of
+ * those meanings applies here -- so the explosion gets its own spelling, the
+ * way orig.h already does where it notes "the same offset is OBJ_OFF_POSE on a
+ * TROOPER". */
+#define AM2_OBJ_TYPE_EXPLOSION   6
+#define BLAST_OFF_DAMAGE         0x98u  /* halved for one trooper class */
+#define BLAST_OFF_RECT           0x9Cu  /* AM2_Rect, the blast area */
+#define BLAST_OFF_DUE_MS         0xACu  /* fires when the clock passes it */
+#define BLAST_OFF_SOUND_PENDING  0xB0u  /* cleared after the one sound */
+#define BLAST_OFF_MODE           0xB4u  /* >= 5 takes the spawn path */
+#define BLAST_OFF_SOURCE_UID     0xB8u  /* handed to DamageObject as attacker */
+#define AM2_BLAST_SOUND          0x27
 /* The missile's own constants. The def record is 52 bytes and the file gives
  * LoadType5 an INDEX into the table rather than a pointer, which is the same
  * tag-for-pointer trade LoadType1 makes with its save tag. */
