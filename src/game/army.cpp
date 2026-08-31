@@ -199,9 +199,13 @@ typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
                                     int32_t unused, int32_t x, int32_t y);
 
-typedef int32_t (__cdecl *AM2_BoatExitPointFn)(void *vehicle, uint32_t *out);
-#define orig_boat_exit_point \
-    ((AM2_BoatExitPointFn)(uintptr_t)ADDR_BOAT_EXIT_POINT)
+/* BoatExitPoint is reconstructed, in win32/mapdraw.cpp -- it clips with
+ * IntersectRect, so it is on the platform side of the split. Declared here
+ * rather than by including that header, for the reason script.cpp declares
+ * PreloadSprite: army.cpp is flat and must name no Win32 type. This signature
+ * has none. */
+extern "C" int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out);
+
 
 /* ExitOneFromVehicle -- original 0x0045AC90, four callers. Empty ONE seat:
  * look the occupant up, choose a spot beside the vehicle, unlink the seat, put
@@ -263,7 +267,7 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
 
     if (*(const int32_t *)(v + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
         && *(const int16_t *)(v + OBJ_OFF_HEALTH) != 0) {
-        if (!orig_boat_exit_point(v, &at)) {
+        if (!BoatExitPoint(v, &at)) {
             PlaySoundAt(3, 0, 0,
                         *(const int16_t *)(v + OBJ_OFF_POS),
                         *(const int16_t *)(v + OBJ_OFF_POS + 2));

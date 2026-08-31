@@ -10906,3 +10906,89 @@ with its own verification, not a passenger on this one.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels.
+
+
+## BoatExitPoint, and a table base I got wrong in a self-consistent way
+
+**1,239 - 1,147 = 92 entries outstanding.** `0x0045AAF0` into
+`src/game/win32/mapdraw.cpp`, beside the `ObjectsInRect` that lives there for
+the same reason: it clips with `IntersectRect`, so it names a Win32 type and
+belongs on the platform side. `army.cpp` stays flat with a forward declaration,
+the way `script.cpp` declares `PreloadSprite`.
+
+It is a nearest-free-tile search. A box `AM2_BOAT_EXIT_RANGE` either side of
+the vehicle, clipped to `ADDR_MAP_BOUNDS`, both corners through `TileOfPoint`,
+and every tile whose `ADDR_CELL_WEIGHTS` entry is under `AM2_BLOCK_CLEAR` is a
+candidate; nearest by `ApproxDist` wins. `AM2_BOAT_EXIT_MAX` is the initial
+best AND the reject threshold with a STRICT compare, so "nowhere to go" and
+"nothing nearer than 90" are the same answer and a tile exactly 90 away is
+refused.
+
+**`AM2_BLOCK_CLEAR` already existed**, commented "a weight below this is
+passable" -- the exact test this function makes. Fourth independent reader of
+`ADDR_CELL_WEIGHTS`, which this file records as having been settled by a
+`+1`/`-1` writer pair.
+
+**The seam typedef AGREED this time**, which is worth noting after
+`ObjMoveAlongFacing`. `checkseams` surfaced `orig_boat_exit_point` in
+`army.cpp` and its typedef was `int32_t(void *, uint32_t *)` -- my signature
+exactly. Its call site also settled a reachability question I had asked badly:
+the guard is `VEHICLE_OFF_KIND == AM2_VEHICLE_KIND_BOAT`, a vehicle KIND, so
+grepping the shipped scripts for "boat" was the wrong corpus. `orig.h` had
+already said the name is ours, not the program's.
+
+**A push-level miscount of my own**, caught by re-deriving rather than
+trusting the first pass: I had `[esp+0x24]` down as an uninitialised read.
+There is a second `push ecx` immediately before the write, so it is at level +2
+and holds the START tile -- and with that the row advance lands exactly on
+`rowStart + mapW`, one row down.
+
+**Verified by READING, and the A/B is a regression check only.** Its one
+caller is ours and calls it by name, so the counter is blind; and reaching it
+needs a living boat with an occupant getting out, which no configuration
+drives. Said plainly rather than letting a clean suite imply otherwise --
+today has twice shown a clean A/B is no evidence the new code ran.
+
+### The next function was solved from its tables, and the tables nearly fooled me
+
+`0x00448380` is what Sarge says when an item is picked up. It dispatches
+through TWO tables -- `arg - 2` bounded at 0x28, a 41-entry BYTE index at
+`0x0044850C`, then a dword jump table at `0x004484C0` -- and every arm is
+`SpeakLine(group, owner)`.
+
+Reading the bodies top to bottom would have numbered the arms 7, 15, 2, 13, 5,
+1, 0, ... The byte table exists precisely so ids can SHARE arms: 16 reach the
+default and four consecutive ids, `0x23`..`0x26`, all mean **Disguise**. Taken
+from the tables instead, the mapping is 25 live ids over 18 groups, exact.
+
+**The groups name themselves** through their wave files, so the constants are
+Grenades, Bazooka, MedKit, SniperRifle rather than 8, 3, 12, 18.
+
+**And I read that table four bytes late, in a way that agreed with itself.**
+Every wave name resolved correctly -- name0 of group g really is at
+`0x474444 + 20g` -- and the field I took for that group's count was the NEXT
+group's, also 1. A wrong layout that is right on every sample is the kind that
+survives review. I was one step from writing a false correction into `orig.h`,
+which says "a count and up to four wave names" and is RIGHT.
+
+What broke it was the record BEFORE the table having four pointers where my
+layout allowed one. Reading the consumer settles it in one instruction:
+`SpeakLine` does `idiv [esi*4 + 0x474440]`, so the base is `0x00474440` with
+the count at +0.
+
+Four confirmations of that base, where my wrong one has none:
+`SpeakLine`'s divisor; the four-pointer record; `0x00474440` ALREADY being
+`ADDR_WAVE_NAMES_END`, so the two tables TILE -- this file's own test for a
+right base; and the table running exactly 30 entries before garbage, which is
+exactly `OnVolumeVoice`'s `rand() % 30`.
+
+The table explains its own design too. Groups 0..24 have count 1 -- the item
+and HQ announcements. Groups 25..29 have 3 and 4 -- `Uooh`, `HitsSpot`, `Aah`,
+`overHere`, `freeze`, the reactions. That is WHY `SpeakLine` has
+`rand() % count`.
+
+No new `ADDR_` name goes on `0x00474440`: it already has one, and a second
+would be the alias `checkpatches` has caught five times.
+
+A/B clean: bootcamp state identical (1610 lines), 22 pixels; campaign widgets
+identical (35 nodes), log identical, 2 pixels, dialog 0.

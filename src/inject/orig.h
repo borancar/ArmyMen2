@@ -11357,6 +11357,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Answers 0 when there is nowhere, which is the only case that plays a sound
  * and refuses. Nothing in it says what it is; the name is from that use. */
 #define ADDR_BOAT_EXIT_POINT       0x0045AAF0u  /* int32(vehicle, uint32 *out) */
+/* Reconstructed. It is a NEAREST-FREE-TILE search: a box of AM2_BOAT_EXIT_RANGE
+ * either side of the vehicle, clipped to ADDR_MAP_BOUNDS, scanned tile by tile,
+ * keeping the nearest whose ADDR_CELL_WEIGHTS entry is under AM2_BLOCK_CLEAR.
+ * AM2_BOAT_EXIT_MAX is both the initial best and the reject threshold, so a
+ * tile is only taken if it beats it -- which is what makes "nowhere to go"
+ * and "nothing within 90" the same answer. */
+#define AM2_BOAT_EXIT_RANGE        0x48   /* 72, half the search box */
+#define AM2_BOAT_EXIT_MAX          0x5A   /* 90, and no tile may equal it */
 #define AM2_VEHICLE_EXIT_OFFSET    0x30    /* up and left of the vehicle */
 /* Reconstructed as SendVehicleExit in armymsg.cpp. The name here is the one
  * the call site suggested and it is half the story: it does not drop anybody,

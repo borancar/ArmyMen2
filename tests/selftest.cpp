@@ -115,6 +115,16 @@ void *__cdecl ObjectsInRect(const AM2_Rect *, const void *,
     return 0;
 }
 
+/* army.cpp's ExitOneFromVehicle calls this now that its seam is closed, and it
+ * lives in win32/mapdraw.cpp for the same reason ObjectsInRect does -- it
+ * clips with IntersectRect. Eighth stub, and extern "C" because army.cpp
+ * forward-declares it that way. It has no vectors: it reads the map bounds,
+ * the row shift and the cell weights. */
+extern "C" int32_t __cdecl BoatExitPoint(void *, uint32_t *)
+{
+    return 0;
+}
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;

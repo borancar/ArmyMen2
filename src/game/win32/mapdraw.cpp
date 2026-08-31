@@ -30,6 +30,8 @@
 #include "../misc.h"
 #include "../../inject/patch.h"
 #include "../maprow.h"  /* the flat declaration of RowUpdate */
+#include "../map.h"     /* TileOfPoint, PointOfTile -- reconstructed */
+#include "../dist.h"    /* ApproxDist -- reconstructed */
 #include "../objtype.h"  /* ObjIsType2/4, ObjIsItem -- reconstructed */
 #include "../packkey.h"  /* KeyFieldA/B -- reconstructed */
 #include "../army.h"     /* LookupOwnerObj -- reconstructed */
@@ -2743,8 +2745,100 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
     return head;
 }
 
+/* 0x0045AAF0, one caller -- ExitOneFromVehicle, which is ours. Where does a
+ * vehicle put somebody getting out? Answers 1 with the point written through
+ * `out`, or 0 when there is nowhere.
+ *
+ * A nearest-free-tile search. The box is AM2_BOAT_EXIT_RANGE either side of
+ * the vehicle, clipped to ADDR_MAP_BOUNDS, and both corners go through
+ * TileOfPoint to give a tile rectangle. Every tile in it whose
+ * ADDR_CELL_WEIGHTS entry is under AM2_BLOCK_CLEAR is a candidate, and the
+ * nearest by ApproxDist wins.
+ *
+ * AM2_BOAT_EXIT_MAX is the initial best AND the reject threshold, and the
+ * comparison is strict -- so "nowhere to go" and "nothing nearer than 90" are
+ * the same answer, and a tile exactly 90 away is refused. That is the
+ * original's, and it is why the caller's failure path is the only one that
+ * plays a sound.
+ *
+ * It lives here rather than beside the vehicle code for the reason
+ * ObjectsInRect does: it clips with IntersectRect, so it names a Win32 type
+ * and belongs on the platform side of the split.
+ *
+ * The row advance is transcribed rather than re-derived. After the inner loop
+ * the running tile sits at rowStart + (endCol - startCol) + 1; adding
+ * (startCol - endCol) + mapW - 1 lands it on rowStart + mapW, exactly one row
+ * down. ADDR_MAP_TILES_W is re-read inside the loop because the original
+ * re-reads it; it cannot change while this runs. */
+int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
+{
+    const uint8_t   *v = (const uint8_t *)vehicle;
+    const AM2_Point *pos = (const AM2_Point *)(v + OBJ_OFF_POS);
+    const uint8_t   *weights = *(const uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS;
+    AM2_Rect  box;
+    AM2_Rect  clipped;
+    int32_t   x = pos->x;
+    int32_t   y = pos->y;
+    int32_t   startTile, endTile, tile, row, lastRow, best, shift;
+
+    box.left   = x - AM2_BOAT_EXIT_RANGE;
+    box.top    = y - AM2_BOAT_EXIT_RANGE;
+    box.right  = x + AM2_BOAT_EXIT_RANGE;
+    box.bottom = y + AM2_BOAT_EXIT_RANGE;
+
+    IntersectRect((LPRECT)&clipped,
+                  (const RECT *)(uintptr_t)ADDR_MAP_BOUNDS,
+                  (const RECT *)&box);
+
+    /* Both corners are packed as two int16 -- the LOW words of the clipped
+     * rectangle -- and handed to TileOfPoint by value. */
+    startTile = TileOfPoint((uint32_t)(uint16_t)clipped.left
+                            | ((uint32_t)(uint16_t)clipped.top << 16));
+    endTile   = TileOfPoint((uint32_t)(uint16_t)clipped.right
+                            | ((uint32_t)(uint16_t)clipped.bottom << 16));
+
+    startTile &= 0xFFFF;
+    endTile   &= 0xFFFF;
+    shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT & 0xFFFF;
+
+    row     = startTile >> shift;
+    lastRow = endTile >> shift;
+    if (row > lastRow)
+        return 0;
+
+    best = AM2_BOAT_EXIT_MAX;
+    tile = startTile;
+
+    do {
+        int32_t mapW = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+        int32_t col  = (mapW - 1) & startTile;
+
+        while (col <= ((mapW - 1) & endTile)) {
+            if (weights[tile & 0xFFFF] < AM2_BLOCK_CLEAR) {
+                uint32_t here = PointOfTile(tile);
+                int32_t  d = ApproxDist((const AM2_Point *)&here, pos);
+
+                if (d < best) {
+                    best = d;
+                    *out = PointOfTile(tile);
+                }
+            }
+            mapW = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+            tile++;
+            col++;
+        }
+
+        tile += ((mapW - 1) & startTile) - ((mapW - 1) & endTile) + mapW - 1;
+        row++;
+    } while (row <= lastRow);
+
+    return best < AM2_BOAT_EXIT_MAX;
+}
+
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_BOAT_EXIT_POINT, (const void *)BoatExitPoint,
+                  "BoatExitPoint", 1);
     patch_replace(ADDR_OBJECTS_IN_RECT, (const void *)ObjectsInRect,
                   "ObjectsInRect", 3);
     patch_replace(ADDR_ALL_OBJECTS_IN_RECT, (const void *)AllObjectsInRect,
