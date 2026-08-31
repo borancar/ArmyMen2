@@ -1496,6 +1496,82 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
 #define orig_ai_trooper_step \
     ((AM2_AiTrooperStepFn)(uintptr_t)ADDR_AI_TROOPER_STEP)
 
+/* AiHitReact -- original 0x00405050, TEN call sites across the trooper AI
+ * band. What a unit does about having been hit: choose a pose, turn toward the
+ * hit if it is not already watching something, and consume OBJ_OFF_HIT_DIR.
+ *
+ * IT IS WHERE out[8] COMES FROM, which settles what that field is. AiKeepRange
+ * writes 7 or 5 there and this writes 0x2B, 7, or one of six values 12..17 out
+ * of ADDR_HIT_POSE_BY_CLASS -- so `out + 8` is a requested POSE, the same
+ * vocabulary ADDR_SET_POSE and tools/posecheck.py use, and not a mode or a
+ * flag. Reading either function alone would not have said so.
+ *
+ * THE POSE LADDER HAS THREE BANDS AND THE TOP ONE DOES NOTHING. The unit's
+ * OBJ_OFF_RANK selects a threshold from ADDR_RANK_RECORDS -- 32, 48, 56, 64,
+ * 80, 96, 112, 128, rising with rank -- and SIGHTC_OFF_FIELD_3C is compared
+ * against half of it and then against all of it:
+ *
+ *     below half        a pose from ADDR_HIT_POSE_BY_CLASS
+ *     half to full      AM2_POSE_HIT_HEAVY
+ *     at or above full  no pose at all, the field is left as it was
+ *
+ * So a higher rank needs a bigger value to reach the same band, and past the
+ * threshold the unit does not react with a pose at all.
+ *
+ * Three ways to skip the ladder entirely, and they are tested in this order:
+ * OBJ_OFF_SOLDIER_KIND 7 takes AM2_POSE_KIND7 and nothing else; kind 8 takes
+ * no pose; and SIGHTC_OFF_KIND 3 takes no pose. Only the first writes.
+ *
+ * THE TURN IS GATED ON NOT ALREADY WATCHING SOMETHING -- SIGHTC_OFF_OBSERVER
+ * null -- exactly as the vehicle arms gate theirs, but the CONSUME is outside
+ * that test and outside the whole ladder. So a unit that is watching an enemy
+ * forgets it was hit without turning, and one whose kind or class skipped the
+ * pose still forgets. Reproduced; it is the same asymmetry AiStepIgnore has.
+ *
+ * The two-entry table index is `class * 2 + (SIGHTC_OFF_FIELD_3C >= 0x80)`,
+ * computed in the original with `cmp cl, 0x80; sbb edx, edx; inc edx` -- the
+ * borrow-flag idiom for an unsigned comparison as 0 or 1, written here as the
+ * comparison it is.
+ */
+void __cdecl AiHitReact(void *obj, void *out, void *ctx)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t       *w = (uint8_t *)out;
+    const uint8_t *c = (const uint8_t *)ctx;
+    uint8_t        hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+    int32_t        kind;
+
+    if (!hit)
+        return;
+
+    kind = *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND);
+    if (kind == 7) {
+        *(int32_t *)(w + 8) = AM2_POSE_KIND7;
+    } else if (kind != 8
+               && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3) {
+        int32_t limit = *(const int32_t *)
+            ((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+             + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+               * AM2_RANK_RECORD_STRIDE);
+        uint8_t v = *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C);
+
+        if ((int32_t)v < (limit >> 1)) {
+            int32_t slot = *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) * 2
+                           + (v >= 0x80 ? 1 : 0);
+
+            *(int32_t *)(w + 8) =
+                ((const int32_t *)AM2_IMAGE(ADDR_HIT_POSE_BY_CLASS))[slot];
+        } else if ((int32_t)v < limit) {
+            *(int32_t *)(w + 8) = AM2_POSE_HIT_HEAVY;
+        }
+    }
+
+    if (!*(const void *const *)(c + SIGHTC_OFF_OBSERVER))
+        w[4] = hit;
+
+    *(o + OBJ_OFF_HIT_DIR) = 0;
+}
+
 /* AiKeepRange -- original 0x00405100, six call sites in five functions across
  * the trooper AI band. Keep the unit at the range it wants from what it can
  * see: walk to a spot at that range, re-picked every five seconds, choose a
@@ -1581,9 +1657,6 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
         w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
 }
 
-typedef void (__cdecl *AM2_AiHitReactFn)(void *obj, void *out, void *ctx);
-#define orig_ai_hit_react ((AM2_AiHitReactFn)(uintptr_t)ADDR_AI_HIT_REACT)
-
 /* AiWalkStep -- original 0x00405D30, two callers. The trooper family's minimal
  * arm, and the exact counterpart of AiStepIgnore on the vehicle side: while the
  * unit is further than AM2_AI_REACHED_DIST from where it is going, advance the
@@ -1625,7 +1698,7 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    orig_ai_hit_react(obj, out, ctx);
+    AiHitReact(obj, out, ctx);
 
     if (*(const int32_t *)(c + SIGHTC_OFF_FIELD_20)
         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -2059,6 +2132,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_AI_STEP, (const void *)AiStep, "AiStep", 2);
     rc |= patch_replace(ADDR_AI_KEEP_RANGE, (const void *)AiKeepRange,
                         "AiKeepRange", 6);
+    rc |= patch_replace(ADDR_AI_HIT_REACT, (const void *)AiHitReact,
+                        "AiHitReact", 10);
     rc |= patch_replace(ADDR_AI_WALK_STEP, (const void *)AiWalkStep,
                         "AiWalkStep", 2);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

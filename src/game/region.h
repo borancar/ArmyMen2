@@ -71,6 +71,11 @@ void __cdecl AiStep(void *obj, void *out);
  * wants from what it sees: a spot re-picked every five seconds, a pose while
  * it waits, and a turn. Its `out` is NOT the vehicle family's -- heading at
  * +4, pose at +8. */
+/* 0x00405050, ten call sites. What a unit does about having been hit: choose
+ * a pose from its rank and class, turn toward the hit if it is not already
+ * watching something, and consume OBJ_OFF_HIT_DIR. */
+void __cdecl AiHitReact(void *obj, void *out, void *ctx);
+
 void __cdecl AiKeepRange(void *obj, void *out, void *ctx);
 
 /* 0x00405D30, two callers. The trooper family's minimal arm, and the exact

@@ -2875,6 +2875,13 @@
 #define SIGHTC_OFF_DEST_DIST     0x34u  /* to OBJ_OFF_FIELD_C0, as +0x28 is
                                          * in the vehicle record */
 #define SIGHTC_OFF_WANT_RANGE    0x4Cu
+/* Left named by offset, and here is the evidence that has accumulated. It
+ * gates the pose write in AiKeepRange, and AiHitReact uses it as
+ * `value * 2 + bit` into ADDR_HIT_POSE_BY_CLASS, which has exactly SIX usable
+ * entries -- so it is 0, 1 or 2. That is the same range ADDR_WEAPON_POSE_INDEX
+ * gets from ClassifyByCode74, which tools/posecheck.py enumerates as "the
+ * object's class (0, 1 or 2)". Suggestive rather than settled: nothing seen so
+ * far WRITES it. */
 #define SIGHTC_OFF_FIELD_00      0x00u
 #define SIGHTC_OFF_FIELD_3C      0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
 #define AM2_AI_KEEP_RANGE_MS     0x1388 /* 5000, the reposition interval */
@@ -2892,6 +2899,18 @@
  * functions carry really is the SIGHTC one -- it tests 0x44 against 3, which
  * SIGHTC_OFF_KIND already documented, and reads 0x3C beside it. */
 #define ADDR_AI_HIT_REACT        0x00405050u  /* void(obj, out, void *ctx) */
+/* Per-RANK records, stride 28, indexed by OBJ_OFF_RANK 0..7. AiHitReact reads
+ * only the first dword, which runs 32, 48, 56, 64, 80, 96, 112, 128 -- a
+ * threshold that rises with rank, and the only field of the record anything
+ * here touches. */
+#define ADDR_RANK_RECORDS        0x00473DD0u
+#define AM2_RANK_RECORD_STRIDE   28u
+/* Six poses, 12..17, indexed by `SIGHTC_OFF_FIELD_00 * 2 + (byte >= 0x80)`.
+ * The two entries past them are not part of the table -- 0x4FA0C0 and 999 --
+ * which is what bounds it at six and puts that field's range at 0..2. */
+#define ADDR_HIT_POSE_BY_CLASS   0x00475198u  /* int32_t[6] */
+#define AM2_POSE_HIT_HEAVY       7
+#define AM2_POSE_KIND7           0x2B
 /* 0x00405D30, two callers. Reconstructed. */
 #define ADDR_AI_WALK_STEP        0x00405D30u  /* void(obj, out, void *ctx) */
 #define AM2_SIGHT_OMNI_RANGE     0x1000

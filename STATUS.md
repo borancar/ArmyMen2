@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `8bf839c`. Working tree clean.
+Last updated: **2026-08-31**, at `d4d2c11`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,246 patches.**
+Nothing uncommitted. **1,247 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2878,16 +2878,52 @@ commit -- gave the right answer every time it was used.
   drive is IDENTIFIED rather than absent: clear MAP 01's briefing and let it
   run.
 
+- **`AiHitReact`** (`0x00405050`, ten call sites) is what a unit does about
+  having been hit: choose a pose, turn toward the hit if it is not already
+  watching something, and consume `OBJ_OFF_HIT_DIR`.
+
+  **It settles what `out + 8` is.** `AiKeepRange` writes 7 or 5 there and this
+  writes 0x2B, 7, or one of six values 12..17 out of a table -- so that field
+  is a requested POSE, the same vocabulary `ADDR_SET_POSE` and
+  `tools/posecheck.py` use. Reading either function alone would not have said
+  so; it took the second.
+
+  **The pose ladder has three bands and the top one does nothing.**
+  `OBJ_OFF_RANK` selects a threshold from `ADDR_RANK_RECORDS` -- 32, 48, 56,
+  64, 80, 96, 112, 128, rising with rank -- and `SIGHTC_OFF_FIELD_3C` is
+  compared against half of it and then all of it: below half a table pose,
+  half to full pose 7, at or above full NO pose at all. A higher rank needs a
+  bigger value to reach the same band.
+
+  **The consume is outside everything.** The turn is gated on not already
+  watching something and the pose on three other tests, but
+  `OBJ_OFF_HIT_DIR = 0` happens on every path that got past the first line. So
+  a unit watching an enemy forgets it was hit without turning -- the same
+  asymmetry `AiStepIgnore` has.
+
+  Two tables named on the way: `ADDR_RANK_RECORDS` (stride 28, only the first
+  dword read) and `ADDR_HIT_POSE_BY_CLASS`, whose SIX usable entries are what
+  bound `SIGHTC_OFF_FIELD_00` to 0..2 -- the same range `ClassifyByCode74`
+  gives. Recorded as evidence at that field rather than renaming it, since
+  nothing seen so far writes it.
+
+- **`bootcamp` read 76 pixels rather than its usual 22, and the object table is
+  what says that is noise.** 76 is well inside the budget of 500, which on its
+  own is the situation CLAUDE.md warns about -- a real difference can hide
+  under a budget. The `state` artifact added last commit answers it directly:
+  1,610 lines identical, so no object moved. `AiHitReact`'s counter is 0
+  besides. First time the new oracle has been the thing that settled a reading.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,092 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,246
+line (0x0045C000) patched**. Measured: **1,093 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,247
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-two batches have gone in and the 147 entries outstanding start at 48
+small ones in batches. Ninety-three batches have gone in and the 146 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
