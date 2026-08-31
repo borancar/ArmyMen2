@@ -77,6 +77,13 @@ void __cdecl AiStep(void *obj, void *out);
 /* 0x00439D60, three callers. Find a route from where the object is to a point
  * and write it onto the object as a waypoint list. BeginMoveTo's general case:
  * the same five fields, with as many waypoints as the route needs. */
+/* 0x00428E40, six call sites in five functions. Where would this object be
+ * after one frame at that heading and speed? It writes the point and moves
+ * nothing. `outPt` is an AM2_Point. */
+int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
+                              int32_t speed, int32_t unused, int32_t flip,
+                              void *outPt);
+
 int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg);
 
 void __cdecl AiHitReact(void *obj, void *out, void *ctx);

@@ -4,7 +4,9 @@
 
 #include "misc.h"   /* CollapseEqualDeltas -- reconstructed */
 #include "rect.h"   /* Clamp -- reconstructed */
-#include "dist.h"   /* AngleDelta -- reconstructed */
+#include "dist.h"   /* AngleDelta, RoundTo8 -- reconstructed */
+#include "trig.h"   /* Cos8, Sin8 -- reconstructed */
+#include "anim.h"   /* AM2_Anim */
 #include "army.h"   /* ObjIsOurs -- reconstructed */
 #include "air.h"    /* RevealObj -- reconstructed */
 
@@ -587,6 +589,106 @@ uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt)
         dir  = (dir + 1) & 3;
         step = 0;
     }
+}
+
+/* MoveStepPoint -- original 0x00428E40, six call sites in five functions: the
+ * roach steppers, two in the vehicle band and 0x0040DA70. Where would this
+ * object be after one frame, heading that way at that speed? It writes the
+ * point and moves nothing.
+ *
+ * THE HEADING IS SNAPPED TO THE ANIMATION'S FACINGS, and that is the whole
+ * reason the function needs the object rather than just a point.
+ * `AM2_Anim::directionBits` is `Log2Mask(directions)`, so
+ * `RoundTo8(heading, bits) << (8 - bits)` rounds an 8-bit heading to one of
+ * the animation's evenly spaced facings and puts it back in 8-bit form. A
+ * sprite with eight directions therefore moves in eight directions, not 256.
+ * Only when OBJ_FLAG_BIT5 is set; otherwise the heading is used as given.
+ *
+ * THE ROW POINTER IS DEREFERENCED BEFORE IT IS TESTED. `rows` is left NULL
+ * when OBJ_OFF_ROW_COUNT is not positive and then read at
+ * ROW_OFF_ANIM_PLAYING regardless -- address 0x44, which faults. The `rows`
+ * test inside the snap is therefore vacuous: anything that got that far has
+ * already dereferenced it. Reproduced, since the callers evidently guarantee
+ * rows and the alternative is a different program.
+ *
+ * THE STEP IS CLAMPED AWAY FROM ZERO, NOT UP FROM IT. `speed * frameSeconds`
+ * is forced to a magnitude of at least AM2_MOVE_MIN_STEP with its sign kept:
+ * a value in [0, 2) becomes +2 and one in (-2, 0) becomes -2. So a very slow
+ * object still moves a whole step each frame, and a backwards one still backs
+ * up. Four x87 compares in the original, which is what makes the two-sided
+ * shape easy to miss.
+ *
+ * OBJ_OFF_SUBPIXEL_X and _Y are added before the truncation, which is what
+ * they are for: the fraction a step loses to `_ftol` is carried in them rather
+ * than thrown away, so a speed that does not divide the frame still averages
+ * out. Nothing here writes them.
+ *
+ * Two arguments earn a note. The FIFTH is never read -- both the count and the
+ * one call site checked push seven, and nothing in the body touches that slot,
+ * the same shape as RandomPointAhead's first. And the SIXTH adds 0x80 to the
+ * heading, which is half a turn: it is the reverse flag.
+ *
+ * Arithmetic note, and the same one FormationPoint carries. The original keeps
+ * the product in x87 and truncates once through `_ftol`; this uses double,
+ * which is exact for these magnitudes, with a C cast for the truncation. The
+ * intermediate `speed * frameSeconds` IS stored to a float by the original --
+ * `fst dword` -- so that one is a float here too rather than a double.
+ */
+int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
+                              int32_t speed, int32_t unused, int32_t flip,
+                              void *outPt)
+{
+    uint8_t         *o    = (uint8_t *)obj;
+    AM2_Point       *out  = (AM2_Point *)outPt;
+    uint8_t         *rows = (uint8_t *)0;
+    AM2_Anim        *anim;
+    uint8_t          head;
+    float            step;
+
+    (void)unused;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+        return 0;
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
+        rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+    anim = *(AM2_Anim **)(rows + ROW_OFF_ANIM_PLAYING);
+    if (!anim)
+        return 0;
+
+    head = (uint8_t)heading;
+    if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT5) && rows) {
+        uint8_t bits = anim->directionBits;
+
+        head = (uint8_t)((uint8_t)RoundTo8(head, bits) << (8 - bits));
+    }
+
+    if (flip)
+        head = (uint8_t)(head + 0x80);
+    head = (uint8_t)(head + (uint8_t)turn);
+
+    *(uint32_t *)out = *(const uint32_t *)(o + OBJ_OFF_POS);
+    if (!speed)
+        return 1;
+
+    step = (float)speed * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+    if (step >= 0.0f) {
+        if (step < AM2_MOVE_MIN_STEP)
+            step = AM2_MOVE_MIN_STEP;
+    } else if (step > -AM2_MOVE_MIN_STEP) {
+        step = -AM2_MOVE_MIN_STEP;
+    }
+
+    out->x = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS)
+                       + (int32_t)((double)Cos8(head) * (double)step
+                                   + (double)*(const float *)
+                                       (o + OBJ_OFF_SUBPIXEL_X)));
+    out->y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2)
+                       + (int32_t)((double)Sin8(head) * (double)step
+                                   + (double)*(const float *)
+                                       (o + OBJ_OFF_SUBPIXEL_Y)));
+    return 1;
 }
 
 typedef int32_t (__cdecl *AM2_FindPathFn)(int32_t from, int32_t to,
@@ -2222,6 +2324,8 @@ int region_install(void)
                         "AiHitReact", 10);
     rc |= patch_replace(ADDR_PLAN_PATH_TO, (const void *)PlanPathTo,
                         "PlanPathTo", 3);
+    rc |= patch_replace(ADDR_MOVE_STEP_POINT, (const void *)MoveStepPoint,
+                        "MoveStepPoint", 6);
     rc |= patch_replace(ADDR_AI_WALK_STEP, (const void *)AiWalkStep,
                         "AiWalkStep", 2);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

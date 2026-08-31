@@ -1177,6 +1177,21 @@ covered and unchecked. Two mutations in two commits, both uncaught, is the
 suite telling you where its blind spot is -- anything whose only effect is
 WHERE something ends up on a map the pixel checks cannot compare.
 
+**AND THE OTHER HALF IS NOW MEASURED CATEGORICALLY, not inferred.** The two
+mutations above each left one thing alone, so "uncaught" could always have
+meant "that branch never ran". `MoveStepPoint` settles it: it runs **175,145
+times** on a driven Boot Camp mission and computes where every moving object
+goes next, and adding a flat 50 to EVERY step -- a mutation that cannot fail
+to matter, on the hottest function in the tree -- leaves `combat` clean, with
+21 identical log messages and frames in step at 16521/16587.
+
+So the suite does not fail to notice particular movement bugs; it cannot see
+movement AT ALL. Every configuration that reaches live play has its pixel
+check disabled by construction, because two unsynchronised runs of a scrolling
+mission differ by a quarter of the frame either way, and nothing else it
+compares mentions a position. That is a fact about the harness worth knowing
+before crediting any A/B with covering a mover.
+
 **Half of that blind spot is closed now, and the half that is not is worth
 stating.** `tools/objdump.py --table` dumps every registered object as VALUES
 -- type, flags, army, position, tile, both box rectangles, health, cell count,

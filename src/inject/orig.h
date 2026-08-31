@@ -8170,6 +8170,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * destroyed and army are all skipped. So it is an override, and what sets it
  * is not established. Named for the bit. */
 #define OBJ_FLAG_BIT8            0x100u
+#define OBJ_FLAG_BIT5            0x20u   /* MoveStepPoint SNAPS the heading to
+                                          * the animation's facings when set;
+                                          * named by bit, from one reader */
 #define OBJ_FLAG_SELECTED        0x400u
 /* 0x00458380, four callers. Select one object if it is ours and selectable,
  * clearing the existing selection first unless a CONTROL key is held. */
@@ -8881,6 +8884,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_FLAGS          0x08u
 /* The object's own sub-list: a count and an array of 0x60-byte rows, each of
  * which registers itself with the map. */
+/* The SUB-PIXEL remainder a moving object carries, two floats, added to the
+ * step before it is truncated so that a fractional speed accumulates instead
+ * of being lost every frame. ROW_OFF_FRAME and ROW_OFF_HEADING are at these
+ * two offsets on a ROW, which is a different structure -- the same overlap
+ * CLAUDE.md records for the ROW_/OBJ_ pair at 0x1C, and the reason both
+ * prefixes exist. */
+#define OBJ_OFF_SUBPIXEL_X     0x4Cu   /* float */
+#define OBJ_OFF_SUBPIXEL_Y     0x50u   /* float */
 #define OBJ_OFF_ROW_COUNT      0x70u
 #define OBJ_OFF_ROWS           0x74u
 /* The POSE a unit is in and the one queued behind it. Both int32, both written
@@ -9355,6 +9366,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_APPROX_DIST_XY 0x0042DE20u  /* int32_t(dx, dy) -- the same maths */
 #define ADDR_ANGLE_DELTA    0x0042DD90u  /* int32_t(from, to), 8-bit headings */
 #define ADDR_ROUND_TO_8     0x0042DFB0u  /* int32_t(value, bits) */
+/* 0x00428E40, six call sites in five functions -- the movers. Where an object
+ * gets to after one frame at a given heading and speed, without moving it.
+ * Reconstructed. */
+#define ADDR_MOVE_STEP_POINT 0x00428E40u /* int32(obj,head,turn,speed,unused,
+                                          *       flip, AM2_Point *) */
+#define AM2_MOVE_MIN_STEP   2.0f  /* the step is clamped AWAY from zero */
 /* 0x00449F40, three callers. Wobble a facing by rand() % 5 - 2, and keep the
  * wobble only if it rounds into the same direction bucket as the original. */
 #define ADDR_JITTER_FACING  0x00449F40u  /* uint8_t(void *obj, uint8_t) */

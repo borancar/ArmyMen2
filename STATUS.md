@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `4fc60e8`. Working tree clean.
+Last updated: **2026-08-31**, at `e45a6d3`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,248 patches.**
+Nothing uncommitted. **1,249 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2948,16 +2948,51 @@ commit -- gave the right answer every time it was used.
   exercised in their two-waypoint case by running code, which is better
   ground for the naming than reading either function alone.
 
+- **`MoveStepPoint`** (`0x00428E40`) is where an object gets to after one
+  frame at a given heading and speed. It writes the point and moves nothing.
+  **175,145 calls** on a driven Boot Camp mission -- the hottest thing
+  reconstructed in this project.
+
+  **The heading is SNAPPED to the animation's facings**, which is why it needs
+  the object and not just a point. `AM2_Anim::directionBits` is
+  `Log2Mask(directions)`, so `RoundTo8(heading, bits) << (8 - bits)` rounds an
+  8-bit heading to one of the animation's evenly spaced facings. A sprite with
+  eight directions moves in eight directions, not 256. Only when
+  `OBJ_FLAG_BIT5` is set.
+
+  **The step is clamped AWAY from zero, not up from it.** `speed *
+  frameSeconds` is forced to a magnitude of at least 2.0 with its sign kept --
+  four x87 compares, which is what makes the two-sided shape easy to miss. So
+  a very slow object still moves a whole step and a backwards one still backs
+  up.
+
+  **The row pointer is dereferenced before it is tested**, so the `rows` test
+  inside the snap is vacuous and a row count of zero faults at address 0x44.
+  Reproduced. `OBJ_OFF_SUBPIXEL_X` and `_Y` are the fraction the truncation
+  would otherwise throw away; nothing here writes them.
+
+- **The suite cannot see movement AT ALL, and that is now measured rather than
+  inferred.** The two previous uncaught mutations each left something alone,
+  so "uncaught" could have meant "that branch never ran". This one cannot:
+  adding a flat 50 to EVERY step, on 175,145 calls, leaves `combat` clean with
+  21 identical messages and frames in step at 16521/16587. Dropping the
+  minimum-step clamp is likewise clean.
+
+  Every configuration reaching live play has its pixel check disabled by
+  construction -- two unsynchronised runs differ by a quarter of the frame --
+  and nothing else compared mentions a position. Worth knowing before
+  crediting any A/B with covering a mover.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,094 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,248
+line (0x0045C000) patched**. Measured: **1,095 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,249
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-four batches have gone in and the 145 entries outstanding start at 48
+small ones in batches. Ninety-five batches have gone in and the 144 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
