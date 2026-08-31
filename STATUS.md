@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d3c4da7`. Working tree clean.
+Last updated: **2026-08-31**, at `3b15d57`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,240 patches.**
+Nothing uncommitted. **1,241 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2654,16 +2654,51 @@ commit -- gave the right answer every time it was used.
   `mission`'s frame gate failed a seventh time on the original's side, 25229
   against our 7993, and the function's counter of 0 settles it as before.
 
+- **`AiWalkStep`** (`0x00405D30`) is the trooper family's minimal arm and the
+  exact counterpart of `AiStepIgnore`: while the unit is further than
+  `AM2_AI_REACHED_DIST` from where it is going, advance the walk and do nothing
+  else; on arrival forget the destination, react to whatever hit it, and face
+  what it can see.
+
+  **The two families line up in DESIGN and share no code and no constant:**
+
+  | vehicle | trooper |
+  |---|---|
+  | `SIGHT_OFF_DEST_DIST` 0x28 | `SIGHTC_OFF_DEST_DIST` 0x34 |
+  | `AM2_AI_ARRIVED_DIST` 0x20 | `AM2_AI_REACHED_DIST` 0x0C |
+  | heading at `out[1]` | heading at `out[4]` |
+  | the hit handled INLINE | `ADDR_AI_HIT_REACT`, ten call sites |
+
+  That is the opposite of `AiStepTrack` and `AiStepDefend`, which really were
+  one function emitted twice. Worth keeping the two cases apart: one calls for
+  a diff of the disassembly, the other for a table.
+
+  **`ADDR_AI_HIT_REACT` (`0x00405050`) confirmed the record on the way past.**
+  It tests its context's 0x44 against 3, which `SIGHTC_OFF_KIND` already
+  documented, and reads 0x3C beside it -- so the record these functions carry
+  really is the SIGHTC one and not a third family.
+
+  A sixth reading under which 0xB4 and 0xC0 hold packed points: `obj[0xC0] =
+  obj[0xB4]` on the way out and `obj[0xB4] = ADDR_ZERO_POINT` on arrival, the
+  same pair the vehicle arms perform. Still not renamed.
+
+- **One `counts` line settles the whole layer.** `drive.sh ctl "counts Ai"`
+  returns every `Ai*` counter at 0 on a driven mission, the only non-zeroes
+  being `AimInit` and `ResetAirSupport`, which are startup and not AI. Reach
+  for the filter rather than a per-function probe when a whole band is in
+  question -- and the two non-zeroes are what make it evidence rather than a
+  broken dump.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,086 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,240
+line (0x0045C000) patched**. Measured: **1,087 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,241
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-six batches have gone in and the 153 entries outstanding start at 48
+small ones in batches. Eighty-seven batches have gone in and the 152 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

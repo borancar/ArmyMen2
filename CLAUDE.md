@@ -2750,15 +2750,21 @@ exact oracle**, however meaningful it is when it is set.
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
-  `AiKeepRange`, and `RefreshScreen` —
+  `AiKeepRange`, `AiWalkStep`, and `RefreshScreen` —
 
   **The AI is a WHOLE LAYER this environment does not reach, not a handful of
-  cold functions.** The vehicle side is settled by one counter -- `AiStep`
-  reads 0 -- and the trooper side looks the same: `AiKeepRange` has six call
-  sites in five functions and reads 0, `ConsiderSightingC` reads 0 beside it,
-  and `RandomPointToward` reads 0. Boot Camp's enemies never engage, so
-  nothing below the sighting layer runs at all. Everything in that band is
-  verified by reading until a drive exists that provokes a fight.
+  cold functions, and ONE `counts` line says so.** `drive.sh ctl "counts Ai"`
+  on a driven Boot Camp mission returns every `Ai*` counter at 0 --
+  `AiStep` and its six arms, `AiKeepRange`, `AiWalkStep`, `AiTakeAbandoned`,
+  `EvtSetAiMode`, the whole air-support block -- with the only non-zeroes
+  being `AimInit` and `ResetAirSupport`, which are startup and not AI at all.
+  `ConsiderSightingC` and `RandomPointToward` read 0 beside them. Boot Camp's
+  enemies never engage, so nothing below the sighting layer runs.
+
+  Reach for the FILTER rather than a per-function probe when a whole band is
+  in question: one command, one line, and the two non-zeroes in it are the
+  part that makes it evidence rather than a broken dump. Everything in that
+  band is verified by reading until a drive exists that provokes a fight.
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and

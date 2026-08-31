@@ -73,6 +73,11 @@ void __cdecl AiStep(void *obj, void *out);
  * +4, pose at +8. */
 void __cdecl AiKeepRange(void *obj, void *out, void *ctx);
 
+/* 0x00405D30, two callers. The trooper family's minimal arm, and the exact
+ * counterpart of AiStepIgnore: advance the walk, or on arrival forget the
+ * destination, react to a hit and face what it sees. */
+void __cdecl AiWalkStep(void *obj, void *out, void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

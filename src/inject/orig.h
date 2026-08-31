@@ -2863,6 +2863,9 @@
  * SIGHTC_OFF_MAX_RANGE at 0x50, which is the range beyond which
  * ConsiderSightingC stops looking. +0x00 and +0x3C gate the pose write and
  * nothing read so far says what either holds. */
+#define SIGHTC_OFF_FIELD_20      0x20u  /* gates the turn in AiWalkStep */
+#define SIGHTC_OFF_DEST_DIST     0x34u  /* to OBJ_OFF_FIELD_C0, as +0x28 is
+                                         * in the vehicle record */
 #define SIGHTC_OFF_WANT_RANGE    0x4Cu
 #define SIGHTC_OFF_FIELD_00      0x00u
 #define SIGHTC_OFF_FIELD_3C      0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
@@ -2874,6 +2877,15 @@
 #define ADDR_AI_TROOPER_STEP     0x004049C0u  /* void(obj, out, void *ctx) */
 /* 0x00405100, six call sites in five functions. Reconstructed. */
 #define ADDR_AI_KEEP_RANGE       0x00405100u  /* void(obj, out, void *ctx) */
+/* 0x00405050, TEN call sites across the same band. The trooper family's
+ * reaction to being hit: it returns at once unless OBJ_OFF_HIT_DIR is set, and
+ * otherwise picks a pose from OBJ_OFF_SOLDIER_KIND, SIGHTC_OFF_KIND and
+ * SIGHTC_OFF_FIELD_3C. Reading it is what confirmed that the record these
+ * functions carry really is the SIGHTC one -- it tests 0x44 against 3, which
+ * SIGHTC_OFF_KIND already documented, and reads 0x3C beside it. */
+#define ADDR_AI_HIT_REACT        0x00405050u  /* void(obj, out, void *ctx) */
+/* 0x00405D30, two callers. Reconstructed. */
+#define ADDR_AI_WALK_STEP        0x00405D30u  /* void(obj, out, void *ctx) */
 #define AM2_SIGHT_OMNI_RANGE     0x1000
 #define SIGHTCOUT_OFF_BEARING    0x04u  /* uint8_t, compared not written */
 #define SIGHTCOUT_OFF_STATE      0x08u  /* 2 becomes 3 */

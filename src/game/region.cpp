@@ -1581,6 +1581,59 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
         w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
 }
 
+typedef void (__cdecl *AM2_AiHitReactFn)(void *obj, void *out, void *ctx);
+#define orig_ai_hit_react ((AM2_AiHitReactFn)(uintptr_t)ADDR_AI_HIT_REACT)
+
+/* AiWalkStep -- original 0x00405D30, two callers. The trooper family's minimal
+ * arm, and the exact counterpart of AiStepIgnore on the vehicle side: while the
+ * unit is further than AM2_AI_REACHED_DIST from where it is going, advance the
+ * walk and do nothing else; once it is there, forget the destination, react to
+ * anything that hit it, and face what it can see. The name is ours.
+ *
+ * The two families line up field for field and neither shares a constant:
+ *
+ *     vehicle                          trooper
+ *     SIGHT_OFF_DEST_DIST  0x28        SIGHTC_OFF_DEST_DIST  0x34
+ *     AM2_AI_ARRIVED_DIST  0x20        AM2_AI_REACHED_DIST   0x0C
+ *     out[1] is the heading            out[4] is the heading
+ *     the hit is handled INLINE        ADDR_AI_HIT_REACT does it, ten sites
+ *
+ * So the resemblance is at the level of the design and not of the code, which
+ * is the opposite of AiStepTrack and AiStepDefend -- those were one function
+ * emitted twice. Worth keeping the two cases apart: one calls for a diff of
+ * the disassembly, the other for a table like the one above.
+ *
+ * OBJ_OFF_FIELD_C0 IS WRITTEN BEFORE THE WALK AND CLEARED AFTER IT, and it is
+ * OBJ_OFF_SCRIPT_STATE that supplies it -- `obj[0xC0] = obj[0xB4]` on the way
+ * out and `obj[0xB4] = ADDR_ZERO_POINT` on arrival, the same pair the vehicle
+ * arms perform. A sixth reading under which both fields hold packed points;
+ * still not renamed, for the reason recorded at 0xB4.
+ */
+void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t       *w = (uint8_t *)out;
+    const uint8_t *c = (const uint8_t *)ctx;
+
+    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        orig_ai_trooper_step(obj, out, ctx);
+        return;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    orig_ai_hit_react(obj, out, ctx);
+
+    if (*(const int32_t *)(c + SIGHTC_OFF_FIELD_20)
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+           - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
+           >= AM2_AI_TURN_DELAY_MS)
+        w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
+}
+
 /* ConsiderSighting -- original 0x004074A0, four callers.
  *
  * One observer against one object. Four gates -- both of the record's enable
@@ -2006,6 +2059,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_AI_STEP, (const void *)AiStep, "AiStep", 2);
     rc |= patch_replace(ADDR_AI_KEEP_RANGE, (const void *)AiKeepRange,
                         "AiKeepRange", 6);
+    rc |= patch_replace(ADDR_AI_WALK_STEP, (const void *)AiWalkStep,
+                        "AiWalkStep", 2);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);
