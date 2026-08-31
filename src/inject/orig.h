@@ -2980,6 +2980,52 @@
 /* The step every arm but this one shares, nine call sites. Unnamed: nothing
  * in it says what it is and this file will not guess from a call site. */
 #define ADDR_AI_407190         0x00407190u  /* void(obj, out, ctx, int32) */
+/* THE THIRD AND FOURTH AI-MODE DISPATCHERS, and their one shared caller says
+ * which unit each is for. 0x0044B9FE branches on OBJ_OFF_SARGE: set, it calls
+ * 0x00407020; clear, 0x004062B0. So one is Sarge's per-frame AI step and the
+ * other every other trooper's -- not "armed and unarmed", which is what the
+ * extra prologue looks like until the caller is read.
+ *
+ * BOTH BUILD THEIR OWN SIGHTC RECORD ON THE STACK. `sub esp,0x58` and
+ * SIGHTC_OFF_READY at 0x54 fit exactly, and UnitWeaponInfo -- which fills six
+ * SIGHTC fields -- is handed that frame, which is what settles the record as
+ * SIGHTC rather than the SIGHT_OFF_ one the 0x00407F80 dispatcher's arms use.
+ * Two dispatcher families, two different context layouts.
+ *
+ * The dispatch is on OBJ_OFF_AI_MODE through an eight-entry table, and the
+ * table is the only honest source: three indices share the default arm.
+ *
+ *     0        -> ADDR_BIG_4057D0
+ *     1, 4, 5  -> ADDR_BIG_405220        (5 is `evade`)
+ *     2        -> AiWalkStep             (`ignore`)
+ *     3        -> ADDR_AI_405DB0
+ *     6        -> ADDR_AI_406B30         (`attack`)
+ *     7        -> ADDR_CALL_405220       (`defend`, a thunk on the default)
+ *
+ * Reading the bodies top to bottom gives 2, 0, 3, 6, 7, default and gets four
+ * of the eight wrong. Same shape as the 0x0040803C table, different arms.
+ *
+ * SARGE'S EXTRA PROLOGUE IS AN ITEM PICKUP: SelectBestWeapon, then a candidate
+ * out of SIGHTC_OFF_FIELD_20 that ObjIsType4 confirms is a weapon, its
+ * position into the goal point, its +4 into OBJ_OFF_PICKUP_AFTER, the point
+ * settled into a walkable region, and the distance recorded at SIGHTC +0x38.
+ *
+ * THE TROOPER HAS AN EXTRA TAIL SARGE DOES NOT, mapping OBJ_OFF_FIELD_540 and
+ * SIGHTC_OFF_FIELD_00 onto SIGHTCOUT_OFF_STATE. It reads that field against
+ * 0, 1 and 2 -- a third independent site agreeing it is 0..2. Reconstructed.
+ */
+#define ADDR_SARGE_AI_STEP     0x00407020u  /* void(obj, out), 368 bytes */
+#define ADDR_TROOPER_AI_STEP   0x004062B0u  /* void(obj, out), 432 bytes */
+/* Three arms and the context builder, all left original and reached by
+ * address. 0x00404730 is the one worth a note: two OBJ_OFF_ entries already
+ * record that it resolves OBJ_OFF_FOLLOW_UID and OBJ_OFF_UID_56C through the
+ * uid lookup and stores the objects, so it is what FILLS the record every arm
+ * below then reads. Named by offset because its body has not been read. */
+#define ADDR_AI_404730         0x00404730u  /* void(obj, ctx, int32 sarge) */
+#define ADDR_AI_405DB0         0x00405DB0u  /* void(obj, out, ctx) */
+#define ADDR_AI_406B30         0x00406B30u  /* void(obj, out, ctx) */
+#define SIGHTC_OFF_PICKUP_DIST 0x38u  /* SargeAiStep: ApproxDist to the item */
+#define AM2_SIGHTC_BYTES       0x58   /* the frame both dispatchers reserve */
 /* 0x00407BF0, one caller -- the `ignore` arm, mode 2. Reconstructed. */
 #define ADDR_AI_STEP_IGNORE    0x00407BF0u  /* void(obj, out, const void *) */
 /* 0x00407640, one caller -- the `defend` arm, mode 7. Reconstructed. */

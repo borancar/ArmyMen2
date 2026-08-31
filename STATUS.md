@@ -10131,7 +10131,7 @@ counts family aliases, already carries that exact pair in its baseline, and
 its docstring already names it as a plain duplicate rather than a union.
 **Read the tool before reporting the gap it was written to cover.**
 
-## Read but not yet written: the two AI step siblings
+## The two AI step siblings, and a clean A/B that proves nothing about them
 
 `0x00407020` (368 B) and `0x004062B0` (432 B) are the same function twice, and
 their one shared caller says which is which. `0x0044B9FE` branches on
@@ -10174,3 +10174,46 @@ same dword is a packed point, handed to `SettlePointInRegion` and `ApproxDist`,
 both of which take points. No second name was added: `tools/checkoffsets.py`'s
 family baseline may only go down, and the honest record is a comment saying
 one dword has two readings, not a second spelling that makes the count worse.
+
+### They are written, and they do not run
+
+`SargeAiStep` and `TrooperAiStep` are reconstructed and installed. **1,239 -
+1,135 = 104 entries outstanding**, down from 106. `tools/ab.sh bootcamp
+mission campaign` is clean -- and **that result carries no evidence about
+either function**, which took four checks to establish and would have been
+easy to skip.
+
+`ComposeFrame` reading 0 was the first hint, and it is a red herring: it is
+blind, and so are `AiWalkStep`, `AiHitReact` and `FirstItem`, because their
+callers are ours. `tools/blindspots.py` says which, and these two are NOT on
+that list -- their caller `0x0044B7D0` is original, so their counters can
+move. So a 0 there is real.
+
+The other three checks, in the order worth doing them:
+
+- **The log is the list of installs.** Both `patch:` lines are present and
+  both say `(traced)`, and the run reports no trace-table overflow. So it is
+  not a missing patch and not a full table -- the two failures that read
+  exactly like this one.
+- **Is the game actually live?** `ObjectsAtPoint` at 3,747,585 and then
+  21,579,002 forty seconds later, `WeaponPoseIndex` 42,108, `Log` 126,767.
+  It is running hard.
+- **Both counters stay at 0 throughout.** Not late, not blind, not
+  uninstalled. Boot Camp does not reach `0x0044B7D0`'s trooper arm at all.
+
+So they have exactly `SaveDefaultCof`'s standing: verified by reading. What
+is still open is which drive WOULD reach them -- the multiplayer gate above
+the call is not it, since `ADDR_MP_SESSION` is 0 in single player and that
+test falls straight through.
+
+**Two probe failures on the way, both of which produced convincing nonsense.**
+`drive.sh ctl "key 28 tap"` answers `err unknown key '28'` -- the command
+takes a NAME or an `0x`-prefixed hex scancode, and a bare decimal is looked up
+as a name, where `28` matches nothing and `0x28` is the apostrophe. The
+mission never started and every counter read 0, which looks exactly like the
+result being reported here and is not it. Then, past that, the game sat on
+MESSAGE FROM HQ with `ComposeFrame` at 0 -- no frames are composed while a
+dialog is up, which CLAUDE.md already records. **A screenshot answered both in
+seconds where the counters could not**: reach for one before believing a
+probe, and read the reply, since `ctl` reported the bad key perfectly clearly
+and it went past unread.

@@ -13,6 +13,7 @@
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
+#include "gameproc.h" /* Call405220 -- the `defend` arm's thunk */
 #include "item.h"     /* ObjectsHitByPoint -- reconstructed */
 #include "image.h"
 #include "crt.h"
@@ -2647,6 +2648,208 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
 }
 
 
+/* The three arms and the context builder these two dispatchers share with
+ * nothing else, all left original and reached by address. None is patched, so
+ * naming the address here is a seam checkseams allows. */
+typedef void (__cdecl *AM2_AiArmFn)(void *obj, void *out, void *ctx);
+typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
+#define orig_ai_fill   ((AM2_AiFillFn)(uintptr_t)AM2_IMAGE(ADDR_AI_404730))
+#define orig_ai_arm0   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_4057D0))
+#define orig_ai_arm3   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_405DB0))
+#define orig_ai_arm6   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_406B30))
+#define orig_ai_deflt  ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_405220))
+
+/* The middle both dispatchers share, to the instruction. Kind 7 reacts to
+ * being hit and can finish the step outright -- AM2_POSE_KIND7 in the output
+ * state means there is nothing further to decide this frame -- while kind 8
+ * reacts and carries on. Every other kind skips the reaction entirely.
+ *
+ * THE SHORTCUT SKIPS THE DISPATCH AND NOTHING ELSE, in both callers. It is a
+ * `jmp` to the region write, which is where the dispatch arms fall to anyway
+ * -- so in Sarge that is the last thing either path does, and in the trooper
+ * the 0x540 tail below runs either way. Written as a void helper for that
+ * reason: a flag returned to the callers would invite exactly the wrong
+ * reading, which is the mistake this comment exists to prevent. The first
+ * version of this file had the trooper RETURN on the shortcut and skip its
+ * tail; the original falls through.
+ *
+ * The original has this inline in both, which is what a `jmp` into a shared
+ * tail compiles to; one helper says it once instead of twice. */
+static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7) {
+        AiHitReact(obj, out, ctx);
+        if (*(const int32_t *)((uint8_t *)out + SIGHTCOUT_OFF_STATE)
+            == AM2_POSE_KIND7)
+            return;
+    } else if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 8) {
+        AiHitReact(obj, out, ctx);
+    }
+
+    switch (*(const int32_t *)(o + OBJ_OFF_AI_MODE)) {
+    case 0:  orig_ai_arm0(obj, out, ctx);  break;
+    case 2:  AiWalkStep(obj, out, ctx);    break;
+    case 3:  orig_ai_arm3(obj, out, ctx);  break;
+    case 6:  orig_ai_arm6(obj, out, ctx);  break;
+    case 7:  Call405220((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
+                        (int32_t)(intptr_t)ctx);
+             break;
+    /* 1, 4, 5 and everything above 7 -- `evade` is 5 and takes this arm. */
+    default: orig_ai_deflt(obj, out, ctx); break;
+    }
+}
+
+/* Where the unit is standing, recorded on the object every frame. Both
+ * dispatchers end with this, and the kind-7 shortcut above jumps straight to
+ * it -- so the region is updated even on the frame the AI decides nothing. */
+static void AiStepRecordRegion(uint8_t *o)
+{
+    *(uint16_t *)(o + OBJ_OFF_REGION) =
+        kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+}
+
+/* SargeAiStep -- original 0x00407020, one caller, and that caller is what
+ * identifies it: 0x0044B9FE tests OBJ_OFF_SARGE and sends the leader here and
+ * everyone else to TrooperAiStep. The two bodies are otherwise the same
+ * dispatcher, so "armed and unarmed" is what the extra prologue looks like
+ * until the branch above it is read.
+ *
+ * THE 0x58-BYTE FRAME IS A SIGHTC RECORD, not scratch. UnitWeaponInfo fills
+ * six of its fields and every arm below takes it as the `ctx` third argument
+ * the whole Ai* family already shares. What settles it as SIGHTC rather than
+ * the SIGHT_OFF_ record AiStepIgnore's dispatcher uses is that call: the two
+ * dispatcher families genuinely carry different layouts.
+ *
+ * NEITHER OF THESE RUNS ON ANY DRIVE THIS PROJECT HAS, and the A/B that was
+ * green when they landed compares them not at all. Measured rather than
+ * assumed: both `patch:` lines are in the log and both say `(traced)`, the
+ * trace table did not overflow, `tools/blindspots.py` does not list either --
+ * their caller is original, so the counters CAN move -- and both stay at 0
+ * through a live Boot Camp mission in which ObjectsAtPoint climbs past 21
+ * million. Boot Camp does not reach 0x0044B7D0's trooper arm. So these have
+ * SaveDefaultCof's standing, verified by reading, and the clean run beside
+ * them is about the rest of the tree.
+ *
+ * SARGE'S PROLOGUE IS AN ITEM PICKUP. Choose the best weapon, take whatever
+ * candidate the fill left at SIGHTC_OFF_FIELD_20, and if ObjIsType4 says it is
+ * a weapon: copy its position into the goal point, keep its +4 in
+ * OBJ_OFF_PICKUP_AFTER, settle that point into a region the unit can stand in,
+ * record the distance, and clear the candidate so nothing picks it twice.
+ *
+ * SettlePointInRegion TAKES TWO ARGUMENTS AND THE SECOND IS HOISTED. The
+ * original pushes the goal point eight instructions and two calls before the
+ * call that consumes it, and one `add esp, 0x10` cleans four dwords across
+ * three calls. Pairing each push with the nearest call reads it as a
+ * one-argument call with a stray push -- which compiles, runs, and is wrong.
+ * Fourth instance of the MSVC argument shuffle recorded in this tree.
+ *
+ * 0xB8 IS A UNION AND THE OTHER NAME IS THE RIGHT ONE THERE. objscript.cpp
+ * increments the same dword as a script frame number; here it is a packed
+ * point handed to two functions that take points. No second spelling was
+ * added for it -- checkoffsets' family baseline may only go down.
+ */
+void __cdecl SargeAiStep(void *obj, void *out)
+{
+    uint8_t  ctx[AM2_SIGHTC_BYTES];
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *item;
+
+    if (!obj)
+        return;
+
+    SelectBestWeapon(obj);
+    orig_ai_fill(obj, ctx, 1);
+    UnitWeaponInfo(obj, ctx);
+
+    item = *(uint8_t **)(ctx + SIGHTC_OFF_FIELD_20);
+    if (item && ObjIsType4((const AM2_Object *)item)) {
+        uint32_t *goal = (uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME);
+
+        *goal = *(const uint32_t *)(item + OBJ_OFF_POS);
+        *(uint32_t *)(o + OBJ_OFF_PICKUP_AFTER) =
+            *(const uint32_t *)(item + 4);
+
+        SettlePointInRegion(
+            TileOfPoint(*(const uint32_t *)(item + OBJ_OFF_POS)), goal);
+
+        *(int32_t *)(ctx + SIGHTC_OFF_PICKUP_DIST) =
+            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)goal);
+
+        *(uint32_t *)(ctx + SIGHTC_OFF_FIELD_20) = 0;
+    }
+
+    AiStepReactAndDispatch(obj, out, ctx);
+    AiStepRecordRegion(o);
+}
+
+/* TrooperAiStep -- original 0x004062B0, one caller, the other half of the
+ * OBJ_OFF_SARGE branch above.
+ *
+ * ITS PROLOGUE IS ONE CALL AND THE DIFFERENCE IS AN ARGUMENT. Where Sarge
+ * chooses a weapon and looks for something to pick up, this passes 0 rather
+ * than 1 to the same context builder and does nothing else -- so the flag that
+ * separates the two paths is handed to a shared helper rather than being a
+ * difference between these two functions alone.
+ *
+ * IT HAS A TAIL SARGE DOES NOT, and the tail is where the frame's decision
+ * lands. After the region is recorded it maps OBJ_OFF_FIELD_540 and
+ * SIGHTC_OFF_FIELD_00 onto SIGHTCOUT_OFF_STATE:
+ *
+ *     0x540 == 1   ctx0 0 -> 1,  ctx0 2 -> 9,  else 8
+ *     0x540 == 2   ctx0 0 -> 5,  else 4
+ *     0x540 == 3   ctx0 2 -> 6,  else 7
+ *     anything else            no write at all
+ *
+ * That is a THIRD independent site reading SIGHTC_OFF_FIELD_00 against 0, 1
+ * and 2, which is the range orig.h records for it as suggestive rather than
+ * settled. Still nothing WRITES it here either.
+ *
+ * The last arm falls THROUGH into the shared epilogue rather than jumping to
+ * it -- invisible to any diff that normalises jump targets, and the reason the
+ * default case is written as "no write" and not as a fifth constant.
+ *
+ * THE KIND-7 SHORTCUT DOES NOT SKIP THIS TAIL, and the first version of this
+ * function had it doing so. The `je` lands ON the region write, which is where
+ * the dispatch arms fall to anyway, so the only thing it skips is the
+ * dispatch. Reading a jump as "go to the end" rather than looking at what is
+ * AT the target is how that got in; the target here is the middle.
+ */
+void __cdecl TrooperAiStep(void *obj, void *out)
+{
+    uint8_t  ctx[AM2_SIGHTC_BYTES];
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+    int32_t  c0;
+
+    if (!obj)
+        return;
+
+    orig_ai_fill(obj, ctx, 0);
+
+    AiStepReactAndDispatch(obj, out, ctx);
+    AiStepRecordRegion(o);
+
+    c0 = *(const int32_t *)(ctx + SIGHTC_OFF_FIELD_00);
+
+    switch (*(const int32_t *)(o + OBJ_OFF_FIELD_540)) {
+    case 1:
+        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = c0 == 0 ? 1 : c0 == 2 ? 9 : 8;
+        break;
+    case 2:
+        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = c0 == 0 ? 5 : 4;
+        break;
+    case 3:
+        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = c0 == 2 ? 6 : 7;
+        break;
+    default:
+        break;
+    }
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -2680,6 +2883,10 @@ int region_install(void)
                         "AnimStepPoint", 3);
     rc |= patch_replace(ADDR_AI_WALK_STEP, (const void *)AiWalkStep,
                         "AiWalkStep", 2);
+    rc |= patch_replace(ADDR_SARGE_AI_STEP, (const void *)SargeAiStep,
+                        "SargeAiStep", 1);
+    rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
+                        "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);
