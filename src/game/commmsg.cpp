@@ -2351,11 +2351,12 @@ void __cdecl CommInitDefaults(void)
  * `repne scasb` runs over the same buffer, and reproduced as two: folding them
  * would be right for every input and would still be a different program.
  *
- * THE INK IS PER ARMY AND THE FALLBACK IS WHITE. It asks CommArmyOfSlot for
- * the sender's army, indexes ADDR_ARMY_INK at a stride of 256, and takes
- * ADDR_COLOUR_WHITE when that byte is zero. A second reader elsewhere takes it
- * exactly the same way and hands the answer to a HUD text call, which is what
- * says the byte is an ink.
+ * THE INK IS BYTE 1 OF ADDR_OBJ_TABLE_RECORDS, indexed by the sender's army,
+ * with ADDR_COLOUR_WHITE when it is zero. It went in as a table of its own at
+ * 0x004F9ACD -- a field pointer named as a base, which is what orig.h now
+ * records. A second reader takes it exactly the same way and hands the answer
+ * to a HUD text call, which is what says the byte is an ink and settles one
+ * byte of a record orig.h otherwise calls unestablished.
  *
  * THE ARGUMENT SHUFFLE AGAIN, THE THIRD TIME THIS FAMILY HAS SHOWN IT.
  * SendGameMsg's trailing zero is pushed BEFORE CommPlayerId is called, that
@@ -2374,10 +2375,11 @@ void __cdecl SendChatTo(char *text, int32_t slot)
 
     strcpy((char *)(rec + MSG_CHAT_OFF_TEXT), text);
 
-    ink = ((const uint8_t *)(uintptr_t)ADDR_ARMY_INK)
-              [(uint32_t)CommArmyOfSlot(kCommObj,
-                   *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-               * AM2_ARMY_INK_STRIDE];
+    ink = *((const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+            + (uint32_t)CommArmyOfSlot(kCommObj,
+                  *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+              * AM2_OBJ_TABLE_REC_SIZE
+            + OBJ_TABLE_REC_OFF_INK);
     if (!ink)
         ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE;
 

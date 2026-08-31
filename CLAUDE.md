@@ -117,6 +117,30 @@ Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
 
+**A FIELD POINTER NAMED AS A TABLE BASE IS THE COMMONEST MISTAKE IN THIS
+PROJECT, AND FOUR MORE LANDED IN ONE SESSION.** `ADDR_RANK_RECORDS` was four
+bytes late, `COMM_OFF_PLAYERS` twelve, the roach step's "control record" was a
+window into an object, and `ADDR_ARMY_INK` was byte 1 of
+`ADDR_OBJ_TABLE_RECORDS`. Only the first two predate the session; the last two
+were introduced BY the person writing this warning, one of them within a single
+batch of correcting another.
+
+The shape is always the same and it is always invisible at the time: a consumer
+that touches ONE field indexes correctly from any base that puts that field
+where it expects. Nothing can see the error until a second consumer wants an
+earlier field.
+
+What actually catches it, in order of how often it worked here:
+
+- **Grep the ADDRESS before naming anything**, and grep it as a bare hex
+  number, not as a name. Three of the four would have been caught by one
+  `grep 0x004F9AC` before the `#define` was written.
+- **Ask what is BEFORE the field you are naming.** A record whose "first" field
+  has things written twelve bytes below it is not starting where you think.
+- **A stride you have to define is a stride that probably already exists.**
+  `AM2_ARMY_INK_STRIDE 0x100` was a second spelling of `AM2_OBJ_TABLE_REC_SIZE`
+  and that alone should have stopped the edit.
+
 **RE-BASING A SHARED MACRO NEEDS AN AUDIT, NOT A GREP.** Moving
 `COMM_OFF_PLAYERS` twelve bytes to the record's real start meant every use had
 to gain a compensating field offset. One of twenty-six was missed --

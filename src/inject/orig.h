@@ -2900,12 +2900,20 @@
 #define AM2_CHAT_TEXT_MAX        0xFF   /* longer than this is cut at 0xFE */
 #define MSG_CHAT_OFF_INK         0x08u  /* uint8_t, the sender's colour */
 #define MSG_CHAT_OFF_TEXT        0x09u
-/* One byte per ARMY at a stride of 256 -- the first of each army's block. Both
- * readers below the CRT line take it the same way, `CommArmyOfSlot(comm, n)
- * << 8` then this base, and the second hands the answer straight to a HUD
- * text call as its colour. */
-#define ADDR_ARMY_INK            0x004F9ACDu  /* uint8_t[army][256] */
-#define AM2_ARMY_INK_STRIDE      0x100
+/* SendChatTo's ink is byte 1 of ADDR_OBJ_TABLE_RECORDS, and naming it
+ * ADDR_ARMY_INK at 0x004F9ACD gave that table a second base one batch ago --
+ * the fourth time this session a field pointer has been named as though it
+ * were a table, and the first of the four that was mine to begin with. The
+ * records are 0x100 bytes from 0x004F9ACC and AM2_OBJ_TABLE_REC_SIZE already
+ * spelled the stride; ADDR_ARMY_INK's own AM2_ARMY_INK_STRIDE was a second
+ * spelling of that too. Both withdrawn.
+ *
+ * IT SETTLES ONE BYTE OF A RECORD ORIG.H CALLS UNESTABLISHED. Two readers
+ * below the CRT line take `CommArmyOfSlot(comm, n) << 8` and then +1 off that
+ * base, and the second hands the answer straight to a HUD text call as its
+ * colour -- so byte 1 is an ink, and the records are indexed by ARMY. What the
+ * other 255 hold is still open. */
+#define OBJ_TABLE_REC_OFF_INK    0x01u  /* uint8_t, the army's text colour */
 /* NOT a sprite anything. 0x00457820 walks every object an army owns and calls
  * the SECOND argument on each -- `call ebp`, where ebp is that argument. It
  * went in as ADDR_SPRITE_DROP_NAMED from the one call site, which passes

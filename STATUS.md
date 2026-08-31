@@ -5,11 +5,22 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `a26ab88`. Working tree clean.
+Last updated: **2026-08-31**, at `21f6763`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted. **1,288 patches.**
+
+**`ADDR_ARMY_INK` was byte 1 of `ADDR_OBJ_TABLE_RECORDS`; withdrawn.** Naming it
+one batch ago gave that table a second base -- the fourth field-pointer-as-base
+this session, and the second of the four introduced by me.
+
+**It settles one byte of a record orig.h calls unestablished.** Two readers take
+`CommArmyOfSlot(comm, n) << 8` then +1 off the base, and the second hands the
+answer to a HUD text call as its colour -- so byte 1 is an ink and the records
+are indexed by ARMY. The other 255 are still open.
+
+No new patch: every address is unchanged, proved army by army.
 
 **`FreeMapLayers` (`0x0042D3D0`)** -- free every per-map allocation, called by
 the level teardown and by the map loader, which clears before it fills.
