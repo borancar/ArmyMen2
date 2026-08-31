@@ -496,10 +496,6 @@ typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
                                           int32_t c, int32_t d, uint32_t uid);
 #define orig_create_item ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
 
-typedef void *(__cdecl *AM2_CreateRoachFn)(int32_t a, const char *dir,
-                                           int32_t x, int32_t y, int32_t army,
-                                           int32_t e, int32_t f, int32_t g);
-#define orig_create_roach ((AM2_CreateRoachFn)(uintptr_t)ADDR_CREATE_ROACH)
 
 /* LoadType8 -- original 0x0043CB60, one caller, and the ROACH member of the
  * per-type savegame loader family LoadType1 belongs to. Read the 0x4CC-byte
@@ -540,7 +536,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
     InitPtrList(rec + 0x10);
     orig_fread(rec, AM2_TYPE8_RECORD_SIZE, 1, fp);
 
-    o = (uint8_t *)orig_create_roach(
+    o = (uint8_t *)CreateRoach(
             *(const int32_t *)(rec + 0x498),
             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
             *(const int16_t *)(h + OBJ_OFF_POS),
@@ -558,7 +554,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
         part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                        / (double)was);
-        SetMaxHealth(o, *(const int32_t *)AM2_IMAGE(ADDR_ROACH_HEALTH_SCALE));
+        SetMaxHealth(o, *(const int32_t *)AM2_IMAGE(ADDR_ROACH_HEALTH));
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) =

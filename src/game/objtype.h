@@ -117,8 +117,21 @@ int objtype_install(void);
 
 /* 0x00433880, two callers. Build an object out of an AAI record. Nine
  * arguments; the ninth is never read. */
-int32_t __cdecl InitObjFromAai(void *obj, int32_t a2, int32_t army,
+int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
                                int32_t a7, int32_t a8, int32_t unused);
+
+/* ADDR_OBJ_INIT_COMMON, still original, and shared rather than typedef'd
+ * privately in each caller -- item.cpp and objtype.cpp each had their own and
+ * the two disagreed about which argument was the name. See the note in
+ * orig.h; the parameters here are read off the body. `box` is an AM2_Rect,
+ * spelled as a pointer to four int32 so this header need not pull in rect.h
+ * for one declaration. */
+typedef void (__cdecl *AM2_ObjInitCommonFn)(void *obj, const char *name,
+                                            int32_t type, uint32_t at,
+                                            const int32_t *box,
+                                            int32_t e, int32_t f);
+#define orig_obj_init_common \
+    ((AM2_ObjInitCommonFn)(uintptr_t)ADDR_OBJ_INIT_COMMON)
 
 #endif /* AM2_OBJTYPE_H */

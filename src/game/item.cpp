@@ -1277,13 +1277,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn2)(void *obj);
 #define orig_item_teardown_early \
             ((AM2_ObjOnlyFn2)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
 
-/* Still original: the common object initialiser, eight callers across the
- * type makers. */
-typedef void (__cdecl *AM2_ObjInitFn)(void *obj, void *dir, int32_t type,
-                                      uint32_t pt, const char *name,
-                                      int32_t e, int32_t f);
-#define orig_obj_init_common ((AM2_ObjInitFn)(uintptr_t)ADDR_OBJ_INIT_COMMON)
-
 /* 0x00435550, five callers -- the maker LoadType7 uses, and the one that
  * refuses a thirty-third kind-7 object.
  *
@@ -1321,8 +1314,8 @@ void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
     *(o + OBJ_OFF_ARMY)             = (uint8_t)army;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = 1;
 
-    orig_obj_init_common(o, (void *)(uintptr_t)ADDR_DIR_SCRATCH, 7, pt,
-                         (const char *)AM2_IMAGE(ADDR_STR_EMPTY), e, f);
+    orig_obj_init_common(o, (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 7, pt,
+                         (const int32_t *)AM2_IMAGE(ADDR_KIND7_BOX), e, f);
 
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
         *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_KIND7_FUSE_MS;
@@ -1876,6 +1869,112 @@ void __cdecl ObjSetRoachFootprint(void *obj)
     }
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+}
+
+/* The image's own LCG, and it must be: the roach's stagger draws from the
+ * same sequence as everything else in the process that calls it, so libc's
+ * would diverge on the first roach.
+ *
+ * THIS FILE ALREADY HAD THIS MACRO, 1700 lines further down and spelled
+ * differently -- AM2_IMAGE where the new one had a plain cast. The compiler
+ * caught the redefinition, which nothing else would have: the two expansions
+ * agree in the game, where the slide is zero, and differ under
+ * tests/loadimage.h, where it is not. Moved up here so there is one. */
+typedef int32_t (__cdecl *AM2_GameRandFn)(void);
+#define orig_game_rand ((AM2_GameRandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* CreateRoach -- original 0x0043CDD0, two callers: LoadType8, which rebuilds
+ * a saved roach, and the spawner at 0x00420B33, which makes a fresh one.
+ *
+ * ITS EIGHT CONSTANTS ARE NAMED BY THE GAME'S OWN DATA RATHER THAN BY ME.
+ * DefGameParse stores the ROACH_* keywords into eight consecutive dwords and
+ * aai/game.aai lists them in that order with the image's own default values,
+ * so ADDR_ROACH_HEIGHT and ADDR_ROACH_HEALTH are the file's words. Only two
+ * of the eight are read here; the armour, damage and the four velocity and
+ * acceleration terms are consumed further in.
+ *
+ * THE TWO CALL SITES DISAGREE ABOUT EVERY ARGUMENT BUT THE NAME, which is
+ * what makes the signature readable at all: the spawner passes kind 0, flags
+ * 0 and a zero uid where LoadType8 passes the saved record's kind, the saved
+ * flags and the saved uid. A parameter that is a literal at one site and a
+ * field at the other is a parameter, not a constant.
+ *
+ * Two writes are redundant and both are reproduced. The flags word is READ
+ * before it is OR'd, and the facing byte is written zero, immediately after a
+ * memset that has already zeroed all 0x560 bytes. The original does both; a
+ * reconstruction that dropped them would be tidier and would differ.
+ *
+ * The deadline at OBJ_OFF_FIELD_FC is the clock plus a random 0..499, so two
+ * roaches created in the same frame do not act in lockstep. It is the game's
+ * own rand, not ours -- the LCG in the statically linked CRT -- so the
+ * sequence is shared with everything else that draws from it and a
+ * reconstruction calling libc's would diverge on the first roach.
+ *
+ * The footprint is laid down only when ADDR_STATE_ENTERED is clear. On a
+ * load that flag is set, and LoadType8 clears OBJ_FLAG_FOOTPRINT_ON on the
+ * way out instead so a later pass puts it down -- the two halves of one
+ * decision, in two functions. */
+void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
+                          int32_t army, int32_t flags, int32_t a7, int32_t uid)
+{
+    uint8_t  *o    = (uint8_t *)am2_malloc(AM2_ROACH_BYTES);
+    uint32_t  at   = (uint32_t)(uint16_t)(int16_t)x
+                   | ((uint32_t)(uint16_t)(int16_t)y << 16);
+    uint8_t  *rows;
+
+    memset(o, 0, AM2_ROACH_BYTES);
+
+    /* Both already zero from the memset; the original writes them anyway. */
+    *(uint8_t *)(o + OBJ_OFF_FACING) = 0;
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
+        (uint32_t)flags | OBJ_FLAG_BIT0 | OBJ_FLAG_BIT4 | OBJ_FLAG_BIT5;
+
+    *(int8_t *)(o + OBJ_OFF_ARMY)      = (int8_t)army;
+    *(int32_t *)(o + VEHICLE_OFF_KIND) = kind;
+
+    /* Index 0 of the block, which aai/game.aai calls ROACH_HEIGHT; read as a
+     * byte out of a dword that ships 32. */
+    *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
+        *(const int8_t *)AM2_IMAGE(ADDR_GAME_CONSTANTS);
+    *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+        *(const int16_t *)AM2_IMAGE(ADDR_ROACH_HEALTH);
+    SetMaxHealth(o, *(const int32_t *)AM2_IMAGE(ADDR_ROACH_HEALTH));
+    *(int16_t *)(o + OBJ_OFF_HEALTH) =
+        *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+
+    *(int32_t *)(o + OBJ_OFF_RANK) = 7;
+    *(int32_t *)(o + OBJ_OFF_FIELD_FC) =
+        (int32_t)(orig_game_rand() % AM2_ROACH_STAGGER_MS)
+        + *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    orig_obj_init_common(o, name, 8, at,
+                         (const int32_t *)AM2_IMAGE(ADDR_ROACH_BOX), a7, uid);
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
+                (const void *)AM2_IMAGE(ADDR_ROACH_ROW_SPEC), x, y,
+                (const void *)AM2_IMAGE(ADDR_ROACH_BOX));
+
+    if ((flags & (int32_t)OBJ_FLAG_DESTROYED) != 0)
+        SubrecHideRows(o + OBJ_OFF_SUBRECORD);
+
+    PtrListPush(((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army],
+                *(void **)(o + 4));
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+        (const void *)(uintptr_t)ADDR_ROACH_ANIMS;
+    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROACH_ROW_FIELD26;
+    *(uint32_t *)rows |= ROW_FLAG_BIT8;
+
+    *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 1;
+    *(uint8_t *)(o + OBJ_OFF_FIELD_540)   = 0;
+
+    SetAnimFrame(rows, *(const int16_t *)AM2_IMAGE(ADDR_ROACH_START_FRAME), 0);
+    SetObjField530(o, 1);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTERED == 0)
+        ObjSetRoachFootprint(o);
+
+    return o;
 }
 
 /* ObjClearRoachFootprint -- original 0x0043CA00, three callers, one of them
@@ -3503,7 +3602,6 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
 typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
                                         int32_t dir, int32_t height);
-#define orig_game_rand ((int32_t (__cdecl *)(void))AM2_IMAGE(ADDR_GAME_RAND))
 #define orig_clear_footprint \
     ((AM2_ObjOnlyFn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
 
@@ -8105,6 +8203,8 @@ void item_install(void)
     patch_replace(ADDR_OBJ_SET_ROACH_FOOTPRINT,
                   (const void *)ObjSetRoachFootprint,
                   "ObjSetRoachFootprint", 6);
+    patch_replace(ADDR_CREATE_ROACH, (const void *)CreateRoach,
+                  "CreateRoach", 2);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,

@@ -219,6 +219,14 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
  * Was ADDR_ROACH_STEP_TAIL_B, a role name from one call site. */
 void __cdecl ObjSetRoachFootprint(void *obj);
 
+/* 0x0043CDD0, two callers -- LoadType8 and the spawner at 0x00420B33.
+ * Allocate a roach, seed it from the ROACH_* constants aai/game.aai names,
+ * run the common init and the row set, and lay its footprint down unless the
+ * state has already been entered. */
+void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
+                          int32_t army, int32_t flags, int32_t a7,
+                          int32_t uid);
+
 void __cdecl ObjClearRoachFootprint(void *obj);
 
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,

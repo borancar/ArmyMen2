@@ -9599,10 +9599,51 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_LOAD_TYPE8       0x0043CB60u  /* reconstructed */
 /* 0x0043CDD0. What LoadType8 builds its roach with. Eight arguments, the same
  * shape ADDR_CREATE_ITEM has for LoadType1. Name from that one use. */
-#define ADDR_CREATE_ROACH     0x0043CDD0u
-/* The scale LoadType8 hands ADDR_SET_MAX_HEALTH, the same kind of value
- * RANK_REC_OFF_SCALE supplies elsewhere. */
-#define ADDR_ROACH_HEALTH_SCALE 0x00487BACu  /* int32_t */
+#define ADDR_CREATE_ROACH     0x0043CDD0u  /* reconstructed */
+/* The allocation, and the two literals in its body. The stagger is added to
+ * ADDR_GAME_CLOCK_MS, which is milliseconds, so two roaches made in one frame
+ * come due up to half a second apart. AM2_KIND7_FUSE_MS is 0x3E8 as well and
+ * is a different thing in a different struct -- that one is a deadline in an
+ * object, this one is a plain field in a ROW. */
+#define AM2_ROACH_BYTES         0x560u
+#define AM2_ROACH_STAGGER_MS    0x1F4   /* rand() % this, added to the clock */
+#define AM2_ROACH_ROW_FIELD26   0x3E8   /* int16, into ROW_OFF_FIELD_26 */
+/* Bit 8 of a ROW's flags word, which CreateRoach sets with `or dh, 1`. Only
+ * the write is identified: the sixteen byte-wide readers of bit 8 in the
+ * image test whatever happens to be in `ah`, and pinning which of them hold a
+ * row's flags is not done. Named for the bit, not for a meaning it has not
+ * been shown to have -- the same standing as OBJ_FLAG_BIT8 beside it. */
+#define ROW_FLAG_BIT8            0x100u
+/* THE EIGHT ROACH CONSTANTS ARE NAMED BY THE GAME'S OWN DATA. DefGameParse
+ * stores the ROACH_* keywords into the eight consecutive dwords at
+ * ADDR_GAME_CONSTANTS, and aai/game.aai lists them in that order with the
+ * image's own compiled-in defaults -- HEIGHT 32, HEALTH 60, ARMOR 2,
+ * DAMAGE 16, FORVEL 130, REVVEL 80, FORACC 100, REVACC 80, eight for eight.
+ * So the block needs no guessing, and the two entries anything here reads
+ * are named. The other six get no name until something reads them: an
+ * unused name is a second name waiting to happen, which is what the two the
+ * alias ratchet rejected turned out to be.
+ *
+ * 0x00487BAC went in as ADDR_ROACH_HEALTH_SCALE, from CreateRoach handing it
+ * to SetMaxHealth beside a comment about RANK_REC_OFF_SCALE. It is not a
+ * scale: the file calls it ROACH_HEALTH and the value is 60, which is the
+ * health itself. The same dword is read as a word straight into the
+ * max-health field two instructions earlier, which is the second thing
+ * saying so. ADDR_ROACH_ARMOUR at 0x00487BB0 was already right, read off the
+ * subtraction every roach hit goes through -- the data spells it ARMOR and
+ * the existing spelling stays, because renaming a correct name to match a
+ * data file is churn.
+ *
+ * ADDR_GAME_CONSTANTS is index 0 of the block AND the ROACH_HEIGHT dword, so
+ * CreateRoach reads its height through the base rather than through a second
+ * name for the same address. */
+#define ADDR_ROACH_HEALTH       0x00487BACu  /* int32_t; block index 1 */
+#define ADDR_ROACH_BOX          0x00487BC8u  /* AM2_Rect */
+/* One ADDR_BUILD_ROW_SET spec -- x, y, w, h = -48, -48, 96, 96 -- and the
+ * frame SetAnimFrame starts the roach on. The dword at 0x00487BF8 is 81 as
+ * well and nothing here reads it, so it stays unnamed. */
+#define ADDR_ROACH_ROW_SPEC     0x00487BE8u  /* int32_t[4] */
+#define ADDR_ROACH_START_FRAME  0x00487BFCu  /* int16_t */
 /* The object's OWN pointer list, three dwords, which LoadType8 clears so a
  * loaded roach starts with an empty one. */
 #define OBJ_OFF_PTR_LIST      0xA4u
@@ -10300,7 +10341,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_RECORD_LISTS for the row def; +0x14 is handed to ObjInitCommon; and
  * +0x34 is written into every row's own +0x28. */
 #define AAI_OFF_DEF_INDEX          0x10u
-#define AAI_OFF_INIT_BLOCK         0x14u
+/* Named for its USE -- "the block handed to ObjInitCommon" -- until that
+ * argument was read. It is the box offsets, one AM2_Rect. */
+#define AAI_OFF_BOX                0x14u  /* int32_t[4] */
 #define AAI_OFF_OR_FLAGS           0x28u
 #define AAI_OFF_HEALTH             0x2Cu  /* int16, to max AND current */
 #define AAI_OFF_HEIGHT_ADJ         0x2Eu  /* int8 */
@@ -10311,9 +10354,35 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the common init, health, the row set, and a post-move. NINE arguments and
  * the ninth is never read. */
 #define ADDR_INIT_OBJ_FROM_AAI     0x00433880u
-#define ADDR_OBJ_INIT_COMMON       0x00429940u  /* void(obj,dir,type,pt,name,
-                                                 *      int32,int32), 8 callers */
-#define ADDR_STR_EMPTY             0x00487420u  /* "" */
+/* TWO OF THIS PROTOTYPE'S SEVEN PARAMETERS WERE NAMED WRONG, AND THE WRONG
+ * NAMES HAD BEEN COPIED INTO TWO PRIVATE TYPEDEFS THAT DISAGREED WITH EACH
+ * OTHER. It read (obj, dir, type, pt, name, int32, int32); item.cpp declared
+ * arg2 `void *dir` and arg5 `const char *name`, objtype.cpp declared arg2
+ * `int32_t a` and arg5 `const void *blk`. The body settles both:
+ *
+ *   arg2 is the NAME. It is tested for null, tested for empty, and passed to
+ *   _strlwr at 0x0046D7D6 -- none of which a direction survives.
+ *   arg5 is the BOX OFFSETS, one AM2_Rect. Its four int32 go verbatim into
+ *   OBJ_OFF_BOX_OFFSETS, and the same four translated by the position go into
+ *   the hit box at +0x30, which is the pair tools/objdump.py already prints.
+ *
+ * arg3 is the object type, written to the object's first dword; CreateRoach
+ * passes 8. Read a shared callee's parameters out of its own body -- a name
+ * taken from one call site propagates into every private typedef that copies
+ * it, and a second private typedef is a second place to be wrong. The single
+ * corrected typedef is in src/game/objtype.h. 8 callers. */
+#define ADDR_OBJ_INIT_COMMON       0x00429940u  /* void(obj,name,type,pt,box,
+                                                 *      int32,int32) */
+/* NOT THE EMPTY STRING, WHICH IS WHAT IT WAS CALLED FOR AS LONG AS ONLY THE
+ * WRONG PROTOTYPE READ IT. MakeKind7 hands it to ObjInitCommon's fifth
+ * argument, and that argument is the box offsets -- so the four int32 here,
+ * (0, 0, 1, 1), are a 1x1 box at the origin and the leading zero byte that
+ * made it look like "" is the box's own first coordinate.
+ *
+ * Third name settled by one function this batch, and all three the same
+ * mistake: a global named from what its bytes resemble, or from one call
+ * site, rather than from the code that reads it. */
+#define ADDR_KIND7_BOX             0x00487420u  /* int32_t[4] */
 #define AM2_KIND7_FUSE_MS          0x3E8   /* clock + this into OBJ_OFF_DEADLINE_58 */
 #define AM2_KIND7_MAX              0x20
 /* The 0x94 MakeKind7 allocates is AM2_ITEM_HEADER_BYTES, further down and

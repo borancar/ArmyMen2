@@ -653,12 +653,7 @@ int32_t __cdecl AddAaiRecord(void *rec)
     return slot;
 }
 
-typedef void (__cdecl *AM2_ObjInitCommonFn)(void *obj, int32_t a, int32_t b,
-                                            int32_t at, const void *blk,
-                                            int32_t e, int32_t f);
 typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
-#define orig_obj_init_common \
-    ((AM2_ObjInitCommonFn)(uintptr_t)ADDR_OBJ_INIT_COMMON)
 #define orig_obj_after_move \
     ((AM2_ObjAfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
 
@@ -697,7 +692,7 @@ typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
  * writes the same constant into every row. Nothing in the loop can change
  * either; written as the plain loop that means.
  */
-int32_t __cdecl InitObjFromAai(void *obj, int32_t a2, int32_t army,
+int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
                                int32_t a7, int32_t a8, int32_t)
 {
@@ -716,8 +711,8 @@ int32_t __cdecl InitObjFromAai(void *obj, int32_t a2, int32_t army,
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
         (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
 
-    orig_obj_init_common(o, a2, 1, (int32_t)at, rec + AAI_OFF_INIT_BLOCK,
-                         a7, a8);
+    orig_obj_init_common(o, name, 1, (int32_t)at,
+                         (const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
 
     *(const void **)(o + OBJ_OFF_FIELD_94) = rec;
 
