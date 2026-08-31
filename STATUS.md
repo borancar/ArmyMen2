@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d253ee1`. Working tree clean.
+Last updated: **2026-08-31**, at `a1c7873`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted. **1,284 patches.**
+
+**`ROACHCTL_OFF_*` was my own invented record and it is withdrawn.**
+`RoachStepAllowed`'s second argument is not a control record: `StepType8`
+passes `obj + OBJ_OFF_FIELD_540`, so every offset I named one batch ago is an
+object field that already had a name -- `+0x14` is `OBJ_OFF_DEATH_STATE`.
+
+`ROACHCTL_OFF_STOP` was the worst of the three: "1 means do not move at all"
+is a guess off one branch, and 1 is what `StepType8` writes while the roach is
+ALIVE and what `DamageRoach` replaces with 5 or 6 on death. The field is a
+state; what the branch does with it is skip the speed arms, and why is not
+established.
+
+No new patch: every address is unchanged and only the meaning-claims are
+withdrawn.
 
 **`RegionSolvePair` (`0x00438300`)**, declined one commit ago as wanting a
 fresh reading, and given one. Solve the route between two regions and record it

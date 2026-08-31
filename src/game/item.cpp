@@ -2237,9 +2237,17 @@ mark:
  * The here-weight is clamped UP to AM2_ROACH_WEIGHT_FLOOR before the compare,
  * so a completely clear cell still demands 30 of the destination.
  *
- * A stopped record -- ROACHCTL_OFF_STOP == 1 -- skips the speed arms entirely
- * and leaves the speed at zero, which then returns 0 after the turn has
- * already been written. So a stopped roach still turns.
+ * ITS SECOND ARGUMENT IS A WINDOW INTO THE OBJECT, not a record of its own.
+ * StepType8 passes `obj + OBJ_OFF_FIELD_540`, so +0x14 is OBJ_OFF_DEATH_STATE
+ * -- 1 while alive, 5 or 6 once DamageRoach has killed it. This was called a
+ * "control record" with a STOP field one batch ago, which was a second name
+ * for fields that already had one and a meaning guessed off one branch. What
+ * the branch does is skip the speed arms when the state is 1; WHY is not
+ * established, and the comment no longer pretends it is.
+ *
+ * That arm leaves the speed at zero and returns 0 -- but only AFTER the turn
+ * has been written through the third argument. So the caller still gets a
+ * turn out of a call that answers no.
  */
 int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
 {
@@ -2252,8 +2260,8 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
     uint8_t         facing;
     uint32_t        at;
 
-    if (*(const int32_t *)(c + ROACHCTL_OFF_STOP) != 1) {
-        int32_t reverse = *(const int32_t *)(c + ROACHCTL_OFF_REVERSE);
+    if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
+        int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
         double  delta   = (double)*(const float *)
                               (uintptr_t)ADDR_FRAME_DELTA_SEC;
 
@@ -2282,7 +2290,7 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
         return 0;
 
     *turn = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                       *(const uint8_t *)(c + ROACHCTL_OFF_FACING));
+                       *(const uint8_t *)(c + ROACHSTEP_OFF_FACING));
     *turn = Clamp(*turn, -1, 1);
 
     cur = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
@@ -4996,7 +5004,12 @@ void __cdecl NextInventorySlot(void *obj)
 }
 
 
-typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *facing);
+/* Its second argument is `obj + OBJ_OFF_FIELD_540` and the FAMILY reads more
+ * than a byte through it -- 0x0043D5B0 tests +0x14 as an int32, which is the
+ * object's OBJ_OFF_DEATH_STATE. `uint8_t *facing` was a type off one use, the
+ * same shape of mistake as ObjInitCommon's `dir`. Spelled as the pointer it
+ * is; the callers pass exactly what they passed before. */
+typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *step);
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
 #define orig_roach_alive_a \
     ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_ALIVE_STEP_A)

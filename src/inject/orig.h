@@ -10046,9 +10046,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and answer whether the mask weight there is at least what it is here.
  * Reconstructed. */
 #define ADDR_ROACH_STEP_ALLOWED 0x0043D0F0u  /* int32(obj, ctrl, int32 *turn) */
-#define ROACHCTL_OFF_FACING     0x00u  /* uint8_t, what to turn towards */
-#define ROACHCTL_OFF_STOP       0x14u  /* 1 means do not move at all */
-#define ROACHCTL_OFF_REVERSE    0x18u  /* non-zero backs up */
+/* THE SECOND ARGUMENT IS NOT A RECORD OF ITS OWN AND THESE NAMES CLAIMED IT
+ * WAS. StepType8 passes `obj + OBJ_OFF_FIELD_540`, so the "control record" is
+ * a window into the object and every offset here is an object field twelve
+ * hundred bytes in: +0x00 is OBJ_OFF_FIELD_540, +0x14 is OBJ_OFF_DEATH_STATE
+ * and +0x18 is the dword after it. Named ROACHCTL_OFF_* one batch ago, which
+ * is a second name for fields that already had one -- my own mistake, of
+ * exactly the kind this file catalogues.
+ *
+ * ROACHCTL_OFF_STOP was the worst of the three. It said "1 means do not move
+ * at all", which is a guess off one branch; 1 is what StepType8 writes while
+ * the roach is ALIVE and what DamageRoach replaces with 5 or 6 on death, so
+ * the field is a state and 1 is the living value. What the branch does with it
+ * is skip the speed arms; WHY is not established and the name no longer
+ * pretends otherwise.
+ *
+ * The pointer form is kept because the original takes two pointers and four
+ * callers pass them; only the meaning-claims are withdrawn. */
+#define ROACHSTEP_OFF_FACING    0x00u  /* = OBJ_OFF_FIELD_540 */
+#define ROACHSTEP_OFF_STATE     0x14u  /* = OBJ_OFF_DEATH_STATE; 1 is alive */
+#define ROACHSTEP_OFF_FLAG18    0x18u  /* the dword after it; picks the arm */
 #define AM2_ROACH_TURN_HOLD_MS  0x64   /* a turn within this of the last is
                                         * refused */
 #define AM2_ROACH_WEIGHT_FLOOR  0x1E   /* the here-weight is clamped up to it */
