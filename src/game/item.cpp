@@ -7013,6 +7013,80 @@ void __cdecl ToggleSelect(void *obj)
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+typedef int32_t (__cdecl *AM2_VehicleBlockFn)(void *veh, int32_t facing,
+                                              uint32_t at, int32_t unused);
+#define orig_vehicle_block_weight \
+    ((AM2_VehicleBlockFn)(uintptr_t)ADDR_VEHICLE_BLOCK_WEIGHT)
+
+/* NearestClearVehiclePoint -- original 0x0045B930, one caller. The same square
+ * spiral NearestClearPoint above walks, asking a different question at each
+ * point: can THIS VEHICLE stand here facing that way?
+ *
+ * The two are the same loop to the instruction -- the same ADDR_SPIRAL_STEP
+ * table, the same sixteen units a step, the same leg growing every second
+ * turn, the same sixteen-bit adds onto the packed point, and the same absence
+ * of any give-up. What differs is only the test: NearestClearPoint asks
+ * BlockWeightAt for a point with no object, and this asks
+ * ADDR_VEHICLE_BLOCK_WEIGHT for a vehicle of a particular kind at a particular
+ * facing, accepting anything under AM2_VEHICLE_CLEAR_WEIGHT.
+ *
+ * THE FACING IS ROUNDED TO THIRTY-TWO, NOT TO THE SPRITE'S COUNT.
+ * `RoundTo8(facing, 5)` with the 5 a literal -- where MoveStepPoint asks the
+ * animation how many directions it has. So the fit is tested against a coarser
+ * circle than the thing is drawn on, which is the original's and is worth
+ * noticing before assuming the two agree.
+ *
+ * AND IT CANNOT FAIL EITHER. The bounds test only skips the weight test for a
+ * point outside the map; it does not end the walk. What stops this running for
+ * ever on a crowded map is the same thing that stops the other -- the step
+ * arithmetic is sixteen bits, so a long enough walk wraps the coordinate.
+ */
+void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
+                                      void *outPt)
+{
+    AM2_Point *out = (AM2_Point *)outPt;
+    int32_t    dir = 0;
+    int32_t    step = 0;
+    int32_t    leg = 1;
+    int32_t    grew = 0;
+    uint8_t    snapped;
+
+    snapped = (uint8_t)RoundTo8(facing & 0xFF, AM2_VEHICLE_FACING_BITS);
+    *(uint32_t *)out = from;
+
+    for (;;) {
+        const uint8_t *entry;
+
+        if (PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT), out)
+            && orig_vehicle_block_weight(veh, snapped,
+                                         *(const uint32_t *)out, 0)
+               < AM2_VEHICLE_CLEAR_WEIGHT)
+            return;
+
+        if (++step >= leg) {
+            step = 0;
+            if (++dir > 3)
+                dir = 0;
+            if (grew) {
+                leg++;
+                grew = 0;
+            } else {
+                grew = 1;
+            }
+        }
+
+        entry = (const uint8_t *)AM2_IMAGE(ADDR_SPIRAL_STEP)
+                + (uint32_t)dir * AM2_SPIRAL_STEP_STRIDE;
+
+        out->x = (int16_t)(out->x
+                           + (int16_t)((int16_t)*(const int16_t *)entry
+                                       << AM2_SPIRAL_STEP_SHIFT));
+        out->y = (int16_t)(out->y
+                           + (int16_t)((int16_t)*(const int16_t *)(entry + 4)
+                                       << AM2_SPIRAL_STEP_SHIFT));
+    }
+}
+
 /* NearestClearPoint -- original 0x004579C0, two callers. Walk a square spiral
  * out from `from` until a point is both inside the map and passable, and write
  * it back through `out`. The name is ours, from the body.
@@ -7787,6 +7861,9 @@ void item_install(void)
                   "SetObjContext", 3);
     patch_replace(ADDR_NEAREST_CLEAR_POINT, (const void *)NearestClearPoint,
                   "NearestClearPoint", 2);
+    patch_replace(ADDR_NEAREST_CLEAR_VEHICLE_POINT,
+                  (const void *)NearestClearVehiclePoint,
+                  "NearestClearVehiclePoint", 1);
     patch_replace(ADDR_WALK_CELL_AT_POINT, (const void *)WalkCellAtPoint,
                   "WalkCellAtPoint", 2);
     patch_replace(ADDR_WEAPON_FRAME_READY, (const void *)WeaponFrameReady,

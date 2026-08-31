@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `676323f`. Working tree clean.
+Last updated: **2026-08-31**, at `5aa3774`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,250 patches.**
+Nothing uncommitted. **1,251 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3014,16 +3014,43 @@ commit -- gave the right answer every time it was used.
   all, so none of that is evidence about the arithmetic. Said plainly rather
   than left to read as coverage.
 
+- **`NearestClearVehiclePoint`** (`0x0045B930`) is the FOURTH spiral and
+  `NearestClearPoint`'s twin -- the same loop to the instruction, asking a
+  different question at each point: can THIS VEHICLE stand here facing that
+  way?
+
+  Same `ADDR_SPIRAL_STEP` table, same sixteen units a step, same leg growing
+  every second turn, same sixteen-bit adds, same absence of any give-up. What
+  differs is only the test: `BlockWeightAt` for a point with no object there,
+  `ADDR_VEHICLE_BLOCK_WEIGHT` for a vehicle at a facing here, accepting under
+  `AM2_VEHICLE_CLEAR_WEIGHT`.
+
+  **The facing is rounded to THIRTY-TWO, not to the sprite's count.**
+  `RoundTo8(facing, 5)` with the 5 a literal -- where `MoveStepPoint` asks the
+  animation how many directions it has. So the fit is tested against a coarser
+  circle than the thing is drawn on. Worth noticing before assuming the two
+  agree; it is the original's.
+
+- **Four spirals now, and the tally is worth keeping.** `NearestAllowedTile`
+  and `SettlePointInRegion` walk in TILES with `ADDR_SPIRAL_DX`/`DY`;
+  `NearestClearPoint` and this one walk in WORLD UNITS with
+  `ADDR_SPIRAL_STEP`. Two tables, four implementations, one algorithm --
+  which is why "grep for the SHAPE" earns its place beside "grep for the
+  address and the name".
+
+  Cold: 0 calls against `NearestClearPoint`'s 8 on the same drive, for the
+  reason the vehicle band always is.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,096 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,250
+line (0x0045C000) patched**. Measured: **1,097 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,251
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-six batches have gone in and the 143 entries outstanding start at 48
+small ones in batches. Ninety-seven batches have gone in and the 142 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

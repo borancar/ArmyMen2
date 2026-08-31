@@ -2817,7 +2817,8 @@ exact oracle**, however meaningful it is when it is set.
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
   `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`,
-  `RoachMaskWeight`, `AiHitReact`, `PlanPathTo`, and `RefreshScreen` —
+  `RoachMaskWeight`, `AiHitReact`, `PlanPathTo`, `NearestClearVehiclePoint`,
+  and `RefreshScreen` —
 
   **`RoachMaskWeight` is the one whose drive is IDENTIFIED**, which is worth
   more than another entry on this list. `bootcamp` issues no `createroach`;

@@ -5882,6 +5882,18 @@ typedef struct {
 #define AM2_SPIRAL_STEP_SHIFT    4    /* dx << 4 == 16 world units */
 /* 0x004579C0, two callers. Reconstructed. */
 #define ADDR_NEAREST_CLEAR_POINT 0x004579C0u  /* void(uint32 from, AM2_Point*) */
+/* 0x0045B930, one caller. The same spiral for a VEHICLE: walk out until the
+ * vehicle can stand at the point facing the way it faces. Reconstructed. */
+#define ADDR_NEAREST_CLEAR_VEHICLE_POINT 0x0045B930u /* void(veh, facing,
+                                                      *      uint32, pt *) */
+/* 0x0045BC70, three callers. How blocked is that vehicle at that point facing
+ * that way -- the vehicle counterpart of ADDR_ROACH_MASK_WEIGHT, and it reads
+ * VEHICLE_OFF_KIND off its first argument. Nothing in it says what it is; the
+ * name is from what its callers do with the answer. */
+#define ADDR_VEHICLE_BLOCK_WEIGHT 0x0045BC70u /* int32(veh, facing, uint32,
+                                               *       int32) */
+#define AM2_VEHICLE_CLEAR_WEIGHT  0x1E  /* below this and the vehicle fits */
+#define AM2_VEHICLE_FACING_BITS   5     /* the facing is rounded to 32 */
 #define AM2_BLOCK_CLEAR          0x0F  /* a weight below this is passable */
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
