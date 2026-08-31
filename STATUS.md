@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `5aa3774`. Working tree clean.
+Last updated: **2026-08-31**, at `0f4fb8a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,251 patches.**
+Nothing uncommitted. **1,252 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3041,16 +3041,56 @@ commit -- gave the right answer every time it was used.
   Cold: 0 calls against `NearestClearPoint`'s 8 on the same drive, for the
   reason the vehicle band always is.
 
+- **`PeerShouldNack`** (`0x00402C30`) decides whether a NACK goes out for a
+  sequence number or whether one has gone recently enough. It NAMES ITSELF
+  twice -- "Nacking %6d to %x ..." and " Nack Rec Array full for ID %x, %d" --
+  and the first names four of the peer's fields as well, so this one needed no
+  guessing.
+
+  **The rate limit is the measured latency, capped.** Two running sums over
+  their counts give the INTERVAL and the LATENCY, and the log prints both the
+  capped value as `nackinterval` and the uncapped one as `Latency`, which is
+  how the two are told apart. The divisors differ and both are reproduced:
+  `n - 1` for the interval and `n` for the latency -- one averages over the
+  GAPS between samples and the other over the samples.
+
+  **A sequence not seen before is appended and the answer is a guess**: the
+  new record's count starts at 1 or 0 by whether `PEER_OFF_FIELD_40` is below
+  half of `PEER_OFF_FIELD_38`, and that same flag is returned. So the FIRST
+  nack for a sequence rides on a ratio between two fields nothing here
+  identifies, and every later one on the clock.
+
+  **The array never grows past fifty-nine and the last slot is reused**: the
+  count is incremented, tested, and decremented back with a message -- so a
+  peer missing sixty distinct sequences overwrites slot 59 for ever.
+
+- **Two candidates DECLINED this batch, with the reasons written down.**
+  `0x0040F640` (`CommRemovePlayer`) compacts the four player slots field by
+  field and one of the six tail copies goes the wrong way -- reading
+  `slot[n]+0x6C` and writing `slot[n-1]+0x6C`. That is either a bug in the
+  original or a misreading, it is multiplayer-only so nothing here could tell
+  which, and a silent error would ship. `0x00448280` is the multiplayer weapon
+  respawn, whose eight-argument `CreateWeapon` call would have to be derived
+  with no way to check it. Both are uncertainty rather than scope, which is
+  the kind of decline this file says to revisit.
+
+- **The import side moved.** `docs/boundary.md` goes from 109 reconstructed
+  functions to 110 and KERNEL32 from 72 to 73: the `GetTickCount` this reads
+  was counted as incidental game logic and is now inside reconstructed code.
+  Reached through the IAT slot the original calls through rather than by
+  importing the symbol, which is both faithful and what keeps `air.cpp` on the
+  flat side of the split.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,097 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,251
+line (0x0045C000) patched**. Measured: **1,098 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,252
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-seven batches have gone in and the 142 entries outstanding start at 48
+small ones in batches. Ninety-eight batches have gone in and the 141 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -2969,6 +2969,41 @@
 #define COMM_OFF_PLAYERS         0x218u
 #define COMM_PLAYER_STRIDE       112u
 #define COMM_OFF_VERBOSE         0x418u   /* non-zero: log every DESTROYPLAYER */
+/* The PEER record PeerShouldNack works on -- the argument 0x004014C0 passes
+ * through, and NOT the comm object: the verbose flag it consults comes from
+ * the global at ADDR_COMM_OBJECT while everything else comes from this.
+ *
+ * FOUR OF THESE ARE NAMED BY THE PROGRAM. Its own format string reads
+ * "Nacking %6d to %x at %d  >?  %d  ( %d ) Interval = %d Latency = %d
+ * count = %d nackinterval = %d", and the arguments line up: the two running
+ * sums divided by their counts are the INTERVAL and the LATENCY, the record's
+ * third dword is the COUNT, and the capped latency is the NACKINTERVAL. */
+#define PEER_OFF_ID              0x00u   /* "%x" in both messages */
+#define PEER_OFF_INTERVAL_N      0x04u
+#define PEER_OFF_FIELD_38        0x38u
+#define PEER_OFF_FIELD_40        0x40u   /* below half of 0x38 seeds count 1 */
+#define PEER_OFF_LATENCY_N       0x30u
+#define PEER_OFF_LATENCY_SUM     0x4Cu
+#define PEER_OFF_INTERVAL_SUM    0x58u
+#define PEER_OFF_NACK_COUNT      0xB8u
+#define PEER_OFF_NACKS           0xBCu   /* {seq, time, count}[] */
+#define NACKREC_OFF_SEQ          0x00u
+#define NACKREC_OFF_TIME         0x04u
+#define NACKREC_OFF_COUNT        0x08u
+#define AM2_NACKREC_STRIDE       12u
+#define AM2_NACK_RECS_MAX        0x3C    /* 60, and the last slot is reused */
+#define AM2_NACK_INTERVAL_CAP    0xBB8   /* 3000 ms */
+/* 0x00402C30, one caller. Should a NACK go out for this sequence number?
+ * Reconstructed. */
+#define ADDR_PEER_SHOULD_NACK    0x00402C30u  /* int32(peer, uint32 seq) */
+#define ADDR_STR_NACKING         0x00473C30u
+#define ADDR_STR_NACK_FULL       0x00473C94u
+/* The IAT slot the original CALLS THROUGH for GetTickCount. Reached this way
+ * rather than by importing the symbol, for two reasons: it is what the
+ * original does -- `call dword ptr [0x0046F084]` -- and air.cpp is on the flat
+ * side of the split, where naming a Win32 declaration is what
+ * tools/checksplit.py exists to refuse. */
+#define ADDR_IAT_GET_TICK_COUNT  0x0046F084u  /* uint32_t (__stdcall *)(void) */
 /* Where the registry key and the application GUID live in the image. Neither is
  * restated here -- the game's own copies are used, as with the DirectPlay
  * CLSIDs. The GUID is {2777D2A2-89D1-11D2-A387-00C04F79DCEB}. */

@@ -61,6 +61,108 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 #define g_airFlagA   (*(int32_t *)kAirField(AIR_OFF_FLAG_A))
 #define g_airFlagB   (*(int32_t *)kAirField(AIR_OFF_FLAG_B))
 
+typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
+#define orig_get_tick_count \
+    (*(AM2_GetTickCountFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+
+/* PeerShouldNack -- original 0x00402C30, one caller. Should a NACK go out for
+ * this sequence number, or has one gone recently enough? It names itself twice
+ * -- "Nacking %6d to %x ..." and " Nack Rec Array full for ID %x, %d" -- and
+ * the first of those names four of the peer's fields as well, which is why
+ * this one needed no guessing at all.
+ *
+ * THE RATE LIMIT IS THE MEASURED LATENCY, CAPPED. Two running sums are divided
+ * by their counts: PEER_OFF_INTERVAL_SUM by INTERVAL_N minus one, and
+ * PEER_OFF_LATENCY_SUM by LATENCY_N. The latency is what a repeat must wait,
+ * capped at AM2_NACK_INTERVAL_CAP -- and the log prints BOTH the capped value
+ * (as `nackinterval`) and the uncapped one (as `Latency`), which is how the
+ * two are told apart.
+ *
+ * The two divisors are guarded differently and both are reproduced: the
+ * interval's is `n < 2 ? 1 : n - 1` and the latency's is `n < 1 ? 1 : n`. So
+ * the first averages over the GAPS between samples and the second over the
+ * samples, which is what those two quantities are.
+ *
+ * A SEQUENCE NOT SEEN BEFORE IS APPENDED AND THE ANSWER IS A GUESS. The new
+ * record's count starts at 1 or 0 by whether PEER_OFF_FIELD_40 is below half
+ * of PEER_OFF_FIELD_38, and that same flag is what the function returns. So
+ * the first nack for a sequence is sent or withheld on a ratio between two
+ * fields nothing here identifies, and every later one on the clock.
+ *
+ * THE ARRAY NEVER GROWS PAST FIFTY-NINE and the last slot is reused rather
+ * than the append refused: the count is incremented, tested against
+ * AM2_NACK_RECS_MAX, and decremented back with a message. So a peer that
+ * misses sixty distinct sequences keeps overwriting slot 59, and the record
+ * for the sixtieth is lost the moment the sixty-first arrives. The message is
+ * NOT behind COMM_OFF_VERBOSE, unlike the other one.
+ *
+ * The count is tested twice on the way into the search -- `je` and then `jle`
+ * -- so a negative count skips the loop where the first test alone would not.
+ * Written as the `> 0` the pair amounts to.
+ */
+int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq)
+{
+    uint8_t  *p   = (uint8_t *)peer;
+    uint32_t  now = (uint32_t)orig_get_tick_count();
+    uint32_t  n;
+    uint32_t  interval;
+    uint32_t  latency;
+    uint32_t  capped;
+    int32_t   count;
+    int32_t   i;
+
+    n = *(const uint32_t *)(p + PEER_OFF_INTERVAL_N);
+    interval = *(const uint32_t *)(p + PEER_OFF_INTERVAL_SUM)
+               / (n < 2 ? 1u : n - 1u);
+
+    n = *(const uint32_t *)(p + PEER_OFF_LATENCY_N);
+    latency = *(const uint32_t *)(p + PEER_OFF_LATENCY_SUM) / (n < 1 ? 1u : n);
+    capped = latency > AM2_NACK_INTERVAL_CAP ? AM2_NACK_INTERVAL_CAP : latency;
+
+    count = *(const int32_t *)(p + PEER_OFF_NACK_COUNT);
+    for (i = 0; i < count; i++) {
+        uint8_t *rec = p + PEER_OFF_NACKS + (uint32_t)i * AM2_NACKREC_STRIDE;
+
+        if (*(const uint32_t *)(rec + NACKREC_OFF_SEQ) != seq)
+            continue;
+
+        if (now <= *(const uint32_t *)(rec + NACKREC_OFF_TIME) + capped)
+            return 0;
+
+        if (*(const int32_t *)((const uint8_t *)
+                *(void *const *)(uintptr_t)ADDR_COMM_OBJECT + COMM_OFF_VERBOSE))
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_NACKING),
+                    seq, *(const uint32_t *)(p + PEER_OFF_ID), now,
+                    *(const uint32_t *)(rec + NACKREC_OFF_TIME) + capped,
+                    now - *(const uint32_t *)(rec + NACKREC_OFF_TIME) - capped,
+                    interval, latency,
+                    *(const int32_t *)(rec + NACKREC_OFF_COUNT), capped);
+
+        *(int32_t *)(rec + NACKREC_OFF_COUNT) += 1;
+        *(uint32_t *)(rec + NACKREC_OFF_TIME) = now;
+        return 1;
+    }
+
+    {
+        uint8_t *rec = p + PEER_OFF_NACKS + (uint32_t)count * AM2_NACKREC_STRIDE;
+        int32_t  first = *(const uint32_t *)(p + PEER_OFF_FIELD_40)
+                         < (*(const uint32_t *)(p + PEER_OFF_FIELD_38) >> 1);
+
+        *(uint32_t *)(rec + NACKREC_OFF_SEQ)  = seq;
+        *(uint32_t *)(rec + NACKREC_OFF_TIME) = now;
+        *(int32_t *)(rec + NACKREC_OFF_COUNT) = first ? 1 : 0;
+
+        *(int32_t *)(p + PEER_OFF_NACK_COUNT) = count + 1;
+        if (count + 1 >= AM2_NACK_RECS_MAX) {
+            *(int32_t *)(p + PEER_OFF_NACK_COUNT) = count;
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_NACK_FULL),
+                    *(const uint32_t *)(p + PEER_OFF_ID), count);
+        }
+
+        return first;
+    }
+}
+
 /* Forward-declared rather than included: ObjectsInRect lives in
  * win32/mapdraw.h because it clips with IntersectRect, and including that
  * header here would drag windows.h into a flat module. The same reason
@@ -1126,6 +1228,8 @@ void air_install(void)
                   "DoAirSupport", 3);
     patch_replace(ADDR_FIND_ENEMY_NEAR, (const void *)FindEnemyNear,
                   "FindEnemyNear", 1);
+    patch_replace(ADDR_PEER_SHOULD_NACK, (const void *)PeerShouldNack,
+                  "PeerShouldNack", 1);
     patch_replace(ADDR_AIR_BEGIN, (const void *)AirSupportBegin,
                   "AirSupportBegin", 2);
     patch_replace(ADDR_AIR_CLEAR, (const void *)AirSupportClear,

@@ -220,6 +220,11 @@ void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
 
 /* 0x00404E50. RandomPointAhead with the heading taken from another object's
  * position rather than from the way this one faces. */
+/* 0x00402C30, one caller. Should a NACK go out for this sequence number, or
+ * has one gone recently enough? Rate-limited by the peer's own measured
+ * latency, capped at three seconds. It names itself in its log lines. */
+int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
+
 void __cdecl RandomPointToward(const void *target, const void *obj,
                                int32_t dist, AM2_Point *out);
 
