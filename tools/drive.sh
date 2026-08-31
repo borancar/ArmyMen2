@@ -83,6 +83,13 @@ shot)
 ctl)
     ctl "$@"
     ;;
+objtable)
+    # Every registered object as VALUES, for an exact A/B. The port comes from
+    # here rather than from objdump.py's default so the two cannot drift, which
+    # is the same reason `ctl` above is a subcommand and not a note in a
+    # comment.
+    "$REPO/tools/objdump.py" --port "$CTLPORT" --table
+    ;;
 press)
     ctl key "$1" tap
     shot "${2:-key-$1}"

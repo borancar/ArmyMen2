@@ -70,9 +70,59 @@ def find(ctl, uid):
     raise SystemExit("uid %08x is not in the table of %d" % (uid, count))
 
 
+# What --table prints per object. Every one of these is a VALUE the game
+# computed, never a heap pointer: a dump that carried an address would differ
+# between two runs for a reason that is not a defect, which is the rule
+# tools/actdiff.py and `ctl widgets` already follow.
+TABLE_FIELDS = (
+    ("type",   0x000, "<i"),
+    ("flags",  0x008, "<I"),
+    ("army",   0x010, "<b"),
+    ("pos",    0x012, "<hh"),
+    ("tile",   0x01A, "<H"),
+    ("box",    0x020, "<iiii"),   # OBJ_OFF_BOX_OFFSETS
+    ("hit",    0x030, "<iiii"),   # OBJ_OFF_HIT_RECT
+    ("health", 0x060, "<hh"),
+    ("cells",  0x08C, "<B"),      # OBJ_OFF_CELL_COUNT
+)
+TABLE_SPAN = 0x90
+
+
+def dump_table(ctl):
+    """Every registered object, as values only. See TABLE_FIELDS.
+
+    This exists because two mutations in two commits went uncaught: the suite
+    compares pixels, a log and a widget tree, and is blind to anything whose
+    only effect is WHERE something is on the map. Taken at the Boot Camp
+    briefing the table is STATIC -- the game composes no frames while a dialog
+    is up -- so it diffs exactly between the two sides of an A/B, with no
+    budget, the way `ctl widgets` does for the menu layer.
+    """
+    count, = struct.unpack("<i", read(ctl, OBJ_COUNT, 4))
+    base, = struct.unpack("<I", read(ctl, OBJ_TABLE, 4))
+    if count <= 0 or not base:
+        raise SystemExit("the object table is empty -- has a mission loaded?")
+
+    table = read(ctl, base, count * ENTRY)
+    print("registered %d" % count)
+    for i in range(count):
+        uid, obj, _serial = struct.unpack_from("<III", table, i * ENTRY)
+        if not obj:
+            print("%08x (null)" % uid)
+            continue
+        blob = read(ctl, obj, TABLE_SPAN)
+        out = []
+        for name, off, fmt in TABLE_FIELDS:
+            vals = struct.unpack_from(fmt, blob, off)
+            out.append("%s=%s" % (name, ",".join(str(v) for v in vals)))
+        print("%08x %s" % (uid, " ".join(out)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=am2ctl.DEFAULT_PORT)
+    ap.add_argument("--table", action="store_true",
+                    help="every registered object, values only, for an A/B")
     ap.add_argument("--uid", help="hex uid; omit with --leader")
     ap.add_argument("--leader", action="store_true",
                     help="our own army's leader, from 0x00511E4C")
@@ -81,6 +131,9 @@ def main():
     args = ap.parse_args()
 
     ctl = am2ctl.Control(port=args.port)
+    if args.table:
+        dump_table(ctl)
+        return
     if args.leader:
         uid, = struct.unpack("<I", read(ctl, LEADER_UID, 4))
     elif args.uid:

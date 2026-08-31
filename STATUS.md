@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `84cf09e`. Working tree clean.
+Last updated: **2026-08-31**, at `b8f0700`. Working tree clean.
 
 ## In flight
 
@@ -2818,6 +2818,38 @@ commit -- gave the right answer every time it was used.
   Two mutations in two commits, both uncaught, and the pattern is clear: the
   suite is blind to anything whose only effect is WHERE something ends up on a
   map its pixel checks cannot compare.
+
+- **`tools/objdump.py --table`, and half a blind spot closed.** The previous
+  two commits each recorded a mutation the suite could not see, and both were
+  of the same kind: something whose only effect is WHERE an object is. The
+  pixels, the log and the widget tree between them cannot compare that.
+
+  The new mode dumps every registered object as VALUES -- type, flags, army,
+  position, tile, both box rectangles, health, cell count, and never a heap
+  pointer -- and `ab.sh bootcamp` takes it as a `state` artifact and diffs it
+  exactly, with no budget. 1,609 objects in 0.6 s.
+
+  **Taken at the BRIEFING, which is the whole design.** The game composes no
+  frames while a dialog is up, so every object is exactly where the load path
+  put it and nothing has moved; two independent runs give a byte-identical
+  dump, measured before it was wired in, which is what makes an exact diff
+  legitimate.
+
+  **Mutation-checked, and the diagnosis is the point.** Writing a scenario
+  row's x into its y moves uid 3e8 from `pos=1743,1052` to `pos=1759,1743`
+  with its hit rectangle following, and the diff names the object and the
+  field. "154,855 pixels differ" never does.
+
+  **It covers construction and NOT gameplay, and that limit is real.** Both
+  mutations that prompted it happen after the briefing and neither would be
+  caught by this either: a live table moves, so it cannot be diffed exactly.
+  What is now checked is everything the map load builds, for all 1,609
+  objects. What is still verified by pixels alone is what happens to them once
+  the mission starts.
+
+  The port comes from a new `drive.sh objtable` subcommand rather than from
+  `objdump.py`'s default, for the reason `drive.sh` gives about `ctl`: one
+  place derives it, so the two cannot drift.
 
 ## Stop condition
 

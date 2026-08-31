@@ -1177,6 +1177,28 @@ covered and unchecked. Two mutations in two commits, both uncaught, is the
 suite telling you where its blind spot is -- anything whose only effect is
 WHERE something ends up on a map the pixel checks cannot compare.
 
+**Half of that blind spot is closed now, and the half that is not is worth
+stating.** `tools/objdump.py --table` dumps every registered object as VALUES
+-- type, flags, army, position, tile, both box rectangles, health, cell count,
+and never a heap pointer -- and `ab.sh bootcamp` takes it as a `state`
+artifact and diffs it exactly, no budget. 1,609 objects in 0.6 s, and two
+independent runs give a byte-identical dump, which is what makes an exact diff
+legitimate rather than hopeful.
+
+It is taken AT THE BRIEFING and that is the whole design: the game composes no
+frames while a dialog is up, so every object is exactly where the LOAD path
+put it and nothing has moved. Mutation-checked -- writing a scenario row's x
+into its y moves uid 3e8 from `pos=1743,1052` to `pos=1759,1743` with its hit
+rectangle following, and the diff names the object and the field, which
+"154,855 pixels differ" never does.
+
+**So it covers construction and NOT gameplay.** The two mutations that started
+this both happen after the briefing, and neither would be caught by this
+either -- a live table moves, so it cannot be diffed exactly. What is now
+checked is everything the map load builds: positions, boxes, ownership, health
+and cell membership counts for all 1,609. What is still verified by pixels
+alone is what happens to them once the mission starts.
+
 **`combat`'s pixel figure is BIMODAL, and both modes are meaningless.** Four
 runs of one build gave 177,112, 716, 177,109 and 684 -- two clusters, three
 pixels apart within each. That is not noise around a mean; it is whether the

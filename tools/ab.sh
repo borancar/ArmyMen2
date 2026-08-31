@@ -341,6 +341,25 @@ play() {
         sleep 30
     fi
 
+    # THE OBJECT TABLE, and it is the answer to a blind spot this suite has had
+    # all along. The pixels, the log and the widget tree between them cannot
+    # see WHERE anything is on the map: two mutations in two commits went
+    # uncaught, one to ShotStrike's penetration branch at 13,582 calls and one
+    # that stopped NearestClearPoint spiralling at all.
+    #
+    # Taken HERE, at the Boot Camp briefing, because the game composes no
+    # frames while a dialog is up -- so all 1,609 objects are exactly where the
+    # load path put them and nothing has moved. Two independent runs give a
+    # byte-identical dump, measured before this was wired in, which is what
+    # lets it be diffed with no budget at all.
+    #
+    # Values only, never a heap pointer: type, flags, army, position, tile, the
+    # two box rectangles, health and the cell count. The same rule
+    # tools/actdiff.py and `ctl widgets` follow, for the same reason.
+    if [ "$cfg" = bootcamp ]; then
+        drive objtable 2>/dev/null > "$WORK/$cfg-$side.state" || true
+    fi
+
     if [ "$cfg" = campaign ]; then
         # SINGLE PLAYER -> the player row -> SELECT -> NEW. The recruit dialog
         # is deliberately NOT used: a name that already exists is rejected in
