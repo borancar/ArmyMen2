@@ -14,6 +14,7 @@
 #include "savetag.h"
 #include "image.h"
 #include "misc.h"   /* MeetsAllThree -- reconstructed */
+#include "msgslot.h" /* CommMustBroadcast -- reconstructed */
 #include "script.h"     /* ScriptFindName -- reconstructed */
 #include "scriptint.h"  /* kScriptNames */
 #include "army.h"   /* ObjIsFriendly -- reconstructed */
@@ -780,6 +781,11 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 struct AM2_Sprite;
 extern "C" void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
+/* DrawSprite is reconstructed too, and declared here for the same reason.
+ * Its four arguments name no Win32 type once AM2_Sprite is opaque. */
+extern "C" void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y,
+                                   int32_t mode);
+
 #define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)
 #define g_spriteListN   (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_COUNT)
 #define g_spriteListCap (*(int32_t *)(uintptr_t)ADDR_SPRITE_LIST_CAP)
@@ -1196,6 +1202,95 @@ void __cdecl ToggleFogOfWar(void)
     }
 }
 
+/* The pass queue: eight slots inside the same block the savegame section is,
+ * so they are fields rather than globals of their own. */
+#define g_airPassCount (*(int32_t *)kAirField(AIR_OFF_PASS_COUNT))
+#define g_airPassTimer ((int32_t *)kAirField(AIR_OFF_PASS_TIMER))
+#define g_airPassWhere ((int16_t *)kAirField(AIR_OFF_PASS_WHERE))
+#define g_airPassArmy  ((int16_t *)kAirField(AIR_OFF_PASS_ARMY))
+
+/* The strike itself, still original -- what a pass does when its timer runs
+ * out. Its second argument is an army: it compares it against
+ * ADDR_DEFAULT_OWNER, which is the third reading agreeing on that field. */
+typedef void (__cdecl *AM2_AirStrikeFn)(uint32_t at, int32_t army);
+#define orig_air_pass_strike \
+    ((AM2_AirStrikeFn)(uintptr_t)ADDR_AIR_PASS_STRIKE)
+
+/* AirPassesDraw -- original 0x00408E50, one caller: AirFrameDraw, first thing.
+ * Draw every pass in the sub-queue and retire the head one when its time is
+ * up.
+ *
+ * THE TWENTY SPRITES RUN TWICE, once in each half of ADDR_AIR_PASS_MS, and the
+ * first half is drawn a further AM2_AIR_PASS_LIFT higher. So a pass is an
+ * approach and a departure over the same twenty frames, and the lift is what
+ * makes the two halves look different. The original spells that as one
+ * `sub ecx, 0x72` before the branch and a second inside the near arm.
+ *
+ * IT NAMED TWO FIELDS THAT HAD BEEN NAMED FROM THE PUSH. +0x1F0 was
+ * AIR_OFF_PASS_LIVE, "written 1"; this adds the frame delta to it every frame
+ * and retires the pass when it reaches ADDR_AIR_PASS_MS, so it is a timer that
+ * happens to start at 1. +0x230 was AIR_OFF_PASS_TAG, "from 0x0042A7A0" --
+ * which is UidArmy, so the writer had already said what it was. This hands it
+ * to CommMustBroadcast, whose parameter is an army.
+ *
+ * THE MULTIPLAYER GATE IS ONE-SIDED. With no session the strike always lands;
+ * with one it lands only when CommMustBroadcast says this army is ours to
+ * report. Either way the pass is popped, so a pass belonging to someone else
+ * is drawn for its full three seconds and then quietly discarded.
+ *
+ * The original tests the count TWICE on entry, the second test unreachable
+ * after the first. Written once.
+ */
+void __cdecl AirPassesDraw(void)
+{
+    int32_t ms   = *(const int32_t *)AM2_IMAGE(ADDR_AIR_PASS_MS);
+    int32_t half = ms / 2;
+    int32_t i;
+
+    if (g_airPassCount <= 0)
+        return;
+
+    for (i = 0; i < g_airPassCount; i++) {
+        int32_t t = g_airPassTimer[i];
+        int32_t x = g_airPassWhere[i * 2]
+                    - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+        int32_t y = g_airPassWhere[i * 2 + 1]
+                    - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                    - AM2_AIR_PASS_LIFT;
+        int32_t frame;
+
+        if (t < half) {
+            frame = (t * AM2_AIR_PASS_FRAMES) / half;
+            y -= AM2_AIR_PASS_LIFT;
+        } else {
+            frame = ((t - half) * AM2_AIR_PASS_FRAMES) / half;
+        }
+
+        DrawSprite(((AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3)[frame],
+                   x, y, 0);
+
+        g_airPassTimer[i] += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    }
+
+    if (g_airPassTimer[0] < ms)
+        return;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        || CommMustBroadcast(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                             g_airPassArmy[0]))
+        orig_air_pass_strike(*(const uint32_t *)g_airPassWhere,
+                             g_airPassArmy[0]);
+
+    for (i = 1; i < g_airPassCount; i++) {
+        g_airPassTimer[i - 1]        = g_airPassTimer[i];
+        g_airPassWhere[(i - 1) * 2]     = g_airPassWhere[i * 2];
+        g_airPassWhere[(i - 1) * 2 + 1] = g_airPassWhere[i * 2 + 1];
+        g_airPassArmy[i - 1]         = g_airPassArmy[i];
+    }
+    --g_airPassCount;
+}
+
+
 void air_install(void)
 {
     patch_replace(ADDR_FORMATION_POINT, (const void *)FormationPoint,
@@ -1236,6 +1331,8 @@ void air_install(void)
                   "AirSupportClear", 1);
     patch_replace(ADDR_AIR_POP, (const void *)AirSupportPop,
                   "AirSupportPop", 2);
+    patch_replace(ADDR_AIR_PASSES_DRAW, (const void *)AirPassesDraw,
+                  "AirPassesDraw", 1);
     patch_replace(ADDR_SAVE_AIR_SECTION, (const void *)SaveAirSection,
                   "SaveAirSection", 1);
     patch_replace(ADDR_LOAD_AIR_SECTION, (const void *)LoadAirSection,

@@ -1258,6 +1258,26 @@ shot landed. Its budget is disabled for the same reason `mission`'s is, so
 there, exactly as for `mission` and `intro`. Do not read a `combat` pixel
 count as a result in either direction.
 
+**IT HAPPENED AGAIN, IN REVERSE, AND THE CONTROL WAS THE ONE SAMPLE THAT
+LIED.** `bootcamp` had read 22 pixels on every run of a long session. A batch
+landed and it read 76, twice, and once more with the new function mutated to
+return immediately -- so the body was not the cause and the diff had nothing
+else in it that could execute. One run of the PARENT commit came back at 22,
+which reads as decisive: same machine, minutes apart, one variable.
+
+Two further parent runs both read 76. The parent had moved, not the change.
+What moved with it was the machine: `uptime` had gone from 0.62 to 7.45 over
+the session, and CLAUDE.md's own note below says an unequal starve is exactly
+what that does to two halves of a run.
+
+So the rule below is symmetric and the second half is easy to forget: **give
+the control as many samples as the thing it is controlling for, in BOTH
+directions.** One clean control does not establish a regression, and one dirty
+control does not establish one either. The cheap question that settled it
+first was whether the code executes at all -- the pass count reads 0 on that
+screen and the function returns immediately -- and that should have been
+believed rather than re-litigated with screenshots.
+
 **A single clean CONTROL run does not establish a regression, and this cost
 an hour.** Two `ab.sh` runs of one build failed the frame gate on all three
 configurations with identical logs; the parent commit, run once on the same

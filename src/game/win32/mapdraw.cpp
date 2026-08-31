@@ -2005,7 +2005,6 @@ void __cdecl DrawSelection(void)
 
 /* The two air functions that stay original, both reached only from here. */
 typedef void (__cdecl *AM2_AirNoArgFn)(void);
-#define orig_air_passes_draw ((AM2_AirNoArgFn)(uintptr_t)ADDR_AIR_PASSES_DRAW)
 #define orig_air_deliver     ((AM2_AirNoArgFn)(uintptr_t)ADDR_AIR_DELIVER)
 
 /* AirFrameDraw -- original 0x00409070, one caller.
@@ -2069,7 +2068,7 @@ void __cdecl AirFrameDraw(void)
     if (!LockSurface(g_drawTarget))
         return;
 
-    orig_air_passes_draw();
+    AirPassesDraw();
 
     /* --- the caller's own animation, on AIR_OFF_FLAG_B ------------------ */
     if (*(const int32_t *)(air + AIR_OFF_FLAG_B) > 0) {

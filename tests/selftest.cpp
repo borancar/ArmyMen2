@@ -702,6 +702,14 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *, const void *)
     return 0;
 }
 
+/* air.cpp's AirPassesDraw reaches DrawSprite, in win32/sprite.cpp. Same
+ * reasoning as the stubs around it, and the same route in: this arrived by
+ * closing a seam. extern "C" to match the forward declaration air.cpp makes,
+ * which is what the widget stub above records as the trap. */
+extern "C" void __cdecl DrawSprite(void *, int32_t, int32_t, int32_t)
+{
+}
+
 /* air.cpp's sprite teardown reaches ReleaseSprite, in win32/sprite.cpp. Same
  * reasoning as the stubs above, and air.cpp arrived in SELFTEST_SRC for the
  * same reason map.cpp did: item.cpp gained a call into it, and adding the flat

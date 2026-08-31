@@ -2434,9 +2434,31 @@
 #define AIR_OFF_FROM             0x0FCu  /* uint32_t[30], the uid asking */
 #define AIR_OFF_EXTRA            0x174u  /* int32_t[30], what 0x00409680 found */
 #define AIR_OFF_PASS_COUNT       0x1ECu  /* int32_t, at most 8 */
-#define AIR_OFF_PASS_LIVE        0x1F0u  /* int32_t[8], written 1 */
+/* TWO OF THESE THREE WERE NAMED FROM THE WRITER AND ARE CORRECTED BY THE
+ * READER. AirPassesDraw is the reader, and it is the only one.
+ *
+ * +0x1F0 was AIR_OFF_PASS_LIVE, "written 1", which is all the push shows. It
+ * is a TIMER: the drawer adds ADDR_FRAME_DELTA_MS to it every frame, divides
+ * it by half of ADDR_AIR_PASS_MS to pick a sprite, and retires the pass when
+ * it reaches the whole of it. The 1 is just where it starts.
+ *
+ * +0x230 was AIR_OFF_PASS_TAG, "from 0x0042A7A0", which is UidArmy -- so the
+ * writer already said what it is and the name did not. The drawer hands it to
+ * CommMustBroadcast, whose parameter is an army, and to the strike, which
+ * compares it against ADDR_DEFAULT_OWNER. Three readings, one answer. */
+#define AIR_OFF_PASS_TIMER       0x1F0u  /* int32_t[8], ms, starts at 1 */
 #define AIR_OFF_PASS_WHERE       0x210u  /* int32_t[8], from AIR_OFF_WHERE */
-#define AIR_OFF_PASS_TAG         0x230u  /* int16_t[8], from 0x0042A7A0 */
+#define AIR_OFF_PASS_ARMY        0x230u  /* int16_t[8], from UidArmy */
+/* How long one pass takes, in milliseconds. The drawer runs the twenty
+ * ADDR_AIR_SPRITES_3 frames TWICE over it -- once in each half -- and lifts
+ * the sprite by a second AM2_AIR_PASS_LIFT during the first half, so the two
+ * halves are the approach and the departure. */
+#define ADDR_AIR_PASS_MS         0x00473F34u  /* int32_t, 3000 */
+#define AM2_AIR_PASS_FRAMES      20
+#define AM2_AIR_PASS_LIFT        0x72   /* taken off Y once, or twice */
+/* 0x00409540, 320 bytes, one caller -- what a pass does when its timer runs
+ * out. The name is descriptive; the function names itself nowhere. */
+#define ADDR_AIR_PASS_STRIKE     0x00409540u  /* void(uint32 at, int32 army) */
 #define AM2_AIR_PASS_MAX         8
 #define AIR_OFF_FLAG_A           0x240u  /* int32_t, set and cleared together */
 #define AIR_OFF_FLAG_B           0x244u  /* int32_t, with the above */

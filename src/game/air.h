@@ -207,6 +207,11 @@ void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
 int32_t __cdecl SaveAirSection(am2_FILE *fp);
 int32_t __cdecl LoadAirSection(am2_FILE *fp);
 
+/* 0x00408E50, one caller -- AirFrameDraw's first step. Draw every pass in the
+ * eight-slot sub-queue, advancing each one's timer, and retire the head pass
+ * when its timer reaches ADDR_AIR_PASS_MS. */
+void __cdecl AirPassesDraw(void);
+
 void air_install(void);
 
 #ifdef __cplusplus

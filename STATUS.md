@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `e4311b9`. Working tree clean.
+Last updated: **2026-08-31**, at `6a585d7`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,270 patches.**
+Nothing uncommitted. **1,271 patches.**
+
+**`AirPassesDraw` (`0x00408E50`)** -- draw every air-support pass in the
+eight-slot sub-queue and retire the head one when its timer runs out. The
+twenty sprites run TWICE over `ADDR_AIR_PASS_MS`, once per half, with the
+first half lifted a second `AM2_AIR_PASS_LIFT`: an approach and a departure.
+
+It named two fields that had been named from the push. `AIR_OFF_PASS_LIVE`
+("written 1") is a TIMER, and `AIR_OFF_PASS_TAG` ("from 0x0042A7A0" -- which is
+`UidArmy`) is an ARMY.
+
+**`bootcamp`'s pixel figure is 76 now, not 22, and that is the MACHINE.** The
+parent commit reads 76 as well, twice; one earlier control run at 22 is what
+made it look like a regression. `uptime` went from 0.62 to 7.45 over the
+session.
 
 **`LoadType5` (`0x0043B870`), and OBJECT TYPE 5 IS A MISSILE.** The loader
 calls `ObjInitCommon` with 5 and puts `ADDR_MISSILE_ANIMS` -- missile.ani --
@@ -3422,13 +3436,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,115 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,270
+line (0x0045C000) patched**. Measured: **1,116 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,271
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and fifteen batches have gone in and the 124 entries outstanding
+small ones in batches. A hundred and sixteen batches have gone in and the 123 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
