@@ -2929,9 +2929,39 @@
 #define SIGHT_OFF_OBSERVER     0x10u
 #define SIGHT_OFF_RANGE        0x14u
 #define SIGHT_OFF_BEARING      0x18u  /* uint8_t */
-#define SIGHT_OFF_ENABLED_30   0x30u
-#define SIGHT_OFF_MAX_RANGE    0x3Cu
-#define SIGHT_OFF_ENABLED_40   0x40u
+/* THE WEAPON BLOCK, and two of these three names were wrong for as long as
+ * they existed. They were taken from ConsiderSighting, which only TESTS them
+ * -- `if (!ctx[0x30]) return; if (!ctx[0x40]) return;` -- where a pointer and
+ * a flag both read as "enabled". That is the identical mistake orig.h already
+ * records fixing on the SIGHTC family, where +0x40 and +0x54 were ENABLED_40
+ * and ENABLED_54 until UnitWeaponInfo was read. Made twice, on neighbouring
+ * records, and caught the same way: by finding the WRITER.
+ *
+ * 0x00407D70's tail is that writer, and it settles all five:
+ *
+ *     out[0x30] = WeaponByUid(obj[0x550]);         the weapon OBJECT
+ *     if (!weapon) { out[0x34] = 0; ... return; }
+ *     out[0x34] = rec[ITEMTYPE_OFF_KIND];
+ *     out[0x38] = rec[ITEMTYPE_OFF_RANGE] * 0.75;  the range it WANTS
+ *     out[0x3C] = rec[ITEMTYPE_OFF_RANGE] * 1.1;   the range it stops at
+ *     out[0x40] = (now - weapon[0xC4]) > rec[4];   the cooldown has elapsed
+ *
+ * So ConsiderSighting's two guards mean "no weapon, no sighting" and "the
+ * weapon is not ready", which is a coherent rule the old names hid entirely.
+ *
+ * MAX_RANGE IS CONFIRMED TO THE BYTE rather than merely kept: the constant at
+ * +0x3C is ADDR_WEAPON_RANGE_HI, the same named 1.1 that UnitWeaponInfo uses
+ * to produce SIGHTC_OFF_MAX_RANGE. The low factors differ -- 0.9 there, 0.75
+ * here -- which is a real difference between the two builders and not a
+ * misreading of one. */
+#define SIGHT_OFF_WEAPON       0x30u  /* obj *, null when unarmed */
+#define SIGHT_OFF_KIND         0x34u  /* int32, ITEMTYPE_OFF_KIND */
+#define SIGHT_OFF_WANT_RANGE   0x38u  /* range * ADDR_SIGHT_RANGE_WANT */
+#define SIGHT_OFF_MAX_RANGE    0x3Cu  /* range * ADDR_WEAPON_RANGE_HI */
+#define SIGHT_OFF_READY        0x40u  /* int32, 1 when the cooldown is up */
+/* 0.75, and it has no counterpart in the SIGHTC path -- UnitWeaponInfo uses
+ * ADDR_WEAPON_RANGE_LO, which is 0.9. Named separately for that reason. */
+#define ADDR_SIGHT_RANGE_WANT  0x0046F2F8u  /* double, 0.75 */
 
 /* The rest of the SAME RECORD, which the AI arms call a context and
  * ConsiderSighting calls a sight. 0x00407D70 builds it, 0x00407F80 hands it to

@@ -2196,6 +2196,18 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
  * The absolute value is the original's `cdq; xor; sub` and the comparison is
  * on `al`, so a delta above 255 could not arise -- AngleDelta answers
  * -128..128.
+ *
+ * ITS FIRST TWO GUARDS ARE ABOUT THE WEAPON, which the field names used to
+ * hide. They were SIGHT_OFF_ENABLED_30 and _ENABLED_40, taken from THIS
+ * function, which only tests them -- and a pointer and a flag both read as
+ * "enabled". 0x00407D70 is the writer and settles both: +0x30 is the weapon
+ * object and +0x40 is whether its cooldown has elapsed. So the rule is "no
+ * weapon, no sighting" and "not while it is reloading", and the range it
+ * compares against is that weapon's range times 1.1 -- the same named
+ * constant UnitWeaponInfo uses for SIGHTC_OFF_MAX_RANGE.
+ *
+ * Nothing here changed. The code is identical and the names now say what it
+ * was always doing, which is the whole of the difference.
  */
 void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
 {
@@ -2206,9 +2218,9 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
     int32_t        range;
     int32_t        delta;
 
-    if (!*(const int32_t *)(c + SIGHT_OFF_ENABLED_30))
+    if (!*(const int32_t *)(c + SIGHT_OFF_WEAPON))
         return;
-    if (!*(const int32_t *)(c + SIGHT_OFF_ENABLED_40))
+    if (!*(const int32_t *)(c + SIGHT_OFF_READY))
         return;
 
     range = *(const int32_t *)(c + SIGHT_OFF_RANGE);
