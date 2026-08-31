@@ -181,7 +181,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 #define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
 #define orig_remove_player  (*(am2_int_fn2)ADDR_REMOVE_PLAYER)
-#define orig_lobby_reset    (*(am2_void_fn2)ADDR_LOBBY_RESET)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -323,7 +322,7 @@ static LRESULT OnSetupDone(void)
     SetFogOfWar((int32_t)((g_gameOverFlags >> 18) & 1u));
     PlayDynamicSound((const char *)(uintptr_t)ADDR_STR_ALLRIGHT_WAV,
                       0, 0, 0, 0, 0, 3, 0);
-    orig_lobby_reset();
+    BuildHudWidgets();
     CommResetStats(comm);
     CommSessionOver(comm);
     return 1;

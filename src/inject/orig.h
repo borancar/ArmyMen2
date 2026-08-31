@@ -2802,7 +2802,37 @@
  * the last frame left. WndProc's setup-done handler passes bit 18 of the game
  * flags, which makes fog a negotiated multiplayer option. */
 #define ADDR_SET_FOG_OF_WAR      0x004295C0u  /* void(int32_t noFog) */
-#define ADDR_LOBBY_RESET         0x00413480u  /* void(void), 320 bytes */
+/* 0x00413480, 320 bytes, two callers. It went in as ADDR_LOBBY_RESET, from the
+ * 0x046E setup-done handler that calls it -- and it is not a lobby anything.
+ * It is the other half of ADDR_FREE_HUD_WIDGETS: free the three HUD widgets,
+ * build three new ones. Every global it touches was already named for the HUD
+ * by whoever wrote the free half, which is what settles it, and the second
+ * caller is mission start, where it is followed by two more HUD helpers.
+ * RENAMED rather than aliased. Eighth instance of a name taken from a call
+ * site instead of a body.
+ *
+ * The three classes are unnamed and stay original, reached by address. Sizes
+ * come from the `push` in front of each operator new.
+ *
+ * ADDR_HUD_WIDGET_C is built only when ADDR_NET_GAME is CLEAR, which is
+ * independent confirmation of that global's own "may be null" comment and of
+ * the free half's note that HudPaint and HudUpdate test C and not the other
+ * two.
+ *
+ * HUD_A_OFF_CHECKBOX is a child widget, and three separate touchers say it is
+ * a CHECKBOX rather than anything else: A's constructor news one and builds it
+ * with ADDR_CHECKBOX_CTOR before handing it to WidgetAddChild; 0x004184E3
+ * independently reads the same child and gates a loop on its +0x78; and
+ * CHECK_OFF_TICKED is already 0x78, a uint8_t. So the latch around the rebuild
+ * preserves the box's TICKED state -- and only outside a net game. */
+#define ADDR_BUILD_HUD_WIDGETS   0x00413480u  /* void(void), 320 bytes */
+#define ADDR_HUD_A_CTOR          0x00417580u  /* thiscall void *(this) */
+#define ADDR_HUD_B_CTOR          0x00418FB0u
+#define ADDR_HUD_C_CTOR          0x004195B0u
+#define AM2_HUD_A_BYTES          0x5BCu
+#define AM2_HUD_B_BYTES          0xCCu
+#define AM2_HUD_C_BYTES          0xB0u
+#define HUD_A_OFF_CHECKBOX       0x5B8u  /* AM2_Widget *, the checkbox child */
 /* The HUD's message LOG, inside ADDR_HUD_WIDGET_A. Twelve rows of 88 bytes at
  * +0x6C, a live count at +0x594, and a running total of characters at +0x59C.
  * A row is text at +0, an x position as a FLOAT at +0x50, and the text's width

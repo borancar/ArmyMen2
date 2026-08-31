@@ -10743,3 +10743,75 @@ from -- **the real outstanding work is larger than 95, not smaller.**
 
 A/B clean: `quit` identical on 8 messages, 0 pixels; `bootcamp` state
 identical on 1,610 lines, 22 pixels.
+
+
+## BuildHudWidgets, and a gate that diagnoses itself wrongly
+
+**1,239 - 1,145 = 94 entries outstanding.** `0x00413480` into
+`src/game/win32/widget.cpp`, beside the `FreeHudWidgets` it undoes.
+
+**`ADDR_LOBBY_RESET` was a misnomer and is RENAMED, not aliased.** The name
+came from the `0x046E` setup-done handler that calls it. The body frees the
+three HUD widgets and builds three new ones, and every global it touches was
+already named for the HUD by whoever wrote the free half -- which is what
+settles it. The second caller is mission start, where it is followed by two
+more HUD helpers. Eighth instance of a name taken from a call site.
+
+**The latch either side of the teardown preserves a CHECKBOX's ticked state**,
+and three independent touchers say so rather than one reading: A's constructor
+`new`s the child and builds it with the address `widget.h` already documents
+as the checkbox before handing it to `WidgetAddChild`; `0x004184E3`
+independently gates a loop on the same child's `+0x78`; and `CHECK_OFF_TICKED`
+was already `0x78`, a `uint8_t`. It runs only outside a net game.
+
+Widget C is built only when `ADDR_NET_GAME` is clear, which independently
+confirms that global's own "may be null" comment.
+
+Two things reproduced rather than tidied: the tail dereferences
+`ADDR_HUD_WIDGET_A` with no null test although the `new` above it can answer
+null, and the net-game arm calls the logger with NO ARGUMENTS -- the idiom
+`frame.cpp` already reproduces twice.
+
+**A tension recorded and deliberately not acted on.** `OnSetupDone` clears
+`ADDR_NET_GAME` immediately before calling this, and `orig.h` notes the same
+flag is raised by `0x00411000` and lowered by that handler -- which reads more
+like "in multiplayer SETUP" than "is a network game". Twenty-one sites read it;
+one caller is not evidence enough to rename it, so the observation goes in a
+comment for whoever has the evidence.
+
+**`tools/ab.sh mission` fails for a reason that is not the reconstruction, and
+proving that took the parent commit rather than a re-run.** Two runs failed the
+frames gate -- 7,203/496 and 6,117/433 -- with the same asymmetry on the same
+side, which is NOT the load signature this file documents (that starves both
+halves and wanders). Reproducing with the same shape twice is what made it look
+real.
+
+The control settles it. Stashed, rebuilt the parent, ran the same
+configuration: **5,999/315, 1904%** -- identical failure, identical 299 pixels,
+identical 13-line log, identical 16-node widget tree, with the change not in
+the build.
+
+**The gate's own diagnosis is wrong, and that is the finding worth keeping.**
+It prints "That is behaviour, not timing" and "at least one side did not reach
+live gameplay", both inferred FROM THE FRAME COUNT ALONE -- and two lines later
+prints 299 differing pixels of 786,432, which says both sides ended on the same
+screen. The two final PNGs are seven bytes apart in size. A side genuinely
+stuck while the other played differs by tens of percent; an earlier real
+mismatch this session was 27%. Same family as the pixel budget that once
+reported "A/B clean" over a 33,137-pixel error with the number printed directly
+above it.
+
+What I could not explain and did not paper over: the per-frame marker
+histograms differ in SHAPE, not just scale -- the original side is 3,375 `m`
+out of 6,117 while the other is uniform at ~30 each. A pure slowdown would
+scale the shape down, not change it. That is unresolved, and it happens on the
+parent too, so it is a property of the configuration rather than of this
+change.
+
+**Evidence this reconstruction actually rests on**, none of it the frames gate:
+`bootcamp` clean twice with its 1,610-line object-state dump identical and 22
+pixels; both `mission` logs identical at 13 lines and widget trees at 16 nodes;
+and a `TRACE=1` probe reading **`BuildHudWidgets=1`**, from the original
+level-load caller -- so the code runs and the counter is not blind.
+`FreeHudWidgets=0` beside it is the expected blind spot, since our builder
+calls it by name.

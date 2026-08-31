@@ -1600,6 +1600,11 @@ void __cdecl CloseScreen(void);
 /* 0x004135C0. Delete all three HUD widgets and clear their globals. */
 void __cdecl FreeHudWidgets(void);
 
+
+/* Original: 0x00413480, two callers. The other half: free the three HUD
+ * widgets and build three new ones, preserving the checkbox's ticked state
+ * across the rebuild when this is not a net game. */
+void __cdecl BuildHudWidgets(void);
 int widget_install(void);
 
 #ifdef __cplusplus

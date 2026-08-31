@@ -4149,6 +4149,91 @@ void __cdecl FreeHudWidgets(void)
     }
 }
 
+/* 0x00413480, two callers -- the 0x046E setup-done handler and mission start.
+ * The counterpart to FreeHudWidgets above: tear the three down, build three
+ * more. See orig.h for why this is not the "lobby reset" its old name claimed.
+ *
+ * The latch either side of the teardown is the interesting part. It reads one
+ * BYTE out of A's checkbox child before freeing anything and puts it back
+ * afterwards, so the box stays ticked across a rebuild -- and only outside a
+ * net game, since the guard tests ADDR_NET_GAME on the way in and the tail
+ * runs only if the guard passed.
+ *
+ * Two faithfulness notes. The tail dereferences ADDR_HUD_WIDGET_A with NO null
+ * test, although the `new` above it can answer null; that is the original's
+ * and is reproduced rather than hardened, the same standing as LockSurface's
+ * descriptor after a successful Restore. And the net-game arm calls the logger
+ * with NO ARGUMENTS AT ALL -- not a transcription slip, the same idiom
+ * frame.cpp already reproduces twice as orig_log_noargs.
+ *
+ * The third widget is built only when ADDR_NET_GAME is clear, which is where
+ * ADDR_HUD_WIDGET_C's "may be null" comes from independently.
+ *
+ * Worth recording a tension rather than acting on it: OnSetupDone clears
+ * ADDR_NET_GAME immediately before calling this, so at that call site the flag
+ * is 0 and the single-player arm runs. orig.h notes the same global is raised
+ * by 0x00411000 and lowered by the 0x046E handler, which reads more like "we
+ * are in multiplayer SETUP" than "this is a network game". Twenty-one sites
+ * read it and one caller is not evidence enough to rename it here. */
+typedef void *(__attribute__((thiscall)) *AM2_HudCtorFn)(void *obj);
+typedef void (__cdecl *AM2_NoArgLogFn)(void);
+
+#define orig_hud_a_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_A_CTOR))
+#define orig_hud_b_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_B_CTOR))
+#define orig_hud_c_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_C_CTOR))
+#define orig_log_noargs   ((AM2_NoArgLogFn)(uintptr_t)ADDR_LOG)
+
+static AM2_Widget *NewHudWidget(uint32_t size, AM2_HudCtorFn ctor)
+{
+    void *obj = orig_operator_new(size);
+
+    return obj ? (AM2_Widget *)ctor(obj) : (AM2_Widget *)0;
+}
+
+void __cdecl BuildHudWidgets(void)
+{
+    AM2_Widget *a;
+    AM2_Widget *box;
+    int32_t     ticked = 0;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
+        if (a) {
+            box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
+            if (box && *((uint8_t *)box + CHECK_OFF_TICKED))
+                ticked = 1;
+        }
+    }
+
+    FreeHudWidgets();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        int32_t slot = *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT;
+
+        *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY = 0;
+        *(int32_t *)(uintptr_t)ADDR_OUR_POINTS =
+            ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[slot];
+        orig_log_noargs();
+    }
+
+    *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A =
+        NewHudWidget(AM2_HUD_A_BYTES, orig_hud_a_ctor);
+    *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B =
+        NewHudWidget(AM2_HUD_B_BYTES, orig_hud_b_ctor);
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME)
+        *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C =
+            NewHudWidget(AM2_HUD_C_BYTES, orig_hud_c_ctor);
+
+    if (ticked) {
+        /* No null test on A -- the original's. */
+        a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
+        box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
+        if (box)
+            *((uint8_t *)box + CHECK_OFF_TICKED) = 1;
+    }
+}
+
 /* And the half they close with. `new` answering null is checked at every one
  * of these sites -- VC6's does answer null rather than throwing, and the game
  * tests it -- so the global ends up null rather than holding a constructor's
@@ -9536,6 +9621,8 @@ int widget_install(void)
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,
                         "CloseScreen", 1);
+    rc |= patch_replace(ADDR_BUILD_HUD_WIDGETS, (const void *)BuildHudWidgets,
+                        "BuildHudWidgets", 2);
     rc |= patch_replace(ADDR_FREE_HUD_WIDGETS, (const void *)FreeHudWidgets,
                         "FreeHudWidgets", 2);
     return rc;
