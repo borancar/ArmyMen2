@@ -6037,12 +6037,45 @@ typedef struct {
  *
  * Every address stays exactly what it was: each site moved from base+0 to the
  * corrected base plus its own offset, so this renames and cannot re-aim. */
-#define ADDR_RANK_RECORDS        0x00473DCCu  /* 28-byte records, rank 0..7 */
+/* AND TWELVE BYTES EARLIER AGAIN, which the paragraph above predicted. A
+ * FOURTH consumer wanted an earlier field: 0x00404730 indexes
+ * `*(int32 *)(0x00473DC0 + rank * 28) << 1` and forgets a target beyond that
+ * distance. So the record starts at 0x00473DC0 and the four fields named above
+ * are its LAST four.
+ *
+ * THE GIVEAWAY WAS ALREADY IN THIS FILE: a 28-byte stride with only 16 bytes
+ * of named fields. Three dwords were unaccounted for and they are in FRONT.
+ *
+ * MONOTONICITY CANNOT SETTLE A BASE, and that is what the paragraph above used.
+ * "The only base on which every field is a clean monotone series" was true of
+ * the four fields known then; 0x473DC0 gives three more in front of them --
+ * 280..320, 48..76, 120..190. A base-plus-a-field is monotone too.
+ *
+ * TILING SETTLES IT, in one subtraction. 0x473DC0 + 8 ranks * 28 bytes is
+ * 0x473EA0, which is exactly ADDR_FORMATION_SLOTS; 0x473DCC + 224 would run
+ * twelve bytes into that table. Below, 0x473DB0 holds 480, 1000, 3000, 0 --
+ * unrelated constants ending in a zero. It tiles from here and from nowhere
+ * else, which is the trig-table argument this project already states.
+ *
+ * Confirmed a fourth way by a number measured in the running game: +20 at rank
+ * 7 is 70, and tools/objdump.py reads the leader's max health as 140 with the
+ * 2.0 difficulty scale.
+ *
+ * Every absolute address is unchanged -- all four call sites index as
+ * `base + rank * RANK_REC_BYTES + RANK_REC_OFF_*`, so the base moved back
+ * twelve and each offset gained twelve. Measured, not assumed: region.o's and
+ * item.o's .text are byte-identical across the change. */
+#define ADDR_RANK_RECORDS        0x00473DC0u  /* 28-byte records, rank 0..7 */
 #define RANK_REC_BYTES           28u
-#define RANK_REC_OFF_FIRE_SCALE  0u    /* float; UnitWeaponInfo */
-#define RANK_REC_OFF_THRESHOLD   4u    /* int32; AiHitReact halves it */
-#define RANK_REC_OFF_MAX_HEALTH  8u    /* int32; handed to SetMaxHealth */
-#define RANK_REC_OFF_XP          12u   /* experience needed for this rank */
+/* 280 285 290 295 300 305 310 320, doubled at the one site that reads it --
+ * so 560..640, the range past which a trooper forgets its target. */
+#define RANK_REC_OFF_SIGHT_RANGE 0u    /* int32; 0x00404730 */
+#define RANK_REC_OFF_FIELD_04    4u    /* int32; 48 52 56 60 64 68 72 76 */
+#define RANK_REC_OFF_FIELD_08    8u    /* int32; 120 130 140 150 160 170 180 190 */
+#define RANK_REC_OFF_FIRE_SCALE  12u   /* float; UnitWeaponInfo */
+#define RANK_REC_OFF_THRESHOLD   16u   /* int32; AiHitReact halves it */
+#define RANK_REC_OFF_MAX_HEALTH  20u   /* int32; handed to SetMaxHealth */
+#define RANK_REC_OFF_XP          24u   /* experience needed for this rank */
 /* Reconstructed. Bump the rank and, at ranks 3, 5 and 7, hand a type 2 a new
  * weapon -- 0x0A, 0x08 and 0x1D, three ids in no order and with rank 4 and 6
  * giving nothing. The promotion itself happens for every type; only the
