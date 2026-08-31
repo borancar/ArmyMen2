@@ -219,6 +219,13 @@ int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
  * same record, and was declared `int32_t arg` here until BoxAction was read. */
 int32_t __cdecl ObjBoxAction(void *obj, void *out);
 
+/* 0x00439320, six callers. Take an object's footprint back off the map:
+ * ObjClearFootprint or ObjClearRoachFootprint for a vehicle or a roach, and
+ * for an ITEM, subtract its height from every masked cell's weight and move
+ * the tile cover where a weight crosses 15. Clears OBJ_FLAG_FOOTPRINT_ON, so
+ * it is idempotent. COLD: no drive this project has destroys an item. */
+void __cdecl ItemTeardown(void *obj);
+
 /* 0x00438F10, one caller. The same function for a record-list HEADER: the
  * first list record's sprite, the header's own box, and the point as an
  * argument rather than a field. */

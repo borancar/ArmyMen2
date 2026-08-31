@@ -15,6 +15,7 @@
 #include "map.h"      /* TileOfPoint -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- the timeout kill's gate */
 #include "armymsg.h"  /* DamageBroadcast */
+#include "item.h"     /* ObjClearFootprint, ObjClearRoachFootprint */
 #include "gameproc.h" /* Call405220 -- the `defend` arm's thunk */
 #include "item.h"     /* ObjectsHitByPoint -- reconstructed */
 #include "image.h"
@@ -1223,6 +1224,172 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out)
                      *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x,
                      *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y,
                      out);
+}
+
+/* 0x004389D0 stays original and is reached by name so checkseams can see it. */
+typedef int32_t (__cdecl *AM2_HitMaskActionFn)(void *obj, void *mask);
+#define orig_obj_hit_mask_action \
+    ((AM2_HitMaskActionFn)(uintptr_t)AM2_IMAGE(ADDR_OBJ_HIT_MASK_ACTION))
+
+
+/* The original inlines this twice -- once to add cover and once to remove it
+ * -- with the same bounds test and the same walk over ADDR_TILE_NEIGHBOURS,
+ * differing only in `inc` against `dec`. Written once with a delta. The bounds
+ * keep two tiles clear of every edge, and the x and y are recovered from the
+ * cell SEPARATELY: x by masking with the width minus one and y by shifting
+ * down ADDR_MAP_ROW_SHIFT, which only agree if the map's width is a power of
+ * two -- which is presumably why that shift is stored beside the width. */
+static void ShiftTileCover(int32_t cell, int32_t delta)
+{
+    int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t  tx = cell & (w - 1);
+    int32_t  ty = cell >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    uint8_t *cover;
+    const int32_t *n;
+    int32_t  i;
+
+    if (tx < AM2_TILEMASK_MARGIN || tx >= w - AM2_TILEMASK_MARGIN)
+        return;
+    if (ty < AM2_TILEMASK_MARGIN
+        || ty >= *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                 - AM2_TILEMASK_MARGIN)
+        return;
+
+    cover = *(uint8_t *const *)(uintptr_t)ADDR_TILE_COVER;
+    cover[cell] = (uint8_t)(cover[cell] + delta);
+
+    n = (const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
+    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
+        uint8_t *p = *(uint8_t *const *)(uintptr_t)ADDR_TILE_COVER
+                     + cell + n[i];
+
+        *p = (uint8_t)(*p + delta);
+    }
+}
+
+/* ItemTeardown -- original 0x00439320, 656 bytes, six callers. Take an
+ * object's footprint back off the map. orig.h had it as "the item-only half of
+ * the common teardown, and the only callee of DestroyObjCommon without a
+ * name" -- true, and it says nothing about what the function does, which is
+ * maintain the terrain cover map.
+ *
+ * THE FLAG NAME IS THE WHOLE STORY: it refuses anything without
+ * OBJ_FLAG_FOOTPRINT_ON and clears that flag on the way out, so it is
+ * idempotent and the name already said what the body does.
+ *
+ * TYPES 3 AND 8 ARE ONE-CALL TAILS -- ObjClearFootprint and
+ * ObjClearRoachFootprint, the vehicle and roach versions of this. The dispatch
+ * is the chained `dec / sub 2 / sub 5` idiom, so the set is {1, 3, 8} and
+ * reading only the first test gives type 1 alone.
+ *
+ * `__chkstk` IS NOT CODE. The opening `mov eax, 0x1020; call ADDR_CRT_CHKSTK`
+ * is MSVC's page-walking stack probe, a compiler artifact; what it reserves is
+ * one tile mask. ObjBoxAction fills it, or ADDR_OBJ_HIT_MASK_ACTION when the
+ * object has an OBJ_OFF_HIT_MASK -- and region.cpp records that on every map
+ * this project can drive, everything has one, so the else arm is the cold half
+ * of a cold function.
+ *
+ * THE LOOP subtracts OBJ_OFF_HEIGHT_SET from each masked cell's
+ * ADDR_CELL_WEIGHTS entry and moves ADDR_TILE_COVER for that cell and its
+ * twenty ADDR_TILE_NEIGHBOURS only when the weight CROSSES 15. This is the +1
+ * half of the pair CLAUDE.md credits with settling those two globals.
+ *
+ * THE CELL INDEX STARTS AT rect.top AND THAT LOOKS LIKE A BUG. Both fillers
+ * index zero-based over the rect -- ADDR_OBJ_HIT_MASK_ACTION computes
+ * `cells + row * width + 2` and BoxAction `cells + (y - top) * stride - left`
+ * -- while this walks `cells[top ...]`. Reproduced exactly, not corrected:
+ * this is the original's behaviour, the same standing as LockSurface's
+ * uninitialised descriptor, and correcting it on a function no drive reaches
+ * would be an unverifiable divergence from the binary.
+ *
+ * THE INCREMENT ARM NEEDS A NEGATIVE HEIGHT. `h <= 15 && h - height >= 15`
+ * collapses to `h == 15 && height == 0` for any non-negative height, so it is
+ * reachable only if OBJ_OFF_HEIGHT_SET goes negative -- and every compare here
+ * is a SIGNED byte compare, so it can. Written as found rather than pruned.
+ *
+ * COLD, AND SAID PLAINLY. It is reached from DestroyObjCommon, and no drive
+ * this project has destroys an item: 325 are added during load and none dies
+ * in the window observed. So a clean A/B says only that nothing else
+ * regressed, exactly as region.cpp says of ObjBoxAction. Verified by reading.
+ */
+void __cdecl ItemTeardown(void *obj)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t        mask[AM2_TILEMASK_BYTES];
+    const int32_t *rect = (const int32_t *)(mask + TILEMASK_OFF_RECT);
+    const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
+    int32_t        height;
+    int32_t        idx;
+    int32_t        row;
+    int32_t        x;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return;
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON))
+        return;
+
+    switch (*(const int32_t *)o) {
+    case AM2_OBJ_TYPE_ROACH:
+        ObjClearRoachFootprint(obj);
+        return;
+    case AM2_OBJ_TYPE_VEHICLE:
+        ObjClearFootprint(obj);
+        return;
+    case AM2_OBJ_TYPE_ITEM:
+        break;
+    default:
+        return;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
+        return;
+    if (!*(const void *const *)(*(const uint8_t *const *)(o + OBJ_OFF_ROWS)
+                                + ROW_OFF_SPRITE))
+        return;
+    if (!ObjIsItem((const AM2_Object *)obj))
+        return;
+
+    height = *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET);
+    if ((int8_t)height
+        > (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+              [*(const uint16_t *)(o + OBJ_OFF_TILE)])
+        return;
+    if (!*(const int8_t *)(o + OBJ_OFF_RANK))
+        return;
+
+    if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
+        orig_obj_hit_mask_action(obj, mask);
+    else
+        ObjBoxAction(obj, mask);
+
+    idx = rect[1];      /* the original starts it at rect.top -- see above */
+
+    for (row = rect[1]; row <= rect[3]; row++) {
+        int32_t cell = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * row
+                       + rect[0];
+
+        for (x = rect[0]; x <= rect[2]; x++, idx++, cell++) {
+            uint8_t *weights =
+                *(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+            int8_t   h;
+            int8_t   nh;
+
+            if (!(cells[idx] & 1))
+                continue;
+
+            h  = (int8_t)weights[cell & 0xFFFF];
+            nh = (int8_t)(h - height);
+
+            if (h <= 15 && nh >= 15)
+                ShiftTileCover(cell, 1);
+            else if (h >= 15 && nh < 15)
+                ShiftTileCover(cell, -1);
+
+            weights[cell & 0xFFFF] = (uint8_t)nh;
+        }
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 }
 
 /* ListBoxAction -- original 0x00438F10, one caller.
@@ -4061,6 +4228,8 @@ int region_install(void)
                         "RebuildTileCover", 1);
     rc |= patch_replace(ADDR_OBJ_BOX_ACTION, (const void *)ObjBoxAction,
                         "ObjBoxAction", 2);
+    rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,
+                        "ItemTeardown", 1);
     rc |= patch_replace(ADDR_BOX_ACTION, (const void *)BoxAction,
                         "BoxAction", 5);
     rc |= patch_replace(ADDR_LIST_BOX_ACTION, (const void *)ListBoxAction,

@@ -1470,6 +1470,15 @@
 #define AM2_TILEMASK_MARGIN      2      /* tiles added on every side */
 #define AM2_TILEMASK_PAD_CELL    2      /* what the margin is filled with */
 #define AM2_TILEMASK_BOX_CELL    3      /* and the box; bit 0 is what is read */
+/* The frame ItemTeardown reserves for one, through __chkstk. CanPlaceAt
+ * reserves 0x1018 for the same structure; the difference is frame alignment,
+ * not layout, and this is the larger of the two so it holds either. */
+#define AM2_TILEMASK_BYTES       0x1020u
+/* 0x004389D0, 1056 bytes, two callers -- ObjBoxAction's twin for an object
+ * that HAS an OBJ_OFF_HIT_MASK, which on every map this project can drive is
+ * all of them. Still original; region.cpp records that ObjBoxAction and
+ * BoxAction both read 0 on a full combat run for exactly that reason. */
+#define ADDR_OBJ_HIT_MASK_ACTION 0x004389D0u  /* int32_t(void *obj, void *) */
 /* The scratch record's size, from the one caller that puts it on the STACK:
  * CanPlaceAt reserves 0x1018 bytes and the cells run from TILEMASK_OFF_CELLS
  * to the end of that frame less two locals. BoxAction clamps into the map, so
@@ -11300,6 +11309,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * neighbourhood all three cover functions walk. The bound is the ADDRESS the
  * loop stops at, which is what fixes the count at twenty. */
 #define ADDR_TILE_NEIGHBOURS     0x00654BD8u  /* int32_t[20] */
+#define AM2_TILE_NEIGHBOUR_COUNT 20     /* 0x00654BD8..0x00654C28 */
 #define AM2_TILE_NEIGHBOURS      20
 /* The +1/-1 pair, and the reader that turns their two tables into tile flags.
  * All three share one bounds test: 2 <= x < width-2 and 2 <= y < height-2,

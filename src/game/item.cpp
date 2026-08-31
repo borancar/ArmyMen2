@@ -1281,9 +1281,9 @@ void __cdecl ApplyHeightItem(void *obj, int32_t height)
  * ends on. */
 typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
 #define orig_obj_after_move ((AM2_AfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
-typedef void (__cdecl *AM2_ObjOnlyFn2)(void *obj);
-#define orig_item_teardown_early \
-            ((AM2_ObjOnlyFn2)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
+/* ItemTeardown had THREE private spellings in this file -- two typedefs and a
+ * bare cast, under three names -- for one void(void *). Reconstructing it
+ * collapsed all three; the typedef is gone with them. */
 
 /* 0x00435550, five callers -- the maker LoadType7 uses, and the one that
  * refuses a thirty-third kind-7 object.
@@ -1364,7 +1364,7 @@ void __cdecl PointActionC(void *obj, uint32_t point)
         return;
 
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    orig_item_teardown_early(o);
+    ItemTeardown(o);
 
     *(uint32_t *)(o + OBJ_OFF_POS)      = point;
     *(uint32_t *)(rows + ROW_OFF_X)     = point;
@@ -3552,7 +3552,6 @@ void __cdecl DestroyByType(void *obj)
         SendObjDestroyed(obj);
 }
 
-#define orig_item_teardown  ((am2_destroy_fn)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
 
 
 
@@ -3693,7 +3692,7 @@ void __cdecl DestroyObjCommon(void *obj)
     }
 
     if (ObjIsItem((const AM2_Object *)obj))
-        orig_item_teardown(obj);
+        ItemTeardown(obj);
 
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & 1u)
         ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
@@ -3767,7 +3766,6 @@ void __cdecl DestroyObjCommon(void *obj)
  */
 typedef void (__cdecl *AM2_ObjOnlyFn3)(void *obj);
 typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
-#define orig_place_teardown ((AM2_ObjOnlyFn3)(uintptr_t)ADDR_ITEM_TEARDOWN)
 #define orig_after_move     ((AM2_AfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
 
 void __cdecl PlaceObj(void *obj, uint32_t where)
@@ -3786,7 +3784,7 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
         && ObjIsItem((const AM2_Object *)obj))
-        orig_place_teardown(obj);
+        ItemTeardown(obj);
 
     *(int16_t *)(o + OBJ_OFF_POS)     = (int16_t)where;
     *(int16_t *)(o + OBJ_OFF_POS + 2) = (int16_t)(where >> 16);
