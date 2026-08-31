@@ -74,6 +74,11 @@ void __cdecl AiStep(void *obj, void *out);
 /* 0x00405050, ten call sites. What a unit does about having been hit: choose
  * a pose from its rank and class, turn toward the hit if it is not already
  * watching something, and consume OBJ_OFF_HIT_DIR. */
+/* 0x00439D60, three callers. Find a route from where the object is to a point
+ * and write it onto the object as a waypoint list. BeginMoveTo's general case:
+ * the same five fields, with as many waypoints as the route needs. */
+int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg);
+
 void __cdecl AiHitReact(void *obj, void *out, void *ctx);
 
 void __cdecl AiKeepRange(void *obj, void *out, void *ctx);

@@ -9080,11 +9080,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * into the object at +0x120 and +0x124 and three small fields are seeded.
  * Reconstructed. */
 #define ADDR_BEGIN_MOVE_TO       0x00439E90u  /* int32_t(void *obj, uint32 *to) */
-#define OBJ_OFF_MOVE_FROM        0x120u   /* packed point */
-#define OBJ_OFF_MOVE_TO          0x124u   /* packed point */
-#define OBJ_OFF_MOVE_F128        0x128u   /* uint16_t, seeded 0 */
-#define OBJ_OFF_MOVE_F520        0x520u   /* uint16_t, seeded 1 */
-#define OBJ_OFF_MOVE_F522        0x522u   /* uint16_t, seeded 2 */
+/* These five are ONE STRUCTURE and PlanPathTo is what says so. +0x120 is a
+ * WAYPOINT LIST -- {int16 x, int16 y} pairs, stride 4, terminated by a zero
+ * word -- with +0x520 the index of the one being walked to and +0x522 how many
+ * there are. BeginMoveTo is the two-waypoint case: from at +0x120, to at
+ * +0x124, the terminator at +0x128, index 1 of 2. That is why its three small
+ * fields were "seeded 0, 1 and 2" and why nothing said what they were.
+ * PlanPathTo writes as many as the route needs and sets the same three. */
+#define OBJ_OFF_MOVE_FROM        0x120u   /* packed point, and waypoint 0 */
+#define OBJ_OFF_MOVE_TO          0x124u   /* packed point, and waypoint 1 */
+#define OBJ_OFF_MOVE_END         0x128u   /* the terminator when there are 2 */
+#define OBJ_OFF_MOVE_AT          0x520u   /* uint16_t, the waypoint in hand */
+#define OBJ_OFF_MOVE_COUNT       0x522u   /* uint16_t */
+#define AM2_MOVE_STEP_BYTES      4u
+/* When the move expires. PlanPathTo sets it to the clock plus
+ * AM2_MOVE_VALID_MS on success and plus ADDR_PATH_RETRY_MS on failure, so a
+ * route that could not be found is not attempted again for half a second. */
+#define OBJ_OFF_MOVE_UNTIL       0x11Cu   /* game-clock ms */
+#define AM2_MOVE_VALID_MS        0xBB8    /* 3000 */
+#define ADDR_PATH_RETRY_MS       0x00487894u  /* int32_t, 500 */
+/* 0x004395B0, and nothing in it says what it is. PlanPathTo hands it the two
+ * tiles, ADDR_TILE_LINE_BUF, a length out and its own third argument, and
+ * treats a zero answer as "no route". */
+#define ADDR_FIND_PATH           0x004395B0u  /* int32(from, to, uint16 *,
+                                               *       int32 *n, int32) */
+/* 0x00439D60, three callers -- both AI families' common steps and 0x00408210.
+ * Reconstructed. */
+#define ADDR_PLAN_PATH_TO        0x00439D60u  /* int32(obj, uint32 *, int32) */
 #define ADDR_POINT_RULE_BOAT     0x00437D60u  /* vehicle kind 5 */
 #define ADDR_POINT_RULE_VEHICLE  0x00437D10u  /* other vehicles, and roaches */
 #define ADDR_POINT_RULE_DEFAULT  0x00437DB0u  /* everything else, and null */

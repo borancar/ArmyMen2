@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "misc.h"   /* CollapseEqualDeltas -- reconstructed */
 #include "rect.h"   /* Clamp -- reconstructed */
 #include "dist.h"   /* AngleDelta -- reconstructed */
 #include "army.h"   /* ObjIsOurs -- reconstructed */
@@ -588,6 +589,91 @@ uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt)
     }
 }
 
+typedef int32_t (__cdecl *AM2_FindPathFn)(int32_t from, int32_t to,
+                                          uint16_t *route, int32_t *n,
+                                          int32_t arg);
+#define orig_find_path ((AM2_FindPathFn)(uintptr_t)ADDR_FIND_PATH)
+
+/* PlanPathTo -- original 0x00439D60, three callers: the trooper AI's common
+ * step, the vehicle AI's, and 0x00408210. Find a route from where the object
+ * is to a point, and write it onto the object as a list of waypoints.
+ * Answers 1 on success and 0 when there is no route.
+ *
+ * IT IS BeginMoveTo's GENERAL CASE, and putting the two side by side is what
+ * named five fields. That one traces a straight line and, if nothing refuses,
+ * writes the from and to points at +0x120 and +0x124 and seeds three small
+ * fields with 0, 1 and 2 -- which orig.h recorded as three unknowns. This one
+ * writes as many waypoints as the route needs, at the same +0x120 with the
+ * same stride, a zero word after the last, the index of the one in hand at
+ * +0x520 and the count at +0x522. So BeginMoveTo's "seeded 0, 1 and 2" is a
+ * terminator, an index and a count for a list of exactly two, and the five
+ * offsets are one structure.
+ *
+ * The route comes back in ADDR_TILE_LINE_BUF -- the same uint16 tile buffer
+ * TraceTileLine fills for the straight-line case, which is the other half of
+ * the evidence that these two are one mechanism.
+ *
+ * THE LIST IS CLEARED BEFORE THE SEARCH, not after it. The three words go to
+ * zero between NearestAllowedTile and the pathfinder, so a failure leaves the
+ * object with an empty list rather than the previous route -- and the failure
+ * exit writes nothing else but the retry time.
+ *
+ * TWO DEADLINES ON ONE FIELD, and the difference is the point.
+ * OBJ_OFF_MOVE_UNTIL gets the clock plus ADDR_PATH_RETRY_MS (500) when there
+ * is no route and plus AM2_MOVE_VALID_MS (3000) when there is. So a failure
+ * costs half a second before anything tries again and a success is good for
+ * three.
+ *
+ * THE TARGET IS SNAPPED FIRST. NearestAllowedTile is given the point's tile
+ * and may rewrite the point through the caller's pointer, and the tile handed
+ * to the pathfinder is taken from the point AFTERWARDS -- so the route is to
+ * where the object may actually stand, not to where it was asked to go. The
+ * caller sees the rewritten point too, since the pointer is its own.
+ */
+int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint16_t *route = (uint16_t *)AM2_IMAGE(ADDR_TILE_LINE_BUF);
+    int32_t   n = 0;
+    int32_t   i;
+
+    SetPointRule(obj);
+    NearestAllowedTile(obj, TileOfPoint(*at), at);
+
+    *(uint16_t *)(o + OBJ_OFF_MOVE_FROM)  = 0;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
+
+    if (!orig_find_path((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE),
+                        TileOfPoint(*at), route, &n, arg)) {
+        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + *(const int32_t *)AM2_IMAGE(ADDR_PATH_RETRY_MS);
+        return 0;
+    }
+
+    CollapseEqualDeltas(route, &n);
+
+    for (i = 0; i < n; i++) {
+        int32_t x, y;
+
+        TileToXY((int32_t)route[i], &x, &y);
+        *(uint16_t *)(o + OBJ_OFF_MOVE_FROM + (uint32_t)i * AM2_MOVE_STEP_BYTES)
+            = (uint16_t)x;
+        *(uint16_t *)(o + OBJ_OFF_MOVE_FROM + (uint32_t)i * AM2_MOVE_STEP_BYTES
+                      + 2) = (uint16_t)y;
+    }
+
+    *(uint16_t *)(o + OBJ_OFF_MOVE_FROM
+                  + (uint32_t)n * AM2_MOVE_STEP_BYTES) = 0;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = (uint16_t)n;
+
+    *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_MOVE_VALID_MS;
+    return 1;
+}
+
 /* 0x00439E90, four callers. Can this object reach that point in a straight
  * line, and if so, record the move on it.
  *
@@ -657,9 +743,9 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
     *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
         *(const uint32_t *)(o + OBJ_OFF_POS);
     *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *to;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_F128) = 0;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_F520) = 1;
-    *(uint16_t *)(o + OBJ_OFF_MOVE_F522) = 2;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_END) = 0;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_AT) = 1;
+    *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = 2;
 
     return 1;
 }
@@ -2134,6 +2220,8 @@ int region_install(void)
                         "AiKeepRange", 6);
     rc |= patch_replace(ADDR_AI_HIT_REACT, (const void *)AiHitReact,
                         "AiHitReact", 10);
+    rc |= patch_replace(ADDR_PLAN_PATH_TO, (const void *)PlanPathTo,
+                        "PlanPathTo", 3);
     rc |= patch_replace(ADDR_AI_WALK_STEP, (const void *)AiWalkStep,
                         "AiWalkStep", 2);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

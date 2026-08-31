@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d4d2c11`. Working tree clean.
+Last updated: **2026-08-31**, at `4fc60e8`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,247 patches.**
+Nothing uncommitted. **1,248 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2914,16 +2914,50 @@ commit -- gave the right answer every time it was used.
   1,610 lines identical, so no object moved. `AiHitReact`'s counter is 0
   besides. First time the new oracle has been the thing that settled a reading.
 
+- **`PlanPathTo`** (`0x00439D60`) finds a route from where an object is to a
+  point and writes it onto the object as a waypoint list. Three callers: both
+  AI families' common steps and `0x00408210`.
+
+  **It is `BeginMoveTo`'s general case, and putting the two side by side named
+  FIVE fields.** That one traces a straight line and, if nothing refuses,
+  writes from and to at +0x120 and +0x124 and seeds three small fields with 0,
+  1 and 2 -- which `orig.h` recorded as three unknowns, `OBJ_OFF_MOVE_F128`,
+  `_F520` and `_F522`. This writes as many waypoints as the route needs, at the
+  same +0x120 with the same stride, a zero word after the last, the index of
+  the one in hand at +0x520 and the count at +0x522.
+
+  So the seed of 0, 1 and 2 is a terminator, an index and a count for a list of
+  exactly two, and the five offsets are ONE STRUCTURE. Renamed
+  `OBJ_OFF_MOVE_END`, `OBJ_OFF_MOVE_AT` and `OBJ_OFF_MOVE_COUNT`. The other
+  half of the evidence is that the route comes back in `ADDR_TILE_LINE_BUF` --
+  the same buffer `TraceTileLine` fills for the straight-line case.
+
+  **Two deadlines on one field and the difference is the point.**
+  `OBJ_OFF_MOVE_UNTIL` gets the clock plus 500 ms when there is no route and
+  plus 3000 when there is, so a failed search costs half a second before
+  anything tries again. And the list is cleared BEFORE the search, so a failure
+  leaves an empty list rather than the previous route.
+
+  The target is snapped first: `NearestAllowedTile` may rewrite the point
+  through the caller's own pointer, and the tile given to the pathfinder is
+  taken from the point afterwards -- so the route is to where the object may
+  actually stand.
+
+- **Cold, but the fields it names are not.** `PlanPathTo` reads 0 and
+  `BeginMoveTo` reads 51 on the same driven mission. So the five offsets are
+  exercised in their two-waypoint case by running code, which is better
+  ground for the naming than reading either function alone.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,093 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,247
+line (0x0045C000) patched**. Measured: **1,094 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,248
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-three batches have gone in and the 146 entries outstanding start at 48
+small ones in batches. Ninety-four batches have gone in and the 145 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
