@@ -1486,6 +1486,60 @@ has to be the game's.** `src/game/crt.h` points `am2_malloc`/`am2_realloc`/
 narrow seam, not a general escape hatch: nearly all of `src/game/` is
 arithmetic over memory the caller supplies and needs none of it.
 
+## After writing a function, in this order
+
+Each of these caught something in one session that reading had already missed,
+which is why the list is empirical rather than aspirational.
+
+1. **`make`.** The compiler finds name collisions -- three in one session, twice
+   because the obvious name for a table was already on a different table -- and
+   linkage mismatches, which go BOTH ways: `mapdraw.h` closes its `extern "C"`
+   at line 129 and declares `ShakeAt` at 158, so a stub for it must NOT be
+   wrapped, while `BoatExitPoint` must be.
+2. **Read the transcription count.** A function can be written, compile clean,
+   and pass every static check while never being installed -- `checkinstalled`
+   cannot see one whose declaration was never added. That happened twice in one
+   session. **The count moving is the only proof the patch went in**, and an
+   A/B over an uninstalled function compares the original against itself and
+   reports clean.
+3. **`make check`.** `checkseams` finds an `orig_` macro on reconstructed code
+   -- and its TYPEDEF is evidence: twice it exposed a wrong arity, and once the
+   arity error was hiding a wrong gate condition. `checkoffsets` refuses a
+   second name on an offset that already has one.
+4. **`tools/checkoffsetuse.py <addr> <src> <Func>`, BEFORE the A/B.** It diffs
+   the displacements the original reads against what the C's `*_OFF_*` macros
+   expand to. It has caught unnamed literals and, once, OMITTED CODE -- a
+   cleared field and a whole second exit. It costs seconds and does not depend
+   on any drive reaching the function. Read its docstring for the eight blind
+   spots; four produce false positives, which is why it is a report and not a
+   gate.
+5. **`tools/ab.sh`, and read the STATE artifact rather than the verdict line.**
+   `bootcamp`'s state dump is 1,610 lines of object fields diffed with no
+   budget, and it is what catches a wrong field where the pixels and the log
+   agree.
+
+**Before writing, ask four things in this order, not by size.** Byte count
+predicts transcription volume; these predict reading cost, which is where the
+defects are.
+
+  - **Can anything execute it?** A comm function with six of seven callees
+    reconstructed still cannot be A/B'd on a machine that opens no DirectPlay
+    session.
+  - **How many callees are unnamed?** Each is a function that must be read
+    first. A 448-byte function with six unknowns is dearer than a 560-byte one
+    with one.
+  - **How many exits, and do they converge?** Neighbours in a family are not a
+    guide: `StepType2` converges to one tail and `CanPickUpWeapon` has eight
+    independent returns. Assuming either way costs a rewrite.
+  - **What do the dispatch tables CONTAIN?** Counting entries said "two 29-way
+    dispatches"; reading them said "one six-element predicate used twice".
+
+**And classify the counter before writing, not after.** A zero means blind
+(every caller reconstructed), cold (nothing reaches it), or unwatched -- and
+this file records time lost to picking the wrong one. `StepType6`'s caller is
+ours, so its counter cannot move; `FormationSlotPoint`'s callers are original,
+so its zero was real and a `TRACE=1` probe proved the function never runs.
+
 ## Verifying a reconstruction
 
 Build, install, run, drive, screenshot, check counts:
