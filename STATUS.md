@@ -11315,3 +11315,69 @@ headers as well as `orig.h` -- looking only at `orig.h` reported
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.
+
+
+## tools/checkoffsetuse.py -- the first ratchet that checks a name's VALUE
+
+Every other check here guards NAMES. `checkpatches` finds duplicate `ADDR_`
+aliases, `checkglobals` finds `g_` drift, `checkseams` finds an `orig_` macro
+pointing at reconstructed code, `checkinstalled` finds a declaration with no
+patch. **None of them asks whether a name's VALUE is the offset the original
+actually reads**, and that is the hole `OBJ_OFF_OWNER` (0x04) fell through
+while `DeployVehicle` read `+0x10`.
+
+The check: disassemble the original from its entry, collect every displacement
+it reads off a register, collect what the C's `*_OFF_*` macros expand to, and
+diff the two sets.
+
+**Falsified in both directions before being believed.** With the bug reverted
+it flags `0x10`; with the fix it does not. And honestly: it catches that defect
+by ONE of its two possible routes, because `0x04` collides with
+`ROW_OFF_SPRITE`, which the original does read -- so only the missing offset
+shows, not the spurious one.
+
+**Five functions verify clean**, which is what says it is not just emitting
+noise: `BuildHudWidgets` 2/2, `ArmyMessageFlush` 12/12, `ObjMoveAlongFacing`
+19/19, `DeployTrooper` 30/30, and `DeployVehicle` 25/25 -- the last only after
+acting on its one finding, five offsets written as bare literals rather than
+named. `0x59C` already had a name, so the existing one was used.
+
+**Every blind spot was found by an implausible RESULT, not by an error**, which
+is the same tell as the desynced disassembler and the case-mangled grep earlier
+today. Each is now in the docstring:
+
+  - capstone prints small displacements without `0x`, so `[esi + 8]` was
+    silently missed;
+  - `[esp + N]` and `[ebp + N]` are frame slots, not fields;
+  - absolute image addresses matched the same pattern -- `ADDR_SLOT_HEADINGS`
+    appeared as a phantom "field" until a `0x400000` test excluded it;
+  - two-register SIB forms, `[esi + eax + 0x214]`, were invisible until the
+    pattern learned them -- that was `ArmyMessageFlush`'s only mismatch;
+  - a macro whose prefix contains an underscore, `HUD_A_OFF_CHECKBOX`, did not
+    match a pattern anchored on `[A-Z][A-Z0-9]*_OFF_`;
+  - offsets live in MODULE headers as well as `orig.h`, and looking only at
+    `orig.h` reported `CHECK_OFF_TICKED` unnamed;
+  - the original may compute a field address with `add reg, imm`, which a
+    memory-operand scan never sees;
+  - the C may reach a field through a typed struct member, so no macro exists.
+
+The last two are why this is a REPORT and not a wall: `FormationSlotPoint` has
+one of each and is correct.
+
+**It is a new KIND of evidence.** The A/B compares behaviour and needs the code
+to run; `AM2_SELFCHECK` compares `eax`; the state dump compares object fields
+afterwards. This compares the TRANSCRIPTION, before anything runs -- so it
+works on cold functions the game never calls, which is exactly where
+`FormationSlotPoint` and `BoatExitPoint` sit, both otherwise verified by
+reading alone.
+
+**And a rule I broke while building it.** I started a 600-process sweep while
+an A/B was running and took the load average from 3 to 8.7. This file documents
+at length that external load corrupts these runs -- collapsed frame counts,
+`bootcamp` at 291,505 pixels on an identical log, an hour lost to a false
+regression -- and I had quoted that rule at other people's edits twice the same
+day. The run came back at the usual 22 pixels anyway, so nothing was lost, but
+the sweep waits: it needs to load the image ONCE rather than spawning a process
+per function, which is both why it was slow and why it was disruptive.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels.

@@ -8986,11 +8986,11 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
          * first: 0x578 and 0x579 are inside it. */
         *(o + OBJ_OFF_FIELD_578)    = *(const uint8_t *)(o + OBJ_OFF_FACING);
         *(o + OBJ_OFF_FACING_COPY2) = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
-        *(int32_t *)(o + 0x59C) = 0;
-        *(int32_t *)(o + 0x580) = 1;
-        *(int32_t *)(o + 0x584) = 0;
-        *(int32_t *)(o + 0x58C) = 0;
-        *(int32_t *)(o + 0x588) = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_580) = 1;
+        *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_58C) = 0;
+        *(int32_t *)(o + OBJ_OFF_FIELD_588) = 0;
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
     }
 

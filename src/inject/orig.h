@@ -5108,6 +5108,7 @@ typedef struct {
 #define OBJ_OFF_FIELD_580        0x580u
 #define OBJ_OFF_FIELD_584        0x584u
 #define OBJ_OFF_FIELD_588        0x588u
+#define OBJ_OFF_FIELD_58C        0x58Cu
 #define OBJ_OFF_FIELD_598        0x598u
 #define AM2_DEPLOY_KIND_DONE     5      /* the kind reassignment's no-op value */
 #define ADDR_DEPLOY_VEHICLE      0x0045B9F0u  /* type 3 */
