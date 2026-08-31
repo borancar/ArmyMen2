@@ -18,9 +18,19 @@
 #include "maprow.h"   /* BuildRowsFromDef -- reconstructed */
 #include "crt.h"           /* am2_malloc -- the game's own heap */
 #include "objtable.h"
+#include "rect.h"        /* AM2_Rect -- the box and the hit rect */
 #include "objflag.h"       /* ObjFlagClear0 -- reconstructed */
 #include "misc.h"          /* CommArmyOfSlot -- reconstructed */
 #include "defparse.h"      /* DefFindObjRec -- reconstructed */
+#include "script.h"        /* ScriptFindName, AddNameTableName */
+#include "scriptint.h"     /* kScriptNames -- the table itself */
+#include "map.h"           /* TileOfPoint -- reconstructed */
+#include "item.h"          /* ItemLinkCells -- reconstructed */
+
+/* The CRT's _strlwr, which ObjInitCommon applies to the CALLER's buffer. Same
+ * seam map.cpp and definfo.cpp use; it is CRT, so it stays original. */
+typedef char *(__cdecl *AM2_StrlwrFn)(char *);
+#define orig_strlwr ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -692,7 +702,7 @@ typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
  * writes the same constant into every row. Nothing in the loop can change
  * either; written as the plain loop that means.
  */
-int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
+int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
                                int32_t a7, int32_t a8, int32_t)
 {
@@ -711,7 +721,7 @@ int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
         (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
 
-    orig_obj_init_common(o, name, 1, (int32_t)at,
+    ObjInitCommon(o, name, 1, (int32_t)at,
                          (const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
 
     *(const void **)(o + OBJ_OFF_FIELD_94) = rec;
@@ -743,6 +753,164 @@ int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
     orig_obj_after_move(o, 0, 0);
     return 1;
 }
+
+
+/* ObjInitCommon -- original 0x00429940, eight callers. The shared tail of
+ * every object constructor: register the object, give it a unique script
+ * name, place it, copy its box and build the list of map cells it occupies.
+ *
+ * IT RETURNS int32 AND WAS DECLARED void, which only started to matter once
+ * it became ours. Both exits set eax deliberately -- `xor eax,eax` when the
+ * object gets no cell list, and the BYTE SIZE of the list when it does. Four
+ * of the eight callers are still the original's, and a void reconstruction
+ * would have handed those whatever eax happened to hold. Our four ignore the
+ * result, which is exactly why the wrong prototype survived: nothing read it.
+ * The same shape as ADDR_RECT_SET's `void`, one header along.
+ *
+ * ITS NAME BLOCK IS ScriptBindUniqueName INLINED, and the offsets prove it
+ * rather than the shape: the index goes to SCRIPT_REF_OFF_NAME_INDEX and the
+ * value comes from SCRIPT_REF_OFF_VALUE, the very fields that function uses,
+ * because AN OBJECT'S FIRST SIXTEEN BYTES ARE A SCRIPT-REF RECORD. Same
+ * lower-case-in-place, same adopt-an-entry-whose-value-is-zero, same "%s_%d"
+ * formatted from the ORIGINAL name so suffixes cannot accumulate, same
+ * AM2_NAME_TYPE_REF on the append. Written against that reconstruction rather
+ * than from scratch, which is where its comments about the buffer belong too.
+ *
+ * THE COUNTER LIVES IN ARG1'S STACK SLOT and the three `lea`s that look like
+ * three buffers are ONE 0x40-byte buffer at three different push depths. Both
+ * come from tracking esp, not from reading operands: arg1 is dead once `obj`
+ * is in ebp, so MSVC reused the slot.
+ *
+ * ARG6 IS NEVER READ. Kept in the signature because eight callers push it.
+ *
+ * The cell list is built only when OBJ_FLAG_BIT0 is set. Each axis of the box
+ * is narrowed by 2 when it is wider than 2, shifted down by AM2_CELL_SHIFT and
+ * widened by 2, and the two are multiplied AS BYTES -- `imul dl` is an 8-bit
+ * multiply, so a footprint whose product exceeds 255 wraps, and the count
+ * field is a byte to match. Reproduced with the truncation explicit.
+ *
+ * The four box offsets are emitted 0, 2, 1, 3 and the hit rect 0, 1, 2, 3;
+ * that is scheduling, not meaning, and both are written in field order here.
+ */
+int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
+                              uint32_t at, const int32_t *box,
+                              int32_t unused, uint32_t uid)
+{
+    uint8_t        *o = (uint8_t *)obj;
+    const AM2_Rect *b = (const AM2_Rect *)box;
+    char            tried[AM2_SCRIPT_UNIQUE_BUF];
+    int32_t         n = 1;
+    int32_t         bytes = 0;
+    int16_t         x, y;
+
+    (void)unused;
+
+    *(int32_t *)o = type;
+    AddToItemList((AM2_Object *)obj, uid);
+
+    if (!name || !*name) {
+        *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = -1;
+    } else {
+        orig_strlwr(name);
+        strcpy(tried, name);
+
+        for (;;) {
+            int32_t index = ScriptFindName(tried);
+
+            if (index < 0) {
+                *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) =
+                    AddNameTableName(tried, AM2_NAME_TYPE_REF,
+                                     *(const int32_t *)
+                                         (o + SCRIPT_REF_OFF_VALUE));
+                break;
+            }
+
+            if (kScriptNames[index].value == 0) {
+                *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = index;
+                kScriptNames[index].value =
+                    *(const int32_t *)(o + SCRIPT_REF_OFF_VALUE);
+                break;
+            }
+
+            am2_sprintf(tried, (const char *)AM2_IMAGE(AM2_STR_UNIQUE_SUFFIX),
+                        name, n);
+            n++;
+        }
+    }
+
+    x = (int16_t)(at & 0xFFFFu);
+    y = (int16_t)(at >> 16);
+    *(int16_t *)(o + OBJ_OFF_POS) = x;
+    *(int16_t *)(o + OBJ_OFF_POS + 2) = y;
+    *(uint16_t *)(o + OBJ_OFF_TILE) =
+        (uint16_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+
+    {
+        AM2_Rect *keep = (AM2_Rect *)(o + OBJ_OFF_BOX_OFFSETS);
+        AM2_Rect *hit  = (AM2_Rect *)(o + OBJ_OFF_HIT_RECT);
+
+        keep->left   = b->left;
+        keep->top    = b->top;
+        keep->right  = b->right;
+        keep->bottom = b->bottom;
+
+        hit->left   = b->left + x;
+        hit->top    = b->top + y;
+        hit->right  = b->right + x;
+        hit->bottom = b->bottom + y;
+    }
+
+    /* THE NO-CELLS EXIT IS AN EARLY RETURN, not a skipped block. `test al,1 /
+     * jne` falls straight into the epilogue with eax zeroed, so an object
+     * without a cell list never reaches ItemLinkCells either. Writing this as
+     * two independent ifs with a shared tail linked every such object into the
+     * map a second time, which cost a campaign A/B: the load never finished
+     * and five log lines from "calculating region data..." on were missing. */
+    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
+        return 0;
+
+    {
+        int32_t  w = b->right - b->left;
+        int32_t  h = b->bottom - b->top;
+        uint8_t  count;
+        int32_t  i;
+        uint8_t *cells;
+
+        if (w > 2)
+            w -= 2;
+        if (h > 2)
+            h -= 2;
+        h >>= AM2_CELL_SHIFT;
+        w >>= AM2_CELL_SHIFT;
+
+        /* `add al,2` / `add dl,2` / `imul dl`: an 8-bit signed multiply whose
+         * low byte is what the count field keeps. */
+        {
+            int8_t hc = (int8_t)((int8_t)h + 2);
+            int8_t wc = (int8_t)((int8_t)w + 2);
+
+            count = (uint8_t)(int8_t)(hc * wc);
+        }
+        *(uint8_t *)(o + OBJ_OFF_CELL_COUNT) = count;
+
+        bytes = (int32_t)count * 0x10;
+        *(void **)(o + OBJ_OFF_CELL_ENTRIES) = am2_malloc((size_t)bytes);
+
+        cells = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES);
+        for (i = 0; i < *(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
+            *(void **)(cells + i * 0x10) = obj;
+            *(int32_t *)(cells + i * 0x10 + 8) = 0;
+            *(int32_t *)(cells + i * 0x10 + 4) = 0;
+            *(int32_t *)(cells + i * 0x10 + 0xC) = -1;
+        }
+    }
+
+    if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+        ItemLinkCells(obj, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+
+    return bytes;
+}
+
 
 int objtype_install(void)
 {
@@ -781,5 +949,7 @@ int objtype_install(void)
                         "ObjType2Field548", 1);
     rc |= patch_replace(ADDR_LOOKUP_TYPE3_BY_UID, (const void *)LookupType3ByUID,
                         "LookupType3ByUID", 1);
+    rc |= patch_replace(ADDR_OBJ_INIT_COMMON, (const void *)ObjInitCommon,
+                        "ObjInitCommon", 7);
     return rc;
 }

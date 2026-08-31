@@ -16,7 +16,7 @@
 #include "script.h"
 #include "objscript.h"
 #include "objflag.h"   /* ObjFlagSet0 -- the row-visible bit */
-#include "objtype.h"   /* orig_obj_init_common -- the shared typedef */
+#include "objtype.h"   /* ObjInitCommon -- reconstructed */
 #include "maprow.h"    /* BuildRowSet, SetAnimFrame -- reconstructed */
 
 /* FreeSpriteRegistry is reconstructed, in win32/sprite.cpp with the rest of
@@ -884,7 +884,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(h + OBJ_OFF_ARMY);
 
-    orig_obj_init_common(o, (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                          AM2_OBJ_TYPE_MISSILE,
                          *(const uint32_t *)(h + OBJ_OFF_POS),
                          (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
@@ -962,7 +962,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
     o = (uint8_t *)CreateRoach(
             *(const int32_t *)(rec + 0x498),
-            (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+            (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
             *(const int16_t *)(h + OBJ_OFF_POS),
             *(const int16_t *)(h + OBJ_OFF_POS + 2),
             *(const int8_t *)(h + OBJ_OFF_ARMY),
@@ -1049,7 +1049,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     orig_fread(&tag, 4, 1, fp);
 
     obj = (uint8_t *)orig_create_item(
-        (const char *)(uintptr_t)ADDR_DIR_SCRATCH, AM2_ARMY_NEUTRAL,
+        (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL,
         (int32_t)tag,
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_POS),
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_FLAGS), 1,

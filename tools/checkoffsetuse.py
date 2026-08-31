@@ -51,13 +51,20 @@ def orig_offsets(addr):
     out = subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'disasm.py'),
                           hex(addr)], capture_output=True, text=True).stdout
     seen = set()
-    # esp/ebp displacements are stack frame slots, not structure fields --
-    # right for a standard prologue and WRONG whenever ebp is a general
-    # register. CanPickUpWeapon does `push ebp; mov ebp, [esp+8]`, so its
-    # [ebp + 0xC8] is OBJ_OFF_PICKUP_AFTER and this reports it missing. There
-    # is no cheap way to tell the two apart; it stays a known false positive.
+    # esp displacements are stack frame slots, never structure fields.
+    #
+    # ebp DEPENDS, and this used to say there was no cheap way to tell. There
+    # is: a frame pointer is ESTABLISHED, by `mov ebp, esp`. A function that
+    # never writes esp into ebp is using it as a general register, and its
+    # [ebp + N] are fields. CanPickUpWeapon does `push ebp; mov ebp, [esp+8]`
+    # and ObjInitCommon `push ebp; mov ebp, [esp+0x4c]` -- neither has the
+    # prologue, and skipping ebp reported ObjInitCommon as touching THREE
+    # displacements where it touches twelve, which is not a false positive so
+    # much as no check at all.
+    frame_ptr = re.search(r'\bmov\s+ebp, esp\b', out) is not None
+    skip = ('esp', 'ebp') if frame_ptr else ('esp',)
     for m in re.finditer(r'\[(e[a-z][a-z])(?: \+ e[a-z][a-z])? \+ (0x[0-9a-f]+|\d+)\]', out):
-        if m.group(1) in ('esp', 'ebp'):
+        if m.group(1) in skip:
             continue
         if int(m.group(2), 0) >= 0x400000:
             continue        # an absolute image address, not a field

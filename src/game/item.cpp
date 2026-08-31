@@ -1322,7 +1322,7 @@ void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
     *(o + OBJ_OFF_ARMY)             = (uint8_t)army;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = 1;
 
-    orig_obj_init_common(o, (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 7, pt,
+    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), 7, pt,
                          (const int32_t *)AM2_IMAGE(ADDR_KIND7_BOX), e, f);
 
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
@@ -1922,7 +1922,7 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * load that flag is set, and LoadType8 clears OBJ_FLAG_FOOTPRINT_ON on the
  * way out instead so a later pass puts it down -- the two halves of one
  * decision, in two functions. */
-void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
+void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7, int32_t uid)
 {
     uint8_t  *o    = (uint8_t *)am2_malloc(AM2_ROACH_BYTES);
@@ -1955,7 +1955,7 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
         (int32_t)(orig_game_rand() % AM2_ROACH_STAGGER_MS)
         + *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
-    orig_obj_init_common(o, name, 8, at,
+    ObjInitCommon(o, name, 8, at,
                          (const int32_t *)AM2_IMAGE(ADDR_ROACH_BOX), a7, uid);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 (const void *)AM2_IMAGE(ADDR_ROACH_ROW_SPEC), x, y,
@@ -3977,7 +3977,7 @@ void __cdecl PortalSpawn(void)
         pick = orig_game_rand() & 3;
 
         weapon = (uint8_t *)orig_create_weapon(
-                     (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+                     (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), 1,
                      KeyLookupTriple(AM2_WEAPON_RESPAWN_KEY,
                                      (uint32_t)kWeapons[pick], 0),
                      *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
@@ -5988,7 +5988,7 @@ void __cdecl Type2ActionA(void *obj)
     if (old)
         *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
 
-    made = orig_make_weapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+    made = orig_make_weapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                             (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
                             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                             AM2_WEAPON_KEY_2B, 0),

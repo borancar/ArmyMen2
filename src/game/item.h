@@ -263,7 +263,7 @@ void __cdecl ObjSetRoachFootprint(void *obj);
  * Allocate a roach, seed it from the ROACH_* constants aai/game.aai names,
  * run the common init and the row set, and lay its footprint down unless the
  * state has already been entered. */
-void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
+void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7,
                           int32_t uid);
 

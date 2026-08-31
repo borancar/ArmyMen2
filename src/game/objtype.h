@@ -117,7 +117,7 @@ int objtype_install(void);
 
 /* 0x00433880, two callers. Build an object out of an AAI record. Nine
  * arguments; the ninth is never read. */
-int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
+int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
                                int32_t a7, int32_t a8, int32_t unused);
 
@@ -127,11 +127,14 @@ int32_t __cdecl InitObjFromAai(void *obj, const char *name, int32_t army,
  * orig.h; the parameters here are read off the body. `box` is an AM2_Rect,
  * spelled as a pointer to four int32 so this header need not pull in rect.h
  * for one declaration. */
-typedef void (__cdecl *AM2_ObjInitCommonFn)(void *obj, const char *name,
-                                            int32_t type, uint32_t at,
-                                            const int32_t *box,
-                                            int32_t e, int32_t f);
-#define orig_obj_init_common \
-    ((AM2_ObjInitCommonFn)(uintptr_t)ADDR_OBJ_INIT_COMMON)
+/* 0x00429940, eight callers. The shared tail of every object constructor:
+ * register it, unique its script name, place it, copy its box and build the
+ * cell list. RETURNS the byte size of that list, or 0 when it builds none --
+ * the prototype said void for as long as only our callers read it, and four
+ * of the eight are still the original's. `name` is NOT const: the function
+ * lower-cases the caller's buffer in place. Arg 6 is never read. */
+int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
+                              uint32_t at, const int32_t *box,
+                              int32_t unused, uint32_t uid);
 
 #endif /* AM2_OBJTYPE_H */
