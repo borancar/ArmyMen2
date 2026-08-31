@@ -28,6 +28,11 @@ extern "C" {
  * A raw read of the matrix: no bounds check, no special case for army 4. */
 int32_t __attribute__((stdcall)) AllyFlag(int32_t a, int32_t b);
 
+/* 0x00458070, twenty callers. Detach an object from whatever it is attached
+ * to, then attach it to a target if one is given -- a NULL target is the pure
+ * detach the three per-type destroy handlers use. Types 2, 3 and 8 only. */
+void __cdecl ObjAttachTo(void *subject, void *target);
+
 /* 0x00457720, two callers. The same question with army 4 answering yes to
  * everything, on either side. */
 int32_t __cdecl ArmiesAllied(int32_t a, int32_t b);

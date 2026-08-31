@@ -462,6 +462,193 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
     return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
 }
 
+/* ObjAttachTo -- original 0x00458070, 640 bytes, twenty callers. Detach an
+ * object from whatever it is attached to, and then attach it to a target if
+ * one is given. The three per-type destroy handlers pass a NULL target, so for
+ * them this is purely a detach.
+ *
+ * IT WAS READ A WHILE AGO AND DEFERRED FOR A LIST OF PREREQUISITES THAT HAVE
+ * ALL SINCE ARRIVED. orig.h said it "would need names for nine fields, three
+ * comm methods and four 0x100-byte blocks". Every one of those was named by
+ * some other unit in the meantime -- the fields one at a time, the comm
+ * queries with misc.cpp, the blocks as ADDR_OBJ_TABLE_RECORDS -- and nobody
+ * re-read the note. It needed no new names at all. A decline is worth
+ * re-testing against the tree rather than against the reason it was written.
+ *
+ * TWO CORRECTIONS TO THAT NOTE, both from the body.
+ *
+ * The stance is 0, 3 or 6 and NOT "0, 3, 6 or 7". Only three instructions
+ * store OBJ_OFF_AI_MODE. The 7 is `mov esi, 7`, which is what soldier kind is
+ * COMPARED against, and it is never written anywhere.
+ *
+ * +0xA8 and +0xAC are the SUB-LIST HEADER at OBJ_OFF_PTR_LIST, not the item
+ * chain. `lea ecx,[edi+0xa4]` hands ListRemoveAt that header directly, and
+ * 0xA4 + SUBREC_OFF_COUNT is 0xA8 and + SUBREC_OFF_ROWS is 0xAC. Spelling
+ * them that way dissolves the type-overload the note warned about instead of
+ * working around it: for types 2, 3 and 8 this is a list of member uids.
+ *
+ * THE DETACH LOOP DOES NOT ADVANCE ON A REMOVAL, which is what makes it
+ * correct rather than a bug: after ListRemoveAt the following element has
+ * shifted down into the same index, so the jump goes to the loop CONDITION and
+ * not to the increment. It removes the subject's own uid and any uid that no
+ * longer resolves, and renumbers every survivor's OBJ_OFF_FORMATION_SLOT as it
+ * passes. Reading it as a break, or as an ordinary for, gets both wrong.
+ *
+ * THE THREE STANCE VALUES ARE LEFT AS LITERALS ON PURPOSE. 0, 3 and 6 go
+ * into OBJ_OFF_AI_MODE, and the script vocabulary this file records elsewhere
+ * already calls 6 `attack`; a new name here would be a SECOND name for that
+ * value in the same field, which is the alias mistake one level down. Nothing
+ * establishes what 3 and 0 mean beyond the branches that write them -- 3 when
+ * the two are allied or the same side, 0 when the subject's own army is
+ * ADDR_DEFAULT_OWNER -- so they stay numbers until something reads them.
+ * Soldier kind 7 is a literal for the same reason.
+ *
+ * THE ecx LOADS BEFORE AllyFlag ARE DEAD and the prototype is right as it
+ * stands. Both sites do `mov ecx, [comm]` immediately before the call, which
+ * reads exactly like thiscall -- but AllyFlag is `mov eax,[esp+8];
+ * mov ecx,[esp+4]; ...; ret 8`, so ecx is an input to nothing and is clobbered
+ * as scratch. Checked in the callee rather than inferred from the call site,
+ * which is the only reason a correct declaration was not "corrected". */
+void __cdecl ObjAttachTo(void *subject, void *target)
+{
+    uint8_t *s = (uint8_t *)subject;
+    uint8_t *t = (uint8_t *)target;
+    void    *comm;
+    int32_t  mp;
+    uint32_t old;
+    int32_t  army;
+
+    if (subject == target || !subject || !ObjIsTypeIn238((const AM2_Object *)s))
+        return;
+
+    old = *(const uint32_t *)(s + OBJ_OFF_FOLLOW_UID);
+    *(uint32_t *)(s + OBJ_OFF_TARGET_UID) = 0;
+
+    if (old) {
+        uint8_t *h = (uint8_t *)LookupByUID(old);
+
+        if (h && ObjIsTypeIn238((const AM2_Object *)h)) {
+            uint8_t *list = h + OBJ_OFF_PTR_LIST;
+            int32_t  i = 0;
+
+            while (i < *(const int32_t *)(list + SUBREC_OFF_COUNT)) {
+                uint32_t uid = (*(uint32_t *const *)
+                                (list + SUBREC_OFF_ROWS))[i];
+                uint8_t *other;
+
+                if (uid == ((const AM2_Object *)s)->uid) {
+                    ListRemoveAt(list, i);
+                    continue;           /* the next one shifted into i */
+                }
+
+                other = (uint8_t *)LookupByUID(uid);
+                if (!other) {
+                    ListRemoveAt(list, i);
+                    continue;
+                }
+
+                if (ObjIsTypeIn238((const AM2_Object *)other))
+                    *(int32_t *)(other + OBJ_OFF_FORMATION_SLOT) = i;
+                i++;
+            }
+        }
+    }
+
+    if (!target) {
+        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 0;
+        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = 0;
+        return;
+    }
+
+    /* TWO DIFFERENT GLOBALS, and reading them as one was a real mistake in an
+     * earlier draft of this. `mov ecx,[0x511da0]` at the top is
+     * ADDR_MP_SESSION and it gates both kind-7 arms; the comm object is loaded
+     * separately at 0x4581E6 as the `this` for CommArmyOfSlot. ObjsAreAllied
+     * four hundred lines up gates the same arms on `mp` too, which is what
+     * exposed it -- and NO A/B COULD HAVE: ADDR_MP_SESSION is 0 on every drive
+     * this project has, so both arms are unreachable and a wrong global there
+     * is invisible. */
+    mp   = *(const int32_t *)(uintptr_t)ADDR_MP_SESSION;
+    comm = *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    army = *(const int8_t *)(s + OBJ_OFF_ARMY);
+
+    if (mp
+        && *(const int32_t *)s == AM2_OBJ_TYPE_TROOPER
+        && *(const int32_t *)(s + OBJ_OFF_SOLDIER_KIND) == 7) {
+        if (*(const int32_t *)t == AM2_OBJ_TYPE_TROOPER
+            && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
+               == 7)
+            goto attach_and_join;
+        goto mode_only;
+    }
+
+    /* The subject's army is movsx and the target's is a plain `cmp byte`, so
+     * one is signed and the other is not -- ObjsAreAllied spells the pair the
+     * same way. It cannot matter at 4, and it is written as the original reads
+     * it rather than made uniform. */
+    if (army == AM2_ARMY_ALL
+        || *(const uint8_t *)(t + OBJ_OFF_ARMY) == AM2_ARMY_ALL)
+        goto attach_and_join;
+
+    if (*(const int32_t *)t == AM2_OBJ_TYPE_TROOPER) {
+        const uint8_t *kind;
+        int32_t        idx;
+
+        if (comm
+            && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
+               == 7)
+            goto mode_only;
+
+        kind = *(const uint8_t *const *)(t + SAVED_OFF_TABLE_REC2);
+        /* Spelled exactly as ObjsAreAllied spells it, four hundred lines up
+         * in this same file -- that function is the SAME inlined block and is
+         * already verified, so a second spelling here would be a second place
+         * to be wrong. */
+        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
+                + (uint32_t)(CommArmyOfSlot(comm, army) << 8)) == kind)
+            goto attach_and_join;
+
+        if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
+            idx = 0;
+        else if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
+            idx = 1;
+        else if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
+            idx = 2;
+        else if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
+            idx = 3;
+        else
+            goto mode_only;
+
+        if (AllyFlag(army, CommSlotForArmy(comm, idx)))
+            goto attach_and_join;
+    }
+
+    if (AllyFlag(army, *(const int8_t *)(t + OBJ_OFF_ARMY)))
+        goto attach_and_join;
+
+mode_only:
+    *(int32_t *)(s + OBJ_OFF_AI_MODE) =
+        (army == (int32_t)g_defaultOwner)
+            ? 0 : 6;
+    *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) =
+        ((const AM2_Object *)t)->uid;
+    return;
+
+attach_and_join:
+    *(int32_t *)(s + OBJ_OFF_AI_MODE) = 3;
+    *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) =
+        ((const AM2_Object *)t)->uid;
+
+    if (ObjIsTypeIn238((const AM2_Object *)t)) {
+        uint8_t *list = t + OBJ_OFF_PTR_LIST;
+
+        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) =
+            *(const int32_t *)(list + SUBREC_OFF_COUNT);
+        PtrListPush(list, (void *)(uintptr_t)
+                    ((const AM2_Object *)s)->uid);
+    }
+}
+
 /* 0x00457620, six callers. The same question as ObjsAreAllied with an ARMY on
  * the left instead of an object.
  *
@@ -679,6 +866,8 @@ int army_install(void)
     rc |= patch_replace(ADDR_LIST_FIRST_FIELD548, (const void *)ListFirstField548,
                         "ListFirstField548", 1);
     rc |= patch_replace(ADDR_ALLY_FLAG, (const void *)AllyFlag, "AllyFlag", 2);
+    rc |= patch_replace(ADDR_OBJ_ATTACH_TO, (const void *)ObjAttachTo,
+                        "ObjAttachTo", 2);
     rc |= patch_replace(ADDR_OBJ_IS_OURS, (const void *)ObjIsOurs,
                         "ObjIsOurs", 5);
     rc |= patch_replace(ADDR_OBJ_IS_LIVE_TARGET, (const void *)ObjIsLiveTarget,

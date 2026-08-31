@@ -3120,9 +3120,7 @@ void __cdecl RoachBuildContext(void *obj, void *out)
 
 
 typedef void (__cdecl *AM2_AiTrooperFn)(void *obj, void *out, void *ctx);
-typedef void (__cdecl *AM2_AttachFn)(void *subject, void *target);
 #define orig_ai_trooper ((AM2_AiTrooperFn)(uintptr_t)AM2_IMAGE(ADDR_AI_TROOPER_STEP))
-#define orig_attach_to  ((AM2_AttachFn)(uintptr_t)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
 
 /* AiStepAttach -- original 0x004060D0, one caller, inside the trooper step
  * chooser at 0x0044B990. The name is OURS and describes what distinguishes it
@@ -3227,7 +3225,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
                     && ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                                   (const AM2_Point *)(t + OBJ_OFF_POS))
                        < AM2_AI_ATTACH_RANGE)
-                    orig_attach_to(obj, t);
+                    ObjAttachTo(obj, t);
             }
         }
     }
@@ -3713,8 +3711,6 @@ tail:
 }
 
 
-typedef void (__cdecl *AM2_AttachFn2)(void *subject, void *target);
-#define orig_attach_to2 ((AM2_AttachFn2)(uintptr_t)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
 #define orig_step3_45c8d0 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45C8D0))
 #define orig_step3_45cb30 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45CB30))
 
@@ -3843,7 +3839,7 @@ attach:
         AiStep(obj, out);
         orig_step3_45c8d0(obj, out);
     } else {
-        orig_attach_to2(obj, NULL);
+        ObjAttachTo(obj, NULL);
         *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
         *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
     }

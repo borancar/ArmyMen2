@@ -3554,8 +3554,6 @@ void __cdecl DestroyByType(void *obj)
 
 #define orig_item_teardown  ((am2_destroy_fn)AM2_IMAGE(ADDR_ITEM_TEARDOWN))
 
-#define orig_obj_attach_to \
-            ((void (__cdecl *)(void *, void *))AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
 
 
 
@@ -3592,7 +3590,7 @@ void __cdecl DestroyType2(void *obj)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
 
-    orig_obj_attach_to(obj, 0);
+    ObjAttachTo(obj, 0);
     DestroyObjCommon(obj);
 }
 
@@ -3617,7 +3615,7 @@ void __cdecl DestroyType3(void *obj)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
 
-    orig_obj_attach_to(obj, 0);
+    ObjAttachTo(obj, 0);
     DestroyObjCommon(obj);
 }
 
@@ -3640,7 +3638,7 @@ void __cdecl DestroyType8(void *obj)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID)     = 0;
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID + 2) = 0;
 
-    orig_obj_attach_to(obj, 0);
+    ObjAttachTo(obj, 0);
     DestroyObjCommon(obj);
 }
 
@@ -5548,7 +5546,7 @@ void __cdecl PointActionA(void *obj, uint32_t point)
     if (type > 3 && type != 8)
         return;
 
-    orig_obj_attach_to(obj, 0);
+    ObjAttachTo(obj, 0);
 
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID) = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_B2)  = 0;
@@ -6875,8 +6873,7 @@ void __cdecl DeselectAll(void)
                     && ArmyAlliedWithObj(
                            (int32_t)*(const uint32_t *)
                                (uintptr_t)ADDR_DEFAULT_OWNER, other, 0))
-                    ((void (__cdecl *)(void *, void *))
-                         AM2_IMAGE(ADDR_OBJ_ATTACH_TO))(obj, (void *)0);
+                    ObjAttachTo(obj, (void *)0);
             }
         }
 
@@ -7928,7 +7925,7 @@ void __cdecl ResetObjOnCof(void *obj)
     *(uint32_t *)(o + OBJ_OFF_FIELD_100)   = 0;
     *(int32_t  *)(o + OBJ_OFF_FIELD_FC)    = orig_rand() % AM2_COF_PHASE_MAX;
 
-    orig_obj_attach_to(o, (void *)0);
+    ObjAttachTo(o, (void *)0);
 
     if (!o)                     /* dead: five stores above already used it */
         return;
@@ -8213,7 +8210,7 @@ void __cdecl ToggleSelect(void *obj)
 
     ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
     *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
-    orig_obj_attach_to(o, (void *)0);
+    ObjAttachTo(o, (void *)0);
     OnSelectionChanged(
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }

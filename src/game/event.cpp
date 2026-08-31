@@ -939,9 +939,6 @@ void __cdecl TimerTick(void)
 
 typedef void (__cdecl *AM2_Type2ActionFn)(void *obj);
 typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
-typedef void (__cdecl *AM2_ObjAttachFn)(void *a, void *b);
-#define orig_obj_attach_to \
-    (*(AM2_ObjAttachFn)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
 typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
@@ -1802,7 +1799,7 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
     if (ObjIsType2((const AM2_Object *)a))
         *(int32_t *)(a + OBJ_OFF_FIELD_540) = 0;
 
-    orig_obj_attach_to(a, b);
+    ObjAttachTo(a, b);
 }
 
 /* --------------------------------------------------- bitmaps ---- */
@@ -2492,7 +2489,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
         if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             && ObjIsTypeIn238((const AM2_Object *)obj)
             && (filter == AM2_ATTACH_ANY || ObjFieldA(obj) == (uint32_t)filter))
-            orig_obj_attach_to(obj, target);
+            ObjAttachTo(obj, target);
 
         i++;
     }
