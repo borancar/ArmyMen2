@@ -118,6 +118,12 @@ void __cdecl TrooperAiStep(void *obj, void *out);
  * see the body. */
 void __cdecl AiBuildContext(void *obj, void *out);
 
+/* 0x00408060, one caller -- ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is
+ * this record's length. AiBuildContext's twin for a roach: the same structure
+ * one dword shorter, with a null weapon and the ranges a weapon of range 64
+ * would give. */
+void __cdecl RoachBuildContext(void *obj, void *out);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

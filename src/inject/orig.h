@@ -3167,6 +3167,11 @@
  * gets from ClassifyByCode74, which tools/posecheck.py enumerates as "the
  * object's class (0, 1 or 2)". Suggestive rather than settled: nothing seen so
  * far WRITES it. */
+/* SETTLED, and the guess above was right. 0x00404730 -- the trooper's context
+ * builder, the third of the family -- opens with `ctx[0] = ClassifyByCode74(obj)`.
+ * So the field IS that classifier's 0, 1 or 2, established by the WRITER
+ * rather than by two consumers agreeing on a range. The paragraph above
+ * reasoned it out and said plainly that nothing wrote it; something does. */
 #define SIGHTC_OFF_FIELD_00      0x00u
 #define SIGHTC_OFF_FIELD_3C      0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
 #define AM2_AI_KEEP_RANGE_MS     0x1388 /* 5000, the reposition interval */
@@ -6433,6 +6438,50 @@ typedef struct {
  * destroyed. Nothing here reads their bodies. */
 #define ADDR_STEP_TYPE8          0x0043D980u  /* void(obj) */
 #define ADDR_ROACH_ALIVE_STEP_A  0x00408A60u  /* void(obj, uint8_t *facing) */
+/* 0x00408060, one caller -- ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is
+ * this record's LENGTH. The roach's half of the sight-context idea: the same
+ * structure ADDR_AI_BUILD_CONTEXT fills for a vehicle, four bytes shorter.
+ *
+ * THE TWO RECORDS DIVERGE AT 0x34, NOT AT 0x40, and that is worth stating
+ * because the lengths suggest otherwise. The vehicle record carries a weapon
+ * KIND at 0x34 and this one does not, so everything after shifts down a dword:
+ *
+ *     vehicle   0x30 weapon  0x34 kind  0x38 want  0x3C max   0x40 ready
+ *     roach     0x30 weapon  ----       0x34 want  0x38 max   0x3C ready
+ *
+ * ESTABLISHED FOUR WAYS, none of them a guess. The two callers reserve 0x44
+ * and 0x40; the two builders `rep stos` 0x11 and 0x10 dwords; only the vehicle
+ * one writes +0x40; and this one's constants are 48 and 70, which are the
+ * vehicle builder's own 0.75 and 1.1 over a default range of 64 -- 48/0.75 is
+ * exactly 64 and 64*1.1 truncates to 70. A consumer agrees independently:
+ * 0x00408640 compares SIGHT_OFF_RANGE against this record's +0x34, and a
+ * comparison against a range is what a range field is for.
+ *
+ * IT DIFFERS FROM ITS TWIN IN THREE WAYS, not one. It measures from the raw
+ * OBJ_OFF_POS where the vehicle builder measures from ObjAnchorPoint; it
+ * resolves a FORMATION point when the leader is a type 2, 3 or 8 where that
+ * one copies the leader's position; and it writes these fixed ranges where
+ * that one reads the weapon.
+ *
+ * IT CARRIES THE ORIGINAL'S OWN ASSERTION. After DistAndAngle gives it the
+ * target's bearing it recomputes the same bearing with AngleBetween and logs
+ * "Bad!" if they disagree. Dead in practice, and reproduced.
+ *
+ * Reconstructed as RoachBuildContext. */
+#define ADDR_ROACH_BUILD_CONTEXT 0x00408060u  /* void(obj, ctx *) */
+#define AM2_ROACH_CONTEXT_BYTES  0x40
+/* The three tail fields, one dword below the vehicle record's. A prefix of
+ * their own because they are a different structure -- the same reason
+ * SIGHTC_OFF_ has one -- and NOT the AICTX_ mistake, which gave new names to
+ * the SAME record's offsets. The head, 0x00 to 0x2C, is shared and keeps the
+ * SIGHT_OFF_ names. */
+#define ROACHCTX_OFF_WANT_RANGE  0x34u
+#define ROACHCTX_OFF_MAX_RANGE   0x38u
+#define ROACHCTX_OFF_READY       0x3Cu
+#define AM2_ROACH_WANT_RANGE     48    /* 64 * ADDR_SIGHT_RANGE_WANT */
+#define AM2_ROACH_MAX_RANGE      70    /* 64 * ADDR_WEAPON_RANGE_HI */
+#define AM2_ROACH_READY_MS       0x2EE /* 750, against OBJ_OFF_DEADLINE_58 */
+#define ADDR_STR_BAD             0x00473F18u  /* "Bad!\n" */
 #define ADDR_ROACH_ALIVE_STEP_B  0x0043D5B0u  /* void(obj, uint8_t *facing) */
 #define ADDR_ROACH_STEP_TAIL_A   0x0043D750u  /* void(obj, uint8_t *facing) */
 /* NOT a "step tail", and the note above predicted this: the five names in this

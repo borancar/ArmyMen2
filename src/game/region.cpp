@@ -3007,6 +3007,114 @@ void __cdecl AiBuildContext(void *obj, void *out)
 }
 
 
+/* RoachBuildContext -- original 0x00408060, one caller:
+ * ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is this record's length. The
+ * roach's half of the sight-context idea, and AiBuildContext's twin.
+ *
+ * THE RECORDS DIVERGE AT 0x34, NOT AT THEIR ENDS. The vehicle record carries a
+ * weapon KIND at 0x34 that this one has no use for, so its want range, max
+ * range and cooldown flag all sit one dword lower -- which is the whole of the
+ * 0x40-against-0x44 difference. Four independent things say so and orig.h
+ * lists them; the prettiest is that this function's 48 and 70 are the vehicle
+ * builder's own 0.75 and 1.1 over a default range of 64.
+ *
+ * SO A ROACH IS SIMPLY ALWAYS UNARMED. It writes a null weapon and the ranges
+ * a weapon of range 64 would give, which is why the constants are here rather
+ * than read from an item record.
+ *
+ * IT DIFFERS FROM ITS TWIN IN THREE WAYS. It measures from the raw
+ * OBJ_OFF_POS, not from ObjAnchorPoint; it resolves a FORMATION point when the
+ * leader is one of the owned types, where the twin copies the leader's
+ * position; and it writes those fixed ranges instead of reading a weapon.
+ *
+ * IT CARRIES THE ORIGINAL'S OWN ASSERTION AND IT IS KEPT. Having taken the
+ * target's bearing from DistAndAngle it recomputes the same bearing with
+ * AngleBetween and logs "Bad!" when they disagree. The two cannot disagree --
+ * AngleBetween is the second half of DistAndAngle -- so this is dead code that
+ * somebody left in, and reproducing it costs one comparison.
+ *
+ * IT RUNS 221,220 TIMES IN A LIVE MAP 01 AND NOTHING COMPARES IT. Measured,
+ * with the prediction written down first: kitchen1.txt declares nine roaches
+ * and bootcamp1.txt none, so this should read zero on one drive and a large
+ * number on the other. It does -- 0 under `ab.sh bootcamp` with StepType8 also
+ * at 0, and 221,220 with CreateRoach at 9 on MAP 01 once the briefing is
+ * cleared.
+ *
+ * But `ab.sh campaign` STOPS at that briefing, and deliberately: its own
+ * comment records that dismissing it makes MAP 01 hostile and puts two dozen
+ * FIRE lines into the log in a non-deterministic order. So the clean run this
+ * landed with does not compare a line of this function. It is not cold, it is
+ * unwatched -- which is the standing CLAUDE.md already gives the whole roach
+ * layer, now with a number on it.
+ */
+void __cdecl RoachBuildContext(void *obj, void *out)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *s = (uint8_t *)out;
+    uint8_t *leader, *target;
+
+    if (!obj)
+        return;
+
+    memset(out, 0, AM2_ROACH_CONTEXT_BYTES);
+
+    leader = SightResolve((uint32_t *)(o + OBJ_OFF_FOLLOW_UID),
+                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
+                          (void **)(s + SIGHT_OFF_LEADER));
+    if (leader) {
+        if (ObjIsTypeIn238((const AM2_Object *)leader))
+            ResolveFormationPoint(obj, leader,
+                                  (AM2_Point *)(s + SIGHT_OFF_DEST));
+        else
+            *(uint32_t *)(s + SIGHT_OFF_DEST) =
+                *(const uint32_t *)(leader + OBJ_OFF_POS);
+
+        DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
+                     (const AM2_Point *)(s + SIGHT_OFF_DEST),
+                     (int32_t *)(s + SIGHT_OFF_LEAD_RANGE),
+                     s + SIGHT_OFF_LEAD_BEARING);
+    }
+
+    target = SightResolve((uint32_t *)(o + OBJ_OFF_TARGET_UID),
+                          (uint32_t *)(o + OBJ_OFF_TARGET_UID),
+                          (void **)(s + SIGHT_OFF_OBSERVER));
+    if (target) {
+        DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
+                     (const AM2_Point *)(target + OBJ_OFF_POS),
+                     (int32_t *)(s + SIGHT_OFF_RANGE),
+                     s + SIGHT_OFF_BEARING);
+
+        if (*(const uint8_t *)(s + SIGHT_OFF_BEARING)
+            != AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                            (const AM2_Point *)
+                                (*(uint8_t **)(s + SIGHT_OFF_OBSERVER)
+                                 + OBJ_OFF_POS)))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_BAD));
+    }
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
+        *(int32_t *)(s + SIGHT_OFF_FOUND) =
+            orig_scan_403b40(obj, s + SIGHT_OFF_FOUND_RANGE,
+                             s + SIGHT_OFF_FOUND_BEARING,
+                             o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110, 0);
+
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
+        *(int32_t *)(s + SIGHT_OFF_DEST_DIST) =
+            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_STATE));
+
+    *(void **)(s + SIGHT_OFF_WEAPON)          = NULL;
+    *(int32_t *)(s + ROACHCTX_OFF_WANT_RANGE) = AM2_ROACH_WANT_RANGE;
+    *(int32_t *)(s + ROACHCTX_OFF_MAX_RANGE)  = AM2_ROACH_MAX_RANGE;
+    *(int32_t *)(s + ROACHCTX_OFF_READY) =
+        (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+         - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_ROACH_READY_MS;
+
+    *(uint8_t *)(s + SIGHT_OFF_SEED) = (uint8_t)orig_region_rand();
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -3044,6 +3152,9 @@ int region_install(void)
                         "SargeAiStep", 1);
     rc |= patch_replace(ADDR_AI_BUILD_CONTEXT, (const void *)AiBuildContext,
                         "AiBuildContext", 1);
+    rc |= patch_replace(ADDR_ROACH_BUILD_CONTEXT,
+                        (const void *)RoachBuildContext,
+                        "RoachBuildContext", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
