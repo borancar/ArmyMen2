@@ -8050,6 +8050,73 @@ typedef void (__cdecl *AM2_SpawnAtFn2)(int32_t x, int32_t y, int32_t kind,
                                        int32_t g, int32_t h);
 #define orig_spawn_at_aim ((AM2_SpawnAtFn2)(uintptr_t)ADDR_SPAWN_AT)
 
+/* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
+ * of an aim marker, and the pair is now complete: THIS ONE DOES THE DAMAGE and
+ * AimStartB below draws the marker. Reading either alone would have made the
+ * split look like duplication.
+ *
+ * The first eleven lines are AimStartB's, field for field on the A arrays: the
+ * live flag, the point, the stamp only if clear, and a deadline that is a flat
+ * AM2_AIM_LIFE_REMOTE_MS for a shot relayed from another player and
+ * `2 * ADDR_AIM_LIFE_HALF_A - 1` for our own.
+ *
+ * THEN THE TWO DIVERGE, AND THE REMOTE CASE IS THE TELL. Where B carries on
+ * and spawns its sprite whatever the session says, A RETURNS as soon as it has
+ * written the remote deadline. So somebody else's shot gets a marker drawn for
+ * it and does no damage here -- the damage is the shooter's own machine's job,
+ * and this is the client refusing to double it. Two functions started from one
+ * call site, and only the pair shows why.
+ *
+ * The damage sweep uses ObjectsHitByPoint, the PRECISE test -- rectangle and
+ * then the sprite's own mask -- rather than the looser ObjectsAtPoint, and
+ * walks its answer through OBJ_OFF_QUERY_NEXT giving every object
+ * ADDR_AIM_DAMAGE with kind 1 and the firing uid as the attacker.
+ *
+ * The point is composed with SIXTEEN-BIT adds of the view origin onto the
+ * stored point, so a marker near the edge of the world wraps rather than
+ * clamping -- the same arithmetic the spirals and MoveStepPoint use on a
+ * packed point, and the same reason.
+ */
+void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at)
+{
+    int32_t   i = army;
+    int16_t  *pt = (int16_t *)((uint8_t *)AM2_IMAGE(ADDR_AIM_POINT_A)
+                               + (uint32_t)i * 4);
+    uint32_t  hit;
+    uint8_t  *o;
+
+    ((int32_t *)AM2_IMAGE(ADDR_AIM_LIVE_A))[i] = 1;
+    *(uint32_t *)pt = at;
+
+    if (!((int32_t *)AM2_IMAGE(ADDR_AIM_STAMP_A))[i])
+        ((int32_t *)AM2_IMAGE(ADDR_AIM_STAMP_A))[i] =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)army)) {
+        ((int32_t *)AM2_IMAGE(ADDR_AIM_DEADLINE_A))[i] =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + AM2_AIM_LIFE_REMOTE_MS;
+        return;
+    }
+
+    ((int32_t *)AM2_IMAGE(ADDR_AIM_DEADLINE_A))[i] =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_A * 2 - 1;
+
+    ((int16_t *)&hit)[0] =
+        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X + pt[0]);
+    ((int16_t *)&hit)[1] =
+        (int16_t)(pt[1] + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+
+    o = (uint8_t *)ObjectsHitByPoint(&hit,
+                                     (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT))
+        DamageObject(o, *(const int32_t *)(uintptr_t)ADDR_AIM_DAMAGE, 1,
+                     uid, 0, 0);
+}
+
 /* AimStartB -- original 0x00412310, one caller, which is FireWeapon. The other
  * half of starting an aim marker, and orig.h has framed 0x00412230 and this as
  * "the two halves" since before either was read.
@@ -8068,7 +8135,7 @@ typedef void (__cdecl *AM2_SpawnAtFn2)(int32_t x, int32_t y, int32_t kind,
  * TWO LIFETIMES AND THE SHORT ONE IS FOR OTHER PEOPLE. In a multiplayer
  * session where CommMustBroadcast refuses this army -- someone else's shot,
  * relayed to us -- the deadline is a flat AM2_AIM_LIFE_REMOTE_MS. Ours, and
- * every shot outside a session, gets `2 * ADDR_AIM_LIFE_HALF - 1`. So a
+ * every shot outside a session, gets `2 * ADDR_AIM_LIFE_HALF_B - 1`. So a
  * remote player's marker is on a fixed timer and our own is on the game's.
  *
  * The spawned marker's position is the stored point PLUS THE VIEW ORIGIN,
@@ -8095,7 +8162,7 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
                    + AM2_AIM_LIFE_REMOTE_MS;
     } else {
         deadline = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                   + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF * 2 - 1;
+                   + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_B * 2 - 1;
     }
     ((int32_t *)AM2_IMAGE(ADDR_AIM_DEADLINE_B))[i] = deadline;
 
@@ -8668,6 +8735,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
     rc |= patch_replace(ADDR_AIM_START_B, (const void *)AimStartB,
                         "AimStartB", 1);
+    rc |= patch_replace(ADDR_AIM_START, (const void *)AimStart,
+                        "AimStart", 1);
     rc |= patch_replace(ADDR_HUD_PAINT, (const void *)HudPaint,
                         "HudPaint", 0);
 

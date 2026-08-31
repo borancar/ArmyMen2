@@ -1590,6 +1590,11 @@ void __cdecl HudPaint(void);
  * of the per-army state behind them. */
 /* 0x00412310, one caller -- FireWeapon. The other half of starting an aim
  * marker: the per-ARMY B arrays, a deadline, and the marker itself. */
+/* 0x00412230, one caller -- FireWeapon. The A half of an aim marker, and the
+ * one that DAMAGES: same eleven opening lines as AimStartB on the A arrays,
+ * then everything at the point takes ADDR_AIM_DAMAGE. */
+void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at);
+
 void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
 
 void __cdecl AimInit(void);

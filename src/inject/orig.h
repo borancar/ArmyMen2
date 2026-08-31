@@ -919,7 +919,14 @@
  * doubled and reduced by one to make the marker's deadline, so it is half a
  * lifetime in milliseconds; the second goes straight into ADDR_SPAWN_AT's
  * sixth argument. Both names are ours, from that one use each. */
-#define ADDR_AIM_LIFE_HALF       0x00662854u  /* int32_t */
+#define ADDR_AIM_LIFE_HALF_B     0x00662854u  /* int32_t */
+/* The A half's own pair. The lifetime works the same way -- doubled, less one
+ * -- and the damage is what AimStart deals to everything at the point, where
+ * the B half spawns a sprite instead. Renamed the B one to match the moment
+ * the A one turned up; a bare LIFE_HALF would have been ambiguous within a
+ * commit of being written. */
+#define ADDR_AIM_LIFE_HALF_A     0x00662820u  /* int32_t */
+#define ADDR_AIM_DAMAGE          0x00662838u  /* int32_t */
 #define ADDR_AIM_SPAWN_ARG       0x0066286Cu  /* int32_t */
 #define AM2_AIM_SPAWN_KIND       0x7E   /* what the marker is spawned as */
 #define AM2_AIM_LIFE_REMOTE_MS   0x3E8  /* 1000, when the army is not ours */

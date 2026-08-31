@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `e1e3f88`. Working tree clean.
+Last updated: **2026-08-31**, at `bbc66aa`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,255 patches.**
+Nothing uncommitted. **1,256 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3175,16 +3175,40 @@ commit -- gave the right answer every time it was used.
   so nothing moved. A figure inside the budget that would otherwise have had to
   be shrugged at.
 
+- **`AimStart`** (`0x00412230`) completes the pair, and the split is the
+  finding: **this one does the DAMAGE and `AimStartB` draws the marker**.
+  Reading either alone would have made the two look like duplication -- the
+  first eleven lines are identical, field for field, on the A arrays instead
+  of the B ones.
+
+  **The remote case is the tell.** Where B carries on and spawns its sprite
+  whatever the session says, A RETURNS as soon as it has written the remote
+  deadline. So somebody else's shot gets a marker drawn for it and does no
+  damage here: the damage is the shooter's own machine's job and this is the
+  client refusing to double it. Two functions from one call site, and only the
+  pair shows why.
+
+  The sweep uses `ObjectsHitByPoint` -- the PRECISE test, rectangle and then
+  the sprite's own mask -- rather than the looser `ObjectsAtPoint`, and gives
+  every object in the chain `ADDR_AIM_DAMAGE` with the firing uid as attacker.
+
+  **`ADDR_AIM_LIFE_HALF` became `_A` and `_B` the moment the second turned
+  up**, which is one commit after the first was written. A bare name for one
+  of a pair is ambiguous as soon as the pair is known, and renaming it while
+  it had a single use site cost nothing.
+
+  Cold, like its twin: 0 calls beside `AimInit`'s 1.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,101 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,255
+line (0x0045C000) patched**. Measured: **1,102 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,256
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and one batches have gone in and the 138 entries outstanding start at 48
+small ones in batches. A hundred and two batches have gone in and the 137 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
