@@ -374,6 +374,21 @@ void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
 
 /* TellOneSlot -- original 0x0044C480, one caller, which is TellEachSlot.
  *
+ * IT REACHED ADDR_ARMY_OBJ_LISTS THROUGH TWO DEREFERENCES AND THE ORIGINAL
+ * USES ONE. Both sites here read `mem[mem[0x4F9ECC] + slot*4]` where
+ * `mov eax, [ebp*4 + 0x4F9ECC]` reads `mem[0x4F9ECC + slot*4]` -- a different
+ * pointer entirely, then dereferenced for its count. event.cpp spells the
+ * same table the single way at both of its sites and EvtArmyAtPoint's
+ * original agrees at all three of its own, so the table is an array of
+ * pointers and not a pointer to one.
+ *
+ * Nothing could have caught it. This function sends a comm batch, so it needs
+ * a live DirectPlay session with a second player; its counter reads 0 in
+ * every configuration this machine can drive, including the one just run.
+ * Found by grepping for the SHAPE after CreateRoach indexed the same table --
+ * two spellings of one access is the tell, and the disassembly is the tie
+ * breaker.
+ *
  * The SENDER of the kind-0x16 batch. Its receiver, RecvTroopBatch, has been
  * reconstructed since long before this: that one walks a run of
  * variable-length sub-records from +8 to the header's length, and this is
@@ -417,7 +432,7 @@ void __cdecl TellOneSlot(int32_t slot)
     h->uid  = 0;
 
     list = (const uint8_t *)
-        (*(void *const *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+        ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
     if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
         return;
 
@@ -440,7 +455,7 @@ void __cdecl TellOneSlot(int32_t slot)
         }
 
         list = (const uint8_t *)
-            (*(void *const *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+            ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
         i++;
     } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
 
