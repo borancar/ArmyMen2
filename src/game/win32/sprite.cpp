@@ -31,6 +31,7 @@
 #include "surface.h"       /* CreateBitmapSurface -- reconstructed */
 #include "../crt.h"        /* am2_malloc */
 #include "../gamedir.h"    /* SetGameDir -- reconstructed */
+#include "winmain.h"       /* Ticks -- reconstructed */
 #include "../../inject/patch.h"
 
 #include <stdint.h>
@@ -352,6 +353,96 @@ void __cdecl FreeMenuSprites(void)
         IDirectDrawSurface_Release(g_menuSurface);
         g_menuSurface = NULL;
     }
+}
+
+/* InitMenuScreen -- original 0x00412E00, two callers. It was
+ * ADDR_INIT_DIGIT_TABLE, "fills 0x004FCDF8", which is one of the five things it
+ * does: free the old menu sprites, build two byte tables, load the digit
+ * sprites, reset the cursor's two rects and the animation clock, and make the
+ * menu's offscreen surface.
+ *
+ * THE FIRST TABLE SHARES ITS 256 BYTES WITH ADDR_FLAME_RECORD, which the
+ * alias ratchet found and reading both confirmed: the "Flame On!" cheat hands
+ * that address to SetFieldInAll as a weapon record. Two subsystems, one
+ * buffer, and neither is up while the other is.
+ *
+ * THE TWO TABLES ARE BOTH GLYPH MAPS AND THE BIAS IS THE SAME. The first is
+ * the identity except for its first ten entries, which come out 0x50 lower --
+ * a digit turned into the font's glyph for it. The second walks the LIVE
+ * palette: largest of the three channels, divided by 25, taken from ten,
+ * clamped to 0..9, same bias. So a palette index becomes the digit glyph that
+ * stands for how dark it is, and the two tables are read the same way by
+ * whatever draws them.
+ *
+ * The division is the original's `imul 0x51EB851F; sar edx, 3` -- a signed
+ * divide by 25 without a `div`. Written as the division it is.
+ *
+ * THE SPRITE LOOP RUNS ONE ROW PAST THE ARRAY. Its bound is inclusive and the
+ * count is 0x13, so it walks rows 0..19 of a table FreeMenuSprites frees as 19
+ * rows of ten. Row 19 lands on ADDR_MENU_SPRITES_END -- the cursor slot -- and
+ * the six dwords after it. Two statements later this function overwrites the
+ * cursor slot anyway, so the only trace an overrun could leave is in those six
+ * dwords, and only if PreloadSprite answers non-null for set 0 index 19, which
+ * ends the row the moment it does not. Reproduced exactly as written; the
+ * bound is the original's and shortening it would be a difference.
+ *
+ * NOTHING LOADS UNLESS THE GAME IS IN STATE 2. Outside it the count is 0 and
+ * the loop still runs ONE row -- inclusive again -- so row 0 is loaded on
+ * every call and the other nineteen only in a mission.
+ */
+void __cdecl InitMenuScreen(void)
+{
+    /* The same buffer ADDR_FLAME_RECORD names -- see orig.h. Two subsystems,
+     * one 256 bytes, and neither is up while the other is. */
+    uint8_t       *digits  = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
+    uint8_t       *shades  = (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
+    const uint8_t *palette;
+    AM2_Rect       r;
+    int32_t        i, row, frame, rows;
+
+    FreeMenuSprites();
+
+    for (i = 0; i < 10; i++)
+        digits[i] = (uint8_t)(i - AM2_GLYPH_DIGIT_BIAS);
+    for (i = 10; i < 256; i++)
+        digits[i] = (uint8_t)i;
+
+    palette = *(const uint8_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE;
+
+    for (i = 0; i < 256; i++) {
+        int32_t hi = palette[i * 4];
+
+        if (palette[i * 4 + 2] > hi)
+            hi = palette[i * 4 + 2];
+        if (palette[i * 4 + 1] > hi)
+            hi = palette[i * 4 + 1];
+
+        shades[i] = (uint8_t)(Clamp(10 - (hi + 4) / AM2_GLYPH_SHADE_STEP, 0, 9)
+                              - AM2_GLYPH_DIGIT_BIAS);
+    }
+
+    rows = (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
+           ? AM2_MENU_SPRITE_ROWS : 0;
+
+    for (row = 0; row <= rows; row++) {
+        AM2_Sprite **dst = (AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES + row * 10;
+
+        for (frame = 0; frame < 10; frame++) {
+            dst[frame] = PreloadSprite(0, row, frame, 0, 1);
+            if (!dst[frame])
+                break;
+        }
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME = 0;
+    g_menuSpritesEnd = *(const uint32_t *)(uintptr_t)ADDR_MENU_SPRITES;
+    *(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT = Ticks() + MENU_ANIM_PERIOD;
+
+    RectSet(&r, 0, 0, 0, 0);
+    *(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV = r;
+    *(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT = r;
+
+    g_menuSurface = CreateOffscreenSurface(0x20, 0x20, 0x40, -1);
 }
 
 /* LoadBitmap is defined below; the image seam that stood here went with the
@@ -2068,6 +2159,8 @@ int sprite_install(void)
                         "ReleaseSprite", 1);
     rc |= patch_replace(ADDR_FREE_MENU_SPRITES, (const void *)FreeMenuSprites,
                         "FreeMenuSprites", 0);
+    rc |= patch_replace(ADDR_INIT_MENU_SCREEN, (const void *)InitMenuScreen,
+                        "InitMenuScreen", 2);
     rc |= patch_replace(ADDR_PRELOAD_SPRITE, (const void *)PreloadSprite,
                         "PreloadSprite", 37);
     return rc;

@@ -8686,7 +8686,36 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STATE1_ENTER        0x004262E0u
 #define ADDR_DIR_TITLE_PTR       0x004852D0u  /* const char *, "01-title" */
 #define ADDR_STR_TITLE_WAV       0x00485218u
-#define ADDR_INIT_DIGIT_TABLE    0x00412E00u  /* void(void), fills 0x004FCDF8 */
+/* Was ADDR_INIT_DIGIT_TABLE, "fills 0x004FCDF8" -- one of the five things it
+ * does. It frees the old menu sprites, builds TWO byte tables, loads the digit
+ * sprites when the game is in state 2, resets the menu cursor's two rects and
+ * the animation clock, and makes the menu's offscreen surface. Renamed for the
+ * whole of it. */
+#define ADDR_INIT_MENU_SCREEN    0x00412E00u  /* void(void) */
+/* The two tables it builds, both 256 bytes and both indexed by a byte.
+ *
+ * The first is the identity except for its first ten entries, which come out
+ * 0x50 LOWER -- so 0..9 map to 0xB0..0xB9 and everything else maps to itself.
+ * That is a digit turned into the font's glyph for it.
+ *
+ * The second is a BRIGHTNESS table over the live palette: for each index it
+ * takes the largest of the three channels, divides by 25, subtracts that from
+ * ten, clamps to 0..9 and applies the same 0x50 bias. So a palette entry
+ * becomes the digit glyph that stands for how dark it is, brightest first.
+ *
+ * AND THE FIRST TABLE SHARES ITS ADDRESS WITH ADDR_FLAME_RECORD, which is not
+ * a naming error but a real overlap. The alias ratchet refused a second name
+ * and reading both settled it: InitMenuScreen writes 256 bytes at 0x004FCDF8,
+ * and the "Flame On!" cheat hands the same address to SetFieldInAll as the
+ * weapon record every unit is pointed at. Both readings are of live code and
+ * both are evidenced. So the buffer is used two ways by two subsystems that
+ * cannot be up at once -- a menu is not a cheat mid-mission -- and whichever
+ * ran last owns it. ADDR_FLAME_RECORD keeps the name, being the older and
+ * equally evidenced one, and the glyph table is spelled through it. */
+#define ADDR_PALETTE_GLYPHS      0x004FC998u  /* uint8_t[256] */
+#define AM2_GLYPH_DIGIT_BIAS     0x50
+#define AM2_GLYPH_SHADE_STEP     25    /* channel units per glyph */
+#define AM2_MENU_SPRITE_ROWS     0x13  /* the loop's bound, INCLUSIVE */
 /* The menu modes this arm can leave behind. 7 and 9 are the two multiplayer
  * screens a LOBBY launch goes straight to; 1 is the title's own. */
 #define AM2_MENU_MODE_TITLE      1

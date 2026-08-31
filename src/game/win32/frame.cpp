@@ -431,7 +431,6 @@ void __cdecl State0Frame(void)
  * that table is FOR is not established, only that entering the title rebuilds
  * it. */
 typedef void (__cdecl *AM2_VoidFn0)(void);
-#define orig_init_digit_table ((AM2_VoidFn0)(uintptr_t)ADDR_INIT_DIGIT_TABLE)
 
 /* State1Enter -- original 0x004262E0, one caller, which is State1Frame below.
  * Entering the title screen.
@@ -480,7 +479,7 @@ void __cdecl State1Enter(void)
 
     BuildFontAlias(1);
     BuildFontAlias(2);
-    orig_init_digit_table();
+    InitMenuScreen();
 
     *(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED = 1;
     *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED   = 0;

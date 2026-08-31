@@ -5,11 +5,30 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `37ea18a`. Working tree clean.
+Last updated: **2026-08-31**, at `bd2f873`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,280 patches.**
+Nothing uncommitted. **1,281 patches.**
+
+**`InitMenuScreen` (`0x00412E00`)**, which was `ADDR_INIT_DIGIT_TABLE` -- one
+of the five things it does. It frees the old menu sprites, builds two glyph
+tables, loads the digit sprites when the game is in state 2, resets the
+cursor's two rects and the animation clock, and makes the menu's offscreen
+surface.
+
+**Both tables are glyph maps with the same 0x50 bias**: one turns a digit into
+the font's glyph, the other turns a palette index into the digit glyph standing
+for how dark it is.
+
+**Its first table shares 256 bytes with `ADDR_FLAME_RECORD`.** The alias
+ratchet refused a second name and reading both settled it -- the "Flame On!"
+cheat hands the same address to `SetFieldInAll` as a weapon record. Both
+readings are of live code; two subsystems, one buffer, neither up while the
+other is.
+
+**And its sprite loop runs one row past the array**, an inclusive bound over a
+table `FreeMenuSprites` frees as 19 rows of ten. Reproduced.
 
 **`WeaponRespawn` (`0x00448280`), reconstructed after being declined twice.**
 When a weapon leaves the map in a multiplayer game the HOST puts another one
@@ -3554,13 +3573,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,123 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 116
-outstanding, which is 1,239 minus 1,123 -- from 1,280 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,124 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 115
+outstanding, which is 1,239 minus 1,124 -- from 1,281 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-three batches have gone in and the 116 entries
+small ones in batches. A hundred and twenty-four batches have gone in and the 115 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

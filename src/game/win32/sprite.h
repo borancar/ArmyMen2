@@ -288,6 +288,13 @@ void __cdecl FreeBitmap(void **pp);
 
 void __cdecl FreeMenuSprites(void);
 
+/* 0x00412E00, two callers -- it was ADDR_INIT_DIGIT_TABLE, which is one of the
+ * five things it does. Free the old menu sprites, build the digit and palette
+ * glyph tables, load the digit sprites when the game is in state 2, reset the
+ * cursor's two rects and the animation clock, and make the menu's offscreen
+ * surface. */
+void __cdecl InitMenuScreen(void);
+
 /* 0x0045A450. The same for one vehicle kind, and the function that names the
  * family: it logs "vehicle mask direction: %d" under -traceVEH. It keeps a
  * block on twelve of the 64 samples where the roach wants sixteen. */
