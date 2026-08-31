@@ -148,6 +148,11 @@ int32_t __cdecl RadarBlipColour(const void *obj, int32_t *blink);
  * field against whatever is already running. */
 void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp);
 
+/* 0x0042B360, one caller. The gate in front of StartShake: measure the blast
+ * from the centre of the view, fall off linearly past AM2_SHAKE_NEAR, and
+ * pick one of the four presets -- or none. */
+void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
+
 /* 0x0042A240, three callers. Every object in a world rectangle, chained
  * through OBJ_OFF_QUERY_NEXT with a caller-supplied predicate -- the family
  * item.cpp holds, with a block of cells to walk rather than one, and a

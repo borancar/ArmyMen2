@@ -5,11 +5,42 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `b3b1050`. Working tree clean.
+Last updated: **2026-08-31**, at `8818ab5`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,260 patches.**
+Nothing uncommitted. **1,262 patches.**
+
+**`ShakeAt` (`0x0042B360`) and a defect it found underneath itself.** The gate
+in front of `StartShake`: it takes the midpoint of the view rectangle,
+measures `ApproxDist` to the blast, and turns the result into one of four
+presets. `tools/shakecheck.py` enumerates 11,088 cases against the original
+because no drive reaches the function -- a probe on a live MAP 01 mission,
+past both dialogs, reads `ShakeAt=0` and `StartShake=0`.
+
+Seeding a shake ALREADY IN PROGRESS failed 831 of them, and not in the new
+code: `StartShake`'s four maxima had been written as NESTED early returns
+under a confident comment saying that reading them as independent "would be
+wrong for every case but the strongest". Each `jle` in the original jumps only
+past its own store. From an all-zero state the two readings agree exactly, so
+the first version of the tool passed with the bug in and no A/B could ever
+have seen it.
+
+`AM2_SHAKE_FALLOFF` is 1/512 and the two radii are 832 and 320, so the ramp
+meets the flat top at exactly 1.0 and the falloff is CONTINUOUS -- which makes
+moving the near radius by one provably undetectable rather than merely
+uncovered.
+
+**`CreateRoach` (`0x0043CDD0`)**, and three names settled by reading
+`ObjInitCommon`'s body instead of a call site: `ADDR_STR_EMPTY` is
+`ADDR_KIND7_BOX`, `AAI_OFF_INIT_BLOCK` is `AAI_OFF_BOX`, and that function's
+arg2 is a name where two private typedefs had called it a direction and an
+int. The eight roach constants are named by `aai/game.aai` itself.
+
+**`TellOneSlot` indexed `ADDR_ARMY_OBJ_LISTS` through one dereference too
+many**, in two places. The original is `mov eax, [ebp*4 + 0x4F9ECC]` -- one
+load. Nothing in the suite could have caught it: that function needs a live
+DirectPlay session and its counter is 0 everywhere.
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3323,14 +3354,16 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,106 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,260
+line (0x0045C000) patched**. Measured: **1,108 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,262
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and six batches have gone in and the 133 entries outstanding start at 48
-bytes.
+small ones in batches. A hundred and nine batches have gone in and the 131 entries outstanding start
+at 96 bytes -- and the smallest of those is the MSVC static-init glue at
+`0x004248A0`, which is permanently out of scope, so the first real candidate
+is 192.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
 went in naming its five callees `ADDR_DEF_STEP_*`; two commits later two of

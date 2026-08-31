@@ -2436,12 +2436,22 @@ static int32_t AbsInt(int32_t v)
  * value as `cdq; xor; sub`, which is what makes the difference visible; it is
  * written here as the comparison it is.
  *
- * THE COMPARISONS ARE NESTED, NOT INDEPENDENT. Each `jle` skips everything
- * after it, so a request whose time is not greater than the current one never
- * reaches the step tests at all -- and one whose X step is weaker never
- * reaches Y or the amplitude. Written as the early returns the original
- * branches into: reading them as four separate maxima would be wrong for
- * every case but the strongest.
+ * THE FOUR COMPARISONS ARE INDEPENDENT, AND THIS SAID THE OPPOSITE FOR AS
+ * LONG AS NOTHING RAN IT. The comment here used to argue that they are
+ * NESTED -- that a request whose time is not greater never reaches the step
+ * tests -- and it was written as four early returns to match. Each `jle`
+ * jumps only past its OWN store, to the next comparison: 0x0042B300 goes to
+ * 0x0042B307, which is where the X step test begins, and so on down. So a
+ * weak-but-long shake arriving during a strong short one really does extend
+ * the time and leave the steps alone, which the nested reading made
+ * impossible.
+ *
+ * It was caught by tools/shakecheck.py on its first run with a non-zero seed,
+ * and could not have been caught any other way: StartShake's counter reads 0
+ * on every drive this project has, so nothing had ever executed either
+ * version. From an all-zero state the two readings agree exactly -- every
+ * preset field is positive, so nothing is ever refused -- which is why the
+ * first version of that tool passed with the bug in.
  *
  * Its one caller picks a preset from ADDR_SHAKE_PRESETS and pushes all four
  * fields, so the values that ever arrive are the twelve in that table.
@@ -2451,21 +2461,86 @@ void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp)
     *(float *)(uintptr_t)ADDR_SHAKE_PHASE_X = 0.0f;
     *(float *)(uintptr_t)ADDR_SHAKE_PHASE_Y = 0.0f;
 
-    if (ms <= *(const int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
-        return;
-    *(int32_t *)(uintptr_t)ADDR_SHAKE_TIME = ms;
+    if (ms > *(const int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
+        *(int32_t *)(uintptr_t)ADDR_SHAKE_TIME = ms;
 
-    if (AbsInt(stepX) <= AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X))
-        return;
-    *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X = stepX;
+    if (AbsInt(stepX) > AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X))
+        *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X = stepX;
 
-    if (AbsInt(stepY) <= AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y))
-        return;
-    *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y = stepY;
+    if (AbsInt(stepY) > AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y))
+        *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y = stepY;
 
-    if (amp <= *(const int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
+    if (amp > *(const int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)
+        *(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE = amp;
+}
+
+/* ShakeAt -- original 0x0042B360, one caller, and the gate in front of
+ * StartShake: it turns a blast's position and strength into one of the four
+ * presets, or into nothing at all.
+ *
+ * THE DISTANCE IS FROM THE CENTRE OF THE VIEW, computed here rather than
+ * stored -- the midpoint of ADDR_VIEW_ORIGIN_X..ADDR_VIEW_FAR_X and of
+ * ADDR_VIEW_ORIGIN_Y..ADDR_VIEW_FAR_Y, packed into a point on the stack. So
+ * the screen shakes by how far the blast is from what the player is looking
+ * at, and not from the player'"'"'s own units.
+ *
+ * THE FALLOFF HAS A FLAT TOP AND THE TWO ARMS ARE ALTERNATIVES. Inside
+ * AM2_SHAKE_NEAR the multiplier is 1.0; beyond it the original DISCARDS the
+ * 1.0 it has already loaded, with an `fstp st(0)`, and multiplies by
+ * (AM2_SHAKE_FAR - dist) * AM2_SHAKE_FALLOFF instead. Reading that as two
+ * factors rather than two arms would scale everything twice.
+ *
+ * The arithmetic is exact and that is worth stating rather than hoping.
+ * AM2_SHAKE_FALLOFF is 2^-9, the strength is at most ten and the distance is
+ * an integer under 832, so every intermediate is a dyadic rational well
+ * inside a double. The original computes it on the x87 stack in 80 bits and
+ * this computes it in 64; there is no argument on which they can differ, so
+ * the _ftol truncation reproduces exactly.
+ *
+ * THE PRESET INDEX IS CHECKED AT THE BOTTOM END ONLY. The table has four
+ * entries and the strength is clamped to ten, so a strength above 3 arriving
+ * inside the near radius indexes PAST ADDR_SHAKE_PRESETS. That is the
+ * original'"'"'s behaviour and is reproduced -- the clamp bounds how far past it
+ * can reach, which is presumably what it is for. The `< 1` test at the bottom
+ * also skips preset 0, which is all zeroes and would do nothing anyway.
+ *
+ * Its one caller reads the strength out of an object field at +0xB4, so what
+ * actually arrives is whatever the AAI record or the script put there.
+ */
+void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
+{
+    int32_t        centreX, centreY, dist, index;
+    uint32_t       centre;
+    double         scale;
+    const int32_t *preset;
+
+    if (strength <= 0)
         return;
-    *(int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE = amp;
+    if (strength > AM2_SHAKE_STRENGTH_MAX)
+        strength = AM2_SHAKE_STRENGTH_MAX;
+
+    centreX = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+    centreX += (*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_X - centreX) / 2;
+    centreY = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
+    centreY += (*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_Y - centreY) / 2;
+
+    centre = (uint32_t)(uint16_t)(int16_t)centreX
+           | ((uint32_t)(uint16_t)(int16_t)centreY << 16);
+
+    dist = ApproxDist(at, (const AM2_Point *)&centre);
+    if (dist >= AM2_SHAKE_FAR)
+        return;
+
+    scale = (dist > AM2_SHAKE_NEAR)
+          ? (double)(AM2_SHAKE_FAR - dist) * AM2_SHAKE_FALLOFF
+          : 1.0;
+
+    index = (int32_t)((double)strength * scale);
+    if (index < 1)
+        return;
+
+    preset = (const int32_t *)(uintptr_t)ADDR_SHAKE_PRESETS + index * 4;
+    StartShake(preset[0], preset[1], preset[2], preset[3]);
 }
 
 /* 0x0042A240, three callers, 400 bytes. Every object in a world rectangle,
@@ -2679,6 +2754,7 @@ int mapdraw_install(void)
     patch_replace(ADDR_ALL_OBJECTS_IN_RECT, (const void *)AllObjectsInRect,
                   "AllObjectsInRect", 3);
     patch_replace(ADDR_START_SHAKE, (const void *)StartShake, "StartShake", 1);
+    patch_replace(ADDR_SHAKE_AT, (const void *)ShakeAt, "ShakeAt", 1);
     patch_replace(ADDR_VIEW_UPDATE, (const void *)ViewUpdate, "ViewUpdate", 0);
     patch_replace(ADDR_DRAW_VLINE, (const void *)DrawVLine, "DrawVLine", 2);
     patch_replace(ADDR_DRAW_HLINE, (const void *)DrawHLine, "DrawHLine", 2);

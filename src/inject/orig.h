@@ -1824,6 +1824,29 @@
  * in duration and in which axis dominates, and not in how far the screen
  * moves. */
 #define ADDR_SHAKE_PRESETS       0x00486170u  /* int32_t[4][4] */
+/* 0x0042B360, one caller, and the gate in front of ADDR_START_SHAKE: it turns
+ * a blast's position and strength into one of the four presets, or into
+ * nothing. The distance is measured from the CENTRE OF THE VIEW rectangle,
+ * computed rather than stored, so the screen shakes by how far the blast is
+ * from what the player is looking at.
+ *
+ * The falloff has a FLAT TOP: inside AM2_SHAKE_NEAR the multiplier is the 1.0
+ * at 0x0046F2D8 and the strength passes through unscaled, and beyond it the
+ * far branch throws that 1.0 away with an `fstp st(0)` and uses
+ * (AM2_SHAKE_FAR - dist) / 512 instead, reaching zero exactly at the far
+ * radius. Every value in that chain is a dyadic rational -- 1/512 is 2^-9 and
+ * the operands are small integers -- so the x87 arithmetic is exact and the
+ * _ftol truncation is reproducible without any 80-bit concern.
+ *
+ * THE PRESET INDEX IS CHECKED AT THE BOTTOM END ONLY. The strength is clamped
+ * to AM2_SHAKE_STRENGTH_MAX and the table has four entries, so a strength
+ * above 3 arriving inside the near radius indexes past the table and reads
+ * whatever follows it. Reproduced; the clamp is what bounds how far past. */
+#define ADDR_SHAKE_AT            0x0042B360u  /* void(const AM2_Point *, int32) */
+#define AM2_SHAKE_STRENGTH_MAX   10
+#define AM2_SHAKE_NEAR           0x140   /* full strength within this */
+#define AM2_SHAKE_FAR            0x340   /* nothing at all beyond this */
+#define AM2_SHAKE_FALLOFF        (1.0 / 512.0)  /* the double at 0x0046F9A8 */
 #define AM2_SHAKE_PRESETS        4
 #define SHAKE_PRESET_BYTES       0x10u
 /* Not a shake constant, despite living in this block and being read by the
@@ -1846,6 +1869,13 @@
 #define ADDR_VIEW_SPEED          0x004852E0u  /* int32_t, units per second */
 #define ADDR_VIEW_CLIPPED        0x00514E54u  /* AM2_Rect, the intersection */
 #define ADDR_VIEW_ORIGIN_Y       0x00514E18u  /* int32_t */
+/* The other two edges of the same rectangle. ADDR_VIEW_UPDATE writes all four
+ * together and then pushes 0x00514E14 straight into IntersectRect as a RECT,
+ * which is what settles that the four dwords are one rectangle in left, top,
+ * right, bottom order rather than two points. ShakeAt takes the midpoint of
+ * each pair. */
+#define ADDR_VIEW_FAR_X          0x00514E1Cu  /* int32_t, the right edge */
+#define ADDR_VIEW_FAR_Y          0x00514E20u  /* int32_t, the bottom edge */
 /* Last frame's copies, written by ComposeFrame at the end of every frame and
  * read by the dirty-rectangle merge to find what has scrolled. The listener
  * point is saved the same way and in the same block. */

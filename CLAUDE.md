@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **22** analysis
+**`make check` runs everything that does not need the game.** **23** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -388,6 +388,41 @@ What moviecheck does not reach: the buffer overrun. `dst` is unbounded and the f
 call site passes a name a mission's script wrote, so a long enough name in a
 script smashes a 0x40-byte frame. That is the original's behaviour and is kept
 -- but nothing here tests it, and a corpus of short names could not.
+
+**`tools/shakecheck.py` is the third, and it found a defect in the function
+BELOW the one it was written for.** `ShakeAt` turns a blast's position and
+strength into one of four screen-shake presets, and no drive reaches it: a
+probe on a live MAP 01 mission, past both dialogs and thirty seconds in, reads
+`ShakeAt=0` and `StartShake=0`, because nothing exploded near enough to the
+view. So the tool is that function's verification or there is none.
+
+It seeds the four view-rect globals, calls the original, and reads back the
+four shake globals -- 11,088 cases over three view rectangles, eighteen
+distances and fourteen strengths.
+
+**The SEED is the whole finding.** The first version started every case from an
+all-zero shake state and passed, and `StartShake`'s reconstruction had its four
+maxima written as NESTED early returns under a confident comment saying that
+reading them as four independent maxima "would be wrong for every case but the
+strongest". Each `jle` in the original jumps only past its OWN store. From zero
+the two readings agree exactly, because every preset field is positive and
+nothing is ever refused -- so the bug was invisible to the tool, to every A/B,
+and to the counters, which read 0 for `StartShake` on every configuration.
+Seeding a shake already in progress fails 831 cases and names the field.
+
+A second seed with NEGATIVE steps was needed for the same reason one step
+further in: every preset step is positive, so comparing the steps signed
+instead of by absolute value passes without it. The sign flips in play, as
+`ADDR_SHAKE_STEP_X`'s own note says, so that state is reachable.
+
+**And one constant is provably unobservable rather than merely uncovered.**
+`AM2_SHAKE_FALLOFF` is 1/512 and `AM2_SHAKE_FAR - AM2_SHAKE_NEAR` is
+832 - 320 = 512, so the ramp meets the flat top at exactly 1.0 and the
+piecewise falloff is CONTINUOUS. Moving the near radius by one, or swapping the
+boundary's `>` for `>=`, cannot be detected by any corpus -- the two arms
+compute the same number there. Moving it to 200 does fail, on 192 cases, and
+only after offsets in the 250..300 band were added. Say which of a tool's gaps
+are gaps and which are theorems.
 
 **Where the program ships its own input, use that instead of vectors.**
 A keyword lookup learns nothing from a random 32-bit argument.
@@ -2826,16 +2861,38 @@ exact oracle**, however meaningful it is when it is set.
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
   `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`,
-  `RoachMaskWeight`, `AiHitReact`, `PlanPathTo`, `NearestClearVehiclePoint`,
-  and `RefreshScreen` —
+  `AiHitReact`, `PlanPathTo`, `NearestClearVehiclePoint`,
+  `ShakeAt`, `StartShake`, and `RefreshScreen` —
 
-  **`RoachMaskWeight` is the one whose drive is IDENTIFIED**, which is worth
-  more than another entry on this list. `bootcamp` issues no `createroach`;
-  `kitchen` -- MAP 01, which `ab.sh campaign` already drives -- issues NINE.
-  What is missing is not a map but a configuration that clears MAP 01's
-  briefing and lets it run, which this suite avoids because the map is hostile
-  the moment it clears. Anyone wanting to exercise the roach code starts
-  there.
+  **`RoachMaskWeight` came OFF this list by someone doing the drive it named**,
+  which is what an identified drive is for. The entry used to say that
+  `bootcamp` issues no `createroach` while `kitchen` issues nine, and that what
+  was missing was a configuration clearing MAP 01's briefing. Driving exactly
+  that -- SINGLE PLAYER, the player row, SELECT, NEW, RETURN at the strategic
+  map, OK on MESSAGE FROM HQ, a click for the instruction sign, then thirty
+  seconds -- gives `CreateRoach=9` and `RoachMaskWeight=591980`. Nine against
+  the nine `createroach` statements in `kitchen1.txt` is better evidence than a
+  bare non-zero.
+
+  **`ab.sh campaign` still does not reach it**, and that is worth separating
+  from the above. That configuration dumps the briefing widgets WITHOUT
+  dismissing the dialog, deliberately, so it can compare the HUD behind it --
+  and the game pauses while a dialog is up, so the clock never reaches
+  `triggerdelay 1000 init_roaches`. A clean `campaign` run is therefore not
+  evidence about anything the roaches touch.
+
+  **Two probe runs read `CreateRoach=0` before that, and the counter was not
+  what settled it.** Zero looks exactly like dead code. The screenshot showed
+  the game sitting on MESSAGE FROM HQ, and `ComposeFrame=0` on the same dump
+  said no frame had been composed at all. **Read a liveness counter beside the
+  one you care about** -- a zero next to `ComposeFrame=0` is a drive that did
+  not happen, not a function that did not run.
+
+  **`ShakeAt` and `StartShake` are unexercised and no longer unverified.**
+  `tools/shakecheck.py` enumerates 11,088 cases against the original, which is
+  the whole of what decides them; see the section above for the defect that
+  found. The pair is the argument for reaching for an exhaustive oracle
+  rather than another entry on this list.
 
   **The AI is a WHOLE LAYER this environment does not reach, not a handful of
   cold functions, and ONE `counts` line says so.** `drive.sh ctl "counts Ai"`
