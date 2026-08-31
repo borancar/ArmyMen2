@@ -27,6 +27,7 @@
 #include "../inject/patch.h"
 #include "maprow.h"   /* RowUpdate, SetAnimFrame -- reconstructed */
 #include "anim.h"     /* AM2_Anim -- the frame count SetUnitPose waits on */
+#include "trig.h"     /* Cos8, Sin8 -- reconstructed */
 #include "script.h"   /* AM2_Pad */
 #include "map.h"      /* TileOfPoint */
 #include "air.h"      /* RevealNearby */
@@ -1975,6 +1976,77 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
         ObjSetRoachFootprint(o);
 
     return o;
+}
+
+/* AllObjectsInRect is reconstructed, in win32/mapdraw.cpp. Declared here
+ * rather than by including that header for the reason item.cpp already
+ * declares PlaySoundAt above: this file is on the flat side of the split and
+ * mapdraw.h reaches win32.h. Neither of its parameters names a Win32 type. */
+void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
+
+/* RoachBite -- original 0x0043D330, one caller: the roach's per-frame step,
+ * which reaches it only in state 4. Step AM2_ROACH_REACH along the facing,
+ * play a sound at the point stepped to, and damage every object in a 48x48 box
+ * around it that is not on the roach's side.
+ *
+ * THE NAME IS MINE. Nothing in the image names this function -- it pushes no
+ * string and its caller pushes none either -- so `RoachBite` describes the
+ * body rather than recovering anything, and is written down as such. What IS
+ * evidenced is the damage: ADDR_ROACH_DAMAGE is one of the eight constants
+ * aai/game.aai names, and it goes in at kind 5.
+ *
+ * The direction handed to DamageObject is `facing + 0x80`, which is the
+ * facing REVERSED -- the direction the blow arrives FROM, as the victim sees
+ * it. A byte add wraps, so no masking is needed and none is written.
+ *
+ * IT CLEARS OBJ_OFF_DEADLINE_58 ON ENTRY, before anything else, so the bite
+ * always resets its own timer even if the box turns out to be empty.
+ *
+ * ONE THING IS DELIBERATELY NOT REPRODUCED, and it is measured rather than
+ * waved through. The original hands PlaySoundAt the PACKED point as `x` and
+ * the dword starting two bytes into it as `y` -- MSVC put the two int16 in one
+ * slot and read it twice at overlapping offsets -- so the upper half of each
+ * argument is the other coordinate or whatever the frame held. PlaySoundAt
+ * assigns `where.x = (int16_t)x` and `where.y = (int16_t)y`, so both upper
+ * halves are discarded and clean arguments cannot differ. Passing the two
+ * coordinates plainly.
+ */
+void __cdecl RoachBite(void *roach)
+{
+    uint8_t  *o      = (uint8_t *)roach;
+    int32_t   facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    int32_t   x      = *(const int16_t *)(o + OBJ_OFF_POS);
+    int32_t   y      = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+    float     reach  = *(const float *)(uintptr_t)ADDR_ROACH_REACH;
+    const int32_t *box = (const int32_t *)(uintptr_t)ADDR_ROACH_BITE_BOX;
+    AM2_Rect  at;
+    int16_t   toX, toY;
+    uint8_t  *hit;
+
+    *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+
+    toX = (int16_t)(int32_t)(Cos8(facing) * reach + (float)x);
+    toY = (int16_t)(int32_t)(Sin8(facing) * reach + (float)y);
+
+    PlaySoundAt(AM2_ROACH_BITE_SOUND, 0, 0, toX, toY);
+
+    at.left   = toX + box[0];
+    at.top    = toY + box[1];
+    at.right  = toX + box[2];
+    at.bottom = toY + box[3];
+
+    hit = (uint8_t *)AllObjectsInRect(
+              &at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+
+    while (hit) {
+        if (!ObjsAreAllied(o, hit, 0))
+            DamageObject(hit,
+                         *(const int32_t *)AM2_IMAGE(ADDR_ROACH_DAMAGE),
+                         AM2_ROACH_DAMAGE_KIND,
+                         *(const uint32_t *)(o + 4),
+                         (uint8_t)(facing + 0x80), 0);
+        hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT);
+    }
 }
 
 /* ObjClearRoachFootprint -- original 0x0043CA00, three callers, one of them
@@ -8205,6 +8277,7 @@ void item_install(void)
                   "ObjSetRoachFootprint", 6);
     patch_replace(ADDR_CREATE_ROACH, (const void *)CreateRoach,
                   "CreateRoach", 2);
+    patch_replace(ADDR_ROACH_BITE, (const void *)RoachBite, "RoachBite", 1);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,

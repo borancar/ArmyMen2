@@ -227,6 +227,12 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7,
                           int32_t uid);
 
+/* 0x0043D330, one caller -- the roach's per-frame step, in its state 4. Step
+ * ADDR_ROACH_REACH along the facing, play a sound there, and damage every
+ * object in ADDR_ROACH_BITE_BOX around that point which is not on the roach's
+ * side. The name is descriptive; nothing in the image names this function. */
+void __cdecl RoachBite(void *roach);
+
 void __cdecl ObjClearRoachFootprint(void *obj);
 
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,

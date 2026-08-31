@@ -9727,7 +9727,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * CreateRoach reads its height through the base rather than through a second
  * name for the same address. */
 #define ADDR_ROACH_HEALTH       0x00487BACu  /* int32_t; block index 1 */
+/* Index 3, and it gets a name now because RoachBite reads it -- which is the
+ * rule above working rather than an exception to it. Five of the eight are
+ * still nameless. */
+#define ADDR_ROACH_DAMAGE       0x00487BB4u  /* int32_t; block index 3 */
 #define ADDR_ROACH_BOX          0x00487BC8u  /* AM2_Rect */
+/* The rect 16 bytes later, which CreateRoach does not touch and RoachBite
+ * does: (-24, -24, 24, 24), a 48x48 box centred on the point the roach steps
+ * to. Named once something read it, which is why it was left alone before. */
+#define ADDR_ROACH_BITE_BOX     0x00487BD8u  /* AM2_Rect */
+/* 0x0043D330, one caller -- the roach's per-frame step, in its state 4. Step
+ * AM2_ROACH_REACH along the facing, play a sound there, and damage every
+ * object in ADDR_ROACH_BITE_BOX around that point which is not on the roach's
+ * side. The name is DESCRIPTIVE: nothing in the image names this function. */
+#define ADDR_ROACH_BITE         0x0043D330u  /* void(void *roach) */
+#define ADDR_ROACH_REACH        0x0046FAA8u  /* float, 24.0 */
+#define AM2_ROACH_BITE_SOUND    0x31
+#define AM2_ROACH_DAMAGE_KIND   5
 /* One ADDR_BUILD_ROW_SET spec -- x, y, w, h = -48, -48, 96, 96 -- and the
  * frame SetAnimFrame starts the roach on. The dword at 0x00487BF8 is 81 as
  * well and nothing here reads it, so it stays unnamed. */

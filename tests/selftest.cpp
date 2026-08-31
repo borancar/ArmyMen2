@@ -692,6 +692,16 @@ extern "C" void __cdecl PlaySoundAt(int32_t, int32_t, int32_t, int32_t,
 {
 }
 
+/* item.cpp's RoachBite queries the map, and AllObjectsInRect is in
+ * win32/mapdraw.cpp. Declared C++ rather than extern "C" -- mapdraw.h declares
+ * it outside any linkage block -- so the stub must be too, which is the same
+ * trap the widget stub above records. Answering null makes the bite hit
+ * nothing, which is all a linker stub can honestly do. */
+void *__cdecl AllObjectsInRect(const AM2_Rect *, const void *)
+{
+    return 0;
+}
+
 /* air.cpp's sprite teardown reaches ReleaseSprite, in win32/sprite.cpp. Same
  * reasoning as the stubs above, and air.cpp arrived in SELFTEST_SRC for the
  * same reason map.cpp did: item.cpp gained a call into it, and adding the flat

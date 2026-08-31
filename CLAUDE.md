@@ -2862,7 +2862,15 @@ exact oracle**, however meaningful it is when it is set.
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
   `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`,
   `AiHitReact`, `PlanPathTo`, `NearestClearVehiclePoint`,
-  `ShakeAt`, `StartShake`, and `RefreshScreen` —
+  `ShakeAt`, `StartShake`, `RoachBite`, and `RefreshScreen` —
+
+  **`RoachBite`'s drive is identified and it is not a longer wait.** Its one
+  caller reaches it only in the roach's state 4, and a live MAP 01 run with
+  nine roaches alive -- `CreateRoach=9`, `RoachMaskWeight=506808` -- leaves it
+  at 0 after TWO MINUTES. So the roaches are running and simply never attack
+  anything: what is missing is a unit walking into one, which no configuration
+  here does. Measured rather than assumed, and the longer wait was tried
+  first.
 
   **`RoachMaskWeight` came OFF this list by someone doing the drive it named**,
   which is what an identified drive is for. The entry used to say that
