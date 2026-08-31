@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `eb2fc93`. Working tree clean.
+Last updated: **2026-08-31**, at `78d6008`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,278 patches.**
+Nothing uncommitted. **1,279 patches.**
+
+**`CommRemovePlayer` (`0x0040F640`)** -- the function whose compaction loop
+settled `COMM_OFF_PLAYERS` last commit, now reconstructed. It drops the count,
+tells the packet layer, closes the gap in the record array and stamps six
+fields that record who went.
+
+**It does not move the whole record**: eleven named fields go down a slot and
+the other 68 bytes stay, so a compacted slot keeps whatever the departing
+player had in the fields nobody listed.
+
+**It reads one slot past the array**, because the loop runs `4 - slot` times --
+removing slot 0 copies 3 from 4 and there is no record 4. A slot of -1, which
+`CommPlayerSlot` answers for a player it cannot find, gets past the `>= 4`
+guard and writes one record BEFORE the array. Both reproduced, both recorded.
 
 **The comm player record starts at 0x020C and `COMM_OFF_PLAYERS` said 0x0218**
 -- its NAME field, which is what named it. `CommRemovePlayer`'s compaction loop
@@ -3524,13 +3538,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,121 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,278
-patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,122 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 117
+outstanding, which is 1,239 minus 1,122 -- from 1,279 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-one batches have gone in and the 118 entries outstanding
+small ones in batches. A hundred and twenty-two batches have gone in and the 117 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

@@ -8307,12 +8307,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_RECV_PACKETS    0x004756D0u
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
+/* Six fields CommRemovePlayer clears or stamps on its way out, and the only
+ * thing established about them is that they move together: 0x35C, 0x360 and
+ * 0x364 have ten, ten and nine touchers each, 0x368 is a byte, and 0x3A8 and
+ * 0x3AC have one apiece. 0x360 takes the departing slot's own index, so the
+ * group is plausibly a record of who just left -- plausibly, and the names say
+ * only where they are. Reading the other nineteen touchers is a job of its
+ * own. */
+#define COMM_OFF_FIELD_35C       0x35Cu
+#define COMM_OFF_FIELD_360       0x360u   /* the departing slot's index */
+#define COMM_OFF_FIELD_364       0x364u
+#define COMM_OFF_FIELD_368       0x368u   /* uint8_t */
+#define COMM_OFF_FIELD_3A8       0x3A8u
+#define COMM_OFF_FIELD_3AC       0x3ACu
 #define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */
 #define COMM_SLOT_OFF_NAME       0x00Cu   /* 0x40-byte string; CommConstruct
                                            * clears it, StartSelectedGame writes
                                            * "Computer%d" into it */
 #define COMM_SLOT_OFF_ID         0x008u
 #define COMM_SLOT_OFF_UNACKED    0x058u
+/* The two ready flags as offsets into the record, beside the absolute
+ * COMM_ARMY_OFF_READY_TO_LOAD and COMM_ARMY_OFF_READY. Same fields; those two
+ * are 0x20C higher and are used as `comm + slot * 112 + OFFSET`. */
+#define COMM_SLOT_OFF_READY_TO_LOAD 0x064u
+#define COMM_SLOT_OFF_READY         0x068u
+#define COMM_SLOT_OFF_FIELD_5C      0x05Cu
+/* "Remove Player numPlayers now = %d \n" */
+#define ADDR_STR_REMOVE_PLAYER   0x00475860u
 #define COMM_STAT_RING           30u
 #define ADDR_SESSION_LIST        0x004FA908u  /* void *, what the callback fills */
 #define COMM_OFF_APP_GUID        0x3D4u       /* GUID *, set by CommConstruct */

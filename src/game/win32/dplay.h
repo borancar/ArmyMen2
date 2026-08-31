@@ -249,4 +249,10 @@ void *__cdecl MsgListInsert(void *list, void *node);
  * slot, release the three pause reasons it held, mark its army ready. */
 int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id);
 
+/* 0x0040F640, three callers. Take a player out of the comm object: drop the
+ * count, tell the packet layer, close the gap in the record array by copying
+ * eleven named fields down a slot, and stamp the six fields that record who
+ * went. Always answers 1. */
+int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id);
+
 #endif /* AM2_DPLAY_H */

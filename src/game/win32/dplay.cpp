@@ -268,6 +268,113 @@ typedef void (__cdecl *am2_comm_void_fn)(void);
  * twelve bytes late -- so the file that had the right base kept it to itself.
  * One pair of names now. */
 
+/* ADDR_REMOVE_PLAYER, still original -- the packet layer's own bookkeeping.
+ * Declared here rather than beside its other caller further down because
+ * CommRemovePlayer needs it first. */
+typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
+#define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
+
+/* CommRemovePlayer -- original 0x0040F640, three callers. Take a player out of
+ * the comm object: drop the count, tell the packet layer, close the gap in the
+ * record array, and stamp the six fields that record who went.
+ *
+ * IT IS WHAT SETTLED COMM_OFF_PLAYERS. The compaction copies fields at +0x00,
+ * +0x04 and +0x08 -- twelve bytes BELOW what orig.h used to call the start of
+ * the record -- which is what showed the base was the NAME field rather than
+ * the record. With the base corrected every offset in the loop lands on a
+ * field the COMM_SLOT_OFF_ family already names.
+ *
+ * IT DOES NOT MOVE THE WHOLE RECORD. Eleven fields are copied one slot down
+ * and the other 68 bytes are left where they are, so a compacted slot keeps
+ * whatever the departing player had in the fields nobody listed. Reproduced; a
+ * memmove of the stride would be tidier and would differ.
+ *
+ * IT READS ONE SLOT PAST THE ARRAY. The loop runs 4 - slot times, so removing
+ * slot 0 copies 3 from 4 -- and there is no record 4. The read lands in the
+ * comm object's own fields just past them. That is the original's behaviour
+ * and is kept.
+ *
+ * AND A SLOT OF -1 IS WORSE. CommPlayerSlot answers -1 for a player it cannot
+ * find, the guard here is only `slot >= 4`, and -1 passes it -- so the loop
+ * starts one record BEFORE the array and writes there. Nothing in the three
+ * callers is known to do that; it is recorded rather than defended against,
+ * because a guard we added would be a difference.
+ *
+ * THE GLOBAL AND `this` ARE BOTH USED, and not interchangeably: the count and
+ * the log read ADDR_COMM_OBJECT while the records and the six fields are
+ * reached through `this`. They are the same object on every path this project
+ * can drive, which is exactly why the distinction has to be preserved rather
+ * than tidied.
+ */
+int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id)
+{
+    uint8_t *me = (uint8_t *)self;
+    uint8_t *comm;
+    int32_t  slot = CommPlayerSlot(self, id);
+    int32_t  index;
+    int32_t  n;
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    comm_u32(comm, COMM_OFF_PLAYER_COUNT) -= 1;
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    orig_log((const char *)(uintptr_t)ADDR_STR_REMOVE_PLAYER,
+            comm_u32(comm, COMM_OFF_PLAYER_COUNT));
+
+    if (id != -1)
+        orig_remove_player((uint32_t)id);
+
+    comm  = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    index = *(const int32_t *)(comm + COMM_OFF_PLAYERS
+                               + slot * COMM_PLAYER_STRIDE
+                               + COMM_SLOT_OFF_INDEX);
+
+    if (slot < AM2_COMM_PLAYERS) {
+        for (n = AM2_COMM_PLAYERS - slot; n > 0; n--) {
+            uint8_t *dst = me + COMM_OFF_PLAYERS
+                           + (slot + (AM2_COMM_PLAYERS - slot) - n)
+                             * COMM_PLAYER_STRIDE;
+            uint8_t *src = dst + COMM_PLAYER_STRIDE;
+
+            *(int32_t *)(dst + COMM_SLOT_OFF_INDEX) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_INDEX);
+            *(int32_t *)(dst + COMM_SLOT_OFF_ID) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_ID);
+            *(int32_t *)(dst + COMM_SLOT_OFF_READY_TO_LOAD) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_READY_TO_LOAD);
+            *(int32_t *)(dst + COMM_SLOT_OFF_READY) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_READY);
+            strcpy((char *)(dst + COMM_SLOT_OFF_NAME),
+                   (const char *)(src + COMM_SLOT_OFF_NAME));
+            *(int32_t *)(dst + COMM_SLOT_OFF_TEAM) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_TEAM);
+            *(int32_t *)(dst + COMM_SLOT_OFF_TAKEN) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_TAKEN);
+            *(int32_t *)dst = *(const int32_t *)src;
+            *(int32_t *)(dst + COMM_SLOT_OFF_UNACKED) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_UNACKED);
+            *(int32_t *)(dst + COMM_SLOT_OFF_FIELD_5C) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_FIELD_5C);
+            *(int32_t *)(dst + COMM_SLOT_OFF_HEARD) =
+                *(const int32_t *)(src + COMM_SLOT_OFF_HEARD);
+        }
+    }
+
+    comm_u32(me, COMM_OFF_FIELD_364) = 0;
+    comm_u32(me, COMM_OFF_FIELD_35C) = 0;
+    *(uint8_t *)(me + COMM_OFF_FIELD_368) = 0;
+    comm_u32(me, COMM_OFF_FIELD_360) = (uint32_t)index;
+    comm_u32(me, COMM_OFF_FIELD_3A8) = 0;
+    comm_u32(me, COMM_OFF_FIELD_3AC) = 0;
+
+    if ((int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER > slot) {
+        *(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER -= 1;
+        *(uint32_t *)(uintptr_t)ADDR_OUR_SLOT      -= 1;
+    }
+
+    return 1;
+}
+
 void *__attribute__((thiscall)) CommConstruct(void *comm)
 {
     uint8_t *self = (uint8_t *)comm;
@@ -722,8 +829,6 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
  * loop and removed afterwards, so it outlives the slots it appears in.
  *
  * Returns 0 always, which every caller ignores. */
-typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
-#define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
 #define g_noBuffersLatch       (*(int32_t *)(uintptr_t)ADDR_COMM_NO_BUFFERS_LATCH)
 
 int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
@@ -1896,8 +2001,6 @@ void __cdecl OnLobbySlave(void)
  */
 typedef int32_t (__attribute__((thiscall)) *am2_comm_remove_fn)(void *comm,
                                                                 int32_t id);
-#define orig_comm_remove_player \
-    ((am2_comm_remove_fn)(uintptr_t)ADDR_COMM_REMOVE_PLAYER)
 
 void __attribute__((thiscall)) CommReopenSession(void *comm)
 {
@@ -1910,7 +2013,7 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
 
         if (id == -1) {
             /* No step: the slot is looked at again. See above. */
-            orig_comm_remove_player(comm, id);
+            CommRemovePlayer(comm, id);
             continue;
         }
         i++;
@@ -2296,6 +2399,9 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_SEND_GAME_START, (const void *)SendGameStartMsg,
                         "SendGameStartMsg", 3);
     rc |= patch_replace(ADDR_COMM_SEND, (const void *)CommSend, "CommSend", 4);
+    rc |= patch_replace(ADDR_COMM_REMOVE_PLAYER,
+                        (const void *)CommRemovePlayer,
+                        "CommRemovePlayer", 3);
     rc |= patch_replace(ADDR_COMM_OPEN_SESSION, (const void *)CommOpenSession,
                         "CommOpenSession", 1);
     rc |= patch_replace(ADDR_COMM_CONNECTED, (const void *)CommOnConnected,
