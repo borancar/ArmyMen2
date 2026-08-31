@@ -2857,6 +2857,23 @@
 #define SIGHTC_OFF_KIND          0x44u  /* 3 enables the state bump */
 #define SIGHTC_OFF_MAX_RANGE     0x50u
 #define SIGHTC_OFF_ENABLED_54    0x54u
+/* Three more of the same record, from AiKeepRange. +0x4C is the range the unit
+ * WANTS to be at: it repositions only when SIGHTC_OFF_RANGE is at or inside
+ * it, and it is the distance RandomPointToward steps. Distinct from
+ * SIGHTC_OFF_MAX_RANGE at 0x50, which is the range beyond which
+ * ConsiderSightingC stops looking. +0x00 and +0x3C gate the pose write and
+ * nothing read so far says what either holds. */
+#define SIGHTC_OFF_WANT_RANGE    0x4Cu
+#define SIGHTC_OFF_FIELD_00      0x00u
+#define SIGHTC_OFF_FIELD_3C      0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
+#define AM2_AI_KEEP_RANGE_MS     0x1388 /* 5000, the reposition interval */
+#define AM2_AI_REACHED_DIST      0xC    /* nearer than this and the walk ends */
+/* 0x004049C0, TWENTY-SIX call sites across the 0x00405xxx..0x00406xxx band and
+ * one in 0x0044AD40 -- the step the trooper AI shares, as ADDR_AI_407190 is
+ * the vehicle one. Nothing in it says what it is. */
+#define ADDR_AI_TROOPER_STEP     0x004049C0u  /* void(obj, out, void *ctx) */
+/* 0x00405100, six call sites in five functions. Reconstructed. */
+#define ADDR_AI_KEEP_RANGE       0x00405100u  /* void(obj, out, void *ctx) */
 #define AM2_SIGHT_OMNI_RANGE     0x1000
 #define SIGHTCOUT_OFF_BEARING    0x04u  /* uint8_t, compared not written */
 #define SIGHTCOUT_OFF_STATE      0x08u  /* 2 becomes 3 */

@@ -1492,6 +1492,95 @@ void __cdecl AiStep(void *obj, void *out)
             [*(const uint16_t *)(o + OBJ_OFF_TILE)];
 }
 
+typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
+#define orig_ai_trooper_step \
+    ((AM2_AiTrooperStepFn)(uintptr_t)ADDR_AI_TROOPER_STEP)
+
+/* AiKeepRange -- original 0x00405100, six call sites in five functions across
+ * the trooper AI band. Keep the unit at the range it wants from what it can
+ * see: walk to a spot at that range, re-picked every five seconds, choose a
+ * pose while it waits, and face the target.
+ *
+ * IT ONLY REPOSITIONS WHEN THE ENEMY IS TOO CLOSE. `SIGHTC_OFF_RANGE` greater
+ * than `SIGHTC_OFF_WANT_RANGE` skips the whole middle and goes straight to the
+ * turn, so this backs a unit OFF and never closes. Which is what makes the
+ * argument order below matter.
+ *
+ * RandomPointToward IS PASSED THE ENEMY AS THE MOVER. Its parameters are
+ * (target, obj, dist, out): it takes the heading from `obj` to `target` and
+ * steps `dist` from `obj`. This call passes the unit as `target` and the
+ * OBSERVER as `obj`, so the point is `want` away from the ENEMY, on the side
+ * the unit is already on, with the +/-32 spread that function applies. Reading
+ * the two the other way round gives a point near the unit heading at the enemy
+ * -- a unit that charges instead of backing off -- and air.cpp's own comment
+ * warns about exactly this, both arguments being the same type.
+ *
+ * TWO DEADLINES ON ONE FIELD. OBJ_OFF_DEADLINE_58 is used as "when the current
+ * walk expires" at the top and as "when this unit last settled" in the middle,
+ * and the middle sets it to `now + AM2_AI_KEEP_RANGE_MS` after ordering a
+ * walk, which is what makes the top's test fire for the next five seconds. So
+ * a walk in progress short-circuits everything until the unit is within
+ * AM2_AI_REACHED_DIST of OBJ_OFF_FIELD_C0, at which point the field is cleared
+ * and the middle starts the clock again from zero.
+ *
+ * The pose is written only in the gap: not while a walk is outstanding, not
+ * for a soldier kind of 6 or more, not when OBJ_OFF_FIELD_540 is set, not for
+ * SIGHTC_OFF_KIND 3, and not when SIGHTC_OFF_FIELD_00 is non-zero. Five gates
+ * for one dword, and 7 or 5 by whether SIGHTC_OFF_FIELD_3C is under 4.
+ *
+ * AND `out` IS NOT THE VEHICLE FAMILY'S. Those arms write a heading at out[1];
+ * this writes one at out[4] and a pose at out[8]. Same three-argument shape,
+ * different record -- worth checking before carrying an offset across.
+ */
+void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
+{
+    uint8_t       *o   = (uint8_t *)obj;
+    uint8_t       *w   = (uint8_t *)out;
+    const uint8_t *c   = (const uint8_t *)ctx;
+    uint32_t       now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) > now) {
+        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_FIELD_C0))
+            >= AM2_AI_REACHED_DIST) {
+            orig_ai_trooper_step(obj, out, ctx);
+            return;
+        }
+        *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+    }
+
+    if (!*(const void *const *)(c + SIGHTC_OFF_OBSERVER))
+        return;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < 6
+        && *(const int32_t *)(c + SIGHTC_OFF_RANGE)
+           <= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
+        if (*(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) == 0)
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = now;
+
+        if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+            > AM2_AI_KEEP_RANGE_MS) {
+            RandomPointToward(obj,
+                              *(const void *const *)(c + SIGHTC_OFF_OBSERVER),
+                              *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE),
+                              (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
+            orig_ai_trooper_step(obj, out, ctx);
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+                now + AM2_AI_KEEP_RANGE_MS;
+        } else if (!*(const int32_t *)(o + OBJ_OFF_FIELD_540)
+                   && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3
+                   && *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C) < 0x10
+                   && *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) == 0) {
+            *(int32_t *)(w + 8) =
+                *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C) < 4 ? 7 : 5;
+        }
+    }
+
+    if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
+        >= AM2_AI_TURN_DELAY_MS)
+        w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
+}
+
 /* ConsiderSighting -- original 0x004074A0, four callers.
  *
  * One observer against one object. Four gates -- both of the record's enable
@@ -1915,6 +2004,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_AI_STEP_ATTACK, (const void *)AiStepAttack,
                         "AiStepAttack", 1);
     rc |= patch_replace(ADDR_AI_STEP, (const void *)AiStep, "AiStep", 2);
+    rc |= patch_replace(ADDR_AI_KEEP_RANGE, (const void *)AiKeepRange,
+                        "AiKeepRange", 6);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
                         (const void *)SettlePointInRegion,
                         "SettlePointInRegion", 5);

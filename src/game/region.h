@@ -67,6 +67,12 @@ void __cdecl AiStepAttack(void *obj, void *out, void *ctx);
  * eight-entry table, then record the object's region. */
 void __cdecl AiStep(void *obj, void *out);
 
+/* 0x00405100, six call sites in five functions. Keep the unit at the range it
+ * wants from what it sees: a spot re-picked every five seconds, a pose while
+ * it waits, and a turn. Its `out` is NOT the vehicle family's -- heading at
+ * +4, pose at +8. */
+void __cdecl AiKeepRange(void *obj, void *out, void *ctx);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

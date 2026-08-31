@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `80823c2`. Working tree clean.
+Last updated: **2026-08-31**, at `d3c4da7`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,239 patches.**
+Nothing uncommitted. **1,240 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2619,16 +2619,51 @@ commit -- gave the right answer every time it was used.
   again. When a family of cold functions shares a dispatcher, reconstruct the
   dispatcher early.
 
+- **`AiKeepRange`** (`0x00405100`) is the trooper side of the same idea: keep
+  the unit at the range it wants from what it can see. Walk to a spot at that
+  range, re-picked every five seconds, choose a pose while waiting, and face
+  the target.
+
+  **It only repositions when the enemy is TOO CLOSE.** A range greater than
+  `SIGHTC_OFF_WANT_RANGE` skips the whole middle and goes straight to the turn,
+  so this backs a unit off and never closes.
+
+  **And the argument order is where it would have gone wrong.**
+  `RandomPointToward(target, obj, dist, out)` takes the heading from `obj` to
+  `target` and steps `dist` from `obj`. This call passes the UNIT as `target`
+  and the OBSERVER as `obj`, so the point is `want` away from the ENEMY on the
+  side the unit is already on. Read the other way round it is a point near the
+  unit heading at the enemy -- a unit that charges instead of backing off --
+  and `air.cpp`'s own comment warns about exactly this, both arguments being
+  the same type.
+
+  **The shape rule paid off before the mistake, this time.** The record it
+  reads has an object, a range and a bearing at 0x14/0x18/0x1C, which looks
+  like the `SIGHT_OFF_` triple shifted by four. It is not: `SIGHTC_OFF_*`
+  already existed for it, and the callers of this function are exactly the
+  callers of `ConsiderSightingC`. Grepping the offsets first is what found the
+  family instead of inventing a third one.
+
+  Note `out` is NOT the vehicle family's -- heading at +4, pose at +8, where
+  those arms write a heading at +1. Same three-argument shape, different
+  record.
+
+- **The AI is a whole LAYER this environment does not reach.** `AiKeepRange`,
+  `ConsiderSightingC` and `RandomPointToward` all read 0 on the same driven
+  mission, as `AiStep` and its six arms do. Boot Camp's enemies never engage.
+  `mission`'s frame gate failed a seventh time on the original's side, 25229
+  against our 7993, and the function's counter of 0 settles it as before.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,085 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,239
+line (0x0045C000) patched**. Measured: **1,086 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,240
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-five batches have gone in and the 154 entries outstanding start at 48
+small ones in batches. Eighty-six batches have gone in and the 153 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

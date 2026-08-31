@@ -2749,8 +2749,16 @@ exact oracle**, however meaningful it is when it is set.
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
-  `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`, and
-  `RefreshScreen` —
+  `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
+  `AiKeepRange`, and `RefreshScreen` —
+
+  **The AI is a WHOLE LAYER this environment does not reach, not a handful of
+  cold functions.** The vehicle side is settled by one counter -- `AiStep`
+  reads 0 -- and the trooper side looks the same: `AiKeepRange` has six call
+  sites in five functions and reads 0, `ConsiderSightingC` reads 0 beside it,
+  and `RandomPointToward` reads 0. Boot Camp's enemies never engage, so
+  nothing below the sighting layer runs at all. Everything in that band is
+  verified by reading until a drive exists that provokes a fight.
 
   **`AllObjectsInRect` is unexercised while its near-twin runs 112 times on
   the same drive**, which is the useful shape of it. `ObjectsInRect` and
