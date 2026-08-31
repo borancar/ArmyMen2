@@ -10963,6 +10963,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ROACHSTEP_OFF_FACING    0x00u  /* = OBJ_OFF_FIELD_540 */
 #define ROACHSTEP_OFF_STATE     0x14u  /* = OBJ_OFF_DEATH_STATE; 1 is alive */
 #define ROACHSTEP_OFF_FLAG18    0x18u  /* the dword after it; picks the arm */
+/* 0x0043D750's two stuck fields, and the second is a UNION rather than a new
+ * field. A roach that asks to move into a cell no better than the one it is in
+ * is refused: its speed is zeroed, STUCK_COUNT rises by one and STUCK_SINCE is
+ * stamped once with the clock. A later frame MULTIPLIES the speed by the count
+ * before clamping, so the longer it is stuck the harder it shoves; a move that
+ * succeeds clears both.
+ *
+ * STUCK_SINCE IS OBJ_OFF_TABLE_REC_SLOT'S OFFSET, which is a record pointer on
+ * the types that have one. Overloading by type, as at 0x52C and 0x538 already
+ * -- a roach never carries the table pair, so the slot is free for this. Named
+ * in its own right rather than reusing the pointer's name, since a timestamp
+ * read through a name that says "record pointer" is how a wrong dereference
+ * gets written. */
+#define OBJ_OFF_STUCK_COUNT     0xD8u   /* int32_t, refused moves in a row */
+#define OBJ_OFF_STUCK_SINCE     0x534u  /* uint32_t ms; = OBJ_OFF_TABLE_REC_SLOT */
 #define AM2_ROACH_TURN_HOLD_MS  0x64   /* a turn within this of the last is
                                         * refused */
 #define AM2_ROACH_WEIGHT_FLOOR  0x1E   /* the here-weight is clamped up to it */

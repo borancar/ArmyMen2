@@ -289,6 +289,14 @@ void __cdecl PortalSpawn(void);
  * here. Writes the turn through its third argument. */
 int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn);
 
+/* 0x0043D750, four callers. The committing twin of RoachStepAllowed: bite if
+ * the roach is in the biting state, work out the speed and turn, refuse the
+ * move when the destination weighs no less than here, then write the facing,
+ * the speed and the row heading and move. Turns +-6 where the predicate
+ * allows +-1, and compiles the four physics constants in where the predicate
+ * reads them from the image. */
+void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl);
+
 /* 0x0043D5B0, one caller -- StepType8's alive path. Find a direction the roach
  * can move in by fanning out from ROACH_OFF_BASE_DIR: straight ahead, one step
  * clockwise, one anticlockwise, and so on to AM2_ROACH_FAN_LIMIT. */

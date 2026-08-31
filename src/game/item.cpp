@@ -2416,6 +2416,154 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
     return RoachMaskWeight(obj, next, at, 0) >= here;
 }
 
+/* RoachStepTailA -- original 0x0043D750, four callers. Commit one roach step:
+ * bite if it is in the biting state, work out the speed and the turn, refuse
+ * the move if where it would land is no better than where it is, and then
+ * write the facing, the speed and the row heading and actually move.
+ *
+ * IT IS THE COMMITTING TWIN OF RoachStepAllowed, which asks the same question
+ * and answers it without touching anything. Reading the two together is what
+ * made this one quick, and the two places they DISAGREE are the interesting
+ * part, because both are in the image and neither is a misreading:
+ *
+ *   - The turn is clamped to +-6 here and to +-1 in the predicate.
+ *   - The four physics constants are COMPILED IN here -- 130, 80, 100.0, 80.0
+ *     as an immediate pair and two .rdata floats -- where the predicate reads
+ *     ADDR_ROACH_FORVEL, _REVVEL, _FORACC and _REVACC out of the image. The
+ *     values are the same four numbers today, so nothing diverges; they would
+ *     diverge if game.aai ever set that block to anything else, and then the
+ *     predicate would answer for one roach and this would move a different
+ *     one. Reproduced as written rather than unified, which is the whole rule.
+ *   - The second weight call passes 1 as its last argument where the predicate
+ *     passes 0. The argument is unused in the callee, so this changes nothing
+ *     and is kept because the original does it.
+ *
+ * THE STAMP IS WRITTEN HERE AND ONLY READ THERE, which is the asymmetry that
+ * makes the pair make sense: the predicate must not disturb the hysteresis it
+ * is measuring against, so ROW_OFF_TURN_STAMP is updated by whichever of the
+ * two actually commits.
+ *
+ * OBJ_OFF_FIELD_44 IS WRITTEN TWICE, once before StepObjRows and once after,
+ * with the same value. Nothing here reads it in between, so the second store
+ * is only explicable as StepObjRows modifying it -- that is the original's
+ * shape and both stores are kept. Dropping either is invisible until the row
+ * step starts changing the field.
+ *
+ * The stuck counter multiplies the speed BEFORE the clamp, so a roach that has
+ * been refused ten times asks for ten times the speed and still gets no more
+ * than the cap. The guard is `!= 0`, not `> 0` -- the original tests it with
+ * `jbe` after `test`, which on a self-test is exactly equality with zero. */
+void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
+{
+    uint8_t        *o = (uint8_t *)obj;
+    const uint8_t  *c = (const uint8_t *)ctrl;
+    uint8_t        *rows;
+    const AM2_Anim *anim;
+    int32_t         speed = 0;
+    int32_t         cap   = 0;
+    int32_t         turn, cur, next, here;
+    uint8_t         facing;
+    uint32_t        at;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) == 4
+        && *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+           > *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
+        RoachBite(obj);
+
+    if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
+        int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
+        double  delta   = (double)*(const float *)
+                              (uintptr_t)ADDR_FRAME_DELTA_SEC;
+        int32_t stuck;
+
+        cap = reverse ? 80 : 130;
+
+        if (reverse) {
+            int32_t v = (int32_t)((double)*(const int32_t *)
+                                      (o + OBJ_OFF_FIELD_44)
+                                  - delta * 80.0);
+
+            speed = (-cap > v) ? -cap : v;
+        } else {
+            int32_t v = (int32_t)(delta * 100.0
+                                  + (double)*(const int32_t *)
+                                      (o + OBJ_OFF_FIELD_44));
+
+            speed = (cap < v) ? cap : v;
+        }
+
+        stuck = *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT);
+        if (stuck != 0 && speed != 0) {
+            int32_t shove = stuck * speed;
+
+            if (reverse)
+                speed = (-cap > shove) ? -cap : shove;
+            else
+                speed = (cap < shove) ? cap : shove;
+        }
+    }
+
+    rows = *(uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+    if (!anim)
+        return;
+
+    turn = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                      *(const uint8_t *)(c + ROACHSTEP_OFF_FACING));
+    turn = Clamp(turn, -6, 6);
+
+    cur = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
+                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+                   anim->directionBits) & 0xFF;
+    next = RoundTo8((turn + *(const uint8_t *)(rows + ROW_OFF_HEADING)
+                     + *(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)) & 0xFF,
+                    anim->directionBits) & 0xFF;
+
+    if (cur != next) {
+        uint32_t now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+        if (now - *(const uint32_t *)(rows + ROW_OFF_TURN_STAMP)
+            > AM2_ROACH_TURN_HOLD_MS)
+            *(uint32_t *)(rows + ROW_OFF_TURN_STAMP) = now;
+        else
+            turn = 0;
+    }
+
+    facing = (uint8_t)(turn + *(const uint8_t *)(o + OBJ_OFF_FACING));
+
+    here = RoachMaskWeight(obj, cur, *(const uint32_t *)(o + OBJ_OFF_POS), 0);
+    if (here < AM2_ROACH_WEIGHT_FLOOR)
+        here = AM2_ROACH_WEIGHT_FLOOR;
+
+    MoveStepPoint(obj, facing, 0, speed, 0, 0, (AM2_Point *)&at);
+
+    if (((const AM2_Point *)&at)->x != ((const AM2_Point *)(o + OBJ_OFF_POS))->x
+        || ((const AM2_Point *)&at)->y
+           != ((const AM2_Point *)(o + OBJ_OFF_POS))->y) {
+        int32_t n;
+
+        if (RoachMaskWeight(obj, next, at, 1) >= here) {
+            speed = 0;
+            if (*(const uint32_t *)(o + OBJ_OFF_STUCK_SINCE) == 0)
+                *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            n = *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT) + 1;
+        } else {
+            *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) = 0;
+            n = 0;
+        }
+        *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = n;
+    }
+
+    *(uint8_t *)(o + OBJ_OFF_FACING) = facing;
+    *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
+    SetObjField530(obj, *(const int32_t *)(c + ROACHSTEP_OFF_STATE));
+    *(uint8_t *)(rows + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    StepObjRows(obj);
+    *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
+    ObjMoveAlongFacing(obj, 0, 0, 0);
+}
+
 /* RoachBite -- original 0x0043D330, one caller: the roach's per-frame step,
  * which reaches it only in state 4. Step AM2_ROACH_REACH along the facing,
  * play a sound at the point stepped to, and damage every object in a 48x48 box
@@ -5094,15 +5242,14 @@ void __cdecl NextInventorySlot(void *obj)
 }
 
 
-/* Its second argument is `obj + OBJ_OFF_FIELD_540` and the FAMILY reads more
- * than a byte through it -- 0x0043D5B0 tests +0x14 as an int32, which is the
- * object's OBJ_OFF_DEATH_STATE. `uint8_t *facing` was a type off one use, the
- * same shape of mistake as ObjInitCommon's `dir`. Spelled as the pointer it
- * is; the callers pass exactly what they passed before. */
-typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *step);
+/* The roach step seam is gone -- RoachStepTailA is reconstructed and its one
+ * caller below calls it by name. What the seam's comment established is still
+ * true of the signature and is kept here: the second argument is
+ * `obj + OBJ_OFF_FIELD_540` and the FAMILY reads more than a byte through it
+ * -- 0x0043D5B0 tests +0x14 as an int32, which is the object's
+ * OBJ_OFF_DEATH_STATE. `uint8_t *facing` was a type off one use, the same
+ * shape of mistake as ObjInitCommon's `dir`. */
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
-#define orig_roach_tail_a \
-    ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_STEP_TAIL_A)
 #define orig_roach_row_final \
     ((AM2_RoachRowFn)(uintptr_t)ADDR_ROACH_ROW_FINAL)
 
@@ -5185,7 +5332,7 @@ void __cdecl StepType8(void *obj)
         }
     }
 
-    orig_roach_tail_a(obj, facing);
+    RoachStepTailA(obj, facing);
     ObjSetRoachFootprint(obj);
 }
 
@@ -9619,6 +9766,8 @@ void item_install(void)
                   "PortalSpawn", 1);
     patch_replace(ADDR_ROACH_STEP_ALLOWED, (const void *)RoachStepAllowed,
                   "RoachStepAllowed", 4);
+    patch_replace(ADDR_ROACH_STEP_TAIL_A, (const void *)RoachStepTailA,
+                  "RoachStepTailA", 1);
     patch_replace(ADDR_ROACH_ALIVE_STEP_B, (const void *)RoachAliveStepB,
                   "RoachAliveStepB", 1);
     patch_replace(ADDR_OBJ_SET_FOOTPRINT, (const void *)ObjSetFootprint,
