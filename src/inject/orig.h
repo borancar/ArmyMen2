@@ -10955,6 +10955,42 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_OBJ_TILE_CHANGED    0x004294C0u /* void(obj, int32 h, int32 force) */
 #define ADDR_OBJ_TILE_HOOK       0x00437860u /* void(obj), when bit 3 is clear */
 #define ADDR_OBJ_REMAP           0x00429D00u /* void(obj, desc, int32 force) */
+/* READ IN FULL, not yet written. 544 bytes, three callers -- both deploys and
+ * the stepper -- and every callee is already ours: ListUnlink, ListPushFront,
+ * ItemPreDestroy, PointsEqual. Two `ret`s.
+ *
+ *   if (!force && PointsEqual(pos, OBJ_OFF_PREV_POS)) return;
+ *   rebuild OBJ_OFF_HIT_RECT from the position plus the four
+ *     OBJ_OFF_BOX_OFFSETS -- left, top, right, bottom, in that order,
+ *     confirmed by the stores to +0x30/+0x34/+0x38/+0x3C;
+ *   if (!(flags & 1)) return;
+ *   shift each corner right by 8 -- the 256-unit tile -- clamp against the
+ *     descriptor's grid at [desc+0] and [desc+4] with the shift at [desc+8],
+ *     and bail if the box falls outside;
+ *   walk the covered cells, and for each OBJ_OFF_CELL_ENTRIES entry (0x10
+ *     bytes, the cell index at +0xC, -1 meaning unlinked): unlink from the old
+ *     list when the index differs, store the new one, ListPushFront onto
+ *     [desc+0xC] + index*4;
+ *   then release every remaining entry up to OBJ_OFF_CELL_COUNT, unlinking
+ *     each and writing -1 back.
+ *
+ * Two things found while reading it, both worth having on record.
+ *
+ * OBJ_OFF_DEPTH_LAYER (0x26) and OBJ_OFF_DEPTH_SLOPE (0x28) sit INSIDE
+ * OBJ_OFF_BOX_OFFSETS' sixteen bytes, and both readings are right: the depth
+ * pair is used only on ROW records (maprow.cpp's comparator, item.cpp writing
+ * `rows + ...`) and the box only on OBJECTS. Same offsets, different structs --
+ * so the depth pair is MISFILED under an OBJ_OFF_ prefix. That is the exact
+ * trap that cost a defect today, where OBJ_OFF_OWNER's prefix was trusted and
+ * the field belonged to another struct.
+ *
+ * And the offset macros DO have a ratchet -- tools/checkoffsets.py, baseline
+ * 14 -- which is worth saying because I wrote the opposite here and it failed
+ * the build within the minute. It refused OBJ_OFF_ENTRY_COUNT because 0x8C is
+ * already OBJ_OFF_CELL_COUNT, which is the very field I was naming; and its
+ * backlog already lists 0x8C with three names and 0x90 with two
+ * (OBJ_OFF_CELL_ENTRIES beside OBJ_OFF_ALLOC_PTR). Use the existing ones. */
+
 #define OBJ_FLAG_NO_TILE_HOOK    0x08u
 /* 0x004278E0, four callers. Give an object a height and push it into the
  * depth sort. A ZERO height means "take the tile's own", read through
