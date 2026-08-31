@@ -6,6 +6,9 @@
 #include "image.h"
 #include "definfo.h"  /* DefParseInfoFile */
 #include "packkey.h"  /* PackKey -- reconstructed */
+#include "misc.h"     /* CommArmyOfSlot -- reconstructed */
+#include "objtable.h"  /* AM2_Object */
+#include "objtype.h"   /* ObjIsItem, ObjIsTypeIn238 -- reconstructed */
 #include "gamedir.h"  /* SetGameDir */
 #include "crt.h"       /* the game's allocator -- this table is its memory */
 #include "../inject/orig.h"
@@ -271,8 +274,97 @@ int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n)
     }
 }
 
+typedef int32_t (__cdecl *AM2_UnitKindMatchesFn)(int32_t code, int32_t kind,
+                                                 int32_t slot);
+#define orig_unit_kind_matches \
+    ((AM2_UnitKindMatchesFn)(uintptr_t)ADDR_UNIT_KIND_MATCHES)
+
+/* IsPlacedUnit -- original 0x0043B0A0, one caller, which is the manual
+ * placement screen at 0x00413BC0. Does this object count as one of that army's
+ * placed units? The name is ours, from the caller and from what each arm
+ * accepts.
+ *
+ * FOUR ANSWERS AND ONLY ONE OF THEM DOES ANY WORK. A VEHICLE (type 3) counts
+ * outright. A TROOPER (type 2) counts unless it is OBJ_OFF_SARGE or carries
+ * anything at OBJ_OFF_FIELD_94 -- so the squad leader is not a placed unit,
+ * which is exactly right for a screen where you lay your squad out and Sarge
+ * is always there. Anything that is neither an item nor one of types 2, 3 and
+ * 8 answers 0 before the type is even looked at.
+ *
+ * AN ITEM (type 1) IS THE ONE THAT SEARCHES. It walks all eighteen
+ * ADDR_UNIT_TYPES records, skips every one that is a trooper or a vehicle, and
+ * asks ADDR_UNIT_KIND_MATCHES whether that kind claims this item; ANY yes
+ * makes the answer 1. It does not stop at the first -- the flag is set and the
+ * loop runs on -- which changes nothing and is written out as it stands.
+ *
+ * THE SLOT IT PASSES IS AN ARMY. ADDR_COMM_ARMY_OF_SLOT is prototyped
+ * `(this, slot)` and this hands it the army argument, which CLAUDE.md records
+ * as the identity for every army a script can write -- the comm slots hold
+ * armies 0..3 in order. So the two coincide here rather than one being wrong,
+ * and that is worth saying because the call reads like a mistake.
+ *
+ * The first gate accepts types 2, 3 and 8 OR an item, and the switch below
+ * then has no arm for type 8 -- so a roach reaches the switch and falls out of
+ * it with 0. Two tests that could have been one, kept apart because that is
+ * how the original reads.
+ */
+int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  found = 0;
+    int32_t  slot;
+    const uint8_t *rec;
+
+    if (!ObjIsTypeIn238((const AM2_Object *)obj)
+        && !ObjIsItem((const AM2_Object *)obj))
+        return 0;
+
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY) != army)
+        return 0;
+
+    switch (*(const int32_t *)o) {
+    case 2:
+        if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+            return 0;
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+            return 0;
+        return 1;
+
+    case 3:
+        return 1;
+
+    case 1:
+        break;
+
+    default:
+        return 0;
+    }
+
+    slot = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army);
+
+    for (rec = (const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES);
+         rec < (const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES)
+               + AM2_UNIT_TYPE_COUNT * AM2_UNIT_TYPE_STRIDE;
+         rec += AM2_UNIT_TYPE_STRIDE) {
+        if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
+            || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+            continue;
+
+        if (orig_unit_kind_matches(
+                *(const int32_t *)(*(const uint8_t *const *)
+                                       (o + OBJ_OFF_FIELD_94)
+                                   + TYPEREC_OFF_FIELD_08),
+                *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND), slot))
+            found = 1;
+    }
+
+    return found;
+}
+
 int place_install(void)
 {
+    patch_replace(ADDR_IS_PLACED_UNIT, (const void *)IsPlacedUnit,
+                  "IsPlacedUnit", 1);
     int rc = 0;
 
     rc |= patch_replace(ADDR_SPRITE_KEY_FOR_KIND,

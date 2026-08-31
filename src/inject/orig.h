@@ -8680,6 +8680,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *   +0x24 int32   game-type mask, one distinct bit per type
  */
 #define ADDR_UNIT_TYPES         0x00487898u  /* 18 records */
+/* 0x0043B0A0, one caller -- the manual placement screen. Does this object
+ * count as one of that army's placed units? Reconstructed. */
+#define ADDR_IS_PLACED_UNIT     0x0043B0A0u  /* int32(obj, int32 army) */
+/* 0x0043AAB0, and it is an eight-arm jump table on its first argument.
+ * IsPlacedUnit asks it, per unit type that is neither trooper nor vehicle,
+ * whether that type claims an item -- so the name is from that use and the
+ * body is unread. */
+#define ADDR_UNIT_KIND_MATCHES  0x0043AAB0u  /* int32(code, kind, slot) */
 #define AM2_UNIT_TYPE_STRIDE    0x28u
 #define AM2_UNIT_TYPE_COUNT     18
 #define UNIT_TYPE_OFF_TROOPER   0x00u

@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `43a10f9`. Working tree clean.
+Last updated: **2026-08-31**, at `c012b29`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,258 patches.**
+Nothing uncommitted. **1,259 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3255,16 +3255,43 @@ commit -- gave the right answer every time it was used.
   drive. The two figures being within eighty of each other is its own small
   check: whatever puts footprints down takes almost all of them up again.
 
+- **`IsPlacedUnit`** (`0x0043B0A0`) answers whether an object counts as one of
+  that army's placed units, for the manual placement screen.
+
+  **Four answers and only one does any work.** A VEHICLE counts outright. A
+  TROOPER counts unless it is `OBJ_OFF_SARGE` or carries anything at
+  `OBJ_OFF_FIELD_94` -- so the squad leader is not a placed unit, which is
+  exactly right for a screen where you lay your squad out and Sarge is always
+  there. An ITEM is the one that searches: all eighteen `ADDR_UNIT_TYPES`
+  records, skipping every trooper or vehicle, asking whether that kind claims
+  this item, and ANY yes wins. It does not stop at the first -- the flag is set
+  and the loop runs on.
+
+  **The first gate and the switch disagree about type 8.** The gate accepts
+  types 2, 3 and 8 or an item; the switch has no arm for 8, so a roach passes
+  the gate and falls out of the switch with 0. Two tests that could have been
+  one, kept apart because that is how the original reads.
+
+  **The slot it passes is an ARMY**, and that is worth saying because the call
+  reads like a mistake: `ADDR_COMM_ARMY_OF_SLOT` is prototyped `(this, slot)`.
+  CLAUDE.md already records that lookup as the identity for every army a script
+  can write, the comm slots holding armies 0..3 in order, so the two coincide
+  here. And `BuildPlacementPath` twenty lines above reads the same field INLINE
+  rather than calling the helper -- two functions in one band disagreeing about
+  how to get an army, both reproduced.
+
+  Cold, as the placement screen is multiplayer.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,104 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,258
+line (0x0045C000) patched**. Measured: **1,105 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,259
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and four batches have gone in and the 135 entries outstanding start at 48
+small ones in batches. A hundred and five batches have gone in and the 134 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
