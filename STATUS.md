@@ -11595,3 +11595,71 @@ otherwise -- its call is reachable only through that arm.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels.
+
+
+## StepType6, where checkoffsetuse.py caught OMITTED CODE
+
+**1,239 - 1,157 = 82 entries outstanding.** `0x00422B90` into
+`src/game/item.cpp`. The step for an EXPLOSION.
+
+**checkoffsetuse.py made its first BEHAVIOURAL catch, and this is what the
+tool was built for.** It reported `OBJ_OFF_FLAGS` read by the original and
+named nowhere in the C. That one line pointed at a tail region I had assumed
+was two calls, and which held two things I had left out:
+
+  - BLAST_OFF_MODE is cleared after the shake, so the spawn and the shake
+    happen ONCE rather than every frame;
+  - there is a SECOND EXIT -- an explosion whose row animation has finished
+    sets OBJ_FLAG_OVERDUE on itself and returns WITHOUT stepping its rows or
+    moving.
+
+Without those a blast shakes repeatedly and never finishes. The compiler could
+not see it, `checkseams` could not, and the pixel and log comparisons would
+not.
+
+**And a claim of mine that needs walking back.** I wrote that the A/B "never
+would have" caught this. That is an INFERENCE, not a measurement -- I assumed
+Boot Camp's explosions are short-lived enough to hide a missing finish flag
+because it sounded right, which is the exact failure that produced nine wrong
+readings today. What is supportable: the catch arrived BEFORE the A/B, cost
+seconds, and did not depend on any drive reaching that code. **The unrun test**
+that would settle the stronger claim is the standard one here -- mutate the fix
+back out, run bootcamp, and see whether the state dump moves.
+
+**Type 6 is an EXPLOSION**, which closes one of the three object types
+CLAUDE.md lists as unread. From the body: a deadline against ADDR_GAME_CLOCK_MS,
+AM2_BLAST_SOUND played once at its own position, damage over everything
+AllObjectsInRect finds in a rect it carries -- halved for one trooper class,
+with the kind chosen 3 or 1 by a rand roll -- then above mode 5 a scorch decal
+and a screen shake.
+
+The decal helper at 0x00461950 was named from ITS body too: it tests the tile
+and all EIGHT neighbours against ADDR_TILE_FLAGS and only then makes a row
+carrying one of six sprites. A scorch mark that will not be laid over anything
+already flagged.
+
+**Three other checks fired on this one function.**
+
+The COUNT caught a missing `patch_replace` -- clean build, every static check
+green, and the function simply not installed. Second time today, after
+FormationSlotPoint.
+
+The COMPILER caught two name collisions in a row: ADDR_TILE_NEIGHBOURS is the
+int32_t[20] at 0x00654BD8 and ADDR_TILE_RING8 the int32_t[17] at 0x0053C480 --
+both were the obvious names for an eight-entry ring and both were taken. The
+grep-before-naming pass covered the names I invented and not the ones I assumed
+were free.
+
+And the DISPATCHER appeared to contradict the identification by calling this
+from `case 5`. The selector is `objType - 1`, which `case 1 -> StepType2`
+settles. Without checking, "explosion" would have gone into orig.h against the
+wrong type number.
+
+**Its counter will read 0** -- the only caller is reconstructed, so the call
+never crosses the patched entry. Established BEFORE writing rather than puzzled
+over afterwards. The blast path is covered by bootcamp's state dump; the
+spawn-and-shake arm needs BLAST_OFF_MODE >= 5 and the decal additionally needs
+nine clear tiles, so both stay verified by reading.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.

@@ -125,6 +125,16 @@ extern "C" int32_t __cdecl BoatExitPoint(void *, uint32_t *)
     return 0;
 }
 
+/* item.cpp's StepType6 calls this now that type 6 is reconstructed, and it
+ * lives in win32/mapdraw.cpp. Ninth stub, and NOT extern "C" -- mapdraw.h's
+ * block closes at line 129 and ShakeAt is declared at 158, outside it. The
+ * linkage matches the header, not the file it is stubbed in, which is the same
+ * rule ObjectsInRect above follows for the opposite reason. StepType6 has no
+ * vectors: it reads the game clock and the tile layers. */
+void __cdecl ShakeAt(const AM2_Point *, int32_t)
+{
+}
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;

@@ -115,6 +115,11 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint);
 /* 0x004335F0, two callers. Can this unit pick this weapon up, and into which
  * of its six slots? Eight separate exits -- not the converging tail this
  * family usually uses. See item.cpp. */
+/* 0x00422B90, one caller. The step for an EXPLOSION -- a deadline, a one-shot
+ * sound, a blast over everything in its rect, and above mode 5 a scorch decal
+ * and a screen shake. Its counter reads 0 because its caller is ours. */
+void __cdecl StepType6(void *obj);
+
 int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
                                 int32_t *already);
 

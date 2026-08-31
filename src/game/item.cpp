@@ -13,6 +13,18 @@
 #include "misc.h"      /* ClearPtrList */
 #include "defparse.h"  /* DefFindObjRec -- reconstructed */
 #include "pad.h"      /* ObjTileHook -- reconstructed */
+
+/* ShakeAt lives in win32/mapdraw.h and item.cpp is flat, so it is declared
+ * here the way script.cpp declares PreloadSprite. Its signature names no Win32
+ * type. And the decal helper stays original, reached by address -- it has one
+ * caller and that caller is this file. */
+/* NOT extern "C": mapdraw.h's block closes at line 129 and ShakeAt is
+ * declared at 158, outside it. The linkage has to match the header, not the
+ * file it is stubbed in -- audio.h has the same split and selftest.cpp records
+ * it. BoatExitPoint needed the wrapper for exactly the opposite reason. */
+void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
+typedef void (__cdecl *AM2_DecalFn)(int32_t x, int32_t y, int32_t variant);
+#define orig_blast_spin ((AM2_DecalFn)(uintptr_t)ADDR_PLACE_GROUND_DECAL)
 #include "objtable.h"
 #include "objtype.h"   /* ObjType2Field548 */
 #include "objflag.h"   /* ObjFlagClear0 -- reconstructed */
@@ -5179,7 +5191,6 @@ void __cdecl StepType8(void *obj)
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
 #define orig_step_type5   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE5)
-#define orig_step_type6   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE6)
 
 /* Defined below, beside the rest of the object stepping. */
 void __cdecl StepType1And4(void *obj);
@@ -5258,7 +5269,7 @@ void __cdecl ObjFrameStep(void *obj)
     case 1:         StepType2(obj);         break;   /* ours now */
     case 2:         StepType3(obj);         break;   /* ours now */
     case 4:         orig_step_type5(obj);   break;
-    case 5:         orig_step_type6(obj);   break;
+    case 5:         StepType6(obj);         break;   /* ours now */
     case 6:         ObjMarkIfOverdue(obj);  break;   /* ours already */
     default:        StepType8(obj);         break;
     }
@@ -9430,6 +9441,117 @@ int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
     }
 }
 
+/* 0x00422B90, one caller -- the per-type step dispatcher's type 6 arm, which
+ * is an EXPLOSION. See orig.h for how that was identified and for why its
+ * fields carry BLAST_OFF_ names rather than the OBJ_OFF_ ones that share those
+ * offsets on other types.
+ *
+ * Four parts, in this order:
+ *
+ *   a deadline at BLAST_OFF_DUE_MS -- while the clock has not passed it the
+ *     function RETURNS, so nothing below runs; once it has, the deadline is
+ *     cleared and row 0 is flagged;
+ *   a one-shot sound, AM2_BLAST_SOUND at the blast's own position, cleared
+ *     after it plays;
+ *   the blast itself, over everything AllObjectsInRect finds in
+ *     BLAST_OFF_RECT; and
+ *   with BLAST_OFF_MODE at 5 or more, a spawn and a screen shake.
+ *
+ * The damage is HALVED for one class -- ObjIsType2 and ClassifyByCode74
+ * answering 2 -- and the damage KIND is 3 or 1 by a rand roll, which the
+ * OBJ_OFF_FIELD_94 == 0x89 test skips entirely. Reading `and eax, 0x255` as a
+ * mask over a percentage would be wrong: it is the original's own roll and is
+ * transcribed, not tidied.
+ *
+ * Its two exits are at DIFFERENT STACK DEPTHS because `push edi` and
+ * `push ebx` happen inside the flow rather than in the prologue -- the ebx
+ * pair brackets the blast loop and the branch that skips the loop jumps past
+ * both. That is why the early return is a return and not a goto.
+ *
+ * The counter for this will read 0: its only caller is reconstructed, so the
+ * call never crosses the patched entry. It runs -- the state dump reflects it
+ * -- but the counter cannot show that. */
+void __cdecl StepType6(void *obj)
+{
+    uint8_t   *o = (uint8_t *)obj;
+    uint8_t   *victim;
+    AM2_Point *pos = (AM2_Point *)(o + OBJ_OFF_POS);
+
+    if (*(const uint32_t *)(o + BLAST_OFF_DUE_MS) > 0) {
+        if (*(const uint32_t *)(o + BLAST_OFF_DUE_MS)
+            > *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
+            return;
+        *(uint32_t *)(o + BLAST_OFF_DUE_MS) = 0;
+        ObjFlagSet0(*(void **)(o + OBJ_OFF_ROWS));
+    }
+
+    if (*(const int32_t *)(o + BLAST_OFF_SOUND_PENDING) != 0) {
+        PlaySoundAt(AM2_BLAST_SOUND, 0, 0, pos->x, pos->y);
+        *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 0;
+    }
+
+    if (*(const uint8_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_CELL) >= 4
+        && *(const int32_t *)(o + BLAST_OFF_DAMAGE) > 0) {
+
+        victim = (uint8_t *)AllObjectsInRect(
+                     (const AM2_Rect *)(o + BLAST_OFF_RECT),
+                     (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+
+        for (; victim != 0;
+             victim = *(uint8_t **)(victim + OBJ_OFF_QUERY_NEXT)) {
+            int32_t dmg = *(const int32_t *)(o + BLAST_OFF_DAMAGE);
+            int32_t kind = 1;
+
+            if (ObjIsType2((const AM2_Object *)victim)
+                && ClassifyByCode74(victim) == 2)
+                dmg = *(const int32_t *)(o + BLAST_OFF_DAMAGE) >> 1;
+
+            if (*(const int32_t *)(o + OBJ_OFF_FIELD_94) != 0x89
+                && (orig_rand() & 0x255) >= 0x40)
+                kind = 3;
+
+            DamageObject(victim, dmg, kind,
+                         *(const uint32_t *)(o + BLAST_OFF_SOURCE_UID),
+                         orig_rand() % 0xFF + 1, 0);
+        }
+
+        *(int32_t *)(o + BLAST_OFF_DAMAGE) = 0;
+
+        if (*(const int32_t *)(o + BLAST_OFF_MODE) >= 5) {
+            int32_t  spin = orig_rand() % 6;
+            int32_t  tile;
+
+            orig_blast_spin(pos->x, pos->y, spin);
+            tile = TileOfPoint(*(const uint32_t *)pos) & 0xFFFF;
+
+            if ((( *(const uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1)
+                && (*(const uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[tile]
+                   >= AM2_BLOCK_CLEAR)
+                orig_spawn_at(pos->x, pos->y, 0x90,
+                              *(const int8_t *)(o + OBJ_OFF_ARMY),
+                              *(const uint32_t *)(o + BLAST_OFF_SOURCE_UID),
+                              0, 0xC8, 0, 0, 0);
+
+            ShakeAt(pos, *(const int32_t *)(o + BLAST_OFF_MODE));
+            /* Once, not once a frame. */
+            *(int32_t *)(o + BLAST_OFF_MODE) = 0;
+        }
+    }
+
+    /* The second exit, and the one this function needs: an explosion whose
+     * animation has run out flags itself and stops -- it does NOT step its
+     * rows or move. Omitting this leaves a blast that never finishes, and
+     * tools/checkoffsetuse.py is what caught it, by reporting OBJ_OFF_FLAGS
+     * read by the original and named nowhere in the C. */
+    if (RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS))) {
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        return;
+    }
+
+    StepObjRows(o);
+    ObjMoveAlongFacing(o, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 0, 0);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -9701,6 +9823,7 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_STEP_TYPE6, (const void *)StepType6, "StepType6", 1);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,
                   "CanPickUpWeapon", 2);
     patch_replace(ADDR_ON_SELECTION_CHANGED, (const void *)OnSelectionChanged,

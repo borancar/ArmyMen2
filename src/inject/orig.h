@@ -11342,6 +11342,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define BLAST_OFF_MODE           0xB4u  /* >= 5 takes the spawn path */
 #define BLAST_OFF_SOURCE_UID     0xB8u  /* handed to DamageObject as attacker */
 #define AM2_BLAST_SOUND          0x27
+/* 0x00461950, 160 bytes, one caller -- StepType6. Named from its BODY, not
+ * from that call site: it tests the tile and all EIGHT neighbours against
+ * ADDR_TILE_FLAGS bit 0, and only when every one is clear does it make a row,
+ * give it one of AM2_DECAL_VARIANTS sprites chosen by the caller's rand, put
+ * it at the point and call RowUpdate. A scorch mark under the explosion, and
+ * one that will not be laid over anything already flagged. */
+#define ADDR_PLACE_GROUND_DECAL  0x00461950u  /* void(int32 x, int32 y, int32) */
+#define ADDR_DECAL_SPRITES       0x0048CBA0u  /* void *[6] */
+/* An EIGHT-entry ring of tile deltas, and the third such table in this image:
+ * ADDR_TILE_NEIGHBOURS is the int32_t[20] at 0x00654BD8 and ADDR_TILE_RING8
+ * the int32_t[17] at 0x0053C480. Both of those names were the obvious ones and
+ * both were already taken -- the compiler caught each in turn, because the
+ * grep-before-naming pass covered the names I invented and not the ones I
+ * thought were free. Named for its one consumer, which is what distinguishes
+ * it from the other two rings rather than anything in the data. */
+#define ADDR_DECAL_RING8         0x00523DA0u  /* int32[8] */
+#define AM2_DECAL_VARIANTS       6
 /* The missile's own constants. The def record is 52 bytes and the file gives
  * LoadType5 an INDEX into the table rather than a pointer, which is the same
  * tag-for-pointer trade LoadType1 makes with its save tag. */
