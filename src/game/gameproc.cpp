@@ -92,6 +92,26 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
  * and a C linkage declaration here would not resolve. */
 int32_t __cdecl LoadAudioSection(am2_FILE *fp);
 
+/* SaveAudioSection, the eleventh section writer, declared here for the same
+ * reason and NOT `extern "C"` -- audio.h's extern block spans lines 11 to 182
+ * and this sits at 188, outside it, exactly like LoadAudioSection above.
+ * PlaySoundAt in region.cpp is at 157 and DOES need the wrapper. Both spellings
+ * compile and only the linker tells them apart, so read where the block ends
+ * rather than assuming the header is uniform. */
+int32_t __cdecl SaveAudioSection(am2_FILE *fp);
+
+/* SaveGame's three CRT seams. _findfirst and _findclose are named in orig.h
+ * already; _mkdir is 0x00465F56, which docs/imports.tsv identifies from the
+ * KERNEL32!CreateDirectoryA at 0x00465F5C inside it. */
+typedef int32_t (__cdecl *AM2_FindFirstFn2)(const char *pattern, void *data);
+typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t handle);
+typedef int32_t (__cdecl *AM2_MkdirFn)(const char *path);
+typedef int32_t (__cdecl *AM2_SprintfFn2)(char *dst, const char *fmt, ...);
+#define orig_findfirst ((AM2_FindFirstFn2)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findclose ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_mkdir     ((AM2_MkdirFn)AM2_IMAGE(ADDR_CRT_MKDIR))
+#define orig_sprintf   ((AM2_SprintfFn2)AM2_IMAGE(ADDR_GAME_SPRINTF))
+
 /* _chmod and fflush, neither of which this tree had needed before. */
 typedef int32_t (__cdecl *AM2_ChmodFn)(const char *path, int32_t mode);
 #define orig_chmod  ((AM2_ChmodFn)AM2_IMAGE(ADDR_CRT_CHMOD))
@@ -412,6 +432,89 @@ int32_t __cdecl LoadDefaultCof(void)
  * Every callee is reconstructed, so none of their counters can move when this
  * runs -- the usual blind spot. This one's counter does, because the caller
  * is still original. */
+/* SaveGame -- original 0x00425790, the write half of the savegame and the
+ * mirror of LoadGame below.
+ *
+ * ITS FRAME TILES EXACTLY, which is what settled every offset in it: a
+ * 0x104-byte level-name buffer, a 0xFC-byte path buffer, and a 0x118-byte
+ * _finddata_t at +0x200. 0x200 + AM2_FINDDATA_BYTES is 0x318, the frame the
+ * original reserves, and `attrib` at the struct's offset 0 is what the
+ * `test BYTE PTR [esp+0x208], 0x10` reads. Same tiling argument that re-based
+ * ADDR_RANK_RECORDS.
+ *
+ * IT CREATES THE SAVE DIRECTORY, which took two wrong readings to see. The
+ * middle block is not a slot search and 0x00465F56 is not _findnext -- that is
+ * ADDR_CRT_FINDNEXT at 0x00465C6D. docs/imports.tsv puts
+ * KERNEL32!CreateDirectoryA at 0x00465F5C, inside 0x00465F56, so it is _mkdir:
+ * `save\<level>\` is created when _findfirst does not find it, and again when
+ * it finds something that is not a directory.
+ *
+ * THE TEN SECTION GUARDS ARE NOT RETURNS. Each `je 0x0042591C` lands on
+ * `push esi; call fclose` -- writing them as a bare `return 0` would leak the
+ * handle on every failure path, which is the defect StepType2 carried three
+ * times today. Its three genuine early returns are fall-through rets.
+ *
+ * THE ORDER IS CONFIRMED TWICE INDEPENDENTLY: LoadGame calls the eleven
+ * loaders in it, and CLAUDE.md's savegame oracle reports its per-section
+ * results in the same sequence. Every writer is already reconstructed, so this
+ * needs no orig_ seam -- gameproc.cpp already includes every module involved.
+ */
+int32_t __cdecl SaveGame(const char *name)
+{
+    char       lvl[0x104];
+    char       path[0xFC];
+    uint8_t    fd[AM2_FINDDATA_BYTES];
+    am2_FILE  *fp;
+    int32_t    h;
+
+    if (!*(const char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
+        return 0;
+    if (!*name)
+        return 0;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+
+    strcpy(lvl, (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+
+    h = orig_findfirst(lvl, fd);
+    if (h == -1) {
+        orig_mkdir(lvl);
+    } else {
+        if (!(fd[0] & AM2_ATTR_SUBDIR))
+            orig_mkdir(lvl);
+        orig_findclose(h);
+    }
+
+    orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_SAVE_PLAYER_FMT),
+                 (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+    SetGameDir(path);
+
+    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_WB));
+    if (!fp)
+        return 0;
+
+    WriteSaveTag(fp, AM2_SAVETAG_GAMEPROC);
+
+    if (!SaveGameProcSection(fp))   goto fail;
+    if (!SaveMapSection(fp))        goto fail;
+    if (!SavePadSection(fp))        goto fail;
+    if (!SaveObjScriptSection(fp))  goto fail;
+    if (!SaveScriptSection(fp))     goto fail;
+    if (!SaveEventBlock(fp))        goto fail;
+    if (!SaveScriptConditions(fp))  goto fail;
+    if (!SaveEventSection(fp))      goto fail;
+    if (!SaveItems(fp))             goto fail;
+    if (!SaveAirSection(fp))        goto fail;
+    if (!SaveAudioSection(fp))      goto fail;
+
+    orig_fclose(fp);
+    return 1;
+
+fail:
+    orig_fclose(fp);
+    return 0;
+}
+
 int32_t __cdecl LoadGame(am2_FILE *fp)
 {
     if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
@@ -1673,6 +1776,7 @@ void gameproc_install(void)
     patch_replace(ADDR_UID_REMAP_ADD, (const void *)UidRemapAdd,
                   "UidRemapAdd", 2);
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
+    patch_replace(ADDR_SAVE_GAME, (const void *)SaveGame, "SaveGame", 1);
     patch_replace(ADDR_LOAD_DEFAULT_COF, (const void *)LoadDefaultCof,
                   "LoadDefaultCof", 1);
     patch_replace(ADDR_SAVE_DEFAULT_COF, (const void *)SaveDefaultCof,

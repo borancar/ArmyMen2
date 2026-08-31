@@ -172,6 +172,13 @@ void __cdecl UidRemapAdd(uint32_t from, uint32_t to);
  * Closes `fp` on both exits. Returns 1 on success, 0 if any loader failed. */
 int32_t __cdecl LoadGame(am2_FILE *fp);
 
+/* 0x00425790, the write half. Refuse unless a level is loaded and a filename
+ * was given, ensure `save\<level>\` exists, chdir into it, open "wb", write
+ * the outer tag and then the eleven section writers in a fixed order -- the
+ * same order LoadGame reads them. Any writer returning 0 abandons the rest,
+ * and BOTH exits close the file. */
+int32_t __cdecl SaveGame(const char *name);
+
 /* 0x00425950, one caller. Open the current save for reading, verify its
  * gameproc section, rewind, and hand back the open FILE or NULL. */
 am2_FILE *__cdecl OpenSaveForLoad(void);

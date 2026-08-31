@@ -5611,7 +5611,30 @@ typedef struct {
  * ADDR_ATTEMPT_COUNT and logs "Attempt# %d". */
 #define ADDR_MISSION_RETRY       0x0051232Cu  /* int32_t */
 #define ADDR_ATTEMPT_COUNT       0x00512330u  /* int32_t */
-#define ADDR_SAVE_GAME           0x00425790u
+/* Reconstructed as SaveGame -- the write half of the savegame, and the mirror
+ * of the already-reconstructed LoadGame. It refuses unless a level is loaded
+ * and a filename was given, ensures `save\<level>\` EXISTS, chdirs into it,
+ * opens the file "wb", writes the outer tag and then eleven section writers in
+ * a fixed order, each guarded: any failure abandons the rest.
+ *
+ * THE ORDER IS CONFIRMED TWICE INDEPENDENTLY. LoadGame calls the eleven
+ * loaders in it, and CLAUDE.md's savegame oracle reports its per-section
+ * results in the same sequence -- gameproc, map, pad, objscript, script,
+ * eventblock, conds, event, item, air, audio.
+ *
+ * BOTH ITS EXITS CLOSE THE FILE. The ten `je 0x0042591C` are not returns:
+ * that address is `push esi; call fclose`, and 0x00425930 is the same with a
+ * 1 instead of a 0. Writing them as a bare `return 0` would leak the handle on
+ * every failure path. Its three genuine early returns are fall-through rets.
+ *
+ * Every section writer is already reconstructed, so this needs no orig_ seam
+ * at all -- only includes from the modules that own each section. */
+#define ADDR_SAVE_GAME           0x00425790u  /* int32_t(const char *name) */
+/* _mkdir: CreateDirectoryA(path, NULL), -1 on failure. Named from
+ * docs/imports.tsv, which puts KERNEL32!CreateDirectoryA at 0x00465F5C inside
+ * it -- the disassembly only shows a call through an IAT slot. */
+#define ADDR_CRT_MKDIR           0x00465F56u  /* int32_t(const char *path) */
+#define AM2_ATTR_SUBDIR          0x10   /* _A_SUBDIR in the find data */
 /* 0x00444EF0, two callers, one of them the per-frame path. Raise the level's
  * "startupN" script event and then autosave. */
 #define ADDR_MISSION_STARTUP     0x00444EF0u  /* void(void) */

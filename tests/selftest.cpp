@@ -717,6 +717,14 @@ extern "C" void __cdecl FreeMapSurfaces(void)
 {
 }
 
+/* gameproc.cpp's SaveGame reaches SaveAudioSection, in win32/audio.cpp. Same
+ * reasoning as the stubs around it, and the same route in: closing the
+ * orig_save_game seam in event.cpp pulled SaveGame into the link. */
+int32_t __cdecl SaveAudioSection(am2_FILE *)
+{
+    return 1;
+}
+
 /* air.cpp's sprite teardown reaches ReleaseSprite, in win32/sprite.cpp. Same
  * reasoning as the stubs above, and air.cpp arrived in SELFTEST_SRC for the
  * same reason map.cpp did: item.cpp gained a call into it, and adding the flat

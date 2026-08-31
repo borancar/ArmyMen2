@@ -6,6 +6,7 @@
 
 #include "crt.h"
 #include "event.h"
+#include "gameproc.h"  /* SaveGame -- reconstructed */
 #include "image.h"
 #include "misc.h"      /* FilterMatches */
 #include "armymsg.h"   /* SendGamePause */
@@ -814,7 +815,6 @@ void __cdecl EventMessageReceive(const AM2_EventMsg *msg)
 
 
 typedef int32_t (__cdecl *AM2_SaveGameFn)(const char *name);
-#define orig_save_game      ((AM2_SaveGameFn)(uintptr_t)ADDR_SAVE_GAME)
 
 /* 0x00444EF0, two callers. Raise the level's own "startupN" script event, then
  * autosave the mission.
@@ -871,7 +871,7 @@ void __cdecl MissionStartup(void)
     sprintf(name, (const char *)AM2_IMAGE(ADDR_STR_MISSION_SAV_FMT),
             *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID,
             *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX);
-    orig_save_game(name);
+    SaveGame(name);
     strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, name);
 }
 
