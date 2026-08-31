@@ -5,11 +5,24 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `d61913c`. Working tree clean.
+Last updated: **2026-08-31**, at `a26ab88`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,287 patches.**
+Nothing uncommitted. **1,288 patches.**
+
+**`FreeMapLayers` (`0x0042D3D0`)** -- free every per-map allocation, called by
+the level teardown and by the map loader, which clears before it fills.
+
+**The regions go first and own a second allocation each**: every region with a
+non-zero link count has its link list freed before the array is, and the loop
+is bounded by `ADDR_REGION_STRIDE` -- the same int16 the routing matrices are
+square on, which is what says it is the region COUNT and not just their pitch.
+
+Twelve pointers then follow, each guarded, freed and cleared -- and the clear
+is what makes calling it twice safe, which is exactly what the loader relies
+on. The list was extracted by script; twelve near-identical blocks is the shape
+a hand copy skips one of.
 
 **`SendChatTo` (`0x00411F10`)** -- the chat record `ADDR_SEND_CHAT_MSG`
 broadcasts, addressed to ONE player instead.
@@ -3683,13 +3696,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,130 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 109
-outstanding, which is 1,239 minus 1,130 -- from 1,287 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,131 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 108
+outstanding, which is 1,239 minus 1,131 -- from 1,288 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty batches have gone in and the 109 entries
+small ones in batches. A hundred and thirty-one batches have gone in and the 108 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

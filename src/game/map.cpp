@@ -948,10 +948,73 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
     return sum;
 }
 
+/* FreeMapSurfaces is reconstructed, in win32/surface.cpp. Declared here rather
+ * than by including that header because map.cpp is on the flat side of the
+ * split; `void(void)` names nothing platform, which is what makes the
+ * declaration enough. */
+extern "C" void __cdecl FreeMapSurfaces(void);
+
+/* FreeMapLayers -- original 0x0042D3D0, two callers: the level teardown and
+ * the map loader, which clears before it fills. Free every per-map allocation.
+ *
+ * THE REGIONS GO FIRST AND THEY OWN A SECOND ALLOCATION EACH. Every region
+ * with a non-zero REGION_OFF_NLINKS has its REGION_OFF_LINKS freed before the
+ * array itself is, and the loop is bounded by ADDR_REGION_STRIDE -- the same
+ * int16 the routing matrices are square on, which is what says it is the
+ * region COUNT and not just their pitch.
+ *
+ * THE COUNT IS RE-READ EVERY ITERATION AND SO IS THE ARRAY. The original
+ * reloads both globals inside the loop, which matters only if `free` could
+ * change them; it cannot, and they are reloaded anyway. Reproduced.
+ *
+ * TWELVE POINTERS THEN FOLLOW, each guarded against null, freed and cleared --
+ * and the clear is what makes calling this twice safe, which is exactly what
+ * the loader relies on. The list was extracted from the disassembly by script;
+ * twelve near-identical blocks is the shape a hand copy skips one of.
+ */
+void __cdecl FreeMapLayers(void)
+{
+    static const uint32_t kLayers[] = {
+        ADDR_REGION_NEXT, ADDR_REGION_COST, ADDR_MAP_TILES, ADDR_TILE_ATTRS,
+        ADDR_CELL_WEIGHTS, ADDR_MAP_PADBIT_LAYER, ADDR_MAP_PAD_LAYER,
+        ADDR_TILE_KIND, ADDR_REGION_OF_CELL, ADDR_TILE_FLAGS, ADDR_TILE_COVER,
+    };
+    uint32_t i;
+
+    FreeMapSurfaces();
+
+    if (*(void *const *)(uintptr_t)ADDR_REGIONS) {
+        int32_t n;
+
+        for (n = 0; n < *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE; n++) {
+            uint8_t *r = (uint8_t *)*(void *const *)(uintptr_t)ADDR_REGIONS
+                         + (uint32_t)n * AM2_REGION_SIZE;
+
+            if (*(const uint8_t *)(r + REGION_OFF_NLINKS) > 0)
+                am2_free(*(void **)(r + REGION_OFF_LINKS));
+        }
+
+        am2_free(*(void **)(uintptr_t)ADDR_REGIONS);
+        *(void **)(uintptr_t)ADDR_REGIONS = 0;
+    }
+
+    for (i = 0; i < sizeof kLayers / sizeof kLayers[0]; i++) {
+        void **p = (void **)(uintptr_t)kLayers[i];
+
+        if (*p) {
+            am2_free(*p);
+            *p = 0;
+        }
+    }
+}
+
+
 void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
                         "LevelCount", 2);
+    patch_replace(ADDR_FREE_MAP_LAYERS, (const void *)FreeMapLayers,
+                  "FreeMapLayers", 2);
     patch_replace(ADDR_PARSE_SCENARIOS, (const void *)ParseScenarios,
                   "ParseScenarios", 1);
     patch_replace(ADDR_PARSE_SCENARIO_PART, (const void *)ParseScenarioPart,

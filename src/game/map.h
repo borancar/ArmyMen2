@@ -70,6 +70,12 @@ void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y);
  * also the load. */
 void *__cdecl ScriptListFind(char *name);
 
+/* 0x0042D3D0, two callers -- the level teardown and the map loader, which
+ * clears before it fills. Free every per-map allocation: the region array with
+ * each region's own link list first, then twelve pointers in a row, each
+ * guarded and each cleared after. */
+void __cdecl FreeMapLayers(void);
+
 void map_install(void);
 
 #ifdef __cplusplus

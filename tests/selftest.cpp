@@ -710,6 +710,13 @@ extern "C" void __cdecl DrawSprite(void *, int32_t, int32_t, int32_t)
 {
 }
 
+/* map.cpp's FreeMapLayers reaches FreeMapSurfaces, in win32/surface.cpp. Same
+ * reasoning as the stubs around it, and the same route in: this arrived by
+ * closing a seam rather than by adding a call. */
+extern "C" void __cdecl FreeMapSurfaces(void)
+{
+}
+
 /* air.cpp's sprite teardown reaches ReleaseSprite, in win32/sprite.cpp. Same
  * reasoning as the stubs above, and air.cpp arrived in SELFTEST_SRC for the
  * same reason map.cpp did: item.cpp gained a call into it, and adding the flat

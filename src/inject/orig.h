@@ -1519,6 +1519,11 @@
 #define MAP_TILE_SIZE          16
 #define MAP_SHEET_COLUMNS      0x1F   /* mask; the sheet is 32 tiles wide */
 #define ADDR_FREE_MAP_SURFACES 0x0042D390u /* void(void) */
+/* 0x0042D3D0, two callers -- the level teardown and the map loader, which
+ * clears before it fills. Free every per-map allocation: the region array with
+ * each region's own link list first, then twelve pointers in a row, each
+ * guarded and each cleared after. Reconstructed. */
+#define ADDR_FREE_MAP_LAYERS   0x0042D3D0u /* void(void) */
 /* The menu's sprite table: 190 AM2_Sprite* laid out as 19 rows of 10, one more
  * slot just past the end, and a surface of its own. */
 #define ADDR_FREE_MENU_SPRITES 0x00412F80u /* void(void) */
