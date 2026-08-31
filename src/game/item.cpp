@@ -3669,7 +3669,6 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
 typedef void (__cdecl *AM2_DeployTypeFn)(void *obj, int32_t x, int32_t y,
                                          int32_t resurrect);
 #define orig_deploy_trooper ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_TROOPER)
-#define orig_deploy_vehicle ((AM2_DeployTypeFn)(uintptr_t)ADDR_DEPLOY_VEHICLE)
 
 /* 0x00428CA0, seven callers, and it names itself in the resurrection log line.
  * Put an object into the world at `where`, then tell the other machines.
@@ -3735,7 +3734,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                             resurrect);
         break;
     case 3:
-        orig_deploy_vehicle(obj, (int16_t)where, (int16_t)(where >> 16),
+        DeployVehicle(obj, (int16_t)where, (int16_t)(where >> 16),
                             resurrect);
         break;
     default:
@@ -7701,6 +7700,9 @@ void __cdecl ResetType2Fields(void *obj)
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    /* objdump.py reads 0xC0 as the destination point; orig.h names it
+     * OBJ_OFF_FIELD_C0, and that is the name used here rather than a second
+     * one. Deploying cancels wherever the vehicle was headed. */
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
@@ -8887,6 +8889,118 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
     ObjTileChanged(o, tileArg, 0);
 }
 
+/* 0x0045B9F0, one caller -- the type-3 arm of the deploy dispatcher. Place a
+ * vehicle at a point.
+ *
+ * Clear OBJ_FLAG_DESTROYED, take the nearest clear point for the vehicle's
+ * facing, stamp the tile height, then relink row 0 and every sub-part. That
+ * sub-part loop is the same idiom ObjMoveAlongFacing uses -- stride
+ * AM2_OBJ_ROW_STRIDE, each row offset by row 0's sprite attach point -- which
+ * is independent corroboration of that reading, since the two functions were
+ * read days apart in different families.
+ *
+ * TWO THINGS READ BACKWARDS IN PROSE AND ARE REPRODUCED AS ENCODED.
+ *
+ * The ten-dword clear at OBJ_OFF_FIELD_578 covers 0x578..0x5A0, and the facing
+ * is stamped into 0x578 and OBJ_OFF_FACING_COPY2 AFTERWARDS. Doing the stamps
+ * first -- the natural order to write -- zeroes them.
+ *
+ * And the attack mode is DEAD CODE. A vehicle whose owner is not the local
+ * army gets OBJ_OFF_AI_MODE = 6, and the unconditional `= 1` a few stores
+ * later overwrites it with no call or read in between. Kept as the original
+ * has it; no A/B could show this, since both sides do the same thing. */
+void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
+                           int32_t resurrect)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *row0;
+    AM2_Point at;
+    uint32_t  where;
+    uint8_t   height;
+    int32_t   i;
+
+    at.x = (int16_t)x;
+    at.y = (int16_t)y;
+    where = *(const uint32_t *)&at;
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+
+    NearestClearVehiclePoint(o, *(const uint8_t *)(o + OBJ_OFF_FACING),
+                             where, &at);
+    *(uint32_t *)(o + OBJ_OFF_POS) = *(const uint32_t *)&at;
+
+    height = HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+    *(o + OBJ_OFF_HEIGHT_SET) = height;
+    ObjTileChanged(o, (int32_t)(int8_t)height, 1);
+
+    row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    ObjFlagSet0(row0);
+    RowUpdate(row0, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t       *r = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+        const uint8_t *spr;
+
+        *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
+        *(int16_t *)(r + ROW_OFF_X) = (int16_t)
+            (*(const int16_t *)(r + ROW_OFF_X)
+             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));
+        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
+        *(int16_t *)(r + ROW_OFF_Y) = (int16_t)
+            (*(const int16_t *)(r + ROW_OFF_Y)
+             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
+        ObjFlagSet0(r);
+        RowUpdate(r, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+    }
+
+    ResetType2Fields(o);
+    memset(o + OBJ_OFF_FIELD_578, 0, AM2_DEPLOY_CLEAR_DWORDS * 4u);
+
+    /* Gated on `resurrect`, the fourth argument -- not on the position. The
+     * original reads it at [esp+0x24] after two deferred cleanups, which is
+     * arg3 and not the packed point that shares a slot with arg0. */
+    if (resurrect != 0) {
+        uint8_t facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+
+        *(o + OBJ_OFF_FIELD_530)   = facing;
+        *(o + OBJ_OFF_FACING_COPY) = facing;
+        *(o + OBJ_OFF_FIELD_578)   = facing;
+        *(o + OBJ_OFF_FACING_COPY2) = facing;
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_BIT0;
+        *(int32_t *)(o + OBJ_OFF_RANK) = 0;
+        *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
+
+        orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
+
+        if (!ObjIsFriendly(o))
+            ObjConceal(o, 0);
+
+        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_OWNER)
+            != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+            *(int32_t *)(o + OBJ_OFF_AI_MODE) = 6;   /* dead: see above */
+
+        /* Re-stamped after the clear, and this is why the clear must come
+         * first: 0x578 and 0x579 are inside it. */
+        *(o + OBJ_OFF_FIELD_578)    = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(o + OBJ_OFF_FACING_COPY2) = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+        *(int32_t *)(o + 0x59C) = 0;
+        *(int32_t *)(o + 0x580) = 1;
+        *(int32_t *)(o + 0x584) = 0;
+        *(int32_t *)(o + 0x58C) = 0;
+        *(int32_t *)(o + 0x588) = 0;
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
+    }
+
+    SetKindFrames(o, 1);
+    ObjSetFootprint(o);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -9158,6 +9272,8 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_DEPLOY_VEHICLE, (const void *)DeployVehicle,
+                  "DeployVehicle", 1);
     patch_replace(ADDR_OBJ_MOVE_ALONG_FACING,
                   (const void *)ObjMoveAlongFacing,
                   "ObjMoveAlongFacing", 6);

@@ -94,6 +94,13 @@ void __cdecl RefreshObjCtx(void);
  * passes it. Nothing reads the deadline; see the source. */
 void __cdecl AdvanceSecondDeadline(void);
 
+/* 0x0045B9F0, one caller -- the type-3 arm of the deploy dispatcher. Place a
+ * vehicle at a point: nearest clear spot for its facing, relink every row,
+ * reset the AI block. See item.cpp for the two orderings that read backwards
+ * and for the attack mode that is dead code in the original. */
+void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
+                           int32_t resurrect);
+
 void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                         int32_t suppress);
 

@@ -11178,3 +11178,59 @@ an artifact and some are not, and which is which matters more than the count.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.
+
+
+## DeployVehicle, where a SIGNATURE check surfaced a SEMANTIC error
+
+**1,239 - 1,151 = 88 entries outstanding.** `0x0045B9F0` into
+`src/game/item.cpp`, the type-3 arm of the deploy dispatcher.
+
+**`tools/checkseams.py` caught a wrong arity for the second time today, and
+this one hid something worse.** An `orig_deploy_vehicle` macro already existed
+whose typedef read `(void *obj, int32_t x, int32_t y, int32_t resurrect)` --
+FOUR arguments where I had written three. Chasing that forced me to recompute
+the frame through two deferred cleanups (`add esp, 0x30` spanning four calls,
+then `add esp, 0x10`), and the read at `0x45BAE5` turned out to be **arg3**,
+not the position.
+
+So the whole stamping block is gated on `resurrect != 0`. I had written
+`obj->pos != 0`. Both compile, both type-check, and an A/B diverges only on a
+deploy with `resurrect == 0`. **A signature check found a semantics error**, and
+nothing else in the tree could have.
+
+The rule that falls out: **when a seam already exists for the function you are
+reconstructing, its typedef is EVIDENCE.** Read it before deriving the
+signature yourself -- somebody already resolved a real call site.
+
+**Two findings about the original, neither fixable nor visible to any A/B.**
+
+The ten-dword clear at `OBJ_OFF_FIELD_578` covers `0x578..0x5A0`, and the
+facing is stamped into `0x578` and `0x579` AFTERWARDS. Writing the stamps first
+-- the natural prose order -- zeroes them.
+
+And `OBJ_OFF_AI_MODE = 6` for a foreign owner is DEAD: an unconditional `= 1` a
+few stores later overwrites it, with no call or read between, and `edi` has
+held 1 since well before the branch. Reproduced, not fixed.
+
+**The dead store is a PATTERN, not a slip, and the sibling proves it.**
+Scouting `DeployTrooper` (`0x00449250`) found the identical shape -- `= 6` at
+`0x00449394`, then `obj[0xE4] = edi` with `edi` long since 1 at `0x0044942A`.
+Two siblings carrying the same dead assignment reads as a shared template where
+the unconditional write was added later and the earlier conditional never
+removed. That distinction is what makes "reproduce it" defensible rather than a
+guess about my own misreading.
+
+**And the siblings' differences turn out to have a REASON.** The trooper clears
+from `0x57C` and the vehicle from `0x578`, which I first recorded as a bare
+difference to preserve. `OBJ_OFF_SIGHT_OUT_T2` is commented "StepType2's
+SIGHTCOUT base" -- so each deploy clears ITS OWN TYPE'S sight-output block, and
+the two types' records start four bytes apart. Same fact, now impossible to
+tidy away by accident.
+
+The sub-part loop is byte-for-byte the idiom `ObjMoveAlongFacing` uses -- stride
+`AM2_OBJ_ROW_STRIDE`, each row offset by row 0's sprite attach point --
+independent corroboration of a reading committed hours earlier in a different
+family.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels, dialog 0.

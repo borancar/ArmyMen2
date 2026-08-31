@@ -5077,6 +5077,26 @@ typedef struct {
  * twice by a sibling that does carry a string. */
 #define ADDR_DEPLOY_TROOPER      0x00449250u  /* type 2 */
 #define ADDR_DEPLOY_VEHICLE      0x0045B9F0u  /* type 3 */
+/* Reconstructed. Place a vehicle: clear OBJ_FLAG_DESTROYED, take the nearest clear
+ * point for its facing, stamp the tile height, relink row 0 and every sub-part
+ * (stride AM2_OBJ_ROW_STRIDE, each offset by row 0's sprite attach point --
+ * the same idiom ObjMoveAlongFacing uses), clear the destination to
+ * ADDR_ZERO_POINT, reset the type-2 fields, wipe ten dwords of the AI sight
+ * block from OBJ_OFF_FIELD_578, then re-stamp the facing into four fields and
+ * finish with SetKindFrames and ObjSetFootprint.
+ *
+ * ORDER MATTERS AND READS BACKWARDS: the ten-dword clear covers 0x578..0x5A0,
+ * and the facing is stamped into 0x578 and 0x579 AFTERWARDS. Writing the
+ * stamps first, which is how the function reads in prose, zeroes them.
+ *
+ * AND THE ATTACK MODE IS DEAD CODE. A vehicle whose owner is not the local
+ * army gets OBJ_OFF_AI_MODE = 6 -- attack -- and then the unconditional
+ * `= 1` a few stores later overwrites it, with no call or read in between.
+ * `edi` is 1 from well before the branch and is not reassigned. Reproduced,
+ * not fixed; no A/B could ever see it, since both sides do the same thing.
+ * Same family as PlaySoundAt's PointsEqual branch that never fires. */
+#define OBJ_OFF_FACING_COPY2       0x579u  /* beside OBJ_OFF_FIELD_578 */
+#define AM2_DEPLOY_CLEAR_DWORDS    10      /* 0x578..0x5A0 */
 #define ADDR_PLACE_OBJ           0x00429220u  /* everything else; name ours */
 #define ADDR_ITEM_DEPLOY_MSG     0x0042AA50u  /* void(obj, int32 resurrect) */
 /* 0x0041FBE0 and 0x0041FC10 are the same shim twice: uid >= 1000, look it up,
