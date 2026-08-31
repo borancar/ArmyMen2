@@ -1404,6 +1404,20 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi);
  * `this`, as every i386 MSVC constructor does. */
 AM2_Widget *__attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w);
 
+/* 0x00418C20, 0x00418CE0 and 0x00418D00 -- the COUNT BUTTON's constructor,
+ * deleting destructor and activate handler. Nine arguments; two faces from one
+ * sprite index; the activate toggles COUNTBTN_OFF_LIT, repaints through the
+ * vtable and then fires the optional COUNTBTN_OFF_ON_TOGGLE. In no widget tree
+ * this project can dump, so verified by reading. */
+AM2_Widget *__attribute__((thiscall))
+CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t frame,
+                     int32_t x, int32_t y, int32_t cw, int32_t ch,
+                     int32_t arg7, int32_t count,
+                     void (__cdecl *onToggle)(AM2_Widget *));
+void __cdecl CountButtonActivate(AM2_Widget *w);
+AM2_Widget *__attribute__((thiscall))
+CountButtonDelete(AM2_Widget *w, int32_t flags);
+
 /* Original: 0x00454760. Every checkbox's left-click handler, installed by the
  * constructor. Toggles the tick, repaints, then calls the caller's own
  * handler at CHECK_OFF_ON_CHANGE if there is one. */

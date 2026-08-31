@@ -453,6 +453,24 @@
 #define COUNTBTN_OFF_SPR_OFF   0x6Cu   /* AM2_Sprite *, when disabled */
 #define COUNTBTN_OFF_LIT       0x70u   /* uint8_t, fills behind the sprite */
 #define COUNTBTN_OFF_COUNT     0x80u   /* int32_t, formatted with "%d" */
+/* The two fields between the flag and the count, both named by the class's
+ * three own functions and by nothing else. +0x74 is a CALLBACK the activate
+ * handler fires after it has toggled and repainted, and the null test in front
+ * of it is what makes it optional. +0x78 is written by the constructor from
+ * its seventh argument and read by NOTHING below the CRT line -- neither the
+ * paint, the activate, nor the three inherited slots -- so it is carried and
+ * not used, and the name says only where it comes from. */
+#define COUNTBTN_OFF_ON_TOGGLE 0x74u   /* void (*)(AM2_Widget *), may be null */
+#define COUNTBTN_OFF_ARG7      0x78u   /* int32_t, written and never read */
+/* The class's own three functions. The constructor takes NINE arguments and
+ * the widget dump has never seen an instance, so all three are verified by
+ * reading -- see the note on VTABLE_COUNT_BUTTON above. */
+#define ADDR_COUNT_BUTTON_CTOR     0x00418C20u  /* thiscall w *(w, 9 args) */
+#define ADDR_COUNT_BUTTON_DELETE   0x00418CE0u  /* thiscall w *(w, flags) */
+#define ADDR_COUNT_BUTTON_ACTIVATE 0x00418D00u  /* void(AM2_Widget *) */
+#define ADDR_COUNT_BUTTON_DTOR     0x00418D60u  /* thiscall void(w) */
+#define AM2_COUNT_SPRITE_SET   0x10   /* PreloadArmySprite's first argument */
+#define AM2_COUNT_FRAME_OFF    4      /* the disabled face's frame */
 #define AM2_COUNT_FILL_LIT     0xE3    /* +1 when it also has the focus */
 #define AM2_COUNT_FILL_FOCUS   0xE9    /* focused but not lit */
 #define AM2_COUNT_CELL_W       0x29    /* 41; the count is RIGHT-aligned in it */

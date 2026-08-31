@@ -2874,6 +2874,105 @@ void __attribute__((thiscall)) CheckboxPaint(AM2_Widget *w, RECT clip)
     UnlockSurface();
 }
 
+/* The class's own destructor, still original: it restores the vtable, releases
+ * both faces and runs the base's. It is the NEXT entry in docs/functions.tsv,
+ * past this one's 320 bytes, so it is reached by address rather than dragged
+ * into this batch. */
+typedef void (__attribute__((thiscall)) *AM2_CountDtorFn)(AM2_Widget *);
+#define orig_count_button_dtor \
+    ((AM2_CountDtorFn)(uintptr_t)ADDR_COUNT_BUTTON_DTOR)
+
+/* The COUNT BUTTON's own three functions -- constructor, deleting destructor
+ * and activate handler. The class already had its paint here; this completes
+ * it.
+ *
+ * NO WIDGET TREE THIS PROJECT CAN DUMP CONTAINS ONE, so all three are verified
+ * by reading, exactly as the paint is. orig.h's note on VTABLE_COUNT_BUTTON
+ * says the same and says why: two of the eight classes in that address band
+ * appear in neither Boot Camp's tree nor MAP 01's.
+ *
+ * THE CONSTRUCTOR TAKES NINE ARGUMENTS and loads TWO faces from one sprite
+ * index -- the caller's frame for the normal one and a fixed
+ * AM2_COUNT_FRAME_OFF for the disabled one. The normal face is also stored as
+ * the widget's own backdrop, so before the first paint the button already
+ * draws something.
+ *
+ * ITS SEVENTH ARGUMENT IS CARRIED AND NEVER READ. +0x78 is written here and
+ * read by nothing below the CRT line -- not the paint, not the activate, and
+ * not the three slots this class inherits. Reproduced, because a constructor
+ * that dropped it would differ from the original in the one place a debugger
+ * would look; named ARG7 rather than given a meaning it has not been shown to
+ * have.
+ *
+ * THE ACTIVATE HANDLER TOGGLES, REPAINTS AND THEN CALLS BACK, in that order,
+ * and the repaint goes through the VTABLE rather than to CountButtonPaint
+ * directly -- so a derived class would get its own. The callback at
+ * COUNTBTN_OFF_ON_TOGGLE is optional and tested for null.
+ *
+ * The sound is PlaySoundAt with five zeros -- index 0 at the origin -- which
+ * is the same call item.cpp already documents as the game's generic click.
+ */
+AM2_Widget *__attribute__((thiscall))
+CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t frame,
+                     int32_t x, int32_t y, int32_t cw, int32_t ch,
+                     int32_t arg7, int32_t count,
+                     void (__cdecl *onToggle)(AM2_Widget *))
+{
+    uint8_t *self = (uint8_t *)w;
+
+    ButtonBaseConstruct(w);
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_COUNT_BUTTON);
+
+    *(void **)(self + COUNTBTN_OFF_SPR) =
+        PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, frame, 0);
+    *(void **)(self + COUNTBTN_OFF_SPR_OFF) =
+        PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, AM2_COUNT_FRAME_OFF, 0);
+
+    w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR);
+    *(uint8_t *)(self + COUNTBTN_OFF_LIT) = 0;
+
+    w->x = x;
+    w->y = y;
+    w->w = cw;
+    w->h = ch;
+    WidgetScreenRect(w);
+
+    *(int32_t *)(self + COUNTBTN_OFF_COUNT) = count;
+    *(int32_t *)(self + COUNTBTN_OFF_ARG7)  = arg7;
+    w->activate = CountButtonActivate;
+    *(void **)(self + COUNTBTN_OFF_ON_TOGGLE) = (void *)onToggle;
+
+    return w;
+}
+
+void __cdecl CountButtonActivate(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    void   (*onToggle)(AM2_Widget *);
+
+    *(uint8_t *)(self + COUNTBTN_OFF_LIT) =
+        (uint8_t)(*(const uint8_t *)(self + COUNTBTN_OFF_LIT) == 0);
+
+    PlaySoundAt(0, 0, 0, 0, 0);
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+
+    onToggle = *(void (**)(AM2_Widget *))(self + COUNTBTN_OFF_ON_TOGGLE);
+    if (onToggle)
+        onToggle(w);
+}
+
+AM2_Widget *__attribute__((thiscall))
+CountButtonDelete(AM2_Widget *w, int32_t flags)
+{
+    orig_count_button_dtor(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+
 /* 0x00418DC0, vtable slot 1 of VTABLE_COUNT_BUTTON -- a button that shows a
  * number. Another of the outstanding Lock/Unlock functions.
  *
@@ -9205,6 +9304,15 @@ int widget_install(void)
                         "CheckboxPaint", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_PAINT, (const void *)CountButtonPaint,
                         "CountButtonPaint", 1);
+    rc |= patch_replace(ADDR_COUNT_BUTTON_CTOR,
+                        (const void *)CountButtonConstruct,
+                        "CountButtonConstruct", 1);
+    rc |= patch_replace(ADDR_COUNT_BUTTON_DELETE,
+                        (const void *)CountButtonDelete,
+                        "CountButtonDelete", 1);
+    rc |= patch_replace(ADDR_COUNT_BUTTON_ACTIVATE,
+                        (const void *)CountButtonActivate,
+                        "CountButtonActivate", 1);
     rc |= patch_replace(ADDR_MP_NAME_PAINT, (const void *)MpNamePaint,
                         "MpNamePaint", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, (const void *)HudPanelUpdate,

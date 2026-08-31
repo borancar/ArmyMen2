@@ -5,11 +5,28 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `7e4c6b5`. Working tree clean.
+Last updated: **2026-08-31**, at `c395069`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,275 patches.**
+Nothing uncommitted. **1,278 patches.**
+
+**The COUNT BUTTON is complete** -- `CountButtonConstruct` (`0x00418C20`),
+`CountButtonDelete` (`0x00418CE0`) and `CountButtonActivate` (`0x00418D00`)
+join the paint that was already here.
+
+Nine arguments, two faces from one sprite index -- the caller's frame for the
+normal one and a fixed 4 for the disabled one. The activate toggles
+`COUNTBTN_OFF_LIT`, repaints THROUGH THE VTABLE rather than calling the paint
+directly, and then fires an optional callback.
+
+**Its seventh argument is carried and never read.** `+0x78` is written by the
+constructor and read by nothing below the CRT line -- not the paint, not the
+activate, not the three inherited slots. Reproduced and named `ARG7` rather
+than given a meaning.
+
+No widget tree this project can dump contains one, so all three are verified by
+reading, as the paint already was.
 
 **`CommInitDefaults` (`0x0040FD40`)** -- it fills no table, which is what
 orig.h called it. It stamps the two-dword header of TWENTY separate messages
@@ -3494,13 +3511,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,120 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,275
+line (0x0045C000) patched**. Measured: **1,121 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,278
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty batches have gone in and the 119 entries outstanding
+small ones in batches. A hundred and twenty-one batches have gone in and the 118 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
