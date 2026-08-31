@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `21f6763`. Working tree clean.
+Last updated: **2026-08-31**, at `0b64d4e`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,288 patches.**
+Nothing uncommitted. **1,289 patches.**
+
+**`EvalOperand` (`0x00421590`)** -- one side of a testvar comparison, eight
+kinds through a jump table, with anything past them answering the operand
+unchanged (which is how a literal is expressed).
+
+**Three of the eight are named by the game's own vocabulary.** Kind 5 walks the
+six inventory slots for a weapon uid -- `hasitem`; kind 7 is `AllyFlag` --
+`isally`; kind 8 reads a comm slot's team -- `teamscore`. All three are
+keywords `docs/scripttokens.md` already lists, and a testvar operand evaluator
+is exactly where they would live, so the mapping is the program's rather than
+mine.
+
+Its counter is blind (both callers are ours) but `EvalCondTests` above it reads
+5 on a driven Boot Camp mission, so the path is live and the A/B compares it.
 
 **`ADDR_ARMY_INK` was byte 1 of `ADDR_OBJ_TABLE_RECORDS`; withdrawn.** Naming it
 one batch ago gave that table a second base -- the fourth field-pointer-as-base
@@ -3707,13 +3721,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,131 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 108
-outstanding, which is 1,239 minus 1,131 -- from 1,288 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,132 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 107
+outstanding, which is 1,239 minus 1,132 -- from 1,289 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-one batches have gone in and the 108 entries
+small ones in batches. A hundred and thirty-two batches have gone in and the 107 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

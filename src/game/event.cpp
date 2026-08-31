@@ -17,6 +17,7 @@
 #include "map.h"      /* TileOfPoint */
 #include "item.h"   /* UidOnWire */
 #include "objtype.h"
+#include "army.h"     /* AllyFlag -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- the multiplayer guard */
 #include "savetag.h"
 #include "script.h"
@@ -1910,7 +1911,6 @@ void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
 typedef int32_t (__cdecl *AM2_EvalOperandFn)(int32_t a, int32_t b, int32_t c);
 typedef void (__cdecl *AM2_MissionLocalFn)(int32_t a);
 typedef void (__cdecl *AM2_MissionNetFn)(int32_t a, int32_t b);
-#define orig_eval_operand   (*(AM2_EvalOperandFn)AM2_IMAGE(ADDR_EVAL_OPERAND))
 #define orig_mission_local  (*(AM2_MissionLocalFn)AM2_IMAGE(ADDR_SCRIPT_FIND_FILE))
 
 /* 0x00421750. Evaluate an `if`'s testvar comparisons. All must pass; a
@@ -1931,8 +1931,8 @@ int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c)
 {
     for (int32_t i = 0; i < c->ntests; i++) {
         const AM2_ScriptTest *t = &c->tests[i];
-        int32_t left  = orig_eval_operand(t->left[0], t->left[1], t->left[2]);
-        int32_t right = orig_eval_operand(t->right[0], t->right[1],
+        int32_t left  = EvalOperand(t->left[0], t->left[1], t->left[2]);
+        int32_t right = EvalOperand(t->right[0], t->right[1],
                                           t->right[2]);
 
         switch (t->op) {
@@ -2498,12 +2498,119 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
     }
 }
 
+/* The comm object's team score, still original. */
+typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
+                                                             int32_t slot);
+#define orig_comm_team_score \
+    ((AM2_TeamScoreFn)(uintptr_t)ADDR_COMM_TEAM_SCORE)
+
+/* EvalOperand -- original 0x00421590, two callers. Evaluate one side of a
+ * testvar comparison: eight kinds through a jump table, and anything past them
+ * answers the operand unchanged, which is how a LITERAL is expressed.
+ *
+ * THREE OF THE EIGHT ARE NAMED BY THE GAME'S OWN VOCABULARY. Kind 5 walks the
+ * six UNIT_OFF_INVENTORY slots for a weapon uid, which is `hasitem`; kind 7 is
+ * AllyFlag, which is `isally`; kind 8 reads a comm slot's team, which is
+ * `teamscore`. All three are keywords docs/scripttokens.md already lists, and
+ * a testvar operand evaluator is exactly where they would live -- so the
+ * mapping is the program's own rather than mine.
+ *
+ * FOUR KINDS SHARE ONE PREAMBLE and it is written out four times in the
+ * original: resolve the name to a uid, look the object up, and give up if it
+ * is gone. Kinds 2 and 3 then want an ITEM, kinds 4 and 5 a TROOPER, and each
+ * has its own default for the failure -- 0 for three of them and 5 for kind 4.
+ * That last is the one worth noticing: a missing trooper and a trooper in
+ * state 5 answer the same thing.
+ *
+ * KIND 6 ANSWERS 1 OR 2, NOT 1 OR 0. An empty slot leaves early with 0, and a
+ * taken one answers 1 when CommSlotHasPlayer agrees and 2 when it does not --
+ * so the caller has three outcomes to compare against, and the original spells
+ * the last two as `neg; sbb; add 2` rather than as a branch.
+ */
+int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
+{
+    uint8_t *o;
+
+    switch (kind) {
+    case AM2_OPERAND_VARIABLE:
+        return ((const int32_t *)((const uint8_t *)
+                   *(void *const *)(uintptr_t)ADDR_SCRIPT_NAMES
+                   + (uint32_t)a * AM2_NAME_TABLE_STRIDE))[2];
+
+    case AM2_OPERAND_ITEM_FRAME:
+        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        if (!o || !ObjIsItem((const AM2_Object *)o))
+            return 0;
+        return *(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME);
+
+    case AM2_OPERAND_HEALTH:
+        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        if (!o)
+            return 0;
+        return *(const int16_t *)(o + OBJ_OFF_HEALTH);
+
+    case AM2_OPERAND_TROOP_STATE:
+        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        if (!o || !ObjIsType2((const AM2_Object *)o))
+            return 5;
+        return *(const int32_t *)(o + OBJ_OFF_FIELD_530);
+
+    case AM2_OPERAND_HASITEM: {
+        uint32_t want;
+        int32_t  i;
+
+        o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
+        if (!o || !ObjIsType2((const AM2_Object *)o))
+            return 0;
+        if (!*(const int32_t *)(o + OBJ_OFF_SARGE))
+            return 0;
+
+        want = ResolveUid(b, 0);
+        if (!want)
+            return 0;
+
+        for (i = 0; i < AM2_INVENTORY_SLOTS; i++)
+            if (((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i] == want)
+                return 1;
+        return 0;
+    }
+
+    case AM2_OPERAND_SLOT_TAKEN: {
+        const uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+        if (!*(const int32_t *)(comm + COMM_OFF_PLAYERS
+                                + (uint32_t)a * COMM_PLAYER_STRIDE
+                                + COMM_SLOT_OFF_TAKEN))
+            return 0;
+        return CommSlotHasPlayer((void *)comm, a) ? 1 : 2;
+    }
+
+    case AM2_OPERAND_ISALLY:
+        /* The original loads the comm object into ecx before this call and
+         * AllyFlag is stdcall, so that load is dead -- it is the shape a
+         * thiscall leaves behind, and the callee never reads it. Not
+         * reproduced: there is no register to write in C, and nothing
+         * observes it. */
+        return AllyFlag(a, b) ? 1 : 0;
+
+    case AM2_OPERAND_TEAMSCORE:
+        return orig_comm_team_score(
+                   *(void *const *)(uintptr_t)ADDR_COMM_OBJECT, a);
+
+    default:
+        return a;
+    }
+}
+
+
 int event_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_RESET_TIMERS, (const void *)ResetTimers,
                         "ResetTimers", 0);
+    patch_replace(ADDR_EVAL_OPERAND, (const void *)EvalOperand,
+                  "EvalOperand", 2);
     rc |= patch_replace(ADDR_CREATE_TIMER, (const void *)CreateTimer,
                         "CreateTimer", 20);
     rc |= patch_replace(ADDR_DECLARE_RULE_VARS, (const void *)DeclareRuleVars,

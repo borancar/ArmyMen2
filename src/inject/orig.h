@@ -5764,7 +5764,29 @@ typedef struct {
  * 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=', in that order, and the 0x1C stride is
  * AM2_ScriptTest's size. Six callers. */
 #define ADDR_EVAL_COND_TESTS     0x00421750u  /* int32_t(AM2_ScriptCond *) */
-#define ADDR_EVAL_OPERAND        0x00421590u  /* int32_t(a, b, c) -- a triple */
+/* 0x00421590, two callers. Evaluate one side of a testvar comparison. Eight
+ * kinds through a jump table, and THREE OF THEM ARE NAMED BY THE GAME'S OWN
+ * VOCABULARY rather than by me: kind 5 asks whether a unit holds a weapon uid,
+ * which is `hasitem`; kind 7 is AllyFlag, which is `isally`; kind 8 starts
+ * from a comm slot's COMM_SLOT_OFF_TEAM, which is `teamscore`. All three are
+ * in the 185 keywords docs/scripttokens.md lists, and a testvar operand
+ * evaluator is exactly where they would be implemented.
+ *
+ * Anything past 8 falls through to returning the operand unchanged, which is
+ * how a LITERAL is expressed. Reconstructed. */
+#define ADDR_EVAL_OPERAND        0x00421590u  /* int32_t(kind, a, b) */
+#define AM2_OPERAND_VARIABLE     1   /* a name table entry's value */
+#define AM2_OPERAND_ITEM_FRAME   2
+#define AM2_OPERAND_HEALTH       3
+#define AM2_OPERAND_TROOP_STATE  4   /* OBJ_OFF_FIELD_530; 5 when not a troop */
+#define AM2_OPERAND_HASITEM      5
+#define AM2_OPERAND_SLOT_TAKEN   6   /* 1 when the slot has a player, else 2 */
+#define AM2_OPERAND_ISALLY       7
+#define AM2_OPERAND_TEAMSCORE    8
+/* 0x0040F990, thiscall. Its first act is to read the slot's
+ * COMM_SLOT_OFF_TEAM, and EvalOperand's kind 8 answers whatever it returns --
+ * which is what makes `teamscore` the keyword it belongs to. Still original. */
+#define ADDR_COMM_TEAM_SCORE     0x0040F990u  /* thiscall int32(comm, slot) */
 /* 0x0041FF60. Point an object at one of the 256-byte records at 0x004F9ACC
  * and propagate it with SetFieldInAll. What those records HOLD is not
  * established -- "state" was a guess, and AM2_OBJ_STATE_REC_SIZE already means

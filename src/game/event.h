@@ -135,6 +135,12 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg);
  * type-2 entry, gives 0. Fifty-three callers. */
 uint32_t __cdecl ResolveUid(int32_t name, uint32_t me);
 
+/* 0x00421590, two callers. Evaluate one side of a testvar comparison: eight
+ * kinds through a jump table, three of them the script keywords `hasitem`,
+ * `isally` and `teamscore`, and anything past them answers the operand
+ * unchanged -- which is how a literal is expressed. */
+int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b);
+
 /* The four ways a script action asks for a shot -- 0x004200F0, 0x004201A0,
  * 0x00420260 and 0x00420300 -- an explicit weapon or the unit's own, at a
  * point or at another object. A NEGATIVE heading means "work it out from the
