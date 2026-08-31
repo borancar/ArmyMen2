@@ -97,6 +97,12 @@ void __cdecl FlushDelayedSends(void);
  * record's whole size -- of the twenty comm messages that live in .bss. */
 void __cdecl CommInitDefaults(void);
 
+/* 0x00411F10, one caller. The chat record sent to ONE player rather than
+ * broadcast: truncate at 254, copy to the record's +9, take the sender's ink
+ * from ADDR_ARMY_INK with white as the fallback, address it to the slot's
+ * DirectPlay id. */
+void __cdecl SendChatTo(char *text, int32_t slot);
+
 int commmsg_install(void);
 
 #ifdef __cplusplus

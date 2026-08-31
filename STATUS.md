@@ -5,11 +5,27 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `37195cf`. Working tree clean.
+Last updated: **2026-08-31**, at `d61913c`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,286 patches.**
+Nothing uncommitted. **1,287 patches.**
+
+**`SendChatTo` (`0x00411F10`)** -- the chat record `ADDR_SEND_CHAT_MSG`
+broadcasts, addressed to ONE player instead.
+
+**It truncates at 254 and measures twice.** The test is `> 0xFF` and the
+terminator goes at `0xFE`, so exactly 255 characters is left alone and longer
+is cut to 254; then it measures again for the copy, because the truncation may
+have changed the answer. Two `repne scasb` runs over one buffer, reproduced as
+two.
+
+**The ink is per army with white as the fallback**, and a second reader
+elsewhere takes `ADDR_ARMY_INK` exactly the same way and hands the answer to a
+HUD text call -- which is what says the byte is an ink.
+
+Third sighting of the argument shuffle: `SendGameMsg`'s trailing zero is pushed
+before `CommPlayerId` is called.
 
 **`CommRegisterSelf` (`0x004027F0`)** -- give a DirectPlay id a player record,
 what the flow-control code calls a FlowQ.
@@ -3667,13 +3683,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,129 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 110
-outstanding, which is 1,239 minus 1,129 -- from 1,286 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,130 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 109
+outstanding, which is 1,239 minus 1,130 -- from 1,287 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-nine batches have gone in and the 110 entries
+small ones in batches. A hundred and thirty batches have gone in and the 109 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

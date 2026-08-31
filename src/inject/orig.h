@@ -2886,6 +2886,21 @@
  * and hands it to SendGameMsg. Appending the line locally is what the FIRST
  * call does. Renamed, not aliased. */
 #define ADDR_SEND_CHAT_MSG       0x00411E90u  /* void(char *, int32), 128 bytes */
+/* 0x00411F10, one caller -- the same chat record sent to ONE player rather
+ * than broadcast. It truncates at 254, copies the text to the record's +9,
+ * takes the sender's ink from ADDR_ARMY_INK with white as the fallback, and
+ * hands the record to SendGameMsg addressed to the slot's DirectPlay id.
+ * Reconstructed. */
+#define ADDR_SEND_CHAT_TO        0x00411F10u  /* void(char *text, int32 slot) */
+#define AM2_CHAT_TEXT_MAX        0xFF   /* longer than this is cut at 0xFE */
+#define MSG_CHAT_OFF_INK         0x08u  /* uint8_t, the sender's colour */
+#define MSG_CHAT_OFF_TEXT        0x09u
+/* One byte per ARMY at a stride of 256 -- the first of each army's block. Both
+ * readers below the CRT line take it the same way, `CommArmyOfSlot(comm, n)
+ * << 8` then this base, and the second hands the answer straight to a HUD
+ * text call as its colour. */
+#define ADDR_ARMY_INK            0x004F9ACDu  /* uint8_t[army][256] */
+#define AM2_ARMY_INK_STRIDE      0x100
 /* NOT a sprite anything. 0x00457820 walks every object an army owns and calls
  * the SECOND argument on each -- `call ebp`, where ebp is that argument. It
  * went in as ADDR_SPRITE_DROP_NAMED from the one call site, which passes

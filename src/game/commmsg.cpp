@@ -2341,6 +2341,52 @@ void __cdecl CommInitDefaults(void)
 }
 
 
+/* SendChatTo -- original 0x00411F10, one caller. The same chat record
+ * ADDR_SEND_CHAT_MSG broadcasts, addressed to ONE player instead.
+ *
+ * IT TRUNCATES AT 254 AND MEASURES TWICE. The length test is `> 0xFF`, and
+ * what it then writes is a terminator at 0xFE -- so a string of exactly 255
+ * characters is left alone and a longer one is cut to 254. Then it measures
+ * again for the copy, because the truncation may have changed the answer. Two
+ * `repne scasb` runs over the same buffer, and reproduced as two: folding them
+ * would be right for every input and would still be a different program.
+ *
+ * THE INK IS PER ARMY AND THE FALLBACK IS WHITE. It asks CommArmyOfSlot for
+ * the sender's army, indexes ADDR_ARMY_INK at a stride of 256, and takes
+ * ADDR_COLOUR_WHITE when that byte is zero. A second reader elsewhere takes it
+ * exactly the same way and hands the answer to a HUD text call, which is what
+ * says the byte is an ink.
+ *
+ * THE ARGUMENT SHUFFLE AGAIN, THE THIRD TIME THIS FAMILY HAS SHOWN IT.
+ * SendGameMsg's trailing zero is pushed BEFORE CommPlayerId is called, that
+ * call takes the one argument above it and cleans only its own, and the two
+ * remaining pushes complete the three. Pairing each push with the nearest call
+ * reads it as a two-argument SendGameMsg and a two-argument CommPlayerId, and
+ * both would be wrong.
+ */
+void __cdecl SendChatTo(char *text, int32_t slot)
+{
+    uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_MSG_CHAT;
+    uint8_t  ink;
+
+    if (strlen(text) > AM2_CHAT_TEXT_MAX)
+        text[AM2_CHAT_TEXT_MAX - 1] = 0;
+
+    strcpy((char *)(rec + MSG_CHAT_OFF_TEXT), text);
+
+    ink = ((const uint8_t *)(uintptr_t)ADDR_ARMY_INK)
+              [(uint32_t)CommArmyOfSlot(kCommObj,
+                   *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+               * AM2_ARMY_INK_STRIDE];
+    if (!ink)
+        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE;
+
+    rec[MSG_CHAT_OFF_INK] = ink;
+
+    orig_send_game_msg(rec, CommPlayerId(kCommObj, slot), 0);
+}
+
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_TROOP_SUB_PARSE, (const void *)TroopSubParse,
@@ -2349,6 +2395,8 @@ int commmsg_install(void)
                   "FlushDelayedSends", 1);
     patch_replace(ADDR_COMM_INIT_DEFAULTS, (const void *)CommInitDefaults,
                   "CommInitDefaults", 1);
+    patch_replace(ADDR_SEND_CHAT_TO, (const void *)SendChatTo,
+                  "SendChatTo", 1);
     patch_replace(ADDR_DRAIN_MSG_LIST, (const void *)DrainMsgList,
                   "DrainMsgList", 1);
     patch_replace(ADDR_TELL_EACH_SLOT, (const void *)TellEachSlot,
