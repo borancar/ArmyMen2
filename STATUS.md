@@ -5,11 +5,20 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `47d13bd`. Working tree clean.
+Last updated: **2026-08-31**, at `e4311b9`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,269 patches.**
+Nothing uncommitted. **1,270 patches.**
+
+**`LoadType5` (`0x0043B870`), and OBJECT TYPE 5 IS A MISSILE.** The loader
+calls `ObjInitCommon` with 5 and puts `ADDR_MISSILE_ANIMS` -- missile.ani --
+into the row it builds, which is how type 8 was settled as a roach and type 3
+as a vehicle. Types 6 and 7 are still unread.
+
+The lesson generalises: a per-type savegame loader is where a type's constants
+all appear at once -- box, row spec, anim table, def record. Reach for
+`LoadTypeN` when a type is unidentified.
 
 **`CanPlaceAt` (`0x0043A6D0`)** -- could the thing at key-table slot `slot`
 stand at world point `at`? Build its tile mask there and answer 0 the moment a
@@ -3413,13 +3422,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,114 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,269
+line (0x0045C000) patched**. Measured: **1,115 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,270
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and fourteen batches have gone in and the 125 entries outstanding
+small ones in batches. A hundred and fifteen batches have gone in and the 124 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

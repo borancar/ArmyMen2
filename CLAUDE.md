@@ -3150,8 +3150,21 @@ exact oracle**, however meaningful it is when it is set.
   because nobody put the switch beside the question. Before recording something
   as unknown, grep the tree for what already answers it.
 
-- Types 5, 6 and 7 are still unread. They share `FreeItem`'s common arm with
-  type 1, which says nothing about what they are.
+- **Type 5 is a MISSILE, and the evidence is the loader.** `LoadType5`
+  (`0x0043B870`) calls `ObjInitCommon` with 5 and then puts
+  `ADDR_MISSILE_ANIMS` -- missile.ani -- into the row it builds, which is
+  exactly how type 8 was settled as a roach and type 3 as a vehicle. Its whole
+  record is 0xB8 bytes against a roach's 0x560, and its box is six units
+  square, both of which fit.
+
+  What made it findable was the same thing that made the roach findable: the
+  per-type SAVEGAME LOADER is where a type's constants all appear at once --
+  the box, the row spec, the anim table and the def record. Reach for
+  `LoadTypeN` when a type is unidentified, before anything else.
+
+  Types 6 and 7 are still unread. They share `FreeItem`'s common arm with type
+  1 and type 5, which says nothing about what they are -- and now demonstrably
+  so, since type 5 is in that arm and is a missile.
 - **`object.aai`'s `link 33-1..4` complaint is explained, and it is data
   rather than a defect.** The message is "Object AAI record not found for link
   %02d-%-3d", emitted by `0x00435FD0` -- a post-parse validator that qsorts the

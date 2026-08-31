@@ -1961,7 +1961,7 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(const void **)(rows + ROW_OFF_ANIM_CUR) =
         (const void *)(uintptr_t)ADDR_ROACH_ANIMS;
-    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROACH_ROW_FIELD26;
+    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
     *(uint32_t *)rows |= ROW_FLAG_BIT8;
 
     *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 1;

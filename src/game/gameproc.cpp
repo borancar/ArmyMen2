@@ -15,6 +15,8 @@
 #include "event.h"
 #include "script.h"
 #include "objscript.h"
+#include "objtype.h"   /* orig_obj_init_common -- the shared typedef */
+#include "maprow.h"    /* BuildRowSet, SetAnimFrame -- reconstructed */
 
 /* FreeSpriteRegistry is reconstructed, in win32/sprite.cpp with the rest of
  * the sprite lifetime. It is declared here rather than by including that
@@ -497,6 +499,83 @@ typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
 #define orig_create_item ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
 
 
+/* LoadType5 -- original 0x0043B870, one caller, and the MISSILE member of the
+ * per-type savegame loader family.
+ *
+ * TYPE 5 IS A MISSILE, and this function is the evidence. It calls
+ * ObjInitCommon with type 5 and then puts ADDR_MISSILE_ANIMS -- missile.ani --
+ * into the row it builds, which is exactly how type 8 was settled as a roach
+ * and type 3 as a vehicle. CLAUDE.md lists 5, 6 and 7 as unread; this is one
+ * of the three, and the other two are still open.
+ *
+ * IT READS AN INDEX WHERE THE OBJECT HOLDS A POINTER, which is the same trade
+ * LoadType1 makes with its save tag: the file gives a number, the loader turns
+ * it into ADDR_MISSILE_DEFS + index * AM2_MISSILE_DEF_BYTES and stores that in
+ * OBJ_OFF_FIELD_94. A pointer written to disk would not survive a reload.
+ *
+ * THE FOUR DWORDS AFTER IT ARE READ BY POSITION and the offsets they land on
+ * carry other types' names -- OBJ_OFF_RANK, OBJ_OFF_REPAIR_FRAME,
+ * OBJ_OFF_PTR_LIST and OBJ_OFF_CHAIN_NEXT_UID. That is overloading, the same
+ * as at 0x52C and 0x538, and the names are kept rather than duplicated: what
+ * defines these four for a missile is the save format, and nothing here says
+ * what they mean.
+ *
+ * The starting frame comes off the def record's first dword, with 2 and 5
+ * taking one frame and everything else the other. What that dword IS has not
+ * been read -- only which two values it treats alike.
+ *
+ * The bounding rect handed to BuildRowSet is ADDR_ZERO_RECT, which no code in
+ * the image writes; three call sites use it the same way.
+ */
+void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
+{
+    uint8_t       *o = (uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
+    const uint8_t *h = (const uint8_t *)hdr;
+    uint8_t       *rows;
+    int32_t        def;
+    int32_t        frame;
+
+    memset(o, 0, AM2_MISSILE_BYTES);
+
+    *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(h + OBJ_OFF_ARMY);
+
+    orig_obj_init_common(o, (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                         AM2_OBJ_TYPE_MISSILE,
+                         *(const uint32_t *)(h + OBJ_OFF_POS),
+                         (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
+                         1, *(const int32_t *)(h + 4));
+
+    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+
+    orig_fread(&def, 4, 1, fp);
+    *(const void **)(o + OBJ_OFF_FIELD_94) =
+        (const uint8_t *)(uintptr_t)ADDR_MISSILE_DEFS
+        + def * AM2_MISSILE_DEF_BYTES;
+
+    orig_fread(o + OBJ_OFF_RANK, 4, 1, fp);
+    orig_fread(o + OBJ_OFF_REPAIR_FRAME, 4, 1, fp);
+    orig_fread(o + OBJ_OFF_PTR_LIST, 4, 1, fp);
+    orig_fread(o + OBJ_OFF_CHAIN_NEXT_UID, 4, 1, fp);
+
+    def = **(const int32_t *const *)(o + OBJ_OFF_FIELD_94);
+    frame = (def == 2 || def == 5) ? AM2_MISSILE_FRAME_A : AM2_MISSILE_FRAME_B;
+
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
+                (const void *)AM2_IMAGE(ADDR_MISSILE_ROW_SPEC),
+                *(const int16_t *)(h + OBJ_OFF_POS),
+                *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                (const void *)(uintptr_t)ADDR_ZERO_RECT);
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+        (const void *)(uintptr_t)ADDR_MISSILE_ANIMS;
+    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
+    *(uint8_t *)(rows + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+
+    SetAnimFrame(rows, (int16_t)frame, 1);
+    return o;
+}
+
 /* LoadType8 -- original 0x0043CB60, one caller, and the ROACH member of the
  * per-type savegame loader family LoadType1 belongs to. Read the 0x4CC-byte
  * record, build a roach from the header, and paste the record over the
@@ -949,7 +1028,6 @@ typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
 #define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
 #define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
-#define orig_load_type5  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE5)
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
  * hands it to the type's loader, which builds the object and RETURNS it.
@@ -998,7 +1076,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     case 2:  made = (uint8_t *)orig_load_type2(fp, hdr, arg); break;
     case 3:  made = (uint8_t *)orig_load_type3(fp, hdr);      break;
     case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
-    case 5:  made = (uint8_t *)orig_load_type5(fp, hdr);      break;
+    case 5:  made = (uint8_t *)LoadType5(fp, hdr);      break;
     case 6:  made = (uint8_t *)LoadType6(fp, hdr);      break;
     case 7:  made = (uint8_t *)LoadType7(fp, hdr);            break;
     case 8:  made = (uint8_t *)LoadType8(fp, hdr);      break;
@@ -1388,6 +1466,7 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE1, (const void *)SaveType1, "SaveType1", 2);
     patch_replace(ADDR_LOAD_TYPE1, (const void *)LoadType1, "LoadType1", 1);
     patch_replace(ADDR_LOAD_TYPE8, (const void *)LoadType8, "LoadType8", 1);
+    patch_replace(ADDR_LOAD_TYPE5, (const void *)LoadType5, "LoadType5", 1);
     patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
     patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);

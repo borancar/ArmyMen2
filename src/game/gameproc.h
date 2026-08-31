@@ -107,6 +107,11 @@ int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
  * different maximum. */
 void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
 
+/* 0x0043B870, one caller -- the MISSILE member of the per-type savegame
+ * loader family. Type 5 is a missile: this calls ObjInitCommon with 5 and puts
+ * missile.ani into the row it builds. */
+void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
+
 /* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
  * the tag, build the item from the tag, then overwrite most of it from the
  * saved header -- keeping the FRESH object's OBJ_OFF_FIELD_94 pointer and its

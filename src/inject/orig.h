@@ -3157,6 +3157,10 @@
  * is wrong about its own caller and both are wrong about the global. Found
  * while reading a third user in air.cpp, which returns it for a null object. */
 #define ADDR_ZERO_POINT          0x005125A0u  /* AM2_Point, always {0,0} */
+/* Eight bytes on, and the same kind of thing: three call sites push it as
+ * ADDR_BUILD_ROW_SET's bounding `rect` and nothing in the image writes it, so
+ * it is a permanently zero AM2_Rect in .bss. */
+#define ADDR_ZERO_RECT           0x005125A8u  /* AM2_Rect, always all zero */
 /* 0x00456E20, one caller. Split a slot number into a band code, an index
  * within the band, and a heading byte off ADDR_SLOT_HEADINGS. */
 #define ADDR_SLOT_BAND_HEADING   0x00456E20u  /* void(int32,int32*,int32*,
@@ -9727,7 +9731,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * object, this one is a plain field in a ROW. */
 #define AM2_ROACH_BYTES         0x560u
 #define AM2_ROACH_STAGGER_MS    0x1F4   /* rand() % this, added to the clock */
-#define AM2_ROACH_ROW_FIELD26   0x3E8   /* int16, into ROW_OFF_FIELD_26 */
+/* What a constructor writes into ROW_OFF_FIELD_26. It was
+ * AM2_ROACH_ROW_FIELD26 until LoadType5 wrote the same value into the same
+ * field of a MISSILE's row -- one constant in one struct, so one name. */
+#define AM2_ROW_FIELD26_INIT    0x3E8   /* int16, into ROW_OFF_FIELD_26 */
 /* Bit 8 of a ROW's flags word, which CreateRoach sets with `or dh, 1`. Only
  * the write is identified: the sixteen byte-wide readers of bit 8 in the
  * image test whatever happens to be in `ah`, and pinning which of them hold a
@@ -10015,6 +10022,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_OBJ_TYPE_TROOPER     2
 /* Type 3, from FreeItem's own "DestroyVehicle" arm; see the type table. */
 #define AM2_OBJ_TYPE_VEHICLE     3
+/* TYPE 5 IS A MISSILE, and the evidence is exactly the shape that settled the
+ * roach and the vehicle: LoadType5 calls ObjInitCommon with 5 and then puts
+ * ADDR_MISSILE_ANIMS -- missile.ani -- into the row it builds. CLAUDE.md lists
+ * 5, 6 and 7 as unread; this is one of the three.
+ *
+ * Its box is six units square and its whole record is 0xB8 bytes, against a
+ * roach's 0x560, which is the other thing that fits. */
+#define AM2_OBJ_TYPE_MISSILE     5
+/* The missile's own constants. The def record is 52 bytes and the file gives
+ * LoadType5 an INDEX into the table rather than a pointer, which is the same
+ * tag-for-pointer trade LoadType1 makes with its save tag. */
+#define ADDR_MISSILE_BOX         0x00487B78u  /* AM2_Rect, (-3,-3,3,3) */
+#define ADDR_MISSILE_ROW_SPEC    0x00487B88u  /* int32_t[4], (0,0,16,16) */
+#define ADDR_MISSILE_DEFS        0x00662030u
+#define AM2_MISSILE_BYTES        0xB8u
+#define AM2_MISSILE_DEF_BYTES    52
+/* The two frames LoadType5 chooses between on the def's first dword: 2 and 5
+ * take one and everything else the other. What the dword IS has not been
+ * read -- only which two values it treats alike. */
+#define AM2_MISSILE_FRAME_A      0x5A
+#define AM2_MISSILE_FRAME_B      0x5B
 /* 0x0043CF70, one caller. The FOURTH member of the block-weight family, and
  * the only one with a SIDE EFFECT: it damages what it walks past. See
  * item.cpp beside BlockWeightChain, which it is otherwise a twin of. */
