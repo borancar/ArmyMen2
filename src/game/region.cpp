@@ -13,6 +13,7 @@
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
+#include "item.h"     /* ObjectsHitByPoint -- reconstructed */
 #include "image.h"
 #include "crt.h"
 #include "../inject/orig.h"
@@ -1268,6 +1269,94 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
                      out);
 }
 
+/* The bitmask twin of ListBoxAction, still original: LISTHDR_OFF_HIT_MASK
+ * chooses between the two and this is the arm taken when it is SET. */
+typedef int32_t (__cdecl *AM2_ListMaskFn)(uint32_t at, void *hdr, void *out);
+#define orig_list_mask_action \
+    ((AM2_ListMaskFn)(uintptr_t)ADDR_LIST_MASK_ACTION)
+
+/* CanPlaceAt -- original 0x0043A6D0, six callers. Could the thing described by
+ * key-table slot `slot` stand at world point `at`? Build its tile mask there
+ * and answer 0 the moment any cell of it fails; 1 if none does.
+ *
+ * THE SLOT IS A KEY-TABLE SLOT, and that is the one thing here that had to be
+ * derived rather than read. It is bounds-checked against ADDR_KEY_TABLE_COUNT
+ * and then used to index ADDR_AAI_RECORDS -- so those two arrays are PARALLEL,
+ * one count over both, which nothing in the file said before.
+ *
+ * The mask comes from whichever of the two markers LISTHDR_OFF_HIT_MASK
+ * selects, and BoxAction underneath fills the margin with
+ * AM2_TILEMASK_PAD_CELL and the box itself with AM2_TILEMASK_BOX_CELL. So
+ * `cell & 1` is exactly "inside the box rather than the padding", which is
+ * what orig.h already records as the bit that is read -- this is the reader.
+ *
+ * THREE WAYS TO FAIL, in the order the original tests them: the cell is
+ * already covered, its ADDR_TILE_KIND byte is not the one asked for, or an
+ * object is standing on it. The first two are array reads and the third is a
+ * call, which is presumably why they are in that order.
+ *
+ * The original tests the cell byte TWICE -- `test al,al; je` then
+ * `test al,1; je` -- and the first is subsumed by the second, since a zero
+ * byte has bit 0 clear. Written once. Nothing can observe the difference:
+ * neither test has a side effect and both skip to the same place.
+ *
+ * The tile mask is 0x1010 bytes on the stack and the original reserves 0x1018,
+ * the extra eight being the loop's own row counter and the point it hands the
+ * hit test. Written as the record it is rather than as a byte array.
+ */
+int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
+{
+    struct {
+        AM2_Rect r;
+        uint8_t  cells[AM2_TILEMASK_CELLS];
+    } mask;
+
+    const uint8_t *rec;
+    void          *hdr;
+    int32_t        x, y, n = 0;
+    int32_t        shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+
+    if (slot >= *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
+        return 1;
+
+    rec = ((const uint8_t *const *)
+              *(void *const *)(uintptr_t)ADDR_AAI_RECORDS)[slot];
+    hdr = ((void *const *)*(void *const *)(uintptr_t)ADDR_RECORD_LISTS)
+              [*(const int32_t *)(rec + AAI_OFF_DEF_INDEX)];
+
+    if (*(const int32_t *)((const uint8_t *)hdr + LISTHDR_OFF_HIT_MASK))
+        orig_list_mask_action(at, hdr, &mask);
+    else
+        ListBoxAction(at, hdr, &mask);
+
+    for (y = mask.r.top; y <= mask.r.bottom; y++) {
+        int32_t tile = (y << shift) + mask.r.left;
+
+        for (x = mask.r.left; x <= mask.r.right; x++, tile++, n++) {
+            uint32_t index = (uint32_t)tile & 0xFFFFu;
+            uint32_t pt;
+
+            if (!(mask.cells[n] & 1))
+                continue;
+
+            if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+                    [index] >= AM2_CELL_WEIGHT_STEP)
+                return 0;
+
+            if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
+                    [index] != (uint32_t)kind)
+                return 0;
+
+            pt = PointOfTile(tile);
+            if (ObjectsHitByPoint(&pt,
+                    (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC))
+                return 0;
+        }
+    }
+
+    return 1;
+}
+
 /* RebuildTileCover -- original 0x0042BE10, one caller.
  *
  * Clear the whole cover grid and rebuild it from the cell weights: every
@@ -2444,6 +2533,8 @@ int region_install(void)
                         "BoxAction", 5);
     rc |= patch_replace(ADDR_LIST_BOX_ACTION, (const void *)ListBoxAction,
                         "ListBoxAction", 3);
+    rc |= patch_replace(ADDR_CAN_PLACE_AT, (const void *)CanPlaceAt,
+                        "CanPlaceAt", 6);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
                         "TileCoverAdd", 3);
     rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,

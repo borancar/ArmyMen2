@@ -2862,7 +2862,7 @@ exact oracle**, however meaningful it is when it is set.
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
   `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`,
   `AiHitReact`, `PlanPathTo`, `NearestClearVehiclePoint`,
-  `ShakeAt`, `StartShake`, `RoachBite`, and `RefreshScreen` —
+  `ShakeAt`, `StartShake`, `RoachBite`, `CanPlaceAt`, and `RefreshScreen` —
 
   **`RoachBite`'s drive is identified and it is not a longer wait.** Its one
   caller reaches it only in the roach's state 4, and a live MAP 01 run with

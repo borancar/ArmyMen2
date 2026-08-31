@@ -5,11 +5,24 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `e1d5ee5`. Working tree clean.
+Last updated: **2026-08-31**, at `47d13bd`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,268 patches.**
+Nothing uncommitted. **1,269 patches.**
+
+**`CanPlaceAt` (`0x0043A6D0`)** -- could the thing at key-table slot `slot`
+stand at world point `at`? Build its tile mask there and answer 0 the moment a
+cell is covered, is the wrong `ADDR_TILE_KIND`, or has an object on it.
+
+Its bounds check is the finding: the slot is checked against
+`ADDR_KEY_TABLE_COUNT` and then indexes `ADDR_AAI_RECORDS`, so those two arrays
+are PARALLEL under one count -- which nothing in the file said before. It is
+also the reader `AM2_TILEMASK_BOX_CELL`'s note predicted: `cell & 1` is exactly
+"inside the box rather than the two-tile padding".
+
+Unexercised, and for a mapped reason: `ListBoxAction` and `BoxAction` below it
+read 0 on every drive too.
 
 **`ObjSetFootprint` and `ObjClearFootprint` (`0x0045A620`, `0x0045A770`)** --
 the GENERAL footprint pair, of which the roach pair is the special case. They
@@ -3400,13 +3413,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,113 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,268
+line (0x0045C000) patched**. Measured: **1,114 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,269
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirteen batches have gone in and the 126 entries outstanding
+small ones in batches. A hundred and fourteen batches have gone in and the 125 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

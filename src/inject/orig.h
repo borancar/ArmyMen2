@@ -1356,6 +1356,13 @@
  * whose weight has reached AM2_CELL_WEIGHT_STEP. Per tile index, like the two
  * tables beside it. */
 #define ADDR_CELL_WEIGHTS      0x00514EC0u /* uint8_t *, one per tile index */
+/* A THIRD per-tile byte array, and the only one of the three the map FILE
+ * supplies: 0x0042C761 mallocs width * height and freads straight into it,
+ * with a second path that allocates and zeroes when the file has none. One
+ * accessor returns the byte for a tile and CanPlaceAt requires every cell of a
+ * placement to match a value the caller passes. What the value MEANS is not
+ * established -- only that it is per tile, comes off disk, and has to match. */
+#define ADDR_TILE_KIND         0x00514ED4u /* uint8_t *, one per tile index */
 /* 0x0042BCF0, one caller. Seal the map's four edges with a full cell weight,
  * then walk every tile once: block what is marked open, mark what is blocked,
  * and flag everything outside a five-tile margin. */
@@ -1439,6 +1446,12 @@
 #define AM2_TILEMASK_MARGIN      2      /* tiles added on every side */
 #define AM2_TILEMASK_PAD_CELL    2      /* what the margin is filled with */
 #define AM2_TILEMASK_BOX_CELL    3      /* and the box; bit 0 is what is read */
+/* The scratch record's size, from the one caller that puts it on the STACK:
+ * CanPlaceAt reserves 0x1018 bytes and the cells run from TILEMASK_OFF_CELLS
+ * to the end of that frame less two locals. BoxAction clamps into the map, so
+ * nothing here bounds the fill by this figure -- it is the caller's frame that
+ * says how big the array is. */
+#define AM2_TILEMASK_CELLS       0x1000u
 #define SPR_FLAG_SOFTWARE_BITS   0x1Cu  /* the subset of 0x3C these two test */
 #define OBJ_OFF_BOX_TOP        0x80u  /* int32_t, added to .y */
 #define OBJ_OFF_BOX_RIGHT      0x84u  /* int32_t, added to .x */
@@ -8668,6 +8681,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * object: the same three exits, the same 0x1C flag test, the same box offset
  * by a point -- except the point is an ARGUMENT here rather than a field. */
 #define ADDR_LIST_BOX_ACTION     0x00438F10u /* int32_t(uint32 at, hdr, mask) */
+/* Its bitmask twin, the one LISTHDR_OFF_HIT_MASK selects when it is SET --
+ * the same relation ADDR_OBJ_MASK_ACTION has to ObjBoxAction one structure
+ * over. Named at last, by the function that chooses between the two. */
+#define ADDR_LIST_MASK_ACTION    0x004385A0u /* int32_t(uint32 at, hdr, mask) */
+/* 0x0043A6D0, six callers. Could the thing at key-table slot `slot` stand at
+ * world point `at`? Its bounds check is what says ADDR_KEY_TABLE_COUNT counts
+ * ADDR_AAI_RECORDS as well. Reconstructed in region.cpp. */
+#define ADDR_CAN_PLACE_AT        0x0043A6D0u /* int32_t(uint32, int32, int32) */
 /* 0x00434C40, one caller, and that caller walks every entry of
  * ADDR_RECORD_LISTS -- so this is ADDR_MAKE_RECORD_LIST's counterpart. Free
  * the header's two pointers and then the header. Reconstructed. */

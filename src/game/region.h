@@ -159,6 +159,12 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out);
  * argument rather than a field. */
 int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out);
 
+/* 0x0043A6D0, six callers. Could the thing described by key-table slot `slot`
+ * stand at world point `at`? Build its tile mask there and answer 0 the moment
+ * a cell of it is covered, is the wrong ADDR_TILE_KIND, or has an object on
+ * it. 1 when none does, and 1 for a slot past the end. */
+int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind);
+
 /* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell
  * weights. */
 void __cdecl RebuildTileCover(void);
