@@ -392,7 +392,7 @@ void __cdecl FramePost(void)
     if (!CommActive())
         return;
 
-    call0(ADDR_COMM_FRAME_POST_B);
+    FlushDelayedSends();
     call0(ADDR_COMM_FRAME_POST_C);
 
     if (MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)

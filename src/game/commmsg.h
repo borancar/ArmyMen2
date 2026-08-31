@@ -88,6 +88,11 @@ void __cdecl Announce(const char *text);
 void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
                              uint32_t bits);
 
+/* 0x00402F50, one caller -- the frame chain's post-work. Drain the delayed
+ * send queue: every node whose MSGNODE_OFF_KEY deadline GetTickCount has
+ * reached goes out through CommSend and its buffer returns to the pool. */
+void __cdecl FlushDelayedSends(void);
+
 int commmsg_install(void);
 
 #ifdef __cplusplus

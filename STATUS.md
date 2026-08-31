@@ -5,11 +5,26 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `248cba7`. Working tree clean.
+Last updated: **2026-08-31**, at `39f768e`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,264 patches.**
+Nothing uncommitted. **1,265 patches.**
+
+**`FlushDelayedSends` (`0x00402F50`)**, which was `ADDR_COMM_FRAME_POST_B` -- a
+name off the one call site, saying only when it runs. It drains the delayed
+send queue: every node whose deadline `GetTickCount` has reached goes out
+through `CommSend` and its buffer returns to the pool.
+
+Reading it named two of the four message lists. `0x004F8780` is the DELAYED
+queue -- `MsgListInsert` files nodes into it in ascending `MSGNODE_OFF_KEY`
+order and this drains it against the clock, so for that list the key is a
+millisecond deadline. `0x0048D8E8` is where a sent node goes, which confirms
+`ADDR_MSG_LIST_POOL` and retires `ADDR_MSG_LIST_A`, a letter that had been
+sitting on the same address.
+
+A failed send LEAKS the node -- it is already unlinked and no error arm puts
+it back. Reproduced.
 
 **`TextListConstruct` and `TextListDelete` (`0x00433290`, `0x00433330`).** The
 message log's list box, inside the multiplayer panel: the LIST BOX with a
@@ -3366,14 +3381,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,109 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,264
+line (0x0045C000) patched**. Measured: **1,110 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,265
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and ten batches have gone in and the 130 entries outstanding start
-at 96 bytes -- and the smallest of those is the MSVC static-init glue at
+small ones in batches. A hundred and eleven batches have gone in and the 129 entries outstanding
+start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
 

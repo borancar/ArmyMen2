@@ -123,10 +123,10 @@ void __cdecl CommShutdown(void)
 {
     DWORD exitCode;
 
-    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_A);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
     EventClose((void *)(uintptr_t)ADDR_MSG_LIST_B);
     EventClose((void *)(uintptr_t)ADDR_MSG_LIST_C);
-    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_D);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_DELAYED);
 
     orig_log("Setting Event 0 \n");
     SetEvent(g_commEvent);
@@ -1147,7 +1147,7 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
 
     /* Room again in the message list: let the senders go. */
     {
-        int32_t free = orig_msg_list_free((void *)(uintptr_t)ADDR_MSG_LIST_A);
+        int32_t free = orig_msg_list_free((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
 
         if (free > COMM_FLOW_FREE_OK
                 && (GetPauseFlags() & COMM_FLOW_PAUSED_BIT)) {
@@ -1374,7 +1374,7 @@ int32_t __cdecl StartPacketThread(void)
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_POOL)) return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_B))    return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_C))    return 0;
-    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_D))    return 0;
+    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_DELAYED))    return 0;
 
 /* Defined below, beside MsgListInit. */
 void __cdecl PacketSlotReset(uint32_t slot);

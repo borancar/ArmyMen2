@@ -2180,10 +2180,17 @@
 /* Comm teardown: destroy the four mutex-guarded message lists, wake the packet
  * thread, wait for it and close the handles. */
 #define ADDR_COMM_SHUTDOWN       0x004020A0u  /* void(void) */
-#define ADDR_MSG_LIST_A          0x0048D8E8u
+/* Two of the four are named now, and reading FlushDelayedSends is what did it.
+ * 0x0048D8E8 was ADDR_MSG_LIST_A as well as ADDR_MSG_LIST_POOL -- one address
+ * under two names, with the second one right; the letter is retired rather
+ * than kept beside it. And 0x004F8780 is the DELAYED SEND QUEUE: MsgListInsert
+ * puts a node into it in ascending MSGNODE_OFF_KEY order and FlushDelayedSends
+ * drains it while GetTickCount has reached that key, so for this list the key
+ * is a millisecond deadline. B and C stay letters until something reads
+ * them. */
 #define ADDR_MSG_LIST_B          0x004F48C8u
 #define ADDR_MSG_LIST_C          0x0048D8D8u
-#define ADDR_MSG_LIST_D          0x004F8780u
+#define ADDR_MSG_LIST_DELAYED    0x004F8780u
 #define ADDR_COMM_EVENT          0x0048D8F8u  /* HANDLE, signalled to stop the thread */
 #define ADDR_COMM_EVENT_2        0x0048D8FCu  /* HANDLE */
 #define ADDR_PACKET_THREAD       0x004F48D8u  /* HANDLE */
@@ -7238,6 +7245,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * copying the body out -- so the search consumes what it finds and a second
  * call cannot answer the same node twice. */
 #define MSGNODE_OFF_FLAGS          0x18u
+/* The destination player, named by the message FlushDelayedSends prints on a
+ * failure -- "DPlaySend Failure %x to %x size %d" takes the result, this
+ * field, and MSGNODE_OFF_BODY_LEN. It is also CommSend's first argument. */
+#define MSGNODE_OFF_TO             0x0Cu
 #define ADDR_MSG_WANTED_FLAGS      0x004F8B98u  /* uint32_t */
 /* 0x00401330, two callers, and the exact shape of MsgListCopyByKey with the
  * key test replaced by a mask test. Answers the bits it took, or 0. */
@@ -8438,7 +8449,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * outgoing message packet. ArmyMessageSend calls it too, whenever the packet
  * fills. Returns zero when it could not send. */
 #define ADDR_ARMY_MESSAGE_FLUSH  0x00410420u  /* int32_t(int32_t) */
-#define ADDR_COMM_FRAME_POST_B   0x00402F50u
+/* Was ADDR_COMM_FRAME_POST_B, which is a name off the one call site in the
+ * frame chain and says only when it runs. The body says what it IS: drain the
+ * delayed send queue, sending every node whose deadline GetTickCount has
+ * reached and returning its buffer to the pool. Renamed rather than aliased,
+ * the same as ADDR_ARMY_MESSAGE_FLUSH above. */
+#define ADDR_FLUSH_DELAYED_SENDS 0x00402F50u  /* void(void) */
+/* The five DirectPlay results it names, as literals rather than through
+ * dplay.h: air.cpp is on the FLAT side of the split and including an SDK
+ * header there would fail tools/checksplit.py. The spelling in the comment is
+ * the SDK's, so the values can be checked against it. */
+#define AM2_DPERR_BUSY           0x8877010Eu
+#define AM2_DPERR_INVALIDOBJECT  0x88770082u
+#define AM2_E_INVALIDARG         0x80070057u  /* the game prints it as DPLAY */
+#define AM2_DPERR_INVALIDPLAYER  0x88770096u
+#define AM2_DPERR_SENDTOOBIG     0x887700E6u
 #define ADDR_COMM_FRAME_POST_C   0x00403050u
 #define AM2_COMM_MIN_BUFFERS     10           /* below this, COMM ERROR: NO BUFFERS */
 #define AM2_COMM_OFF_ACTIVE      0x3DCu       /* gates all the comm frame work */

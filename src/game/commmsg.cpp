@@ -32,6 +32,11 @@
 #include "rect.h"       /* AM2_Rect, for the dialog paint slot */
 #include "objtype.h"    /* ObjIsType4 -- reconstructed */
 #include "armymsg.h"    /* SendGamePause */
+
+/* GetTickCount through the game's own IAT slot, the same seam air.cpp uses:
+ * an import of our own would resolve through our IAT, and this file is flat. */
+typedef uint32_t (__stdcall *AM2_TickFn)(void);
+#define orig_get_tick_count (*(AM2_TickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
 #include "../inject/orig.h"
 #include "crt.h"        /* am2_log */
 #include "image.h"      /* AM2_IMAGE */
@@ -2063,7 +2068,7 @@ void __cdecl DrainMsgList(void *list)
     void *node;
 
     while ((node = MsgListRemHead(list)) != (void *)0)
-        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_A, node);
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
 }
 
 /* TellEachSlot -- original 0x0044C550, one caller.
@@ -2185,10 +2190,92 @@ const void *__cdecl TroopSubParse(const void *rec, int32_t army)
     return p;
 }
 
+/* CommSend is reconstructed, in win32/dplay.cpp with the rest of the comm
+ * object. It is declared here rather than by including that header because
+ * commmsg.cpp is on the flat side of the split and dplay.h pulls in win32.h --
+ * the same reason script.cpp forward-declares PreloadSprite. Its four
+ * arguments are exactly four of the delayed node's fields. */
+int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
+                                           uint32_t flags, void *data,
+                                           uint32_t size);
+
+/* FlushDelayedSends -- original 0x00402F50, one caller, the frame chain's
+ * post-work. It lives here rather than in air.cpp, whose band the image
+ * suggests, for two reasons that point the same way: this file already owns
+ * the message lists and their helpers, and air.cpp is in SELFTEST_SRC, where
+ * a dependency on CommSend cannot be linked. Drain the delayed send queue: every node whose deadline
+ * GetTickCount has reached goes out through CommSend and its buffer goes back
+ * to the pool.
+ *
+ * IT WAS CALLED ADDR_COMM_FRAME_POST_B, a name off that one call site, which
+ * says only WHEN it runs. What makes the body readable is the pair of lists:
+ * MsgListInsert puts a node into ADDR_MSG_LIST_DELAYED in ascending
+ * MSGNODE_OFF_KEY order and this compares that key against GetTickCount, so
+ * for this list the key is a millisecond deadline and the list is a timer
+ * queue. The node then goes to ADDR_MSG_LIST_POOL, which is what settles that
+ * the second list is the free-buffer pool -- and retires ADDR_MSG_LIST_A, the
+ * letter that was sitting on the same address.
+ *
+ * A FAILED SEND LEAKS THE NODE. It has already been unlinked by
+ * MsgListRemHead, and every error arm returns without putting it back on
+ * either list, so the buffer is gone. That is the original's behaviour and is
+ * reproduced; returning it to the pool would be tidier and would differ. Any
+ * result other than the five named is logged by the general line alone.
+ *
+ * The loop RE-READS the head each time round rather than walking the node's
+ * own next pointer, which is what keeps it safe against the packet thread
+ * inserting while it runs -- MsgListRemHead takes the list's mutex and this
+ * holds no node across the gap.
+ */
+void __cdecl FlushDelayedSends(void)
+{
+    uint32_t  now  = orig_get_tick_count();
+    uint8_t  *list = (uint8_t *)(uintptr_t)ADDR_MSG_LIST_DELAYED;
+
+    while (*(void *const *)(list + MSGLIST_OFF_HEAD)) {
+        uint8_t *node = (uint8_t *)*(void *const *)(list + MSGLIST_OFF_HEAD);
+        int32_t  hr;
+
+        if (now < *(const uint32_t *)(node + MSGNODE_OFF_KEY))
+            return;
+
+        node = (uint8_t *)MsgListRemHead(list);
+
+        hr = CommSend(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                      *(const uint32_t *)(node + MSGNODE_OFF_TO),
+                      *(const uint32_t *)(node + MSGNODE_OFF_FLAGS),
+                      *(void *const *)(node + MSGNODE_OFF_BODY),
+                      *(const uint32_t *)(node + MSGNODE_OFF_BODY_LEN));
+
+        if (hr < 0) {
+            am2_log("DPlaySend Failure %x to %x size %d\n", hr,
+                    *(const int32_t *)(node + MSGNODE_OFF_TO),
+                    *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN));
+
+            if ((uint32_t)hr == AM2_DPERR_BUSY)
+                am2_log("DPLAY ERROR: Busy\n");
+            else if ((uint32_t)hr == AM2_DPERR_INVALIDOBJECT)
+                am2_log("DPLAY ERROR: Invalid Object\n");
+            else if ((uint32_t)hr == AM2_E_INVALIDARG)
+                am2_log("DPLAY ERROR: INVALID PARAMETERS\n");
+            else if ((uint32_t)hr == AM2_DPERR_INVALIDPLAYER)
+                am2_log("DPLAY ERROR: INVALID PLAYER\n");
+            else if ((uint32_t)hr == AM2_DPERR_SENDTOOBIG)
+                am2_log("DPLAY ERROR: Send too big\n");
+            return;
+        }
+
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+    }
+}
+
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_TROOP_SUB_PARSE, (const void *)TroopSubParse,
                   "TroopSubParse", 1);
+    patch_replace(ADDR_FLUSH_DELAYED_SENDS, (const void *)FlushDelayedSends,
+                  "FlushDelayedSends", 1);
     patch_replace(ADDR_DRAIN_MSG_LIST, (const void *)DrainMsgList,
                   "DrainMsgList", 1);
     patch_replace(ADDR_TELL_EACH_SLOT, (const void *)TellEachSlot,
