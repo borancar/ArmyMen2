@@ -2243,7 +2243,11 @@
 #define ADDR_COMM_LOBBY_START    0x0040ED10u  /* thiscall int32(this) */
 #define ADDR_READ_MP_MAPS        0x0043ECC0u  /* void(void) -- ReadMpMapList */
 #define ADDR_COMM_CREATE_PLAYER  0x0040DE10u  /* thiscall int32(this,name,evt,data,len) */
-#define ADDR_COMM_REGISTER_SELF  0x004027F0u  /* void(DPID), stays original */
+/* Reconstructed. It answers 1 when the id already had a record or has just
+ * been given one, and 0 when all six slots are taken -- the prototype here
+ * said `void` and every caller ignores the result, so nothing observed the
+ * difference. */
+#define ADDR_COMM_REGISTER_SELF  0x004027F0u  /* int32_t(uint32_t id) */
 #define ADDR_DEFAULT_PLAYER_EVT  0x004F48C0u  /* HANDLE, used when none is given */
 #define COMM_OFF_PLAYER_MADE     0x3E4u
 #define COMM_OFF_JOINED          0x3DCu
@@ -7798,6 +7802,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * beyond zeroing. Everything else it touches it simply clears. */
 #define PLAYER_REC_OFF_OWN_BIT   0x14u  /* uint32_t, set to 1 << slot */
 #define PLAYER_REC_OFF_MSGS      0x78u  /* the list ADDR_MSG_LIST_INIT takes */
+/* Four more, all from CommRegisterSelf, which is the function that BUILDS a
+ * record rather than resetting one. +0x18 is a second bit mask, `1 << (slot +
+ * 4)`, and it is OR'd into ADDR_MSG_WANTED_FLAGS -- so the four-bit shift is
+ * what keeps the two mask families apart in one word. +0x5C is stamped from
+ * GetTickCount as the record is made. +0x88 is written 1 and then immediately
+ * overwritten with the comm object's COMM_OFF_IS_HOST, which is a store the
+ * original makes and this reproduces. +0x94 is written 1 and nothing here
+ * reads it. */
+#define PLAYER_REC_OFF_WANT_BIT  0x18u  /* uint32_t, 1 << (slot + 4) */
+#define PLAYER_REC_OFF_MADE_AT   0x5Cu  /* uint32_t, GetTickCount */
+#define PLAYER_REC_OFF_IS_HOST   0x88u
+#define PLAYER_REC_OFF_FLAG_94   0x94u
+/* The two 120-dword arrays at the end of a record, cleared together by one
+ * loop that walks them in step. */
+#define PLAYER_REC_OFF_RING_A    0x420u  /* int32_t[120] */
+#define PLAYER_REC_OFF_RING_B    0x600u  /* int32_t[120] */
+#define AM2_PLAYER_RING_LEN      0x78    /* 120 */
+/* The mask of occupied player slots, OR'd with PLAYER_REC_OFF_OWN_BIT as each
+ * record is made. ADDR_MSG_WANTED_FLAGS takes the other one. */
+#define ADDR_PLAYER_SLOT_MASK    0x004F48DCu  /* uint32_t */
+/* CommRegisterSelf's own two lines. The first is gated on COMM_OFF_DEBUG. */
+#define ADDR_STR_FLOWQ_MAKING    0x00473A5Cu /* "Creating Flow Queue for Player id %x" */
+#define ADDR_STR_FLOWQ_FAILED    0x00473A3Cu /* "Create FlowQ failed for ID %x" */
+#define AM2_PLAYER_WANT_SHIFT    4
 
 /* Two masks out of that record, each named by its own error message. */
 #define ADDR_GET_PLAYER_MASK     0x00402BD0u  /* uint32_t(uint32_t id) -- +0x14 */

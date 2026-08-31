@@ -230,6 +230,12 @@ void __cdecl OnLobbySlave(void);
 int dplay_install(void);
 
 #ifdef __cplusplus
+
+/* 0x004027F0, five callers. Give a DirectPlay id a player record -- the
+ * flow-control code's "FlowQ". Two scans: one for an existing record, one for
+ * a free slot. Answers 1 either way, 0 when all six are taken. */
+int32_t __cdecl CommRegisterSelf(uint32_t id);
+
 }
 #endif
 

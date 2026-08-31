@@ -62,6 +62,9 @@ extern "C" {
 int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
+/* A fourth, and cdecl rather than thiscall -- it registers a DirectPlay id
+ * into the player-record table and takes no comm object at all. */
+int32_t __cdecl CommRegisterSelf(uint32_t id);
 }
 
 
@@ -720,8 +723,6 @@ typedef int32_t (__attribute__((thiscall)) *AM2_GetSessionFn)(void *comm);
 typedef int32_t (__cdecl *AM2_RegisterSelfFn)(uint32_t dpid);
 typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
-#define orig_comm_register_self \
-    ((AM2_RegisterSelfFn)(uintptr_t)ADDR_COMM_REGISTER_SELF)
 
 void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 {
@@ -760,7 +761,7 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 
         /* Only if this player has no queue yet. Both tests re-read the id from
          * the record rather than reusing the one above. */
-        if (!FindPlayerById(id) && !orig_comm_register_self(id)) {
+        if (!FindPlayerById(id) && !CommRegisterSelf(id)) {
             ok = 0;
             am2_log("FlowQ creation Failure %x\n", id);
         }

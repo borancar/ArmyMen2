@@ -274,6 +274,114 @@ typedef void (__cdecl *am2_comm_void_fn)(void);
 typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
 #define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
 
+/* CommRegisterSelf -- original 0x004027F0, five callers. Give a DirectPlay id
+ * a player record -- what the flow-control code calls a FlowQ and CommSend
+ * calls a player, one thing under two of the program's own vocabularies.
+ *
+ * TWO SCANS, AND THE SECOND IS NOT A CONTINUATION OF THE FIRST. It walks all
+ * six records looking for this id and answers 1 if it finds one, then walks
+ * them again from the start looking for a free slot. So a re-registration is
+ * free and a first registration costs two passes; the original does not fold
+ * them into one and neither does this.
+ *
+ * Both scans bound on ADDR_DEFAULT_PLAYER_EVT, the next global after the
+ * table -- the same "the next global is the bound" evidence that sized the
+ * event registration table.
+ *
+ * TWO BIT MASKS, FOUR BITS APART. PLAYER_REC_OFF_OWN_BIT is `1 << slot` and
+ * goes into ADDR_PLAYER_SLOT_MASK; PLAYER_REC_OFF_WANT_BIT is
+ * `1 << (slot + 4)` and goes into ADDR_MSG_WANTED_FLAGS. One word holds both
+ * families and the shift is what keeps them apart, which is why six slots fit
+ * in a byte's worth of each.
+ *
+ * +0x88 IS WRITTEN TWICE, 1 and then the comm object's COMM_OFF_IS_HOST. The
+ * first store is dead and is reproduced: a reconstruction that dropped it
+ * would differ in the one place a debugger would look.
+ *
+ * The field list was EXTRACTED from the disassembly by script rather than
+ * transcribed -- thirty stores through two zeroed registers is the shape a
+ * hand copy gets wrong, and tools/posecheck.py exists because of one that did.
+ */
+int32_t __cdecl CommRegisterSelf(uint32_t id)
+{
+    uint8_t *table = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS;
+    uint8_t *end   = (uint8_t *)(uintptr_t)ADDR_DEFAULT_PLAYER_EVT;
+    uint8_t *rec;
+    int32_t  slot;
+    uint32_t own, want;
+
+    for (rec = table; rec < end; rec += AM2_PLAYER_RECORD_BYTES)
+        if (*(const uint32_t *)rec == id)
+            return 1;
+
+    slot = 0;
+    for (rec = table; rec < end; rec += AM2_PLAYER_RECORD_BYTES, slot++)
+        if (*(const uint32_t *)rec == 0)
+            break;
+
+    if (rec >= end) {
+        orig_log((const char *)(uintptr_t)ADDR_STR_FLOWQ_FAILED, id);
+        return 0;
+    }
+
+    if (comm_u32(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                 COMM_OFF_DEBUG) != 0)
+        orig_log((const char *)(uintptr_t)ADDR_STR_FLOWQ_MAKING, id);
+
+    own  = 1u << slot;
+    want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
+
+    *(uint32_t *)(rec + 0x00) = id;
+    *(uint32_t *)(rec + 0x04) = 0;
+    *(uint32_t *)(rec + 0x08) = 0;
+    *(uint32_t *)(rec + 0x0C) = 0;
+    *(uint32_t *)(rec + PLAYER_REC_OFF_FLAG_94) = 1;
+    *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = own;
+    *(uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK |= own;
+    *(uint32_t *)(rec + PLAYER_REC_OFF_WANT_BIT) = want;
+    *(uint32_t *)(rec + 0x10) = 0;
+    *(uint32_t *)(rec + 0x1C) = 0;
+    *(uint32_t *)(rec + 0x20) = 0;
+    *(uint32_t *)(rec + 0x28) = 0;
+    *(uint32_t *)(rec + 0x30) = 0;
+    *(uint32_t *)(rec + 0x34) = 0;
+    *(uint32_t *)(rec + 0x38) = 0;
+    *(uint32_t *)(rec + 0x40) = 0;
+    *(uint32_t *)(rec + 0x44) = 0;
+    *(uint32_t *)(rec + 0x48) = 0;
+    *(uint32_t *)(rec + 0x4C) = 0;
+    *(uint32_t *)(uintptr_t)ADDR_MSG_WANTED_FLAGS |= want;
+    *(uint32_t *)(rec + PLAYER_REC_OFF_MADE_AT) = GetTickCount();
+    *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) = 1;
+    *(uint32_t *)(rec + 0x0C) = 0;
+    *(uint32_t *)(rec + 0x8C) = 0;
+    *(uint32_t *)(rec + 0x9C) = 0;
+    *(uint32_t *)(rec + 0xA0) = 0;
+    *(uint32_t *)(rec + 0xA4) = 0;
+    *(uint32_t *)(rec + 0xA8) = 0;
+    *(uint32_t *)(rec + 0xAC) = 0;
+    *(uint32_t *)(rec + 0xB0) = 0;
+    *(uint32_t *)(rec + 0xB4) = 0;
+
+    *(uint32_t *)(rec + PLAYER_REC_OFF_IS_HOST) =
+        comm_u32(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                 COMM_OFF_IS_HOST);
+
+    {
+        uint32_t *a = (uint32_t *)(rec + PLAYER_REC_OFF_RING_A);
+        uint32_t *b = (uint32_t *)(rec + PLAYER_REC_OFF_RING_B);
+        int32_t   i;
+
+        for (i = 0; i < AM2_PLAYER_RING_LEN; i++) {
+            a[i] = 0;
+            b[i] = 0;
+        }
+    }
+
+    return 1;
+}
+
+
 /* CommRemovePlayer -- original 0x0040F640, three callers. Take a player out of
  * the comm object: drop the count, tell the packet layer, close the gap in the
  * record array, and stamp the six fields that record who went.
@@ -1110,7 +1218,6 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
 static_assert(sizeof(DPNAME) == 0x10, "DPNAME");
 
 typedef void (__cdecl *am2_register_self_fn)(DPID id);
-#define orig_register_self (*(am2_register_self_fn)ADDR_COMM_REGISTER_SELF)
 #define g_defaultPlayerEvent (*(HANDLE *)(uintptr_t)ADDR_DEFAULT_PLAYER_EVT)
 
 int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
@@ -1170,7 +1277,7 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
 
     comm_u32(shared, COMM_OFF_IS_HOST)  = 1;
     comm_u32(shared, COMM_OFF_JOINED) = 1;
-    orig_register_self((DPID)comm_u32(shared, COMM_OFF_OUR_PLAYER_ID));
+    CommRegisterSelf((DPID)comm_u32(shared, COMM_OFF_OUR_PLAYER_ID));
     return 1;
 }
 
@@ -2402,6 +2509,9 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_COMM_REMOVE_PLAYER,
                         (const void *)CommRemovePlayer,
                         "CommRemovePlayer", 3);
+    rc |= patch_replace(ADDR_COMM_REGISTER_SELF,
+                        (const void *)CommRegisterSelf,
+                        "CommRegisterSelf", 5);
     rc |= patch_replace(ADDR_COMM_OPEN_SESSION, (const void *)CommOpenSession,
                         "CommOpenSession", 1);
     rc |= patch_replace(ADDR_COMM_CONNECTED, (const void *)CommOnConnected,

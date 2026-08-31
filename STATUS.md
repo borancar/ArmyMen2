@@ -5,11 +5,27 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `de6ccbf`. Working tree clean.
+Last updated: **2026-08-31**, at `37195cf`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,285 patches.**
+Nothing uncommitted. **1,286 patches.**
+
+**`CommRegisterSelf` (`0x004027F0`)** -- give a DirectPlay id a player record,
+what the flow-control code calls a FlowQ.
+
+**Two scans, and the second is not a continuation of the first**: all six
+records for this id, then all six again for a free slot. A re-registration is
+free and a first one costs two passes; the original does not fold them and
+neither does this.
+
+**Two bit masks, four bits apart.** `PLAYER_REC_OFF_OWN_BIT` is `1 << slot` and
+goes into `ADDR_PLAYER_SLOT_MASK`; `PLAYER_REC_OFF_WANT_BIT` is
+`1 << (slot + 4)` and goes into `ADDR_MSG_WANTED_FLAGS`. One word holds both
+families and the shift is what keeps them apart.
+
+Its prototype said `void` and it answers 1 or 0 -- every caller ignores the
+result, so nothing observed the difference.
 
 **`RoachAliveStepB` (`0x0043D5B0`)** -- find a direction the roach can move in
 by FANNING OUT from the last one that worked: straight ahead, one step
@@ -3651,13 +3667,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,128 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 111
-outstanding, which is 1,239 minus 1,128 -- from 1,285 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,129 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 110
+outstanding, which is 1,239 minus 1,129 -- from 1,286 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-eight batches have gone in and the 111 entries
+small ones in batches. A hundred and twenty-nine batches have gone in and the 110 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
