@@ -233,6 +233,11 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
  * side. The name is descriptive; nothing in the image names this function. */
 void __cdecl RoachBite(void *roach);
 
+/* 0x00448280, eight callers. When a weapon leaves the map in a multiplayer
+ * game the HOST puts another one back where it was, once. Four gates, the
+ * second of which -- an ADDR_MP_SESSION -- no drive here can satisfy. */
+void __cdecl WeaponRespawn(void *obj);
+
 /* 0x0045A620 and 0x0045A770, six and seven callers -- the GENERAL footprint
  * pair, of which the roach pair is the special case. Lay an object's mask over
  * ADDR_CELL_WEIGHTS, or take it off, using the vehicle mask record

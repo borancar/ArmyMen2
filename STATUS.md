@@ -5,11 +5,27 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `78d6008`. Working tree clean.
+Last updated: **2026-08-31**, at `37ea18a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,279 patches.**
+Nothing uncommitted. **1,280 patches.**
+
+**`WeaponRespawn` (`0x00448280`), reconstructed after being declined twice.**
+When a weapon leaves the map in a multiplayer game the HOST puts another one
+back where it was, once. Four gates; the second is an `ADDR_MP_SESSION` no
+drive here can satisfy, which is why it stays verified by reading.
+
+**It was declined for uncertainty, not scope**, and the uncertainty was one
+thing: MSVC builds `CreateWeapon`'s eight arguments ACROSS a `KeyLookupTriple`
+call, pushing eight dwords, letting the lookup consume the top three, cleaning
+exactly those, and putting three fresh pushes on the five that remain. Pairing
+each push with the nearest call gets both calls wrong. Written down in orig.h
+two batches ago and now written out as code.
+
+A client reaches the end, sets the flag and creates nothing -- so it neither
+respawns nor retries. The host's copy arrives as an ordinary item-create
+message.
 
 **`CommRemovePlayer` (`0x0040F640`)** -- the function whose compaction loop
 settled `COMM_OFF_PLAYERS` last commit, now reconstructed. It drops the count,
@@ -3538,14 +3554,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,122 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 117
-outstanding, which is 1,239 minus 1,122 -- from 1,279 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,123 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 116
+outstanding, which is 1,239 minus 1,123 -- from 1,280 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-two batches have gone in and the 117 entries outstanding
-start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
+small ones in batches. A hundred and twenty-three batches have gone in and the 116 entries
+outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
 

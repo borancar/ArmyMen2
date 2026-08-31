@@ -2103,6 +2103,113 @@ void __cdecl ObjClearFootprint(void *obj)
  * mapdraw.h reaches win32.h. Neither of its parameters names a Win32 type. */
 void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
 
+/* CreateWeapon, still original -- the type-4 arm of the item-create message,
+ * and it names itself in its own log line. Eight arguments. */
+typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *name, int32_t type,
+                                            int32_t key, uint32_t at,
+                                            int32_t flags, int32_t quantity,
+                                            int32_t g, int32_t h);
+#define orig_create_weapon \
+    ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
+
+/* The respawn's other half, still original: pick a random eligible kind and
+ * hand back one of its ADDR_MISSILE_DEFS fields. */
+typedef int32_t (__cdecl *AM2_RandomKindFn)(int32_t *out);
+#define orig_random_respawn_kind \
+    ((AM2_RandomKindFn)(uintptr_t)ADDR_RANDOM_RESPAWN_KIND)
+
+/* WeaponRespawn -- original 0x00448280, eight callers. When a weapon leaves
+ * the map in a multiplayer game, put another one back where it was.
+ *
+ * FOUR GATES, AND EVERY ONE OF THEM IS WHY IT CANNOT BE EXERCISED HERE. The
+ * object must be a type-4 WEAPON; there must be an ADDR_MP_SESSION; bit 20 of
+ * ADDR_GAME_OVER_FLAGS must be set; and the weapon's own
+ * OBJ_FLAG_8000 must be clear -- which it then SETS, so the whole thing
+ * fires at most once per weapon. No DirectPlay session opens on this machine,
+ * so the second gate always refuses and every drive stops there.
+ *
+ * IT IS THE HOST'S JOB. COMM_OFF_IS_HOST gates everything but the flag: a
+ * client reaches the end, sets OBJ_FLAG_8000 and creates nothing, so it
+ * neither respawns the weapon nor tries again later. The host's copy arrives
+ * as an ordinary item-create message.
+ *
+ * TWO WAYS TO CHOOSE WHAT COMES BACK. With OBJ_FLAG_RESPAWN_RANDOM set it asks
+ * ADDR_RANDOM_RESPAWN_KIND for any eligible kind and takes the quantity from
+ * that kind's record; without it, the same weapon comes back with the ammo it
+ * had, and a type record whose +0x28 is zero refuses outright.
+ *
+ * THE ARGUMENT SHUFFLE IS THE ONE HARD PART AND IT IS NOT VISIBLE IN THE
+ * SOURCE. The original pushes eight dwords, lets KeyLookupTriple consume the
+ * top three, cleans exactly those with `add esp, 0xc`, and then puts three
+ * fresh pushes on top of the five that are left -- so one call's arguments are
+ * built across another call. Reading it by pairing each push with the nearest
+ * call gets BOTH calls wrong, which is what made this function look
+ * unreadable when it was first declined. Written here as the two calls it is.
+ *
+ * The event goes out with a delay of AM2_WEAPON_RESPAWN_MS -- five minutes --
+ * on the NEW weapon's uid, so whatever consumes it is timing the replacement
+ * and not the original.
+ */
+void __cdecl WeaponRespawn(void *obj)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *comm;
+    uint32_t  flags;
+    int32_t   kind;
+    int32_t   quantity = 0;
+    const char *name = 0;
+    void     *made;
+
+    if (!ObjIsType4((const AM2_Object *)obj))
+        return;
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+    if (!(*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & 0x100000u))
+        return;
+
+    flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
+    if (flags & OBJ_FLAG_8000)
+        return;
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        goto mark;
+
+    if (flags & OBJ_FLAG_RESPAWN_RANDOM) {
+        kind = orig_random_respawn_kind(&quantity);
+    } else {
+        const uint8_t *rec = *(const uint8_t *const *)(o + OBJ_OFF_FIELD_C0);
+
+        if (!*(const int32_t *)(rec + 0x28))
+            return;
+        quantity = *(const int32_t *)(o + ITEM_OFF_AMMO);
+        kind     = *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
+    }
+
+    if (*(const int32_t *)(o + ITEM_OFF_NAME_INDEX) > 0)
+        name = *(const char *const *)
+                   ((const uint8_t *)*(void *const *)
+                        (uintptr_t)ADDR_SCRIPT_NAMES
+                    + (uint32_t)*(const int32_t *)(o + ITEM_OFF_NAME_INDEX)
+                      * AM2_NAME_TABLE_STRIDE);
+
+    made = orig_create_weapon(name, AM2_OBJ_TYPE_WEAPON,
+                              KeyLookupTriple(AM2_WEAPON_RESPAWN_KEY,
+                                              (uint32_t)kind, 0),
+                              *(const uint32_t *)(o + OBJ_OFF_POS),
+                              (int32_t)(*(const uint32_t *)(o + OBJ_OFF_FLAGS)
+                                        | 4u),
+                              quantity, 0, 0);
+
+    if (made)
+        EventNotify(0, *(const int32_t *)(uintptr_t)ADDR_RULE_UID_C,
+                    *(const uint32_t *)((const uint8_t *)made + 4),
+                    0, 0, 0, 0, AM2_WEAPON_RESPAWN_MS, 0, 1);
+
+mark:
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
+}
+
 /* RoachBite -- original 0x0043D330, one caller: the roach's per-frame step,
  * which reaches it only in state 4. Step AM2_ROACH_REACH along the facing,
  * play a sound at the point stepped to, and damage every object in a 48x48 box
@@ -8395,6 +8502,8 @@ void item_install(void)
     patch_replace(ADDR_CREATE_ROACH, (const void *)CreateRoach,
                   "CreateRoach", 2);
     patch_replace(ADDR_ROACH_BITE, (const void *)RoachBite, "RoachBite", 1);
+    patch_replace(ADDR_WEAPON_RESPAWN, (const void *)WeaponRespawn,
+                  "WeaponRespawn", 8);
     patch_replace(ADDR_OBJ_SET_FOOTPRINT, (const void *)ObjSetFootprint,
                   "ObjSetFootprint", 6);
     patch_replace(ADDR_OBJ_CLEAR_FOOTPRINT, (const void *)ObjClearFootprint,

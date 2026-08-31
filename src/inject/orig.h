@@ -10181,6 +10181,34 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * be opened here, so ADDR_MP_SESSION is 0 on every drive and the first gate
  * always refuses. */
 #define ADDR_WEAPON_RESPAWN      0x00448280u  /* void(void *weapon) */
+/* 0x004601D0, and the respawn's other half: pick a random kind out of the list
+ * at ADDR_RESPAWN_KINDS, write that kind's ADDR_MISSILE_DEFS field +0x30 into
+ * the caller's dword, and answer the kind. Still original -- it is its own
+ * entry in docs/functions.tsv.
+ *
+ * ITS STRIDE IS AM2_MISSILE_DEF_BYTES AND ITS BASE IS ADDR_MISSILE_DEFS + 0x30,
+ * which is the second reader that table has had. LoadType5 named it for the
+ * missile whose def index it stores; a weapon respawn indexing the same
+ * records with the same stride suggests the table is WEAPONS generally and the
+ * name is too narrow. Left alone -- one more reader would settle it, and a
+ * rename on two is a guess. */
+#define ADDR_RANDOM_RESPAWN_KIND 0x004601D0u  /* int32_t(int32_t *out) */
+#define ADDR_RESPAWN_KINDS       0x00662920u  /* int32_t *, the eligible kinds */
+#define ADDR_RESPAWN_KIND_COUNT  0x00662924u  /* int32_t */
+#define MISSILEDEF_OFF_FIELD_30  0x30u
+/* A weapon's own script-name index, used to look the name up in
+ * ADDR_SCRIPT_NAMES and hand it to CreateWeapon. Zero or negative means no
+ * name and CreateWeapon gets a null. OBJ_OFF_BOUNDS is the same offset on
+ * another kind of object -- overloading, as at 0x52C and 0x538. */
+#define ITEM_OFF_NAME_INDEX      0x0Cu   /* int32_t, into ADDR_SCRIPT_NAMES */
+#define AM2_NAME_TABLE_STRIDE    16
+/* WeaponRespawn's own flag is OBJ_FLAG_8000, which already existed -- and the
+ * name stays structural rather than becoming OBJ_FLAG_RESPAWNED, because its
+ * two other users are a death event and a kind-7 object and neither is a
+ * respawn. One bit, three subsystems, all of them using it as "this has been
+ * handled once". Caught by tools/checkoffsets.py, which sees it precisely
+ * because the new name used the family's own prefix. */
+#define OBJ_FLAG_RESPAWN_RANDOM  0x10000u   /* pick a kind instead of reusing */
 #define AM2_WEAPON_RESPAWN_MS    0x000493E0  /* 300,000 -- five minutes */
 #define AM2_WEAPON_RESPAWN_KEY   0x2D
 /* Reconstructed, and its SIGNATURE WAS WRONG HERE: `void(obj, int32)` said
