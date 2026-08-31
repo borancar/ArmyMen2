@@ -101,6 +101,11 @@ void __cdecl AdvanceSecondDeadline(void);
 /* 0x00449250, one caller -- the type-2 arm. The near-twin of DeployVehicle;
  * see item.cpp for the three differences that writing one from the other
  * would erase. */
+/* 0x00429D00, three callers. Recompute an object's hit rect after it moves and
+ * re-link it into the map's cell lists. Off the grid calls ItemPreDestroy, so
+ * leaving the map and being unregistered are the same operation. */
+void __cdecl ObjRemap(void *obj, void *desc, int32_t force);
+
 void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
 
 void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,

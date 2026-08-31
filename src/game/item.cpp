@@ -1065,9 +1065,7 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
 /* Still original: the cell query HeightAtPoint walks, and the two halves of
  * ObjTileChanged's "something moved" path. */
 typedef void (__cdecl *AM2_ObjHookFn)(void *obj);
-typedef void (__cdecl *AM2_ObjRemapFn)(void *obj, void *desc, int32_t force);
 #define orig_obj_tile_hook ((AM2_ObjHookFn)(uintptr_t)ADDR_OBJ_TILE_HOOK)
-#define orig_obj_remap     ((AM2_ObjRemapFn)(uintptr_t)ADDR_OBJ_REMAP)
 
 
 /* ObjectsAtPoint -- original 0x0042A550, fifteen callers.
@@ -1582,7 +1580,7 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
         && force == 0)
         return;
 
-    orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), force);
+    ObjRemap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), force);
     ApplyObjHeight(o, height);
 }
 
@@ -8973,7 +8971,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
         *(int32_t *)(o + OBJ_OFF_RANK) = 0;
         *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
 
-        orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
+        ObjRemap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
 
         if (!ObjIsFriendly(o))
             ObjConceal(o, 0);
@@ -9070,7 +9068,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
         *(int32_t *)(o + OBJ_OFF_RIDING)    = 0;
         *(int32_t *)(o + OBJ_OFF_FIELD_5A4) = 0;
-        orig_obj_remap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
+        ObjRemap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
         *(int32_t *)(o + OBJ_OFF_POSE) = 0;
 
         if (!ObjIsFriendly(o))
@@ -9111,6 +9109,111 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
            == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
         && *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT <= 0)
         SelectUnit(o);
+}
+
+/* 0x00429D00, three callers -- both deploys and the stepper. Recompute an
+ * object's hit rect after it has moved, and re-link it into the map's cell
+ * lists.
+ *
+ * Three exits and they mean different things. Unchanged position with `force`
+ * clear, or the object not flagged, simply returns. A box that falls off the
+ * grid calls ItemPreDestroy first, which unlinks it from every cell it was in
+ * -- so leaving the map and being unregistered are the same operation.
+ *
+ * The cell coordinates come out of an arithmetic that reads oddly and is
+ * transcribed rather than simplified: the original reassigns the register
+ * holding `right` to the BOTTOM OFFSET partway through, so what looks like
+ * `right - topOffset + top` is really `bottomOffset - topOffset + top`, which
+ * is the bottom. Simplifying from the register names rather than the values
+ * gets it wrong.
+ *
+ * The clamps are the `xor/setle/dec/and` idiom, which is `max(v, 0)` without a
+ * branch. Written as the comparison it is.
+ *
+ * PointsEqual takes its two points BY VALUE -- rect.h has the signature, and
+ * CLAUDE.md records a defect from calling it with pointers instead. */
+void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const int32_t *grid = (const int32_t *)desc;
+    const int32_t *box;
+    int32_t       *hit;
+    int32_t        x, y, left, top, right, bottom;
+    int32_t        cl, ct, cr, cb, row, col, idx;
+
+    if (force == 0
+        && PointsEqual(*(const uint32_t *)(o + OBJ_OFF_PREV_POS),
+                       *(const uint32_t *)(o + OBJ_OFF_POS)))
+        return;
+
+    x = *(const int16_t *)(o + OBJ_OFF_X);
+    y = *(const int16_t *)(o + OBJ_OFF_Y);
+    box = (const int32_t *)(o + OBJ_OFF_BOX_OFFSETS);
+    hit = (int32_t *)(o + OBJ_OFF_HIT_RECT);
+
+    left   = x + box[0];
+    top    = y + box[1];
+    right  = x + box[2];
+    bottom = y + box[3];
+    hit[0] = left;
+    hit[1] = top;
+    hit[2] = right;
+    hit[3] = bottom;
+
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
+        return;
+
+    cl = left   >> AM2_CELL_SHIFT;
+    ct = top    >> AM2_CELL_SHIFT;
+    cr = (left + (box[2] - box[0]))   >> AM2_CELL_SHIFT;
+    cb = (top  + (box[3] - box[1]))   >> AM2_CELL_SHIFT;
+
+    /* Off the grid in any direction is an unregister, not a clamp. */
+    if (cb < 0 || ct > grid[1] - 1 || cr < 0 || cl > grid[0] - 1) {
+        ItemPreDestroy(o, (int32_t)(uintptr_t)desc);
+        return;
+    }
+
+    if (cl < 0) cl = 0;
+    if (ct < 0) ct = 0;
+    if (cr > grid[0] - 1) cr = grid[0] - 1;
+    if (cb > grid[0] - 1) cb = grid[0] - 1;
+
+    idx = 0;
+    for (row = ct; row <= cb; row++) {
+        int32_t cell = (row << grid[2]) + cl;
+
+        for (col = cl; col <= cr; col++, cell++, idx++) {
+            uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
+                             + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE;
+            int32_t  was = *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX);
+
+            if (was == cell)
+                continue;
+            if (was >= 0)
+                ListUnlink(entry,
+                           (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
+                                     + (uint32_t)was * 4u));
+            *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
+            ListPushFront(entry,
+                          (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
+                                    + (uint32_t)cell * 4u));
+        }
+    }
+
+    /* Whatever the object was linked into beyond the cells it now covers is
+     * released, and -1 written back so a second pass sees it unlinked. */
+    for (; idx < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); idx++) {
+        uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
+                         + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE;
+        int32_t  was = *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX);
+
+        if (was < 0)
+            return;
+        ListUnlink(entry, (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
+                                    + (uint32_t)was * 4u));
+        *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+    }
 }
 
 void item_install(void)
@@ -9384,6 +9487,7 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_OBJ_REMAP, (const void *)ObjRemap, "ObjRemap", 3);
     patch_replace(ADDR_DEPLOY_TROOPER, (const void *)DeployTrooper,
                   "DeployTrooper", 1);
     patch_replace(ADDR_DEPLOY_VEHICLE, (const void *)DeployVehicle,

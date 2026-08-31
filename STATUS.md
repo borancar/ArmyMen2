@@ -11381,3 +11381,52 @@ the sweep waits: it needs to load the image ONCE rather than spawning a process
 per function, which is both why it was slow and why it was disruptive.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels.
+
+
+## ObjRemap, and three constants that were already named
+
+**1,239 - 1,153 = 86 entries outstanding.** `0x00429D00` into
+`src/game/item.cpp`. Three callers -- both deploys and the stepper -- and it
+was the one callee both deploy siblings still reached by address, so those
+seams are closed and all three are now genuinely in the path.
+
+**Off the grid and unregistered are the SAME operation.** Three exits meaning
+three different things: an unchanged position with `force` clear returns, an
+unflagged object returns, and a box that falls outside the cell grid calls
+`ItemPreDestroy` -- which unlinks it from every cell it was in. There is no
+separate off-map state.
+
+**Grep-before-naming caught three things, one of them serious.**
+`AM2_TILE_SHIFT` is **4** and this code shifts by **8**. Both are plausible
+names for "the map grid shift", both compile, and the wrong one halves every
+cell coordinate silently. `AM2_CELL_SHIFT 8` already existed -- "world units
+per cell, as a shift". `AM2_CELL_ENTRY_STRIDE` and `CELLS_OFF_HEADS` were
+likewise already there, the latter written as a bare literal in my first pass.
+**Every constant this function needed had already been named by somebody
+else**; the contribution was checking rather than inventing.
+
+Third time today a name that SOUNDED right had the wrong value, after
+`OBJ_OFF_OWNER` and the speech-table base -- and the one time that check was
+skipped, the bug shipped.
+
+**A transcription trap recorded rather than smoothed.** The original reassigns
+the register holding `right` to the BOTTOM OFFSET partway through, so what
+reads as `right - topOffset + top` is really `bottomOffset - topOffset + top`,
+which is the bottom. Simplifying from register NAMES rather than values gets it
+wrong.
+
+That is the fourth instance of one shape today, worth stating once as a rule:
+**the compiler reuses storage, and a paraphrase that tracks names rather than
+values will misread it.** `[esp+0x18]` naming different arguments at different
+push depths; an `add esp, 0x14` cleaning two calls' arguments at once; this
+register reassignment; and a `rep stosd` sitting inside its loop rather than
+before it. Each was resolved by tracing what a location HELD at that
+instruction.
+
+`tools/checkoffsetuse.py` reports seven differences here and all seven are its
+documented array-indexing blind spot -- `box[1..3]`, `hit[1..3]` and `grid[1]`
+are typed array accesses where the original uses explicit displacements. A
+useful demonstration that the check reports rather than fails.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels.
