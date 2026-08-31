@@ -670,6 +670,10 @@ void __attribute__((thiscall)) ClearPtrList(void *rec);
  * Which buffer is current alternates: PollKeyboard SWAPS the two pointers each
  * poll, which is why these read through ADDR_KEYS_NOW_PTR rather than a fixed
  * array. */
+/* 0x00413A80, one caller. The 1..8 keys latch 0..7 into
+ * ADDR_NUMBER_KEY_SLOT, lowest key first, on a fresh press. */
+void __cdecl TakeNumberKey(void);
+
 int32_t __cdecl IsKeyDown(int32_t dik);
 int32_t __cdecl KeyChanged(int32_t dik);
 

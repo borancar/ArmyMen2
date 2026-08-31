@@ -1116,6 +1116,41 @@ void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
     ClearPtrList(rec);
 }
 
+/* TakeNumberKey -- original 0x00413A80, one caller. The 1..8 keys latch 0..7
+ * into ADDR_NUMBER_KEY_SLOT.
+ *
+ * Eight arms and every one of them identical: `IsKeyDown(dik) &&
+ * KeyChanged(dik)` -- held now and different from last poll, which is this
+ * program's idiom for a fresh press -- then store and RETURN. The return is
+ * the only thing that makes the eight an if-else rather than eight
+ * independent tests, and with two keys pressed in one frame the lowest wins.
+ *
+ * WRITTEN AS A LOOP where the original is eight inlined copies, and that is a
+ * choice worth stating rather than leaving to be noticed. The two are
+ * behaviourally identical -- the return makes the arms an if/else chain, so
+ * the lowest key wins either way, and `&&` keeps KeyChanged behind IsKeyDown
+ * exactly as the original's second branch does. Eight copies of five lines
+ * would say nothing the table does not. The same trade State1Menu's
+ * twenty-one-entry table makes.
+ *
+ * WHAT THE NUMBER SELECTS IS NOT DECIDED HERE. The slot's only reader is
+ * 0x00413BC0, which pushes it into a formatting call beside ADDR_OUR_POINTS
+ * and ADDR_HUD_INDEX; nothing in this function knows or cares. The name is
+ * for how it is written, not for what it is for.
+ */
+void __cdecl TakeNumberKey(void)
+{
+    static const int32_t kKeys[] = { 2, 3, 4, 5, 6, 7, 8, 9 };
+    int32_t i;
+
+    for (i = 0; i < (int32_t)(sizeof kKeys / sizeof kKeys[0]); i++) {
+        if (IsKeyDown(kKeys[i]) && KeyChanged(kKeys[i])) {
+            *(int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT = i;
+            return;
+        }
+    }
+}
+
 /* The same spelling device.cpp uses -- PollKeyboard owns these and swaps them
  * each poll, and two names on one address is what checkglobals exists to
  * stop. */
@@ -2309,6 +2344,8 @@ int misc_install(void)
                   "ChainField14", 1);
     patch_replace(ADDR_LIST_PUSH_FRONT, (const void *)ListPushFront,
                   "ListPushFront", 2);
+    patch_replace(ADDR_TAKE_NUMBER_KEY, (const void *)TakeNumberKey,
+                  "TakeNumberKey", 1);
     patch_replace(ADDR_SET_FIELD_IN_ALL, (const void *)SetFieldInAll,
                   "SetFieldInAll", 2);
     patch_replace(ADDR_FIELD51_MEETS_MIN, (const void *)Field51MeetsMin,

@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `0a86c36`. Working tree clean.
+Last updated: **2026-08-31**, at `b83fafb`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,242 patches.**
+Nothing uncommitted. **1,243 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2722,16 +2722,44 @@ commit -- gave the right answer every time it was used.
   how many there are** -- a five-figure counter here certifies only the path
   that does nothing.
 
+- **`TakeNumberKey`** (`0x00413A80`) is eight identical arms -- DIK 2..9, the
+  1..8 keys -- each latching its index 0..7 into `ADDR_NUMBER_KEY_SLOT` on a
+  fresh press, with a `return` that makes the eight an if/else chain so the
+  lowest key wins.
+
+  **Written as a loop where the original is eight inlined copies**, and that
+  is stated at the definition rather than left to be noticed. The two are
+  behaviourally identical -- the return gives the same precedence, and `&&`
+  keeps `KeyChanged` behind `IsKeyDown` exactly as the original's second
+  branch does -- and eight copies of five lines would say nothing the table
+  does not. The same trade `State1Menu`'s twenty-one-entry table makes.
+
+  **What the number selects is NOT decided here.** The slot's only reader is
+  `0x00413BC0`, which pushes it into a formatting call beside
+  `ADDR_OUR_POINTS`, `ADDR_HUD_INDEX` and `ADDR_DIR_SCRATCH`. Nothing in this
+  function knows or cares, and the name is for how it is written.
+
+- **The drive proved it cold, which an A/B could not have.** Driving all eight
+  keys in a live mission and dumping `ADDR_NUMBER_KEY_SLOT` after each leaves
+  it at 0 throughout, with the counter at 0 -- and that method discriminates a
+  wrong scancode constant, which an A/B never can because both sides get the
+  same key.
+
+  The reason is one xref deep: `0x00413BC0` is called from
+  `ADDR_HUD_POST_UPDATE`, which runs every frame, but only when
+  `ADDR_NET_GAME` is set. So the whole path is multiplayer-only. Reading the
+  gate is what turned "it does not run" into "it cannot run here".
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,088 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,242
+line (0x0045C000) patched**. Measured: **1,089 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,243
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-eight batches have gone in and the 151 entries outstanding start at 48
+small ones in batches. Eighty-nine batches have gone in and the 150 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

@@ -783,6 +783,14 @@
 #define ADDR_HUD_REPAINT_ONE   0x00413A30u  /* void(void) */
 #define ADDR_HUD_DIRTY         0x004FCF84u  /* int32_t */
 #define ADDR_HUD_INDEX         0x004FCF50u  /* int32_t, into the table below */
+/* 0..7, latched by TakeNumberKey from the 1..8 keys. Its ONLY reader is
+ * 0x00413BC0, which pushes it into a formatting call beside ADDR_OUR_POINTS,
+ * ADDR_HUD_INDEX and ADDR_DIR_SCRATCH -- so what the number selects is
+ * decided there and not here. Named for how it is written. */
+#define ADDR_NUMBER_KEY_SLOT   0x004FCF90u  /* int32_t 0..7 */
+/* 0x00413A80, one caller. Eight arms, DIK 2..9 -- the 1..8 keys -- each
+ * latching its index into the above on a fresh press. Reconstructed. */
+#define ADDR_TAKE_NUMBER_KEY   0x00413A80u  /* void(void) */
 #define ADDR_HUD_WIDGET_TABLE  0x004FCF04u  /* AM2_Widget *[] */
 #define HUDWIDGET_OFF_FLAG70   0x70u        /* uint8_t, cleared before paint */
 /* 0x004143A0, two callers. Paint all three through vtable slot 1. */
