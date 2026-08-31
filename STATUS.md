@@ -10267,3 +10267,46 @@ questions, one answer between them -- do not let the tidy story cover both.
 A counter at 0 means nothing alone. It means something when
 `tools/blindspots.py` says the counter CAN move, the log says the patch went
 in `(traced)`, and a second counter on the same drive reads 21 million.
+
+## The rank record is twelve bytes earlier again, and the file said so first
+
+`ADDR_RANK_RECORDS` has been re-based twice already -- `0x00473DD4` to
+`0x00473DD0` to `0x00473DCC` -- each time because a new consumer wanted an
+earlier field. `0x00404730` is the FOURTH consumer and wants one twelve bytes
+earlier still: it indexes `*(int32 *)(0x00473DC0 + rank * 28) << 1` and forgets
+a target beyond that distance.
+
+**The giveaway had been sitting in `orig.h` the whole time**: a documented
+28-byte stride with only 16 bytes of named fields. Three dwords were
+unaccounted for, and they are in FRONT of the four that were named.
+
+**And the existing comment predicted this exact correction.** It says a
+consumer touching one field "indexes correctly from any base that puts that
+field where it expects, and nothing can see the error until a second consumer
+wants an earlier field -- here the THIRD consumer wanted the first field of
+all." A fourth has now done it again.
+
+**What that comment used to settle the base cannot settle it.** It calls
+`0x473DCC` "the only base on which every field is a clean monotone series",
+which was true of the four fields known then -- and `0x473DC0` gives three
+more monotone series in front of them: 280..320, 48..76, 120..190.
+**Monotonicity cannot distinguish a base from a base-plus-a-field.**
+
+**Tiling can, and it is one subtraction.** `0x473DC0 + 8 ranks x 28 bytes` is
+`0x473EA0`, which is exactly `ADDR_FORMATION_SLOTS`; `0x473DCC + 224` would
+run twelve bytes into that table. Below it, `0x473DB0` holds 480, 1000, 3000,
+0 -- unrelated constants ending in a zero. The record tiles from the corrected
+base and from no other. This is the trig-table argument CLAUDE.md already
+states -- "if a layout does not tile, one of the bases is wrong" -- applied to
+a table that had been corrected twice without it.
+
+Four independent confirmations, none of them mine to assume: the indexing
+arithmetic in `0x00404730`; the seven monotone columns; the exact tiling; and
+`d5` at rank 7 reading **70**, which is the 140 max health
+`tools/objdump.py` measures in the running game once the 2.0 difficulty scale
+is applied.
+
+The fix is behaviour-preserving by construction -- all four call sites index
+as `base + rank * RANK_REC_BYTES + RANK_REC_OFF_*`, so moving the base back
+twelve and adding twelve to each offset leaves every absolute address
+unchanged. `.text` should be byte-identical and will be measured, not assumed.

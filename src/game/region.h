@@ -124,6 +124,13 @@ void __cdecl AiBuildContext(void *obj, void *out);
  * would give. */
 void __cdecl RoachBuildContext(void *obj, void *out);
 
+/* 0x004060D0, one caller, inside the trooper step chooser. Walk toward the
+ * destination, and on arrival attach to a nearby object; a unit that lingers
+ * fifteen seconds is killed. The name is ours. Its object pick reads the
+ * count from one army's list and the array from another -- the original's
+ * defect, reproduced; see the body. */
+void __cdecl AiStepAttach(void *obj, void *out);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

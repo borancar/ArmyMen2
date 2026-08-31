@@ -3180,6 +3180,56 @@
  * one in 0x0044AD40 -- the step the trooper AI shares, as ADDR_AI_407190 is
  * the vehicle one. Nothing in it says what it is. */
 #define ADDR_AI_TROOPER_STEP     0x004049C0u  /* void(obj, out, void *ctx) */
+/* 0x004060D0, one caller, inside the trooper step chooser at 0x0044B990. A
+ * trooper AI step of the usual shape -- build the 0x58 context, act, set the
+ * output state -- with two things in it that no other member of the family
+ * has. The name is OURS and describes the distinguishing act, the way
+ * SettlePointInRegion's does.
+ *
+ * WALK, THEN ATTACH. While SIGHTC_OFF_DEST_DIST is over AM2_AI_REACHED_DIST it
+ * copies the destination into OBJ_OFF_FIELD_C0 and hands off to
+ * ADDR_AI_TROOPER_STEP, which is AiStepIgnore's shape exactly. On arrival it
+ * clears the destination, picks an object out of an army's list, and if that
+ * object is within 0x400 calls ADDR_OBJ_ATTACH_TO.
+ *
+ * AND THE PICK READS THE WRONG LIST. The count and the modulus come from the
+ * army in `edi` -- which is the object's own half the time and a random 0..3
+ * the other half -- while the array actually indexed belongs to obj[+0x10].
+ * When they differ and the chosen army holds more objects, this reads past the
+ * end of the uid list. Reproduced: it is the original's behaviour, it is not
+ * reachable by any test this project can run, and it is exactly the class of
+ * defect the LockSurface Restore path is kept for.
+ *
+ * IT KILLS THE UNIT ON A TIMEOUT. Fifteen seconds after OBJ_OFF_DEADLINE_58,
+ * with the destination reached, the object takes AM2_AI_TIMEOUT_DAMAGE from
+ * its own army's owner object. With a multiplayer session up and
+ * CommMustBroadcast answering no, it broadcasts by hand and suppresses the
+ * automatic one; otherwise it damages plainly.
+ *
+ * THE SIGNED %4 IS DEAD. `sar/and 0x80000003/jns/dec/or/inc` is MSVC's signed
+ * modulo, but GameRand never returns a negative, so the correction arm cannot
+ * run and `& 3` would be equivalent. The idiom says the source wrote a signed
+ * `% 4`; it is not a hazard here and is not written up as one.
+ *
+ * ONE READ IS UNALIGNED. `mov eax, [esp+0x1a]` takes a dword at ctx+0x0E,
+ * across the two-byte gap after SIGHT_OFF_DEST. Kept at 0x0E rather than
+ * tidied to a neighbouring field. Reconstructed. */
+#define ADDR_AI_STEP_ATTACH      0x004060D0u  /* void(obj, out) */
+#define AM2_AI_IDLE_TIMEOUT_MS   0x3A98  /* 15,000 */
+#define AM2_AI_ATTACH_RANGE      0x400
+#define AM2_AI_TIMEOUT_DAMAGE    0x2710  /* 10,000 */
+/* The output state, chosen on a SECOND and shorter timer against the same
+ * stamp: over ten seconds gives 0x27 and at or under it gives 0x29. The
+ * threshold is 10,000 MILLISECONDS and happens to equal AM2_AI_TIMEOUT_DAMAGE
+ * exactly; it is named separately because a constant that is numerically
+ * right can still be the wrong constant, and reusing that one would say the
+ * state depends on how much damage the unit takes. */
+#define AM2_AI_STATE_MS          0x2710  /* 10,000 ms */
+#define AM2_AI_STATE_STALE       0x27    /* idle longer than that */
+#define AM2_AI_STATE_RECENT      0x29    /* and not */
+#define SIGHTC_OFF_FIELD_0E      0x0Eu   /* read unaligned, see above */
+#define SIGHTC_OFF_FIELD_04      0x04u
+#define SIGHTC_OFF_FIELD_08      0x08u
 /* 0x00405100, six call sites in five functions. Reconstructed. */
 #define ADDR_AI_KEEP_RANGE       0x00405100u  /* void(obj, out, void *ctx) */
 /* 0x00405050, TEN call sites across the same band. The trooper family's

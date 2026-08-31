@@ -13,6 +13,8 @@
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
+#include "msgslot.h"  /* CommMustBroadcast -- the timeout kill's gate */
+#include "armymsg.h"  /* DamageBroadcast */
 #include "gameproc.h" /* Call405220 -- the `defend` arm's thunk */
 #include "item.h"     /* ObjectsHitByPoint -- reconstructed */
 #include "image.h"
@@ -21,6 +23,9 @@
 #include "../inject/patch.h"
 
 #define kRegionOfCell (*(uint8_t **)AM2_IMAGE(ADDR_REGION_OF_CELL))
+/* Spelled as army.cpp spells it, so checkglobals sees one name per
+ * address rather than two. */
+#define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
 /* 0x00514EF0 holds a POINTER to the array, not the array. Same shape as the
  * cell map above; getting this wrong took the game down on the first run. */
 #define kRegions      (*(uint8_t **)AM2_IMAGE(ADDR_REGIONS))
@@ -3115,6 +3120,151 @@ void __cdecl RoachBuildContext(void *obj, void *out)
 }
 
 
+typedef void (__cdecl *AM2_AiTrooperFn)(void *obj, void *out, void *ctx);
+typedef void (__cdecl *AM2_AttachFn)(void *subject, void *target);
+#define orig_ai_trooper ((AM2_AiTrooperFn)(uintptr_t)AM2_IMAGE(ADDR_AI_TROOPER_STEP))
+#define orig_attach_to  ((AM2_AttachFn)(uintptr_t)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
+
+/* AiStepAttach -- original 0x004060D0, one caller, inside the trooper step
+ * chooser at 0x0044B990. The name is OURS and describes what distinguishes it
+ * from the rest of the family, the way SettlePointInRegion's does.
+ *
+ * WALK, THEN ATTACH. While the destination is further than AM2_AI_REACHED_DIST
+ * it copies the destination into OBJ_OFF_FIELD_C0 and hands off to the trooper
+ * step -- AiStepIgnore's shape exactly. On arrival it clears the destination,
+ * picks an object out of an army's list, and attaches to it if it is within
+ * AM2_AI_ATTACH_RANGE.
+ *
+ * THE PICK READS THE WRONG LIST, AND THAT IS THE ORIGINAL'S. The count and the
+ * modulus come from `army`, which is the object's own half the time and a
+ * random 0..3 the other half; the array actually indexed is obj's own army's.
+ * When they differ and the chosen army holds more objects, this reads past the
+ * end of the uid list. Kept, for the same reason surface.cpp keeps
+ * LockSurface's Restore path: it is what the program does, and nothing this
+ * project can drive would reach it -- it needs a coin flip, two army
+ * populations of different size, and an out-of-bounds uid that resolves.
+ *
+ * IT KILLS THE UNIT ON A TIMEOUT. Fifteen seconds after OBJ_OFF_DEADLINE_58,
+ * with the destination reached, the object takes 10,000 damage from its own
+ * army's owner object. The multiplayer arm is the interesting one and reads
+ * backwards until you see it: when a session is up and CommMustBroadcast says
+ * NO, it broadcasts by hand and passes suppress=1 so the automatic one does
+ * not fire; otherwise it damages plainly with suppress=0.
+ *
+ * THE SIGNED %4 IS DEAD CODE. The `sar/and 0x80000003/jns/dec/or/inc` is
+ * MSVC's signed modulo, but GameRand cannot return a negative, so the
+ * correction arm never runs and `& 3` would be equivalent. Written as `% 4`
+ * because that is what the source said, not because it matters.
+ *
+ * THE BOUNDARY AT EXACTLY 12 IS EXCLUDED BY BOTH TESTS. The entry walks only
+ * when the distance is strictly GREATER than AM2_AI_REACHED_DIST, and the
+ * timeout kill fires only when it is strictly LESS. So a unit at exactly 12 is
+ * "arrived" and also exempt from the kill. The two comparisons look
+ * inconsistent and are not; do not normalise one of them to `<=`.
+ *
+ * IT DRAWS FROM GameRand TWICE, once for the branch and the army and once for
+ * the list index. Reusing the first value would be the obvious simplification
+ * and would desynchronise every later draw in the frame.
+ *
+ * THE COMM OBJECT IS REACHED BY VALUE, NOT BY ADDRESS. ADDR_COMM_OBJECT points
+ * AT the object -- ADDR_COMM_GLOBAL is the object itself -- and the original
+ * dereferences it. The first version of this function passed the address, the
+ * way an AM2_IMAGE macro reads at a use site; army.cpp had the right form in
+ * three places. Nothing could have caught it: the guard above is
+ * ADDR_MP_SESSION, which is zero in single player, so no A/B reaches the call
+ * at all. Grep an existing call site before passing a global to a function.
+ *
+ * ONE READ IS UNALIGNED. The original takes a dword at ctx+0x0E, across the
+ * two-byte gap after the packed destination point. Reproduced at 0x0E rather
+ * than tidied to a neighbouring field, which is what it would look like if
+ * somebody assumed the compiler would not do that.
+ *
+ * ITS COUNTER CAN MOVE -- the caller is original -- but nothing has driven it
+ * yet, and the trooper band's coldness is the open question recorded in
+ * STATUS.md rather than a property of this function.
+ */
+void __cdecl AiStepAttach(void *obj, void *out)
+{
+    uint8_t  ctx[AM2_SIGHTC_BYTES];
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+
+    if (!obj)
+        return;
+
+    orig_ai_fill(obj, ctx, 0);
+
+    if (*(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        orig_ai_trooper(obj, out, ctx);
+    } else {
+        int32_t r;
+
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
+
+        r = orig_region_rand();
+
+        if (!(*(const int32_t *)(ctx + SIGHTC_OFF_FIELD_04)
+              && *(const int32_t *)(ctx + SIGHTC_OFF_FIELD_08)
+                 <= AM2_AI_ATTACH_RANGE
+              && (uint8_t)r)) {
+            int32_t army = (r & 1) ? (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+                                   : (r >> 1) % 4;
+            uint8_t *list = (uint8_t *)g_armyObjLists[army];
+
+            if (*(const int32_t *)(list + LIST_OFF_COUNT) > 0) {
+                /* The modulus is taken from `army`'s count and the array from
+                 * the object's OWN army. See the header: reproduced. */
+                int32_t idx = orig_region_rand()
+                              % *(const int32_t *)(list + LIST_OFF_COUNT);
+                uint8_t *own =
+                    (uint8_t *)g_armyObjLists[*(const int8_t *)(o + OBJ_OFF_ARMY)];
+                uint8_t *t = (uint8_t *)LookupByUID(
+                    ((const uint32_t *)*(void **)(own + LIST_OFF_UIDS))[idx]);
+
+                if (t
+                    && ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                                  (const AM2_Point *)(t + OBJ_OFF_POS))
+                       < AM2_AI_ATTACH_RANGE)
+                    orig_attach_to(obj, t);
+            }
+        }
+    }
+
+    if ((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+         - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_AI_IDLE_TIMEOUT_MS
+        && *(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) < AM2_AI_REACHED_DIST) {
+        int32_t   army = *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1;
+        uint8_t  *rec  = (uint8_t *)LookupOwnerObj((uint32_t)army);
+        uint32_t  from = rec ? *(const uint32_t *)(rec + 4) : 0;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                  (int16_t)army)) {
+            DamageBroadcast(obj, from, AM2_AI_TIMEOUT_DAMAGE, 3,
+                            o + OBJ_OFF_POS, 0);
+            DamageObject(obj, AM2_AI_TIMEOUT_DAMAGE, 3, from, 0, 1);
+        } else {
+            DamageObject(obj, AM2_AI_TIMEOUT_DAMAGE, 3, from, 0, 0);
+        }
+    } else {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(ctx + SIGHTC_OFF_FIELD_0E);
+        orig_ai_trooper(obj, out, ctx);
+
+        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) =
+            (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+             - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
+            > AM2_AI_STATE_MS ? AM2_AI_STATE_STALE : AM2_AI_STATE_RECENT;
+    }
+
+    *(uint16_t *)(o + OBJ_OFF_REGION) =
+        kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -3155,6 +3305,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_ROACH_BUILD_CONTEXT,
                         (const void *)RoachBuildContext,
                         "RoachBuildContext", 1);
+    rc |= patch_replace(ADDR_AI_STEP_ATTACH, (const void *)AiStepAttach,
+                        "AiStepAttach", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
