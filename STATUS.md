@@ -10680,3 +10680,66 @@ the only patched address inside it is the new one. The count had not moved
 because the *starting* figure was wrong, not because the entry was already
 credited. **A number that fails to move has two explanations and they point in
 opposite directions** -- check which before writing either down.
+
+
+## The two static-initialiser groups, and a claim refuted by one probe
+
+**1,239 - 1,144 = 95 entries outstanding.** Ten functions: the four-stub MSVC
+boilerplate around each of this image's static C++ globals, in
+`src/game/gameproc.cpp` and `src/game/win32/dplay.cpp`.
+
+**There are exactly two such globals, and the scan says so rather than the
+reading.** Sweeping for `push imm32; call ADDR_CRT_ATEXIT` returns two hits and
+nothing else -- the comm object at `0x0040DB40`, which `orig.h` had described
+in prose for months without anyone writing it, and the selected-units list at
+`0x00424890`. Each is the same shape: an init-table entry that calls a ctor
+thunk and tail-jumps to a registrar, the registrar handing a dtor thunk to
+`atexit`, and each thunk naming the object with a `mov ecx, <global>`.
+
+**The selection list is a MEMBER of the gameproc block.**
+`ADDR_GAMEPROC_BLOCK + 0x8A0` resolves to `ADDR_SELECTED_UIDS`, which was
+already named and already read by `DrawSelection` and twenty other sites --
+but nothing recorded where it lived. The offset arithmetic is written the way
+the original writes it rather than as a reference to the absolute address, so
+the fact survives in code and not only in a comment.
+
+**I wrote down a plausible falsehood and one probe refuted it.** The comment
+that went in with these said only the destructor half could execute, on the
+reasoning that the CRT runs the initialiser table before `am2hook.dll` can
+patch anything. A `TRACE=1` quit run says the opposite in two adjacent lines:
+
+    am2hook: 1311 patch(es) installed
+    trace CommGlobalInit#1(00000000)
+
+The harness is in before the initterm. **`CommGlobalInit` and `SelListInit`
+read 1 each**, so both constructors run under our code, and the clean A/B is
+evidence about ten live functions rather than about four dead ones.
+
+The four thunks under them read 0 for the ordinary blind-spot reason -- each
+entry calls its own thunk and registrar by name -- and the destructors are
+blind for a second reason on top, below.
+
+Worth being precise about what the A/B alone could have shown here: nothing.
+`quit` came back identical on 8 messages and 0 pixels, and would have come back
+identical had the patches never been reached, because the original would then
+have run. **A clean A/B does not establish that the new code executed**, and
+that question is cheaper to answer than the comparison is.
+
+**The registrar passes OUR thunk, not the address the original pushes**, and
+that is forced rather than chosen. The original hands `0x004248C0` to `atexit`;
+that address holds a detour into our code by the time exit runs, so the two
+registrations do the same thing -- but naming a patched address in `src/game`
+is exactly what `tools/checkseams.py` fails on. The cost is observability: the
+CRT then calls our function directly and the counter cannot move. That the
+exit path does reach reconstructed code is visible anyway, since the format
+string logged after `ReportLeaks` resolves inside the DLL rather than the
+image.
+
+**Only one of the two groups is visible to the headline count.** The
+selected-units group sits in the outstanding 96-byte entry and moves it; the
+comm group's four sit inside an entry `CommConstruct` already credits and move
+nothing. That is the merged-entry problem from the side it is usually not seen
+from -- **the real outstanding work is larger than 95, not smaller.**
+
+A/B clean: `quit` identical on 8 messages, 0 pixels; `bootcamp` state
+identical on 1,610 lines, 22 pixels.

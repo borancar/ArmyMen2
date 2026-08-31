@@ -28,6 +28,11 @@
 void __cdecl FreeSpriteRegistry(void);
 #include "image.h"
 #include "../inject/orig.h"
+#include "misc.h"      /* InitPtrList, ClearPtrListAlias -- reconstructed */
+
+/* The CRT's atexit, above the CRT line and not on the patch list. */
+typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
+#define orig_atexit (*(AM2_AtExitFn)AM2_IMAGE(ADDR_CRT_ATEXIT))
 #include "../inject/patch.h"
 #include "misc.h"      /* ReturnOne */
 #include "crt.h"       /* am2_realloc, am2_free -- the game's own */
@@ -1751,6 +1756,69 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
     return fp;
 }
 
+/* The selected-units list is a static C++ global, and these five are the
+ * boilerplate MSVC emits around one. See orig.h for the shape, and for the
+ * measurement that says all of it runs -- the harness patches before the CRT
+ * initterm, so SelListInit executes under our code rather than ahead of it.
+ *
+ * What makes the group worth naming rather than skipping is where the object
+ * lives: base + GAMEPROC_OFF_SELECTED resolves to ADDR_SELECTED_UIDS, the
+ * {capacity, count, items} list that DrawSelection and twenty other sites
+ * read. Nothing had recorded that the selection list is a MEMBER of the
+ * gameproc block. The arithmetic is written the way the original writes it,
+ * rather than as a direct reference to the absolute address, so that fact
+ * survives in the code and not only in a comment. */
+
+/* 0x004248E0, thiscall. Construct the member and answer the OUTER object --
+ * `mov eax, esi` restores the block, not the list, which is what a C++
+ * constructor returns. */
+void *__attribute__((thiscall)) SelListConstruct(void *block)
+{
+    InitPtrList((uint8_t *)block + GAMEPROC_OFF_SELECTED);
+    return block;
+}
+
+/* 0x004248D0, thiscall. One `add ecx` and a tail jump. */
+void __attribute__((thiscall)) SelListDestruct(void *block)
+{
+    ClearPtrListAlias((uint8_t *)block + GAMEPROC_OFF_SELECTED);
+}
+
+/* 0x004248A0 and 0x004248C0: the two thunks that name the object. Each is
+ * `mov ecx, <block>; jmp <body>`, so they are the only place the global is
+ * mentioned. */
+void *__cdecl SelListConstructThunk(void)
+{
+    return SelListConstruct((void *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+}
+
+void __cdecl SelListDestructThunk(void)
+{
+    SelListDestruct((void *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+}
+
+/* 0x004248B0. Hands the destructor thunk to the CRT's atexit and returns its
+ * answer -- the `ret` follows the call with eax untouched, so the result is
+ * atexit's 0 or -1 and not a value of its own.
+ *
+ * It passes OUR thunk rather than the image address the original pushes. The
+ * two are the same registration: the original address holds a detour to this
+ * code by the time exit runs. Naming the patched address here would be the lie
+ * tools/checkseams.py exists to catch, and it would buy one extra hop. */
+int32_t __cdecl SelListAtExit(void)
+{
+    return orig_atexit(SelListDestructThunk);
+}
+
+/* 0x00424890. The initialiser-table entry: construct, then register the
+ * teardown. Its only reference in the image is a dword at 0x00473048, so it is
+ * reached by `refs_to` and never by `xrefs`. */
+int32_t __cdecl SelListInit(void)
+{
+    SelListConstructThunk();
+    return SelListAtExit();
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_OPEN_SAVE_FOR_LOAD, (const void *)OpenSaveForLoad,
@@ -1820,4 +1888,16 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE3, (const void *)SaveType3, "SaveType3", 1);
     patch_replace(ADDR_LOAD_TYPE7, (const void *)LoadType7, "LoadType7", 1);
     patch_replace(ADDR_LOAD_TYPE6, (const void *)LoadType6, "LoadType6", 1);
+    patch_replace(ADDR_SEL_LIST_INIT, (const void *)SelListInit,
+                  "SelListInit", 1);
+    patch_replace(ADDR_SEL_LIST_CTOR_THUNK, (const void *)SelListConstructThunk,
+                  "SelListConstructThunk", 1);
+    patch_replace(ADDR_SEL_LIST_ATEXIT, (const void *)SelListAtExit,
+                  "SelListAtExit", 1);
+    patch_replace(ADDR_SEL_LIST_DTOR_THUNK, (const void *)SelListDestructThunk,
+                  "SelListDestructThunk", 1);
+    patch_replace(ADDR_SEL_LIST_DTOR, (const void *)SelListDestruct,
+                  "SelListDestruct", 1);
+    patch_replace(ADDR_SEL_LIST_CTOR, (const void *)SelListConstruct,
+                  "SelListConstruct", 1);
 }

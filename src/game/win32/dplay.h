@@ -108,6 +108,16 @@ void __attribute__((thiscall)) CommReopenSession(void *comm);
  * object. The game's entire registry surface lives in these two: the key is
  * created at static-initialisation time and closed again from atexit, and
  * nothing is ever stored under it. See dplay.cpp. */
+/* 0x0040DB40. The CRT initialiser-table entry for the comm object. */
+int32_t __cdecl CommGlobalInit(void);
+
+/* 0x0040DB50 / 0x0040DB70. The two thunks that name the object. */
+void *__cdecl CommGlobalCtorThunk(void);
+void __cdecl CommGlobalDtorThunk(void);
+
+/* 0x0040DB60. Register the comm teardown with the CRT's atexit. */
+int32_t __cdecl CommGlobalAtExit(void);
+
 void *__attribute__((thiscall)) CommConstruct(void *comm);
 void  __attribute__((thiscall)) CommDestruct(void *comm);
 

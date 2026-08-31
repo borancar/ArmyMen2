@@ -2354,6 +2354,43 @@
  * the game's ENTIRE registry surface -- one RegCreateKeyExA and one
  * RegCloseKey, and there is no third registry call anywhere in the image. */
 #define ADDR_COMM_GLOBAL         0x004FA480u  /* the object itself; ADDR_COMM_OBJECT points at it */
+/* The static-initialiser group in front of them. This image has exactly TWO
+ * static C++ globals, and both are built by the same four-stub shape the MSVC
+ * front end emits -- found by scanning for `push imm32; call ADDR_CRT_ATEXIT`,
+ * which returns these two and nothing else, rather than by guessing:
+ *
+ *   entry     call <ctor thunk> ; jmp <registrar>     -- in the CRT init table
+ *   ctor      mov ecx, <object> ; jmp <constructor>
+ *   registrar push <dtor thunk> ; call atexit
+ *   dtor      mov ecx, <object> ; jmp <destructor>
+ *
+ * The entry is reached only as a dword in the initialiser table, never by a
+ * call, so `refs_to` finds it and `xrefs` does not -- the one shape this
+ * project has had to learn twice.
+ *
+ * ALL OF IT EXECUTES, which is the opposite of what this comment said when it
+ * was written. The reasoning was that the CRT runs the init table before
+ * am2hook.dll can patch anything, so the constructor half would be past by the
+ * time our code existed. A TRACE=1 run says otherwise, and says it in two
+ * adjacent lines: "am2hook: 1311 patch(es) installed" is immediately followed
+ * by "trace CommGlobalInit#1". The harness is in before the initterm, so both
+ * entries run under our patches -- CommGlobalInit and SelListInit read 1 each.
+ *
+ * The four thunks under them read 0 for the ordinary reason: each entry calls
+ * its own thunk and registrar by name, so no patched entry is crossed. The
+ * destructors are blind for a second reason on top -- our registrar hands
+ * atexit OUR thunk rather than the image address, so the CRT calls it directly
+ * at exit. That the exit path really does reach reconstructed code is visible
+ * anyway: after ReportLeaks the log's next format string resolves inside the
+ * DLL rather than the image.
+ *
+ * Recorded at length because the wrong version was plausible, was written
+ * down as fact, and took one probe to refute. Ask whether the new code runs
+ * before reasoning about whether it can. */
+#define ADDR_COMM_GLOBAL_INIT    0x0040DB40u  /* cdecl, from the init table */
+#define ADDR_COMM_GLOBAL_CTOR    0x0040DB50u  /* cdecl void *(void) */
+#define ADDR_COMM_GLOBAL_ATEXIT  0x0040DB60u  /* cdecl int32_t(void) */
+#define ADDR_COMM_GLOBAL_DTOR    0x0040DB70u  /* cdecl void(void) */
 #define ADDR_COMM_CONSTRUCT      0x0040DB80u  /* thiscall void *(this) */
 #define ADDR_COMM_DESTRUCT       0x0040DCC0u  /* thiscall void(this) */
 /* Called by the constructor, all three left original. */
@@ -5648,6 +5685,7 @@ typedef struct {
  * docs/imports.tsv, which puts KERNEL32!CreateDirectoryA at 0x00465F5C inside
  * it -- the disassembly only shows a call through an IAT slot. */
 #define ADDR_CRT_MKDIR           0x00465F56u  /* int32_t(const char *path) */
+#define ADDR_CRT_ATEXIT          0x00465011u  /* int32_t(void (*)(void)) */
 #define AM2_ATTR_SUBDIR          0x10   /* _A_SUBDIR in the find data */
 /* 0x00444EF0, two callers, one of them the per-frame path. Raise the level's
  * "startupN" script event and then autosave. */
@@ -9104,6 +9142,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * group" is the reading. ShutdownSubsystems empties it, which is all the old
  * name knew. */
 #define ADDR_SELECTED_UIDS       0x00512308u  /* {capacity, count, items} */
+/* And ADDR_SELECTED_UIDS is a MEMBER of the gameproc block rather than a
+ * global of its own: it is ADDR_GAMEPROC_BLOCK + GAMEPROC_OFF_SELECTED, which
+ * is what the second static-initialiser group builds. The constructor runs
+ * InitPtrList on it and the destructor ClearPtrListAlias, both of which this
+ * port already owns, so the group is four stubs plus the two bodies that do
+ * the offset arithmetic. See the comm group above for why only half of it can
+ * execute here. */
+#define GAMEPROC_OFF_SELECTED    0x8A0u
+#define ADDR_SEL_LIST_INIT       0x00424890u  /* cdecl, from the init table */
+#define ADDR_SEL_LIST_CTOR_THUNK 0x004248A0u  /* cdecl void *(void) */
+#define ADDR_SEL_LIST_ATEXIT     0x004248B0u  /* cdecl int32_t(void) */
+#define ADDR_SEL_LIST_DTOR_THUNK 0x004248C0u  /* cdecl void(void) */
+#define ADDR_SEL_LIST_DTOR       0x004248D0u  /* thiscall void(block) */
+#define ADDR_SEL_LIST_CTOR       0x004248E0u  /* thiscall void *(block) */
 #define AM2_MAX_SELECTED         0x40
 /* Bit 8, and all three of the target predicates at 0x00403600..0x004036F0
  * open by answering "yes" for it without looking at anything else -- health,

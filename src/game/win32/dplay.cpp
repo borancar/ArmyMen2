@@ -35,6 +35,10 @@
 #include "../commmsg.h"  /* CommInitDefaults -- reconstructed */
 #include "../../inject/patch.h"
 #include "winmain.h"   /* Ticks */
+
+/* The CRT's atexit, above the CRT line and not on the patch list. */
+typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
+#define orig_atexit (*(AM2_AtExitFn)AM2_IMAGE(ADDR_CRT_ATEXIT))
 #include "../image.h"  /* AM2_IMAGE */
 
 #include <stdint.h>
@@ -2454,6 +2458,49 @@ void __cdecl DumpMsgList(void *list)
     ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
 }
 
+/* The comm object is the image's other static C++ global, and these four are
+ * the same MSVC boilerplate the selected-units list gets in gameproc.cpp --
+ * scanning for `push imm32; call ADDR_CRT_ATEXIT` returns exactly those two
+ * groups and nothing else. orig.h carries the shape, and the probe showing
+ * that all of it runs: CommGlobalInit reads 1, one line after the patch count.
+ *
+ * These four are invisible to the coverage count: they sit inside a
+ * functions.tsv entry that CommConstruct already credits, so reconstructing
+ * them moves nothing. That is the merged-entry problem seen from the side it
+ * usually is not -- the real outstanding work is LARGER than the headline
+ * number, not smaller. */
+
+/* 0x0040DB50 and 0x0040DB70. `mov ecx, <object>; jmp <body>` apiece -- the only
+ * two places the object itself is named. It is ADDR_COMM_GLOBAL, the object,
+ * not ADDR_COMM_OBJECT, which is the pointer at it. */
+void *__cdecl CommGlobalCtorThunk(void)
+{
+    return CommConstruct((void *)AM2_IMAGE(ADDR_COMM_GLOBAL));
+}
+
+void __cdecl CommGlobalDtorThunk(void)
+{
+    CommDestruct((void *)AM2_IMAGE(ADDR_COMM_GLOBAL));
+}
+
+/* 0x0040DB60. Hands the teardown to the CRT's atexit and returns its answer,
+ * eax being untouched between the call and the `ret`. It passes OUR thunk for
+ * the reason gameproc.cpp's twin does: the image address holds a detour into
+ * this code by the time exit runs, and naming a patched address is exactly
+ * what tools/checkseams.py exists to catch. */
+int32_t __cdecl CommGlobalAtExit(void)
+{
+    return orig_atexit(CommGlobalDtorThunk);
+}
+
+/* 0x0040DB40. The initialiser-table entry: construct, then register the
+ * teardown. Reached only as a dword in that table, never by a call. */
+int32_t __cdecl CommGlobalInit(void)
+{
+    CommGlobalCtorThunk();
+    return CommGlobalAtExit();
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -2495,6 +2542,16 @@ int dplay_install(void)
                         "EventClose", 1);
     rc |= patch_replace(ADDR_COMM_ENUM_PLAYERS, (const void *)CommEnumPlayers,
                         "CommEnumPlayers", 0);
+    rc |= patch_replace(ADDR_COMM_GLOBAL_INIT, (const void *)CommGlobalInit,
+                        "CommGlobalInit", 1);
+    rc |= patch_replace(ADDR_COMM_GLOBAL_CTOR,
+                        (const void *)CommGlobalCtorThunk,
+                        "CommGlobalCtorThunk", 1);
+    rc |= patch_replace(ADDR_COMM_GLOBAL_ATEXIT, (const void *)CommGlobalAtExit,
+                        "CommGlobalAtExit", 1);
+    rc |= patch_replace(ADDR_COMM_GLOBAL_DTOR,
+                        (const void *)CommGlobalDtorThunk,
+                        "CommGlobalDtorThunk", 1);
     rc |= patch_replace(ADDR_COMM_CONSTRUCT, (const void *)CommConstruct,
                         "CommConstruct", 0);
     rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,

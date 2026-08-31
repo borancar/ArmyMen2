@@ -183,4 +183,21 @@ int32_t __cdecl SaveGame(const char *name);
  * gameproc section, rewind, and hand back the open FILE or NULL. */
 am2_FILE *__cdecl OpenSaveForLoad(void);
 
+/* 0x004248E0. Construct the selected-units list inside the gameproc block and
+ * answer the block. */
+void *__attribute__((thiscall)) SelListConstruct(void *block);
+
+/* 0x004248D0. Tear the same list down. */
+void __attribute__((thiscall)) SelListDestruct(void *block);
+
+/* 0x004248A0 / 0x004248C0. The two thunks that name the global. */
+void *__cdecl SelListConstructThunk(void);
+void __cdecl SelListDestructThunk(void);
+
+/* 0x004248B0. Register the teardown with the CRT's atexit. */
+int32_t __cdecl SelListAtExit(void);
+
+/* 0x00424890. The CRT initialiser-table entry for the list. */
+int32_t __cdecl SelListInit(void);
+
 #endif /* AM2_GAMEPROC_H */
