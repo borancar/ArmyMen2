@@ -176,6 +176,11 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
  * would divide by zero, and every shipped group has one. */
 void __cdecl SpeakLine(int32_t group, int32_t owner);
 
+/* 0x00448380, two callers. What a trooper says on picking an item up: the
+ * item type chooses a SpeakLine group. See audio.cpp -- the mapping is taken
+ * from the original's two dispatch tables, not from its arms. */
+void __cdecl SpeakItemPickupLine(int32_t item, int32_t owner);
+
 int audio_install(void);
 
 #ifdef __cplusplus

@@ -1936,11 +1936,96 @@ void __cdecl SpeakLine(int32_t group, int32_t owner)
                      1, 0);
 }
 
+/* 0x00448380, two callers -- TrooperPickupItem and
+ * TrooperHostApprovedPickupItem, both of which name themselves in their own
+ * log strings. What a trooper says on picking something up.
+ *
+ * TAKEN FROM THE TABLES, not from the bodies. The original dispatches through
+ * a 41-entry byte index and a dword jump table, and reading the nineteen arms
+ * in layout order numbers them 7, 15, 2, 13, 5, 1, 0, ... The byte table is
+ * what lets ids share an arm, which is why 0x23..0x26 fall together: they are
+ * all Disguise. Sixteen ids reach the default and say nothing.
+ *
+ * The group constants are the game's own wave names -- see orig.h, where the
+ * table is thirty records based at ADDR_WAVE_NAMES_END. Three groups the
+ * table holds are never reached from here (AutoRifle, HeavyMacGun,
+ * VulcanGun), which is a fact about this dispatcher and not about the table.
+ *
+ * The caller special-cases items 0x0E and 0x16 before calling, and both are
+ * default entries here -- the caller and the table agree. */
+void __cdecl SpeakItemPickupLine(int32_t item, int32_t owner)
+{
+    switch (item) {
+    case 0x02:
+        SpeakLine(AM2_SPEAK_GRENADES, owner);
+        break;
+    case 0x03:
+        SpeakLine(AM2_SPEAK_FLAMETHROWER, owner);
+        break;
+    case 0x04:
+        SpeakLine(AM2_SPEAK_BAZOOKA, owner);
+        break;
+    case 0x05:
+        SpeakLine(AM2_SPEAK_MORTAR, owner);
+        break;
+    case 0x0B:
+        SpeakLine(AM2_SPEAK_MINES, owner);
+        break;
+    case 0x0C:
+        SpeakLine(AM2_SPEAK_EXPLOSIVES, owner);
+        break;
+    case 0x14:
+        SpeakLine(AM2_SPEAK_MINESWEEPER, owner);
+        break;
+    case 0x17:
+        SpeakLine(AM2_SPEAK_MEDKIT, owner);
+        break;
+    case 0x18:
+        SpeakLine(AM2_SPEAK_AIRSTRIKE, owner);
+        break;
+    case 0x19:
+        SpeakLine(AM2_SPEAK_PARATROOPERS, owner);
+        break;
+    case 0x1A:
+        SpeakLine(AM2_SPEAK_RECONN, owner);
+        break;
+    case 0x1C:
+        SpeakLine(AM2_SPEAK_FLAKJACK, owner);
+        break;
+    case 0x1E:
+        SpeakLine(AM2_SPEAK_SNIPERRIFLE, owner);
+        break;
+    case 0x23:
+    case 0x24:
+    case 0x25:
+    case 0x26:
+        SpeakLine(AM2_SPEAK_DISGUISE, owner);
+        break;
+    case 0x27:
+        SpeakLine(AM2_SPEAK_MAGNIFYINGGLASS, owner);
+        break;
+    case 0x28:
+        SpeakLine(AM2_SPEAK_AEROSOL, owner);
+        break;
+    case 0x29:
+        SpeakLine(AM2_SPEAK_WRENCH, owner);
+        break;
+    case 0x2A:
+        SpeakLine(AM2_SPEAK_M80S, owner);
+        break;
+    default:
+        break;
+    }
+}
+
 int audio_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_SPEAK_LINE, (const void *)SpeakLine, "SpeakLine", 2);
+    rc |= patch_replace(ADDR_SPEAK_ITEM_PICKUP,
+                        (const void *)SpeakItemPickupLine,
+                        "SpeakItemPickupLine", 2);
     rc |= patch_replace(ADDR_STOP_AUDIO_STREAM, (const void *)StopAudioStream,
                         "StopAudioStream", 0);
     rc |= patch_replace(ADDR_SAVE_AUDIO_SECTION, (const void *)SaveAudioSection,

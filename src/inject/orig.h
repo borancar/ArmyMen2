@@ -3647,10 +3647,70 @@
 #define ADDR_PLAY_SOUND_AT       0x0040C040u /* void(idx,flags,?,x,y) */
 #define ADDR_PLAY_DYNAMIC_SOUND  0x0040B8F0u /* void(name,loop,?,x,y,slot,pri,owner) */
 /* 0x0040BFF0, 35 callers. One of a group's voice lines, at random, and only
- * when the owner is ours. The groups are 20-byte records at 0x00474444 -- a
- * count and up to four wave names -- and the names say what they are:
- * Aerosol.wav, AirStrike.wav, AutoRifle.wav, Bazooka.wav, Disguise.wav. It
- * goes out on slot 0x10, which orig.h already records as a voice slot. */
+ * when the owner is ours. It goes out on slot 0x10, which orig.h already
+ * records as a voice slot.
+ *
+ * The groups are THIRTY 20-byte records based at ADDR_WAVE_NAMES_END -- the
+ * count first, then up to four wave names. This comment said 0x00474444 and
+ * four bytes late is exactly the error SpeakItemPickupLine's author (me) then
+ * made independently, so it is worth saying how the base is settled rather
+ * than asserted: SpeakLine divides by `[esi*4 + 0x474440]`, the record below
+ * the table has four names where a late base allows one, 0x00474440 is
+ * already ADDR_WAVE_NAMES_END so the two tables TILE, and at that base the
+ * table is exactly thirty entries -- which is exactly OnVolumeVoice's
+ * rand() % 30.
+ *
+ * A late base is HARD to see because it is self-consistent: name0 of group g
+ * really is at 0x474444 + 20g, so every name resolves, and the field that
+ * looks like the group's count is the next group's.
+ *
+ * Groups 0..24 hold one line each -- the item and HQ announcements. Groups
+ * 25..29 hold three or four, which is why SpeakLine has a rand() % count at
+ * all: announcements are fixed and reactions vary. */
+#define AM2_SPEAK_AEROSOL          0 
+#define AM2_SPEAK_AIRSTRIKE        1 
+#define AM2_SPEAK_AUTORIFLE        2 
+#define AM2_SPEAK_BAZOOKA          3 
+#define AM2_SPEAK_DISGUISE         4 
+#define AM2_SPEAK_EXPLOSIVES       5 
+#define AM2_SPEAK_FLAKJACK         6 
+#define AM2_SPEAK_FLAMETHROWER     7 
+#define AM2_SPEAK_GRENADES         8 
+#define AM2_SPEAK_HEAVYMACGUN      9 
+#define AM2_SPEAK_M80S             10
+#define AM2_SPEAK_MAGNIFYINGGLASS  11
+#define AM2_SPEAK_MEDKIT           12
+#define AM2_SPEAK_MINES            13
+#define AM2_SPEAK_MINESWEEPER      14
+#define AM2_SPEAK_MORTAR           15
+#define AM2_SPEAK_PARATROOPERS     16
+#define AM2_SPEAK_RECONN           17
+#define AM2_SPEAK_SNIPERRIFLE      18
+#define AM2_SPEAK_VULCANGUN        19
+#define AM2_SPEAK_WRENCH           20
+#define AM2_SPEAK_MOREAMMO         21
+#define AM2_SPEAK_HQAIRSTRIKE      22
+#define AM2_SPEAK_HQREINFORCEMENTS 23
+#define AM2_SPEAK_HQRECONN         24
+#define AM2_SPEAK_UOOH             25  /* 3 lines */
+#define AM2_SPEAK_HITSSPOT         26  /* 3 lines */
+#define AM2_SPEAK_AAH              27  /* 4 lines */
+#define AM2_SPEAK_OVERHERE         28  /* 4 lines */
+#define AM2_SPEAK_FREEZE           29  /* 3 lines */
+/* 0x00448380, two callers, both of which name themselves in their own log
+ * strings: TrooperPickupItem and TrooperHostApprovedPickupItem. So this is
+ * what a trooper SAYS when it picks something up, and "pickup" is the
+ * program's word rather than an inference from the call site.
+ *
+ * It dispatches through TWO tables -- the argument less 2, bounded at 0x28,
+ * into a 41-entry BYTE index at 0x0044850C, then a dword jump table at
+ * 0x004484C0. Reading the nineteen arms top to bottom numbers them
+ * 7, 15, 2, 13, 5, 1, 0, ... so the mapping has to come from the tables. The
+ * byte table is there so ids can SHARE an arm: sixteen reach the default and
+ * ids 0x23..0x26 all mean Disguise. */
+#define ADDR_SPEAK_ITEM_PICKUP     0x00448380u  /* void(int32 item, int32 own) */
+#define ADDR_TROOPER_PICKUP_ITEM   0x00448540u
+#define ADDR_TROOPER_HOST_PICKUP   0x004488C0u
 /* MSVC's rand, the LCG at 0x00464420 with its state in 0x0048CC1C. Named
  * here because game code that draws from it must draw from THIS one -- the
  * sequence is the image's, and libc's would leave it standing still. */

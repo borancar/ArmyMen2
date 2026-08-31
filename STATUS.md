@@ -10959,7 +10959,10 @@ through TWO tables -- `arg - 2` bounded at 0x28, a 41-entry BYTE index at
 Reading the bodies top to bottom would have numbered the arms 7, 15, 2, 13, 5,
 1, 0, ... The byte table exists precisely so ids can SHARE arms: 16 reach the
 default and four consecutive ids, `0x23`..`0x26`, all mean **Disguise**. Taken
-from the tables instead, the mapping is 25 live ids over 18 groups, exact.
+from the tables instead, the mapping is 21 live ids over 18 groups, exact.
+(That figure read 25 when this paragraph was first written -- I subtracted the
+sixteen defaults I had counted by eye rather than counting the twenty the byte
+table actually holds. Recomputed, not re-read.)
 
 **The groups name themselves** through their wave files, so the constants are
 Grenades, Bazooka, MedKit, SniperRifle rather than 8, 3, 12, 18.
@@ -10992,3 +10995,63 @@ would be the alias `checkpatches` has caught five times.
 
 A/B clean: bootcamp state identical (1610 lines), 22 pixels; campaign widgets
 identical (35 nodes), log identical, 2 pixels, dialog 0.
+
+
+## SpeakItemPickupLine, written from the tables and then checked against them
+
+**1,239 - 1,148 = 91 entries outstanding.** `0x00448380` into
+`src/game/win32/audio.cpp`, beside the `SpeakLine` it dispatches to.
+
+**Both callers name themselves**, so "pickup" is the program's word and not an
+inference from a call site: `TrooperPickupItem` (`0x00448540`) and
+`TrooperHostApprovedPickupItem` (`0x004488C0`), from their own log strings.
+Both are new names in `orig.h`. This is the ninth time a function here has been
+identified by letting it name itself rather than by reading a call site.
+
+**Taken from the TABLES, not the arms.** The original dispatches through the
+argument less 2, bounded at 0x28, a 41-entry BYTE index at `0x0044850C`, and a
+dword jump table at `0x004484C0`. Reading the nineteen arms in layout order
+numbers them 7, 15, 2, 13, 5, 1, 0, ... and the byte table exists so ids can
+SHARE an arm -- twenty reach the default, and 0x23..0x26 all mean Disguise.
+Both of the failure modes this file records for jump tables were live, and
+taking the mapping from the tables sidesteps both.
+
+**The group constants are the game's own wave names.** Grenades, Bazooka,
+MedKit, SniperRifle rather than 8, 3, 12, 18. Thirty of them are now in
+`orig.h`.
+
+**Verified by re-deriving, not by re-reading.** A second extraction straight
+from the binary -- byte table, jump table, the push before each call -- was
+diffed against the C: 21 live ids, zero mismatches, nothing extra.
+
+That check also caught a wrong number in my own prose. I had written "25 live
+ids", from subtracting sixteen defaults counted BY EYE; the byte table holds
+twenty, so it is 21. Corrected in place with the reason, because the figure had
+already gone into a commit. **Recompute, do not re-read** -- the same failure as
+the transcription count this session opened with one too high.
+
+**The speech table's base is corrected in `orig.h`, with the METHOD recorded.**
+It said "20-byte records at 0x00474444", four bytes late -- independently the
+same error I then made scouting this function. The entry now says how the base
+is settled rather than asserting it: `SpeakLine` divides by
+`[esi*4 + 0x474440]`; the record below the table has four names where a late
+base allows one; `0x00474440` is already `ADDR_WAVE_NAMES_END`, so the two
+tables TILE; and at that base the table is exactly thirty entries, which is
+exactly `OnVolumeVoice`'s `rand() % 30`.
+
+It also warns why a late base is hard to see: **it is self-consistent.** name0
+of group g really is at `0x474444 + 20g`, so every name resolves, and the field
+that looks like the group's count is the next group's -- also 1.
+
+No new `ADDR_` name went on `0x00474440`. It already has one, and a second
+would be the alias `checkpatches` has caught five times.
+
+Groups 0..24 hold one line each -- the item and HQ announcements. Groups 25..29
+hold three or four -- `Uooh`, `HitsSpot`, `Aah`, `overHere`, `freeze`. That is
+WHY `SpeakLine` has a `rand() % count`.
+
+Unlike `BoatExitPoint`, this one is OBSERVABLE: both callers are original, so
+the counter moves whenever an item is picked up.
+
+A/B clean: bootcamp state identical (1610 lines), 22 pixels; campaign widgets
+identical (35 nodes), log identical, 2 pixels.
