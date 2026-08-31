@@ -1168,6 +1168,15 @@ does nothing. What would settle it is `tools/objdump.py` on a target's health
 across the two sides, which is the class of check this project already keeps
 for functions that write an object field and return nothing.
 
+**It is not only the five-figure counters.** `NearestClearPoint` runs EIGHT
+times on the same drive -- live, in the trooper band, placing something at a
+passable point -- and returning the start point unchanged without spiralling
+at all leaves `bootcamp` at its floor of 22 and `mission`'s log and 16-node
+tree identical. So the standing is the same at eight calls as at 13,582:
+covered and unchecked. Two mutations in two commits, both uncaught, is the
+suite telling you where its blind spot is -- anything whose only effect is
+WHERE something ends up on a map the pixel checks cannot compare.
+
 **`combat`'s pixel figure is BIMODAL, and both modes are meaningless.** Four
 runs of one build gave 177,112, 716, 177,109 and 684 -- two clusters, three
 pixels apart within each. That is not noise around a mean; it is whether the

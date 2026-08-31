@@ -621,6 +621,12 @@ void __cdecl ToggleSelect(void *obj);
 
 /* 0x00457A60, three callers. Point the object-context globals at one object
  * and set the pointer mode from what it is. */
+/* 0x004579C0, two callers. Spiral out from a point until one is both inside
+ * the map and passable, and write it back. It has no give-up: the only exit is
+ * success. `out` is an AM2_Point, taken as void * for the reason given at
+ * ObjRowsMaskAt above. */
+void __cdecl NearestClearPoint(uint32_t from, void *out);
+
 void __cdecl SetObjContext(void *obj);
 
 /* 0x0042A110, two callers. ObjectsHitByPoint with a caller-supplied

@@ -6954,6 +6954,74 @@ void __cdecl ToggleSelect(void *obj)
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+/* NearestClearPoint -- original 0x004579C0, two callers. Walk a square spiral
+ * out from `from` until a point is both inside the map and passable, and write
+ * it back through `out`. The name is ours, from the body.
+ *
+ * THE THIRD SPIRAL IN THIS TREE and the second table. NearestAllowedTile and
+ * SettlePointInRegion walk in TILES with ADDR_SPIRAL_DX/DY, two separate int32
+ * arrays; this walks in WORLD UNITS with ADDR_SPIRAL_STEP, an interleaved
+ * {dx, dy} array at a different address, sixteen units a step. Same four
+ * directions, same leg-grows-every-second-turn rule, three different
+ * implementations. Worth knowing before assuming the image has one of either.
+ *
+ * IT CANNOT FAIL AND SO IT CANNOT STOP. The only exit is finding a point that
+ * passes both tests; a start surrounded by nothing acceptable spirals until
+ * the arithmetic wraps, because the bounds test does not end the walk -- it
+ * only skips the weight test for that point. SettlePointInRegion has the same
+ * shape with a give-up on the region, and this one has no give-up at all.
+ * Reproduced; it is the original's.
+ *
+ * The step arithmetic is SIXTEEN BITS throughout: the table's low word into
+ * AX, `shl ax, 4`, and `add word ptr` onto each half of the packed point. So a
+ * long enough walk wraps the coordinate rather than growing it, which is the
+ * only thing that keeps the loop above from running for ever on a real map.
+ *
+ * The weight comes from BlockWeightAt with a NULL object and the candidate
+ * point passed twice -- "how blocked is this point, for nobody in particular".
+ */
+void __cdecl NearestClearPoint(uint32_t from, void *outPt)
+{
+    AM2_Point *out = (AM2_Point *)outPt;
+    int32_t dir = 0;
+    int32_t step = 0;
+    int32_t leg = 1;
+    int32_t grew = 0;
+
+    *(uint32_t *)out = from;
+
+    for (;;) {
+        const uint8_t *entry;
+
+        if (PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT), out)
+            && BlockWeightAt((void *)0, *(const uint32_t *)out,
+                             *(const uint32_t *)out) < AM2_BLOCK_CLEAR)
+            return;
+
+        if (++step >= leg) {
+            step = 0;
+            if (++dir > 3)
+                dir = 0;
+            if (grew) {
+                leg++;
+                grew = 0;
+            } else {
+                grew = 1;
+            }
+        }
+
+        entry = (const uint8_t *)AM2_IMAGE(ADDR_SPIRAL_STEP)
+                + (uint32_t)dir * AM2_SPIRAL_STEP_STRIDE;
+
+        out->x = (int16_t)(out->x
+                           + (int16_t)((int16_t)*(const int16_t *)entry
+                                       << AM2_SPIRAL_STEP_SHIFT));
+        out->y = (int16_t)(out->y
+                           + (int16_t)((int16_t)*(const int16_t *)(entry + 4)
+                                       << AM2_SPIRAL_STEP_SHIFT));
+    }
+}
+
 /* SetObjContext -- original 0x00457A60, three callers.
  *
  * Point the object-context globals at one object and set the pointer mode
@@ -7656,6 +7724,8 @@ void item_install(void)
                   "ToggleSelect", 1);
     patch_replace(ADDR_SET_OBJ_CONTEXT, (const void *)SetObjContext,
                   "SetObjContext", 3);
+    patch_replace(ADDR_NEAREST_CLEAR_POINT, (const void *)NearestClearPoint,
+                  "NearestClearPoint", 2);
     patch_replace(ADDR_WALK_CELL_AT_POINT, (const void *)WalkCellAtPoint,
                   "WalkCellAtPoint", 2);
     patch_replace(ADDR_WEAPON_FRAME_READY, (const void *)WeaponFrameReady,

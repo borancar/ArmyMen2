@@ -5851,6 +5851,19 @@ typedef struct {
 #define ADDR_NEAREST_ALLOWED_TILE 0x0043A0A0u /* uint16(obj, tile, uint32 *) */
 #define ADDR_SPIRAL_DX           0x0048782Cu  /* int32_t[4]: 0, 1, 0, -1 */
 #define ADDR_SPIRAL_DY           0x0048783Cu  /* int32_t[4]: -1, 0, 1, 0 */
+/* A SECOND spiral table, the same four directions in a different layout:
+ * {int32 dx, int32 dy} interleaved, stride 8, where the pair above is two
+ * separate arrays. NearestClearPoint reads only the LOW WORD of each with
+ * `mov ax, word ptr` and shifts it up four, which is exact for the 0 and +/-1
+ * the table holds and gives a step of 16 world units. Not an alias of the
+ * pair above -- a different address and a different shape -- and worth knowing
+ * before assuming this image has one spiral table. */
+#define ADDR_SPIRAL_STEP         0x00485340u  /* {int32 dx, int32 dy}[4] */
+#define AM2_SPIRAL_STEP_STRIDE   8u
+#define AM2_SPIRAL_STEP_SHIFT    4    /* dx << 4 == 16 world units */
+/* 0x004579C0, two callers. Reconstructed. */
+#define ADDR_NEAREST_CLEAR_POINT 0x004579C0u  /* void(uint32 from, AM2_Point*) */
+#define AM2_BLOCK_CLEAR          0x0F  /* a weight below this is passable */
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
 /* A second deadline on the same clock, at +0x58. It had "0x004355D0 is the

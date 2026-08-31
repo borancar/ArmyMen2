@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `67d3871`. Working tree clean.
+Last updated: **2026-08-31**, at `84cf09e`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,244 patches.**
+Nothing uncommitted. **1,245 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2793,16 +2793,42 @@ commit -- gave the right answer every time it was used.
   outstanding entry, and what is left small is in the AI, vehicle and
   multiplayer bands this environment cannot drive.
 
+- **`NearestClearPoint`** (`0x004579C0`) walks a square spiral out from a point
+  until one is both inside the map and passable, and writes it back.
+
+  **The THIRD spiral in this tree and the SECOND table.**
+  `NearestAllowedTile` and `SettlePointInRegion` walk in TILES with
+  `ADDR_SPIRAL_DX`/`DY`, two separate int32 arrays; this walks in WORLD UNITS
+  with `ADDR_SPIRAL_STEP`, an interleaved `{dx, dy}` array at a different
+  address, sixteen units a step. Same four directions, same
+  leg-grows-every-second-turn rule, three implementations. Worth knowing
+  before assuming the image has one of either.
+
+  **It cannot fail and so it cannot stop.** The only exit is finding an
+  acceptable point; the bounds test does not end the walk, it only skips the
+  weight test for that point. `SettlePointInRegion` has the same shape with a
+  give-up on the region and this one has no give-up at all -- what keeps it
+  from running for ever is that the step arithmetic is SIXTEEN BITS
+  throughout, so a long enough walk wraps the coordinate rather than growing
+  it. Reproduced.
+
+- **Eight live calls, and the same standing as 13,582.** It runs 8 times on a
+  driven mission -- and returning the start point unchanged, never spiralling,
+  leaves `bootcamp` at its floor of 22 and `mission`'s log and tree identical.
+  Two mutations in two commits, both uncaught, and the pattern is clear: the
+  suite is blind to anything whose only effect is WHERE something ends up on a
+  map its pixel checks cannot compare.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,090 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,244
+line (0x0045C000) patched**. Measured: **1,091 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,245
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety batches have gone in and the 149 entries outstanding start at 48
+small ones in batches. Ninety-one batches have gone in and the 148 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
