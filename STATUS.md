@@ -10526,3 +10526,74 @@ taken from `StepType2`'s record init.
 
 Both halves of the baseline run agree: state identical, 1,610 lines, 11 with
 an AI block.
+
+## The headline count understates the work in two independent ways
+
+`StepType3` was written and the outstanding count did not move. That is
+correct, not a bug: `0x0045D660` is ABOVE the CRT line at `0x0045C000`, so it
+is not in the 1,239 the stop condition counts -- and it is unambiguously game
+code, the vehicle's per-frame step.
+
+**115 game functions sit above that line, and 85 of them are outstanding**
+(`0x0045C000` to `0x00464420`, where `tools/crt.py` puts the real CRT). So the
+remaining work is nearer **98 + 85 = 183** functions than 98. CLAUDE.md already
+records that `CRT_START` is "26 KB too low" and that 112 game functions live
+above it; this is that same set, and the goal's `< 0x0045C000` bound excludes
+every one.
+
+**And the 98 itself counts ENTRIES, not functions.** This image was
+incrementally linked, so `docs/functions.tsv` merges wherever a thunk hides a
+boundary -- `tools/thunks.py` finds 20 such sites, eleven inside one 704-byte
+entry. Patching one function there marks the entry covered.
+
+Both facts point the same way and neither changes what to do next. But "98
+left" quoted alone is misleading, and the stop condition as written could be
+satisfied with real game code still original -- above the line, or behind a
+thunk.
+
+## StepType3, and a truncated check that was worse than no check
+
+`0x0045D660` is the vehicle's per-frame step and the mirror of `StepType2`. It
+is ABOVE the CRT line, so writing it moves the outstanding count by zero while
+being unambiguously game code -- see the note on the two undercounts.
+
+**I truncated my own exhaustive check and it cost two defects.** Two turns
+after writing "run the list, don't consult memory", I listed the jump targets
+with `| head -20`. There are **24**. The four cut off contained
+`0x0045D94D` -- the function's ONLY return -- and missing it produced exactly
+what the check exists to prevent:
+
+- the destroyed path's `jne 0x0045D94D` goes to the BARE EPILOGUE, past both
+  tails; I sent it to the second tail instead;
+- and a THIRD tail was absent entirely,
+  `if (health != 0) ObjSetFootprint(obj)`.
+
+**A truncated exhaustive check produces the confidence of having checked.**
+The `head` was there to keep output readable. The fix is to print the count
+first: `TOTAL jump targets: 24` against my stated "twenty" would have exposed
+it before a line was written.
+
+**The second defect was a missed IDIOM, not a missed jump.** `orig.h` already
+records the bracket, from a save function: "ADDR_OBJ_CLEAR_FOOTPRINT first and
+ADDR_OBJ_SET_FOOTPRINT last ... the saved record is the object with its
+footprint lifted." `StepType3` opens with the clear and I never wrote the set,
+leaving every live vehicle with its footprint up. No jump-target listing could
+have caught that -- the call is not a jump. What catches it is recognising a
+`Clear`/`Free`/`Remove` call at an entry as half of a documented pair.
+
+Symptom: `flags=0x200861` against `0x821` on two of four vehicles -- exactly
+the `0x200000|0x40` that `item.cpp` documents as the one `or`-against-`and`
+difference between the twins.
+
+**And I then diffed two EMPTY artifacts and called it clean.** A stale
+listener on the control port -- which I had seen and argued past, since the
+check ran BEFORE that run's game existed -- meant the suite produced nothing.
+`ab.sh` refused correctly; my hand-rolled `diff` said "identical", because
+`diff` calls two empty files identical. **Assert non-empty before asserting
+equal**, and after any `pkill`, wait and refuse to launch unless `game=0` and
+`port=0`.
+
+Its death table is the jump-table trap at its worst: six indices on
+`OBJ_OFF_TABLE_REC_KIND`, five arms, and the sound constants run `0x1F`,
+`0x20`, `0x21`, `0x22` in the arms' LAYOUT order -- which reads as
+confirmation the arms are in index order. The table says 1, 0, {2,3}, 5.

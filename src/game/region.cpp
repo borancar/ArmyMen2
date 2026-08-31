@@ -3714,6 +3714,173 @@ tail:
 }
 
 
+typedef void (__cdecl *AM2_AttachFn2)(void *subject, void *target);
+#define orig_attach_to2 ((AM2_AttachFn2)(uintptr_t)AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
+#define orig_step3_45c8d0 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45C8D0))
+#define orig_step3_45cb30 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45CB30))
+
+/* StepType3 -- original 0x0045D660, one caller: ObjFrameStep's type-3 arm.
+ * The vehicle's per-frame step, and the mirror of StepType2.
+ *
+ * TWO SEQUENTIAL CONVERGING TAILS, and nothing here returns early. All twenty
+ * jump targets were decoded before this was written and not one begins with a
+ * pop or a ret -- so every conditional jump goes to more code. The AI and
+ * attach arms reach orig_step3_45c8d0 and FALL THROUGH into a second block
+ * that ends at orig_step3_45cb30, which every path reaches. StepType2 carried
+ * exactly this defect three times; here the shape was established first.
+ *
+ * ITS OUTPUT RECORD IS AT +0x578 WHERE StepType2's IS AT +0x57C, both
+ * SIGHTCOUT. So obj+0x580 is this one's STATE and that one's BEARING, and the
+ * SIGHTCOUT_OFF_ names are relative to the base a caller passes.
+ *
+ * THE DEATH TABLE IS THE JUMP-TABLE TRAP AT ITS WORST. Six indices on
+ * OBJ_OFF_TABLE_REC_KIND, five arms, and the sound constants run 0x1F, 0x20,
+ * 0x21, 0x22 in the arms' LAYOUT order -- which reads as confirmation that the
+ * arms are in index order. The table says 1, 0, {2,3}, 5. Kinds 2 and 3 share
+ * an arm and kind 4 makes no sound at all.
+ *
+ * IT PRUNES DEAD OCCUPANTS BEFORE RUNNING THE AI. OBJ_OFF_POSE is a vehicle's
+ * list header -- orig.h already said so -- with the standard layout on top, so
+ * the count is at +0x53C and the uids at +0x540. A first occupant that no
+ * longer resolves is removed.
+ */
+void __cdecl StepType3(void *obj)
+{
+    uint8_t *o   = (uint8_t *)obj;
+    uint8_t *out = o + OBJ_OFF_FIELD_578;
+
+    /* 0x0045D66B is `jne 0x0045D94D` -- the bare epilogue, PAST both tails.
+     * A destroyed vehicle runs neither, and in particular never re-sets its
+     * footprint. */
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return;
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
+        ObjClearFootprint(obj);
+
+    if (*(const int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+           > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
+        if (!ObjIsFriendly(obj))
+            ObjConceal(obj, 0);
+        *(int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) = 0;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) == 0) {
+        *(uint8_t *)(out + 0) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(uint8_t *)(out + 1) = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+        *(int32_t *)(out + SIGHTCOUT_OFF_HIT)   = 0;
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = 1;
+        *(int32_t *)(out + SIGHTCOUT_OFF_X)     = 0;
+        *(int32_t *)(out + SIGHTCOUT_OFF_SEEN)  = 0;
+    }
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
+        goto alive;
+
+    /* Dead: only kind 5 runs the destruction sequence at all. */
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 0)
+        goto attach;
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 5)
+        goto post;
+    {
+        void *row = *(void **)(o + OBJ_OFF_ROWS);
+
+        if (!RowAnimFinished(row))
+            goto post;
+        RowFaceSprite(row);
+
+        /* The table's order, not the arms'. See the header. */
+        switch (*(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND)) {
+        case 0:
+            PlaySoundAt(AM2_SND_VEH_KIND0, 0, 0,
+                        *(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+            break;
+        case 1:
+            PlaySoundAt(AM2_SND_VEH_KIND1, 0, 0,
+                        *(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+            break;
+        case 2: case 3:
+            PlaySoundAt(AM2_SND_VEH_KIND23, 0, 0,
+                        *(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+            break;
+        case 5:
+            PlaySoundAt(AM2_SND_VEH_KIND5, 0, 0,
+                        *(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+            break;
+        default:
+            /* kind 4 and anything above 5: no sound, finish and destroy */
+            *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+            orig_row_final(row);
+            DestroyByType(obj);
+            goto post;
+        }
+    }
+    goto post;
+
+alive:
+    if (*(const int32_t *)out != 0)
+        goto post;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        goto post;
+
+    if (*(const int32_t *)(o + OBJ_OFF_POSE + LIST_OFF_COUNT) > 0) {
+        uint8_t *first = (uint8_t *)LookupByUID(
+            ((const uint32_t *)*(void **)(o + OBJ_OFF_POSE + LIST_OFF_UIDS))[0]);
+
+        if (!first)
+            ListRemoveAt(o + OBJ_OFF_POSE, 0);
+    }
+
+attach:
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_94)) {
+        AiStep(obj, out);
+        orig_step3_45c8d0(obj, out);
+    } else {
+        orig_attach_to2(obj, NULL);
+        *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
+        *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
+    }
+
+post:
+    /* The second tail. Everything above reaches it. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        goto emit;
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) < 0)
+        goto emit;
+    if (*(const int32_t *)(out + SIGHTCOUT_OFF_STATE) != 1)
+        goto emit;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > AM2_VEH_TURN_LIMIT) {
+        *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 1;
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_VEH_STATE_TURNING;
+    } else if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) < -AM2_VEH_TURN_LIMIT) {
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_VEH_STATE_TURNING;
+    }
+
+emit:
+    orig_step3_45cb30(obj, out);
+
+    /* THE THIRD TAIL, and the footprint is why it matters. The entry clears
+     * this vehicle's footprint and this puts it back, so a reconstruction that
+     * stops at the second tail leaves OBJ_OFF_FLAGS short of the footprint
+     * bits -- which is exactly how this was caught: `flags=0x200861` against
+     * `0x821` on two vehicles in the object dump. */
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
+        ObjSetFootprint(obj);
+}
+
+
 int region_install(void)
 {
     /* Two now, so this is no longer a single `return patch_replace`. That
@@ -3764,6 +3931,8 @@ int region_install(void)
                         "RoachAliveStepA", 1);
     rc |= patch_replace(ADDR_STEP_TYPE2, (const void *)StepType2,
                         "StepType2", 1);
+    rc |= patch_replace(ADDR_STEP_TYPE3, (const void *)StepType3,
+                        "StepType3", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

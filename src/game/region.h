@@ -153,6 +153,13 @@ void __cdecl RoachAliveStepA(void *obj, void *out);
  * SIGHTCOUT_OFF_ names are relative to the base the caller passes. */
 void __cdecl StepType2(void *obj);
 
+/* 0x0045D660, one caller -- ObjFrameStep's type-3 arm. The vehicle's
+ * per-frame step: the same reveal-expiry prologue as StepType2, then either a
+ * death sequence keyed on the vehicle's kind or the AI, and TWO sequential
+ * converging tails that every path reaches. Its output record is at +0x578
+ * where StepType2's is at +0x57C. */
+void __cdecl StepType3(void *obj);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

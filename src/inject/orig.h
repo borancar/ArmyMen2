@@ -6572,7 +6572,40 @@ typedef struct {
  * off that gate, not off their bodies, and neither has been read. */
 #define ADDR_STEP2_44A420        0x0044A420u  /* void(obj, weapon, out) */
 #define ADDR_STEP2_44AD40        0x0044AD40u  /* void(obj, out) */
+/* Reconstructed as StepType3. The vehicle's per-frame step, and the mirror of
+ * StepType2: the same reveal-expiry prologue, then either a death sequence or
+ * the AI, then two converging tails.
+ *
+ * ITS OUTPUT RECORD IS AT +0x578 WHERE StepType2's IS AT +0x57C. Both are the
+ * SIGHTCOUT layout, so obj+0x580 is this one's STATE and that one's BEARING.
+ * Read the base before reading a field.
+ *
+ * NOT ONE OF ITS TWENTY JUMP TARGETS IS AN EPILOGUE -- checked by decoding the
+ * first instruction at each. Every conditional jump goes to more code, and the
+ * function has TWO sequential converging tails: ADDR_STEP3_45C8D0 falls
+ * through into a second block that ends at ADDR_STEP3_45CB30. Writing any of
+ * those jumps as a `return` is the defect StepType2 carried three times.
+ *
+ * ITS DEATH TABLE IS THE JUMP-TABLE TRAP AT ITS WORST. Six indices on
+ * OBJ_OFF_TABLE_REC_KIND, five distinct arms (2 and 3 share), and the sound
+ * constants run 0x1F, 0x20, 0x21, 0x22 IN LAYOUT ORDER -- which looks like
+ * confirmation the arms are in index order. They are 1, 0, {2,3}, 5. Take the
+ * order from the table at 0x0045D954, never from the bodies. */
 #define ADDR_STEP_TYPE3          0x0045D660u  /* void(obj) */
+#define ADDR_STEP3_JUMP_TABLE    0x0045D954u  /* six entries, five arms */
+/* Two callees, still original and named by offset: their bodies are unread and
+ * every path through StepType3 reaches both. */
+#define ADDR_STEP3_45C8D0        0x0045C8D0u  /* void(obj, out) */
+#define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
+#define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */
+/* The destruction sounds, one per vehicle kind. Kind 4 makes none -- it goes
+ * straight to the row finish and DestroyByType. */
+#define AM2_SND_VEH_KIND0        0x20
+#define AM2_SND_VEH_KIND1        0x1F
+#define AM2_SND_VEH_KIND23       0x21
+#define AM2_SND_VEH_KIND5        0x22
+#define AM2_VEH_TURN_LIMIT       30     /* outside +/-30 puts it in state 4 */
+#define AM2_VEH_STATE_TURNING    4
 #define ADDR_STEP_TYPE5          0x0043C110u  /* void(obj) */
 #define ADDR_STEP_TYPE6          0x00422B90u  /* void(obj) */
 #define ADDR_OBJ_MARK_IF_OVERDUE 0x004355D0u /* void(void *obj) -- type 7 */
