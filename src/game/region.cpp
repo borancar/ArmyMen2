@@ -1967,7 +1967,7 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  *
  * THE POSE LADDER HAS THREE BANDS AND THE TOP ONE DOES NOTHING. The unit's
  * OBJ_OFF_RANK selects a threshold from ADDR_RANK_RECORDS -- 32, 48, 56, 64,
- * 80, 96, 112, 128, rising with rank -- and SIGHTC_OFF_FIELD_3C is compared
+ * 80, 96, 112, 128, rising with rank -- and SIGHTC_OFF_SEED is compared
  * against half of it and then against all of it:
  *
  *     below half        a pose from ADDR_HIT_POSE_BY_CLASS
@@ -1987,7 +1987,7 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  * forgets it was hit without turning, and one whose kind or class skipped the
  * pose still forgets. Reproduced; it is the same asymmetry AiStepIgnore has.
  *
- * The two-entry table index is `class * 2 + (SIGHTC_OFF_FIELD_3C >= 0x80)`,
+ * The two-entry table index is `class * 2 + (SIGHTC_OFF_SEED >= 0x80)`,
  * computed in the original with `cmp cl, 0x80; sbb edx, edx; inc edx` -- the
  * borrow-flag idiom for an unsigned comparison as 0 or 1, written here as the
  * comparison it is.
@@ -2013,7 +2013,7 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                * RANK_REC_BYTES
              + RANK_REC_OFF_THRESHOLD);
-        uint8_t v = *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C);
+        uint8_t v = *(const uint8_t *)(c + SIGHTC_OFF_SEED);
 
         if ((int32_t)v < (limit >> 1)) {
             int32_t slot = *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) * 2
@@ -2062,7 +2062,7 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
  * The pose is written only in the gap: not while a walk is outstanding, not
  * for a soldier kind of 6 or more, not when OBJ_OFF_FIELD_540 is set, not for
  * SIGHTC_OFF_KIND 3, and not when SIGHTC_OFF_FIELD_00 is non-zero. Five gates
- * for one dword, and 7 or 5 by whether SIGHTC_OFF_FIELD_3C is under 4.
+ * for one dword, and 7 or 5 by whether SIGHTC_OFF_SEED is under 4.
  *
  * AND `out` IS NOT THE VEHICLE FAMILY'S. Those arms write a heading at out[1];
  * this writes one at out[4] and a pose at out[8]. Same three-argument shape,
@@ -2105,10 +2105,10 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
                 now + AM2_AI_KEEP_RANGE_MS;
         } else if (!*(const int32_t *)(o + OBJ_OFF_FIELD_540)
                    && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3
-                   && *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C) < 0x10
+                   && *(const uint8_t *)(c + SIGHTC_OFF_SEED) < 0x10
                    && *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) == 0) {
             *(int32_t *)(w + 8) =
-                *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C) < 4 ? 7 : 5;
+                *(const uint8_t *)(c + SIGHTC_OFF_SEED) < 4 ? 7 : 5;
         }
     }
 
@@ -2668,7 +2668,6 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
  * naming the address here is a seam checkseams allows. */
 typedef void (__cdecl *AM2_AiArmFn)(void *obj, void *out, void *ctx);
 typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
-#define orig_ai_fill   ((AM2_AiFillFn)(uintptr_t)AM2_IMAGE(ADDR_AI_404730))
 #define orig_ai_arm0   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_4057D0))
 #define orig_ai_arm3   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_405DB0))
 #define orig_ai_arm6   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_406B30))
@@ -2775,7 +2774,7 @@ void __cdecl SargeAiStep(void *obj, void *out)
         return;
 
     SelectBestWeapon(obj);
-    orig_ai_fill(obj, ctx, 1);
+    TrooperBuildContext(obj, ctx, 1);
     UnitWeaponInfo(obj, ctx);
 
     item = *(uint8_t **)(ctx + SIGHTC_OFF_FIELD_20);
@@ -2789,7 +2788,7 @@ void __cdecl SargeAiStep(void *obj, void *out)
         SettlePointInRegion(
             TileOfPoint(*(const uint32_t *)(item + OBJ_OFF_POS)), goal);
 
-        *(int32_t *)(ctx + SIGHTC_OFF_PICKUP_DIST) =
+        *(int32_t *)(ctx + SIGHTC_OFF_DEST_DIST_B) =
             ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                        (const AM2_Point *)goal);
 
@@ -2842,7 +2841,7 @@ void __cdecl TrooperAiStep(void *obj, void *out)
     if (!obj)
         return;
 
-    orig_ai_fill(obj, ctx, 0);
+    TrooperBuildContext(obj, ctx, 0);
 
     AiStepReactAndDispatch(obj, out, ctx);
     AiStepRecordRegion(o);
@@ -3192,7 +3191,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
     if (!obj)
         return;
 
-    orig_ai_fill(obj, ctx, 0);
+    TrooperBuildContext(obj, ctx, 0);
 
     if (*(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
@@ -3206,8 +3205,8 @@ void __cdecl AiStepAttach(void *obj, void *out)
 
         r = orig_region_rand();
 
-        if (!(*(const int32_t *)(ctx + SIGHTC_OFF_FIELD_04)
-              && *(const int32_t *)(ctx + SIGHTC_OFF_FIELD_08)
+        if (!(*(const int32_t *)(ctx + SIGHTC_OFF_LEADER)
+              && *(const int32_t *)(ctx + SIGHTC_OFF_LEAD_RANGE)
                  <= AM2_AI_ATTACH_RANGE
               && (uint8_t)r)) {
             int32_t army = (r & 1) ? (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
@@ -3251,7 +3250,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
         }
     } else {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(ctx + SIGHTC_OFF_FIELD_0E);
+            *(const uint32_t *)(ctx + SIGHTC_OFF_DEST);
         orig_ai_trooper(obj, out, ctx);
 
         *(int32_t *)(w + SIGHTCOUT_OFF_STATE) =
@@ -3262,6 +3261,207 @@ void __cdecl AiStepAttach(void *obj, void *out)
 
     *(uint16_t *)(o + OBJ_OFF_REGION) =
         kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+}
+
+
+
+/* TrooperBuildContext -- original 0x00404730, the THIRD sight builder and the
+ * trooper's. Its 0x58 record is the one orig.h calls SIGHTC, and reading it
+ * explains the whole family rather than just this member.
+ *
+ * WHY SIGHTC IS 0x14 BYTES LONGER THAN THE VEHICLE RECORD. Its head shifts by
+ * four, because ClassifyByCode74's answer sits at +0 where the SIGHT record
+ * keeps the leader. Its weapon block shifts by sixteen, because it also
+ * carries the vehicle, that vehicle's distance, and a second destination
+ * distance. 0x44 + 0x14 = 0x58, exactly -- so the difference is derived and
+ * not merely observed.
+ *
+ * IT VALIDATES FAR MORE THAN ITS TWO SIBLINGS, and a shared helper would have
+ * erased that. They test `flags & 0x204` as one composite and drop; this one
+ * splits the bits. A concealed or dead leader goes; a DESTROYED leader goes
+ * only when it is a non-riding trooper or a vehicle, so a destroyed
+ * anything-else is KEPT.
+ *
+ * THE VEHICLE TEST READS BACKWARDS AND I HAD IT BACKWARDS. `je` after
+ * ObjIsType3 fires when the predicate is FALSE, so it is the vehicle that
+ * falls through into the drop. Reading a conditional jump after a predicate
+ * call is where that goes wrong: the jump means "not a vehicle", which skims
+ * as "is a vehicle".
+ *
+ * IT TESTS THE SAME TWO FLAGS TWO DIFFERENT WAYS. The leader block splits
+ * them -- `test ch,2` then `test cl,4` -- and gives concealed and destroyed
+ * different consequences; the target block tests `flags & 0x204` as one
+ * composite and drops on either. Two adjacent blocks, one pair of bits, two
+ * treatments. It reads as an inconsistency, and tidying it either way changes
+ * behaviour in one of the two.
+ *
+ * THE TARGET BLOCK REJECTS TWO MORE THINGS: an item whose health is negative,
+ * and a weapon outright -- and the order matters. An item whose health is NOT
+ * negative falls THROUGH to the weapon test, so a healthy weapon is still
+ * rejected, by the second test rather than the first. Nesting the health
+ * check inside the item check would let it escape both. Then it forgets the
+ * target altogether if it is further than the per-rank range in
+ * ADDR_RANK_RECORDS, doubled.
+ *
+ * THAT LOOKUP IS WHAT MOVED THE RANK TABLE. It indexes from 0x00473DC0, twelve
+ * bytes before the base orig.h carried, and the record tiles from there
+ * exactly into ADDR_FORMATION_SLOTS. See the header; the field is
+ * RANK_REC_OFF_SIGHT_RANGE now.
+ *
+ * ITS LAST ACT NAMES A FIELD. `ctx[SIGHTC_OFF_SEED] = GameRand()` makes that
+ * byte a fresh roll per build, so AiHitReact comparing it against 4 and 0x10
+ * is a probability gate and not a threshold on anything measured.
+ *
+ * Every caller is ours -- SargeAiStep, TrooperAiStep and AiStepAttach all
+ * reached it through an orig_ai_fill seam until now -- so its counter cannot
+ * move and tools/blindspots.py will say so.
+ */
+void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *c = (uint8_t *)ctx;
+    uint32_t  anchor;
+    uint8_t  *L, *T, *V;
+
+    if (!obj)
+        return;
+
+    anchor = ObjAnchorPoint(obj);
+    memset(ctx, 0, AM2_SIGHTC_BYTES);
+    *(int32_t *)(c + SIGHTC_OFF_FIELD_00) = ClassifyByCode74(obj);
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID)) {
+        L = (uint8_t *)LookupByUID(*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID));
+        *(void **)(c + SIGHTC_OFF_LEADER) = L;
+
+        if (!L) {
+            *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+        } else {
+            uint32_t f    = *(const uint32_t *)(L + OBJ_OFF_FLAGS);
+            int32_t  drop = 0;
+
+            if (f & OBJ_FLAG_CONCEALED)
+                drop = 1;
+            else if (*(const int16_t *)(L + OBJ_OFF_HEALTH) == 0)
+                drop = 1;
+            else if (f & OBJ_FLAG_DESTROYED) {
+                if (ObjIsType2((const AM2_Object *)L)
+                    && !*(const uint32_t *)(
+                           *(uint8_t **)(c + SIGHTC_OFF_LEADER) + OBJ_OFF_RIDING))
+                    drop = 1;
+                else if (ObjIsType3((const AM2_Object *)
+                                    *(uint8_t **)(c + SIGHTC_OFF_LEADER)))
+                    drop = 1;
+            }
+            if (drop) {
+                *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+                *(void **)(c + SIGHTC_OFF_LEADER)     = NULL;
+            }
+        }
+
+        L = *(uint8_t **)(c + SIGHTC_OFF_LEADER);
+        if (L) {
+            if (ObjsAreAllied(obj, L, 1)
+                && ObjIsTypeIn238((const AM2_Object *)L)) {
+                ResolveFormationPoint(obj, L,
+                                      (AM2_Point *)(c + SIGHTC_OFF_DEST));
+            } else {
+                *(uint32_t *)(c + SIGHTC_OFF_DEST) =
+                    *(const uint32_t *)(L + OBJ_OFF_POS);
+                *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+                    *(const uint32_t *)(L + OBJ_OFF_OWNER);
+            }
+            DistAndAngle((const AM2_Point *)&anchor,
+                         (const AM2_Point *)(c + SIGHTC_OFF_DEST),
+                         (int32_t *)(c + SIGHTC_OFF_LEAD_RANGE),
+                         c + SIGHTC_OFF_LEAD_BEARING);
+        }
+    }
+
+    if (*(const uint32_t *)(o + OBJ_OFF_TARGET_UID)) {
+        T = (uint8_t *)LookupByUID(*(const uint32_t *)(o + OBJ_OFF_TARGET_UID));
+        *(void **)(c + SIGHTC_OFF_OBSERVER) = T;
+
+        if (!T) {
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+        } else if (*(const uint32_t *)(T + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP) {
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
+        } else if (*(const int16_t *)(T + OBJ_OFF_HEALTH) == 0) {
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
+        } else if (ObjIsItem((const AM2_Object *)T)
+                   && *(const int16_t *)(
+                          *(uint8_t **)(c + SIGHTC_OFF_OBSERVER)
+                          + OBJ_OFF_HEALTH) < 0) {
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
+        } else if (ObjIsType4((const AM2_Object *)
+                              *(uint8_t **)(c + SIGHTC_OFF_OBSERVER))) {
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
+        } else {
+            const uint8_t *rank;
+
+            DistAndAngle((const AM2_Point *)&anchor,
+                         (const AM2_Point *)(
+                             *(uint8_t **)(c + SIGHTC_OFF_OBSERVER)
+                             + OBJ_OFF_POS),
+                         (int32_t *)(c + SIGHTC_OFF_RANGE),
+                         c + SIGHTC_OFF_BEARING);
+
+            rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                   + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+                     * RANK_REC_BYTES;
+
+            if (*(const int32_t *)(c + SIGHTC_OFF_RANGE)
+                > (*(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE) << 1))
+                *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+        }
+    }
+
+    if (*(const uint32_t *)(o + OBJ_OFF_UID_56C)) {
+        V = (uint8_t *)LookupType3ByUID(
+                *(const uint32_t *)(o + OBJ_OFF_UID_56C));
+        *(void **)(c + SIGHTC_OFF_VEHICLE) = V;
+
+        if (!V)
+            *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+        else
+            *(int32_t *)(c + SIGHTC_OFF_VEHICLE_DIST) =
+                ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                           (const AM2_Point *)(V + OBJ_OFF_POS));
+    }
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
+        *(int32_t *)(c + SIGHTC_OFF_FIELD_20) =
+            orig_scan_403b40(obj, c + SIGHTC_OFF_FOUND_RANGE,
+                             c + SIGHTC_OFF_FOUND_BEARING,
+                             o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110,
+                             (int32_t)anchor);
+
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
+        *(int32_t *)(c + SIGHTC_OFF_DEST_DIST) =
+            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_STATE));
+
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_FRAME))
+        *(int32_t *)(c + SIGHTC_OFF_DEST_DIST_B) =
+            ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_FRAME));
+
+    UnitWeaponInfo(obj, ctx);
+
+    *(uint8_t *)(c + SIGHTC_OFF_SEED) = (uint8_t)orig_region_rand();
+
+    /* The third argument is DEAD in the original and the callers vary it
+     * anyway -- SargeAiStep passes 1, the other two pass 0. Proved by frame
+     * arithmetic rather than assumed: with five pushes before the body its
+     * slot is [esp+0x20], and nothing in the 656 bytes reads [esp+0x20],
+     * [esp+0x24] or [esp+0x28]. Kept in the signature because three call
+     * sites pass it. */
+    (void)sarge;
 }
 
 
@@ -3307,6 +3507,9 @@ int region_install(void)
                         "RoachBuildContext", 1);
     rc |= patch_replace(ADDR_AI_STEP_ATTACH, (const void *)AiStepAttach,
                         "AiStepAttach", 1);
+    rc |= patch_replace(ADDR_TROOPER_BUILD_CONTEXT,
+                        (const void *)TrooperBuildContext,
+                        "TrooperBuildContext", 1);
     rc |= patch_replace(ADDR_TROOPER_AI_STEP, (const void *)TrooperAiStep,
                         "TrooperAiStep", 1);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,

@@ -131,6 +131,14 @@ void __cdecl RoachBuildContext(void *obj, void *out);
  * defect, reproduced; see the body. */
 void __cdecl AiStepAttach(void *obj, void *out);
 
+/* 0x00404730, three callers, all of them ours. The THIRD sight builder and
+ * the trooper's: it fills the 0x58 SIGHTC record every trooper AI step reads.
+ * Longer than its two siblings by exactly the fields it adds -- the class at
+ * the front, the vehicle pair and a second destination distance in the middle
+ * -- and it validates the leader and the target far more strictly than they
+ * do. Its counter cannot move; every caller is reconstructed. */
+void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge);
+
 /* 0x00439F40, five callers. NearestAllowedTile's twin: the same square spiral
  * under the DEFAULT point rule, and writing nothing through `pt` when the
  * starting tile is already accepted. */

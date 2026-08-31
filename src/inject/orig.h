@@ -3076,10 +3076,29 @@
  * record that it resolves OBJ_OFF_FOLLOW_UID and OBJ_OFF_UID_56C through the
  * uid lookup and stores the objects, so it is what FILLS the record every arm
  * below then reads. Named by offset because its body has not been read. */
-#define ADDR_AI_404730         0x00404730u  /* void(obj, ctx, int32 sarge) */
+/* The THIRD sight builder, and the trooper's. Its 0x58 record is the one
+ * orig.h calls SIGHTC, and reading it explains the whole family:
+ *
+ *   roach    0x00408060  rep stos 0x10 dwords = 0x40
+ *   vehicle  0x00407D70  rep stos 0x11 dwords = 0x44
+ *   trooper  0x00404730  rep stos 0x16 dwords = 0x58
+ *
+ * WHY SIGHTC IS 0x14 BYTES LONGER. Its head shifts by four, because the class
+ * from ClassifyByCode74 sits at +0 where SIGHT keeps the leader. Its weapon
+ * block shifts by sixteen, because it also carries the vehicle at +0x2C, that
+ * vehicle's distance at +0x30, and a second destination distance at +0x38.
+ * 0x44 + 0x14 = 0x58, exactly.
+ *
+ * IT VALIDATES FAR MORE THAN ITS TWO SIBLINGS. They test flags & 0x204 as one
+ * composite and drop; this splits the bits. A CONCEALED or dead leader is
+ * dropped, and a DESTROYED one only when it is a non-riding trooper or a
+ * vehicle -- a destroyed anything-else is kept. Its target block additionally
+ * rejects an item whose health is negative and a weapon outright.
+ *
+ * Reconstructed as TrooperBuildContext. */
+#define ADDR_TROOPER_BUILD_CONTEXT 0x00404730u /* void(obj, ctx, int32 sarge) */
 #define ADDR_AI_405DB0         0x00405DB0u  /* void(obj, out, ctx) */
 #define ADDR_AI_406B30         0x00406B30u  /* void(obj, out, ctx) */
-#define SIGHTC_OFF_PICKUP_DIST 0x38u  /* SargeAiStep: ApproxDist to the item */
 #define AM2_SIGHTC_BYTES       0x58   /* the frame both dispatchers reserve */
 /* 0x00407BF0, one caller -- the `ignore` arm, mode 2. Reconstructed. */
 #define ADDR_AI_STEP_IGNORE    0x00407BF0u  /* void(obj, out, const void *) */
@@ -3173,7 +3192,11 @@
  * rather than by two consumers agreeing on a range. The paragraph above
  * reasoned it out and said plainly that nothing wrote it; something does. */
 #define SIGHTC_OFF_FIELD_00      0x00u
-#define SIGHTC_OFF_FIELD_3C      0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
+/* SETTLED: TrooperBuildContext's last act is `ctx[0x3C] = (uint8_t)GameRand()`,
+ * so this is a fresh roll per build -- the SIGHTC counterpart of
+ * SIGHT_OFF_SEED. AiHitReact comparing it against 4 and 0x10 is therefore a
+ * PROBABILITY GATE, 4/256 and 16/256, not a threshold on anything measured. */
+#define SIGHTC_OFF_SEED          0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
 #define AM2_AI_KEEP_RANGE_MS     0x1388 /* 5000, the reposition interval */
 #define AM2_AI_REACHED_DIST      0xC    /* nearer than this and the walk ends */
 /* 0x004049C0, TWENTY-SIX call sites across the 0x00405xxx..0x00406xxx band and
@@ -3227,15 +3250,29 @@
 #define AM2_AI_STATE_MS          0x2710  /* 10,000 ms */
 #define AM2_AI_STATE_STALE       0x27    /* idle longer than that */
 #define AM2_AI_STATE_RECENT      0x29    /* and not */
-#define SIGHTC_OFF_FIELD_0E      0x0Eu   /* read unaligned, see above */
-#define SIGHTC_OFF_FIELD_04      0x04u
-#define SIGHTC_OFF_FIELD_08      0x08u
+#define SIGHTC_OFF_DEST          0x0Eu  /* packed point; read UNALIGNED by
+                                        * AiStepAttach, which is ordinary
+                                        * once you know it is a point */
+/* SIGHT_OFF_FOUND_RANGE and _BEARING, plus the four-byte head shift. */
+#define SIGHTC_OFF_FOUND_RANGE   0x24u
+#define SIGHTC_OFF_FOUND_BEARING 0x28u
+#define SIGHTC_OFF_VEHICLE       0x2Cu  /* obj *, LookupType3ByUID */
+#define SIGHTC_OFF_VEHICLE_DIST  0x30u
+/* The distance to the point in OBJ_OFF_SCRIPT_FRAME, which is that dword's
+ * OTHER reading -- a packed point in this band and a script frame number in
+ * objscript.cpp. It went in as SIGHTC_OFF_PICKUP_DIST from SargeAiStep,
+ * which stores a weapon's position there; TrooperBuildContext measures to
+ * whatever is there, so the general name is the right one. */
+#define SIGHTC_OFF_DEST_DIST_B   0x38u
+#define SIGHTC_OFF_LEADER        0x04u  /* obj *, from OBJ_OFF_FOLLOW_UID */
+#define SIGHTC_OFF_LEAD_RANGE    0x08u  /* to SIGHTC_OFF_DEST */
+#define SIGHTC_OFF_LEAD_BEARING  0x0Cu  /* uint8_t */
 /* 0x00405100, six call sites in five functions. Reconstructed. */
 #define ADDR_AI_KEEP_RANGE       0x00405100u  /* void(obj, out, void *ctx) */
 /* 0x00405050, TEN call sites across the same band. The trooper family's
  * reaction to being hit: it returns at once unless OBJ_OFF_HIT_DIR is set, and
  * otherwise picks a pose from OBJ_OFF_SOLDIER_KIND, SIGHTC_OFF_KIND and
- * SIGHTC_OFF_FIELD_3C. Reading it is what confirmed that the record these
+ * SIGHTC_OFF_SEED. Reading it is what confirmed that the record these
  * functions carry really is the SIGHTC one -- it tests 0x44 against 3, which
  * SIGHTC_OFF_KIND already documented, and reads 0x3C beside it. */
 #define ADDR_AI_HIT_REACT        0x00405050u  /* void(obj, out, void *ctx) */

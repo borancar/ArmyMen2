@@ -10310,3 +10310,50 @@ The fix is behaviour-preserving by construction -- all four call sites index
 as `base + rank * RANK_REC_BYTES + RANK_REC_OFF_*`, so moving the base back
 twelve and adding twelve to each offset leaves every absolute address
 unchanged. `.text` should be byte-identical and will be measured, not assumed.
+
+## The three sight builders, and why they are three different lengths
+
+`TrooperBuildContext` (`0x00404730`) is the last of them, so the family is
+complete and its differences are now derived rather than catalogued:
+
+| builder | `rep stos` | record | for |
+|---|---|---|---|
+| `0x00408060` | 0x10 dwords | 0x40 | roach |
+| `0x00407D70` | 0x11 dwords | 0x44 | vehicle |
+| `0x00404730` | 0x16 dwords | 0x58 | trooper (`SIGHTC`) |
+
+Each length is confirmed twice -- by the builder's own `rep stos` count and by
+its dispatcher's `sub esp`.
+
+**`orig.h` recorded the shift between the layouts as a curiosity**: "a clean
+shift of four ... the three are related and distinct". The cause is that
+`SIGHTC` puts `ClassifyByCode74`'s answer at +0 where `SIGHT` keeps the leader.
+And the weapon block shifts by sixteen rather than four because `SIGHTC` also
+carries the vehicle, that vehicle's distance and a second destination
+distance. `0x44 + 0x14 = 0x58`, exactly.
+
+**Reading it settled three fields that were named by offset**, all by finding
+the writer: `SIGHTC_OFF_FIELD_00` is `ClassifyByCode74`'s class, `FIELD_20` is
+what `Scan403B40` found, and `FIELD_3C` is a fresh `GameRand` byte -- which
+makes `AiHitReact` comparing it against 4 and 0x10 a probability gate rather
+than a threshold on anything measured. The first two confirmed guesses
+`orig.h` had already reasoned out; the third was new. Earlier the same move
+OVERTURNED `SIGHT_OFF_ENABLED_30` and `_40`. Finding the writer is decisive in
+both directions, which is why it is worth doing when the guess looks sound.
+
+**Four things in it look wrong and are not.** It tests the same two flags two
+different ways in adjacent blocks -- split for the leader, composite for the
+target. A destroyed leader is dropped only when it is a non-riding trooper or
+a vehicle. An item with non-negative health falls THROUGH to the weapon test,
+so a healthy weapon is still rejected, by the second test and not the first.
+And its third parameter is dead: three callers vary it and the original never
+reads the slot, proved by frame arithmetic rather than assumed.
+
+**I had one of those backwards before it reached the code.** `je` after
+`ObjIsType3` fires when the predicate is FALSE, so it is the vehicle that
+falls into the drop. Reading a conditional jump after a predicate call is
+where that goes wrong -- the jump means "not a vehicle" and skims as "is one".
+
+**And it closed the last seam into the AI band.** `SargeAiStep`,
+`TrooperAiStep` and `AiStepAttach` all reached `0x00404730` through an
+`orig_ai_fill` macro; all three call it by name now.
