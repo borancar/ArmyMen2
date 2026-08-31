@@ -7,6 +7,20 @@
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "defparse.h"  /* DefFreeTables, DefFreeTrooperRecs -- reconstructed */
+#include "gameproc.h"  /* DefFinish -- reconstructed */
+#include "gamedir.h"   /* SetGameDir -- ADDR_SET_DATA_DIR is it */
+
+/* The five seams LoadDefTables needs. All are original and reached by
+ * address; none is on the patch list. */
+typedef void    (__cdecl *AM2_VoidFn)(void);
+typedef void   *(__cdecl *AM2_DefFindFn)(int32_t id);
+
+#define orig_free_list_662024  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662024))
+#define orig_free_list_662928  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662928))
+#define orig_missile_def_find  ((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))
+#define orig_rank_def_find     ((AM2_DefFindFn)AM2_IMAGE(ADDR_RANK_DEF_FIND))
+#define orig_log_noargs        ((AM2_VoidFn)(uintptr_t)ADDR_LOG)
 
 /* strtol reached through the game's own thunk. Unlike strtok, nothing here
  * depends on shared state -- this is for consistency with the rest of the def
@@ -205,10 +219,131 @@ int32_t __cdecl DefParseInfoFile(const char *path)
     return DefDispatchFile(fp);
 }
 
+/* 0x00403400, one caller -- the level load, which also builds the HUD. It
+ * names itself through the five files it parses and its "Couldn't parse %s!".
+ *
+ * Six steps: free every definition table, SetDataDir("aai") and parse the
+ * five files, then SetDataDir(ADDR_TILESET_PATH) and parse Object.aai AGAIN --
+ * a tileset directory may override the global object definitions -- then
+ * DefFinish, then rebuild the missile definitions and the rank records.
+ *
+ * The bare Log() with no arguments is the original's, the same idiom frame.cpp
+ * reproduces twice. A failure to parse is logged and otherwise ignored: every
+ * one of the six is best-effort.
+ *
+ * BOTH REBUILDS PERMUTE, and that is what a memcpy would silently destroy.
+ * Each destination entry is cleared immediately before it is filled rather
+ * than the table being cleared once, so an id the bsearch cannot find reads as
+ * zeros instead of as the previous level's data. */
+void __cdecl LoadDefTables(void)
+{
+    uint8_t *dst;
+    int32_t  id;
+
+    DefFreeTables();
+    orig_free_list_662024();
+    orig_free_list_662928();
+    DefFreeTrooperRecs();
+    orig_log_noargs();
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_AAI_DIR));
+
+    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_TROOP_AAI)))
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
+                 AM2_IMAGE(ADDR_STR_DEF_TROOP_AAI));
+    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_WEAPON_AAI)))
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
+                 AM2_IMAGE(ADDR_STR_DEF_WEAPON_AAI));
+    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_VEHICLE_AAI)))
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
+                 AM2_IMAGE(ADDR_STR_VEHICLE_AAI));
+    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI)))
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
+                 AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI));
+    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_GAME_AAI)))
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
+                 AM2_IMAGE(ADDR_STR_DEF_GAME_AAI));
+
+    /* The override pass. */
+    SetGameDir((const char *)AM2_IMAGE(ADDR_TILESET_PATH));
+    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI)))
+        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
+                 AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI));
+
+    DefFinish();
+
+    /* The missile definitions. Thirteen dwords per entry, five of them moved:
+     * 0x10 and 0x14 swap, and 0x1C -> 0x24 -> 0x20 -> 0x1C. */
+    dst = (uint8_t *)AM2_IMAGE(ADDR_MISSILE_DEFS);
+    for (id = 0; id < AM2_MISSILE_DEF_COUNT;
+         id++, dst += AM2_MISSILE_DEF_BYTES) {
+        const uint8_t *src;
+
+        memset(dst, 0, AM2_MISSILE_DEF_BYTES);
+        src = (const uint8_t *)orig_missile_def_find(id);
+        if (src == 0)
+            continue;
+
+        *(uint32_t *)(dst + 0x00) = *(const uint32_t *)(src + 0x00);
+        *(uint32_t *)(dst + 0x04) = *(const uint32_t *)(src + 0x04);
+        *(uint32_t *)(dst + 0x08) = *(const uint32_t *)(src + 0x08);
+        *(uint32_t *)(dst + 0x0C) = *(const uint32_t *)(src + 0x0C);
+        *(uint32_t *)(dst + 0x10) = *(const uint32_t *)(src + 0x14);
+        *(uint32_t *)(dst + 0x14) = *(const uint32_t *)(src + 0x10);
+        *(uint32_t *)(dst + 0x18) = *(const uint32_t *)(src + 0x18);
+        *(uint32_t *)(dst + 0x1C) = *(const uint32_t *)(src + 0x20);
+        *(uint32_t *)(dst + 0x20) = *(const uint32_t *)(src + 0x24);
+        *(uint32_t *)(dst + 0x24) = *(const uint32_t *)(src + 0x1C);
+        *(uint32_t *)(dst + 0x28) = *(const uint32_t *)(src + 0x28);
+        *(uint32_t *)(dst + 0x2C) = *(const uint32_t *)(src + 0x2C);
+        *(uint32_t *)(dst + 0x30) = *(const uint32_t *)(src + 0x30);
+    }
+
+    /* The rank records. A projection of a 0x20-byte parsed record onto a
+     * 28-byte runtime one in which nothing stays in place. The original walks
+     * a pointer four bytes INTO each record and writes the first field through
+     * [ptr - 4], which is why ADDR_RANK_RECORDS is where it is. Written here
+     * against the record base, which is the same addresses. */
+    for (id = 0; id < AM2_RANK_COUNT; id++) {
+        uint8_t       *rec = (uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                             + (uint32_t)id * RANK_REC_BYTES;
+        const uint8_t *src = (const uint8_t *)orig_rank_def_find(id);
+        float          pct;
+
+        if (src == 0)
+            continue;
+
+        *(int32_t *)(rec + RANK_REC_OFF_SIGHT_RANGE) =
+            *(const int32_t *)(src + RANK_SRC_OFF_SIGHT_RANGE);
+        *(int32_t *)(rec + RANK_REC_OFF_FIELD_04) =
+            *(const int32_t *)(src + RANK_SRC_OFF_FIELD_04);
+        *(int32_t *)(rec + RANK_REC_OFF_FIELD_08) =
+            *(const int32_t *)(src + RANK_SRC_OFF_FIELD_08);
+
+        /* An integer percentage becomes a rate, with a floor of 1.0 -- and
+         * this is the record's only float, which is what confirms the whole
+         * permutation. */
+        pct = (float)((long double)*(const int32_t *)(src + RANK_SRC_OFF_FIRE_PCT)
+                      * (long double)*(const float *)AM2_IMAGE(ADDR_F_ONE_HUNDREDTH));
+        if (pct < *(const float *)AM2_IMAGE(ADDR_F_ONE))
+            pct = 1.0f;
+        *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) = pct;
+
+        *(int32_t *)(rec + RANK_REC_OFF_THRESHOLD) =
+            *(const int32_t *)(src + RANK_SRC_OFF_THRESHOLD);
+        *(int32_t *)(rec + RANK_REC_OFF_MAX_HEALTH) =
+            *(const int32_t *)(src + RANK_SRC_OFF_MAX_HEALTH);
+        *(int32_t *)(rec + RANK_REC_OFF_XP) =
+            *(const int32_t *)(src + RANK_SRC_OFF_XP);
+    }
+}
+
 int definfo_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_LOAD_DEF_TABLES, (const void *)LoadDefTables,
+                        "LoadDefTables", 1);
     rc |= patch_replace(ADDR_DEF_PARSE_NUMBER, (const void *)DefParseNumber,
                         "DefParseNumber", 2);
     rc |= patch_replace(ADDR_DEF_PARSE_FLOAT, (const void *)DefParseFloat,

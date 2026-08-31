@@ -7774,6 +7774,55 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_OBJECT_AAI      0x004870DCu  /* "object.aai" */
 #define ADDR_STR_TROOP_AAI       0x004870D0u  /* "troop.aai" */
 #define ADDR_STR_VEHICLE_AAI     0x00473D64u  /* "vehicle.aai" */
+/* The image carries the .aai names TWICE. The lowercase set above, at
+ * 0x004870xx, and the mixed-case set LoadDefTables uses, here -- and the two
+ * are not interchangeable, since the loader passes these literals straight to
+ * the CRT's fopen. Note ADDR_STR_VEHICLE_AAI is in THIS set even though it is
+ * spelled lowercase; only four of the five needed a new name.
+ *
+ * Found by the compiler, not by grepping: the addresses were clean and the
+ * NAMES were taken. Grep both before defining one. */
+#define ADDR_STR_DEF_TROOP_AAI   0x00473D90u  /* "Troop.aai" */
+#define ADDR_STR_DEF_WEAPON_AAI  0x00473D70u  /* "Weapon.aai" */
+#define ADDR_STR_DEF_OBJECT_AAI  0x00473D58u  /* "Object.aai" */
+#define ADDR_STR_DEF_GAME_AAI    0x00473D4Cu  /* "Game.aai" */
+/* 0x00403400, one caller -- the level load, which also builds the HUD. It
+ * names itself through the five files it parses. Free every definition table,
+ * SetDataDir("aai"), parse the five, then SetDataDir(ADDR_TILESET_PATH) and
+ * parse Object.aai AGAIN -- so a tileset directory may override the global
+ * object definitions. Then DefFinish, and rebuild two runtime tables.
+ *
+ * Both rebuilds PERMUTE, which is the part a memcpy would silently destroy.
+ * The missile copy moves five of thirteen fields (0x10 and 0x14 swap;
+ * 0x1C -> 0x24 -> 0x20 -> 0x1C), and the rank copy is a projection of a
+ * 0x20-byte parsed record onto a 28-byte runtime one in which NOTHING stays
+ * in place. Each destination entry is cleared immediately before it is
+ * filled, not once up front, so a definition the bsearch cannot find reads as
+ * zeros rather than as the previous level's.
+ *
+ * The rank permutation is confirmed rather than asserted: the one field it
+ * computes as a float lands on RANK_REC_OFF_FIRE_SCALE, which is the record's
+ * only float, and the value is a percentage scaled by 0.01 with a floor of
+ * 1.0. */
+#define ADDR_LOAD_DEF_TABLES     0x00403400u  /* void(void) */
+#define ADDR_MISSILE_DEF_FIND    0x004602C0u  /* rec *(int32 id), a bsearch */
+#define ADDR_RANK_DEF_FIND       0x0044CD70u  /* rec *(int32 rank), a bsearch */
+/* The loop ends at 0x00662920, which is already ADDR_RESPAWN_KINDS -- the two
+ * tables TILE, so the bound is a count rather than a second name for that
+ * address. (0x662920 - ADDR_MISSILE_DEFS) / AM2_MISSILE_DEF_BYTES == 44.) */
+#define AM2_MISSILE_DEF_COUNT    44
+#define AM2_RANK_COUNT           8
+#define AM2_RANK_SRC_BYTES       0x20u  /* the parsed record, 8 dwords */
+#define ADDR_F_ONE_HUNDREDTH     0x0046F2DCu  /* float 0.01 */
+#define ADDR_F_ONE               0x0046F2D8u  /* float 1.0 */
+/* The parsed rank record, keyed at +0 and projected onto the runtime one. */
+#define RANK_SRC_OFF_MAX_HEALTH  0x04u
+#define RANK_SRC_OFF_FIELD_04    0x08u
+#define RANK_SRC_OFF_SIGHT_RANGE 0x0Cu
+#define RANK_SRC_OFF_FIELD_08    0x10u
+#define RANK_SRC_OFF_FIRE_PCT    0x14u
+#define RANK_SRC_OFF_THRESHOLD   0x18u
+#define RANK_SRC_OFF_XP          0x1Cu
 #define ADDR_STR_WEAPON_AAI      0x004870C4u  /* "weapon.aai" */
 #define ADDR_RULES_CHECKSUM_VAL  0x00511CD4u  /* uint32_t, the rules total */
 #define ADDR_MP_SCRIPT_CHKSUM_VAL 0x00511CD0u /* uint32_t */

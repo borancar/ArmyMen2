@@ -11055,3 +11055,66 @@ the counter moves whenever an item is picked up.
 
 A/B clean: bootcamp state identical (1610 lines), 22 pixels; campaign widgets
 identical (35 nodes), log identical, 2 pixels.
+
+
+## LoadDefTables, and three defences catching three different errors
+
+**1,239 - 1,149 = 90 entries outstanding.** `0x00403400` into
+`src/game/definfo.cpp`. It names itself through the five files it parses --
+`Troop.aai`, `Weapon.aai`, `vehicle.aai`, `Object.aai`, `Game.aai` -- and its
+own "Couldn't parse %s!".
+
+Six steps: free every definition table, `SetGameDir("aai")` and parse the five,
+then `SetGameDir(ADDR_TILESET_PATH)` and parse `Object.aai` AGAIN, then
+`DefFinish`, then rebuild 44 missile definitions and 8 rank records.
+
+**Two behavioural findings nobody had recorded.** A TILESET DIRECTORY MAY
+OVERRIDE `Object.aai` -- definitions load globally and are then re-parsed from
+the tileset path. And each destination entry is cleared IMMEDIATELY BEFORE it
+is filled rather than the table being cleared once, so a definition the
+`bsearch` cannot find reads as zeros instead of as the previous level's data.
+The `rep stosd` sits inside the loop; reading it as a pre-loop `memset` would
+have been a live cross-level bug.
+
+**Both rebuilds PERMUTE, which is what a memcpy destroys silently.** The
+missile copy moves five of thirteen fields -- 0x10 and 0x14 swap, and
+0x1C -> 0x24 -> 0x20 -> 0x1C -- extracted programmatically from the instruction
+stream rather than read by eye. The rank copy is a projection of a 0x20-byte
+parsed record onto a 28-byte runtime one in which NOTHING stays in place.
+
+**The rank permutation was confirmed before it ran.** The one field the code
+computes as a float lands on `RANK_REC_OFF_FIRE_SCALE`, which is the record's
+only float, and the arithmetic is an integer percentage times 0.01 with a floor
+of 1.0.
+
+**And the rank base and count were confirmed by TILING.** 0x473DC0 + 8 x 28 is
+exactly `ADDR_FORMATION_SLOTS`. That is the third tiling check this session --
+speech groups begin at `ADDR_WAVE_NAMES_END`, missile defs end at
+`ADDR_RESPAWN_KINDS`, rank records end at `ADDR_FORMATION_SLOTS` -- and each
+confirmed a base or count derived some other way. **The one table I did not
+tiling-check is the one I read four bytes late.** It costs one grep of the
+neighbouring address.
+
+### Three defences, three different errors
+
+None of these would have yielded to reading more carefully.
+
+| defence | what it caught |
+|---|---|
+| the compiler | `ADDR_STR_TROOP_AAI` already taken -- by a DIFFERENT string at another address |
+| `checkpatches` | `0x00662920` already named `ADDR_RESPAWN_KINDS`; the tables tile |
+| `checkseams` | `ADDR_SET_DATA_DIR` **is** `SetGameDir`, already reconstructed |
+
+The first is new and worth writing down: **the image carries the .aai names
+twice**, lowercase at 0x004870xx and mixed-case at 0x00473Dxx, and they are not
+interchangeable because the loader hands the literal straight to `fopen`. I had
+grepped the ADDRESSES before naming -- all clean -- and not the NAMES. The
+address grep catches aliases; the name grep catches collisions; neither
+substitutes for the other, and `orig.h` now says so.
+
+The third is the fourth time in this project's history that `SetGameDir` has
+been reached through a wrongly-named seam. My header grep for "SetDataDir"
+found nothing because the FUNCTION's name differs from the ADDRESS's.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels.

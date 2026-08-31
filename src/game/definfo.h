@@ -50,6 +50,12 @@ int32_t __cdecl DefDispatchFile(am2_FILE *fp);
  * owns it. Ten callers. */
 int32_t __cdecl DefParseInfoFile(const char *path);
 
+/* 0x00403400, one caller. Reload every definition table from the .aai files,
+ * letting the tileset directory override Object.aai, then rebuild the missile
+ * definitions and the rank records. Both rebuilds permute their fields; see
+ * definfo.cpp. */
+void __cdecl LoadDefTables(void);
+
 int definfo_install(void);
 
 #ifdef __cplusplus
