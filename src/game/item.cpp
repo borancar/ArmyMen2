@@ -3299,7 +3299,115 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
 #define orig_damage_item      ((AM2_DamageItemFn)(uintptr_t)ADDR_DAMAGE_ITEM)
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
-#define orig_damage_vehicle   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_VEHICLE)
+
+typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
+                                        int32_t dir, int32_t height);
+#define orig_game_rand ((int32_t (__cdecl *)(void))AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_clear_footprint \
+    ((AM2_ObjOnlyFn)AM2_IMAGE(ADDR_OBJ_CLEAR_FOOTPRINT))
+
+#define orig_spawn_hit_effect \
+    ((AM2_HitEffectFn)(uintptr_t)ADDR_SPAWN_HIT_EFFECT)
+
+/* DamageVehicle -- original 0x0045B4D0, one caller, which is DamageObject's
+ * type-3 arm. Take `amount` off a vehicle, and if that empties it, empty the
+ * vehicle too.
+ *
+ * ARMOUR IS A THRESHOLD AND NOT A SUBTRACTION, mostly. A hit at or under
+ * VEHICLE_OFF_ARMOUR normally does nothing at all -- the function returns
+ * before touching the health -- but it first rolls `rand() & 0xFF` against
+ * `amount * 8` and, if that comes up, raises the amount to `armour + 1` so
+ * that exactly one point gets through. So a rifle round has a chance
+ * proportional to its damage of scratching a tank, and eight times the damage
+ * is certainty. Only after that is the armour subtracted from what remains.
+ *
+ * THE HIT MARK IS ROLLED SEPARATELY and only above one point of damage:
+ * `rand() % 255 <= AM2_HIT_EFFECT_CHANCE`, roughly a quarter of the time. It
+ * is given the position SAVED BEFORE any of this, which matters because
+ * ExitAllFromVehicle below moves things.
+ *
+ * TWO GATES AND THEY ARE NOT SYMMETRIC. In a multiplayer session
+ * CommMustBroadcast must accept this army or nothing happens -- a client does
+ * not damage on its own account. Outside one, ADDR_CHEAT_INVULNERABLE makes
+ * our OWN army immune, which is the "I am the Juggernaut!" cheat, and the
+ * multiplayer path skips that test entirely. So the cheat is single-player
+ * only, and by construction rather than by a check for it.
+ *
+ * DEATH IS EXACT EQUALITY WITH ZERO. `health -= amount` and then `!= 0`
+ * returns -- and the amount was already clamped to the health above, so it
+ * cannot go negative. The clamp is what makes the equality safe, and removing
+ * either would leave a vehicle that survives at negative health.
+ *
+ * The fourth argument -- `kind` in the family's shared signature -- is never
+ * read here. DamageObject passes the same five to all three arms and this one
+ * wants four of them.
+ */
+void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
+                           uint32_t attacker)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  armour;
+    uint32_t at;
+
+    (void)kind;
+
+    *(o + OBJ_OFF_HIT_DIR) = (uint8_t)((d & 0xFF) < 1 ? 1 : (d & 0xFF));
+    *(uint32_t *)(o + OBJ_OFF_HIT_TIME) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    armour = *(const int32_t *)(o + VEHICLE_OFF_ARMOUR);
+    if (amount <= armour
+        && (int32_t)(orig_game_rand() & 0xFF) < amount * 8)
+        amount = armour + 1;
+
+    if (*(const int32_t *)(o + VEHICLE_OFF_ARMOUR) > amount)
+        return;
+
+    amount -= *(const int32_t *)(o + VEHICLE_OFF_ARMOUR);
+    if (amount < 0)
+        amount = 0;
+    if (amount > *(const int16_t *)(o + OBJ_OFF_HEALTH))
+        amount = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+
+    at = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+    if (amount > 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE)
+        orig_spawn_hit_effect(&at,
+                              *(const int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT),
+                              *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
+                              *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+        if (!CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                               *(const int8_t *)(o + OBJ_OFF_ARMY)))
+            return;
+    } else if (*(const int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE
+               && *(const int8_t *)(o + OBJ_OFF_ARMY)
+                  == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        return;
+    }
+
+    *(int16_t *)(o + OBJ_OFF_HEALTH) =
+        (int16_t)(*(const int16_t *)(o + OBJ_OFF_HEALTH) - (int16_t)amount);
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
+        return;
+
+    ExitAllFromVehicle(obj, attacker);
+
+    *(int32_t *)(o + VEHICLE_OFF_DEATH_STATE) = 5;
+    *(int32_t *)(o + VEHICLE_OFF_DEAD)        = 1;
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+        ObjFlagClear0(*(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE);
+
+    orig_clear_footprint(obj);
+
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & 1) {
+        ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~1u;
+    }
+}
+
 
 #define g_gameOverFlags (*(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS)
 #define g_selectedCount (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT)
@@ -3674,7 +3782,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         orig_damage_trooper(obj, amount, extra, kind, attackerUid);
         break;
     case 3:
-        orig_damage_vehicle(obj, amount, extra, kind, attackerUid);
+        DamageVehicle(obj, amount, extra, kind, attackerUid);
         break;
     case 8:
         DamageRoach(obj, amount, extra, kind, attackerUid);
@@ -7903,6 +8011,8 @@ void item_install(void)
                   "MaskBlockWeight", 5);
     patch_replace(ADDR_DAMAGE_OBJECT, (const void *)DamageObject,
                   "DamageObject", 6);
+    patch_replace(ADDR_DAMAGE_VEHICLE, (const void *)DamageVehicle,
+                  "DamageVehicle", 1);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,
                   "HealObject", 3);
     patch_replace(ADDR_OBJ_FIELD_A, (const void *)ObjFieldA, "ObjFieldA", 1);

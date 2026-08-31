@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `0f4fb8a`. Working tree clean.
+Last updated: **2026-08-31**, at `4f23292`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,252 patches.**
+Nothing uncommitted. **1,253 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3081,16 +3081,50 @@ commit -- gave the right answer every time it was used.
   importing the symbol, which is both faithful and what keeps `air.cpp` on the
   flat side of the split.
 
+- **`DamageVehicle`** (`0x0045B4D0`) is `DamageObject`'s type-3 arm: take
+  `amount` off a vehicle, and if that empties it, empty the vehicle too.
+
+  **Armour is a THRESHOLD and not a subtraction, mostly.** A hit at or under
+  `VEHICLE_OFF_ARMOUR` normally does nothing -- but the function first rolls
+  `rand() & 0xFF` against `amount * 8` and, if that comes up, raises the amount
+  to `armour + 1` so exactly one point gets through. A rifle round has a chance
+  proportional to its damage of scratching a tank, and eight times the damage
+  is certainty. Only then is the armour subtracted from what remains.
+
+  **Two gates and they are not symmetric.** In a multiplayer session
+  `CommMustBroadcast` must accept this army or nothing happens. OUTSIDE one,
+  `ADDR_CHEAT_INVULNERABLE` makes our own army immune -- and the multiplayer
+  path skips that test entirely, so the cheat is single-player only by
+  construction rather than by a check for it.
+
+  **Death is exact equality with zero**, which is safe only because the amount
+  was clamped to the health first. Removing either would leave a vehicle alive
+  at negative health.
+
+- **Three names arrived from two call sites agreeing.**
+  `ADDR_SPAWN_HIT_EFFECT` (`0x00461BA0`) has exactly two callers,
+  `DamageTrooper` and `DamageVehicle`, and they roll for it the same way and
+  pass the same four things -- which is a better footing than most role names
+  in this file get. `ADDR_CHEAT_INVULNERABLE` is written by the CHEAT RUNNER
+  at `0x00417B80` and read by exactly those two handlers: "I am the
+  Juggernaut!" is one of the four cheat lines this image carries, and this is
+  what it sets.
+
+- **And `VEHICLE_OFF_DEATH_STATE` and `VEHICLE_OFF_DEAD` were already there**,
+  documented as "set to 5" and "set to 1" -- which is exactly what this writes.
+  Grepping the offsets before naming found them; a `VEHICLE_` name of my own at
+  either would have failed `checkoffsets`, but only after I had written it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,098 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,252
+line (0x0045C000) patched**. Measured: **1,099 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,253
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-eight batches have gone in and the 141 entries outstanding start at 48
+small ones in batches. Ninety-nine batches have gone in and the 140 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

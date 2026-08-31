@@ -4550,7 +4550,19 @@ typedef struct {
                                                * is NOT a guess: it logs
                                                * "DamageTrooper: droping armor
                                                * uid:%x" */
-#define ADDR_DAMAGE_VEHICLE      0x0045B4D0u  /* type 3 */
+#define ADDR_DAMAGE_VEHICLE      0x0045B4D0u  /* type 3 -- reconstructed */
+/* 0x00461BA0, two callers, and they are DamageTrooper and DamageVehicle. The
+ * mark a hit leaves at a point: both damage handlers roll for it the same way
+ * and pass the same four things. Name ours, from those two call sites agreeing
+ * -- which is two more than most of this file's role names get. */
+#define ADDR_SPAWN_HIT_EFFECT    0x00461BA0u /* void(const AM2_Point *, slot,
+                                              *      dir, height) */
+#define AM2_HIT_EFFECT_CHANCE    0x40   /* of 255, and only above 1 damage */
+/* Written by the CHEAT RUNNER at 0x00417B80, twice, and read by exactly the
+ * two damage handlers -- where it makes our own army take no damage at all in
+ * a single-player game. "I am the Juggernaut!" is one of the four cheat lines
+ * this image carries, and this is what it sets. */
+#define ADDR_CHEAT_INVULNERABLE  0x00512358u  /* int32_t */
 #define ADDR_DAMAGE_ROACH        0x0043D280u  /* type 8 */
 /* The two event kinds these notifiers raise. Both come from the literal each
  * pushes as EventNotify's `type`, and the pair is what makes them readable:
@@ -9666,6 +9678,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * does use one. Reproduced with the parameter present and ignored, since
  * dropping it would change the calling convention the one caller uses. */
 #define ADDR_VEHICLE_DIED        0x0045B630u  /* void(obj, uint32 by) */
+/* The armour DamageVehicle subtracts, and the reason a weak hit usually does
+ * nothing at all. UNIT_OFF_INVENTORY and TROOPER_OFF_WEAPON_UID are at this
+ * offset on the other two types -- overloading, as at 0x52C and 0x538. */
+#define VEHICLE_OFF_ARMOUR       0x54Cu  /* int32_t */
 #define VEHICLE_OFF_DEATH_STATE  0x580u  /* int32_t, set to 5 */
 #define VEHICLE_OFF_DEAD         0x59Cu  /* int32_t, set to 1 */
 /* The two it calls are ADDR_OBJ_CLEAR_FOOTPRINT and

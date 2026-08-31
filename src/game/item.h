@@ -227,6 +227,12 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj);
  * table over the shot's TYPEREC_OFF_CODE scales its TYPEREC_OFF_DAMAGE, and
  * then the shooter turns on the target if the two are not allied. Two of its
  * five arguments are never read. See item.cpp. */
+/* 0x0045B4D0, one caller -- DamageObject's type-3 arm. Take `amount` off a
+ * vehicle, and if that empties it, empty the vehicle too. Armour is a
+ * THRESHOLD with a damage-proportional chance of one point getting through. */
+void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
+                           uint32_t attacker);
+
 void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
                              int32_t unusedB, int32_t doubled);
 
