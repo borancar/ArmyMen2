@@ -25,6 +25,7 @@
  */
 
 #include "objtable.h"
+#include "item.h"     /* OnSelectionChanged -- reconstructed */
 #include "misc.h"      /* PtrListPush -- reconstructed */
 #include "image.h"
 #include "../inject/patch.h"
@@ -296,7 +297,7 @@ void __cdecl SelectUnit(void *obj)
 
     PtrListPush(rec, (void *)(uintptr_t)uid);
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
-    orig_on_selection_changed(*(const uint32_t *)(uintptr_t)
+    OnSelectionChanged(*(const uint32_t *)(uintptr_t)
                               ADDR_ZERO_POINT);
 }
 
@@ -337,7 +338,7 @@ void __cdecl DeselectUnit(void *obj)
     }
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
-    orig_on_selection_changed(*(const uint32_t *)(uintptr_t)
+    OnSelectionChanged(*(const uint32_t *)(uintptr_t)
                               ADDR_ZERO_POINT);
 }
 

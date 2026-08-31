@@ -11479,3 +11479,69 @@ PAD_OFF_DAMAGE_KIND.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels.
+
+
+## OnSelectionChanged, and three confirmations that were one confirmation
+
+**1,239 - 1,155 = 84 entries outstanding.** `0x00427990` into
+`src/game/item.cpp`, eight callers, every callee already ours.
+
+Three things happen to `ADDR_SELECTED_UIDS`: an entry whose uid no longer
+resolves through `ADDR_OBJ_TABLE` is dropped; a destroyed one is dropped AND
+has `OBJ_FLAG_DESTROYED` cleared on the way out; and the survivor that wins is
+**swapped to index 0**, so the selection's leader is literally its first
+element.
+
+**THE AI-MODE ACCUMULATOR EXPLAINS A NOTE THAT HAD NO MECHANISM.** It starts at
+8 and collapses to 0 the moment two selected units disagree, so orig.h's "the
+pointer mode follows the selection" is really "follows a selection that AGREES
+WITH ITSELF" -- select three units with different modes and `SetPointerMode` is
+never reached. Somebody recorded that behaviour from a drive; this is why.
+
+**Its argument is never read.** Eight callers push a packed point and the body
+never touches it -- checked by looking for the parameter slot at EVERY push
+depth, not by reading past it once.
+
+**The final dispatch is a jump table and was read as one.** Eight indices, FOUR
+arms: 6 shares 0's and 7 shares 1's, while 3, 4 and 5 fall to a default that
+calls nothing. With orig.h's mode names that is attack drawing mode 0's cursor,
+defend drawing mode 1's, ignore its own, evade changing nothing. Numbering the
+arms top to bottom loses the sharing -- the SpriteKeyForKind trap.
+
+### Three confirmations that were one confirmation
+
+I had three independent-looking facts that `+0x04` holds a uid -- DeployTrooper's
+log printing it as `uid:%x`, this function comparing it against
+`OBJ_OFF_RIDING`, and objtable.h's `AM2_Object` declaring `uid` there -- and
+concluded `OBJ_OFF_OWNER` was misnamed and should be renamed.
+
+**That was wrong, and grepping the constant's own uses before touching a shared
+header is what caught it.** Four modules had already settled it, more carefully
+than I had: `OBJ_OFF_OWNER 0x04` belongs to a DIFFERENT STRUCTURE, where it
+genuinely is an owner POINTER -- objscript.cpp reads it as `void *owner`,
+widget.cpp records "a POINTER, not a uid". air.cpp states it exactly: **"Two
+right names, one collision."**
+
+So the constant is right and MY USE was wrong -- twice today, in the shipped
+DeployVehicle bug and again in DeployTrooper's log line, now fixed to
+`((const AM2_Object *)o)->uid`.
+
+**All three of my confirmations sampled AM2_Object and none spoke for the other
+structure.** Three witnesses to one side of a collision are one witness
+repeated. This session's operating rule -- corrections come from fetching
+DIFFERENT evidence -- needs the sharper form: **the evidence has to differ in
+the dimension the claim depends on.** The claim was about a NAME, so the
+decisive evidence was the name's USES, not the field's contents.
+
+Four hand-written warnings in four modules is the pattern this file already
+names as the argument for a check rather than a fifth comment. What is missing
+is anything that catches one struct's offset macro applied to another struct's
+pointer -- one level up from what checkoffsetuse.py does.
+
+**A seventh blind spot for that tool**, found the usual way: it flagged `0x7B`,
+which is a byte of the address `0x00427B51` inside this function's own trailing
+JUMP TABLE, decoded as instructions. Data in .text desynchronising a linear
+decode, surfacing as a field that does not exist.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels.

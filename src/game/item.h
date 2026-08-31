@@ -106,6 +106,12 @@ void __cdecl AdvanceSecondDeadline(void);
  * leaving the map and being unregistered are the same operation. */
 void __cdecl ObjRemap(void *obj, void *desc, int32_t force);
 
+/* 0x00427990, eight callers. The selection changed: drop entries whose object
+ * is gone, drop and un-flag destroyed ones, promote a leader to index 0, and
+ * set the pointer mode -- but only when every selected unit agrees on its AI
+ * mode. Its argument is never read; see item.cpp. */
+void __cdecl OnSelectionChanged(uint32_t unusedPoint);
+
 void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
 
 void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,

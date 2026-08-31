@@ -26,6 +26,12 @@ other. KNOWN BLIND SPOTS, measured on real functions rather than guessed:
     ObjTileHook reads PAD_OFF_DAMAGE as [ecx*8 + 0x5161CC], which is
     ADDR_PADS + 0x34;
   - a field at offset zero is `[reg]` with no displacement at all.
+  - a function with a TRAILING JUMP TABLE has that table decoded as
+    instructions, and its address bytes read as displacements --
+    OnSelectionChanged's table at 0x00427B7C produces a phantom 0x7B, which is
+    a byte of the address 0x00427B51. Data in .text desynchronising a linear
+    decode is the same hazard CLAUDE.md records for am2.Image().disasm(); here
+    it surfaces as a field that does not exist.
 Validated by running it on a function known good: ObjMoveAlongFacing reports
 "sets agree", 19 for 19. It is a HEURISTIC, not a proof -- the original indexes arrays and uses
 literal displacements the C may legitimately spell differently -- so it is

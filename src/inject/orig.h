@@ -9451,8 +9451,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * selects three units can still leave SetPointerMode at 1, and why three
  * reconstructed functions behind the weapon path read 0. Still original. */
 #define ADDR_ON_SELECTION_CHANGED 0x00427990u /* void(uint32_t packedPoint) */
-#define orig_on_selection_changed \
-            ((void (__cdecl *)(uint32_t))(uintptr_t)ADDR_ON_SELECTION_CHANGED)
 #define ADDR_FREE_SPRITE_LIST    0x004098B0u  /* what the alias jumps to */
 #define ADDR_MAP_NAME_DEFAULT    0x00485108u  /* const char **, used when empty */
 #define ADDR_MP_SCRIPT_DEFAULT   0x0048510Cu  /* const char ** */

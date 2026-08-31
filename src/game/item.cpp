@@ -6726,7 +6726,7 @@ void __cdecl DeselectAll(void)
     }
 
     ClearPtrList(sel);
-    orig_on_selection_changed(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+    OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
 /* ADDR_SEND_VEHICLE_ENTER stays original and is reached by address -- it is
@@ -8035,7 +8035,7 @@ void __cdecl ToggleSelect(void *obj)
         PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
                     (void *)(uintptr_t)o->uid);
         *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
-        orig_on_selection_changed(
+        OnSelectionChanged(
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
         return;
     }
@@ -8048,7 +8048,7 @@ void __cdecl ToggleSelect(void *obj)
             break;
 
     if (i >= n || n <= 1) {
-        orig_on_selection_changed(
+        OnSelectionChanged(
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
         return;
     }
@@ -8056,7 +8056,7 @@ void __cdecl ToggleSelect(void *obj)
     ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
     *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
     orig_obj_attach_to(o, (void *)0);
-    orig_on_selection_changed(
+    OnSelectionChanged(
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
@@ -9026,7 +9026,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
     if (*(const int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
                            + COMM_OFF_VERBOSE) != 0)
         orig_log((const char *)AM2_IMAGE(ADDR_FMT_DEPLOY_TROOPER),
-                 *(const uint32_t *)(o + OBJ_OFF_OWNER), x, y);
+                 ((const AM2_Object *)o)->uid, x, y);
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
 
@@ -9212,6 +9212,138 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
         ListUnlink(entry, (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
                                     + (uint32_t)was * 4u));
         *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+    }
+}
+
+/* 0x00427990, eight callers. The selection changed: drop what is gone,
+ * promote a leader, and set the pointer to match.
+ *
+ * ITS ARGUMENT IS NEVER READ. Eight callers dutifully push a packed point and
+ * nothing in the body touches it -- checked by looking for the parameter slot
+ * at every push depth, not by reading past it once. The signature stays
+ * because the callers are cdecl and orig.h already declares it.
+ *
+ * Three things happen to the selection list, which is ADDR_SELECTED_UIDS in
+ * the ordinary sub-list shape: a count at +4 and the uid array at +8.
+ *
+ *   - an entry whose uid no longer resolves through ADDR_OBJ_TABLE is dropped;
+ *   - a destroyed one is dropped AND has OBJ_FLAG_DESTROYED cleared on the way
+ *     out, which is the only place that bit is taken off a dead unit here;
+ *   - what survives is classified, and the winner is SWAPPED TO INDEX 0 -- the
+ *     selection's leader is literally its first element.
+ *
+ * THE AI-MODE ACCUMULATOR IS WHY THE POINTER OFTEN DOES NOT CHANGE, and it
+ * explains a note orig.h already carried without a mechanism. It starts at 8
+ * and collapses to 0 the moment two selected units disagree, so "the pointer
+ * mode follows the selection" is really "follows a selection that AGREES WITH
+ * ITSELF". Select three units with different modes and SetPointerMode is never
+ * reached.
+ *
+ * THE FINAL DISPATCH IS A JUMP TABLE AND WAS READ AS ONE. Eight indices,
+ * FOUR distinct arms: 6 shares 0's and 7 shares 1's, while 3, 4 and 5 fall to
+ * a default that calls nothing. With orig.h's mode names that is attack
+ * drawing mode 0's cursor, defend drawing mode 1's, ignore its own, and evade
+ * changing nothing. Numbering the arms top to bottom gives 0,1,2,3... and
+ * loses the sharing entirely -- the SpriteKeyForKind trap. */
+void __cdecl OnSelectionChanged(uint32_t unusedPoint)
+{
+    uint8_t  *list = (uint8_t *)(uintptr_t)ADDR_SELECTED_UIDS;
+    uint8_t  *local;
+    uint8_t  *leader = 0;
+    int32_t   leaderIdx = 0;
+    int32_t   mode = 1;
+    int32_t   aiMode = 8;
+    int32_t   maxRank = -1;
+    int32_t   i, slot;
+
+    (void)unusedPoint;
+
+    local = (uint8_t *)LookupOwnerObj(
+                *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+    if (*(const int32_t *)(list + SUBREC_OFF_COUNT) <= 0)
+        return;
+
+    for (i = 0; i < *(const int32_t *)(list + SUBREC_OFF_COUNT); ) {
+        const uint32_t *uids = *(const uint32_t **)(list + SUBREC_OFF_ROWS);
+        uint8_t        *obj = 0;
+
+        slot = FindSlot(uids[i], &slot);
+        if (slot >= 0)
+            obj = (uint8_t *)g_objTable[slot].obj;
+
+        if (obj == 0) {
+            ListRemoveAt(list, i);
+            continue;
+        }
+
+        if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
+            ListRemoveAt(list, i);
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+            continue;
+        }
+
+        if (ObjIsTypeIn238((const AM2_Object *)obj)) {
+            if (ObjType2Field548((const AM2_Object *)obj)) {
+                leader = obj;
+                leaderIdx = i;
+                mode = 0;
+                break;
+            }
+            if (ObjIsType3((const AM2_Object *)obj)) {
+                if (local != 0
+                    && *(const uint32_t *)(local + OBJ_OFF_RIDING)
+                       == ((const AM2_Object *)obj)->uid) {
+                    leader = obj;
+                    leaderIdx = i;
+                    mode = 0;
+                    break;
+                }
+                if (maxRank < 8) {
+                    maxRank = 8;
+                    leaderIdx = i;
+                    leader = obj;
+                    if (aiMode == 8)
+                        aiMode = *(const int32_t *)(obj + OBJ_OFF_AI_MODE);
+                    else if (aiMode != *(const int32_t *)(obj + OBJ_OFF_AI_MODE))
+                        mode = 0;
+                }
+            } else {
+                if (*(const int32_t *)(obj + OBJ_OFF_RANK) > maxRank) {
+                    maxRank = *(const int32_t *)(obj + OBJ_OFF_RANK);
+                    leaderIdx = i;
+                    leader = obj;
+                }
+                if (aiMode == 8)
+                    aiMode = *(const int32_t *)(obj + OBJ_OFF_AI_MODE);
+                else if (aiMode != *(const int32_t *)(obj + OBJ_OFF_AI_MODE))
+                    mode = 0;
+            }
+        }
+        i++;
+    }
+
+    /* The leader becomes element zero. */
+    {
+        uint32_t *uids = *(uint32_t **)(list + SUBREC_OFF_ROWS);
+        uint32_t  first = uids[0];
+
+        uids[leaderIdx] = first;
+        uids = *(uint32_t **)(list + SUBREC_OFF_ROWS);
+        uids[0] = first;
+    }
+
+    if (leader != 0)
+        SetObjContext(leader);
+
+    if (mode == 0 || (uint32_t)aiMode > 7u)
+        return;
+
+    switch (aiMode) {
+    case 0: case 6: SetPointerMode(4); break;
+    case 1: case 7: SetPointerMode(5); break;
+    case 2:         SetPointerMode(6); break;
+    default:        break;   /* 3, 4, 5 change nothing */
     }
 }
 
@@ -9486,6 +9618,8 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_ON_SELECTION_CHANGED, (const void *)OnSelectionChanged,
+                  "OnSelectionChanged", 8);
     patch_replace(ADDR_OBJ_REMAP, (const void *)ObjRemap, "ObjRemap", 3);
     patch_replace(ADDR_DEPLOY_TROOPER, (const void *)DeployTrooper,
                   "DeployTrooper", 1);
