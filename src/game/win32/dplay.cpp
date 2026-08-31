@@ -32,6 +32,7 @@
 #include "cdcheck.h"
 #include "../msgslot.h"
 #include "../objtable.h"
+#include "../commmsg.h"  /* CommInitDefaults -- reconstructed */
 #include "../../inject/patch.h"
 #include "winmain.h"   /* Ticks */
 #include "../image.h"  /* AM2_IMAGE */
@@ -256,7 +257,6 @@ static_assert(KEY_ALL_ACCESS == 0xF003F, "KEY_ALL_ACCESS");
 #define comm_u32(base, off) (*(uint32_t *)((uint8_t *)(base) + (off)))
 
 typedef void (__cdecl *am2_comm_void_fn)(void);
-#define orig_comm_init_defaults (*(am2_comm_void_fn)ADDR_COMM_INIT_DEFAULTS)
 /* The logger is called with no arguments at all. It is stubbed to `ret` in the
  * shipping image, so this is a no-op either way, but it is reproduced rather
  * than dropped -- see ADDR_LOG. */
@@ -274,7 +274,7 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     int32_t  i;
 
     StartPacketThread();
-    orig_comm_init_defaults();
+    CommInitDefaults();
     now = GetTickCount();
 
     comm_u32(self, 0x3EC) = 0;

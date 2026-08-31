@@ -93,6 +93,10 @@ void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
  * reached goes out through CommSend and its buffer returns to the pool. */
 void __cdecl FlushDelayedSends(void);
 
+/* 0x0040FD40, one caller. Stamp the two-dword header -- a kind and the
+ * record's whole size -- of the twenty comm messages that live in .bss. */
+void __cdecl CommInitDefaults(void);
+
 int commmsg_install(void);
 
 #ifdef __cplusplus

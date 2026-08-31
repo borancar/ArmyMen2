@@ -2270,12 +2270,83 @@ void __cdecl FlushDelayedSends(void)
 }
 
 
+/* CommInitDefaults -- original 0x0040FD40, one caller. Stamp the two-dword
+ * header of twenty messages that live in .bss: a kind and the record's whole
+ * size, and nothing else.
+ *
+ * IT FILLS NO TABLE, which is what orig.h called it. The twenty records are
+ * scattered across 0x004F48E8..0x004FC8A8 with no stride between them, so this
+ * is twenty separate structures being initialised in one place rather than an
+ * array being walked.
+ *
+ * THE KIND IS NOT UNIQUE: four different records take kind 0x0B at sizes
+ * 0x400, 0x14, 0x14 and 0x400. So a kind selects a HANDLER and the record says
+ * which conversation it belongs to; a survey assuming one record per kind
+ * would come up four short.
+ *
+ * Written as a table and a loop rather than forty assignments, the same shape
+ * win32/palette.cpp uses for the colours it looks up by name -- and the table
+ * was EXTRACTED from the disassembly by script rather than transcribed, which
+ * is the lesson tools/posecheck.py records about hand-copied tables.
+ *
+ * The order is the original's. It looks shuffled at two points because the
+ * original loads 8, 0x10, 0xB and 0xC into registers once at the top and then
+ * spends them as it goes, so the two halves of 0x004FC3A8 and 0x004FC3B8 are
+ * written far apart. Nothing observes the order -- the twenty records are
+ * distinct objects -- so they are grouped here.
+ *
+ * Four of the twenty already had names, which is what confirms the layout
+ * rather than assuming it: ADDR_MSG_CHAT is kind 3 at 0x108 bytes, a 256-byte
+ * line plus a header, and ADDR_MSG_COLOR and ADDR_MSG_TEAM are both 0x0C.
+ */
+static const struct {
+    uint32_t addr;
+    int32_t  kind;
+    int32_t  size;
+} kCommMessages[] = {
+    { 0x004FC3B8, 0x08, 0x238 },
+    { 0x004FBF80, 0x01, 0x404 },
+    { 0x004F48E8, 0x02, 0x010 },
+    { 0x004FA910, 0x03, 0x108 },   /* ADDR_MSG_CHAT */
+    { 0x004FBB80, 0x04, 0x010 },
+    { 0x004FC5F0, 0x05, 0x194 },   /* ADDR_MSG_GAME_START */
+    { 0x004FAA50, 0x06, 0x010 },
+    { 0x004FAA18, 0x12, 0x00C },
+    { 0x004FAA28, 0x07, 0x00C },
+    { 0x004FB770, 0x0F, 0x010 },
+    { 0x004FC898, 0x09, 0x00C },   /* ADDR_MSG_COLOR */
+    { 0x004FC8A8, 0x11, 0x00C },   /* ADDR_MSG_TEAM */
+    { 0x004FC3A8, 0x0A, 0x008 },
+    { 0x004FC788, 0x0D, 0x10C },
+    { 0x004FAE68, 0x0B, 0x400 },
+    { 0x004FAA68, 0x0B, 0x014 },
+    { 0x004FB270, 0x0B, 0x014 },
+    { 0x004FB780, 0x0B, 0x400 },
+    { 0x004FC388, 0x0C, 0x010 },
+    { 0x004FAA38, 0x10, 0x014 },
+};
+
+void __cdecl CommInitDefaults(void)
+{
+    uint32_t i;
+
+    for (i = 0; i < sizeof kCommMessages / sizeof kCommMessages[0]; i++) {
+        uint8_t *rec = (uint8_t *)AM2_IMAGE(kCommMessages[i].addr);
+
+        *(int32_t *)(rec + COMMMSG_OFF_KIND) = kCommMessages[i].kind;
+        *(int32_t *)(rec + COMMMSG_OFF_SIZE) = kCommMessages[i].size;
+    }
+}
+
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_TROOP_SUB_PARSE, (const void *)TroopSubParse,
                   "TroopSubParse", 1);
     patch_replace(ADDR_FLUSH_DELAYED_SENDS, (const void *)FlushDelayedSends,
                   "FlushDelayedSends", 1);
+    patch_replace(ADDR_COMM_INIT_DEFAULTS, (const void *)CommInitDefaults,
+                  "CommInitDefaults", 1);
     patch_replace(ADDR_DRAIN_MSG_LIST, (const void *)DrainMsgList,
                   "DrainMsgList", 1);
     patch_replace(ADDR_TELL_EACH_SLOT, (const void *)TellEachSlot,

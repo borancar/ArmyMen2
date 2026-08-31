@@ -2368,7 +2368,25 @@
 #define ADDR_STR_THREAD_FAILED   0x0047384Cu  /* "Error launching packet thread" */
 #define ADDR_GAME_SRAND          0x00464416u  /* void(uint32_t) */
 #define ADDR_GAME_RAND           0x00464420u  /* int32_t(void) */
-#define ADDR_COMM_INIT_DEFAULTS  0x0040FD40u  /* void(void); fills a global table */
+/* 0x0040FD40, one caller -- and it fills no table. It writes the two-dword
+ * HEADER of twenty separate messages that live in .bss, each one a
+ * {kind, size} pair, and nothing else. The records are scattered across
+ * 0x004F48E8..0x004FC8A8 and four of them already had names -- ADDR_MSG_CHAT,
+ * ADDR_MSG_GAME_START, ADDR_MSG_COLOR, ADDR_MSG_TEAM -- so the layout is
+ * confirmed rather than assumed: chat is kind 3 at 0x108 bytes, which is a
+ * 256-byte line and a header.
+ *
+ * THE KIND IS NOT UNIQUE. Four different records take kind 0x0B, at sizes
+ * 0x400, 0x014, 0x014 and 0x400, so the kind selects a HANDLER and the record
+ * is which conversation it belongs to. A survey that assumed one record per
+ * kind would come up four short.
+ *
+ * Reconstructed as a table and a loop rather than forty assignments, the same
+ * shape win32/palette.cpp uses for the colours it looks up by name. Twenty
+ * invented record names would be worse than none. */
+#define ADDR_COMM_INIT_DEFAULTS  0x0040FD40u  /* void(void) */
+#define COMMMSG_OFF_KIND         0x00u   /* int32_t */
+#define COMMMSG_OFF_SIZE         0x04u   /* int32_t, the whole record */
 #define ADDR_COMM_RESET_STATE    0x0040F380u  /* thiscall void(this) */
 
 /* The six window messages WndProc used to hand back to the original. They are
