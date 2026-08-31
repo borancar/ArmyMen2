@@ -607,7 +607,7 @@ uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt)
  * `RoundTo8(heading, bits) << (8 - bits)` rounds an 8-bit heading to one of
  * the animation's evenly spaced facings and puts it back in 8-bit form. A
  * sprite with eight directions therefore moves in eight directions, not 256.
- * Only when OBJ_FLAG_BIT5 is set; otherwise the heading is used as given.
+ * Only when OBJ_FLAG_SNAP_HEADING is set; otherwise the heading is used as given.
  *
  * THE ROW POINTER IS DEREFERENCED BEFORE IT IS TESTED. `rows` is left NULL
  * when OBJ_OFF_ROW_COUNT is not positive and then read at
@@ -663,7 +663,7 @@ int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
         return 0;
 
     head = (uint8_t)heading;
-    if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT5) && rows) {
+    if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SNAP_HEADING) && rows) {
         uint8_t bits = anim->directionBits;
 
         head = (uint8_t)((uint8_t)RoundTo8(head, bits) << (8 - bits));

@@ -40,6 +40,12 @@ void __cdecl RankPromote(void *obj);
  * act on every live type 2. */
 void __cdecl Type2ActionAll(void);
 
+/* 0x00429040, six callers. Advance an object along its facing for one frame
+ * and re-link its map rows. See item.cpp for the X/Y rounding asymmetry and
+ * for why zero vertical velocity means not falling. */
+void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
+                                int32_t reverse);
+
 #endif
 
 /* Original: 0x00447990, and it names itself -- "RemoveInventoryItem". Take one

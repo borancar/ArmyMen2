@@ -5326,7 +5326,12 @@ typedef struct {
 #define ADDR_STEP_OBJ_ROWS       0x00428E00u  /* void(void *obj) */
 #define ADDR_STEP_ROW_ANIM       0x0040A380u  /* void(void *row) */
 #define ROW_OFF_FIELD_3C         0x3Cu   /* int16_t -> OBJ_OFF_FIELD_44 */
-#define OBJ_OFF_FIELD_44         0x44u   /* int32_t, from the row above */
+/* int32_t, copied from ROW_OFF_FIELD_3C above. ObjMoveAlongFacing multiplies
+ * it by ADDR_FRAME_DELTA_SEC and projects the result through Cos8/Sin8 into
+ * the position, so it is a SPEED in units per second and the animation is
+ * what supplies it. Left named for its offset: twenty sites across two files
+ * read it, and renaming them is its own change with its own verification. */
+#define OBJ_OFF_FIELD_44         0x44u
 /* 0x0042B210, five callers. ADDR_POINT_OF_TILE's two-pointer twin: the same
  * arithmetic, written back as a pair of int32 rather than packed into one
  * dword. Both add 8, which is the centre of a 16-pixel tile. */
@@ -9192,9 +9197,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * destroyed and army are all skipped. So it is an override, and what sets it
  * is not established. Named for the bit. */
 #define OBJ_FLAG_BIT8            0x100u
-#define OBJ_FLAG_BIT5            0x20u   /* MoveStepPoint SNAPS the heading to
-                                          * the animation's facings when set;
-                                          * named by bit, from one reader */
+/* Two readers now, doing the same thing: MoveStepPoint and
+ * ObjMoveAlongFacing both round the heading to one of the animation's
+ * directions when this is set -- RoundTo8(facing, bits) << (8 - bits), the
+ * shift anim.h predicts where it says a consumer gets from an 8-bit heading
+ * to a direction "with a shift instead of a divide". Promoted off its bit
+ * name on the strength of the second reader; RENAMED, not aliased. */
+#define OBJ_FLAG_SNAP_HEADING    0x20u
 #define OBJ_FLAG_SELECTED        0x400u
 /* 0x00458380, four callers. Select one object if it is ours and selectable,
  * clearing the existing selection first unless a CONTROL key is held. */
@@ -9987,6 +9996,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * two offsets on a ROW, which is a different structure -- the same overlap
  * CLAUDE.md records for the ROW_/OBJ_ pair at 0x1C, and the reason both
  * prefixes exist. */
+/* The vertical pair, named by exact analogy with the X/Y one below and
+ * confirmed by the arithmetic that reads them: OBJ_OFF_VEL_Z is scaled by
+ * ADDR_FRAME_DELTA_SEC into OBJ_OFF_ROW0_Y_ADJUST with the remainder kept,
+ * then ADDR_GRAVITY x the same scale is subtracted from it.
+ *
+ * ZERO MEANS NOT FALLING. ObjMoveAlongFacing compares OBJ_OFF_VEL_Z against a
+ * float zero and skips the whole vertical block when it matches -- which is
+ * what AM2_VEL_Z_MIN is for: subtracting gravity can land exactly on zero, and
+ * that would mark a falling object as landed. Both constants were read out of
+ * the image rather than reasoned about, and the first reading of them as
+ * sentinels distinct from zero was wrong. */
+#define OBJ_OFF_VEL_Z          0x48u   /* float */
+#define OBJ_OFF_SUBPIXEL_Z     0x54u   /* float */
+#define ADDR_GRAVITY           0x004852ECu  /* float 440.0, units/s/s */
+#define AM2_VEL_Z_MIN          0xBC23D70Au  /* -0.01f, the anti-zero nudge */
 #define OBJ_OFF_SUBPIXEL_X     0x4Cu   /* float */
 #define OBJ_OFF_SUBPIXEL_Y     0x50u   /* float */
 #define OBJ_OFF_ROW_COUNT      0x70u

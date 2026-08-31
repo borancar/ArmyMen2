@@ -10815,3 +10815,94 @@ and a `TRACE=1` probe reading **`BuildHudWidgets=1`**, from the original
 level-load caller -- so the code runs and the counter is not blind.
 `FreeHudWidgets=0` beside it is the expected blind spot, since our builder
 calls it by name.
+
+
+## ObjMoveAlongFacing, an arity caught by a ratchet, and a desynced decoder
+
+**1,239 - 1,146 = 93 entries outstanding.** `0x00429040` into
+`src/game/item.cpp`, beside the `ObjTileChanged` and `StepObjRows` it calls.
+
+It is a per-frame integrator. `ADDR_FRAME_DELTA_SEC` scales everything, so
+`OBJ_OFF_FIELD_44` is a SPEED and the 440.0f at `ADDR_GRAVITY` is an
+acceleration, with three sub-pixel accumulators -- one per axis.
+
+**Almost every name it needed was written by another function, and each one
+predicts what this code does rather than merely fitting it.**
+`ROW_OFF_HEADING_BIAS` says "added to the a[ngle]", and the code does
+`add al, [row+0x5C]`. `OBJ_OFF_ROW0_Y_ADJUST` says "copied to ROW_OFF..." --
+this is the copier. `OBJ_OFF_SUBPIXEL_X/_Y` were already float accumulators.
+`SPRITE_OFF_ATTACH_X/Y` are the sub-part offsets. And `anim.h` predicted the
+heading idiom outright, saying a consumer gets from an 8-bit heading to a
+direction "with a shift instead of a divide" -- which is
+`RoundTo8(facing, bits) << (8 - bits)`.
+
+A trap avoided by resolving each offset to its FAMILY, not just its number:
+`edi` here is the ROW, so `[edi+0x5C]` is `ROW_OFF_HEADING_BIAS` and not
+`OBJ_OFF_REVEALED_UNTIL`, which is also 0x5C on the other struct.
+
+**`tools/checkseams.py` caught a wrong SIGNATURE, not just a wrong seam.** I
+wrote three parameters. The check failed the build on an existing
+`orig_move_along_facing` in the same file, whose typedef had FOUR and whose
+call site passes `(obj, 0, 0, 0)`. Recomputing the offsets from entry showed I
+had the roles wrong too: `[esp+0x18]` survives untouched to `ObjTileChanged`,
+`[esp+0x1C]` is never read, and `[esp+0x20]` is the reverse flag whose slot is
+then REUSED as the angle scratch -- which is what makes it read like a local.
+
+Confirmed independently at `StepType6`'s call site, which pushes four. That
+site also carries the inverse trap: its `add esp, 0x14` cleans twenty bytes
+across TWO calls, so counting arity from the stack adjustment gives five.
+
+**X AND Y ARE NOT ROUNDED ALIKE**, and the encoding says so instruction by
+instruction. The new X is stored to its float field and reloaded before its
+integer part is taken off, so it rounds to float mid-expression; the new Y
+stays on the x87 stack from the add through to the subtraction and rounds once
+on store. `long double` is i386's 80-bit type, which is what makes the
+difference expressible; writing both as plain floats would silently change Y.
+
+**The bootcamp STATE dump is what verifies this, and nothing else could.**
+It is 1,610 lines of object fields compared with `diff` and no budget -- the
+same artifact that once caught a weapon at 0,0 instead of 1743,1052. Both the
+rounding asymmetry and the `long double` modelling would move it. Identical.
+
+**`am2.Image().disasm()` DESYNCS, and I nearly reconstructed from garbage.**
+Scouting `StepType6` through the linear pass produced a phantom
+`je 0x422bb9` whose target falls INSIDE a `call`, plus `or al,0x33` and
+`in eax,dx` as prologue. `tools/disasm.py` decodes from the function entry and
+gives `push ebp; push esi; mov esi,[esp+0xc]; xor ebp,ebp`.
+
+The corrected read differs where it matters: 11 distinct targets rather than
+12, and **TWO `ret`s rather than one**. A second return is exactly what hid a
+branch from `AngleDelta` and shipped a confident comment explaining an
+asymmetry that function does not have.
+
+Checked rather than assumed: today's four earlier reads --
+`ArmyMessageFlush`, both static-init groups, `BuildHudWidgets` and this
+function -- all decode identically from the entry, with plausible prologues and
+matching epilogues. `ObjMoveAlongFacing` is 159 instructions and ONE `ret`, so
+both `return`s in the reconstruction are jumps to the single epilogue.
+
+**The tell for a desync is garbage in the prologue and a jump target that is
+not the start of any instruction.** Use the entry-based decoder to read a
+function; keep the linear pass for whole-section sweeps where boundaries do
+not matter.
+
+Two more names, both promoted on a SECOND reader rather than invented:
+`OBJ_FLAG_BIT5` becomes `OBJ_FLAG_SNAP_HEADING` (its own comment said "from one
+reader"; this is the second, doing the same rounding), renamed not aliased
+across four sites. `OBJ_OFF_VEL_Z` and `OBJ_OFF_SUBPIXEL_Z` are named by exact
+analogy with the X/Y pair and confirmed by the gravity arithmetic that reads
+them.
+
+**Zero vertical velocity means NOT FALLING**, and reading the constants is what
+settled it. `0x0046F928` and `0x0046F920` are both plain zero, not the
+sentinels I first took them for -- and once that is known, the -0.01f clamp
+explains itself: subtracting gravity can land exactly on zero, which would mark
+a falling object as landed.
+
+`OBJ_OFF_FIELD_44` keeps its offset name deliberately. The writer/reader pair
+now says it is a speed in units per second supplied by the animation, and that
+is recorded in its comment -- but twenty sites across two files is a rename
+with its own verification, not a passenger on this one.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels.

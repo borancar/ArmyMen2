@@ -1926,7 +1926,7 @@ void *__cdecl CreateRoach(int32_t kind, const char *name, int32_t x, int32_t y,
     /* Both already zero from the memset; the original writes them anyway. */
     *(uint8_t *)(o + OBJ_OFF_FACING) = 0;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
-        (uint32_t)flags | OBJ_FLAG_BIT0 | OBJ_FLAG_BIT4 | OBJ_FLAG_BIT5;
+        (uint32_t)flags | OBJ_FLAG_BIT0 | OBJ_FLAG_BIT4 | OBJ_FLAG_SNAP_HEADING;
 
     *(int8_t *)(o + OBJ_OFF_ARMY)      = (int8_t)army;
     *(int32_t *)(o + VEHICLE_OFF_KIND) = kind;
@@ -5468,10 +5468,6 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
     SetSoldierKind(obj, 6);
 }
 
-typedef void (__cdecl *AM2_MoveFacingFn)(void *obj, int32_t a, int32_t b,
-                                         int32_t c);
-#define orig_move_along_facing ((AM2_MoveFacingFn)(uintptr_t)ADDR_OBJ_MOVE_ALONG_FACING)
-
 /* 0x00433EC0, and the jump table gives it to types 1 AND 4 -- 24.8 million
  * calls between them in one Boot Camp mission, which makes this the
  * best-exercised reconstruction in the tree and the worst place to be sloppy.
@@ -5540,7 +5536,7 @@ void __cdecl StepType1And4(void *obj)
     UpdateObjectScript(obj);
 
     if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT7) {
-        orig_move_along_facing(obj, 0, 0, 0);
+        ObjMoveAlongFacing(obj, 0, 0, 0);
         *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT7;
     }
 
@@ -8730,6 +8726,167 @@ void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj))
     }
 }
 
+/* 0x00429040, six callers. Advance an object along its facing for one frame
+ * and re-link its map rows.
+ *
+ * FOUR arguments, and the arity came from the seam this replaces rather than
+ * from the body: `unused` is never read, `tileArg` survives untouched to
+ * ObjTileChanged at the end, and `reverse` is read once and its stack slot
+ * then reused as the angle scratch. A three-argument reading put both live
+ * arguments in the wrong places; tools/checkseams.py is what forced the old
+ * typedef into view.
+ *
+ * ADDR_FRAME_DELTA_SEC scales everything, so OBJ_OFF_FIELD_44 is a SPEED and
+ * ADDR_GRAVITY's 440.0 is an acceleration: the whole function is a per-frame
+ * integrator with three sub-pixel accumulators, one per axis.
+ *
+ * The heading is not the facing directly. With OBJ_FLAG_SNAP_HEADING set and
+ * an animation on row 0 it is rounded to one of that animation's directions
+ * and re-expanded to eight bits -- RoundTo8(facing, bits) << (8 - bits), the
+ * shift anim.h predicts. Then `reverse` adds half a turn and
+ * ROW_OFF_HEADING_BIAS is added last. Note ROW_OFF_HEADING_BIAS is a ROW field
+ * at 0x5C, not OBJ_OFF_REVEALED_UNTIL, which is also 0x5C on the other struct.
+ *
+ * X AND Y ARE NOT ROUNDED ALIKE, and that is reproduced rather than tidied.
+ * The new X is stored into its float field and read back before its integer
+ * part is taken off, so it rounds to float mid-expression; the new Y stays on
+ * the x87 stack from the add right through to the subtraction and rounds once,
+ * on the way in. Writing both as plain floats would silently change Y. The
+ * `long double` is i386's 80-bit x87 type, which is what makes the difference
+ * expressible at all, and _ftol truncates toward zero exactly as a C cast
+ * does -- mapdraw.cpp records the same.
+ *
+ * Zero vertical velocity means NOT FALLING; see AM2_VEL_Z_MIN in orig.h.
+ *
+ * Two null dereferences of the original's are kept. With no rows the row
+ * pointer stays null and ROW_OFF_ANIM_PLAYING is read off it anyway, as is
+ * ROW_OFF_HEADING_BIAS. Same standing as LockSurface's descriptor after a
+ * successful Restore. */
+void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
+                                int32_t reverse)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *row0 = (uint8_t *)0;
+    uint8_t *anim;
+    int32_t  i;
+
+    (void)unused;   /* the original never reads its third argument */
+
+    if (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS == 0)
+        return;
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
+        row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
+
+    /* Read off a null row0 when there are no rows -- the original's. */
+    anim = *(uint8_t **)(row0 + ROW_OFF_ANIM_PLAYING);
+    if (anim != (uint8_t *)0) {
+        const float scale = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+        uint8_t     angle = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        int32_t     speed;
+
+        if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SNAP_HEADING)
+            && row0 != (uint8_t *)0) {
+            uint32_t bits = ((const AM2_Anim *)anim)->directionBits;
+
+            angle = (uint8_t)RoundTo8((int32_t)angle, bits);
+            /* Re-read the animation off the row, as the original does. */
+            bits = ((const AM2_Anim *)
+                    *(uint8_t **)(row0 + ROW_OFF_ANIM_PLAYING))->directionBits;
+            angle = (uint8_t)((uint32_t)angle << (8u - bits));
+        }
+
+        if (reverse != 0)
+            angle = (uint8_t)(angle + 0x80u);
+        angle = (uint8_t)(angle
+                          + *(const uint8_t *)(row0 + ROW_OFF_HEADING_BIAS));
+
+        speed = *(const int32_t *)(o + OBJ_OFF_FIELD_44);
+        if (speed != 0) {
+            float       step;
+            long double ny;
+            int32_t     ix, iy;
+
+            step = (float)((long double)speed * (long double)scale);
+
+            /* Stored and read back: X rounds to float here. */
+            *(float *)(o + OBJ_OFF_SUBPIXEL_X) = (float)
+                ((long double)Cos8(angle) * (long double)step
+                 + (long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_X));
+            /* Never stored: Y stays at 80 bits until its own store below. */
+            ny = (long double)Sin8(angle) * (long double)step
+                 + (long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_Y);
+
+            ix = (int32_t)*(const float *)(o + OBJ_OFF_SUBPIXEL_X);
+            iy = (int32_t)ny;
+
+            *(int16_t *)(o + OBJ_OFF_X) =
+                (int16_t)(*(const int16_t *)(o + OBJ_OFF_X) + (int16_t)ix);
+            *(int16_t *)(o + OBJ_OFF_Y) =
+                (int16_t)(*(const int16_t *)(o + OBJ_OFF_Y) + (int16_t)iy);
+
+            *(float *)(o + OBJ_OFF_SUBPIXEL_X) = (float)
+                ((long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_X)
+                 - (long double)ix);
+            *(float *)(o + OBJ_OFF_SUBPIXEL_Y) =
+                (float)(ny - (long double)iy);
+        }
+
+        if (*(const float *)(o + OBJ_OFF_VEL_Z) != 0.0f) {
+            long double dz = (long double)scale
+                             * (long double)*(const float *)
+                               (o + OBJ_OFF_VEL_Z);
+            int32_t     iz = (int32_t)dz;
+
+            *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = (int16_t)
+                (*(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) + (int16_t)iz);
+            *(float *)(o + OBJ_OFF_SUBPIXEL_Z) = (float)
+                (dz + (long double)*(const float *)(o + OBJ_OFF_SUBPIXEL_Z)
+                 - (long double)iz);
+
+            if (*(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) < 0) {
+                *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = 0;
+                *(int32_t *)(o + OBJ_OFF_VEL_Z) = 0;
+            } else {
+                *(float *)(o + OBJ_OFF_VEL_Z) = (float)
+                    ((long double)*(const float *)(o + OBJ_OFF_VEL_Z)
+                     - (long double)*(const float *)(uintptr_t)ADDR_GRAVITY
+                       * (long double)scale);
+                if (*(const float *)(o + OBJ_OFF_VEL_Z) == 0.0f)
+                    *(uint32_t *)(o + OBJ_OFF_VEL_Z) = AM2_VEL_Z_MIN;
+            }
+        }
+    }
+
+    if (row0 != (uint8_t *)0) {
+        if (*(void **)(row0 + ROW_OFF_SPRITE) == (void *)0)
+            return;
+        *(int32_t *)(row0 + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
+        *(int16_t *)(row0 + ROW_OFF_Y_ADJUST) =
+            *(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST);
+        RowUpdate(row0, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+    }
+
+    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t       *r = *(uint8_t **)(o + OBJ_OFF_ROWS)
+                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+        const uint8_t *spr;
+
+        *(int32_t *)(r + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
+        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
+        *(int16_t *)(r + ROW_OFF_X) = (int16_t)
+            (*(const int16_t *)(r + ROW_OFF_X)
+             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));
+        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
+        *(int16_t *)(r + ROW_OFF_Y) = (int16_t)
+            (*(const int16_t *)(r + ROW_OFF_Y)
+             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
+        RowUpdate(r, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+    }
+
+    ObjTileChanged(o, tileArg, 0);
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -9001,6 +9158,9 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_OBJ_MOVE_ALONG_FACING,
+                  (const void *)ObjMoveAlongFacing,
+                  "ObjMoveAlongFacing", 6);
     patch_replace(ADDR_OBJ_TILE_CHANGED, (const void *)ObjTileChanged,
                   "ObjTileChanged", 15);
     patch_replace(ADDR_VEHICLE_DIED, (const void *)VehicleDied, "VehicleDied", 1);
