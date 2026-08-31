@@ -540,6 +540,12 @@
  * block already describes as indexing ADDR_WEAPON_HANDLERS; it is also what
  * picks the caption here, which is what names 41 of its values. */
 #define ITEMTYPE_OFF_KIND      0x00u
+/* Two more of that record, read by UnitWeaponInfo: +0x10 is spread into a min
+ * and a max range and +0x14 goes straight into SIGHTC_OFF_DAMAGE. Its +4 was
+ * ITEMTYPE_OFF_COOLDOWN here for a third time until checkoffsets refused it --
+ * the definition further down is the one that stands. */
+#define ITEMTYPE_OFF_RANGE     0x10u  /* int32, the nominal range */
+#define ITEMTYPE_OFF_DAMAGE    0x14u  /* int32 */
 #define ITEMTYPE_OFF_CAPACITY  0x18u  /* denominator for the ARMOR bar */
 #define ITEM_OFF_AMMO          0xCCu  /* int32_t, numerator for both */
 #define AM2_ITEM_TYPE_ARMOR    0x1Cu
@@ -2949,10 +2955,16 @@
 #define SIGHTC_OFF_OBSERVER      0x14u
 #define SIGHTC_OFF_RANGE         0x18u
 #define SIGHTC_OFF_BEARING       0x1Cu  /* uint8_t */
-#define SIGHTC_OFF_ENABLED_40    0x40u
+/* SIX FIELDS UnitWeaponInfo FILLS IN ONE GO, which is what named the two that
+ * were called ENABLED_40 and ENABLED_54 -- names off the one site that TESTS
+ * them, where a pointer and a flag both read as "enabled". +0x40 is the weapon
+ * OBJECT, and it is set to null and returned on when there is none; +0x54 is
+ * whether the weapon's cooldown has elapsed. */
+#define SIGHTC_OFF_WEAPON        0x40u  /* obj *, null when unarmed */
 #define SIGHTC_OFF_KIND          0x44u  /* 3 enables the state bump */
+#define SIGHTC_OFF_DAMAGE        0x48u  /* int32, from the weapon record */
 #define SIGHTC_OFF_MAX_RANGE     0x50u
-#define SIGHTC_OFF_ENABLED_54    0x54u
+#define SIGHTC_OFF_READY         0x54u  /* int32, 1 when the cooldown is up */
 /* Three more of the same record, from AiKeepRange. +0x4C is the range the unit
  * WANTS to be at: it repositions only when SIGHTC_OFF_RANGE is at or inside
  * it, and it is the distance RandomPointToward steps. Distinct from
@@ -2987,12 +2999,10 @@
  * functions carry really is the SIGHTC one -- it tests 0x44 against 3, which
  * SIGHTC_OFF_KIND already documented, and reads 0x3C beside it. */
 #define ADDR_AI_HIT_REACT        0x00405050u  /* void(obj, out, void *ctx) */
-/* Per-RANK records, stride 28, indexed by OBJ_OFF_RANK 0..7. AiHitReact reads
- * only the first dword, which runs 32, 48, 56, 64, 80, 96, 112, 128 -- a
- * threshold that rises with rank, and the only field of the record anything
- * here touches. */
-#define ADDR_RANK_RECORDS        0x00473DD0u
-#define AM2_RANK_RECORD_STRIDE   28u
+/* AiHitReact reads RANK_REC_OFF_THRESHOLD out of ADDR_RANK_RECORDS -- 32, 48,
+ * 56, 64, 80, 96, 112, 128, rising with rank. This comment used to say it read
+ * "the first dword", which is what put the table's base four bytes late; see
+ * the record's own note. */
 /* Six poses, 12..17, indexed by `SIGHTC_OFF_FIELD_00 * 2 + (byte >= 0x80)`.
  * The two entries past them are not part of the table -- 0x4FA0C0 and 999 --
  * which is what bounds it at six and puts that field's range at 0..2. */
@@ -5670,10 +5680,36 @@ typedef struct {
  * (type 2). Both readings are of live code and neither is wrong; the object is
  * a union past its header. Recorded rather than aliased, as with the other
  * two. */
-#define ADDR_RANK_TABLE          0x00473DD4u  /* 28-byte records */
+/* THE RANK TABLE HAD THREE BASES AND NONE OF THEM WAS THE RECORD. It was
+ * ADDR_RANK_TABLE here at 0x00473DD4 and ADDR_RANK_RECORDS at 0x00473DD0, and
+ * UnitWeaponInfo reads 0x00473DCC -- three consumers, three bases, one stride
+ * of 28. They are three FIELDS of one record, and the record starts at
+ * 0x00473DCC, which is the only base on which every field is a clean monotone
+ * series:
+ *
+ *   +0   float  2.5 2.2 2.0 1.8 1.6 1.4 1.2 1.0   fire scale
+ *   +4   int32   32  48  56  64  80  96 112 128   AiHitReact's threshold
+ *   +8   int32   30  35  45  50  55  60  65  70   base max health
+ *   +12  int32   40 100 180 300 460 660 920 1000  experience for the rank
+ *
+ * The +8 reading is confirmed by its consumer and by a number this project
+ * already measured: it is handed to SetMaxHealth, and CLAUDE.md records the
+ * leader's max health as 140 on a correct build -- 70, the rank-7 entry, times
+ * the 2.0 difficulty scale.
+ *
+ * It is the ADDR_SOLDIER_NAMES mistake three times over. A consumer that
+ * touches ONE field indexes correctly from any base that puts that field where
+ * it expects, and nothing can see the error until a second consumer wants an
+ * earlier field. Here the third consumer wanted the first field of all.
+ *
+ * Every address stays exactly what it was: each site moved from base+0 to the
+ * corrected base plus its own offset, so this renames and cannot re-aim. */
+#define ADDR_RANK_RECORDS        0x00473DCCu  /* 28-byte records, rank 0..7 */
 #define RANK_REC_BYTES           28u
-#define RANK_REC_OFF_SCALE       0u    /* handed to ADDR_RANK_APPLY */
-#define RANK_REC_OFF_XP          4u    /* experience needed for this rank */
+#define RANK_REC_OFF_FIRE_SCALE  0u    /* float; UnitWeaponInfo */
+#define RANK_REC_OFF_THRESHOLD   4u    /* int32; AiHitReact halves it */
+#define RANK_REC_OFF_MAX_HEALTH  8u    /* int32; handed to SetMaxHealth */
+#define RANK_REC_OFF_XP          12u   /* experience needed for this rank */
 /* Reconstructed. Bump the rank and, at ranks 3, 5 and 7, hand a type 2 a new
  * weapon -- 0x0A, 0x08 and 0x1D, three ids in no order and with rank 4 and 6
  * giving nothing. The promotion itself happens for every type; only the
@@ -6783,7 +6819,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0x0046F2E0..0x0046F2F0 on the x87 stack, with kind 3 scaling the input
  * first. Kind 3 also computes `ready` from ADDR_GAME_CLOCK_MS against the
  * weapon's +0xC4, as an sbb/neg pair -- a comparison written as arithmetic. */
-#define ADDR_UNIT_WEAPON_INFO     0x004045E0u  /* void(unit, out) */
+#define ADDR_UNIT_WEAPON_INFO     0x004045E0u  /* void(unit, sightc) */
+/* Its three range constants and the two kinds it special-cases. The band is
+ * plus or minus ten percent of the record's nominal range, and kind 3 scales
+ * the range up by a fifth before spreading it. */
+#define ADDR_WEAPON_RANGE_LO      0x0046F2E8u  /* double, 0.9 */
+#define ADDR_WEAPON_RANGE_HI      0x0046F2E0u  /* double, 1.1 */
+#define ADDR_WEAPON_RANGE_K3      0x0046F2F0u  /* double, 1.2 */
+#define AM2_WEAPON_KIND_FIXED     0x2B  /* range is (r - 4, r + 2) flat */
+#define AM2_WEAPON_KIND_TIMED     3     /* cooldown unscaled by rank */
+#define AM2_WEAPON_RANGE_NONE     0x1000
 /* The weapon HANDLER table and the four globals SelectInventorySlot installs
  * out of it. Each record is 16 bytes and the index is the first dword of the
  * weapon's OBJ_OFF_FIELD_C0, so that field is a pointer to a type record
@@ -10490,6 +10535,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * it -- writing 0 back -- when the leader is concealed, out of health, already
  * destroyed, or the wrong type. */
 #define OBJ_OFF_FOLLOW_UID         0xC4u   /* uint32_t */
+/* +0xC4 on an ITEM is ITEM_OFF_LAST_USE, already named further up and used by
+ * UnitWeaponInfo for exactly what that name says. It was very nearly given a
+ * second name here -- WEAPON_OFF_LAST_FIRED -- and a NEW PREFIX is the one
+ * shape tools/checkoffsets.py cannot see, so nothing would have refused it.
+ * The rule is to grep the OFFSET, and grepping the prefix is not the same
+ * thing: the duplicate that was caught in the same edit reused an existing
+ * prefix, and this one would not have. */
 #define OBJ_OFF_RIDING             0x570u  /* cleared as an occupant gets out */
 #define AM2_VEHICLE_DEATH_DAMAGE   0x2710
 #define AM2_VEHICLE_DEATH_KIND     4

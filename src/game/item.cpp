@@ -6082,7 +6082,7 @@ void __cdecl Type238Action(void *obj, int32_t award)
     *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) += award;
 
     for (;;) {
-        const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_RANK_TABLE
+        const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_RANK_RECORDS
                              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                                * RANK_REC_BYTES;
         int16_t health;
@@ -6094,9 +6094,9 @@ void __cdecl Type238Action(void *obj, int32_t award)
 
         RankPromote(obj);
 
-        rec = (const uint8_t *)(uintptr_t)ADDR_RANK_TABLE
+        rec = (const uint8_t *)(uintptr_t)ADDR_RANK_RECORDS
               + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES;
-        SetMaxHealth(obj, *(const int32_t *)(rec + RANK_REC_OFF_SCALE));
+        SetMaxHealth(obj, *(const int32_t *)(rec + RANK_REC_OFF_MAX_HEALTH));
 
         health    = *(const int16_t *)(o + OBJ_OFF_HEALTH);
         maxHealth = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);

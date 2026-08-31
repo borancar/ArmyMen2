@@ -1275,6 +1275,108 @@ typedef int32_t (__cdecl *AM2_ListMaskFn)(uint32_t at, void *hdr, void *out);
 #define orig_list_mask_action \
     ((AM2_ListMaskFn)(uintptr_t)ADDR_LIST_MASK_ACTION)
 
+/* UnitWeaponInfo -- original 0x004045E0, three callers. Fill the six fields of
+ * a sight context that describe the weapon a unit is HOLDING: the object, its
+ * kind, its damage, the two ends of its range band, and whether its cooldown
+ * has elapsed.
+ *
+ * IT NAMED FOUR FIELDS AND RE-BASED A TABLE. SIGHTC_OFF_WEAPON and
+ * SIGHTC_OFF_READY were ENABLED_40 and ENABLED_54, off the one site that tests
+ * them -- where a pointer and a flag both read as "enabled". +0x48 had no name
+ * at all. And ADDR_RANK_RECORDS was four bytes late: this reads the field
+ * BEFORE the one AiHitReact reads, which is the second toucher that makes the
+ * record's real start visible. See orig.h.
+ *
+ * THE RANGE BAND IS PLUS OR MINUS TEN PERCENT, in three arms. Kind 0x2B takes
+ * a flat (r - 4, r + 2) and no float at all; a record with no range at all
+ * answers AM2_WEAPON_RANGE_NONE both ways, so an unranged weapon is treated as
+ * reaching everywhere rather than nowhere; everything else multiplies by 0.9
+ * and 1.1, with kind 3 scaling the range up by 1.2 first.
+ *
+ * The original loads the range once and multiplies the COPY, so both ends come
+ * from the same rounded intermediate -- `fild; fld st(0); fmul; ftol; fmul;
+ * ftol`. Written the same way round.
+ *
+ * THE COOLDOWN IS SCALED BY RANK EXCEPT FOR KIND 3. A kind-3 weapon compares
+ * the record's cooldown directly; every other kind multiplies it by
+ * RANK_REC_OFF_FIRE_SCALE first, which runs 2.5 at rank 0 down to 1.0 at rank
+ * 7 -- so a raw recruit waits two and a half times as long between shots as a
+ * veteran. That is the whole of what the rank table's first field does here.
+ *
+ * The scaled compare loads the cooldown as a 64-bit `fild qword` over a pair
+ * whose high half is a zero the function has just written, which makes it
+ * UNSIGNED; the kind-3 compare is a plain signed one. Both are then written as
+ * `cmp; sbb; neg`, a comparison spelled as arithmetic.
+ */
+void __cdecl UnitWeaponInfo(void *unit, void *out)
+{
+    const uint8_t *u = (const uint8_t *)unit;
+    uint8_t       *c = (uint8_t *)out;
+    const uint8_t *w;
+    const uint8_t *rec;
+    int32_t        kind, range;
+    uint32_t       elapsed;
+
+    w = (const uint8_t *)WeaponByUid(*(const uint32_t *)
+            (u + UNIT_OFF_INVENTORY
+             + (uint32_t)*(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL) * 4));
+
+    *(const void **)(c + SIGHTC_OFF_WEAPON) = w;
+    if (!w) {
+        *(int32_t *)(c + SIGHTC_OFF_KIND)  = 0;
+        *(int32_t *)(c + SIGHTC_OFF_READY) = 0;
+        return;
+    }
+
+    rec  = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+    kind = *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
+
+    *(int32_t *)(c + SIGHTC_OFF_KIND)   = kind;
+    *(int32_t *)(c + SIGHTC_OFF_DAMAGE) =
+        *(const int32_t *)(rec + ITEMTYPE_OFF_DAMAGE);
+
+    range = *(const int32_t *)(rec + ITEMTYPE_OFF_RANGE);
+
+    if (kind == AM2_WEAPON_KIND_FIXED) {
+        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = range - 4;
+        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  =
+            *(const int32_t *)(rec + ITEMTYPE_OFF_RANGE) + 2;
+    } else if (range == 0) {
+        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = AM2_WEAPON_RANGE_NONE;
+        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = AM2_WEAPON_RANGE_NONE;
+    } else {
+        double v;
+
+        if (kind == AM2_WEAPON_KIND_TIMED)
+            range = (int32_t)((double)range
+                              * *(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_K3));
+
+        v = (double)range;
+        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) =
+            (int32_t)(v * *(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_LO));
+        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE) =
+            (int32_t)(v * *(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_HI));
+    }
+
+    elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+              - *(const uint32_t *)(w + ITEM_OFF_LAST_USE);
+
+    if (kind == AM2_WEAPON_KIND_TIMED) {
+        *(int32_t *)(c + SIGHTC_OFF_READY) =
+            ((uint32_t)*(const int32_t *)(rec + ITEMTYPE_OFF_COOLDOWN)
+             < elapsed) ? 1 : 0;
+    } else {
+        const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+            + (uint32_t)*(const int32_t *)(u + OBJ_OFF_RANK) * RANK_REC_BYTES;
+        uint32_t wait = (uint32_t)(double)
+            ((double)(uint32_t)*(const int32_t *)(rec + ITEMTYPE_OFF_COOLDOWN)
+             * (double)*(const float *)(rank + RANK_REC_OFF_FIRE_SCALE));
+
+        *(int32_t *)(c + SIGHTC_OFF_READY) = (wait < elapsed) ? 1 : 0;
+    }
+}
+
+
 /* CanPlaceAt -- original 0x0043A6D0, six callers. Could the thing described by
  * key-table slot `slot` stand at world point `at`? Build its tile mask there
  * and answer 0 the moment any cell of it fails; 1 if none does.
@@ -1907,7 +2009,8 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
         int32_t limit = *(const int32_t *)
             ((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-               * AM2_RANK_RECORD_STRIDE);
+               * RANK_REC_BYTES
+             + RANK_REC_OFF_THRESHOLD);
         uint8_t v = *(const uint8_t *)(c + SIGHTC_OFF_FIELD_3C);
 
         if ((int32_t)v < (limit >> 1)) {
@@ -2261,8 +2364,8 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
     const uint8_t *c = (const uint8_t *)sight;
     int32_t        maxRange = *(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE);
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_ENABLED_40)
-        && *(const int32_t *)(c + SIGHTC_OFF_ENABLED_54)) {
+    if (*(const int32_t *)(c + SIGHTC_OFF_WEAPON)
+        && *(const int32_t *)(c + SIGHTC_OFF_READY)) {
         int32_t range = *(const int32_t *)(c + SIGHTC_OFF_RANGE);
 
         if (range > 0 && range < maxRange) {
@@ -2535,6 +2638,8 @@ int region_install(void)
                         "ListBoxAction", 3);
     rc |= patch_replace(ADDR_CAN_PLACE_AT, (const void *)CanPlaceAt,
                         "CanPlaceAt", 6);
+    rc |= patch_replace(ADDR_UNIT_WEAPON_INFO, (const void *)UnitWeaponInfo,
+                        "UnitWeaponInfo", 3);
     rc |= patch_replace(ADDR_TILE_COVER_ADD, (const void *)TileCoverAdd,
                         "TileCoverAdd", 3);
     rc |= patch_replace(ADDR_TILE_COVER_SUB, (const void *)TileCoverSub,

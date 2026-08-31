@@ -5,11 +5,28 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `6a585d7`. Working tree clean.
+Last updated: **2026-08-31**, at `6b77de0`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,271 patches.**
+Nothing uncommitted. **1,272 patches.**
+
+**`UnitWeaponInfo` (`0x004045E0`), and the rank table had three bases.** It
+fills the six sight-context fields describing the weapon a unit holds. Two of
+those fields were `SIGHTC_OFF_ENABLED_40` and `_54`, named off the one site
+that TESTS them; they are the weapon object and the cooldown-elapsed flag.
+
+**`ADDR_RANK_RECORDS` was four bytes late and `ADDR_RANK_TABLE` eight.** Three
+consumers, three bases, one stride of 28 -- they are three FIELDS of one record
+that starts at `0x00473DCC`. Confirmed by a number already measured here: the
++8 field is handed to `SetMaxHealth` and its rank-7 entry is 70, which is the
+140 CLAUDE.md records for the leader at the 2.0 difficulty scale. Every address
+is unchanged; each site moved from base+0 to the corrected base plus its own
+offset.
+
+The rank field this function reads is the FIRE SCALE: 2.5 at rank 0 down to 1.0
+at rank 7, so a raw recruit waits two and a half times as long between shots as
+a veteran.
 
 **`AirPassesDraw` (`0x00408E50`)** -- draw every air-support pass in the
 eight-slot sub-queue and retire the head one when its timer runs out. The
@@ -3436,13 +3453,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,116 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,271
+line (0x0045C000) patched**. Measured: **1,117 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,272
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and sixteen batches have gone in and the 123 entries outstanding
+small ones in batches. A hundred and seventeen batches have gone in and the 122 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

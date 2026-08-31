@@ -163,6 +163,11 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out);
  * stand at world point `at`? Build its tile mask there and answer 0 the moment
  * a cell of it is covered, is the wrong ADDR_TILE_KIND, or has an object on
  * it. 1 when none does, and 1 for a slot past the end. */
+/* 0x004045E0, three callers. Fill the six sight-context fields that describe
+ * the weapon a unit is holding: SIGHTC_OFF_WEAPON, _KIND, _DAMAGE,
+ * _WANT_RANGE, _MAX_RANGE and _READY. */
+void __cdecl UnitWeaponInfo(void *unit, void *out);
+
 int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind);
 
 /* 0x0042BE10, one caller. Clear the cover grid and rebuild it from the cell

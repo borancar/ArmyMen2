@@ -117,6 +117,20 @@ Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
 
+**`tools/checkoffsets.py` has one blind spot and it is the PREFIX, which was
+demonstrated rather than reasoned.** One edit created two duplicates of the
+same two fields: `ITEMTYPE_OFF_COOLDOWN`, which already existed at the same
+value under the same prefix and was refused outright, and
+`WEAPON_OFF_LAST_FIRED` for `0xC4`, which the tree already had as
+`ITEM_OFF_LAST_USE`. Only the first was caught. A NEW prefix is a new namespace
+and the checker has nothing to compare it against, so the second would have
+landed silently and been a second name for one field forever.
+
+So "grep the OFFSET before naming it" means the offset, not the prefix -- and
+the case where it matters most is exactly the case where the prefix is new,
+because that is when the checker cannot help. `0xC4` alone would have found it
+in one command.
+
 **Offset macros have no ratchet at all, and that is where the fourth duplicate
 of the session landed.** `checkpatches.py` counts `ADDR_` aliases and
 `checkglobals.py` counts `g_` ones; nothing counts `OBJ_OFF_*`, `AM2_*` or the
@@ -2882,7 +2896,8 @@ exact oracle**, however meaningful it is when it is set.
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
   `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`,
   `AiHitReact`, `PlanPathTo`, `NearestClearVehiclePoint`,
-  `ShakeAt`, `StartShake`, `RoachBite`, `CanPlaceAt`, and `RefreshScreen` —
+  `ShakeAt`, `StartShake`, `RoachBite`, `CanPlaceAt`, `UnitWeaponInfo`, and
+  `RefreshScreen` —
 
   **`RoachBite`'s drive is identified and it is not a longer wait.** Its one
   caller reaches it only in the roach's state 4, and a live MAP 01 run with
