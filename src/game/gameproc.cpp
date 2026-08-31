@@ -517,7 +517,7 @@ typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
  * row, the other a column. Written here as the two assignments they are; the
  * pointer arithmetic is the same either way and the symmetry is the point.
  *
- * A RECORD IS SKIPPED ENTIRELY when its COMM_PLAYER_OFF_ACTIVE is zero, and
+ * A RECORD IS SKIPPED ENTIRELY when its COMM_SLOT_OFF_TAKEN is zero, and
  * that test is made on the OUTER record before the inner loop and again on
  * each inner one -- so an empty slot neither allies nor is allied with,
  * rather than being allied by the other side of the pair.
@@ -575,19 +575,19 @@ void __cdecl ResetLevelState(void)
     for (i = 0; i < AM2_COMM_PLAYERS; i++) {
         const uint8_t *a = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
 
-        if (!*(const int32_t *)(a + COMM_PLAYER_OFF_ACTIVE))
+        if (!*(const int32_t *)(a + COMM_SLOT_OFF_TAKEN))
             continue;
-        if (!*(const int32_t *)(a + COMM_PLAYER_OFF_TEAM))
+        if (!*(const int32_t *)(a + COMM_SLOT_OFF_TEAM))
             continue;
 
         for (j = 0; j < AM2_COMM_PLAYERS; j++) {
             const uint8_t *b = comm + COMM_OFF_PLAYERS
                                + j * COMM_PLAYER_STRIDE;
 
-            if (!*(const int32_t *)(b + COMM_PLAYER_OFF_ACTIVE))
+            if (!*(const int32_t *)(b + COMM_SLOT_OFF_TAKEN))
                 continue;
-            if (*(const int32_t *)(a + COMM_PLAYER_OFF_TEAM)
-                != *(const int32_t *)(b + COMM_PLAYER_OFF_TEAM))
+            if (*(const int32_t *)(a + COMM_SLOT_OFF_TEAM)
+                != *(const int32_t *)(b + COMM_SLOT_OFF_TEAM))
                 continue;
 
             matrix[i * AM2_COMM_PLAYERS + j] = 1;

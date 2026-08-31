@@ -3114,15 +3114,46 @@
 #define ADDR_STR_SET_SESSION_FAIL 0x004741A4u /* "Set Session Failed to reopen Session" */
 #define ADDR_STR_DESTROYPLAYER   0x00474220u  /* "DESTROYPLAYER Win Message ..." */
 
-/* The player records live at COMM_OFF_PLAYERS, 112 bytes apart, and the name is
- * the first field -- which is how both "Player %s ..." messages are built. */
-#define COMM_OFF_PLAYERS         0x218u
-/* Two fields of a player record, both read by ResetLevelState's ally pass and
- * by nothing else here. It refuses a record whose +0x44 is zero and allies any
- * two whose +0x40 match, which is what makes +0x40 a TEAM and +0x44 the record
- * being occupied at all. */
-#define COMM_PLAYER_OFF_TEAM     0x40u
-#define COMM_PLAYER_OFF_ACTIVE   0x44u
+/* THE PLAYER RECORD STARTS AT 0x020C AND THIS SAID 0x0218, which is its NAME
+ * field -- "the name is the first field", from the two "Player %s" messages
+ * that were the only readers anyone had looked at. CommRemovePlayer settles
+ * it: its compaction loop moves fields at 0x0C BELOW 0x218 down a slot, and
+ * CommConstruct writes the slot index at 0x210. Fields before the "first"
+ * field are the tell, and it is the fourth time this session that a base named
+ * from one consumer has turned out to be a field pointer -- see
+ * ADDR_RANK_RECORDS and ADDR_SOLDIER_NAMES.
+ *
+ * The layout, from CommConstruct, CommRemovePlayer and the absolute names
+ * already scattered through this file:
+ *
+ *   +0x00  cleared on construction
+ *   +0x04  the slot INDEX; CommConstruct writes i
+ *   +0x08  AM2_PLAYER_ID, the DirectPlay id
+ *   +0x0C  the NAME
+ *   +0x4C  the TEAM; ResetLevelState allies any two that match
+ *   +0x50  non-zero while the slot is occupied
+ *   +0x64  COMM_ARMY_OFF_READY_TO_LOAD
+ *   +0x68  COMM_ARMY_OFF_READY
+ *   0x70 bytes to the next
+ *
+ * AM2_PLAYER_ID, COMM_ARMY_OFF_READY and COMM_ARMY_OFF_READY_TO_LOAD are the
+ * same fields spelled absolutely, which works because they are used as
+ * `comm + slot * 112 + OFFSET` and slot 0's record starts at 0x20C. They are
+ * left alone; folding them in is a separate job with its own A/B.
+ *
+ * AND THE FIELD NAMES ALREADY EXISTED, under the COMM_SLOT_OFF_ prefix --
+ * INDEX 0x004, ID 0x008, NAME 0x00C, TAKEN 0x050, UNACKED 0x058, HEARD 0x060,
+ * every one of them an offset from 0x20C and every one of them right. So the
+ * family was correct, the private bases were correct, and the single shared
+ * BASE was the only thing wrong. Only the team is new.
+ *
+ * Three COMM_PLAYER_OFF_ names were nearly added beside them in this very
+ * edit, which is the third time this session a duplicate has been created
+ * under a NEW PREFIX -- the one shape tools/checkoffsets.py cannot see, and
+ * the rule this file already states. Writing the rule down did not prevent it;
+ * grepping the OFFSET would have. */
+#define COMM_OFF_PLAYERS         0x20Cu
+#define COMM_SLOT_OFF_TEAM       0x04Cu  /* ResetLevelState allies on it */
 #define AM2_COMM_PLAYERS         4
 #define COMM_PLAYER_STRIDE       112u
 #define COMM_OFF_VERBOSE         0x418u   /* non-zero: log every DESTROYPLAYER */

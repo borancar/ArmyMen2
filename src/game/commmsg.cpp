@@ -1699,7 +1699,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
         }
 
         strcpy((char *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
-                        + COMM_OFF_PLAYERS),
+                        + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
                (const char *)(rec + REC_PLAYER_NAME));
     }
 
@@ -1737,7 +1737,8 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
                      (const char *)(kCommObj
                                     + g_defaultOwner
                                       * COMM_ARMY_RECORD_SIZE
-                                    + COMM_OFF_PLAYERS));
+                                    + COMM_OFF_PLAYERS
+                                    + COMM_SLOT_OFF_NAME));
         MenuMessage(buf, 4, 0);
         SendChatMsg(buf, 1);
         SendMapMsg(5, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));

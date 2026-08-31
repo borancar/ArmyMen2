@@ -5,11 +5,24 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `c395069`. Working tree clean.
+Last updated: **2026-08-31**, at `eb2fc93`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted. **1,278 patches.**
+
+**The comm player record starts at 0x020C and `COMM_OFF_PLAYERS` said 0x0218**
+-- its NAME field, which is what named it. `CommRemovePlayer`'s compaction loop
+moves fields twelve bytes BELOW that, and `CommConstruct` writes the slot index
+at 0x0210. Fields before the "first" field are the tell.
+
+**Three files already had the right base privately.** `dplay.cpp` and
+`startgame.cpp` each defined their own `COMM_SLOT_BASE 0x20C`, and the
+`COMM_SLOT_OFF_*` family in orig.h -- INDEX, ID, NAME, TAKEN, UNACKED, HEARD --
+is offsets from 0x20C and every one is right. Only the single shared base was
+wrong, and the files that knew kept it to themselves.
+
+No new patch: this is a rename with every address provably unchanged.
 
 **The COUNT BUTTON is complete** -- `CountButtonConstruct` (`0x00418C20`),
 `CountButtonDelete` (`0x00418CE0`) and `CountButtonActivate` (`0x00418D00`)

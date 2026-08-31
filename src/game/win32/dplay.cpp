@@ -262,10 +262,11 @@ typedef void (__cdecl *am2_comm_void_fn)(void);
  * than dropped -- see ADDR_LOG. */
 #define orig_log_noargs         (*(am2_comm_void_fn)ADDR_LOG)
 
-/* Four of these, back to back at +0x20C. Only the index and a timestamp are
- * ever set to anything; the rest is cleared. */
-#define COMM_SLOT_BASE   0x20C
-#define COMM_SLOT_STRIDE 0x70
+/* Four player records, back to back. Only the index and a timestamp are ever
+ * set to anything; the rest is cleared. These were a private COMM_SLOT_BASE
+ * and COMM_SLOT_STRIDE here, both correct, while orig.h's COMM_OFF_PLAYERS was
+ * twelve bytes late -- so the file that had the right base kept it to itself.
+ * One pair of names now. */
 
 void *__attribute__((thiscall)) CommConstruct(void *comm)
 {
@@ -281,7 +282,7 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     comm_u32(self, 0x3F4) = 0;
 
     for (i = 0; i < 4; i++) {
-        uint8_t *slot = self + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint8_t *slot = self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
 
         comm_u32(slot, 0x00) = 0;
         comm_u32(slot, 0x64) = 0;
@@ -519,7 +520,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
 
         n = comm_u32(cm, COMM_OFF_PLAYER_COUNT);
         for (i = 0; i < n; i++) {
-            if (comm_u32(cm, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+            if (comm_u32(cm, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
                              + COMM_SLOT_OFF_ID) == idTo) {
                 found = 1;
                 break;
@@ -537,13 +538,13 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
     other = g_commObject;
     n = comm_u32(other, COMM_OFF_PLAYER_COUNT);
     for (i = 0; i < n; i++) {
-        uint8_t *slot = self  + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint8_t *slot = self  + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
         uint32_t id;
         uint32_t bit;
 
         if (comm_u32(slot, COMM_SLOT_OFF_ID) == 0xFFFFFFFFu)
             continue;
-        id = comm_u32(other, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+        id = comm_u32(other, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
                              + COMM_SLOT_OFF_ID);
         if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
             continue;
@@ -607,7 +608,7 @@ int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
          * host reaches this branch, so "ours" and "the host's" are the same
          * slot here -- which is how the global came to be misnamed. */
         desc.dwUser1 = comm_u32((uint8_t *)self,
-                                COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE + 4);
+                                COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE + 4);
 
         app = *(const GUID **)(comm + COMM_OFF_APP_GUID);
         if (app)
@@ -756,7 +757,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
     ours = comm_u32(self, COMM_OFF_OUR_PLAYER_ID);
 
     for (i = 0; i < 4; i++) {
-        uint8_t *slot = self + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint8_t *slot = self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
         uint32_t id;
 
         comm_u32(slot, 0x00) = 0;
@@ -976,8 +977,8 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
         OnLobbySlave();
     } else {
         /* The host records its own name in the slot it occupies. */
-        char *slotName = (char *)(g_commObject + COMM_SLOT_BASE
-                                  + g_ourSlot * COMM_SLOT_STRIDE
+        char *slotName = (char *)(g_commObject + COMM_OFF_PLAYERS
+                                  + g_ourSlot * COMM_PLAYER_STRIDE
                                   + COMM_SLOT_OFF_NAME);
         strcpy(slotName, playerName);
     }
@@ -1023,9 +1024,9 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
 
     /* Offline: nobody to tell, so just claim the slot. */
     if (comm_u32(shared, COMM_OFF_LOCAL)) {
-        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE
                          + COMM_SLOT_OFF_TAKEN) = 1;
-        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE
                          + COMM_SLOT_OFF_ID) = 1;
         comm_u32(self, COMM_OFF_PLAYER_MADE) = 1;
         return 1;
@@ -1055,10 +1056,10 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
     }
 
     if (comm_u32(self, COMM_OFF_IS_HOST)) {
-        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE
                          + COMM_SLOT_OFF_ID) =
             comm_u32(self, COMM_OFF_OUR_PLAYER_ID);
-        comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE
+        comm_u32(shared, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE
                          + COMM_SLOT_OFF_TAKEN) = 1;
     }
 
@@ -1120,16 +1121,16 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
 
     /* Type 0x0B is the acknowledgement: it wipes the outstanding count. */
     if (*(uint32_t *)data == COMM_MSG_TYPE_ACK)
-        comm_u32(self, COMM_SLOT_BASE + slot * COMM_SLOT_STRIDE
+        comm_u32(self, COMM_OFF_PLAYERS + slot * COMM_PLAYER_STRIDE
                        + COMM_SLOT_OFF_UNACKED) = 0;
-    comm_u32(self, COMM_SLOT_BASE + slot * COMM_SLOT_STRIDE
+    comm_u32(self, COMM_OFF_PLAYERS + slot * COMM_PLAYER_STRIDE
                    + COMM_SLOT_OFF_HEARD) = now;
 
     /* Anyone who has caught up gets their alarm cleared. */
     shared = g_commObject;
     n = (int32_t)comm_u32(shared, COMM_OFF_PLAYER_COUNT);
     for (i = 0; i < n; i++) {
-        uint32_t id = comm_u32(shared, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+        uint32_t id = comm_u32(shared, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
                                        + COMM_SLOT_OFF_ID);
         uint32_t bit;
 
@@ -1137,7 +1138,7 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
             continue;
         if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
             continue;
-        if (comm_u32(self, COMM_SLOT_BASE + i * COMM_SLOT_STRIDE
+        if (comm_u32(self, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
                            + COMM_SLOT_OFF_UNACKED) >= COMM_UNACKED_CLEAR)
             continue;
         bit = 0x800u << i;
@@ -1204,7 +1205,7 @@ int32_t __attribute__((thiscall)) CommJoinSession(void *comm, const GUID *instan
             *(LPDPSESSIONDESC2 *)(shared + COMM_OFF_SESSION_DESC);
 
         if (sd->dwUser1 == 0)
-            comm_u32(shared, COMM_SLOT_BASE + g_ourSlot * COMM_SLOT_STRIDE + 4)
+            comm_u32(shared, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE + 4)
                 = sd->dwCurrentPlayers;
     }
     return 1;
@@ -1287,7 +1288,7 @@ int32_t __cdecl CommEnumPlayers(void)
         return 0;
 
     for (i = 0; i < 4; i++) {
-        uint8_t *slot = comm + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint8_t *slot = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
 
         comm_u32(slot, COMM_SLOT_OFF_INDEX) = COMM_SLOT_INDEX_NONE;
         comm_u32(slot, COMM_SLOT_OFF_ID)    = 0;

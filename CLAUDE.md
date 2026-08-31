@@ -117,6 +117,26 @@ Includes are written out in full rather than resolved by `-I` flags, so a
 module's directory is visible at its use sites: `win32/` sources reach the
 harness as `"../../inject/orig.h"` and the flat half as `"../blit.h"`.
 
+**RE-BASING A SHARED MACRO NEEDS AN AUDIT, NOT A GREP.** Moving
+`COMM_OFF_PLAYERS` twelve bytes to the record's real start meant every use had
+to gain a compensating field offset. One of twenty-six was missed --
+`widget.cpp:7890`, wrapped across two lines so a `grep -n 'rec + COMM_OFF'`
+never saw it -- and it silently wrote a computer player's name twelve bytes
+early. `ab.sh mpoptions` caught it outright: the widget tree lost rows, the
+chat record came back empty and the frame moved 253,227 pixels.
+
+The fix is a script, not more grepping. Walk every use with its next two lines
+and assert each one carries a field offset or a stride; that check is three
+lines of Python and it found the one that eyes did not. **A macro whose VALUE
+changes is not a rename** -- it is a change to every site at once, and the
+sites are what have to be enumerated.
+
+The control mattered here too, and nearly lied a second way: the first two
+control runs failed with "produced no game log lines" because a stale
+`ArmyMen2.exe` still held port 31436 from the failing run. Check `pgrep` and
+`ss` before believing a control, which this file already says and which is easy
+to skip when you are chasing something else.
+
 **`tools/checkoffsets.py` has one blind spot and it is the PREFIX, which was
 demonstrated rather than reasoned.** One edit created two duplicates of the
 same two fields: `ITEMTYPE_OFF_COOLDOWN`, which already existed at the same

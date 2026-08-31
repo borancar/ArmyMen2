@@ -188,7 +188,8 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 static const char *PlayerName(uint8_t *comm, int32_t slot)
 {
     return (const char *)(comm + COMM_OFF_PLAYERS
-                          + (uint32_t)slot * COMM_PLAYER_STRIDE);
+                          + (uint32_t)slot * COMM_PLAYER_STRIDE
+                          + COMM_SLOT_OFF_NAME);
 }
 
 /* Ask DirectPlay for the session description again and clear the two bits that

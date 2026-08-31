@@ -62,10 +62,10 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 #define ROW_OFF_CONNECTION 0x100
 
 /* The comm object's four player slots, as laid out by CommConstruct. Slot 0 is
- * the human; 1..3 are filled in here. */
-#define COMM_SLOT_BASE    0x20C
-#define COMM_SLOT_STRIDE  0x70
-#define SLOT_OFF_ACTIVE   0x50
+ * the human; 1..3 are filled in here. This file had its own COMM_OFF_PLAYERS,
+ * COMM_PLAYER_STRIDE and COMM_SLOT_OFF_TAKEN -- all three correct, and all three
+ * private, while orig.h's shared COMM_OFF_PLAYERS pointed twelve bytes into
+ * the record. Two files knew the right base and neither said so out loud. */
 
 /* COMM_OFF_LOCAL, COMM_OFF_IS_HOST and COMM_OFF_DPLAY are in orig.h. */
 
@@ -126,9 +126,9 @@ void __cdecl StartSelectedGame(void)
 
     /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */
     for (i = 1; i < 4; i++) {
-        uint8_t *slot = comm + COMM_SLOT_BASE + i * COMM_SLOT_STRIDE;
+        uint8_t *slot = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
 
-        *(int32_t *)(slot + SLOT_OFF_ACTIVE) = 1;
+        *(int32_t *)(slot + COMM_SLOT_OFF_TAKEN) = 1;
         orig_sprintf((char *)(slot + COMM_SLOT_OFF_NAME),
                      (const char *)(uintptr_t)ADDR_FMT_COMPUTER_N, i);
     }
@@ -285,7 +285,7 @@ void __cdecl HostBattle(void)
     }
 
     /* The host is always slot 0. */
-    CopyName((char *)(g_commObject + COMM_SLOT_BASE + COMM_SLOT_OFF_NAME),
+    CopyName((char *)(g_commObject + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
              player);
 
     PlaySoundAt(2, 0, 0, 0, 0);

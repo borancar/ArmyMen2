@@ -3120,7 +3120,7 @@ void __attribute__((thiscall)) MpNamePaint(AM2_Widget *w, RECT clip)
         } else {
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
                         (const char *)AM2_IMAGE(AM2_STR_PCT_S),
-                        rec + COMM_OFF_PLAYERS);
+                        rec + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME);
             MpNameSetInk(w, MpNameInk(slot));
             *(uint8_t *)(self + MPNAME_OFF_PAPER) = MpNamePaper(slot);
         }
@@ -7887,7 +7887,7 @@ void __cdecl OnMpName(AM2_Widget *w)
         *active = 1;
         /* Numbered from the first computer slot, not from the row. */
         orig_sprintf((char *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
-                              + COMM_OFF_PLAYERS),
+                              + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
                      (const char *)AM2_IMAGE(ADDR_FMT_COMPUTER_N),
                      row - *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1);
     }
