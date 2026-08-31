@@ -144,6 +144,12 @@ uint32_t __cdecl ListFirstField548(const void *obj);
  * The loop index lives in the argument slot the vehicle came in on, MSVC
  * having kept the vehicle in a register; it is restored from there after the
  * ejection, because that half clobbers the register. */
+/* 0x0045AC90, four callers. Empty ONE seat of a vehicle: look the occupant up,
+ * choose a spot beside it, unlink the seat, put the occupant on the ground and
+ * move the selection if that emptied it. Answers 1 when somebody came out.
+ * Was ADDR_VEHICLE_SEAT_BLOCKED, which was named from a call site. */
+int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle);
+
 void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner);
 
 int army_install(void);

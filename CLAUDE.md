@@ -2770,7 +2770,8 @@ exact oracle**, however meaningful it is when it is set.
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
   `AiStepDefend`, `AiStepTrack`, `AiStepFollow`, `AiStepAttack`, `AiStep`,
-  `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, and `RefreshScreen` —
+  `AiKeepRange`, `AiWalkStep`, `TakeNumberKey`, `ExitOneFromVehicle`, and
+  `RefreshScreen` —
 
   **The AI is a WHOLE LAYER this environment does not reach, not a handful of
   cold functions, and ONE `counts` line says so.** `drive.sh ctl "counts Ai"`

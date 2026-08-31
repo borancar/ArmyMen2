@@ -8862,8 +8862,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * OBJ_OFF_HEIGHT_ADJ values it selects, 8, 0x10 and 0x18, are three heights,
  * which is what stand/kneel/prone look like. The alias ratchet is what found
  * this: naming the table a second time failed the build. */
-#define OBJ_OFF_POSE               0x538u
-#define OBJ_OFF_POSE_PENDING       0x53Cu
+#define OBJ_OFF_POSE               0x538u  /* VEHICLE_OFF_PTR_LIST on a vehicle */
+#define OBJ_OFF_POSE_PENDING       0x53Cu  /* which makes this its seat COUNT */
 /* 0x0040D930, nine callers. Put a unit into a pose: refuse if it is already
  * there, queue instead of switching for some poses, wait for the current
  * animation's last cell for others, then set OBJ_OFF_HEIGHT_ADJ from the frame
@@ -9875,6 +9875,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * in one function, which is what makes the two field names agree.
  * Reconstructed. */
 #define ADDR_BOARD_VEHICLE         0x0045AAC0u  /* void(uint32 uid, void *veh) */
+/* The vehicle's SEAT LIST, and it is a sub-list header of the ordinary shape:
+ * SUBREC_OFF_COUNT at +4 is how many are aboard and SUBREC_OFF_ROWS at +8 the
+ * array of their uids. ADDR_LIST_REMOVE_AT is handed this address directly.
+ * ExitAllFromVehicle spelled the count as `+ VEHICLE_OFF_PTR_LIST + 4` before
+ * the shape was recognised.
+ *
+ * The same offset is OBJ_OFF_POSE on a TROOPER -- overloading by type, as
+ * VEHICLE_OFF_KIND is beside OBJ_OFF_TABLE_REC_KIND at 0x52C. A THIRD name
+ * here was written and deleted: grepping the offset found this one, which is
+ * the rule working rather than the ratchet, since a new VEHICLE_ name would
+ * have clashed and a new prefix would not have. */
 #define VEHICLE_OFF_PTR_LIST       0x538u
 /* How many the vehicle holds -- EnterVehicle refuses once the occupant list
  * has reached it. The same offset carries OBJ_OFF_DEATH_STATE on a roach,
@@ -9909,7 +9920,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * occupant that WAS taken out, and the third goes out only on the path whose
  * message says the damage was not ours. */
 #define ADDR_EXIT_ALL_FROM_VEHICLE 0x0045AE30u  /* void(vehicle, uint32 uid) */
-#define ADDR_VEHICLE_SEAT_BLOCKED  0x0045AC90u  /* int32(int32 seat, vehicle) */
+/* NOT "seat blocked", which was named from ExitAllFromVehicle's call site and
+ * which that function's own comment warned to check. It EMPTIES one seat: look
+ * the occupant up, choose a spot beside the vehicle, unlink the seat, put the
+ * occupant on the ground and move the selection if the vehicle is now empty.
+ * Answers 1 when it took somebody out and 0 otherwise. Reconstructed. */
+#define ADDR_EXIT_ONE_FROM_VEHICLE 0x0045AC90u  /* int32(int32 seat, vehicle) */
+/* 0x0045AAF0, one caller. Where does a LIVING BOAT put somebody getting out?
+ * Answers 0 when there is nowhere, which is the only case that plays a sound
+ * and refuses. Nothing in it says what it is; the name is from that use. */
+#define ADDR_BOAT_EXIT_POINT       0x0045AAF0u  /* int32(vehicle, uint32 *out) */
+#define AM2_VEHICLE_EXIT_OFFSET    0x30    /* up and left of the vehicle */
 /* Reconstructed as SendVehicleExit in armymsg.cpp. The name here is the one
  * the call site suggested and it is half the story: it does not drop anybody,
  * it TELLS THE OTHER PLAYERS that somebody was dropped. Its own two log lines
@@ -9919,6 +9940,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_VEHICLE_DROP_OCCUPANT 0x0045E3C0u  /* void(vehicle, occupant) */
 #define ADDR_DAMAGE_BROADCAST      0x0042A880u  /* void(obj,uid,int,int,pt,int) */
 #define VEHICLE_OFF_KIND           0x52Cu  /* 2 and 3 skip the damage entirely */
+
 /* FORMATION. 0x00404400 places a follower relative to whatever it is
  * following, and the table it indexes is what identifies the whole cluster:
  * twelve 6-byte entries at 0x00473EA0, {uint8 facing, pad, int16 distance},

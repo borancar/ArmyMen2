@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `b83fafb`. Working tree clean.
+Last updated: **2026-08-31**, at `67d3871`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,243 patches.**
+Nothing uncommitted. **1,244 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2750,16 +2750,59 @@ commit -- gave the right answer every time it was used.
   `ADDR_NET_GAME` is set. So the whole path is multiplayer-only. Reading the
   gate is what turned "it does not run" into "it cannot run here".
 
+- **`ExitOneFromVehicle`** (`0x0045AC90`) empties ONE seat: look the occupant
+  up, choose a spot beside the vehicle, unlink the seat, put the occupant on
+  the ground, and move the selection if that emptied it.
+
+  **It was `ADDR_VEHICLE_SEAT_BLOCKED`, and the address's own comment predicted
+  the correction.** `ExitAllFromVehicle` named its three still-original callees
+  from that one call site, and `orig.h` said of them: *"read their bodies
+  before relying on the names. What is evidenced is only what
+  ExitAllFromVehicle does with them: the first decides whether a seat is
+  emptied at all."* This is the first, and it does not decide anything -- it
+  does the emptying. Renamed.
+
+  **Where the occupant lands is the one interesting choice.** A LIVING boat --
+  kind 5 with health still non-zero -- asks `ADDR_BOAT_EXIT_POINT`, and if that
+  finds nowhere the function plays a sound and refuses, the only refusal of the
+  four that makes a noise. Everything else, including a DEAD boat, goes 0x30 up
+  and left with no check at all. So the boat is the only vehicle that can be
+  too surrounded to get out of, and sinking it removes that protection.
+
+  The selection moves only if the vehicle was selected AND is now empty;
+  with seats still occupied it is `SetObjContext` on the vehicle instead.
+
+- **The offset rule caught me a third time, and this time before the ratchet
+  could.** The seat list at 0x538 wanted a name; I wrote `VEHICLE_OFF_SEATS`
+  and then grepped the offset, which found `VEHICLE_OFF_PTR_LIST` already
+  there -- and `OBJ_OFF_POSE` at the same offset on a trooper. Deleted before
+  it landed. Worth noting WHICH check would have saved me: a second `VEHICLE_`
+  name would have failed `checkoffsets`, but the trooper/vehicle overlap would
+  not have, the families being different prefixes. The grep is the defence,
+  not the tool.
+
+  The seat list turned out to be an ordinary sub-list header, so the count and
+  the uid array are `SUBREC_OFF_COUNT` and `SUBREC_OFF_ROWS` off it rather
+  than two more offsets on the vehicle -- which `ExitAllFromVehicle` had been
+  spelling as `+ VEHICLE_OFF_PTR_LIST + 4`.
+
+- **Cold, and so was most of the last ten.** `ExitOneFromVehicle`,
+  `ExitAllFromVehicle` and `SendVehicleExit` all read 0: nothing in a driven
+  Boot Camp mission gets into a vehicle. Eight of the last ten batches have
+  been cold, and that is not chance -- the picker takes the smallest
+  outstanding entry, and what is left small is in the AI, vehicle and
+  multiplayer bands this environment cannot drive.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,089 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,243
+line (0x0045C000) patched**. Measured: **1,090 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,244
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Eighty-nine batches have gone in and the 150 entries outstanding start at 48
+small ones in batches. Ninety batches have gone in and the 149 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

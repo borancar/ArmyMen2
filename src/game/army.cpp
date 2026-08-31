@@ -188,12 +188,114 @@ uint32_t __cdecl ListFirstField548(const void *obj)
     return ObjType2Field548((const AM2_Object *)ListFirstObj(obj));
 }
 
-typedef int32_t (__cdecl *AM2_SeatBlockedFn)(int32_t seat, void *vehicle);
 typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
                                              int32_t kind, uint32_t uid,
                                              int32_t a, int32_t b);
-#define orig_seat_blocked \
-    (*(AM2_SeatBlockedFn)AM2_IMAGE(ADDR_VEHICLE_SEAT_BLOCKED))
+
+/* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
+ * by including that header because this module is on the flat side of the
+ * split and audio.h names Win32 types -- the same reason air.cpp and
+ * commmsg.cpp do it, and spelled the same way so the three cannot drift. */
+extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
+                                    int32_t unused, int32_t x, int32_t y);
+
+typedef int32_t (__cdecl *AM2_BoatExitPointFn)(void *vehicle, uint32_t *out);
+#define orig_boat_exit_point \
+    ((AM2_BoatExitPointFn)(uintptr_t)ADDR_BOAT_EXIT_POINT)
+
+/* ExitOneFromVehicle -- original 0x0045AC90, four callers. Empty ONE seat:
+ * look the occupant up, choose a spot beside the vehicle, unlink the seat, put
+ * the occupant on the ground, and move the selection if that emptied it.
+ * Answers 1 when somebody came out and 0 otherwise.
+ *
+ * IT WAS ADDR_VEHICLE_SEAT_BLOCKED, and the address's own comment predicted
+ * the correction. ExitAllFromVehicle names its three still-original callees
+ * from that one call site, and orig.h says of them: "read their bodies before
+ * relying on the names. What is evidenced is only what ExitAllFromVehicle does
+ * with them: the first decides whether a seat is emptied at all". This is the
+ * first, and it does not decide anything -- it does the emptying. Renamed.
+ *
+ * FOUR WAYS OUT BEFORE ANY WORK, and each answers 0: a null vehicle; a
+ * multiplayer session where CommMustBroadcast refuses this army; a seat index
+ * past the count; and a uid that no longer resolves. The middle one means a
+ * client cannot empty a seat on its own account -- the host tells it to.
+ *
+ * WHERE THE OCCUPANT LANDS IS THE ONE INTERESTING CHOICE. A LIVING BOAT --
+ * VEHICLE_OFF_KIND 5 with OBJ_OFF_HEALTH still non-zero -- asks
+ * ADDR_BOAT_EXIT_POINT, and if that finds nowhere the function plays a sound
+ * and refuses, which is the only refusal that makes a noise. Everything else,
+ * including a DEAD boat, goes AM2_VEHICLE_EXIT_OFFSET up and left of the
+ * vehicle with no check at all. So the boat is the only vehicle that can be
+ * too surrounded to get out of, and sinking it removes that protection.
+ *
+ * The seat list is a sub-list header, so the count and the uid array are
+ * SUBREC_OFF_COUNT and SUBREC_OFF_ROWS off VEHICLE_OFF_PTR_LIST rather than
+ * two more offsets on the vehicle.
+ *
+ * THE SELECTION MOVES ONLY IF THE VEHICLE WAS SELECTED and is now empty:
+ * SelectUnit on the occupant, DeselectUnit on the vehicle. With seats still
+ * occupied it is SetObjContext on the VEHICLE instead, which keeps the
+ * selection where it was and just refreshes what the HUD is looking at.
+ */
+int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
+{
+    uint8_t  *v = (uint8_t *)vehicle;
+    uint8_t  *seats;
+    uint8_t  *occupant;
+    uint32_t  at;
+
+    if (!vehicle)
+        return 0;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              *(const int8_t *)(v + OBJ_OFF_ARMY)))
+        return 0;
+
+    seats = v + VEHICLE_OFF_PTR_LIST;
+    if (*(const int32_t *)(seats + SUBREC_OFF_COUNT) < seat)
+        return 0;
+
+    occupant = (uint8_t *)LookupByUID(
+        (*(uint32_t *const *)(seats + SUBREC_OFF_ROWS))[seat]);
+    if (!occupant)
+        return 0;
+
+    if (*(const int32_t *)(v + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
+        && *(const int16_t *)(v + OBJ_OFF_HEALTH) != 0) {
+        if (!orig_boat_exit_point(v, &at)) {
+            PlaySoundAt(3, 0, 0,
+                        *(const int16_t *)(v + OBJ_OFF_POS),
+                        *(const int16_t *)(v + OBJ_OFF_POS + 2));
+            return 0;
+        }
+    } else {
+        at = (uint32_t)(uint16_t)(*(const int16_t *)(v + OBJ_OFF_POS)
+                                  - AM2_VEHICLE_EXIT_OFFSET)
+             | ((uint32_t)(uint16_t)(*(const int16_t *)(v + OBJ_OFF_POS + 2)
+                                     - AM2_VEHICLE_EXIT_OFFSET) << 16);
+    }
+
+    *(int32_t *)(occupant + OBJ_OFF_RIDING) = 0;
+    ListRemoveAt(seats, seat);
+
+    if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                          *(const int8_t *)(v + OBJ_OFF_ARMY)))
+        SendVehicleExit(v, occupant);
+
+    DeployItem(occupant, at, 0, 0);
+
+    if (*(const uint32_t *)(v + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
+        if (*(const int32_t *)(seats + SUBREC_OFF_COUNT) <= 0) {
+            SelectUnit(occupant);
+            DeselectUnit(v);
+            return 1;
+        }
+        SetObjContext(v);
+    }
+
+    return 1;
+}
 
 void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 {
@@ -207,7 +309,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
         void    *rider = LookupByUID(uids[seat]);
         int32_t  kind;
 
-        if (!orig_seat_blocked(seat, vehicle)
+        if (!ExitOneFromVehicle(seat, vehicle)
             && (!g_mpSession
                 || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
                                      (int16_t)((const AM2_Object *)v)->owner))) {
@@ -563,6 +665,9 @@ int army_install(void)
     rc |= patch_replace(ADDR_EXIT_ALL_FROM_VEHICLE,
                         (const void *)ExitAllFromVehicle,
                         "ExitAllFromVehicle", 2);
+    rc |= patch_replace(ADDR_EXIT_ONE_FROM_VEHICLE,
+                        (const void *)ExitOneFromVehicle,
+                        "ExitOneFromVehicle", 4);
     rc |= patch_replace(ADDR_SET_LEADS_AND_ACT, (const void *)SetLeadsAndAct,
                         "SetLeadsAndAct", 1);
     rc |= patch_replace(ADDR_LIST_FIRST_OBJ, (const void *)ListFirstObj,
