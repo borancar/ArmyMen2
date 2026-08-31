@@ -210,6 +210,12 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
 /* 0x0043D050, four call sites in two functions. How obstructed is a roach at
  * `at` facing `dir`: BlockWeightDamaging summed over every point of its mask
  * for that direction. */
+/* 0x0043CA00, three callers, one of them the type-8 destroy handler. Take a
+ * roach's footprint back off the map: every cell its mask covers gets
+ * AM2_TILE_COVER_STEP added back, once each however many mask points land in
+ * it, and OBJ_FLAG_FOOTPRINT_ON is cleared. */
+void __cdecl ObjClearRoachFootprint(void *obj);
+
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
                                 int32_t unused);
 

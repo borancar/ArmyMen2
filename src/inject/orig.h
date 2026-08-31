@@ -9973,6 +9973,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * three callers, one of them that handler. Types 2, 3 and 8 were all three
  * listed as unidentified; two now have a reading. */
 #define ADDR_OBJ_CLEAR_ROACH_FOOTPRINT 0x0043CA00u  /* void(void *obj) */
+/* The visit MARK the clearer uses so a cell is decremented once however many
+ * mask points land in it: a 16 x 16 window of uint16 around the object, and a
+ * stamp bumped once per call and written into every cell it touches. The two
+ * are adjacent and the array's size is exactly the gap -- 0x00656328 minus
+ * 0x00656128 is 0x200, which is 256 uint16 -- so the window's extent is not a
+ * guess. The vehicle twin has its own pair. */
+#define ADDR_ROACH_MARK          0x00656128u  /* uint16_t[16 * 16] */
+#define ADDR_ROACH_MARK_STAMP    0x00656328u  /* uint16_t */
+#define AM2_MASK_WINDOW          16   /* cells across, X major */
+#define AM2_MASK_WINDOW_HALF     8
+#define AM2_MASK_CELL_SHIFT      4    /* AM2_MASK_STEP as a shift */
+#define AM2_TILE_COVER_STEP      15   /* what a footprint takes off a cell */
 #define ADDR_DESTROY_TYPE8         0x0043CF30u  /* void(void *obj) */
 #define ADDR_DESTROY_OBJ_COMMON    0x00429320u  /* void(void *obj) */
 /* DestroyObjCommon iterates the same rows RevealObj does -- see

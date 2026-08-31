@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `bbc66aa`. Working tree clean.
+Last updated: **2026-08-31**, at `5582a76`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,256 patches.**
+Nothing uncommitted. **1,257 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3199,16 +3199,44 @@ commit -- gave the right answer every time it was used.
 
   Cold, like its twin: 0 calls beside `AimInit`'s 1.
 
+- **`ObjClearRoachFootprint`** (`0x0043CA00`) takes a roach's footprint back
+  off the map: every cell its mask covers gets `AM2_TILE_COVER_STEP` added
+  back to `ADDR_CELL_WEIGHTS`, and `OBJ_FLAG_FOOTPRINT_ON` is cleared.
+
+  **A cell is decremented ONCE however many mask points land in it**, and the
+  mechanism is the interesting part. A stamp is bumped once per call and
+  written into every cell of a 16 x 16 window as that cell is done; a cell
+  already carrying this call's stamp is skipped. So the window never needs
+  clearing between calls -- a stamp not written this call cannot match -- which
+  is what makes a per-call scratch array cost nothing.
+
+  **The window's extent is measured, not inferred.** The stamp sits 0x200
+  bytes past the array, which is exactly 256 uint16, so 16 x 16 is what the
+  layout says rather than what the indexing suggested.
+
+  **The window is in 16-unit cells and so is the mask**, where the grid the
+  object registration uses is 256. A mask point further than eight of these
+  from the object indexes outside the window and nothing bounds it; the mask
+  is built to fit. And the rounded direction is used AS THE RECORD INDEX --
+  unlike `MoveStepPoint`, which rounds the same way and then shifts back up to
+  eight bits because it wants a heading rather than a slot.
+
+- **Cold, and its mechanism is not.** `ObjClearRoachFootprint` reads 0 -- Boot
+  Camp has no roaches -- while `TileCoverSub`, the per-cell helper it shares
+  with the vehicle twin, reads **2,121,813** on the same drive. So the thing
+  this does per cell is among the most exercised code in the game; only this
+  entry into it is cold.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,102 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,256
+line (0x0045C000) patched**. Measured: **1,103 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,257
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and two batches have gone in and the 137 entries outstanding start at 48
+small ones in batches. A hundred and three batches have gone in and the 136 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

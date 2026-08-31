@@ -1767,6 +1767,98 @@ int32_t __cdecl ObjIsWatchedKind(const void *obj)
            == *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND;
 }
 
+/* ObjClearRoachFootprint -- original 0x0043CA00, three callers, one of them
+ * the type-8 destroy handler. Take a roach's footprint back off the map:
+ * every cell its mask covers gets AM2_TILE_COVER_STEP added back to
+ * ADDR_CELL_WEIGHTS, and the object's OBJ_FLAG_FOOTPRINT_ON is cleared.
+ *
+ * A CELL IS DECREMENTED ONCE HOWEVER MANY MASK POINTS LAND IN IT, and the
+ * mechanism is worth the paragraph. ADDR_ROACH_MARK_STAMP is bumped once per
+ * call and written into every cell of a 16 x 16 uint16 window as that cell is
+ * done; a cell already carrying this call's stamp is skipped. So the window
+ * needs no clearing between calls -- a stamp that has not been written this
+ * call cannot match -- which is what makes a per-call scratch array cost
+ * nothing. The window's extent is not inferred: the stamp sits 0x200 bytes
+ * past the array, which is exactly 256 uint16.
+ *
+ * THE WINDOW IS IN 16-UNIT CELLS AND SO IS THE MASK, where the cell grid the
+ * object registration uses is 256. Both coordinates are shifted by
+ * AM2_MASK_CELL_SHIFT and taken relative to the object's own cell less
+ * AM2_MASK_WINDOW_HALF, so a mask point further than eight of these from the
+ * object indexes outside the window -- and nothing bounds it. Reproduced; the
+ * mask is built to fit.
+ *
+ * The direction is `RoundTo8(row->heading + ROW_OFF_HEADING_BIAS, bits)` with
+ * the animation's own directionBits, and it is used AS THE RECORD INDEX --
+ * unlike MoveStepPoint, which rounds the same way and then shifts the result
+ * back up to eight bits because it wants a heading rather than a slot.
+ *
+ * ADDR_TILE_COVER_SUB is called for each cell as well, on the tile rather than
+ * the cell, and after the weight has already been adjusted.
+ */
+void __cdecl ObjClearRoachFootprint(void *obj)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const uint8_t *rows;
+    const AM2_Anim *anim;
+    int32_t        dir;
+    int32_t        baseX, baseY;
+    uint32_t       slot;
+    int32_t        i;
+
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON))
+        return;
+
+    ++*(uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
+
+    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+
+    baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
+            - AM2_MASK_WINDOW_HALF;
+    baseY = (*(const int16_t *)(o + OBJ_OFF_POS + 2) >> AM2_MASK_CELL_SHIFT)
+            - AM2_MASK_WINDOW_HALF;
+
+    dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
+                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+                   anim->directionBits) & 0xFF;
+
+    slot = (uint32_t)dir * AM2_MASK_STRIDE;
+
+    for (i = 0; i < ((const int32_t *)((const uint8_t *)
+             AM2_IMAGE(ADDR_ROACH_MASK_COUNT) + slot))[0]; i++) {
+        const int16_t *pts = (const int16_t *)
+            ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK) + slot);
+        uint32_t  at;
+        uint16_t *mark;
+        int32_t   tile;
+
+        ((int16_t *)&at)[0] = (int16_t)(pts[i * 2]
+                                        + *(const int16_t *)(o + OBJ_OFF_POS));
+        ((int16_t *)&at)[1] = (int16_t)(pts[i * 2 + 1]
+                                        + *(const int16_t *)(o + OBJ_OFF_POS
+                                                             + 2));
+
+        mark = (uint16_t *)(uintptr_t)ADDR_ROACH_MARK
+               + (((int32_t)((int16_t *)&at)[0] >> AM2_MASK_CELL_SHIFT) - baseX)
+                 * AM2_MASK_WINDOW
+               + (((int32_t)((int16_t *)&at)[1] >> AM2_MASK_CELL_SHIFT)
+                  - baseY);
+
+        if (*mark == *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP)
+            continue;
+
+        tile = TileOfPoint(at);
+        ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+            -= AM2_TILE_COVER_STEP;
+        TileCoverSub((uint16_t)tile);
+
+        *mark = *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
+}
+
 /* RoachMaskWeight -- original 0x0043D050, four call sites in two functions,
  * one of them ADDR_ROACH_STEP_TAIL_A. How obstructed is a roach that stands at
  * `at` facing `dir`: the sum of BlockWeightDamaging over every point of its
@@ -2603,8 +2695,6 @@ void __cdecl DestroyByType(void *obj)
 #define orig_obj_attach_to \
             ((void (__cdecl *)(void *, void *))AM2_IMAGE(ADDR_OBJ_ATTACH_TO))
 
-#define orig_obj_clear_roach_footprint \
-            ((am2_destroy_fn)AM2_IMAGE(ADDR_OBJ_CLEAR_ROACH_FOOTPRINT))
 
 
 /* 0x00449460, one caller -- DestroyByType's type-2 arm.
@@ -2681,7 +2771,7 @@ void __cdecl DestroyType8(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
 
-    orig_obj_clear_roach_footprint(obj);
+    ObjClearRoachFootprint(obj);
 
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
@@ -4256,7 +4346,7 @@ void __cdecl StepType8(void *obj)
     uint8_t *o      = (uint8_t *)obj;
     uint8_t *facing = o + OBJ_OFF_FIELD_540;
 
-    orig_obj_clear_roach_footprint(obj);
+    ObjClearRoachFootprint(obj);
     *facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0) {
@@ -7899,6 +7989,9 @@ void item_install(void)
                   "BlockWeightDamaging", 1);
     patch_replace(ADDR_ROACH_MASK_WEIGHT, (const void *)RoachMaskWeight,
                   "RoachMaskWeight", 4);
+    patch_replace(ADDR_OBJ_CLEAR_ROACH_FOOTPRINT,
+                  (const void *)ObjClearRoachFootprint,
+                  "ObjClearRoachFootprint", 3);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,
