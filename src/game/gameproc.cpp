@@ -499,6 +499,106 @@ typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
 #define orig_create_item ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
 
 
+/* ResetLevelState -- original 0x00424E80, one caller: the level start.
+ *
+ * Clear two dozen globals, seed the tick interval from the difficulty, empty
+ * the selection list, fill ADDR_ALLY_MATRIX with the identity and then ally any
+ * two comm players sharing a team.
+ *
+ * THE TICK INTERVAL IS DIFFICULTY-SCALED AND ITS STATIC VALUE IS NEVER USED.
+ * ADDR_TICK_INTERVAL_MS holds 1000 in the image and this overwrites it with
+ * 3000, 5000 or 7000 -- and with a flat AM2_TICK_NET_MS in a session, so a
+ * network game runs on the hardest single-player cadence whatever the
+ * difficulty says. ADDR_SECOND_DEADLINE is seeded to the same number, which
+ * makes the first tick one whole interval long rather than immediate.
+ *
+ * THE ALLY PASS IS SYMMETRIC AND THE ORIGINAL WRITES BOTH HALVES SEPARATELY,
+ * through two pointers walking the matrix in opposite senses -- one striding a
+ * row, the other a column. Written here as the two assignments they are; the
+ * pointer arithmetic is the same either way and the symmetry is the point.
+ *
+ * A RECORD IS SKIPPED ENTIRELY when its COMM_PLAYER_OFF_ACTIVE is zero, and
+ * that test is made on the OUTER record before the inner loop and again on
+ * each inner one -- so an empty slot neither allies nor is allied with,
+ * rather than being allied by the other side of the pair.
+ *
+ * The identity fill runs first and unconditionally, so an army is always
+ * allied with itself even when the comm object holds nothing.
+ */
+void __cdecl ResetLevelState(void)
+{
+    int32_t  *matrix = (int32_t *)(uintptr_t)ADDR_ALLY_MATRIX;
+    uint8_t  *comm;
+    int32_t   interval;
+    int32_t   i, j;
+
+    *(int32_t *)(uintptr_t)ADDR_LEVEL_FLAG_E30 = 1;
+    *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP      = 1;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET    = 1;
+
+    *(int32_t *)(uintptr_t)ADDR_NEXT_UID          = 0x186A0;
+    *(int32_t *)(uintptr_t)ADDR_PAD_COUNT         = 0;
+    *(int32_t *)(uintptr_t)ADDR_CLOCK_BASE_MS     = 0;
+    *(int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS     = 0;
+    *(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS    = 0;
+    *(int32_t *)(uintptr_t)ADDR_LAST_TICK_MS      = 0;
+    *(int32_t *)(uintptr_t)ADDR_EVT_ID15_UID      = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A     = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL       = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV  = 0;
+    *(int32_t *)(uintptr_t)ADDR_EVT_ID15_FLAG     = 0;
+
+    interval = *(const int32_t *)(uintptr_t)ADDR_DIFFICULTY * AM2_TICK_PER_STEP
+               + AM2_TICK_BASE_MS;
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
+        interval = AM2_TICK_NET_MS;
+
+    *(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS = interval;
+    *(int32_t *)(uintptr_t)ADDR_SECOND_DEADLINE  = interval;
+
+    *(int32_t *)(uintptr_t)ADDR_OUR_LEADER_UID   = 0;
+    *(int32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID  = 0;
+    *(int32_t *)(uintptr_t)ADDR_WEAPON_SLOT      = 0;
+    *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS   = 0;
+
+    ClearPtrList((void *)(uintptr_t)ADDR_SELECTED_UIDS);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        *(int32_t *)(uintptr_t)ADDR_NET_GAME = 0;
+
+    for (i = 0; i < AM2_COMM_PLAYERS; i++)
+        for (j = 0; j < AM2_COMM_PLAYERS; j++)
+            matrix[i * AM2_COMM_PLAYERS + j] = (i == j) ? 1 : 0;
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+    for (i = 0; i < AM2_COMM_PLAYERS; i++) {
+        const uint8_t *a = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
+
+        if (!*(const int32_t *)(a + COMM_PLAYER_OFF_ACTIVE))
+            continue;
+        if (!*(const int32_t *)(a + COMM_PLAYER_OFF_TEAM))
+            continue;
+
+        for (j = 0; j < AM2_COMM_PLAYERS; j++) {
+            const uint8_t *b = comm + COMM_OFF_PLAYERS
+                               + j * COMM_PLAYER_STRIDE;
+
+            if (!*(const int32_t *)(b + COMM_PLAYER_OFF_ACTIVE))
+                continue;
+            if (*(const int32_t *)(a + COMM_PLAYER_OFF_TEAM)
+                != *(const int32_t *)(b + COMM_PLAYER_OFF_TEAM))
+                continue;
+
+            matrix[i * AM2_COMM_PLAYERS + j] = 1;
+            matrix[j * AM2_COMM_PLAYERS + i] = 1;
+        }
+    }
+
+    *(int32_t *)(uintptr_t)ADDR_THROTTLE_DEADLINE   = 0;
+    *(int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE  = 0;
+}
+
 /* LoadType5 -- original 0x0043B870, one caller, and the MISSILE member of the
  * per-type savegame loader family.
  *
@@ -1467,6 +1567,8 @@ void gameproc_install(void)
     patch_replace(ADDR_LOAD_TYPE1, (const void *)LoadType1, "LoadType1", 1);
     patch_replace(ADDR_LOAD_TYPE8, (const void *)LoadType8, "LoadType8", 1);
     patch_replace(ADDR_LOAD_TYPE5, (const void *)LoadType5, "LoadType5", 1);
+    patch_replace(ADDR_LEVEL_STATE_RESET, (const void *)ResetLevelState,
+                  "ResetLevelState", 1);
     patch_replace(ADDR_SAVE_TYPE6, (const void *)SaveType6, "SaveType6", 1);
     patch_replace(ADDR_SAVE_TYPE8, (const void *)SaveType8, "SaveType8", 1);
     patch_replace(ADDR_SAVE_TYPE4, (const void *)SaveType4, "SaveType4", 1);

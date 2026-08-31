@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `c1eed17`. Working tree clean.
+Last updated: **2026-08-31**, at `e3eb6a0`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,273 patches.**
+Nothing uncommitted. **1,274 patches.**
+
+**`ResetLevelState` (`0x00424E80`)** -- the level start. Clear two dozen
+globals, seed the tick interval from the difficulty, empty the selection list,
+fill `ADDR_ALLY_MATRIX` with the identity and then ally any two comm players
+sharing a team.
+
+**`ADDR_TICK_INTERVAL_MS`'s 1000 is only its static initialiser.** This
+overwrites it with 3000, 5000 or 7000 by difficulty, or a flat 7000 in a
+session -- so a network game runs on the hardest single-player cadence whatever
+the difficulty says. The value in the image is never the value in play.
+
+It RUNS, once per level, and the object-table artifact is the sharp check: it
+seeds `ADDR_NEXT_UID` to 0x186A0, so a wrong seed would shift every one of the
+1,610 uids the `state` dump compares.
 
 **`AirDeliver` (`0x004093D0`)** -- what the head of the air support queue does.
 Kind 1 pushes a pass onto the sub-queue `AirPassesDraw` flies; kind 0 drops
@@ -3467,13 +3481,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,118 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,273
+line (0x0045C000) patched**. Measured: **1,119 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,274
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and eighteen batches have gone in and the 121 entries outstanding
+small ones in batches. A hundred and nineteen batches have gone in and the 120 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

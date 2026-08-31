@@ -3081,6 +3081,13 @@
 /* The player records live at COMM_OFF_PLAYERS, 112 bytes apart, and the name is
  * the first field -- which is how both "Player %s ..." messages are built. */
 #define COMM_OFF_PLAYERS         0x218u
+/* Two fields of a player record, both read by ResetLevelState's ally pass and
+ * by nothing else here. It refuses a record whose +0x44 is zero and allies any
+ * two whose +0x40 match, which is what makes +0x40 a TEAM and +0x44 the record
+ * being occupied at all. */
+#define COMM_PLAYER_OFF_TEAM     0x40u
+#define COMM_PLAYER_OFF_ACTIVE   0x44u
+#define AM2_COMM_PLAYERS         4
 #define COMM_PLAYER_STRIDE       112u
 #define COMM_OFF_VERBOSE         0x418u   /* non-zero: log every DESTROYPLAYER */
 /* The PEER record PeerShouldNack works on -- the argument 0x004014C0 passes
@@ -10703,7 +10710,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * even if its presence is not. */
 #define ADDR_ADVANCE_SECOND   0x00424FE0u  /* void(void) */
 #define ADDR_SECOND_DEADLINE  0x005122F8u  /* uint32_t, game-clock ms */
-#define ADDR_TICK_INTERVAL_MS 0x00485104u  /* int32_t, 1000 */  /* uint32_t */
+/* ITS 1000 IS ONLY THE STATIC INITIALISER. ResetLevelState overwrites it at
+ * every level start with AM2_TICK_BASE_MS plus AM2_TICK_PER_STEP per
+ * difficulty -- 3000, 5000, 7000 -- or AM2_TICK_NET_MS flat in a network game,
+ * and seeds ADDR_SECOND_DEADLINE to the same number. So the value in the image
+ * is never the value in play, and the comment said otherwise for as long as
+ * only the reader had been looked at. */
+#define ADDR_TICK_INTERVAL_MS 0x00485104u  /* uint32_t; see ResetLevelState */
+#define AM2_TICK_BASE_MS      0xBB8   /* 3000 */
+#define AM2_TICK_PER_STEP     2000    /* times ADDR_DIFFICULTY */
+#define AM2_TICK_NET_MS       0x1B58  /* 7000, flat, in a session */
+/* 0x00424E80, one caller -- the level start. Clear two dozen globals, seed the
+ * tick interval from the difficulty, fill ADDR_ALLY_MATRIX with the identity
+ * and then ally any two comm players sharing a team. Reconstructed. */
+#define ADDR_LEVEL_STATE_RESET 0x00424E80u  /* void(void) */
+/* Two globals it clears that nothing else here explains. The first is written
+ * twice below the CRT line and read nowhere, so it is write-only as far as
+ * this image goes. The second is a game-clock deadline -- 0x0044A94E sets it
+ * to the clock plus 300 and 0x0044AB91 refuses while the clock is at or under
+ * it -- so it throttles something at three a second; WHAT it throttles is not
+ * established, only that this clears it. */
+#define ADDR_LEVEL_FLAG_E30    0x00511E30u  /* int32_t, written never read */
+#define ADDR_THROTTLE_DEADLINE 0x00659EF8u  /* uint32_t, game-clock ms */
 
 /* A UID is (owner << 29) | counter, so eight owners each with a 29-bit
  * counter. These are the per-owner counters, indexed 0..7. */

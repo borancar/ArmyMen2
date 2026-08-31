@@ -110,6 +110,11 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
 /* 0x0043B870, one caller -- the MISSILE member of the per-type savegame
  * loader family. Type 5 is a missile: this calls ObjInitCommon with 5 and puts
  * missile.ani into the row it builds. */
+/* 0x00424E80, one caller -- the level start. Clear two dozen globals, seed the
+ * tick interval from the difficulty, fill ADDR_ALLY_MATRIX with the identity
+ * and then ally any two comm players sharing a team. */
+void __cdecl ResetLevelState(void);
+
 void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
 
 /* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
