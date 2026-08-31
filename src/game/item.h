@@ -249,6 +249,11 @@ void __cdecl PortalSpawn(void);
  * here. Writes the turn through its third argument. */
 int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn);
 
+/* 0x0043D5B0, one caller -- StepType8's alive path. Find a direction the roach
+ * can move in by fanning out from ROACH_OFF_BASE_DIR: straight ahead, one step
+ * clockwise, one anticlockwise, and so on to AM2_ROACH_FAN_LIMIT. */
+void __cdecl RoachAliveStepB(void *obj, uint8_t *step);
+
 /* 0x0045A620 and 0x0045A770, six and seven callers -- the GENERAL footprint
  * pair, of which the roach pair is the special case. Lay an object's mask over
  * ADDR_CELL_WEIGHTS, or take it off, using the vehicle mask record

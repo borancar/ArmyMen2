@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `a1c7873`. Working tree clean.
+Last updated: **2026-08-31**, at `de6ccbf`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,284 patches.**
+Nothing uncommitted. **1,285 patches.**
+
+**`RoachAliveStepB` (`0x0043D5B0`)** -- find a direction the roach can move in
+by FANNING OUT from the last one that worked: straight ahead, one step
+clockwise, one anticlockwise, two clockwise, and so on, stopping the moment
+`RoachStepAllowed` says yes.
+
+**It named the roach's three fields at 0x534, 0x538 and 0x53C**, which the
+object header calls a table slot and two pose fields -- overloading by type, as
+at 0x52C and 0x538 already.
+
+**Closing its seams made two counters blind**, which is the cost and is worth
+recording: `RoachStepAllowed` read 366,870 last batch and reads 0 now, because
+`RoachAliveStepB` calls it by name. `RoachMaskWeight` at 618,102 is what still
+shows the layer running.
 
 **`ROACHCTL_OFF_*` was my own invented record and it is withdrawn.**
 `RoachStepAllowed`'s second argument is not a control record: `StepType8`
@@ -3637,13 +3651,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,127 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 112
-outstanding, which is 1,239 minus 1,127 -- from 1,284 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,128 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 111
+outstanding, which is 1,239 minus 1,128 -- from 1,285 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-seven batches have gone in and the 112 entries
+small ones in batches. A hundred and twenty-eight batches have gone in and the 111 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

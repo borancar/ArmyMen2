@@ -9156,7 +9156,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TRY_TAKE_WEAPON   0x00406720u /* int32_t(void *cand, void *unit) */
 #define AM2_SLOT_NONE_NEEDED   (-1)
 #define AM2_SLOT_ALL_FULL      (-2)
-#define ADDR_SET_FACING_14     0x0043D450u  /* void(facing, src, out) */
+/* RoachAliveStepB is what makes this pair legible. The first is handed one of
+ * eight compass directions and the roach's step window, and the second turns a
+ * turn back into one of the eight -- so the "14" in both names is the step
+ * window's ROACHSTEP_OFF_STATE offset and the pair are the roach's facing in
+ * and out. Names kept, since neither body has been read. */
+#define ADDR_SET_FACING_14     0x0043D450u  /* void(dir, obj, step) */
 #define ADDR_SET_FACING_08     0x0045C5E0u
 #define ADDR_IS_KIND_10_17     0x0044BBF0u  /* int32_t(int32_t) */
 #define ADDR_IS_KIND_14_22     0x00433500u  /* int32_t(int32_t) */
@@ -9224,7 +9229,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FILTER_MATCHES    0x0041EF20u  /* int32_t(wantA,wantB,haveA,haveB,maskA,maskB) */
 #define ADDR_CONSUME_PENDING   0x00408520u  /* void(src, dst, cfg) */
 #define ADDR_FACING_DELTA_08   0x0045C870u  /* int32_t(const void*, int32_t) */
-#define ADDR_FACING_DELTA_14   0x0043D550u
+#define ADDR_FACING_DELTA_14   0x0043D550u  /* int32(step, turn) */
 #define ADDR_MAP_CODE_18_28    0x00406A40u  /* int32_t(int32_t code) */
 #define ADDR_OBJ_CODE_UNMAPPED 0x00449EF0u  /* int32_t(const void *obj) */
 #define ADDR_MEETS_ALL_THREE   0x00409650u  /* int32_t(const void *p) */
@@ -9382,6 +9387,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * this: naming the table a second time failed the build. */
 #define OBJ_OFF_POSE               0x538u  /* VEHICLE_OFF_PTR_LIST on a vehicle */
 #define OBJ_OFF_POSE_PENDING       0x53Cu  /* which makes this its seat COUNT */
+/* THE SAME THREE DWORDS ON A ROACH, and none of them is a pose or a table
+ * slot. RoachAliveStepB uses +0x534 as a game-clock stamp, +0x538 as the base
+ * compass direction its search fans out from, and +0x53C as the fan counter --
+ * even values step clockwise from the base, odd ones anticlockwise, both
+ * masked to eight. Overloading by type, as at 0x52C and 0x538 already, and
+ * named per type rather than aliased. */
+#define ROACH_OFF_STAMP            0x534u  /* uint32_t, game-clock ms */
+#define ROACH_OFF_BASE_DIR         0x538u  /* int32_t, 0..7 */
+#define ROACH_OFF_FAN              0x53Cu  /* int32_t, the search counter */
+#define AM2_ROACH_BLOCKED_MS       0x1F4   /* 500; under this it keeps fanning */
+#define AM2_ROACH_FAN_LIMIT        7       /* directions tried before giving up */
 /* 0x0040D930, nine callers. Put a unit into a pose: refuse if it is already
  * there, queue instead of switching for some poses, wait for the current
  * animation's last cell for others, then set OBJ_OFF_HEIGHT_ADJ from the frame

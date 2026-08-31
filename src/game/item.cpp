@@ -2210,6 +2210,91 @@ mark:
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
 }
 
+/* RoachAliveStepB -- original 0x0043D5B0, one caller: StepType8, on the alive
+ * path. Find a direction the roach can actually move in, by fanning out from
+ * the one it settled on last time.
+ *
+ * THE FAN IS THE WHOLE FUNCTION. ROACH_OFF_FAN counts attempts and the
+ * direction comes out of it as `base + n/2` for an even n and `base - n/2` for
+ * an odd one, masked to eight -- so the search goes straight ahead, one step
+ * clockwise, one anticlockwise, two clockwise, and so on. It stops the moment
+ * RoachStepAllowed says yes, which is the ONLY exit that leaves the fan
+ * counter where it is; every other path either resets it or runs out.
+ *
+ * ITS TWO ARMS DIFFER BY WHEN THEY WERE LAST BLOCKED. Under
+ * AM2_ROACH_BLOCKED_MS since ROACH_OFF_STAMP it resumes the fan where it left
+ * off; past that it starts by trying the current heading, and seeds
+ * ROACH_OFF_BASE_DIR from the turn RoachStepAllowed just produced -- but only
+ * when the base is still zero. So a roach that has never been blocked adopts
+ * the first direction it is refused in as the centre of every later fan.
+ *
+ * THE EARLY-OUT NEEDS BOTH HALVES. It returns only when the step window's
+ * facing already matches the object's AND ROACHSTEP_OFF_STATE is 1 -- and that
+ * return is the RESET path, which zeroes the base and the fan. So the roach
+ * forgets its search the moment it is pointed where it already faces.
+ *
+ * FOUR CALLS TO RoachStepAllowed AND ALL FOUR HAND IT THE CALLER'S ARG2 SLOT
+ * as the turn output. MSVC reuses the argument slot as a local; the three
+ * different `lea` displacements in the original are three stack depths, not
+ * three variables, and reading them as separate locals would invent two.
+ */
+void __cdecl RoachAliveStepB(void *obj, uint8_t *step)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  turn;
+    uint32_t now;
+    int32_t  tries;
+
+    if (step[ROACHSTEP_OFF_FACING] == *(const uint8_t *)(o + OBJ_OFF_FACING)
+        && *(const int32_t *)(step + ROACHSTEP_OFF_STATE) == 1)
+        goto reset;
+
+    now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    if (now - *(const uint32_t *)(o + ROACH_OFF_STAMP)
+        >= (uint32_t)AM2_ROACH_BLOCKED_MS) {
+        *(uint32_t *)(o + ROACH_OFF_STAMP) = now;
+
+        if (!RoachStepAllowed(obj, step, &turn))
+            goto reset;
+
+        *(uint32_t *)(o + ROACH_OFF_STAMP) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+        if (*(const int32_t *)(o + ROACH_OFF_BASE_DIR) == 0)
+            *(int32_t *)(o + ROACH_OFF_BASE_DIR) =
+                FacingFromDelta14(step, turn);
+    } else {
+        int32_t n   = *(const int32_t *)(o + ROACH_OFF_FAN);
+        int32_t dir = (n & 1)
+            ? ((*(const int32_t *)(o + ROACH_OFF_BASE_DIR) - (n >> 1)) & 7)
+            : (((n >> 1) + *(const int32_t *)(o + ROACH_OFF_BASE_DIR)) & 7);
+
+        SetFacing14(dir, obj, step);
+        if (!RoachStepAllowed(obj, step, &turn))
+            return;
+
+        *(uint32_t *)(o + ROACH_OFF_STAMP) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    }
+
+    for (tries = 0; tries < AM2_ROACH_FAN_LIMIT; tries++) {
+        int32_t n   = ++*(int32_t *)(o + ROACH_OFF_FAN);
+        int32_t dir = (n & 1)
+            ? ((*(const int32_t *)(o + ROACH_OFF_BASE_DIR) - (n >> 1)) & 7)
+            : (((n >> 1) + *(const int32_t *)(o + ROACH_OFF_BASE_DIR)) & 7);
+
+        SetFacing14(dir, obj, step);
+        if (!RoachStepAllowed(obj, step, &turn))
+            return;
+    }
+    return;
+
+reset:
+    *(int32_t *)(o + ROACH_OFF_BASE_DIR) = 0;
+    *(int32_t *)(o + ROACH_OFF_FAN)      = 0;
+}
+
 /* RoachStepAllowed -- original 0x0043D0F0, four callers. May the roach step
  * the way this control record says? Work out the speed it would move at, the
  * turn it would make and the direction it would end up facing, and answer
@@ -5013,8 +5098,6 @@ typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *step);
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
 #define orig_roach_alive_a \
     ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_ALIVE_STEP_A)
-#define orig_roach_alive_b \
-    ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_ALIVE_STEP_B)
 #define orig_roach_tail_a \
     ((AM2_RoachStepFn)(uintptr_t)ADDR_ROACH_STEP_TAIL_A)
 #define orig_roach_row_final \
@@ -5072,7 +5155,7 @@ void __cdecl StepType8(void *obj)
                     *(const int16_t *)(o + OBJ_OFF_POS + 2));
 
         orig_roach_alive_a(obj, facing);
-        orig_roach_alive_b(obj, facing);
+        RoachAliveStepB(obj, facing);
 
     } else {
         switch (*(const int32_t *)(o + OBJ_OFF_FIELD_530)) {
@@ -8718,6 +8801,8 @@ void item_install(void)
                   "PortalSpawn", 1);
     patch_replace(ADDR_ROACH_STEP_ALLOWED, (const void *)RoachStepAllowed,
                   "RoachStepAllowed", 4);
+    patch_replace(ADDR_ROACH_ALIVE_STEP_B, (const void *)RoachAliveStepB,
+                  "RoachAliveStepB", 1);
     patch_replace(ADDR_OBJ_SET_FOOTPRINT, (const void *)ObjSetFootprint,
                   "ObjSetFootprint", 6);
     patch_replace(ADDR_OBJ_CLEAR_FOOTPRINT, (const void *)ObjClearFootprint,
