@@ -2440,6 +2440,7 @@
 #define AIR_OFF_FROM             0x0FCu  /* uint32_t[30], the uid asking */
 #define AIR_OFF_EXTRA            0x174u  /* int32_t[30], what 0x00409680 found */
 #define AIR_OFF_PASS_COUNT       0x1ECu  /* int32_t, at most 8 */
+#define AM2_AIR_PASS_SLOTS       8      /* AirDeliver's own `cmp eax, 8` */
 /* TWO OF THESE THREE WERE NAMED FROM THE WRITER AND ARE CORRECTED BY THE
  * READER. AirPassesDraw is the reader, and it is the only one.
  *
@@ -2549,7 +2550,22 @@
  * pass sub-queue, anything else does nothing. Note that is 0 and 1 where
  * AIR_OFF_KIND's own comment says "2 or 3"; both readings are from live code
  * and the field evidently carries more than two values. Stays original. */
-#define ADDR_AIR_DELIVER         0x004093D0u  /* void(void) */
+#define ADDR_AIR_DELIVER         0x004093D0u  /* void(void); reconstructed */
+/* The two constants its scatter uses. The slope turns the random X offset into
+ * a Y one -- the twelve blasts fall along a line rather than in a disc, which
+ * is what makes a strafing run look like a run. The kinds are six explosion
+ * codes and the arm picks one per blast at random. */
+#define ADDR_AIR_STRIKE_SLOPE    0x00473F28u  /* double, 0.43 */
+#define ADDR_AIR_STRIKE_KINDS    0x00473FDCu  /* int32_t[6] */
+#define AM2_AIR_STRIKE_KINDS     6
+#define AM2_AIR_STRIKE_BLASTS    12   /* plus one at the centre afterwards */
+#define AM2_AIR_STRIKE_SPREAD    0x140 /* the X offset's range, centred by */
+#define AM2_AIR_STRIKE_HALF      0xA0  /* ... this, which is also Y's range */
+#define AM2_AIR_STRIKE_Y_BIAS    0x50
+#define AM2_AIR_STRIKE_JITTER    0x12C /* the delay's random part, and the */
+#define AM2_AIR_STRIKE_BASE_MS   0x1E0 /* ... base it is added to */
+#define AM2_AIR_STRIKE_SLIDE     3     /* the X offset's weight in the delay */
+#define AM2_AIR_STRIKE_EXTRA     0x1E  /* SpawnAt's sixth argument */
 /* 0x00408E50, 304 bytes, one caller -- ADDR_AIR_FRAME_DRAW, first thing.
  * Walks the eight-slot pass sub-queue and draws ADDR_AIR_SPRITES_3 at each
  * live one, advancing its timer. Stays original. */

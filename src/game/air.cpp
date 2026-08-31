@@ -1216,6 +1216,99 @@ typedef void (__cdecl *AM2_AirStrikeFn)(uint32_t at, int32_t army);
 #define orig_air_pass_strike \
     ((AM2_AirStrikeFn)(uintptr_t)ADDR_AIR_PASS_STRIKE)
 
+/* SpawnAt, still original -- the ten-argument creator LoadType6 uses too. */
+typedef void *(__cdecl *AM2_SpawnFn)(int32_t x, int32_t y, int32_t kind,
+                                     int32_t army, uint32_t uid, int32_t extra,
+                                     int32_t e, int32_t f, int32_t g,
+                                     int32_t h);
+#define orig_spawn_at ((AM2_SpawnFn)(uintptr_t)ADDR_SPAWN_AT)
+
+/* AirDeliver -- original 0x004093D0, one caller. What the head of the air
+ * support queue actually DOES, dispatched on its AIR_OFF_KIND: kind 1 pushes a
+ * pass onto the sub-queue AirPassesDraw then flies, kind 0 drops a strike
+ * immediately, and any other kind does nothing at all.
+ *
+ * THE STRIKE FALLS ALONG A LINE, NOT IN A DISC, and the slope is what says so:
+ * each of the twelve blasts takes a random X offset in a 320-unit band and
+ * then SUBTRACTS 0.43 of it from its own random Y. So the scatter is a
+ * strafing run across the point rather than a circle around it, which is the
+ * one thing about this function that could not be read off the constants
+ * alone.
+ *
+ * The delay carries the same idea: it is the random jitter plus three times
+ * the X offset, so blasts further along the run land later.
+ *
+ * THIRTEEN BLASTS, NOT TWELVE. The loop runs AM2_AIR_STRIKE_BLASTS times and
+ * then one more goes in at the centre, undisplaced, with a fixed delay --
+ * written out below the loop in the original and reproduced that way, since
+ * folding it in would need a special case for the offsets.
+ *
+ * FOUR CALLS TO THE GAME'S rand PER BLAST, in a fixed order, and the order is
+ * load-bearing rather than incidental: everything else in the process draws
+ * from the same LCG, so a reconstruction that computed the same numbers in a
+ * different sequence would leave the generator in a different place. The
+ * centre blast draws once more.
+ *
+ * The pass push writes a timer of 1 rather than 0, which is what
+ * AIR_OFF_PASS_TIMER's note means by "starts at 1", and takes the army through
+ * UidArmy from the uid that asked -- the writer that named
+ * AIR_OFF_PASS_ARMY.
+ */
+void __cdecl AirDeliver(void)
+{
+    int32_t i;
+
+    if (g_airKind[0] == 1) {
+        int32_t n = g_airPassCount;
+
+        if (n >= AM2_AIR_PASS_SLOTS)
+            return;
+
+        ((uint32_t *)g_airPassWhere)[n] = ((const uint32_t *)g_airWhere)[0];
+        g_airPassTimer[g_airPassCount] = 1;
+        g_airPassArmy[g_airPassCount] =
+            (int16_t)UidArmy(g_airFrom[0]);
+        ++g_airPassCount;
+        return;
+    }
+
+    if (g_airKind[0] != 0)
+        return;
+
+    for (i = 0; i < AM2_AIR_STRIKE_BLASTS; i++) {
+        int32_t dx = orig_air_rand() % AM2_AIR_STRIKE_SPREAD
+                     - AM2_AIR_STRIKE_HALF;
+        int32_t dy = orig_air_rand() % AM2_AIR_STRIKE_HALF;
+        int32_t delay;
+        uint32_t who;
+
+        dy -= (int32_t)((double)dx
+                        * *(const double *)AM2_IMAGE(ADDR_AIR_STRIKE_SLOPE));
+        dy -= AM2_AIR_STRIKE_Y_BIAS;
+
+        delay = orig_air_rand() % AM2_AIR_STRIKE_JITTER
+                + dx * AM2_AIR_STRIKE_SLIDE + AM2_AIR_STRIKE_BASE_MS;
+
+        who = g_airFrom[0];
+        orig_spawn_at((int16_t)g_airWhere[0] + dx,
+                      (int16_t)g_airWhere[1] + dy,
+                      ((const int32_t *)AM2_IMAGE(ADDR_AIR_STRIKE_KINDS))
+                          [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
+                      (int32_t)UidArmy(who), who, AM2_AIR_STRIKE_EXTRA,
+                      delay, 0, 0, 0);
+    }
+
+    {
+        uint32_t who = g_airFrom[0];
+
+        orig_spawn_at((int16_t)g_airWhere[0], (int16_t)g_airWhere[1],
+                      ((const int32_t *)AM2_IMAGE(ADDR_AIR_STRIKE_KINDS))
+                          [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
+                      (int32_t)UidArmy(who), who, AM2_AIR_STRIKE_EXTRA,
+                      AM2_AIR_STRIKE_JITTER, 0, 0, 0);
+    }
+}
+
 /* AirPassesDraw -- original 0x00408E50, one caller: AirFrameDraw, first thing.
  * Draw every pass in the sub-queue and retire the head one when its time is
  * up.
@@ -1333,6 +1426,8 @@ void air_install(void)
                   "AirSupportPop", 2);
     patch_replace(ADDR_AIR_PASSES_DRAW, (const void *)AirPassesDraw,
                   "AirPassesDraw", 1);
+    patch_replace(ADDR_AIR_DELIVER, (const void *)AirDeliver,
+                  "AirDeliver", 1);
     patch_replace(ADDR_SAVE_AIR_SECTION, (const void *)SaveAirSection,
                   "SaveAirSection", 1);
     patch_replace(ADDR_LOAD_AIR_SECTION, (const void *)LoadAirSection,

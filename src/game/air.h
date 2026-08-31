@@ -210,6 +210,11 @@ int32_t __cdecl LoadAirSection(am2_FILE *fp);
 /* 0x00408E50, one caller -- AirFrameDraw's first step. Draw every pass in the
  * eight-slot sub-queue, advancing each one's timer, and retire the head pass
  * when its timer reaches ADDR_AIR_PASS_MS. */
+/* 0x004093D0, one caller. What the head of the air support queue does: kind 1
+ * pushes a pass onto the sub-queue, kind 0 drops thirteen blasts along a line
+ * through the point, any other kind does nothing. */
+void __cdecl AirDeliver(void);
+
 void __cdecl AirPassesDraw(void);
 
 void air_install(void);

@@ -2003,9 +2003,6 @@ void __cdecl DrawSelection(void)
     UnlockSurface();
 }
 
-/* The two air functions that stay original, both reached only from here. */
-typedef void (__cdecl *AM2_AirNoArgFn)(void);
-#define orig_air_deliver     ((AM2_AirNoArgFn)(uintptr_t)ADDR_AIR_DELIVER)
 
 /* AirFrameDraw -- original 0x00409070, one caller.
  *
@@ -2147,7 +2144,7 @@ void __cdecl AirFrameDraw(void)
         }
 
         if (*(const int32_t *)(air + AIR_OFF_ACTIVE) >= span) {
-            orig_air_deliver();
+            AirDeliver();
             AirSupportPop();
         }
     }

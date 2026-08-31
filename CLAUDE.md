@@ -1272,6 +1272,22 @@ shot landed. Its budget is disabled for the same reason `mission`'s is, so
 there, exactly as for `mission` and `intro`. Do not read a `combat` pixel
 count as a result in either direction.
 
+**`mission`'s FRAME RUNAWAY IS ONE-SIDED, AND THAT IS STRUCTURAL RATHER THAN
+RANDOM.** Every time it has fired, it is the ORIGINAL half that runs away --
+25,932 against 7,806, 25,917 against 8,135, 25,738 against 8,057 -- and never
+ours. That direction is what the configuration makes: the `AM2_NOPATCH=1` half
+runs the image's own code with no reconstruction and no trace stubs in front of
+it, so it is simply faster, and under load the gap widens until the 300% gate
+trips. Ours staying in its 6,300-8,300 band while the other side climbs is the
+signature of the machine, not of a change.
+
+So read the SIDE before the ratio, every time; the named `.volatile` artifacts
+carry it. And the cheap question still beats both: **ask whether the new code
+executes at all.** For the air functions the answer is a dump -- the whole
+`ADDR_AIR_SAVE_BLOCK` header reads all zeros through a live Boot Camp mission,
+so nothing in that subsystem runs and no reconstruction of it can move a frame.
+That took one probe and settled what five A/B runs could not.
+
 **IT HAPPENED AGAIN, IN REVERSE, AND THE CONTROL WAS THE ONE SAMPLE THAT
 LIED.** `bootcamp` had read 22 pixels on every run of a long session. A batch
 landed and it read 76, twice, and once more with the new function mutated to

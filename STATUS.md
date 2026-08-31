@@ -5,11 +5,25 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `6b77de0`. Working tree clean.
+Last updated: **2026-08-31**, at `c1eed17`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,272 patches.**
+Nothing uncommitted. **1,273 patches.**
+
+**`AirDeliver` (`0x004093D0`)** -- what the head of the air support queue does.
+Kind 1 pushes a pass onto the sub-queue `AirPassesDraw` flies; kind 0 drops
+THIRTEEN blasts, twelve in a loop and one more at the centre; any other kind
+does nothing.
+
+**The strike falls along a LINE, not in a disc.** Each blast takes a random X
+offset in a 320-unit band and then subtracts 0.43 of it from its own random Y,
+and the delay adds three times the same X -- so it is a strafing run across the
+point, landing progressively. That is the one thing the constants alone do not
+say.
+
+The whole air subsystem is cold here: `ADDR_AIR_SAVE_BLOCK`'s header reads all
+zeros through a live Boot Camp mission, so nothing in it runs.
 
 **`UnitWeaponInfo` (`0x004045E0`), and the rank table had three bases.** It
 fills the six sight-context fields describing the weapon a unit holds. Two of
@@ -3453,13 +3467,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,117 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,272
+line (0x0045C000) patched**. Measured: **1,118 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,273
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and seventeen batches have gone in and the 122 entries outstanding
+small ones in batches. A hundred and eighteen batches have gone in and the 121 entries outstanding
 start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.
