@@ -387,7 +387,7 @@ void __cdecl FramePre(void)
 void __cdecl FramePost(void)
 {
     if (CommActive() && !GetPauseFlags())
-        ((am2_i32_fn)(uintptr_t)ADDR_ARMY_MESSAGE_FLUSH)(0);
+        ArmyMessageFlush(0);
 
     if (!CommActive())
         return;

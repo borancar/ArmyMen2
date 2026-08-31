@@ -10597,3 +10597,86 @@ Its death table is the jump-table trap at its worst: six indices on
 `OBJ_OFF_TABLE_REC_KIND`, five arms, and the sound constants run `0x1F`,
 `0x20`, `0x21`, `0x22` in the arms' LAYOUT order -- which reads as
 confirmation the arms are in index order. The table says 1, 0, {2,3}, 5.
+
+
+## ArmyMessageFlush, and a headline count that was one ahead of itself
+
+**1,239 - 1,143 = 96 entries outstanding.** `ArmyMessageFlush` (`0x00410420`,
+464 B) is `src/game/armymsg.cpp`, and it closes the last `orig_` seam in that
+module.
+
+**The count I opened the session with was wrong by one, and the mistake was
+carrying a figure forward instead of measuring it.** I reported "1,143 of
+1,239" before writing anything; `HEAD` was 1,142. Recomputing against
+`git show HEAD:` rather than the worktree is what settled it, and it is the
+same lesson `checkclaims.py` exists for one level up: a number that is quoted
+rather than recomputed drifts, and a number carried across a context break
+drifts silently.
+
+**Every constant in the rate limit came from code this port already owns.**
+The function decides whether to send on three arms, and reading them alone
+would have left three unexplained field offsets:
+
+    send if (payload >= caller's minimum AND +0x420 has elapsed)
+         or (+0x424 has elapsed, whatever the size)
+         or (payload > +0x428)
+
+`CommConstruct` in `dplay.cpp` -- reconstructed months ago -- writes those as
+**100**, **1000** and **996**, against a `COMM_OFF_BUFFER_MAX` of 1024. So it
+is a 100 ms coalescing window, a 1 s maximum hold, and a flush when the packet
+is within 28 bytes of full. They are `COMM_OFF_COALESCE_MS`,
+`COMM_OFF_MAX_HOLD_MS` and the already-named `COMM_OFF_BUFFER_DEFAULT`.
+
+That third arm is what `ArmyMessageSend`'s lookahead aims at, and `orig.h`
+already described it from the other side -- "flush when ANOTHER message this
+size would pass the threshold". **Two notes written from opposite ends of a
+mechanism agreeing is better evidence than either alone**, and it cost one
+grep rather than a reading.
+
+**The two `return 1`s are the load-bearing part.** Not joined, or fewer than
+two players, and the flush answers *one* -- "dealt with". It has to:
+`ArmyMessageSend` spins on the zero (`while (!flush()) log(...)`), so a
+single-player game answering 0 there would hang the frame. The zero means "not
+yet", and only the rate limit returns it.
+
+**Three machine call sites, two C ones, and that is loop rotation rather than
+a missing call.** `xrefs` reports the flush called from `0x00410696`,
+`0x004106AE` and `0x0041070E` inside `ArmyMessageSend`, whose reconstruction
+has two. The compiler peeled the first test out of `while (!flush()) log();`,
+so the first call is the peel and the second is the back edge. Checked before
+assuming, because a site count that does not match is exactly how a missing
+arm looks.
+
+**Signedness is mixed and reproduced.** Both size comparisons are signed and
+both elapsed ones unsigned. The unsigned pair is right rather than sloppy --
+`GetTickCount` wraps and the subtraction carries the wrap -- so this is the
+ordinary shape of a tick comparison, not a slip to tidy.
+
+**What the A/B can and cannot say here.** `FramePost` calls it every frame, so
+the first guard runs constantly; `COMM_OFF_JOINED` is 0 in single-player, so
+*nothing below that guard executes on any configuration this machine has*.
+`bootcamp` and `campaign` confirm the guard and confirm nothing broke. The
+rate limit, the flow-queue lookup, the recipient loop and the sequence bump
+need a live DirectPlay session with a second player, which puts them in the
+same standing as the five `WM_` comm messages: **verified by reading**, and
+worth saying plainly rather than letting a clean suite imply otherwise.
+
+The counter will read 0 for the usual reason -- both callers are reconstructed
+and now call by name.
+
+**Two names arrived from the function that bumps the field.**
+`FLOW_OFF_SEQUENCE` had been in `orig.h` for some time with the comment "read,
+never bumped here", written by `TrooperFireSend`. This is where it is bumped:
+once per flush, not once per recipient, and stamped into the packet at
+`ADDR_ARMY_PACKET_SEQ` (base+8) before the loop, so every player in one flush
+is told the same number. `FLOW_OFF_READY` (+0x88) is new and gates the whole
+send.
+
+**The headline count did not move for a moment, and checking why was worth
+it.** After installing, the recomputation still said 1,143 -- which reads
+exactly like a merged `functions.tsv` entry crediting a neighbour. It was not:
+the entry is `0x00410420` at 464 bytes, an exact match for the function, and
+the only patched address inside it is the new one. The count had not moved
+because the *starting* figure was wrong, not because the entry was already
+credited. **A number that fails to move has two explanations and they point in
+opposite directions** -- check which before writing either down.

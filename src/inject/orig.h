@@ -2323,6 +2323,20 @@
 #define COMM_OFF_CAPS            0x42Cu   /* DPCAPS, filled by GetCaps */
 #define COMM_OFF_BUFFER_MAX      0x410u   /* set to 0x400 by CommConstruct */
 #define COMM_OFF_BUFFER_DEFAULT  0x428u   /* set to 0x3E4 by CommConstruct */
+/* ArmyMessageFlush's rate limit, and CommConstruct writes both: 100 and 1000
+ * milliseconds. The packet goes out when it is big enough AND +0x420 has
+ * passed, or when +0x424 has passed regardless, or when the payload exceeds
+ * COMM_OFF_BUFFER_DEFAULT -- 996 of the 1024-byte COMM_OFF_BUFFER_MAX, so 28
+ * bytes of headroom. That third arm is what orig.h means where it says
+ * ArmyMessageSend calls the flush "whenever the packet fills". */
+#define COMM_OFF_SEND_STAMP      0x408u   /* GetTickCount at the last send */
+#define COMM_OFF_COALESCE_MS     0x420u   /* 100 */
+#define COMM_OFF_MAX_HOLD_MS     0x424u   /* 1000 */
+/* The player slots ArmyMessageFlush walks, COMM_OFF_PLAYER_COUNT of them at a
+ * stride of 0x70. Each begins with the player id; -1 marks an empty slot and
+ * COMM_OFF_OUR_PLAYER_ID is skipped, so a flush sends to everyone else. */
+#define COMM_OFF_PLAYER_SLOTS    0x214u
+#define AM2_COMM_SLOT_STRIDE     0x70u
 #define ADDR_STR_CAPS_HEAD       0x00475400u
 #define ADDR_STR_CAPS_PACKET     0x004753E8u
 #define ADDR_STR_CAPS_HEADER     0x004753D0u
@@ -5839,7 +5853,13 @@ typedef struct {
 #define ADDR_TROOPER_FIRE_SEND     0x0044C250u  /* void(trooper, target) */
 #define AM2_MSG_TROOPER_FIRE       0x17
 #define AM2_MSG_TROOPER_FIRE_LEN   0x1C
-#define FLOW_OFF_SEQUENCE          0x94u   /* read, never bumped here */
+/* The per-player flow record FindPlayerById answers with. ArmyMessageFlush is
+ * where the sequence is bumped -- once per flush, not once per recipient -- and
+ * it stamps the same value into the packet before the send loop, so every
+ * player in one flush is told the same number. FLOW_OFF_READY gates the flush
+ * entirely: no flow queue for ourselves yet and nothing goes out. */
+#define FLOW_OFF_READY             0x88u
+#define FLOW_OFF_SEQUENCE          0x94u
 /* The trooper fields this touches. Only the two positions and the facing are
  * evidenced by the log line beside them; the rest are named for what the
  * message does with them. */
@@ -5869,6 +5889,10 @@ typedef struct {
 #define ADDR_ARMY_PACKET           0x004FAA68u
 #define ADDR_ARMY_PACKET_LEN       0x004FAA6Cu
 #define AM2_ARMY_PACKET_HDR        0x14u
+/* base+8 is the sequence, which ArmyMessageFlush copies out of our own flow
+ * record on its way past. The "Sending Flow Packet seq %d" trace prints the
+ * record's copy, so the two are the same number by construction. */
+#define ADDR_ARMY_PACKET_SEQ       0x004FAA70u
 /* Every message on this transport opens with the same eight bytes: a length, a
  * kind, and a uid. ArmyMessageSend reads the third as one -- it logs
  * UidArmy(UidOnWire(msg->uid)) -- which is how the field is known to be a uid

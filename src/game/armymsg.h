@@ -106,6 +106,12 @@ void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
 void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
                              int32_t arg);
 
+/* 0x00410420. Send the accumulated packet to everyone else, if the rate limit
+ * lets it. Answers 1 when the packet is dealt with -- including when there is
+ * nobody to send to, which is what stops ArmyMessageSend's spin in a
+ * single-player game -- and 0 only when it declined. */
+int32_t __cdecl ArmyMessageFlush(int32_t least);
+
 int armymsg_install(void);
 
 #ifdef __cplusplus

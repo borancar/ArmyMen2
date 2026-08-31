@@ -16,19 +16,121 @@
 #include "scriptint.h"  /* kScriptNames -- the object name the message carries */
 #include "misc.h"
 #include "air.h"      /* ObjConceal */
+#include "msgslot.h"  /* FindPlayerById, MsgField12 */
 
-/* ArmyMessageFlush stays original and is reached by address. It empties the
- * packet and resets the cursor to AM2_ARMY_PACKET_HDR, returning zero when it
- * could not send. */
-typedef int32_t (__cdecl *AM2_ArmyMessageFlushFn)(int32_t arg);
-#define orig_army_message_flush \
-    (*(AM2_ArmyMessageFlushFn)AM2_IMAGE(ADDR_ARMY_MESSAGE_FLUSH))
+typedef uint32_t (__stdcall *AM2_TickFn)(void);
+#define orig_get_tick_count (*(AM2_TickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
 
 #define kComm       (*(uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT))
 #define kPacket     ((uint8_t *)AM2_IMAGE(ADDR_ARMY_PACKET))
 #define kPacketLen  (*(int32_t *)AM2_IMAGE(ADDR_ARMY_PACKET_LEN))
 
 #define kCommField(off) (*(const int32_t *)(kComm + (off)))
+
+/* SendGameMsg stays original -- 928 bytes and fourteen callers, the hub this
+ * whole family funnels through. */
+typedef int32_t (__cdecl *AM2_SendGameMsgFn)(void *msg, int32_t a, int32_t b);
+#define orig_send_game_msg \
+    (*(AM2_SendGameMsgFn)AM2_IMAGE(ADDR_SEND_GAME_MSG))
+
+
+/* 0x00410420, and it names itself twice -- "ArmyMessageFlush: can't send since
+ * no flowq for %x yet" and the "myflow null %d" beside it.
+ *
+ * The rate limit is the whole function, and every constant in it is written by
+ * CommConstruct, which this port already owns: COMM_OFF_COALESCE_MS is 100,
+ * COMM_OFF_MAX_HOLD_MS is 1000 and COMM_OFF_BUFFER_DEFAULT is 996 of the
+ * 1024-byte COMM_OFF_BUFFER_MAX. So the packet goes out when it is at least as
+ * big as the caller asked for AND 100ms have passed, or when a second has
+ * passed whatever its size, or when it is within 28 bytes of filling the
+ * buffer. That last arm is the one ArmyMessageSend's lookahead aims at.
+ *
+ * The three comparisons do NOT agree about signedness, and it is reproduced
+ * rather than tidied: both size tests are signed and both elapsed tests are
+ * unsigned. Unsigned is right for the elapsed ones -- GetTickCount wraps, and
+ * the subtraction carries the wrap correctly -- so this is the ordinary shape
+ * of a tick comparison rather than a slip.
+ *
+ * Two zero returns and two ONE returns, which is worth stating because they
+ * mean opposite things. Returning 1 for "not joined" or "fewer than two
+ * players" tells the caller the packet is dealt with, and ArmyMessageSend
+ * spins on the zero -- so a single-player game must answer 1 or the spin in
+ * ArmyMessageSend would never end. The rate-limit refusal is the zero that
+ * means "not yet".
+ *
+ * The count is re-read at the bottom of the recipient loop rather than latched,
+ * so a player leaving mid-flush shortens it. The sequence is bumped once for
+ * the whole flush, not once per recipient.
+ *
+ * The tail reads field 12 of the message pool and throws the answer away. That
+ * is the original's, and MsgField12 really is nothing but that read, so
+ * nothing is lost by it -- reproduced because it is a call, and calls are
+ * observable. */
+int32_t __cdecl ArmyMessageFlush(int32_t least)
+{
+    uint8_t *me;
+    int32_t  payload, seq, i, off;
+    uint32_t elapsed;
+
+    if (kCommField(COMM_OFF_JOINED) == 0)
+        return 1;
+
+    if ((uint32_t)kCommField(COMM_OFF_PLAYER_COUNT) < 2u)
+        return 1;
+
+    payload = kPacketLen - (int32_t)AM2_ARMY_PACKET_HDR;
+    elapsed = orig_get_tick_count()
+              - (uint32_t)kCommField(COMM_OFF_SEND_STAMP);
+
+    if (!((payload >= least
+           && elapsed > (uint32_t)kCommField(COMM_OFF_COALESCE_MS))
+          || elapsed > (uint32_t)kCommField(COMM_OFF_MAX_HOLD_MS)
+          || payload > kCommField(COMM_OFF_BUFFER_DEFAULT)))
+        return 0;
+
+    me = (uint8_t *)FindPlayerById((uint32_t)kCommField(COMM_OFF_OUR_PLAYER_ID));
+    if (me == 0) {
+        orig_log("myflow null %d\n", kCommField(COMM_OFF_OUR_PLAYER_ID));
+        return 0;
+    }
+
+    if (*(const int32_t *)(me + FLOW_OFF_READY) == 0)
+        return 0;
+
+    seq = *(const int32_t *)(me + FLOW_OFF_SEQUENCE);
+    *(int32_t *)AM2_IMAGE(ADDR_ARMY_PACKET_SEQ) = seq;
+
+    for (i = 0, off = 0;
+         i < kCommField(COMM_OFF_PLAYER_COUNT);
+         i++, off += (int32_t)AM2_COMM_SLOT_STRIDE) {
+        int32_t id = *(const int32_t *)(kComm + COMM_OFF_PLAYER_SLOTS + off);
+
+        if (id == kCommField(COMM_OFF_OUR_PLAYER_ID) || id == -1)
+            continue;
+
+        if (FindPlayerById((uint32_t)id) == 0) {
+            if (kCommField(COMM_OFF_VERBOSE))
+                orig_log("ArmyMessageFlush: can't send since no flowq for "
+                         "%x yet\n", id);
+            continue;
+        }
+
+        orig_send_game_msg(kPacket, id, kCommField(COMM_OFF_SEND_FLAGS));
+
+        /* Re-read rather than reuse `seq`: nothing in the loop bumps it, so
+         * this is the original's spelling and not a second value. */
+        if ((uint32_t)*(const int32_t *)(me + FLOW_OFF_SEQUENCE) < 5u
+            && kCommField(COMM_OFF_VERBOSE))
+            orig_log("Sending Flow Packet seq %d to %x \n",
+                     *(const int32_t *)(me + FLOW_OFF_SEQUENCE), id);
+    }
+
+    *(int32_t *)(me + FLOW_OFF_SEQUENCE) += 1;
+    *(int32_t *)(kComm + COMM_OFF_SEND_STAMP) = (int32_t)orig_get_tick_count();
+    kPacketLen = (int32_t)AM2_ARMY_PACKET_HDR;
+    (void)MsgField12((const void *)AM2_IMAGE(ADDR_MSG_LIST_POOL));
+    return 1;
+}
 
 /* 0x004105F0. Append one message to the outgoing packet.
  *
@@ -83,24 +185,18 @@ void __cdecl ArmyMessageSend(const void *msg)
              * size would pass the threshold. */
             if ((uint32_t)kPacketLen + n
                 >= (uint32_t)kCommField(COMM_OFF_BUFFER_DEFAULT))
-                orig_army_message_flush(0);
+                ArmyMessageFlush(0);
 
             return;
         }
 
-        while (!orig_army_message_flush(0))
+        while (!ArmyMessageFlush(0))
             orig_log("Send Over Flow, Couldn't Empty Buffer \n");
 
         if (kCommField(COMM_OFF_DPLAY) == 0)
             return;
     }
 }
-
-/* SendGameMsg stays original -- 928 bytes and fourteen callers, the hub this
- * whole family funnels through. */
-typedef int32_t (__cdecl *AM2_SendGameMsgFn)(void *msg, int32_t a, int32_t b);
-#define orig_send_game_msg \
-    (*(AM2_SendGameMsgFn)AM2_IMAGE(ADDR_SEND_GAME_MSG))
 
 /* 0x00410820. Tell the other players the game has been paused or resumed.
  *
@@ -1273,6 +1369,8 @@ int armymsg_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_ARMY_MESSAGE_FLUSH, (const void *)ArmyMessageFlush,
+                        "ArmyMessageFlush", 1);
     rc |= patch_replace(ADDR_ARMY_MESSAGE_SEND, (const void *)ArmyMessageSend,
                         "ArmyMessageSend", 1);
     rc |= patch_replace(ADDR_VEHICLE_DROP_OCCUPANT, (const void *)SendVehicleExit,
