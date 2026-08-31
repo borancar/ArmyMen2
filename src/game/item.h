@@ -243,6 +243,12 @@ void __cdecl WeaponRespawn(void *obj);
  * lands, all facing ADDR_LISTENER_POS. */
 void __cdecl PortalSpawn(void);
 
+/* 0x0043D0F0, four callers. May the roach step the way this control record
+ * says? Compute the speed, the turn and the direction it would face, and
+ * answer whether the mask weight where it would land is at least what it is
+ * here. Writes the turn through its third argument. */
+int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn);
+
 /* 0x0045A620 and 0x0045A770, six and seven callers -- the GENERAL footprint
  * pair, of which the roach pair is the special case. Lay an object's mask over
  * ADDR_CELL_WEIGHTS, or take it off, using the vehicle mask record

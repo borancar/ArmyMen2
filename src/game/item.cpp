@@ -2210,6 +2210,110 @@ mark:
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
 }
 
+/* RoachStepAllowed -- original 0x0043D0F0, four callers. May the roach step
+ * the way this control record says? Work out the speed it would move at, the
+ * turn it would make and the direction it would end up facing, and answer
+ * whether the mask weight where it would land is at least what it is here.
+ *
+ * IT NAMED FOUR OF THE EIGHT ROACH CONSTANTS, which had been left nameless on
+ * the argument that an unused name is a second name waiting to happen. Two
+ * symmetric arms: ADDR_ROACH_FORVEL and _REVVEL cap the speed, _FORACC and
+ * _REVACC are what a frame adds to or takes off it, and the reverse cap is
+ * applied NEGATED -- which is what says the two are one signed speed rather
+ * than two magnitudes. Only ARMOR is still nameless.
+ *
+ * IT WRITES THROUGH ITS THIRD ARGUMENT TWICE and the second write is a clamp:
+ * the raw AngleDelta goes out first and is then replaced by its sign. A caller
+ * reading the pointer between the two would see the delta; nothing does, and
+ * the original stores both, so both are stored.
+ *
+ * THE TURN CAN BE CANCELLED AND THE MEASUREMENT IS NOT. If the row turned
+ * within AM2_ROACH_TURN_HOLD_MS the turn is zeroed -- but the direction handed
+ * to the second RoachMaskWeight was computed BEFORE that, so the weight is
+ * measured for the direction the roach WOULD have turned to. The facing handed
+ * to MoveStepPoint uses the cancelled value. Two different answers from one
+ * turn, and reproducing it means keeping the order.
+ *
+ * The here-weight is clamped UP to AM2_ROACH_WEIGHT_FLOOR before the compare,
+ * so a completely clear cell still demands 30 of the destination.
+ *
+ * A stopped record -- ROACHCTL_OFF_STOP == 1 -- skips the speed arms entirely
+ * and leaves the speed at zero, which then returns 0 after the turn has
+ * already been written. So a stopped roach still turns.
+ */
+int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
+{
+    const uint8_t  *c = (const uint8_t *)ctrl;
+    uint8_t        *o = (uint8_t *)obj;
+    const uint8_t  *rows;
+    const AM2_Anim *anim;
+    int32_t         speed = 0;
+    int32_t         cur, next, here;
+    uint8_t         facing;
+    uint32_t        at;
+
+    if (*(const int32_t *)(c + ROACHCTL_OFF_STOP) != 1) {
+        int32_t reverse = *(const int32_t *)(c + ROACHCTL_OFF_REVERSE);
+        double  delta   = (double)*(const float *)
+                              (uintptr_t)ADDR_FRAME_DELTA_SEC;
+
+        if (reverse) {
+            int32_t cap = *(const int32_t *)AM2_IMAGE(ADDR_ROACH_REVVEL);
+            int32_t v   = (int32_t)((double)*(const int32_t *)
+                                        (o + OBJ_OFF_FIELD_44)
+                                    - (double)*(const int32_t *)
+                                        AM2_IMAGE(ADDR_ROACH_REVACC) * delta);
+
+            speed = (-cap > v) ? -cap : v;
+        } else {
+            int32_t cap = *(const int32_t *)AM2_IMAGE(ADDR_ROACH_FORVEL);
+            int32_t v   = (int32_t)((double)*(const int32_t *)
+                                        AM2_IMAGE(ADDR_ROACH_FORACC) * delta
+                                    + (double)*(const int32_t *)
+                                        (o + OBJ_OFF_FIELD_44));
+
+            speed = (cap < v) ? cap : v;
+        }
+    }
+
+    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+    if (!anim)
+        return 0;
+
+    *turn = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                       *(const uint8_t *)(c + ROACHCTL_OFF_FACING));
+    *turn = Clamp(*turn, -1, 1);
+
+    cur = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
+                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+                   anim->directionBits) & 0xFF;
+    next = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
+                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)
+                     + *turn) & 0xFF,
+                    anim->directionBits) & 0xFF;
+
+    if (cur != next
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+           - *(const uint32_t *)(rows + ROW_OFF_TURN_STAMP)
+           <= AM2_ROACH_TURN_HOLD_MS)
+        *turn = 0;
+
+    facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                       + (int8_t)*turn);
+
+    if (speed == 0)
+        return 0;
+
+    here = RoachMaskWeight(obj, cur, *(const uint32_t *)(o + OBJ_OFF_POS), 0);
+    if (here < AM2_ROACH_WEIGHT_FLOOR)
+        here = AM2_ROACH_WEIGHT_FLOOR;
+
+    MoveStepPoint(obj, facing, 0, speed, 0, 0, (AM2_Point *)&at);
+
+    return RoachMaskWeight(obj, next, at, 0) >= here;
+}
+
 /* RoachBite -- original 0x0043D330, one caller: the roach's per-frame step,
  * which reaches it only in state 4. Step AM2_ROACH_REACH along the facing,
  * play a sound at the point stepped to, and damage every object in a 48x48 box
@@ -8599,6 +8703,8 @@ void item_install(void)
                   "WeaponRespawn", 8);
     patch_replace(ADDR_PORTAL_SPAWN, (const void *)PortalSpawn,
                   "PortalSpawn", 1);
+    patch_replace(ADDR_ROACH_STEP_ALLOWED, (const void *)RoachStepAllowed,
+                  "RoachStepAllowed", 4);
     patch_replace(ADDR_OBJ_SET_FOOTPRINT, (const void *)ObjSetFootprint,
                   "ObjSetFootprint", 6);
     patch_replace(ADDR_OBJ_CLEAR_FOOTPRINT, (const void *)ObjClearFootprint,

@@ -5,11 +5,27 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `44ca967`. Working tree clean.
+Last updated: **2026-08-31**, at `0cc95c8`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,282 patches.**
+Nothing uncommitted. **1,283 patches.**
+
+**`RoachStepAllowed` (`0x0043D0F0`)** -- may the roach step the way this
+control record says? It runs **366,870 times** on a live MAP 01 mission, which
+is the most-called thing reconstructed in a while; `ab.sh campaign` still stops
+at the briefing dialog, so the suite does not compare it.
+
+**It named four of the eight roach constants**, which had been left nameless
+deliberately: FORVEL and REVVEL cap the speed, FORACC and REVACC are what a
+frame adds or takes off, and the reverse cap is applied NEGATED -- so the two
+are one signed speed. Only ARMOR is still nameless.
+
+**The turn can be cancelled and the measurement is not.** A turn within 100 ms
+of the last is zeroed, but the direction handed to the second
+`RoachMaskWeight` was computed before that -- so the weight is measured for the
+direction the roach WOULD have turned to, while the facing handed to
+`MoveStepPoint` uses the cancelled value.
 
 **`PortalSpawn` (`0x00417930`)** -- a cheat's effect, identified by its one
 caller sitting two functions along from the "Flame On!" arms. Twenty-five armed
@@ -3589,13 +3605,13 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,125 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 114
-outstanding, which is 1,239 minus 1,125 -- from 1,282 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,126 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 113
+outstanding, which is 1,239 minus 1,126 -- from 1,283 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and twenty-five batches have gone in and the 114 entries
+small ones in batches. A hundred and twenty-six batches have gone in and the 113 entries
 outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
 `0x004248A0`, which is permanently out of scope, so the first real candidate
 is 192.

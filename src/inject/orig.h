@@ -6228,6 +6228,10 @@ typedef struct {
 /* The row's own timestamp, which the frame advance is timed off rather than
  * the object's -- they are different clocks for different things. */
 #define ROW_OFF_STAMP_54           0x54u    /* uint32_t */
+/* The row's other stamp, four bytes on: RoachStepAllowed compares
+ * ADDR_GAME_CLOCK_MS against it and refuses a turn within
+ * AM2_ROACH_TURN_HOLD_MS of it, so it is when the row last turned. */
+#define ROW_OFF_TURN_STAMP        0x58u    /* uint32_t, game-clock ms */
 #define ADDR_STEP_TYPE2          0x0044B7D0u  /* void(obj) */
 #define ADDR_STEP_TYPE3          0x0045D660u  /* void(obj) */
 #define ADDR_STEP_TYPE5          0x0043C110u  /* void(obj) */
@@ -10000,6 +10004,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * rule above working rather than an exception to it. Five of the eight are
  * still nameless. */
 #define ADDR_ROACH_DAMAGE       0x00487BB4u  /* int32_t; block index 3 */
+/* Four more of the eight, and they get names now because RoachStepAllowed
+ * reads them -- the rule above working rather than an exception to it. It uses
+ * them in two symmetric arms: FORVEL and REVVEL cap the speed, FORACC and
+ * REVACC are what a frame adds to or takes off it. The reverse cap is applied
+ * NEGATED, which is what says the two are one signed speed and not two. Only
+ * ARMOR is still nameless of the eight. */
+#define ADDR_ROACH_FORVEL       0x00487BB8u  /* int32_t; block index 4 */
+#define ADDR_ROACH_REVVEL       0x00487BBCu  /* int32_t; block index 5 */
+#define ADDR_ROACH_FORACC       0x00487BC0u  /* int32_t; block index 6 */
+#define ADDR_ROACH_REVACC       0x00487BC4u  /* int32_t; block index 7 */
+/* 0x0043D0F0, four callers. May the roach step the way this control record
+ * says? Work out the speed, the turn and the direction it would end up facing,
+ * and answer whether the mask weight there is at least what it is here.
+ * Reconstructed. */
+#define ADDR_ROACH_STEP_ALLOWED 0x0043D0F0u  /* int32(obj, ctrl, int32 *turn) */
+#define ROACHCTL_OFF_FACING     0x00u  /* uint8_t, what to turn towards */
+#define ROACHCTL_OFF_STOP       0x14u  /* 1 means do not move at all */
+#define ROACHCTL_OFF_REVERSE    0x18u  /* non-zero backs up */
+#define AM2_ROACH_TURN_HOLD_MS  0x64   /* a turn within this of the last is
+                                        * refused */
+#define AM2_ROACH_WEIGHT_FLOOR  0x1E   /* the here-weight is clamped up to it */
 #define ADDR_ROACH_BOX          0x00487BC8u  /* AM2_Rect */
 /* The rect 16 bytes later, which CreateRoach does not touch and RoachBite
  * does: (-24, -24, 24, 24), a 48x48 box centred on the point the roach steps
