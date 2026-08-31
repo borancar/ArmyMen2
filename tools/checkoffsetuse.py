@@ -21,6 +21,11 @@ other. KNOWN BLIND SPOTS, measured on real functions rather than guessed:
     raw displacement, so no *_OFF_* macro exists (that function's 0x2);
   - array indexing and absolute addresses are excluded, the latter by the
     0x400000 test above.
+  - a field reached as `[reg*scale + absolute]` folds the TABLE BASE and the
+    field offset into one displacement, so the offset never appears alone --
+    ObjTileHook reads PAD_OFF_DAMAGE as [ecx*8 + 0x5161CC], which is
+    ADDR_PADS + 0x34;
+  - a field at offset zero is `[reg]` with no displacement at all.
 Validated by running it on a function known good: ObjMoveAlongFacing reports
 "sets agree", 19 for 19. It is a HEURISTIC, not a proof -- the original indexes arrays and uses
 literal displacements the C may legitimately spell differently -- so it is

@@ -12,6 +12,7 @@
 #include "item.h"
 #include "misc.h"      /* ClearPtrList */
 #include "defparse.h"  /* DefFindObjRec -- reconstructed */
+#include "pad.h"      /* ObjTileHook -- reconstructed */
 #include "objtable.h"
 #include "objtype.h"   /* ObjType2Field548 */
 #include "objflag.h"   /* ObjFlagClear0 -- reconstructed */
@@ -1064,8 +1065,6 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
 
 /* Still original: the cell query HeightAtPoint walks, and the two halves of
  * ObjTileChanged's "something moved" path. */
-typedef void (__cdecl *AM2_ObjHookFn)(void *obj);
-#define orig_obj_tile_hook ((AM2_ObjHookFn)(uintptr_t)ADDR_OBJ_TILE_HOOK)
 
 
 /* ObjectsAtPoint -- original 0x0042A550, fifteen callers.
@@ -1571,7 +1570,7 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
         (uint16_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_NO_TILE_HOOK))
-        orig_obj_tile_hook(o);
+        ObjTileHook(o);
 
     if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_PREV_POS),
                     *(const uint32_t *)(o + OBJ_OFF_POS))

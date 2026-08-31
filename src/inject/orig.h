@@ -4944,6 +4944,14 @@ typedef struct {
 #define PAD_OFF_TRIGGER           0x14u  /* its selector: flags, or a name */
 #define AM2_PAD_STRIDE            72u
 #define AM2_PAD_NUMBER_STRIDE     76u
+/* An AM2_PadNumber as ObjTileHook reads it: a count, then that many int16 pad
+ * ids, and a pointer at +0x48 that must be non-null before the ids are walked.
+ * The eight is ADDR_PAD_BIT_TABLE's length, and the bit layer has exactly one
+ * bit per pad-number slot. */
+#define PADNUM_OFF_COUNT          0x00u  /* int16_t */
+#define PADNUM_OFF_IDS            0x02u  /* int16_t[], into ADDR_PADS */
+#define PADNUM_OFF_PADS           0x48u  /* null means nothing to walk */
+#define AM2_PAD_BITS              8
 #define PAD_OFF_CMP_OP            0x18u  /* ScriptCompare's middle argument */
 #define PAD_OFF_CMP_A             0x1Cu  /* the threshold the script wrote */
 /* ScriptCompare's THIRD argument, and the program names it: the leave half of
@@ -4958,6 +4966,14 @@ typedef struct {
 #define PAD_OFF_EVENT_LEAVE       0x24u
 #define PAD_OFF_UID_ENTER         0x28u
 #define PAD_OFF_UID_LEAVE         0x2Cu
+/* The damage a pad does to whatever is standing on it, read by ObjTileHook:
+ * DamageObject(obj, PAD_OFF_DAMAGE, PAD_OFF_DAMAGE_KIND, 0, 0, 0), gated on
+ * the amount being non-zero and on ADDR_GAME_CLOCK_MS having passed
+ * PAD_OFF_DAMAGE_DUE. The argument order is the call's, not a guess -- the
+ * amount is pushed second and the kind third. */
+#define PAD_OFF_DAMAGE            0x34u
+#define PAD_OFF_DAMAGE_DUE        0x3Cu  /* mission ms */
+#define PAD_OFF_DAMAGE_KIND       0x40u
 #define PAD_OFF_INSIDE            0x44u
 #define AM2_PAD_NOTIFY_ENTER      3
 #define AM2_PAD_NOTIFY_LEAVE      2

@@ -8,6 +8,7 @@
 #include "crt.h"       /* am2_log */
 #include "misc.h"      /* ScriptCompare -- reconstructed */
 #include "script.h"    /* AllocUid -- reconstructed */
+#include "item.h"      /* DamageObject -- reconstructed */
 #include "event.h"     /* EventRegister, EventNotify -- reconstructed */
 #include "savetag.h"
 #include "image.h"
@@ -250,8 +251,118 @@ void __cdecl PadFinalise(void *pad, void *obj)
                 *(const int32_t *)(p + PAD_OFF_EVENT_LEAVE), 1, 0);
 }
 
+/* 0x00437860, one caller -- ObjTileChanged, when OBJ_OFF_FLAGS bit 3 is clear.
+ * What happens to an object as it crosses trigger pads.
+ *
+ * THE ORDERING IS THE PART orig.h ALREADY WARNS ABOUT: the damage pass runs
+ * BEFORE the tile-changed early exit, so it is not part of the "something
+ * moved" path however much its position in the body suggests otherwise.
+ *
+ * TWO INDEPENDENT PAD MECHANISMS, which is what a partial read destroys. The
+ * eight-bit layer looks like the whole function and is not:
+ *
+ *   ADDR_MAP_PADBIT_LAYER  eight bits per tile. Entered is ~prev & cur and
+ *                          left is ~cur & prev, walked against
+ *                          ADDR_PAD_BIT_TABLE while stepping ADDR_PAD_NUMBERS
+ *                          by its 0x4C stride.
+ *   ADDR_MAP_PAD_LAYER     one pad NUMBER per tile. Enter and leave fire when
+ *                          that number differs between the two tiles.
+ *
+ * Both strides come out of the original's lea chains independently of the
+ * names -- 19*4 is 76 and 9*8 is 72 -- which is what CONFIRMS ADDR_PAD_NUMBERS
+ * and ADDR_PADS rather than merely fitting them.
+ *
+ * IT RETURNS A FLAG AND THE CALLER DISCARDS IT: 1 when any enter or leave
+ * fired, 0 from the unchanged-tile exit, and ObjTileChanged does
+ * `call; add esp, 4` without testing eax. orig.h called it void(obj), which is
+ * harmless and inaccurate. Reproduced as it is -- the mirror of Log2Mask,
+ * where the function writes only al and the vectors needed a byte_ret flag. */
+int32_t __cdecl ObjTileHook(void *obj)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const uint8_t *padLayer = *(const uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER;
+    const uint8_t *bitLayer;
+    uint32_t       tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
+    uint32_t       prev;
+    int32_t        changed = 0;
+    uint8_t        curPad = 0, prevPad = 0;
+    uint8_t        curBits = 0, prevBits = 0;
+    int32_t        i;
+
+    /* The damage pass, before the early exit. */
+    if (padLayer != 0 && padLayer[tile] > 0) {
+        const uint8_t *num = (const uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS)
+                             + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;
+
+        if (*(const int32_t *)(num + PADNUM_OFF_PADS) != 0
+            && *(const int16_t *)(num + PADNUM_OFF_COUNT) > 0) {
+            const int16_t *ids = (const int16_t *)(num + PADNUM_OFF_IDS);
+            int32_t        n = *(const int16_t *)(num + PADNUM_OFF_COUNT);
+
+            for (i = 0; i < n; i++) {
+                const uint8_t *pad = (const uint8_t *)AM2_IMAGE(ADDR_PADS)
+                                     + (uint32_t)ids[i] * AM2_PAD_STRIDE;
+
+                if (*(const int32_t *)(pad + PAD_OFF_DAMAGE) != 0
+                    && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                       > *(const uint32_t *)(pad + PAD_OFF_DAMAGE_DUE))
+                    DamageObject(o,
+                                 *(const int32_t *)(pad + PAD_OFF_DAMAGE),
+                                 *(const int32_t *)(pad + PAD_OFF_DAMAGE_KIND),
+                                 0, 0, 0);
+            }
+        }
+    }
+
+    prev = *(const uint32_t *)(o + OBJ_OFF_PREV_TILE);
+    if (tile == prev)
+        return 0;
+
+    /* The eight-bit layer. */
+    bitLayer = *(const uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER;
+    if (bitLayer != 0) {
+        if (tile != 0) curBits  = bitLayer[tile];
+        if (prev != 0) prevBits = bitLayer[prev];
+
+        if (curBits != prevBits) {
+            uint8_t entered = (uint8_t)(~prevBits & curBits);
+            uint8_t left    = (uint8_t)(~curBits  & prevBits);
+            const int32_t *mask = (const int32_t *)AM2_IMAGE(ADDR_PAD_BIT_TABLE);
+            uint8_t *num = (uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS);
+
+            for (i = 0; i < AM2_PAD_BITS; i++, num += AM2_PAD_NUMBER_STRIDE) {
+                if (mask[i] & entered)
+                    PadNumberEnter(o, num);
+                else if ((uint8_t)mask[i] & left)
+                    PadNumberLeave(o, num);
+            }
+            changed = 1;
+        }
+    }
+
+    /* And the pad-number layer, which is a separate mechanism. */
+    if (padLayer != 0) {
+        if (tile != 0) curPad  = padLayer[tile];
+        if (prev != 0) prevPad = padLayer[prev];
+
+        if (curPad != prevPad) {
+            if (curPad != 0)
+                PadNumberEnter(o, (uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS)
+                                  + (uint32_t)curPad * AM2_PAD_NUMBER_STRIDE);
+            if (prevPad != 0)
+                PadNumberLeave(o, (uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS)
+                                  + (uint32_t)prevPad * AM2_PAD_NUMBER_STRIDE);
+            changed = 1;
+        }
+    }
+
+    return changed;
+}
+
 void pad_install(void)
 {
+    patch_replace(ADDR_OBJ_TILE_HOOK, (const void *)ObjTileHook,
+                  "ObjTileHook", 1);
     patch_replace(ADDR_PAD_FINALISE, (const void *)PadFinalise,
                   "PadFinalise", 1);
     patch_replace(ADDR_PAD_NUMBER_ENTER, (const void *)PadNumberEnter,

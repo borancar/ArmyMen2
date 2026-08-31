@@ -11430,3 +11430,52 @@ useful demonstration that the check reports rather than fails.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels.
+
+
+## ObjTileHook, and reading past what looks like the end
+
+**1,239 - 1,154 = 85 entries outstanding.** `0x00437860` into
+`src/game/pad.cpp`. One caller -- ObjTileChanged, when OBJ_OFF_FLAGS bit 3 is
+clear -- and every callee already ours.
+
+**TWO INDEPENDENT PAD MECHANISMS, and the second one sits past what reads as
+the function's end.** The eight-bit loop over ADDR_MAP_PADBIT_LAYER looks
+conclusive; after it comes a separate pass over ADDR_MAP_PAD_LAYER, one pad
+NUMBER per tile, firing enter and leave when that number differs. Writing only
+the first would give a function that handles one pad system and silently
+ignores the other -- and Boot Camp may exercise only one layer, so the A/B
+could have passed anyway.
+
+Same failure as AngleDelta here: a reconstruction from a disassembly that
+stopped at the first `ret`, hiding a branch, shipping with a confident comment
+explaining an asymmetry the function does not have. The defence is mechanical
+-- count the exits, read to the last one, treat anything after an apparent
+conclusion as suspect -- not attentiveness.
+
+**The damage pass runs BEFORE the tile-changed early exit**, which orig.h
+already warned about, so it fires every time the hook runs rather than only on
+movement.
+
+**It returns a flag the caller discards** -- 1 when any enter or leave fired --
+and ObjTileChanged does `call; add esp, 4` without testing eax. orig.h said
+`void(obj)`. Reproduced as it is; the mirror of Log2Mask, where the function
+writes only `al` and the vectors needed a byte_ret flag.
+
+**Both strides confirm their names rather than fitting them.** 19*4 is 76 and
+9*8 is 72, straight out of the lea chains, matching AM2_PAD_NUMBER_STRIDE and
+AM2_PAD_STRIDE. ADDR_PAD_BIT_TABLE was verified by reading its bytes back --
+1, 2, 4 ... 0x80, exactly its "1<<n" comment.
+
+**A sixth blind spot for tools/checkoffsetuse.py**, found the way the other
+five were, by an implausible result rather than an error: a field reached as
+`[reg*scale + absolute]` folds the TABLE BASE and the field offset into one
+displacement, so the offset never appears alone -- PAD_OFF_DAMAGE is read as
+`[ecx*8 + 0x5161CC]`, which is ADDR_PADS + 0x34. And a field at offset zero is
+`[reg]` with no displacement at all. Both are in the docstring now.
+
+Three pad damage fields named from the call itself, argument order taken from
+the pushes rather than guessed: PAD_OFF_DAMAGE, PAD_OFF_DAMAGE_DUE,
+PAD_OFF_DAMAGE_KIND.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels.

@@ -65,6 +65,12 @@ void __cdecl PadFinalise(void *pad, void *obj);
  * comparison counts the object and hands it to PadFinalise; one without
  * notifies immediately, type 3 for entering and 2 for leaving. See pad.cpp
  * for what the leave half's own log line names. */
+/* 0x00437860, one caller. What happens to an object as it crosses trigger
+ * pads: a damage pass BEFORE the tile-changed early exit, then two independent
+ * pad mechanisms. Returns 1 when any enter or leave fired -- the caller
+ * discards it. */
+int32_t __cdecl ObjTileHook(void *obj);
+
 void __cdecl PadNumberEnter(void *obj, void *padNumber);
 void __cdecl PadNumberLeave(void *obj, void *padNumber);
 
