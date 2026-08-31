@@ -49,6 +49,13 @@ typedef struct AM2_AnimCell {
  * field4 and field6 are copied and not used here; across the shipped files
  * field4 takes sixteen values from 0 to 99 and field6 only 0, 1, 2 and 4.
  *
+ * field4 IS THE SPEED, on one reader's evidence and so not renamed yet.
+ * AnimStepPoint takes it out of the animation an object is playing and hands
+ * it straight to MoveStepPoint as the speed, doubling it when the row's
+ * ROW_OFF_FIELD_2C is ADDR_ROW_LUT_DOUBLES. A range of 0..99 fits, and so
+ * does an animation carrying how fast the thing it draws moves. One reader is
+ * not two, which is why the name has not moved.
+ *
  * The record is malloc'd and NOT cleared, so when `frames * directions` is not
  * positive `cells` is left holding whatever the heap had. The original leaves
  * it that way and nothing reads it, since the same test guards the loop. */

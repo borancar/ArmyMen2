@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `e45a6d3`. Working tree clean.
+Last updated: **2026-08-31**, at `676323f`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,249 patches.**
+Nothing uncommitted. **1,250 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -2983,16 +2983,47 @@ commit -- gave the right answer every time it was used.
   and nothing else compared mentions a position. Worth knowing before
   crediting any A/B with covering a mover.
 
+- **`AnimStepPoint`** (`0x0040DA70`) is `MoveStepPoint` with the speed taken
+  from the object's CURRENT ANIMATION rather than passed in. 16,559 calls on a
+  driven mission.
+
+  **The pose index is two table lookups deep.** `pose` indexes
+  `ADDR_WEAPON_POSE_FRAMES` for an animation ID; that ID is searched for in the
+  row's own animation table by `AM2_AnimEntry::id`; and the same ID indexes
+  `ADDR_FRAME_HEADING_BIAS` for a byte added to the heading. So the pose
+  decides both how fast the object moves and which way it faces doing it.
+
+  **A MATCH ON THE LAST ENTRY IS TREATED AS A MISS.** The search runs to the
+  end and the original then re-tests `i < count`, which is false whether the id
+  was found at the last entry or not found at all -- and either way the index
+  is forced to 0. A real off-by-one in the original, written out as it stands.
+
+  **`AM2_Anim::field4` is the SPEED**, on this one reader's evidence: it goes
+  straight into `MoveStepPoint`'s speed argument. anim.h's comment already
+  recorded its range as 0..99, which fits. Not renamed -- one reader is not
+  two -- but the evidence is now written at the field.
+
+  And the doubling is stranger than it looks: a row whose `ROW_OFF_FIELD_2C`
+  colour remap is `ADDR_ROW_LUT_DOUBLES` moves twice as fast. Reproduced
+  without explanation.
+
+- **Two hot functions, and the A/B still says only "no regression".** 16,559
+  and 159,080 calls, `bootcamp` at 22 pixels with an identical 1,610-line
+  object table and `combat` in step at 16532/16539 with 21 identical messages
+  -- but the previous commit established that the suite cannot see movement at
+  all, so none of that is evidence about the arithmetic. Said plainly rather
+  than left to read as coverage.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,095 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,249
+line (0x0045C000) patched**. Measured: **1,096 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,250
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-five batches have gone in and the 144 entries outstanding start at 48
+small ones in batches. Ninety-six batches have gone in and the 143 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

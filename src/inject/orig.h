@@ -9369,6 +9369,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00428E40, six call sites in five functions -- the movers. Where an object
  * gets to after one frame at a given heading and speed, without moving it.
  * Reconstructed. */
+/* 0x0040DA70, three callers, all in 0x0044AFB0. MoveStepPoint with the speed
+ * taken from the object's CURRENT ANIMATION rather than passed in.
+ * Reconstructed. */
+#define ADDR_ANIM_STEP_POINT 0x0040DA70u /* int32(obj, head, pose,
+                                          *       AM2_Point *, fast) */
+#define AM2_ANIM_FAST_STEP   8.0f  /* units this frame when `fast` is set */
 #define ADDR_MOVE_STEP_POINT 0x00428E40u /* int32(obj,head,turn,speed,unused,
                                           *       flip, AM2_Point *) */
 #define AM2_MOVE_MIN_STEP   2.0f  /* the step is clamped AWAY from zero */

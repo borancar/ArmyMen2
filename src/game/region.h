@@ -84,6 +84,12 @@ int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
                               int32_t speed, int32_t unused, int32_t flip,
                               void *outPt);
 
+/* 0x0040DA70, three callers. MoveStepPoint with the speed taken from the
+ * object's current animation rather than passed in. `outPt` is an AM2_Point
+ * and is filled with the object's own position on every exit. */
+int32_t __cdecl AnimStepPoint(void *obj, int32_t heading, int32_t pose,
+                              void *outPt, int32_t fast);
+
 int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg);
 
 void __cdecl AiHitReact(void *obj, void *out, void *ctx);

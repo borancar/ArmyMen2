@@ -691,6 +691,84 @@ int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
     return 1;
 }
 
+/* AnimStepPoint -- original 0x0040DA70, three callers, all in 0x0044AFB0.
+ * MoveStepPoint with the speed taken from the object's CURRENT ANIMATION
+ * rather than passed in. The out point is filled with the object's own
+ * position first, so every exit leaves it valid.
+ *
+ * THE POSE INDEX IS TWO TABLE LOOKUPS DEEP. `pose` indexes
+ * ADDR_WEAPON_POSE_FRAMES for an animation ID; that ID is searched for in the
+ * row's own ROW_OFF_ANIM_CUR table by AM2_AnimEntry::id; and the same ID indexes
+ * ADDR_FRAME_HEADING_BIAS for a byte added to the heading. So the pose decides
+ * both how fast the object moves and which way it faces while doing it.
+ *
+ * A MISS FALLS BACK TO ENTRY ZERO rather than failing. The search runs to the
+ * end and then the index is forced to 0 -- and the same forcing happens when
+ * the id IS found at the last entry, because the original re-tests `i < count`
+ * after the loop and that is false either way. So a match on the LAST
+ * animation of a table is treated as a miss. Written out as the original has
+ * it; it is a real off-by-one and not a transcription of one.
+ *
+ * THE SPEED IS THE ANIMATION'S, DOUBLED FOR ONE PARTICULAR REMAP. It is
+ * AM2_Anim::field4, and the doubling is `ROW_OFF_FIELD_2C ==
+ * ADDR_ROW_LUT_DOUBLES` -- a row whose colour remap is that specific table
+ * moves twice as fast, which is a stranger coupling than it looks and is
+ * reproduced without explanation.
+ *
+ * `fast` replaces all of that with AM2_ANIM_FAST_STEP divided by the frame's
+ * seconds, which MoveStepPoint then multiplies by the same number: eight units
+ * this frame, whatever the frame rate.
+ *
+ * Two exits before the step. No animation id at all answers 1 with the point
+ * at the object's position, and a row with no animation table answers 0 with
+ * the same point. The difference matters to the caller and not to the point.
+ */
+int32_t __cdecl AnimStepPoint(void *obj, int32_t heading, int32_t pose,
+                              void *outPt, int32_t fast)
+{
+    uint8_t   *o    = (uint8_t *)obj;
+    AM2_Point *out  = (AM2_Point *)outPt;
+    uint8_t   *rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    int32_t    animId =
+        ((const int32_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES))[pose];
+    const AM2_AnimTable *table;
+    int32_t              i;
+    int32_t              speed;
+
+    out->x = *(const int16_t *)(o + OBJ_OFF_POS);
+    out->y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+
+    if (!animId)
+        return 1;
+
+    table = *(const AM2_AnimTable *const *)(rows + ROW_OFF_ANIM_CUR);
+    if (!table)
+        return 0;
+
+    i = 0;
+    if (table->count > 0) {
+        while (i < table->count && table->entries[i].id != animId)
+            i++;
+    }
+    if (i >= table->count)
+        i = 0;
+
+    if (fast) {
+        speed = (int32_t)(AM2_ANIM_FAST_STEP
+                          / *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+    } else {
+        speed = table->entries[i].anim->field4;
+    }
+
+    if (*(const uint32_t *)(rows + ROW_OFF_FIELD_2C)
+        == (uint32_t)ADDR_ROW_LUT_DOUBLES)
+        speed += speed;
+
+    return MoveStepPoint(obj, heading, ((const uint8_t *)
+                             AM2_IMAGE(ADDR_FRAME_HEADING_BIAS))[animId],
+                         speed, 0, 0, out);
+}
+
 typedef int32_t (__cdecl *AM2_FindPathFn)(int32_t from, int32_t to,
                                           uint16_t *route, int32_t *n,
                                           int32_t arg);
@@ -2326,6 +2404,8 @@ int region_install(void)
                         "PlanPathTo", 3);
     rc |= patch_replace(ADDR_MOVE_STEP_POINT, (const void *)MoveStepPoint,
                         "MoveStepPoint", 6);
+    rc |= patch_replace(ADDR_ANIM_STEP_POINT, (const void *)AnimStepPoint,
+                        "AnimStepPoint", 3);
     rc |= patch_replace(ADDR_AI_WALK_STEP, (const void *)AiWalkStep,
                         "AiWalkStep", 2);
     rc |= patch_replace(ADDR_SETTLE_POINT_IN_REGION,
