@@ -9979,6 +9979,39 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MAP_CODE          0x00406920u  /* int32_t(int32_t) */
 #define ADDR_COMPARE_TRIPLE    0x00435A80u  /* int32_t(const void*, const void*) */
 #define ADDR_TYPES_COMPATIBLE  0x00433570u  /* int32_t(int32_t a, int32_t b) */
+/* 0x004335F0, two callers. Can this unit pick this weapon up, and into which
+ * of its six slots -- `slot` out, and a second out set to 1 for the one case
+ * that means "already yours".
+ *
+ * EIGHT SEPARATE EXITS, not the converging tail its neighbours in this family
+ * use; each pops independently with its own side effect, so counting them
+ * before writing is what stops eight wrong gotos.
+ *
+ * Its two "29-entry jump tables" are nothing of the sort. Both have TWO arms
+ * and an IDENTICAL byte index, so they encode a PREDICATE over item types --
+ * ids 1, 7, 8, 9, 10 and 29 take one arm and everything else the other -- with
+ * the same predicate applied to the held weapon and to the candidate. Counting
+ * the table entries said "two 29-way dispatches"; READING them said "one
+ * six-element set, used twice".
+ *
+ * A CONDITIONAL WHOSE ARMS ARE IDENTICAL. At 0x00433714 a
+ * `cmp [weapon + OBJ_OFF_TARGET_UID], -1; jg` splits into two blocks that both
+ * compute `other->OBJ_OFF_TARGET_UID > 0`. The test decides nothing.
+ * Reproduced, not fixed -- the second dead conditional found today, after the
+ * AI_MODE = 6 both deploy siblings overwrite. */
+#define ADDR_CAN_PICK_UP_WEAPON 0x004335F0u /* int32(weapon,unit,int32*,int32*) */
+#define OBJ_OFF_HELD_WEAPON_UID  0x564u  /* the one already in hand */
+#define AM2_WEAPON_SLOTS         6
+/* The predicate those two tables encode, read from the image rather than
+ * transcribed: the byte index at 0x00433770 is 29 entries over `kind - 1`, and
+ * a zero means the special set -- kinds 1, 7, 8, 9, 10 and 29. The copy at
+ * 0x00433798 is byte-identical, which is what says the two dispatches share
+ * one predicate. A kind outside 1..29 fails the original's unsigned bound and
+ * takes the ordinary arm. */
+#define ADDR_PICKUP_KIND_INDEX   0x00433770u  /* uint8_t[29] */
+#define AM2_ITEM_KIND_IS_SPECIAL(kind) \
+    ((uint32_t)((kind) - 1) <= 0x1Cu \
+     && ((const uint8_t *)AM2_IMAGE(ADDR_PICKUP_KIND_INDEX))[(kind) - 1] == 0)
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
  * may it be taken at all? The slot goes to an out-parameter and the answer is
  * the return: -1 means the kind needs no slot, -2 that all six are full. */

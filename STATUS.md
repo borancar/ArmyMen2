@@ -11545,3 +11545,53 @@ decode, surfacing as a field that does not exist.
 
 A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
 campaign widgets identical (35 nodes), log identical, 2 pixels.
+
+
+## CanPickUpWeapon, where reading a table made the work SMALLER
+
+**1,239 - 1,156 = 83 entries outstanding.** `0x004335F0` into
+`src/game/item.cpp`. Can this unit pick this weapon up, and into which of its
+AM2_WEAPON_SLOTS slots.
+
+**EIGHT SEPARATE EXITS, and the family pattern was the trap.** Its neighbours
+converge to one tail; this does not. Each exit pops independently with its own
+side effect, so they are returns because they ARE returns -- and assuming the
+family shape would have produced eight wrong gotos, the exact inverse of the
+StepType2 mistake that cost three attempts. Counting them before writing is
+the whole defence.
+
+**Its two "29-entry jump tables" are one six-element PREDICATE.** Both have TWO
+arms and a byte-identical index, so the same test -- kinds 1, 7, 8, 9, 10 and
+29 -- is applied to the held weapon and then to the candidate. I had already
+written down that this function was "materially bigger than its size suggested"
+on the strength of counting the table entries; READING them made it smaller.
+**A scout that counts is worth less than one that reads**, and being wrong in
+that direction only helps if you go back and check.
+
+The predicate is defined by reading the original's own table out of the image
+rather than transcribing 29 bytes, and the byte-identical copy at 0x00433798
+is what proves the two dispatches share one test -- a fact a hand transcription
+would have destroyed.
+
+**A conditional whose arms are identical.** At 0x00433714 a
+`cmp [weapon + OBJ_OFF_TARGET_UID], -1; jg` splits into two blocks that both
+compute `other->OBJ_OFF_TARGET_UID > 0`. Reproduced, not fixed. Second dead
+conditional found today, after the AI_MODE = 6 that both deploy siblings
+overwrite -- and two instances make it a pattern in the original rather than a
+misreading here.
+
+**An eighth blind spot for checkoffsetuse.py, and one I chose not to fix.** It
+excludes `ebp` as a frame pointer, which is right for a standard prologue and
+wrong here: this function does `push ebp; mov ebp, [esp+8]`, so `[ebp + 0xC8]`
+is OBJ_OFF_PICKUP_AFTER and the check reports it missing. Dropping the
+exclusion would trade one false positive for dozens. It stays documented.
+
+**What the A/B does and does not cover.** bootcamp is state-identical on 1,610
+lines and the function gates every pickup, so the common path is verified. The
+special-kind arm is NOT: those six kinds only matter when a unit already holds
+a weapon of a different OBJ_OFF_FIELD_94 class, which Boot Camp may never
+present. Verified by reading until a TRACE=1 run watching TypesCompatible says
+otherwise -- its call is reachable only through that arm.
+
+A/B clean: bootcamp state identical (1610 lines), log identical, 22 pixels;
+campaign widgets identical (35 nodes), log identical, 2 pixels.

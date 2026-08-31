@@ -9347,6 +9347,89 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
     }
 }
 
+/* 0x004335F0, two callers. Can this unit pick this weapon up, and into which
+ * of its AM2_WEAPON_SLOTS slots? The slot goes to `slot`; `already` is set to
+ * 1 for the one case that means "this is the weapon you are holding".
+ *
+ * EIGHT SEPARATE EXITS. Its neighbours in this family converge to one tail and
+ * this does not -- each exit pops independently with its own side effect, so
+ * they are written as returns because they ARE returns. Counting them before
+ * writing is what stops eight wrong gotos; StepType2 cost three attempts for
+ * exactly the opposite mistake.
+ *
+ * The two dispatches through 0x00433768 and 0x00433790 look like 29-way jump
+ * tables and are not: both have TWO arms and an identical byte index, so they
+ * encode a PREDICATE over item types -- ids 1, 7, 8, 9, 10 and 29 on one side
+ * -- applied first to the held weapon and then to the candidate. Counting the
+ * entries said "two 29-way dispatches"; reading them said "one six-element set
+ * used twice".
+ *
+ * The `target != -1` test is reproduced although it decides nothing: both its
+ * arms compute `other->OBJ_OFF_TARGET_UID > 0`. See orig.h. */
+int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
+                                int32_t *already)
+{
+    uint8_t *w = (uint8_t *)weapon;
+    uint8_t *u = (uint8_t *)unit;
+
+    if (!ObjIsType4((const AM2_Object *)w))
+        return 0;
+
+    if (*(const uint32_t *)(u + OBJ_OFF_HELD_WEAPON_UID)
+        == ((const AM2_Object *)w)->uid) {
+        *already = 1;
+        return 0;
+    }
+
+    if (*(const uint32_t *)(w + OBJ_OFF_PICKUP_AFTER)
+        > *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
+        return 0;
+
+    if (IsKind14Or22(**(const int32_t **)(w + OBJ_OFF_FIELD_C0))) {
+        *slot = -1;
+        return 1;
+    }
+
+    *slot = 0;
+    if (*(const uint32_t *)(u + OBJ_OFF_WEAPON_UID) == 0)
+        return 1;
+
+    for (;;) {
+        uint8_t *other = (uint8_t *)WeaponByUid(
+            *(const uint32_t *)(u + OBJ_OFF_WEAPON_UID
+                                + (uint32_t)*slot * 4u));
+
+        if (other == 0) {
+            /* A slot naming a weapon that no longer exists is emptied. */
+            *(uint32_t *)(u + OBJ_OFF_WEAPON_UID
+                          + (uint32_t)*slot * 4u) = 0;
+            return 1;
+        }
+
+        if (*(const int32_t *)(other + OBJ_OFF_FIELD_94)
+            == *(const int32_t *)(w + OBJ_OFF_FIELD_94)) {
+            /* Both arms of the original's test compute this; see orig.h. */
+            return *(const int32_t *)(other + OBJ_OFF_TARGET_UID) > 0;
+        }
+
+        if (AM2_ITEM_KIND_IS_SPECIAL(**(const int32_t **)
+                                     (other + OBJ_OFF_FIELD_C0))
+            && AM2_ITEM_KIND_IS_SPECIAL(**(const int32_t **)
+                                        (w + OBJ_OFF_FIELD_C0)))
+            return TypesCompatible(**(const int32_t **)
+                                   (other + OBJ_OFF_FIELD_C0),
+                                   **(const int32_t **)
+                                   (w + OBJ_OFF_FIELD_C0)) != 0;
+
+        ++*slot;
+        if (*slot >= AM2_WEAPON_SLOTS)
+            return 0;
+        if (*(const uint32_t *)(u + OBJ_OFF_WEAPON_UID
+                                + (uint32_t)*slot * 4u) == 0)
+            return 1;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -9618,6 +9701,8 @@ void item_install(void)
                   "HeightAtPoint", 5);
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
+    patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,
+                  "CanPickUpWeapon", 2);
     patch_replace(ADDR_ON_SELECTION_CHANGED, (const void *)OnSelectionChanged,
                   "OnSelectionChanged", 8);
     patch_replace(ADDR_OBJ_REMAP, (const void *)ObjRemap, "ObjRemap", 3);

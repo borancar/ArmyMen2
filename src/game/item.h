@@ -112,6 +112,12 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force);
  * mode. Its argument is never read; see item.cpp. */
 void __cdecl OnSelectionChanged(uint32_t unusedPoint);
 
+/* 0x004335F0, two callers. Can this unit pick this weapon up, and into which
+ * of its six slots? Eight separate exits -- not the converging tail this
+ * family usually uses. See item.cpp. */
+int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
+                                int32_t *already);
+
 void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect);
 
 void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
