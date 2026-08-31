@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `5582a76`. Working tree clean.
+Last updated: **2026-08-31**, at `43a10f9`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,257 patches.**
+Nothing uncommitted. **1,258 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3227,16 +3227,44 @@ commit -- gave the right answer every time it was used.
   this does per cell is among the most exercised code in the game; only this
   entry into it is cold.
 
+- **`ObjSetRoachFootprint`** (`0x0043C8D0`) puts a roach's footprint ON the
+  map, and is the exact partner of the clearer done last commit.
+
+  **It was `ADDR_ROACH_STEP_TAIL_B`, and `orig.h`'s own note predicted the
+  correction.** That block's five names are role names taken from one call
+  site, described there as "the weakest kind of naming... Nothing here reads
+  their bodies." Reading the body makes it the setter. Two of the other four
+  in that block are still role names and should be read before they are
+  trusted.
+
+  **Measured rather than eyeballed:** both disassembled with branch targets
+  normalised give EIGHTY-SEVEN instructions each and a diff of four lines --
+  the flag gate inverted, `add 0xF` against `add 0xF1`, `ADDR_TILE_COVER_ADD`
+  against `_SUB`, and `or 0x200000` against `and ~0x200000`. Everything else is
+  the same instruction in the same place.
+
+  Written out beside its partner rather than folded into one function with a
+  sign and two function pointers -- the same choice `ConsiderSightingB` and
+  `AiStepTrack` record, and for the same reason: a shared body would make those
+  four differences parameters, and the next reader would have to trust that the
+  parameters are right.
+
+- **Cold, and the pair's own helpers are among the busiest code in the game.**
+  Both footprint functions read 0 -- Boot Camp has no roaches -- while
+  `TileCoverAdd` reads 2,107,253 and `TileCoverSub` 2,107,173 on the same
+  drive. The two figures being within eighty of each other is its own small
+  check: whatever puts footprints down takes almost all of them up again.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,103 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,257
+line (0x0045C000) patched**. Measured: **1,104 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,258
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and three batches have gone in and the 136 entries outstanding start at 48
+small ones in batches. A hundred and four batches have gone in and the 135 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`

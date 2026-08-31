@@ -6041,7 +6041,14 @@ typedef struct {
 #define ADDR_ROACH_ALIVE_STEP_A  0x00408A60u  /* void(obj, uint8_t *facing) */
 #define ADDR_ROACH_ALIVE_STEP_B  0x0043D5B0u  /* void(obj, uint8_t *facing) */
 #define ADDR_ROACH_STEP_TAIL_A   0x0043D750u  /* void(obj, uint8_t *facing) */
-#define ADDR_ROACH_STEP_TAIL_B   0x0043C8D0u  /* void(obj) */
+/* NOT a "step tail", and the note above predicted this: the five names in this
+ * block are role names taken from one call site, "the weakest kind of naming",
+ * and nothing had read their bodies. 0x0043C8D0 is the exact partner of
+ * ADDR_OBJ_CLEAR_ROACH_FOOTPRINT -- eighty-seven instructions each, differing
+ * in four places: the flag gate inverted, +15 instead of -15,
+ * ADDR_TILE_COVER_ADD instead of _SUB, and the flag set instead of cleared.
+ * Renamed. Two of the other four in this block are still role names. */
+#define ADDR_OBJ_SET_ROACH_FOOTPRINT 0x0043C8D0u  /* void(obj) */
 #define ADDR_ROACH_ROW_FINAL     0x00461EA0u  /* void(row), before the destroy */
 #define AM2_ROACH_ALIVE_SOUND    0x30
 #define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */

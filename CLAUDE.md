@@ -1258,6 +1258,15 @@ stash the work, build the commit before it, and run the same configuration:
 the parent failed the same way, 306,172 pixels and log differences, on code
 that had been clean hours earlier. So the noise was the machine.
 
+**Do not pipe `ab.sh` through `tail -N`.** A short tail drops whole
+configurations: a `bootcamp mission` run tailed at 12 lines keeps only
+`mission`, and the run's own output file then has no record that `bootcamp`
+happened at all. That is how a commit message came to assert "bootcamp clean at
+its usual 22 pixels" for a figure nobody had seen -- the artifacts could still
+show the log and the object table identical, but the pixel count exists only in
+the output that was thrown away. Capture the whole thing and read the part you
+need.
+
 Check `uptime` before believing an A/B failure, and reach for the parent
 commit rather than a fourth re-run. **The `frames` line is the early warning**
 -- it is printed before the pixels and a collapse in it means neither side ran

@@ -1767,6 +1767,117 @@ int32_t __cdecl ObjIsWatchedKind(const void *obj)
            == *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND;
 }
 
+/* ObjSetRoachFootprint -- original 0x0043C8D0, six call sites in three
+ * functions. Put a roach's footprint ON the map: every cell its mask covers
+ * loses AM2_TILE_COVER_STEP from ADDR_CELL_WEIGHTS, and OBJ_FLAG_FOOTPRINT_ON
+ * is set.
+ *
+ * IT WAS ADDR_ROACH_STEP_TAIL_B, and orig.h's own note predicted the
+ * correction: the five names in that block are role names taken from one call
+ * site, described there as "the weakest kind of naming", with "nothing here
+ * reads their bodies". Reading the body makes it the exact partner of
+ * ObjClearRoachFootprint below.
+ *
+ * MEASURED RATHER THAN EYEBALLED. Disassembling both with branch targets
+ * normalised gives EIGHTY-SEVEN instructions each and a diff of four lines:
+ * the flag gate inverted (`jne` against `je`), `add 0xF` against `add 0xF1`,
+ * ADDR_TILE_COVER_ADD against _SUB, and `or 0x200000` against
+ * `and ~0x200000`. Everything else -- the stamp, the window, the rounding, the
+ * loop -- is the same instruction in the same place.
+ *
+ * Written out beside its partner rather than folded into one function with a
+ * sign and two function pointers, which is what ConsiderSightingB and
+ * AiStepTrack are also written out for: a shared body would make those four
+ * differences parameters and the next reader would have to trust that the
+ * parameters are right.
+ *
+ * A CELL IS CHARGED ONCE HOWEVER MANY MASK POINTS LAND IN IT, and the
+ * mechanism is worth the paragraph. ADDR_ROACH_MARK_STAMP is bumped once per
+ * call and written into every cell of a 16 x 16 uint16 window as that cell is
+ * done; a cell already carrying this call's stamp is skipped. So the window
+ * needs no clearing between calls -- a stamp that has not been written this
+ * call cannot match -- which is what makes a per-call scratch array cost
+ * nothing. The window's extent is not inferred: the stamp sits 0x200 bytes
+ * past the array, which is exactly 256 uint16.
+ *
+ * THE WINDOW IS IN 16-UNIT CELLS AND SO IS THE MASK, where the cell grid the
+ * object registration uses is 256. Both coordinates are shifted by
+ * AM2_MASK_CELL_SHIFT and taken relative to the object's own cell less
+ * AM2_MASK_WINDOW_HALF, so a mask point further than eight of these from the
+ * object indexes outside the window -- and nothing bounds it. Reproduced; the
+ * mask is built to fit.
+ *
+ * The direction is `RoundTo8(row->heading + ROW_OFF_HEADING_BIAS, bits)` with
+ * the animation's own directionBits, and it is used AS THE RECORD INDEX --
+ * unlike MoveStepPoint, which rounds the same way and then shifts the result
+ * back up to eight bits because it wants a heading rather than a slot.
+ *
+ * ADDR_TILE_COVER_SUB is called for each cell as well, on the tile rather than
+ * the cell, and after the weight has already been adjusted.
+ */
+void __cdecl ObjSetRoachFootprint(void *obj)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const uint8_t *rows;
+    const AM2_Anim *anim;
+    int32_t        dir;
+    int32_t        baseX, baseY;
+    uint32_t       slot;
+    int32_t        i;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
+        return;
+
+    ++*(uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
+
+    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+
+    baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
+            - AM2_MASK_WINDOW_HALF;
+    baseY = (*(const int16_t *)(o + OBJ_OFF_POS + 2) >> AM2_MASK_CELL_SHIFT)
+            - AM2_MASK_WINDOW_HALF;
+
+    dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
+                    + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
+                   anim->directionBits) & 0xFF;
+
+    slot = (uint32_t)dir * AM2_MASK_STRIDE;
+
+    for (i = 0; i < ((const int32_t *)((const uint8_t *)
+             AM2_IMAGE(ADDR_ROACH_MASK_COUNT) + slot))[0]; i++) {
+        const int16_t *pts = (const int16_t *)
+            ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK) + slot);
+        uint32_t  at;
+        uint16_t *mark;
+        int32_t   tile;
+
+        ((int16_t *)&at)[0] = (int16_t)(pts[i * 2]
+                                        + *(const int16_t *)(o + OBJ_OFF_POS));
+        ((int16_t *)&at)[1] = (int16_t)(pts[i * 2 + 1]
+                                        + *(const int16_t *)(o + OBJ_OFF_POS
+                                                             + 2));
+
+        mark = (uint16_t *)(uintptr_t)ADDR_ROACH_MARK
+               + (((int32_t)((int16_t *)&at)[0] >> AM2_MASK_CELL_SHIFT) - baseX)
+                 * AM2_MASK_WINDOW
+               + (((int32_t)((int16_t *)&at)[1] >> AM2_MASK_CELL_SHIFT)
+                  - baseY);
+
+        if (*mark == *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP)
+            continue;
+
+        tile = TileOfPoint(at);
+        ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+            += AM2_TILE_COVER_STEP;
+        TileCoverAdd((uint16_t)tile);
+
+        *mark = *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+}
+
 /* ObjClearRoachFootprint -- original 0x0043CA00, three callers, one of them
  * the type-8 destroy handler. Take a roach's footprint back off the map:
  * every cell its mask covers gets AM2_TILE_COVER_STEP added back to
@@ -4306,7 +4417,6 @@ typedef void (__cdecl *AM2_RoachRowFn)(void *row);
     ((AM2_RoachRowFn)(uintptr_t)ADDR_ROACH_ROW_FINAL)
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);
-#define orig_roach_tail_b ((AM2_StepFn)(uintptr_t)ADDR_ROACH_STEP_TAIL_B)
 
 /* StepType8 -- original 0x0043D980, one caller. The ROACH's per-frame step.
  *
@@ -4386,7 +4496,7 @@ void __cdecl StepType8(void *obj)
     }
 
     orig_roach_tail_a(obj, facing);
-    orig_roach_tail_b(obj);
+    ObjSetRoachFootprint(obj);
 }
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
@@ -7992,6 +8102,9 @@ void item_install(void)
     patch_replace(ADDR_OBJ_CLEAR_ROACH_FOOTPRINT,
                   (const void *)ObjClearRoachFootprint,
                   "ObjClearRoachFootprint", 3);
+    patch_replace(ADDR_OBJ_SET_ROACH_FOOTPRINT,
+                  (const void *)ObjSetRoachFootprint,
+                  "ObjSetRoachFootprint", 6);
     patch_replace(ADDR_ENTER_VEHICLE, (const void *)EnterVehicle,
                   "EnterVehicle", 3);
     patch_replace(ADDR_DESELECT_ALL, (const void *)DeselectAll,

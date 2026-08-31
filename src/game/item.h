@@ -214,6 +214,11 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
  * roach's footprint back off the map: every cell its mask covers gets
  * AM2_TILE_COVER_STEP added back, once each however many mask points land in
  * it, and OBJ_FLAG_FOOTPRINT_ON is cleared. */
+/* 0x0043C8D0, six call sites. Put a roach's footprint ON the map -- the exact
+ * partner of the below, eighty-seven instructions each and four lines of diff.
+ * Was ADDR_ROACH_STEP_TAIL_B, a role name from one call site. */
+void __cdecl ObjSetRoachFootprint(void *obj);
+
 void __cdecl ObjClearRoachFootprint(void *obj);
 
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
