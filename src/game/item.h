@@ -230,6 +230,11 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj);
 /* 0x0045B4D0, one caller -- DamageObject's type-3 arm. Take `amount` off a
  * vehicle, and if that empties it, empty the vehicle too. Armour is a
  * THRESHOLD with a damage-proportional chance of one point getting through. */
+/* 0x004498F0, one caller. Move a trooper on to its next inventory slot,
+ * wrapping to 0, on the weapon-switch action key or on the middle mouse button
+ * being RELEASED. */
+void __cdecl NextInventorySlot(void *obj);
+
 void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
                            uint32_t attacker);
 

@@ -4140,6 +4140,70 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
     SendTrooperSetWeapon(unit, ((const AM2_Object *)w)->uid, slot);
 }
 
+typedef int32_t (__cdecl *AM2_Scan403B40Fn)(void *obj, void *a, void *b,
+                                            void *c, void *d, int32_t e);
+#define orig_scan_403b40 ((AM2_Scan403B40Fn)(uintptr_t)ADDR_SCAN_403B40)
+
+/* NextInventorySlot -- original 0x004498F0, one caller. Move a trooper on to
+ * its next inventory slot, wrapping to 0, on the weapon-switch action key or
+ * on the middle mouse button.
+ *
+ * THE MOUSE TEST IS A RELEASE, not a press. `!ADDR_MOUSE_BUTTON[2] &&
+ * ADDR_MOUSE_CHANGED[2]` -- held is clear, changed is set -- which is this
+ * program's idiom for a button coming up, the same one the in-mission ESCAPE
+ * handler and WidgetUpdate use. Both globals were already named as the two
+ * three-element arrays they belong to, so this needed no new ones; reading
+ * them as two loose flags would have hidden that the pair is one gesture.
+ *
+ * THE SLOT ARRAY IS READ ONE PAST THE SELECTION. `UNIT_OFF_INVENTORY` is six
+ * uids and the test is on `inventory[sel + 1]`, so the question is "is there
+ * anything in the NEXT slot" and the answer decides between `sel + 1` and 0.
+ * The bound is `AM2_INVENTORY_SLOTS - 1` and that is not a tidy-up: the
+ * original's literal is 5, and writing it as 5 got a redefinition of the
+ * existing 6 from `checkoffsets` within the minute. The constant this wants is
+ * "there is a next slot", which is the count less one, and saying so is what
+ * keeps the read inside the six.
+ *
+ * The scan above it is on a timer of its own -- `OBJ_OFF_FIELD_FC` against the
+ * game clock -- and runs whether or not anything is pressed, so it is not part
+ * of the switch at all. Its answer is discarded here, where AiStepDefend keeps
+ * the same function's answer as SIGHT_OFF_FOUND.
+ *
+ * The sound is PlaySoundAt with five zeros: index 0 at the origin, which the
+ * volume model then treats as far away. Written as the original has it.
+ */
+void __cdecl NextInventorySlot(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  sel;
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
+        int32_t a, b, c, d;
+
+        orig_scan_403b40(obj, &a, &b, &c, &d, 0);
+    }
+
+    if (!ActionKeyPressed(AM2_ACTION_NEXT_WEAPON)) {
+        if (((const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)[AM2_MOUSE_MIDDLE])
+            return;
+        if (!((const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)[AM2_MOUSE_MIDDLE])
+            return;
+    }
+
+    sel = *(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL);
+    if (sel < AM2_INVENTORY_SLOTS - 1
+        && *(const int32_t *)(o + UNIT_OFF_INVENTORY
+                              + (uint32_t)(sel + 1) * 4) != 0) {
+        PlaySoundAt(0, 0, 0, 0, 0);
+        SelectInventorySlot(obj, sel + 1);
+    } else {
+        PlaySoundAt(0, 0, 0, 0, 0);
+        SelectInventorySlot(obj, 0);
+    }
+}
+
+
 typedef void (__cdecl *AM2_RoachStepFn)(void *obj, uint8_t *facing);
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
 #define orig_roach_alive_a \
@@ -8013,6 +8077,8 @@ void item_install(void)
                   "DamageObject", 6);
     patch_replace(ADDR_DAMAGE_VEHICLE, (const void *)DamageVehicle,
                   "DamageVehicle", 1);
+    patch_replace(ADDR_NEXT_INVENTORY_SLOT, (const void *)NextInventorySlot,
+                  "NextInventorySlot", 1);
     patch_replace(ADDR_HEAL_OBJECT, (const void *)HealObject,
                   "HealObject", 3);
     patch_replace(ADDR_OBJ_FIELD_A, (const void *)ObjFieldA, "ObjFieldA", 1);

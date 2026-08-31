@@ -6551,6 +6551,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * more. */
 #define UNIT_OFF_LAST_DROPPED     0x564u
 #define ADDR_SELECT_INVENTORY_SLOT 0x00449860u /* void(AM2_Object *, int32_t) */
+/* 0x004498F0, one caller. Cycle a trooper to its next inventory slot, on the
+ * action key or on the middle mouse button being RELEASED. Reconstructed. */
+#define ADDR_NEXT_INVENTORY_SLOT 0x004498F0u  /* void(AM2_Object *) */
+#define AM2_ACTION_NEXT_WEAPON   11    /* ADDR_ACTION_KEY_PRESSED's argument */
+#define AM2_MOUSE_MIDDLE         2     /* into ADDR_MOUSE_BUTTON/_CHANGED */
+/* 0x00403B40, five callers, and what it ANSWERS is what several of them keep:
+ * AiStepDefend promotes it into SIGHT_OFF_FOUND, and NextInventorySlot runs it
+ * for its effect and ignores the answer. Nothing in it says what it is. */
+#define ADDR_SCAN_403B40         0x00403B40u  /* int32(obj, a, b, c, d, e) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value
  * SaveType2 writes as its tag and ThingCode switches on. Reconstructed. Both

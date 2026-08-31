@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `4f23292`. Working tree clean.
+Last updated: **2026-08-31**, at `93b3102`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,253 patches.**
+Nothing uncommitted. **1,254 patches.**
 
 Sixty-eight functions since the last snapshot. The seven-class HUD family is
 complete, the radar is reconstructed end to end, and CLAUDE.md's Lock/Unlock
@@ -3115,16 +3115,47 @@ commit -- gave the right answer every time it was used.
   Grepping the offsets before naming found them; a `VEHICLE_` name of my own at
   either would have failed `checkoffsets`, but only after I had written it.
 
+- **`NextInventorySlot`** (`0x004498F0`) moves a trooper on to its next
+  inventory slot, wrapping to 0. **23,575 calls** on a driven mission -- it
+  runs every frame for the selected unit, not only when something is pressed.
+
+  **The mouse test is a RELEASE, not a press.** `!ADDR_MOUSE_BUTTON[2] &&
+  ADDR_MOUSE_CHANGED[2]` -- held clear, changed set -- this program's idiom for
+  a button coming up, the same one the in-mission ESCAPE handler and
+  `WidgetUpdate` use. Both globals were ALREADY named, as element 2 of the two
+  three-element arrays; reading them as two loose flags would have hidden that
+  the pair is one gesture and would have cost two invented names.
+
+  **The scan above it is on a timer of its own** and runs whether or not
+  anything is pressed, so it is not part of the switch at all. Its answer is
+  discarded here, where `AiStepDefend` keeps the same function's answer as
+  `SIGHT_OFF_FOUND`.
+
+- **`checkoffsets` caught a constant within the minute.** The original's
+  literal bound is 5 and I wrote `AM2_INVENTORY_SLOTS 5` -- which redefined the
+  existing 6. The constant this wants is "there is a next slot", which is the
+  count LESS ONE, and saying it that way is what keeps the read inside the six.
+  A ratchet firing on a value rather than a name, which is the case the
+  duplicate-definition rule exists for.
+
+- **`0x004248A0` is permanently out of scope, and the reason is now written
+  down.** It is 96 bytes of MSVC static-init glue -- `mov ecx, <object>; jmp
+  <ctor>` thunks and an `atexit` registration for a global at `0x00511A68`,
+  six one-line compiler-generated functions merged into one `functions.tsv`
+  entry. Reproducing it would mean reproducing MSVC's static construction,
+  which this port replaces with the C++ runtime wholesale. It has sat on the
+  picker's shortlist for weeks; it should stay there and be skipped.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,099 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them, from 1,253
+line (0x0045C000) patched**. Measured: **1,100 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them, from 1,254
 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. Ninety-nine batches have gone in and the 140 entries outstanding start at 48
+small ones in batches. A hundred batches have gone in and the 139 entries outstanding start at 48
 bytes.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
