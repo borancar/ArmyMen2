@@ -5376,6 +5376,39 @@ typedef struct {
  * THE FILE DOES NOT SHIP, per ADDR_HAVE_DEFAULT_COF above, so everything past
  * the fopen is unreachable on this data set. */
 #define ADDR_LOAD_DEFAULT_COF    0x00457320u  /* int32_t(void) */
+/* 0x00457070, one caller (0x00421AAA) -- the WRITE half of the pair above,
+ * and the only thing in the image that produces `save\default.cof`. Walk the
+ * default owner's object list and write every surviving trooper, each
+ * followed by its six inventory slots.
+ *
+ * IT IS NOT A PURE WRITER. Before anything reaches the file it retires the
+ * unit: ADDR_OBJ_DROP_ALT_RECORD puts it in state 5, Type238Action awards the
+ * level's completion score, the position is reset to ADDR_ZERO_POINT, and a
+ * rider is dismounted -- OBJ_OFF_RIDING cleared and its first map row made
+ * drawable again through ObjFlagSet0. So this is the end-of-level roster
+ * writer, not a snapshot, and calling it twice would award the score twice.
+ *
+ * THE TYPE FILTER IS THREE TESTS DEEP AND ONLY THE LAST ONE BITES. It admits
+ * types 2, 3 and 8, then requires OBJ_OFF_FIELD_94 to be zero, then requires
+ * the type to be exactly 2 -- so vehicles and roaches are excluded twice over.
+ * Reproduced as written rather than folded, because the wider test is what
+ * the original asks and a fold would hide that it once meant more.
+ *
+ * A MISSING OBJECT IS REMOVED FROM THE LIST AND THE INDEX DOES NOT ADVANCE,
+ * which is correct for a compacting ListRemoveAt and is the one place the
+ * walk can loop on the same slot. Both the list pointer and its count are
+ * re-read from the globals every iteration.
+ *
+ * ITS ONE CALLER NAMES THE OCCASION. 0x00421AAA saves the best difficulty
+ * through SaveOptions, finds the record for levelId + 1, calls this,
+ * increments ADDR_LEVEL_ID, sets ADDR_LEVEL_INDEX to 1 and hands the next
+ * record to SelectLevel -- the advance-to-the-next-mission path. The award
+ * uses the level id BEFORE that increment, so it is for the level just
+ * finished.
+ *
+ * Unreachable on this data set for the same reason as the load half. */
+#define ADDR_SAVE_DEFAULT_COF    0x00457070u  /* int32_t(void) */
+#define ADDR_MODE_WB             0x004851E0u  /* "wb" -- beside "default.cof" */
 /* 0x00457220, three callers. Clear an object's hit record, give it a random
  * phase, detach it, and hand a non-Sarge kind-3 trooper stance 2 -- all of it
  * behind ADDR_HAVE_DEFAULT_COF. */
@@ -10469,6 +10502,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_OBJ_TYPE_TROOPER     2
 /* Type 3, from FreeItem's own "DestroyVehicle" arm; see the type table. */
 #define AM2_OBJ_TYPE_VEHICLE     3
+/* Type 8, from the type-8 destroy handler clearing ADDR_ROACH_MASK; the type
+ * table at ADDR_OBJ_TABLE_RECORDS records the evidence. */
+#define AM2_OBJ_TYPE_ROACH       8
 /* TYPE 5 IS A MISSILE, and the evidence is exactly the shape that settled the
  * roach and the vehicle: LoadType5 calls ObjInitCommon with 5 and then puts
  * ADDR_MISSILE_ANIMS -- missile.ani -- into the row it builds. CLAUDE.md lists

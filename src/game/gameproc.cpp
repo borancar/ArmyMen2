@@ -15,6 +15,7 @@
 #include "event.h"
 #include "script.h"
 #include "objscript.h"
+#include "objflag.h"   /* ObjFlagSet0 -- the row-visible bit */
 #include "objtype.h"   /* orig_obj_init_common -- the shared typedef */
 #include "maprow.h"    /* BuildRowSet, SetAnimFrame -- reconstructed */
 
@@ -36,6 +37,11 @@ void __cdecl FreeSpriteRegistry(void);
 #define kVolZero   (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_VOLUME_AT_ZERO))
 #define kVolStream (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_STREAM_VOLUME))
 #define kVolVoice  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_VOLUME_VOICE))
+/* SaveDefaultCof's three. The first two are spelled as army.cpp spells them,
+ * so checkglobals sees one name per address and not two. */
+#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
+#define g_levelId      (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
 
 /* The original's frame is 0x80 with the two stashes at +0 and +0x50, so each
  * has 80 bytes and neither is bounded against the string it copies. Same size
@@ -167,6 +173,137 @@ void __cdecl SaveOptions(void)
 
     orig_fflush(fp);
     orig_fclose(fp);
+}
+
+/* SaveDefaultCof -- original 0x00457070, one caller, and it is the write half
+ * of the pair below: the only thing in the image that produces
+ * `save\default.cof`.
+ *
+ * IT RETIRES EACH UNIT ON THE WAY PAST. This is not a snapshot writer. For
+ * every type-2 object in the list it calls ObjDropAltRecord -- state 5, the
+ * alternate table record given up -- then Type238Action with the level's
+ * completion award, then resets the position to the zero point, then
+ * dismounts a rider: OBJ_OFF_RIDING cleared, OBJ_FLAG8_BLOCKED cleared, and
+ * the object's first map row made drawable again through ObjFlagSet0. Calling
+ * it twice would award the score twice, which is why the one caller is a
+ * level-completion path and not a menu.
+ *
+ * THE ORDER OF THE TWO HEALTH TESTS IS NOT WHAT IT LOOKS LIKE. It reads as
+ * "skip the dead", and it is not: `health > 0` proceeds, and only when health
+ * is at or below zero does maxHealth decide -- a positive maxHealth then
+ * SKIPS. So an object with health 0 and maxHealth 0 is written, and one with
+ * health 0 and maxHealth 10 is not. Transcribed from the branch structure,
+ * not from the reading, for exactly that reason.
+ *
+ * THE TYPE FILTER IS THREE TESTS AND ONLY THE LAST ONE BITES. Types 2, 3 and
+ * 8 are admitted, OBJ_OFF_FIELD_94 must be zero, and then the type must be
+ * exactly 2. Vehicles and roaches are excluded twice over. Kept as written:
+ * folding it to `type == 2` would give the same behaviour and hide that the
+ * wider test is what the original asks.
+ *
+ * A MISSING OBJECT IS REMOVED AND THE INDEX DOES NOT ADVANCE. ListRemoveAt
+ * compacts, so the slot now holds the next uid and must be re-examined; the
+ * original jumps straight to the loop condition without its `inc`. Both the
+ * list pointer and the count are re-read from the globals every iteration,
+ * which is what makes that safe.
+ *
+ * THE INVENTORY LOOP CLOBBERS THE OBJECT and the original does not care --
+ * `esi` is reused for each weapon and the saved index is restored from the
+ * frame afterwards. Nothing reads the unit again, so a local of our own is
+ * the same function.
+ *
+ * NOTHING HERE IS EXERCISED. The one caller is a level-completion path this
+ * project has no drive for, and the file it writes does not ship, so no
+ * configuration in tools/ab.sh reaches a line of it -- the load half below
+ * says the same about itself. What would compare it is a byte-for-byte diff
+ * of save/default.cof between a patched and an AM2_NOPATCH=1 run of a
+ * completed mission; that drive does not exist yet, so this is verified by
+ * reading alone and that is worth saying plainly.
+ */
+int32_t __cdecl SaveDefaultCof(void)
+{
+    am2_FILE *fp;
+    int32_t   i = 0;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+
+    orig_chmod((const char *)AM2_IMAGE(ADDR_STR_DEFAULT_COF), AM2_CHMOD_RW);
+
+    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_DEFAULT_COF),
+                    (const char *)AM2_IMAGE(ADDR_MODE_WB));
+    if (!fp)
+        return 0;
+
+    WriteSaveTag(fp, AM2_SAVETAG_COF);
+
+    for (;;) {
+        uint8_t *list = (uint8_t *)g_armyObjLists[g_defaultOwner];
+        uint8_t *obj;
+
+        if (i >= *(const int32_t *)(list + LIST_OFF_COUNT))
+            break;
+
+        obj = (uint8_t *)LookupByUID(
+                  ((const uint32_t *)*(void **)(list + LIST_OFF_UIDS))[i]);
+        if (!obj) {
+            ListRemoveAt(list, i);
+            continue;
+        }
+
+        if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) <= 0 &&
+            *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) > 0) {
+            i++;
+            continue;
+        }
+
+        if (*(const int32_t *)obj == AM2_OBJ_TYPE_TROOPER) {
+            ObjDropAltRecord(obj);
+            Type238Action(obj, (g_levelId * 5 + 5) * 2);
+            *(uint32_t *)(obj + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
+
+            if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
+                void *rows = *(void **)(obj + OBJ_OFF_ROWS);
+
+                *(uint32_t *)(obj + OBJ_OFF_FLAGS) &=
+                    ~(uint32_t)OBJ_FLAG8_BLOCKED;
+                *(uint32_t *)(obj + OBJ_OFF_RIDING) = 0;
+                ObjFlagSet0(rows);
+            }
+        }
+
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG8_BLOCKED;
+
+        {
+            int32_t type = *(const int32_t *)obj;
+
+            if (type >= AM2_OBJ_TYPE_TROOPER &&
+                (type <= AM2_OBJ_TYPE_VEHICLE || type == AM2_OBJ_TYPE_ROACH) &&
+                *(const int32_t *)(obj + OBJ_OFF_FIELD_94) == 0 &&
+                type == AM2_OBJ_TYPE_TROOPER) {
+                int32_t slot;
+
+                SaveOneItem(fp, obj);
+                SaveScriptName(fp, obj);
+
+                for (slot = 0; slot < AM2_INVENTORY_SLOTS; slot++) {
+                    void *w = LookupByUID(
+                        ((const uint32_t *)(obj + UNIT_OFF_INVENTORY))[slot]);
+
+                    if (w) {
+                        SaveOneItem(fp, w);
+                        SaveScriptName(fp, w);
+                    }
+                }
+            }
+        }
+
+        i++;
+    }
+
+    WriteSaveTag(fp, AM2_SAVE_TAG_END);
+    orig_fclose(fp);
+    return 1;
 }
 
 /* LoadDefaultCof -- original 0x00457320, one caller, and that caller is the
@@ -1538,6 +1675,8 @@ void gameproc_install(void)
     patch_replace(ADDR_LOAD_GAME, (const void *)LoadGame, "LoadGame", 1);
     patch_replace(ADDR_LOAD_DEFAULT_COF, (const void *)LoadDefaultCof,
                   "LoadDefaultCof", 1);
+    patch_replace(ADDR_SAVE_DEFAULT_COF, (const void *)SaveDefaultCof,
+                  "SaveDefaultCof", 1);
     patch_replace(ADDR_SAVE_OPTIONS, (const void *)SaveOptions,
                   "SaveOptions", 7);
     patch_replace(ADDR_DEF_GAME_PARSE, (const void *)DefGameParse,

@@ -148,6 +148,13 @@ void __cdecl UidRemapClear(void);
  * gameproc.cpp. */
 int32_t __cdecl LoadDefaultCof(void);
 
+/* 0x00457070, one caller. The WRITE half of the pair: walk the default
+ * owner's object list, retire each trooper -- state 5, the level's completion
+ * award, position reset, a rider dismounted -- and write it followed by its
+ * six inventory slots. Not a snapshot; calling it twice awards twice.
+ * Unreachable here for the same reason the load half is. */
+int32_t __cdecl SaveDefaultCof(void);
+
 /* 0x0044CFA0, seven callers. Write Options.cfg -- volumes, key bindings,
  * difficulty, the host masks and two names -- as one straight line of
  * fwrites with no header, tag or version. It chmods the file writable first,

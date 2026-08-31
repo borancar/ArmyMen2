@@ -7184,12 +7184,13 @@ documented, then let its callers tell you what the field is.
 
 | | | how |
 |---|---:|---|
-| `patch_replace` sites | 821 | `grep -rho patch_replace src/game \| wc -l` |
-| distinct addresses reconstructed | 821 | each patched exactly once |
+| `patch_replace` sites | 1,294 | `grep -rho patch_replace src/game \| wc -l` |
+| distinct addresses reconstructed | 1,294 | each patched exactly once |
 | sub-CRT functions in the image | 1,239 | `docs/functions.tsv` |
-| sub-CRT code reconstructed | 150,240 / 372,816 B (**40.3%**) | `tools/reconstructed.py`, split at referenced starts |
-| the same, crediting whole entries | 164,000 / 372,816 B (44.0%) | what every earlier session quoted, and an over-count |
-| modules | 30 flat + 16 `win32/` | `tools/checkclaims.py` |
+| **sub-CRT entries covered** | **1,133 of 1,239 -- 1,239 - 1,133 = 106 outstanding** | any patched address inside the entry |
+| sub-CRT code reconstructed | 237,868 / 372,816 B (**63.8%**) | `tools/reconstructed.py`, split at referenced starts |
+| the same, crediting whole entries | 265,600 / 372,816 B (71.2%) | what every earlier session quoted, and an over-count |
+| modules | 33 flat + 16 `win32/` | `tools/checkclaims.py` |
 | pure unreconstructed leaves | **0** (2 listed, both false positives) |
 | self-naming unreconstructed functions | 109 at the sweep, 10 taken since | `tools/vectors.py --all` |
 | boundary functions reconstructed | 78, 192 import sites | `docs/boundary.md` |
@@ -7204,7 +7205,7 @@ way, and `tools/blindspots.py` says which counters can move at all.
 | check | when | result |
 |---|---|---|
 | `make` | current | builds clean |
-| `make check` (16 static checks) | current | all pass, generated files regenerate identically |
+| `make check` (23 static checks) | current | all pass, generated files regenerate identically |
 | `make selftest` | current | **6,852** DISTINCT vectors, 15,228 words, 13,956 lines, 9,062 spine, 198 variable -- 0 fail |
 | `tools/ab.sh campaign` | current | clean, three times: log identical at 14 messages, 2,571/786,432 pixels every time |
 | savegame oracle, per section | current | `map` `pad` `script` `eventblock` `event` `air` `audio` **0**; `objscript` 376, all inside pointer fields; `conds` 372, a uniform -196 uid shift; `item` 16 heap pointers; `gameproc` 2 volatile |
@@ -10071,3 +10072,105 @@ and not promoted to fact without evidence.
   in an arm those vectors do reach, so coverage was not the thing that hid it
   -- but a third of two functions is still unvisited and nothing is tracking
   which functions are short.
+
+## SaveDefaultCof, and a branch that does not mean what it reads as
+
+`0x00457070` is the write half of the `save\default.cof` pair -- the only
+thing in the image that produces that file, and the counterpart to
+`LoadDefaultCof` immediately after it in the image. Reconstructed into
+`gameproc.cpp` beside its twin. **1,239 - 1,133 = 106 entries outstanding**
+below the CRT line, down from 107.
+
+**It is not a writer, it is a retirement pass.** The name says "save" and the
+body says otherwise: for every type-2 object in the default owner's list it
+calls `ObjDropAltRecord` -- state 5, the alternate table record given up --
+then `Type238Action` with `(levelId * 5 + 5) * 2`, which is the level's
+completion award, then resets the position to `ADDR_ZERO_POINT`, then
+dismounts a rider. Only after all of that does anything reach the file.
+Calling it twice would award the score twice, and **the one caller settles
+that by reading rather than by inference**: `0x00421AAA` saves the best
+difficulty through `SaveOptions`, looks up the record for `levelId + 1`
+through `FindLevelRecord`, calls this, then increments `ADDR_LEVEL_ID`, sets
+`ADDR_LEVEL_INDEX` to 1 and hands the next record to `SelectLevel`. It is the
+advance-to-the-next-mission path, and the award is computed from the level id
+BEFORE that increment -- so it is the score for the level just finished. **A function that mutates before
+it serialises is not a snapshot, whatever it is called** -- and the name is
+the program's own vocabulary, not ours, so the name is not the thing to fix.
+
+**The two health tests read as "skip the dead" and are not that.** The
+structure is `if (health > 0) proceed; else if (maxHealth > 0) skip;` -- so an
+object at health 0 with maxHealth 0 IS written, and one at health 0 with
+maxHealth 10 is NOT. Written from the branch structure rather than from the
+sentence it appears to be, because the sentence gets the first case wrong.
+
+**The type filter is three tests deep and only the last one bites.** Types 2,
+3 and 8 are admitted, `OBJ_OFF_FIELD_94` must be zero, and then the type must
+be exactly 2 -- so vehicles and roaches are excluded twice over. Kept as
+written rather than folded to `type == 2`: the fold has identical behaviour
+and hides that the wider test is what the original asks, which is the sort of
+thing that matters when the next reader wonders whether vehicles were ever
+meant to be in this file.
+
+**A missing object is removed and the index does not advance**, which is
+correct for a compacting `ListRemoveAt` and is the one place the walk can
+revisit a slot. Both the list pointer and its count are re-read from the
+globals every iteration, which is what makes that safe.
+
+**Nothing exercises it, and that is worth stating rather than implying.** The
+one caller is a level-completion path this project has no drive for, and the
+file does not ship, so no configuration in `tools/ab.sh` reaches a line of it
+-- the same standing the load half has had since it was written. What would
+compare it is a byte-for-byte diff of `save/default.cof` between a patched and
+an `AM2_NOPATCH=1` run of a completed mission. That drive does not exist, so
+this is verified by reading alone.
+
+**A near-miss that the tool had already thought about.** Writing it I noticed
+`OBJ_OFF_FLAGS` and `OBJ_OFF_FLAGS8` are two names for offset 8 and was about
+to write up a gap in the ratchet -- except `tools/checkoffsets.py` already
+counts family aliases, already carries that exact pair in its baseline, and
+its docstring already names it as a plain duplicate rather than a union.
+**Read the tool before reporting the gap it was written to cover.**
+
+## Read but not yet written: the two AI step siblings
+
+`0x00407020` (368 B) and `0x004062B0` (432 B) are the same function twice, and
+their one shared caller says which is which. `0x0044B9FE` branches on
+`OBJ_OFF_SARGE`: set, it calls `0x00407020`; clear, `0x004062B0`. **So one is
+Sarge's per-frame AI step and the other is every other trooper's** -- not
+"armed and unarmed", which is what the extra prologue looks like until the
+caller is read.
+
+**The 0x58-byte frame IS a sight context.** `sub esp,0x58` and the record's
+own `SIGHTC_OFF_READY` at 0x54 fit exactly, and every arm is passed `&frame`
+as the `ctx` third argument the whole `ADDR_AI_*` family already takes. So
+these two build the context their callees consume rather than receiving one.
+
+**The dispatch is on `OBJ_OFF_AI_MODE`, and the table is the only honest
+source for it** -- laid out 2, 0, 3, 6, 7, default but dispatched 0, 1, 2, 3,
+4, 5, 6, 7, with **three indices sharing the default arm**. Against the mode
+names already recovered from the action parser (attack 6, defend 7, ignore 2,
+evade 5): ignore walks (`AiWalkStep`), attack goes to `0x00406B30`, defend to
+`0x004057B0` -- itself a thin wrapper on the default `0x00405220` -- and
+**evade takes the default arm along with 1 and 4**. Reading the bodies top to
+bottom would have got four of the eight wrong, which is the third instance of
+that trap in this project.
+
+**Sarge's extra prologue is an item pickup**, and every field in it is already
+named: `SelectBestWeapon`, then a candidate item out of the context, its
+position into `obj+0xB8`, its `+4` into `OBJ_OFF_PICKUP_AFTER`, the point
+settled into a walkable region, and the distance recorded.
+
+**`SettlePointInRegion` takes TWO arguments and the second is hoisted early.**
+`push edi` sits eight instructions and two calls before the call that consumes
+it, and one `add esp,0x10` cleans four dwords across three calls. Pairing each
+push with the nearest call makes it a one-argument call with a stray push --
+the fourth instance of the MSVC argument shuffle recorded here, and the one
+that would have been hardest to notice, because a one-argument reading
+compiles and runs.
+
+**`OBJ_OFF_SCRIPT_FRAME` (0xB8) is a union and the name is right for the other
+user.** `objscript.cpp` genuinely increments it as a frame number; here the
+same dword is a packed point, handed to `SettlePointInRegion` and `ApproxDist`,
+both of which take points. No second name was added: `tools/checkoffsets.py`'s
+family baseline may only go down, and the honest record is a comment saying
+one dword has two readings, not a second spelling that makes the count worse.
