@@ -4568,7 +4568,15 @@ typedef void (__cdecl *AM2_SendDeathMsgFn)(void *obj, uint32_t attacker,
                                             int32_t kind);
 typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
-#define orig_damage_item      ((AM2_DamageItemFn)(uintptr_t)ADDR_DAMAGE_ITEM)
+/* DamageItem is reconstructed below and called by name.
+ *
+ * SpawnAt is still original and reached by address -- the same ten-argument
+ * creator air.cpp and gameproc.cpp already spell this way. */
+typedef void *(__cdecl *AM2_ItemSpawnFn)(int32_t x, int32_t y, int32_t kind,
+                                         int32_t army, uint32_t uid,
+                                         int32_t extra, int32_t e, int32_t f,
+                                         int32_t g, int32_t h);
+#define SpawnAt ((AM2_ItemSpawnFn)(uintptr_t)ADDR_SPAWN_AT)
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 
 typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
@@ -5044,7 +5052,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
 
     switch (*(const int32_t *)o) {
     case 1:
-        orig_damage_item(obj, amount, extra, kind, attackerUid, 0);
+        DamageItem(obj, amount, extra, kind, attackerUid, 0);
         break;
     case 2:
         orig_damage_trooper(obj, amount, extra, kind, attackerUid);
@@ -7520,7 +7528,7 @@ void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
     uint8_t *o = (uint8_t *)obj;
     uint32_t uid;
 
-    orig_damage_item(o, amount, d, kind, attacker, 1);
+    DamageItem(o, amount, d, kind, attacker, 1);
 
     for (uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID); uid;
          uid = *(const uint32_t *)(o + OBJ_OFF_CHAIN_NEXT_UID)) {
@@ -7534,7 +7542,7 @@ void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
         if (type != 1 && type != 4)
             return;
 
-        orig_damage_item(o, amount, d, kind, attacker, 1);
+        DamageItem(o, amount, d, kind, attacker, 1);
     }
 }
 
@@ -10709,6 +10717,199 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
     return o;
 }
 
+/* DamageItem -- original 0x004356C0, three callers. DamageObject's type-1 arm:
+ * take armour off the hit, apply what is left, and if that empties the health
+ * either advance the item to its next damage frame or destroy it and spawn
+ * whatever it leaves behind.
+ *
+ * ITS ARGUMENT ORDER IS DamageObject'S, not the one the body suggests: the
+ * kind is the FOURTH and the attacker's uid the FIFTH, with a third value
+ * that this function only passes on. Read off the existing call sites and the
+ * depth arithmetic together -- `[esp+0x1C]` at a depth of 12 is frame+16 --
+ * after CLAUDE.md's lesson from EnterVehicle earlier today.
+ *
+ * ITS SIXTH ARGUMENT IS THE RECURSION GUARD, and DamageItemChain is what sets
+ * it. Called with it clear, an item that HEADS a chain hands the whole chain
+ * to DamageItemChain and returns, and an item that is a CHILD of one returns
+ * having done nothing -- so a hit on a composite is delivered once, from the
+ * parent, to every piece. DamageItemChain then calls back with a literal 1,
+ * which is the only way past that gate.
+ *
+ * THE ARMOUR IS AAIREC_OFF_ARMOUR AND IS APPLIED AS AN ABSOLUTE VALUE. A
+ * negative entry protects exactly as much as its positive twin, and for damage
+ * kind 1 it is clamped to zero first -- so kind 1 ignores armour entirely.
+ * `cdq; xor; sub` is the abs; written as one.
+ *
+ * THREE FLAGS AND ONE SEQUENCE. Damage kind 1 is refused outright by
+ * OBJ_FLAG_IMMUNE_KIND1 -- the damage becomes zero and the armour subtraction
+ * then makes it negative, so the function returns. An object carrying
+ * OBJ_FLAG_SEQ_ON_KIND1 and not yet OBJ_FLAG_SEQ_STARTED gets a kind-7
+ * sequence at its own position lasting (health + 4) * 250, and the second flag
+ * is what stops it starting twice. The names are the MECHANISM; calling them
+ * fireproof, flammable and burning would read better and assert more.
+ *
+ * THE NEXT DAMAGE FRAME IS A LOOKUP, NOT A COUNTER. On reaching zero health it
+ * unpacks the record's key, adds one to OBJ_OFF_REPAIR_FRAME, and asks
+ * DefFindObjRec for a record with that frame -- and REQUIRES the answer's own
+ * key to match, because DefFindObjRec falls back through three searches and
+ * can return a near miss. Only then does ApplyObjFrame run, and only if THAT
+ * succeeds is the item still alive. So a damaged crate walks through as many
+ * frames as its `.aai` declares and is destroyed on the first one missing.
+ *
+ * THE TWO TEARDOWN ARMS ARE THE SAME CODE TWICE, which is the original's:
+ * whether the lookup missed or ApplyObjFrame refused, it tears the subrecord
+ * down, marks OBJ_FLAG_OVERDUE, hides the rows and calls the pre-destroy.
+ *
+ * AND THE WHOLE SPAWN TAIL IS GATED ON ONE SPRITE SET. `cmp edi, 0x1D` on the
+ * key's set field: an item from any other set is destroyed silently. Inside
+ * it, a WATCHED kind spawns AM2_SPAWN_WATCHED with the owning player's uid --
+ * or its own if the army has no owner object -- and unreveals the area first;
+ * anything else spawns one of three kinds chosen by the record's INDEX field,
+ * with a life to match.
+ *
+ * A .bss GLOBAL WITH NO WRITER IS THAT SPAWN'S SIXTH ARGUMENT. 0x00662288 has
+ * exactly one reference in the image and it is here, so it is always zero --
+ * and the multiplayer arm beside it, which passes a literal zero when
+ * CommMustBroadcast refuses, therefore cannot be told from the other. Both
+ * reproduced; the test is dead as written and it is not ours to remove.
+ */
+void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
+                        uint32_t attacker, int32_t inChain)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    const uint8_t *rec;
+    int32_t        armour;
+    int32_t        dmg;
+    int32_t        set, index, frame;
+
+    if (!inChain) {
+        if (*(const uint32_t *)(o + OBJ_OFF_CHAIN_UID)) {
+            DamageItemChain(obj, amount, extra, kind, attacker);
+            return;
+        }
+        if (*(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID))
+            return;
+    }
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0)
+        return;
+
+    rec    = *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94);
+    armour = *(const int16_t *)(rec + AAIREC_OFF_ARMOUR);
+    dmg    = amount;
+
+    if (kind == 1) {
+        if (armour < 0)
+            armour = 0;
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_IMMUNE_KIND1)
+            dmg = 0;
+    }
+
+    dmg -= (armour < 0) ? -armour : armour;
+    if (dmg <= 0)
+        return;
+
+    if (kind == 1
+        && (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SEQ_ON_KIND1)
+        && !(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SEQ_STARTED)) {
+        int32_t life;
+
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SEQ_STARTED;
+        life = (*(const int16_t *)(o + OBJ_OFF_HEALTH) + AM2_SEQ_LIFE_BIAS)
+               * AM2_SEQ_LIFE_PER_HP;
+        SeqAddKind7((const int32_t *)(o + OBJ_OFF_POS), (int32_t)attacker,
+                    0, 0, life);
+    }
+
+    if (dmg > *(const int16_t *)(o + OBJ_OFF_HEALTH))
+        dmg = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+
+    *(int16_t *)(o + OBJ_OFF_HEALTH) -= (int16_t)dmg;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
+        return;
+
+    /* ---- out of health ---- */
+    {
+        uint32_t       key  = *(const uint32_t *)(rec + AAIREC_OFF_KEY);
+        const uint8_t *next;
+        int32_t        alive = 0;
+
+        set   = (int32_t)((key >> AM2_OBJREC_SHIFT_B) & AM2_OBJREC_MASK_B);
+        index = (int32_t)((key >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
+        frame = *(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) + 1;
+
+        next = (const uint8_t *)DefFindObjRec(set, index, frame);
+
+        /* The answer's own key must BE the frame asked for: DefFindObjRec
+         * falls back through three searches and can hand back a near miss. */
+        if (next && *(const int32_t *)(next + AAIREC_OFF_KEY) == frame)
+            alive = ApplyObjFrame(obj, set, index, frame, 0);
+
+        if (!alive) {
+            ItemTeardown(obj);
+            *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+
+            if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {
+                ObjFlagClear0(*(void **)(o + OBJ_OFF_ROWS));
+                RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,
+                          (void *)(uintptr_t)ADDR_MAP_DESC);
+            }
+
+            ItemPreDestroyAlias(obj, (int32_t)ADDR_OBJ_MAP_DESC);
+        }
+    }
+
+    if (set != AM2_DAMAGE_ITEM_SET)
+        return;
+
+    if (ObjIsWatchedKind(obj)) {
+        uint8_t *owner = (uint8_t *)LookupOwnerObj(
+            (uint32_t)*(const int8_t *)(o + OBJ_OFF_ARMY));
+        uint32_t who = owner ? ((const AM2_Object *)owner)->uid
+                             : ((const AM2_Object *)o)->uid;
+        int32_t  sixth;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+            sixth = 0;
+        else
+            sixth = *(const int32_t *)(uintptr_t)ADDR_UNUSED_662288;
+
+        UnrevealArea((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                     *(const uint32_t *)(o + OBJ_OFF_POS));
+
+        SpawnAt((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
+                AM2_SPAWN_WATCHED,
+                (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                who, sixth, 0, 0, 0, 0);
+        return;
+    }
+
+    {
+        const uint8_t *r2 = *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94);
+        int32_t idx = (int32_t)((*(const uint32_t *)(r2 + AAIREC_OFF_KEY)
+                                 >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
+        int32_t leaves, life;
+
+        if (idx == AM2_SPAWN_INDEX_A) {
+            leaves = AM2_SPAWN_KIND_A; life = AM2_SPAWN_LIFE_A;
+        } else if (idx == AM2_SPAWN_INDEX_B) {
+            leaves = AM2_SPAWN_KIND_B; life = AM2_SPAWN_LIFE_B;
+        } else {
+            leaves = AM2_SPAWN_KIND_C; life = AM2_SPAWN_LIFE_C;
+        }
+
+        SpawnAt((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
+                leaves,
+                attacker ? (int32_t)UidArmy(attacker)
+                      : (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                ((const AM2_Object *)o)->uid, life, 0, 0, 0, 0);
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -10717,6 +10918,8 @@ void item_install(void)
                   "CreateItem", 9);
     patch_replace(ADDR_SHOOTER_REACT, (const void *)ShooterReact,
                   "ShooterReact", 1);
+    patch_replace(ADDR_DAMAGE_ITEM, (const void *)DamageItem,
+                  "DamageItem", 3);
     patch_replace(ADDR_ITEM_TYPE_NAME, (const void *)ItemTypeName,
                   "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,

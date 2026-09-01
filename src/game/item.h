@@ -695,6 +695,14 @@ int32_t __cdecl WeaponClassOf(uint32_t uid);
 void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
                              int32_t kind, uint32_t attacker);
 
+/* 0x004356C0, three callers. DamageObject's type-1 arm: armour off the hit,
+ * the rest off the health, and on reaching zero either the next damage frame
+ * or destruction and whatever the item leaves behind. The last argument is
+ * DamageItemChain's recursion guard -- clear, a chain head delegates to it
+ * and a chain child does nothing. */
+void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
+                        uint32_t attacker, int32_t inChain);
+
 /* 0x0044A3C0, one caller. The negated overlay Y of the sprite the object's
  * first row is showing. */
 int32_t __cdecl ObjOverlayY(const void *obj);

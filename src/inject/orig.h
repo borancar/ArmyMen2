@@ -5344,7 +5344,41 @@ typedef struct {
  * multiplayer broadcast when non-zero. */
 #define ADDR_DAMAGE_OBJECT       0x00428140u  /* void(obj,int32,int32,uid,
                                                *      int32,int32) */
-#define ADDR_DAMAGE_ITEM         0x004356C0u  /* type 1 */
+#define ADDR_DAMAGE_ITEM         0x004356C0u  /* type 1. Reconstructed. */
+/* Three object flags DamageItem is the only reader of, named for the
+ * MECHANISM rather than for what it is probably modelling. Damage kind 1 --
+ * whatever it is -- clamps the armour to zero, is refused outright by
+ * IMMUNE_KIND1, and on an object carrying SEQ_ON_KIND1 starts a kind-7
+ * sequence lasting (health + 4) * 250 and sets SEQ_STARTED so it starts only
+ * once. Calling them fireproof, flammable and burning would read better and
+ * assert more than the body does. */
+#define OBJ_FLAG_IMMUNE_KIND1    0x4000u
+#define OBJ_FLAG_SEQ_ON_KIND1    0x1000u
+#define OBJ_FLAG_SEQ_STARTED     0x400000u
+#define AM2_SEQ_LIFE_PER_HP      250
+#define AM2_SEQ_LIFE_BIAS        4
+/* The set a destroyed item must be in before any of the spawn tail runs. */
+#define AM2_DAMAGE_ITEM_SET      0x1D
+/* What a destroyed item leaves behind. A WATCHED kind spawns 0x81 with the
+ * owner's uid; anything else spawns one of three kinds by the record's index,
+ * with a life to match -- 0x14 and 0x15 get their own and everything else
+ * shares the third. */
+#define AM2_SPAWN_WATCHED        0x81
+#define AM2_SPAWN_INDEX_A        0x14
+#define AM2_SPAWN_INDEX_B        0x15
+#define AM2_SPAWN_KIND_A         0x8A
+#define AM2_SPAWN_LIFE_A         0x78
+#define AM2_SPAWN_KIND_B         0x83
+#define AM2_SPAWN_LIFE_B         0x96
+#define AM2_SPAWN_KIND_C         0x8B
+#define AM2_SPAWN_LIFE_C         0x32
+/* ONE READER IN THE WHOLE IMAGE AND NO WRITER ANYWHERE. DamageItem passes it
+ * to SpawnAt as the sixth argument, and it is .bss, so it is always zero --
+ * which makes the multiplayer test beside it observably dead, since the arm
+ * that avoids this global passes a literal zero instead. Named for its
+ * address because nothing establishes a meaning; same standing as
+ * MISSILE_OFF_FIELD_A8. */
+#define ADDR_UNUSED_662288       0x00662288u  /* int32_t, never written */
 /* 0x00435650, one caller -- and that caller is ADDR_DAMAGE_ITEM itself, so
  * the two are mutually recursive. Damage an item and then every item in the
  * chain hanging off it, OBJ_OFF_CHAIN_UID then OBJ_OFF_CHAIN_NEXT_UID. */
@@ -10202,6 +10236,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_AAI_RECORD_BYTES     0x40u
 #define AAIREC_OFF_TYPE          0x00u   /* 0x2E when the argument is negative */
 #define AAIREC_OFF_KEY           0x08u
+/* Subtracted from every hit before it is applied, and clamped to zero for
+ * damage kind 1 -- so it is the record's ARMOUR. Named from DamageItem, its
+ * only reader. */
+#define AAIREC_OFF_ARMOUR        0x3Au   /* int16_t */
+/* TWO PREFIXES ARE ON THIS ONE RECORD, which is the shape checkoffsets cannot
+ * see and CLAUDE.md already warns about under ITEM_OFF_LAST_USE. AAIREC_OFF_
+ * has KEY at 8, SLOT at 0x0C and LIST_SLOT at 0x10; AAI_OFF_ has DEF_INDEX at
+ * 0x10, BOX at 0x14, OR_FLAGS at 0x28, HEALTH at 0x2C. LIST_SLOT and
+ * DEF_INDEX are the SAME DWORD under two names in two families, and no
+ * ratchet can refuse that. Recorded here rather than merged: settling it means
+ * deciding which prefix survives across a dozen sites, and this commit is not
+ * the place. */
 /* Seeded to -1 by ADDR_MAKE_AAI_RECORD and OVERWRITTEN with the slot by
  * ADDR_ADD_AAI_RECORD. It went in as MINUS_ONE, named from the maker alone,
  * which is naming a field from one of its two writers -- the same failure as
