@@ -1613,6 +1613,17 @@ this file records time lost to picking the wrong one. `StepType6`'s caller is
 ours, so its counter cannot move; `FormationSlotPoint`'s callers are original,
 so its zero was real and a `TRACE=1` probe proved the function never runs.
 
+**ONE PREDICATE ASKED TWICE CAN BE USED IN OPPOSITE SENSES, and writing both
+the same way is a defect no pixel can see.** `CreateTrooper` calls
+`ObjIsFriendly` at its head and again at its tail: the first is `je` past an
+OR, so `OBJ_FLAG_REVEALED` goes on when the answer is NON-zero, and the second
+is `jne` past a call, so `ObjConceal` runs when it is ZERO. Both were written
+as the negation and half of that was wrong. `bootcamp`'s object-state dump
+caught it -- eight lines differing by exactly 0x800, with the log identical and
+the pixels at their usual 22 -- which is the fifth time that artifact has found
+something the verdict line would have called clean. Two calls to one predicate
+are two branches to read, not one.
+
 **Grep for how the tree already reaches a GLOBAL before writing an expression
 for it.** The naming rule -- grep the address before inventing a name -- has an
 exact analogue for ACCESS, and ignoring it cost three defects in one function.
@@ -2644,7 +2655,18 @@ exact oracle**, however meaningful it is when it is set.
   configured and destroyed by reconstructed code, and the registry is opened
   and closed by ours. What still dispatches through COM is game logic holding a
   handle it did not make.
-- **A decline is worth revisiting when the reason was uncertainty rather than
+- **Second instance, and the cure was doing the same arithmetic elsewhere
+  first.** `CreateTrooper` was deferred with a reading that could not be made
+  self-consistent: `BuildRowSet`'s `dy` appeared to come from argument 2's
+  slot, which by then held a packed point, making every trooper's row y equal
+  its x. The blocker was an esp off by five pushes -- `RectSet`'s arguments and
+  the `lea` below them -- and `dy` is argument 3 with no aliasing at all. What
+  made it followable was writing `CreateExplosion` and `PlacementScreenClick`
+  first, both of which really DO reuse a slot for a packed point: in both, the
+  point lives in a LOCAL that a bare `push ecx` reserved. Knowing what the
+  shape looks like when it IS there is what made it readable when it was not.
+
+**A decline is worth revisiting when the reason was uncertainty rather than
   scope.** `0x0040BCF0` sat on the list below for most of a session because its
   position fields looked like they aliased — `[eax+0x12]` on one path and
   `[eax+0x10]` on another, apparently two overlapping fields of one record. They

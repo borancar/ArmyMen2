@@ -12152,7 +12152,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * written out: a reconstruction that can be shown to be wrong is worse than
  * none, and the two role-swap defects found today were both of exactly this
  * shape. */
-#define ADDR_CREATE_TROOPER      0x00447620u  /* type 2 */
+#define ADDR_CREATE_TROOPER      0x00447620u  /* type 2; reconstructed */
+#define AM2_TROOPER_BYTES        0x5D0u
+/* Three trooper fields CreateTrooper writes, all overloading offsets other
+ * types own. +0x528 takes the FACING beside TROOPER_OFF_FACING -- one argument
+ * into two fields -- and +0x524 takes the packed spawn point. +0x00B0 takes
+ * the same point read one instruction too EARLY, before ObjInitCommon has put
+ * it at OBJ_OFF_POS, so what lands there is the memset's zero; see the note in
+ * item.cpp. Named for what the constructor puts in them and nothing more. */
+#define TROOPER_OFF_FACING2      0x528u  /* uint8_t, the facing again */
+#define TROOPER_OFF_SPAWN_POS    0x524u  /* packed point */
+#define TROOPER_OFF_ZERO_B0      0x0B0u  /* always zero -- see item.cpp */
+#define AM2_TROOPER_HEIGHT_ADJ   0x18    /* into OBJ_OFF_HEIGHT_ADJ */
+/* The AI mode a fresh trooper gets: 1 when the army is ours and 6 when it is
+ * not. The two values are the constructor's own; what each mode DOES is the
+ * AI band's business. */
+#define AM2_TROOPER_AI_MINE      1
+#define AM2_TROOPER_AI_THEIRS    6
 #define ADDR_TROOPER_BOX         0x00489850u  /* AM2_Rect {-16,-32,16,16} */
 #define ADDR_TROOPER_ROW_SPEC    0x00489860u  /* one AM2_ROW_SPEC_BYTES spec */
 #define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */

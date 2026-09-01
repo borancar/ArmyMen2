@@ -296,6 +296,13 @@ typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t kind, const char *name,
 typedef void *(__cdecl *AM2_VehicleDefFindFn)(int32_t kind);
 #define VehicleDefFind (*(AM2_VehicleDefFindFn)AM2_IMAGE(ADDR_VEHICLE_DEF_FIND))
 
+/* 0x00447620, and formerly deferred. Make a type-2 TROOPER. Answers null when
+ * a network session refuses a local creation for an army this machine must not
+ * broadcast for; `settle` routes the point through NearestClearPoint. */
+void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
+                            int32_t army, int32_t flags, int32_t remote,
+                            uint32_t uid, int32_t settle, int32_t facing);
+
 void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7,
                           int32_t uid);

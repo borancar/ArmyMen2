@@ -4330,14 +4330,10 @@ extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
                                          int32_t slot, int32_t priority,
                                          uint32_t owner);
 
-/* CreateTrooper and CreateWeapon, both still original -- the type-2 and type-4
- * arms of the item-create message. */
-typedef void *(__cdecl *AM2_CreateTrooperFn)(const char *name, int32_t x,
-                                             int32_t y, int32_t a, int32_t b,
-                                             int32_t c, int32_t d, int32_t e,
-                                             int32_t f, int32_t g);
-#define orig_create_trooper \
-    ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
+/* CreateWeapon is still original -- the type-4 arm of the item-create
+ * message. CreateTrooper, the type-2 arm, is reconstructed below and its
+ * typedef went with it; both call sites name it. */
+#define orig_create_trooper CreateTrooper
 
 /* PortalSpawn -- original 0x00417930, one caller, and that caller is the cheat
  * dispatcher two functions along from the "Flame On!" arms -- so this is a
@@ -4384,7 +4380,7 @@ void __cdecl PortalSpawn(void)
         orig_spawn_at(x, y, AM2_PORTAL_EFFECT, 0, 0, 0, 0, 0, 0, 0);
 
         trooper = (uint8_t *)orig_create_trooper(
-                      (const char *)(uintptr_t)ADDR_STR_ONE_LETTER,
+                      (char *)(uintptr_t)ADDR_STR_ONE_LETTER,
                       x, y, 1, 1, 0, 0, 0, 1, 0);
         if (!trooper)
             continue;
@@ -10886,6 +10882,172 @@ void __cdecl StepType6(void *obj)
     ObjMoveAlongFacing(o, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 0, 0);
 }
 
+/* CreateTrooper -- original 0x00447620, and it was DEFERRED. orig.h recorded
+ * ten arguments settled against two anchors and then said the reading could
+ * not be made self-consistent: "BuildRowSet's `dy` is loaded from ARG2's slot
+ * -- which by then holds the PACKED point -- while `dx` comes from a register
+ * holding the ORIGINAL ARG2", which would make every trooper's row y equal its
+ * x, and the game plainly does not do that.
+ *
+ * THE BLOCKER WAS AN ESP OFF BY FIVE PUSHES, and nothing else. `dy` is
+ * `[esp+0x54]` read at 0x00447816, where esp has RectSet's five arguments and
+ * the `lea` shift below it -- so it is E+0x0C, which is ARGUMENT 3, the y.
+ * `dx` is ebp, argument 2, the x. There is no aliasing anywhere in the call.
+ * "I could not follow this" ages differently from "this is game logic", which
+ * is exactly what CLAUDE.md says about revisiting a decline.
+ *
+ * WHAT MADE IT FOLLOWABLE THIS TIME was doing the same arithmetic twice in a
+ * row on CreateExplosion and PlacementScreenClick, both of which really DO
+ * reuse a slot for a packed point -- and in both the packed point lives in a
+ * LOCAL that a bare `push ecx` reserved, not in an argument slot. Here it is
+ * in argument 2's slot, which is what made the first reading plausible; the
+ * point never reaches BuildRowSet.
+ *
+ * THE ENTRY GATE REFUSES OUTRIGHT AND RETURNS NULL. In a network session a
+ * LOCAL creation -- `remote` clear -- for an army this machine must not
+ * broadcast for is not made at all. Single player has no session, so the gate
+ * is skipped entirely; the whole thing is three tests deep and every one has
+ * to hold for the refusal.
+ *
+ * IT READS OBJ_OFF_POS TWICE AND THE FIRST READ IS TOO EARLY. Both go through
+ * `mov edx, [esi+0x12]`, but the first is before ObjInitCommon has written the
+ * position -- so TROOPER_OFF_ZERO_B0 always takes the memset's zero while
+ * TROOPER_OFF_SPAWN_POS, read after, takes the real point. That is the same
+ * shape as CreateExplosion's arms reading OBJ_OFF_ARMY before the constructor
+ * writes it, twice in one day. Reproduced with the read written out, because
+ * folding it to a zero would hide what the original looks like it meant.
+ *
+ * ONE ARGUMENT, TWO FIELDS: the facing goes to both TROOPER_OFF_FACING and
+ * TROOPER_OFF_FACING2, four hundred bytes apart.
+ *
+ * THE AI MODE IS 1 OR 6 BY WHETHER THE ARMY IS OURS, decided against
+ * ADDR_DEFAULT_OWNER, and the field is written 1 unconditionally first and
+ * overwritten -- so the intermediate is observable by nothing and is kept.
+ *
+ * THE STAGGER IS CreateRoach's, to the constant: the clock plus a random
+ * 0..499 into OBJ_OFF_FIELD_FC, from the GAME's rand rather than libc's, so
+ * two troopers made in one frame do not act in lockstep.
+ *
+ * IT ASKS ObjIsFriendly TWICE AND THE TWO ANSWERS ARE USED IN OPPOSITE SENSES.
+ * The first is `je` past an OR, so OBJ_FLAG_REVEALED goes on when the trooper
+ * IS friendly; the last is `jne` past a call, so ObjConceal runs when it is
+ * NOT. Writing both the same way is the defect bootcamp's state dump caught --
+ * see the note at the first of them.
+ *
+ * A NAME IS TAKEN ONLY IF NONE WAS GIVEN -- a null pointer or an empty string
+ * both reach TakeSoldierName, which is the "is this string set" idiom this
+ * project has met before. */
+void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
+                            int32_t army, int32_t flags, int32_t remote,
+                            uint32_t uid, int32_t settle, int32_t facing)
+{
+    uint8_t  *o;
+    uint8_t  *rows;
+    uint32_t  at;
+    uint32_t  where;
+    AM2_Rect  box;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army))
+        return (void *)0;
+
+    o = (uint8_t *)am2_malloc(AM2_TROOPER_BYTES);
+    memset(o, 0, AM2_TROOPER_BYTES);
+
+    at = (uint32_t)(uint16_t)(int16_t)x
+       | ((uint32_t)(uint16_t)(int16_t)y << 16);
+
+    if (settle)
+        NearestClearPoint(at, &where);
+    else
+        where = at;
+
+    *(uint8_t *)(o + TROOPER_OFF_FACING)  = (uint8_t)facing;
+    *(uint8_t *)(o + TROOPER_OFF_FACING2) = (uint8_t)facing;
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= (uint32_t)flags | OBJ_FLAG_BIT0;
+    *(int32_t *)(o + OBJ_OFF_FIELD_530) = 5;
+    *(int32_t *)(o + OBJ_OFF_POSE)      = 0;
+    *(int8_t *)(o + OBJ_OFF_ARMY)       = (int8_t)army;
+
+    /* FRIENDLY, not un-friendly, and the two ObjIsFriendly tests in this
+     * function have OPPOSITE senses: this one is `je` past the OR, so the flag
+     * goes on when the answer is non-zero, while the conceal test at the end
+     * is `jne` past the call. Writing both the same way put OBJ_FLAG_REVEALED
+     * on the wrong troopers, and bootcamp's object-state dump is what caught
+     * it -- eight lines differing by exactly 0x800, with the log and the
+     * pixels agreeing throughout. */
+    if (ObjIsFriendly(o))
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
+
+    *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+        *(const int16_t *)((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                           + RANK_REC_OFF_MAX_HEALTH);
+    SetMaxHealth(o, *(const int32_t *)((const uint8_t *)
+                                       AM2_IMAGE(ADDR_RANK_RECORDS)
+                                       + RANK_REC_OFF_MAX_HEALTH));
+    *(int16_t *)(o + OBJ_OFF_HEALTH) = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+    *(int16_t *)(o + OBJ_OFF_FIELD_574) =
+        (int16_t)*(const uint8_t *)(o + TROOPER_OFF_FACING);
+
+    /* Read before ObjInitCommon writes it, so this is the memset's zero. */
+    *(uint32_t *)(o + TROOPER_OFF_ZERO_B0) = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+    *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_MINE;
+    if (army != (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_THEIRS;
+
+    ObjInitCommon(o, name, AM2_OBJ_TYPE_TROOPER, where,
+                  (const int32_t *)AM2_IMAGE(ADDR_TROOPER_BOX), remote, uid);
+
+    *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = AM2_TROOPER_HEIGHT_ADJ;
+    *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_KIND) =
+        (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        + slot * AM2_OBJ_TABLE_REC_SIZE;
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_FC) =
+        (int32_t)(orig_game_rand() % AM2_ROACH_STAGGER_MS)
+        + *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    /* And this one is after, so it is the real position. */
+    *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+    if (!name || !*name)
+        *(int32_t *)(o + OBJ_OFF_NAME_INDEX) = TakeSoldierName();
+
+    *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
+        HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+
+    if (!remote
+        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army))
+        SendItemCreate(o);
+
+    RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
+                (const void *)AM2_IMAGE(ADDR_TROOPER_ROW_SPEC), x, y, &box);
+    SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                  *(void **)(o + OBJ_OFF_TABLE_REC_KIND));
+
+    if (flags & (int32_t)OBJ_FLAG_DESTROYED)
+        SubrecHideRows(o + OBJ_OFF_SUBRECORD);
+
+    PtrListPush(((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army],
+                *(void **)(o + 4));
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+        (const void *)(uintptr_t)ADDR_SOLDIER_ANIMS;
+    *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
+    *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
+        AM2_ROW_FIELD26_INIT;
+
+    if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
+        ObjConceal(o, 0);
+
+    SetUnitPose(o, 1);
+    return o;
+}
+
 /* CreateItem -- original 0x00433980, 672 bytes, NINE callers. The type-1 arm
  * of the four creators, and the one SendItemCreate's own note names first.
  *
@@ -11745,6 +11907,8 @@ void item_install(void)
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
     patch_replace(ADDR_STEP_TYPE6, (const void *)StepType6, "StepType6", 1);
+    patch_replace(ADDR_CREATE_TROOPER, (const void *)CreateTrooper,
+                  "CreateTrooper", 1);
     patch_replace(ADDR_CREATE_EXPLOSION, (const void *)CreateExplosion,
                   "CreateExplosion", 23);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,

@@ -929,10 +929,7 @@ void __cdecl RecvDamage(void *msg)
 }
 
 /* CreateItem is reconstructed and called by name; its typedef went with it. */
-typedef void *(__cdecl *AM2_CreateTrooperFn)(const char *, int32_t, int32_t,
-                                             int32_t, int32_t, int32_t,
-                                             int32_t, uint32_t, int32_t,
-                                             int32_t);
+/* CreateTrooper is reconstructed too, and its typedef went with it. */
 /* AM2_CreateVehicleFn moved to item.h -- gameproc.cpp wants it too. */
 typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *, int32_t, int32_t,
                                             int32_t, int32_t, int32_t,
@@ -1018,7 +1015,7 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
     }
 }
 
-#define orig_create_trooper  ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
+#define orig_create_trooper  CreateTrooper
 #define orig_create_vehicle  CreateVehicle
 #define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 
@@ -1206,7 +1203,7 @@ void __cdecl RecvItemCreate(void *msg)
 
     case 2:
         made = orig_create_trooper(
-                   name,
+                   (char *)(uintptr_t)name,
                    (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
                    (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
                    CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,

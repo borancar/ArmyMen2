@@ -9,7 +9,61 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,371 patches.**
+Nothing uncommitted. **1,372 patches.**
+
+**`CreateTrooper` (`0x00447620`), which had been DEFERRED** -- `orig.h`
+recorded ten arguments settled against two anchors and then said the reading
+could not be made self-consistent, because "BuildRowSet's `dy` is loaded from
+ARG2's slot -- which by then holds the PACKED point -- while `dx` comes from a
+register holding the ORIGINAL ARG2". That would make every trooper's row y
+equal its x, which the game plainly does not do, so it was written down instead
+of written out.
+
+**The blocker was an esp off by five pushes and nothing else.** `dy` is
+`[esp+0x54]` read at `0x00447816`, where esp carries `RectSet`'s five arguments
+and the `lea` below them -- so it resolves to E+0x0C, which is ARGUMENT 3, the
+y. `dx` is `ebp`, argument 2, the x. There is no aliasing anywhere in that
+call.
+
+**What made it followable was doing the same arithmetic twice today.**
+`CreateExplosion` and `PlacementScreenClick` both really DO reuse a slot for a
+packed point -- and in both the point lives in a LOCAL that a bare `push ecx`
+reserved, not in an argument slot. Here it IS in argument 2's slot, which is
+what made the first reading plausible; the point simply never reaches
+`BuildRowSet`. "I could not follow this" ages differently from "this is game
+logic", and this is the second decline this project has revisited and taken.
+
+**It reads `OBJ_OFF_POS` twice and the first read is too early.** Both go
+through `mov edx, [esi+0x12]`, but the first is before `ObjInitCommon` has
+written the position -- so `TROOPER_OFF_ZERO_B0` always takes the memset's zero
+while `TROOPER_OFF_SPAWN_POS`, read after, takes the real point. That is the
+same shape as `CreateExplosion`'s arms reading `OBJ_OFF_ARMY` before the
+constructor writes it, twice in one day and in two unrelated functions.
+
+**Its entry gate refuses outright and answers null**: in a network session a
+LOCAL creation for an army this machine must not broadcast for is not made at
+all. Three tests deep, and single player has no session so it is skipped.
+
+Two more private typedefs of a creator gone -- both agreed with the
+disassembly, which is what made the argument order free again.
+
+**And this one is genuinely LIVE, which is how the defect was caught.** Every
+trooper on every map goes through it, so `bootcamp`'s object-state dump
+compares every field of every object it made -- and on the first run eight
+lines differed by exactly **0x800**, `OBJ_FLAG_REVEALED`, with the log
+identical and the pixels at their usual 22.
+
+**It asks `ObjIsFriendly` twice and the two answers are used in OPPOSITE
+senses.** The first is `je` past an OR, so the flag goes on when the trooper IS
+friendly; the last is `jne` past a call, so `ObjConceal` runs when it is NOT. I
+wrote both the same way, which put `OBJ_FLAG_REVEALED` on exactly the wrong
+troopers. Nothing but the state dump could have seen it -- it is a flag, not a
+pixel, and the four objects it moved were still drawn, still at the right
+position, still the right health.
+
+That is the artifact CLAUDE.md says to read rather than the verdict line,
+earning its keep on a function whose whole reason for being deferred was that
+the reading was uncertain.
 
 **`LoadType3` (`0x0045A120`)** -- the VEHICLE member of the per-type savegame
 loader family, and the last of the eight that was small enough to take.
@@ -4060,16 +4114,16 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,199 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 40
-outstanding, which is 1,239 minus 1,199 -- from 1,371 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,200 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 39
+outstanding, which is 1,239 minus 1,200 -- from 1,372 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-eight batches have gone in and NOTHING SMALL IS LEFT: the
-40 entries outstanding start at **672 bytes** -- `0x00447620`, which is
-`CreateTrooper` and is deferred rather than unread -- and the median is
-**1,192**.
+small ones in batches. A hundred and thirty-nine batches have gone in and NOTHING SMALL IS LEFT: the
+39 entries outstanding start at **912 bytes** and the median is **1,216**. The
+672-byte entry that headed this list for days was `CreateTrooper`, deferred
+rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init
 glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
 band under 480. What is left is real functions, so the strategy that ranked by
