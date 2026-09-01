@@ -266,6 +266,11 @@ int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
  * same record, and was declared `int32_t arg` here until BoxAction was read. */
 int32_t __cdecl ObjBoxAction(void *obj, void *out);
 
+/* 0x004389D0, the same job from the object's per-pixel OBJ_OFF_HIT_MASK rather
+ * than from its box. This is the arm that runs; ObjBoxAction is the fallback
+ * for an object with no mask, which nothing on a drivable map is. */
+int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
+
 /* 0x00439320, six callers. Take an object's footprint back off the map:
  * ObjClearFootprint or ObjClearRoachFootprint for a vehicle or a roach, and
  * for an ITEM, subtract its height from every masked cell's weight and move

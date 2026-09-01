@@ -5,58 +5,71 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `cb4f349`. Working tree clean.
+Last updated: **2026-09-01**, at `4577d00`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,389 patches**, **29** analysis tools in `make check`.
+Nothing uncommitted. **1,390 patches**, **29** analysis tools in `make check`.
 
-**The spinner trio is reconstructed** -- `SpinCommit` (`0x00456580`, 80 B),
-`SpinUp` (`0x004565D0`) and `SpinDown` (`0x00456660`). A spinner is an edit box
-with two arrows beside it, and all three handlers read the same five fields off
-the spinner widget: the edit child at `SPIN_OFF_EDIT`, the range at
-`SPIN_OFF_MIN`/`SPIN_OFF_MAX`, the arrow step at `SPIN_OFF_STEP`, and an
-optional `void(spinner *)` notify at `SPIN_OFF_HANDLER`.
+**`ObjHitMaskAction` (`0x004389D0`, 1,056 bytes) is reconstructed** -- the arm
+`ItemTeardown` and `ObjAfterMove` take when an object has a per-pixel
+`OBJ_OFF_HIT_MASK`, where `ObjBoxAction` is the no-mask fallback. Its only
+callee is `Clamp`; the other thousand bytes are arithmetic, which is why it
+reads as harder than it is.
 
-**They are one class rather than three functions, and the differences are the
-part worth writing down.** The arrows clamp against ONE END EACH -- up clamps
-to max and never touches min, down the reverse -- because an arrow cannot
-cross the far end in a single step. The commit clamps BOTH ways, because it is
-the only one of the three a user can hand an arbitrary number to. And only the
-ARROWS repaint and play a sound: a value typed into the box and then clamped
-keeps showing what was typed until something else repaints it. Merging the
-three into one helper would have lost all three of those.
+**The walk is a half-tile step in both directions.** A tile is 16 world units,
+one bitmap bit is one unit, so a tile is two bytes of a mask row. Rows are
+sampled every eight units and the byte that STRADDLES a tile boundary is the
+one that advances the output cell: its high part goes to the current cell, its
+low part to the next. Every other byte is tested whole and advances nothing.
+Two bytes make one cell, which is what makes the two branches add up.
 
-**The two children sit at different offsets on the spinner** -- arrows at
-`SPINCHILD_OFF_SPIN_ARROW` (0x78), edit at `SPINCHILD_OFF_SPIN_EDIT` (0x7C) --
-and that was read off the three bodies rather than off the constructor, which
-is the more usual source. Three handlers agreeing about a layout is as good as
-a constructor stating it.
+**The split index is one past the entry the split wants**, so the pixel exactly
+on a 16-unit boundary is credited to the tile on its left. Where `left` is a
+multiple of 8 there is no straddle at all and the index is 8, which walks the
+first eight-entry table into the second (0x7F) and the second into the eight
+0xFF bytes after it. Transcribed, not corrected.
 
-**`checkoffsets` caught a duplicate name, the second in two commits.**
-`ADDR_FMT_INT` was defined fresh and already existed in `orig.h`; the previous
-commit had the compiler catch `EDIT_OFF_TEXT` the same way. Two different
-mechanisms catching the same class of mistake in consecutive units is the
-argument for the ratchets, not against the rule -- the grep still costs one
-command and would have caught both before either tool ran.
+**The neighbour ring's bounds check is a BREAK, not a skip.** The twenty deltas
+ascend, so a cell in the top two rows has a negative first delta and loses its
+entire ring rather than the two rows above it -- and there is no upper bound at
+all. Both reproduced.
 
-**A/B: `bootcamp` 22 pixels, `multi` 0, `controls` 0 on the dialog frame**, all
-widget dumps and logs identical. `controls` is the configuration that compares
-the menu widget layer at all.
+**The two readers of the hit mask disagree about the sign of its origin.**
+`ObjMaskBitAt` places the mask at `hitRect.topLeft - origin` and this one at
+`+ origin`. Each is internally consistent with the row index it then computes,
+so they agree only where the origin is zero. Recorded in `orig.h` rather than
+resolved; neither is corrected.
+
+**COLD, and it took three attempts to measure that rather than assume it.**
+All four of the family's counters are BLIND -- `tools/blindspots.py` says
+every caller of each is reconstructed -- so a live mission reading 0 on all
+four says nothing. Then the probe itself proved nothing: an `am2_log` fired 0
+times and so did a CONTROL at the top of `region_install`, which must run,
+because `crt.cpp` binds `am2_log` after the install. Moved to the call sites it
+works: `ObjAfterMove` is entered **1,598** times on a live Boot Camp mission,
+**1,436** get past the flag guards and every one is an ITEM, and the marker
+pair runs **zero** times. So neither marker is reached, and `region.cpp`'s
+older note explaining `ObjBoxAction`'s zero by "everything has a mask" is true
+and beside the point.
+
+**A/B clean on `bootcamp` (22 pixels) and `campaign` (2, and 0 on the dialog).**
+`mission`'s frames gate failed at 25822/634 -- the standing behaviour of that
+configuration, and this function is now measured not to run on it at all.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,214 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 25
-outstanding, which is 1,239 minus 1,214 -- from 1,389 patched addresses, and
-**86.3% of the sub-CRT bytes**. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,215 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 24
+outstanding, which is 1,239 minus 1,215 -- from 1,390 patched addresses, and
+**86.6% of the sub-CRT bytes**. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-five batches have gone in and NOTHING SMALL IS LEFT: the
-25 entries outstanding start at **1,056 bytes** -- `ObjHitMaskAction` at
-`0x004389D0` -- and the median is **1,424**. The
+small ones in batches. A hundred and forty-six batches have gone in and NOTHING SMALL IS LEFT: the
+24 entries outstanding start at **1,072 bytes** -- `ListMaskAction` at
+`0x004385A0`, this one's twin -- and the median is **1,504**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

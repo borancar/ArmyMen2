@@ -1584,7 +1584,30 @@
  * sixteen-step stride on a PARITY test of the row against a value saved
  * earlier. Which is the whole of the mask walk, and it is not read. */
 #define ADDR_TILEMASK_NEIGHBOURS 0x00554B84u  /* int32_t[20], built per call */
-#define ADDR_BIT_FROM_N          0x00487814u  /* uint8_t[16] */
+#define AM2_TILEMASK_RING        20   /* the 5x5 block less its corners and centre */
+/* Three eight-entry tables laid end to end, and the index runs 1..8 into each,
+ * so BOTH walk one past their own into the next. HIGH is 80 C0 E0 ... FF, LOW
+ * is 7F 3F 1F ... 00, and the eight bytes after LOW are all FF -- which is
+ * what the second read lands on when the split index is 8. See the walk in
+ * ObjHitMaskAction for why the index is one past the entry the split wants. */
+#define ADDR_BIT_FROM_N          0x00487814u  /* uint8_t[24]: HIGH, LOW, ALL */
+#define AM2_BIT_FROM_N_LOW       8    /* what to add for the second half-byte */
+/* The per-object hit bitmask OBJ_OFF_HIT_MASK points at. Four int16s and a
+ * pointer; the rows run TOP-DOWN and the row stride is the width in bits
+ * rounded up to a dword. misc.cpp's ObjMaskBitAt reads the same record. */
+#define OBJMASK_OFF_ORIGIN_X     0x00u  /* int16_t */
+#define OBJMASK_OFF_ORIGIN_Y     0x02u  /* int16_t */
+#define OBJMASK_OFF_WIDTH        0x04u  /* int16_t, in bits */
+#define OBJMASK_OFF_HEIGHT       0x06u  /* int16_t, in rows */
+#define OBJMASK_OFF_BITS         0x0Cu  /* uint8_t *, null means "no mask" */
+/* THE TWO READERS DISAGREE ABOUT THE SIGN OF THE ORIGIN, and this is recorded
+ * rather than resolved. ObjMaskBitAt places the mask's top-left at
+ * `hitRect.topLeft - origin` (0x004353CC: `movsx ecx,[edx]; sub ecx,[esi+0x30]`)
+ * and ObjHitMaskAction at `hitRect.topLeft + origin` (0x00438A13:
+ * `movsx ecx,[edi]; add ecx,[ebp+0x30]`). Each is internally consistent -- the
+ * row index each computes agrees with the origin each assumed -- so they can
+ * only both be right where the origin is zero. Neither is "corrected" here;
+ * both are transcribed as the image has them. */
 /* The scratch record's size, from the one caller that puts it on the STACK:
  * CanPlaceAt reserves 0x1018 bytes and the cells run from TILEMASK_OFF_CELLS
  * to the end of that frame less two locals. BoxAction clamps into the map, so

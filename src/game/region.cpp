@@ -1535,10 +1535,284 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out)
                      out);
 }
 
-/* 0x004389D0 stays original and is reached by name so checkseams can see it. */
-typedef int32_t (__cdecl *AM2_HitMaskActionFn)(void *obj, void *mask);
-#define orig_obj_hit_mask_action \
-    ((AM2_HitMaskActionFn)(uintptr_t)AM2_IMAGE(ADDR_OBJ_HIT_MASK_ACTION))
+/* The ring the two markers below OR a 2 into: the 5x5 block around a cell less
+ * its four corners and its centre, as INDEX deltas over the scratch grid.
+ *
+ * TWO THINGS IN HERE ARE THE ORIGINAL BEING WRONG AND ARE REPRODUCED. The
+ * guard is a BREAK, not a skip: the deltas run in ascending order, so a cell
+ * in the top two rows of the grid has a negative first delta and loses its
+ * ENTIRE ring rather than the two rows above it. And there is no upper bound
+ * at all, so a cell in the bottom two rows writes past the end of the grid --
+ * which is survivable only because both callers hand this a 0x1020-byte stack
+ * scratch whose cells never fill it.
+ *
+ * Written as a loop over ADDR_TILEMASK_NEIGHBOURS because that is what the
+ * original does -- it walks the table with a pointer from 0x00554B84 to
+ * 0x00554BD4 -- rather than as twenty adds. */
+static void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx)
+{
+    int32_t i;
+
+    for (i = 0; i < AM2_TILEMASK_RING; i++) {
+        int32_t at = ring[i] + idx;
+
+        if (at < 0)
+            return;
+        cells[at] |= AM2_TILEMASK_PAD_CELL;
+    }
+}
+
+/* ObjHitMaskAction -- original 0x004389D0, 1,056 bytes, two callers, and both
+ * of them are ItemTeardown and ObjAfterMove above.
+ *
+ * ObjBoxAction's twin for an object that HAS an OBJ_OFF_HIT_MASK, which on
+ * every map this project can drive is all of them -- so this is the arm that
+ * actually runs and ObjBoxAction is the cold fallback, exactly as its own
+ * comment says. Same job: turn the object into a scratch tile mask. Different
+ * source: the per-pixel bitmask rather than a rectangle.
+ *
+ * ITS ONLY CALLEE IS Clamp. A thousand bytes of arithmetic and one call, which
+ * is why it reads as harder than it is.
+ *
+ * IT CLAMPS EIGHT TIMES WHERE BoxAction CLAMPS FOUR. First the four edges of
+ * the mask, in WORLD units, against ADDR_MAP_EXTENT_X/Y with a margin of one
+ * whole tile; then those same four shifted down by AM2_TILE_SHIFT, in TILES,
+ * against ADDR_MAP_TILES_W/H with the usual AM2_TILEMASK_MARGIN of two. The
+ * world clamp is what keeps the bitmap walk on the map; the tile clamp is what
+ * keeps the padded rectangle inside the grid.
+ *
+ * Then it writes the four padded edges in the original's order -- bottom,
+ * right, top, left -- and memsets the cells to ZERO, where BoxAction fills
+ * them with AM2_TILEMASK_PAD_CELL. Both are consistent with the readers, which
+ * test bit 0.
+ *
+ * THERE IS A SECOND NEIGHBOUR TABLE AND THIS IS WHAT BUILDS IT, per call, from
+ * the scratch grid's own width -- ADDR_TILE_NEIGHBOURS is the same twenty
+ * deltas over the MAP's width and BuildTileDeltas fills that one. Two tables of
+ * the same shape over two different strides.
+ *
+ * THE WALK IS A HALF-TILE STEP IN BOTH DIRECTIONS. A tile is 16 world units,
+ * one bitmap bit is one world unit, so a tile is two bytes of a bitmap row.
+ * Rows are sampled every EIGHT units, columns a byte at a time, and the byte
+ * that straddles a tile boundary is the one that advances the output cell:
+ *
+ *   - a byte whose index has the STRADDLING parity is split, its high part
+ *     ORed into the current cell and its low part into the next, with the cell
+ *     advanced in between;
+ *   - every other byte is tested WHOLE against the current cell and advances
+ *     nothing.
+ *
+ * So two bytes produce one cell and the halves land either side of the split,
+ * which is what makes the two branches add up. Which parity straddles is
+ * decided by `left % 16` -- under 8 the odd bytes straddle, from 8 the even
+ * ones -- and that is the flag this reads as `splitOdd`.
+ *
+ * THE SPLIT INDEX IS ONE PAST THE ENTRY THE SPLIT WANTS, and it is transcribed
+ * rather than corrected. With `k` bits of the byte belonging to the current
+ * tile the masks should be HIGH[k-1] and LOW[k-1]; the original computes `k`
+ * and uses HIGH[k] and LOW[k], so the pixel exactly on a 16-unit boundary is
+ * credited to the tile on its left. Where `left` is a multiple of 8 there is no
+ * straddle at all and k is 8, which walks HIGH off its own eight entries into
+ * LOW's first (0x7F) and LOW off its own into the eight 0xFF bytes that follow
+ * -- so that byte marks the next tile whenever it holds anything. One pixel of
+ * tile attribution, on a grid that is then dilated by a 5x5 ring, which is
+ * presumably why nobody ever saw it.
+ *
+ * THE ROW STRIDE IS COMPUTED FROM THE CLAMPED EXTENT, not from the width
+ * field, and it rounds `right - left` rather than `width`. misc.cpp's
+ * ObjMaskBitAt rounds `width`, so the two agree on every width except those
+ * one above a multiple of 32, where this one is a dword short. Recorded, not
+ * corrected: correcting it would be a divergence from the binary on a function
+ * no drive this project has reaches.
+ *
+ * TWO REFUSALS AND THEY BOTH ANSWER 0 -- no mask at all, and a mask whose bits
+ * pointer is null. A third exit, an empty row, answers 0 too. Otherwise the
+ * answer is 1 if any cell was marked and 0 if none was, which is a different
+ * shape from ObjBoxAction's three-valued answer.
+ *
+ * COLD, AND MEASURED RATHER THAN INFERRED -- which took three attempts, and
+ * the first two are the lesson.
+ *
+ * All four of this family's counters are BLIND: tools/blindspots.py says
+ * ObjHitMaskAction, ObjBoxAction, ObjAfterMove and ItemTeardown each have
+ * every caller reconstructed, so a live Boot Camp mission reading 0 on all
+ * four says nothing whatever. Reading those zeros as "it does not run" was
+ * the first mistake.
+ *
+ * The second was the probe. An `am2_log` at the top of this function fired 0
+ * times -- and so did a control at the top of region_install, which MUST run.
+ * A test that cannot fail has not passed: crt.cpp points am2_log at ADDR_LOG
+ * during the bind, and the install runs before it, so both calls were being
+ * dropped and the whole probe proved nothing.
+ *
+ * Moved to the call sites, it works and it answers: on a live Boot Camp
+ * mission with the player walking and firing, ObjAfterMove is entered 1,598
+ * times, 1,436 of those get past the flag guards and every one is an ITEM,
+ * and the marker pair below runs ZERO times. ItemTeardown is 0 as well. So
+ * NEITHER marker is reached -- not this one and not ObjBoxAction -- and the
+ * note over there, which explains its zero by "everything has a mask", is
+ * true and beside the point: the branch that chooses between them is not
+ * reached at all. What stops all 1,436 is one of the four guards after the
+ * type switch, and the shape of ItemTeardown says the likely one is the
+ * height being zero.
+ *
+ * So this is verified by READING, and a clean A/B says only that nothing else
+ * regressed. It also means this function cannot be behind a difference in any
+ * configuration -- worth knowing when `mission`'s frame gate fails, which it
+ * does on this machine for reasons of its own. */
+int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
+{
+    const uint8_t  *o     = (const uint8_t *)obj;
+    uint8_t        *rec   = (uint8_t *)out;
+    int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
+    uint8_t        *cells = rec + TILEMASK_OFF_CELLS;
+    int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
+    const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
+                                AM2_IMAGE(ADDR_BIT_FROM_N);
+    const AM2_Rect *hit;
+    const uint8_t  *m;
+    const uint8_t  *bits;
+    int32_t         mx;
+    int32_t         my;
+    int32_t         lw;
+    int32_t         rw;
+    int32_t         tw;
+    int32_t         bw;
+    int32_t         w;
+    int32_t         rowbits;
+    int32_t         rowbytes;
+    int32_t         phase;
+    int32_t         splitOdd;
+    int32_t         k;
+    int32_t         tilew;
+    int32_t         y;
+    int32_t         marked = 0;
+
+    m = *(const uint8_t *const *)(o + OBJ_OFF_HIT_MASK);
+    if (!m)
+        return 0;
+    bits = *(const uint8_t *const *)(m + OBJMASK_OFF_BITS);
+    if (!bits)
+        return 0;
+
+    hit = (const AM2_Rect *)(o + OBJ_OFF_HIT_RECT);
+    mx  = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X);
+    my  = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y);
+
+    /* The world clamp, x pair then y pair, with a margin of one tile. */
+    lw = Clamp(hit->left + mx, 1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+                   - (1 << AM2_TILE_SHIFT));
+    rw = Clamp(hit->left + mx + *(const int16_t *)(m + OBJMASK_OFF_WIDTH) - 1,
+               1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+                   - (1 << AM2_TILE_SHIFT));
+    tw = Clamp(hit->top + my, 1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+                   - (1 << AM2_TILE_SHIFT));
+    bw = Clamp(hit->top + my + *(const int16_t *)(m + OBJMASK_OFF_HEIGHT) - 1,
+               1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+                   - (1 << AM2_TILE_SHIFT));
+
+    /* and the tile clamp over the same four, into the grid. */
+    box[3] = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                       - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
+    box[2] = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                       - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
+    box[1] = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                       - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
+    box[0] = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                       - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
+
+    w = box[2] - box[0] + 1;
+    memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
+
+    /* The original stores these in register-scheduling order rather than in
+     * index order; the values are what matters and they are written out here
+     * in the order the walk reads them. */
+    ring[0]  = -2 * w - 1;
+    ring[1]  = -2 * w;
+    ring[2]  = -2 * w + 1;
+    ring[3]  = -w - 2;
+    ring[4]  = -w - 1;
+    ring[5]  = -w;
+    ring[6]  = -w + 1;
+    ring[7]  = -w + 2;
+    ring[8]  = -2;
+    ring[9]  = -1;
+    ring[10] = 1;
+    ring[11] = 2;
+    ring[12] = w - 2;
+    ring[13] = w - 1;
+    ring[14] = w;
+    ring[15] = w + 1;
+    ring[16] = w + 2;
+    ring[17] = 2 * w - 1;
+    ring[18] = 2 * w;
+    ring[19] = 2 * w + 1;
+
+    /* `% 32` and `% 16` below are C's signed remainder, which is exactly what
+     * the original's `and 0x8000001F` / `dec` / `or` / `inc` computes. */
+    rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
+    rowbytes = rowbits >> 3;
+    if (rowbits == 0)
+        return 0;
+
+    phase = lw % (1 << AM2_TILE_SHIFT);
+    if (phase >= 8) {
+        splitOdd = 0;
+        k        = (1 << AM2_TILE_SHIFT) - phase;
+    } else {
+        splitOdd = 1;
+        k        = 8 - phase;
+    }
+
+    tilew = (box[2] - AM2_TILEMASK_MARGIN)
+            - (box[0] + AM2_TILEMASK_MARGIN) + 1;
+
+    for (y = tw; y < bw; y += 8) {
+        int32_t off = (y - my - hit->top) * rowbytes;
+        int32_t end = off + rowbytes;
+        int32_t col = AM2_TILEMASK_MARGIN;
+        int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w
+                      + AM2_TILEMASK_MARGIN;
+
+        for (; off < end; off++) {
+            if (splitOdd != off % 2) {
+                if (bits[off]) {
+                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    marked = 1;
+                    MarkTileRing(cells, ring, idx);
+                }
+                continue;
+            }
+
+            if (bits[off] & tab[k]) {
+                cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                marked = 1;
+                MarkTileRing(cells, ring, idx);
+            }
+
+            col++;
+            idx++;
+            if (col == tilew + AM2_TILEMASK_MARGIN)
+                break;
+
+            if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                marked = 1;
+                MarkTileRing(cells, ring, idx);
+            }
+        }
+    }
+
+    return marked;
+}
 
 
 /* The original inlines this twice -- once to add cover and once to remove it
@@ -1678,7 +1952,7 @@ void __cdecl ItemTeardown(void *obj)
         return;
 
     if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
-        orig_obj_hit_mask_action(obj, mask);
+        ObjHitMaskAction(obj, mask);
     else
         ObjBoxAction(obj, mask);
 
@@ -1809,7 +2083,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
         return;
 
     if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
-        orig_obj_hit_mask_action(obj, mask);
+        ObjHitMaskAction(obj, mask);
     else
         ObjBoxAction(obj, mask);
 
@@ -5719,6 +5993,9 @@ int region_install(void)
                         "RebuildTileCover", 1);
     rc |= patch_replace(ADDR_OBJ_BOX_ACTION, (const void *)ObjBoxAction,
                         "ObjBoxAction", 2);
+    rc |= patch_replace(ADDR_OBJ_HIT_MASK_ACTION,
+                        (const void *)ObjHitMaskAction,
+                        "ObjHitMaskAction", 2);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,
                         "ItemTeardown", 1);
     rc |= patch_replace(ADDR_BOX_ACTION, (const void *)BoxAction,
