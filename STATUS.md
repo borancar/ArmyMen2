@@ -9,7 +9,44 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,376 patches.**
+Nothing uncommitted. **1,377 patches.**
+
+**`LoadType2` (`0x004471D0`)** -- the TROOPER savegame loader, and the SECOND
+deferral revisited today. `orig.h` had recorded its ten-argument creator and
+then said "what is NOT established: the exact identity of four small stack
+locals around SoldierKindForWeapon and the Type2Action arms".
+
+**All four are settled and three of them were one mistake.** The first is a
+four-byte `fread` AFTER the record -- the weapon code, which the default arm of
+the kind switch hands to `SoldierKindForWeapon`. The second is the per-uid
+buffer the inventory loop reads into. The last two are a health PAIR saved
+across the kind-7 handler and put back; they read as three different slots
+because an `add esp, 4` sits between the writes and the reads, so the same two
+words are 0x84/0x86 going in and 0x84/0x82 coming out.
+
+**Writing `CreateTrooper` and `MakePlacedUnit` first is what made it legible.**
+Both do the CreateTrooper / weapon / SoldierKindForWeapon dance, and knowing
+that shape is what separated the record's fields from the scratch. Same pattern
+as this morning's decline: the cure was doing the neighbouring arithmetic
+first, not staring harder.
+
+**Its third argument is "renumber".** Clear, the trooper keeps the uid the file
+gave it. Set, `CreateTrooper` is passed 0 and allocates a fresh one, the pair
+goes to `UidRemapAdd`, the header takes the new value, `OBJ_FLAG_NEEDS_REMAP`
+goes on and five record fields that named the old uid are zeroed.
+**`UidRemapAdd`'s own note already said both its call sites "build a
+replacement object and pass (old->uid, new->uid)"** -- this is one of the two,
+so the two readings meet from opposite directions.
+
+**Renumbering DROPS the inventory rather than remapping it**: the loop still
+reads each uid out of the file, and throws it away. The original's own test,
+and worth saying plainly because it looks like an oversight and is not ours to
+fix.
+
+**Three of the four kind arms clear `OBJ_OFF_SOLDIER_KIND` before acting**, so
+a loaded trooper of kind 6, 7 or 8 comes back as kind 0 with the handler's
+effect applied. What those kinds ARE is still not established; the arms are
+named for the callee each reaches.
 
 **`MissionEnded` (`0x00421890`)** -- and it was `ADDR_SCRIPT_FIND_FILE`, a name
 taken from the one thing anybody had looked at: the `"%s%d.txt"` it builds.
@@ -4273,14 +4310,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,204 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 35
-outstanding, which is 1,239 minus 1,204 -- from 1,376 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,205 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 34
+outstanding, which is 1,239 minus 1,205 -- from 1,377 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-three batches have gone in and NOTHING SMALL IS LEFT: the
-35 entries outstanding start at **928 bytes** and the median is **1,280**. The
+small ones in batches. A hundred and forty-four batches have gone in and NOTHING SMALL IS LEFT: the
+34 entries outstanding start at **928 bytes** and the median is **1,288**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

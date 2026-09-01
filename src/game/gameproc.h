@@ -146,6 +146,11 @@ void *__cdecl LoadType6(am2_FILE *fp, const void *hdr);
  * one table-record pointer out of counts and a comm slot the file carries,
  * then rescale the health against the vehicle definition. */
 void *__cdecl LoadType3(am2_FILE *fp, const void *hdr);
+
+/* 0x004471D0, one caller. The TROOPER loader; its third argument is
+ * "renumber", which decides whether the trooper keeps the uid the file gave it
+ * or gets a fresh one recorded in the remap table. */
+void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber);
 void *__cdecl LoadType7(am2_FILE *fp, const void *hdr);
 
 void gameproc_install(void);

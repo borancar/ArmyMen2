@@ -1153,6 +1153,196 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
     return o;
 }
 
+/* LoadType2 -- original 0x004471D0, one caller, and the TROOPER member of the
+ * per-type savegame loader family. It had been DEFERRED: orig.h recorded ten
+ * arguments for the creator below it and then said "what is NOT established:
+ * the exact identity of four small stack locals around SoldierKindForWeapon
+ * and the Type2Action arms".
+ *
+ * ALL FOUR ARE SETTLED AND THREE OF THEM ARE ONE MISTAKE. The first is a
+ * four-byte fread AFTER the record -- the weapon code, and the default arm of
+ * the kind switch hands it to SoldierKindForWeapon. The second is the per-uid
+ * buffer the inventory loop reads into. The last two are a health PAIR saved
+ * across the kind-7 handler and put back afterwards; they read as three
+ * different slots because an `add esp, 4` sits between the writes and the
+ * reads, so the same two words are named 0x84/0x86 going in and 0x84/0x82
+ * coming out. Writing CreateTrooper and MakePlacedUnit first is what made this
+ * legible: both do the CreateTrooper/weapon/SoldierKindForWeapon dance, and
+ * knowing its shape is what separated the record's fields from the scratch.
+ *
+ * ITS THIRD ARGUMENT IS "RENUMBER". Clear, the trooper keeps the uid the file
+ * gave it. Set, CreateTrooper is passed 0 and allocates a fresh one, the pair
+ * goes to UidRemapAdd, the header takes the new value, OBJ_FLAG_NEEDS_REMAP
+ * goes on and five record fields that named the old uid are zeroed. orig.h's
+ * note on UidRemapAdd already said both its call sites "build a replacement
+ * object and pass (old->uid, new->uid)"; this is one of them, so the two
+ * readings meet.
+ *
+ * THE TWO ARMS DIFFER IN ONE ARGUMENT AND ARE OTHERWISE THE SAME CALL. Written
+ * out twice, as the original has it -- factoring them would need a variable
+ * for the uid and would hide that the renumbering arm has a whole tail the
+ * other does not.
+ *
+ * THE KIND SWITCH IS ON OBJ_OFF_SOLDIER_KIND and three of its four arms clear
+ * that field before they act, so a loaded trooper of kind 6, 7 or 8 comes back
+ * as kind 0 with the handler's effect applied. The fourth takes the weapon
+ * code instead. What the three kinds ARE is not established; the arms are
+ * named for the callee each reaches.
+ *
+ * THE HEALTH RESCALE IS LoadType8's, with the maximum coming from the RANK
+ * record indexed by OBJ_OFF_RANK rather than from a global.
+ *
+ * DELIBERATE DEVIATION -- the MSVC structured-exception frame is not
+ * reproduced, per the standing decision.
+ */
+void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
+{
+    uint8_t  rec[AM2_TYPE2_RECORD_SIZE];
+    uint8_t *h = (uint8_t *)hdr;
+    uint8_t *o;
+    int32_t  weaponCode;
+    int32_t  uid;
+    int32_t  i, n;
+    float    part;
+
+    InitPtrList(rec + TYPE2_REC_OFF_LIST);
+
+    orig_fread(rec, AM2_TYPE2_RECORD_SIZE, 1, fp);
+    orig_fread(&weaponCode, 4, 1, fp);
+
+    if (renumber) {
+        o = (uint8_t *)CreateTrooper(
+                (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                *(const int16_t *)(h + OBJ_OFF_POS),
+                *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
+                *(const int8_t *)(h + OBJ_OFF_ARMY),
+                *(const int32_t *)(h + OBJ_OFF_FLAGS), 1, 0, 0, 0);
+
+        UidRemapAdd(*(const uint32_t *)(h + 4), *(const uint32_t *)(o + 4));
+        *(uint32_t *)(h + 4) = *(const uint32_t *)(o + 4);
+
+        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4D0) = 0;
+        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_30)  = 0;
+        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_38)  = 0;
+        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4D8) = 0;
+        *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4DC) = 0;
+    } else {
+        o = (uint8_t *)CreateTrooper(
+                (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                *(const int16_t *)(h + OBJ_OFF_POS),
+                *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
+                *(const int8_t *)(h + OBJ_OFF_ARMY),
+                *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
+                *(const uint32_t *)(h + 4), 0, 0);
+    }
+
+    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE2_RECORD_SIZE);
+
+    if (!(*(const uint32_t *)(h + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)) {
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) =
+            (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
+             & ~(uint32_t)OBJ_FLAG_DESTROYED) | OBJ_FLAG_BIT0;
+        DestroyByType(o);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
+    }
+
+    if (renumber)
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_NEEDS_REMAP;
+
+    *(int16_t *)(o + OBJ_OFF_FIELD_574) = -1;
+    *(int32_t *)(o + OBJ_OFF_FIELD_568) = 0;
+    memset(o + TROOPER_OFF_CLEAR_A, 0, AM2_DEPLOY_CLEAR_DWORDS * 4);
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
+        int32_t now;
+        int32_t rank = *(const int32_t *)(o + OBJ_OFF_RANK);
+
+        part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
+                       / (double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH));
+        SetMaxHealth(o, *(const int32_t *)((const uint8_t *)
+                                           AM2_IMAGE(ADDR_RANK_RECORDS)
+                                           + (uintptr_t)rank * RANK_REC_BYTES
+                                           + RANK_REC_OFF_MAX_HEALTH));
+
+        now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            (int16_t)(int32_t)((double)now * (double)part);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
+    }
+
+    *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_KIND) =
+        (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        + *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT) * AM2_OBJ_TABLE_REC_SIZE;
+
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST)     = 0;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 4) = 0;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 8) = 0;
+
+    n = *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT);
+    for (i = 0; i < n; i++) {
+        orig_fread(&uid, 4, 1, fp);
+        /* Renumbering DROPS the inventory rather than remapping it: the uid
+         * is read and thrown away. The original's own test, not a shortcut. */
+        if (!renumber)
+            PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+        n = *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT);
+    }
+
+    switch (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)) {
+    case AM2_SOLDIER_KIND_ACTION_C:
+        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
+        Type2ActionC(o, *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1);
+        break;
+
+    case AM2_SOLDIER_KIND_ACTION_A:
+        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
+        if (*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
+            > AM2_TYPE2_KEEP_HEALTH_OVER) {
+            int16_t maxWas = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+            int16_t was    = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+
+            Type2ActionA(o);
+            *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) = maxWas;
+            *(int16_t *)(o + OBJ_OFF_HEALTH)     = was;
+        } else {
+            Type2ActionA(o);
+        }
+        break;
+
+    case AM2_SOLDIER_KIND_ACTION_B:
+        *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
+        Type2ActionB(o);
+        break;
+
+    default:
+        SoldierKindForWeapon(o, (uint32_t)weaponCode);
+        break;
+    }
+
+    *(int32_t *)(o + OBJ_OFF_DEADLINE_58) =
+        *(const int32_t *)(h + OBJ_OFF_DEADLINE_58);
+    *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const int32_t *)(rec + TYPE2_REC_OFF_SCRIPT);
+    *(int32_t *)(o + OBJ_OFF_POSE) = 1;
+    SetUnitPose(o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
+
+    *(int32_t *)(rec + TYPE2_REC_OFF_LIST)     = 0;
+    *(int32_t *)(rec + TYPE2_REC_OFF_LIST + 4) = 0;
+    *(int32_t *)(rec + TYPE2_REC_OFF_LIST + 8) = 0;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+        *(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID =
+            *(const uint32_t *)(o + 4);
+
+    ResetObjOnCof(o);
+    ClearPtrListAlias(rec + TYPE2_REC_OFF_LIST);
+    return o;
+}
+
 /* LoadType3 -- original 0x0045A120, one caller, and the VEHICLE member of the
  * per-type savegame loader family. LoadType8 above is its near twin and was
  * read beside it the whole way; what follows is the diff.
@@ -1670,7 +1860,6 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
 typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
-#define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
@@ -1717,7 +1906,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
 
     switch (*(const int32_t *)hdr) {
     case 1:  made = (uint8_t *)LoadType1(fp, hdr);            break;
-    case 2:  made = (uint8_t *)orig_load_type2(fp, hdr, arg); break;
+    case 2:  made = (uint8_t *)LoadType2(fp, (void *)hdr, arg); break;
     case 3:  made = (uint8_t *)LoadType3(fp, hdr);      break;
     case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
     case 5:  made = (uint8_t *)LoadType5(fp, hdr);      break;
@@ -2201,6 +2390,7 @@ void gameproc_install(void)
     patch_replace(ADDR_LOAD_TYPE7, (const void *)LoadType7, "LoadType7", 1);
     patch_replace(ADDR_LOAD_TYPE6, (const void *)LoadType6, "LoadType6", 1);
     patch_replace(ADDR_LOAD_TYPE3, (const void *)LoadType3, "LoadType3", 1);
+    patch_replace(ADDR_LOAD_TYPE2, (const void *)LoadType2, "LoadType2", 1);
     patch_replace(ADDR_SEL_LIST_INIT, (const void *)SelListInit,
                   "SelListInit", 1);
     patch_replace(ADDR_SEL_LIST_CTOR_THUNK, (const void *)SelListConstructThunk,

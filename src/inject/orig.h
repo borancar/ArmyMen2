@@ -11787,7 +11787,43 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * two readings four bytes apart. That is the class of mistake this file has
  * caught twice today by reading siblings, and guessing it at the end of a
  * long session is how the third one would get written instead of found. */
-#define ADDR_LOAD_TYPE2       0x004471D0u  /* takes a THIRD argument */
+#define ADDR_LOAD_TYPE2       0x004471D0u  /* int32(fp, hdr, renumber);
+                                            * reconstructed */
+/* THE THIRD ARGUMENT IS "RENUMBER", and the two arms are what say so. With it
+ * clear the trooper is rebuilt with the uid the file gave it; with it set the
+ * uid argument is 0, so CreateTrooper allocates a fresh one, the pair goes to
+ * ADDR_UID_REMAP_ADD, the header takes the new value, OBJ_FLAG_NEEDS_REMAP
+ * goes on, and five record fields that named the old uid are zeroed. That
+ * global's own note says "both call sites build a replacement object and pass
+ * (old->uid, new->uid)" -- this is one of the two, so the reading is confirmed
+ * from the other end.
+ *
+ * ITS FOUR SMALL STACK LOCALS ARE SETTLED, which is what the deferral was
+ * about. One is a four-byte read AFTER the record -- the weapon code, handed
+ * to SoldierKindForWeapon in the default arm of the kind switch. One is the
+ * per-uid buffer the inventory loop freads into. The last two are a health
+ * PAIR saved across ADDR_TYPE2_ACTION_A and put back, and they looked like
+ * three because an `add esp, 4` between the writes and the reads moves the
+ * displacement by two words. */
+#define TYPE2_REC_OFF_LIST      0x010u  /* {capacity, count, items} */
+#define TYPE2_REC_OFF_COUNT     0x014u  /* how many uids follow the record */
+#define TYPE2_REC_OFF_SCRIPT    0x020u  /* -> OBJ_OFF_SCRIPT_STATE */
+#define TYPE2_REC_OFF_CLEAR_30  0x030u  /* zeroed when renumbering */
+#define TYPE2_REC_OFF_CLEAR_38  0x038u
+#define TYPE2_REC_OFF_SLOT      0x498u  /* a comm slot, as in types 3 and 8 */
+#define TYPE2_REC_OFF_POSE      0x4A4u  /* -> SetUnitPose */
+#define TYPE2_REC_OFF_CLEAR_4D0 0x4D0u
+#define TYPE2_REC_OFF_CLEAR_4D8 0x4D8u
+#define TYPE2_REC_OFF_CLEAR_4DC 0x4DCu
+/* The three soldier kinds LoadType2 gives their own arm, and everything else
+ * takes the weapon code. What each kind IS is not established; the numbers are
+ * OBJ_OFF_SOLDIER_KIND's and the arms are named for the callee they reach. */
+#define AM2_SOLDIER_KIND_ACTION_C 6
+#define AM2_SOLDIER_KIND_ACTION_A 7
+#define AM2_SOLDIER_KIND_ACTION_B 8
+/* The health above which the kind-7 arm saves and restores the pair around its
+ * call, rather than letting the callee keep what it produced. */
+#define AM2_TYPE2_KEEP_HEALTH_OVER 100
 #define ADDR_LOAD_TYPE3       0x0045A120u  /* reconstructed */
 /* The type-3 record's fields LoadType3 reads BEFORE the memcpy puts the whole
  * thing at OBJ_OFF_FIELD_94. Each is that offset plus 0x94, and every one of
