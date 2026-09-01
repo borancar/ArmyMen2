@@ -3878,7 +3878,26 @@
  * byte table is there so ids can SHARE an arm: sixteen reach the default and
  * ids 0x23..0x26 all mean Disguise. */
 #define ADDR_SPEAK_ITEM_PICKUP     0x00448380u  /* void(int32 item, int32 own) */
-#define ADDR_TROOPER_PICKUP_ITEM   0x00448540u
+#define ADDR_TROOPER_PICKUP_ITEM   0x00448540u  /* void(trooper, item, slot) */
+#define AM2_STR_TROOPER_PICKUP     0x0048A288u /* "TrooperPickupItem %x\n" */
+#define AM2_STR_TROOPER_PICKUP_2   0x0048A270u /* "TrooperPickupItem 2 %x\n" */
+/* THE FIVE SPEECH GROUPS IT ASKS FOR ARE ALL ALREADY NAMED, in the
+ * AM2_SPEAK_ table above -- 9, 2, 0x13, 0x15 and 0x1A are HEAVYMACGUN,
+ * AUTORIFLE, VULCANGUN, MOREAMMO and HITSSPOT. I had invented five AM2_LINE_
+ * names for them before grepping the VALUES; nothing would have refused those,
+ * since checkoffsets only watches *_OFF_* macros. Fifth rediscovery of the
+ * session and the one with the best payoff, because the existing names ANSWER
+ * a question the numbers could not:
+ *
+ * THE THREE KINDS THE SWAP ARM HAS A LINE FOR ARE IDENTIFIED BY THAT LINE.
+ * A picked-up weapon of kind 8 makes the trooper say HEAVYMACGUN, kind 10
+ * AUTORIFLE and kind 0x1D VULCANGUN -- which is the same evidence a function
+ * named from its own log string has. Every other kind is swapped in silence.
+ * Note the kind is NOT the speech id: kind 8 speaks group 9, and group 8 is
+ * GRENADES. */
+#define AM2_WEAPON_KIND_HEAVYMACGUN 8
+#define AM2_WEAPON_KIND_AUTORIFLE   10
+#define AM2_WEAPON_KIND_VULCANGUN   0x1D
 /* 0x004488C0, 608 bytes, one caller. IT NAMES ITSELF seven times:
  * TrooperHostApprovedPickupItem, the HOST half of the pickup pair whose other
  * half is ADDR_TROOPER_REMOTE_PICKUP. The host CONSUMES and ANNOUNCES --

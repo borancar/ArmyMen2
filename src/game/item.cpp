@@ -11101,6 +11101,207 @@ void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
     }
 }
 
+/* TrooperPickupItem -- original 0x00448540, one caller, and it NAMES ITSELF
+ * twice: "TrooperPickupItem %x" and "TrooperPickupItem 2 %x". The third and
+ * last of the pickup family, after TrooperRemotePickupItem and
+ * TrooperHostApprovedPickupItem earlier in this file, and the one that decides
+ * what actually happens rather than who is allowed to decide.
+ *
+ * IT ALWAYS STAMPS AND ALWAYS NOTIFIES. OBJ_OFF_PICKUP_AFTER takes the clock
+ * plus AM2_PICKUP_HOLD_MS and the pickup event is raised before any test, so
+ * an item that is then refused has still been touched.
+ *
+ * FIVE OUTCOMES, chosen by the item's kind and by what is already in the slot:
+ *
+ *   A MEDKIT heals the whole army through ForEachArmyObject and is marked
+ *   OBJ_FLAG_OVERDUE. That arm appears TWICE, once before the slot is looked
+ *   at and once after an empty slot has taken the item, and the second copy
+ *   is reached only when the item was NOT a weapon. Written out both times,
+ *   as the original has it.
+ *
+ *   A HOT TARGET is destroyed and nothing else.
+ *
+ *   AN EMPTY SLOT takes the item outright: its uid into the slot, the
+ *   trooper's army onto it if it had none, then DestroyByType and
+ *   WeaponRespawn -- in that order, so the respawn timer is armed on an
+ *   object already destroyed.
+ *
+ *   A FULL SLOT holding a DIFFERENT weapon is a SWAP: the old one is marked
+ *   overdue and destroyed, the new one takes the slot and the trooper's army,
+ *   and three kinds get a line for it.
+ *
+ *   A FULL SLOT holding the SAME kind is an AMMO MERGE, and it is the only
+ *   arm that can partly fail: what fits goes in, what does not stays on the
+ *   ground in the item's own OBJ_OFF_TARGET_UID -- which on a weapon is its
+ *   ammo, another reading of that offset -- and the trooper says MOREAMMO. A
+ *   slot already at ITEMTYPE_OFF_CAPACITY refuses silently.
+ *
+ * A NEGATIVE AMMO COUNT MEANS INFINITE, and it propagates: an item with one
+ * merges as "it all fits" and sets the destination to -1 rather than adding.
+ *
+ * THE PARTIAL-MERGE BROADCAST SENDS ZERO, and it looks like a slip in the
+ * original. The fourth argument is computed as `capacity - capacity` --
+ * `mov edx,[edx+0x18]` fills the slot and then `mov eax,edx` / `sub ecx,eax`
+ * subtracts that same capacity from itself -- where every other call on this
+ * path sends an ammo count. What it presumably meant is how much was
+ * transferred. Reproduced; the arm is multiplayer-only and cold, so nothing
+ * has ever been in a position to notice.
+ */
+void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
+{
+    uint8_t       *t = (uint8_t *)trooper;
+    uint8_t       *w = (uint8_t *)item;
+    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        kind;
+    uint8_t       *held;
+
+    *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_PICKUP_HOLD_MS;
+
+    NotifyPickedUp(item, trooper);
+
+    kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+    if (kind == AM2_ITEM_KIND_MEDKIT) {
+        ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
+                          (void (__cdecl *)(void *))(uintptr_t)
+                              ADDR_MEDKIT_HEAL_ONE);
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
+                     ((const AM2_Object *)w)->uid);
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        WeaponRespawn(w);
+        SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
+        return;
+    }
+
+    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
+        DestroyByType(w);
+        return;
+    }
+
+    if (*(const uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4)) {
+        held = (uint8_t *)WeaponByUid(
+            *(const uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4));
+        if (!held)
+            return;
+
+        if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
+            && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
+            /* ---- swap ---- */
+            switch (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) {
+            case AM2_WEAPON_KIND_HEAVYMACGUN:
+                SpeakLine(AM2_SPEAK_HEAVYMACGUN,
+                          *(const int8_t *)(t + OBJ_OFF_ARMY));
+                break;
+            case AM2_WEAPON_KIND_AUTORIFLE:
+                SpeakLine(AM2_SPEAK_AUTORIFLE,
+                          *(const int8_t *)(t + OBJ_OFF_ARMY));
+                break;
+            case AM2_WEAPON_KIND_VULCANGUN:
+                SpeakLine(AM2_SPEAK_VULCANGUN,
+                          *(const int8_t *)(t + OBJ_OFF_ARMY));
+                break;
+            default:
+                break;
+            }
+
+            *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+            *(uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4) =
+                ((const AM2_Object *)w)->uid;
+            *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+            DestroyByType(held);
+
+            if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+                SendPairMessage(t, w, (int32_t)slot,
+                                *(const int32_t *)(w + OBJ_OFF_TARGET_UID));
+            return;
+        }
+
+        /* ---- same kind: merge the ammo ---- */
+        {
+            int32_t add = *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
+            int32_t cap = *(const int32_t *)(
+                *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)
+                + ITEMTYPE_OFF_CAPACITY);
+            int32_t have = *(const int32_t *)(held + OBJ_OFF_TARGET_UID);
+
+            if (add >= 0 && have + add > cap) {
+                if (have >= cap)
+                    return;
+
+                *(int32_t *)(w + OBJ_OFF_TARGET_UID) = have - cap + add;
+                *(int32_t *)(held + OBJ_OFF_TARGET_UID) = cap;
+
+                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+                    SendPairMessage(t, w, (int32_t)slot,
+                                    0 /* = capacity - capacity; see above */);
+
+                SpeakLine(AM2_SPEAK_MOREAMMO,
+                          *(const int8_t *)(t + OBJ_OFF_ARMY));
+                return;
+            }
+        }
+
+        WeaponRespawn(w);
+        if (*(const int32_t *)(w + OBJ_OFF_TARGET_UID) < 0)
+            *(int32_t *)(held + OBJ_OFF_TARGET_UID) = -1;
+        else
+            *(int32_t *)(held + OBJ_OFF_TARGET_UID) +=
+                *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
+
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP_2),
+                     ((const AM2_Object *)w)->uid);
+
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+            SendPairMessage(t, w, (int32_t)slot,
+                            *(const int32_t *)(w + OBJ_OFF_TARGET_UID));
+        return;
+    }
+
+    /* ---- the slot was empty ---- */
+    *(uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4) =
+        ((const AM2_Object *)w)->uid;
+
+    if (*(const int8_t *)(w + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
+        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+
+    DestroyByType(w);
+    WeaponRespawn(w);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+        SendPairMessage(t, w, (int32_t)slot,
+                        *(const int32_t *)(w + OBJ_OFF_TARGET_UID));
+
+    kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
+                     ((const AM2_Object *)w)->uid);
+        DestroyByType(w);
+        return;
+    }
+
+    if (kind == AM2_ITEM_KIND_MEDKIT) {
+        ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
+                          (void (__cdecl *)(void *))(uintptr_t)
+                              ADDR_MEDKIT_HEAL_ONE);
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
+                     ((const AM2_Object *)w)->uid);
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        WeaponRespawn(w);
+        SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
+        return;
+    }
+
+    SpeakItemPickupLine(kind, *(const int8_t *)(t + OBJ_OFF_ARMY));
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -11113,6 +11314,8 @@ void item_install(void)
                   "DamageItem", 3);
     patch_replace(ADDR_SHOT_HITS_OBJ, (const void *)ShotHitsObj,
                   "ShotHitsObj", 1);
+    patch_replace(ADDR_TROOPER_PICKUP_ITEM, (const void *)TrooperPickupItem,
+                  "TrooperPickupItem", 1);
     patch_replace(ADDR_ITEM_TYPE_NAME, (const void *)ItemTypeName,
                   "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,

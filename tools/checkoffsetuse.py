@@ -29,6 +29,13 @@ other. KNOWN BLIND SPOTS, measured on real functions rather than guessed:
   - an ARGUMENT of a frameless function is [esp + N] and is skipped, but only
     esp is: a function with no `mov ebp, esp` has its [ebp + N] read as
     fields, which is right far more often than not (see below);
+  - a SCALED index hides the displacement: `[ebx + ebp*4 + 0x54C]` is an array
+    of records at a named offset, and the operand regex below matches only
+    `[reg + reg + disp]` with no scale, so the C is reported as naming an
+    offset the original "does not read". TrooperPickupItem's 0x54C is the
+    example. Fixable by widening the regex; left alone because doing so
+    changes the answer for every function and would need re-validating
+    against the whole set.
   - a `lea reg, [reg + N]` on a SCALAR is arithmetic, not a field --
     UnitKindMatches' +1, +2 and +11 all report as unnamed offsets. Excluding
     `lea` would be worse: a `lea` on a struct pointer IS a field reference.
