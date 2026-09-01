@@ -1050,6 +1050,29 @@ point at the same code; counting the bodies gives six arms for an eight-case
 switch. So the table answers two questions the bodies cannot -- which arm each
 index takes, and how many indices share one. Read it every time.
 
+**A THIRD failure mode: an arm that ENDS INSIDE ANOTHER.** `UnitKindMatches`
+kind 3 does two tests and then `jmp`s into kind 4's fourth test to share its
+epilogue, so the `n*10+12` code sits in kind 4's body and kind 3 never reaches
+it -- reading the bodies top to bottom gives kind 3 four candidates when it
+has three. `PlacementAllowed` arm 16 does the same in the other direction: it
+pushes its three arguments and jumps into the middle of arm 15 to make the
+call. Two in one session. The jump table does not show this at all; only
+following every branch out of an arm does.
+
+**And a fourth, which is not about the table: AN ARM CAN BE UNREADABLE FROM
+ITS OWN BODY.** `PlacementAllowed`'s five vehicle arms pass MaskBlockWeight
+kinds 1, 0, 2, 3, 5 in table order, which is the WeaponClassOf shape exactly
+-- and is not that at all. Each arm passes ITS OWN `ADDR_UNIT_TYPES` record's
++0x08 field, and the apparent scramble is the table's, not the switch's. One
+`am2.Image.read` of eighteen records distinguished the two readings; no amount
+of staring at the arms would have. **When a switch is indexed by a table the
+image ships, DUMP THE TABLE before writing anything down about the order.**
+
+That same dump settled three other things for free: why `SpriteKeyForKind`
+and `UnitKindMatches` share arm zero three ways (riflepill, bazookapill and
+mgpill are one sprite set), which record each building arm belongs to, and
+that `ADDR_TILE_KIND`'s per-tile byte is `(army + 1) * 0x10`.
+
 **States 0 and 3 check the same two flags in opposite orders.** State 0 tests
 "leaving" first and state 3 tests "entering" first, so a state entered and left
 in the same frame runs its entry action in 3 and not in 0. Reproduced rather
