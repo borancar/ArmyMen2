@@ -1625,6 +1625,14 @@ int32_t __cdecl PointerPickWatchedItem(void *obj);
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);
 
+/* 0x00458B50, 0x00458C00, 0x00458CB0 and 0x00458E30. The same handler for one
+ * weapon kind each; the sweeper is the one that leaves UNIT_OFF_FIRE_MODE
+ * alone, and 0x00458CB0 has an extra guard on the unit's soldier kind. */
+void __cdecl SetWeaponTargetMedic(void *target, uint32_t at);
+void __cdecl SetWeaponTargetWrench(void *target, uint32_t at);
+void __cdecl SetWeaponTargetKind2A(void *target, uint32_t at);
+void __cdecl SetWeaponTargetSweeper(void *target, uint32_t at);
+
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */
 void __cdecl HudMessage(const char *text, int32_t colour);

@@ -980,9 +980,19 @@
 /* 0x00458D70, column 1 of the four weapon-handler records at 0x00489AB0..AE0 --
  * ADDR_SET_WEAPON_TARGET's sibling, for the kinds below. */
 #define ADDR_SET_WEAPON_TARGET_AIMED 0x00458D70u /* void(void *, uint32_t) */
-/* The weapon kinds those four records cover, re-checked inside the handler. */
-#define AM2_WEAPON_KIND_AIMED_LO 0x23
-#define AM2_WEAPON_KIND_AIMED_HI 0x26
+/* Its four siblings, same table column, one kind each. Transcribed from a diff
+ * against 0x00458D70 rather than read separately -- see widget.cpp. */
+#define ADDR_SET_WEAPON_TARGET_MEDIC   0x00458B50u /* void(void *, uint32_t) */
+#define ADDR_SET_WEAPON_TARGET_WRENCH  0x00458C00u
+#define ADDR_SET_WEAPON_TARGET_KIND2A  0x00458CB0u
+#define ADDR_SET_WEAPON_TARGET_SWEEPER 0x00458E30u
+/* The weapon kinds those four records cover are AM2_ITEM_KIND_DISG_0..DISG_3,
+ * which were already in this file. They went in here for one commit as
+ * AM2_WEAPON_KIND_AIMED_LO/HI -- a second name for 0x23 and 0x26 under a NEW
+ * prefix, which is the exact blind spot this file describes: checkoffsets
+ * compares within a prefix and has nothing to compare a new one against. Found
+ * by decoding the caption table for the sibling handlers' kinds and seeing the
+ * names already there. Grep the VALUE, not the prefix. */
 /* 0x00459DA0, 320 bytes. Reconstructed as PointerPickBoard. It is the PICK of those four records: refuse a null object,
  * refuse one whose army byte is not ADDR_DEFAULT_OWNER, find our leader
  * through the dead-fallback helper described above, and then two arms.
@@ -7763,6 +7773,11 @@ typedef struct {
 #define AM2_ITEM_KIND_DISG_2     0x25
 #define AM2_ITEM_KIND_DISG_3     0x26
 #define AM2_ITEM_KIND_WREN       0x29
+/* PAST THE CAPTION INDEX TABLE, which is 41 bytes and so covers kinds 0..0x28
+ * only. So this one has no caption to be named from and neither, strictly, does
+ * WREN above it -- that name predates this note and is left alone rather than
+ * re-litigated here. Named for its value. */
+#define AM2_ITEM_KIND_2A         0x2A
 /* +0x04 IS THE UID, and OBJ_OFF_OWNER is a second name on it that this does
  * not resolve. TrooperFire logs the dword there as `trooper: %x` and
  * `weapon: %x`, and TrooperFireSend hands the same field to UidOnWire -- so

@@ -9001,6 +9001,154 @@ static uint8_t *OurLeader(void)
         *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
 }
 
+/* The tail FIVE handlers in this band share, byte for byte: mark the unit
+ * firing, copy its +0x40, set the two ones, aim at ADDR_AIM_X/Y/Z and name the
+ * target. `withMode` is the ONE thing that varies -- 0x00458E30 omits the
+ * UNIT_OFF_FIRE_MODE store the other four make, which is a real difference and
+ * not a compiler artefact: its two instructions are simply absent.
+ *
+ * Factored because the five are identical here and CLAUDE.md's warning is about
+ * flattening differences, not about sharing what is genuinely the same. Every
+ * difference the five have -- the kind test, the extra guard, this flag -- is
+ * at a call site where it can be read.
+ *
+ * IT COSTS THE OFFSET CHECK, THOUGH, AND THAT IS WORTH STATING. checkoffsetuse
+ * scans the NAMED function only, so moving the field writes in here leaves all
+ * five reporting "C names 0" against eleven displacements the original touches
+ * -- the tool cannot see any of it. The tail was checked BEFORE it was
+ * factored, when SetWeaponTargetAimed had it inline: fourteen names against
+ * eleven displacements, agreeing but for the SIB form of UNIT_OFF_INVENTORY,
+ * the zero offset of ITEMTYPE_OFF_KIND, and three int16 stores where the
+ * original does a dword and a word. That measurement is what covers these five,
+ * and it is not repeatable now. Sharing a tail and keeping the tool's coverage
+ * are in tension; this records which was chosen. */
+static void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
+{
+    *(int32_t *)(u + UNIT_OFF_FIRE_ACTIVE) = 1;
+    *(uint8_t *)(u + UNIT_OFF_FIRE_F40)    = *(const uint8_t *)(u + 0x40);
+    *(int32_t *)(u + UNIT_OFF_FIRE_F588)   = 1;
+    *(int32_t *)(u + UNIT_OFF_FIRE_F58C)   = 1;
+
+    *(int16_t *)(u + UNIT_OFF_FIRE_X) = *(const int16_t *)(uintptr_t)ADDR_AIM_X;
+    *(int16_t *)(u + UNIT_OFF_FIRE_Y) = *(const int16_t *)(uintptr_t)ADDR_AIM_Y;
+    *(int16_t *)(u + UNIT_OFF_FIRE_Z) = *(const int16_t *)(uintptr_t)ADDR_AIM_Z;
+
+    *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
+        *(const uint32_t *)((const uint8_t *)target + OBJ_OFF_UID);
+
+    if (withMode)
+        *(int32_t *)(u + UNIT_OFF_FIRE_MODE) =
+            *(const int32_t *)(u + OBJ_OFF_POSE);
+}
+
+/* The unit ADDR_WEAPON_OWNER_ID names and the kind of the weapon it holds, or
+ * NULL. The five handlers all open with this and then test the kind. */
+static uint8_t *AimedFireUnit(int32_t *kind)
+{
+    uint8_t       *u;
+    const uint8_t *weapon;
+
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!u)
+        return (uint8_t *)0;
+    if (!ObjIsType2((const AM2_Object *)u))
+        return (uint8_t *)0;
+
+    weapon = (const uint8_t *)WeaponByUid(
+        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+    if (!weapon)
+        return (uint8_t *)0;
+
+    *kind = *(const int32_t *)
+        (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+         + ITEMTYPE_OFF_KIND);
+    return u;
+}
+
+/* FOUR MORE COLUMN-1 HANDLERS, and they were transcribed from a DIFF rather
+ * than read one at a time. Normalising the five bodies and diffing them against
+ * 0x00458D70 leaves 47-58 instructions each at 0.76-0.84 similarity, and every
+ * difference is one of three things: which kind the handler accepts, one extra
+ * guard on 0x00458CB0, and whether UNIT_OFF_FIRE_MODE is written.
+ *
+ * That is the method CLAUDE.md prescribes for functions that look like one
+ * function twice, and here it turned four separate reads into one diff and four
+ * one-line differences. The kinds come from the caption table, which is the
+ * program's own vocabulary for these numbers.
+ *
+ * The kind test SHAPE differs too and is reproduced: 0x00458D70 takes a RANGE
+ * (DISG_0..DISG_3, four disguises sharing one handler) and these four each take
+ * a single equality. */
+void __cdecl SetWeaponTargetMedic(void *target, uint32_t at)
+{
+    int32_t  kind;
+    uint8_t *u;
+
+    (void)at;
+    if (!target)
+        return;
+    u = AimedFireUnit(&kind);
+    if (!u || kind != AM2_ITEM_KIND_MEDI)
+        return;
+    RecordAimedFire(u, target, 1);
+}
+
+void __cdecl SetWeaponTargetWrench(void *target, uint32_t at)
+{
+    int32_t  kind;
+    uint8_t *u;
+
+    (void)at;
+    if (!target)
+        return;
+    u = AimedFireUnit(&kind);
+    if (!u || kind != AM2_ITEM_KIND_WREN)
+        return;
+    RecordAimedFire(u, target, 1);
+}
+
+/* The only one with an extra refusal, and it sits between the type test and the
+ * weapon lookup: the UNIT's own OBJ_OFF_SOLDIER_KIND must be under 6. */
+void __cdecl SetWeaponTargetKind2A(void *target, uint32_t at)
+{
+    int32_t  kind;
+    uint8_t *u;
+
+    (void)at;
+    if (!target)
+        return;
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!u || !ObjIsType2((const AM2_Object *)u))
+        return;
+    if (*(const int32_t *)(u + OBJ_OFF_SOLDIER_KIND) >= 6)
+        return;
+
+    u = AimedFireUnit(&kind);
+    if (!u || kind != AM2_ITEM_KIND_2A)
+        return;
+    RecordAimedFire(u, target, 1);
+}
+
+/* The minesweeper, and the one that does NOT write UNIT_OFF_FIRE_MODE -- the
+ * two instructions the other four have are absent here, so whatever mode the
+ * unit was in survives the order. */
+void __cdecl SetWeaponTargetSweeper(void *target, uint32_t at)
+{
+    int32_t  kind;
+    uint8_t *u;
+
+    (void)at;
+    if (!target)
+        return;
+    u = AimedFireUnit(&kind);
+    if (!u || kind != AM2_ITEM_KIND_MSWP)
+        return;
+    RecordAimedFire(u, target, 0);
+}
+
 /* SetWeaponTargetAimed -- original 0x00458D70, 192 bytes. Column 1 -- the
  * ACTION -- of four consecutive weapon-handler records at 0x00489AB0..0x00489AE0,
  * whose column 0 is PointerPickBoard above.
@@ -9058,23 +9206,11 @@ void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
             (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
              + ITEMTYPE_OFF_KIND);
 
-        if (kind < AM2_WEAPON_KIND_AIMED_LO || kind > AM2_WEAPON_KIND_AIMED_HI)
+        if (kind < AM2_ITEM_KIND_DISG_0 || kind > AM2_ITEM_KIND_DISG_3)
             return;
     }
 
-    *(int32_t *)(u + UNIT_OFF_FIRE_ACTIVE) = 1;
-    *(uint8_t *)(u + UNIT_OFF_FIRE_F40)    = *(const uint8_t *)(u + 0x40);
-    *(int32_t *)(u + UNIT_OFF_FIRE_F588)   = 1;
-    *(int32_t *)(u + UNIT_OFF_FIRE_F58C)   = 1;
-
-    *(int16_t *)(u + UNIT_OFF_FIRE_X) = *(const int16_t *)(uintptr_t)ADDR_AIM_X;
-    *(int16_t *)(u + UNIT_OFF_FIRE_Y) = *(const int16_t *)(uintptr_t)ADDR_AIM_Y;
-    *(int16_t *)(u + UNIT_OFF_FIRE_Z) = *(const int16_t *)(uintptr_t)ADDR_AIM_Z;
-
-    *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
-        *(const uint32_t *)((const uint8_t *)target + OBJ_OFF_UID);
-    *(int32_t *)(u + UNIT_OFF_FIRE_MODE) =
-        *(const int32_t *)(u + OBJ_OFF_POSE);
+    RecordAimedFire(u, target, 1);
 }
 
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
@@ -10432,6 +10568,18 @@ int widget_install(void)
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);
+    rc |= patch_replace(ADDR_SET_WEAPON_TARGET_MEDIC,
+                        (const void *)SetWeaponTargetMedic,
+                        "SetWeaponTargetMedic", 1);
+    rc |= patch_replace(ADDR_SET_WEAPON_TARGET_WRENCH,
+                        (const void *)SetWeaponTargetWrench,
+                        "SetWeaponTargetWrench", 1);
+    rc |= patch_replace(ADDR_SET_WEAPON_TARGET_KIND2A,
+                        (const void *)SetWeaponTargetKind2A,
+                        "SetWeaponTargetKind2A", 1);
+    rc |= patch_replace(ADDR_SET_WEAPON_TARGET_SWEEPER,
+                        (const void *)SetWeaponTargetSweeper,
+                        "SetWeaponTargetSweeper", 1);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,

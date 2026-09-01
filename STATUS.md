@@ -9,7 +9,33 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,400 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,404 patches**, **30** analysis tools in `make check`.
+
+**Four more weapon-handler actions** -- `0x00458B50`, `0x00458C00`,
+`0x00458CB0`, `0x00458E30` -- **transcribed from a DIFF rather than read one at
+a time.** Normalising the five bodies against `SetWeaponTargetAimed` leaves
+47-58 instructions each at 0.76-0.84 similarity, and every difference is one of
+three things: which weapon kind the handler accepts, one extra guard on
+`0x00458CB0` (the unit's own `OBJ_OFF_SOLDIER_KIND` must be under 6), and
+whether `UNIT_OFF_FIRE_MODE` is written -- the sweeper's two instructions for
+that are simply absent, so whatever mode the unit was in survives the order.
+
+**The kind test's SHAPE differs too**: the parent takes a RANGE, four disguises
+sharing one handler, and these four each take a single equality.
+
+**And the diff caught a duplicate I had introduced one commit earlier.**
+`AM2_WEAPON_KIND_AIMED_LO/HI` were a second name for 0x23 and 0x26 under a NEW
+prefix, while `AM2_ITEM_KIND_DISG_0..DISG_3` were already in the file --
+precisely the blind spot `CLAUDE.md` describes, since `checkoffsets` compares
+within a prefix and has nothing to compare a new one against. Retired. Grep the
+VALUE, not the prefix.
+
+**Factoring the shared tail costs the offset check, and that is a real
+trade-off.** `checkoffsetuse` scans the named function only, so all five now
+report "C names 0" against eleven displacements. The tail was checked *before*
+it was factored, when the parent had it inline -- fourteen names against eleven,
+agreeing but for documented forms -- and that measurement is what covers these
+five. It is not repeatable now.
 
 **`SetWeaponTargetAimed` (`0x00458D70`, 192 B) is reconstructed**, and reading
 it settled two older things.
@@ -109,7 +135,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,357 of 1,530 real functions, 79.9% of sub-CRT bytes
+    split-aware      1,361 of 1,530 real functions, 80.1% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -120,9 +146,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,400 patched addresses, and
-**89.5% of the sub-CRT bytes**. Split-aware that is **1,357 of 1,530** real
-functions and **79.9%** of the bytes; see the section above. That figure counts merged entries generously and is a
+outstanding, which is 1,239 minus 1,220 -- from 1,404 patched addresses, and
+**89.5% of the sub-CRT bytes**. Split-aware that is **1,361 of 1,530** real
+functions and **80.1%** of the bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
