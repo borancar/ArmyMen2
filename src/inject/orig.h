@@ -5111,7 +5111,36 @@ typedef struct {
                                                * then GetCurrentDirectoryA */
 #define ADDR_CRT_FREE            0x004646A9u
 #define ADDR_SCRIPT_DECLARE_VAR  0x0043F7A0u  /* handle(const char *, kind, init) */
-#define ADDR_SCRIPT_FIND_FILE    0x00421890u  /* probes <map><n>.txt via _findfirst */
+/* MissionEnded, and it was ADDR_SCRIPT_FIND_FILE -- a name from the one thing
+ * anybody had looked at, the "%s%d.txt" it builds. Probing for the next
+ * sub-mission is its FIRST test and not its job: past that it advances the
+ * campaign, saves the platoon to save\default.cof, unlocks a movie in
+ * Options.cfg, picks the film to play and asks for the state that plays it.
+ * Renamed, not aliased.
+ *
+ * ITS ONE ARGUMENT IS "LOST", and the paths are what say so: zero with a level
+ * in hand takes the advance, and anything else takes the arm that chooses one
+ * of three loss movies. */
+#define ADDR_MISSION_ENDED       0x00421890u  /* void(int32_t lost) */
+/* The two the record carries for it, and the field the campaign's movie
+ * unlock is maxed from. The trio at +0x104 is three 0x40-byte names picked
+ * from at random; +0xC4 is the single one a win plays. */
+#define LEVEL_OFF_WIN_MOVIE      0x0C4u  /* char[0x40] */
+#define LEVEL_OFF_LOSE_MOVIES    0x104u  /* char[3][0x40] */
+#define LEVEL_OFF_MOVIE_INDEX    0x308u  /* int32_t, maxed into ADDR_MOVIE_COUNT */
+#define AM2_LOSE_MOVIE_COUNT     3
+#define AM2_LEVEL_STR_BYTES      0x40u  /* the record's string field size */
+/* The probe buffer MissionEnded builds "<tileset><n>.txt" in, and the
+ * _finddata_t beside it. Both are the original's stack sizes, taken off the
+ * `sub esp, 0x218` and the two `lea`s into it. */
+#define AM2_LEVEL_PROBE_BUF      0x10
+#define AM2_FIND_DATA_BYTES      0x110
+#define ADDR_STR_GRAVE_MOVIE     0x00478810u /* "grave", the fallback */
+#define ADDR_STR_LEVEL_FILE_FMT  0x00478818u /* "%s%d.txt" */
+/* What the loss path leaves in ADDR_MENU_REQUEST. Nothing else in the image
+ * writes it, and the dispatch table's arms stop at 0x15, so this is a request
+ * the menu router will not recognise -- reproduced without an explanation. */
+#define AM2_MENU_REQUEST_LOST    0x12u
 
 /* ReadScript names itself: "ReadScript: Could not open %s for ...". It fopen's
  * the file, fgets a line at a time, tokenises, and dispatches on the first

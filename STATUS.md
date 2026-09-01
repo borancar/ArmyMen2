@@ -9,7 +9,42 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,375 patches.**
+Nothing uncommitted. **1,376 patches.**
+
+**`MissionEnded` (`0x00421890`)** -- and it was `ADDR_SCRIPT_FIND_FILE`, a name
+taken from the one thing anybody had looked at: the `"%s%d.txt"` it builds.
+Probing for the next sub-mission is its FIRST test, not its job. Past that it
+advances the campaign, saves the platoon to `save\default.cof`, unlocks a movie
+in `Options.cfg`, picks the film and asks for the state that plays it.
+
+**Its argument is "lost"**, and the paths are what say so: zero with a level in
+hand takes the advance; anything else takes the arm that chooses one of three
+loss movies and leaves an unrecognised menu request behind.
+
+**Three endings, and the first ignores the argument entirely.** With
+`ADDR_WIN_ENABLED` set it probes for the next sub-script and queues it, won or
+lost. Reproduced; the flag is written by the win condition, so reaching that
+arm with `lost` set may be unreachable rather than wrong, and the note says
+which of those is established.
+
+**The same probe appears TWICE and the two tails differ** -- the first falls
+through to "the campaign is over", the second to the next LEVEL. Written out
+twice as the original has it, because a shared helper would need a flag to say
+which tail it wanted.
+
+**It picks a loss movie by the CLOCK and retries until it gets one.**
+`ADDR_GAME_CLOCK_MS` modulo three chooses among the record's three names and
+the loop repeats while the slot is empty -- a busy-wait on a ticking global
+rather than a scan of three strings. It terminates because the arm is only
+entered when the first name is non-empty. An empty result falls back to
+`"grave"`.
+
+**The movie unlock is a MAXIMUM and it is written through**: whenever the level
+record's index exceeds `ADDR_MOVIE_COUNT` the global rises and `Options.cfg` is
+rewritten there and then, so the viewer's list grows as a mission ends rather
+than at a save point.
+
+`checkoffsetuse` says **sets agree** on all three displacements.
 
 **`DirtyCollect` (`0x0041DD90`)** -- the dirty-rectangle collector, three
 callers, all row code. `orig.h` said "Stays original" of it.
@@ -4238,14 +4273,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,203 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 36
-outstanding, which is 1,239 minus 1,203 -- from 1,375 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,204 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 35
+outstanding, which is 1,239 minus 1,204 -- from 1,376 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-two batches have gone in and NOTHING SMALL IS LEFT: the
-36 entries outstanding start at **928 bytes** and the median is **1,272**. The
+small ones in batches. A hundred and forty-three batches have gone in and NOTHING SMALL IS LEFT: the
+35 entries outstanding start at **928 bytes** and the median is **1,280**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

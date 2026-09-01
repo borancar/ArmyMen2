@@ -563,4 +563,10 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at);
  * those whose field A matches -- to one target object. */
 void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid);
 
+/* 0x00421890, one caller -- AdvanceMission's single-player arm. End a
+ * mission: chain to the next sub-script if one exists, otherwise advance the
+ * campaign, save the platoon, unlock a movie and ask for the state that plays
+ * it. Its argument is "lost". Was ADDR_SCRIPT_FIND_FILE. */
+void __cdecl MissionEnded(int32_t lost);
+
 #endif /* AM2_EVENT_H */

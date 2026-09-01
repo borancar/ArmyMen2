@@ -1906,9 +1906,187 @@ void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
 /* ------------------------------------------------ cond tests ---- */
 
 typedef int32_t (__cdecl *AM2_EvalOperandFn)(int32_t a, int32_t b, int32_t c);
-typedef void (__cdecl *AM2_MissionLocalFn)(int32_t a);
 typedef void (__cdecl *AM2_MissionNetFn)(int32_t a, int32_t b);
-#define orig_mission_local  (*(AM2_MissionLocalFn)AM2_IMAGE(ADDR_SCRIPT_FIND_FILE))
+typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *spec, void *data);
+typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t handle);
+#define orig_findfirst (*(AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findclose (*(AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+/* MissionEnded is reconstructed below and called by name; its typedef went
+ * with the seam. */
+#define orig_mission_local  MissionEnded
+
+/* MissionEnded -- original 0x00421890, one caller: AdvanceMission, which is
+ * the single-player arm of the mission-end router.
+ *
+ * IT WAS ADDR_SCRIPT_FIND_FILE, and that name came from the one thing anybody
+ * had looked at: the "%s%d.txt" it builds. Probing for the next sub-mission is
+ * its FIRST test and not its job. Past that it advances the campaign, saves
+ * the platoon to save\default.cof, unlocks a movie in Options.cfg, picks the
+ * film and asks for the state that plays it. Sixth or seventh instance of a
+ * name taken from one observation rather than the body.
+ *
+ * ITS ARGUMENT IS "LOST" and the paths are what say so: zero with a level in
+ * hand takes the advance; anything else takes the arm that chooses one of
+ * three loss movies and leaves AM2_MENU_REQUEST_LOST behind.
+ *
+ * THREE ENDINGS, AND THE FIRST IGNORES THE ARGUMENT ENTIRELY. With
+ * ADDR_WIN_ENABLED set it probes for "<tileset><n+1>.txt" and, if that exists,
+ * simply queues it and bumps the index -- won or lost. That asymmetry is the
+ * original's and is not obviously deliberate; the flag is written by the win
+ * condition, so reaching this arm with `lost` set may be unreachable rather
+ * than wrong.
+ *
+ * THE SAME PROBE APPEARS TWICE, once in that arm and once in the advance, and
+ * the two are not quite the same: the first falls through to "the campaign is
+ * over" when the file is missing, the second falls through to the next LEVEL.
+ * Written out twice, as the original has it, rather than factored -- the two
+ * tails differ and a shared helper would have to carry a flag to say which.
+ *
+ * IT PICKS A LOSS MOVIE BY THE CLOCK AND RETRIES UNTIL IT GETS ONE.
+ * ADDR_GAME_CLOCK_MS modulo three chooses among the record's three names and
+ * the loop repeats while the chosen slot is empty -- so it spins on a ticking
+ * global rather than scanning the three. It terminates because the arm is only
+ * entered when the first of the three is non-empty, and the clock reaches 0
+ * eventually; but it is a busy-wait on a clock and worth saying so. An empty
+ * result after all that falls back to "grave".
+ *
+ * THE MOVIE UNLOCK IS A MAXIMUM AND IT IS WRITTEN THROUGH. Whenever the
+ * record's index exceeds ADDR_MOVIE_COUNT the global rises and Options.cfg is
+ * rewritten immediately -- so the viewer's list grows at the moment a mission
+ * ends rather than at a save point.
+ */
+void __cdecl MissionEnded(int32_t lost)
+{
+    char     path[AM2_LEVEL_PROBE_BUF];
+    char     found[AM2_FIND_DATA_BYTES];
+    int32_t  h;
+    uint8_t *rec;
+    uint8_t *next;
+    int32_t  movie = 0;
+
+    *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS = 0;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
+        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+        am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_LEVEL_FILE_FMT),
+                    (const char *)(uintptr_t)ADDR_TILESET_NAME,
+                    *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
+
+        h = orig_findfirst(path, found);
+        if (h != -1) {
+            orig_findclose(h);
+            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
+            strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
+            *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
+            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
+            return;
+        }
+
+        rec = (uint8_t *)FindLevelRecord(
+                  *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+        if (!rec) {
+            RequestState(1);
+            return;
+        }
+
+        if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
+            strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+                   (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
+            movie = 1;
+        }
+        if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
+            > *(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT) {
+            *(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT =
+                *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
+            SaveOptions();
+        }
+        if (!movie) {
+            RequestState(1);
+            return;
+        }
+
+        RequestState(3);
+        *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
+        return;
+    }
+
+    if (!lost && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 0) {
+        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+        am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_LEVEL_FILE_FMT),
+                    (const char *)(uintptr_t)ADDR_TILESET_NAME,
+                    *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
+
+        h = orig_findfirst(path, found);
+        if (h != -1) {
+            orig_findclose(h);
+            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
+            strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
+            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
+            return;
+        }
+
+        rec = (uint8_t *)FindLevelRecord(
+                  *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+        if (rec) {
+            if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
+                strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+                       (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
+                movie = 1;
+            }
+            if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
+                > *(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT) {
+                *(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT =
+                    *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
+                SaveOptions();
+            }
+        }
+
+        next = (uint8_t *)FindLevelRecord(
+                   *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID + 1);
+        SaveDefaultCof();
+
+        *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX   = 1;
+        *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     += 1;
+        *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
+        SelectLevel(next);
+
+        if (movie) {
+            RequestState(3);
+            *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = (next != 0) + 1;
+            return;
+        }
+        if (next) {
+            RequestState(2);
+            return;
+        }
+        RequestState(1);
+        return;
+    }
+
+    /* ---- lost, or no level in hand ---- */
+    rec = (uint8_t *)FindLevelRecord(
+              *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+    *(char *)(uintptr_t)ADDR_MOVIE_TO_PLAY = '\0';
+
+    if (rec && strlen((const char *)(rec + LEVEL_OFF_LOSE_MOVIES))) {
+        do {
+            uint32_t pick = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                            % AM2_LOSE_MOVIE_COUNT;
+
+            strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+                   (const char *)(rec + LEVEL_OFF_LOSE_MOVIES
+                                  + pick * AM2_LEVEL_STR_BYTES));
+        } while (*(const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY == '\0');
+    }
+
+    if (!strlen((const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY))
+        strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+               (const char *)AM2_IMAGE(ADDR_STR_GRAVE_MOVIE));
+
+    RequestState(3);
+    *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
+    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = AM2_MENU_REQUEST_LOST;
+}
 
 /* 0x00421750. Evaluate an `if`'s testvar comparisons. All must pass; a
  * condition with none passes trivially.
@@ -2658,6 +2836,8 @@ int event_install(void)
                         "ScriptSetObjTable", 1);
     rc |= patch_replace(ADDR_EVAL_COND_TESTS, (const void *)EvalCondTests,
                         "EvalCondTests", 6);
+    rc |= patch_replace(ADDR_MISSION_ENDED, (const void *)MissionEnded,
+                        "MissionEnded", 1);
     rc |= patch_replace(ADDR_ADVANCE_MISSION, (const void *)AdvanceMission,
                         "AdvanceMission", 2);
     rc |= patch_replace(ADDR_ACTION_POINT, (const void *)ActionPoint,
