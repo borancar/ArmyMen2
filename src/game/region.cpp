@@ -1613,10 +1613,18 @@ static void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx)
  * and uses HIGH[k] and LOW[k], so the pixel exactly on a 16-unit boundary is
  * credited to the tile on its left. Where `left` is a multiple of 8 there is no
  * straddle at all and k is 8, which walks HIGH off its own eight entries into
- * LOW's first (0x7F) and LOW off its own into the eight 0xFF bytes that follow
- * -- so that byte marks the next tile whenever it holds anything. One pixel of
- * tile attribution, on a grid that is then dilated by a 5x5 ring, which is
+ * LOW's first (0x7F) and LOW off its own into ADDR_REGION_SEARCH_STATE -- so
+ * that byte marks the next tile whenever it holds anything. One pixel of tile
+ * attribution, on a grid that is then dilated by a 5x5 ring, which is
  * presumably why nobody ever saw it.
+ *
+ * THIS COMMENT SAID THE OVERRUN LANDS IN A THIRD ALL-ONES TABLE, and it does
+ * not. Eight 0xFF bytes sitting exactly where the overrun reaches make a tidy
+ * story -- someone noticed and padded -- and the truth is duller: 0x00487824
+ * is an ordinary int32_t belonging to RegionFindPath, which is -1 in the image
+ * and only ever written -1, so the byte read is 0xFF by coincidence of layout.
+ * Corrected after reading that function; a table's EXTENT wants a second
+ * toucher the same way a struct's layout does.
  *
  * THE ROW STRIDE IS COMPUTED FROM THE CLAMPED EXTENT, not from the width
  * field, and it rounds `right - left` rather than `width`. misc.cpp's

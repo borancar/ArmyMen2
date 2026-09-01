@@ -1585,13 +1585,29 @@
  * earlier. Which is the whole of the mask walk, and it is not read. */
 #define ADDR_TILEMASK_NEIGHBOURS 0x00554B84u  /* int32_t[20], built per call */
 #define AM2_TILEMASK_RING        20   /* the 5x5 block less its corners and centre */
-/* Three eight-entry tables laid end to end, and the index runs 1..8 into each,
- * so BOTH walk one past their own into the next. HIGH is 80 C0 E0 ... FF, LOW
- * is 7F 3F 1F ... 00, and the eight bytes after LOW are all FF -- which is
- * what the second read lands on when the split index is 8. See the walk in
- * ObjHitMaskAction for why the index is one past the entry the split wants. */
-#define ADDR_BIT_FROM_N          0x00487814u  /* uint8_t[24]: HIGH, LOW, ALL */
+/* TWO eight-entry tables laid end to end, and the index runs 1..8 into each,
+ * so BOTH walk one past their own. HIGH is 80 C0 E0 ... FF and LOW is
+ * 7F 3F 1F ... 00; index 8 into HIGH reads LOW's first entry (0x7F) and index
+ * 8 into LOW reads whatever is at 0x00487824. See ObjHitMaskAction for why the
+ * index is one past the entry the split wants.
+ *
+ * IT WENT IN AS *THREE* TABLES AND THAT WAS WRONG. The eight 0xFF bytes past
+ * LOW read as a deliberate all-ones table sized to absorb exactly that
+ * overrun, which is a tidy story and not what they are: 0x00487824 is a plain
+ * int32_t that RegionFindPath reads and WRITES -- ADDR_REGION_SEARCH_STATE
+ * below. It is -1 in the image and the only value ever stored is -1, so the
+ * byte the overrun reads really is 0xFF; but that is where a global happens to
+ * sit, not a table anyone laid out. Found by reading the OTHER toucher, which
+ * is the rule this file states for layouts and applies just as well to a
+ * table's extent. */
+#define ADDR_BIT_FROM_N          0x00487814u  /* uint8_t[16]: HIGH then LOW */
 #define AM2_BIT_FROM_N_LOW       8    /* what to add for the second half-byte */
+/* 0x00487824, touched only by RegionFindPath, which compares it against -1 to
+ * choose between starting a search and resuming one -- and whose only write to
+ * it is -1. So the resume arm cannot be reached: nothing in the image can put
+ * any other value there. Recorded rather than acted on; it is the same
+ * standing as the copy-protection branches. */
+#define ADDR_REGION_SEARCH_STATE 0x00487824u  /* int32_t, always -1 */
 /* The per-object hit bitmask OBJ_OFF_HIT_MASK points at. Four int16s and a
  * pointer; the rows run TOP-DOWN and the row stride is the width in bits
  * rounded up to a dword. misc.cpp's ObjMaskBitAt reads the same record. */
