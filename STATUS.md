@@ -5,41 +5,44 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `ad5a3d5`. Working tree clean.
+Last updated: **2026-09-02**, at `8318011`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,396 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,397 patches**, **30** analysis tools in `make check`.
 
-**`PointerDropItem` (`0x00458A20`, 144 B) is reconstructed** -- the ACTION slot
-of pointer mode 3: drop whatever our leader is holding.
+**`PointerSelect` (`0x00458ED0`, 16 B) is reconstructed** -- the ACTION slot of
+pointer mode 0, sixteen bytes that drop the point and hand the object to
+`SelectIfOwn`, which `item.cpp` already had.
 
-**It identifies one of the fire-once modes `SetPointerMode` could not name.**
-That function's comment says its two fire-once records and every mode above 0
-are verified by reading; mode 3's record is `pick = 0, f14 = 0, action = this`,
-which is exactly its guard -- so `SetPointerMode(3)` never becomes a cursor
-state, it runs this immediately with a null object and the zero point. Which
-makes this function's own closing `SetPointerMode(0)` redundant: two
-independent resets, neither able to observe the other. Reproduced.
+**It is the one member of this family that actually runs**, and that is
+measured: three clicks on Sarge in a live Boot Camp mission give
+`PointerSelect=3`. So this is what happens when the player selects a unit.
+`SelectIfOwn` reads 0 beside it because this now calls it by name -- the blind
+spot, and itself confirmation the chain is ours. **The A/B does not compare
+it**: `bootcamp` and `campaign` both stop at a dialog and neither clicks a
+unit, so their clean runs say only that nothing else regressed.
 
-**Its search loop cannot run, and it is NOT a binary patch.** The function
-compares `ADDR_DEFAULT_OWNER` against itself -- `3b c0`, two bytes, so nothing
-was overwritten the way `docs/binarypatches.md`'s six were. The source compared
-a local against the global it had just been assigned from and VC6 folded the
-second load. Everything behind the `jne` is dead: a walk of that army's object
-list for the first live type-2 object with `OBJ_OFF_SARGE` set. Transcribed
-anyway, and written as a local compared against the global -- both what the
-source must have said and the only spelling a compiler takes without a
-tautological-compare warning.
+## The pointer-mode family shares a dead helper, eight times over
 
-**And the dead arm is where the null check is.** It sets the object to NULL and
-falls into the inventory read; the live path dereferences the uid lookup with
-no check at all, so a leader that has just died takes the game down. The
-original's.
+Worth having written down before the rest of that band is transcribed, because
+it is a third of the bytes in some of those functions and none of it can run.
 
-`checkoffsetuse` reports the offset sets agree exactly. A/B clean on `bootcamp`
-and `campaign`; the function is not reachable by any drive here, so that says
-only that nothing else regressed.
+Every pointer-mode handler needs the unit the player commands, and they all get
+it from the same inlined block: read `ADDR_DEFAULT_OWNER`, and if it differs
+from `ADDR_DEFAULT_OWNER` scan that army's object list for the first live
+type-2 object with `OBJ_OFF_SARGE` set, otherwise `LookupByUID` on
+`ADDR_OUR_LEADER_UID`. VC6 folds the second load, so the compare is
+`cmp eax, eax` and the scan is unreachable.
+
+A byte scan finds **eight** sites -- `0x00457E61`, `0x00457F7F`, `0x00458A20`,
+`0x00458ACB`, `0x00459534`, `0x004598C0`, `0x00459B12`, `0x00459F0C` -- and
+there are more where the load sits further from the compare.
+
+**None of them is a binary patch.** The compare is two bytes, so nothing was
+overwritten the way `docs/binarypatches.md`'s six were; this is one source
+construct compiled the same way everywhere. And the NULL check lives inside the
+dead arm, so every one of these dereferences the uid lookup unguarded.
 
 ## Read the split-aware figure, not the entry one
 
@@ -49,7 +52,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,353 of 1,530 real functions, 79.7% of sub-CRT bytes
+    split-aware      1,354 of 1,530 real functions, 79.7% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -60,8 +63,8 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,396 patched addresses, and
-**89.5% of the sub-CRT bytes**. Split-aware that is **1,353 of 1,530** real
+outstanding, which is 1,239 minus 1,220 -- from 1,397 patched addresses, and
+**89.5% of the sub-CRT bytes**. Split-aware that is **1,354 of 1,530** real
 functions and **79.7%** of the bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 

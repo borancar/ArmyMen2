@@ -907,10 +907,40 @@
 #define ADDR_POINTER_MODES     0x004761B8u  /* 7 records of 40 bytes */
 #define AM2_POINTER_MODE_SIZE  40
 #define AM2_POINTER_MODES      7
+/* AN INLINED "OUR LEADER" HELPER WHOSE FALLBACK IS DEAD, EIGHT TIMES OVER.
+ *
+ * The pointer-mode handlers all need the unit the player is commanding, and
+ * they all get it from the same inlined block:
+ *
+ *     owner = ADDR_DEFAULT_OWNER;
+ *     if (owner != ADDR_DEFAULT_OWNER)   -- scan that army's object list for
+ *                                           the first live type-2 object with
+ *                                           OBJ_OFF_SARGE set
+ *     else                               -- LookupByUID(ADDR_OUR_LEADER_UID)
+ *
+ * VC6 folds the second load, so the compare becomes `cmp eax, eax` and the
+ * scan can never run. A byte scan for that load followed by that compare finds
+ * EIGHT sites -- 0x00457E61, 0x00457F7F, 0x00458A20, 0x00458ACB, 0x00459534,
+ * 0x004598C0, 0x00459B12, 0x00459F0C -- and there are more where the load sits
+ * further from the compare.
+ *
+ * NONE OF THEM IS A BINARY PATCH. The compare is two bytes, so nothing was
+ * overwritten in place the way docs/binarypatches.md's six were; this is one
+ * source-level construct compiled the same way everywhere it appears.
+ *
+ * Worth having written down before the rest of this family is transcribed: the
+ * scan is a third of the bytes in some of these functions and none of it can
+ * execute, and the NULL check lives inside it, so every one of these
+ * dereferences the uid lookup unguarded. */
 /* 0x00458A20: mode 3's action, and mode 3 is one of the fire-once records --
  * pick and f14 both zero, so SetPointerMode runs it rather than installing it.
  * Reconstructed as PointerDropItem. */
 #define ADDR_POINTER_DROP_ITEM 0x00458A20u  /* void(void *obj, uint32_t at) */
+/* 0x00458ED0: mode 0's action -- sixteen bytes that drop the second argument
+ * and forward the first to SelectIfOwn. Mode 0 is the DEFAULT pointer mode and
+ * the one SetPointerMode's note records a driven mission actually reaching, so
+ * unlike the rest of this family it is on a live path. */
+#define ADDR_POINTER_SELECT    0x00458ED0u  /* void(void *obj, uint32_t at) */
 #define MODE_OFF_PICK          0x00u  /* int32(obj) -- may the pointer take it */
 #define MODE_OFF_ACTION        0x04u  /* void(obj, packed point) on release */
 #define MODE_OFF_OVERLAY       0x0Cu  /* OverlayPrepare's row, 0..0x12 */

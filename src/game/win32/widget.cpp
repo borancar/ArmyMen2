@@ -8962,6 +8962,32 @@ void __cdecl HudMessage(const char *text, int32_t colour)
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
 typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
 
+/* PointerSelect -- original 0x00458ED0, sixteen bytes, and its only reference
+ * is the ACTION slot of pointer mode 0. Drop the point and hand the object to
+ * SelectIfOwn, which item.cpp already has.
+ *
+ * MODE 0 IS THE DEFAULT AND THIS ONE ACTUALLY RUNS, which is measured rather
+ * than argued from the table. Three clicks on Sarge in a live Boot Camp
+ * mission give `PointerSelect=3` -- one per click -- so this is what happens
+ * when the player selects a unit, and it is the only member of this family
+ * with a counter that moves. SelectIfOwn reads 0 beside it, because this now
+ * calls it by name; that zero is the blind spot and is itself confirmation the
+ * chain is ours.
+ *
+ * THE A/B DOES NOT COMPARE IT, though, and that is worth separating from the
+ * liveness. `bootcamp` and `campaign` both stop at a dialog and neither clicks
+ * a unit, so a clean run of those says only that nothing else regressed. What
+ * covers this is the three-call measurement plus reading; comparing it would
+ * need a configuration that clicks on the map.
+ *
+ * The original is a thunk and is written as one. It pushes only the first
+ * argument, which is what says the second is dropped rather than passed on. */
+void __cdecl PointerSelect(void *obj, uint32_t at)
+{
+    (void)at;
+    SelectIfOwn(obj);
+}
+
 /* PointerDropItem -- original 0x00458A20, 144 bytes, and its only reference in
  * the image is the ACTION slot of pointer mode 3 in the table SetPointerMode
  * below indexes. Drop whatever our leader is holding.
@@ -10158,6 +10184,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_DROP_ITEM,
                         (const void *)PointerDropItem,
                         "PointerDropItem", 0);
+    rc |= patch_replace(ADDR_POINTER_SELECT, (const void *)PointerSelect,
+                        "PointerSelect", 0);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,

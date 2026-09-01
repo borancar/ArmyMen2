@@ -1608,6 +1608,10 @@ void __cdecl SetPointerMode(int32_t mode);
  * Both arguments are ignored -- the shape is the slot's, not its own. */
 void __cdecl PointerDropItem(void *obj, uint32_t at);
 
+/* 0x00458ED0. The ACTION slot of pointer mode 0 -- the default mode, and the
+ * one ordinary play reaches: hand the object to SelectIfOwn, drop the point. */
+void __cdecl PointerSelect(void *obj, uint32_t at);
+
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */
 void __cdecl HudMessage(const char *text, int32_t colour);
