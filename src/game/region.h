@@ -151,6 +151,12 @@ void __cdecl RoachAliveStepA(void *obj, void *out);
  * instead, which is why SargeAiStep and TrooperAiStep read 0 in Boot Camp.
  * Its output record is at +0x57C where StepType3's is at +0x578, so the
  * SIGHTCOUT_OFF_ names are relative to the base the caller passes. */
+/* 0x0044AD40, one caller -- StepType2's player arm. What the trooper you are
+ * commanding does each frame: board a claimed vehicle if it is close enough,
+ * otherwise walk toward OBJ_OFF_FIELD_C0, pick the pose the held weapon
+ * wants, and drag every other selected unit along. */
+void __cdecl Type2PlayerStep(void *obj, void *out);
+
 void __cdecl StepType2(void *obj);
 
 /* 0x0045D660, one caller -- ObjFrameStep's type-3 arm. The vehicle's

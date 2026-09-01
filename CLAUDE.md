@@ -2959,7 +2959,20 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **AN ARGUMENT ORDER IN `orig.h` IS A GUESS UNTIL SOMETHING READS THE
+- **A PROBE THAT REDEFINES THE FUNCTION'S NAME ALSO REDEFINES ITS PATCH.** The
+trick that works for a blind counter -- `#define Fn ((FnType)(uintptr_t)ADDR_FN)`
+so the caller goes through the detour -- rewrites the `patch_replace(ADDR_FN,
+(const void *)Fn, ...)` line too, so the address is patched to jump to itself.
+The counter then reads whatever the corrupted stub leaves in the slot: 752
+million, then two billion ten seconds later, which is not a call count of
+anything. Reverted, and the reading stands on the disassembly instead.
+
+The version that worked on `ApplyObjFrame` put the macro in the CALLER'S file,
+where there is no `patch_replace` to catch. **Put the probe macro where the
+call is, never where the install is** -- and treat an implausible counter as a
+broken probe before treating it as a result.
+
+**AN ARGUMENT ORDER IN `orig.h` IS A GUESS UNTIL SOMETHING READS THE
 PROLOGUE, and one of them propagated into a reconstruction and stayed wrong.**
 `ADDR_ENTER_VEHICLE` carried `/* void(vehicle, unit) */`; the unit is first.
 The reconstruction was written from that comment and then written CONSISTENTLY

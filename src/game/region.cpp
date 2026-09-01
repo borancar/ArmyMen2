@@ -13,6 +13,7 @@
 #include "region.h"
 #include "objtype.h"  /* ObjIsType3, ObjIsType8 */
 #include "map.h"      /* TileOfPoint -- reconstructed */
+#include "maprow.h"   /* RowAnimField4 -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- the timeout kill's gate */
 #include "armymsg.h"  /* DamageBroadcast */
 #include "item.h"     /* ObjClearFootprint, ObjClearRoachFootprint */
@@ -3684,6 +3685,189 @@ void __cdecl RoachAliveStepA(void *obj, void *out)
 }
 
 
+/* GetTickCount through the game's own IAT slot, the same seam air.cpp and
+ * commmsg.cpp use: an import of our own would resolve through our IAT, and
+ * this file is flat. */
+typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
+#define orig_get_tick_count \
+    (*(AM2_RegionTickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+
+/* Type2PlayerStep -- original 0x0044AD40, one caller: StepType2's player arm,
+ * which runs when the object is Sarge AND belongs to the default owner. So
+ * this is what the trooper you are commanding does each frame, and none of
+ * the AI below it runs for that object.
+ *
+ * orig.h called it ADDR_STEP2_44AD40 and said outright that the name was "read
+ * off that gate, not off the body, and neither has been read". Read now, and
+ * the part the gate could not hint at is the last third: IT DRAGS THE REST OF
+ * THE SELECTION ALONG.
+ *
+ * FOUR THINGS IN ORDER:
+ *
+ *   BOARD. If OBJ_OFF_UID_56C names a live type 3, board it when it is nearer
+ *   than AM2_BOARD_NEAR, or nearer than AM2_BOARD_FAR if its
+ *   OBJ_OFF_TABLE_REC_KIND is 5. A uid that no longer resolves is cleared and
+ *   the walk goes on. Boarding RETURNS -- nothing below it runs that frame.
+ *
+ *   WALK toward OBJ_OFF_FIELD_C0, which AiKeepRange one file up already reads
+ *   as the destination. Two arms, and their thresholds differ by four: an
+ *   object already walking (OBJ_OFF_FIELD_10C set) stops when it is within
+ *   AM2_AI_REACHED_DIST and reports 1; an object not walking starts only past
+ *   AM2_WALK_START_DIST, re-aims at most every AM2_WALK_TURN_MS, and reports
+ *   2. Reaching for the existing 0xC in both places would have been wrong in
+ *   one of them.
+ *
+ *   POSE. A report of 2 becomes a pose index -- AM2_POSE_INDEX_SPECIAL for one
+ *   weapon code and AM2_POSE_INDEX_DEFAULT for every other -- and that indexes
+ *   ADDR_WEAPON_POSE_FRAMES for an animation id the row is asked about.
+ *
+ *   FOLLOW. If the row has that animation and this object is selected, every
+ *   OTHER selected object that is alive, undestroyed and of type 2, 3 or 8
+ *   either inherits this object's vehicle claim -- ai mode 0 and a move order
+ *   to where the vehicle is -- or is attached to this one with ai mode 3. So
+ *   ordering Sarge somewhere orders the squad.
+ *
+ * THE SAME DISTANCE IS COMPUTED TWICE with the same two arguments, because
+ * the compiler did not fold the boarding test's two branches into one call.
+ * Written as two calls: ApproxDist is pure, so nothing but its counter can
+ * tell, and its counter is blind here anyway -- but the shape is the
+ * original's.
+ *
+ * THE UNNAMED GLOBAL WAS A FIELD OF A NAMED ONE. 0x0048549C is four bytes
+ * past ADDR_MOUSE_PRESS, which orig.h already describes as "three {point,
+ * tick} pairs, one per button", and the write at 0x00426FD7 stores
+ * GetTickCount into it in the instruction after the point. So it is button
+ * zero's tick and the test here is "the last press was more than
+ * AM2_VIEW_SNAP_MS ago". Grepping the ADDRESS found it; grepping for a name
+ * would not have, since it has none.
+ *
+ * THE CONTEXT IS THE WHOLE 0x58-BYTE FRAME. `sub esp, 0x58` is
+ * AM2_SIGHTC_BYTES exactly, the local starts where the four pushes leave it,
+ * and ClassifyByCode74's answer is seeded into its +4 before the walker is
+ * handed it. Nothing in this function reads that field back.
+ *
+ * The follow arm dereferences LookupByUID's answer with no null test, which is
+ * the original's; reproduced.
+ */
+void __cdecl Type2PlayerStep(void *obj, void *out)
+{
+    uint8_t *o    = (uint8_t *)obj;
+    uint8_t *w    = (uint8_t *)out;
+    uint8_t *dest = o + OBJ_OFF_FIELD_C0;
+    uint8_t  ctx[AM2_SIGHTC_BYTES];
+    uint32_t uid;
+    int32_t  frame;
+    int32_t  i;
+
+    /* Into SIGHTC_OFF_LEADER, whose name says a pointer and which takes a
+     * 0/1/2 class code here -- see orig.h. */
+    *(int32_t *)(ctx + SIGHTC_OFF_LEADER) = ClassifyByCode74(obj);
+
+    uid = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+    if (uid) {
+        uint8_t *veh = (uint8_t *)LookupType3ByUID(uid);
+
+        if (!veh) {
+            *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+        } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                              (const AM2_Point *)(veh + OBJ_OFF_POS))
+                       < AM2_BOARD_NEAR
+                   || (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                                  (const AM2_Point *)(veh + OBJ_OFF_POS))
+                           < AM2_BOARD_FAR
+                       && *(const int32_t *)(veh + OBJ_OFF_TABLE_REC_KIND)
+                          == 5)) {
+            EnterVehicle(obj, veh);
+            return;
+        }
+    }
+
+    if (*(const int16_t *)dest != 0) {
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
+            orig_ai_trooper_step(obj, o + OBJ_OFF_SIGHT_OUT_T2, ctx);
+
+            if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                           (const AM2_Point *)dest) < AM2_AI_REACHED_DIST) {
+                *(int32_t *)(w + 8) = 1;
+                *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+            }
+        } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                              (const AM2_Point *)dest)
+                   > AM2_WALK_START_DIST) {
+            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
+                > AM2_WALK_TURN_MS) {
+                uint8_t a = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                         (const AM2_Point *)dest);
+
+                *(uint8_t *)(w + 4) = a;
+                *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)a;
+            }
+            *(int32_t *)(w + 8) = 2;
+        }
+
+        if (!*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
+            *(uint32_t *)dest =
+                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    }
+
+    if (*(const int32_t *)(w + 8) == 2)
+        *(int32_t *)(w + 8) =
+            (HeldWeaponCode(obj) == AM2_POSE_WEAPON_CODE)
+                ? AM2_POSE_INDEX_SPECIAL : AM2_POSE_INDEX_DEFAULT;
+
+    frame = *(const int16_t *)((const uint8_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES)
+                               + (uint32_t)*(const int32_t *)(w + 8) * 4);
+
+    if (RowAnimField4(*(const void *const *)(o + OBJ_OFF_ROWS),
+                      (uint16_t)frame) <= 0)
+        return;
+
+    /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
+     * spells the same two fields as AM2_MousePress, privately. */
+    if (orig_get_tick_count()
+            - ((const uint32_t *)AM2_IMAGE(ADDR_MOUSE_PRESS))[1]
+        > AM2_VIEW_SNAP_MS
+        && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
+        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP  = 1;
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 1;
+    }
+
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED))
+        return;
+
+    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; i++) {
+        uint8_t *other = (uint8_t *)LookupByUID(
+            (*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+
+        if (!other || other == o)
+            continue;
+        if (*(const uint32_t *)(other + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            continue;
+        if (*(const int16_t *)(other + OBJ_OFF_HEALTH) == 0)
+            continue;
+        if (!ObjIsTypeIn238((const AM2_Object *)other))
+            continue;
+        if (*(const int32_t *)(other + OBJ_OFF_FIELD_94) != 0)
+            continue;
+
+        if (ObjIsType2((const AM2_Object *)other)
+            && *(const uint32_t *)(o + OBJ_OFF_UID_56C)) {
+            const uint8_t *veh = (const uint8_t *)LookupByUID(
+                *(const uint32_t *)(o + OBJ_OFF_UID_56C));
+
+            *(int32_t *)(other + OBJ_OFF_AI_MODE) = 0;
+            *(uint32_t *)(other + OBJ_OFF_UID_56C) =
+                *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+            PointActionA(other, *(const uint32_t *)(veh + OBJ_OFF_POS));
+            continue;
+        }
+
+        *(int32_t *)(other + OBJ_OFF_AI_MODE) = 3;
+        ObjAttachTo(other, obj);
+    }
+}
+
 /* PlaySoundAt is reconstructed in win32/audio.cpp, and region.cpp is on the
  * flat side of the split, so it is declared here rather than included -- the
  * same reason script.cpp declares PreloadSprite. Its arguments are all
@@ -3703,7 +3887,7 @@ typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 #define orig_step2_449fd0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_449FD0))
 #define orig_step2_44afb0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_44AFB0))
 #define orig_step2_44a420 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44A420))
-#define orig_step2_44ad40 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44AD40))
+/* Type2PlayerStep is reconstructed below and called by name. */
 #define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
 
 /* StepType2 -- original 0x0044B7D0, one caller: ObjFrameStep's type-2 arm. The
@@ -3847,7 +4031,7 @@ void __cdecl StepType2(void *obj)
         if (!*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A
             && !*(const uint32_t *)(o + OBJ_OFF_RIDING))
             orig_step2_44a420(obj, w, out);
-        orig_step2_44ad40(obj, out);
+        Type2PlayerStep(obj, out);
         goto tail;                     /* 0x0044B9D4 is `jmp 0x0044BA3F` --
                                         * this converges too, and Boot Camp's
                                         * Sarge takes exactly this path */
@@ -4188,6 +4372,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_ROACH_ALIVE_STEP_A,
                         (const void *)RoachAliveStepA,
                         "RoachAliveStepA", 1);
+    rc |= patch_replace(ADDR_TYPE2_PLAYER_STEP, (const void *)Type2PlayerStep,
+                        "Type2PlayerStep", 1);
     rc |= patch_replace(ADDR_STEP_TYPE2, (const void *)StepType2,
                         "StepType2", 1);
     rc |= patch_replace(ADDR_STEP_TYPE3, (const void *)StepType3,

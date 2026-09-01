@@ -6956,7 +6956,40 @@ typedef struct {
  * the function they are called from and their offset: "player control" is read
  * off that gate, not off their bodies, and neither has been read. */
 #define ADDR_STEP2_44A420        0x0044A420u  /* void(obj, weapon, out) */
-#define ADDR_STEP2_44AD40        0x0044AD40u  /* void(obj, out) */
+/* READ NOW, and renamed off its body rather than off the gate that reaches
+ * it. It walks the player's trooper toward the point at OBJ_OFF_FIELD_C0,
+ * boards a vehicle when one is claimed and close enough, picks the pose the
+ * held weapon wants, and then drags the REST OF THE SELECTION along -- which
+ * is the part the old offset-name could not hint at. Reconstructed. */
+#define ADDR_TYPE2_PLAYER_STEP   0x0044AD40u  /* void(obj, out) */
+/* Its two boarding thresholds. Under NEAR it always boards; between NEAR and
+ * FAR only a vehicle whose OBJ_OFF_TABLE_REC_KIND is 5, which is the one kind
+ * that will be walked to from further off. */
+#define AM2_BOARD_NEAR           0x40
+#define AM2_BOARD_FAR            0x5A
+/* NOT AM2_AI_REACHED_DIST, which is 0xC and is the OTHER arm's threshold in
+ * this same function: the arm that is already walking stops at 0xC, the arm
+ * that is not starts only past 8. Two numbers, two arms, and reaching for the
+ * existing name would have been off by four. */
+#define AM2_WALK_START_DIST      8
+/* How often the walker re-aims. The same 200 ms AM2_FLAME_PERIOD_MS and
+ * AM2_FIELD_530_DELAY_MS use elsewhere; a third structure, a third name. */
+#define AM2_WALK_TURN_MS         0xC8
+/* The weapon code that takes the second pose. Everything else takes 2. */
+#define AM2_POSE_WEAPON_CODE     0x14
+#define AM2_POSE_INDEX_SPECIAL   0x26
+#define AM2_POSE_INDEX_DEFAULT   2
+/* How long after the last mouse press the view stops being snapped. */
+#define AM2_VIEW_SNAP_MS         0x1F4
+/* +0x04 ALREADY HAD A NAME AND THE RATCHET SAID SO. Type2PlayerStep seeds
+ * ClassifyByCode74's answer there before handing the context to the walker,
+ * and that answer is 0, 1 or 2 -- a class code, not a pointer -- where
+ * SIGHTC_OFF_LEADER is `obj *, from OBJ_OFF_FOLLOW_UID`. Both readings are of
+ * live code. Either the field is a fourth type-dependent one or the leader
+ * name is a call-site name; nothing here settles it, so this is RECORDED and
+ * the existing name is what the reconstruction writes through. Same trade as
+ * OBJ_OFF_FORMATION_SLOT's, and the check refused the alias before it could
+ * be committed -- which is the argument for the ratchet, again. */
 /* Reconstructed as StepType3. The vehicle's per-frame step, and the mirror of
  * StepType2: the same reveal-expiry prologue, then either a death sequence or
  * the AI, then two converging tails.
