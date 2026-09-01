@@ -11862,7 +11862,40 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * function. Two names for two buffers, not two names for one number. */
 #define AM2_STR_CHILD_SUFFIX     0x00487400u  /* "%s-%d" */
 #define AM2_CHILD_NAME_BUF       0x40u
+/* READ AND NOT RECONSTRUCTED, for the same reason as ADDR_LOAD_TYPE2 and
+ * recorded the same way. Ten arguments, settled by the annotator against two
+ * hard anchors and cross-checked against LoadType2's call site:
+ *
+ *   1 name   2 x   3 y   4 comm slot   5 army   6 flags
+ *   7 remote (the broadcast gate, exactly CreateItem's)   8 uid
+ *   9 "settle the point" -- non-zero routes x,y through NearestClearPoint
+ *   10 facing, which goes to OBJ_OFF_FACING and +0x528
+ *
+ * The body is CreateItem's shape with a trooper's tail: malloc 0x5D0 and
+ * zero it, pack x and y into ARGUMENT 2'S OWN SLOT, ObjInitCommon with
+ * ADDR_TROOPER_BOX, max health from ADDR_RANK_RECORDS rank 0, an AI mode of 1
+ * or 6 by whether the army is ADDR_DEFAULT_OWNER, a stagger deadline of
+ * rand() %% 0x1F4 past the clock, TakeSoldierName when no name was given,
+ * BuildRowSet, the army object list, ADDR_SOLDIER_ANIMS on row zero, and
+ * SetUnitPose.
+ *
+ * WHAT STOPPED IT IS ONE ARGUMENT. BuildRowSet's `dy` is loaded from ARG2's
+ * slot -- which by then holds the PACKED point, because the packing above
+ * overwrote it -- while `dx` comes from a register holding the ORIGINAL ARG2.
+ * Every other caller of BuildRowSet passes x and y as separate ints, and
+ * RowInit's MakePoint truncates, so this reading makes every trooper's row y
+ * equal its x. That is not what the game does.
+ *
+ * The depth was re-derived three times from two independent anchors --
+ * ARG4 at [esp+0x48] after the `add esp, 0x34`, and ARG1 at [esp+0x38] at the
+ * top -- and came out the same each time. So the error is an ASSUMPTION, not
+ * arithmetic, and I could not find which one. Written down rather than
+ * written out: a reconstruction that can be shown to be wrong is worse than
+ * none, and the two role-swap defects found today were both of exactly this
+ * shape. */
 #define ADDR_CREATE_TROOPER      0x00447620u  /* type 2 */
+#define ADDR_TROOPER_BOX         0x00489850u  /* AM2_Rect {-16,-32,16,16} */
+#define ADDR_TROOPER_ROW_SPEC    0x00489860u  /* one AM2_ROW_SPEC_BYTES spec */
 #define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
 /* 0x00448280, 256 bytes, EIGHT callers -- the multiplayer weapon RESPAWN, read
