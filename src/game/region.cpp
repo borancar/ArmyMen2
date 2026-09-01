@@ -1953,6 +1953,170 @@ heading:
     }
 }
 
+/* RoachRouteToward -- original 0x00408210, three callers, all of them
+ * ADDR_ROACH_BEHAVIOUR. It is AiRouteToward's TWIN: 518 of its 784 bytes are
+ * byte-identical, and the diff of the two disassemblies is twenty-one lines.
+ * orig.h had it as "a reachability helper ... it compares the region of the
+ * object's position against the region of OBJ_OFF_FIELD_C0", which describes
+ * its first six instructions and nothing after them.
+ *
+ * READ AS A DIFF, WHICH IS THE WHOLE METHOD HERE. Four changes:
+ *
+ *   A CURSOR THAT HAS RUN OUT RESETS THE PATH rather than heading straight
+ *   off -- and that seeder is the one of the three in this pair that does NOT
+ *   write OBJ_OFF_TAIL_BLOCK, which is the kind of asymmetry only a diff
+ *   surfaces.
+ *
+ *   IT ARRIVES AT 0x18 where the trooper arrives at 0x20. Eight units closer,
+ *   for a thing eight units smaller.
+ *
+ *   IT REPORTS THROUGH out+0x14 -- 1 for arrived, 2 for heading -- where the
+ *   trooper writes a POSE into out+8 and uses out+0x14 only as a slow-down
+ *   flag. Same record, different field, so the roach's caller reads somewhere
+ *   the trooper's does not.
+ *
+ *   AND IT HAS NO FOURTH ARGUMENT, no second copy of the bearing into out+1,
+ *   and no approach grading at all. A roach either walks or has arrived.
+ *
+ * Everything else -- BeginMoveTo, the region routing through the all-pairs
+ * tables, the middle link, PlanPathTo with the same two budgets, the cursor
+ * walk -- is AiRouteToward's, and the comment there is the one to read.
+ */
+void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
+{
+    uint8_t  *o    = (uint8_t *)obj;
+    uint8_t  *w    = (uint8_t *)out;
+    uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
+    AM2_Point pt;                    /* the original's first argument slot */
+    int32_t   from, to;
+    int32_t   d;
+
+    (void)ctx;
+
+    *(uint32_t *)&pt = *(const uint32_t *)dest;
+
+    from = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS))
+                         & 0xFFFFu];
+    to   = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)&pt) & 0xFFFFu];
+
+    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
+        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
+            *(const uint32_t *)(o + OBJ_OFF_POS);
+        *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
+        *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 0;
+        *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 1;
+        goto heading;
+    }
+
+    if (to > 0 && from > 0 && to != from) {
+        int16_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int32_t link;
+
+        *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
+
+        if (kRegionCost[(uint32_t)(from * stride + to)]
+            != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))
+            RegionSolvePair(from, to);
+
+        if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
+            && *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
+            goto waypoint;
+
+        link = (int16_t)MiddleRegionLink(
+            from, (int16_t)(uint8_t)kRegionNext[(uint32_t)(from * stride + to)]);
+        if (link < 0)
+            goto waypoint;
+
+        {
+            int32_t x = 0, y = 0;
+
+            TileToXY(kLinks(from)[link].into, &x, &y);
+            if (x) {
+                pt.x = (int16_t)x;
+                pt.y = (int16_t)y;
+            }
+        }
+    }
+
+waypoint:
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_TAIL_BLOCK), &pt);
+
+    if (d > AM2_AI_REPLAN_DIST
+        || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+           >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
+        int32_t budget = AM2_AI_PLAN_BUDGET_SHORT;
+
+        if (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
+            budget = AM2_AI_PLAN_BUDGET_LONG;
+
+        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+
+        if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
+            *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+            *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
+                *(const uint32_t *)(o + OBJ_OFF_POS);
+            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
+            *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
+            *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 1;
+            *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 2;
+            goto heading;
+        }
+    }
+
+    /* Reached BOTH when no replan was wanted and when one SUCCEEDED -- the
+     * original's `jne` from PlanPathTo lands here, not past it. */
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_TAIL_BLOCK),
+                    *(const uint32_t *)&pt)) {
+        if (*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+            >= *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
+            /* THE ONE STRUCTURAL ADDITION over the trooper's copy: a cursor
+             * that has run out resets the path to a zero-length one instead
+             * of heading straight off -- and this is the one seeder of the
+             * three that does NOT write OBJ_OFF_TAIL_BLOCK. */
+            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *(const uint32_t *)&pt;
+            *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
+                *(const uint32_t *)(o + OBJ_OFF_POS);
+            *(int16_t *)(o + OBJ_OFF_MOVE_END)   = 0;
+            *(int16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
+            *(int16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
+            goto heading;
+        }
+
+        {
+            uint32_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+
+            *(uint32_t *)&pt =
+                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+
+        while (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt)
+               < AM2_AI_ARRIVED_DIST) {
+            at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+            if ((int32_t)at
+                >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+                break;
+
+            at++;
+            *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
+            *(uint32_t *)&pt =
+                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+        }
+        }
+    }
+
+heading:
+    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                   (const AM2_Point *)dest) < AM2_ROACH_ARRIVED_DIST) {
+        *(int32_t *)(w + 0x14) = 1;
+        *(uint32_t *)dest = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        return;
+    }
+
+    w[0] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
+    *(int32_t *)(w + 0x14) = 2;
+}
+
 /* AiStepIgnore -- original 0x00407BF0, one caller, which is the AI mode
  * dispatcher at 0x00407F80. THIS IS THE `ignore` ARM, and the identification
  * is the point of the commit rather than the eighty bytes of body.
@@ -4424,8 +4588,7 @@ emit:
 }
 
 
-typedef void (__cdecl *AM2_RegionCmpFn)(void *obj, void *out, void *ctx);
-#define orig_ai_408210 ((AM2_RegionCmpFn)(uintptr_t)AM2_IMAGE(ADDR_AI_408210))
+/* RoachRouteToward is reconstructed above and called by name. */
 
 /* The promote-and-engage block, written out at each of its four sites rather
  * than called, because the original inlines it four times and orig.h already
@@ -4474,7 +4637,7 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(*(uint8_t **)(c + SIGHT_OFF_OBSERVER)
                                 + OBJ_OFF_POS);
-        orig_ai_408210(obj, out, ctx);
+        RoachRouteToward(obj, out, ctx);
         if (*(void **)(c + SIGHT_OFF_FOUND))
             AM2_ROACH_PROMOTE_FOUND(o, c);
         goto tail;
@@ -4484,7 +4647,7 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
         /* Not arrived: keep the destination and look again. */
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        orig_ai_408210(obj, out, ctx);
+        RoachRouteToward(obj, out, ctx);
         if (*(void **)(c + SIGHT_OFF_FOUND))
             AM2_ROACH_PROMOTE_FOUND(o, c);
         goto tail;
@@ -4573,6 +4736,9 @@ int region_install(void)
                         "Type2PlayerStep", 1);
     rc |= patch_replace(ADDR_AI_ROUTE_TOWARD, (const void *)AiRouteToward,
                         "AiRouteToward", 9);
+    rc |= patch_replace(ADDR_ROACH_ROUTE_TOWARD,
+                        (const void *)RoachRouteToward,
+                        "RoachRouteToward", 3);
     rc |= patch_replace(ADDR_STEP_TYPE2, (const void *)StepType2,
                         "StepType2", 1);
     rc |= patch_replace(ADDR_STEP_TYPE3, (const void *)StepType3,

@@ -7111,10 +7111,25 @@ typedef struct {
  * 26 jump targets and not one is an epilogue: a single exit, like the rest of
  * the band. */
 #define ADDR_ROACH_BEHAVIOUR     0x00408640u  /* void(obj, out, ctx) */
-/* Its one unnamed callee, three call sites, still original: it compares the
- * region of the object's position against the region of OBJ_OFF_FIELD_C0 --
- * TileOfPoint on each, then ADDR_REGION_OF_CELL. A reachability helper. */
-#define ADDR_AI_408210           0x00408210u  /* void(obj, out, ctx) */
+/* NOT A "REACHABILITY HELPER" -- it is ADDR_AI_ROUTE_TOWARD's TWIN, 518 of
+ * 784 bytes byte-identical, and the old note described its first six
+ * instructions. Same five stages, same region routing, same waypoint cursor.
+ * All three call sites are ADDR_ROACH_BEHAVIOUR, so this is the roach's copy;
+ * reconstructed as RoachRouteToward. Four differences and no more:
+ *
+ *   a cursor that has run out RESETS the path to a zero-length one rather
+ *   than heading straight off, and that seeder is the one of the three that
+ *   does NOT write OBJ_OFF_TAIL_BLOCK;
+ *   it arrives at 0x18 where the trooper arrives at AM2_AI_ARRIVED_DIST;
+ *   it reports through out+0x14 -- 1 arrived, 2 heading -- where the trooper
+ *   uses out+8 for a pose and out+0x14 only as a slow-down flag;
+ *   and it has no fourth argument, no second copy of the bearing, and no
+ *   approach grading at all.
+ *
+ * Reading the DIFFERENCES rather than the function is what made it an hour's
+ * work; the diff of the two disassemblies is 21 lines. */
+#define ADDR_ROACH_ROUTE_TOWARD  0x00408210u  /* void(obj, out, ctx) */
+#define AM2_ROACH_ARRIVED_DIST   0x18
 /* 0x00408060, one caller -- ADDR_ROACH_ALIVE_STEP_A, whose `sub esp, 0x40` is
  * this record's LENGTH. The roach's half of the sight-context idea: the same
  * structure ADDR_AI_BUILD_CONTEXT fills for a vehicle, four bytes shorter.

@@ -109,6 +109,12 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx);
 void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
                            int32_t keepFacing);
 
+/* 0x00408210, three callers, all ADDR_ROACH_BEHAVIOUR. The same function for
+ * a roach: 518 of 784 bytes identical, arriving eight units closer, reporting
+ * through out+0x14 rather than out+8, and resetting the path when its
+ * waypoint cursor runs out. */
+void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx);
+
 /* 0x00407020, one caller. Sarge's per-frame AI step: build a SIGHTC record on
  * the stack, pick up a weapon if one is in reach, react to being hit, then
  * dispatch on OBJ_OFF_AI_MODE and record the region. */
