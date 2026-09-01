@@ -1617,6 +1617,10 @@ void __cdecl PointerSelect(void *obj, uint32_t at);
  * shows a hint and still answers 0; a trooper in reach answers 1. */
 int32_t __cdecl PointerPickBoard(void *obj);
 
+/* 0x00459EE0. A PICK in the same table: an unconcealed item of the watched
+ * kind, within our leader's reach. */
+int32_t __cdecl PointerPickWatchedItem(void *obj);
+
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */
 void __cdecl HudMessage(const char *text, int32_t colour);

@@ -976,6 +976,7 @@
 #define ADDR_PICK_REACH_662450   0x00662450u  /* int32_t */
 #define ADDR_PICK_REACH_66275C   0x0066275Cu  /* int32_t */
 #define ADDR_POINTER_PICK_BOARD  0x00459DA0u  /* int32_t(void *obj) */
+#define ADDR_POINTER_PICK_WATCHED 0x00459EE0u /* int32_t(void *obj) */
 /* 0x00459DA0, 320 bytes. Reconstructed as PointerPickBoard. It is the PICK of those four records: refuse a null object,
  * refuse one whose army byte is not ADDR_DEFAULT_OWNER, find our leader
  * through the dead-fallback helper described above, and then two arms.

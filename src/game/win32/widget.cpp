@@ -9001,6 +9001,53 @@ static uint8_t *OurLeader(void)
         *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
 }
 
+/* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
+ * PICK slot of a record in the second {pick, action, kind, flags} table.
+ *
+ * Four refusals and then a yes. A null object; one that is not an ITEM of the
+ * type id in ADDR_CREATE_WATCHED_KIND, which is what ObjIsWatchedKind answers;
+ * one that is OBJ_FLAG_CONCEALED, so the pointer will not offer what the player
+ * cannot see; and one further from our leader than the reach threshold.
+ * Otherwise it shows an overlay row and answers 1.
+ *
+ * THE ROW IS 0x11 AND ITS NAME CAME FROM SOMEWHERE ELSE. orig.h calls it
+ * AM2_OVERLAY_ROW_SELL, from the placement screen, where it is the cursor shown
+ * over a unit that could be sold. The constant is right -- same row, same
+ * cursor sheet -- but this table is the ORDER table, one of whose actions is
+ * ADDR_SET_WEAPON_TARGET, so nothing here confirms the row means "sell" in this
+ * context. Used by number, and the name is not being taken as evidence.
+ *
+ * The concealed test is `test ah, 2` on the dword at OBJ_OFF_FLAGS, which is
+ * bit 9 -- OBJ_FLAG_CONCEALED. Written against the whole dword, which is the
+ * same test.
+ *
+ * Not exercised: nothing in this band runs except mode 0's action, and this
+ * table has no identified consumer. Verified by reading. */
+int32_t __cdecl PointerPickWatchedItem(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *leader;
+
+    if (!o)
+        return 0;
+    if (!ObjIsWatchedKind(o))
+        return 0;
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)
+        return 0;
+
+    leader = OurLeader();
+    if (!leader)
+        return 0;
+
+    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                   (const AM2_Point *)(o + OBJ_OFF_X))
+        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_662450)
+        return 0;
+
+    OverlayPrepare(AM2_OVERLAY_ROW_SELL, 1);
+    return 1;
+}
+
 /* PointerPickBoard -- original 0x00459DA0, 320 bytes. The PICK half of four
  * consecutive records in the second {pick, action, kind, flags} table, whose
  * ACTION is 0x00458D70 in all four.
@@ -10303,6 +10350,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_BOARD,
                         (const void *)PointerPickBoard,
                         "PointerPickBoard", 4);
+    rc |= patch_replace(ADDR_POINTER_PICK_WATCHED,
+                        (const void *)PointerPickWatchedItem,
+                        "PointerPickWatchedItem", 1);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,

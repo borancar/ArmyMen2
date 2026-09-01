@@ -9,7 +9,20 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,398 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,399 patches**, **30** analysis tools in `make check`.
+
+**`PointerPickWatchedItem` (`0x00459EE0`, 208 B) is reconstructed** -- another
+PICK in the second table: four refusals then a yes. A null object; one that is
+not an ITEM of the type id in `ADDR_CREATE_WATCHED_KIND`; one that is
+`OBJ_FLAG_CONCEALED`, so the pointer will not offer what the player cannot see;
+and one out of the leader's reach.
+
+**Its overlay row is 0x11 and the name for that row came from somewhere else.**
+`orig.h` calls it `AM2_OVERLAY_ROW_SELL`, from the placement screen. The
+constant is right -- same row, same cursor sheet -- but this table is the ORDER
+table, one of whose actions is `ADDR_SET_WEAPON_TARGET`, so nothing here
+confirms the row means "sell" in this context. Used by number, and the name is
+not being taken as evidence.
 
 **`PointerPickBoard` (`0x00459DA0`, 320 B) is reconstructed** -- the PICK half
 of four records in the second `{pick, action, kind, flags}` table. The previous
@@ -74,7 +87,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,355 of 1,530 real functions, 79.8% of sub-CRT bytes
+    split-aware      1,356 of 1,530 real functions, 79.9% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -85,9 +98,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,398 patched addresses, and
-**89.5% of the sub-CRT bytes**. Split-aware that is **1,355 of 1,530** real
-functions and **79.8%** of the bytes; see the section above. That figure counts merged entries generously and is a
+outstanding, which is 1,239 minus 1,220 -- from 1,399 patched addresses, and
+**89.5% of the sub-CRT bytes**. Split-aware that is **1,356 of 1,530** real
+functions and **79.9%** of the bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
