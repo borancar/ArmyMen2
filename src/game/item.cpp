@@ -3099,11 +3099,86 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
 typedef int32_t (__cdecl *AM2_RandFn)(void);
 #define orig_rand ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
 
-/* ADDR_SHOOTER_REACT stays original and is reached by address: what the
- * shooter does once it has hit something it is not allied with. */
-typedef void (__cdecl *AM2_ShooterReactFn)(void *shooter, void *target);
-#define orig_shooter_react \
-    ((AM2_ShooterReactFn)(uintptr_t)ADDR_SHOOTER_REACT)
+/* ShooterReact -- original 0x00457DA0, one caller: ShotStrike, once a shot
+ * has damaged something it is not allied with. What it actually does is award
+ * the SHOOTER experience, and how much depends entirely on what it hit.
+ *
+ * ITS ENTRY GUARDS ARE Type238Action's, WORD FOR WORD -- null, the multiplayer
+ * broadcast gate on the shooter's own army, and a rank already at
+ * AM2_RANK_MAX. Both functions run all three and the callee runs them again a
+ * hundred bytes later. The duplication is the original's; nothing here is
+ * skipped on the strength of the callee doing it too.
+ *
+ * FOUR AWARDS, AND THE TABLE IS THE WHOLE FUNCTION:
+ *
+ *   anything else                            1
+ *   a LIVE trooper, vehicle or roach         its rank + 1
+ *   the same, KILLED                         (its rank + 1) * 3
+ *   a killed SARGE                           100
+ *
+ * So killing is worth three times wounding, and Sarge is worth more than a
+ * rank-7 anything -- 100 against 24. OBJ_OFF_SARGE is what says the last one
+ * is Sarge rather than some other trooper flag, and it is only consulted on
+ * the dead branch: wounding Sarge pays his rank plus one like any trooper.
+ *
+ * THE TWO BRANCHES ARE NOT SYMMETRIC IN A SECOND WAY. The killed branch tests
+ * `type == 2 && sarge` AFTER computing the triple, so a killed non-Sarge
+ * trooper keeps the triple and a killed Sarge overwrites it. The live branch
+ * has no type-2 case at all. Written as the two separate arms they are rather
+ * than folded, because folding them would need the asymmetry to be an
+ * accident and there is no evidence for that.
+ *
+ * THE TARGET IS DEREFERENCED BEFORE IT IS NULL-CHECKED. `cmp word ptr
+ * [eax+0x62], 0` reads the health and only then does `test eax, eax`. Second
+ * instance today after ApplyObjFrame's; kept for the same reason, that
+ * deleting a test the compiler emitted is a decision about the original.
+ *
+ * The types it pays for are 2, 3 and 8 -- trooper, vehicle and roach -- which
+ * is the same trio ObjIsTypeIn238 answers for and the same one
+ * ADDR_TYPE238_ACTION is named after, even though that function admits only
+ * type 2 once its own body is read.
+ */
+void __cdecl ShooterReact(void *shooter, void *target)
+{
+    uint8_t *s = (uint8_t *)shooter;
+    uint8_t *t = (uint8_t *)target;
+    int32_t  points = 1;
+
+    if (!s)
+        return;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(s + OBJ_OFF_ARMY)))
+        return;
+
+    if (*(const int32_t *)(s + OBJ_OFF_RANK) >= AM2_RANK_MAX)
+        return;
+
+    if (*(const int16_t *)(t + OBJ_OFF_HEALTH) == 0) {
+        /* The original's own null test, after the read above. */
+        if (t) {
+            int32_t type = *(const int32_t *)t;
+
+            if (type >= 2) {
+                if (type <= 3 || type == 8)
+                    points = (*(const int32_t *)(t + OBJ_OFF_RANK) + 1)
+                             * AM2_KILL_POINT_SCALE;
+                if (type == 2 && *(const int32_t *)(t + OBJ_OFF_SARGE))
+                    points = AM2_SARGE_KILL_POINTS;
+            }
+        }
+    } else {
+        if (t) {
+            int32_t type = *(const int32_t *)t;
+
+            if (type >= 2 && (type <= 3 || type == 8))
+                points = *(const int32_t *)(t + OBJ_OFF_RANK) + 1;
+        }
+    }
+
+    Type238Action(s, points);
+}
 
 typedef int32_t (__cdecl *AM2_ShotHitsObjFn)(void *target, int32_t code,
                                              int32_t army, int32_t height,
@@ -3289,7 +3364,7 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
         return;
 
     *(uint32_t *)(owner + OBJ_OFF_TARGET_UID) = ((const AM2_Object *)target)->uid;
-    orig_shooter_react(owner, target);
+    ShooterReact(owner, target);
 }
 
 /* ObjCollidesWith -- original 0x0045B700, 224 bytes, two callers, both inside
@@ -10613,6 +10688,8 @@ void item_install(void)
                   "ItemIsReady", 1);
     patch_replace(ADDR_CREATE_ITEM, (const void *)CreateItem,
                   "CreateItem", 9);
+    patch_replace(ADDR_SHOOTER_REACT, (const void *)ShooterReact,
+                  "ShooterReact", 1);
     patch_replace(ADDR_ITEM_TYPE_NAME, (const void *)ItemTypeName,
                   "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,

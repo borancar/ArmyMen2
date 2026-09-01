@@ -3060,6 +3060,22 @@ exact oracle**, however meaningful it is when it is set.
 - Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
   in the original — it publishes an uninitialised descriptor after a successful
   Restore without re-locking. Kept as-is deliberately; see `src/game/win32/surface.cpp`.
+- **NO CONFIGURATION IN THE SUITE REACHES COMBAT, and that is one measurement
+  rather than a dozen separate mysteries.** On a Boot Camp mission driven past
+  both dialogs, with `ObjIsItem` climbing past 84,000 and the frame ticking,
+  `ShotStrike`, `ApplyShotDamage`, `DamageObject`, `CreateMissile`,
+  `FireWeaponAtPoint` and `FireWeaponAtObject` ALL read 0 -- and none of those
+  counters is blind. Sarge stands there; nothing fires and nothing is hit.
+  Pressing SPACE, both CTRLs, ALT and RETURN changes none of them.
+
+  So every function whose only route is "something took damage" is cold for
+  ONE reason, and the entries below that used to explain themselves
+  individually -- `RemoveFromItemList`, `FreeItem`, `ShooterReact`,
+  `ApplyObjFrame`'s DamageItem route -- are the same fact said four times.
+  Getting any of them exercised needs a drive that makes a unit shoot, which
+  this project does not have and which would be worth more than several more
+  reconstructions: it would unlock the whole combat-consequence layer at once.
+
 - **`RemoveFromItemList` is unexercised for a now-known reason.** Its gated
   caller is `FreeItem` (`0x004285F0`), which dispatches on the item kind and is
   the only route that unlinks. Neither runs on a campaign drive: 325 items are

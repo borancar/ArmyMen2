@@ -326,6 +326,12 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
  * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
 int32_t __cdecl ObjIsWatchedKind(const void *obj);
 
+/* 0x00457DA0, one caller -- ShotStrike, once a shot has damaged something it
+ * is not allied with. Award the shooter experience: 1 for anything, the
+ * target's rank + 1 if it is a live trooper, vehicle or roach, three times
+ * that if the shot killed it, and 100 for a killed Sarge. */
+void __cdecl ShooterReact(void *shooter, void *target);
+
 /* 0x00433980, nine callers. The type-1 creator: a composite key builds a
  * parent and its numbered children by recursion, a leaf key allocates one
  * object and fills it from its AAI record. `remote` non-zero means the

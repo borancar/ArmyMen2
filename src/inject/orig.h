@@ -12083,8 +12083,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_SHOT_DAMAGE_KIND_RAND  1
 #define AM2_SHOT_DIR_BIAS          0x80   /* added to OBJ_OFF_FACING */
 /* 0x00457DA0, one caller. What the shooter does once it has hit something it
- * is not allied with; still original. */
+ * is not allied with: award it experience. Reconstructed; see item.cpp. */
 #define ADDR_SHOOTER_REACT         0x00457DA0u /* void(shooter, target) */
+/* What it PAYS, which is the whole function: 1 for anything, the target's
+ * rank + 1 for a live type 2, 3 or 8, three times that if the shot killed it,
+ * and a flat 100 for a killed Sarge. Sarge is worth more than a rank-7
+ * anything -- 100 against 24 -- and the Sarge test is on the dead branch
+ * only. */
+#define AM2_KILL_POINT_SCALE       3
+#define AM2_SARGE_KILL_POINTS      100
 #define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
 /* FOURTH READING, and it is the one that makes the type-1 answer plain rather
  * than likely: CreateItem's LEAF arm ends by storing the sprite FRAME it

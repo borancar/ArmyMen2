@@ -26,6 +26,12 @@ other. KNOWN BLIND SPOTS, measured on real functions rather than guessed:
     ObjTileHook reads PAD_OFF_DAMAGE as [ecx*8 + 0x5161CC], which is
     ADDR_PADS + 0x34;
   - a field at offset zero is `[reg]` with no displacement at all.
+  - an ARGUMENT of a frameless function is [esp + N] and is skipped, but only
+    esp is: a function with no `mov ebp, esp` has its [ebp + N] read as
+    fields, which is right far more often than not (see below);
+  - a `lea reg, [reg + N]` on a SCALAR is arithmetic, not a field --
+    UnitKindMatches' +1, +2 and +11 all report as unnamed offsets. Excluding
+    `lea` would be worse: a `lea` on a struct pointer IS a field reference.
   - a function with a TRAILING JUMP TABLE has that table decoded as
     instructions, and its address bytes read as displacements --
     OnSelectionChanged's table at 0x00427B7C produces a phantom 0x7B, which is
@@ -46,10 +52,41 @@ import os, re, subprocess, sys
 REPO = os.environ.get('AM2_REPO',
                       os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+def _function_end(addr):
+    """Where the function at `addr` really ends.
+
+    disasm.py prints a whole docs/functions.tsv ENTRY, and at least 128 of
+    those below the CRT line are several functions run together. On a merged
+    entry every field of the NEIGHBOUR is reported as one the C failed to
+    name -- ShooterReact came back with six phantoms, all of them belonging to
+    the 549-byte function sharing its entry. tools/merges.py already knows
+    where the splits are, so ask it.
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import am2, merges
+    for entry, (splits, size) in merges.real_functions(am2.Image()).items():
+        if entry <= addr < entry + size:
+            later = [p for p in splits if p > addr]
+            return min(later) if later else entry + size
+    return None
+
+def _trim_to_function(out, addr):
+    end = _function_end(addr)
+    if end is None:
+        return out
+    keep = []
+    for line in out.splitlines():
+        m = re.match(r'\s+0x([0-9a-f]+)\s', line)
+        if m and not (addr <= int(m.group(1), 16) < end):
+            continue
+        keep.append(line)
+    return '\n'.join(keep)
+
 def orig_offsets(addr):
     """Displacements the ORIGINAL reads or writes off a register."""
     out = subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'disasm.py'),
                           hex(addr)], capture_output=True, text=True).stdout
+    out = _trim_to_function(out, addr)
     seen = set()
     # esp displacements are stack frame slots, never structure fields.
     #
