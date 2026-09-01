@@ -9,8 +9,18 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,404 patches plus 3 REGISTERED = 1,407 reconstructed
+Nothing uncommitted. **1,405 patches plus 3 REGISTERED = 1,408 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerPickMode6` (`0x00459300`, 288 B) is reconstructed** -- the same two
+refusals as modes 4 and 5, then the shared friend tail, with **no alliance test
+at all**. So mode 6 offers nothing on an enemy where modes 4 and 5 show the
+enemy overlay and answer 1.
+
+288 bytes came to three lines, because the tail was factored out for modes 4 and
+5 first. That is the return on the two previous commits rather than a claim
+about this function being simple -- the original writes the whole tail out
+again.
 
 **`PointerPickMode4` and `PointerPickMode5` (`0x00458EE0`, `0x004590F0`, 528 B
 each) are reconstructed**, written as CALLS to `ArmyAlliedWithObj` rather than
@@ -198,7 +208,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,364 of 1,530 real functions, 80.4% of sub-CRT bytes
+    split-aware      1,365 of 1,530 real functions, 80.5% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -209,9 +219,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,407 reconstructed addresses
-(1,404 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
-Split-aware that is **1,364 of 1,530** real functions and **80.4%** of the
+outstanding, which is 1,239 minus 1,220 -- from 1,408 reconstructed addresses
+(1,405 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
+Split-aware that is **1,365 of 1,530** real functions and **80.5%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 

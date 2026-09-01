@@ -1628,6 +1628,10 @@ int32_t __cdecl PointerPickWatchedItem(void *obj);
 int32_t __cdecl PointerPickMode4(void *obj);
 int32_t __cdecl PointerPickMode5(void *obj);
 
+/* 0x00459300. Mode 6's pick: the same two refusals and then the friend tail,
+ * with no alliance test -- so it offers nothing on an enemy. */
+int32_t __cdecl PointerPickMode6(void *obj);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);

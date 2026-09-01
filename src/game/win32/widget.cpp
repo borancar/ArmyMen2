@@ -9309,6 +9309,37 @@ int32_t __cdecl PointerPickMode5(void *obj)
     return 1;
 }
 
+/* PointerPickMode6 -- original 0x00459300, 288 bytes, mode 6's PICK.
+ *
+ * THE SAME TWO REFUSALS AND THEN THE SHARED FRIEND TAIL, with no alliance test
+ * at all: it goes straight to the tail, whose first act is to require the
+ * object be OURS. So mode 6 offers nothing on an enemy, where modes 4 and 5
+ * show the enemy overlay and answer 1.
+ *
+ * 288 bytes that come to three lines, because the tail was factored out for
+ * modes 4 and 5 first. That is the return on the previous two commits rather
+ * than a claim about this function being simple -- the original writes the
+ * whole tail out again here.
+ *
+ * The one encoding difference is cosmetic and worth noting so a reader diffing
+ * against the others does not stop on it: this tests OBJ_FLAG_SELECTED as
+ * `test ch, 4` on the flags dword where modes 4 and 5 load 0x400 into a
+ * register first. Same bit.
+ *
+ * Not exercised -- no drive installs a pointer mode above 0. */
+int32_t __cdecl PointerPickMode6(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
+        & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
+        return 0;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        return 0;
+
+    return PointerFriendTail(o);
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10667,6 +10698,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_MODE5,
                         (const void *)PointerPickMode5,
                         "PointerPickMode5", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_MODE6,
+                        (const void *)PointerPickMode6,
+                        "PointerPickMode6", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

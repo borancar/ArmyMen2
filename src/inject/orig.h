@@ -10081,6 +10081,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * not, and the index is the part that is measured. */
 #define ADDR_POINTER_PICK_MODE4  0x00458EE0u  /* int32_t(void *obj) */
 #define ADDR_POINTER_PICK_MODE5  0x004590F0u  /* int32_t(void *obj) */
+#define ADDR_POINTER_PICK_MODE6  0x00459300u  /* int32_t(void *obj) */
 /* ArmyAlliedWithObj IS INLINED INTO THE POINTER PICKS, and army.cpp has had it
  * as a function since long before. The block that appears in 0x00458EE0,
  * 0x004590F0, 0x00459300, 0x00459420, 0x004597B0, 0x004599A0 and 0x00459BE0 --
