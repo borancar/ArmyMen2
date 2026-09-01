@@ -30,6 +30,10 @@
 #include "widget.h"      /* HudUpdate, HudPaint */
 #include "../item.h"     /* ObjFrameSweep and the per-frame steps */
 #include "dplay.h"       /* CommNoBuffers */
+#include "../objscript.h" /* FreeObjScripts -- LevelTeardown */
+#include "../pad.h"       /* ResetPads */
+#include "../anim.h"      /* the four Free*Anims */
+#include "../map.h"       /* FreeScenarios, FreeMapLayers */
 
 /* ---- what stays in the original image --------------------------------- */
 
@@ -689,6 +693,87 @@ static const AM2_SubStatePainter kSubStatePainter[] = {
 };
 
 
+/* LevelTeardown -- original 0x004256F0, 160 bytes, one caller, and that caller
+ * is State2Frame just below: the arm it takes when a state change is pending
+ * while the game is already in state 2, which is what "leaving a level" means.
+ * CLAUDE.md's chain -- menu request while in state 2, pending flag, this --
+ * ends here.
+ *
+ * TWENTY-FIVE CALLS IN ORDER AND THE ORDER IS THE POINT. This is the
+ * ShutdownSubsystems shape one level in: a fixed sequence of teardowns whose
+ * arrangement is the fact worth preserving, where a name for each would be a
+ * guess for each. TWENTY of the twenty-five were already reconstructed, which
+ * is the measurement that made this worth writing rather than leaving at an
+ * address -- the teardown was the last original thing holding them together.
+ * Of the five that were not, two could be read off their own bodies and are
+ * now ADDR_FREE_AIM_SPRITES and ADDR_FREE_SEQ_CONTEXTS; the other two carry
+ * placeholders that say only their addresses.
+ *
+ * IT OPENS BY DELETING WHATEVER DIALOG IS UP. 0x0065A058 is the slot the
+ * dialog opener stores into and `drive.sh ctl widgets` walks; slot 0 with a
+ * flag of 1 is the MSVC scalar deleting destructor, the same call
+ * FreeHudWidgets makes three times. Clearing the global afterwards is what
+ * stops a second teardown from deleting it twice.
+ *
+ * The last call is a TAIL JUMP to CommitState in the original, which is a
+ * compiler detail rather than behaviour: written as an ordinary call.
+ *
+ * TWO CDECL CLEANUPS ARE BATCHED INTO ONE `add esp, 8` covering pushes eleven
+ * instructions apart -- the script context and the refresh gate's argument.
+ * None of that survives into C, and it is noted because a reader matching the
+ * disassembly will find one cleanup for two calls and wonder.
+ *
+ * EXERCISED, AND IT TOOK POKING A GLOBAL TO DO IT. No drive reaches this by
+ * playing: the in-mission ESCAPE handler is sub-state 34 and ordinary play
+ * sits at 33. Writing ADDR_MENU_REQUEST and its flag during a live Boot Camp
+ * mission -- what that handler would write -- runs the whole sequence, which
+ * was confirmed here by logging one marker per call and seeing all 23 arrive.
+ *
+ * WHAT THAT DRIVE ALSO FOUND IS NOT THIS FUNCTION'S, and it is worth stating
+ * where it was nearly misattributed. Under AM2_NOPATCH the same poke ends with
+ * sixty "DestroyWeapon, %x" lines as the level's items are freed; with the
+ * reconstruction installed there are NONE, and the game does not return to the
+ * title. That looked exactly like a defect in this transcription -- until the
+ * same poke was run on the PARENT COMMIT, where this function is still the
+ * original's and its callees are already ours: DestroyWeapon reads 0 there
+ * too. So the divergence is somewhere else on the path and predates this
+ * commit by an unknown margin; see STATUS.md. One control run separated
+ * "my change broke it" from "nothing has ever tested this path". */
+void __cdecl LevelTeardown(void)
+{
+    AM2_Widget *dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
+
+    if (dlg) {
+        ((AM2_WidgetDeleteFn *)dlg->vtable)[WIDGET_VSLOT_DTOR](dlg, 1);
+        *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT = (AM2_Widget *)0;
+    }
+
+    StopAllSounds();
+    FreeObjScripts();
+    ResetScriptState();
+    ScriptResetTokens((AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
+    ResetPads();
+    call0(ADDR_TEARDOWN_40A6A0);
+    call0(ADDR_FREE_SEQ_CONTEXTS);
+    FreeAirSpritesAlias();
+    call0(ADDR_FREE_AIM_SPRITES);
+    call0(ADDR_TEARDOWN_463360);
+    FreeHudWidgets();
+    RefreshGate(0);
+    FreeMenuSprites();
+    FreeAllFonts();
+    FreeScenarios();
+    FreeMapLayers();
+    FreeExplosionAnims();
+    FreeMissileAnims();
+    FreeRoachAnims();
+    FreeVehicleAnims();
+    FreeSoldierAnims();
+    FreeSpriteList();
+    TeardownDefTables();
+    CommitState();   /* a tail jump in the original */
+}
+
 /* 0x004260C0. State 2 -- a live mission.
  *
  * The entry action has an early RETURN in it that the other states do not:
@@ -698,7 +783,7 @@ static const AM2_SubStatePainter kSubStatePainter[] = {
 void __cdecl State2Frame(void)
 {
     if (g_statePending) {
-        call0(ADDR_LEVEL_TEARDOWN);
+        LevelTeardown();
         return;
     }
 
@@ -1343,6 +1428,8 @@ int frame_install(void)
                         "State1Frame", 1);
     rc |= patch_replace(ADDR_STATE2_FRAME, (const void *)State2Frame,
                         "State2Frame", 1);
+    rc |= patch_replace(ADDR_LEVEL_TEARDOWN, (const void *)LevelTeardown,
+                        "LevelTeardown", 1);
     rc |= patch_replace(ADDR_STATE3_FRAME, (const void *)State3Frame,
                         "State3Frame", 1);
     rc |= patch_replace(ADDR_STATE4_FRAME, (const void *)State4Frame,

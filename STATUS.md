@@ -5,71 +5,70 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `df2f87c`. Working tree clean.
+Last updated: **2026-09-02**, at `b428bf5`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,394 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,395 patches**, **30** analysis tools in `make check`.
 
-**`RegionFindPath` (`0x00437E70`, 1,168 B) is reconstructed** -- A* over the
-region graph, with the working set kept in the region records themselves, an
-open list sorted by g+h, and a generation stamp in place of a visited set. Its
-only caller, `RegionSolvePair`, was already ours and had been reaching it by
-address.
+**`LevelTeardown` (`0x004256F0`, 160 B) is reconstructed** -- the arm
+`State2Frame` takes when a state change is pending while the game is already in
+state 2, which is what leaving a level means. A dialog delete through vtable
+slot 0, then twenty-four subsystem teardowns in a fixed order, then the state
+change committed.
 
-**`tools/pathcheck.py` is the 30th tool and the only check this code can have.**
-No drive reaches region routing -- probed, not assumed: an `am2_log` here with
-a control at `ObjAfterMove`'s top gives 1,598 for the control and **0** for
-this function on a live Boot Camp mission. So `tools/ab.sh` is not evidence
-about it in either direction. The tool emulates the ORIGINAL over fourteen
-seeded graphs -- chains, grids, a diamond, a split graph, inactive nodes,
-`from == to`, and chains long enough to reach the depth cap -- and compares the
-return value, the length and every path entry against a Python model of the C.
+**TWENTY of the twenty-five callees were already ours**, which is what made
+this worth writing out rather than leaving at an address: the teardown was the
+last original thing holding them together. Two of the remaining five were read
+off their own bodies -- `ADDR_FREE_AIM_SPRITES`, which is `ReleaseSprite` over
+six sprites whose COUNT is the distance between two globals, and
+`ADDR_FREE_SEQ_CONTEXTS` -- and two carry placeholders that say only their
+addresses, which is the `ShutdownSubsystems` precedent: the order is the fact
+worth keeping and a name each would be a guess each.
 
-**It found two real errors on its first two runs.**
+**Exercised by poking a global, and all 23 steps confirmed.** No drive reaches
+it by playing -- the in-mission ESCAPE handler is sub-state 34 and ordinary
+play sits at 33 -- so `ADDR_MENU_REQUEST` and its flag were written during a
+live Boot Camp mission, and a marker logged per call showed every one arrive.
 
-*The open list's unlink drops the rest of the list.* Improving a node that is
-at the HEAD writes `openHead = NULL` where it must write `openHead = head->next`,
-so every other open node is orphaned. That is the original's, checked in the
-bytes, and reproduced. The model was written with a CORRECT unlink and
-disagreed on four graphs, which is how it surfaced -- a defect no drive could
-show, because a pathfinder that drops candidates still returns a path.
+**A/B clean on `bootcamp`, `campaign` and `quit`.**
 
-*`ApproxDistXY` is not "max + min/2".* `dist.cpp`'s comment had said so for a
-long time; the code is `dx + dy - (min >> 1)`, which is max + CEIL(min/2), and
-the two differ for every odd min. The paraphrase was copied into the model,
-where it disagreed with the original on 40 of 81 small deltas and moved enough
-A* ties to pick different routes. **A formula restated in words is a second
-implementation and can be wrong on its own.**
+## Open: something on the poked teardown path diverges, and it is not new
 
-**One mutation PASSES and the reason is better than the gap.** Recomputing h on
-the improvement arm -- an asymmetry this file wrote out as deliberate --
-changes no case and cannot: h is a function of the node and the goal, both
-fixed for a search. The term is redundant by construction, not uncovered.
+Driving that same poke under `AM2_NOPATCH=1` ends with **sixty**
+`DestroyWeapon, %x` lines as the level's items are freed, and the game returns
+to the title. With the reconstruction installed there are **none**, and it does
+not.
 
-**`AM2_KIND7_HEALTH_SCALE` is `AM2_CONST_1_5`.** The pooled double 1.5 was
-named for the first thing seen to multiply by it; this weights the A*
-heuristic by the same address. The linker folds equal literals, so a name taken
-from one use site is one more use away from being wrong.
+That looked exactly like a defect in the new transcription. It is not: the same
+poke on the **parent commit** -- where `LevelTeardown` is still the original's
+and its callees are already ours -- also reads 0. So the divergence is
+somewhere else on that path and predates this work by an unknown margin.
 
-**A/B clean on `bootcamp` and `campaign`**; `mission`'s frames gate failed as
-it has on every run of that configuration, and the probe above says this code
-is not in it.
+It has never been caught because no configuration in `tools/ab.sh` reaches the
+in-mission teardown at all; `quit` leaves from the title, which is state 1.
+Finding it means bisecting the twenty-odd reconstructed callees against
+`AM2_NOPATCH` on the poked drive. Worth doing: this is the one path where a
+whole subsystem comes down, and it is currently unwatched.
+
+**The lesson is the cheaper half.** One control run on the parent separated
+"my change broke it" from "nothing has ever tested this path", and the
+temptation was to keep debugging the function in flight instead.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,218 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 21
-outstanding, which is 1,239 minus 1,218 -- from 1,394 patched addresses, and
-**87.7% of the sub-CRT bytes**. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,219 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 20
+outstanding, which is 1,239 minus 1,219 -- from 1,395 patched addresses, and
+**88.0% of the sub-CRT bytes**. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-nine batches have gone in and NOTHING SMALL IS LEFT: the
-21 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
-median is **1,504**. Read them through `tools/merges.py`, which splits those 21
-into 41 real functions whose smallest are 16, 144 and 160 bytes. The
+small ones in batches. A hundred and fifty batches have gone in and NOTHING SMALL IS LEFT: the
+20 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
+median is **1,504**. Read them through `tools/merges.py`, which splits those 20
+into 40 real functions whose smallest are 16, 144 and 160 bytes. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

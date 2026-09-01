@@ -970,6 +970,11 @@
 #define AM2_AIM_INDEX_B          5
 #define AM2_AIM_PRELOAD_FLAGS    0x1000
 #define ADDR_AIM_SPRITES_A       0x004FC8C8u  /* AM2_Sprite *[6], set 19 idx 4 */
+/* 0x00412120, two callers. ReleaseSprite over all six of those, by walking
+ * 0x004FC8C8 to 0x004FC8E0 four bytes at a time -- so the count is the
+ * DISTANCE between two globals rather than a literal, and it is 6. Named from
+ * the body: nothing else in it says what the sprites are for. */
+#define ADDR_FREE_AIM_SPRITES    0x00412120u  /* void(void) */
 #define ADDR_AIM_LIVE_A          0x004FC8E0u  /* int32_t[4], per army */
 #define ADDR_AIM_POINT_A         0x004FC8F0u  /* {int16 x, int16 y}[4] */
 #define ADDR_AIM_STAMP_A         0x004FC900u  /* int32_t[4], game-clock ms */
@@ -1907,6 +1912,10 @@
 #define ADDR_SEQ_STEP7           0x00461700u
 #define ADDR_SEQ_RUN_BOTH        0x00461930u  /* void(void) */
 #define ADDR_SEQ_CTX_A           0x00664580u
+/* 0x00461120, two callers. The sequence subsystem coming down: the same
+ * releaser over CTX_B then CTX_A, then two more calls in the same band. Named
+ * for the two globals it names, which is as far as the body goes. */
+#define ADDR_FREE_SEQ_CONTEXTS   0x00461120u  /* void(void) */
 #define ADDR_SEQ_CTX_B           0x006640B0u
 #define ADDR_RELEASE_SPRITE      0x00445D80u  /* void(AM2_Sprite *) */
 #define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
@@ -10956,6 +10965,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0x004260C9 -- no call site anywhere -- which is why a reachability scan that
  * looks for `call` and `push imm32` reports it as dead code. It calls
  * ADDR_STOP_ALL_SOUNDS as its second instruction-level call. */
+/* Two of LevelTeardown's twenty-five callees have no name and get a
+ * placeholder rather than a guess, which is the ShutdownSubsystems precedent:
+ * the ORDER is the fact worth keeping and a name each would be a guess each.
+ * 0x0040A6A0 is a one-instruction `jmp` into the middle of another entry;
+ * 0x00463360 is eight chained calls in the band above the nominal CRT line. */
+#define ADDR_TEARDOWN_40A6A0     0x0040A6A0u  /* void(void) */
+#define ADDR_TEARDOWN_463360     0x00463360u  /* void(void) */
 #define ADDR_LEVEL_TEARDOWN      0x004256F0u  /* void(void), on leaving a level */
 /* Sub-state 34 of ADDR_STATE2_FRAME's table, and the only in-mission code that
  * reads a key and raises a menu request. The test is `!IsKeyDown(ESC) &&

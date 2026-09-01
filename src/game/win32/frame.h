@@ -38,6 +38,10 @@ void __cdecl FramePost(void);
 void __cdecl State0Frame(void);
 void __cdecl State1Frame(void);
 void __cdecl State2Frame(void);
+
+/* 0x004256F0. Leaving a level: delete whatever dialog is up, then twenty-four
+ * subsystem teardowns in the original's order, then commit the state change. */
+void __cdecl LevelTeardown(void);
 void __cdecl State3Frame(void);
 void __cdecl State4Frame(void);
 
