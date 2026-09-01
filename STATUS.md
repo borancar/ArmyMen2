@@ -9,7 +9,65 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,369 patches.**
+Nothing uncommitted. **1,370 patches.**
+
+**`CreateExplosion` (`0x00422860`)** -- twenty-three callers, one of them
+itself, and it was `ADDR_SPAWN_AT` with `orig.h` saying of it and its
+neighbour "what either is FOR is not established".
+
+**It is established by the WRITER/READER PAIR, not by either alone.** Every
+field it fills already carried a `BLAST_OFF_` name given by `StepType6`, which
+reads them all back -- and the six of them are exactly the type-6 save record,
+0x28 bytes with nothing left over. `TYPE6_REC_OFF_KIND`, `_EXTRA` and `_UID`
+were the only three named; the other four are named now and the record is
+closed. Three further things agree: it hands `ObjInitCommon` type 6, it puts
+`explosions.ani` on the row it builds, and the "Duck and cover!" cheat fires
+two hundred of them across the view.
+
+**Five private typedefs of it existed across four modules** -- air.cpp,
+gameproc.cpp, item.cpp twice and win32/widget.cpp -- all agreeing on
+`(x, y, kind, army, uid, extra, e, f, g, h)`. All five are gone. The agreement
+is why the first four arguments needed no re-derivation; what the typedefs had
+nothing to say about is that arguments 5 and 9 are TWO DIFFERENT UIDS -- the
+attacker `StepType6` blames, and the object's own.
+
+**The arms pass a hard zero as the army and it does not look like one.** Each
+arm that makes a kind-7 object reads `OBJ_OFF_ARMY` off the object with
+`movsx` -- but the constructor does not write that field until the
+`ObjInitCommon` call further down, so at arm time it is still the zero the
+memset left. Reproduced with the read written out, because deleting it would
+hide that the original looks like it meant to pass the army.
+
+**One pair, drawn in two layers.** Kind 0x85 recurses to make a 0x86 four units
+below itself and then sits two units above where it was asked for, and the two
+take depth keys of 999 and 1001 where every other kind takes 10000 -- so they
+straddle whatever draws at 1000. **And the blast rect is translated by the
+ORIGINAL y in both halves**, so the damage is not where the sprite is.
+Reproduced; it is the same register the whole way down.
+
+**Kind 0x7B scatters on position**: its arm makes its kind-7 object only where
+`(x & 0x0B) == 1`, one x in eight, deterministic rather than random. Nothing
+else in the image tests a coordinate this way. It is also the only arm that
+leaves the mode at zero and the sound unarmed.
+
+**`tools/explcheck.py` enumerates the whole kind table**, which no A/B can:
+nothing in the suite reaches combat, and even in a live mission a wrong arm
+changes a blast radius and a sound rather than a log line. 272 cases over the
+thirty kinds plus four out of range, comparing all six blast fields, the
+translated rect, the row's depth key and `MakeKind7`'s arguments. Everything
+below the constructor is hooked -- the CRT's malloc reaches `HeapAlloc`, which
+does not exist under emulation, and the five game callees read map globals that
+are `.bss` zeros here.
+
+**Four mutations, and the fourth is the one worth recording.** Dropping a kind
+from the 16-radius arm fails 24 cases, widening the scatter mask fails 2,
+swapping two blast areas fails 16 -- and swapping the two depth keys PASSED,
+because the `sed` that was meant to make it did not match the indentation. The
+edit was verified and re-run: 8 cases. That is CLAUDE.md's "check the mutation
+landed" caught in the act, on the one direction of four that would otherwise
+have been credited.
+
+`make check` runs 26 tools now.
 
 **`DefParseBoolean` (`0x0041A2D0`)** -- the third of `DefParseNumber`'s family,
 and it sits between the integer form and `DefParseInfoFile` in the image as
@@ -3955,14 +4013,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,197 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 42
-outstanding, which is 1,239 minus 1,197 -- from 1,369 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,198 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 41
+outstanding, which is 1,239 minus 1,198 -- from 1,370 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-six batches have gone in and NOTHING SMALL IS LEFT: the
-42 entries outstanding start at **672 bytes** -- `0x00447620`, which is
+small ones in batches. A hundred and thirty-seven batches have gone in and NOTHING SMALL IS LEFT: the
+41 entries outstanding start at **672 bytes** -- `0x00447620`, which is
 `CreateTrooper` and is deferred rather than unread -- and the median is
 **1,168**.
 The sentence here used to say they started at 96 and name the MSVC static-init

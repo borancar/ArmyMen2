@@ -8391,11 +8391,10 @@ uint8_t __cdecl MpNamePaper(int32_t row)
 #define g_hudWidgetB (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)
 #define g_hudWidgetC (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C)
 
-typedef void (__cdecl *AM2_SpawnAtFn2)(int32_t x, int32_t y, int32_t kind,
-                                       int32_t army, uint32_t uid,
-                                       int32_t extra, int32_t e, int32_t f,
-                                       int32_t g, int32_t h);
-#define orig_spawn_at_aim ((AM2_SpawnAtFn2)(uintptr_t)ADDR_SPAWN_AT)
+/* The FIFTH private typedef of the ten-argument creator, and the one that made
+ * the count worth stating: it is CreateExplosion, reconstructed in item.cpp,
+ * and all five are gone. */
+#define orig_spawn_at_aim CreateExplosion
 
 /* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
  * of an aim marker, and the pair is now complete: THIS ONE DOES THE DAMAGE and

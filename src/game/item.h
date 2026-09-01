@@ -118,6 +118,15 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint);
 /* 0x00422B90, one caller. The step for an EXPLOSION -- a deadline, a one-shot
  * sound, a blast over everything in its rect, and above mode 5 a scorch decal
  * and a screen shake. Its counter reads 0 because its caller is ours. */
+/* 0x00422860, twenty-three callers and one of them itself. Make a type-6
+ * EXPLOSION: the kind is an index into explosions.ani, `src` is the attacker
+ * uid StepType6 will blame, `damage` and the blast rect are what it applies,
+ * and a `delay` above zero both sets the deadline and hides the rows until it
+ * passes. Was ADDR_SPAWN_AT. */
+void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
+                              uint32_t src, int32_t damage, int32_t delay,
+                              int32_t unused, uint32_t uid, int32_t facing);
+
 void __cdecl StepType6(void *obj);
 
 int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,

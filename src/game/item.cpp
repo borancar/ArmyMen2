@@ -1183,16 +1183,10 @@ typedef void *(__cdecl *AM2_ObjectsAtFn)(const uint32_t *pt, void *desc);
 typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
 /* Still original: the tail both death handlers share, and the ten-argument
- * maker. The second was already declared further down this file, so it moved
- * up here rather than being written a second time -- its fifth argument is a
- * uid at that other site, which is why it is uint32_t and why this caller
- * passes a plain 0 rather than inventing a name for it. */
+ * maker. Both seams are gone with it: the ten-argument creator is
+ * CreateExplosion and is reconstructed below, so both call sites name it. */
 /* AM2_DiedTailFn went with its seam: TrooperDiedTail is ours now. */
-typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
-                                      int32_t army, uint32_t uid, int32_t extra,
-                                      int32_t e, int32_t f, int32_t g,
-                                      int32_t h);
-#define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
+#define orig_spawn_at          CreateExplosion
 
 /* ApplyHeightItem -- original 0x00433C20, three callers.
  *
@@ -4761,13 +4755,9 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 
 /* DamageItem is reconstructed below and called by name.
  *
- * SpawnAt is still original and reached by address -- the same ten-argument
- * creator air.cpp and gameproc.cpp already spell this way. */
-typedef void *(__cdecl *AM2_ItemSpawnFn)(int32_t x, int32_t y, int32_t kind,
-                                         int32_t army, uint32_t uid,
-                                         int32_t extra, int32_t e, int32_t f,
-                                         int32_t g, int32_t h);
-#define SpawnAt ((AM2_ItemSpawnFn)(uintptr_t)ADDR_SPAWN_AT)
+ * SpawnAt was a macro over the image here; the function is CreateExplosion and
+ * is reconstructed further down, so the call sites below name it. */
+#define SpawnAt CreateExplosion
 #define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 
 typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
@@ -10628,6 +10618,163 @@ int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
     }
 }
 
+/* CreateExplosion -- original 0x00422860, twenty-three callers and one of them
+ * itself. This was ADDR_SPAWN_AT, and orig.h said of it and its neighbour
+ * "what either is FOR is not established".
+ *
+ * IT IS ESTABLISHED BY THE WRITER/READER PAIR, not by either alone. Every
+ * field it fills already carried a BLAST_OFF_ name -- given by StepType6
+ * directly below, which reads them all back -- and the six of them are exactly
+ * the type-6 save record, 0x28 bytes with nothing left over. Three further
+ * things agree: it hands ObjInitCommon type 6, it puts ADDR_EXPLOSION_ANIMS
+ * (explosions.ani) on the row it builds, and the "Duck and cover!" cheat fires
+ * two hundred of them across the view.
+ *
+ * THE KIND IS AN ANIMATION FRAME. It goes to SetAnimFrame unchanged at the
+ * end, so the thirty kinds are indices into explosions.ani; the switch that
+ * uses them covers exactly 0x78..0x95 and anything outside takes the default.
+ *
+ * THE ARMS PASS A HARD ZERO AS THE ARMY AND IT DOES NOT LOOK LIKE ONE. Each
+ * arm that makes a kind-7 object reads OBJ_OFF_ARMY off the object with
+ * `movsx` -- but the constructor does not write that field until the
+ * ObjInitCommon call further down, so at arm time it is still the zero the
+ * memset left. Reproduced with the read written out, because removing it would
+ * hide the fact that the original looks like it meant to pass the army.
+ *
+ * ONE PAIR, DRAWN IN TWO LAYERS. Kind 0x85 recurses to make a 0x86 four units
+ * BELOW itself and then sits two units ABOVE where it was asked for, and the
+ * two take depth keys of 999 and 1001 where every other kind takes 10000 --
+ * so they straddle whatever draws at 1000. The recursion passes zeros for the
+ * last three arguments, so the second half gets no uid and no facing.
+ *
+ * AND THE RECT IS TRANSLATED BY THE ORIGINAL Y IN BOTH HALVES. The point moves
+ * to y-2 for kind 0x85 but the blast area is offset by the y that came in, so
+ * the damage is not where the sprite is. Reproduced; it is the same `ebx` the
+ * whole way down and nothing suggests it is deliberate.
+ *
+ * KIND 0x7B SCATTERS ON POSITION. Its arm makes its kind-7 object only where
+ * (x & 0x0B) == 1 -- one x in eight, deterministic rather than random, and
+ * nothing else in the image tests a coordinate this way. It is also the only
+ * arm that leaves BLAST_OFF_MODE at zero and BLAST_OFF_SOUND_PENDING clear, so
+ * a 0x7B is silent and takes no spawn path.
+ *
+ * A DELAY HIDES THE ROWS. `delay` above zero sets BLAST_OFF_DUE_MS to the
+ * clock plus it AND calls SubrecHideRows, so a delayed blast is invisible
+ * until StepType6's deadline passes. At zero it neither sets the deadline nor
+ * hides anything.
+ *
+ * TWO UIDS, AND THEY ARE NOT THE SAME ONE. `src` goes to BLAST_OFF_SOURCE_UID,
+ * which StepType6 hands DamageObject as the attacker; `uid` goes to
+ * ObjInitCommon and becomes the object's own. The four private typedefs that
+ * spelled this function before called the first of them "uid" and had nothing
+ * to say about the second. */
+void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
+                              uint32_t src, int32_t damage, int32_t delay,
+                              int32_t unused, uint32_t uid, int32_t facing)
+{
+    uint8_t  *o = (uint8_t *)am2_malloc(AM2_EXPLOSION_BYTES);
+    uint8_t  *rows;
+    uint32_t  at;
+    int16_t   depth = AM2_EXPL_DEPTH_DEFAULT;
+    int32_t   tile;
+
+    memset(o, 0, AM2_EXPLOSION_BYTES);
+
+    ((int16_t *)&at)[0] = (int16_t)x;
+    ((int16_t *)&at)[1] = (int16_t)y;
+
+    if (kind == AM2_EXPL_KIND_PAIR_LOW) {
+        CreateExplosion(x, y + AM2_EXPL_PAIR_DY, AM2_EXPL_KIND_PAIR_HIGH,
+                        army, src, damage, delay, 0, 0, 0);
+        ((int16_t *)&at)[1] = (int16_t)(y + AM2_EXPL_PAIR_SELF_DY);
+        depth = AM2_EXPL_DEPTH_UNDER;
+    } else if (kind == AM2_EXPL_KIND_PAIR_HIGH) {
+        depth = AM2_EXPL_DEPTH_OVER;
+    }
+
+    *(int32_t *)(o + BLAST_OFF_DAMAGE)     = damage;
+    *(int32_t *)(o + OBJ_OFF_FIELD_94)     = kind;
+    memcpy(o + BLAST_OFF_RECT, (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_16),
+           sizeof(AM2_Rect));
+    *(uint32_t *)(o + BLAST_OFF_SOURCE_UID) = src;
+
+    /* The army read below is the object's own field, which is still zero --
+     * see the note above. */
+    switch (kind) {
+    case 0x78: case 0x82: case 0x8C: case 0x94:
+        *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_16;
+        memcpy(o + BLAST_OFF_RECT,
+               (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_16),
+               sizeof(AM2_Rect));
+        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
+        break;
+
+    case 0x81: case 0x95:
+        *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_24;
+        memcpy(o + BLAST_OFF_RECT,
+               (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_24),
+               sizeof(AM2_Rect));
+        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
+        break;
+
+    case 0x83: case 0x8A: case 0x8B:
+        *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_32;
+        memcpy(o + BLAST_OFF_RECT,
+               (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_32),
+               sizeof(AM2_Rect));
+        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
+        break;
+
+    case 0x7B:
+        if (((uint8_t)x & AM2_EXPL_SCATTER_MASK) == AM2_EXPL_SCATTER_VALUE)
+            MakeKind7(at, 1, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_NONE;
+        break;
+
+    default:
+        *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_NONE;
+        break;
+    }
+
+    ((AM2_Rect *)(o + BLAST_OFF_RECT))->left   += x;
+    ((AM2_Rect *)(o + BLAST_OFF_RECT))->right  += x;
+    ((AM2_Rect *)(o + BLAST_OFF_RECT))->top    += y;
+    ((AM2_Rect *)(o + BLAST_OFF_RECT))->bottom += y;
+
+    if (delay > 0)
+        *(int32_t *)(o + BLAST_OFF_DUE_MS) =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + delay;
+
+    *(int8_t *)(o + OBJ_OFF_ARMY) = (int8_t)army;
+    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                  AM2_OBJ_TYPE_EXPLOSION, at,
+                  (const int32_t *)AM2_IMAGE(ADDR_EXPLOSION_BOX),
+                  unused, uid);
+
+    tile = TileOfPoint(at);
+    *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
+        (uint8_t)((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)[tile]
+                  + AM2_EXPL_HEIGHT_BIAS);
+
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
+                (const void *)AM2_IMAGE(ADDR_EXPLOSION_ROW_SPEC), x, y,
+                (const void *)(uintptr_t)ADDR_ZERO_RECT);
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+        (const void *)(uintptr_t)ADDR_EXPLOSION_ANIMS;
+    *(int16_t *)(rows + ROW_OFF_FIELD_26) = depth;
+
+    if (delay > 0)
+        SubrecHideRows(o + OBJ_OFF_SUBRECORD);
+
+    SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS), (int16_t)kind, 1);
+    return o;
+}
+
 /* 0x00422B90, one caller -- the per-type step dispatcher's type 6 arm, which
  * is an EXPLOSION. See orig.h for how that was identified and for why its
  * fields carry BLAST_OFF_ names rather than the OBJ_OFF_ ones that share those
@@ -11598,6 +11745,8 @@ void item_install(void)
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
     patch_replace(ADDR_STEP_TYPE6, (const void *)StepType6, "StepType6", 1);
+    patch_replace(ADDR_CREATE_EXPLOSION, (const void *)CreateExplosion,
+                  "CreateExplosion", 23);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,
                   "CanPickUpWeapon", 2);
     patch_replace(ADDR_ON_SELECTION_CHANGED, (const void *)OnSelectionChanged,

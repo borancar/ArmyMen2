@@ -7182,7 +7182,57 @@ typedef struct {
  * is a type id being matched, not a count. 0x006622BC is read at exactly one
  * site, this one, and passed straight through as an argument. */
 #define ADDR_OBJ_MOVE_ALONG_FACING 0x00429040u /* void(obj, int32, int32, int32) */
-#define ADDR_SPAWN_AT              0x00422860u /* void(x, y, kind, army, uid, ...) */
+/* CreateExplosion, and it was ADDR_SPAWN_AT with the note above saying "what
+ * either is FOR is not established". It is established now, and by the
+ * WRITER/READER PAIR this file keeps recommending rather than by either alone:
+ * every field it fills already carries a BLAST_OFF_ name given by StepType6,
+ * which reads them back. It hands ObjInitCommon type 6, puts
+ * ADDR_EXPLOSION_ANIMS on the row it builds, and the "Duck and cover!" cheat
+ * fires two hundred of them across the view. Renamed, not aliased. */
+#define ADDR_CREATE_EXPLOSION      0x00422860u /* void *(x,y,kind,army,src,
+                                                *        damage,delay,unused,
+                                                *        uid,facing) */
+/* The kinds are indices into explosions.ani, straight through to
+ * SetAnimFrame, and the switch covers exactly this range -- anything outside
+ * takes the default arm. */
+#define AM2_EXPL_KIND_FIRST        0x78
+#define AM2_EXPL_KIND_LAST         0x95
+/* THE ONE PAIR. Kind 0x85 spawns a 0x86 four units BELOW itself and then sits
+ * two units ABOVE where it was asked for, and the two take depth keys either
+ * side of 1000 where everything else takes 10000. So the pair is drawn as one
+ * effect in two layers; the rect it damages is translated by the ORIGINAL y in
+ * both, not the shifted one. */
+#define AM2_EXPL_KIND_PAIR_LOW     0x85
+#define AM2_EXPL_KIND_PAIR_HIGH    0x86
+#define AM2_EXPL_PAIR_DY           4
+#define AM2_EXPL_PAIR_SELF_DY      (-2)
+#define AM2_EXPL_DEPTH_DEFAULT     0x2710  /* 10000 */
+#define AM2_EXPL_DEPTH_UNDER       0x3E7   /* 999 */
+#define AM2_EXPL_DEPTH_OVER        0x3E9   /* 1001 */
+/* The four rects, and only this function reads any of them. The first is the
+ * object's own box; the other three are blast areas of radius 16, 24 and 32
+ * that the arms choose between, and the default one is written before the
+ * switch so an arm that picks nothing still leaves the 16. */
+#define ADDR_EXPLOSION_BOX         0x004788E0u /* AM2_Rect (-24,-24,24,24) */
+#define ADDR_EXPLOSION_AREA_16     0x004788F0u /* also the pre-switch default */
+#define ADDR_EXPLOSION_AREA_24     0x00478900u
+#define ADDR_EXPLOSION_AREA_32     0x00478910u
+#define ADDR_EXPLOSION_ROW_SPEC    0x00478920u /* int32[4], (0,0,48,48) */
+/* What each arm puts in BLAST_OFF_MODE. StepType6 takes the spawn path at 5 or
+ * more, so 5, 7 and 9 all spawn and 0 does not -- and the three that spawn are
+ * exactly the three that also arm BLAST_OFF_SOUND_PENDING. */
+#define AM2_BLAST_MODE_16          5
+#define AM2_BLAST_MODE_24          7
+#define AM2_BLAST_MODE_32          9
+#define AM2_BLAST_MODE_NONE        0
+/* Kind 0x7B's arm makes its kind-7 object only where (x & 0x0B) == 1 -- one x
+ * in eight, deterministic on position rather than random. Reproduced; nothing
+ * else in the image tests a coordinate this way. */
+#define AM2_EXPL_SCATTER_MASK      0x0Bu
+#define AM2_EXPL_SCATTER_VALUE     1
+/* Added to the tile's terrain attribute to make the object's height. */
+#define AM2_EXPL_HEIGHT_BIAS       0x20
+#define AM2_EXPLOSION_BYTES        0xBCu
 /* 0x00417890, one caller, and that caller prints "Duck and cover!" one
  * instruction earlier -- so this is the cheat's effect: 200 SpawnAt calls at
  * random points across the view, six kinds, each with a random delay. */
@@ -11570,9 +11620,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Three fields of the type 6 record that LoadType6 hands to ADDR_SPAWN_AT
  * before it copies the record in -- so the object is MADE from them and then
  * overwritten by them. Named for the argument each becomes. */
-#define TYPE6_REC_OFF_KIND    0x00u
-#define TYPE6_REC_OFF_EXTRA   0x04u
-#define TYPE6_REC_OFF_UID     0x24u
+/* THE RECORD IS FULLY ACCOUNTED FOR NOW, and CreateExplosion is what accounts
+ * for it: the six fields below are the six the constructor writes, and each is
+ * OBJ_OFF_FIELD_94 plus the BLAST_OFF_ offset StepType6 reads it back at.
+ * 0x00 + 0x04 + 0x10 of rect + 0x04 + 0x04 + 0x04 + 0x04 is 0x28, which is
+ * AM2_TYPE6_RECORD_SIZE exactly. */
+#define TYPE6_REC_OFF_KIND    0x00u   /* -> OBJ_OFF_FIELD_94 */
+#define TYPE6_REC_OFF_EXTRA   0x04u   /* -> BLAST_OFF_DAMAGE */
+#define TYPE6_REC_OFF_RECT    0x08u   /* -> BLAST_OFF_RECT */
+#define TYPE6_REC_OFF_DUE_MS  0x18u   /* -> BLAST_OFF_DUE_MS */
+#define TYPE6_REC_OFF_SOUND   0x1Cu   /* -> BLAST_OFF_SOUND_PENDING */
+#define TYPE6_REC_OFF_MODE    0x20u   /* -> BLAST_OFF_MODE */
+#define TYPE6_REC_OFF_UID     0x24u   /* -> BLAST_OFF_SOURCE_UID */
 #define AM2_ITEM_HEADER_TAG   0x6660000u
 #define ADDR_SAVE_ITEM_HEADER 0x00428730u  /* int32_t(FILE *, obj) */
 #define ADDR_SAVE_TYPE1       0x00433D20u

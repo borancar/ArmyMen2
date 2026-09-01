@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **25** analysis
+**`make check` runs everything that does not need the game.** **26** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -511,6 +511,16 @@ it was the numbered headings in the EULA that ships beside the scripts, which
 the corpus includes because it takes every `.txt` under the prefix and not only
 the ones the game loads. **Take the whole corpus, including the parts that are
 not input.**
+
+**AND A `sed` THAT DOES NOT MATCH THE INDENTATION IS A MUTATION THAT NEVER
+LANDED.** `tools/explcheck.py` was checked in four directions and the fourth --
+swapping the two depth keys of the 0x85/0x86 pair -- came back "all identical".
+The edit had matched nothing: the anchor was written with twelve spaces and the
+line has eight. Grepped for the replacement, saw it was absent, redid it, and
+the mutation fails 8 cases. This file already records the same thing happening
+to a `case` column in the action-parser probe; it is the second instance, and
+the cheap defence is to `grep` for the MUTATED text before believing the run,
+not to eyeball the `sed`.
 
 **A CORPUS DERIVED FROM THE MODEL UNDER TEST CANNOT FAIL AGAINST IT.**
 `tools/boolcheck.py` built its token list from the same two tuples its

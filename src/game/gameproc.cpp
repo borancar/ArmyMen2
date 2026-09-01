@@ -1384,14 +1384,10 @@ int32_t __cdecl SaveType5(am2_FILE *fp, void *obj)
     return 1;
 }
 
-/* Still original: the ten-argument maker, declared here as item.cpp declares
- * it -- same address, same shape, and the two modules are not each other's
- * headers. */
-typedef void *(__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
-                                       int32_t army, uint32_t uid,
-                                       int32_t extra, int32_t e, int32_t f,
-                                       int32_t g, int32_t h);
-#define orig_spawn_at ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
+/* The ten-argument maker is CreateExplosion and is reconstructed in item.cpp,
+ * whose header this file already includes. Four private typedefs of it existed
+ * across three modules; all four are gone. */
+#define orig_spawn_at CreateExplosion
 
 /* 0x00422780, one caller. The type 6 loader.
  *

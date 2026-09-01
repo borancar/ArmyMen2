@@ -1216,12 +1216,9 @@ typedef void (__cdecl *AM2_AirStrikeFn)(uint32_t at, int32_t army);
 #define orig_air_pass_strike \
     ((AM2_AirStrikeFn)(uintptr_t)ADDR_AIR_PASS_STRIKE)
 
-/* SpawnAt, still original -- the ten-argument creator LoadType6 uses too. */
-typedef void *(__cdecl *AM2_SpawnFn)(int32_t x, int32_t y, int32_t kind,
-                                     int32_t army, uint32_t uid, int32_t extra,
-                                     int32_t e, int32_t f, int32_t g,
-                                     int32_t h);
-#define orig_spawn_at ((AM2_SpawnFn)(uintptr_t)ADDR_SPAWN_AT)
+/* The ten-argument creator is CreateExplosion and is reconstructed in
+ * item.cpp, so the two call sites below name it. */
+#define orig_spawn_at CreateExplosion
 
 /* AirDeliver -- original 0x004093D0, one caller. What the head of the air
  * support queue actually DOES, dispatched on its AIR_OFF_KIND: kind 1 pushes a
