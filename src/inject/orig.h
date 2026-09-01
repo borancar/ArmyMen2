@@ -2312,7 +2312,12 @@
                                            * 0x0040ED3C names it */
 #define COMM_OFF_SEND_BUF        0x3E8u   /* game heap */
 #define COMM_OFF_RECV_BUF        0x3F0u   /* game heap */
-#define ADDR_REMOVE_PLAYER       0x004029B0u  /* void(uint32 id), 7 callers */
+/* IT NAMES ITSELF TWICE -- "DestroyFlow: Flow queue for Player %x not found"
+ * and "...for me (%x) not found" -- where ADDR_REMOVE_PLAYER was a name off a
+ * call site. It reclaims a departing player's queued messages by SIMULATING
+ * ACKS for them, and can UNPAUSE the game if that refills the pool.
+ * Reconstructed. */
+#define ADDR_DESTROY_FLOW        0x004029B0u  /* int32(uint32 id), 7 callers */
 /* The pause mask and its pair of accessors, and all three name themselves:
  * 0x004267C0 logs "PauseGame: %x (set: %x)" and 0x00426800 logs
  * "UnPauseGame: %x (reset: %x)". They went in as event flags, which is what
@@ -6122,6 +6127,10 @@ typedef struct {
  * packet whose PACKET_OFF_SEQ is below +0x0C, and stamps PACKET_OFF_ACK from
  * +0x04. Field-numbered, since one reader is not a meaning -- read a writer
  * before relying on either. */
+/* DrainMsgList is handed `flow + 0x78`, and that function takes a message
+ * list -- so this offset IS the flow's queue. Named from its one use, which
+ * is enough here only because the callee's own type says what it is. */
+#define FLOW_OFF_QUEUE             0x78u
 #define FLOW_OFF_FIELD_04          0x04u
 #define FLOW_OFF_FIELD_0C          0x0Cu
 #define FLOW_OFF_READY             0x88u
@@ -6557,6 +6566,13 @@ typedef struct {
 /* The pause bits that mean "the map is still loading", which is what puts the
  * wait bitmap up. Four bits, 17 through 20, tested as a group. */
 #define AM2_PAUSE_MAP_WAIT        0x1E0000u
+/* The transport's own reason for pausing: the send pool has run dry.
+ * DestroyFlow clears it once reclaiming a departing player's buffers has put
+ * the pool back above AM2_FLOW_UNPAUSE_FREE, so a player LEAVING is one of
+ * the things that can restart a stalled game. */
+#define AM2_PAUSE_NO_BUFFERS      0x8000u
+#define AM2_FLOW_UNPAUSE_FREE     0x12C    /* 300 free buffers */
+#define AM2_PLAYER_RECORDS        6        /* 0x004F1980..0x004F48C0 */
 /* 0x00462600, 1088 bytes. Whatever the paused mission frame drives before it
  * considers the wait bitmap; stays original and unnamed, since nothing here
  * says what it is. */

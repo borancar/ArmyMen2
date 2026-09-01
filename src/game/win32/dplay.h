@@ -263,6 +263,11 @@ int32_t __cdecl MsgListTakeFlags(void *list, void *dst);
  * the frame. Cold: needs a live DirectPlay session. */
 void __cdecl ProcessResendQueue(void);
 
+/* 0x004029B0, seven callers. Tear down one player's flow queue: reclaim
+ * everything still queued for them by treating it as acknowledged, and free
+ * the record. Can UNPAUSE the game when that refills the buffer pool. */
+int32_t __cdecl DestroyFlow(uint32_t id);
+
 /* 0x00401150, one caller. Insert a node in ascending key order under the
  * list's mutex, and answer the node. */
 void *__cdecl MsgListInsert(void *list, void *node);

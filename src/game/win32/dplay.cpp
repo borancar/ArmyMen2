@@ -273,11 +273,11 @@ typedef void (__cdecl *am2_comm_void_fn)(void);
  * twelve bytes late -- so the file that had the right base kept it to itself.
  * One pair of names now. */
 
-/* ADDR_REMOVE_PLAYER, still original -- the packet layer's own bookkeeping.
+/* DestroyFlow is reconstructed now -- the packet layer's own bookkeeping.
  * Declared here rather than beside its other caller further down because
  * CommRemovePlayer needs it first. */
-typedef void (__cdecl *am2_remove_player_fn)(uint32_t id);
-#define orig_remove_player     (*(am2_remove_player_fn)ADDR_REMOVE_PLAYER)
+/* am2_remove_player_fn went with its seam: DestroyFlow is ours. Its two
+ * spellings differed only in signedness, which is why neither was wrong. */
 
 /* CommRegisterSelf -- original 0x004027F0, five callers. Give a DirectPlay id
  * a player record -- what the flow-control code calls a FlowQ and CommSend
@@ -435,7 +435,7 @@ int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id)
             comm_u32(comm, COMM_OFF_PLAYER_COUNT));
 
     if (id != -1)
-        orig_remove_player((uint32_t)id);
+        DestroyFlow((uint32_t)id);
 
     comm  = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     index = *(const int32_t *)(comm + COMM_OFF_PLAYERS
@@ -989,7 +989,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
         /* Remote players are destroyed; ours is left for the call below. */
         id = comm_u32(slot, COMM_SLOT_OFF_ID);
         if (id && id != ours)
-            orig_remove_player(id);
+            DestroyFlow(id);
         comm_u32(slot, COMM_SLOT_OFF_ID) = 0;
 
         comm_u32(slot, 0x58) = 0;
@@ -998,7 +998,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
         memset(slot + 0x0C, 0, 0x40);
     }
 
-    orig_remove_player(ours);
+    DestroyFlow(ours);
     comm_u32(self, COMM_OFF_OUR_PLAYER_ID) = 0;
 
     if (*lobby) {
@@ -2385,7 +2385,7 @@ int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id)
     if (!id || id == -1)
         return 0;
 
-    orig_remove_player((uint32_t)id);
+    DestroyFlow((uint32_t)id);
 
     slot = CommPlayerSlot(c, id);
 
@@ -2500,6 +2500,144 @@ int32_t __cdecl CommGlobalInit(void)
 {
     CommGlobalCtorThunk();
     return CommGlobalAtExit();
+}
+
+/* DestroyFlow -- original 0x004029B0, 544 bytes, seven callers. Tear down one
+ * player's flow queue when they leave: reclaim everything still queued for
+ * them, and free the record.
+ *
+ * IT NAMES ITSELF TWICE -- "DestroyFlow: Flow queue for Player %x not found"
+ * and "...for me (%x) not found" -- where orig.h had ADDR_REMOVE_PLAYER, a
+ * name off a call site. Fifth function this batch named from its own strings.
+ *
+ * IT NEEDED NO NEW NAMES AT ALL, which is worth recording as a measure of how
+ * far the comm vocabulary has come: FLOW_OFF_SEQUENCE, ADDR_MSG_LIST_C,
+ * ADDR_MSG_LIST_POOL, ADDR_PLAYER_SLOT_MASK, ADDR_PLAYER_RECORDS,
+ * AM2_PLAYER_RECORD_BYTES, MsgListSetFlag, MsgListRemove, MsgListAdd and
+ * FindPlayerById were all already there. Early units in this batch cost eight
+ * or nine names each.
+ *
+ * "SIMULATING ACKS" IS THE WHOLE IDEA. The departing player can no longer
+ * acknowledge anything, so every message queued between their last ack and our
+ * own FLOW_OFF_SEQUENCE is treated as if they had -- and any that no OTHER
+ * connected player still wants, by ADDR_PLAYER_SLOT_MASK against the node's
+ * own bits, goes back on the free pool.
+ *
+ * AND IT CAN UNPAUSE THE GAME, which its name gives no hint of. The transport
+ * pauses play when the send pool runs dry -- bit 0x8000 of the pause mask,
+ * which CLAUDE.md records as "one bit per reason the game is paused" -- and
+ * once reclaiming has put the pool back above 300 buffers this clears that
+ * reason. So a player leaving is one of the things that can restart a stalled
+ * game.
+ *
+ * THE RECORD ARRAY IS SIX ENTRIES and I first read it as eight by eyeballing
+ * the bounds instead of dividing: (0x4F48C0 - 0x4F1980) / 0x7E0 is 6, and
+ * ADDR_PLAYER_RECORDS already said "six of them". The index arithmetic is the
+ * compiler expanding that multiply -- `(i << 6) - i` then `<< 5` is i * 0x7E0
+ * -- and reading it as a shift pair gives a wrong stride.
+ *
+ * ITS FIRST LOG LINE NAMES THE WRONG PLAYER. "Flow queue for Player %x not
+ * found" is handed COMM_OFF_OUR_PLAYER_ID, not the `id` that failed to
+ * resolve, so the diagnostic points at us rather than at whoever left. The
+ * original's, and reproduced -- but worth knowing before trusting that line
+ * in a capture.
+ *
+ * ONE NEAR-MISS WORTH RECORDING: I had 0x00401040 down as `MsgListCount`,
+ * because the log beside it says "sendqueue Size = %d". It is MsgField12 --
+ * a field read, not a count. Naming a CALLEE from what the surrounding log
+ * message seems to mean is the same mistake as naming a function from one
+ * call site, one level down.
+ *
+ * COLD: nothing here runs without a live DirectPlay session. Verified by
+ * reading; a clean A/B says only that nothing else regressed.
+ */
+int32_t __cdecl DestroyFlow(uint32_t id)
+{
+    uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t *flow;
+    uint8_t *mine;
+    int32_t  seq;
+    int32_t  i;
+
+    if (!id || id == 0xFFFFFFFFu)
+        return 0;
+
+    flow = (uint8_t *)FindPlayerById(id);
+    if (!flow)
+        orig_log("DestroyFlow: Flow queue for Player %x not found\n",
+                 *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID));
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("About to Destroy FlowQ for id %x sendqueue Size = %d \n",
+                 id, MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_C));
+
+    if (!flow)
+        return 0;
+
+    mine = (uint8_t *)FindPlayerById(
+               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID));
+    if (!mine) {
+        orig_log("DestroyFlow: Flow queue for me (%x) not found\n",
+                 *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID));
+        return 0;
+    }
+
+    DrainMsgList(flow + FLOW_OFF_QUEUE);
+
+    if (id != *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
+        uint32_t mask = GetReSendMask(id);
+
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log(" Simulating Acks for  seq %d thru %d\n",
+                     *(const int32_t *)(flow + FLOW_OFF_FIELD_0C) + 1,
+                     *(const int32_t *)(mine + FLOW_OFF_SEQUENCE) - 1);
+
+        for (seq = *(const int32_t *)(flow + FLOW_OFF_FIELD_0C) + 1;
+             seq <= *(const int32_t *)(mine + FLOW_OFF_SEQUENCE) - 1; seq++) {
+            uint8_t *node = (uint8_t *)MsgListSetFlag(
+                (void *)(uintptr_t)ADDR_MSG_LIST_C, seq, 0, mask);
+
+            if (!node)
+                continue;
+            if (*(const uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK
+                & *(const uint32_t *)(node + MSGNODE_OFF_FLAGS))
+                continue;   /* somebody still connected wants it */
+
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                orig_log("Adding to freelist from sendque Buffer seq %d "
+                         " elelment %x \n",
+                         *(const int32_t *)(node + MSGNODE_OFF_KEY), node);
+
+            MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_C, node);
+            MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+        }
+    }
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("Finished Destroying FlowQ for id %x sendqueue Size = %d \n",
+                 id, MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_C));
+
+    {
+        int32_t nfree = MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
+
+        if (nfree > AM2_FLOW_UNPAUSE_FREE
+            && (GetPauseFlags() & AM2_PAUSE_NO_BUFFERS)) {
+            orig_log("FLOW UNPAUSE nfree = %d\n", nfree);
+            UnPauseGame(AM2_PAUSE_NO_BUFFERS);
+        }
+    }
+
+    for (i = 0; i < AM2_PLAYER_RECORDS; i++) {
+        uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS
+                       + i * AM2_PLAYER_RECORD_BYTES;
+
+        if (*(const uint32_t *)rec == id) {
+            *(uint32_t *)rec = 0;
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 /* ProcessResendQueue -- original 0x00403050, 560 bytes, one caller. Drain up
@@ -2649,6 +2787,8 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_PROCESS_RESEND_QUEUE,
                         (const void *)ProcessResendQueue,
                         "ProcessResendQueue", 1);
+    rc |= patch_replace(ADDR_DESTROY_FLOW, (const void *)DestroyFlow,
+                        "DestroyFlow", 7);
     rc |= patch_replace(ADDR_MSG_LIST_INSERT, (const void *)MsgListInsert,
                         "MsgListInsert", 1);
     rc |= patch_replace(ADDR_COMM_PLAYER_LEFT, (const void *)CommPlayerLeft,
