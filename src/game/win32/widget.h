@@ -1621,6 +1621,13 @@ int32_t __cdecl PointerPickBoard(void *obj);
  * kind, within our leader's reach. */
 int32_t __cdecl PointerPickWatchedItem(void *obj);
 
+/* 0x00458EE0 and 0x004590F0. Modes 4 and 5's picks: a foe gets the enemy
+ * overlay and a yes, a friend falls into the shared tail. They differ in one
+ * thing -- mode 4 refuses a NEUTRAL object outright, mode 5 treats it as
+ * allied. */
+int32_t __cdecl PointerPickMode4(void *obj);
+int32_t __cdecl PointerPickMode5(void *obj);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);

@@ -9177,6 +9177,138 @@ void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
     RecordAimedFire(u, target, 1);
 }
 
+/* The tail modes 4 and 5 share once the object is known to be a FRIEND: it must
+ * be ours, and then either a vehicle with a free seat -- which shows a hint and
+ * answers 0, exactly as PointerPickBoard does -- or a trooper, vehicle or roach
+ * that is not already busy, which answers 1.
+ *
+ * The vehicle arm has a guard the others do not: it scans the SELECTION for a
+ * type-3 that is already selected, and refuses if it finds one. So the board
+ * hint is suppressed while a vehicle is under selection.
+ *
+ * Its OverlayPrepare force flag is 0 here where PointerPickBoard passes 1 for
+ * the same row. Reproduced; nothing here says why they differ. */
+static int32_t PointerFriendTail(uint8_t *o)
+{
+    int32_t type;
+
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY)
+        != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return 0;
+    if (!o)
+        return 0;
+
+    type = *(const int32_t *)o;
+
+    if (type == AM2_OBJ_TYPE_VEHICLE
+        && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
+        && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
+               < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
+        int32_t i;
+        int32_t none = 1;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            && GetTickCount()
+                   - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+               >= AM2_CLICK_MS)
+            return 0;
+
+        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; i++) {
+            const uint8_t *sel = (const uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+
+            if (sel && *(const int32_t *)sel == AM2_OBJ_TYPE_VEHICLE
+                && (*(const uint32_t *)(sel + OBJ_OFF_FLAGS)
+                    & OBJ_FLAG_SELECTED))
+                none = 0;
+        }
+        if (!none)
+            return 0;
+
+        OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+        *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+            *(const uint32_t *)(o + OBJ_OFF_UID);
+        return 0;
+    }
+
+    if (type < AM2_OBJ_TYPE_TROOPER)
+        return 0;
+    if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
+        return 0;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+        return 0;
+    return 1;
+}
+
+/* PointerPickMode4 and PointerPickMode5 -- originals 0x00458EE0 and 0x004590F0,
+ * 528 bytes each, the PICK slots of pointer modes 4 and 5.
+ *
+ * BOTH INLINE ArmyAlliedWithObj, which army.cpp has had as a function all
+ * along -- the record-to-index mapping against ADDR_OBJ_TABLE_RECORDS is that
+ * body, arm for arm. Written as calls, so that the only thing left in each of
+ * these is what makes it itself.
+ *
+ * AND WHAT MAKES THEM DIFFER IS ONE `je` TARGET. Mode 4 hoists an
+ * `obj->army == 4` refusal ABOVE the alliance test and sends it to the FAILURE
+ * exit; mode 5 leaves that test inside ArmyAlliedWithObj, where army 4 returns
+ * ALLIED. So a NEUTRAL object is refused outright by one and treated as a
+ * friend by the other. Nothing but a diff shows that, and writing the two from
+ * one mental model would have made them agree.
+ *
+ * `useRec3` is 0 in both: the original reads SAVED_OFF_TABLE_REC2 with no
+ * OBJ_OFF_FIELD_530 test, which is the arm ArmyAlliedWithObj takes for 0.
+ *
+ * A FOE gets the enemy overlay row and answers 1. A FRIEND falls into the
+ * shared tail above. The opening refusals are the same in both: destroyed or
+ * concealed -- one `test` against OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED --
+ * and zero health.
+ *
+ * Not exercised: no drive here installs a pointer mode above 0. Verified by
+ * reading, and by the diff for the part that differs. */
+int32_t __cdecl PointerPickMode4(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
+        & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
+        return 0;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        return 0;
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
+        return 0;   /* hoisted above the alliance test -- see above */
+
+    if (ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                          o, 0))
+        return PointerFriendTail(o);
+
+    OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
+    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+        *(const uint32_t *)(o + OBJ_OFF_UID);
+    return 1;
+}
+
+int32_t __cdecl PointerPickMode5(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
+        & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
+        return 0;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        return 0;
+
+    /* No hoisted refusal: a neutral object reaches the alliance test, which
+     * answers ALLIED for army 4. That is the whole difference from mode 4. */
+    if (ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                          o, 0))
+        return PointerFriendTail(o);
+
+    OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
+    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+        *(const uint32_t *)(o + OBJ_OFF_UID);
+    return 1;
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10529,6 +10661,12 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_WATCHED,
                         (const void *)PointerPickWatchedItem,
                         "PointerPickWatchedItem", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_MODE4,
+                        (const void *)PointerPickMode4,
+                        "PointerPickMode4", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_MODE5,
+                        (const void *)PointerPickMode5,
+                        "PointerPickMode5", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

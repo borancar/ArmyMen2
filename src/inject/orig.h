@@ -461,6 +461,7 @@
  * hint and the "your leader can reach this" hint. Named from their use sites,
  * which is all the evidence there is -- the rows themselves are just indices
  * into the cursor sheet OverlayPrepare selects from. */
+#define AM2_OVERLAY_ROW_ENEMY     4   /* what a pick shows over a foe */
 #define AM2_OVERLAY_ROW_BOARD     8
 #define AM2_OVERLAY_ROW_REACH     0x12
 /* The click-versus-drag window, in GetTickCount ticks. Every test of it in the
@@ -10075,6 +10076,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * along, with a comment that already said what the function does. Grep the
  * ADDRESS first; the ratchet is the mechanism, not the backstop. */
 #define ADDR_MEDKIT_HEAL_ONE     0x00458AB0u  /* void(void *obj) */
+/* Modes 4 and 5's PICK slots. Named for their table index rather than for a
+ * purpose: what they do is clear (below) but which order the mode represents is
+ * not, and the index is the part that is measured. */
+#define ADDR_POINTER_PICK_MODE4  0x00458EE0u  /* int32_t(void *obj) */
+#define ADDR_POINTER_PICK_MODE5  0x004590F0u  /* int32_t(void *obj) */
 /* ArmyAlliedWithObj IS INLINED INTO THE POINTER PICKS, and army.cpp has had it
  * as a function since long before. The block that appears in 0x00458EE0,
  * 0x004590F0, 0x00459300, 0x00459420, 0x004597B0, 0x004599A0 and 0x00459BE0 --
