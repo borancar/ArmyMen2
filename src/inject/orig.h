@@ -2439,6 +2439,9 @@
 #define COMM_OFF_SLOT_FIELD_258  0x258u
 #define COMM_OFF_SLOT_FIELD_25C  0x25Cu
 #define COMM_OFF_SLOT_FIELD_270  0x270u
+/* Stamped from GetTickCount as a player is admitted, and read nowhere that has
+ * been looked at. Named for what puts it there. */
+#define COMM_OFF_SLOT_JOINED_MS  0x26Cu  /* uint32_t */
 #define COMM_OFF_SLOT_FIELD_278  0x278u  /* cleared for every slot but ours */
 #define AM2_COMM_SLOT_STRIDE     0x70u
 #define ADDR_STR_CAPS_HEAD       0x00475400u
@@ -2586,8 +2589,24 @@
  * "CreatePlayer to=%x, name = %s id = %x", "DestroyPlayer Id=%x, to = %x",
  * "SESSIONLOST from=%x, to = %x" and, for anything else, "UnHandled System
  * Message %x %d". Stays original. */
-#define ADDR_COMM_SYSTEM_MSG     0x00410090u  /* void(int32, int32, int32,
-                                               *      int32) */
+#define ADDR_COMM_SYSTEM_MSG     0x00410090u  /* void(msg, size, from, to);
+                                               * reconstructed */
+/* The busy wait CommSystemMessage does after admitting the fourth player: one
+ * second of GetTickCount in a loop, with nothing pumped and nothing drawn. */
+#define AM2_COMM_JOIN_SETTLE_MS  0x3E8
+/* The longest player name CommSystemMessage will copy into a slot; a name at
+ * or past it is dropped and the slot keeps whatever was there. */
+#define AM2_COMM_NAME_MAX        0x40
+/* Its five format strings, which are what name its five cases. */
+#define ADDR_STR_SYS_DESTROY_PLAYER 0x00475A2Cu /* "DestroyPlayer Id=%x, to = %x" */
+#define ADDR_STR_SYS_CREATE_PLAYER  0x00475A04u /* "CreatePlayer to=%x, name = %s id = %x" */
+#define ADDR_STR_SYS_SESSION_LOST   0x004759E4u /* "SESSIONLOST   from=%x, to = %x" */
+#define ADDR_STR_SYS_UNHANDLED      0x004759C0u /* "UnHandled System Message %x %d " */
+#define ADDR_STR_SYS_HOST           0x00475998u /* "DPSYS_HOST Size=%d, from=%x, to = %x" */
+/* What it ORs into the session description's flags before handing it back.
+ * Kept as the literal the image carries rather than spelled out as two
+ * DPSESSION_ bits, because which two is a guess and the sum is not. */
+#define AM2_SESSION_FULL_FLAGS   0x21
 #define ADDR_COMM_NO_BUFFERS     0x00403280u  /* void(void), "COMM ERROR: NO BUFFERS" */
 #define ADDR_COMM_PLAYER_SLOT    0x0040F320u  /* thiscall int32(this,id), 16 bytes */
 /* Three tiny thiscall accessors for one per-player field, 0x020C. The names
@@ -8816,6 +8835,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_WM_HOST_CHANGED        0x046Du
 #define AM2_WM_SETUP_DONE          0x046Eu
 #define AM2_WM_STREAM_DONE         0x0500u
+/* AND A SEVENTH THAT NOTHING LISTENS FOR. CommSystemMessage posts it after a
+ * player joins, and it is the only site in the image that does -- but WndProc
+ * has cases for the six above and none for this, so DefWindowProc eats it. The
+ * sweep that found the other six went from the RECEIVER's switch, which is
+ * exactly why this one was not in the list. Named from its sender, and the
+ * fact that it is unhandled is the interesting half. */
+#define AM2_WM_PLAYER_JOINED       0x0468u
 
 /* 0x00402720. Posts WM_CLOSE to the game window and says so. Sets a flag
  * first, and the ORDER matters: the flag is raised before the log line, so a
@@ -10314,6 +10340,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_MENU_MODE_MAX        21   /* the jump table's last arm */
 #define AM2_DLG_SLOT_DELETE      0    /* the scalar deleting destructor */
 #define AM2_DLG_SLOT_PAINT       1
+#define AM2_DLG_SLOT_UPDATE      2
 #define AM2_DLG_OFF_RECT         0x14u
 #define ADDR_STATE1_COMMON       0x00426270u
 #define ADDR_MOVIE_FRAME_STEP    0x00445630u  /* states 0 and 3, per frame */

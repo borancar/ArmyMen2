@@ -64,6 +64,10 @@ void __cdecl SendPlayerMsg(int32_t arg);
  * to match the definition, and a C++-mangled declaration here links against
  * nothing while looking perfectly correct. */
 extern "C" {
+/* A fifth, added when CommSystemMessage was reconstructed: four integers and
+ * a void *, so it declares here for exactly the reason the other four do. */
+void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
+                               int32_t to);
 int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
@@ -2186,10 +2190,14 @@ void __cdecl Announce(const char *text)
     SendChatMsg((char *)text, 1);
 }
 
-typedef void (__cdecl *AM2_CommSystemMsgFn)(void *msg, int32_t dpid,
-                                            int32_t kind, int32_t last);
-#define orig_comm_system_msg \
-    ((AM2_CommSystemMsgFn)(uintptr_t)ADDR_COMM_SYSTEM_MSG)
+/* CommSystemMessage is reconstructed in win32/dplay.cpp and its typedef went
+ * with it. Worth knowing what this call site does with the three arguments
+ * after the message: the callee's own format strings call them size, from and
+ * to, and this passes the node's dpid, a constant 0 and the node's +0x0C. So
+ * "DPSYS_HOST Size=%d" logs a player id and "from=%x" is always zero. The
+ * names stay the function's own, because they are what it says about itself;
+ * the mismatch is the original's. */
+#define orig_comm_system_msg CommSystemMessage
 
 /* 0x00402690. Take everything the receive thread has queued and hand each one
  * on, then return the node to the pool. Called from FramePre -- but only when

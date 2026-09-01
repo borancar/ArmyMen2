@@ -3116,6 +3116,14 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   forward to the original are reconstructed, so nothing in `winproc.cpp` calls
   `0x0040A6B0` any more.
 
+  **AND SWEEP BOTH ENDS, because a sweep from one misses what the other has.**
+  The six names below came from the RECEIVER's switch and are complete for
+  what `WndProc` handles -- which is exactly why `0x0468` was not among them.
+  `CommSystemMessage` posts it after a player joins, it is the only site in
+  the image that does, and nothing handles it at all: `DefWindowProc` eats it.
+  A message with a sender and no receiver is invisible to a sweep of either
+  end alone.
+
   **Name a window message from what POSTS it.** Decoding forward from each
   `push <msg>` to the `PostMessageA` that follows gives every sender, and it
   also removes two candidates that a bare constant scan reports: `InitInput`'s

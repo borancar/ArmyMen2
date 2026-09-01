@@ -244,6 +244,13 @@ int dplay_install(void);
 /* 0x004027F0, five callers. Give a DirectPlay id a player record -- the
  * flow-control code's "FlowQ". Two scans: one for an existing record, one for
  * a free slot. Answers 1 either way, 0 when all six are taken. */
+/* 0x00410090, one caller -- the message drain. The DirectPlay SYSTEM message
+ * handler; five cases, each named by its own format string. Its trailing three
+ * arguments are the names it gives them, which its one call site does not
+ * honour -- see the note in dplay.cpp. */
+void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
+                               int32_t to);
+
 int32_t __cdecl CommRegisterSelf(uint32_t id);
 
 }

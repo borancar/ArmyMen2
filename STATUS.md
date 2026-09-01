@@ -9,7 +9,47 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,372 patches.**
+Nothing uncommitted. **1,373 patches.**
+
+**`CommSystemMessage` (`0x00410090`)** -- the DirectPlay SYSTEM message
+handler, one caller, and `orig.h` said "Stays original" of it. Five cases, each
+named by its own format string, which is the whole of why they carry the names
+they do.
+
+**Its one caller does not honour the names it gives its own arguments.**
+`CommDrainMsgs` passes `(msg, node dpid, 0, node +0x0C)`, so `"DPSYS_HOST
+Size=%d"` logs a player id and `"from=%x"` is always zero. The parameters keep
+the function's own words -- that is the rule, and renaming them to fit the one
+call site is the mistake this project has recorded five times -- and the
+mismatch is written down rather than resolved.
+
+**It removes player -1 for every EMPTY slot.** The host loop walks all four and
+calls `CommRemovePlayer` when the slot's id IS -1, passing that -1 through. The
+`jne` skips the call for an OCCUPIED slot, so this is not a misread branch.
+Nothing explains it; reproduced.
+
+**It busy-waits one second once the fourth player is in** -- `GetTickCount` in
+a loop with nothing pumped and nothing drawn. Written out as the original has
+it, including the leading test that skips the loop when a second has already
+passed between the two reads.
+
+**And it posts a message nothing listens for.** `AM2_WM_PLAYER_JOINED` (0x0468)
+goes to the window after a join and `WndProc` has no case for it, so
+`DefWindowProc` eats it. The six messages `orig.h` names were found from the
+RECEIVER's switch, which is exactly why this one was missing -- a sweep from
+the senders would have caught it, and this is the argument for doing both.
+
+**The DirectPlay structures come from the SDK**, not from us: `<dplay.h>` is
+already pulled in through `win32.h`, so the message is a
+`DPMSG_CREATEPLAYERORGROUP` and the five cases are `DPSYS_` constants.
+
+`docs/boundary.md` moved with it -- **116 functions and 249 import sites
+reconstructed**, up four sites, because three `PostMessageA` calls and a
+`GetTickCount` came inside.
+
+Cold: this needs a live DirectPlay session with a second player, which this
+machine cannot open. Verified by reading and by the ratchets, like the rest of
+the comm layer, and said plainly.
 
 **`CreateTrooper` (`0x00447620`), which had been DEFERRED** -- `orig.h`
 recorded ten arguments settled against two anchors and then said the reading
@@ -4114,14 +4154,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,200 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 39
-outstanding, which is 1,239 minus 1,200 -- from 1,372 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,201 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 38
+outstanding, which is 1,239 minus 1,201 -- from 1,373 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-nine batches have gone in and NOTHING SMALL IS LEFT: the
-39 entries outstanding start at **912 bytes** and the median is **1,216**. The
+small ones in batches. A hundred and forty batches have gone in and NOTHING SMALL IS LEFT: the
+38 entries outstanding start at **928 bytes** and the median is **1,240**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

@@ -2786,6 +2786,209 @@ int32_t __cdecl DestroyFlow(uint32_t id)
     return 0;
 }
 
+/* CommSystemMessage -- original 0x00410090, one caller: the message drain. The
+ * DirectPlay SYSTEM message handler, and it names its own five cases in its
+ * own format strings, which is the whole of why they are named that way.
+ *
+ * THE MESSAGE LAYOUT IS THE SDK's, not ours. The dword at +0 is the DPSYS_
+ * type, +8 is the player or group id and +0x20 is the name -- which is
+ * DPMSG_CREATEPLAYERORGROUP's shape, and <dplay.h> is already pulled in
+ * through win32.h, so the constants come from the SDK rather than being
+ * restated here.
+ *
+ * ITS THREE TRAILING ARGUMENTS ARE size, from AND to, and the format strings
+ * are what say so: "DPSYS_HOST Size=%d, from=%x, to = %x" takes them in that
+ * order off [esp+0x18], [esp+0x1C] and [esp+0x20], four pushes deep.
+ *
+ * AND ITS ONE CALLER DOES NOT AGREE WITH THOSE NAMES. CommDrainMsgs passes
+ * (msg, node dpid, 0, node +0x0C), so "Size=%d" logs a player id and "from=%x"
+ * is always zero. The parameter names here stay the function's own -- they are
+ * what it says about itself, which is the rule -- and the mismatch is recorded
+ * rather than resolved by renaming to fit the one call site, which is the
+ * mistake this project has made five times.
+ *
+ * THE HOST AND NON-HOST PATHS OF A JOIN ARE DIFFERENT LENGTHS, and the short
+ * one is the non-host's: register the new player, repaint the current screen,
+ * done. Everything else -- the slot table, the name copy, the session
+ * description, the settle, the broadcast -- is the HOST's work.
+ *
+ * IT REMOVES PLAYER -1 FOR EVERY EMPTY SLOT. The host loop walks all four
+ * slots and calls CommRemovePlayer when the slot's id IS -1, passing that -1
+ * straight through. Nothing here explains it and the sense reads backwards
+ * from what one would write; the `jne` skips the call for an OCCUPIED slot, so
+ * this is not a misreading of the branch. Reproduced.
+ *
+ * IT BUSY-WAITS ONE SECOND ONCE THE FOURTH PLAYER IS IN. GetTickCount in a
+ * loop, with nothing pumped and nothing drawn -- the window stops responding
+ * for AM2_COMM_JOIN_SETTLE_MS. Written out as the original has it, including
+ * the leading test that skips the loop entirely when a second has already
+ * passed between the two reads.
+ *
+ * AND IT POSTS A MESSAGE NOTHING LISTENS FOR. AM2_WM_PLAYER_JOINED goes to the
+ * window after a successful join, and WndProc has no case for it -- the six
+ * messages orig.h names were found from the RECEIVER's switch, which is
+ * exactly why this one was missing. DefWindowProc eats it.
+ *
+ * COLD, AND SAYING SO PLAINLY: this needs a live DirectPlay session with a
+ * second player, which this machine cannot open. It is verified by reading and
+ * by the ratchets, like the rest of the comm layer. */
+typedef void (__attribute__((thiscall)) *AM2_ScreenUpdateFn)(void *w);
+typedef void (__attribute__((thiscall)) *AM2_ScreenPaintFn)(void *w, RECT r);
+
+/* Slot 1 with the screen's own rectangle -- frame.cpp's State1Menu spells the
+ * identical call, and this is the second site to want it. */
+static void ScreenPaint(void *dlg)
+{
+    ((AM2_ScreenPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
+        dlg, *(const RECT *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+}
+
+void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
+                               int32_t to)
+{
+    const DPMSG_CREATEPLAYERORGROUP *m =
+        (const DPMSG_CREATEPLAYERORGROUP *)msg;
+    uint8_t *comm = g_commObject;
+    int32_t  slot;
+    uint32_t t0;
+
+    switch ((int32_t)m->dwType) {
+    case DPSYS_DESTROYPLAYERORGROUP:
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log((const char *)(uintptr_t)ADDR_STR_SYS_DESTROY_PLAYER,
+                     m->dpId, to);
+        PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_PLAYER_GONE,
+                     (WPARAM)m->dpId, (LPARAM)msg);
+        return;
+
+    case DPSYS_CREATEPLAYERORGROUP:
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
+            orig_log((const char *)(uintptr_t)ADDR_STR_SYS_CREATE_PLAYER,
+                     to, m->dpnName.lpszShortNameA, m->dpId);
+            comm = g_commObject;
+        }
+
+        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+        *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
+                     + COMM_OFF_SLOT_FIELD_25C) = 1;
+
+        comm = g_commObject;
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+            /* The short path: register and repaint, nothing else. */
+            CommRegisterSelf((uint32_t)m->dpId);
+            if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT)
+                ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
+            return;
+        }
+
+        {
+            int32_t i;
+
+            for (i = 0; i < AM2_COMM_ARMY_COUNT; i++) {
+                int32_t id = *(const int32_t *)(comm
+                                                + i * AM2_COMM_SLOT_STRIDE
+                                                + COMM_OFF_PLAYER_SLOTS);
+
+                /* Yes, when the slot is EMPTY, and -1 is what goes in. */
+                if (id == -1) {
+                    CommRemovePlayer(comm, id);
+                    comm = g_commObject;
+                }
+            }
+        }
+
+        *(int32_t *)(comm
+                     + *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT
+                           * AM2_COMM_SLOT_STRIDE
+                     + COMM_OFF_PLAYER_SLOTS) =
+            *(const int32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
+
+        comm = g_commObject;
+        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+        *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
+                     + COMM_OFF_PLAYER_SLOTS) = (int32_t)m->dpId;
+
+        comm = g_commObject;
+        CommSetSlotRemote(comm,
+                          *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
+
+        if ((int32_t)strlen(m->dpnName.lpszShortNameA) < AM2_COMM_NAME_MAX) {
+            comm = g_commObject;
+            strcpy((char *)(comm
+                            + *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)
+                                  * AM2_COMM_SLOT_STRIDE
+                            + COMM_OFF_SLOT_NAME),
+                   m->dpnName.lpszShortNameA);
+        }
+
+        comm = g_commObject;
+        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+        *(uint32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
+                      + COMM_OFF_SLOT_JOINED_MS) = Ticks();
+
+        comm = g_commObject;
+        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+        *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
+                     + COMM_OFF_SLOT_FIELD_278) = 0;
+
+        comm = g_commObject;
+        *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
+            *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1;
+
+        comm = g_commObject;
+        if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT)
+            >= (uint32_t)AM2_COMM_ARMY_COUNT) {
+            uint8_t *desc;
+
+            CommGetSessionDesc(comm);
+            desc = *(uint8_t **)(g_commObject + COMM_OFF_SESSION_DESC);
+            *(uint32_t *)(desc + 4) |= AM2_SESSION_FULL_FLAGS;
+            CommSetSessionDesc(g_commObject, desc, 0);
+        }
+
+        CommRegisterSelf((uint32_t)m->dpId);
+
+        if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT) {
+            void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+
+            ((AM2_ScreenUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+            ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
+        }
+
+        /* One second with nothing pumped -- see the note above. */
+        t0 = Ticks();
+        if (Ticks() - t0 < AM2_COMM_JOIN_SETTLE_MS)
+            while (Ticks() - t0 < AM2_COMM_JOIN_SETTLE_MS)
+                ;
+
+        RefreshMapSelection();
+        SendPlayerMsg(1);
+        PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_PLAYER_JOINED,
+                     (WPARAM)m->dpId, (LPARAM)msg);
+        return;
+
+    case DPSYS_SESSIONLOST:
+        orig_log((const char *)(uintptr_t)ADDR_STR_SYS_SESSION_LOST,
+                 from, to, 0);
+        return;
+
+    case DPSYS_HOST:
+        orig_log((const char *)(uintptr_t)ADDR_STR_SYS_HOST, size, from, to);
+        PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_HOST_CHANGED, 0, 0);
+        return;
+
+    case DPSYS_SETSESSIONDESC:
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            CommGetSessionDesc(comm);
+        return;
+
+    default:
+        orig_log((const char *)(uintptr_t)ADDR_STR_SYS_UNHANDLED,
+                 m->dwType, m->dwType, 0);
+        return;
+    }
+}
+
 /* ProcessResendQueue -- original 0x00403050, 560 bytes, one caller. Drain up
  * to three messages off the resend list, sending each to every player whose
  * resend mask wants it.
@@ -2907,6 +3110,8 @@ int dplay_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_COMM_SYSTEM_MSG, (const void *)CommSystemMessage,
+                        "CommSystemMessage", 1);
     rc |= patch_replace(ADDR_COMM_CREATE_DPLAY, (const void *)CommCreateDirectPlay,
                         "CommCreateDirectPlay", 1);
     rc |= patch_replace(ADDR_CREATE_LOBBY, (const void *)CreateDirectPlayLobby,
