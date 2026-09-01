@@ -8053,13 +8053,34 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 1.0. */
 #define ADDR_LOAD_DEF_TABLES     0x00403400u  /* void(void) */
 #define ADDR_MISSILE_DEF_FIND    0x004602C0u  /* rec *(int32 id), a bsearch */
-#define ADDR_RANK_DEF_FIND       0x0044CD70u  /* rec *(int32 rank), a bsearch */
+/* RENAMED INTO THE FAMILY IT BELONGS TO. It was ADDR_RANK_DEF_FIND, named
+ * from its one caller -- LoadDefTables' rank loop -- while the three other
+ * functions on the same table are DEF_ADD_TROOPER_REC, DEF_SORT_TROOPER_RECS
+ * and DEF_FREE_TROOPER_RECS. Add, sort, find, free, and one of the four was
+ * spelled in a different vocabulary. Renamed, not aliased. */
+#define ADDR_DEF_FIND_TROOPER_REC 0x0044CD70u  /* rec *(int32 level), bsearch */
+/* AND I WAS ABOUT TO RENAME THE OTHER FOUR THE OTHER WAY. Nothing but this
+ * bsearch's caller reads the table, that caller fills ADDR_RANK_RECORDS with
+ * it for ids 0..7, and DefAddTrooperRec appends exactly EIGHT records on a
+ * real drive -- which reads as "the table is rank records and `trooper` is a
+ * call-site guess". It is not a guess. The .aai keyword table at
+ * ADDR_DEF_NAME_TABLE has eight entries pointing at the parser above,
+ * `trooperlevel1` through `trooperlevel8`, values 45..52. So TROOPER is the
+ * PROGRAM'S OWN WORD for these records and rank is ours.
+ *
+ * That is the ReadScript lesson pointing the opposite way: there, prose kept
+ * a name I invented over one the image supplies. Here I nearly replaced the
+ * image's word with mine on evidence that was entirely consistent with it.
+ * Dumping the keyword table cost one command. */
 /* The loop ends at 0x00662920, which is already ADDR_RESPAWN_KINDS -- the two
  * tables TILE, so the bound is a count rather than a second name for that
  * address. (0x662920 - ADDR_MISSILE_DEFS) / AM2_MISSILE_DEF_BYTES == 44.) */
 #define AM2_MISSILE_DEF_COUNT    44
 #define AM2_RANK_COUNT           8
-#define AM2_RANK_SRC_BYTES       0x20u  /* the parsed record, 8 dwords */
+/* The parsed record is 8 dwords and its size is AM2_DEF_TROOPER_REC_SIZE,
+ * which is what the four functions on that table already use. AM2_RANK_SRC_BYTES
+ * was a second spelling of the same 0x20 defined here and used nowhere;
+ * removed rather than left as the kind of duplicate this file keeps finding. */
 #define ADDR_F_ONE_HUNDREDTH     0x0046F2DCu  /* float 0.01 */
 #define ADDR_F_ONE               0x0046F2D8u  /* float 1.0 */
 /* The parsed rank record, keyed at +0 and projected onto the runtime one. */

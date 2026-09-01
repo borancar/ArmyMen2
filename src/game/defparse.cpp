@@ -354,6 +354,42 @@ int32_t __cdecl DefObjParse(int32_t token)
     }
 }
 
+/* DefFindTrooperRec -- original 0x0044CD70, one caller: LoadDefTables, which
+ * walks levels 0..7 filling ADDR_RANK_RECORDS from what this finds.
+ *
+ * The find half of the quartet DefAddTrooperRec, DefSortTrooperRecs and
+ * DefFreeTrooperRecs already make up, and one bsearch is the whole of it --
+ * the key is a single dword in a stack record, and CompareDword compares only
+ * the first, which is what makes a sorted table searchable on its level.
+ *
+ * IT RESERVES A WHOLE RECORD ON THE STACK AND FILLS ONE FIELD. `sub esp, 0x20`
+ * is AM2_DEF_TROOPER_REC_SIZE, the same size it hands bsearch, and only the
+ * first dword is written -- the other seven are whatever the frame held.
+ * CompareDword never reads them, so it cannot matter, and it is written the
+ * same way rather than as a bare int32: the size the original reserves is
+ * evidence about what the key IS.
+ *
+ * `TROOPER` HERE IS THE PROGRAM'S WORD, not a role name taken from a caller.
+ * ADDR_DEF_NAME_TABLE has eight .aai keywords pointing at the parser above
+ * this one -- `trooperlevel1` through `trooperlevel8` -- which is also why
+ * DefAddTrooperRec reads exactly 8 on a drive. See orig.h; the name this
+ * function had, ADDR_RANK_DEF_FIND, was the odd one of the four.
+ *
+ * ITS ENTRY IN docs/functions.tsv IS MERGED: 512 bytes covering this 46-byte
+ * bsearch and the 450-byte `trooperlevel` line parser after it, which is
+ * still original and which the keyword table points at.
+ */
+void *__cdecl DefFindTrooperRec(int32_t level)
+{
+    int32_t key[AM2_DEF_TROOPER_REC_SIZE / 4];
+
+    key[0] = level;
+
+    return orig_bsearch(key, kDefTrooperRecs, (uint32_t)kDefTrooperCount,
+                        AM2_DEF_TROOPER_REC_SIZE,
+                        (const void *)CompareDword);
+}
+
 /* 0x00435AC0. Find the object record for a (type, a, b) triple, falling back
  * to less specific keys. A role name.
  *
@@ -691,6 +727,9 @@ int defparse_install(void)
                         "DefAddObjRec", 1);
     rc |= patch_replace(ADDR_DEF_ADD_TROOPER_REC,
                         (const void *)DefAddTrooperRec, "DefAddTrooperRec", 1);
+    rc |= patch_replace(ADDR_DEF_FIND_TROOPER_REC,
+                        (const void *)DefFindTrooperRec,
+                        "DefFindTrooperRec", 1);
     rc |= patch_replace(ADDR_DEF_FREE_TROOPER_RECS,
                         (const void *)DefFreeTrooperRecs,
                         "DefFreeTrooperRecs", 2);

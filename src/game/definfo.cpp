@@ -11,15 +11,16 @@
 #include "gameproc.h"  /* DefFinish -- reconstructed */
 #include "gamedir.h"   /* SetGameDir -- ADDR_SET_DATA_DIR is it */
 
-/* The five seams LoadDefTables needs. All are original and reached by
- * address; none is on the patch list. */
+/* The seams LoadDefTables needs. All are original and reached by address;
+ * none is on the patch list. There were five -- the fifth was
+ * ADDR_RANK_DEF_FIND, now DefFindTrooperRec in defparse.cpp and called by
+ * name. */
 typedef void    (__cdecl *AM2_VoidFn)(void);
 typedef void   *(__cdecl *AM2_DefFindFn)(int32_t id);
 
 #define orig_free_list_662024  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662024))
 #define orig_free_list_662928  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662928))
 #define orig_missile_def_find  ((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))
-#define orig_rank_def_find     ((AM2_DefFindFn)AM2_IMAGE(ADDR_RANK_DEF_FIND))
 #define orig_log_noargs        ((AM2_VoidFn)(uintptr_t)ADDR_LOG)
 
 /* strtol reached through the game's own thunk. Unlike strtok, nothing here
@@ -307,7 +308,7 @@ void __cdecl LoadDefTables(void)
     for (id = 0; id < AM2_RANK_COUNT; id++) {
         uint8_t       *rec = (uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
                              + (uint32_t)id * RANK_REC_BYTES;
-        const uint8_t *src = (const uint8_t *)orig_rank_def_find(id);
+        const uint8_t *src = (const uint8_t *)DefFindTrooperRec(id);
         float          pct;
 
         if (src == 0)

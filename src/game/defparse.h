@@ -22,6 +22,11 @@ extern "C" {
 void __cdecl DefSortObjRecs(void);
 void __cdecl DefSortTrooperRecs(void);
 
+/* 0x0044CD70, one caller. The find half of that quartet: a bsearch of the
+ * `trooperlevel` records on their level, with CompareDword on the first
+ * dword. NULL when the .aai declared no such level. */
+void *__cdecl DefFindTrooperRec(int32_t level);
+
 #endif
 
 /* One entry of the link table at ADDR_DEF_LINKS. Twenty bytes, which is the
