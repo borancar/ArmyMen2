@@ -274,10 +274,100 @@ int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n)
     }
 }
 
-typedef int32_t (__cdecl *AM2_UnitKindMatchesFn)(int32_t code, int32_t kind,
-                                                 int32_t slot);
-#define orig_unit_kind_matches \
-    ((AM2_UnitKindMatchesFn)(uintptr_t)ADDR_UNIT_KIND_MATCHES)
+/* UnitKindMatches -- original 0x0043AAB0, TWO callers, and the membership
+ * half of the function directly above.
+ *
+ * READ IT BESIDE SpriteKeyForKind AND ALMOST NOTHING IS NEW. Same eight-slot
+ * jump table, same unsigned bound, same three selectors sharing arm zero, and
+ * the same six set ids in the same order -- 0x26, 0x20, 0x21, 0x2A, 0x1F and
+ * the watched-kind global. The FIRST test of every arm is literally
+ * SpriteKeyForKind(kind, n): n+1 for the first three sets, n+2 for 0x2A,
+ * (n+1)*10 for 0x1F. So this asks "is `code` one of the keys kind `kind` uses
+ * at `n`", and its first candidate is the one key the sibling answers with.
+ * orig.h said the name came from the call site and the body was unread; the
+ * body agrees with the name, which is not the usual outcome.
+ *
+ * WHAT IS NEW IS THE EXTRA CANDIDATES, and they do not follow one rule:
+ *
+ *   kinds 0, 1, 2 and kind 4   n+1, (n+1)*10, n*10+11, n*10+12
+ *   kind 3                     n+1, (n+1)*10, n*10+11
+ *   kind 5                     n+2, then the constant 1, then a DIFFERENT
+ *                              SET -- 0x2B rather than 0x2A -- at n+0x3D5
+ *   kinds 6 and 7              exactly what the sibling answers, nothing more
+ *
+ * KIND 3 IS ONE TEST SHORT AND A LINEAR READ MISSES IT. Its third arm ends in
+ * `jmp` into kind 4's fourth test, so the two share one epilogue -- the code
+ * for `n*10+12` sits inside kind 4's arm and kind 3 never reaches it. Reading
+ * the bodies top to bottom gives kind 3 four candidates. It has three. Same
+ * lesson as the jump table itself, one level in: follow the branch, do not
+ * count the layout.
+ *
+ * KIND 5's THIRD CANDIDATE IS NEAR THE TOP OF ITS FIELD. PackKey's B field is
+ * ten bits and every reader masks 0x3FF, so n + 0x3D5 = 981 + n stays inside
+ * it for n in 0..3 and would truncate above 42. The one caller in this tree
+ * passes an ARMY, which is 0..3, so nothing here reaches that -- see
+ * packkey.h, which records the same limit as a latent one.
+ *
+ * THE ARMS DISAGREE ABOUT WHICH REGISTER HOLDS WHAT -- kind 5 keeps the code
+ * in esi and the slot in edi where every other arm has them the other way
+ * round -- which is register allocation and not a difference. Written as
+ * values.
+ */
+int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
+{
+    switch ((uint32_t)kind) {
+    case 0:
+    case 1:
+    case 2:
+        if (code == (int32_t)PackKey(0x26, (uint32_t)(n + 1), 0))
+            return 1;
+        if (code == (int32_t)PackKey(0x26, (uint32_t)((n + 1) * 10), 0))
+            return 1;
+        if (code == (int32_t)PackKey(0x26, (uint32_t)(n * 10 + 11), 0))
+            return 1;
+        return code == (int32_t)PackKey(0x26, (uint32_t)(n * 10 + 12), 0)
+               ? 1 : 0;
+
+    case 3:
+        if (code == (int32_t)PackKey(0x20, (uint32_t)(n + 1), 0))
+            return 1;
+        if (code == (int32_t)PackKey(0x20, (uint32_t)((n + 1) * 10), 0))
+            return 1;
+        /* and NOT n*10+12 -- see the note above. */
+        return code == (int32_t)PackKey(0x20, (uint32_t)(n * 10 + 11), 0)
+               ? 1 : 0;
+
+    case 4:
+        if (code == (int32_t)PackKey(0x21, (uint32_t)(n + 1), 0))
+            return 1;
+        if (code == (int32_t)PackKey(0x21, (uint32_t)((n + 1) * 10), 0))
+            return 1;
+        if (code == (int32_t)PackKey(0x21, (uint32_t)(n * 10 + 11), 0))
+            return 1;
+        return code == (int32_t)PackKey(0x21, (uint32_t)(n * 10 + 12), 0)
+               ? 1 : 0;
+
+    case 5:
+        if (code == (int32_t)PackKey(0x2A, (uint32_t)(n + 2), 0))
+            return 1;
+        if (code == (int32_t)PackKey(0x2A, 1, 0))
+            return 1;
+        return code == (int32_t)PackKey(0x2B, (uint32_t)(n + 0x3D5), 0)
+               ? 1 : 0;
+
+    case 6:
+        return code == (int32_t)PackKey(0x1F, (uint32_t)((n + 1) * 10), 0)
+               ? 1 : 0;
+
+    case 7:
+        return code == *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND
+               ? 1 : 0;
+
+    default:
+        return 0;
+    }
+}
+
 
 /* IsPlacedUnit -- original 0x0043B0A0, one caller, which is the manual
  * placement screen at 0x00413BC0. Does this object count as one of that army's
@@ -350,7 +440,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
             || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
             continue;
 
-        if (orig_unit_kind_matches(
+        if (UnitKindMatches(
                 *(const int32_t *)(*(const uint8_t *const *)
                                        (o + OBJ_OFF_FIELD_94)
                                    + TYPEREC_OFF_FIELD_08),
@@ -370,6 +460,9 @@ int place_install(void)
     rc |= patch_replace(ADDR_SPRITE_KEY_FOR_KIND,
                         (const void *)SpriteKeyForKind,
                         "SpriteKeyForKind", 1);
+    rc |= patch_replace(ADDR_UNIT_KIND_MATCHES,
+                        (const void *)UnitKindMatches,
+                        "UnitKindMatches", 2);
 
     rc |= patch_replace(ADDR_FREE_PLACEMENTS, (const void *)FreePlacements,
                         "FreePlacements", 1);

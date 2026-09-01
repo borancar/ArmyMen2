@@ -3721,16 +3721,19 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,174 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 65
-outstanding, which is 1,239 minus 1,174 -- from 1,341 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,175 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 64
+outstanding, which is 1,239 minus 1,175 -- from 1,342 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-two batches have gone in and the 65 entries
-outstanding start at 96 bytes -- and the smallest of those is the MSVC static-init glue at
-`0x004248A0`, which is permanently out of scope, so the first real candidate
-is 192.
+small ones in batches. A hundred and thirty-two batches have gone in and NOTHING SMALL IS LEFT: the
+64 entries outstanding start at **480 bytes**, and the median is over 1,000.
+The sentence here used to say they started at 96 and name the MSVC static-init
+glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
+band under 480. What is left is real functions, so the strategy that ranked by
+size has run out and the ranking that matters now is how many names a
+candidate needs -- eight of the 64 need NONE.
 
 **A placeholder name is fine until the thing has a real one.** `DefFinish`
 went in naming its five callees `ADDR_DEF_STEP_*`; two commits later two of

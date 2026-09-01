@@ -10035,10 +10035,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x0043B0A0, one caller -- the manual placement screen. Does this object
  * count as one of that army's placed units? Reconstructed. */
 #define ADDR_IS_PLACED_UNIT     0x0043B0A0u  /* int32(obj, int32 army) */
-/* 0x0043AAB0, and it is an eight-arm jump table on its first argument.
- * IsPlacedUnit asks it, per unit type that is neither trooper nor vehicle,
- * whether that type claims an item -- so the name is from that use and the
- * body is unread. */
+/* 0x0043AAB0, an eight-arm jump table on its SECOND argument, and now READ
+ * rather than named from a call site -- the body agrees with the name, which
+ * is not how these usually end. It is the membership half of
+ * ADDR_SPRITE_KEY_FOR_KIND: same table, same bound, same six set ids in the
+ * same order, and the first candidate of every arm is exactly the one key that
+ * function answers with. The arms differ in how many MORE they try, kind 3 is
+ * one short because its third test tail-jumps into kind 4's fourth, and kind 5
+ * reaches a set the sibling never mentions. Reconstructed; see place.cpp. */
 #define ADDR_UNIT_KIND_MATCHES  0x0043AAB0u  /* int32(code, kind, slot) */
 #define AM2_UNIT_TYPE_STRIDE    0x28u
 #define AM2_UNIT_TYPE_COUNT     18

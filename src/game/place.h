@@ -79,6 +79,12 @@ int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line);
  * C file will use. */
 int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n);
 
+/* 0x0043AAB0, two callers. The membership half of the one above: does `code`
+ * match one of the packed keys unit kind `kind` uses at `n`? Its first
+ * candidate is exactly SpriteKeyForKind(kind, n) and the arms differ in how
+ * many more they try. Same eight-way selector, same unsigned bound. */
+int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n);
+
 int place_install(void);
 
 #ifdef __cplusplus
